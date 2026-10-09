@@ -378,6 +378,7 @@ pub mod boot {
             skipped = outcome.skipped,
             "[mcp] startup connect finished"
         );
+        crate::mcp::ui::discovery::log_all_installed(service).await;
     }
 }
 
