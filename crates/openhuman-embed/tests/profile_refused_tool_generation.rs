@@ -42,8 +42,8 @@ impl Respond for Script {
                 json!(format!("call_{results}"));
             completion
         };
-        let completion = if prompt.contains("loop forever") {
-            call("current_time", json!({}))
+        let completion = if prompt.contains("reminder ping") {
+            chat_completion("pong")
         } else if prompt.contains("schedule it") && results == 0 {
             call("tool_search", json!({"query":"cron schedule job"}))
         } else if prompt.contains("schedule it") && results == 1 {
@@ -62,8 +62,6 @@ impl Respond for Script {
             )
         } else if prompt.contains("run shell") && results == 0 {
             call("shell", json!({"command":"ls"}))
-        } else if prompt.contains("reminder ping") {
-            chat_completion("pong")
         } else {
             chat_completion("done")
         };
