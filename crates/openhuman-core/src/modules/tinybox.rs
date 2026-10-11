@@ -198,6 +198,12 @@ fn docker_control_deadline(timeout_ms: u64, grace: Duration) -> Duration {
     Duration::from_millis(timeout_ms).saturating_add(grace)
 }
 
+fn docker_control_client(client: &ModuleClient, timeout_ms: u64, grace: Duration) -> ModuleClient {
+    client
+        .clone()
+        .with_timeout(docker_control_deadline(timeout_ms, grace))
+}
+
 async fn call_docker_status_with_client(
     client: &ModuleClient,
     request: contract::DockerStatusRequest,
@@ -210,9 +216,7 @@ async fn call_docker_status_with_grace(
     request: contract::DockerStatusRequest,
     grace: Duration,
 ) -> Result<contract::DockerStatus, String> {
-    let client = client
-        .clone()
-        .with_timeout(docker_control_deadline(request.timeout_ms, grace));
+    let client = docker_control_client(client, request.timeout_ms, grace);
     call_with_client(&client, DOCKER_STATUS, (request,), false).await
 }
 
@@ -220,10 +224,15 @@ async fn call_cleanup_docker_with_client(
     client: &ModuleClient,
     request: contract::CleanupDockerRequest,
 ) -> Result<contract::CleanupDockerOutput, String> {
-    let client = client.clone().with_timeout(docker_control_deadline(
-        request.timeout_ms,
-        DOCKER_CALL_GRACE,
-    ));
+    call_cleanup_docker_with_grace(client, request, DOCKER_CALL_GRACE).await
+}
+
+async fn call_cleanup_docker_with_grace(
+    client: &ModuleClient,
+    request: contract::CleanupDockerRequest,
+    grace: Duration,
+) -> Result<contract::CleanupDockerOutput, String> {
+    let client = docker_control_client(client, request.timeout_ms, grace);
     call_with_client(&client, CLEANUP_DOCKER, (request,), false).await
 }
 

@@ -438,4 +438,16 @@ async fn docker_status_transport_uses_its_bounded_deadline() {
     .expect_err("transport must stop waiting at operation deadline plus grace");
 
     assert!(error.contains("MODULE_CALL_REPORTED"), "{error}");
+
+    let error = call_cleanup_docker_with_grace(
+        &client,
+        contract::CleanupDockerRequest {
+            label: "openhuman.sandbox=true".to_owned(),
+            timeout_ms: 5,
+        },
+        std::time::Duration::from_millis(5),
+    )
+    .await
+    .expect_err("cleanup transport must also stop at its bounded deadline plus grace");
+    assert!(error.contains("MODULE_CALL_REPORTED"), "{error}");
 }
