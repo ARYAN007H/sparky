@@ -78,17 +78,7 @@ impl Respond for CallTools {
             chat_completion("done")
         } else {
             let mut completion = tool_call_completion("tenant_probe", "{}");
-            let names = [
-                "tenant_probe",
-                "hidden",
-                "shell",
-                "delegate",
-                "curl",
-                "install_workflow_from_url",
-                "http_request",
-                "run_workflow",
-                "delegate_to",
-            ];
+            let names = ["tenant_probe"];
             completion["choices"][0]["message"]["tool_calls"] = json!(names.iter().enumerate().map(|(i, name)| json!({"id":format!("call_{i}"),"type":"function","function":{"name":name,"arguments":"{}"}})).collect::<Vec<_>>());
             let message = common::last_user_message(&body);
             let user = if message.contains("alice") {
