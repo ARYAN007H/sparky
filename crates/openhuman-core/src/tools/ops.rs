@@ -642,8 +642,9 @@ pub fn all_tools_with_runtime(
             mcp_registry.list().len()
         );
         if !mcp_registry.is_empty() {
-            tools.push(Box::new(McpListServersTool::new(Arc::clone(&mcp_registry))));
-            tools.push(Box::new(McpListToolsTool::new(Arc::clone(&mcp_registry))));
+            let mcp_config = Arc::new(root_config.clone());
+            tools.push(Box::new(McpListServersTool::new(Arc::clone(&mcp_config))));
+            tools.push(Box::new(McpListToolsTool::new(Arc::clone(&mcp_config))));
             tools.push(Box::new(mcp_call_tool(
                 Arc::new(root_config.clone()),
                 security.clone(),
