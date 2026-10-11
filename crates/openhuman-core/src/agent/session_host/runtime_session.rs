@@ -1096,12 +1096,10 @@ impl OpenHumanSessionHost {
                 }
             },
         ));
-        // Bind the transcript at construction for a thread-bound session,
-        // rather than leaving it to the per-turn `before_resume` hook. The
-        // hook still supplies the same target, but binding it here means the
-        // session knows its own durable destination before any turn runs —
-        // which is what lets a host read the conversation back without
-        // driving a provider first.
+        // Bind the native target before any turn so both durable thread
+        // resumes and cold latest-agent resumes can read their recorded tool
+        // declarations before host admission. The hook supplies the same
+        // locator and target; unthreaded runs retain their fresh write stem.
         let mut builder = SessionBuilder::new(driver)
             .codec(Arc::new(OpenHumanTranscriptCodec))
             .hooks(hooks)
@@ -1110,6 +1108,14 @@ impl OpenHumanSessionHost {
             );
         if let Some(session) = self.session.clone() {
             builder = builder.session(session_locator, session, self.runtime_transcript_meta());
+        } else {
+            builder = builder
+                .transcript(
+                    session_locator,
+                    self.runtime_transcript_stem(),
+                    self.runtime_transcript_meta(),
+                )
+                .resume_agent(self.agent_definition_name.clone());
         }
         self.runtime_session = Some(
             builder
