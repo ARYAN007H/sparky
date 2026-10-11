@@ -7,7 +7,6 @@
 //! (or the iteration budget is exhausted).
 
 use std::collections::HashSet;
-use std::sync::Arc;
 use std::time::Instant;
 
 use crate::agent::harness::artifact_offload::{
@@ -309,8 +308,8 @@ pub(crate) async fn run_subagent_direct(
             "[subagent_host] dispatching"
         );
 
-        // Install the sub-agent's declared `sandbox_mode` as the active
-        // task-local for every tool invocation inside this run.
+        // The child carrier projects the definition's sandbox mode to every
+        // tool through HostOperationContext.
         //
         // When the worker opted into git-worktree isolation, its isolated
         // checkout is carried on the `WorkspaceDescriptor` prepared below and
