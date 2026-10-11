@@ -76,6 +76,17 @@ impl McpModulePort for FakePort {
         args: Value,
         confidential: bool,
     ) -> Result<Value, ModuleCallError> {
+        if member == names::methods::DRAIN_SUPERVISOR_EVENTS {
+            self.calls.lock().unwrap().push((
+                object_path.to_owned(),
+                member.to_owned(),
+                args,
+                confidential,
+            ));
+            self.call_started.notify_one();
+            return serde_json::to_value(SupervisorBatch::default())
+                .map_err(|_| ModuleCallError::ModuleFault);
+        }
         self.calls.lock().unwrap().push((
             object_path.to_owned(),
             member.to_owned(),
@@ -88,6 +99,32 @@ impl McpModulePort for FakePort {
         }
         Ok(Value::Bool(true))
     }
+}
+
+#[tokio::test]
+async fn supervisor_drain_only_uses_an_open_object_and_keeps_the_bounded_limit() {
+    let port = FakePort::default();
+    let calls = Arc::clone(&port.calls);
+    let client = client(port);
+
+    assert_eq!(client.drain_supervisor_events(256).await.unwrap(), None);
+    assert!(calls.lock().unwrap().is_empty());
+
+    client
+        .call::<bool>(&configured("server"), "ConnectedOverview", ())
+        .await
+        .unwrap();
+    let batch = client
+        .drain_supervisor_events(256)
+        .await
+        .unwrap()
+        .expect("open child is polled");
+    assert!(batch.events.is_empty());
+    let calls = calls.lock().unwrap();
+    assert_eq!(calls[1].0, "/workspace/1");
+    assert_eq!(calls[1].1, names::methods::DRAIN_SUPERVISOR_EVENTS);
+    assert_eq!(calls[1].2, serde_json::json!([256]));
+    assert!(!calls[1].3);
 }
 
 fn client(port: FakePort) -> McpConfiguredClient {

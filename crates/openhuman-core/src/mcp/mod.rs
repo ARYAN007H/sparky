@@ -158,11 +158,34 @@ pub(crate) async fn refresh_configured_tool_cache(config: &crate::config::Config
 /// workspace.
 #[cfg(feature = "mcp")]
 fn spawn_reconnect_supervisor() {
-    static SUPERVISOR_SPAWNED: std::sync::Once = std::sync::Once::new();
-    SUPERVISOR_SPAWNED.call_once(|| {
-        tokio::spawn(async move {
-            registry::supervisor::run().await;
-        });
+    static SUPERVISOR_SPAWNED: std::sync::atomic::AtomicBool =
+        std::sync::atomic::AtomicBool::new(false);
+    static SUPERVISOR_TASK: std::sync::OnceLock<tokio::sync::Mutex<Option<tokio::task::JoinHandle<()>>>> =
+        std::sync::OnceLock::new();
+    use std::sync::atomic::Ordering;
+
+    if SUPERVISOR_SPAWNED.swap(true, Ordering::AcqRel) {
+        return;
+    }
+    let task = tokio::spawn(async move {
+        registry::supervisor::run().await;
+    });
+    let task_slot = SUPERVISOR_TASK.get_or_init(|| tokio::sync::Mutex::new(None));
+    if let Ok(mut slot) = task_slot.try_lock() {
+        *slot = Some(task);
+    } else {
+        task.abort();
+        SUPERVISOR_SPAWNED.store(false, Ordering::Release);
+        return;
+    }
+    crate::core::shutdown::register(|| async {
+        if let Some(task) = SUPERVISOR_TASK.get() {
+            if let Some(task) = task.lock().await.take() {
+                task.abort();
+                let _ = task.await;
+            }
+        }
+        SUPERVISOR_SPAWNED.store(false, Ordering::Release);
     });
 }
 
