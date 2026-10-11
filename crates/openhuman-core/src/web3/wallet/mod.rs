@@ -86,9 +86,8 @@ pub use schemas::{
 #[cfg(feature = "web3")]
 pub use tinywallet_web3::crypto::abi::encode_erc20_transfer;
 #[cfg(feature = "web3")]
-pub use tinywallet_web3::crypto::defaults::{
-    evm_asset_catalog, explorer_tx_url, EvmNetwork, RpcSource, SolanaCluster,
-    WalletAssetDefinition, WalletNetworkDefaults,
+pub use tinywallet_bus::wire::{
+    EvmNetwork, RpcSource, SolanaCluster, WalletAssetDefinition, WalletNetworkDefaults,
 };
 
 // ---------------------------------------------------------------------------
