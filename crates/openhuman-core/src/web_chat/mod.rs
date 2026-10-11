@@ -84,6 +84,7 @@ pub use ops::{
     in_flight_entries_for_test, invalidate_thread_sessions, run_system_turn_on_thread, start_chat,
     StartChatError, SESSION_CHECKOUT_FAILURE, SYSTEM_CLIENT_ID,
 };
+pub(crate) use ops::invalidate_thread_sessions_for_tenant;
 pub use types::ChatRequestMetadata;
 
 // Public API — schemas / controllers

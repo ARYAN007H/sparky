@@ -156,6 +156,28 @@ pub async fn invalidate_thread_sessions(thread_id: &str) {
     }
 }
 
+/// Invalidate only the captured tenant, unless its channel session ended.
+///
+/// Call from the captured core context so the original session table is used.
+/// Cancellation while waiting for that table never mutates a replacement session.
+pub(crate) async fn invalidate_thread_sessions_for_tenant(
+    tenant: &crate::core::runtime::Tenant,
+    thread_id: &str,
+    cancellation: &tokio_util::sync::CancellationToken,
+) -> bool {
+    let table = thread_sessions();
+    let mut sessions = tokio::select! {
+        biased;
+        _ = cancellation.cancelled() => return false,
+        sessions = table.lock_owned() => sessions,
+    };
+    if cancellation.is_cancelled() {
+        return false;
+    }
+    sessions.remove(&key_in(tenant, thread_id));
+    true
+}
+
 /// The thread ids (as the caller chose them) with a primary or parallel turn
 /// in the calling context's tables.
 pub(crate) async fn live_thread_ids() -> Vec<String> {
