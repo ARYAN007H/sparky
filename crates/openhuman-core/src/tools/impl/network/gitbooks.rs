@@ -1,11 +1,13 @@
 //! `gitbooks` — answer questions about OpenHuman through the TinyMCP module's
 //! confidential one-shot tool-call contract.
 
-use crate::{config::Config, mcp::http_client::redact_endpoint, modules::client::ModuleClient};
+use crate::{config::Config, modules::client::ModuleClient};
 use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::time::Duration;
 use tinytools::{PermissionLevel, Tool, ToolResult};
+
+const MAX_RESULT_BLOCK_BYTES: usize = 64 * 1024;
 
 pub struct GitbooksSearchTool {
     endpoint: String,
@@ -244,11 +246,70 @@ async fn configured_call(
     {
         Ok(call) if call.outcome.ok => call
             .rendered
-            .map(tinymcp::tools::tool_result)
+            .map(map_module_rendered_result)
             .unwrap_or_else(|| ToolResult::error(format!("{label} failed: empty module result"))),
         Ok(_) => ToolResult::error(format!("{label} failed: MCP server call failed")),
         Err(error) => ToolResult::error(format!("{label} failed: {error}")),
     }
+}
+
+fn map_module_rendered_result(rendered: tinymcp_bus::McpToolResult) -> ToolResult {
+    ToolResult {
+        content: rendered
+            .content
+            .into_iter()
+            .map(|block| match block {
+                tinymcp_bus::McpToolContent::Text { text } => tinytools::ToolContent::Text {
+                    text: bound_rendered_text(text),
+                },
+                tinymcp_bus::McpToolContent::Json { data } => tinytools::ToolContent::Json {
+                    data: bound_rendered_json(data),
+                },
+                other => {
+                    let data = serde_json::to_value(other).unwrap_or(Value::Null);
+                    tinytools::ToolContent::Json {
+                        data: bound_rendered_json(data),
+                    }
+                }
+            })
+            .collect(),
+        is_error: rendered.is_error,
+        markdown_formatted: rendered.markdown_formatted.map(bound_rendered_text),
+        ..ToolResult::default()
+    }
+}
+
+fn bound_rendered_text(text: String) -> String {
+    if text.len() <= MAX_RESULT_BLOCK_BYTES {
+        text
+    } else {
+        format!("[{} bytes elided]", text.len())
+    }
+}
+
+fn bound_rendered_json(data: Value) -> Value {
+    let serialized = serde_json::to_string(&data).unwrap_or_default();
+    if serialized.len() <= MAX_RESULT_BLOCK_BYTES {
+        data
+    } else {
+        Value::String(format!("[{} bytes elided]", serialized.len()))
+    }
+}
+
+fn redact_endpoint(raw: &str) -> String {
+    let Ok(url) = url::Url::parse(raw.trim()) else {
+        return "<redacted>".to_owned();
+    };
+    if !matches!(url.scheme(), "http" | "https")
+        || url.host_str().is_none()
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
+        return "<redacted>".to_owned();
+    }
+
+    let port = url.port().map_or_else(String::new, |port| format!(":{port}"));
+    format!("{}://{}{port}", url.scheme(), url.host_str().unwrap_or_default())
 }
 
 #[cfg(test)]
