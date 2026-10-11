@@ -24,10 +24,7 @@ impl ServerPort for FixturePort {
         Ok(config.session_id)
     }
 
-    async fn open_http(
-        &self,
-        config: ServerHttpSessionConfig,
-    ) -> Result<String, ModuleCallError> {
+    async fn open_http(&self, config: ServerHttpSessionConfig) -> Result<String, ModuleCallError> {
         self.open(config.server).await
     }
 
@@ -96,7 +93,6 @@ impl ServerPort for FixturePort {
     ) -> Result<ServerHttpResponseMetadata, ModuleCallError> {
         unreachable!()
     }
-
 }
 
 #[tokio::test]
@@ -114,7 +110,10 @@ async fn server_session_completes_host_resource_callback() {
         .await
         .unwrap();
 
-    assert!(matches!(snapshot.state, ServerOperationState::Complete { .. }));
+    assert!(matches!(
+        snapshot.state,
+        ServerOperationState::Complete { .. }
+    ));
     let state = port.0.lock().unwrap();
     assert!(matches!(
         state.completed,

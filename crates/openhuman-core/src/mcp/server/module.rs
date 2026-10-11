@@ -49,8 +49,7 @@ pub(super) enum ServerError {
 #[async_trait]
 pub(super) trait ServerPort: Send + Sync {
     async fn open(&self, config: ServerSessionConfig) -> Result<String, ModuleCallError>;
-    async fn open_http(&self, config: ServerHttpSessionConfig)
-        -> Result<String, ModuleCallError>;
+    async fn open_http(&self, config: ServerHttpSessionConfig) -> Result<String, ModuleCallError>;
     async fn submit(
         &self,
         session: &str,
@@ -79,13 +78,12 @@ struct TinyMcpPort {
 #[async_trait]
 impl ServerPort for TinyMcpPort {
     async fn open(&self, config: ServerSessionConfig) -> Result<String, ModuleCallError> {
-        self.client.call(MODULE, names::methods::SERVER_OPEN, (config,)).await
+        self.client
+            .call(MODULE, names::methods::SERVER_OPEN, (config,))
+            .await
     }
 
-    async fn open_http(
-        &self,
-        config: ServerHttpSessionConfig,
-    ) -> Result<String, ModuleCallError> {
+    async fn open_http(&self, config: ServerHttpSessionConfig) -> Result<String, ModuleCallError> {
         self.client
             .call(MODULE, names::methods::SERVER_OPEN_HTTP, (config,))
             .await
@@ -147,7 +145,6 @@ impl ServerPort for TinyMcpPort {
             .call(MODULE, names::methods::SERVER_HTTP_SESSION, (request,))
             .await
     }
-
 }
 
 pub(super) struct ServerSession {
@@ -290,11 +287,7 @@ impl ServerSession {
             }
         };
         self.port
-            .submit(
-                &self.id,
-                pending.headers.clone(),
-                pending.input.clone(),
-            )
+            .submit(&self.id, pending.headers.clone(), pending.input.clone())
             .await
             .map_err(ServerError::Module)?;
 
@@ -394,10 +387,7 @@ impl ServerSession {
     }
 
     pub(super) async fn close(&self) -> Result<(), ServerError> {
-        self.port
-            .close(&self.id)
-            .await
-            .map_err(ServerError::Module)
+        self.port.close(&self.id).await.map_err(ServerError::Module)
     }
 
     pub(super) async fn http_session(
@@ -409,10 +399,11 @@ impl ServerSession {
             .await
             .map_err(ServerError::Module)
     }
-
 }
 
-pub(super) fn headers_object(headers: impl Iterator<Item = (String, String)>) -> Map<String, Value> {
+pub(super) fn headers_object(
+    headers: impl Iterator<Item = (String, String)>,
+) -> Map<String, Value> {
     headers
         .map(|(name, value)| (name, Value::String(value)))
         .collect()

@@ -1,26 +1,21 @@
 //! OpenHuman's thin Streamable HTTP adapter over TinyMCP's server contract.
 
-use std::{
-    collections::HashMap,
-    convert::Infallible,
-    net::SocketAddr,
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::HashMap, convert::Infallible, net::SocketAddr, sync::Arc, time::Duration};
 
 use axum::{
     body::Bytes,
     extract::State,
     http::{header::AUTHORIZATION, HeaderMap, HeaderName, HeaderValue, StatusCode},
-    response::{sse::{Event, KeepAlive, Sse}, IntoResponse, Response},
+    response::{
+        sse::{Event, KeepAlive, Sse},
+        IntoResponse, Response,
+    },
     routing::post,
     Router,
 };
 use futures_util::stream;
 use serde_json::{Map, Value};
-use tinymcp_bus::{
-    ServerHttpSessionMethod, ServerHttpSessionRequest, HEADER_SESSION_ID,
-};
+use tinymcp_bus::{ServerHttpSessionMethod, ServerHttpSessionRequest, HEADER_SESSION_ID};
 
 use crate::{config::Config, modules::client::ModuleCallError};
 
@@ -83,7 +78,12 @@ async fn handle_post(State(state): State<HttpState>, headers: HeaderMap, body: B
     };
     let requested_session_id = header_value(&headers, HEADER_SESSION_ID).map(str::to_owned);
     let session = if let Some(requested_session_id) = requested_session_id.as_deref() {
-        state.sessions.lock().await.get(requested_session_id).cloned()
+        state
+            .sessions
+            .lock()
+            .await
+            .get(requested_session_id)
+            .cloned()
     } else {
         None
     };
@@ -163,7 +163,12 @@ async fn http_session_request(
     }
     let requested_session_id = header_value(headers, HEADER_SESSION_ID).map(str::to_owned);
     let session = if let Some(requested_session_id) = requested_session_id.as_deref() {
-        state.sessions.lock().await.get(requested_session_id).cloned()
+        state
+            .sessions
+            .lock()
+            .await
+            .get(requested_session_id)
+            .cloned()
     } else {
         None
     };
@@ -183,12 +188,13 @@ async fn http_session_request(
     };
     let response = response_from_metadata(metadata, String::new());
     if method == ServerHttpSessionMethod::Get && response.status() == StatusCode::OK {
-        return Sse::new(stream::pending::<Result<Event, Infallible>>()).keep_alive(
-            KeepAlive::new()
-                .interval(Duration::from_secs(10))
-                .text("keepalive"),
-        )
-        .into_response();
+        return Sse::new(stream::pending::<Result<Event, Infallible>>())
+            .keep_alive(
+                KeepAlive::new()
+                    .interval(Duration::from_secs(10))
+                    .text("keepalive"),
+            )
+            .into_response();
     }
     if method == ServerHttpSessionMethod::Delete && response.status() == StatusCode::NO_CONTENT {
         if let Some(requested_session_id) = requested_session_id {
@@ -235,8 +241,8 @@ fn response_from_metadata(
     metadata: tinymcp_bus::ServerHttpResponseMetadata,
     body: String,
 ) -> Response {
-    let status = StatusCode::from_u16(metadata.status_code)
-        .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+    let status =
+        StatusCode::from_u16(metadata.status_code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
     let mut response = if let Some(error_body) = metadata.error_body {
         (status, error_body).into_response()
     } else if body.is_empty() {
@@ -254,7 +260,9 @@ fn response_from_metadata(
     }
     if let Some(content_type) = metadata.content_type {
         if let Ok(value) = HeaderValue::from_str(&content_type) {
-            response.headers_mut().insert(axum::http::header::CONTENT_TYPE, value);
+            response
+                .headers_mut()
+                .insert(axum::http::header::CONTENT_TYPE, value);
         }
     }
     response

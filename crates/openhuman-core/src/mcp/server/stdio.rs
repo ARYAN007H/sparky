@@ -7,9 +7,9 @@ use std::net::SocketAddr;
 
 use crate::{config::Config, core::logging::CliLogDefault};
 
-use super::module::ServerSession;
 #[cfg(feature = "http-server")]
 use super::http::{run_http, HttpServerConfig};
+use super::module::ServerSession;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum McpTransport {

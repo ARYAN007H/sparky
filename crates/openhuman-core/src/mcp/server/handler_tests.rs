@@ -3,7 +3,9 @@ use super::*;
 #[test]
 fn host_tool_errors_keep_their_category_and_diagnostic() {
     assert_eq!(
-        reply_error(ToolCallError::InvalidParams("argument was empty".to_owned())),
+        reply_error(ToolCallError::InvalidParams(
+            "argument was empty".to_owned()
+        )),
         ServerHostReply::InvalidParams {
             message: "argument was empty".to_owned()
         }

@@ -80,9 +80,7 @@ fn reply_error(error: ToolCallError) -> ServerHostReply {
     match error {
         ToolCallError::InvalidParams(message) => ServerHostReply::InvalidParams { message },
         ToolCallError::Internal(message) => ServerHostReply::Internal { message },
-        ToolCallError::ResourceNotFound(message) => {
-            ServerHostReply::ResourceNotFound { message }
-        }
+        ToolCallError::ResourceNotFound(message) => ServerHostReply::ResourceNotFound { message },
     }
 }
 
