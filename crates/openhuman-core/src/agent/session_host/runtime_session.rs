@@ -152,6 +152,10 @@ struct OpenHumanTurnPreludeMutable {
     /// turn so disconnects remove their deferred executors immediately.
     #[cfg(feature = "mcp")]
     connected_mcp_tools: Vec<tinymcp_bus::McpToolPresentation>,
+    /// Configured static MCP tool declarations fetched through TinyMCP's
+    /// owner cache and refreshed with the connected-server catalog.
+    #[cfg(feature = "mcp")]
+    configured_mcp_tools: Vec<tinymcp_bus::McpToolPresentation>,
     /// `mcp_*` tool names a resumed thread was sent, so a tool recorded under
     /// its pre-readable hashed name is restored under that name too.
     #[cfg(feature = "mcp")]
@@ -865,6 +869,8 @@ impl OpenHumanSessionHost {
                     pending_mcp_announcement: self.pending_mcp_announcement.clone(),
                     #[cfg(feature = "mcp")]
                     connected_mcp_tools: Vec::new(),
+                    #[cfg(feature = "mcp")]
+                    configured_mcp_tools: Vec::new(),
                     #[cfg(feature = "mcp")]
                     recorded_mcp_tool_names: std::collections::HashSet::new(),
                     announced_skills: self.announced_skills.clone(),
