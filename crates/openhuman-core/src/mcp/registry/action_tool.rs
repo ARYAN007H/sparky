@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use async_trait::async_trait;
-use serde_json::{Value, json};
+use serde_json::Value;
 use tinytools::{PermissionLevel, Tool, ToolCategory, ToolContent, ToolExposure, ToolResult};
 
 use crate::config::Config;
@@ -120,19 +120,24 @@ impl Tool for InstalledServerTool {
 
 impl InstalledServerTool {
     async fn execute_inner(&self, arguments: Value) -> anyhow::Result<ToolResult> {
-        let client = McpConfiguredClient::for_config(&self.config)
-            .map_err(|_| anyhow::anyhow!("MCP module is unavailable"))?;
+        let client = match McpConfiguredClient::for_config(&self.config) {
+            Ok(client) => client,
+            Err(_) => return Ok(ToolResult::error("MCP module is unavailable")),
+        };
         let client_config = host::client_config(&self.config);
-        let arguments: serde_json::Map<String, Value> = client
+        let arguments: serde_json::Map<String, Value> = match client
             .call(
                 &client_config,
                 tinymcp_bus::names::methods::NORMALIZE_TOOL_ARGUMENTS,
                 (Some(arguments),),
             )
             .await
-            .map_err(|_| anyhow::anyhow!("invalid arguments for MCP tool"))?;
+        {
+            Ok(arguments) => arguments,
+            Err(_) => return Ok(ToolResult::error("invalid arguments for MCP tool")),
+        };
 
-        let outcome: tinymcp_bus::ToolCallOutcome = client
+        let outcome: tinymcp_bus::ToolCallOutcome = match client
             .call(
                 &client_config,
                 tinymcp_bus::names::methods::TOOL_CALL,
@@ -143,8 +148,11 @@ impl InstalledServerTool {
                 ),
             )
             .await
-            .map_err(|_| anyhow::anyhow!("MCP tool call failed"))?;
-        let rendered = client
+        {
+            Ok(outcome) => outcome,
+            Err(_) => return Ok(ToolResult::error("MCP tool call failed")),
+        };
+        let rendered: String = match client
             .call::<String>(
                 &client_config,
                 tinymcp_bus::names::methods::RENDER_TOOL_OUTPUT,
@@ -155,7 +163,10 @@ impl InstalledServerTool {
                 },),
             )
             .await
-            .map_err(|_| anyhow::anyhow!("MCP tool output is unavailable"))?;
+        {
+            Ok(rendered) => rendered,
+            Err(_) => return Ok(ToolResult::error("MCP tool output is unavailable")),
+        };
         let mut result = ToolResult {
             content: vec![ToolContent::Text { text: rendered }],
             is_error: outcome.rendered.is_error,
