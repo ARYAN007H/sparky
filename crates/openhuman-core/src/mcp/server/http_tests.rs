@@ -12,7 +12,6 @@ use tinymcp_bus::{
     ServerHttpSessionConfig, ServerHttpSessionRequest, ServerInput, ServerOperationRef,
     ServerOperationSnapshot, ServerOperationState, ServerSessionConfig, HEADER_SESSION_ID,
 };
-use tokio_util::sync::CancellationToken;
 
 #[derive(Default)]
 struct HttpFixtureState {
@@ -194,15 +193,17 @@ async fn successful_http_delete_joins_blocked_callback_before_removing_session()
     };
     let (started_tx, started_rx) = tokio::sync::oneshot::channel();
     let (dropped_tx, dropped_rx) = tokio::sync::oneshot::channel();
+    let started_tx = Arc::new(Mutex::new(Some(started_tx)));
+    let dropped_tx = Arc::new(Mutex::new(Some(dropped_tx)));
     http_test_session(port, &state, move |_call| {
-        let started_tx = Mutex::new(Some(started_tx));
-        let dropped_tx = Mutex::new(Some(dropped_tx));
+        let started_tx = Arc::clone(&started_tx);
+        let dropped_tx = Arc::clone(&dropped_tx);
         Box::pin(async move {
-            let _drop_guard = CallbackDrop(dropped_tx.into_inner().unwrap());
-            if let Some(sender) = started_tx.into_inner().unwrap() {
+            let _drop_guard = CallbackDrop(dropped_tx.lock().unwrap().take());
+            if let Some(sender) = started_tx.lock().unwrap().take() {
                 let _ = sender.send(());
             }
-            pending().await
+            pending::<ServerHostReply>().await
         })
     })
     .await;
