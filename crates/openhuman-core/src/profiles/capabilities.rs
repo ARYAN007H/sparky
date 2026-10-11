@@ -155,9 +155,24 @@ impl ProfileCapabilities {
                     .iter()
                     .map(|t| t.name().to_string())
                     .collect();
-                supplied.tools.extend(native.into_iter().filter(|tool| {
-                    self.admits(tool.name()) && !supplied_names.contains(tool.name())
-                }));
+                // Search tools are classified as ordinary platform tools, which
+                // a profile's domain set withholds. The operator's direct search
+                // settings are the profile-owned source for them, so add the
+                // roles the binding advertises; `admits` still applies.
+                let search = if config.profile_providers.is_some() {
+                    crate::search::build_search_tools(config)
+                } else {
+                    Vec::new()
+                };
+                supplied.tools.extend(
+                    native
+                        .into_iter()
+                        .filter(|tool| tool.name() != "web_search_tool")
+                        .chain(search)
+                        .filter(|tool| {
+                            self.admits(tool.name()) && !supplied_names.contains(tool.name())
+                        }),
+                );
             }
         }
         // Metadata from the host cannot widen registration or hide a registered
