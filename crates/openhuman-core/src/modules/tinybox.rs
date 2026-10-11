@@ -48,6 +48,8 @@ const START_EXEC: &str = contract::METHODS[23];
 const READ_OUTPUT: &str = contract::METHODS[24];
 const RELEASE_OUTPUT: &str = contract::METHODS[25];
 const START_JAILED_EXEC: &str = contract::METHODS[26];
+const RUN_DOCKER: &str = contract::METHODS[27];
+const DOCKER_CALL_GRACE: Duration = Duration::from_secs(5);
 
 #[cfg(test)]
 #[path = "tinybox_tests.rs"]
@@ -158,6 +160,27 @@ pub async fn start_jailed_exec(
     jail: contract::NativeJailConfig,
 ) -> Result<contract::ProcessRef, String> {
     call(config, START_JAILED_EXEC, (request, jail), true).await
+}
+
+/// Run one bounded Docker-isolated command through TinyBox.
+///
+/// The caller applies authorization and Docker policy before sending this
+/// confidential request. The bus deadline includes a short reply grace after
+/// TinyBox's own command deadline so the timeout result can be delivered.
+pub async fn run_docker(
+    config: &Config,
+    request: contract::DockerRunRequest,
+) -> Result<contract::DockerRunOutput, String> {
+    let timeout = Duration::from_millis(request.timeout_ms).saturating_add(DOCKER_CALL_GRACE);
+    let client = ModuleClient::new(config.clone()).with_timeout(timeout);
+    call_run_docker_with_client(&client, request).await
+}
+
+async fn call_run_docker_with_client(
+    client: &ModuleClient,
+    request: contract::DockerRunRequest,
+) -> Result<contract::DockerRunOutput, String> {
+    call_with_client(client, RUN_DOCKER, (request,), true).await
 }
 
 /// Read a bounded output batch from a live or completed process.

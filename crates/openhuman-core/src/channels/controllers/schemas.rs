@@ -14,8 +14,8 @@ use super::backend::OpenHumanChannelBackend;
 use super::definitions::ChannelAuthMode;
 use crate::channels::contract_schema::from_channel_controller_schema;
 use crate::security::credentials::channel_credential_provider;
-use tinychannels::controllers::{all_channel_controller_schemas, channel_controller_schema};
 use tinychannels::{ChannelManager, ChannelsConfig};
+use tinychannels_bus::controllers::{all_channel_controller_schemas, channel_controller_schema};
 
 // ---------------------------------------------------------------------------
 // Param structs
@@ -340,17 +340,18 @@ fn handle_test(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let p = deserialize_params::<TestParams>(params)?;
-        let mode: ChannelAuthMode = p
-            .auth_mode
-            .parse()
-            .map_err(|e: String| format!("invalid authMode: {e}"))?;
-        let manager = openhuman_channel_manager(config);
-        let result = manager
-            .test(p.channel.trim(), mode, p.credentials)
-            .await
-            .map_err(|e| e.to_string())?;
-        to_json(Outcome::new(result, vec![]))
+        test_with_config(&config, p).await
     })
+}
+
+async fn test_with_config(config: &Config, params: TestParams) -> Result<Value, String> {
+    let mode: ChannelAuthMode = params
+        .auth_mode
+        .parse()
+        .map_err(|e: String| format!("invalid authMode: {e}"))?;
+    to_json(
+        super::ops::test_channel(config, params.channel.trim(), mode, params.credentials).await?,
+    )
 }
 
 fn handle_discord_list_guilds(_params: Map<String, Value>) -> ControllerFuture {
