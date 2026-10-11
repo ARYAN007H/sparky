@@ -51,11 +51,20 @@ impl std::fmt::Debug for WalletRecoveryMaterial {
 }
 
 /// Generated recovery phrase returned for encryption and user confirmation.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct GeneratedRecoveryPhrase {
     pub phrase: String,
     pub word_count: u8,
+}
+
+impl std::fmt::Debug for GeneratedRecoveryPhrase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GeneratedRecoveryPhrase")
+            .field("phrase", &"<redacted>")
+            .field("word_count", &self.word_count)
+            .finish()
+    }
 }
 
 /// Result of checking a recovery phrase with TinyWallet.
