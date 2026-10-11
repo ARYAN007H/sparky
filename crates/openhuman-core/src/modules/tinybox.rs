@@ -6,7 +6,7 @@
 
 use std::time::Duration;
 
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 pub use tinybox_bus as contract;
 
 use crate::config::Config;

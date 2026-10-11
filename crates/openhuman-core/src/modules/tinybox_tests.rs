@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinybus::broker::Broker;
 use tinybus::service::Interface;
 use tinybus::transport::memory::MemoryBus;
