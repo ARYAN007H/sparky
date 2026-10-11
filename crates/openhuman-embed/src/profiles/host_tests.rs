@@ -50,3 +50,16 @@ fn named_selection_never_overrides_hard_denies_or_default_readonly() {
     );
     assert!(!capabilities.authorizes_approval("memory"));
 }
+
+
+#[test]
+fn profiles_keep_a_nonempty_readonly_permission_map_without_operator_grants() {
+    let saas = SaasConfig::new("/srv/openhuman");
+    let capabilities = ProfileHostOptions::default().finish(&saas).unwrap();
+    let id = super::super::ProfileId::parse("alice").unwrap();
+    let layout = openhuman_core::profiles::layout::profile_layout(&saas.root, &id);
+    let mut config = openhuman_core::profiles::layout::profile_config(&layout, &id);
+    capabilities.configure(&mut config);
+    assert!(!config.agent.channel_permissions.is_empty());
+    assert!(config.agent.channel_permissions.values().all(|level| level == "readonly"));
+}
