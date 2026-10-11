@@ -110,15 +110,16 @@ fn response_with(calls: &[TaToolCall]) -> ModelResponse {
     response
 }
 
-/// Drive `rounds` model responses that each re-issue one read per path in
-/// `paths`, through the repeat guard and the failure breaker assembled as
+/// Drive `rounds` model responses that each re-issue one call per
+/// `(tool, path)` in `batch`, through the repeat guard and the failure breaker assembled as
 /// `harness_assembly` does: the guard registered first (outermost), the
 /// breaker after it, both on one stop-note slot. The read-only batch is
 /// admitted whole before any result folds back (concurrent execution); a
 /// call the guard refuses never runs and is answered with its refusal,
-/// stamped with the guard's marker. Stops at the first pause and returns the
-/// rendered stop kind and summary.
-async fn re_read_until_stopped(paths: &[&str], rounds: usize) -> (StopReasonKind, String) {
+/// stamped with the guard's marker. A `grep` returns something new every
+/// round. Stops at the first pause and returns the rendered stop kind and
+/// summary.
+async fn re_read_until_stopped(batch: &[(&str, &str)], rounds: usize) -> (StopReasonKind, String) {
     let handle = SteeringHandle::allow_all();
     let slot = std::sync::Arc::new(std::sync::Mutex::new(None));
     let guard = RepeatProgressMiddleware::new(
@@ -126,21 +127,17 @@ async fn re_read_until_stopped(paths: &[&str], rounds: usize) -> (StopReasonKind
         slot.clone(),
         Arc::new(is_repeat_call_exempt),
     )
-    .with_read_only(Arc::new(|name: &str| name == "file_read"))
+    .with_read_only(Arc::new(|name: &str| matches!(name, "file_read" | "grep")))
     .with_cleared_placeholder(CLEARED_PLACEHOLDER);
     let breaker = RepeatedToolFailureMiddleware::new(handle.clone(), 3, slot.clone());
     let mut ctx = ctx();
     let mut records = Vec::new();
     for round in 0..rounds {
-        let mut calls: Vec<TaToolCall> = paths
+        let mut calls: Vec<TaToolCall> = batch
             .iter()
             .enumerate()
-            .map(|(n, path)| {
-                TaToolCall::new(
-                    format!("r{round}-{n}"),
-                    "file_read",
-                    json!({ "path": path }),
-                )
+            .map(|(n, (tool, path))| {
+                TaToolCall::new(format!("r{round}-{n}"), *tool, json!({ "path": path }))
             })
             .collect();
         guard
@@ -164,10 +161,10 @@ async fn re_read_until_stopped(paths: &[&str], rounds: usize) -> (StopReasonKind
                 Ok(()) => {
                     breaker.before_tool(&mut ctx, &(), call).await.unwrap();
                     let path = call.arguments["path"].as_str().unwrap();
-                    if path == "src/lbi.rs" {
-                        failing_result("file_read", MISTYPED_PATH)
-                    } else {
-                        tool_result("file_read", &format!("contents of {path}"))
+                    match (call.name.as_str(), path) {
+                        ("grep", _) => tool_result("grep", &format!("round {round}: 3 matches")),
+                        (_, "src/lbi.rs") => failing_result("file_read", MISTYPED_PATH),
+                        _ => tool_result("file_read", &format!("contents of {path}")),
                     }
                 }
             };
@@ -175,7 +172,7 @@ async fn re_read_until_stopped(paths: &[&str], rounds: usize) -> (StopReasonKind
         }
         // Results fold back in call order; `after_tool` runs innermost first.
         for (call, mut result) in calls.iter().zip(results) {
-            let id = invocation(&call.id, "file_read");
+            let id = invocation(&call.id, call.name.clone());
             breaker
                 .after_tool(&mut ctx, &(), &id, &mut result)
                 .await
@@ -184,7 +181,7 @@ async fn re_read_until_stopped(paths: &[&str], rounds: usize) -> (StopReasonKind
                 .after_tool(&mut ctx, &(), &id, &mut result)
                 .await
                 .unwrap();
-            records.push(record("file_read", &result));
+            records.push(record(&call.name, &result));
         }
         if drain_pause_count(&handle) > 0 {
             breaker
@@ -204,20 +201,31 @@ async fn re_read_until_stopped(paths: &[&str], rounds: usize) -> (StopReasonKind
 /// summary must say so, not that something was missing.
 #[tokio::test]
 async fn a_not_found_stop_inside_a_repeat_loop_is_summarised_as_repeating() {
-    let (kind, summary) =
-        re_read_until_stopped(&["src/lib.rs", "src/main.rs", "src/lbi.rs"], 12).await;
+    let batch = [
+        ("file_read", "src/lib.rs"),
+        ("file_read", "src/main.rs"),
+        ("file_read", "src/lbi.rs"),
+    ];
+    let (kind, summary) = re_read_until_stopped(&batch, 12).await;
     assert_eq!(kind, StopReasonKind::RepeatingStep, "{summary}");
-    assert!(summary.contains("kept repeating the same step"), "{summary}");
+    assert!(
+        summary.contains("kept repeating the same step"),
+        "{summary}"
+    );
     assert!(!summary.contains("could not be found"), "{summary}");
 }
 
-/// The same loop with the mistyped read first in the batch: its failure
-/// stops the run before the guard's refusals in that batch fold back, and
-/// they still relabel the stop.
+/// The same loop behind a search that finds something new every round: the
+/// mistyped read stops the run before any refusal in its batch has folded
+/// back, and the refusals that follow still relabel the stop.
 #[tokio::test]
 async fn a_refusal_later_in_the_batch_relabels_a_repeat_loop_stop() {
-    let (kind, summary) =
-        re_read_until_stopped(&["src/lbi.rs", "src/lib.rs", "src/main.rs"], 12).await;
+    let batch = [
+        ("grep", "src"),
+        ("file_read", "src/lbi.rs"),
+        ("file_read", "src/lib.rs"),
+    ];
+    let (kind, summary) = re_read_until_stopped(&batch, 12).await;
     assert_eq!(kind, StopReasonKind::RepeatingStep, "{summary}");
 }
 

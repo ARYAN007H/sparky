@@ -18,11 +18,11 @@ use tinytools::ToolResult as TaToolResult;
 
 use super::call_effect::{call_effect, dispatch_target, CallEffect, ToolFactsLookup};
 use super::fetched_site::{fetch_host_scope, heuristic_text};
-use super::repeat_loop_stop::{is_correctable_class, repeat_loop_halt_summary, RepeatLoopWitness};
 use super::loop_guards::{
     is_repeat_call_exempt, RECOVERABLE_NO_PROGRESS_FAILURE_THRESHOLD,
     RECOVERABLE_REPEAT_FAILURE_THRESHOLD,
 };
+use super::repeat_loop_stop::{is_correctable_class, repeat_loop_halt_summary, RepeatLoopWitness};
 pub(crate) use crate::inference::failure_copy::user_actionable_escalation;
 use crate::inference::failure_copy::{
     recoverable_identical_halt_summary, recoverable_no_progress_halt_summary,

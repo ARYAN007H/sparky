@@ -21,7 +21,12 @@ fn a_success_clears_the_refusal_count() {
 
 #[test]
 fn security_and_side_effect_classes_keep_their_own_wording() {
-    for class in ["not_found", "missing_window", "validation", "invalid_arguments"] {
+    for class in [
+        "not_found",
+        "missing_window",
+        "validation",
+        "invalid_arguments",
+    ] {
         assert!(is_correctable_class(class), "{class}");
     }
     for class in [
