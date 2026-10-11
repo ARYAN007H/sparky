@@ -61,7 +61,7 @@ pub(super) fn handle_update_model_settings(params: Map<String, Value>) -> Contro
                 .cloud_providers
                 .map(|entries| {
                     use crate::config::schema::cloud_providers::{
-                        generate_provider_id, is_slug_reserved, migrate_legacy_fields, AuthStyle,
+                        generate_provider_id, is_slug_reserved, builtin_cloud_provider, AuthStyle,
                         CloudProviderCreds,
                     };
                     let reserved_count = entries
@@ -99,10 +99,14 @@ pub(super) fn handle_update_model_settings(params: Map<String, Value>) -> Contro
                                     "cloud provider slug must not be empty".to_string()
                                 );
                             }
+                            let legacy_auth = e.legacy_type.as_deref()
+                                .and_then(builtin_cloud_provider)
+                                .map(|provider| provider.auth_style.as_str())
+                                .unwrap_or("bearer");
                             let auth_style = match e
                                 .auth_style
                                 .as_deref()
-                                .unwrap_or("bearer")
+                                .unwrap_or(legacy_auth)
                                 .to_ascii_lowercase()
                                 .as_str()
                             {
@@ -125,17 +129,14 @@ pub(super) fn handle_update_model_settings(params: Map<String, Value>) -> Contro
                                 .label
                                 .filter(|s| !s.trim().is_empty())
                                 .unwrap_or_else(|| slug.clone());
-                            let mut entry = CloudProviderCreds {
+                            let entry = CloudProviderCreds {
                                 id,
                                 slug,
                                 label,
                                 endpoint: e.endpoint,
                                 auth_style,
-                                legacy_type: e.legacy_type,
                                 default_model: e.default_model,
                             };
-                            // Apply any remaining legacy-field migration.
-                            migrate_legacy_fields(&mut entry);
                             Ok(entry)
                         })
                         .collect::<Result<Vec<_>, String>>()

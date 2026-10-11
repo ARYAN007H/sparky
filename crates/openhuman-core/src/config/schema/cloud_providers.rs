@@ -192,7 +192,7 @@ pub const BUILTIN_CLOUD_PROVIDERS: &[BuiltinCloudProvider] = &[
     },
 ];
 
-fn builtin_cloud_provider(type_str: &str) -> Option<&'static BuiltinCloudProvider> {
+pub(crate) fn builtin_cloud_provider(type_str: &str) -> Option<&'static BuiltinCloudProvider> {
     BUILTIN_CLOUD_PROVIDERS
         .iter()
         .find(|provider| provider.slug == type_str)
