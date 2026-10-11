@@ -24,6 +24,7 @@ use wiremock::{Mock, Request, Respond, ResponseTemplate};
 struct TenantTool {
     name: &'static str,
     calls: Arc<Mutex<Vec<String>>>,
+    relay_origins: Arc<Mutex<Vec<(String, String)>>>,
 }
 
 #[async_trait::async_trait]
@@ -175,6 +176,8 @@ async fn scenario() {
     let root = tempfile::tempdir().unwrap();
     let calls = Arc::new(Mutex::new(Vec::new()));
     let factory_calls = calls.clone();
+    let relay_origins = Arc::new(Mutex::new(Vec::new()));
+    let factory_relay_origins = relay_origins.clone();
     let sessions = Arc::new(Mutex::new(Vec::new()));
     let factory_sessions = sessions.clone();
     let engine = Arc::new(ReferenceEngine::new());
@@ -205,6 +208,7 @@ async fn scenario() {
                     Box::new(TenantTool {
                         name,
                         calls: factory_calls.clone(),
+                        relay_origins: factory_relay_origins.clone(),
                     }) as Box<dyn Tool>
                 })
                 .collect(),
@@ -459,6 +463,14 @@ async fn scenario() {
     assert_eq!(
         &calls.lock().unwrap()[4..],
         ["tenant_probe:alice", "tenant_probe:alice"]
+    );
+    assert_eq!(
+        *relay_origins.lock().unwrap(),
+        [
+            ("alice".into(), "message".into()),
+            ("bob".into(), "message".into()),
+            ("alice".into(), "reopened-message".into())
+        ]
     );
     let reopened_sessions = sessions.lock().unwrap();
     assert_eq!(
