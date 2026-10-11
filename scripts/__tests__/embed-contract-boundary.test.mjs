@@ -31,8 +31,8 @@ function check(files) {
 }
 
 const contracts = {
-  'crates/openhuman-core/src/agent/host_overrides.rs': 'pub use tinyagents_harness::cancel::CancellationToken;\\n',
-  'crates/openhuman-embed/src/config.rs': 'pub use tinytools::{\n DefaultEffect, Patterns, RuleEffect, Surface, ToolMatcher, ToolRule, ToolRules,\n};\\n',
+  'crates/openhuman-core/src/agent/host_overrides.rs': 'pub use tinyagents_harness::cancel::CancellationToken;\n',
+  'crates/openhuman-embed/src/config.rs': 'pub use tinytools::{\n DefaultEffect, Patterns, RuleEffect, Surface, ToolMatcher, ToolRule, ToolRules,\n};\n',
   'crates/openhuman-embed/src/lib.rs': 'pub mod providers {\n pub use tinyinference_llm::message::MessageDelta;\n pub use tinyinference_llm::model::{\n ChatModel, DeferredHandle, DeferredStatus, ModelProfile, ModelRequest, ModelResponse,\n ModelStream, ModelStreamItem, ModelStreamMetadata,\n };\n pub use tinyinference_llm::{Error, Result};\n}\n',
 };
 
@@ -55,19 +55,19 @@ test('the same native contract remains forbidden outside its owning adapter', ()
 
 test('Embed preserves its existing native tool, session and budget injection contracts', () => {
   const result = check({
-    'crates/openhuman-embed/src/lib.rs': 'pub use tinytools::{PermissionLevel, Tool, ToolExposure, ToolResult};\\n' +
-      'pub use tinyagents_session::port::{AgentStores, SessionStoreProvider};\\n',
-    'crates/openhuman-embed/src/budget.rs': 'pub use tinyinference_llm::model::budget::{Budget, BudgetExceeded, BudgetSnapshot, CallBudget, Spend, SpendLimits};\\n',
+    'crates/openhuman-embed/src/lib.rs': 'pub use tinytools::{PermissionLevel, Tool, ToolExposure, ToolResult};\n' +
+      'pub use tinyagents_session::port::{AgentStores, SessionStoreProvider};\n',
+    'crates/openhuman-embed/src/budget.rs': 'pub use tinyinference_llm::model::budget::{Budget, BudgetExceeded, BudgetSnapshot, CallBudget, Spend, SpendLimits};\n',
   });
   assert.equal(result.status, 0, result.output);
 });
 
 test('native injection allowances reject expanded or core compatibility exports', () => {
   for (const files of [
-    { 'crates/openhuman-embed/src/lib.rs': 'pub use tinytools::{PermissionLevel, Tool, ToolExposure, ToolResult, ToolRegistry};\\n' },
-    { 'crates/openhuman-core/src/tools/mod.rs': 'pub use tinytools::{PermissionLevel, Tool, ToolExposure, ToolResult};\\n' },
-    { 'crates/openhuman-core/src/agent/session_store/mod.rs': 'pub use tinyagents_session::port::{AgentStores, SessionStoreProvider};\\n' },
-    { 'crates/openhuman-embed/src/budget.rs': 'pub use tinyinference_llm::model::budget::{Budget, BudgetExceeded, BudgetSnapshot, CallBudget, Spend, SpendLimits, BudgetedModel};\\n' },
+    { 'crates/openhuman-embed/src/lib.rs': 'pub use tinytools::{PermissionLevel, Tool, ToolExposure, ToolResult, ToolRegistry};\n' },
+    { 'crates/openhuman-core/src/tools/mod.rs': 'pub use tinytools::{PermissionLevel, Tool, ToolExposure, ToolResult};\n' },
+    { 'crates/openhuman-core/src/agent/session_store/mod.rs': 'pub use tinyagents_session::port::{AgentStores, SessionStoreProvider};\n' },
+    { 'crates/openhuman-embed/src/budget.rs': 'pub use tinyinference_llm::model::budget::{Budget, BudgetExceeded, BudgetSnapshot, CallBudget, Spend, SpendLimits, BudgetedModel};\n' },
   ]) {
     const result = check(files);
     assert.equal(result.status, 1, result.output);
