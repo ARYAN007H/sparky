@@ -10,7 +10,6 @@ use tokio_util::sync::CancellationToken;
 
 use crate::voice::hotkey;
 
-#[cfg(any(target_os = "macos", test))]
 use super::LOG_PREFIX;
 
 /// Opaque handle that keeps the hotkey listener alive. Drop to stop.
