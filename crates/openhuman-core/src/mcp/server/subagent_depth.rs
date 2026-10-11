@@ -46,9 +46,13 @@ pub fn current_depth() -> usize {
 /// via [`current_depth`].
 pub async fn scope<F: Future>(depth: usize, fut: F) -> F::Output {
     tinyagents_harness::context::with_run_depth(
-        tinyagents_harness::context::RunDepth { depth, max_depth: MAX_SUBAGENT_DEPTH },
+        tinyagents_harness::context::RunDepth {
+            depth,
+            max_depth: MAX_SUBAGENT_DEPTH,
+        },
         fut,
-    ).await
+    )
+    .await
 }
 
 /// Parse the incoming depth header value. The header is external input, so

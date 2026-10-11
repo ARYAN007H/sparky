@@ -45,8 +45,10 @@ async fn incoming_mcp_depth_is_visible_to_the_native_harness_and_refuses_a_fourt
     scope(incoming, async {
         let facts = tinyagents_harness::context::current_run_depth()
             .expect("MCP ingress installs native recursion facts");
-        let native = crate::agent::tinyagents::host::OpenHumanRunContext::new()
-            .into_tinyagents(tinyagents_harness::context::RunConfig::new("mcp-ingress").with_max_depth(MAX_SUBAGENT_DEPTH));
+        let native = crate::agent::tinyagents::host::OpenHumanRunContext::new().into_tinyagents(
+            tinyagents_harness::context::RunConfig::new("mcp-ingress")
+                .with_max_depth(MAX_SUBAGENT_DEPTH),
+        );
         assert_eq!(native.config.depth(), 3);
         assert_eq!(facts.depth, 3);
         assert_eq!(facts.max_depth, MAX_SUBAGENT_DEPTH);

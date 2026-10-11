@@ -557,9 +557,10 @@ impl OpenHumanRunContext {
     ) -> tinyagents_harness::context::RunContext<Self> {
         // Imported transport facts and explicit child context must survive entry
         // into the native driver, which scopes the depth recorded in RunConfig.
-        let depth = config.depth().max(self.spawn_depth).max(
-            tinyagents_harness::context::current_run_depth().map_or(0, |facts| facts.depth),
-        );
+        let depth = config
+            .depth()
+            .max(self.spawn_depth)
+            .max(tinyagents_harness::context::current_run_depth().map_or(0, |facts| facts.depth));
         self.spawn_depth = depth;
         config = config.with_depth(depth);
         if config.thread_id.is_none() {
