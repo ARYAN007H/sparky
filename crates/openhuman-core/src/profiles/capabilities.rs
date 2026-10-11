@@ -69,6 +69,12 @@ impl ProfileCapabilities {
     pub fn admits(&self, name: &str) -> bool {
         super::tools::admits_with(name, true, &self.groups)
             && !matches!(
+                crate::tools::ops::tool_group(name),
+                crate::core::all::DomainGroup::Skills
+                    | crate::core::all::DomainGroup::Flows
+                    | crate::core::all::DomainGroup::Mcp
+            )
+            && !matches!(
                 name,
                 "http_request" | "spawn_agent" | "spawn_async_subagent" | "use_skill"
             )
