@@ -459,7 +459,11 @@ async fn handle_runtime_command_telegram_status_replies_without_agent() {
 
     let sent = channel_impl.sent.lock().unwrap();
     assert_eq!(sent.len(), 1);
-    assert!(sent[0].content.contains("**Status**"));
+    assert!(
+        sent[0].content.contains("**Status**"),
+        "status command returned unexpected reply: {:?}",
+        sent[0].content
+    );
     assert!(sent[0].content.contains("Provider:"));
 }
 
