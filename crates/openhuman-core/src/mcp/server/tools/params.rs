@@ -1,9 +1,5 @@
 use serde_json::{Map, Value};
 
-use tinymcp::server::args::{
-    object_arguments, optional_non_empty_string, optional_positive_u64,
-    reject_unexpected_arguments, required_non_empty_string, required_non_empty_string_array,
-};
 use tinymcp_bus::ToolCallError;
 
 use crate::core::all;
@@ -16,11 +12,11 @@ use super::types::{
     WEB_SEARCH_ARGUMENTS,
 };
 
-pub fn build_rpc_params(
+pub async fn build_rpc_params(
     tool_name: &str,
     arguments: Value,
 ) -> Result<Map<String, Value>, ToolCallError> {
-    let args = object_arguments(arguments)?;
+    let args = validate_tool_arguments(tool_name, arguments).await?;
     let name = tool_name;
     match tool_name {
         "core.list_tools" | "core.tool_instructions" | "agent.list_subagents" => {
@@ -29,8 +25,8 @@ pub fn build_rpc_params(
         }
         "agent.run_subagent" => {
             reject_unexpected_arguments(&args, SUBAGENT_RUN_ARGUMENTS)?;
-            let agent_id = required_non_empty_string(&args, "agent_id")?;
-            let prompt = required_non_empty_string(&args, "prompt")?;
+            let agent_id = validated_string(&args, "agent_id")?;
+            let prompt = validated_string(&args, "prompt")?;
             Ok(Map::from_iter([
                 ("agent_id".to_string(), Value::String(agent_id)),
                 ("prompt".to_string(), Value::String(prompt)),
@@ -41,7 +37,7 @@ pub fn build_rpc_params(
             let mut params = Map::new();
             params.insert(
                 "question".to_string(),
-                Value::String(required_non_empty_string(&args, "question")?),
+                Value::String(validated_string(&args, "question")?),
             );
             insert_filter_and_limit(&args, &mut params)?;
             Ok(params)
@@ -51,9 +47,9 @@ pub fn build_rpc_params(
             let mut params = Map::new();
             params.insert(
                 "query".to_string(),
-                Value::String(required_non_empty_string(&args, "query")?),
+                Value::String(validated_string(&args, "query")?),
             );
-            if let Some(mode) = optional_non_empty_string(&args, "mode")? {
+            if let Some(mode) = optional_string(&args, "mode") {
                 require_one_of("mode", &mode, FETCH_MODES)?;
                 params.insert("mode".to_string(), Value::String(mode));
             }
@@ -73,9 +69,9 @@ pub fn build_rpc_params(
             let mut params = Map::new();
             params.insert(
                 "text".to_string(),
-                Value::String(required_non_empty_string(&args, "text")?),
+                Value::String(validated_string(&args, "text")?),
             );
-            if let Some(kind) = optional_non_empty_string(&args, "kind")? {
+            if let Some(kind) = optional_string(&args, "kind") {
                 require_one_of("kind", &kind, LEARNING_KINDS)?;
                 params.insert("kind".to_string(), Value::String(kind));
             }
@@ -96,7 +92,7 @@ pub fn build_rpc_params(
         }
         "memory.forget" => {
             reject_unexpected_arguments(&args, MEMORY_FORGET_ARGUMENTS)?;
-            let ids = required_non_empty_string_array(&args, "ids")?;
+            let ids = validated_string_array(&args, "ids")?;
             if ids.len() > MEMORY_FORGET_MAX_IDS {
                 return Err(ToolCallError::InvalidParams(format!(
                     "argument `ids` accepts at most {MEMORY_FORGET_MAX_IDS} entries (got {})",
@@ -112,25 +108,25 @@ pub fn build_rpc_params(
                 SEARXNG_SEARCH_ARGUMENTS
             };
             reject_unexpected_arguments(&args, allowed)?;
-            let query = required_non_empty_string(&args, "query")?;
+            let query = validated_string(&args, "query")?;
             let mut params = Map::new();
             params.insert("query".to_string(), Value::String(query));
             if let Some(max_results) =
-                optional_positive_u64(&args, "max_results", SEARCH_MAX_RESULTS as u64)?
+                optional_u64(&args, "max_results")
             {
                 params.insert("max_results".to_string(), Value::from(max_results));
             }
-            if let Some(provider) = optional_non_empty_string(&args, "provider")? {
+            if let Some(provider) = optional_string(&args, "provider") {
                 params.insert("provider".to_string(), Value::String(provider));
             }
             Ok(params)
         }
         "web_answer" => {
             reject_unexpected_arguments(&args, WEB_ANSWER_ARGUMENTS)?;
-            let query = required_non_empty_string(&args, "query")?;
+            let query = validated_string(&args, "query")?;
             let mut params = Map::new();
             params.insert("query".to_string(), Value::String(query));
-            if let Some(depth) = optional_non_empty_string(&args, "depth")? {
+            if let Some(depth) = optional_string(&args, "depth") {
                 if depth != "quick" && depth != "deep" {
                     return Err(ToolCallError::InvalidParams(
                         "argument `depth` must be quick or deep".to_string(),
@@ -144,6 +140,72 @@ pub fn build_rpc_params(
             "unknown MCP tool `{tool_name}`"
         ))),
     }
+}
+
+async fn validate_tool_arguments(
+    tool_name: &str,
+    arguments: Value,
+) -> Result<Map<String, Value>, ToolCallError> {
+    use tinymcp_bus::{ServerArgumentRule as Rule, ServerArgumentsValidation, ValidateServerArgumentsRequest};
+
+    let required = |key: &str| Rule::RequiredNonEmptyString { key: key.to_owned() };
+    let optional = |key: &str| Rule::OptionalNonEmptyString { key: key.to_owned() };
+    let positive = |key: &str, max| Rule::OptionalPositiveU64 { key: key.to_owned(), max };
+    let array = |key: &str| Rule::RequiredNonEmptyStringArray { key: key.to_owned() };
+    let (allowed, rules): (&[&str], Vec<Rule>) = match tool_name {
+        "core.list_tools" | "core.tool_instructions" | "agent.list_subagents" => (&[], Vec::new()),
+        "agent.run_subagent" => (SUBAGENT_RUN_ARGUMENTS, vec![required("agent_id"), required("prompt")]),
+        "memory.recall" => (MEMORY_RECALL_ARGUMENTS, vec![required("question"), positive("limit", MEMORY_MAX_LIMIT)]),
+        "memory.fetch" => (MEMORY_FETCH_ARGUMENTS, vec![required("query"), optional("mode"), positive("limit", MEMORY_MAX_LIMIT), optional("cursor")]),
+        "memory.list" => (MEMORY_LIST_ARGUMENTS, vec![positive("limit", MEMORY_MAX_LIMIT), optional("cursor")]),
+        "memory.learn" => (MEMORY_LEARN_ARGUMENTS, vec![required("text"), optional("kind")]),
+        "memory.forget" => (MEMORY_FORGET_ARGUMENTS, vec![array("ids")]),
+        "searxng_search" => (SEARXNG_SEARCH_ARGUMENTS, vec![required("query"), positive("max_results", SEARCH_MAX_RESULTS as u64), optional("provider")]),
+        "web_search" => (WEB_SEARCH_ARGUMENTS, vec![required("query"), positive("max_results", SEARCH_MAX_RESULTS as u64), optional("provider")]),
+        "web_answer" => (WEB_ANSWER_ARGUMENTS, vec![required("query"), optional("depth")]),
+        _ => return Err(ToolCallError::InvalidParams(format!("unknown MCP tool `{tool_name}`"))),
+    };
+
+    let config = crate::config::ops::load_current_or_init()
+        .await
+        .map_err(|_| ToolCallError::Internal("MCP argument validation is unavailable".into()))?;
+    let client = crate::mcp::module_client::McpConfiguredClient::for_config(&config)
+        .map_err(|_| ToolCallError::Internal("MCP argument validation is unavailable".into()))?;
+    let result = client
+        .validate_server_arguments(ValidateServerArgumentsRequest {
+            arguments,
+            allowed: allowed.iter().map(|key| (*key).to_owned()).collect(),
+            rules,
+        })
+        .await
+        .map_err(|_| ToolCallError::Internal("MCP argument validation is unavailable".into()))?;
+    match result {
+        ServerArgumentsValidation::Valid(arguments) => Ok(arguments),
+        ServerArgumentsValidation::Invalid(error) => Err(error),
+    }
+}
+
+fn validated_string(args: &Map<String, Value>, key: &str) -> Result<String, ToolCallError> {
+    args.get(key)
+        .and_then(Value::as_str)
+        .map(str::to_owned)
+        .ok_or_else(|| ToolCallError::Internal("MCP module returned invalid arguments".into()))
+}
+
+fn validated_string_array(args: &Map<String, Value>, key: &str) -> Result<Vec<String>, ToolCallError> {
+    args.get(key)
+        .and_then(Value::as_array)
+        .and_then(|values| values.iter().map(Value::as_str).collect::<Option<Vec<_>>>())
+        .map(|values| values.into_iter().map(str::to_owned).collect())
+        .ok_or_else(|| ToolCallError::Internal("MCP module returned invalid arguments".into()))
+}
+
+fn optional_string(args: &Map<String, Value>, key: &str) -> Option<String> {
+    args.get(key).and_then(Value::as_str).map(str::to_owned)
+}
+
+fn optional_u64(args: &Map<String, Value>, key: &str) -> Option<u64> {
+    args.get(key).and_then(Value::as_u64)
 }
 
 pub fn validate_controller_params(
@@ -173,7 +235,7 @@ fn insert_filter_and_limit(
     if let Some(filter) = args.get("filter").filter(|v| !v.is_null()) {
         params.insert("filter".to_string(), validated_filter(filter)?);
     }
-    if let Some(limit) = optional_positive_u64(args, "limit", MEMORY_MAX_LIMIT)? {
+    if let Some(limit) = optional_u64(args, "limit") {
         params.insert("limit".to_string(), Value::from(limit));
     }
     Ok(())
@@ -183,7 +245,7 @@ fn insert_cursor(
     args: &Map<String, Value>,
     params: &mut Map<String, Value>,
 ) -> Result<(), ToolCallError> {
-    if let Some(cursor) = optional_non_empty_string(args, "cursor")? {
+    if let Some(cursor) = optional_string(args, "cursor") {
         params.insert("cursor".to_string(), Value::String(cursor));
     }
     Ok(())
