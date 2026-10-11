@@ -107,7 +107,7 @@ pub(crate) async fn process_channel_runtime_message(
     });
 
     let target_channel = ctx.channels_by_name.get(&msg.channel).cloned();
-    if handle_runtime_command_if_needed(ctx.as_ref(), &msg, target_channel.as_ref()).await {
+    if handle_runtime_command_if_needed(ctx.as_ref(), &msg, target_channel.as_ref(), &history_key).await {
         return;
     }
 
