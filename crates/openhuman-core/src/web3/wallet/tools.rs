@@ -2,6 +2,7 @@
 
 use async_trait::async_trait;
 use serde::Deserialize;
+use serde::Serialize;
 use serde_json::Value;
 use tinytools::{Tool, ToolExposure, ToolResult};
 use tinywallet_bus::tools::ToolDeclaration;
@@ -27,6 +28,15 @@ struct TxQuery {
     hash: String,
 }
 
+fn outcome_value<T: Serialize>(
+    outcome: Result<crate::core::Outcome<T>, String>,
+) -> Result<Value, String> {
+    outcome.and_then(|outcome| {
+        serde_json::to_value(outcome.value)
+            .map_err(|error| format!("failed to serialize wallet result: {error}"))
+    })
+}
+
 #[async_trait]
 impl Tool for WalletModuleTool {
     fn exposure(&self) -> ToolExposure {
@@ -47,23 +57,14 @@ impl Tool for WalletModuleTool {
 
     async fn execute(&self, args: Value) -> anyhow::Result<ToolResult> {
         let result = match self.name() {
-            "wallet_status" => crate::web3::wallet::status()
-                .await
-                .map(|outcome| serde_json::to_value(outcome.value))
-                .map_err(anyhow::Error::msg),
-            "wallet_chain_status" => crate::web3::wallet::chain_status()
-                .await
-                .map(|outcome| serde_json::to_value(outcome.value))
-                .map_err(anyhow::Error::msg),
+            "wallet_status" => outcome_value(crate::web3::wallet::status().await),
+            "wallet_chain_status" => outcome_value(crate::web3::wallet::chain_status().await),
             "wallet_prepare_transfer" => {
                 let params = match serde_json::from_value(args) {
                     Ok(params) => params,
                     Err(error) => return Ok(ToolResult::error(format!("invalid arguments: {error}"))),
                 };
-                crate::web3::wallet::prepare_transfer(params)
-                    .await
-                    .map(|outcome| serde_json::to_value(outcome.value))
-                    .map_err(anyhow::Error::msg)
+                outcome_value(crate::web3::wallet::prepare_transfer(params).await)
             }
             "wallet_tx_status" | "wallet_tx_receipt" | "wallet_lookup_tx" => {
                 let query: TxQuery = match serde_json::from_value(args) {
@@ -77,31 +78,33 @@ impl Tool for WalletModuleTool {
                         &query.hash,
                     )
                     .await
-                    .map(|outcome| serde_json::to_value(outcome.value)),
+                    .map(|outcome| outcome.value),
                     "wallet_tx_receipt" => crate::web3::wallet::tx_receipt(
                         query.chain,
                         query.evm_network,
                         &query.hash,
                     )
                     .await
-                    .map(|outcome| serde_json::to_value(outcome.value)),
+                    .map(|outcome| outcome.value),
                     _ => crate::web3::wallet::lookup_tx(
                         query.chain,
                         query.evm_network,
                         &query.hash,
                     )
                     .await
-                    .map(|outcome| serde_json::to_value(outcome.value)),
+                    .map(|outcome| outcome.value),
                 };
-                result.map_err(anyhow::Error::msg)
+                result.and_then(|value| {
+                        serde_json::to_value(value)
+                            .map_err(|error| format!("failed to serialize wallet result: {error}"))
+                    })
             }
             _ => return Ok(ToolResult::error("unknown wallet tool")),
         };
 
         match result {
-            Ok(Ok(value)) => Ok(ToolResult::success(serde_json::to_string_pretty(&value)?)),
-            Ok(Err(error)) => Ok(ToolResult::error(format!("failed to serialize wallet result: {error}"))),
-            Err(error) => Ok(ToolResult::error(error.to_string())),
+            Ok(value) => Ok(ToolResult::success(serde_json::to_string_pretty(&value)?)),
+            Err(error) => Ok(ToolResult::error(error)),
         }
     }
 }
