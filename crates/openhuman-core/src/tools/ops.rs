@@ -201,23 +201,13 @@ pub fn all_tools_with_runtime(
             security.clone(),
             action_dir.to_path_buf(),
         )),
-        // Audio-toolkit podcast tools — gated with the `voice` feature (they
-        // live in the `audio_toolkit` domain, which is compiled out when voice
-        // is disabled).
-        #[cfg(feature = "voice")]
-        Box::new(AudioGeneratePodcastTool::new(
-            config.clone(),
-            security.clone(),
-        )),
-        #[cfg(feature = "voice")]
-        Box::new(AudioEmailPodcastTool::new(config.clone(), security.clone())),
-        #[cfg(feature = "voice")]
-        Box::new(AudioGenerateAndEmailPodcastTool::new(
-            config.clone(),
-            security.clone(),
-        )),
-        Box::new(GmailUnsubscribeTool),
     ]);
+    #[cfg(feature = "voice")]
+    tools.extend(crate::voice::audio_toolkit::tools::registered_tools(
+        config.clone(),
+        security,
+    ));
+    tools.extend(vec![Box::new(GmailUnsubscribeTool)]);
     #[cfg(feature = "skills")]
     tools.extend(crate::skills::registration::tools(config.clone()));
     tools.extend(vec![
@@ -250,26 +240,14 @@ pub fn all_tools_with_runtime(
     tools.extend(crate::desktop::dashboard::tools::registered_tools(
         config.clone(),
     ));
-    tools.extend(vec![
-        #[cfg(feature = "modules")]
-        Box::new(DesktopTool::new(config.clone(), DesktopToolKind::Apps)),
-        #[cfg(feature = "modules")]
-        Box::new(DesktopTool::new(config.clone(), DesktopToolKind::Windows)),
-        #[cfg(feature = "modules")]
-        Box::new(DesktopTool::new(config.clone(), DesktopToolKind::Launch)),
-        #[cfg(feature = "modules")]
-        Box::new(DesktopTool::new(config.clone(), DesktopToolKind::Snapshot)),
-        #[cfg(feature = "modules")]
-        Box::new(DesktopTool::new(config.clone(), DesktopToolKind::Find)),
-        #[cfg(feature = "modules")]
-        Box::new(DesktopTool::new(config.clone(), DesktopToolKind::Goal)),
-        #[cfg(feature = "modules")]
-        Box::new(DesktopTool::new(
-            config.clone(),
-            DesktopToolKind::ContinueGoal,
-        )),
-        Box::new(SecurityPolicyInfoTool::new(config.clone())),
-    ]);
+    tools.extend(vec![]);
+    #[cfg(feature = "modules")]
+    tools.extend(crate::desktop::control::tools::registered_tools(
+        config.clone(),
+    ));
+    tools.extend(vec![]);
+    tools.extend(crate::security::tools::registered_tools(config.clone()));
+    tools.extend(vec![]);
     tools.extend(crate::platform::service::tools::registered_tools(
         config.clone(),
     ));
@@ -284,10 +262,13 @@ pub fn all_tools_with_runtime(
         // surfaces, not things an agent should reach for mid-turn, and their
         // controllers remain registered for the UI. `credentials` exposes only
         // non-secret reads.
-        Box::new(CredentialListTool::new(config.clone())),
-        Box::new(SessionStateTool::new(config.clone())),
-        Box::new(OAuthConnectUrlTool::new(config.clone())),
-        Box::new(OAuthListTool::new(config.clone())),
+    ]);
+    tools.extend(crate::security::credentials::tools::registered_tools(
+        config.clone(),
+    ));
+    tools.extend(vec![]);
+    tools.extend(crate::integrations::tools::registered_tools(config.clone()));
+    tools.extend(vec![
         // MCP registry and workspace persona. Observe/connect/call tools
         // default-ON; MCP uninstall (mcp_manage), and persona/workspace writers
         // (workspace_manage) ship default-OFF via `tools::user_filter`. There
@@ -296,25 +277,12 @@ pub fn all_tools_with_runtime(
         // MCP registry (dynamic, user-installed servers) — compiled out with
         // the `mcp` feature. Per-element attrs inside the `vec![]` mirror the
         // voice idiom used earlier in this same literal.
-        #[cfg(feature = "mcp")]
-        Box::new(McpRegistrySearchTool::new(config.clone())),
-        #[cfg(feature = "mcp")]
-        Box::new(McpRegistryGetTool::new(config.clone())),
-        #[cfg(feature = "mcp")]
-        Box::new(McpRegistryInstalledListTool::new(config.clone())),
-        #[cfg(feature = "mcp")]
-        Box::new(McpRegistryStatusTool::new(config.clone())),
-        #[cfg(feature = "mcp")]
-        Box::new(McpRegistryListToolsTool::new(config.clone())),
-        #[cfg(feature = "mcp")]
-        Box::new(McpRegistryConnectTool::new(config.clone())),
-        #[cfg(feature = "mcp")]
-        Box::new(McpRegistryDisconnectTool::new(config.clone())),
-        #[cfg(feature = "mcp")]
-        Box::new(McpRegistryToolCallTool::new(config.clone())),
-        #[cfg(feature = "mcp")]
-        Box::new(McpRegistryUninstallTool::new(config.clone())),
     ]);
+    #[cfg(feature = "mcp")]
+    tools.extend(crate::mcp::registry::tools::registered_tools(
+        config.clone(),
+    ));
+    tools.extend(vec![]);
     tools.extend(crate::config::workspace::tools::registered_tools(
         config.clone(),
     ));

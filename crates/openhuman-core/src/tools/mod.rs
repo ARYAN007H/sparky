@@ -18,19 +18,10 @@ pub(crate) mod implementations;
 
 pub use crate::agent::orchestration::tools::*;
 pub use crate::agent::tools::*;
-#[cfg(feature = "modules")]
-pub use crate::desktop::control::tools::*;
 pub use crate::integrations::composio::tools::*;
-pub use crate::integrations::tools::*;
-#[cfg(feature = "mcp")]
-pub use crate::mcp::registry::tools::*;
 pub use crate::memory::tools::{MemoryTool, MEMORY_TOOL_NAME};
 #[cfg(feature = "modules")]
 pub use crate::search::TinySearchTool;
-pub use crate::security::credentials::tools::*;
-pub use crate::security::tools::*;
-#[cfg(feature = "voice")]
-pub use crate::voice::audio_toolkit::tools::*;
 pub use implementations::*;
 pub use schemas::{
     all_controller_schemas as all_tools_controller_schemas,
