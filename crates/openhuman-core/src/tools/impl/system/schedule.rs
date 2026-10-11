@@ -380,7 +380,7 @@ impl ScheduleTool {
         }
 
         if let Some(value) = delay {
-            let job = cron::add_once(&self.config, value, command)?;
+            let job = cron::add_once(&self.config, value, command).await?;
             return Ok(ToolResult::success(format!(
                 "Created one-shot job {} (runs at: {}, cmd: {})",
                 job.id,
@@ -394,7 +394,7 @@ impl ScheduleTool {
             .map_err(|error| anyhow::anyhow!("Invalid run_at timestamp: {error}"))?
             .with_timezone(&Utc);
 
-        let job = cron::add_once_at(&self.config, run_at_parsed, command)?;
+        let job = cron::add_once_at(&self.config, run_at_parsed, command).await?;
         Ok(ToolResult::success(format!(
             "Created one-shot job {} (runs at: {}, cmd: {})",
             job.id,

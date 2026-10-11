@@ -42,17 +42,25 @@ pub(crate) fn try_acquire_run(job_id: &str) -> Option<ActiveRunGuard> {
     })
 }
 
-pub fn add_once(config: &Config, delay: &str, command: &str) -> Result<CronJob> {
+pub async fn add_once(config: &Config, delay: &str, command: &str) -> Result<CronJob> {
     let duration = parse_human_delay(delay)?;
     let at = chrono::Utc::now() + duration;
-    add_once_at(config, at, command)
+    add_once_at(config, at, command).await
 }
 
-pub fn add_once_at(
+pub async fn add_once_at(
     config: &Config,
     at: chrono::DateTime<chrono::Utc>,
     command: &str,
 ) -> Result<CronJob> {
+    let security = SecurityPolicy::from_config(
+        &config.autonomy,
+        &config.workspace_dir,
+        &config.action_dir,
+    );
+    crate::cron::scheduler::shell_job::authorize_shell_command(config, &security, command)
+        .await
+        .map_err(anyhow::Error::msg)?;
     let schedule = Schedule::At { at };
     add_shell_job(config, None, schedule, command)
 }
@@ -84,7 +92,7 @@ pub fn resume_job(config: &Config, id: &str) -> Result<CronJob> {
 /// `expression` and `tz` are merged with the existing [`Schedule::Cron`] fields; the
 /// existing `active_hours` is always preserved as-is.  To set or clear `active_hours`
 /// directly, use the RPC path (`cron.update` with a full [`CronJobPatch`]).
-pub fn update_cron_job(
+pub async fn update_cron_job(
     config: &Config,
     id: &str,
     expression: Option<String>,
@@ -123,9 +131,9 @@ pub fn update_cron_job(
             &config.workspace_dir,
             &config.action_dir,
         );
-        if !security.is_command_allowed(cmd) {
-            anyhow::bail!("Command blocked by security policy: {cmd}");
-        }
+        crate::cron::scheduler::shell_job::authorize_shell_command(config, &security, cmd)
+            .await
+            .map_err(anyhow::Error::msg)?;
     }
 
     let patch = CronJobPatch {
@@ -187,8 +195,8 @@ pub async fn cron_update(
             &config.workspace_dir,
             &config.action_dir,
         );
-        if !security.is_command_allowed(command) {
-            return Err(format!("Command blocked by security policy: {command}"));
+        crate::cron::scheduler::shell_job::authorize_shell_command(config, &security, command)
+            .await?;
         }
     }
 
