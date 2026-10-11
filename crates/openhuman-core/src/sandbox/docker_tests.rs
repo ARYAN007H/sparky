@@ -61,10 +61,13 @@ fn validate_docker_policy_multiple_issues() {
     assert!(issues.len() >= 3);
 }
 
-#[tokio::test]
-async fn docker_backend_handle_reports_status() {
-    let handle = docker_backend_handle().await;
-    assert_eq!(handle.kind, SandboxBackendKind::Docker);
-    // Status depends on whether Docker is installed in the test env.
-    assert!(handle.status == SandboxStatus::Ready || handle.status == SandboxStatus::Error);
+#[test]
+fn docker_backend_handle_maps_module_status_truthfully() {
+    let available = docker_handle_for_status(true);
+    assert_eq!(available.kind, SandboxBackendKind::Docker);
+    assert_eq!(available.status, SandboxStatus::Ready);
+
+    let unavailable = docker_handle_for_status(false);
+    assert_eq!(unavailable.kind, SandboxBackendKind::Docker);
+    assert_eq!(unavailable.status, SandboxStatus::Error);
 }
