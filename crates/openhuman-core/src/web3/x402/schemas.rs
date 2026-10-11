@@ -171,13 +171,11 @@ fn handle_update_budget(params: Map<String, Value>) -> ControllerFuture {
         .await
         .map_err(|error| format!("x402 update_budget: {error}"))?;
 
-        Ok(json!({
-            "budget": {
-                "perRequestMaxAtomic": summary.per_request_max_atomic,
-                "dailyMaxAtomic": summary.daily_max_atomic,
-                "monthlyMaxAtomic": summary.monthly_max_atomic,
-            }
-        }))
+        Ok(budget_value(
+            summary.per_request_max_atomic,
+            summary.daily_max_atomic,
+            summary.monthly_max_atomic,
+        ))
     })
 }
 
@@ -196,6 +194,16 @@ fn summary_value(summary: tinywallet_bus::wire::X402DetailedSpendingSummary) -> 
             "dailyMaxAtomic": summary.daily_max_atomic,
             "monthlyMaxAtomic": summary.monthly_max_atomic,
         },
+    })
+}
+
+fn budget_value(per_request_max_atomic: u64, daily_max_atomic: u64, monthly_max_atomic: u64) -> Value {
+    json!({
+        "budget": {
+            "perRequestMaxAtomic": per_request_max_atomic,
+            "dailyMaxAtomic": daily_max_atomic,
+            "monthlyMaxAtomic": monthly_max_atomic,
+        }
     })
 }
 

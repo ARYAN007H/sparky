@@ -34,3 +34,17 @@ fn summary_response_preserves_legacy_camel_case_rpc_shape() {
         })
     );
 }
+
+#[test]
+fn budget_response_preserves_legacy_camel_case_rpc_shape() {
+    assert_eq!(
+        budget_value(1, 20, 300),
+        json!({
+            "budget": {
+                "perRequestMaxAtomic": 1,
+                "dailyMaxAtomic": 20,
+                "monthlyMaxAtomic": 300,
+            }
+        })
+    );
+}
