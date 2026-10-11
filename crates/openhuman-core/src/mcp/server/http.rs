@@ -215,7 +215,9 @@ async fn close_http_sessions(state: &HttpState) {
 
 fn check_auth(state: &HttpState, headers: &HeaderMap) -> Option<Response> {
     let expected = state.auth_token.as_deref()?;
-    let provided = header_value(headers, AUTHORIZATION)
+    let provided = headers
+        .get(AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
         .and_then(|value| value.strip_prefix("Bearer "))
         .map(str::trim);
     (provided != Some(expected)).then(|| {

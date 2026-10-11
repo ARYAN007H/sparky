@@ -58,6 +58,9 @@ pub(super) async fn dispatch(call: ServerHostCall) -> ServerHostReply {
         ServerHostCall::Unsupported => ServerHostReply::Internal {
             message: "unsupported server callback".to_owned(),
         },
+        _ => ServerHostReply::Internal {
+            message: "unsupported server callback".to_owned(),
+        },
     }
 }
 

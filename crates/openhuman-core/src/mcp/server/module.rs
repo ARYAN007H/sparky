@@ -343,6 +343,7 @@ impl ServerSession {
                     return Err(ServerError::Failed(message));
                 }
                 ServerOperationState::Unknown => return Err(ServerError::UnknownState),
+                _ => return Err(ServerError::UnknownState),
             }
         }
     }
