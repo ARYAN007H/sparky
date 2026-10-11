@@ -4357,7 +4357,7 @@ const messages: TranslationMap = {
   'walletSend.to': 'Kime',
   'walletSend.availableBalance': 'Mevcut: {{amount}} {{symbol}}',
   'settings.skillsRunner.error.listWorkflows': 'İş akışları yüklenemedi:',
-  'conversations.runMode.plan': 'Planı',
+  'conversations.runMode.plan': 'Plan',
   'channels.oauth.connectRecoverFailed':
     "{channel}'nin bağlanması tamamlanamadı. Erişim verilmeden önce oturum açma penceresi kapatıldı; tekrar deneyin.",
   'channels.savedRestartRequired':

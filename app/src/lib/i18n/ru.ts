@@ -4398,7 +4398,7 @@ const messages: TranslationMap = {
   'mcp.json.loading': 'Загрузка…',
   'settings.embeddings.testUnavailableCustom':
     'Тестирование пользовательской конечной точки пока не поддерживается — сохраните его и проверьте статус на панели «Внедрения».',
-  'walletSend.to': 'Чтобы',
+  'walletSend.to': 'Кому',
   'walletSend.availableBalance': 'Доступно: {{amount}} {{symbol}}',
   'settings.skillsRunner.error.listWorkflows': 'Не удалось загрузить рабочие процессы:',
   'conversations.runMode.plan': 'План',
