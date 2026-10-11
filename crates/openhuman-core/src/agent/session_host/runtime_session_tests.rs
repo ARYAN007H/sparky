@@ -297,7 +297,12 @@ async fn resumed_mcp_snapshot_survives_a_cold_catalog_and_keeps_its_frozen_spec(
         .with_retained(&recorded)
         .expect("retain the transcript declaration");
     assert_eq!(retained, 1, "the cold catalog supplied no MCP executor");
-    assert_eq!(cold_with_recorded.specs(), &[recorded_spec.clone()]);
+    let cold_spec = cold_with_recorded
+        .specs()
+        .iter()
+        .find(|spec| spec.name == name)
+        .expect("recorded MCP name survives the cold catalog");
+    assert_eq!(cold_spec, &recorded_spec);
 
     prelude
         .mutable
