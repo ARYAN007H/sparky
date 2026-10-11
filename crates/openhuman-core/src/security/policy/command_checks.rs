@@ -15,6 +15,50 @@ use tinybox_core::shell::scan::{
 };
 
 impl SecurityPolicy {
+    /// Apply OpenHuman's shell policy to generic facts returned by TinyBox.
+    /// The module supplies parsing facts, while this host owns path checks,
+    /// autonomy tiers, and approval decisions.
+    #[cfg(feature = "modules")]
+    pub fn check_gated_command_analysis(
+        &self,
+        analysis: &crate::modules::tinybox::contract::CommandAnalysis,
+    ) -> Result<CommandClass, String> {
+        self.check_protected_path_words(&analysis.literal_words)?;
+
+        let mut class = analysis
+            .segments
+            .iter()
+            .map(|segment| match segment.class {
+                crate::modules::tinybox::contract::CommandClass::Read => CommandClass::Read,
+                crate::modules::tinybox::contract::CommandClass::Write => CommandClass::Write,
+                crate::modules::tinybox::contract::CommandClass::Network => CommandClass::Network,
+                crate::modules::tinybox::contract::CommandClass::Install => CommandClass::Install,
+                crate::modules::tinybox::contract::CommandClass::Destructive => {
+                    CommandClass::Destructive
+                }
+            })
+            .max()
+            .unwrap_or(CommandClass::Read);
+        if analysis.redirection || analysis.tee {
+            class = class.max(CommandClass::Write);
+        }
+
+        if !self.enabled {
+            return Ok(class);
+        }
+        if self.gate_decision(class) == GateDecision::Block {
+            return Err(format!(
+                "{POLICY_BLOCKED_MARKER} Security policy: read-only mode — only read commands are permitted."
+            ));
+        }
+        if self.autonomy != AutonomyLevel::Full && analysis.hidden_execution {
+            return Err(format!(
+                "{POLICY_BLOCKED_MARKER} Command blocked: hidden command execution is not allowed in this mode."
+            ));
+        }
+        Ok(class)
+    }
+
     /// Classify command risk. Any high-risk segment marks the whole command high.
     pub fn command_risk_level(&self, command: &str) -> CommandRiskLevel {
         let mut saw_medium = false;
@@ -229,12 +273,34 @@ impl SecurityPolicy {
     /// guard for direct path arguments and source literals; arbitrary shell or
     /// interpreter code still needs a filesystem sandbox to enforce the floor.
     pub fn check_protected_path_literals(&self, input: &str) -> Result<(), String> {
-        for word in strip_quoted_heredoc_bodies(input).split(|c: char| {
-            c.is_whitespace() || matches!(c, '\'' | '"' | '(' | ')' | '[' | ']' | ',' | ';' | '=')
-        }) {
+        let words = strip_quoted_heredoc_bodies(input)
+            .split(|c: char| {
+                c.is_whitespace()
+                    || matches!(c, '\'' | '"' | '(' | ')' | '[' | ']' | ',' | ';' | '=')
+            })
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
+        self.check_protected_path_words(&words)
+    }
+
+    /// Refuse protected paths and unsafe path literals returned by the
+    /// execution module's command analysis. The host still owns path policy;
+    /// the module only supplies token boundaries.
+    pub fn check_protected_path_words(&self, words: &[String]) -> Result<(), String> {
+        for word in words {
             let word = word.trim_matches(|c: char| matches!(c, ':' | '<' | '>' | '&' | '|'));
             if word.is_empty() || word.contains("://") {
                 continue;
+            }
+            let candidate_path = PathBuf::from(word);
+            if word.contains('\0')
+                || candidate_path
+                    .components()
+                    .any(|component| matches!(component, std::path::Component::ParentDir))
+            {
+                return Err(format!(
+                    "{POLICY_BLOCKED_MARKER} Command references an unsafe path"
+                ));
             }
             let word = ["${HOME}", "$HOME", "%USERPROFILE%"]
                 .iter()

@@ -1,5 +1,23 @@
 use super::*;
 
+#[tokio::test]
+async fn configured_shell_fails_closed_when_tinybox_analysis_is_disabled() {
+    let mut config = crate::config::Config::default();
+    config.modules.enabled = false;
+    let tool = ShellTool::with_config(
+        test_security(AutonomyLevel::Full),
+        test_runtime(),
+        test_audit(),
+        Arc::new(config),
+    );
+
+    let error = tool
+        .prepare_authorization(&json!({"command": "cat ~/.ssh/id_rsa"}))
+        .await
+        .expect_err("hosted shell authorization requires TinyBox analysis");
+    assert_eq!(error.to_string(), "command analysis is unavailable");
+}
+
 #[cfg(not(windows))]
 #[tokio::test]
 async fn shell_emits_audit_line_on_success() {

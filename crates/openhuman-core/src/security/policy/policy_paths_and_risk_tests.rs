@@ -69,6 +69,63 @@ fn parse_declared_class_maps_known_and_rejects_unknown() {
     );
 }
 
+#[cfg(feature = "modules")]
+#[test]
+fn tinybox_command_facts_drive_policy_and_keep_the_path_floor_when_disabled() {
+    use crate::modules::tinybox::contract::{
+        CommandAnalysis, CommandClass as ModuleClass, CommandSegment,
+    };
+
+    let write_segment = CommandSegment {
+        source: "ls -la".into(),
+        command: "ls -la".into(),
+        basename: "ls".into(),
+        normalized_name: "ls".into(),
+        arguments: vec!["-la".into()],
+        class: ModuleClass::Write,
+        leading_env_assignment: false,
+        dangerous_env_prefix: false,
+        executor: false,
+    };
+    let analysis = CommandAnalysis {
+        segments: vec![write_segment],
+        hidden_execution: false,
+        redirection: false,
+        expansion: false,
+        tee: false,
+        background: false,
+        literal_words: vec!["ls".into(), "-la".into()],
+    };
+    let readonly = SecurityPolicy {
+        enabled: true,
+        autonomy: AutonomyLevel::ReadOnly,
+        ..SecurityPolicy::default()
+    };
+    assert!(readonly.check_gated_command_analysis(&analysis).is_err());
+
+    let disabled = SecurityPolicy {
+        enabled: false,
+        ..SecurityPolicy::default()
+    };
+    let protected = CommandAnalysis {
+        literal_words: vec!["cat".into(), "~/.ssh/id_rsa".into()],
+        ..analysis
+    };
+    assert!(disabled.check_gated_command_analysis(&protected).is_err());
+
+    let traversal = CommandAnalysis {
+        literal_words: vec!["cat".into(), "workspace/../.ssh/id_rsa".into()],
+        ..protected.clone()
+    };
+    assert!(disabled.check_gated_command_analysis(&traversal).is_err());
+
+    let nul_path = CommandAnalysis {
+        literal_words: vec!["cat".into(), "safe\0/credential".into()],
+        ..protected
+    };
+    assert!(disabled.check_gated_command_analysis(&nul_path).is_err());
+}
+
 #[test]
 fn command_risk_medium_for_command_executors() {
     // Interpreters / code executors are medium-risk now (not high): a coding
