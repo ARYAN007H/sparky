@@ -1,5 +1,5 @@
 use super::*;
-use crate::agent::todos::ops::{TodoItem, TodoStatus};
+use tinyagents_graph::todos::{TodoItem, TodoStatus};
 use serde_json::{json, Value};
 
 /// Serialize tests that share the process-global scratch store. Same lock
