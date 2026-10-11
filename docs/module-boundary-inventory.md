@@ -16,7 +16,7 @@ copying its implementation into a host, or accepting weaker isolation.
 | tinyjuice | none (module loaded through TinyBus) | tinyjuice-bus | core tools, compression, CCR REPL | Complete: PR #59 provides module-owned compression, CCR queries, HTML extraction, schemas and declarations; the host retains turn-bound model callbacks and artifact authorization |
 | tinyconnectors | none | tinyconnectors-bus | core integrations, credentials and triggers | Module-backed argument preparation, action execution and trigger archives; host credential reconciliation and frozen tool restoration remain in OpenHuman |
 | tinymcp | tinymcp | tinymcp-bus | core MCP registry, supervisor, CLI stdio/HTTP server | Supervisor notifications, server protocol operations and callbacks for approved host tools/resources/prompts |
-| tinychannels | tinychannels, tinychannels-runtime (remaining runtime callers) | tinychannels-bus | core channels, TinyHumans host, CLI REPL | Contract is pure; v0.1.25 adds scoped runtime/provider facts, outbound preparation, and inbound identity contracts. Discord discovery/permission checks, credential tests and connection validation/defaults and `doctor channels` health checks use confidential module calls. Remaining runtime callers need bus cutover with inbound/status callbacks and shutdown draining |
+| tinychannels | tinychannels, tinychannels-runtime, tinychannels-module (test-only) | tinychannels-bus | core channels, TinyHumans host, CLI REPL | Contract is pure; scoped providers, inbound/identity/outbound preparation, remote commands, runtime limits, typing and progressive delivery execute through confidential module calls. Host-owned policy, credentials, persistence and callbacks remain in OpenHuman. Both host implementation exceptions are removed; final focused build validation is pending |
 | tinyhosts | none | tinyhosts-bus | core hosting tools | Released Execute/Providers contract consumed through the module; workspace authorization, credentials and approval policy remain in OpenHuman |
 | tinywallet | tinywallet-crypto, tinywallet-web3, tinywallet-x402 through remaining host imports | tinywallet-bus | core wallet/web3/x402 | Contract is pure at v0.13.0; native transfer preparation/execution use confidential module calls with host custody, exact approval binding and explicit close. Initialization, remaining validation, Web3 quotes/swaps, x402 payments, budgets and ledger still need host cutover |
 | tinybox | tinybox-core, tinybox-jail, tinybox-docker | tinybox-bus | core sandbox and security, desktop gateways | Pre-core gateways use the released v0.1.18 bus client. Core sandbox execution and shell analysis still require cutover |
@@ -384,3 +384,24 @@ fixture passes callback isolation, acknowledged stop, and final-send replay,
 alongside four lease validation and cancellation tests. Native providers, relay,
 remote-command host adapters and context helpers are still being migrated;
 both Channels implementation exceptions remain.
+
+
+## Full Channels host cutover validation
+
+The native-provider, relay, remote-command, typing, approval presentation and
+progressive-delivery adapters now use the minimal bus contract. Provider
+implementations and compatibility wrappers are available only to unit tests.
+The root contract fixture links the owning module in dev-dependencies and
+communicates with it over TinyBus; shipped hosts never link that fixture.
+
+The dependency checker reports zero violations, zero stale exceptions, four
+remaining temporary exceptions (MCP and Wallet), and no pending contracts.
+`scripts/assert-shed.sh channels tinychannels tinychannels-runtime
+tinychannels-module` passes. The dependency simulator reports 308 resolved
+packages / 284 package names for `--no-default-features --features channels`,
+compared with 346 packages / 318 names in the primary base checkout. These
+are dependency counts, not measured build-time or binary-size improvements.
+
+The focused host tests and build are queued for final validation. Earlier
+225-test channel results above describe the earlier adapter revision and do
+not establish acceptance of this full cutover.
