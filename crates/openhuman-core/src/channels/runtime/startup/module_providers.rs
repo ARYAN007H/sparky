@@ -136,34 +136,7 @@ impl ModuleChannelRuntime {
         timeout_secs: u64,
         listener_count: usize,
     ) -> Result<(u64, usize)> {
-        use tinychannels_bus::module_control::{ChannelControlRequest, ChannelControlResult};
-
-        let result: ChannelControlResult = self
-            .client
-            .call_confidential(
-                "tinychannels",
-                tinychannels_bus::methods::PREPARE_CHANNEL_CONTROL,
-                (ChannelControlRequest::RuntimeLimits {
-                    timeout_secs,
-                    listener_count,
-                },),
-            )
-            .await?;
-        match result {
-            ChannelControlResult::RuntimeLimits {
-                timeout_secs,
-                max_in_flight,
-            } if timeout_secs >= tinychannels_bus::context::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS
-                && max_in_flight > 0 =>
-            {
-                Ok((timeout_secs, max_in_flight))
-            }
-            _ => {
-                ModuleClient::report_malformed_reply("tinychannels");
-                Err(anyhow::Error::new(ModuleCallError::ModuleFault)
-                    .context("channel runtime returned invalid runtime limits"))
-            }
-        }
+        super::prepare_runtime_limits(&self.client, timeout_secs, listener_count).await
     }
 
     pub(super) async fn start(&mut self, config: &Config) -> Result<()> {

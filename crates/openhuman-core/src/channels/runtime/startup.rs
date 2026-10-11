@@ -10,6 +10,45 @@ mod relay;
 mod start_channels;
 mod turn_parts;
 
+use crate::modules::client::{ModuleCallError, ModuleClient};
+use anyhow::{Context, Result};
+
+/// Ask the owning module to prepare effective execution limits for this host
+/// runtime. A malformed response fails closed and reports only the module ID.
+pub(crate) async fn prepare_runtime_limits(
+    client: &ModuleClient,
+    timeout_secs: u64,
+    listener_count: usize,
+) -> Result<(u64, usize)> {
+    use tinychannels_bus::module_control::{ChannelControlRequest, ChannelControlResult};
+
+    let result: ChannelControlResult = client
+        .call_confidential(
+            "tinychannels",
+            tinychannels_bus::methods::PREPARE_CHANNEL_CONTROL,
+            (ChannelControlRequest::RuntimeLimits {
+                timeout_secs,
+                listener_count,
+            },),
+        )
+        .await?;
+    match result {
+        ChannelControlResult::RuntimeLimits {
+            timeout_secs,
+            max_in_flight,
+        } if timeout_secs >= tinychannels_bus::context::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS
+            && max_in_flight > 0 =>
+        {
+            Ok((timeout_secs, max_in_flight))
+        }
+        _ => {
+            ModuleClient::report_malformed_reply("tinychannels");
+            Err(anyhow::Error::new(ModuleCallError::ModuleFault)
+                .context("channel runtime returned invalid runtime limits"))
+        }
+    }
+}
+
 pub(crate) use credentials::hydrate_channel_credentials;
 pub use start_channels::start_channels;
 pub(crate) use start_channels::start_channels_with_session;
