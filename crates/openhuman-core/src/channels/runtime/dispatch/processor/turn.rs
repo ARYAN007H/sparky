@@ -345,6 +345,7 @@ pub(crate) async fn process_channel_runtime_message(
     };
 
     let typing_cancellation = target_channel.as_ref().map(|_| CancellationToken::new());
+    let _typing_cancel_on_drop = typing_cancellation.as_ref().map(|token| token.clone().drop_guard());
     // Typing was already started early (before memory/provider setup). Here we only
     // spawn the background refresh task that keeps the indicator alive during long turns.
     let typing_task = match (target_channel.as_ref(), typing_cancellation.as_ref()) {
