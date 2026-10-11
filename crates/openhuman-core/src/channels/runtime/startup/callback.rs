@@ -6,7 +6,6 @@ use crate::channels::runtime::dispatch::RuntimeChannelMessage;
 use crate::config::Config;
 use std::sync::{Arc, OnceLock, Weak};
 use tinybus::{Error, Result};
-use tinychannels_bus::names::{HOST_BUS_NAME, host_methods};
 use tinychannels_bus::{
     ChannelBackendRequest, ChannelBackendResult, DeliveryQueueEntry, DeliveryTerminalResult,
     HostEventPublication, HostTranscriptionRequest, HostTranscriptionResult,
@@ -14,6 +13,8 @@ use tinychannels_bus::{
 use tokio::sync::mpsc;
 
 const MAX_CALLBACK_BYTES: usize = 128 * 1024;
+const MAX_TRANSCRIPTION_BYTES: usize = 12 * 1024 * 1024;
+const MAX_CONTROLLER_BYTES: usize = 1024 * 1024;
 
 /// Callbacks capture one immutable host config and a weak runtime context.
 /// The weak reference avoids a cycle from runtime context -> module channel ->
@@ -177,12 +178,19 @@ impl ChannelHostCallbacks {
         &self,
         request: HostTranscriptionRequest,
     ) -> Result<HostTranscriptionResult> {
-        Self::validate_callback_size(&request)?;
+        if serde_json::to_vec(&request).map_or(true, |bytes| bytes.len() > MAX_TRANSCRIPTION_BYTES) {
+            return Err(Error::failed("transcription callback exceeds its limit"));
+        }
         use tinychannels::host::Transcriber as _;
         crate::channels::host::VoiceTranscriber {
             config: Arc::clone(&self.config),
         }
-        .transcribe(request)
+        .transcribe(tinychannels::host::TranscriptionRequest {
+            audio_base64: request.audio_base64,
+            mime_type: request.mime_type,
+            file_name: request.file_name,
+            language: request.language,
+        })
         .await
         .map(|result| HostTranscriptionResult {
             text: result.text,
@@ -205,7 +213,9 @@ impl ChannelHostCallbacks {
         &self,
         request: ChannelBackendRequest,
     ) -> Result<ChannelBackendResult> {
-        Self::validate_callback_size(&request)?;
+        if serde_json::to_vec(&request).map_or(true, |bytes| bytes.len() > MAX_CONTROLLER_BYTES) {
+            return Err(Error::failed("controller callback exceeds its limit"));
+        }
         match request {
             ChannelBackendRequest::RemoteControl(request) => {
                 crate::channels::host::remote_control::dispatch_callback(
@@ -226,8 +236,4 @@ impl ChannelHostCallbacks {
             .map_err(|_| Error::failed("channel controller callback failed")),
         }
     }
-}
-
-pub(super) fn interface_name() -> &'static str {
-    HOST_BUS_NAME
 }

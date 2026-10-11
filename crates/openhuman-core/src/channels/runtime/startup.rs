@@ -1,7 +1,9 @@
 //! Channel startup wiring.
 
 mod chat_workload;
+mod callback;
 mod credentials;
+mod delivery_store;
 mod prompt;
 mod relay;
 mod start_channels;
