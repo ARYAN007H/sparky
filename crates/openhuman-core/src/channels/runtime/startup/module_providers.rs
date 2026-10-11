@@ -65,7 +65,9 @@ impl ModuleChannelRuntime {
             Ok(infos) => infos,
             Err(error) => {
                 let _ = lease.close().await;
-                return Err(anyhow::Error::new(error).context("could not describe configured channels"));
+                return Err(
+                    anyhow::Error::new(error).context("could not describe configured channels")
+                );
             }
         };
         if infos.is_empty() && !relay_configured(&hydrated) {
@@ -84,7 +86,9 @@ impl ModuleChannelRuntime {
                 Ok(reservation) => Some(reservation),
                 Err(error) => {
                     let _ = lease.close().await;
-                    return Err(anyhow::Error::new(error).context("could not reserve channel relay"));
+                    return Err(
+                        anyhow::Error::new(error).context("could not reserve channel relay")
+                    );
                 }
             }
         } else {
@@ -93,7 +97,10 @@ impl ModuleChannelRuntime {
         let relay_fronts = |channel: &str| {
             hydrated.relay.as_ref().is_some_and(|relay| {
                 relay_configured(&hydrated)
-                    && relay.identities.iter().any(|identity| identity.platform == channel)
+                    && relay
+                        .identities
+                        .iter()
+                        .any(|identity| identity.platform == channel)
             })
         };
         let channels = infos
@@ -139,25 +146,33 @@ impl ModuleChannelRuntime {
         for info in &self.infos {
             let member = match info.ingress {
                 ChannelIngressKind::Listener => tinychannels_bus::methods::START_CHANNEL_SUPERVISED,
-                ChannelIngressKind::ExternalWebhook => tinychannels_bus::methods::START_OUTBOUND_CHANNEL,
+                ChannelIngressKind::ExternalWebhook => {
+                    tinychannels_bus::methods::START_OUTBOUND_CHANNEL
+                }
             };
-            let result: Result<(), ModuleCallError> = if info.ingress == ChannelIngressKind::Listener {
-                self.lease
-                    .object()
-                    .call_confidential(
-                        member,
-                        (info.name.clone(), self.config.clone(), self.proxy.clone(), policy),
-                    )
-                    .await
-            } else {
-                self.lease
-                    .object()
-                    .call_confidential(
-                        member,
-                        (info.name.clone(), self.config.clone(), self.proxy.clone()),
-                    )
-                    .await
-            };
+            let result: Result<(), ModuleCallError> =
+                if info.ingress == ChannelIngressKind::Listener {
+                    self.lease
+                        .object()
+                        .call_confidential(
+                            member,
+                            (
+                                info.name.clone(),
+                                self.config.clone(),
+                                self.proxy.clone(),
+                                policy,
+                            ),
+                        )
+                        .await
+                } else {
+                    self.lease
+                        .object()
+                        .call_confidential(
+                            member,
+                            (info.name.clone(), self.config.clone(), self.proxy.clone()),
+                        )
+                        .await
+                };
             if let Err(error) = result {
                 let _ = self.close().await;
                 return Err(anyhow::Error::new(error).context("channel provider startup failed"));
@@ -196,7 +211,12 @@ impl ModuleChannelRuntime {
                 failure = Some(anyhow::Error::new(error));
             }
         }
-        if let Err(error) = self.lease.object().call::<()>(tinychannels_bus::methods::SHUTDOWN, ()).await {
+        if let Err(error) = self
+            .lease
+            .object()
+            .call::<()>(tinychannels_bus::methods::SHUTDOWN, ())
+            .await
+        {
             failure.get_or_insert_with(|| anyhow::Error::new(error));
         }
         if let Err(error) = self.lease.close().await {
@@ -217,7 +237,10 @@ impl Drop for ModuleChannelRuntime {
         let lease = self.lease.clone();
         if let Ok(handle) = tokio::runtime::Handle::try_current() {
             handle.spawn(async move {
-                let _ = lease.object().call::<()>(tinychannels_bus::methods::SHUTDOWN, ()).await;
+                let _ = lease
+                    .object()
+                    .call::<()>(tinychannels_bus::methods::SHUTDOWN, ())
+                    .await;
                 let _ = lease.close().await;
             });
         }
@@ -274,7 +297,10 @@ impl Channel for ModuleChannel {
 
     async fn health_check(&self) -> bool {
         self.object
-            .call::<String>(tinychannels_bus::methods::CHANNEL_STATUS, (self.name.clone(),))
+            .call::<String>(
+                tinychannels_bus::methods::CHANNEL_STATUS,
+                (self.name.clone(),),
+            )
             .await
             .is_ok_and(|state| state == "connected")
     }
@@ -410,7 +436,10 @@ impl ModuleChannel {
                 .object
                 .call_confidential(
                     tinychannels_bus::methods::SEND_RELAY_INTENT,
-                    (self.relay.clone().expect("checked relay handle"), prepared.intent),
+                    (
+                        self.relay.clone().expect("checked relay handle"),
+                        prepared.intent,
+                    ),
                 )
                 .await
                 .map_err(anyhow::Error::new)?;

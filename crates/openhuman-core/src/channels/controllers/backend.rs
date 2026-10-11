@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::config::{ChannelsConfig, Config};
 use crate::core::Outcome;
@@ -70,8 +70,8 @@ impl OpenHumanChannelBackend {
         &self,
         request: tinychannels_bus::ChannelBackendRequest,
     ) -> anyhow::Result<tinychannels_bus::ChannelBackendResult> {
-        use tinychannels_bus::{ChannelBackendRequest as Request, ChannelBackendResult as Result};
         use tinychannels::backend::ChannelBackend as _;
+        use tinychannels_bus::{ChannelBackendRequest as Request, ChannelBackendResult as Result};
 
         match request {
             Request::RemoteControl(_) | Request::ProgressiveTransport(_) => {
@@ -82,7 +82,12 @@ impl OpenHumanChannelBackend {
                 auth_mode,
                 clear_memory,
             } => self
-                .disconnect_channel(&self.config.channels_config, &channel, auth_mode, clear_memory)
+                .disconnect_channel(
+                    &self.config.channels_config,
+                    &channel,
+                    auth_mode,
+                    clear_memory,
+                )
                 .await
                 .map(Result::Disconnected),
             Request::Status { channel } => self
@@ -162,13 +167,8 @@ impl OpenHumanChannelBackend {
         channel: &str,
         title: &str,
     ) -> anyhow::Result<ChannelThreadResult> {
-        tinychannels::backend::ChannelBackend::create_thread(
-            self,
-            channels_config,
-            channel,
-            title,
-        )
-        .await
+        tinychannels::backend::ChannelBackend::create_thread(self, channels_config, channel, title)
+            .await
     }
 
     /// Update or close one provider thread through the product controller.

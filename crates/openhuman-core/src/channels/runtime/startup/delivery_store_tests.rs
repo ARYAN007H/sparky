@@ -36,9 +36,18 @@ async fn pending_delivery_is_durable_ordered_and_idempotent() {
     first.save_pending(entry("earlier", 10)).await.unwrap();
 
     let reopened = store(&path);
-    assert_eq!(reopened.load_pending("earlier".into()).await.unwrap(), Some(entry("earlier", 10)));
     assert_eq!(
-        reopened.load_pending_all().await.unwrap().iter().map(|item| item.id.as_str()).collect::<Vec<_>>(),
+        reopened.load_pending("earlier".into()).await.unwrap(),
+        Some(entry("earlier", 10))
+    );
+    assert_eq!(
+        reopened
+            .load_pending_all()
+            .await
+            .unwrap()
+            .iter()
+            .map(|item| item.id.as_str())
+            .collect::<Vec<_>>(),
         vec!["earlier", "later"]
     );
 }
@@ -51,7 +60,10 @@ async fn changed_intent_cannot_reuse_a_pending_delivery_id() {
     let mut changed = entry("same", 1);
     changed.intent.conversation_id = "other-chat".into();
     assert!(store.save_pending(changed).await.is_err());
-    assert_eq!(store.load_pending_all().await.unwrap(), vec![entry("same", 1)]);
+    assert_eq!(
+        store.load_pending_all().await.unwrap(),
+        vec![entry("same", 1)]
+    );
 }
 
 #[tokio::test]
@@ -65,7 +77,10 @@ async fn terminal_result_is_replayed_and_conflicts_are_rejected() {
     };
     store.save_result(result.clone()).await.unwrap();
     store.save_result(result.clone()).await.unwrap();
-    assert_eq!(store.load_result("done".into()).await.unwrap(), Some(result.clone()));
+    assert_eq!(
+        store.load_result("done".into()).await.unwrap(),
+        Some(result.clone())
+    );
 
     let conflict = DeliveryTerminalResult {
         intent_fingerprint: "different".into(),
@@ -87,6 +102,15 @@ async fn removal_and_failed_delivery_are_idempotent_and_durable() {
     store.remove_pending("pending".into()).await.unwrap();
 
     let reopened = store(&path);
-    assert_eq!(reopened.load_failed("failed".into()).await.unwrap(), Some(failed));
-    assert!(reopened.load_pending("pending".into()).await.unwrap().is_none());
+    assert_eq!(
+        reopened.load_failed("failed".into()).await.unwrap(),
+        Some(failed)
+    );
+    assert!(
+        reopened
+            .load_pending("pending".into())
+            .await
+            .unwrap()
+            .is_none()
+    );
 }

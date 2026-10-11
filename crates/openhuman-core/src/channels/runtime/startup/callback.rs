@@ -65,7 +65,9 @@ impl ChannelHostCallbacks {
         >(message.clone())
         {
             if delivery.envelope.channel.id != channel {
-                return Err(Error::failed("relay callback channel does not match envelope"));
+                return Err(Error::failed(
+                    "relay callback channel does not match envelope",
+                ));
             }
             self.dispatch
                 .send(RuntimeChannelMessage::from_authenticated_relay(delivery))
@@ -74,8 +76,8 @@ impl ChannelHostCallbacks {
             return Ok(());
         }
 
-        let message: tinychannels_bus::ChannelMessage =
-            serde_json::from_value(message).map_err(|_| Error::failed("invalid inbound message"))?;
+        let message: tinychannels_bus::ChannelMessage = serde_json::from_value(message)
+            .map_err(|_| Error::failed("invalid inbound message"))?;
         if message.channel != channel {
             return Err(Error::failed("callback channel does not match message"));
         }
@@ -95,11 +97,14 @@ impl ChannelHostCallbacks {
             return Err(Error::failed("channel status is invalid"));
         }
         match state.as_str() {
-            "connected" => crate::core::bus::BUS.publish(crate::core::events::DomainEvent::ChannelConnected { channel }),
-            "disconnected" | "stopped" => crate::core::bus::BUS.publish(crate::core::events::DomainEvent::ChannelDisconnected {
-                channel,
-                reason: state,
-            }),
+            "connected" => crate::core::bus::BUS
+                .publish(crate::core::events::DomainEvent::ChannelConnected { channel }),
+            "disconnected" | "stopped" => crate::core::bus::BUS.publish(
+                crate::core::events::DomainEvent::ChannelDisconnected {
+                    channel,
+                    reason: state,
+                },
+            ),
             // `connecting`, `reconnecting`, and `unhealthy` are health facts,
             // not user-facing lifecycle events.
             _ => {}
@@ -178,7 +183,8 @@ impl ChannelHostCallbacks {
         &self,
         request: HostTranscriptionRequest,
     ) -> Result<HostTranscriptionResult> {
-        if serde_json::to_vec(&request).map_or(true, |bytes| bytes.len() > MAX_TRANSCRIPTION_BYTES) {
+        if serde_json::to_vec(&request).map_or(true, |bytes| bytes.len() > MAX_TRANSCRIPTION_BYTES)
+        {
             return Err(Error::failed("transcription callback exceeds its limit"));
         }
         use tinychannels::host::Transcriber as _;
@@ -225,15 +231,15 @@ impl ChannelHostCallbacks {
                 .await
                 .map(ChannelBackendResult::RemoteControl)
             }
-            ChannelBackendRequest::ProgressiveTransport(_) => {
-                Err(Error::failed("progressive transport callback is unavailable"))
+            ChannelBackendRequest::ProgressiveTransport(_) => Err(Error::failed(
+                "progressive transport callback is unavailable",
+            )),
+            request => {
+                crate::channels::controllers::OpenHumanChannelBackend::new((*self.config).clone())
+                    .dispatch_callback(request)
+                    .await
+                    .map_err(|_| Error::failed("channel controller callback failed"))
             }
-            request => crate::channels::controllers::OpenHumanChannelBackend::new(
-                (*self.config).clone(),
-            )
-            .dispatch_callback(request)
-            .await
-            .map_err(|_| Error::failed("channel controller callback failed")),
         }
     }
 }

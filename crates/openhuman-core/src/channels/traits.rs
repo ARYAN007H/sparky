@@ -26,10 +26,7 @@ pub trait Channel: Send + Sync {
     async fn send(&self, message: &SendMessage) -> anyhow::Result<()>;
 
     /// Legacy listener seam used by isolated test doubles.
-    async fn listen(
-        &self,
-        tx: tokio::sync::mpsc::Sender<ChannelMessage>,
-    ) -> anyhow::Result<()>;
+    async fn listen(&self, tx: tokio::sync::mpsc::Sender<ChannelMessage>) -> anyhow::Result<()>;
 
     /// Whether the configured provider is currently healthy.
     async fn health_check(&self) -> bool {

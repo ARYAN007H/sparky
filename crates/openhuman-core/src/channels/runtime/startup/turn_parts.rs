@@ -6,10 +6,10 @@
 //! the caller's own config and policy, so a relayed turn never runs with the
 //! operator's tools or workspace.
 
-use super::chat_workload::{resolve_chat_workload, ChatWorkloadResolution};
+use super::chat_workload::{ChatWorkloadResolution, resolve_chat_workload};
 use super::prompt::format_access_context;
 use crate::agent::host_runtime;
-use crate::channels::context::{effective_channel_message_timeout_secs, ChannelRuntimeContext};
+use crate::channels::context::{ChannelRuntimeContext, effective_channel_message_timeout_secs};
 use crate::channels::system_prompt::{ChannelPromptInputs, ChannelSystemPrompt};
 use crate::config::Config;
 use crate::inference::provider;

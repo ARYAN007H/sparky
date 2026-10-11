@@ -3,7 +3,7 @@
 
 use super::super::dispatch::run_message_dispatch_loop;
 use super::module_providers::ModuleChannelRuntime;
-use super::turn_parts::{build_channel_turn_parts, runtime_context, PromptToolDescs};
+use super::turn_parts::{PromptToolDescs, build_channel_turn_parts, runtime_context};
 use crate::config::Config;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
@@ -144,9 +144,11 @@ async fn start_channels_inner(mut config: Config, session: CancellationToken) ->
     }
 
     let configured = crate::channels::commands::configured_providers(&config);
-    let relay_configured = config.channels_config.relay.as_ref().is_some_and(|relay| {
-        !relay.url.is_empty() && !relay.identities.is_empty()
-    });
+    let relay_configured = config
+        .channels_config
+        .relay
+        .as_ref()
+        .is_some_and(|relay| !relay.url.is_empty() && !relay.identities.is_empty());
     if configured.is_empty() && !relay_configured {
         println!("No channels configured. Set up channels in the web UI.");
         return Ok(());
@@ -242,7 +244,11 @@ async fn start_channels_inner(mut config: Config, session: CancellationToken) ->
 
     println!("  🚦 In-flight message limit: {max_in_flight_messages}");
 
-    let runtime_ctx = Arc::new(runtime_context(&config, parts, Arc::clone(&channels_by_name)));
+    let runtime_ctx = Arc::new(runtime_context(
+        &config,
+        parts,
+        Arc::clone(&channels_by_name),
+    ));
     context_slot
         .set(Arc::downgrade(&runtime_ctx))
         .map_err(|_| anyhow::anyhow!("channel callback context was already initialized"))?;

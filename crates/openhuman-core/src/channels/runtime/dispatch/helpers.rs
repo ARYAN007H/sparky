@@ -17,15 +17,15 @@ pub(super) fn spawn_scoped_typing_task(
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         let handle = match channel
-            .begin_typing_refresh(
-                &recipient,
-                CHANNEL_TYPING_REFRESH_INTERVAL_SECS,
-            )
+            .begin_typing_refresh(&recipient, CHANNEL_TYPING_REFRESH_INTERVAL_SECS)
             .await
         {
             Ok(handle) => handle,
             Err(error) => {
-                tracing::debug!(channel = channel.name(), "typing refresh could not start: {error}");
+                tracing::debug!(
+                    channel = channel.name(),
+                    "typing refresh could not start: {error}"
+                );
                 let _ = channel.stop_typing(&recipient).await;
                 return;
             }
@@ -34,7 +34,10 @@ pub(super) fn spawn_scoped_typing_task(
         if let Some(handle) = &handle {
             cancellation_token.cancelled().await;
             if let Err(error) = channel.end_typing_refresh(handle).await {
-                tracing::debug!(channel = channel.name(), "typing refresh cleanup failed: {error}");
+                tracing::debug!(
+                    channel = channel.name(),
+                    "typing refresh cleanup failed: {error}"
+                );
             }
         } else {
             // Compatibility for non-module test doubles. Production module

@@ -45,7 +45,9 @@ impl ChannelDeliveryStore {
         Self { path, gate }
     }
 
-    async fn locked_state(&self) -> anyhow::Result<(tokio::sync::OwnedMutexGuard<()>, DeliveryState)> {
+    async fn locked_state(
+        &self,
+    ) -> anyhow::Result<(tokio::sync::OwnedMutexGuard<()>, DeliveryState)> {
         let guard = Arc::clone(&self.gate).lock_owned().await;
         let state = self.read_state().await?;
         Ok((guard, state))
@@ -59,7 +61,10 @@ impl ChannelDeliveryStore {
             }
             Err(error) => return Err(error.into()),
         };
-        anyhow::ensure!(bytes.len() as u64 <= MAX_STORE_BYTES, "channel delivery store is oversized");
+        anyhow::ensure!(
+            bytes.len() as u64 <= MAX_STORE_BYTES,
+            "channel delivery store is oversized"
+        );
         let state: DeliveryState = serde_json::from_slice(&bytes)?;
         validate_state(&state)?;
         Ok(state)
@@ -68,7 +73,10 @@ impl ChannelDeliveryStore {
     async fn write_state(&self, state: DeliveryState) -> anyhow::Result<()> {
         validate_state(&state)?;
         let bytes = serde_json::to_vec(&state)?;
-        anyhow::ensure!(bytes.len() as u64 <= MAX_STORE_BYTES, "channel delivery store is oversized");
+        anyhow::ensure!(
+            bytes.len() as u64 <= MAX_STORE_BYTES,
+            "channel delivery store is oversized"
+        );
         let path = self.path.clone();
         tokio::task::spawn_blocking(move || {
             crate::security::secret_storage::file_store::write_atomic(&path, &bytes)
@@ -82,19 +90,28 @@ impl ChannelDeliveryStore {
         validate_entry(&entry)?;
         let (_guard, mut state) = self.locked_state().await?;
         if let Some(existing) = state.pending.get(&entry.id) {
-            anyhow::ensure!(existing == &entry, "delivery id conflicts with pending entry");
+            anyhow::ensure!(
+                existing == &entry,
+                "delivery id conflicts with pending entry"
+            );
             return Ok(());
         }
         anyhow::ensure!(
             !state.failed.contains_key(&entry.id) && !state.results.contains_key(&entry.id),
             "delivery id already has a terminal result"
         );
-        anyhow::ensure!(state.pending.len() < DELIVERY_PENDING_CAPACITY, "delivery queue is full");
+        anyhow::ensure!(
+            state.pending.len() < DELIVERY_PENDING_CAPACITY,
+            "delivery queue is full"
+        );
         state.pending.insert(entry.id.clone(), entry);
         self.write_state(state).await
     }
 
-    pub(super) async fn load_pending(&self, id: String) -> anyhow::Result<Option<DeliveryQueueEntry>> {
+    pub(super) async fn load_pending(
+        &self,
+        id: String,
+    ) -> anyhow::Result<Option<DeliveryQueueEntry>> {
         validate_id(&id)?;
         let (_guard, state) = self.locked_state().await?;
         Ok(state.pending.get(&id).cloned())
@@ -124,15 +141,24 @@ impl ChannelDeliveryStore {
         validate_entry(&entry)?;
         let (_guard, mut state) = self.locked_state().await?;
         if let Some(existing) = state.failed.get(&entry.id) {
-            anyhow::ensure!(existing == &entry, "delivery id conflicts with failed entry");
+            anyhow::ensure!(
+                existing == &entry,
+                "delivery id conflicts with failed entry"
+            );
             return Ok(());
         }
-        anyhow::ensure!(state.failed.len() < DELIVERY_PENDING_CAPACITY, "failed delivery store is full");
+        anyhow::ensure!(
+            state.failed.len() < DELIVERY_PENDING_CAPACITY,
+            "failed delivery store is full"
+        );
         state.failed.insert(entry.id.clone(), entry);
         self.write_state(state).await
     }
 
-    pub(super) async fn load_failed(&self, id: String) -> anyhow::Result<Option<DeliveryQueueEntry>> {
+    pub(super) async fn load_failed(
+        &self,
+        id: String,
+    ) -> anyhow::Result<Option<DeliveryQueueEntry>> {
         validate_id(&id)?;
         let (_guard, state) = self.locked_state().await?;
         Ok(state.failed.get(&id).cloned())
@@ -140,7 +166,10 @@ impl ChannelDeliveryStore {
 
     pub(super) async fn save_result(&self, result: DeliveryTerminalResult) -> anyhow::Result<()> {
         validate_id(&result.id)?;
-        anyhow::ensure!(!result.intent_fingerprint.is_empty() && result.intent_fingerprint.len() <= 128, "delivery fingerprint is invalid");
+        anyhow::ensure!(
+            !result.intent_fingerprint.is_empty() && result.intent_fingerprint.len() <= 128,
+            "delivery fingerprint is invalid"
+        );
         anyhow::ensure!(
             serde_json::to_vec(&result).map_or(false, |bytes| bytes.len() <= DELIVERY_RECORD_BYTES),
             "delivery result exceeds its record limit"
@@ -148,15 +177,24 @@ impl ChannelDeliveryStore {
         let (_guard, mut state) = self.locked_state().await?;
         prune_results(&mut state, now_unix_ms());
         if let Some(existing) = state.results.get(&result.id) {
-            anyhow::ensure!(existing == &result, "delivery id conflicts with terminal result");
+            anyhow::ensure!(
+                existing == &result,
+                "delivery id conflicts with terminal result"
+            );
             return Ok(());
         }
-        anyhow::ensure!(state.results.len() < DELIVERY_RESULT_CAPACITY, "delivery result replay store is full");
+        anyhow::ensure!(
+            state.results.len() < DELIVERY_RESULT_CAPACITY,
+            "delivery result replay store is full"
+        );
         state.results.insert(result.id.clone(), result);
         self.write_state(state).await
     }
 
-    pub(super) async fn load_result(&self, id: String) -> anyhow::Result<Option<DeliveryTerminalResult>> {
+    pub(super) async fn load_result(
+        &self,
+        id: String,
+    ) -> anyhow::Result<Option<DeliveryTerminalResult>> {
         validate_id(&id)?;
         let (_guard, mut state) = self.locked_state().await?;
         prune_results(&mut state, now_unix_ms());
@@ -169,23 +207,38 @@ impl ChannelDeliveryStore {
 }
 
 fn validate_state(state: &DeliveryState) -> anyhow::Result<()> {
-    anyhow::ensure!(state.pending.len() <= DELIVERY_PENDING_CAPACITY, "pending delivery store exceeds capacity");
-    anyhow::ensure!(state.failed.len() <= DELIVERY_PENDING_CAPACITY, "failed delivery store exceeds capacity");
-    anyhow::ensure!(state.results.len() <= DELIVERY_RESULT_CAPACITY, "delivery result store exceeds capacity");
+    anyhow::ensure!(
+        state.pending.len() <= DELIVERY_PENDING_CAPACITY,
+        "pending delivery store exceeds capacity"
+    );
+    anyhow::ensure!(
+        state.failed.len() <= DELIVERY_PENDING_CAPACITY,
+        "failed delivery store exceeds capacity"
+    );
+    anyhow::ensure!(
+        state.results.len() <= DELIVERY_RESULT_CAPACITY,
+        "delivery result store exceeds capacity"
+    );
     for (id, entry) in state.pending.iter().chain(state.failed.iter()) {
         anyhow::ensure!(id == &entry.id, "delivery store key does not match record");
         validate_entry(entry)?;
     }
     for (id, result) in &state.results {
         validate_id(id)?;
-        anyhow::ensure!(id == &result.id, "delivery result key does not match record");
+        anyhow::ensure!(
+            id == &result.id,
+            "delivery result key does not match record"
+        );
     }
     Ok(())
 }
 
 fn validate_entry(entry: &DeliveryQueueEntry) -> anyhow::Result<()> {
     validate_id(&entry.id)?;
-    anyhow::ensure!(entry.intent.idempotency_key == entry.id, "delivery id does not match intent key");
+    anyhow::ensure!(
+        entry.intent.idempotency_key == entry.id,
+        "delivery id does not match intent key"
+    );
     anyhow::ensure!(
         serde_json::to_vec(entry).map_or(false, |bytes| bytes.len() <= DELIVERY_RECORD_BYTES),
         "delivery record exceeds its limit"
@@ -200,7 +253,9 @@ fn validate_id(id: &str) -> anyhow::Result<()> {
 
 fn prune_results(state: &mut DeliveryState, now_ms: u64) {
     let ttl_ms = DELIVERY_RESULT_TTL_SECONDS.saturating_mul(1000);
-    state.results.retain(|_, result| result.completed_at_unix_ms.saturating_add(ttl_ms) > now_ms);
+    state
+        .results
+        .retain(|_, result| result.completed_at_unix_ms.saturating_add(ttl_ms) > now_ms);
 }
 
 fn now_unix_ms() -> u64 {

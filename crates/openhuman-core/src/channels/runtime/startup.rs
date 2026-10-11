@@ -1,7 +1,7 @@
 //! Channel startup wiring.
 
-mod chat_workload;
 mod callback;
+mod chat_workload;
 mod credentials;
 mod delivery_store;
 mod module_providers;
@@ -13,7 +13,7 @@ mod turn_parts;
 pub(crate) use credentials::hydrate_channel_credentials;
 pub use start_channels::start_channels;
 pub(crate) use start_channels::start_channels_with_session;
-pub(crate) use turn_parts::{build_channel_turn_parts, runtime_context, PromptToolDescs};
+pub(crate) use turn_parts::{PromptToolDescs, build_channel_turn_parts, runtime_context};
 
 // Re-exported at module scope (rather than left as private `pub(super)`
 // items reached only through their owning submodule) so the `#[path]` test
@@ -22,7 +22,7 @@ pub(crate) use turn_parts::{build_channel_turn_parts, runtime_context, PromptToo
 #[cfg(test)]
 use crate::config::Config;
 #[cfg(test)]
-use chat_workload::{resolve_chat_workload, ChatWorkloadResolution};
+use chat_workload::{ChatWorkloadResolution, resolve_chat_workload};
 #[cfg(any(test, debug_assertions))]
 use credentials::resolve_yuanbao_app_secret;
 #[cfg(test)]
