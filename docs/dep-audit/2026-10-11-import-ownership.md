@@ -26,13 +26,13 @@ This cleanup does not complete the component migrations tracked by the other
 children of the epic. Their remaining implementation facades require released
 bus contracts and host adoption in the owning migration:
 
-| Remaining boundary | Owning work |
-| --- | --- |
-| TinyBox jail and shell classification | #7391, #7392 |
+| Remaining boundary                                     | Owning work         |
+| ------------------------------------------------------ | ------------------- |
+| TinyBox jail and shell classification                  | #7391, #7392        |
 | TinyFlows builder, checkpoints and schedule vocabulary | #7395, #7396, #7397 |
-| Channel runtime and provider implementations | #7412 |
-| MCP transport clients and registry adapters | #7416 |
-| Wallet protocol and ledger implementation | #7406 |
+| Channel runtime and provider implementations           | #7412               |
+| MCP transport clients and registry adapters            | #7416               |
+| Wallet protocol and ledger implementation              | #7406               |
 
 The always-on wallet error sentinel stays available through the core until a
 released TinyWallet bus exposes it. RPC and observability classify that producer
