@@ -648,7 +648,7 @@ dependencies = [
  "cap-primitives",
  "cap-std",
  "io-lifetimes 3.0.1",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -665,7 +665,7 @@ dependencies = [
  "maybe-owned",
  "rustix",
  "rustix-linux-procfs",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
  "winx",
 ]
 
@@ -3444,7 +3444,7 @@ dependencies = [
  "png 0.18.1",
  "serde",
  "thiserror 2.0.20",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4061,7 +4061,7 @@ dependencies = [
  "tinystoragedrivers",
  "tinytools",
  "tinytools-agent",
- "tinytools-std 0.5.0",
+ "tinytools-std",
  "tinyvoice-bus",
  "tinywallet-bus",
  "tinywallet-crypto",
@@ -5947,7 +5947,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3d1e2c7f27f8d4cb10542a02c49005dbd6e93095799d6f3be745fae9f8fedd4"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6881,7 +6881,7 @@ dependencies = [
  "tinystoragedrivers-core",
  "tinytools",
  "tinytools-agent",
- "tinytools-std 0.5.0",
+ "tinytools-std",
  "tokio",
  "tracing",
  "uuid",
@@ -7445,7 +7445,7 @@ dependencies = [
  "thiserror 2.0.20",
  "tinymcp-bus",
  "tinytools",
- "tinytools-std 0.5.0 (git+https://github.com/tinyhumansai/tinytools?rev=360721bc3c7a26221b61f6629f5f0415cfccb568)",
+ "tinytools-std",
  "tokio",
  "tokio-stream",
  "tracing",
@@ -7652,31 +7652,6 @@ dependencies = [
 [[package]]
 name = "tinytools-std"
 version = "0.5.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "base64 0.23.1",
- "fs2",
- "futures-util",
- "glob",
- "libc",
- "log",
- "parking_lot",
- "regex",
- "reqwest 0.12.28",
- "rustix",
- "serde_json",
- "sha2 0.11.0",
- "tinytools",
- "tokio",
- "tracing",
- "walkdir",
-]
-
-[[package]]
-name = "tinytools-std"
-version = "0.5.0"
-source = "git+https://github.com/tinyhumansai/tinytools?rev=360721bc3c7a26221b61f6629f5f0415cfccb568#360721bc3c7a26221b61f6629f5f0415cfccb568"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8159,7 +8134,7 @@ dependencies = [
  "png 0.18.1",
  "serde",
  "thiserror 2.0.20",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -8249,7 +8224,7 @@ checksum = "f2f6fb2847f6742cd76af783a2a2c49e9375d0a111c7bef6f71cd9e738c72d6e"
 dependencies = [
  "memoffset",
  "tempfile",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

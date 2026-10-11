@@ -1,8 +1,6 @@
 use crate::config::Config;
 use crate::core::Outcome;
-use crate::cron::{
-    self, add_shell_job, get_job, update_job, CronJob, CronJobPatch, CronRun, Schedule,
-};
+use crate::cron::{self, add_shell_job, update_job, CronJob, CronJobPatch, CronRun, Schedule};
 use crate::security::SecurityPolicy;
 use anyhow::Result;
 use once_cell::sync::Lazy;
@@ -100,7 +98,7 @@ pub fn update_cron_job(
     // Merge expression/tz with the existing schedule so that
     // tz alone updates the timezone and expression alone preserves the timezone.
     let schedule = if expression.is_some() || tz.is_some() {
-        let existing = get_job(config, id)?;
+        let existing = cron::get_job(config, id)?;
         let (existing_expr, existing_tz, existing_active) = match existing.schedule {
             Schedule::Cron {
                 expr,
