@@ -80,6 +80,9 @@ impl Respond for CallTools {
             "delegate",
             "curl",
             "install_workflow_from_url",
+            "http_request",
+            "run_workflow",
+            "delegate_to",
         ];
         completion["choices"][0]["message"]["tool_calls"] = json!(names.iter().enumerate().map(|(i, name)| json!({"id":format!("call_{i}"),"type":"function","function":{"name":name,"arguments":"{}"}})).collect::<Vec<_>>());
         let body: Value = serde_json::from_slice(&request.body).unwrap();
@@ -135,6 +138,9 @@ async fn scenario() {
                     "delegate",
                     "curl",
                     "install_workflow_from_url",
+            "http_request",
+            "run_workflow",
+            "delegate_to",
                 ]
                 .into_iter()
                 .map(|name| {
@@ -153,6 +159,9 @@ async fn scenario() {
             "delegate".into(),
             "curl".into(),
             "install_workflow_from_url".into(),
+            "http_request".into(),
+            "run_workflow".into(),
+            "delegate_to".into(),
         ]))
         .can_use_tool(|_| Box::pin(async { ToolHookDecision::Proceed }))
         .channel_permissions([
