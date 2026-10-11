@@ -47,7 +47,10 @@ impl Respond for Arrivals {
     fn respond(&self, request: &Request) -> ResponseTemplate {
         let body: serde_json::Value = serde_json::from_slice(&request.body).unwrap();
         let prompt = last_user_message(&body);
-        self.0.lock().unwrap().push((prompt.clone(), Instant::now()));
+        self.0
+            .lock()
+            .unwrap()
+            .push((prompt.clone(), Instant::now()));
         let reply = ResponseTemplate::new(200).set_body_json(chat_completion("ok"));
         if prompt.contains("slow") {
             reply.set_delay(SLOW)
@@ -135,7 +138,10 @@ async fn scenario() {
     // The sweep runs Alice's job, but only once her chat turn is over.
     let later = chrono::Utc::now() + chrono::Duration::hours(1);
     let report = runtime.sweep_cron_at(later).await;
-    assert_eq!(report.ran, 1, "the occurrence is deferred, not skipped: {report:?}");
+    assert_eq!(
+        report.ran, 1,
+        "the occurrence is deferred, not skipped: {report:?}"
+    );
     let cron_started = arrivals.wait_for("alice cron").await;
     assert!(
         cron_started >= chat_started + SLOW,
