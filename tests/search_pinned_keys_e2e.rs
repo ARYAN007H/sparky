@@ -43,9 +43,11 @@ impl Write for Captured {
 /// One agent's config: the embedder's shape. Both agents share the runtime's
 /// `config_path`, as every agent of an embedded runtime does.
 fn agent_config(root: &Path, provider_url: &str, key: &str) -> Config {
-    let mut config = Config::default();
-    config.config_path = root.join("config.toml");
-    config.workspace_dir = root.join("workspace");
+    let mut config = Config {
+        config_path: root.join("config.toml"),
+        workspace_dir: root.join("workspace"),
+        ..Config::default()
+    };
     config.secrets.encrypt = false;
     // Brave alone serves search, whatever else the process could reach.
     config
