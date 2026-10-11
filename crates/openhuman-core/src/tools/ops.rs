@@ -628,47 +628,14 @@ pub fn all_tools_with_runtime(
     // `mcp::registry` domain gated above. Both are compiled out by the `mcp`
     // feature; see the static-vs-dynamic note in AGENTS.md.
     #[cfg(feature = "mcp")]
-    {
-        let mcp_registry = {
-            // Built from the converted configuration, which is the one place
-            // the two vocabularies meet. A registry that cannot be built is
-            // logged and treated as empty: a malformed proxy or TLS setting
-            // must not take the whole tool surface down with it.
-            let base = crate::mcp::host::static_registry(root_config);
-            Arc::new(base)
-        };
-        log::debug!(
-            "[tools::ops][mcp_client] static servers={}",
-            mcp_registry.list().len()
-        );
-        if !mcp_registry.is_empty() {
-            let mcp_config = Arc::new(root_config.clone());
-            tools.push(Box::new(McpListServersTool::new(Arc::clone(&mcp_config))));
-            tools.push(Box::new(McpListToolsTool::new(Arc::clone(&mcp_config))));
-            tools.push(Box::new(mcp_call_tool(
-                Arc::new(root_config.clone()),
-                security.clone(),
-            )));
-            tracing::debug!(
-                count = mcp_registry.list().len(),
-                "[mcp_client] registered generic MCP bridge tools"
-            );
-            // And every cached server tool as its own `mcp_<server>_<tool>`,
-            // deferred unless the server asks for direct exposure. Names
-            // already taken keep their owner.
-            let reserved: std::collections::HashSet<String> =
-                tools.iter().map(|tool| tool.name().to_string()).collect();
-            tools.extend(
-                crate::tools::implementations::network::configured_server_tools(
-                    root_config,
-                    &mcp_registry,
-                    security,
-                    &reserved,
-                ),
-            );
-        } else {
-            tracing::debug!("[mcp_client] no MCP servers registered — bridge tools skipped");
-        }
+    if root_config.mcp_client.enabled && !root_config.mcp_client.servers.is_empty() {
+        // Catalog retrieval runs in the async turn prelude. This synchronous
+        // baseline contributes only the generic bridge; per-tool executors
+        // are projected from the module-prepared snapshot there.
+        let mcp_config = Arc::new(root_config.clone());
+        tools.push(Box::new(McpListServersTool::new(Arc::clone(&mcp_config))));
+        tools.push(Box::new(McpListToolsTool::new(Arc::clone(&mcp_config))));
+        tools.push(Box::new(mcp_call_tool(mcp_config, security.clone())));
     }
 
     tools.extend(crate::search::build_search_tools(root_config));
