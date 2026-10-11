@@ -150,6 +150,13 @@ impl DocumentStore for Documents {
     }
 }
 
+/// Size and mtime of the SQLite job store, if it exists: unchanged means
+/// nothing fell back to it.
+fn sqlite_stamp(config: &Config) -> Option<(u64, std::time::SystemTime)> {
+    let meta = std::fs::metadata(config.workspace_dir.join("cron/jobs.db")).ok()?;
+    Some((meta.len(), meta.modified().ok()?))
+}
+
 pub(super) async fn policy_reads_refuse_execution_without_consuming_a_slot(case: Case) {
     let workspace = tempfile::tempdir().unwrap();
     let config = Config {
@@ -170,6 +177,7 @@ pub(super) async fn policy_reads_refuse_execution_without_consuming_a_slot(case:
         inner: case.backend(),
         faults: Arc::clone(&faults),
     }));
+    let sqlite_before = sqlite_stamp(&config);
     let model_calls = Arc::new(AtomicUsize::new(0));
     let mut overrides = openhuman_core::agent::host_overrides::HostOverrides::default();
     overrides.model = Some(Arc::new(recording_model::RecordingModel(Arc::clone(
@@ -322,8 +330,9 @@ pub(super) async fn policy_reads_refuse_execution_without_consuming_a_slot(case:
         "manual paths executed the job"
     );
     assert!(!format!("{direct:?}{agent:?}{manual:?}{queued:?}{tool:?}").contains("secret"));
-    assert!(
-        !config.workspace_dir.join("cron/jobs.db").exists(),
+    assert_eq!(
+        sqlite_stamp(&config),
+        sqlite_before,
         "configured storage fell back to SQLite"
     );
     let reads = faults.calls.lock().unwrap();
