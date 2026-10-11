@@ -35,7 +35,7 @@ impl OpenHumanChannelBackend {
     /// Deliver module-prepared content through the configured product transport.
     pub(crate) async fn send_prepared(
         &self,
-        prepared: tinychannels_bus::PreparedChannelIntent,
+        prepared: tinychannels_bus::module_runtime::PreparedChannelIntent,
     ) -> anyhow::Result<ChannelSendMessageResult> {
         if tinychannels::relay::relay_runtime_fronts_channel(
             &self.config.channels_config,

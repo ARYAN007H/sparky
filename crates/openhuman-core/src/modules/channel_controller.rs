@@ -64,14 +64,14 @@ pub(crate) async fn prepare_message(
     client: &ModuleClient,
     channel: &str,
     message: serde_json::Value,
-) -> Result<tinychannels_bus::PreparedChannelIntent, ModuleCallError> {
+) -> Result<tinychannels_bus::module_runtime::PreparedChannelIntent, ModuleCallError> {
     client
         .call_confidential(
             "tinychannels",
             methods::PREPARE_OUTBOUND_INTENT,
             (
                 channel,
-                tinychannels_bus::ChannelMessagePreparation::Legacy(message),
+                tinychannels_bus::module_runtime::ChannelMessagePreparation::Legacy(message),
             ),
         )
         .await

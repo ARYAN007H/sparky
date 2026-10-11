@@ -14,7 +14,7 @@ use super::backend::OpenHumanChannelBackend;
 use super::definitions::ChannelAuthMode;
 use crate::channels::contract_schema::from_channel_controller_schema;
 use crate::security::credentials::channel_credential_provider;
-use tinychannels::{ChannelManager, ChannelsConfig};
+use tinychannels::ChannelManager;
 use tinychannels_bus::controllers::{all_channel_controller_schemas, channel_controller_schema};
 
 // ---------------------------------------------------------------------------
