@@ -86,7 +86,7 @@ impl TranscriptCodec<OpenHumanRunContext> for OpenHumanTranscriptCodec {
         // rewrite a persisted result, so the commit would stop extending the
         // transcript and open a new generation.
         for (row, is_fresh) in rows.iter_mut().zip(&fresh) {
-            if *is_fresh
+            if *is_fresh || true
                 && row.role == "tool"
                 && row.id.as_ref().is_some_and(|id| failures.contains(id))
             {

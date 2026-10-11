@@ -174,6 +174,14 @@ async fn scenario() {
     eprintln!("SHELLJOB TURN 3: {denied:?}");
     let denied = handle.chat("t1", "run shell").await;
     eprintln!("DENIED TURN 4: {denied:?}");
+    let r = handle.chat("t1", "schedule it").await;
+    eprintln!("RESCHEDULE: {r:?}");
+    eprintln!("SWEEP: {}", runtime.sweep_cron_at(later + chrono::Duration::hours(2)).await.ran);
+    tokio::time::sleep(Duration::from_secs(5)).await;
+    for i in 0..3 {
+        let r = handle.chat("t1", "make a shell job").await;
+        eprintln!("SHELLJOB again {i}: {r:?}");
+    }
     handle.chat("t1", "and once more").await.unwrap();
     let requests = chat_requests(&chat).await;
     assert!(
