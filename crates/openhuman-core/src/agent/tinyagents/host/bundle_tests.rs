@@ -100,5 +100,8 @@ async fn hosted_orchestrator_allows_deferred_browser_discovery() {
         .await
         .expect("resolve")
         .expect("orchestrator");
-    assert!(definition.tools.contains(&"browser_open".to_string()));
+    let tinyagents_definition::ToolScope::Named(tools) = definition.tools else {
+        panic!("host scope must be explicit")
+    };
+    assert!(tools.contains(&"browser_open".to_string()));
 }
