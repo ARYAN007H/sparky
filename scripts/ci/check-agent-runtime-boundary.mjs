@@ -36,6 +36,8 @@ const embedContractExports = new Map(
       "crates/openhuman-embed/src/lib.rs",
       [
         "pub use tinytools::ToolPolicy;",
+        // Existing embed tool injection API now names its contract directly.
+        "pub use tinytools::{PermissionLevel, Tool, ToolExposure, ToolResult};",
         "pub use tinyinference_llm::message::MessageDelta;",
         "pub use tinyinference_llm::model::{ChatModel, DeferredHandle, DeferredStatus, ModelProfile, ModelRequest, ModelResponse, ModelStream, ModelStreamItem, ModelStreamMetadata};",
         "pub use tinyinference_llm::{Error, Result};",
