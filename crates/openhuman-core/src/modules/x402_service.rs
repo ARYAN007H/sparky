@@ -6,8 +6,7 @@ use std::sync::OnceLock;
 use tinywallet_bus::names::methods;
 use tinywallet_bus::wire::{
     X402CloseRequest, X402ConfigResponse, X402ConfigureRequest, X402DetailedSpendingSummary,
-    X402ListPaymentsRequest, X402ListPaymentsResponse, X402ServiceHandle,
-    X402UpdateBudgetRequest,
+    X402ListPaymentsRequest, X402ListPaymentsResponse, X402ServiceHandle, X402UpdateBudgetRequest,
 };
 
 use crate::config::Config;
@@ -94,10 +93,7 @@ async fn ensure_service(
     Ok(())
 }
 
-async fn with_service<R, F, Fut>(
-    config: &Config,
-    operation: F,
-) -> Result<R, WalletCallError>
+async fn with_service<R, F, Fut>(config: &Config, operation: F) -> Result<R, WalletCallError>
 where
     F: FnOnce(X402ServiceHandle) -> Fut,
     Fut: std::future::Future<Output = Result<R, WalletCallError>>,
@@ -156,20 +152,21 @@ pub(crate) async fn update_budget(
 ) -> Result<tinywallet_bus::wire::X402SpendingSummary, WalletCallError> {
     let config = config.clone();
     let operation_config = config.clone();
-    let result: tinywallet_bus::wire::X402SpendingSummary = with_service(&config, move |service| async move {
-        wallet::call(
-            &operation_config,
-            methods::X402_UPDATE_BUDGET,
-            X402UpdateBudgetRequest {
-                service,
-                per_request_max_atomic,
-                daily_max_atomic,
-                monthly_max_atomic,
-            },
-        )
-        .await
-    })
-    .await?;
+    let result: tinywallet_bus::wire::X402SpendingSummary =
+        with_service(&config, move |service| async move {
+            wallet::call(
+                &operation_config,
+                methods::X402_UPDATE_BUDGET,
+                X402UpdateBudgetRequest {
+                    service,
+                    per_request_max_atomic,
+                    daily_max_atomic,
+                    monthly_max_atomic,
+                },
+            )
+            .await
+        })
+        .await?;
     let mut active = service().lock().await;
     if let Some(current) = active.as_mut() {
         current.config.per_request_max_atomic = result.per_request_max_atomic;
@@ -183,8 +180,7 @@ fn budget_from(get: impl Fn(&str) -> Option<String>) -> (u64, u64, u64) {
     let mut per_request_max_atomic = 1_000_000;
     let mut daily_max_atomic = 10_000_000;
     let mut monthly_max_atomic = 100_000_000;
-    if let Some(value) = get("OPENHUMAN_X402_PER_REQUEST_MAX")
-        .and_then(|value| value.parse().ok())
+    if let Some(value) = get("OPENHUMAN_X402_PER_REQUEST_MAX").and_then(|value| value.parse().ok())
     {
         per_request_max_atomic = value;
     }
@@ -194,11 +190,7 @@ fn budget_from(get: impl Fn(&str) -> Option<String>) -> (u64, u64, u64) {
     if let Some(value) = get("OPENHUMAN_X402_MONTHLY_MAX").and_then(|value| value.parse().ok()) {
         monthly_max_atomic = value;
     }
-    (
-        per_request_max_atomic,
-        daily_max_atomic,
-        monthly_max_atomic,
-    )
+    (per_request_max_atomic, daily_max_atomic, monthly_max_atomic)
 }
 
 fn same_budget(config: &X402ConfigResponse, budget: (u64, u64, u64)) -> bool {
