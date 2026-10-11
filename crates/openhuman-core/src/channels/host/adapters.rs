@@ -327,6 +327,17 @@ impl AllowlistStore for ConfigAllowlistStore {
 /// One capability, two backends — providers don't know which bus they hit.
 pub struct OpenHumanEventSink;
 
+impl OpenHumanEventSink {
+    pub(crate) async fn publish_host(
+        &self,
+        domain: &str,
+        kind: &str,
+        payload: serde_json::Value,
+    ) -> anyhow::Result<()> {
+        publish_event(domain, kind, payload).await
+    }
+}
+
 fn json_str(payload: &serde_json::Value, key: &str) -> String {
     payload
         .get(key)
@@ -335,14 +346,11 @@ fn json_str(payload: &serde_json::Value, key: &str) -> String {
         .to_string()
 }
 
-#[async_trait]
-impl EventSink for OpenHumanEventSink {
-    async fn publish(
-        &self,
-        domain: &str,
-        kind: &str,
-        payload: serde_json::Value,
-    ) -> anyhow::Result<()> {
+async fn publish_event(
+    domain: &str,
+    kind: &str,
+    payload: serde_json::Value,
+) -> anyhow::Result<()> {
         match domain {
             "web" => {
                 let event: crate::web_chat::WebChannelEvent = serde_json::from_value(payload)
@@ -381,6 +389,18 @@ impl EventSink for OpenHumanEventSink {
             }
             other => tracing::warn!("{LOG_PREFIX} unmapped event domain: {other}"),
         }
-        Ok(())
+    Ok(())
+}
+
+#[cfg(test)]
+#[async_trait]
+impl EventSink for OpenHumanEventSink {
+    async fn publish(
+        &self,
+        domain: &str,
+        kind: &str,
+        payload: serde_json::Value,
+    ) -> anyhow::Result<()> {
+        self.publish_host(domain, kind, payload).await
     }
 }
