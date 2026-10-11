@@ -69,12 +69,13 @@ fn profiles_keep_a_nonempty_readonly_permission_map_without_operator_grants() {
 
 #[test]
 fn host_only_admission_does_not_authorize_supervised_mutation_or_unknown_channels() {
+    fn allow(_: &crate::seams::ToolHookContext) -> crate::permission::PermissionFuture<'_> {
+        Box::pin(async { crate::seams::ToolHookDecision::Proceed })
+    }
     let config = SaasConfig::new("/srv/openhuman");
     let options = ProfileHostOptions {
         scope: Some(ToolScopeSpec::HostOnly),
-        permission: Some(Arc::new(crate::permission::PermissionHook::new(|_| {
-            Box::pin(async { crate::seams::ToolHookDecision::Proceed })
-        }))),
+        permission: Some(Arc::new(crate::permission::PermissionHook::new(allow))),
         channels: HashMap::from([("telegram".into(), PermissionLevel::Execute)]),
         ..Default::default()
     };
