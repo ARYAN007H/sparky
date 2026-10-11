@@ -222,9 +222,7 @@ fn voice_controllers_registered_when_feature_on() {
 fn voice_controllers_absent_when_feature_off() {
     let schemas = all_controller_schemas();
     assert!(
-        !schemas
-            .iter()
-            .any(|s| s.namespace == "voice"),
+        !schemas.iter().any(|s| s.namespace == "voice"),
         "voice controllers must be compiled out when the `voice` feature is off"
     );
 }

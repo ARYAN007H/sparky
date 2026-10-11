@@ -107,10 +107,7 @@ pub(crate) fn tool_group(name: &str) -> crate::core::all::DomainGroup {
         return DomainGroup::Media;
     }
     // Voice family prefixes.
-    if name.starts_with("voice_")
-        || name.starts_with("tts_")
-        || name.starts_with("stt_")
-    {
+    if name.starts_with("voice_") || name.starts_with("tts_") || name.starts_with("stt_") {
         return DomainGroup::Voice;
     }
     // Memory family (harness-kept): the single `memory` tool.

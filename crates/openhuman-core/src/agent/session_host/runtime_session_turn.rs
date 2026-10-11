@@ -71,9 +71,16 @@ impl OpenHumanSessionHost {
         // Persisted declarations are historical facts, while the hook still
         // supplies the only executable sources and current policy.
         options.run_context.data.recorded_tool_names = std::sync::Arc::new(
-            self.runtime_session.as_ref()
+            self.runtime_session
+                .as_ref()
                 .and_then(|runtime| runtime.recorded_tools())
-                .map(|snapshot| snapshot.specs().iter().map(|spec| spec.name.clone()).collect())
+                .map(|snapshot| {
+                    snapshot
+                        .specs()
+                        .iter()
+                        .map(|spec| spec.name.clone())
+                        .collect()
+                })
                 .unwrap_or_default(),
         );
         let agent_id = self.agent_definition_id.clone();

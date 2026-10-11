@@ -175,7 +175,9 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             .map(|spec| spec.name.clone())
             .collect();
         ensure_snapshot_tools_are_executable(
-            &visible_tool_names, &tools, &synthesized_tools,
+            &visible_tool_names,
+            &tools,
+            &synthesized_tools,
             &request.run_context.data.recorded_tool_names,
         )?;
         // The harness must speak the dialect this session's prompt was
