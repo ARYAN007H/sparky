@@ -78,6 +78,9 @@ impl OpenHumanSessionHost {
     /// The welcome agent uses this entry point when routed from the
     /// Tauri web channel (see `channels::provider::web::build_session_agent`).
     pub fn from_config_for_agent(config: &Config, agent_id: &str) -> Result<Self> {
+        // A hosted profile never receives the ordinary config-derived belt.
+        // Its operator-selected factory carries registration and permission
+        // boundaries into the same session builder, under this profile scope.
         if crate::profiles::capabilities::ProfileCapabilities::current().is_some() {
             return Self::from_config_for_agent_session(config, agent_id, None);
         }
