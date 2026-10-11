@@ -213,6 +213,8 @@ fn family_for_rust_name(name: &str) -> Option<&'static ToolFamily> {
 /// - UI toggle IDs (legacy / partial-rollout format)
 ///
 /// Unknown entries are ignored.
+// keep until v0.66 (review after 2027-01-11): persisted app-state opt-in keys
+// need a one-shot rename before this alias can be removed safely.
 const LEGACY_ALIASES: &[(&str, &str)] = &[("skill_manage", "workflow_manage")];
 
 fn expand_enabled_tool_names(enabled_tool_names: &[String]) -> HashSet<String> {
