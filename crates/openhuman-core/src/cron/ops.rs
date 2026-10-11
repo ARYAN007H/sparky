@@ -84,6 +84,7 @@ pub fn resume_job(config: &Config, id: &str) -> Result<CronJob> {
 /// `expression` and `tz` are merged with the existing [`Schedule::Cron`] fields; the
 /// existing `active_hours` is always preserved as-is.  To set or clear `active_hours`
 /// directly, use the RPC path (`cron.update` with a full [`CronJobPatch`]).
+#[cfg(test)]
 pub fn update_cron_job(
     config: &Config,
     id: &str,
@@ -187,9 +188,8 @@ pub async fn cron_update(
             &config.workspace_dir,
             &config.action_dir,
         );
-        if !security.is_command_allowed(command) {
-            return Err(format!("Command blocked by security policy: {command}"));
-        }
+        crate::cron::scheduler::shell_job::authorize_shell_command(config, &security, command)
+            .await?;
     }
 
     let updated = cron::update_job(config, job_id.trim(), patch).map_err(|e| e.to_string())?;
@@ -228,6 +228,11 @@ pub async fn cron_run(config: &Config, job_id: &str) -> Result<Outcome<serde_jso
 
     // Fail closed before queueing anything: an unreadable policy refuses the run.
     cron::policy::get_policy(config, job_id).map_err(|e| e.to_string())?;
+    cron::limits::check_run(
+        config,
+        &cron::get_job(config, job_id).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())?;
 
     // Guard against duplicate concurrent executions for the same job.
     {
@@ -290,6 +295,7 @@ pub async fn cron_run(config: &Config, job_id: &str) -> Result<Outcome<serde_jso
 pub async fn run_job_now(config: &Config, job_id: &str) -> Result<(bool, String), String> {
     let job = cron::get_job(config, job_id.trim()).map_err(|e| e.to_string())?;
     cron::policy::get_policy(config, &job.id).map_err(|e| e.to_string())?;
+    cron::limits::check_run(config, &job).map_err(|e| e.to_string())?;
     let Some(_guard) = try_acquire_run(&job.id) else {
         tracing::debug!(job_id = %job.id, "[cron_run] job already running; refused");
         return Err(format!("cron job '{}' is already running", job.id));
