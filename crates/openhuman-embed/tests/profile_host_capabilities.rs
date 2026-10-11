@@ -391,7 +391,7 @@ async fn scenario() {
     for handle in &handles {
         assert!(
             handle
-                .call::<Value>(
+                .call::<_, Value>(
                     "openhuman.memory_items_list",
                     json!({"filter":{"reach":{"at":"","descendants":true,"inherit":true}}})
                 )
