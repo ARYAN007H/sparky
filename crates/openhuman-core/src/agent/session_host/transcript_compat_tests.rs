@@ -650,7 +650,7 @@ fn resumed_thread_with_retired_podcast_tool_remains_usable() {
             ..Default::default()
         };
         let security = Arc::new(crate::security::SecurityPolicy::default());
-        let live = crate::tools::all_tools(
+        let live = crate::tools::ops::all_tools(
             Arc::new(config.clone()), &security, crate::security::AuditLogger::disabled(),
             &config.browser, &config.http_request, root.path(),
             &std::collections::HashMap::new(), &config,
