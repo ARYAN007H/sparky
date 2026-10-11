@@ -95,6 +95,82 @@ fn tinybox_registry_matches_the_published_v0119_release_manifest() {
 }
 
 #[test]
+fn tinymcp_registry_matches_the_published_v081_release_manifest() {
+    let record = find("tinymcp").expect("compiled TinyMCP module");
+    assert_eq!(record.version, "0.8.1");
+    assert_eq!(tinymcp_bus::CONTRACT_VERSION, (1, 12));
+    assert_eq!(
+        record.release_url,
+        "https://github.com/tinyhumansai/tinymcp/releases/tag/v0.8.1"
+    );
+
+    let actual = record
+        .assets
+        .iter()
+        .map(|asset| (asset.host_key, asset.archive, asset.sha256))
+        .collect::<Vec<_>>();
+    let published = [
+        (
+            "ubuntu-24.04-x86_64",
+            "tinymcp-0.8.1-ubuntu-24.04-x86_64.tar.gz",
+            "54e05304cc088f83aeb858780426d06aebe4ed604c8a92d8d66136c532807c21",
+        ),
+        (
+            "ubuntu-24.04-arm64",
+            "tinymcp-0.8.1-ubuntu-24.04-arm64.tar.gz",
+            "78bfa9a7e6751b6f7b7c2d6242f6e5f9369421e4ff54e5aef990f1324a386325",
+        ),
+        (
+            "ubuntu-22.04-x86_64",
+            "tinymcp-0.8.1-ubuntu-22.04-x86_64.tar.gz",
+            "eb190c7af70801d17592027dba60c4669e804244b3111859444ca641c209a588",
+        ),
+        (
+            "ubuntu-22.04-arm64",
+            "tinymcp-0.8.1-ubuntu-22.04-arm64.tar.gz",
+            "59dffc24b69552854bc9c6dd1f2d4c07293d15e44d3a4de44a86387b1afb0725",
+        ),
+        (
+            "macos-26-arm64",
+            "tinymcp-0.8.1-macos-26-arm64.tar.gz",
+            "05df5adc80296ba4a6882d5aa519fcdbd7ccd8671ee94ad8b647268bc0cd0523",
+        ),
+        (
+            "macos-26-x86_64",
+            "tinymcp-0.8.1-macos-26-x86_64.tar.gz",
+            "9e4047d0fc1b54f9ec9aa531a604771e2037390a5178413e652248a9e64eef91",
+        ),
+        (
+            "macos-15-arm64",
+            "tinymcp-0.8.1-macos-15-arm64.tar.gz",
+            "cdf409f7e2e93e9d75f35d8f4e7186ddd090a583a48eddf33ef62b1d83c2af89",
+        ),
+        (
+            "macos-15-x86_64",
+            "tinymcp-0.8.1-macos-15-x86_64.tar.gz",
+            "0bc9156d0c2bcf9ba6e9277ee9ad3846185dc2192624f5989ab1331ed12ddaf6",
+        ),
+        (
+            "windows-2025-x86_64",
+            "tinymcp-0.8.1-windows-2025-x86_64.zip",
+            "f2a32c36fe35c7d24e1bcccf489a686e01c3fb875ec10662be45c2858a24e280",
+        ),
+        (
+            "windows-2022-x86_64",
+            "tinymcp-0.8.1-windows-2022-x86_64.zip",
+            "e9b14fd191d2269bb6cc088c76e3ff96a8d97197be9554b0ac8fddd9365c92cc",
+        ),
+        (
+            "windows-11-arm64",
+            "tinymcp-0.8.1-windows-11-arm64.zip",
+            "6fe315376f651a9f425c437d76f4bf50f0a8838d783a94d0fecf61fb2adb71a9",
+        ),
+    ];
+
+    assert_eq!(actual, published);
+}
+
+#[test]
 fn ids_and_bus_names_are_unique() {
     // Two records claiming one bus name is a conflict tinybus would only
     // surface at load time, on whichever one happened to be second.
