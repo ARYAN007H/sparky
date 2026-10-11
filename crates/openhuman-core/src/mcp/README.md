@@ -30,11 +30,18 @@ OpenHuman configuration to bus DTOs and applies product proxy and credential
 transport policy. Registry handlers and agent tools call module operations,
 then translate outcomes into OpenHuman RPC results and domain events.
 
+The configured object's bus path remains private to `module_client.rs`. Open
+and close operations keep transition receipts so retries can finish after a
+caller is cancelled or loses its reply. Calls that carry client credentials
+use TinyBus confidential delivery.
+
 The local MCP server keeps its OpenHuman tool catalog, authorization policy,
 write audit decisions, and RPC dispatch. TinyMCP owns the protocol session,
 stdio/HTTP framing, HTTP session admission, and transport lifecycle. The host
 passes requests and callbacks through bus operations rather than parsing MCP
-protocol messages itself.
+protocol messages itself. A successful HTTP DELETE closes the module session
+before the host cancels and joins its in-flight callback and removes the local
+session; a rejected DELETE leaves the host session intact.
 
 ## Host responsibilities
 

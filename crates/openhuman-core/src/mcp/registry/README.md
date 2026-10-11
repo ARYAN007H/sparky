@@ -35,6 +35,11 @@ calls must not be used for secrets. The module manages protocol state and
 reports typed outcomes. The host translates those outcomes into OpenHuman's
 RPC response shape and domain events.
 
+`McpConfiguredClient` keeps each workspace's module object path private and
+serializes its open, call, and close transitions. It retains transition
+receipts across caller cancellation or lost replies so cleanup can be retried
+without exposing TinyMCP's internal service implementation to host code.
+
 `tools_safe_for_agent` is intentionally host-owned because it is the product's
 prompt-injection policy. Remote descriptions and schemas are scrubbed by the
 module before the host sees them; the host then applies this admission filter
