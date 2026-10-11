@@ -132,6 +132,38 @@ async fn opening_sends_configuration_confidentially_and_reuses_the_ready_object(
 }
 
 #[tokio::test]
+async fn disabling_modules_rejects_a_cached_client_but_keeps_shutdown_cleanup() {
+    let temporary = tempfile::tempdir().expect("temporary workspace");
+    let mut enabled = Config::default();
+    enabled.workspace_dir = temporary.path().to_path_buf();
+    enabled.modules.enabled = true;
+
+    let port = FakePort::default();
+    let opened = Arc::clone(&port.opened);
+    let closed = Arc::clone(&port.closed);
+    let client = McpConfiguredClient::install_test_port(&enabled, Box::new(port))
+        .expect("install test module port");
+    client
+        .call::<bool>(&configured("server"), "ConnectedOverview", ())
+        .await
+        .expect("open enabled module client");
+    assert_eq!(opened.lock().unwrap().len(), 1);
+
+    let mut disabled = enabled;
+    disabled.modules.enabled = false;
+    assert!(matches!(
+        McpConfiguredClient::for_config(&disabled),
+        Err(ModuleCallError::Unavailable)
+    ));
+    assert_eq!(opened.lock().unwrap().len(), 1);
+
+    // Disabling new calls must not drop the prior owner before shutdown can
+    // close the configured TinyMCP object.
+    client.close().await.expect("cleanup cached client");
+    assert_eq!(closed.lock().unwrap().len(), 1);
+}
+
+#[tokio::test]
 async fn configuration_switches_replace_the_object_before_dispatch() {
     let port = FakePort::default();
     let opened = Arc::clone(&port.opened);

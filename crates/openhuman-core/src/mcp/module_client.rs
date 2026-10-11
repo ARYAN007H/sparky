@@ -163,6 +163,11 @@ impl McpConfiguredClient {
     /// reachable until `close` confirms cleanup; workspace/config switching is
     /// serialized by the client itself.
     pub(crate) fn for_config(config: &Config) -> Result<Arc<Self>, ModuleCallError> {
+        if !config.modules.enabled {
+            ModuleClient::report_unavailable(MODULE);
+            return Err(ModuleCallError::Unavailable);
+        }
+
         let data_dir = crate::core::runtime::agent_scope_dir(config);
         let clients = CLIENTS.get_or_init(|| Mutex::new(HashMap::new()));
         let mut clients = clients
