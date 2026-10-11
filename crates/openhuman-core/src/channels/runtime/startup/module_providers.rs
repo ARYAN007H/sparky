@@ -446,7 +446,7 @@ impl ModuleChannel {
                     (self.name.clone(), prepared.intent),
                 )
                 .await
-                .map_err(anyhow::Error::new)?
+                .map_err(anyhow::Error::new)?;
         };
         Ok(())
     }
