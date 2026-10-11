@@ -248,7 +248,7 @@ impl GoalBudgetStopHook {
 }
 
 #[async_trait]
-impl StopHook for GoalBudgetStopHook {
+impl StopHook<crate::agent::cost::TurnCost> for GoalBudgetStopHook {
     fn name(&self) -> &str {
         "thread_goal_budget"
     }

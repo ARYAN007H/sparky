@@ -77,7 +77,7 @@ struct RecordingBudgetStopHook {
 }
 
 #[async_trait]
-impl StopHook for RecordingBudgetStopHook {
+impl StopHook<crate::agent::cost::TurnCost> for RecordingBudgetStopHook {
     fn name(&self) -> &str {
         self.inner.name()
     }
