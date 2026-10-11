@@ -13,6 +13,7 @@
 //! instead.
 
 use std::collections::HashSet;
+use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 
@@ -41,7 +42,8 @@ pub(super) fn is_correctable_class(class: &str) -> bool {
 /// failing calls in the current run.
 #[derive(Default)]
 pub(super) struct RepeatLoopWitness {
-    /// `tool\u{1f}argument-fingerprint` of every call that failed so far.
+    /// `tool\u{1f}argument-fingerprint\u{1f}outcome-hash` of every failure so
+    /// far.
     failed_calls: Mutex<HashSet<String>>,
     /// Calls the repeat guard refused since the last successful call.
     refusals_since_progress: AtomicUsize,
@@ -64,10 +66,21 @@ impl RepeatLoopWitness {
         self.refusals_since_progress.load(Ordering::SeqCst)
     }
 
-    /// A call failed. Returns whether the same tool already failed with the
-    /// same arguments earlier in this run (an identical re-issue).
-    pub(super) fn record_failure(&self, tool: &str, arg_fingerprint: &str) -> bool {
-        let key = format!("{tool}\u{1f}{arg_fingerprint}");
+    /// A call failed with `failure_text`. Returns whether the same tool
+    /// already failed with the same arguments and the same outcome earlier
+    /// in this run (an identical re-issue). The outcome is compared with its
+    /// volatile spans (timestamps, durations, request ids) normalised away; a
+    /// retry that fails differently (a task that got further, a different
+    /// error) is new evidence, not a repeat.
+    pub(super) fn record_failure(
+        &self,
+        tool: &str,
+        arg_fingerprint: &str,
+        failure_text: &str,
+    ) -> bool {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        tinyagents_harness::no_progress::normalize_volatile(failure_text).hash(&mut hasher);
+        let key = format!("{tool}\u{1f}{arg_fingerprint}\u{1f}{:x}", hasher.finish());
         let Ok(mut failed) = self.failed_calls.lock() else {
             return false;
         };

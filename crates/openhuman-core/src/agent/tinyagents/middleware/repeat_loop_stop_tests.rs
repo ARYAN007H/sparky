@@ -4,10 +4,20 @@ use crate::agent::session_host::stop_summary::StopReasonKind;
 #[test]
 fn only_an_identical_re_issue_counts_as_a_repeated_failure() {
     let witness = RepeatLoopWitness::default();
-    assert!(!witness.record_failure("file_read", "a"));
-    assert!(!witness.record_failure("file_read", "b"));
-    assert!(!witness.record_failure("grep", "a"));
-    assert!(witness.record_failure("file_read", "a"));
+    assert!(!witness.record_failure("file_read", "a", "No such file"));
+    assert!(!witness.record_failure("file_read", "b", "No such file"));
+    assert!(!witness.record_failure("grep", "a", "No such file"));
+    assert!(witness.record_failure("file_read", "a", "No such file"));
+}
+
+#[test]
+fn a_retry_that_fails_differently_is_not_a_repeat() {
+    let witness = RepeatLoopWitness::default();
+    assert!(!witness.record_failure("browser_task", "a", "Task ended at step 2"));
+    assert!(!witness.record_failure("browser_task", "a", "Task ended at step 5"));
+    // Only volatile spans differ: still the same outcome.
+    assert!(!witness.record_failure("fetch", "u", "timed out after 31s"));
+    assert!(witness.record_failure("fetch", "u", "timed out after 47s"));
 }
 
 #[test]

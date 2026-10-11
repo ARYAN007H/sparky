@@ -426,7 +426,11 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         };
         let heuristic_failure_text = heuristic_text(tool_name, &failure_text);
         let failed = result.is_error || body_level_failure;
-        let repeated_failure = failed && self.stop.witness().record_failure(tool_name, &arg_fp);
+        let repeated_failure = failed
+            && self
+                .stop
+                .witness()
+                .record_failure(tool_name, &arg_fp, &failure_text);
 
         if !failed {
             self.stop.record_success();
