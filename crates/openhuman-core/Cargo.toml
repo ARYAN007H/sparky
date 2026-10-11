@@ -144,6 +144,7 @@ tinybox-docker = { path = "../../vendor/tinybox/crates/tinybox-docker" }
 # Quote-aware shell command-string scanners (`tinybox_core::shell::scan`); the
 # classification policy built on them stays in `security::policy`.
 tinybox-core = { path = "../../vendor/tinybox/crates/tinybox-core" }
+tinybox-bus = { path = "../../vendor/tinybox/crates/tinybox-bus", optional = true }
 tinyagents-definition = { path = "../../vendor/tinyagents/crates/tinyagents-definition" }
 # Live (realtime voice) agent sessions: `tinyagents-live` runs a
 # `tinyliveagents` provider session (Gemini Live direct/relayed, ElevenLabs
@@ -743,7 +744,7 @@ tinymemes = ["dep:tinymemes"]
 # A loaded module is trusted in-process code with this process's privileges, and
 # tinybus never unloads one. See `crates/openhuman-core/src/modules/` before adding an entry
 # to the registry.
-modules = ["tinybus/modules"]
+modules = ["tinybus/modules", "dep:tinybox-bus"]
 # Voice + audio_toolkit domains: STT/TTS providers, the standalone dictation
 # server, always-on listening, and podcast audio generation/email delivery.
 # Default-ON — the desktop app always ships with voice. Slim / headless builds
