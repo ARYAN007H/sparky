@@ -356,8 +356,8 @@ jobs:
           mkdir -p "$connectors_dir"
           bash scripts/ci-cancel-aware.sh cargo build --release \
             --manifest-path vendor/tinyconnectors/crates/tinyconnectors/Cargo.toml
-          cp vendor/tinyconnectors/target/release/libtinyconnectors.so \
-            "$connectors_dir/libtinyconnectors.so"
+          node scripts/ci/stage-connector-test-module.mjs \
+            vendor/tinyconnectors/target/release/libtinyconnectors.so "$connectors_dir"
           echo "TINYCONNECTORS_TEST_MODULE=$connectors_dir/libtinyconnectors.so" \
             >> "$GITHUB_ENV"
 
