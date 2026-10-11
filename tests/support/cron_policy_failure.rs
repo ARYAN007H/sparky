@@ -277,6 +277,11 @@ pub(super) async fn policy_reads_refuse_execution_without_consuming_a_slot(case:
     })
     .await;
     assert_eq!(
+        faults.writes.load(Ordering::SeqCst),
+        0,
+        "policy refusal mutated persistent job/run state"
+    );
+    assert_eq!(
         scheduled_calls, 0,
         "policy read failure admitted a scheduled job"
     );
