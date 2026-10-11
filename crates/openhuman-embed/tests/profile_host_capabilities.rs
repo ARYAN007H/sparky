@@ -110,8 +110,8 @@ impl Respond for CallTools {
                 call["index"] = json!(index);
             }
         }
-        let chunk = json!({"id":"fixture", "object":"chat.completion.chunk", "model":"fixture", "choices":[{"index":0,"delta":delta,"finish_reason":null}]});
-        let done = json!({"id":"fixture", "object":"chat.completion.chunk", "model":"fixture", "choices":[{"index":0,"delta":{},"finish_reason":completion["choices"][0]["finish_reason"]}], "usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}});
+        let chunk = json!({"id":"fixture", "object":"chat.completion.chunk", "created":1700000000_u64, "model":"fixture", "choices":[{"index":0,"delta":delta,"finish_reason":null}]});
+        let done = json!({"id":"fixture", "object":"chat.completion.chunk", "created":1700000000_u64, "model":"fixture", "choices":[{"index":0,"delta":{},"finish_reason":completion["choices"][0]["finish_reason"]}], "usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}});
         ResponseTemplate::new(200).set_body_raw(
             format!("data: {chunk}\n\ndata: {done}\n\ndata: [DONE]\n\n"),
             "text/event-stream",
@@ -349,13 +349,26 @@ async fn scenario() {
     for handle in &handles {
         let response: Value = tokio::time::timeout(Duration::from_secs(30), async {
             loop {
-                let response: Value = handle.call("openhuman.memory_items_list", json!({"filter":{"reach":{"at":"","descendants":true,"inherit":true}}})).await.unwrap();
-                if response.to_string().contains(&format!("{}-native-learning", handle.id())) { break response; }
+                let response: Value = handle
+                    .call(
+                        "openhuman.memory_items_list",
+                        json!({"filter":{"reach":{"at":"","descendants":true,"inherit":true}}}),
+                    )
+                    .await
+                    .unwrap();
+                if response
+                    .to_string()
+                    .contains(&format!("{}-native-learning", handle.id()))
+                {
+                    break response;
+                }
                 // Native writes acknowledge their durable local queue. Await the
                 // queued worker's store before checking the real engine contents.
                 tokio::time::sleep(Duration::from_millis(10)).await;
             }
-        }).await.expect("the native memory write reaches the shared engine");
+        })
+        .await
+        .expect("the native memory write reaches the shared engine");
         let text = response.to_string();
         assert!(
             text.contains(&format!("{}-secret", handle.id())),
