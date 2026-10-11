@@ -5,8 +5,7 @@
 use crate::agent::bus::AgentTurnResponse;
 use crate::agent::progress::AgentProgress;
 use crate::channels::context::{
-    compact_sender_history, conversation_history_key, is_context_window_overflow_error,
-    ChannelRuntimeContext,
+    compact_sender_history, is_context_window_overflow_error, ChannelRuntimeContext,
 };
 use crate::channels::routes::{
     get_or_create_turn_model_source, get_route_selection, handle_runtime_command_if_needed,
@@ -42,10 +41,53 @@ pub(crate) async fn process_channel_runtime_message(
     ctx: Arc<ChannelRuntimeContext>,
     runtime_msg: RuntimeChannelMessage,
 ) {
+    use tinychannels_bus::module_inbound::{ChannelInboundSource, PrepareChannelInboundRequest};
     let RuntimeChannelMessage {
-        message: msg,
+        message,
         inbound_envelope,
+        authenticated_relay,
+        prepared_inbound,
     } = runtime_msg;
+    let prepared = match prepared_inbound {
+        Some(prepared) => prepared,
+        None => {
+            let config = ctx.config.as_deref().cloned().unwrap_or_default();
+            let source = if message.channel.is_empty() {
+                let Some(envelope) = inbound_envelope else {
+                    return;
+                };
+                ChannelInboundSource::Envelope {
+                    envelope,
+                    timestamp: 0,
+                }
+            } else {
+                ChannelInboundSource::Legacy {
+                    message,
+                    envelope: inbound_envelope,
+                }
+            };
+            match crate::modules::channel_controller::prepare_inbound(
+                &crate::modules::client::ModuleClient::new(config),
+                PrepareChannelInboundRequest {
+                    source,
+                    namespace: "main".into(),
+                    session_policy: Default::default(),
+                },
+            )
+            .await
+            {
+                Ok(prepared) => prepared,
+                Err(error) => {
+                    tracing::warn!("[dispatch] channel preparation failed: {error}");
+                    return;
+                }
+            }
+        }
+    };
+    let msg = prepared.message;
+    let history_key = prepared.history_key;
+    let mut envelope = prepared.envelope;
+    envelope.delivered_via_upstream_relay = authenticated_relay;
 
     println!(
         "  💬 [{}] from {}: {}",
@@ -61,10 +103,7 @@ pub(crate) async fn process_channel_runtime_message(
         reply_target: msg.reply_target.clone(),
         content: msg.content.clone(),
         thread_ts: msg.thread_ts.clone(),
-        inbound_envelope: Some(
-            inbound_envelope
-                .unwrap_or_else(|| tinychannels::inbound_envelope_from_legacy_message(&msg)),
-        ),
+        inbound_envelope: Some(envelope),
         workspace_dir: ctx.workspace_dir.as_ref().clone(),
     });
 
@@ -79,7 +118,9 @@ pub(crate) async fn process_channel_runtime_message(
     // a fresh agent turn would cancel the parked tool call. Any other text
     // falls through to the normal dispatch (the user is redirecting). Mirrors
     // the same intercept in `web_chat/`.
-    if channel_has_approval_surface(&msg.channel) && try_route_approval_reply(&msg).await {
+    if channel_has_approval_surface(&msg.channel)
+        && try_route_approval_reply(&msg, &history_key).await
+    {
         return;
     }
 
@@ -139,7 +180,6 @@ pub(crate) async fn process_channel_runtime_message(
         }
     }
 
-    let history_key = conversation_history_key(&msg);
     let route = get_route_selection(ctx.as_ref(), &history_key);
     let active_turn_model_source = if ctx.config.is_none() {
         match get_or_create_turn_model_source(ctx.as_ref(), &route.provider).await {

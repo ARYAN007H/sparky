@@ -91,6 +91,16 @@ pub(crate) async fn prepare_identity(
         .await
 }
 
+/// Prepare provider projections and persisted keys without a linked implementation.
+pub(crate) async fn prepare_inbound(
+    client: &ModuleClient,
+    request: tinychannels_bus::module_inbound::PrepareChannelInboundRequest,
+) -> Result<tinychannels_bus::module_inbound::PreparedChannelInbound, ModuleCallError> {
+    client
+        .call_confidential("tinychannels", methods::PREPARE_CHANNEL_INBOUND, (request,))
+        .await
+}
+
 /// Resolve OpenHuman's proxy scope before transmitting provider configuration.
 pub(crate) fn discord_proxy(config: &crate::config::Config) -> HttpProxyPolicy {
     let proxy = &config.proxy;
