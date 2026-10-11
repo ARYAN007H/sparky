@@ -256,7 +256,7 @@ fn env_passthrough_includes_safe_vars() {
 
 // ── Windows child environment ────────────────────────────────────────────────
 //
-// `execute_unsandboxed` and `execute_local_jail` both call `env_clear()` and
+// `execute_unsandboxed` and the TinyBox native jail adapter both call `env_clear()` and
 // re-forward only `SANDBOX_ENV_PASSTHROUGH`. On Windows that list has to carry
 // the process-bootstrap variables or the child cannot initialise the OS crypto
 // provider — `node` dies with `Assertion failed: ncrypto::CSPRNG(nullptr, 0)`

@@ -18,7 +18,7 @@ use std::time::Duration;
 /// Safe environment variables forwarded into sandboxed execution.
 ///
 /// This list is the *entire* environment a sandboxed child gets: both
-/// [`execute_unsandboxed`] and [`execute_local_jail`] call `env_clear()` and
+/// [`execute_unsandboxed`] and the TinyBox native jail adapter call `env_clear()` and
 /// re-forward only what is named here. Windows process-bootstrap variables are
 /// added only in the host spawn paths below; keeping them out of this policy
 /// prevents Windows paths from being passed into Linux Docker containers.
@@ -119,7 +119,7 @@ fn sandbox_disabled_by_host() -> bool {
 ///
 /// Non-main sessions (channel, cron, remote) default to `Docker` when
 /// the mode is `Sandboxed` and Docker is configured. Local interactive
-/// sessions default to `Local` (OS-level jail via `cwd_jail`).
+/// sessions default to `Local` (the TinyBox module's native process jail).
 ///
 /// `state_dir` is the core's internal `workspace_dir`; host-side scratch such
 /// as output capture goes there instead of into `action_dir`.
