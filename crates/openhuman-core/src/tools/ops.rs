@@ -175,16 +175,9 @@ pub fn all_tools_with_runtime(
         Box::new(ResolveTimeTool::new()),
         Box::new(DetectToolsTool::new()),
         Box::new(InstallToolTool::new(security.clone())),
-        // The compact, advertised scheduler surface. Keep the six legacy
-        // tools registered below as hidden aliases so saved transcripts and
-        // skills remain replayable.
-        Box::new(CronTool::new(config.clone(), security.clone())),
-        Box::new(CronAddTool::new(config.clone(), security.clone())),
-        Box::new(CronListTool::new(config.clone())),
-        Box::new(CronRemoveTool::new(config.clone())),
-        Box::new(CronUpdateTool::new(config.clone(), security.clone())),
-        Box::new(CronRunTool::new(config.clone())),
-        Box::new(CronRunsTool::new(config.clone())),
+    ];
+    tools.extend(crate::cron::tools::tools(config.clone(), security));
+    tools.extend(vec![
         // Agent-first Workflow authoring (issue B4): validates a candidate
         // graph and returns a proposal summary — never creates/enables a
         // flow itself. Only the chat UI's WorkflowProposalCard "Save &
@@ -309,7 +302,7 @@ pub fn all_tools_with_runtime(
         Box::new(FlowMemoryRecallTool::new()),
         #[cfg(feature = "flows")]
         Box::new(FlowMemoryRememberTool::new(security.clone())),
-    ];
+    ]);
     #[cfg(feature = "web3")]
     tools.extend(crate::web3::wallet::registration::tools());
     tools.extend(vec![
