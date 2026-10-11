@@ -33,7 +33,7 @@ use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 use crate::core::runtime::CoreContext;
 use crate::cron::policy::policy_or_default;
-use crate::cron::{next_run_for_schedule, record_run, update_job, CronJob, CronJobPatch, Schedule};
+use {tinyflows_schedule::schedule::next_run_for_schedule, crate::cron::record_run, crate::cron::update_job, tinyflows_schedule::types::CronJob, tinyflows_schedule::types::CronJobPatch, tinyflows_schedule::types::Schedule};
 use crate::security::SecurityPolicy;
 
 /// Output recorded for a single-flight slot missed while a run was in flight.

@@ -2,7 +2,7 @@
 //! forbidden-path argument scan and a hard timeout.
 
 use crate::config::Config;
-use crate::cron::CronJob;
+use {tinyflows_schedule::types::CronJob};
 use crate::security::SecurityPolicy;
 use std::process::Stdio;
 use tokio::time::{self, Duration};

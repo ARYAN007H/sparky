@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::cron::job_builder::{create_agent_job, AgentJobInput};
 use crate::cron::origin::{current_job_origin, current_turn_may_skip_approval};
-use crate::cron::{self, DeliveryConfig, JobType, Schedule, SessionTarget};
+use {crate::cron::self, tinyflows_schedule::types::DeliveryConfig, tinyflows_schedule::types::JobType, tinyflows_schedule::types::Schedule, tinyflows_schedule::types::SessionTarget};
 use crate::security::SecurityPolicy;
 use crate::tools::schema_cache::static_schema;
 use async_trait::async_trait;

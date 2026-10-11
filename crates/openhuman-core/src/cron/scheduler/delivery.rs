@@ -7,7 +7,7 @@ use super::origin_delivery::{deliver_to_origin, is_suppressed_output};
 use crate::config::Config;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
-use crate::cron::{delivery_mode, CronJob, DeliveryConfig, DeliveryStatus, JobType};
+use {tinyflows_schedule::types::delivery_mode, tinyflows_schedule::types::CronJob, tinyflows_schedule::types::DeliveryConfig, tinyflows_schedule::types::DeliveryStatus, tinyflows_schedule::types::JobType};
 use anyhow::Result;
 use chrono::Utc;
 

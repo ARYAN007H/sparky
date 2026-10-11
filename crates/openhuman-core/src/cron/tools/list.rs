@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::cron;
-use crate::cron::CronJob;
+use {tinyflows_schedule::types::CronJob};
 use async_trait::async_trait;
 use serde_json::json;
 use std::fmt::Write as _;

@@ -8,7 +8,7 @@ use super::failure_classification::{
 };
 use super::shell_job::run_job_command;
 use crate::config::Config;
-use crate::cron::{CronJob, JobType, SessionTarget};
+use {tinyflows_schedule::types::CronJob, tinyflows_schedule::types::JobType, tinyflows_schedule::types::SessionTarget};
 use crate::security::SecurityPolicy;
 use chrono::Utc;
 use tokio::time::{self, Duration};
