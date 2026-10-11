@@ -11,6 +11,24 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import {
+  readRegistrySource,
+  resolveTestModuleAssets,
+} from "../ci/self-hosted/test-module-assets.mjs";
+
+test("native document regressions receive a checksum-pinned module fixture", () => {
+  const assets = resolveTestModuleAssets(
+    readRegistrySource(),
+    "ubuntu-22.04-x86_64",
+  );
+  const documents = assets.find((asset) => asset.id === "tinydocs");
+  assert.ok(
+    documents,
+    "the full Rust suite must include its native document fixture",
+  );
+  assert.match(documents.url, /\/releases\/download\/v\d+\.\d+\.\d+\//);
+  assert.match(documents.sha256, /^[a-f0-9]{64}$/);
+});
 
 const installer = fileURLToPath(
   new URL("../ci/self-hosted/install-test-modules.sh", import.meta.url),

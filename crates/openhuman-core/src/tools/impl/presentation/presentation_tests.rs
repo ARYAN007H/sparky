@@ -158,15 +158,22 @@ async fn execute_rejects_too_many_slides() {
 }
 
 #[tokio::test]
-#[ignore = "needs a built tinydocs module (OPENHUMAN_MODULE_PATH) and its own process: \
-the module bus belongs to the runtime that creates it, so run this test alone"]
 async fn execute_happy_path_returns_artifact_metadata() {
+    if crate::util::module_test_process::run(
+        module_path!(),
+        "execute_happy_path_returns_artifact_metadata",
+    ) {
+        return;
+    }
     // End-to-end: drives the real ppt-rs engine and the artifact
     // pipeline. Asserts the tool's success contract — `slide_count`
     // excludes the synthetic title slide, the artifact is finalised
     // on disk, and the markdown reply quotes the path + size.
     let ws = workspace();
-    let tool = make_tool(ws.path());
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = ws.path().to_path_buf();
+    config.modules.allow_download = false;
+    let tool = make_tool_with_config(ws.path(), config);
     let result = tool
         .execute(minimal_input_json())
         .await
@@ -240,9 +247,11 @@ fn pptx_entry_names(artifact_path: &str) -> Vec<String> {
 }
 
 #[tokio::test]
-#[ignore = "needs a built tinydocs module (OPENHUMAN_MODULE_PATH) and its own process: \
-the module bus belongs to the runtime that creates it, so run this test alone"]
 async fn execute_embeds_file_image_into_deck() {
+    if crate::util::module_test_process::run(module_path!(), "execute_embeds_file_image_into_deck")
+    {
+        return;
+    }
     let ws = workspace();
     let img_path = ws.path().join("chart.png");
     std::fs::write(&img_path, png_1x1()).expect("write png");

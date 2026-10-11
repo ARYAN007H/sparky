@@ -83,6 +83,7 @@ cp "${conn_cached}" "${dest}/tinyconnectors/libtinyconnectors.so"
 {
   echo "TINYJUICE_TEST_MODULE=${dest}/tinyjuice/libtinyjuice_module.so"
   echo "TINYSEARCH_TEST_MODULE=${dest}/tinysearch/libtinysearch.so"
+  echo "OPENHUMAN_MODULE_PATH=${dest}/tinydocs${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
   echo "TINYCONNECTORS_TEST_MODULE=${dest}/tinyconnectors/libtinyconnectors.so"
 } > "${env_file}"
 log "wrote ${env_file}"
