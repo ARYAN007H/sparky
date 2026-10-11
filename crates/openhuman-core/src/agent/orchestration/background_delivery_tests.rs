@@ -18,15 +18,8 @@ fn workspace() -> TestWorkspace {
 }
 
 async fn record(ws: &Path, session: &str, task: &str, summary: &str, thread: &str) {
-    record_completion(
-        ws,
-        session,
-        task,
-        "researcher",
-        summary,
-        Some(thread.to_owned()),
-    )
-    .await;
+    let thread = Some(thread.to_owned());
+    record_completion(ws, session, task, "researcher", summary, thread).await;
 }
 
 fn pending_ids(ws: &Path, thread: &str) -> Vec<String> {

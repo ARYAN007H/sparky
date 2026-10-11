@@ -7,7 +7,7 @@
 #[cfg(target_os = "linux")]
 pub(super) async fn wait(pid: u32) -> std::io::Result<()> {
     loop {
-        let active = tokio::task::spawn_blocking(move || active_members(pid))
+        let active = crate::core::runtime::spawn_blocking_scoped(move || active_members(pid))
             .await
             .map_err(std::io::Error::other)??;
         if !active {
