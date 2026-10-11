@@ -4,8 +4,8 @@
 //! messages, and schemas come from `tinychannels-bus`. Podcast email delivery
 //! calls the loaded module even in a voice-only build.
 //!
-//! The local REPL and legacy channel trait remain explicit implementation
-//! exceptions while the remaining channel runtime is migrated to TinyBus.
+//! The local REPL is host orchestration. The legacy provider trait remains an
+//! explicit implementation exception during the runtime migration to TinyBus.
 
 // Always-compiled carve-outs (see module docs).
 pub mod contract_schema;
@@ -13,7 +13,6 @@ pub mod contract_schema;
 pub(crate) mod credentials;
 pub mod traits;
 
-pub use tinychannels_runtime::CliChannel;
 pub use traits::{Channel, ChannelSendExt, SendMessage};
 
 #[cfg(feature = "channels")]

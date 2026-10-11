@@ -256,20 +256,18 @@ tinymcp = { path = "../../vendor/tinymcp/crates/tinymcp", default-features = fal
 ] }
 tinymcp-bus = { path = "../../vendor/tinymcp/crates/tinymcp-bus", features = ["schemars"] }
 # The transport-free channel vocabulary: inbound envelopes, outbound intents,
-# the config schema, controller metadata, relay frames and the session-key
-# rules. UNCONDITIONAL, and deliberately so — `DomainEvent` embeds
+# the config schema, controller metadata and relay frames. UNCONDITIONAL — `DomainEvent` embeds
 # `ChannelInboundEnvelope`, `config/schema/channels.rs` re-exports the config
-# types and `security/pairing.rs` re-exports the pairing helpers, so this
-# vocabulary is always-on kernel surface. It costs serde/schemars and nothing
+# types, so this vocabulary is always-on kernel surface. It costs serde/schemars and nothing
 # this build did not already have.
 tinychannels-bus = { version = "0.1", path = "../../vendor/tinychannels/crates/tinychannels-bus" }
-# `CliChannel` (always compiled) and the channel runtime helpers.
+# Remaining channel runtime helpers and provider traits (temporary migration dependency).
 tinychannels-runtime = { version = "0.1", path = "../../vendor/tinychannels/crates/tinychannels-runtime" }
 # The provider stack that IMPLEMENTS that vocabulary — Telegram, Discord,
 # Slack, IMAP, WhatsApp, the relay transport loop. Optional: it owns the
 # `reqwest` / `rusqlite` / `rustls` / `tokio-tungstenite` cohort, which a
-# workflow-only build has no use for. Enabled by `channels`, and by `voice`
-# for `EmailChannel` alone.
+# workflow-only build has no use for. Enabled by `channels`; voice-only podcast
+# email executes through the separately loaded TinyChannels module.
 tinychannels = { version = "0.1", features = ["relay-websocket"], optional = true }
 # tinybus — the message bus. Owns what `crates/openhuman-core/src/core/event_bus/` used to: the typed
 # pub/sub surface (`EventBus`, `EventHandler`, `SubscriptionHandle`), the
