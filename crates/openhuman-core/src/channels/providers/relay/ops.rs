@@ -8,9 +8,9 @@ use serde_json::{json, Value};
 use super::channel::RelayChannel;
 use super::params::RelayInboundParams;
 use super::store::{self, Recorded};
-use crate::channels::context::{conversation_history_key, MAX_CHANNEL_HISTORY};
+use crate::channels::context::MAX_CHANNEL_HISTORY;
 use crate::channels::runtime::{
-    build_channel_turn_parts, process_channel_message, runtime_context, PromptToolDescs,
+    build_channel_turn_parts, process_channel_runtime_message, runtime_context, PromptToolDescs,
 };
 use crate::config::Config;
 use crate::core::Outcome;
@@ -27,8 +27,19 @@ pub async fn channel_relay_inbound(params: RelayInboundParams) -> Result<Outcome
     // In SaaS a relayed message must run as its user: with no tenant scope
     // there is no workspace, stream or config it may touch.
     let tenant = crate::core::runtime::current_tenant().map_err(|error| error.to_string())?;
-    let thread_id = params.thread_id();
     let config = crate::config::rpc::load_config_with_timeout().await?;
+    let identity = crate::modules::channel_controller::prepare_identity(
+        &crate::modules::client::ModuleClient::new(config.clone()),
+        tinychannels_bus::module_inbound::PrepareChannelIdentityRequest {
+            channel: params.channel.clone(),
+            sender: Some(params.sender_id.clone()),
+            reply_target: Some(params.chat_id.clone()),
+            thread_ts: None,
+        },
+    )
+    .await
+    .map_err(|error| error.to_string())?;
+    let thread_id = identity.thread_id;
     let workspace_dir = config.workspace_dir.clone();
 
     if store::record_inbound(&workspace_dir, &params, &thread_id).await? == Recorded::Duplicate {
@@ -133,6 +144,25 @@ pub(crate) async fn run_relay_turn(
     // The thread is the conversation's memory: seed the pipeline's per-chat
     // history from it, since this runtime context lives for one message.
     let message = params.to_channel_message();
+    let prepared = match crate::modules::channel_controller::prepare_inbound(
+        &crate::modules::client::ModuleClient::new(config.clone()),
+        tinychannels_bus::module_inbound::PrepareChannelInboundRequest {
+            source: tinychannels_bus::module_inbound::ChannelInboundSource::Legacy {
+                message: message.clone(),
+                envelope: None,
+            },
+            namespace: "main".into(),
+            session_policy: Default::default(),
+        },
+    )
+    .await
+    {
+        Ok(prepared) => prepared,
+        Err(error) => {
+            tracing::warn!("relayed channel preparation failed: {error}");
+            return channel.sent();
+        }
+    };
     match store::prior_turns(
         &workspace_dir,
         &thread_id,
@@ -145,7 +175,7 @@ pub(crate) async fn run_relay_turn(
             ctx.conversation_histories
                 .lock()
                 .unwrap_or_else(|e| e.into_inner())
-                .insert(conversation_history_key(&message), prior);
+                .insert(prepared.history_key.clone(), prior);
         }
         Ok(_) => {}
         Err(error) => tracing::warn!(
@@ -161,7 +191,14 @@ pub(crate) async fn run_relay_turn(
         request_id = %request_id,
         "[channels::relay] dispatching relayed turn"
     );
-    super::with_thread(thread_id.clone(), process_channel_message(ctx, message)).await;
+    let mut runtime_message =
+        crate::channels::runtime::dispatch::RuntimeChannelMessage::from(message);
+    runtime_message.prepared_inbound = Some(prepared);
+    super::with_thread(
+        thread_id.clone(),
+        process_channel_runtime_message(ctx, runtime_message),
+    )
+    .await;
 
     let replies = channel.sent();
     record(&workspace_dir, &params, &thread_id, &replies).await;
