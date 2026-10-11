@@ -42,5 +42,7 @@ pub(crate) fn current_thread_id() -> Option<String> {
 }
 
 pub(crate) async fn with_thread<F: std::future::Future>(thread: String, future: F) -> F::Output {
-    RELAY_THREAD.scope(thread, future).await
+    // Keep the dispatch future on the heap through task-local wrappers;
+    // embedding it multiplies debug-build stack frames on ordinary worker threads.
+    RELAY_THREAD.scope(thread, Box::pin(future)).await
 }

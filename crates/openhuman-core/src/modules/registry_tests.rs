@@ -534,69 +534,69 @@ fn find_resolves_known_ids_only() {
 }
 
 #[test]
-fn tinychannels_registry_matches_health_check_release() {
+fn tinychannels_registry_matches_scoped_runtime_release() {
     let record = find("tinychannels").expect("compiled TinyChannels module");
-    assert_eq!(record.version, "0.1.18");
-    assert_eq!(tinychannels_bus::CONTRACT_VERSION, 8);
+    assert_eq!(record.version, "0.1.26");
+    assert_eq!(tinychannels_bus::CONTRACT_VERSION, 16);
     assert_eq!(
         tinychannels_bus::module_relay::MODULE_OPERATION_VERSION,
-        (1, 9)
+        (1, 17)
     );
     let expected = [
         (
             "macos-15-arm64",
-            "tinychannels-module-0.1.18-macos-15-arm64.tar.gz",
-            "f152d03721ddd9ab5b0074f55b29958a141e023a0657e0f158f7f16070055607",
+            "tinychannels-module-0.1.26-macos-15-arm64.tar.gz",
+            "5924dc78a1b2931c526b5ca2590c675455eaca6db914c648a321ea9225d65142",
         ),
         (
             "macos-15-x86_64",
-            "tinychannels-module-0.1.18-macos-15-x86_64.tar.gz",
-            "2492e497f45db161f588ff625ee18a59b0edaa8cc8e1e36e94a30e2604b48021",
+            "tinychannels-module-0.1.26-macos-15-x86_64.tar.gz",
+            "9be7ad6b11e9dcf14cbe8dba246e8aab55da29b03b60c36cd1a81dc250e312ac",
         ),
         (
             "macos-26-arm64",
-            "tinychannels-module-0.1.18-macos-26-arm64.tar.gz",
-            "e5cdd8318e6c7d71a514e71c36ade1f0833a1ede250fb0026d3c4fce9a1c1f18",
+            "tinychannels-module-0.1.26-macos-26-arm64.tar.gz",
+            "466d6ceaf91735d278e65280f315efa5cfec7e609c9fe12cb8ff4e545846a4e3",
         ),
         (
             "macos-26-x86_64",
-            "tinychannels-module-0.1.18-macos-26-x86_64.tar.gz",
-            "13fec100c1bcf92cb4713fc7e7c83dc5e0a148d78ad7b9c7f71f48f94984c927",
+            "tinychannels-module-0.1.26-macos-26-x86_64.tar.gz",
+            "2f3636ac9bf0b5fadd4b2539730064437770dee25442991591842cf4f5e34d8c",
         ),
         (
             "ubuntu-22.04-arm64",
-            "tinychannels-module-0.1.18-ubuntu-22.04-arm64.tar.gz",
-            "fd0ff1d518b24e692d00cd387d2f721808f0d682fe2c98a91e98293a150337ad",
+            "tinychannels-module-0.1.26-ubuntu-22.04-arm64.tar.gz",
+            "2456cb336de10471199ba38cc680b955242837b49e9b7ef72cf80a63516e834d",
         ),
         (
             "ubuntu-22.04-x86_64",
-            "tinychannels-module-0.1.18-ubuntu-22.04-x86_64.tar.gz",
-            "ecc1bff5be6adf6ac6deb210523429fabe8d3ad2e877d7885f374c9cd21d0ac4",
+            "tinychannels-module-0.1.26-ubuntu-22.04-x86_64.tar.gz",
+            "07fba7fb3d730cfebcc6e5fe8ecbc9c799e1d3b207cb3ad251d6579d965cd6b0",
         ),
         (
             "ubuntu-24.04-arm64",
-            "tinychannels-module-0.1.18-ubuntu-24.04-arm64.tar.gz",
-            "120816212af496e9617e478dad2a1fc0f007bd01e507c1613d8f9255b6006500",
+            "tinychannels-module-0.1.26-ubuntu-24.04-arm64.tar.gz",
+            "141c7d769728070df7bce8bd1f8cf4e9e43501f55fa4d055750842d2f9da6734",
         ),
         (
             "ubuntu-24.04-x86_64",
-            "tinychannels-module-0.1.18-ubuntu-24.04-x86_64.tar.gz",
-            "24efc6a352339afed5a0bec99304fd9567defdd73f13cc350471ce83c7b3e8b8",
+            "tinychannels-module-0.1.26-ubuntu-24.04-x86_64.tar.gz",
+            "ed507c285fd63b0b6ea377b5ae8840dda549a1e03442d95157ca9a5878fe7fa6",
         ),
         (
             "windows-11-arm64",
-            "tinychannels-module-0.1.18-windows-11-arm64.zip",
-            "806aa6b642dbc618f010d4eef3e7a7aef37d45bbfdfec311e1c2a908f5973b60",
+            "tinychannels-module-0.1.26-windows-11-arm64.zip",
+            "834bb5d76b42d32840059ee40d0b1ee3c4aa59b03c0882994228a8013c6c6c56",
         ),
         (
             "windows-2022-x86_64",
-            "tinychannels-module-0.1.18-windows-2022-x86_64.zip",
-            "9433165bf99c27b834a5f9366d78709d3eb15c7acede4a8064e62af84d1da8fe",
+            "tinychannels-module-0.1.26-windows-2022-x86_64.zip",
+            "fc33d7cd4ebb2bc8b7dcacc33ab88d174d07d5b73e4c76eaa22bd74401033b08",
         ),
         (
             "windows-2025-x86_64",
-            "tinychannels-module-0.1.18-windows-2025-x86_64.zip",
-            "4f6d659cca8559093aa91f4a49d0b718f4087d242473358e67ae1e35714e0682",
+            "tinychannels-module-0.1.26-windows-2025-x86_64.zip",
+            "f0778807f16f022f7cebaba7f426d5453ed66313090be031418cf41743208938",
         ),
     ];
     assert_eq!(record.assets.len(), expected.len());
