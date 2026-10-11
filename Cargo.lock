@@ -7092,9 +7092,6 @@ dependencies = [
 name = "tinymcp"
 version = "0.13.0"
 dependencies = [
- "anyhow",
- "async-trait",
- "axum",
  "base64 0.23.1",
  "dirs 7.0.0",
  "futures-util",
@@ -7110,7 +7107,6 @@ dependencies = [
  "tinytools",
  "tinytools-std",
  "tokio",
- "tokio-stream",
  "tracing",
  "url",
  "urlencoding",

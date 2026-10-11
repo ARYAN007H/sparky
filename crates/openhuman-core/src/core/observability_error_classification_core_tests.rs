@@ -140,23 +140,20 @@ fn report_error_or_expected_demotes_codex_auth_unavailable() {
 /// preventable user-state (the server needs OAuth sign-in), already handled
 /// by the `needs_auth` UX (#3733 / #3719), so it must classify as
 /// `McpServerNeedsAuth` and stay out of Sentry. The canonical body comes
-/// using the public TinyMCP unauthorized message shape (both the bare and
-/// `resource metadata:` variants), plus the
-/// `mcp_clients_connect`-prefixed RPC re-report shape that actually reaches
-/// the dispatcher.
+/// using the public TinyMCP unauthorized message shape, plus the
+/// `mcp_clients_connect`-prefixed RPC re-report shape that reaches the
+/// dispatcher. The metadata URL is intentionally absent from the message.
 
 #[test]
 fn classifies_mcp_connect_401_as_needs_auth() {
     // Pin the wording that reaches the classifier without linking the
     // implementation crate into host tests.
-    let bare = "MCP server at https://youtube.run.tools requires authentication";
-    let with_meta = "MCP server at https://youtube.run.tools requires authentication (resource metadata: https://youtube.run.tools/.well-known/oauth-protected-resource)";
+    let bare = "mcp unauthorized for `https://youtube.run.tools` (HTTP 401)";
     for msg in [
         bare.to_string(),
-        with_meta.to_string(),
         // The stringified RPC re-report shape that propagates from
         // `mcp_clients_connect` to `report_error_or_expected`.
-        format!("openhuman.mcp_clients_connect failed: {with_meta}"),
+        format!("openhuman.mcp_clients_connect failed: {bare}"),
     ] {
         assert_eq!(
             expected_error_kind(&msg),
