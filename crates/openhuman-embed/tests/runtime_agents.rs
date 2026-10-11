@@ -27,7 +27,7 @@ struct RecordingBudgetStopHook {
 }
 
 #[async_trait::async_trait]
-impl openhuman_embed::seams::StopHook<openhuman_core::agent::cost::TurnCost>
+impl openhuman_embed::seams::StopHook<openhuman_embed::seams::TurnCost>
     for RecordingBudgetStopHook
 {
     fn name(&self) -> &str {
