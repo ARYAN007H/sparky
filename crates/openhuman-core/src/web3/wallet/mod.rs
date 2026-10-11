@@ -88,6 +88,12 @@ pub use {
 };
 
 
+// Retained for the always-on RPC/observability boundary until #7406 exposes
+// this shared producer error through the released TinyWallet bus contract.
+// Embed must not acquire an implementation dependency for this sentinel.
+#[cfg(feature = "web3")]
+pub use tinywallet_web3::quote::WALLET_NOT_CONFIGURED_MESSAGE;
+
 // ---------------------------------------------------------------------------
 // Disabled facade — compiled only when the `web3` feature is OFF.
 // ---------------------------------------------------------------------------
