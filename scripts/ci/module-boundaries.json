@@ -152,61 +152,6 @@
       "reason": "Validation, transaction construction, web3 and x402 need module operations."
     },
     {
-      "scope": "tinychannels-bus",
-      "package": "anyhow",
-      "reason": "Channel trait, relay signing and pairing implementations remain in the contract; move them to the module."
-    },
-    {
-      "scope": "tinychannels-bus",
-      "package": "async-trait",
-      "reason": "Channel trait, relay signing and pairing implementations remain in the contract; move them to the module."
-    },
-    {
-      "scope": "tinychannels-bus",
-      "package": "base64",
-      "reason": "Channel trait, relay signing and pairing implementations remain in the contract; move them to the module."
-    },
-    {
-      "scope": "tinychannels-bus",
-      "package": "hex",
-      "reason": "Channel trait, relay signing and pairing implementations remain in the contract; move them to the module."
-    },
-    {
-      "scope": "tinychannels-bus",
-      "package": "hmac",
-      "reason": "Channel trait, relay signing and pairing implementations remain in the contract; move them to the module."
-    },
-    {
-      "scope": "tinychannels-bus",
-      "package": "parking_lot",
-      "reason": "Channel trait, relay signing and pairing implementations remain in the contract; move them to the module."
-    },
-    {
-      "scope": "tinychannels-bus",
-      "package": "rand",
-      "reason": "Channel trait, relay signing and pairing implementations remain in the contract; move them to the module."
-    },
-    {
-      "scope": "tinychannels-bus",
-      "package": "sha2",
-      "reason": "Channel trait, relay signing and pairing implementations remain in the contract; move them to the module."
-    },
-    {
-      "scope": "tinychannels-bus",
-      "package": "tokio",
-      "reason": "Channel trait, relay signing and pairing implementations remain in the contract; move them to the module."
-    },
-    {
-      "scope": "tinychannels-bus",
-      "package": "tracing",
-      "reason": "Channel trait, relay signing and pairing implementations remain in the contract; move them to the module."
-    },
-    {
-      "scope": "tinychannels-bus",
-      "package": "uuid",
-      "reason": "Channel trait, relay signing and pairing implementations remain in the contract; move them to the module."
-    },
-    {
       "scope": "tinywallet-bus",
       "package": "tinywallet-crypto",
       "reason": "Compatibility behavioral re-exports still link implementation; move vocabulary into the contract."

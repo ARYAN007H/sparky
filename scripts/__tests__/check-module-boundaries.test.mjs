@@ -144,3 +144,12 @@ test('the migrated TinyJuice implementation has no host exception', () => {
   const m = metadata({ host: [['tinyjuice']] });
   assert.equal(auditGraph(m, ['host'], policy).violations[0].package, 'tinyjuice');
 });
+
+test('contract binary payload serialization permits base64 without admitting crypto or transport', () => {
+  const m = metadata({ 'tinychannels-bus': [['serde'], ['base64']] });
+  assert.deepEqual(auditGraph(m, ['tinychannels-bus'], strict, 'tinychannels-bus').violations, []);
+  for (const dependency of ['hmac', 'sha2', 'tokio', 'tinychannels-runtime']) {
+    const invalid = metadata({ 'tinychannels-bus': [['base64']], base64: [[dependency]] });
+    assert.deepEqual(auditGraph(invalid, ['tinychannels-bus'], strict, 'tinychannels-bus').violations.map(v => v.package), [dependency]);
+  }
+});

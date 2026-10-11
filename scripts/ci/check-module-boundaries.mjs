@@ -12,6 +12,8 @@ export const CONTRACT_CLOSURE = new Set([
   'thiserror', 'thiserror-impl', 'schemars', 'schemars_derive', 'dyn-clone',
   'ref-cast', 'ref-cast-impl', 'serde_derive_internals',
   'proc-macro2', 'quote', 'syn', 'unicode-ident',
+  // Base64 encoding of serialized binary contract fields; no transport/crypto.
+  'base64',
 ]);
 
 export function isImplementation(name, policy) {
