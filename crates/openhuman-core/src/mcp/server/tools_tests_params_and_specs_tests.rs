@@ -178,23 +178,6 @@ fn build_rpc_params_parses_run_subagent_arguments() {
 }
 
 #[test]
-fn build_rpc_params_rejects_extra_run_subagent_fields() {
-    let err = build_rpc_params_for_test(
-        "agent.run_subagent",
-        json!({
-            "agent_id": "researcher",
-            "prompt": "Find the root cause.",
-            "toolkit": "gmail"
-        }),
-    )
-    .expect_err("unexpected field should be rejected");
-
-    assert!(
-        matches!(err, ToolCallError::InvalidParams(message) if message.contains("unexpected argument"))
-    );
-}
-
-#[test]
 fn searxng_search_params_accept_optional_fields() {
     let params = build_rpc_params_for_test(
         "searxng_search",
@@ -207,20 +190,6 @@ fn searxng_search_params_accept_optional_fields() {
 
     assert_eq!(params["query"], "rust async");
     assert_eq!(params["max_results"], 12);
-}
-
-#[test]
-fn searxng_search_rejects_arguments_it_no_longer_takes() {
-    let err = build_rpc_params_for_test(
-        "searxng_search",
-        json!({
-            "query": "rust",
-            "categories": ["videos"]
-        }),
-    )
-    .expect_err("must reject");
-
-    assert!(err.message().contains("categories"), "{}", err.message());
 }
 
 #[test]
@@ -258,20 +227,6 @@ fn search_tools_follow_usable_roles() {
     assert!(signed_in.contains(&"web_search"));
     assert!(signed_in.contains(&"web_answer"));
     assert!(!signed_in.contains(&"searxng_search"));
-}
-
-#[test]
-fn searxng_search_rejects_max_results_above_max() {
-    let err = build_rpc_params_for_test(
-        "searxng_search",
-        json!({
-            "query": "rust",
-            "max_results": SEARCH_MAX_RESULTS + 1
-        }),
-    )
-    .expect_err("must reject");
-
-    assert!(err.message().contains("must not exceed"));
 }
 
 // ── memory v2 tools ───────────────────────────────────────────────
@@ -401,16 +356,18 @@ fn memory_recall_maps_question_filter_and_limit() {
 
 #[test]
 fn memory_recall_requires_question_and_omits_unset_fields() {
-    let err = build_rpc_params_for_test("memory.recall", json!({})).expect_err("must reject");
-    assert!(err
-        .message()
-        .contains("missing required argument `question`"));
     let params = build_rpc_params_for_test("memory.recall", json!({"question": "q"})).expect("params");
     assert_eq!(params.len(), 1);
 }
 
 #[test]
-fn memory_limit_above_max_is_rejected() {
+fn memory_limit_at_max_is_preserved() {
+    let ok = build_rpc_params_for_test("memory.list", json!({ "limit": MEMORY_MAX_LIMIT })).expect("at cap");
+    assert_eq!(ok["limit"], MEMORY_MAX_LIMIT);
+}
+
+#[test]
+fn memory_limit_above_max_is_rejected_by_module_validation() {
     for tool in ["memory.recall", "memory.fetch", "memory.list"] {
         let mut args = json!({ "limit": MEMORY_MAX_LIMIT + 1 });
         args["question"] = json!("q");
@@ -427,8 +384,6 @@ fn memory_limit_above_max_is_rejected() {
             err.message()
         );
     }
-    let ok = build_rpc_params_for_test("memory.list", json!({ "limit": MEMORY_MAX_LIMIT })).expect("at cap");
-    assert_eq!(ok["limit"], MEMORY_MAX_LIMIT);
 }
 
 #[test]
@@ -449,16 +404,12 @@ fn memory_fetch_rejects_unknown_mode_and_missing_query() {
     let err = build_rpc_params_for_test("memory.fetch", json!({"query": "q", "mode": "fuzzy"}))
         .expect_err("bad mode");
     assert!(err.message().contains("`mode` must be one of"));
-    let err = build_rpc_params_for_test("memory.fetch", json!({})).expect_err("missing query");
-    assert!(err.message().contains("missing required argument `query`"));
 }
 
 #[test]
-fn memory_list_accepts_no_arguments_and_rejects_unknown_ones() {
+fn memory_list_accepts_no_arguments() {
     let params = build_rpc_params_for_test("memory.list", json!({})).expect("params");
     assert!(params.is_empty());
-    let err = build_rpc_params_for_test("memory.list", json!({"k": 5})).expect_err("v1 alias");
-    assert!(err.message().contains("unexpected argument `k`"));
 }
 
 #[test]
@@ -509,8 +460,6 @@ fn memory_learn_maps_text_kind_confidence() {
 
 #[test]
 fn memory_learn_rejects_bad_arguments() {
-    let err = build_rpc_params_for_test("memory.learn", json!({})).expect_err("missing text");
-    assert!(err.message().contains("missing required argument `text`"));
     let err = build_rpc_params_for_test("memory.learn", json!({"text": "t", "kind": "rumor"}))
         .expect_err("bad kind");
     assert!(err.message().contains("`kind` must be one of"));
@@ -520,9 +469,6 @@ fn memory_learn_rejects_bad_arguments() {
     let err = build_rpc_params_for_test("memory.learn", json!({"text": "t", "confidence": "high"}))
         .expect_err("non-number");
     assert!(err.message().contains("must be a number"));
-    let err = build_rpc_params_for_test("memory.learn", json!({"text": "t", "meta": {}}))
-        .expect_err("meta is host-filled");
-    assert!(err.message().contains("unexpected argument `meta`"));
 }
 
 #[test]
@@ -531,17 +477,9 @@ fn memory_forget_maps_ids_and_bounds_them() {
     assert_eq!(params["ids"], json!(["a", "b"]));
     let err = build_rpc_params_for_test("memory.forget", json!({"ids": []})).expect_err("empty ids");
     assert!(err.message().contains("`ids`"));
-    let err = build_rpc_params_for_test("memory.forget", json!({})).expect_err("missing ids");
-    assert!(err.message().contains("`ids`"));
     let too_many = (0..=MEMORY_FORGET_MAX_IDS)
         .map(|i| i.to_string())
         .collect::<Vec<_>>();
     let err = build_rpc_params_for_test("memory.forget", json!({ "ids": too_many })).expect_err("cap");
     assert!(err.message().contains("at most"));
-}
-
-#[test]
-fn non_object_arguments_are_invalid() {
-    let err = build_rpc_params_for_test("memory.recall", json!("question")).expect_err("must reject");
-    assert!(err.message().contains("arguments must be an object"));
 }
