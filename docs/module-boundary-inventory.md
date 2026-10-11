@@ -425,3 +425,9 @@ matched every downloaded archive against its GitHub digest and the embedded
 operation and signing E2E. The module-boundary audit reports zero violations
 and no remaining Wallet implementation exceptions. TinyRuntime remains excluded
 from this migration.
+
+## Combined Wallet and Channels integration
+
+This branch integrates merged Wallet host PR [#7489](https://github.com/tinyhumansai/openhuman/pull/7489). The fresh dependency audit reports zero violations, zero stale exceptions, one remaining MCP implementation exception, and no pending contracts. Channel implementation crates remain test-only fixtures. Final Channels host tests and builds are still pending; these dependency results alone do not establish completion.
+
+TinyRuntime is excluded as requested. Broader bus error reporting and Sentry coverage are deferred to separate work.
