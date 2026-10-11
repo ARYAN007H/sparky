@@ -11,9 +11,9 @@
 //! (The `tools` glob is `#[cfg(feature = "skills")]` at its re-export site in
 //! `tools/mod.rs`, so the stub omits it — mirroring the `voice` gate.)
 //!
-//! Workflow metadata in [`ops_types`] remains available with the feature off,
-//! because always-on agent and prompt code uses it. Generic tool result types
-//! come directly from `tinytools` and are independent of this feature.
+//! Workflow metadata comes directly from `tinyskills` in both feature directions.
+//! [`ops_types`] keeps OpenHuman sidecar names and its trust marker. Generic tool
+//! result types come directly from `tinytools`.
 //!
 //! The disabled facade mirrors behavior functions and preserves those metadata
 //! types. Check both feature directions when changing its signatures.
