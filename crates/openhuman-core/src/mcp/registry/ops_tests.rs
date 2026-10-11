@@ -185,11 +185,11 @@ async fn agent_refusal_names_no_rpc_method() {
 /// belt. The read-only planner has no `mcp_registry_connect`.
 #[test]
 fn refusals_name_only_tools_on_every_listing_belt() {
-    let install = tinymcp::ConnStatus {
+    let install = tinymcp_bus::ConnStatus {
         server_id: "srv-1".into(),
         qualified_name: QUALIFIED.into(),
         display_name: "uuid".into(),
-        status: tinymcp::ServerStatus::Disconnected,
+        status: tinymcp_bus::ServerStatus::Disconnected,
         tool_count: 0,
         last_error: None,
         auth_hint: None,
@@ -312,11 +312,11 @@ async fn a_qualified_name_lists_the_tools_of_its_connected_install() {
 
 #[test]
 fn a_registry_name_installed_twice_is_refused_with_both_ids() {
-    let install = |server_id: &str| tinymcp::ConnStatus {
+    let install = |server_id: &str| tinymcp_bus::ConnStatus {
         server_id: server_id.into(),
         qualified_name: QUALIFIED.into(),
         display_name: "uuid".into(),
-        status: tinymcp::ServerStatus::Disconnected,
+        status: tinymcp_bus::ServerStatus::Disconnected,
         tool_count: 0,
         last_error: None,
         auth_hint: None,
