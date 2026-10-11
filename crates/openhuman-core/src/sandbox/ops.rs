@@ -253,37 +253,17 @@ pub async fn create_sandbox_backend_with_config(
             backend_id: None,
         }),
         SandboxBackendKind::Local => {
-            let os_backend = cwd_jail::default_backend();
-            let backend_name = os_backend.name();
-            // Derive the status from WHICH backend was chosen, not from
-            // `is_available()`.
-            //
-            // `default_backend()` is `cwd_jail::detect::pick_backend`, which
-            // already performs the availability check and substitutes
-            // `NoopBackend` when no OS jail is usable. `NoopBackend::is_available()`
-            // is unconditionally `true` — pinned as a contract by the #3235
-            // regression test — so asking it here always answered `true` and the
-            // `else` arm was unreachable. The handle therefore reported `Ready`
-            // on a host with no confinement at all, which is the one direction a
-            // sandbox status must never be wrong in: a caller that trusts it
-            // believes commands are jailed when they run unconfined.
-            //
-            // The noop backend is a documented passthrough, not a failure, so
-            // `Inactive` ("backend not initialized") is the honest report rather
-            // than `Error`. `backend_id` still carries the name for a caller that
-            // wants the specific backend.
-            let status = local_status_for_backend(backend_name);
+            let (backend_name, status) = super::native_jail::status(config).await?;
             if status == SandboxStatus::Inactive {
                 tracing::warn!(
                     backend = backend_name,
-                    "[sandbox:local] no OS jail available; commands run UNCONFINED and \
-                     the handle reports inactive"
+                    "[sandbox:local] TinyBox native jail is unavailable or below the required isolation floor"
                 );
             }
             Ok(SandboxBackendHandle {
                 kind: SandboxBackendKind::Local,
                 status,
-                backend_id: Some(backend_name.to_string()),
+                backend_id: Some(backend_name),
             })
         }
         SandboxBackendKind::Docker => docker::docker_backend_handle(config).await,
