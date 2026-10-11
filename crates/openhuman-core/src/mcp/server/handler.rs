@@ -9,6 +9,8 @@ use tinymcp_bus::{ServerHostCall, ServerHostReply, ToolCallError};
 
 use super::{resources, subagent_depth, tools};
 
+const INSTRUCTIONS: &str = "OpenHuman MCP exposes first-level core integration: inspect the live tool catalog with core.list_tools or core.tool_instructions, inspect subagents with agent.list_subagents, run a standalone subagent with agent.run_subagent, use web_search or web_answer for live web lookups (and searxng_search when self-hosted search is enabled), and use memory.recall (answer with citations), memory.fetch or memory.list to read memory, and memory.learn or memory.forget to change it.";
+
 /// Apply the host-owned part of a validated TinyMCP server callback.
 pub(super) async fn dispatch(call: ServerHostCall) -> ServerHostReply {
     match call {
@@ -31,13 +33,15 @@ pub(super) async fn dispatch(call: ServerHostCall) -> ServerHostReply {
             name,
             arguments,
         } => {
-            let depth = header_string(&headers, subagent_depth::HEADER_SUBAGENT_DEPTH)
-                .and_then(subagent_depth::parse_header);
+            let depth = subagent_depth::parse_header(header_string(
+                &headers,
+                subagent_depth::HEADER_SUBAGENT_DEPTH,
+            ));
             log::trace!(
                 "[mcp_server] tools/call tool={name} client_source_type={source_type} chain_depth={depth:?}"
             );
             let result = subagent_depth::scope(
-                depth.unwrap_or_default(),
+                depth,
                 tools::call_tool(&name, Value::Object(arguments), &source_type),
             )
             .await;
@@ -60,7 +64,7 @@ pub(super) async fn dispatch(call: ServerHostCall) -> ServerHostReply {
 /// Declarations frozen into a module-owned server session.
 pub(super) fn declarations() -> (Value, String, Vec<Value>) {
     let info = tinymcp_bus::ServerInfo::new("openhuman-core", env!("CARGO_PKG_VERSION"))
-        .with_instructions(super::INSTRUCTIONS);
+        .with_instructions(INSTRUCTIONS);
     let resources = resources::resource_specs()
         .into_iter()
         .filter_map(|resource| serde_json::to_value(resource).ok())
