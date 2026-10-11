@@ -113,7 +113,7 @@ background pipeline:
  focused app is OpenHuman? --yes--> publish_transcription -> Socket.IO
         | no
         v
- tinycomputer_accessibility::paste::insert_text (clipboard + keystroke)
+ TinyComputer AccessibilityPaste (confidential bus call)
 ```
 
 A `session_generation` counter makes each recording's state updates
@@ -336,10 +336,12 @@ count, rolling recent-transcript buffer) behind a `OnceCell` singleton.
   library, linked directly with its `hotkey` and `capture` features, owns the
   `rdev` listener and the `cpal` stream. This folder owns only the policy
   around them.
-- `tinycomputer-accessibility` (`vendor/tinycomputer`) owns text insertion
-  (`paste::insert_text`, which carries `arboard` and `enigo`), focused-text
-  inspection and, on macOS, the Swift Globe-key listener
-  (`globe_listener_start` / `globe_listener_poll`).
+- The compiled TinyComputer module owns text insertion, focused-text inspection,
+  permission decisions and the macOS Swift Globe listener. OpenHuman uses
+  `tinycomputer-bus` vocabulary and confidential focus/paste calls. Globe events
+  arrive in bounded replayable batches; the host acknowledges delivered batches
+  and closes the lease on cancellation or server stop. Overflow resets activation
+  and requires a physical release before the next press can rearm it.
 - `tinyliveagents` owns live provider wire protocols and `tinyagents-live` owns
   live tool execution. The tool middleware is `agent::tinyagents::live_harness`.
 - `crates/openhuman-rpc` mounts and authenticates `/ws/dictation` and
@@ -375,7 +377,7 @@ server, listener and always-on mode when gating credentials change),
   (`cargo check --no-default-features --features "<all-but-voice>"`), so change
   both sides together. `VOICE_COMPILED_IN` is ungated so the desktop shell can
   assert at compile time that it did not get the stub (#4901).
-- `voice` pulls in `inference`, `modules`, `tinycomputer-accessibility/paste`
+- `voice` pulls in `inference`, `modules`, `tinyvoice`
   and the email channel (for `audio_toolkit`), so a voice-less build sheds a
   large dependency stack. `streaming` additionally needs `http-server`.
 - macOS hotkeys (#2677): rdev's CGEventTap callback calls

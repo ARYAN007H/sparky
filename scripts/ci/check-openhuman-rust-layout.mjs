@@ -55,7 +55,7 @@ const LEGACY_LIMIT_ENTRIES = [
   // `core/` was pruned from the line limit by name until these pins; its
   // oversized files are pinned at the size they had when enforcement began.
   ["crates/openhuman-core/src/core/all.rs", 1340],
-  ["crates/openhuman-core/src/core/all_tests.rs", 1492],
+  ["crates/openhuman-core/src/core/all_tests.rs", 1482],
   ["crates/openhuman-core/src/core/events.rs", 1789],
   ["crates/openhuman-core/src/core/events_tests.rs", 997],
   ["crates/openhuman-core/src/core/observability.rs", 3493],

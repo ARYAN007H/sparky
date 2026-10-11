@@ -296,13 +296,6 @@ tinysearch-bus = { path = "../../vendor/tinysearch/crates/tinysearch-bus" }
 # Registry vocabulary is available even when the loader is disabled, so the
 # pre-core client can identify and report an unavailable module safely.
 tinycomputer-bus = { path = "../../vendor/tinycomputer/crates/tinycomputer-bus" }
-# Desktop accessibility middleware, linked as a plain library (not through the
-# tinycomputer module): the voice pipeline needs focus lookup, paste validation,
-# permission checks and the Globe key synchronously and in-process. Deps are
-# serde, serde_json and log; `cpal` only via the `inference` gate. The
-# submodule pin sits on `oh-accessibility-on-v0.7.0` (v0.7.0 + this crate) — see
-# scripts/ci/module-pin-exemptions.json.
-tinycomputer-accessibility = { path = "../../vendor/tinycomputer/crates/tinycomputer-accessibility" }
 # Portable skill metadata, parsing, discovery, and filesystem hardening.
 tinyskills = { path = "../../vendor/tinyskills/crates/tinyskills" }
 serde = { version = "1", features = ["derive"] }
@@ -693,24 +686,9 @@ default = ["media", "skills", "flows", "mcp", "channels", "http-server", "schedu
 # TinyMCP HTTP serving is kept optional with the rest of this server surface.
 # Keep vendor/tinymcp pinned to a revision that defines `server-http`.
 http-server = ["dep:axum", "tinymcp/server-http"]
-# Local audio-device access: the accessibility microphone-permission probe
-# (which links `cpal`). The capture stack for voice recording itself is the
-# `tinyvoice` library's `capture` feature, enabled by `voice` below. Default-ON. Slim /
-# headless builds opt out via `--no-default-features --features "<explicit list
-# without inference>"`, which drops the exclusive `cpal` dependency; the
-# microphone probe then reports `Unknown`. `voice` requires this gate, so
-# building `voice` always pulls `inference` in transitively.
-#
-# NOTE ON THE NAME (do not "fix" it to `audio`): this gate used to cover the
-# bundled whisper.cpp STT engine (`whisper-rs` + the `whisper-rs-sys` CRT
-# patch) as well. That engine is gone — STT is now cloud/engine-configurable
-# only (`voice_server.stt_engine`, `voice::factory`) — so `cpal` is all that is
-# left behind the gate. The gate name stays `inference` because it is forwarded
-# by name from `crates/openhuman-app/Cargo.toml`, asserted by `INFERENCE_COMPILED_IN`,
-# and referenced from `tinycomputer-accessibility`'s `microphone-probe` feature (forwarded below); renaming it buys
-# nothing and would silently drop the microphone probe from the shipped app if
-# the forwarding list were not updated in lockstep.
-inference = ["tinycomputer-accessibility/microphone-probe"]
+# The public inference gate is retained for host feature compatibility.
+# Native permission probes execute through the TinyComputer module.
+inference = ["modules"]
 # Office-document tools: the `generate_document` and `generate_presentation`
 # agent tools, plus PDF text extraction during multimodal file ingest.
 # Default-ON.
@@ -776,13 +754,8 @@ modules = ["tinybus/modules"]
 # feature narrows the compile-time surface, `DomainSet` gates it at runtime.
 # Requires `inference` (the microphone-permission probe), so enabling `voice` turns
 # `inference` on transitively.
-# `arboard`/`enigo` (now behind `tinycomputer-accessibility/paste`) and `tinyvoice` (the `rdev` hotkey listener) join here rather than getting their own gate: their
-# only call sites are `tinycomputer_accessibility::paste` (clipboard + synthetic keystrokes to
-# insert a dictated transcript) and `voice::hotkey` (the global push-to-talk
-# listener), both already `#[cfg(feature = "voice")]`, and nothing outside
-# `voice/` reaches them. Worth 17 crates — the largest single shed in the wave —
-# because `arboard` alone drags an X11/wayland clipboard stack (11 crates) into
-# any build that just wants workflow execution.
+# Device capture and hotkeys are owned by TinyVoice. Native text insertion
+# and permissions execute through the TinyComputer contract.
 voice = [
     "inference",
     # Wake-word gating, command routing and hallucination detection run in the
@@ -795,9 +768,6 @@ voice = [
     # only — `serde` and nothing else.
     "dep:tinyvoice-bus",
     "dep:lettre",
-    # `voice::server` inserts dictated text through `tinycomputer_accessibility::paste`
-    # (clipboard + synthetic keystrokes: `arboard`/`enigo` live behind that feature).
-    "tinycomputer-accessibility/paste",
     "dep:tinyvoice",
     # `audio_toolkit::ops` delivers generated podcasts through tinychannels'
     # EmailChannel, so the provider — and therefore the implementation crate —

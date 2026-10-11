@@ -38,6 +38,7 @@
 //! - [`schemas`] — the `modules` RPC surface.
 //! - [`boot`] — what happens at startup.
 
+pub mod accessibility;
 #[cfg(feature = "modules")]
 pub mod boot;
 #[cfg(feature = "modules")]
