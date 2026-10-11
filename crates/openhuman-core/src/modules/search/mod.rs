@@ -20,6 +20,16 @@ mod proxy;
 
 pub use proxy::{execute_tool, list_tools, refresh_loaded};
 
+/// [`module_config`] as the JSON the module is loaded with, recorded as the
+/// configuration the module holds so the first call knows whether to
+/// reconfigure it.
+pub(crate) fn load_configuration(config: &Config) -> serde_json::Value {
+    let configuration =
+        serde_json::to_value(module_config(config)).expect("TinySearch config serializes");
+    proxy::record_load_configuration(&configuration);
+    configuration
+}
+
 pub const MODULE_ID: &str = "tinysearch";
 
 /// Private direct-route settings for one provider: key, base URL, limits.
