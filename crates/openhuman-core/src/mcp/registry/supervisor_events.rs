@@ -1,7 +1,7 @@
 //! Turning what the reconnect supervisor observed into this application's
 //! events.
 //!
-//! `tinymcp::Supervisor::tick` hands back a [`TickReport`] and publishes
+//! TinyMCP's module-owned supervisor reports [`TickReport`] observations and publishes
 //! nothing itself: which of its observations a user should hear about is the
 //! host's call. This module makes that call once. Every non-nominal
 //! observation becomes a [`DomainEvent`] in the `mcp_client` domain, which is
@@ -23,7 +23,7 @@
 
 use std::path::Path;
 
-use tinymcp::{ProbeOutcome, SupervisorEvent, TickReport};
+use tinymcp_bus::{ProbeOutcome, SupervisorEvent, TickReport};
 
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
