@@ -137,7 +137,10 @@ impl std::fmt::Debug for SaasConfig {
             .field("shared_backend_api_key", &self.shared_backend_api_key)
             .field("custom_definitions", &self.custom_definitions)
             .field("require_user_signature", &self.require_user_signature)
-            .field("storage_url", &self.storage_url.as_ref().map(|_| "<redacted>"))
+            .field(
+                "storage_url",
+                &self.storage_url.as_ref().map(|_| "<redacted>"),
+            )
             .field("node_id", &self.node_id)
             .field("advertise_url", &self.advertise_url)
             .field("lease_ttl_secs", &self.lease_ttl_secs)

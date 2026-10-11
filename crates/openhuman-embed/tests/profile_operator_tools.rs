@@ -8,7 +8,9 @@ mod common;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use common::{chat_completion, chat_requests, runtime_without_master_key, tool_names, PointedTransport};
+use common::{
+    chat_completion, chat_requests, runtime_without_master_key, tool_names, PointedTransport,
+};
 use openhuman_embed::seams::ToolHookDecision;
 use openhuman_embed::{
     CronDelivery, CronReply, DirectProfileProvider, JobOrigin, PermissionLevel, ProfileRuntime,
@@ -204,5 +206,8 @@ async fn scenario() {
         .map(|r| r.url.path().to_owned())
         .filter(|p| p.contains("chat") || p.contains("completions") || p.contains("openai"))
         .collect();
-    assert!(managed_paths.is_empty(), "managed inference: {managed_paths:?}");
+    assert!(
+        managed_paths.is_empty(),
+        "managed inference: {managed_paths:?}"
+    );
 }

@@ -70,7 +70,10 @@ impl ProfileCapabilities {
     /// registered although their domain family is off for profiles.
     pub fn names_admittable(&self, name: &str) -> bool {
         super::tools::OPERATOR_ADMITTABLE.contains(&name)
-            && self.names.as_ref().is_some_and(|names| names.contains(name))
+            && self
+                .names
+                .as_ref()
+                .is_some_and(|names| names.contains(name))
     }
 
     /// Whether a selected name may reach the host permission decision.
