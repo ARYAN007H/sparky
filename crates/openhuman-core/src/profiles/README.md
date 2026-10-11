@@ -430,6 +430,8 @@ factory, `ToolScopeSpec::Named` (or `HostOnly`) and an asynchronous
 native and host tools. A wildcard is refused. SaaS hard denies, host group
 opt-ins, the profile lease fence and channel permission ceilings remain
 stronger than the callback. With no callback, execution is denied.
+Operations requiring supervised approval must use `Named`; `HostOnly` does
+not provide the static operator allowlist used for that exemption.
 
 The factory receives the exact durable chat or relay thread through
 `TurnContext::session_id`; its ambient tenant
