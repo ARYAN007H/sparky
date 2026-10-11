@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::Value;
-use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolResult};
+use tinytools::{IndirectCall, PermissionLevel, Tool, ToolCallOptions, ToolResult};
 
 use crate::{
     config::Config,
@@ -62,29 +62,48 @@ impl Tool for McpCallTool {
         true
     }
 
-    fn indirect_target(&self, args: &Value) -> Option<tinytools::IndirectCall> {
-        let server = required_string_arg(args, "server").ok()?;
-        let tool = required_string_arg(args, "tool").ok()?;
-        let mut target = tinytools::ToolSubject::named(
-            tinymcp::tools::naming::disambiguated_tool_name(&server, &server, &tool),
-        )
-        .with_family(server.clone())
-        .with_tag(format!("mcp.server:{server}"))
-        .with_tag(format!("mcp.server_id:{server}"))
-        .with_tag(format!("mcp.tool:{tool}"))
-        .with_permission(PermissionLevel::Execute);
+    async fn indirect_target_async(&self, args: &Value) -> anyhow::Result<Option<IndirectCall>> {
+        let server = required_string_arg(args, "server")
+            .map_err(|_| anyhow::anyhow!("missing MCP server identifier"))?;
+        let tool = required_string_arg(args, "tool")
+            .map_err(|_| anyhow::anyhow!("missing MCP tool identifier"))?;
+        let client = McpConfiguredClient::for_config(&self.config)
+            .map_err(|_| anyhow::anyhow!("TinyMCP module is unavailable"))?;
+        let prepared = client
+            .prepare_agent_tools(tinymcp_bus::PrepareAgentToolsRequest {
+                sources: vec![tinymcp_bus::McpToolSourceSpec {
+                    server_id: server.clone(),
+                    label: server.clone(),
+                    family: server.clone(),
+                    display_name: server.clone(),
+                    tools: vec![tinymcp_bus::McpTool::new(tool.clone())],
+                    default_exposure: tinymcp_bus::McpToolExposure::Direct,
+                    direct_tools: vec![tool.clone()],
+                }],
+            })
+            .await
+            .map_err(|_| anyhow::anyhow!("TinyMCP target preparation failed"))?;
+        let presentation = prepared
+            .into_iter()
+            .find(|presentation| {
+                presentation.server_id == server && presentation.remote_name == tool
+            })
+            .ok_or_else(|| anyhow::anyhow!("TinyMCP target could not be prepared"))?;
+        let mut target = tinytools::ToolSubject::named(presentation.name)
+            .with_family(presentation.family)
+            .with_permission(PermissionLevel::Execute);
+        for tag in presentation.tags {
+            target = target.with_tag(tag);
+        }
         target.category = Some(tinytools::ToolCategory::Workflow);
         let call = tinytools::IndirectCall::new(target);
-        Some(
-            match args
-                .get("arguments")
-                .cloned()
-                .and_then(|arguments| crate::normalize_tool_arguments(arguments).ok())
-            {
-                Some(arguments) => call.with_arguments(Value::Object(arguments)),
-                None => call,
-            },
-        )
+        let arguments = args
+            .get("arguments")
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("missing MCP tool arguments"))?;
+        let arguments = crate::normalize_tool_arguments(arguments)
+            .map_err(|_| anyhow::anyhow!("invalid MCP tool arguments"))?;
+        Ok(Some(call.with_arguments(Value::Object(arguments))))
     }
 
     async fn execute_with_options(

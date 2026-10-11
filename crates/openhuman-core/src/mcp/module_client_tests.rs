@@ -7,6 +7,7 @@ struct FakePort {
     opened: Arc<Mutex<Vec<(String, McpClientConfig)>>>,
     closed: Arc<Mutex<Vec<String>>>,
     calls: Arc<Mutex<Vec<(String, String, Value, bool)>>>,
+    prepared_requests: Arc<Mutex<Vec<PrepareAgentToolsRequest>>>,
     open_started: Arc<Notify>,
     close_started: Arc<Notify>,
     call_started: Arc<Notify>,
@@ -99,6 +100,56 @@ impl McpModulePort for FakePort {
         }
         Ok(Value::Bool(true))
     }
+
+    async fn prepare_agent_tools(
+        &self,
+        request: PrepareAgentToolsRequest,
+    ) -> Result<Vec<McpToolPresentation>, ModuleCallError> {
+        self.prepared_requests
+            .lock()
+            .unwrap()
+            .push(request.clone());
+        Ok(request
+            .sources
+            .into_iter()
+            .flat_map(|source| {
+                source.tools.into_iter().map(move |tool| McpToolPresentation {
+                    name: format!("module:{}:{}", source.server_id, tool.name),
+                    legacy_name: format!("legacy:{}:{}", source.server_id, tool.name),
+                    server_id: source.server_id.clone(),
+                    remote_name: tool.name,
+                    family: source.family.clone(),
+                    description: String::new(),
+                    parameters: Value::Null,
+                    deferred: false,
+                    tags: vec![format!("mcp.server_id:{}", source.server_id)],
+                })
+            })
+            .collect())
+    }
+}
+
+#[tokio::test]
+async fn agent_tool_names_are_requested_from_the_module_root() {
+    let port = FakePort::default();
+    let requests = Arc::clone(&port.prepared_requests);
+    let client = client(port);
+    let request = PrepareAgentToolsRequest {
+        sources: vec![tinymcp_bus::McpToolSourceSpec {
+            server_id: "docs".to_owned(),
+            label: "docs".to_owned(),
+            family: "docs".to_owned(),
+            display_name: "Docs".to_owned(),
+            tools: vec![tinymcp_bus::McpTool::new("whoami")],
+            default_exposure: tinymcp_bus::McpToolExposure::Direct,
+            direct_tools: vec!["whoami".to_owned()],
+        }],
+    };
+
+    let prepared = client.prepare_agent_tools(request.clone()).await.unwrap();
+
+    assert_eq!(prepared[0].name, "module:docs:whoami");
+    assert_eq!(requests.lock().unwrap().as_slice(), &[request]);
 }
 
 #[tokio::test]
