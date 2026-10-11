@@ -21,17 +21,8 @@ use std::path::Path;
 use crate::core::all::RegisteredController;
 use crate::core::ControllerSchema;
 
-// ---------------------------------------------------------------------------
-// Type surface — re-exported from the ungated carve-out, NOT re-declared.
-// Mirrors the `pub use ops::*` → `pub use super::ops_types::{…}` chain that the
-// real build exposes at the `skills` root (`skills::Workflow`, etc.).
-// ---------------------------------------------------------------------------
-
-use {
-    tinyskills::Skill as Workflow, tinyskills::SkillFrontmatter as WorkflowFrontmatter,
-    tinyskills::SkillScope as WorkflowScope,
-    tinyskills::MAX_RESOURCE_BYTES as MAX_WORKFLOW_RESOURCE_BYTES,
-};
+// Disabled discovery returns the same portable skill metadata as an enabled host.
+use tinyskills::Skill as Workflow;
 
 // ---------------------------------------------------------------------------
 // Discovery surface (mirrors `ops_discover::*` re-exported at the skills root)
