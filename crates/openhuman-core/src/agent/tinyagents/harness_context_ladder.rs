@@ -21,6 +21,15 @@ use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent::tinyagents::model::TurnChatModel;
 use crate::agent::tinyagents::turn_outcome::ToolOutcomeSink;
 
+/// Window assumed for sizing microcompact when the model's context window is
+/// unknown (not in any static table, no `context_length` from `/v1/models`).
+/// Deliberately conservative: small enough that a runaway transcript is still
+/// blanked well before any real model overflows, large enough that a short run
+/// stays append-only and prompt-cache eligible. Used only for microcompact;
+/// compression and trim still treat an unknown window as "nothing to size
+/// against", and known-window behaviour is unchanged.
+pub(super) const UNKNOWN_WINDOW_FALLBACK_TOKENS: u64 = 64_000;
+
 /// Fractions of a capped turn's model-call budget at which the model is told
 /// how many calls are left (#6958; `FinalCallWrapUpMiddleware::with_budget_notice`).
 const BUDGET_NOTICE_THRESHOLDS: [f64; 2] = [0.5, 0.8];
@@ -363,14 +372,14 @@ pub(super) fn microcompact_middleware(
     keep_recent: usize,
     context_window: Option<u64>,
 ) -> tinyagents_harness::middleware::MicrocompactMiddleware {
-    let window = context_window
-        .filter(|w| *w > 0)
-        .unwrap_or(UNKNOWN_WINDOW_FALLBACK_TOKENS);
-    tinyagents_harness::middleware::MicrocompactMiddleware::new(
+    let mw = tinyagents_harness::middleware::MicrocompactMiddleware::new(
         keep_recent,
         crate::agent::context::CLEARED_PLACEHOLDER,
-    )
-    .with_token_budget(legacy_max_input_tokens(window).max(1))
+    );
+    match context_window.filter(|w| *w > 0) {
+        Some(window) => mw.with_token_budget(legacy_max_input_tokens(window).max(1)),
+        None => mw,
+    }
 }
 
 /// Share of the context window a compaction keeps verbatim as its tail.
