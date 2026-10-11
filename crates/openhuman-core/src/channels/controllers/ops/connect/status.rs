@@ -7,8 +7,8 @@ use crate::config::Config;
 use crate::core::Outcome;
 use crate::security::credentials;
 
-use super::super::super::definitions::{all_channel_definitions, find_channel_definition};
-use super::super::types::ChannelStatusEntry;
+use tinychannels_bus::controllers::{all_channel_definitions, find_channel_definition};
+use tinychannels_bus::controllers::ChannelStatusEntry;
 use super::shared::{channel_config_connected, credential_provider, merge_listener_health};
 
 /// Get connection status for one or all channels.

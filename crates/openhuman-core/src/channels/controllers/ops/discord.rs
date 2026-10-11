@@ -15,7 +15,7 @@ use tinychannels_bus::{
     ChannelControllerRequest,
 };
 
-use super::super::definitions::ChannelAuthMode;
+use tinychannels_bus::controllers::ChannelAuthMode;
 use super::connect::shared::credential_provider;
 
 // ---------------------------------------------------------------------------

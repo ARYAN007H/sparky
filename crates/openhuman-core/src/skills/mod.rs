@@ -36,7 +36,6 @@
 
 // Type carve-out: always compiled, both feature directions. See module docs.
 pub mod ops_types;
-pub mod types;
 
 // Facade children — the `pub mod` line stays UNGATED because each child is
 // itself a facade+stub for the same `skills` feature and its stub must resolve
@@ -59,8 +58,6 @@ pub mod ops_create;
 pub mod ops_discover;
 #[cfg(feature = "skills")]
 pub mod ops_install;
-#[cfg(feature = "skills")]
-pub mod ops_parse;
 #[cfg(feature = "skills")]
 pub mod preflight;
 #[cfg(feature = "skills")]

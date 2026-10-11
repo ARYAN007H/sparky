@@ -9,7 +9,7 @@ use crate::config::Config;
 use crate::core::Outcome;
 
 use super::super::module_client::{self as connectors, methods};
-use super::super::providers::ProviderUserProfile;
+use super::super::contract::ProviderUserProfile;
 use super::super::types::{
     reencode, ComposioRefreshIdentitiesResponse, ComposioUserProfile, ComposioUserProfileRequest,
 };
@@ -101,7 +101,7 @@ pub async fn composio_refresh_all_identities(
         // A toolkit the module read but this build has no facet schema for is
         // not a failure — it is the same "no native provider" case the loop
         // used to skip before fetching, now discovered one step later.
-        if !super::super::providers::has_native_provider(toolkit) {
+        if !super::super::contract::has_native_provider(toolkit) {
             report.skipped_no_provider += 1;
             messages.push(format!(
                 "{toolkit}/{connection_id}: skipped (no native provider)"

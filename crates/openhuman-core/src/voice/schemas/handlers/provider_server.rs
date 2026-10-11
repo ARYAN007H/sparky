@@ -415,7 +415,7 @@ pub(crate) fn handle_voice_test_provider(params: Map<String, Value>) -> Controll
 
 pub(crate) fn handle_voice_server_start(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        use crate::voice::hotkey::ActivationMode;
+        use tinyvoice_bus::hotkey::ActivationMode;
         use crate::voice::server::{global_server, VoiceServerConfig};
 
         let config = config_rpc::load_config_with_timeout().await?;
@@ -511,7 +511,7 @@ pub(crate) fn handle_voice_server_stop(_params: Map<String, Value>) -> Controlle
             let status = crate::voice::server::VoiceServerStatus {
                 state: crate::voice::server::ServerState::Stopped,
                 hotkey: String::new(),
-                activation_mode: crate::voice::hotkey::ActivationMode::Push,
+                activation_mode: tinyvoice_bus::hotkey::ActivationMode::Push,
                 transcription_count: 0,
                 last_error: None,
             };
@@ -529,7 +529,7 @@ pub(crate) fn handle_voice_server_status(_params: Map<String, Value>) -> Control
             let status = crate::voice::server::VoiceServerStatus {
                 state: crate::voice::server::ServerState::Stopped,
                 hotkey: String::new(),
-                activation_mode: crate::voice::hotkey::ActivationMode::Push,
+                activation_mode: tinyvoice_bus::hotkey::ActivationMode::Push,
                 transcription_count: 0,
                 last_error: None,
             };

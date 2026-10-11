@@ -9,7 +9,7 @@
 use anyhow::{anyhow, Result};
 
 use crate::core::logging::{init_for_cli_run, CliLogDefault};
-use crate::voice::hotkey::ActivationMode;
+use tinyvoice_bus::hotkey::ActivationMode;
 use crate::voice::server::{run_standalone, VoiceServerConfig};
 
 /// Parse and execute the `openhuman voice` / `openhuman dictate` subcommand.

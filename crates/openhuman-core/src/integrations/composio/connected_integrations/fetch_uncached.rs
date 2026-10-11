@@ -405,7 +405,7 @@ async fn fetch_connected_integrations_uncached_inner(
                     .iter()
                     .filter(|t| t.function.name.starts_with(&action_prefix))
                 {
-                    if super::super::providers::is_action_visible_with_pref(&t.function.name, &pref)
+                    if super::super::contract::is_action_visible_with_pref(&t.function.name, &pref)
                     {
                         visible.push(ConnectedIntegrationTool {
                             name: t.function.name.clone(),
@@ -413,7 +413,7 @@ async fn fetch_connected_integrations_uncached_inner(
                             parameters: t.function.parameters.clone(),
                         });
                     } else if let Some(required_scope) =
-                        super::super::providers::curated_scope_for(&t.function.name)
+                        super::super::contract::curated_scope_for(&t.function.name)
                     {
                         // Only surface CURATED actions as `gated` — uncurated
                         // tools (which fall through to `classify_unknown` and

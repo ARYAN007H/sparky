@@ -272,7 +272,7 @@ pub(crate) async fn fetch_live_toolkit_catalog(
     config: &Config,
     toolkit: &str,
 ) -> Option<Vec<ToolContract>> {
-    use crate::integrations::composio::providers::{catalog_for_toolkit, find_curated};
+    use crate::integrations::composio::contract::{catalog_for_toolkit, find_curated};
 
     let key = toolkit.trim().to_ascii_lowercase();
     if key.is_empty() {

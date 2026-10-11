@@ -101,7 +101,7 @@ impl ToolBackend for ComposioToolBackend {
             })?;
         // Autonomy-tier gate (Phase 2, made effect-aware): the node's
         // [`CommandClass`] is derived from the action's curated
-        // [`ToolScope`](crate::integrations::composio::providers::ToolScope)
+        // [`ToolScope`](crate::integrations::composio::contract::ToolScope)
         // via [`classify_composio_action_for_tier`] — a curated Read action
         // (e.g. `TWITTER_RECENT_SEARCH`) is `CommandClass::Read`, which every
         // tier `Allow`s; a curated Write/Admin action, or anything not

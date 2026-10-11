@@ -4,7 +4,7 @@ use super::super::module_client::{self as connectors, methods};
 use crate::config::Config;
 use crate::core::Outcome;
 
-use super::super::providers::agent_ready_toolkits;
+use super::super::contract::agent_ready_toolkits;
 use super::super::types::{ComposioCapabilitiesResponse, ComposioToolkitsResponse};
 use super::error_utils::{report_composio_op_error, OpResult};
 

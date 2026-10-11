@@ -13,7 +13,7 @@ use tinyagents_graph::todos::store as todos;
 use tinyagents_harness::store::Store;
 
 use crate::agent::tinyagents::todos::{session_todos_store, SCRATCH_SESSION_ID};
-pub use crate::agent::todos::types::{TodoItem, TodoStatus};
+pub use tinyagents_graph::todos::{TodoItem, TodoStatus};
 pub use tinyagents_graph::todos::TodosSnapshot;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

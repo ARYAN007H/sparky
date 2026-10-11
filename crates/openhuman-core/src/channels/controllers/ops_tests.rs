@@ -1,4 +1,4 @@
-use super::types::ChannelConnectionResult;
+use tinychannels_bus::controllers::ChannelConnectionResult;
 use super::*;
 use crate::config::schema::{DiscordConfig, IMessageConfig};
 use crate::core::Outcome;

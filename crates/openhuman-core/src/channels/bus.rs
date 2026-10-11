@@ -6,11 +6,10 @@
 
 mod delivery;
 mod subscriber;
-mod thread_id;
 
 pub use subscriber::ChannelInboundSubscriber;
 
-pub(crate) use thread_id::derive_inbound_thread_id;
+pub(crate) use tinychannels::channel::derive_inbound_thread_id;
 
 #[cfg(test)]
 #[path = "bus_inbound_thread_id_tests_tests.rs"]

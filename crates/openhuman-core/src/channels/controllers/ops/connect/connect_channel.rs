@@ -1,6 +1,6 @@
 //! Module-owned connection preparation, followed by host credential custody
 //! and configuration persistence.
-use super::super::types::ChannelConnectionResult;
+use tinychannels_bus::controllers::ChannelConnectionResult;
 use super::shared::credential_provider;
 use crate::config::Config;
 use crate::core::Outcome;

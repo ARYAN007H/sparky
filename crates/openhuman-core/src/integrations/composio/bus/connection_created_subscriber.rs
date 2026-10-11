@@ -173,7 +173,7 @@ async fn on_connection_created(toolkit: String, connection_id: String) {
         );
         return;
     }
-    if !crate::integrations::composio::providers::has_native_provider(&toolkit) {
+    if !crate::integrations::composio::contract::has_native_provider(&toolkit) {
         tracing::debug!(
             toolkit = %toolkit,
             "[composio:bus] no native identity provider for toolkit; skipping profile fetch"
