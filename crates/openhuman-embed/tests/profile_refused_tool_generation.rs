@@ -98,6 +98,10 @@ impl CronDelivery for Recorder {
 
 #[test]
 fn refused_tool_call_after_a_successful_cron_call_in_the_same_thread_does_not_fail_the_turn() {
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("warn,openhuman_core=info")
+        .with_test_writer()
+        .try_init();
     runtime_without_master_key().block_on(async {
         tokio::spawn(scenario()).await.unwrap();
     });
