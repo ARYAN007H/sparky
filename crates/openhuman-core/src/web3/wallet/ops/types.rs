@@ -4,9 +4,7 @@ use serde::{Deserialize, Serialize};
 
 // The wallet's vocabulary lives in `tinywallet-web3`, which the engine and the
 // tools share; the host keeps only the persisted shape and the setup params.
-use tinywallet_web3::crypto::wallet::{
-    WalletAccount, WalletSetupSource,
-};
+use tinywallet_web3::crypto::wallet::{WalletAccount, WalletSetupSource};
 /// Error message returned when the wallet has not been set up yet. Downstream
 /// boundaries match against it to classify the condition as an expected user
 /// state, so it stays out of Sentry; it is defined once in `tinywallet-web3`

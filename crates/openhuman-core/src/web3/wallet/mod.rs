@@ -70,9 +70,6 @@ pub use execution::{
 #[cfg(feature = "web3")]
 pub(crate) use ops::secret_material;
 #[cfg(feature = "web3")]
-pub use {ops::reveal_recovery_phrase, ops::setup, ops::status, ops::RevealRecoveryPhraseResult, ops::WalletSetupParams};
-use {tinywallet_web3::crypto::wallet::WalletAccount, tinywallet_web3::crypto::wallet::WalletChain, tinywallet_web3::crypto::wallet::WalletSetupSource, tinywallet_web3::crypto::wallet::WalletStatus, tinywallet_web3::quote::WALLET_NOT_CONFIGURED_MESSAGE};
-#[cfg(feature = "web3")]
 pub use schemas::{
     all_controller_schemas, all_registered_controllers, all_wallet_controller_schemas,
     all_wallet_registered_controllers, schemas, wallet_schemas,
@@ -83,6 +80,17 @@ pub use tinywallet_web3::crypto::abi::encode_erc20_transfer;
 pub use tinywallet_web3::crypto::defaults::{
     evm_asset_catalog, explorer_tx_url, EvmNetwork, RpcSource, SolanaCluster,
     WalletAssetDefinition, WalletNetworkDefaults,
+};
+#[cfg(feature = "web3")]
+pub use {
+    ops::reveal_recovery_phrase, ops::setup, ops::status, ops::RevealRecoveryPhraseResult,
+    ops::WalletSetupParams,
+};
+use {
+    tinywallet_web3::crypto::wallet::WalletAccount, tinywallet_web3::crypto::wallet::WalletChain,
+    tinywallet_web3::crypto::wallet::WalletSetupSource,
+    tinywallet_web3::crypto::wallet::WalletStatus,
+    tinywallet_web3::quote::WALLET_NOT_CONFIGURED_MESSAGE,
 };
 
 // ---------------------------------------------------------------------------

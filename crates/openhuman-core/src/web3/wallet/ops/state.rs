@@ -385,7 +385,10 @@ pub(super) fn current_time_ms() -> u64 {
         .unwrap_or(0)
 }
 
-pub(super) fn to_status(config: &Config, state: Option<StoredWalletState>) -> tinywallet_web3::crypto::wallet::WalletStatus {
+pub(super) fn to_status(
+    config: &Config,
+    state: Option<StoredWalletState>,
+) -> tinywallet_web3::crypto::wallet::WalletStatus {
     match state {
         Some(state) => {
             // A mnemonic is "stored" if it's either in the JSON field (headless path)

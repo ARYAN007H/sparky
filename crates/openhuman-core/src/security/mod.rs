@@ -49,9 +49,12 @@ pub use policy::{CommandClass, GateDecision};
 #[allow(unused_imports)]
 pub use policy::{TrustedAccess, TrustedRoot};
 pub use policy::{POLICY_BLOCKED_MARKER, POLICY_DENIED_MARKER};
+use tinychannels_runtime::security::PairingGuard;
 #[allow(unused_imports)]
-pub use {pairing::ensure_core_rpc_token_for_bind, pairing::is_public_bind, pairing::CoreBindTokenError, pairing::CORE_TOKEN_ENV_VAR};
-use {tinychannels_runtime::security::PairingGuard};
+pub use {
+    pairing::ensure_core_rpc_token_for_bind, pairing::is_public_bind, pairing::CoreBindTokenError,
+    pairing::CORE_TOKEN_ENV_VAR,
+};
 
 pub use schemas::{
     all_controller_schemas as all_security_controller_schemas,
