@@ -63,6 +63,142 @@ impl OpenHumanChannelBackend {
         config.channels_config = channels_config.clone();
         config
     }
+
+    /// Dispatch the module's narrow host callback without exposing the linked
+    /// provider trait as an OpenHuman API.
+    pub(crate) async fn dispatch_callback(
+        &self,
+        request: tinychannels_bus::ChannelBackendRequest,
+    ) -> anyhow::Result<tinychannels_bus::ChannelBackendResult> {
+        use tinychannels_bus::{ChannelBackendRequest as Request, ChannelBackendResult as Result};
+        use tinychannels::backend::ChannelBackend as _;
+
+        match request {
+            Request::RemoteControl(_) | Request::ProgressiveTransport(_) => {
+                anyhow::bail!("request is served by a separate callback adapter")
+            }
+            Request::Disconnect {
+                channel,
+                auth_mode,
+                clear_memory,
+            } => self
+                .disconnect_channel(&self.config.channels_config, &channel, auth_mode, clear_memory)
+                .await
+                .map(Result::Disconnected),
+            Request::Status { channel } => self
+                .channel_status(&self.config.channels_config, channel.as_deref())
+                .await
+                .map(Result::Status),
+            Request::SendReaction { channel, reaction } => self
+                .send_reaction(&self.config.channels_config, &channel, reaction)
+                .await
+                .map(Result::SendReaction),
+            Request::CreateThread { channel, title } => self
+                .create_thread(&self.config.channels_config, &channel, &title)
+                .await
+                .map(Result::Thread),
+            Request::UpdateThread {
+                channel,
+                thread_id,
+                action,
+            } => self
+                .update_thread(&self.config.channels_config, &channel, &thread_id, &action)
+                .await
+                .map(Result::Thread),
+            Request::ListThreads { channel, active } => self
+                .list_threads(&self.config.channels_config, &channel, active)
+                .await
+                .map(Result::Threads),
+        }
+    }
+
+    /// Disconnect through the host's config and credential owner.
+    pub(crate) async fn disconnect_channel(
+        &self,
+        channels_config: &ChannelsConfig,
+        channel: &str,
+        auth_mode: ChannelAuthMode,
+        clear_memory: bool,
+    ) -> anyhow::Result<ChannelDisconnectResult> {
+        tinychannels::backend::ChannelBackend::disconnect_channel(
+            self,
+            channels_config,
+            channel,
+            auth_mode,
+            clear_memory,
+        )
+        .await
+    }
+
+    /// Read host-owned channel connection state.
+    pub(crate) async fn channel_status(
+        &self,
+        channels_config: &ChannelsConfig,
+        channel: Option<&str>,
+    ) -> anyhow::Result<Vec<ChannelStatusEntry>> {
+        tinychannels::backend::ChannelBackend::channel_status(self, channels_config, channel).await
+    }
+
+    /// Run a reaction operation through the product controller.
+    pub(crate) async fn send_reaction(
+        &self,
+        channels_config: &ChannelsConfig,
+        channel: &str,
+        reaction: Value,
+    ) -> anyhow::Result<ChannelReactionResult> {
+        tinychannels::backend::ChannelBackend::send_reaction(
+            self,
+            channels_config,
+            channel,
+            reaction,
+        )
+        .await
+    }
+
+    /// Create a provider thread through the product controller.
+    pub(crate) async fn create_thread(
+        &self,
+        channels_config: &ChannelsConfig,
+        channel: &str,
+        title: &str,
+    ) -> anyhow::Result<ChannelThreadResult> {
+        tinychannels::backend::ChannelBackend::create_thread(
+            self,
+            channels_config,
+            channel,
+            title,
+        )
+        .await
+    }
+
+    /// Update or close one provider thread through the product controller.
+    pub(crate) async fn update_thread(
+        &self,
+        channels_config: &ChannelsConfig,
+        channel: &str,
+        thread_id: &str,
+        action: &str,
+    ) -> anyhow::Result<ChannelThreadResult> {
+        tinychannels::backend::ChannelBackend::update_thread(
+            self,
+            channels_config,
+            channel,
+            thread_id,
+            action,
+        )
+        .await
+    }
+
+    /// List provider threads through the product controller.
+    pub(crate) async fn list_threads(
+        &self,
+        channels_config: &ChannelsConfig,
+        channel: &str,
+        active: Option<bool>,
+    ) -> anyhow::Result<ChannelThreadListResult> {
+        tinychannels::backend::ChannelBackend::list_threads(self, channels_config, channel, active)
+            .await
+    }
 }
 
 /// The managed-bot link flows need a TinyHumans account, so the core does not
