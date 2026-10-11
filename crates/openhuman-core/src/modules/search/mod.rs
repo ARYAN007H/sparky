@@ -50,9 +50,11 @@ fn direct_settings(config: &Config, provider: &str) -> ProviderConfig {
             settings.default_language = Some(config.searxng.default_language.clone());
         }
         other => {
-            settings.credential = search
-                .credentials(other)
-                .and_then(|c| c.key())
+            // A key pinned on this agent's config wins over the stored one.
+            settings.credential = search.direct_key(other).map(str::to_owned);
+            settings.base_url = search
+                .host_credential(other)
+                .and_then(|pinned| pinned.base_url())
                 .map(str::to_owned);
         }
     }
