@@ -4003,7 +4003,6 @@ dependencies = [
  "tinyinference-providers",
  "tinyinference-voice",
  "tinyjuice-bus",
- "tinymcp",
  "tinymcp-bus",
  "tinymemes",
  "tinymemory-api",
