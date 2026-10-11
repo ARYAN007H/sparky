@@ -229,6 +229,11 @@ pub(crate) fn local_status_for_backend(backend_name: &str) -> SandboxStatus {
 }
 
 pub async fn create_sandbox_backend(policy: &SandboxPolicy) -> SandboxBackendHandle {
+    if policy.backend != SandboxBackendKind::Docker {
+        return create_sandbox_backend_with_config(policy, &crate::config::Config::default())
+            .await
+            .unwrap_or_else(|_| docker_error_handle());
+    }
     let config = match crate::config::ops::load_config_with_timeout().await {
         Ok(config) => config,
         Err(_) if policy.backend == SandboxBackendKind::Docker => {
