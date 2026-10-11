@@ -1,6 +1,14 @@
 //! Call path to the loaded TinySearch module: lazy load, private
 //! reconfiguration when the resolved configuration changes, and serialized
 //! `ListTools` / `ExecuteTool` calls.
+//!
+//! The module is one per process, but a call's configuration is the caller's:
+//! the reloaded `config.toml` for an ordinary agent, or the agent's own
+//! in-memory config when an embedder pinned search keys on it
+//! ([`crate::config::SearchConfig::pin_host_credential`]). Before each call
+//! the module is reconfigured if it holds anything else, and the call lock is
+//! held through the call, so agents with different keys take turns rather
+//! than ever sharing one configuration.
 
 use std::{
     future::Future,
@@ -165,7 +173,9 @@ where
 /// reloaded so a settings or login change is honoured on the next call.
 async fn current_config(config: &Config) -> Result<Config, String> {
     if config.search.is_host_pinned() {
-        tracing::debug!("[modules][search] host-pinned search credentials; using the agent's config");
+        tracing::debug!(
+            "[modules][search] host-pinned search credentials; using the agent's config"
+        );
         return Ok(config.clone());
     }
     crate::config::ops::reload_config_from_paths(&config.config_path, &config.workspace_dir).await

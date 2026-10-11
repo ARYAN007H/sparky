@@ -71,8 +71,8 @@ pub use openhuman_core::backend::{
     BackendTransportError, BaseUrlPurpose, TransportProfile,
 };
 pub use openhuman_core::config::ComposioHostCredential;
-pub use openhuman_core::config::{SearchHostCredential, UnknownKeyedSearchProvider};
 pub use openhuman_core::config::Config as RuntimeConfig;
+pub use openhuman_core::config::{SearchHostCredential, UnknownKeyedSearchProvider};
 pub use openhuman_core::security::TrustedAccess;
 pub use openhuman_core::tools::toolpacks::{GroupMode, ToolGroups};
 // The seam `AgentSpec::tools` needs: the belt types, and `Tool` itself from the

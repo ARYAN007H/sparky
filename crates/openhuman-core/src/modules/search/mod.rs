@@ -4,7 +4,9 @@
 //! (`crate::search::providers`) into the module's private configuration.
 //! Secrets enter only through that configuration, delivered at TinyBus
 //! initialization and reinitialization; they never ride an ordinary method
-//! call or a settings RPC response. `proxy` holds the call path.
+//! call or a settings RPC response. A key an embedder pinned on one agent's
+//! config ([`crate::config::SearchHostCredential`]) enters the same way, for
+//! that agent's calls. `proxy` holds the call path.
 
 use std::collections::BTreeMap;
 
