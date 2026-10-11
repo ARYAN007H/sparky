@@ -4259,7 +4259,7 @@ const messages: TranslationMap = {
   'channels.discord.oauthStartFailed': 'تعذر بدء تسجيل الدخول إلى Discord. حاول ثانية.',
   'mcp.json.loading': 'جارٍ التحميل…',
   'settings.embeddings.testUnavailableCustom':
-    'اختبار نقطة نهاية مخصصة غير مدعوم حتى الآن — احفظه وتحقق من الحالة في لوحة Embeddings.',
+    'اختبار نقطة نهاية مخصصة غير مدعوم حتى الآن ; احفظه وتحقق من الحالة في لوحة Embeddings.',
   'walletSend.to': 'ل',
   'walletSend.availableBalance': 'متاح: {{amount}} {{symbol}}',
   'settings.skillsRunner.error.listWorkflows': 'فشل تحميل مهام سير العمل:',

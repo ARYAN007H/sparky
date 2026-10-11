@@ -4631,7 +4631,7 @@ const en: TranslationMap = {
   'channels.discord.oauthStartFailed': "Couldn't start Discord sign-in. Try again.",
   'mcp.json.loading': 'Loading…',
   'settings.embeddings.testUnavailableCustom':
-    'Testing a custom endpoint is not supported yet — save it and check the status on the Embeddings panel.',
+    'Testing a custom endpoint is not supported yet ; save it and check the status on the Embeddings panel.',
   connectProvider: 'Connect',
   'walletSend.title': 'Send',
   'walletSend.to': 'To',
@@ -4639,7 +4639,7 @@ const en: TranslationMap = {
   'settings.skillsRunner.error.listWorkflows': 'Failed to load workflows:',
   'conversations.runMode.plan': 'Plan',
   'channels.oauth.connectRecoverFailed':
-    "Couldn't finish connecting {channel}. The sign-in window closed before access was granted — try again.",
+    "Couldn't finish connecting {channel}. The sign-in window closed before access was granted ; try again.",
   'composer.reasoning.default': 'Default',
   'composer.reasoning.none': 'Off',
   'composer.reasoning.minimal': 'Minimal',

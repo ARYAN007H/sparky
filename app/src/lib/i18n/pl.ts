@@ -4412,13 +4412,13 @@ const messages: TranslationMap = {
     'Nie udało się rozpocząć logowania do Discorda. Spróbuj ponownie.',
   'mcp.json.loading': 'Ładowanie…',
   'settings.embeddings.testUnavailableCustom':
-    'Testowanie niestandardowego punktu końcowego nie jest jeszcze obsługiwane — zapisz go i sprawdź stan w panelu Osadzania.',
+    'Testowanie niestandardowego punktu końcowego nie jest jeszcze obsługiwane ; zapisz go i sprawdź stan w panelu Osadzania.',
   'walletSend.to': 'Do',
   'walletSend.availableBalance': 'Dostępne: {{amount}} {{symbol}}',
   'settings.skillsRunner.error.listWorkflows': 'Nie udało się załadować przepływów pracy:',
   'conversations.runMode.plan': 'Planuj',
   'channels.oauth.connectRecoverFailed':
-    'Nie można dokończyć łączenia {channel}. Okno logowania zamknęło się przed przyznaniem dostępu — spróbuj ponownie.',
+    'Nie można dokończyć łączenia {channel}. Okno logowania zamknęło się przed przyznaniem dostępu ; spróbuj ponownie.',
   'channels.savedRestartRequired': 'Kanał zapisany. Zrestartuj aplikację, aby go aktywować.',
   'channels.connect': 'Połącz',
   connectProvider: 'Połącz dostawcę',

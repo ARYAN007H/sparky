@@ -4397,7 +4397,7 @@ const messages: TranslationMap = {
   'channels.discord.oauthStartFailed': 'Не удалось начать вход в Discord. Попробуйте еще раз.',
   'mcp.json.loading': 'Загрузка…',
   'settings.embeddings.testUnavailableCustom':
-    'Тестирование пользовательской конечной точки пока не поддерживается — сохраните его и проверьте статус на панели «Внедрения».',
+    'Тестирование пользовательской конечной точки пока не поддерживается ; сохраните его и проверьте статус на панели «Внедрения».',
   'walletSend.to': 'Кому',
   'walletSend.availableBalance': 'Доступно: {{amount}} {{symbol}}',
   'settings.skillsRunner.error.listWorkflows': 'Не удалось загрузить рабочие процессы:',

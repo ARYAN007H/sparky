@@ -4388,13 +4388,13 @@ const messages: TranslationMap = {
   'channels.discord.oauthStartFailed': 'Tidak dapat memulai proses masuk Discord. Coba lagi.',
   'mcp.json.loading': 'Memuat…',
   'settings.embeddings.testUnavailableCustom':
-    'Pengujian titik akhir kustom belum didukung — simpan dan periksa statusnya di panel Embeddings.',
+    'Pengujian titik akhir kustom belum didukung ; simpan dan periksa statusnya di panel Embeddings.',
   'walletSend.to': 'Untuk',
   'walletSend.availableBalance': 'Tersedia: {{amount}} {{symbol}}',
   'settings.skillsRunner.error.listWorkflows': 'Gagal memuat alur kerja:',
   'conversations.runMode.plan': 'Rencana',
   'channels.oauth.connectRecoverFailed':
-    'Tidak dapat menyelesaikan penyambungan {channel}. Jendela masuk ditutup sebelum akses diberikan — coba lagi.',
+    'Tidak dapat menyelesaikan penyambungan {channel}. Jendela masuk ditutup sebelum akses diberikan ; coba lagi.',
   'channels.savedRestartRequired': 'Kanal tersimpan. Mulai ulang aplikasi untuk mengaktifkannya.',
   'channels.connect': 'Hubungkan',
   connectProvider: 'Hubungkan penyedia',

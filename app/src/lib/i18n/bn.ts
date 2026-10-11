@@ -4344,13 +4344,13 @@ const messages: TranslationMap = {
   'channels.discord.oauthStartFailed': 'Discord সাইন-ইন শুরু করা যায়নি। আবার চেষ্টা করুন',
   'mcp.json.loading': 'লোড হচ্ছে...',
   'settings.embeddings.testUnavailableCustom':
-    'একটি কাস্টম এন্ডপয়েন্ট পরীক্ষা করা এখনও সমর্থিত নয় — এটি সংরক্ষণ করুন এবং এম্বেডিং প্যানেলে স্থিতি পরীক্ষা করুন।',
+    'একটি কাস্টম এন্ডপয়েন্ট পরীক্ষা করা এখনও সমর্থিত নয় ; এটি সংরক্ষণ করুন এবং এম্বেডিং প্যানেলে স্থিতি পরীক্ষা করুন।',
   'walletSend.to': 'প্রতি',
   'walletSend.availableBalance': 'উপলব্ধ: {{amount}} {{symbol}}',
   'settings.skillsRunner.error.listWorkflows': 'কর্মপ্রবাহ লোড করতে ব্যর্থ:',
   'conversations.runMode.plan': 'পরিকল্পনা',
   'channels.oauth.connectRecoverFailed':
-    '{channel} সংযোগ করা শেষ করা যায়নি৷ প্রবেশাধিকার মঞ্জুর করার আগে সাইন-ইন উইন্ডো বন্ধ হয়ে গেছে — আবার চেষ্টা করুন।',
+    '{channel} সংযোগ করা শেষ করা যায়নি৷ প্রবেশাধিকার মঞ্জুর করার আগে সাইন-ইন উইন্ডো বন্ধ হয়ে গেছে ; আবার চেষ্টা করুন।',
   'channels.savedRestartRequired': 'চ্যানেল সংরক্ষিত। সক্রিয় করতে অ্যাপ রিস্টার্ট করুন।',
   'channels.connect': 'সংযোগ করুন',
   connectProvider: 'প্রোভাইডার সংযোগ করুন',
