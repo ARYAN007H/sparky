@@ -226,7 +226,7 @@ pub struct AgentDefinition {
     /// * `{ skills = "*" }` entries admit no sub-agent, so they are always
     ///   allowed.
     ///
-    /// Combined with the harness's `MAX_SPAWN_DEPTH = 3` task-local
+    /// Combined with the host's `MAX_SPAWN_DEPTH = 3` policy
     /// gate, this means any execution chain bottoms out within three
     /// hops: `chat → reasoning → worker` (or `chat → worker` for the
     /// fast path).
