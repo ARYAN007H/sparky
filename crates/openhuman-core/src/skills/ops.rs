@@ -41,7 +41,11 @@ pub use super::ops_install::{
     UninstallWorkflowParams, DEFAULT_INSTALL_TIMEOUT_SECS, MAX_INSTALL_TIMEOUT_SECS,
     MAX_INSTALL_URL_LEN, MAX_WORKFLOW_MD_BYTES,
 };
-use {tinyskills::Skill as Workflow, tinyskills::SkillFrontmatter as WorkflowFrontmatter, tinyskills::SkillScope as WorkflowScope, tinyskills::MAX_RESOURCE_BYTES as MAX_WORKFLOW_RESOURCE_BYTES};
+use {
+    tinyskills::Skill as Workflow, tinyskills::SkillFrontmatter as WorkflowFrontmatter,
+    tinyskills::SkillScope as WorkflowScope,
+    tinyskills::MAX_RESOURCE_BYTES as MAX_WORKFLOW_RESOURCE_BYTES,
+};
 
 #[cfg(test)]
 pub(crate) use super::ops_create::create_workflow_inner;
@@ -52,9 +56,12 @@ pub(crate) use super::ops_install::{
     install_workflow_from_url_with_home, normalize_install_url, should_report_install_fetch_status,
 };
 #[cfg(test)]
-pub(crate) use {tinyskills::RESOURCE_DIRS, tinyskills::SKILL_MD, super::ops_types::TRUST_MARKER, tinyskills::WORKFLOW_MD, super::ops_types::WORKFLOW_TOML};
-#[cfg(test)]
 pub(crate) use std::path::{Path, PathBuf};
+#[cfg(test)]
+pub(crate) use {
+    super::ops_types::TRUST_MARKER, super::ops_types::WORKFLOW_TOML, tinyskills::RESOURCE_DIRS,
+    tinyskills::SKILL_MD, tinyskills::WORKFLOW_MD,
+};
 
 #[cfg(test)]
 #[path = "ops_tests.rs"]

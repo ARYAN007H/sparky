@@ -27,7 +27,11 @@ use crate::core::ControllerSchema;
 // real build exposes at the `skills` root (`skills::Workflow`, etc.).
 // ---------------------------------------------------------------------------
 
-use {tinyskills::Skill as Workflow, tinyskills::SkillFrontmatter as WorkflowFrontmatter, tinyskills::SkillScope as WorkflowScope, tinyskills::MAX_RESOURCE_BYTES as MAX_WORKFLOW_RESOURCE_BYTES};
+use {
+    tinyskills::Skill as Workflow, tinyskills::SkillFrontmatter as WorkflowFrontmatter,
+    tinyskills::SkillScope as WorkflowScope,
+    tinyskills::MAX_RESOURCE_BYTES as MAX_WORKFLOW_RESOURCE_BYTES,
+};
 
 // ---------------------------------------------------------------------------
 // Discovery surface (mirrors `ops_discover::*` re-exported at the skills root)

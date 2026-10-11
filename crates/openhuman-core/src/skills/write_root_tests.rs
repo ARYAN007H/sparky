@@ -2,9 +2,9 @@ use super::*;
 use crate::core::runtime::{context::CoreContext, ContextOverlay, DomainSet};
 use crate::skills::ops_create::{create_workflow_inner, CreateWorkflowParams};
 use crate::skills::ops_discover::discover_workflows;
-use {tinyskills::SkillScope as WorkflowScope};
 use crate::tools::toolpacks::ToolGroups;
 use std::sync::Arc;
+use tinyskills::SkillScope as WorkflowScope;
 
 fn agent_on(workspace: &Path, agent: &str) -> Arc<CoreContext> {
     let mut config = crate::config::Config::default();

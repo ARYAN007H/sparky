@@ -37,8 +37,8 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 
 use super::ops_discover::{discover_workflows, is_workspace_trusted};
-use {tinyskills::Skill as Workflow};
 use crate::config::Config;
+use tinyskills::Skill as Workflow;
 use tinytools::rank::Bm25Index;
 use tinytools::{Tool, ToolResult};
 

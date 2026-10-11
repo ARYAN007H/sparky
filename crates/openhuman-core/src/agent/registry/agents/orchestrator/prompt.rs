@@ -16,11 +16,11 @@ use crate::agent::prompts::{
     render_datetime, render_identity, render_tools, render_workspace, ConnectedIntegration,
     PromptContext, ToolCallFormat,
 };
-use {tinyskills::Skill as Workflow};
 use crate::tools::orchestrator_tools::sanitise_slug;
 use crate::tools::toolpacks;
 use anyhow::Result;
 use std::fmt::Write;
+use tinyskills::Skill as Workflow;
 
 const ARCHETYPE: &str = include_str!("prompt.md");
 
