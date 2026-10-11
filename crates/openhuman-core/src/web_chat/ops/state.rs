@@ -178,6 +178,12 @@ pub(crate) async fn invalidate_thread_sessions_for_tenant(
     true
 }
 
+/// Hold the real session table while exercising callback cancellation.
+#[cfg(test)]
+pub(crate) async fn lock_thread_sessions_for_test() -> impl Send + 'static {
+    thread_sessions().lock_owned().await
+}
+
 /// The thread ids (as the caller chose them) with a primary or parallel turn
 /// in the calling context's tables.
 pub(crate) async fn live_thread_ids() -> Vec<String> {
