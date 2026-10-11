@@ -16,7 +16,7 @@ copying its implementation into a host, or accepting weaker isolation.
 | tinyjuice | none (module loaded through TinyBus) | tinyjuice-bus | core tools, compression, CCR REPL | Complete: PR #59 provides module-owned compression, CCR queries, HTML extraction, schemas and declarations; the host retains turn-bound model callbacks and artifact authorization |
 | tinyconnectors | none | tinyconnectors-bus | core integrations, credentials and triggers | Module-backed argument preparation, action execution and trigger archives; host credential reconciliation and frozen tool restoration remain in OpenHuman |
 | tinymcp | tinymcp | tinymcp-bus | core MCP registry, supervisor, CLI stdio/HTTP server | Supervisor notifications, server protocol operations and callbacks for approved host tools/resources/prompts |
-| tinychannels | tinychannels, tinychannels-runtime (remaining runtime callers) | tinychannels-bus | core channels and podcast email, TinyHumans host, CLI REPL | Contract is pure; v0.1.18 supplies complete Discord response vocabulary provider connection preparation and health observations. Podcast SMTP, Discord discovery/permission checks, credential tests and connection validation/defaults and `doctor channels` health checks use confidential module calls. Remaining runtime callers need bus cutover with inbound/status callbacks and shutdown draining |
+| tinychannels | tinychannels, tinychannels-runtime (remaining runtime callers) | tinychannels-bus | core channels and podcast email, TinyHumans host, CLI REPL | Contract is pure; v0.1.22 adds scoped runtime/provider facts, outbound preparation, and inbound identity contracts. Podcast SMTP, Discord discovery/permission checks, credential tests and connection validation/defaults and `doctor channels` health checks use confidential module calls. Remaining runtime callers need bus cutover with inbound/status callbacks and shutdown draining |
 | tinyhosts | none | tinyhosts-bus | core hosting tools | Released Execute/Providers contract consumed through the module; workspace authorization, credentials and approval policy remain in OpenHuman |
 | tinywallet | tinywallet-crypto, tinywallet-web3, tinywallet-x402 through remaining host imports | tinywallet-bus | core wallet/web3/x402 | Contract is pure at v0.13.0; native transfer preparation/execution use confidential module calls with host custody, exact approval binding and explicit close. Initialization, remaining validation, Web3 quotes/swaps, x402 payments, budgets and ledger still need host cutover |
 | tinybox | tinybox-core, tinybox-jail, tinybox-docker | tinybox-bus | core sandbox and security, desktop gateways | Pre-core gateways use the released v0.1.18 bus client. Core sandbox execution and shell analysis still require cutover |
@@ -352,3 +352,27 @@ The owner workspace passed 1,306 tests and two actual compiled-artifact fixtures
 These are upstream prerequisites. The host provider, relay and delivery adapters
 still need migration; both Channels implementation exceptions remain until
 those callers and their dependency graphs are cut over.
+
+
+## Channel message preparation and hosted ingress
+
+The host now pins verified TinyChannels v0.1.22 (contract 12, operation 1.13).
+All eleven published archives and their checksum manifest were checked against
+actual downloaded bytes, GitHub digests, and sizes. Published Linux module
+fixtures pass with both the owning loader and OpenHuman's shipped TinyBus kernel.
+They exercise confidential inbound/identity preparation and isolated runtime
+shutdown.
+
+Rich outbound normalization and idempotency preparation execute through
+`PrepareOutboundIntent`; hosted inbound conversations obtain their existing
+persisted identifiers through `PrepareChannelIdentity`. Disabled or unavailable
+modules fail the affected operation. Channel session cancellation and product
+configuration remain host-owned. Unreachable host-side segmented delivery was
+removed without changing the active direct-delivery path.
+
+Focused host validation passes 225 channel tests, eight controller adapter tests,
+and fourteen module registry tests. Boundary enforcement reports zero violations
+and zero stale exceptions, with nine temporary implementation exceptions still
+present across Channels, MCP, Box, and Wallet. Both Channels implementation
+exceptions remain pending provider, relay, remote-command, and progressive
+runtime cutover.
