@@ -105,5 +105,30 @@ async fn indirect_mcp_target_uses_module_prepared_identity_and_facts() {
         ["mcp.server:docs", "mcp.server_id:docs", "mcp.tool:whoami"]
     );
     assert_eq!(call.arguments, Some(json!({"query": "status"})));
-    assert_eq!(port.requests.lock().unwrap().len(), 1);
+    let requests = port.requests.lock().unwrap();
+    assert_eq!(requests.len(), 1);
+    let source = &requests[0].sources[0];
+    assert_eq!(source.server_id, "docs");
+    assert_eq!(source.label, "docs");
+    assert_eq!(source.family, "docs");
+    assert_eq!(source.tools[0].name, "whoami");
+}
+
+#[tokio::test]
+async fn indirect_mcp_target_fails_closed_when_modules_are_disabled() {
+    let workspace = tempfile::tempdir().unwrap();
+    let mut config = Config::default();
+    config.workspace_dir = workspace.path().to_path_buf();
+    config.modules.enabled = false;
+    let tool = mcp_call_tool(Arc::new(config), Arc::new(SecurityPolicy::default()));
+
+    let result = tool
+        .indirect_target_async(&json!({
+            "server": "docs",
+            "tool": "whoami",
+            "arguments": {}
+        }))
+        .await;
+
+    assert!(result.is_err(), "unavailable owner must not omit target facts");
 }
