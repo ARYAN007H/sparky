@@ -323,6 +323,7 @@ async fn pinned_loader_serves_the_published_tinybox_release() {
             workspace: workspace.path().display().to_string(),
             image: Some("alpine:latest".to_owned()),
             command: "printf tinybox-module-run-ok".to_owned(),
+            login_shell: false,
             network: Some("none".to_owned()),
             memory_limit_mb: Some(128),
             cpus: Some(1.0),
