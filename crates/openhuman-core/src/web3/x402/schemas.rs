@@ -139,8 +139,12 @@ fn handle_list_payments(params: Map<String, Value>) -> ControllerFuture {
         let response = crate::modules::x402_service::list_payments(&config, limit)
             .await
             .map_err(|error| format!("x402 list_payments: {error}"))?;
-        Ok(json!({ "payments": response.payments }))
+        Ok(payments_value(response.payments))
     })
+}
+
+fn payments_value(payments: Vec<tinywallet_bus::wire::X402PaymentRecord>) -> Value {
+    json!({ "payments": payments })
 }
 
 #[derive(Deserialize)]
