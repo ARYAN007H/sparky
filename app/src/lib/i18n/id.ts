@@ -4399,6 +4399,13 @@ const messages: TranslationMap = {
   'channels.connect': 'Hubungkan',
   connectProvider: 'Hubungkan penyedia',
   'walletSend.title': 'Kirim',
+  'composer.reasoning.default': 'Default',
+  'composer.reasoning.none': 'Nonaktif',
+  'composer.reasoning.minimal': 'Minimal',
+  'composer.reasoning.low': 'Rendah',
+  'composer.reasoning.medium': 'Sedang',
+  'composer.reasoning.high': 'Tinggi',
+  'composer.reasoning.xhigh': 'Sangat tinggi',
 };
 
 export default messages;

@@ -4119,6 +4119,13 @@ const messages: TranslationMap = {
   'channels.connect': '连接',
   connectProvider: '连接 {label}',
   'walletSend.title': '发送',
+  'composer.reasoning.default': '默认',
+  'composer.reasoning.none': '关闭',
+  'composer.reasoning.minimal': '最低',
+  'composer.reasoning.low': '低',
+  'composer.reasoning.medium': '中',
+  'composer.reasoning.high': '高',
+  'composer.reasoning.xhigh': '极高',
 };
 
 export default messages;

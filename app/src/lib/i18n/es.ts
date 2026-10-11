@@ -4452,6 +4452,13 @@ const messages: TranslationMap = {
   'channels.connect': 'Conectar',
   connectProvider: 'Conectar proveedor',
   'walletSend.title': 'Enviar',
+  'composer.reasoning.default': 'Predeterminado',
+  'composer.reasoning.none': 'Desactivado',
+  'composer.reasoning.minimal': 'Mínimo',
+  'composer.reasoning.low': 'Bajo',
+  'composer.reasoning.medium': 'Medio',
+  'composer.reasoning.high': 'Alto',
+  'composer.reasoning.xhigh': 'Muy alto',
 };
 
 export default messages;

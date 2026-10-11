@@ -4363,6 +4363,13 @@ const messages: TranslationMap = {
   'channels.connect': 'कनेक्ट करें',
   connectProvider: 'प्रदाता कनेक्ट करें',
   'walletSend.title': 'भेजें',
+  'composer.reasoning.default': 'डिफ़ॉल्ट',
+  'composer.reasoning.none': 'बंद',
+  'composer.reasoning.minimal': 'न्यूनतम',
+  'composer.reasoning.low': 'कम',
+  'composer.reasoning.medium': 'मध्यम',
+  'composer.reasoning.high': 'उच्च',
+  'composer.reasoning.xhigh': 'अति उच्च',
 };
 
 export default messages;

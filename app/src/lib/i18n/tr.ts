@@ -4365,6 +4365,13 @@ const messages: TranslationMap = {
   'channels.connect': 'Bağlan',
   connectProvider: 'Bağlan',
   'walletSend.title': 'Gönder',
+  'composer.reasoning.default': 'Varsayılan',
+  'composer.reasoning.none': 'Kapalı',
+  'composer.reasoning.minimal': 'En düşük',
+  'composer.reasoning.low': 'Düşük',
+  'composer.reasoning.medium': 'Orta',
+  'composer.reasoning.high': 'Yüksek',
+  'composer.reasoning.xhigh': 'Çok yüksek',
 };
 
 export default messages;

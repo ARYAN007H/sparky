@@ -4423,6 +4423,13 @@ const messages: TranslationMap = {
   'channels.connect': 'Połącz',
   connectProvider: 'Połącz dostawcę',
   'walletSend.title': 'Wyślij',
+  'composer.reasoning.default': 'Domyślne',
+  'composer.reasoning.none': 'Wyłączone',
+  'composer.reasoning.minimal': 'Minimalny',
+  'composer.reasoning.low': 'Niski',
+  'composer.reasoning.medium': 'Średni',
+  'composer.reasoning.high': 'Wysoki',
+  'composer.reasoning.xhigh': 'Bardzo wysoki',
 };
 
 export default messages;

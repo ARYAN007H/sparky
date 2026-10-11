@@ -4408,6 +4408,13 @@ const messages: TranslationMap = {
   'channels.connect': 'Подключиться',
   connectProvider: 'Подключить провайдера',
   'walletSend.title': 'Отправить',
+  'composer.reasoning.default': 'По умолчанию',
+  'composer.reasoning.none': 'Выкл.',
+  'composer.reasoning.minimal': 'Минимальный',
+  'composer.reasoning.low': 'Низкий',
+  'composer.reasoning.medium': 'Средний',
+  'composer.reasoning.high': 'Высокий',
+  'composer.reasoning.xhigh': 'Очень высокий',
 };
 
 export default messages;

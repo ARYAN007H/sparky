@@ -4714,6 +4714,13 @@ const messages: TranslationMap = {
   'channels.connect': '接続',
   connectProvider: '接続',
   'walletSend.title': '送金',
+  'composer.reasoning.default': 'デフォルト',
+  'composer.reasoning.none': 'オフ',
+  'composer.reasoning.minimal': '最小',
+  'composer.reasoning.low': '低',
+  'composer.reasoning.medium': '中',
+  'composer.reasoning.high': '高',
+  'composer.reasoning.xhigh': '非常に高い',
 };
 
 export default messages;

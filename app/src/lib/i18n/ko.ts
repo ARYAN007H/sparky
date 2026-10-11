@@ -4309,6 +4309,13 @@ const messages: TranslationMap = {
   'channels.connect': '연결하다',
   connectProvider: '제공업체 연결',
   'walletSend.title': '보내기',
+  'composer.reasoning.default': '기본값',
+  'composer.reasoning.none': '끔',
+  'composer.reasoning.minimal': '최소',
+  'composer.reasoning.low': '낮음',
+  'composer.reasoning.medium': '중간',
+  'composer.reasoning.high': '높음',
+  'composer.reasoning.xhigh': '매우 높음',
 };
 
 export default messages;

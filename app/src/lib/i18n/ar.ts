@@ -4270,6 +4270,13 @@ const messages: TranslationMap = {
   'channels.connect': 'اتصال',
   connectProvider: 'ربط مزود',
   'walletSend.title': 'إرسال',
+  'composer.reasoning.default': 'افتراضي',
+  'composer.reasoning.none': 'إيقاف',
+  'composer.reasoning.minimal': 'ضئيل',
+  'composer.reasoning.low': 'منخفض',
+  'composer.reasoning.medium': 'متوسط',
+  'composer.reasoning.high': 'مرتفع',
+  'composer.reasoning.xhigh': 'مرتفع جدًا',
 };
 
 export default messages;

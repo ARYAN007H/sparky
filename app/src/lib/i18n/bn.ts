@@ -4355,6 +4355,13 @@ const messages: TranslationMap = {
   'channels.connect': 'সংযোগ করুন',
   connectProvider: 'প্রোভাইডার সংযোগ করুন',
   'walletSend.title': 'পাঠান',
+  'composer.reasoning.default': 'ডিফল্ট',
+  'composer.reasoning.none': 'বন্ধ',
+  'composer.reasoning.minimal': 'সর্বনিম্ন',
+  'composer.reasoning.low': 'কম',
+  'composer.reasoning.medium': 'মাঝারি',
+  'composer.reasoning.high': 'উচ্চ',
+  'composer.reasoning.xhigh': 'অতি উচ্চ',
 };
 
 export default messages;
