@@ -21,8 +21,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
 use tinymcp_bus::{
     config::{McpClientConfig, OpenConfiguredRequest, OpenConfiguredResponse, TransitionStatus},
-    names,
-    SupervisorBatch,
+    names, SupervisorBatch,
 };
 
 use crate::{

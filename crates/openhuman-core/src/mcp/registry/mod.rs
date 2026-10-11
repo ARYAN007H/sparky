@@ -104,9 +104,9 @@ pub mod connections {
     /// Sorted by qualified name, so a prompt built from this does not reshuffle
     /// between turns and cost its cached prefix.
     pub async fn connected_overview() -> Vec<ConnectedServerOverview> {
-        host::ambient_config().map_or_else(Vec::new, |config| async move {
-            connected_overview_for_config(&config).await
-        }.await)
+        host::ambient_config().map_or_else(Vec::new, |config| {
+            async move { connected_overview_for_config(&config).await }.await
+        })
     }
 
     /// Every connected server's identity and advertised tools in `config`'s
@@ -192,9 +192,10 @@ pub mod connections {
             .flat_map(|server| {
                 let server_id = server.server_id;
                 let qualified_name = server.qualified_name;
-                server.tools.into_iter().map(move |tool| {
-                    (server_id.clone(), qualified_name.clone(), tool)
-                })
+                server
+                    .tools
+                    .into_iter()
+                    .map(move |tool| (server_id.clone(), qualified_name.clone(), tool))
             })
             .collect()
     }
@@ -418,15 +419,16 @@ pub mod oauth {
     /// Returns a message when the state is unknown or expired, or when the
     /// token exchange fails.
     pub async fn complete(config: &Config, state: &str, code: &str) -> Result<String, String> {
-        let outcome: tinymcp_bus::ConnectOutcome = super::module_client::McpConfiguredClient::for_config(config)
-            .map_err(|error| error.to_string())?
-            .call(
-                &host::client_config(config),
-                tinymcp_bus::names::methods::OAUTH_COMPLETE,
-                (state, code),
-            )
-            .await
-            .map_err(|error| error.to_string())?;
+        let outcome: tinymcp_bus::ConnectOutcome =
+            super::module_client::McpConfiguredClient::for_config(config)
+                .map_err(|error| error.to_string())?
+                .call(
+                    &host::client_config(config),
+                    tinymcp_bus::names::methods::OAUTH_COMPLETE,
+                    (state, code),
+                )
+                .await
+                .map_err(|error| error.to_string())?;
 
         Ok(outcome.server_id)
     }
