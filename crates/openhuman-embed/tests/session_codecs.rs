@@ -92,3 +92,10 @@ fn public_session_codecs_preserve_descriptor_generation_and_import_details() {
     assert_eq!(descriptor.parent_session_key.as_deref(), Some("session-1"));
     assert_eq!(descriptor.run_ids, ["run-1", "run-2"]);
 }
+
+#[test]
+fn public_session_codecs_reject_incomplete_or_unknown_persisted_records() {
+    assert!(serde_json::from_value::<ExecutionStatus>(json!("unknown")).is_err());
+    assert!(serde_json::from_value::<JournalMessage>(json!({"role": "assistant"})).is_err());
+    assert!(serde_json::from_value::<AgentEvent>(json!({"kind": "run_started"})).is_err());
+}
