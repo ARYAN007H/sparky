@@ -352,3 +352,7 @@ pub(super) fn session_config(
 pub(super) fn module_string<T: Serialize>(value: &T) -> Result<String, serde_json::Error> {
     serde_json::to_string(value)
 }
+
+#[cfg(test)]
+#[path = "module_tests.rs"]
+mod tests;

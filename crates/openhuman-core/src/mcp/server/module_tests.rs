@@ -1,0 +1,170 @@
+use super::*;
+use std::sync::Mutex;
+
+#[derive(Default)]
+struct PortState {
+    opened: Option<ServerSessionConfig>,
+    submitted: Option<ServerInput>,
+    completed: Option<ServerHostReply>,
+    cancelled: bool,
+    unavailable: bool,
+    polls: usize,
+}
+
+struct FixturePort(Mutex<PortState>);
+
+#[async_trait]
+impl ServerPort for FixturePort {
+    async fn open(&self, config: ServerSessionConfig) -> Result<String, ModuleCallError> {
+        let mut state = self.0.lock().unwrap();
+        if state.unavailable {
+            return Err(ModuleCallError::Unavailable);
+        }
+        state.opened = Some(config.clone());
+        Ok(config.session_id)
+    }
+
+    async fn open_http(
+        &self,
+        config: ServerHttpSessionConfig,
+    ) -> Result<String, ModuleCallError> {
+        self.open(config.server).await
+    }
+
+    async fn submit(
+        &self,
+        _session: &str,
+        _headers: Map<String, Value>,
+        input: ServerInput,
+    ) -> Result<(), ModuleCallError> {
+        self.0.lock().unwrap().submitted = Some(input);
+        Ok(())
+    }
+
+    async fn poll(&self, _session: &str) -> Result<ServerOperationSnapshot, ModuleCallError> {
+        let mut state = self.0.lock().unwrap();
+        state.polls += 1;
+        let input = state.submitted.clone().unwrap();
+        if state.polls == 1 {
+            Ok(ServerOperationSnapshot {
+                operation_id: input.operation_id,
+                state: ServerOperationState::Callback {
+                    callback: tinymcp_bus::ServerCallback {
+                        id: "callback-1".to_owned(),
+                        call: ServerHostCall::ReadResource {
+                            source_type: "mcp:test".to_owned(),
+                            headers: Map::new(),
+                            uri: "openhuman://prompts/identity".to_owned(),
+                        },
+                    },
+                },
+                http_response: None,
+            })
+        } else {
+            Ok(ServerOperationSnapshot {
+                operation_id: input.operation_id,
+                state: ServerOperationState::Complete {
+                    response: Some("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}".to_owned()),
+                },
+                http_response: None,
+            })
+        }
+    }
+
+    async fn complete(
+        &self,
+        _session: &str,
+        _callback: &str,
+        reply: ServerHostReply,
+    ) -> Result<(), ModuleCallError> {
+        self.0.lock().unwrap().completed = Some(reply);
+        Ok(())
+    }
+
+    async fn cancel(&self, _operation: ServerOperationRef) -> Result<(), ModuleCallError> {
+        self.0.lock().unwrap().cancelled = true;
+        Ok(())
+    }
+
+    async fn close(&self, _session: &str) -> Result<(), ModuleCallError> {
+        Ok(())
+    }
+
+    async fn http_session(
+        &self,
+        _request: ServerHttpSessionRequest,
+    ) -> Result<ServerHttpResponseMetadata, ModuleCallError> {
+        unreachable!()
+    }
+
+    async fn metadata(
+        &self,
+        _session: &str,
+    ) -> Result<tinymcp_bus::ServerSessionMetadata, ModuleCallError> {
+        unreachable!()
+    }
+
+    async fn shutdown(&self) -> Result<usize, ModuleCallError> {
+        Ok(0)
+    }
+}
+
+#[tokio::test]
+async fn server_session_completes_host_resource_callback() {
+    let port = Arc::new(FixturePort(Mutex::new(PortState::default())));
+    let session = ServerSession::open_with_port(port.clone()).await.unwrap();
+    assert!(!Uuid::parse_str(session.id()).unwrap().is_nil());
+
+    let snapshot = session
+        .submit(
+            Map::new(),
+            r#"{"jsonrpc":"2.0","id":1,"method":"resources/read"}"#.to_owned(),
+            &CancellationToken::new(),
+        )
+        .await
+        .unwrap();
+
+    assert!(matches!(snapshot.state, ServerOperationState::Complete { .. }));
+    let state = port.0.lock().unwrap();
+    assert!(matches!(
+        state.completed,
+        Some(ServerHostReply::Success { ref value }) if value["contents"][0]["uri"] == "openhuman://prompts/identity"
+    ));
+    let opened = state.opened.as_ref().unwrap();
+    assert_eq!(opened.source_type_prefix, "mcp");
+    assert_eq!(opened.info["name"], "openhuman-core");
+}
+
+#[tokio::test]
+async fn server_session_cancellation_reaches_module_owner() {
+    let port = Arc::new(FixturePort(Mutex::new(PortState::default())));
+    let session = ServerSession::open_with_port(port.clone()).await.unwrap();
+    let cancellation = CancellationToken::new();
+    cancellation.cancel();
+
+    let error = session
+        .submit(Map::new(), "{}".to_owned(), &cancellation)
+        .await
+        .unwrap_err();
+
+    assert!(matches!(error, ServerError::Cancelled));
+    assert!(port.0.lock().unwrap().cancelled);
+}
+
+#[tokio::test]
+async fn server_session_fails_closed_when_module_is_unavailable() {
+    let port = Arc::new(FixturePort(Mutex::new(PortState {
+        unavailable: true,
+        ..PortState::default()
+    })));
+
+    let error = match ServerSession::open_with_port(port).await {
+        Ok(_) => panic!("unavailable module unexpectedly opened"),
+        Err(error) => error,
+    };
+
+    assert!(matches!(
+        error,
+        ServerError::Module(ModuleCallError::Unavailable)
+    ));
+}
