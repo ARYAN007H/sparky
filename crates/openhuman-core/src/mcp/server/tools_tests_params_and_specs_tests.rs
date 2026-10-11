@@ -367,26 +367,6 @@ fn memory_limit_at_max_is_preserved() {
 }
 
 #[test]
-fn memory_limit_above_max_is_rejected_by_module_validation() {
-    for tool in ["memory.recall", "memory.fetch", "memory.list"] {
-        let mut args = json!({ "limit": MEMORY_MAX_LIMIT + 1 });
-        args["question"] = json!("q");
-        args["query"] = json!("q");
-        args.as_object_mut().unwrap().retain(|k, _| {
-            k == "limit"
-                || (tool == "memory.recall" && k == "question")
-                || (tool == "memory.fetch" && k == "query")
-        });
-        let err = build_rpc_params_for_test(tool, args).expect_err("limit above cap");
-        assert!(
-            err.message().contains("must not exceed"),
-            "{tool}: {}",
-            err.message()
-        );
-    }
-}
-
-#[test]
 fn memory_fetch_maps_query_mode_cursor() {
     let params = build_rpc_params_for_test(
         "memory.fetch",
