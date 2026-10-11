@@ -137,7 +137,9 @@ async fn execute_passthrough_owned(
                 backend: "passthrough".to_owned(),
                 host: contract::HostConfig::Local,
                 workspace: contract::Workspace::Directory(workspace),
-                network: contract::NetworkPolicy::default(),
+                // Cron's existing host command inherits network access; this
+                // passthrough resource does not add a sandbox restriction.
+                network: contract::NetworkPolicy::Open,
                 resources: contract::ResourceLimits::default(),
                 ports: Vec::new(),
                 env: BTreeMap::new(),
