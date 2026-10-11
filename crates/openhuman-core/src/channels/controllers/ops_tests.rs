@@ -3,7 +3,7 @@ use crate::config::schema::{DiscordConfig, IMessageConfig};
 use crate::core::Outcome;
 use tempfile::tempdir;
 use tinychannels_bus::config::{EmailConfig, YuanbaoConfig};
-use tinychannels_bus::controllers::ChannelConnectionResult;
+use tinychannels_bus::controllers::{ChannelAuthMode, ChannelConnectionResult};
 
 fn isolated_test_config() -> (tempfile::TempDir, Config) {
     let tmp = tempdir().expect("failed to create temp dir");
