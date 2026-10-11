@@ -21,7 +21,7 @@ copying its implementation into a host, or accepting weaker isolation.
 | tinywallet | tinywallet-crypto, tinywallet-web3, tinywallet-x402 through remaining host imports | tinywallet-bus | core wallet/web3/x402 | Contract is pure at v0.13.0; native transfer preparation/execution use confidential module calls with host custody, exact approval binding and explicit close. Initialization, remaining validation, Web3 quotes/swaps, x402 payments, budgets and ledger still need host cutover |
 | tinybox | tinybox-core, tinybox-jail, tinybox-docker, tinybox-host, tinybox-ssh | tinybox-bus | core sandbox and security, desktop gateways | Pre-core gateways use the released v0.1.18 bus client. Core sandbox execution and shell analysis still require cutover |
 | tinycomputer | tinycomputer-accessibility | tinycomputer-bus | core voice, paste/focus and permission checks | Permission, focus, paste, Globe listener vocabulary/operations; preserve native thread and target rules |
-| tinyvoice | tinyvoice, cpal (also through accessibility probe) | tinyvoice-bus | core voice capture/hotkeys | Devices, recording/capture and hotkey lifecycle, bounded event batches; computer module permission decisions |
+| tinyvoice | None | tinyvoice-bus | core voice capture/hotkeys | Module-owned devices, recording and continuous capture, bounded audio reads/batches, explicit lease cleanup; computer module permission decisions |
 | tinyruntime | tinyruntime-pyserver | tinyruntime-bus | core Python worker, optional TinyJuice ML | Excluded from this migration: TinyRuntime is being removed separately |
 | tinydocs / tinymemory | pdf-extract, calamine through tinymemory-integrations/documents-office | tinydocs-bus | core memory converter and file sources | Replace OfficeConverter with bus DocumentConverter; XLSX extraction plus existing PDF/DOCX/PPTX metadata/format coverage |
 | tinysearch | none observed | tinysearch-bus | core module search proxy | Preserve existing bus adapter; enforce contract and host dependency graphs |
@@ -319,3 +319,11 @@ The desktop lockfile also catches up the already-merged Wallet v0.13.0 pin.
 Its pure contract removes the two stale contract exceptions; eleven host
 implementation exceptions remain. Runtime channel dispatch and relay delivery
 still need migration.
+
+
+TinyVoice capture uses released v0.1.15 (contract 1.5), including owner-computed
+recording summaries. The host holds opaque reservations, reads WAV output in
+256 KiB slices, polls at most two continuous chunks per request, and releases
+leases on cancellation, sign-out and shutdown. Failed cleanup stays registered
+for retry. Microphone authorization remains a TinyComputer call; the host does
+not link TinyVoice or CPAL. The existing hotkey adapter remains module-backed.

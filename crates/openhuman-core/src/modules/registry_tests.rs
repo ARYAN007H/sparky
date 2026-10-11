@@ -547,3 +547,74 @@ fn tinychannels_registry_matches_health_check_release() {
         assert_eq!(asset.sha256, sha256);
     }
 }
+
+#[cfg(feature = "voice")]
+#[test]
+fn voice_capture_release_pins_summary_contract_and_every_platform_digest() {
+    let record = find("tinyvoice").unwrap();
+    assert_eq!(record.version, "0.1.15");
+    assert_eq!(tinyvoice_bus::CONTRACT_VERSION, (1, 5));
+    let expected = [
+        (
+            "macos-15-arm64",
+            "tinyvoice-module-0.1.15-macos-15-arm64.tar.gz",
+            "16ef3ee328fb2c51506e8f66c2f3ef5e66b87b3f9505d85834b67bbc3e4b98ff",
+        ),
+        (
+            "macos-15-x86_64",
+            "tinyvoice-module-0.1.15-macos-15-x86_64.tar.gz",
+            "1e819f986c59849649c53d75f1a2488a148c1fda3659cd967eaf53d63f2c492b",
+        ),
+        (
+            "macos-26-arm64",
+            "tinyvoice-module-0.1.15-macos-26-arm64.tar.gz",
+            "c25aa3250062f6d02a9442047ea6cb9ab50919923a08bcafea08819a160dd4c7",
+        ),
+        (
+            "macos-26-x86_64",
+            "tinyvoice-module-0.1.15-macos-26-x86_64.tar.gz",
+            "747c2e62f08233cf6657863b1ff9696a0bb9d166126fdde7d717b3c6dac385a1",
+        ),
+        (
+            "ubuntu-22.04-arm64",
+            "tinyvoice-module-0.1.15-ubuntu-22.04-arm64.tar.gz",
+            "daa9a5c660a3ec5d6dd3ae9ad08842060383d8c4421bf58934fa070d34c90fa1",
+        ),
+        (
+            "ubuntu-22.04-x86_64",
+            "tinyvoice-module-0.1.15-ubuntu-22.04-x86_64.tar.gz",
+            "412501462ee421e065507023b94451a10559435955954f317969849a4efc8bd9",
+        ),
+        (
+            "ubuntu-24.04-arm64",
+            "tinyvoice-module-0.1.15-ubuntu-24.04-arm64.tar.gz",
+            "397409478b8739670f2bd256e9b29120015e366df11189a7484e464b4c0531df",
+        ),
+        (
+            "ubuntu-24.04-x86_64",
+            "tinyvoice-module-0.1.15-ubuntu-24.04-x86_64.tar.gz",
+            "3d56893a20cdb50d305f1d35d535d026a3acd9d92931afc01349f131bc7108e8",
+        ),
+        (
+            "windows-11-arm64",
+            "tinyvoice-module-0.1.15-windows-11-arm64.zip",
+            "2701528845188b10f7bcb6b05fc5354d0b733a257325da39b06c68fa1c995398",
+        ),
+        (
+            "windows-2022-x86_64",
+            "tinyvoice-module-0.1.15-windows-2022-x86_64.zip",
+            "ebbde34149317cb306ace5cc61c01abdaa601cecb339c3f2a517f5441858ca46",
+        ),
+        (
+            "windows-2025-x86_64",
+            "tinyvoice-module-0.1.15-windows-2025-x86_64.zip",
+            "0cd3476aba36d6aefb7f318a45cbdf5a47efd0668e9a28425aaef2d5bfd72048",
+        ),
+    ];
+    assert_eq!(record.assets.len(), expected.len());
+    for (key, archive, digest) in expected {
+        let asset = record.asset_for(key).unwrap();
+        assert_eq!(asset.archive, archive);
+        assert_eq!(asset.sha256, digest);
+    }
+}
