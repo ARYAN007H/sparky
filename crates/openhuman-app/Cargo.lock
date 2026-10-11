@@ -1317,15 +1317,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dirs"
-version = "7.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d57d423b3c82e89b9a24ca3091fee61f456a26edbd28d26c65906f4bc1dcd8f"
-dependencies = [
- "dirs-sys 0.5.0",
-]
-
-[[package]]
 name = "dirs-sys"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3996,7 +3987,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "directories 6.0.0",
- "dirs 6.0.0",
+ "dirs",
  "dotenvy",
  "flate2",
  "fs2",
@@ -4064,7 +4055,6 @@ dependencies = [
  "tinyinference-providers",
  "tinyinference-voice",
  "tinyjuice-bus",
- "tinymcp",
  "tinymcp-bus",
  "tinymemes",
  "tinymemory-api",
@@ -4075,7 +4065,7 @@ dependencies = [
  "tinystoragedrivers",
  "tinytools",
  "tinytools-agent",
- "tinytools-std 0.5.0",
+ "tinytools-std",
  "tinyvoice-bus",
  "tinywallet-bus",
  "tinywallet-crypto",
@@ -6365,7 +6355,7 @@ dependencies = [
  "bytes",
  "cookie",
  "data-url",
- "dirs 6.0.0",
+ "dirs",
  "dunce",
  "embed_plist",
  "getrandom 0.3.4",
@@ -6415,7 +6405,7 @@ checksum = "bc9ce40b16101cb6ea63d3e221567affd1c3a9205f95d7bc574941a10636b632"
 dependencies = [
  "anyhow",
  "cargo_toml",
- "dirs 6.0.0",
+ "dirs",
  "glob",
  "heck 0.5.0",
  "json-patch",
@@ -6585,7 +6575,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b28d8cabdeb0564f03ae261963de4bc3d98321cd3d213e76a81b7d344e5df606"
 dependencies = [
  "base64 0.22.1",
- "dirs 6.0.0",
+ "dirs",
  "flate2",
  "futures-util",
  "http",
@@ -6835,9 +6825,13 @@ dependencies = [
 name = "tinyagents-definition"
 version = "2.1.4"
 dependencies = [
+ "anyhow",
  "async-trait",
  "serde",
+ "serde_json",
  "tinytools",
+ "toml 0.8.2",
+ "tracing",
 ]
 
 [[package]]
@@ -6869,7 +6863,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "chrono-tz",
- "dirs 6.0.0",
+ "dirs",
  "flate2",
  "futures",
  "regex",
@@ -6891,7 +6885,7 @@ dependencies = [
  "tinystoragedrivers-core",
  "tinytools",
  "tinytools-agent",
- "tinytools-std 0.5.0",
+ "tinytools-std",
  "tokio",
  "tracing",
  "uuid",
@@ -6921,6 +6915,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.20",
+ "tinyagents-definition",
  "tinyagents-graph",
  "tinyagents-harness",
  "tinyagents-runtime",
@@ -7468,37 +7463,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "tinymcp"
-version = "0.9.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "axum",
- "base64 0.23.1",
- "dirs 7.0.0",
- "futures-util",
- "libc",
- "parking_lot",
- "reqwest 0.12.28",
- "rusqlite",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "thiserror 2.0.20",
- "tinymcp-bus",
- "tinytools",
- "tinytools-std 0.5.0 (git+https://github.com/tinyhumansai/tinytools?rev=360721bc3c7a26221b61f6629f5f0415cfccb568)",
- "tokio",
- "tokio-stream",
- "tracing",
- "url",
- "urlencoding",
- "uuid",
-]
-
-[[package]]
 name = "tinymcp-bus"
-version = "0.9.0"
+version = "0.13.0"
 dependencies = [
  "schemars 1.2.2",
  "serde",
@@ -7693,31 +7659,6 @@ dependencies = [
 [[package]]
 name = "tinytools-std"
 version = "0.5.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "base64 0.23.1",
- "fs2",
- "futures-util",
- "glob",
- "libc",
- "log",
- "parking_lot",
- "regex",
- "reqwest 0.12.28",
- "rustix",
- "serde_json",
- "sha2 0.11.0",
- "tinytools",
- "tokio",
- "tracing",
- "walkdir",
-]
-
-[[package]]
-name = "tinytools-std"
-version = "0.5.0"
-source = "git+https://github.com/tinyhumansai/tinytools?rev=360721bc3c7a26221b61f6629f5f0415cfccb568#360721bc3c7a26221b61f6629f5f0415cfccb568"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8188,7 +8129,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "045979e3f037cd18ad1cb2a419dfda133c5c29c9f3453370079f2255d46c257e"
 dependencies = [
  "crossbeam-channel",
- "dirs 6.0.0",
+ "dirs",
  "libappindicator",
  "muda",
  "objc2",
@@ -9474,7 +9415,7 @@ dependencies = [
  "block2",
  "cookie",
  "crossbeam-channel",
- "dirs 6.0.0",
+ "dirs",
  "dom_query",
  "dpi",
  "dunce",
