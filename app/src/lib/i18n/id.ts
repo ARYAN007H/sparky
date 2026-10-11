@@ -4383,6 +4383,22 @@ const messages: TranslationMap = {
   'connections.voiceAgents.providerDefault': 'Bawaan penyedia',
   'connections.voiceAgents.loadFailed': 'Gagal memuat pengaturan agen suara',
   'connections.voiceAgents.saving': 'Menyimpan…',
+
+  // UI keys referenced by the app but missing from the locale maps.
+  'channels.discord.oauthStartFailed': 'Tidak dapat memulai proses masuk Discord. Coba lagi.',
+  'mcp.json.loading': 'Memuat…',
+  'settings.embeddings.testUnavailableCustom':
+    'Pengujian titik akhir kustom belum didukung — simpan dan periksa statusnya di panel Embeddings.',
+  'walletSend.to': 'Untuk',
+  'walletSend.availableBalance': 'Tersedia: {{amount}} {{symbol}}',
+  'settings.skillsRunner.error.listWorkflows': 'Gagal memuat alur kerja:',
+  'conversations.runMode.plan': 'Rencana',
+  'channels.oauth.connectRecoverFailed':
+    'Tidak dapat menyelesaikan penyambungan {channel}. Jendela masuk ditutup sebelum akses diberikan — coba lagi.',
+  'channels.savedRestartRequired': 'Kanal tersimpan. Mulai ulang aplikasi untuk mengaktifkannya.',
+  'channels.connect': 'Hubungkan',
+  connectProvider: 'Hubungkan penyedia',
+  'walletSend.title': 'Kirim',
 };
 
 export default messages;

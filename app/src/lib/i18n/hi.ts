@@ -4346,6 +4346,23 @@ const messages: TranslationMap = {
   'connections.voiceAgents.providerDefault': 'प्रदाता का डिफ़ॉल्ट',
   'connections.voiceAgents.loadFailed': 'वॉइस एजेंट सेटिंग लोड नहीं हो सकीं',
   'connections.voiceAgents.saving': 'सहेजा जा रहा है…',
+
+  // UI keys referenced by the app but missing from the locale maps.
+  'channels.discord.oauthStartFailed':
+    'डिस्कॉर्ड साइन-इन प्रारंभ नहीं किया जा सका. पुनः प्रयास करें।',
+  'mcp.json.loading': 'लोड हो रहा है...',
+  'settings.embeddings.testUnavailableCustom':
+    'कस्टम एंडपॉइंट का परीक्षण अभी तक समर्थित नहीं है - इसे सहेजें और एंबेडिंग पैनल पर स्थिति की जांच करें।',
+  'walletSend.to': 'को',
+  'walletSend.availableBalance': 'उपलब्ध: {{amount}} {{symbol}}',
+  'settings.skillsRunner.error.listWorkflows': 'वर्कफ़्लो लोड करने में विफल:',
+  'conversations.runMode.plan': 'योजना',
+  'channels.oauth.connectRecoverFailed':
+    '{channel} को कनेक्ट करना पूरा नहीं हो सका. पहुंच प्रदान करने से पहले साइन-इन विंडो बंद कर दी गई - पुनः प्रयास करें।',
+  'channels.savedRestartRequired': 'चैनल सेव हो गया। एक्टिवेट करने के लिए ऐप रीस्टार्ट करें।',
+  'channels.connect': 'कनेक्ट करें',
+  connectProvider: 'प्रदाता कनेक्ट करें',
+  'walletSend.title': 'भेजें',
 };
 
 export default messages;

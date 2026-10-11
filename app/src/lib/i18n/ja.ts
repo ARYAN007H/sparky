@@ -4696,6 +4696,24 @@ const messages: TranslationMap = {
   'memoryPage.import.resume': 'インポートを再開',
   'memoryPage.import.failedItems': 'インポートできなかった項目：{count}',
   'memoryPage.import.retryFailed': '失敗した項目を再試行',
+
+  // UI keys referenced by the app but missing from the locale maps.
+  'channels.discord.oauthStartFailed':
+    'Discord のサインインを開始できませんでした。もう一度やり直してください。',
+  'mcp.json.loading': '読み込み中…',
+  'settings.embeddings.testUnavailableCustom':
+    'カスタム エンドポイントのテストはまだサポートされていません。保存して、[埋め込み] パネルでステータスを確認してください。',
+  'walletSend.to': 'に',
+  'walletSend.availableBalance': '利用可能: {{amount}} {{symbol}}',
+  'settings.skillsRunner.error.listWorkflows': 'ワークフローの読み込みに失敗しました:',
+  'conversations.runMode.plan': '計画',
+  'channels.oauth.connectRecoverFailed':
+    '{channel} の接続を完了できませんでした。アクセスが許可される前にサインイン ウィンドウが閉じました。もう一度お試しください。',
+  'channels.savedRestartRequired':
+    'チャンネルを保存しました。有効にするにはアプリを再起動してください。',
+  'channels.connect': '接続',
+  connectProvider: '接続',
+  'walletSend.title': '送金',
 };
 
 export default messages;

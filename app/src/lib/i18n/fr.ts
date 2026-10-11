@@ -4460,6 +4460,23 @@ const messages: TranslationMap = {
   'connections.voiceAgents.providerDefault': 'Valeur par défaut du fournisseur',
   'connections.voiceAgents.loadFailed': 'Impossible de charger les réglages des agents vocaux',
   'connections.voiceAgents.saving': 'Enregistrement…',
+
+  // UI keys referenced by the app but missing from the locale maps.
+  'channels.discord.oauthStartFailed':
+    'Impossible de démarrer la connexion à Discord. Essayer à nouveau.',
+  'mcp.json.loading': 'Chargement…',
+  'settings.embeddings.testUnavailableCustom':
+    "Le test d'un point de terminaison personnalisé n'est pas encore pris en charge : enregistrez-le et vérifiez l'état dans le panneau Embeddings.",
+  'walletSend.to': 'À',
+  'walletSend.availableBalance': 'Disponible : {{amount}} {{symbol}}',
+  'settings.skillsRunner.error.listWorkflows': 'Échec du chargement des flux de travail :',
+  'conversations.runMode.plan': 'Planifier',
+  'channels.oauth.connectRecoverFailed':
+    "Impossible de terminer la connexion du {channel}. La fenêtre de connexion s'est fermée avant que l'accès ne soit accordé. Réessayez.",
+  'channels.savedRestartRequired': "Canal enregistré. Redémarre l'app pour l'activer.",
+  'channels.connect': 'Se connecter',
+  connectProvider: 'Connecter un fournisseur',
+  'walletSend.title': 'Envoyer',
 };
 
 export default messages;

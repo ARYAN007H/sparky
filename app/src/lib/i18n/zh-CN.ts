@@ -4103,6 +4103,22 @@ const messages: TranslationMap = {
   'connections.voiceAgents.providerDefault': '提供方默认',
   'connections.voiceAgents.loadFailed': '无法加载语音助手设置',
   'connections.voiceAgents.saving': '正在保存…',
+
+  // UI keys referenced by the app but missing from the locale maps.
+  'channels.discord.oauthStartFailed': '无法启动 Discord 登录。再试一次。',
+  'mcp.json.loading': '加载中...',
+  'settings.embeddings.testUnavailableCustom':
+    '尚不支持测试自定义端点 - 保存它并检查“嵌入”面板上的状态。',
+  'walletSend.to': '至',
+  'walletSend.availableBalance': '可用：{{amount}} {{symbol}}',
+  'settings.skillsRunner.error.listWorkflows': '无法加载工作流程：',
+  'conversations.runMode.plan': '计划',
+  'channels.oauth.connectRecoverFailed':
+    '无法完成 {channel} 的连接。登录窗口在授予访问权限之前关闭 - 请重试。',
+  'channels.savedRestartRequired': '频道已保存。重启应用以激活。',
+  'channels.connect': '连接',
+  connectProvider: '连接 {label}',
+  'walletSend.title': '发送',
 };
 
 export default messages;

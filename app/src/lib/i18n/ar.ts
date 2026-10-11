@@ -4254,6 +4254,22 @@ const messages: TranslationMap = {
   'connections.voiceAgents.providerDefault': 'الإعداد الافتراضي للمزوّد',
   'connections.voiceAgents.loadFailed': 'تعذّر تحميل إعدادات الوكلاء الصوتيين',
   'connections.voiceAgents.saving': 'جارٍ الحفظ…',
+
+  // UI keys referenced by the app but missing from the locale maps.
+  'channels.discord.oauthStartFailed': 'تعذر بدء تسجيل الدخول إلى Discord. حاول ثانية.',
+  'mcp.json.loading': 'جارٍ التحميل…',
+  'settings.embeddings.testUnavailableCustom':
+    'اختبار نقطة نهاية مخصصة غير مدعوم حتى الآن — احفظه وتحقق من الحالة في لوحة Embeddings.',
+  'walletSend.to': 'ل',
+  'walletSend.availableBalance': 'متاح: {{amount}} {{symbol}}',
+  'settings.skillsRunner.error.listWorkflows': 'فشل تحميل مهام سير العمل:',
+  'conversations.runMode.plan': 'خطة',
+  'channels.oauth.connectRecoverFailed':
+    'تعذر إنهاء الاتصال {channel}. تم إغلاق نافذة تسجيل الدخول قبل منح الوصول - حاول مرة أخرى.',
+  'channels.savedRestartRequired': 'تم حفظ القناة. أعد تشغيل التطبيق لتفعيلها.',
+  'channels.connect': 'اتصال',
+  connectProvider: 'ربط مزود',
+  'walletSend.title': 'إرسال',
 };
 
 export default messages;

@@ -4626,18 +4626,20 @@ const en: TranslationMap = {
   'connections.voiceAgents.saving': 'Saving…',
 
   // UI keys referenced by the app but missing from the locale maps.
-  "channels.savedRestartRequired": "Channel saved. Restart the app to activate it.",
-  "channels.connect": "Connect",
-  "channels.discord.oauthStartFailed": "Couldn't start Discord sign-in. Try again.",
-  "mcp.json.loading": "Loading…",
-  "settings.embeddings.testUnavailableCustom": "Testing a custom endpoint is not supported yet — save it and check the status on the Embeddings panel.",
-  "connectProvider": "Connect",
-  "walletSend.title": "Send",
-  "walletSend.to": "To",
-  "walletSend.availableBalance": "Available: {{amount}} {{symbol}}",
-  "settings.skillsRunner.error.listWorkflows": "Failed to load workflows:",
-  "conversations.runMode.plan": "Plan",
-  "channels.oauth.connectRecoverFailed": "Couldn't finish connecting {channel}. The sign-in window closed before access was granted — try again.",
+  'channels.savedRestartRequired': 'Channel saved. Restart the app to activate it.',
+  'channels.connect': 'Connect',
+  'channels.discord.oauthStartFailed': "Couldn't start Discord sign-in. Try again.",
+  'mcp.json.loading': 'Loading…',
+  'settings.embeddings.testUnavailableCustom':
+    'Testing a custom endpoint is not supported yet — save it and check the status on the Embeddings panel.',
+  connectProvider: 'Connect',
+  'walletSend.title': 'Send',
+  'walletSend.to': 'To',
+  'walletSend.availableBalance': 'Available: {{amount}} {{symbol}}',
+  'settings.skillsRunner.error.listWorkflows': 'Failed to load workflows:',
+  'conversations.runMode.plan': 'Plan',
+  'channels.oauth.connectRecoverFailed':
+    "Couldn't finish connecting {channel}. The sign-in window closed before access was granted — try again.",
 };
 
 export default en;

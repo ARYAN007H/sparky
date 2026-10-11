@@ -4392,6 +4392,22 @@ const messages: TranslationMap = {
   'connections.voiceAgents.providerDefault': 'По умолчанию у провайдера',
   'connections.voiceAgents.loadFailed': 'Не удалось загрузить настройки голосовых агентов',
   'connections.voiceAgents.saving': 'Сохранение…',
+
+  // UI keys referenced by the app but missing from the locale maps.
+  'channels.discord.oauthStartFailed': 'Не удалось начать вход в Discord. Попробуйте еще раз.',
+  'mcp.json.loading': 'Загрузка…',
+  'settings.embeddings.testUnavailableCustom':
+    'Тестирование пользовательской конечной точки пока не поддерживается — сохраните его и проверьте статус на панели «Внедрения».',
+  'walletSend.to': 'Чтобы',
+  'walletSend.availableBalance': 'Доступно: {{amount}} {{symbol}}',
+  'settings.skillsRunner.error.listWorkflows': 'Не удалось загрузить рабочие процессы:',
+  'conversations.runMode.plan': 'План',
+  'channels.oauth.connectRecoverFailed':
+    'Не удалось завершить подключение {channel}. Окно входа закрылось до того, как был предоставлен доступ. Повторите попытку.',
+  'channels.savedRestartRequired': 'Канал сохранён. Перезапусти приложение для активации.',
+  'channels.connect': 'Подключиться',
+  connectProvider: 'Подключить провайдера',
+  'walletSend.title': 'Отправить',
 };
 
 export default messages;

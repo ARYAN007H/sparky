@@ -4347,6 +4347,24 @@ const messages: TranslationMap = {
   'onboarding.custom.unsavedChanges': 'Devam etmeden önce değişikliklerinizi kaydedin.',
   'settings.composio.directOnlyDesc':
     'Yönetilen Composio kimlik doğrulaması burada kullanılamıyor. Kendi Composio API anahtarınızı girin veya şimdilik geçin.',
+
+  // UI keys referenced by the app but missing from the locale maps.
+  'channels.discord.oauthStartFailed':
+    "Discord'da oturum açma işlemi başlatılamadı. Tekrar deneyin.",
+  'mcp.json.loading': 'Yükleniyor…',
+  'settings.embeddings.testUnavailableCustom':
+    'Özel bir uç noktanın test edilmesi henüz desteklenmiyor; bunu kaydedin ve Yerleştirmeler panelinde durumu kontrol edin.',
+  'walletSend.to': 'Kime',
+  'walletSend.availableBalance': 'Mevcut: {{amount}} {{symbol}}',
+  'settings.skillsRunner.error.listWorkflows': 'İş akışları yüklenemedi:',
+  'conversations.runMode.plan': 'Planı',
+  'channels.oauth.connectRecoverFailed':
+    "{channel}'nin bağlanması tamamlanamadı. Erişim verilmeden önce oturum açma penceresi kapatıldı; tekrar deneyin.",
+  'channels.savedRestartRequired':
+    'Kanal kaydedildi. Etkinleştirmek için uygulamayı yeniden başlatın.',
+  'channels.connect': 'Bağlan',
+  connectProvider: 'Bağlan',
+  'walletSend.title': 'Gönder',
 };
 
 export default messages;

@@ -4293,6 +4293,22 @@ const messages: TranslationMap = {
   'connections.voiceAgents.providerDefault': '제공자 기본값',
   'connections.voiceAgents.loadFailed': '음성 에이전트 설정을 불러오지 못했습니다',
   'connections.voiceAgents.saving': '저장 중…',
+
+  // UI keys referenced by the app but missing from the locale maps.
+  'channels.discord.oauthStartFailed': 'Discord 로그인을 시작할 수 없습니다. 다시 시도해 보세요.',
+  'mcp.json.loading': '로드 중…',
+  'settings.embeddings.testUnavailableCustom':
+    '사용자 정의 엔드포인트 테스트는 아직 지원되지 않습니다. 저장하고 Embeddings 패널에서 상태를 확인하세요.',
+  'walletSend.to': '받는 사람',
+  'walletSend.availableBalance': '사용 가능: {{amount}} {{symbol}}',
+  'settings.skillsRunner.error.listWorkflows': '워크플로를 로드하지 못했습니다.',
+  'conversations.runMode.plan': '계획',
+  'channels.oauth.connectRecoverFailed':
+    '{channel} 연결을 완료할 수 없습니다. 액세스 권한이 부여되기 전에 로그인 창이 닫혔습니다. 다시 시도하세요.',
+  'channels.savedRestartRequired': '채널이 저장되었습니다. 활성화하려면 앱을 다시 시작하세요.',
+  'channels.connect': '연결하다',
+  connectProvider: '제공업체 연결',
+  'walletSend.title': '보내기',
 };
 
 export default messages;
