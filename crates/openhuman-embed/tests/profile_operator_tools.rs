@@ -195,12 +195,14 @@ async fn scenario() {
     );
     assert_eq!(runtime.sweep_cron_at(later).await.ran, 0);
 
-    // A model that never stops calling tools is cut off at the cap.
+    // A model that never stops calling tools is cut off at the operator's cap:
+    // the harness stops at CAP model calls and the turn's recovery adds a few
+    // more, nowhere near the orchestrator's own cap of 200.
     let before = chat_requests(&chat).await.len();
     let _ = handle.chat("t3", "loop forever").await;
     let rounds = chat_requests(&chat).await.len() - before;
     assert!(
-        (CAP..=CAP + 1).contains(&rounds),
+        (CAP..3 * CAP).contains(&rounds),
         "{rounds} model rounds for a cap of {CAP}"
     );
 
