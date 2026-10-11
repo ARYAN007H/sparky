@@ -270,13 +270,8 @@ impl Tool for McpRegistryToolCallTool {
             .await
             .map_err(|_| anyhow::anyhow!("mcp_registry_tool_call: invalid tool arguments"))?;
         emit!(
-            ops::mcp_clients_tool_call(
-                &self.config,
-                sid,
-                tool_name,
-                Value::Object(normalized),
-            )
-            .await,
+            ops::mcp_clients_tool_call(&self.config, sid, tool_name, Value::Object(normalized),)
+                .await,
             "mcp_registry_tool_call"
         )
     }
