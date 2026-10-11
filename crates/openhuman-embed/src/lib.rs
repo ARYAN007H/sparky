@@ -74,7 +74,7 @@ pub use openhuman_core::agent::turn_origin::{AgentTurnOrigin, TrustedAutomationS
 /// reply target. `None` means the caller installed no origin; it grants no
 /// authority. Scheduled turns retain their existing automation origin.
 pub fn current_turn_origin() -> Option<AgentTurnOrigin> {
-    openhuman_core::agent::turn_origin::current()
+    openhuman_core::core::runtime::CoreContext::current_turn_origin()
 }
 pub use openhuman_core::backend::{
     install_backend_transport, installed_backend_transport, BackendRequest, BackendTransport,
