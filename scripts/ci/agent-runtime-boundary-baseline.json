@@ -1065,20 +1065,6 @@
   },
   {
     "rule": "openhuman-upstream-reexport",
-    "path": "crates/openhuman-core/src/agent/harness/artifact_offload/mod.rs",
-    "line": 67,
-    "text": "pub use tinyagents_harness::artifacts::{",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-upstream-reexport",
-    "path": "crates/openhuman-core/src/agent/orchestration/types.rs",
-    "line": 12,
-    "text": "pub use tinyagents_tasks::OrchestrationTaskStatus;",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-upstream-reexport",
     "path": "crates/openhuman-core/src/inference/host_runtime/service/mod.rs",
     "line": 6,
     "text": "pub use tinyinference_local::service::LocalAiService;",
@@ -1089,13 +1075,6 @@
     "path": "crates/openhuman-core/src/inference/mod.rs",
     "line": 48,
     "text": "pub use tinyinference_local::status::{",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-upstream-reexport",
-    "path": "crates/openhuman-core/src/voice/cloud_transcribe.rs",
-    "line": 7,
-    "text": "pub use tinyinference_voice::cloud::{CloudTranscribeOptions, CloudTranscribeResult};",
     "occurrence": 1
   },
   {
