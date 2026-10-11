@@ -311,6 +311,8 @@ pub fn all_tools_with_runtime(
     tools.push(Box::new(crate::tools::x402_request_tool(
         security.clone(),
         http_config.allowed_domains.clone(),
+        http_config.max_response_size,
+        http_config.timeout_secs,
     )));
 
     // Coding-harness baseline `web_fetch` (issue #1205) — single-purpose
