@@ -141,7 +141,7 @@ pub use permission::PermissionFuture;
 pub mod observe;
 
 pub mod process;
-#[cfg(feature = "channels")]
+#[cfg(feature = "profiles")]
 pub mod profiles;
 /// Explicit ordered fallback and truncation policies.
 pub mod routing;
@@ -187,7 +187,7 @@ pub use harness::{
 };
 #[cfg(feature = "mcp")]
 pub use harness::{HttpHeader, McpAuthConfig, McpServer};
-#[cfg(feature = "channels")]
+#[cfg(feature = "profiles")]
 pub use profiles::{
     ChatReply, CronDelivery, CronReply, CronSweepReport, DirectProfileProvider, JobOrigin,
     OpenError, ProfileError, ProfileEvents, ProfileHandle, ProfileId, ProfileIdMode,

@@ -31,7 +31,11 @@ skills = ["openhuman-core/skills"]
 mcp = ["openhuman-core/mcp"]
 # Also carries `process::sentry`, the shared Sentry options + before_send chain.
 crash-reporting = ["dep:sentry", "openhuman-core/crash-reporting"]
-channels = ["openhuman-core/channels"]
+# The in-process SaaS profile facade (`ProfileRuntime`). Headless: it does not
+# pull in tinychannels or axum. Relaying a platform message into a profile
+# (`ProfileHandle::relay_inbound`) is a channel transport and needs `channels`.
+profiles = []
+channels = ["profiles", "openhuman-core/channels"]
 whatsapp-web = ["openhuman-core/whatsapp-web"]
 file-logging = ["openhuman-core/file-logging"]
 scheduler-gate = ["openhuman-core/scheduler-gate"]
