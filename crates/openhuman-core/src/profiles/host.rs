@@ -223,17 +223,22 @@ impl ProfileHost {
 
     /// [`layout::profile_config`] plus the operator's cron limits, which no
     /// profile config can loosen.
-    fn forced_config(&self, layout: &ProfileLayout, id: &ProfileId) -> Result<Config, String> {
+    fn forced_config(&self, layout: &ProfileLayout, id: &ProfileId) -> Config {
         let mut config = layout::profile_config(layout, id);
-        // Operator-owned direct providers apply to every config built for a
-        // profile, whether it serves chat, relay or cron.
-        super::provider_settings::ProfileProviderSettings::from_saas(&self.saas)
-            .map_err(|error| error.to_string())?
-            .bind(&mut config);
         let cron = &self.saas.cron;
         config.cron.agent_jobs_only = cron.agent_jobs_only;
         config.cron.min_interval_secs = cron.min_interval_secs;
         config.cron.max_active_jobs = cron.max_active_jobs;
+        config
+    }
+
+    /// [`Self::forced_config`] plus the operator's direct providers, for any
+    /// config that serves chat, relay or cron turns.
+    fn serving_config(&self, layout: &ProfileLayout, id: &ProfileId) -> Result<Config, String> {
+        let mut config = self.forced_config(layout, id);
+        super::provider_settings::ProfileProviderSettings::from_saas(&self.saas)
+            .map_err(|error| error.to_string())?
+            .bind(&mut config);
         Ok(config)
     }
 
@@ -243,7 +248,7 @@ impl ProfileHost {
         if self.registry.get(id).await?.is_none() {
             return Err(format!("profile {id} is not provisioned"));
         }
-        self.forced_config(&self.layout_of(id), id)
+        self.serving_config(&self.layout_of(id), id)
     }
 
     /// Profile `id`, opening it — and taking its lease — if it is provisioned
@@ -318,7 +323,7 @@ impl ProfileHost {
             return Err(OpenError::Storage(error));
         }
         let mut config = self
-            .forced_config(&layout, id)
+            .serving_config(&layout, id)
             .map_err(OpenError::Storage)?;
         if let Some(capabilities) = &self.capabilities {
             capabilities.configure(&mut config);
