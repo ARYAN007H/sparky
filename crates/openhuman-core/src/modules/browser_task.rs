@@ -69,8 +69,12 @@ pub fn start_request(config: &Config, task: &BrowserTask) -> StartTaskRequest {
             allow_destructive: false,
             browser_endpoint: None,
             headed: !config.browser.headless,
-            browser_executable: None,
-            browser_profile: None,
+            // Read from the settings for every task, so a saved Chrome path
+            // or profile applies without restarting the app.
+            browser_executable: config.browser.chrome_path.clone(),
+            browser_profile: (config.browser.profile_mode == "persistent")
+                .then(|| config.browser.profile_path.clone())
+                .flatten(),
         },
         budget: TaskBudget {
             max_actions: Some(task.max_actions),
@@ -114,6 +118,7 @@ pub(crate) async fn begin<'a>(
         return Err("a browser task needs at least one allowed origin".to_owned());
     }
     let mut request = start_request(config, task);
+    free_profile(&mut request, super::browser_profile::PROFILE_WAIT).await;
     let mut following = super::browser_sites::apply(config, task, &mut request).await;
     tracing::debug!(
         origins = task.origins.len(),
@@ -279,6 +284,23 @@ fn refused_flow(error: &str) -> bool {
         "browser task {} failed [INVALID_FLOW]",
         methods::START_TASK
     ))
+}
+
+/// Leaves `request` its persistent profile only when no other Chrome holds
+/// it within `wait`. Chrome lets one browser at a time use a profile folder,
+/// so a task waits a moment for one closing on it (the browser of the task
+/// before it, which closes as it ends), and otherwise runs in a fresh profile
+/// rather than fail to start its browser.
+async fn free_profile(request: &mut StartTaskRequest, wait: Duration) {
+    let Some(profile) = request.constraints.browser_profile.clone() else {
+        return;
+    };
+    if !super::browser_profile::free_within(std::path::Path::new(&profile), wait).await {
+        tracing::warn!(
+            "[browser-task] another Chrome holds the persistent profile; this task runs in a fresh profile"
+        );
+        request.constraints.browser_profile = None;
+    }
 }
 
 fn unwrap_response<Reply>(member: &str, response: AgentResponse<Reply>) -> Result<Reply, String> {

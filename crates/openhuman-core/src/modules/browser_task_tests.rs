@@ -35,6 +35,34 @@ fn start_request_confines_the_task_to_the_browser_under_host_policy() {
 }
 
 #[test]
+fn a_task_carries_the_chrome_path_and_the_persistent_profile_from_settings() {
+    let mut config = Config::default();
+    config.browser.chrome_path =
+        Some("/Users/asha/Desktop/Google Chrome.app/Contents/MacOS/Google Chrome".into());
+    config.browser.profile_mode = "persistent".into();
+    config.browser.profile_path = Some("/Users/asha/.openhuman/chrome".into());
+    let request = start_request(&config, &task());
+    assert_eq!(
+        request.constraints.browser_executable.as_deref(),
+        Some("/Users/asha/Desktop/Google Chrome.app/Contents/MacOS/Google Chrome")
+    );
+    assert_eq!(
+        request.constraints.browser_profile.as_deref(),
+        Some("/Users/asha/.openhuman/chrome")
+    );
+    // A fresh profile is the module's own temporary one.
+    config.browser.profile_mode = "fresh".into();
+    assert!(start_request(&config, &task())
+        .constraints
+        .browser_profile
+        .is_none());
+    assert!(start_request(&Config::default(), &task())
+        .constraints
+        .browser_executable
+        .is_none());
+}
+
+#[test]
 fn a_traced_host_asks_the_module_to_record_every_decision() {
     let mut config = Config::default();
     config.computer.trace = true;
@@ -121,6 +149,45 @@ fn unwrap_response_returns_data_or_the_structured_error() {
     assert!(unwrap_response("AwaitTask", empty)
         .unwrap_err()
         .contains("no result"));
+}
+
+#[tokio::test]
+async fn a_task_keeps_the_persistent_profile_only_while_no_other_chrome_holds_it() {
+    let mut config = Config::default();
+    config.browser.profile_mode = "persistent".into();
+    let profile =
+        std::env::temp_dir().join(format!("openhuman-task-profile-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&profile);
+    std::fs::create_dir_all(&profile).unwrap();
+    config.browser.profile_path = Some(profile.to_string_lossy().into_owned());
+
+    // Free: the task keeps it.
+    let mut request = start_request(&config, &task());
+    free_profile(&mut request, Duration::from_millis(50)).await;
+    assert_eq!(
+        request.constraints.browser_profile.as_deref(),
+        config.browser.profile_path.as_deref()
+    );
+
+    // Held by a running Chrome (here, this process): a fresh profile instead.
+    #[cfg(not(windows))]
+    {
+        let here = sysinfo::System::host_name().unwrap_or_default();
+        std::os::unix::fs::symlink(
+            format!("{here}-{}", std::process::id()),
+            profile.join("SingletonLock"),
+        )
+        .unwrap();
+        let mut request = start_request(&config, &task());
+        free_profile(&mut request, Duration::from_millis(50)).await;
+        assert!(request.constraints.browser_profile.is_none());
+    }
+    let _ = std::fs::remove_dir_all(&profile);
+
+    // No persistent profile: nothing to wait for.
+    let mut request = start_request(&Config::default(), &task());
+    free_profile(&mut request, Duration::from_millis(50)).await;
+    assert!(request.constraints.browser_profile.is_none());
 }
 
 #[test]
