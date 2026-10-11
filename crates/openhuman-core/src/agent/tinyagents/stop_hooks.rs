@@ -2,8 +2,8 @@
 
 use crate::agent::cost::TurnCost;
 use std::sync::Arc;
-use tinyagents_harness::middleware::StopHook;
 use tinyagents_harness::middleware::library::{StopHookMetrics, StopHookMiddleware};
+use tinyagents_harness::middleware::StopHook;
 use tinyagents_harness::steering::SteeringHandle;
 use tinyinference_llm::model::ModelResponse;
 

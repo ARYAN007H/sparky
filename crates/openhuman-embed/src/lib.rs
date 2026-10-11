@@ -67,8 +67,8 @@
 pub use openhuman_core::agent::harness::definition::AgentDefinition;
 pub use openhuman_core::agent::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
 pub use openhuman_core::backend::{
-    BackendRequest, BackendTransport, BackendTransportError, BaseUrlPurpose, TransportProfile,
-    install_backend_transport, installed_backend_transport,
+    install_backend_transport, installed_backend_transport, BackendRequest, BackendTransport,
+    BackendTransportError, BaseUrlPurpose, TransportProfile,
 };
 pub use openhuman_core::config::ComposioHostCredential;
 pub use openhuman_core::config::Config as RuntimeConfig;
@@ -90,7 +90,7 @@ pub use tinytools::ToolPolicy;
 pub mod agent_progress {
     pub use openhuman_core::agent::progress::AgentProgress;
     pub use openhuman_core::agent::progress_sink::{
-        AGENT_PROGRESS_SINK, ProgressSink, current_progress_sink, with_progress_sink,
+        current_progress_sink, with_progress_sink, ProgressSink, AGENT_PROGRESS_SINK,
     };
 }
 
@@ -100,7 +100,7 @@ pub mod agent_progress {
 #[cfg(feature = "skills")]
 pub mod skill_registry {
     pub use openhuman_core::skills::catalog::{
-        HERMES_REGISTRY_ID, ReqwestTransport, skill_registry,
+        skill_registry, ReqwestTransport, HERMES_REGISTRY_ID,
     };
 }
 
@@ -144,11 +144,11 @@ mod turn_meter;
 #[path = "host_internals.rs"]
 pub mod __host;
 
-pub use openhuman_core::core::ControllerSchema;
 /// Look up the schema of a registered RPC method (`openhuman.<ns>_<fn>`).
 pub use openhuman_core::core::all::schema_for_rpc_method;
 /// Whether this build carries the HTTP server surface the router mounts.
 pub use openhuman_core::core::http_server_status::HTTP_SERVER_COMPILED_IN;
+pub use openhuman_core::core::ControllerSchema;
 /// Why a listen-port pick failed (another live core holds the port, ...).
 pub use openhuman_core::platform::connectivity::rpc::PickListenPortError;
 /// Whether this build carries the voice domain.
@@ -180,14 +180,14 @@ pub use profiles::{
     ProfileRuntime, ProfileRuntimeBuilder, ProfileSummary, Provisioned, RelayAccepted,
     RelayMessage, SaasConfig,
 };
+pub use runtime::builder::DEFAULT_MAX_AGENTS;
 /// Read-only view of a [`RuntimeBuilder`], for the layered crates' tests.
 #[doc(hidden)]
 pub use runtime::BuilderSummary;
-pub use runtime::builder::DEFAULT_MAX_AGENTS;
 pub use runtime::{
-    AgentDefaults, ApiKey, ConfigSource, ConfigurationInfo, DefaultsInfo, LearningSettings,
-    ModelDefaults, RemoveAgent, Runtime, RuntimeBuilder, RuntimeDefaults, RuntimeError,
-    RuntimeInfo, RuntimeModule, SkillsPolicy, StorageInfo, WeightClass, run_from_args,
+    run_from_args, AgentDefaults, ApiKey, ConfigSource, ConfigurationInfo, DefaultsInfo,
+    LearningSettings, ModelDefaults, RemoveAgent, Runtime, RuntimeBuilder, RuntimeDefaults,
+    RuntimeError, RuntimeInfo, RuntimeModule, SkillsPolicy, StorageInfo, WeightClass,
 };
 
 /// The types the [`RuntimeBuilder`] seam options take: controller
@@ -240,7 +240,7 @@ pub use complete::{
     CompletionTrace, CompletionUsage,
 };
 pub use session_store::{InMemorySessionStores, SessionStoreProvider};
-pub use turn::{Route, Turn, TurnOutcome, TurnRequest, absolute};
+pub use turn::{absolute, Route, Turn, TurnOutcome, TurnRequest};
 pub use turn_cancellation::TurnCancellation;
 
 use std::sync::Arc;

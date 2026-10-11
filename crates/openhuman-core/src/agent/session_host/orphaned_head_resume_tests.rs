@@ -180,9 +180,7 @@ async fn resumed_orphaned_tool_head_is_repaired_before_the_request() {
         !matches!(first_non_system, Message::Tool(_)),
         "the request must not open on an orphaned tool result, got {first_non_system:?}"
     );
-    assert!(
-        !sent
-            .iter()
-            .any(|m| matches!(m, Message::Tool(t) if t.tool_call_id.starts_with("call_orphan")))
-    );
+    assert!(!sent
+        .iter()
+        .any(|m| matches!(m, Message::Tool(t) if t.tool_call_id.starts_with("call_orphan"))));
 }

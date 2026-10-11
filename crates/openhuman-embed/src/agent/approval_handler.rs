@@ -1,6 +1,6 @@
 //! Callback-based approvals, using the same agent-scoped gate as polling.
 use crate::{ApprovalDecision, Approvals, CancellationToken, PendingApproval};
-use openhuman_core::core::bus::{BUS, EventHandler, SubscriptionHandle};
+use openhuman_core::core::bus::{EventHandler, SubscriptionHandle, BUS};
 use openhuman_core::core::events::DomainEvent;
 use std::sync::Arc;
 
