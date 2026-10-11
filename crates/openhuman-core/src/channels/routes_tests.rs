@@ -7,8 +7,10 @@ use crate::channels::traits::ChannelMessage;
 use crate::core::events::DomainEvent;
 use async_trait::async_trait;
 use std::collections::HashMap;
+use std::future::Future;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use std::task::{Context, Poll, Wake, Waker};
 use tinyagents_session::transcript::TranscriptMessage;
 use tinybus::EventHandler;
 use tinytools::{Tool, ToolResult};
@@ -221,6 +223,51 @@ fn model_command_messages_use_thread_aware_history_keys() {
         super::super::context::conversation_history_key(&msg),
         "discord_alice_room_thread:thread-1"
     );
+}
+
+struct NoopWake;
+
+impl Wake for NoopWake {
+    fn wake(self: Arc<Self>) {}
+}
+
+#[tokio::test]
+async fn sign_out_cancels_remote_invalidation_while_it_waits_for_the_session_table() {
+    let core_context = crate::core::runtime::CoreContext::for_test(
+        crate::core::runtime::DomainSet::full(),
+        None,
+    );
+    crate::core::runtime::CoreContext::scope(core_context, async {
+        let guard = crate::web_chat::ops::lock_thread_sessions_for_test().await;
+        let cancellation = tokio_util::sync::CancellationToken::new();
+        let callback = RouteCallbacks::new(
+            runtime_context(PathBuf::from("/tmp/channel-callback")),
+            cancellation.clone(),
+        );
+        assert!(callback.core_context.is_some());
+
+        let request = tinychannels_bus::ChannelBackendRequest::RemoteControl(
+            tinychannels_bus::module_remote::RemoteHostRequest::InvalidateThread {
+                thread_id: "sign-out-in-flight".into(),
+            },
+        );
+        let mut operation = Box::pin(callback.dispatch_controller_backend(request));
+        let waker = Waker::from(Arc::new(NoopWake));
+        let mut task_context = Context::from_waker(&waker);
+
+        assert!(
+            matches!(operation.as_mut().poll(&mut task_context), Poll::Pending),
+            "the callback should be waiting on the locked session table"
+        );
+        cancellation.cancel();
+        assert!(
+            matches!(operation.as_mut().poll(&mut task_context), Poll::Ready(Err(_))),
+            "sign-out must cancel the callback before it can mutate session state"
+        );
+
+        drop(guard);
+    })
+    .await;
 }
 
 #[test]
