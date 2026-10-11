@@ -205,11 +205,11 @@ pub mod server;
 
 /// MCP wire-contract response types used by host adapters.
 pub mod http_client {
+    #[cfg(test)]
+    pub use tinymcp::transport::http::{McpHttpClient, McpHttpClientBuilder};
     pub use tinymcp_bus::{
         AuthorizationServerMetadata, McpAuthChallenge, McpAuthorizationContext,
         McpInitializeResult, McpRemoteTool, McpServerToolResult, McpSseEvent,
         ProtectedResourceMetadata,
     };
-    #[cfg(test)]
-    pub use tinymcp::transport::http::{McpHttpClient, McpHttpClientBuilder};
 }
