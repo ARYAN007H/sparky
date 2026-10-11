@@ -672,10 +672,11 @@ fn resumed_thread_with_retired_podcast_tool_remains_usable() {
             std::fs::read(&transcript_path).expect("resumed bytes"),
             archived_bytes
         );
-        resumed
+        let output = resumed
             .turn("continue this conversation")
             .await
             .expect("usable resumed turn");
+        assert_eq!(output, "continued without the retired tool");
         let requests = serde_json::to_string(&next.requests()).expect("requests");
         assert!(
             requests.contains("historical audio artifact"),
