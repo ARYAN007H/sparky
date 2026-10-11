@@ -221,7 +221,7 @@ async fn configured_call(
         arguments,
     };
     match client
-        .call_confidential(
+        .call_confidential::<tinymcp_bus::ClassifiedStaticToolCall>(
             "tinymcp",
             tinymcp_bus::names::methods::CONFIGURED_TOOL_CALL,
             (request,),
