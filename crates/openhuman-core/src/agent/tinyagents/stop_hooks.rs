@@ -33,11 +33,23 @@ pub(super) fn install(
                     model = %report.model,
                     "[stop_hooks] hook voted to stop the turn — pausing run: {}", report.reason
                 );
-                *halt_summary.lock().expect("stop-hook halt mutex poisoned") = Some(format!(
-                    "Stopping after {} model call(s): {}",
-                    report.iteration, report.reason
-                ));
+                record_halt_summary(&halt_summary, report);
             }),
         ));
     }
 }
+
+
+fn record_halt_summary(
+    halt_summary: &super::HaltSummarySlot,
+    report: &tinyagents_harness::middleware::library::StopReport,
+) {
+    *halt_summary.lock().expect("stop-hook halt mutex poisoned") = Some(format!(
+        "Stopping after {} model call(s): {}",
+        report.iteration, report.reason
+    ));
+}
+
+#[cfg(test)]
+#[path = "stop_hooks_tests.rs"]
+mod tests;
