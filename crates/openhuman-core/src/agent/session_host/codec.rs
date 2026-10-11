@@ -20,8 +20,29 @@ pub struct OpenHumanTranscriptCodec;
 
 impl TranscriptCodec<OpenHumanRunContext> for OpenHumanTranscriptCodec {
     fn decode_history(&self, transcript: &SessionTranscript) -> Result<Vec<Message>, RuntimeError> {
-        tinyagents_runtime::transcript::native_transcript_to_messages(&transcript.messages)?;
-        Ok(message_convert::history_to_messages(&transcript.messages))
+        // Old unpaired trims could persist tool results immediately after the
+        // frozen system prefix (#6721). Apply the host's existing adoption
+        // policy before strict native replay validation; later orphan results
+        // still fail validation, and the durable source is never rewritten.
+        let prefix = transcript.messages.iter().take_while(|row| row.role == "system").count();
+        let orphan_count = transcript.messages[prefix..]
+            .iter()
+            .take_while(|row| row.role == "tool")
+            .count();
+        let rows: std::borrow::Cow<'_, [TranscriptMessage]> = if orphan_count == 0 {
+            std::borrow::Cow::Borrowed(&transcript.messages)
+        } else {
+            tracing::warn!(orphan_count, "[session_host::codec] repaired legacy orphaned tool head");
+            std::borrow::Cow::Owned(
+                transcript.messages[..prefix]
+                    .iter()
+                    .chain(&transcript.messages[prefix + orphan_count..])
+                    .cloned()
+                    .collect(),
+            )
+        };
+        tinyagents_runtime::transcript::native_transcript_to_messages(&rows)?;
+        Ok(message_convert::history_to_messages(&rows))
     }
 
     fn reconcile(

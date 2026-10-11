@@ -742,3 +742,21 @@ async fn reply_language_directive_rides_each_user_message_until_cleared_body() {
         "a cleared directive is gone next turn: {second}"
     );
 }
+
+
+#[test]
+fn codec_still_rejects_an_orphan_result_after_a_user_message() {
+    let transcript = tinyagents_session::transcript::SessionTranscript {
+        meta: meta(),
+        messages: [
+            serde_json::json!({"role":"system","content":"frozen"}),
+            serde_json::json!({"role":"tool","id":"legacy-head","content":"trimmed"}),
+            serde_json::json!({"role":"user","content":"continue"}),
+            serde_json::json!({"role":"tool","id":"later-orphan","content":"invalid"}),
+        ].into_iter().map(|row| serde_json::from_value(row).unwrap()).collect(),
+        tools: None,
+    };
+    let error = OpenHumanTranscriptCodec.decode_history(&transcript).unwrap_err();
+    assert!(error.to_string().contains("later-orphan"), "{error}");
+    assert_eq!(transcript.messages[1].id.as_deref(), Some("legacy-head"));
+}
