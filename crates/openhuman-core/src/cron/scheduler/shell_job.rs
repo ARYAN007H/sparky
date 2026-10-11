@@ -4,11 +4,11 @@
 use crate::config::Config;
 use crate::cron::CronJob;
 use crate::security::SecurityPolicy;
-use tokio::time::Duration;
 #[cfg(test)]
 use std::process::Stdio;
 #[cfg(test)]
 use tokio::time;
+use tokio::time::Duration;
 
 pub(super) const SHELL_JOB_TIMEOUT_SECS: u64 = 120;
 

@@ -26,7 +26,13 @@ fn shell_request_uses_the_platform_shell_and_caller_known_process_resource() -> 
     let resource = contract::ResourceId("known-resource".to_owned());
     let cwd = tempfile::tempdir()?;
     let env = BTreeMap::from([("LANG".to_owned(), "C".to_owned())]);
-    let request = shell_request(&resource, "printf 'one two'", cwd.path(), env.clone(), false)?;
+    let request = shell_request(
+        &resource,
+        "printf 'one two'",
+        cwd.path(),
+        env.clone(),
+        false,
+    )?;
 
     let expected = platform_shell::build_std_command("printf 'one two'");
     let expected_argv = std::iter::once(expected.get_program().to_str().unwrap().to_owned())
@@ -240,7 +246,11 @@ async fn released_tinybox_runs_a_native_jail_through_the_pinned_loader() -> anyh
     )
     .await?;
     assert!(output.success());
-    assert_eq!(output.stdout.len(), 150_000, "all terminal output batches are read");
+    assert_eq!(
+        output.stdout.len(),
+        150_000,
+        "all terminal output batches are read"
+    );
 
     let output = execute_passthrough(
         &config,
