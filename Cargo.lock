@@ -6596,14 +6596,14 @@ dependencies = [
 
 [[package]]
 name = "tinybox-bus"
-version = "0.1.19"
+version = "0.1.21"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "tinybox-core"
-version = "0.1.19"
+version = "0.1.21"
 dependencies = [
  "async-trait",
  "serde",
