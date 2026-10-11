@@ -1,0 +1,144 @@
+scripts/mock-api/routes/__tests__/audio.test.mjs:76:  setMockBehavior("audioTranscriptionText", "Podcast transcription.");
+scripts/mock-api/routes/__tests__/audio.test.mjs:86:  assert.equal(JSON.parse(res.body).text, "Podcast transcription.");
+crates/openhuman-core/src/tools/ops.rs:348:        // Audio-toolkit podcast tools — gated with the `voice` feature (they
+crates/openhuman-core/src/tools/ops.rs:352:        Box::new(AudioGeneratePodcastTool::new(
+crates/openhuman-core/src/tools/ops.rs:357:        Box::new(AudioEmailPodcastTool::new(config.clone(), security.clone())),
+crates/openhuman-core/src/tools/ops.rs:359:        Box::new(AudioGenerateAndEmailPodcastTool::new(
+crates/openhuman-core/src/tools/ops_tests.rs:317:        ("audio_generate_podcast", G::Voice),
+crates/openhuman-core/src/tools/toolpacks/toolpacks_tests.rs:337:                "audio_generate_podcast",
+crates/openhuman-core/src/tools/toolpacks/toolpacks_tests.rs:338:                "audio_email_podcast",
+crates/openhuman-core/src/tools/toolpacks/toolpacks_tests.rs:339:                "audio_generate_and_email_podcast",
+crates/openhuman-core/src/tools/ops_tool_groups.rs:83:        "audio_generate_podcast",
+crates/openhuman-core/src/tools/ops_tool_groups.rs:84:        "audio_email_podcast",
+crates/openhuman-core/src/tools/ops_tool_groups.rs:85:        "audio_generate_and_email_podcast",
+crates/openhuman-core/src/tools/ops_tool_groups.rs:117:    // Voice family: explicit audio_* podcast tools plus the defensive
+crates/openhuman-core/src/tools/ops_tests_capability_gating_tests.rs:61:    assert_eq!(tool_group("audio_generate_podcast"), DomainGroup::Voice);
+crates/openhuman-core/src/tools/ops_tests_capability_gating_tests.rs:62:    assert_eq!(tool_group("audio_email_podcast"), DomainGroup::Voice);
+crates/openhuman-core/src/tools/ops_tests_capability_gating_tests.rs:64:        tool_group("audio_generate_and_email_podcast"),
+crates/openhuman-core/src/tools/ops_tests_capability_gating_tests.rs:131:    assert!(!harness.allows(tool_group("audio_generate_podcast")));
+crates/openhuman-core/src/tools/toolpacks/registry.rs:214:        summary: "Generate a spoken podcast from text and optionally email the audio.",
+crates/openhuman-core/src/tools/toolpacks/registry.rs:216:            "audio_generate_podcast",
+crates/openhuman-core/src/tools/toolpacks/registry.rs:217:            "audio_email_podcast",
+crates/openhuman-core/src/tools/toolpacks/registry.rs:218:            "audio_generate_and_email_podcast",
+crates/openhuman-core/src/voice/README.md:254:| [`audio_toolkit/`](./audio_toolkit/) | Podcast generation and email delivery (`audio_toolkit` RPC namespace and agent tools), under the same `voice` gate. [README](audio_toolkit/README.md). |
+crates/openhuman-core/src/voice/always_on/README.md:50:- [../audio_toolkit/README.md](../audio_toolkit/README.md): the sibling podcast-generation toolkit under the same `voice` feature gate.
+crates/openhuman-core/src/voice/audio_toolkit/README.md:3:Text-to-speech "podcast" toolkit. Synthesizes text into a workspace audio file via the `voice` TTS providers, optionally emails that file as an attachment (through the loadable TinyChannels module over SMTP, or as a workspace capture in test/e2e mode), and exposes both as agent tools and JSON-RPC controllers. The combined `generate_and_email` flow chains both steps so the agent can turn arbitrary text into a listen-later audio email in one call.
+crates/openhuman-core/src/voice/audio_toolkit/README.md:20:| `crates/openhuman-core/src/voice/audio_toolkit/ops.rs` | Business logic: `generate_podcast`, `email_podcast`, `generate_and_email_podcast`, `resolve_email_capture_dir`, plus private helpers (path/format/voice resolution, base64 decode, MIME enforcement, slugify, email build/capture). Contains the unit-test suite. |
+crates/openhuman-core/src/voice/audio_toolkit/README.md:22:| `crates/openhuman-core/src/voice/audio_toolkit/tools.rs` | Re-exports the three agent tool structs from [`tools/podcast.rs`](./tools/podcast.rs). |
+crates/openhuman-core/src/voice/audio_toolkit/README.md:23:| `crates/openhuman-core/src/voice/audio_toolkit/tools/podcast.rs` | `Tool` impls: `AudioGeneratePodcastTool`, `AudioEmailPodcastTool`, `AudioGenerateAndEmailPodcastTool`; security gating + arg parsing. |
+crates/openhuman-core/src/voice/audio_toolkit/README.md:29:- ops: `generate_podcast`, `email_podcast`, `generate_and_email_podcast`, `resolve_email_capture_dir`. All take `&Config` and return `Result<Outcome<T>, String>` (except `resolve_email_capture_dir`, which returns `Option<PathBuf>`).
+crates/openhuman-core/src/voice/audio_toolkit/README.md:31:- types: `AudioFormat` (`Mp3`/`Wav`, with `extension()` / `mime()`), `AudioGenerateRequest`, `EmailPodcastRequest`, `AudioGeneratedArtifact`, `AudioEmailDeliveryResult`, `AudioToolkitGenerateAndEmailResult`.
+crates/openhuman-core/src/voice/audio_toolkit/README.md:32:- **tools** (`pub mod tools`): `AudioGeneratePodcastTool`, `AudioEmailPodcastTool`, `AudioGenerateAndEmailPodcastTool`.
+crates/openhuman-core/src/voice/audio_toolkit/README.md:40:| `audio_toolkit_generate_podcast` | `text` (req); optional `title`, `output_path`, `provider`, `voice`, `format` | `audio` (artifact JSON) |
+crates/openhuman-core/src/voice/audio_toolkit/README.md:41:| `audio_toolkit_email_podcast` | `to`, `subject`, `body`, `audio_path` (req); optional `attachment_name` | `email` (delivery JSON) |
+crates/openhuman-core/src/voice/audio_toolkit/README.md:42:| `audio_toolkit_generate_and_email_podcast` | `text`, `to`, `subject`, `body` (req); optional `title`, `output_path`, `provider`, `voice`, `format`, `attachment_name` | `result` (combined JSON) |
+crates/openhuman-core/src/voice/audio_toolkit/README.md:48:From [`tools/podcast.rs`](./tools/podcast.rs). All are `PermissionLevel::Execute`, and each calls `SecurityPolicy::enforce_tool_operation(ToolOperation::Act, ...)` before running:
+crates/openhuman-core/src/voice/audio_toolkit/README.md:52:| `audio_generate_podcast` | `generate_podcast` |
+crates/openhuman-core/src/voice/audio_toolkit/README.md:53:| `audio_email_podcast` | `email_podcast` |
+crates/openhuman-core/src/voice/audio_toolkit/README.md:54:| `audio_generate_and_email_podcast` | `generate_and_email_podcast` |
+crates/openhuman-core/src/voice/audio_toolkit/README.md:63:- Captured emails (test/e2e) → `artifacts/email-capture/` (or `OPENHUMAN_EMAIL_CAPTURE_DIR`) as `.eml` files named `podcast-email-<ts>-<uuid>.eml`.
+crates/openhuman-core/src/voice/audio_toolkit/README.md:85:- `email_podcast` re-validates `audio_path` (workspace-relative, no `..`) independently of `generate_podcast`; the combined flow overwrites the email request's `audio_path` with the freshly generated file's path.
+crates/openhuman-core/src/voice/audio_toolkit/ops.rs:14:    AudioToolkitGenerateAndEmailResult, EmailPodcastRequest,
+crates/openhuman-core/src/voice/audio_toolkit/ops.rs:22:pub async fn generate_podcast(
+crates/openhuman-core/src/voice/audio_toolkit/ops.rs:71:            .unwrap_or_else(|| format!("podcast.{}", format.extension())),
+crates/openhuman-core/src/voice/audio_toolkit/ops.rs:82:        "audio podcast synthesized to workspace file",
+crates/openhuman-core/src/voice/audio_toolkit/ops.rs:86:pub async fn email_podcast(
+crates/openhuman-core/src/voice/audio_toolkit/ops.rs:88:    request: EmailPodcastRequest,
+crates/openhuman-core/src/voice/audio_toolkit/ops.rs:134:        .unwrap_or_else(|| "podcast.mp3".to_string());
+crates/openhuman-core/src/voice/audio_toolkit/ops.rs:208:pub async fn generate_and_email_podcast(
+crates/openhuman-core/src/voice/audio_toolkit/ops.rs:211:    email_request: EmailPodcastRequest,
+crates/openhuman-core/src/voice/audio_toolkit/ops.rs:213:    let generated = generate_podcast(config, generate_request).await?;
+crates/openhuman-core/src/voice/audio_toolkit/ops.rs:214:    let email_request = EmailPodcastRequest {
+crates/openhuman-core/src/voice/audio_toolkit/ops.rs:218:    let emailed = email_podcast(config, email_request).await?;
+crates/openhuman-core/src/voice/audio_toolkit/ops.rs:224:        "audio podcast generated and emailed",
+crates/openhuman-core/src/voice/audio_toolkit/ops.rs:321:            let slug = slugify_title(title.unwrap_or("podcast"));
+crates/openhuman-core/src/voice/audio_toolkit/ops.rs:360:        "podcast".to_string()
+crates/openhuman-core/src/voice/audio_toolkit/ops.rs:424:        "podcast-email-{}-{}.eml",
+crates/openhuman-core/src/voice/audio_toolkit/ops_tests.rs:32:    assert_eq!(slugify_title("###"), "podcast");
+crates/openhuman-core/src/voice/audio_toolkit/ops_tests.rs:53:        "Podcast",
+crates/openhuman-core/src/voice/audio_toolkit/ops_tests.rs:61:    assert!(wire.contains("Subject: Podcast"));
+crates/openhuman-core/src/voice/audio_toolkit/schemas.rs:8:use crate::voice::audio_toolkit::types::{AudioFormat, AudioGenerateRequest, EmailPodcastRequest};
+crates/openhuman-core/src/voice/audio_toolkit/schemas.rs:33:            schema: audio_toolkit_schemas("generate_podcast"),
+crates/openhuman-core/src/voice/audio_toolkit/schemas.rs:34:            handler: handle_generate_podcast,
+crates/openhuman-core/src/voice/audio_toolkit/schemas.rs:37:            schema: audio_toolkit_schemas("email_podcast"),
+crates/openhuman-core/src/voice/audio_toolkit/schemas.rs:38:            handler: handle_email_podcast,
+crates/openhuman-core/src/voice/audio_toolkit/schemas.rs:41:            schema: audio_toolkit_schemas("generate_and_email_podcast"),
+crates/openhuman-core/src/voice/audio_toolkit/schemas.rs:42:            handler: handle_generate_and_email_podcast,
+crates/openhuman-core/src/voice/audio_toolkit/schemas.rs:49:        "generate_podcast" => ControllerSchema {
+crates/openhuman-core/src/voice/audio_toolkit/schemas.rs:51:            function: "generate_podcast",
+crates/openhuman-core/src/voice/audio_toolkit/schemas.rs:52:            description: "Synthesize text into a workspace audio file for listen-later / podcast-style delivery.",
+crates/openhuman-core/src/voice/audio_toolkit/schemas.rs:68:        "email_podcast" => ControllerSchema {
+crates/openhuman-core/src/voice/audio_toolkit/schemas.rs:70:            function: "email_podcast",
+crates/openhuman-core/src/voice/audio_toolkit/schemas.rs:81:        "generate_and_email_podcast" => ControllerSchema {
+crates/openhuman-core/src/voice/audio_toolkit/schemas.rs:83:            function: "generate_and_email_podcast",
+crates/openhuman-core/src/voice/audio_toolkit/schemas.rs:84:            description: "Generate an audio file from text and immediately email it as a podcast-style attachment.",
+crates/openhuman-core/src/voice/audio_toolkit/schemas.rs:119:fn handle_generate_podcast(params: Map<String, Value>) -> ControllerFuture {
+crates/openhuman-core/src/voice/audio_toolkit/schemas.rs:124:        to_json(crate::voice::audio_toolkit::generate_podcast(&config, request).await?)
+crates/openhuman-core/src/voice/audio_toolkit/schemas.rs:128:fn handle_email_podcast(params: Map<String, Value>) -> ControllerFuture {
+crates/openhuman-core/src/voice/audio_toolkit/schemas.rs:131:        let request: EmailPodcastRequest =
+crates/openhuman-core/src/voice/audio_toolkit/schemas.rs:133:        to_json(crate::voice::audio_toolkit::email_podcast(&config, request).await?)
+crates/openhuman-core/src/voice/audio_toolkit/schemas.rs:137:fn handle_generate_and_email_podcast(params: Map<String, Value>) -> ControllerFuture {
+crates/openhuman-core/src/voice/audio_toolkit/schemas.rs:150:        let email = EmailPodcastRequest {
+crates/openhuman-core/src/voice/audio_toolkit/schemas.rs:158:            crate::voice::audio_toolkit::generate_and_email_podcast(&config, generated, email)
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast.rs:10:    email_podcast, generate_and_email_podcast, generate_podcast, AudioGenerateRequest,
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast.rs:11:    EmailPodcastRequest,
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast.rs:15:pub struct AudioGeneratePodcastTool {
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast.rs:20:pub struct AudioEmailPodcastTool {
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast.rs:25:pub struct AudioGenerateAndEmailPodcastTool {
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast.rs:30:impl AudioGeneratePodcastTool {
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast.rs:36:impl AudioEmailPodcastTool {
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast.rs:42:impl AudioGenerateAndEmailPodcastTool {
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast.rs:49:impl Tool for AudioGeneratePodcastTool {
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast.rs:51:        "audio_generate_podcast"
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast.rs:55:        "Generate an audio file from text and save it into the workspace for listen-later or podcast-style delivery."
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast.rs:82:        let outcome = generate_podcast(&self.config, request)
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast.rs:92:impl Tool for AudioEmailPodcastTool {
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast.rs:94:        "audio_email_podcast"
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast.rs:98:        "Email a workspace audio file as an attachment so the recipient can listen to it like a podcast episode."
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast.rs:123:        let request: EmailPodcastRequest = serde_json::from_value(args)?;
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast.rs:124:        let outcome = email_podcast(&self.config, request)
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast.rs:134:impl Tool for AudioGenerateAndEmailPodcastTool {
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast.rs:136:        "audio_generate_and_email_podcast"
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast.rs:140:        "Generate an audio file from text and immediately email it as a podcast-style attachment."
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast.rs:145:            "parameters/audio_generate_and_email_podcast.json"
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast.rs:171:        let email = EmailPodcastRequest {
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast.rs:178:        let outcome = generate_and_email_podcast(&self.config, generated, email)
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast.rs:219:#[path = "podcast_schema_tests.rs"]
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast_schema_tests.rs:4:fn expected_audio_generate_and_email_podcast() -> serde_json::Value {
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast_schema_tests.rs:24:fn audio_generate_and_email_podcast_static_schema_matches_json_literal() {
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast_schema_tests.rs:25:    let tool = AudioGenerateAndEmailPodcastTool::new(
+crates/openhuman-core/src/voice/audio_toolkit/tools/podcast_schema_tests.rs:31:        expected_audio_generate_and_email_podcast()
+crates/openhuman-core/src/voice/audio_toolkit/types.rs:42:pub struct EmailPodcastRequest {
+crates/openhuman-core/src/voice/audio_toolkit/mod.rs:1://! Podcast generation + email delivery (`audio_toolkit` RPC namespace).
+crates/openhuman-core/src/voice/audio_toolkit/mod.rs:12:    email_podcast, generate_and_email_podcast, generate_podcast, resolve_email_capture_dir,
+crates/openhuman-core/src/voice/audio_toolkit/mod.rs:17:    AudioToolkitGenerateAndEmailResult, EmailPodcastRequest,
+crates/openhuman-core/src/voice/audio_toolkit/tools.rs:1:mod podcast;
+crates/openhuman-core/src/voice/audio_toolkit/tools.rs:3:pub use podcast::{
+crates/openhuman-core/src/voice/audio_toolkit/tools.rs:4:    AudioEmailPodcastTool, AudioGenerateAndEmailPodcastTool, AudioGeneratePodcastTool,
+crates/openhuman-core/src/voice/mod.rs:35:/// Podcast generation + email delivery (`audio_toolkit` RPC namespace). Part of
+crates/openhuman-core/src/modules/README.md:228:`channel_email.rs` delivers podcast attachments through TinyChannels' bounded
+app/src/features/conversations/tools/toolSpecs.ts:74:  PodcastIcon,
+app/src/features/conversations/tools/toolSpecs.ts:269:  audio_generate_podcast: spec('generatePodcast', PodcastIcon, 'media', {
+app/src/features/conversations/tools/toolSpecs.ts:272:  audio_email_podcast: spec('emailPodcast', PodcastIcon, 'media', { chip: chip.text('to') }),
+app/src/features/conversations/tools/toolSpecs.ts:273:  audio_generate_and_email_podcast: spec('createAndEmailPodcast', PodcastIcon, 'media', {
+app/src/features/conversations/tools/__fixtures__/coreToolNames.json:7:  "audio_email_podcast",
+app/src/features/conversations/tools/__fixtures__/coreToolNames.json:8:  "audio_generate_and_email_podcast",
+app/src/features/conversations/tools/__fixtures__/coreToolNames.json:9:  "audio_generate_podcast",
+app/src/features/conversations/tools/toolPhrases.ts:93:  generatePodcast: { active: 'Generating podcast', done: 'Generated podcast' },
+app/src/features/conversations/tools/toolPhrases.ts:94:  emailPodcast: { active: 'Emailing podcast', done: 'Emailed podcast' },
+app/src/features/conversations/tools/toolPhrases.ts:95:  createAndEmailPodcast: {
+app/src/features/conversations/tools/toolPhrases.ts:96:    active: 'Creating and emailing podcast',
+app/src/features/conversations/tools/toolPhrases.ts:97:    done: 'Created and emailed podcast',
+crates/openhuman-core/Cargo.toml:262:# workflow-only build has no use for. Enabled by `channels`; voice-only podcast
+crates/openhuman-core/Cargo.toml:737:# server, always-on listening, and podcast audio generation/email delivery.
+crates/openhuman-core/Cargo.toml:740:# which also drops the exclusive `lettre` (podcast email) dependency. `hound`
+crates/openhuman-core/Cargo.toml:760:    # Podcast SMTP delivery uses the loadable Channels module. The always-on
+crates/openhuman-core/src/modules/channel_email_tests.rs:18:        assert_eq!(request.subject, "Podcast");
+crates/openhuman-core/src/modules/channel_email_tests.rs:19:        assert_eq!(request.attachments[0].filename, "podcast.mp3");
+crates/openhuman-core/src/modules/channel_email_tests.rs:49:        subject: "Podcast".into(),
+crates/openhuman-core/src/modules/channel_email_tests.rs:52:            filename: "podcast.mp3".into(),
+crates/openhuman-core/src/modules/channel_email_tests.rs:59:async fn podcast_attachment_uses_bounded_ordered_chunks_before_module_send() {
+crates/openhuman-core/src/modules/channel_email.rs:1://! Podcast attachment delivery through the loadable TinyChannels module.
+crates/openhuman-core/src/channels/README.md:159:- The default `channels` feature gates provider orchestration and enables the module loader. Serialized config, messages, and controller declarations use the unconditional `tinychannels-bus` contract. Legacy provider traits and runtime helpers remain linked as explicit migration exceptions. The CLI REPL is host-owned orchestration; voice-only podcast email uses the loaded module and does not enable the provider implementation. `WhatsAppWebChannel` additionally needs the `whatsapp-web` feature.
+crates/openhuman-core/src/channels/mod.rs:4://! messages, and schemas come from `tinychannels-bus`. Podcast email delivery
+crates/openhuman-core/src/core/all.rs:324:    // Audio generation + podcast-style email delivery (gated with voice).
