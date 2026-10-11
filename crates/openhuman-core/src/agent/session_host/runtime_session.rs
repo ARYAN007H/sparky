@@ -737,8 +737,6 @@ impl OpenHumanSessionHost {
         };
         let artifact_store = super::artifact_wiring::build_artifact_store(
             &self.workspace_dir,
-            self.workspace_descriptor.as_ref(),
-            &self.action_dir,
             &self.event_session_id,
         );
 
