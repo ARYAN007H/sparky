@@ -12,7 +12,7 @@ mod start_channels;
 mod turn_parts;
 
 use crate::modules::client::{ModuleCallError, ModuleClient};
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 /// Ask the owning module to prepare effective execution limits for this host
 /// runtime. A malformed response fails closed and reports only the module ID.

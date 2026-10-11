@@ -5,7 +5,6 @@
 //! module stay on a dedicated process-lifetime runtime because TinyBus module
 //! tasks must outlive the short Tokio runtimes used by individual tests.
 
-use super::*;
 use crate::modules::client::ModuleClient;
 use std::sync::{Mutex, OnceLock};
 use tinybus::Proxy;
