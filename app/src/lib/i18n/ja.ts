@@ -414,7 +414,7 @@ const messages: TranslationMap = {
   'skills.explorer.scopeLegacy': 'レガシー',
   'skills.explorer.noDescription': '説明がありません。',
   'skills.explorer.uninstallSuccess': 'スキルを正常にアンインストールしました。',
-  'skills.explorer.runnerTab': 'ランナー',
+  'skills.explorer.runnerTab': 'Runner',
   'skills.explorer.registryTab': 'レジストリ',
   'skills.explorer.installedTab': 'インストール済み',
   'skills.explorer.refreshRegistry': 'レジストリを更新',
@@ -2489,7 +2489,7 @@ const messages: TranslationMap = {
   'flows.canvas.sidePanelToggle': 'サイドパネル',
   // The palette tab is labelled "Manual" (build by hand) as the counterpart to
   // the AI "Copilot" tab; the key name stays `legendTab` for the node palette.
-  'flows.canvas.legendTab': 'マニュアル',
+  'flows.canvas.legendTab': 'Manual',
   'flows.canvas.runTab': '実行',
   'flows.canvas.toolbar': 'キャンバスコントロール',
   'flows.canvas.zoomIn': '拡大',
@@ -3022,7 +3022,7 @@ const messages: TranslationMap = {
   'settings.ai.slugInUseError': 'そのプロバイダー名はすでに使用されています。',
   'settings.ai.slugReservedError': '別のプロバイダー名を選択してください。',
   'settings.ai.providerNamePlaceholder': 'マイプロバイダー',
-  'settings.ai.slugLabel': 'スラッグ:',
+  'settings.ai.slugLabel': 'Slug:',
   'settings.ai.openAiUrlLabel': 'OpenAI URL',
   'settings.ai.caCertificateLabel': 'CA 証明書（任意）',
   'settings.ai.caCertificateTooLarge': 'CA 証明書は 256 KB 以下にしてください',

@@ -710,7 +710,7 @@ const messages: TranslationMap = {
   'settings.costDashboard.model': 'النموذج',
   'settings.costDashboard.provider': 'المزوّد',
   'settings.costDashboard.cost': 'التكلفة',
-  'settings.costDashboard.tokens': 'الرموز',
+  'settings.costDashboard.tokens': 'رموز',
   'settings.costDashboard.requests': 'الطلبات',
   'settings.costDashboard.percentOfTotal': 'النسبة المئوية من المجموع',
   'settings.costDashboard.inputTokens': 'المدخلات',
@@ -2501,7 +2501,7 @@ const messages: TranslationMap = {
   'settings.ai.slugInUseError': 'اسم الموفر هذا قيد الاستخدام بالفعل.',
   'settings.ai.slugReservedError': 'اختر اسم موفر مختلف.',
   'settings.ai.providerNamePlaceholder': 'موفر الخدمة الخاص بي',
-  'settings.ai.slugLabel': 'الارتباط الثابت:',
+  'settings.ai.slugLabel': 'Slug:',
   'settings.ai.openAiUrlLabel': 'عنوان URL لـ OpenAI',
   'settings.ai.caCertificateLabel': 'شهادة المرجع المصدق (اختياري)',
   'settings.ai.caCertificateTooLarge': 'يجب ألا يتجاوز حجم الشهادة 256 كيلوبايت',
@@ -2741,7 +2741,7 @@ const messages: TranslationMap = {
   'settings.developerMenu.eventLog.filterAgent': '(فيلتر)',
   'settings.developerMenu.eventLog.download': 'تحميل',
   'settings.developerMenu.eventLog.events': 'أحداث',
-  'settings.developerMenu.eventLog.live': 'الحياة',
+  'settings.developerMenu.eventLog.live': 'مباشر',
   'settings.developerMenu.eventLog.disconnected': 'مفصولة',
   'settings.developerMenu.eventLog.waiting': 'ننتظر الأحداث...',
   'settings.developerMenu.eventLog.waitingHint':
@@ -3485,7 +3485,7 @@ const messages: TranslationMap = {
   'settings.ai.openaiOauthCallbackRequired': 'الصق عنوان إعادة التوجيه من متصفحك بعد تسجيل الدخول.',
   'settings.ai.openaiOauthDisconnectError': 'تعذّر قطع الاتصال بـ ChatGPT. يُرجى المحاولة مجددًا.',
   'flows.canvas.sidePanelToggle': 'اللوحة الجانبية',
-  'flows.canvas.legendTab': 'يدوي',
+  'flows.canvas.legendTab': 'Manual',
 
   // Privacy status pill + per-action egress disclosure (#4437 / S3)
   // Data Sync layered pipeline status (GH-4690)
@@ -3641,7 +3641,7 @@ const messages: TranslationMap = {
   'migration.vendor.hermesDesc': 'المذكرات والملاحظات الواردة من Hermes',
   'migration.sourceHeadingDesc': 'اختر المساعد للاستيراد من',
   'migration.confirmTitle': 'استيراد إلى مكان العمل هذا؟',
-  'skills.explorer.runnerTab': 'المشغّل',
+  'skills.explorer.runnerTab': 'Runner',
   'desktop.enableLabel': 'دع العميل يتحكم في تطبيقات',
   'desktop.statusSetupNeeded': 'الإنشاءات اللازمة',
   'desktop.permissionState.granted': 'منح',
