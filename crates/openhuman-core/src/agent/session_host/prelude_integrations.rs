@@ -253,13 +253,18 @@ impl OpenHumanTurnPrelude {
                 .clear();
             return;
         };
-        let presentations = match crate::mcp::module_client::McpConfiguredClient::configured_tool_presentations(config).await {
-            Ok(presentations) => presentations,
-            Err(error) => {
-                tracing::debug!(?error, "[mcp] configured tool catalog is unavailable");
-                Vec::new()
-            }
-        };
+        let presentations =
+            match crate::mcp::module_client::McpConfiguredClient::configured_tool_presentations(
+                config,
+            )
+            .await
+            {
+                Ok(presentations) => presentations,
+                Err(error) => {
+                    tracing::debug!(?error, "[mcp] configured tool catalog is unavailable");
+                    Vec::new()
+                }
+            };
         self.mutable
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)

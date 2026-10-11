@@ -22,8 +22,8 @@ use serde_json::{Map, Value};
 use tinymcp_bus::{
     agent_tools::{McpToolPresentation, PrepareAgentToolsRequest},
     config::{McpClientConfig, OpenConfiguredRequest, OpenConfiguredResponse, TransitionStatus},
-    names, McpRemoteTool, ScrubStaticToolsRequest, ServerArgumentsValidation,
-    ValidateServerArgumentsRequest, SupervisorBatch,
+    names, McpRemoteTool, ScrubStaticToolsRequest, ServerArgumentsValidation, SupervisorBatch,
+    ValidateServerArgumentsRequest,
 };
 
 use crate::{
@@ -452,13 +452,15 @@ impl McpConfiguredClient {
                         meta: None,
                     })
                     .collect(),
-                None => client
-                    .call(
-                        &client_config,
-                        names::methods::STATIC_LIST_TOOLS,
-                        (server.name.as_str(),),
-                    )
-                    .await?,
+                None => {
+                    client
+                        .call(
+                            &client_config,
+                            names::methods::STATIC_LIST_TOOLS,
+                            (server.name.as_str(),),
+                        )
+                        .await?
+                }
             };
             let tools: Vec<McpRemoteTool> = client
                 .scrub_static_tools(&client_config, &server.name, tools)
@@ -481,9 +483,7 @@ impl McpConfiguredClient {
                 display_name: server.name.clone(),
                 tools,
                 default_exposure: match declared.expose {
-                    crate::config::McpToolExposure::Direct => {
-                        tinymcp_bus::McpToolExposure::Direct
-                    }
+                    crate::config::McpToolExposure::Direct => tinymcp_bus::McpToolExposure::Direct,
                     crate::config::McpToolExposure::Deferred => {
                         tinymcp_bus::McpToolExposure::Deferred
                     }
