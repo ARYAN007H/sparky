@@ -19,12 +19,14 @@ use super::types::{
     SandboxStatus,
 };
 use crate::config::Config;
+#[cfg(feature = "modules")]
 use crate::modules::tinybox::{self, contract};
 
 /// Label applied to all sandbox containers for orphan cleanup.
 const CONTAINER_LABEL: &str = "openhuman.sandbox=true";
 
 /// Check whether Docker is available and responsive.
+#[cfg(feature = "modules")]
 pub async fn is_docker_available(config: &Config) -> Result<bool, String> {
     let status = tinybox::docker_status(
         config,
@@ -34,6 +36,11 @@ pub async fn is_docker_available(config: &Config) -> Result<bool, String> {
     )
     .await?;
     Ok(status.available)
+}
+
+#[cfg(not(feature = "modules"))]
+pub async fn is_docker_available(_config: &Config) -> Result<bool, String> {
+    Err("TinyBox module support is disabled; Docker status is unavailable".to_owned())
 }
 
 /// Execute a command inside an ephemeral Docker container.
@@ -163,8 +170,9 @@ fn path_string(path: &std::path::Path, kind: &str) -> anyhow::Result<String> {
         .ok_or_else(|| anyhow::anyhow!("Docker {kind} path is not UTF-8"))
 }
 
-/// Clean up orphaned sandbox containers (those labeled with
-/// `openhuman.sandbox=true` that are still running).
+/// Clean up orphaned sandbox containers owned by TinyBox and carrying the
+/// OpenHuman label.
+#[cfg(feature = "modules")]
 pub async fn cleanup_orphaned_containers(config: &Config) -> anyhow::Result<u32> {
     let output = tinybox::cleanup_docker(
         config,
@@ -178,6 +186,11 @@ pub async fn cleanup_orphaned_containers(config: &Config) -> anyhow::Result<u32>
     let count = output.containers_stopped;
     tracing::debug!(count = count, "[sandbox:docker] orphan cleanup finished");
     Ok(count)
+}
+
+#[cfg(not(feature = "modules"))]
+pub async fn cleanup_orphaned_containers(_config: &Config) -> anyhow::Result<u32> {
+    anyhow::bail!("TinyBox module support is disabled; Docker cleanup is unavailable")
 }
 
 /// Create a handle representing the Docker backend state.
