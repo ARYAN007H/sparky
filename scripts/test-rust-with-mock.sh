@@ -236,11 +236,20 @@ run_json_rpc_e2e() {
   # The JSON-RPC E2E binary intentionally changes process-global environment
   # and runtime configuration. Run each case in a fresh test process so a
   # provider route persisted by one scenario cannot affect another one.
+  local listing test_names test_name
+  if ! listing="$(cargo_test --test json_rpc_e2e -- --list)"; then
+    echo "[test-rust-with-mock] ERROR: could not enumerate json_rpc_e2e tests; refusing an empty or partial list." >&2
+    return 1
+  fi
+  test_names="$(printf '%s\n' "$listing" | sed -n 's/: test$//p')"
+  if [ -z "$test_names" ]; then
+    echo "[test-rust-with-mock] ERROR: json_rpc_e2e enumeration returned no tests." >&2
+    return 1
+  fi
   while IFS= read -r test_name; do
-    [ -n "$test_name" ] || continue
     echo "[test-rust-with-mock] JSON-RPC E2E test: ${test_name}"
-    cargo_test --test json_rpc_e2e "$test_name" -- --test-threads=1 "$@"
-  done < <(cargo_test --test json_rpc_e2e -- --list | sed -n 's/: test$//p')
+    cargo_test --test json_rpc_e2e "$test_name" -- --exact --test-threads=1 "$@"
+  done <<<"$test_names"
 }
 
 run_build_only_reaper_test() {
