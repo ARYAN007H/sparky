@@ -20,6 +20,7 @@ use tokio::sync::mpsc;
 
 /// Channel objects sharing one captured config, callback object and module lease.
 pub(super) struct ModuleChannelRuntime {
+    client: ModuleClient,
     lease: ChannelRuntimeLease,
     config: tinychannels_bus::ChannelsConfig,
     proxy: tinychannels_bus::HttpProxyPolicy,
@@ -115,6 +116,7 @@ impl ModuleChannelRuntime {
             })
             .collect();
         Ok(Self {
+            client,
             lease,
             config: hydrated,
             proxy,
@@ -137,9 +139,9 @@ impl ModuleChannelRuntime {
         use tinychannels_bus::module_control::{ChannelControlRequest, ChannelControlResult};
 
         let result: ChannelControlResult = self
-            .lease
-            .object()
+            .client
             .call_confidential(
+                "tinychannels",
                 tinychannels_bus::methods::PREPARE_CHANNEL_CONTROL,
                 (ChannelControlRequest::RuntimeLimits {
                     timeout_secs,
@@ -151,7 +153,9 @@ impl ModuleChannelRuntime {
             ChannelControlResult::RuntimeLimits {
                 timeout_secs,
                 max_in_flight,
-            } if timeout_secs >= 30 && max_in_flight > 0 => {
+            } if timeout_secs >= tinychannels_bus::context::MIN_CHANNEL_MESSAGE_TIMEOUT_SECS
+                && max_in_flight > 0 =>
+            {
                 Ok((timeout_secs, max_in_flight))
             }
             _ => {
