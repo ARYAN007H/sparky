@@ -472,15 +472,16 @@ async fn scenario() {
             ("alice".into(), "reopened-message".into())
         ]
     );
-    let reopened_sessions = sessions.lock().unwrap();
-    assert_eq!(
-        &reopened_sessions[reopened_sessions.len() - 2..],
-        [
-            ("alice".into(), Some("t1".into())),
-            ("alice".into(), Some("channel:telegram/sender/chat".into()))
-        ]
-    );
-    drop(reopened_sessions);
+    {
+        let reopened_sessions = sessions.lock().unwrap();
+        assert_eq!(
+            &reopened_sessions[reopened_sessions.len() - 2..],
+            [
+                ("alice".into(), Some("t1".into())),
+                ("alice".into(), Some("channel:telegram/sender/chat".into()))
+            ]
+        );
+    }
     handles.insert(0, reopened);
     let alice_profile = handles[0]
         .scope(async { openhuman_core::profiles::current().unwrap() })
