@@ -177,7 +177,7 @@ impl ToolDispatch<(), OpenHumanRunContext> for UseSkillDispatch {
                 .await;
         };
 
-        if let Some(dispatch) = typed_dispatch_for(name, inner_adapter.clone()) {
+        if let Some(dispatch) = typed_dispatch_for(&name, inner_adapter.clone()) {
             return dispatch
                 .execute(&(), call_id, inner_args, options, parent)
                 .await;
