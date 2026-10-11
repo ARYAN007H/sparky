@@ -65,6 +65,14 @@ impl ProfileCapabilities {
         );
     }
 
+    /// Whether the operator named `name` in its tool scope and it is one of
+    /// [`OPERATOR_ADMITTABLE`](super::tools::OPERATOR_ADMITTABLE), the tools
+    /// registered although their domain family is off for profiles.
+    pub fn names_admittable(&self, name: &str) -> bool {
+        super::tools::OPERATOR_ADMITTABLE.contains(&name)
+            && self.names.as_ref().is_some_and(|names| names.contains(name))
+    }
+
     /// Whether a selected name may reach the host permission decision.
     pub fn admits(&self, name: &str) -> bool {
         let binding = super::provider_settings::ProfileProviderSettings::current();
