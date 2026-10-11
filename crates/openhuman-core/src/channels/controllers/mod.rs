@@ -6,11 +6,6 @@ mod schemas;
 
 pub use backend::OpenHumanChannelBackend;
 
-pub use tinychannels_bus::controllers::{
-    all_channel_definitions, find_channel_definition, AuthModeSpec, ChannelAuthMode,
-    ChannelCapability, ChannelDefinition, FieldRequirement,
-};
-
 pub use schemas::all_controller_schemas as all_channels_controller_schemas;
 
 /// Every controller of the channels domain: the `channels.*` connection

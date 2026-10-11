@@ -6,8 +6,6 @@ mod messaging;
 
 // Re-export types needed by tests.
 #[cfg(test)]
-pub(crate) use crate::channels::controllers::ChannelAuthMode;
-#[cfg(test)]
 pub(crate) use crate::config::Config;
 #[cfg(test)]
 pub(crate) use connect::merge_listener_health;
