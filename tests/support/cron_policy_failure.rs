@@ -323,6 +323,51 @@ pub(super) async fn policy_reads_refuse_execution_without_consuming_a_slot(case:
         1,
         "missing policy row must still run with defaults"
     );
+    // Losing the backend after a failed attempt must stop further attempts.
+    let retry_calls = Arc::new(AtomicUsize::new(0));
+    let recorded = Arc::clone(&retry_calls);
+    let failed_backend = Arc::clone(&faults);
+    let _retry_handler = cron::system_job_handlers::register(
+        "policy-retry-fixture",
+        Arc::new(move |_| {
+            recorded.fetch_add(1, Ordering::SeqCst);
+            failed_backend.read.store(true, Ordering::SeqCst);
+            Box::pin(async { Err("retryable fixture failure".to_string()) })
+        }),
+    );
+    CoreContext::scope(Arc::clone(&alpha), async {
+        let job = cron::system_jobs::ensure_system_job(
+            &config,
+            "policy-retry-fixture",
+            Schedule::Every {
+                every_ms: 3_600_000,
+            },
+        )
+        .unwrap();
+        policy::set_policy(
+            &config,
+            &job.id,
+            JobPolicy {
+                retries: Some(2),
+                single_flight: false,
+            },
+        )
+        .unwrap();
+        let (success, output) =
+            cron::scheduler::execute_job_now(&config, &job, "retry-read-failure").await;
+        assert!(!success);
+        assert_eq!(
+            retry_calls.load(Ordering::SeqCst),
+            1,
+            "unreadable policy admitted a retry"
+        );
+        assert!(
+            output.contains("policy"),
+            "the refusal must identify policy availability"
+        );
+        assert!(!output.contains("secret"));
+    })
+    .await;
     assert!(AgentContextRegistry::deregister("policy-alpha", &alpha));
     assert!(AgentContextRegistry::deregister("policy-beta", &beta));
 }
