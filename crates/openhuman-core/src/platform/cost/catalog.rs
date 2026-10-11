@@ -28,9 +28,10 @@ pub fn default_registry_entries() -> Vec<ModelRegistryEntry> {
         .collect()
 }
 
-/// Project an owner price row with this product catalogue source label.
+/// Project an owner price row as flat metadata with this product source label.
+/// This preserves historical metadata, including its distinction from M3 tier estimates.
 pub fn tinyagents_catalog_entry(price: &ModelPrice) -> tinyagents_registry::ModelCatalogEntry {
-    tinyagents_registry::pricing::catalog_entry(price, TINYAGENTS_CATALOG_SOURCE)
+    tinyagents_registry::pricing::flat_catalog_entry(price, TINYAGENTS_CATALOG_SOURCE)
 }
 
 /// Source tag for local (runtime-discovered) model entries in the unified
