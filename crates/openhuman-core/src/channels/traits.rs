@@ -46,6 +46,25 @@ pub trait Channel: Send + Sync {
         Ok(())
     }
 
+    /// Start a module-owned periodic refresh and return its opaque lifecycle
+    /// handle. Implementations without provider-side refresh support return
+    /// `None`, allowing the host's compatibility adapter to retain its legacy
+    /// timer for local test doubles only.
+    async fn begin_typing_refresh(
+        &self,
+        _recipient: &str,
+        _interval_secs: u64,
+    ) -> anyhow::Result<Option<String>> {
+        Ok(None)
+    }
+
+    /// Stop one refresh lifecycle by its opaque handle. Handles let concurrent
+    /// turns type in the same conversation without canceling each other's
+    /// provider task.
+    async fn end_typing_refresh(&self, _handle: &str) -> anyhow::Result<()> {
+        Ok(())
+    }
+
     /// Instance-specific product interaction capabilities.
     fn capabilities(&self) -> tinychannels_bus::ChannelCapabilities {
         tinychannels_bus::capabilities_for(self.name())
