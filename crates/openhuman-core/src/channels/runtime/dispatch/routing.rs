@@ -144,10 +144,7 @@ pub(super) async fn resolve_target_agent(channel: &str) -> AgentScoping {
         // Use the expiry-tolerant read for the fallback: a transient blip that
         // lands just after the 60s cache TTL must still preserve the last-known
         // integrations rather than collapse tool-calling to an empty set.
-        let connected = connected_with_fallback(
-            fetched,
-            cached_active_integrations(&config),
-        );
+        let connected = connected_with_fallback(fetched, cached_active_integrations(&config));
         tracing::debug!(
             channel = %channel,
             target_agent = target_id,

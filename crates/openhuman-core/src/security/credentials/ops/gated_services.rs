@@ -221,4 +221,3 @@ pub async fn stop_credential_gated_services(config: &Config) {
 
     log::info!("[services] all login-gated services stopped");
 }
-

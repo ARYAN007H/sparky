@@ -178,8 +178,6 @@ impl LocalAiConfig {
     pub fn is_active(&self) -> bool {
         self.runtime_enabled
     }
-
-
 }
 
 impl Default for LocalAiConfig {

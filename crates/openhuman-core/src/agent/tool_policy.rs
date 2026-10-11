@@ -69,7 +69,6 @@ pub struct ToolPolicyRequest {
     pub tool_name: String,
     pub arguments: serde_json::Value,
     pub context: ToolCallContext,
-
 }
 
 impl fmt::Debug for ToolPolicyRequest {
