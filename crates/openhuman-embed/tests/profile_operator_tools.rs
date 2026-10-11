@@ -151,7 +151,9 @@ async fn scenario() {
     let requests = chat_requests(&chat).await;
     let mut names = tool_names(&requests[0]);
     names.sort();
-    assert_eq!(names, ["cron", "current_time", "memory", "resolve_time"]);
+    // `cron` and `memory` are deferred tools: registered, reached through the
+    // harness's `tool_search` bridge instead of being listed up front.
+    assert_eq!(names, ["current_time", "resolve_time", "tool_search"]);
 
     // An agent job made through the tool binds to this thread and fires.
     handle.chat("t1", "schedule it").await.unwrap();
