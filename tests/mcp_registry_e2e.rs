@@ -9,7 +9,6 @@
 
 use openhuman_core::config::{schema::ModuleOverride, Config};
 use serde_json::{json, Value};
-use tinymcp_bus::{CommandKind, Transport};
 
 const MODULE_ARTIFACT_ENV: &str = "OPENHUMAN_TINYMCP_TEST_MODULE";
 
