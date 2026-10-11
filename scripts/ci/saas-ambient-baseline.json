@@ -674,13 +674,6 @@
   {
     "rule": "bare-spawn",
     "path": "crates/openhuman-core/src/integrations/composio/bus/trigger_subscriber.rs",
-    "line": 103,
-    "text": "match tokio::task::spawn_blocking(move || {",
-    "occurrence": 1
-  },
-  {
-    "rule": "bare-spawn",
-    "path": "crates/openhuman-core/src/integrations/composio/bus/trigger_subscriber.rs",
     "line": 207,
     "text": "tokio::spawn(async move {",
     "occurrence": 1
@@ -1158,27 +1151,6 @@
     "rule": "bare-spawn",
     "path": "crates/openhuman-core/src/voice/schemas/handlers/provider_server.rs",
     "line": 483,
-    "text": "tokio::spawn(async move {",
-    "occurrence": 1
-  },
-  {
-    "rule": "bare-spawn",
-    "path": "crates/openhuman-core/src/voice/server/hotkey_listener.rs",
-    "line": 120,
-    "text": "tokio::spawn(async move {",
-    "occurrence": 1
-  },
-  {
-    "rule": "bare-spawn",
-    "path": "crates/openhuman-core/src/voice/server/runtime.rs",
-    "line": 218,
-    "text": "tokio::task::spawn_blocking(move || {",
-    "occurrence": 1
-  },
-  {
-    "rule": "bare-spawn",
-    "path": "crates/openhuman-core/src/voice/server/runtime.rs",
-    "line": 418,
     "text": "tokio::spawn(async move {",
     "occurrence": 1
   },

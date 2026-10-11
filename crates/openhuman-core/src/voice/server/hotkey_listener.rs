@@ -86,7 +86,7 @@ pub(super) async fn start_hotkey_listener(
         let (handle, mut source) =
             hotkey::start_listener(combo, mode).map_err(|e| e.to_string())?;
         let (tx, rx) = tokio::sync::mpsc::channel(65);
-        tokio::spawn(async move {
+        crate::core::runtime::spawn_scoped(async move {
             loop {
                 let event = tokio::select! {
                     _ = tx.closed() => break,
@@ -143,7 +143,7 @@ async fn start_globe_with_client(
     let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
     let cancel = server_cancel.child_token();
     let task_cancel = cancel.clone();
-    let task = tokio::spawn(async move {
+    let task = crate::core::runtime::spawn_scoped(async move {
         let _admission = admission;
         let started = match client.globe_start().await {
             Ok(started) => started,

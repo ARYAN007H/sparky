@@ -170,10 +170,12 @@ pub async fn start_recording(config: &Config) -> Result<RecordingHandle, String>
         .microphone_permission(true)
         .await
         .map_err(|e| e.to_string())?;
-    let inner = tokio::task::spawn_blocking(|| tinyvoice::capture::start_recording(|| Ok(())))
-        .await
-        .map_err(|e| format!("microphone setup task failed: {e}"))?
-        .map_err(|e| e.to_string())?;
+    let inner = crate::core::runtime::spawn_blocking_scoped(|| {
+        tinyvoice::capture::start_recording(|| Ok(()))
+    })
+    .await
+    .map_err(|e| format!("microphone setup task failed: {e}"))?
+    .map_err(|e| e.to_string())?;
     Ok(RecordingHandle {
         inner: Some(inner),
         #[cfg(test)]
