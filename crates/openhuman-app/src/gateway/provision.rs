@@ -11,7 +11,7 @@ use openhuman_rpc::embed::config::RuntimeConfig;
 use openhuman_rpc::embed::modules::tinybox::{self, contract};
 
 use super::ops::{ProgressSink, Provisioned};
-use super::types::{ActiveGateway, Confinement, Gateway, Reach, SshReach, CORE_PORT_IN_BOX};
+use super::types::{ActiveGateway, Confinement, Gateway, Reach, CORE_PORT_IN_BOX};
 
 /// How long to wait for a provisioned core to answer `/health`.
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(120);
@@ -155,7 +155,7 @@ pub(super) async fn provision(
 }
 
 /// Construct the module request without exposing TinyBox implementation types.
-fn create_request(
+pub(super) fn create_request(
     resource: contract::ResourceId,
     reach: &Reach,
     confinement: &Confinement,
@@ -197,7 +197,7 @@ fn create_request(
     }
 }
 
-fn host_config(reach: &Reach) -> contract::HostConfig {
+pub(super) fn host_config(reach: &Reach) -> contract::HostConfig {
     match reach {
         Reach::Local => contract::HostConfig::Local,
         Reach::Ssh(ssh) => contract::HostConfig::Ssh(contract::SshHostConfig {
@@ -211,7 +211,7 @@ fn host_config(reach: &Reach) -> contract::HostConfig {
 }
 
 /// Build the explicit core command passed to TinyBox.
-fn core_command(
+pub(super) fn core_command(
     resource: &contract::ResourceId,
     confinement: &Confinement,
     token: &str,

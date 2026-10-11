@@ -4240,6 +4240,7 @@ dependencies = [
  "tinyagents-runtime",
  "tinyagents-session",
  "tinyagents-tasks",
+ "tinybox-bus",
  "tinybox-core",
  "tinybox-docker",
  "tinybox-jail",
@@ -6892,26 +6893,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "tinybox-bus"
+version = "0.1.18"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "tinybox-core"
-version = "0.1.16"
+version = "0.1.18"
 dependencies = [
  "async-trait",
  "serde",
  "thiserror 2.0.20",
+ "tinybox-bus",
 ]
 
 [[package]]
 name = "tinybox-docker"
-version = "0.1.16"
+version = "0.1.18"
 dependencies = [
  "async-trait",
+ "serde_json",
  "tinybox-core",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
 name = "tinybox-jail"
-version = "0.1.16"
+version = "0.1.18"
 dependencies = [
  "landlock",
  "log",

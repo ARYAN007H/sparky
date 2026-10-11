@@ -167,7 +167,7 @@ mod provisioning {
     use std::collections::BTreeMap;
 
     use super::super::ops;
-    use super::super::types::{Confinement, Gateway, GatewaySpec, Reach, CORE_PORT_IN_BOX};
+    use super::super::types::{Confinement, Gateway, GatewaySpec, Reach};
 
     /// A stand-in core: answers `/health` on the port it is handed, forever.
     ///

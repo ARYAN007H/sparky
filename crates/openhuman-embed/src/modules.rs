@@ -13,18 +13,6 @@ pub mod browser {
     pub use openhuman_core::modules::browser::MODULE_ID;
 }
 
-/// TinyBox sandbox operations, with request types from its released bus contract.
-#[cfg(feature = "modules")]
-pub mod tinybox {
-    pub use openhuman_core::modules::tinybox::{
-        abort_file_write, analyze_command, analyze_shell, begin_file_read, begin_file_write,
-        cancel, capabilities, close, close_forward, create, describe, exec, finish_file_read,
-        finish_file_write, forward, inspect, is_running, jail_status, read_file_chunk, read_output,
-        release_output, reserve, shutdown, spawn, start_exec, start_jailed_exec, write_file_chunk,
-        MODULE_ID,
-    };
-}
-
 /// Pre-core calls through the process-wide loader, with explicit runtime configuration.
 pub use openhuman_core::modules::client::{ModuleCallError, ModuleClient};
 
@@ -46,7 +34,6 @@ pub mod tinybox {
         abort_file_write, analyze_command, analyze_shell, begin_file_read, begin_file_write,
         cancel, capabilities, close, close_forward, create, describe, exec, finish_file_read,
         finish_file_write, forward, inspect, is_running, jail_status, read_file_chunk, read_output,
-        release_output, reserve, run_docker, shutdown, spawn, start_exec, start_jailed_exec,
-        write_file_chunk, MODULE_ID,
+        release_output, reserve, shutdown, spawn, start_exec, start_jailed_exec, write_file_chunk,
     };
 }
