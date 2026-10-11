@@ -29,8 +29,8 @@ fn build_rpc_params_from_validated(
             Ok(Map::new())
         }
         "agent.run_subagent" => {
-            let agent_id = validated_string(&args, "agent_id")?;
-            let prompt = validated_string(&args, "prompt")?;
+            let agent_id = validated_string(args, "agent_id")?;
+            let prompt = validated_string(args, "prompt")?;
             Ok(Map::from_iter([
                 ("agent_id".to_string(), Value::String(agent_id)),
                 ("prompt".to_string(), Value::String(prompt)),
@@ -40,38 +40,38 @@ fn build_rpc_params_from_validated(
             let mut params = Map::new();
             params.insert(
                 "question".to_string(),
-                Value::String(validated_string(&args, "question")?),
+                Value::String(validated_string(args, "question")?),
             );
-            insert_filter_and_limit(&args, &mut params)?;
+            insert_filter_and_limit(args, &mut params)?;
             Ok(params)
         }
         "memory.fetch" => {
             let mut params = Map::new();
             params.insert(
                 "query".to_string(),
-                Value::String(validated_string(&args, "query")?),
+                Value::String(validated_string(args, "query")?),
             );
-            if let Some(mode) = optional_string(&args, "mode") {
+            if let Some(mode) = optional_string(args, "mode") {
                 require_one_of("mode", &mode, FETCH_MODES)?;
                 params.insert("mode".to_string(), Value::String(mode));
             }
-            insert_filter_and_limit(&args, &mut params)?;
-            insert_cursor(&args, &mut params)?;
+            insert_filter_and_limit(args, &mut params)?;
+            insert_cursor(args, &mut params)?;
             Ok(params)
         }
         "memory.list" => {
             let mut params = Map::new();
-            insert_filter_and_limit(&args, &mut params)?;
-            insert_cursor(&args, &mut params)?;
+            insert_filter_and_limit(args, &mut params)?;
+            insert_cursor(args, &mut params)?;
             Ok(params)
         }
         "memory.learn" => {
             let mut params = Map::new();
             params.insert(
                 "text".to_string(),
-                Value::String(validated_string(&args, "text")?),
+                Value::String(validated_string(args, "text")?),
             );
-            if let Some(kind) = optional_string(&args, "kind") {
+            if let Some(kind) = optional_string(args, "kind") {
                 require_one_of("kind", &kind, LEARNING_KINDS)?;
                 params.insert("kind".to_string(), Value::String(kind));
             }
@@ -91,7 +91,7 @@ fn build_rpc_params_from_validated(
             Ok(params)
         }
         "memory.forget" => {
-            let ids = validated_string_array(&args, "ids")?;
+            let ids = validated_string_array(args, "ids")?;
             if ids.len() > MEMORY_FORGET_MAX_IDS {
                 return Err(ToolCallError::InvalidParams(format!(
                     "argument `ids` accepts at most {MEMORY_FORGET_MAX_IDS} entries (got {})",
@@ -105,20 +105,20 @@ fn build_rpc_params_from_validated(
             let mut params = Map::new();
             params.insert("query".to_string(), Value::String(query));
             if let Some(max_results) =
-                optional_u64(&args, "max_results")
+                optional_u64(args, "max_results")
             {
                 params.insert("max_results".to_string(), Value::from(max_results));
             }
-            if let Some(provider) = optional_string(&args, "provider") {
+            if let Some(provider) = optional_string(args, "provider") {
                 params.insert("provider".to_string(), Value::String(provider));
             }
             Ok(params)
         }
         "web_answer" => {
-            let query = validated_string(&args, "query")?;
+            let query = validated_string(args, "query")?;
             let mut params = Map::new();
             params.insert("query".to_string(), Value::String(query));
-            if let Some(depth) = optional_string(&args, "depth") {
+            if let Some(depth) = optional_string(args, "depth") {
                 if depth != "quick" && depth != "deep" {
                     return Err(ToolCallError::InvalidParams(
                         "argument `depth` must be quick or deep".to_string(),
