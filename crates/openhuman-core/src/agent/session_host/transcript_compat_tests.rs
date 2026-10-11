@@ -672,15 +672,29 @@ fn assert_retired_tool_replay(identity_bound: bool) {
             ],
             true,
         );
-        let mut resumed = build_host(root.path(), next.clone(), true, "retired-audio-thread");
+        let mut resumed = if identity_bound {
+            build_host(root.path(), next.clone(), true, "retired-audio-thread")
+        } else {
+            let chat_model: Arc<dyn ChatModel<()>> = next.clone();
+            crate::agent::SessionHostBuilder::new()
+                .chat_model(chat_model)
+                .tools(tools())
+                .workspace_dir(workspace)
+                .action_dir(root.path().to_path_buf())
+                .tool_dispatcher(Box::new(tinytools_agent::dialect::NativeDialect))
+                .build()
+                .expect("unthreaded session build")
+        };
         if identity_bound {
             assert!(resumed
                 .resume_bound_session()
                 .await
                 .expect("resume archive"));
         } else {
-            resumed.set_thread_id(None::<&str>);
-            assert!(matches!(resumed.turn_resume_mode(), tinyagents_runtime::ResumeMode::LatestForAgent));
+            assert!(matches!(
+                resumed.turn_resume_mode(),
+                tinyagents_runtime::ResumeMode::LatestForAgent
+            ));
         }
         // An explicit host tool belt is authoritative, while archived declarations
         // remain intact in the durable transcript.
