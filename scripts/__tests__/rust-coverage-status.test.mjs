@@ -12,8 +12,8 @@ const repoRoot = path.join(
 );
 const runner = path.join(repoRoot, "scripts", "ci", "rust-coverage.sh");
 
-function extractFunction(name) {
-  const source = fs.readFileSync(runner, "utf8");
+function extractFunction(name, scriptPath = runner) {
+  const source = fs.readFileSync(scriptPath, "utf8");
   const start = source.indexOf(`${name}() {`);
   assert.notEqual(start, -1, `${name}() not found in ${runner}`);
   const end = source.indexOf("\n}\n", start);
@@ -26,7 +26,7 @@ function withRunnerFunctions(functions, preamble, body) {
     "set -euo pipefail",
     "exec 2>&1",
     preamble,
-    ...functions.map(extractFunction),
+    ...functions.map((name) => extractFunction(name)),
     body,
   ].join("\n");
   try {
@@ -116,14 +116,13 @@ test("an integration target with all required product features runs", () => {
   assert.match(result.output, /RAN-TARGET/);
 });
 
-
 test("headless Embed coverage gets an isolated disposable encryption key", () => {
   const result = withRunnerFunctions(
     ["llvm_cov_product_facade", "llvm_cov_embed"],
     [
       'PRODUCT_FEATURES="channels"',
-      'export OPENHUMAN_KEYRING_MASTER_KEY=operator-key',
-      'export OPENHUMAN_KEYRING_MASTER_KEY_FILE=operator-file',
+      "export OPENHUMAN_KEYRING_MASTER_KEY=operator-key",
+      "export OPENHUMAN_KEYRING_MASTER_KEY_FILE=operator-file",
       'bash() { [[ "${OPENHUMAN_KEYRING_MASTER_KEY:-}" =~ ^[0-9a-f]{64}$ ]] || return 9; [[ -z "${OPENHUMAN_KEYRING_MASTER_KEY_FILE:-}" ]] || return 10; echo DISPOSABLE-KEY; }',
     ].join("\n"),
     'llvm_cov_embed --no-report -p openhuman-embed; [[ "$OPENHUMAN_KEYRING_MASTER_KEY" == operator-key ]]; [[ "$OPENHUMAN_KEYRING_MASTER_KEY_FILE" == operator-file ]]; echo PARENT-UNCHANGED',
@@ -132,3 +131,35 @@ test("headless Embed coverage gets an isolated disposable encryption key", () =>
   assert.match(result.output, /DISPOSABLE-KEY/);
   assert.match(result.output, /PARENT-UNCHANGED/);
 });
+
+for (const [label, scriptPath, invoke] of [
+  [
+    "mock runner",
+    path.join(repoRoot, "scripts", "test-rust-with-mock.sh"),
+    "cargo_test",
+  ],
+  ["coverage runner", runner, "llvm_cov"],
+]) {
+  test(`${label} selects the real isolated runtime-reaper regression`, () => {
+    const script = [
+      "set -euo pipefail",
+      'suite() { shift; "$@"; }',
+      `${invoke}() { printf '%s\\n' "$@"; }`,
+      extractFunction("run_build_only_reaper_test", scriptPath),
+      "run_build_only_reaper_test",
+    ].join("\n");
+    const args = execFileSync("bash", ["-c", script], { encoding: "utf8" })
+      .trim()
+      .split("\n");
+    assert.ok(
+      args.includes("--exact"),
+      "the runtime singleton requires its own process",
+    );
+    assert.ok(
+      args.includes(
+        "agent::tinyagents::reaper::tests::a_build_only_runtime_is_swept_before_it_can_be_invoked",
+      ),
+      `the libtest selector must reach the declared regression: ${args.join(" ")}`,
+    );
+  });
+}
