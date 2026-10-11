@@ -93,13 +93,14 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
         let client_id = identity.client_id;
 
         let mut event_rx = crate::web_chat::subscribe_web_channel_events();
-        let reply = match ModuleProgressiveReply::open(config, channel.clone(), session.clone()).await {
-            Ok(reply) => reply,
-            Err(error) => {
-                tracing::error!("[channel-inbound] progressive runtime unavailable: {error}");
-                return;
-            }
-        };
+        let reply =
+            match ModuleProgressiveReply::open(config, channel.clone(), session.clone()).await {
+                Ok(reply) => reply,
+                Err(error) => {
+                    tracing::error!("[channel-inbound] progressive runtime unavailable: {error}");
+                    return;
+                }
+            };
 
         let request_id = match crate::web_chat::start_chat(
             &client_id,
@@ -267,8 +268,12 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
     }
 }
 
-
-async fn flush_events(reply: &ModuleProgressiveReply, pending: &mut Vec<ProgressiveEvent>) -> Result<(), crate::modules::client::ModuleCallError> {
-    if pending.is_empty() { return Ok(()); }
+async fn flush_events(
+    reply: &ModuleProgressiveReply,
+    pending: &mut Vec<ProgressiveEvent>,
+) -> Result<(), crate::modules::client::ModuleCallError> {
+    if pending.is_empty() {
+        return Ok(());
+    }
     reply.feed(std::mem::take(pending)).await
 }

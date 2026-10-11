@@ -36,10 +36,15 @@ struct ManagedTransport {
 }
 
 impl ManagedTransport {
-    fn capture(config: &crate::config::Config, channel: String, session: tokio_util::sync::CancellationToken) -> anyhow::Result<Self> {
+    fn capture(
+        config: &crate::config::Config,
+        channel: String,
+        session: tokio_util::sync::CancellationToken,
+    ) -> anyhow::Result<Self> {
         anyhow::ensure!(!session.is_cancelled(), "Channel session closed");
         let credential = match get_session_token(config)
-            .map_err(|_| anyhow::anyhow!("Hosted channel credential unavailable"))? {
+            .map_err(|_| anyhow::anyhow!("Hosted channel credential unavailable"))?
+        {
             Some(token) if !is_local_session_token(&token) => BackendCredential::Session(token),
             _ => anyhow::bail!("Hosted channel credential unavailable"),
         };
@@ -62,7 +67,10 @@ impl ManagedTransport {
         }
     }
 
-    async fn execute_transport(&self, request: ProgressiveTransportRequest) -> ProgressiveTransportResult {
+    async fn execute_transport(
+        &self,
+        request: ProgressiveTransportRequest,
+    ) -> ProgressiveTransportResult {
         let result = match request {
             ProgressiveTransportRequest::Send { channel, message } => {
                 self.client

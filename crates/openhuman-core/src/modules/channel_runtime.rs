@@ -181,7 +181,8 @@ impl ChannelRuntimeLease {
         join_cleanup(&self.0.closing, || {
             let cleanup = self.0.cleanup.clone();
             self.0.runtime.spawn(async move { cleanup.run().await })
-        }).await
+        })
+        .await
     }
 }
 
@@ -190,9 +191,12 @@ async fn join_cleanup(
     start: impl FnOnce() -> tokio::task::JoinHandle<Result<(), ModuleCallError>>,
 ) -> Result<(), ModuleCallError> {
     let mut closing = closing.lock().await;
-    if closing.is_none() { *closing = Some(start()); }
+    if closing.is_none() {
+        *closing = Some(start());
+    }
     let result = tokio::time::timeout(CLOSE_BUDGET, closing.as_mut().expect("cleanup worker"))
-        .await.map_err(|_| ModuleCallError::TransportFailed)?;
+        .await
+        .map_err(|_| ModuleCallError::TransportFailed)?;
     closing.take();
     result.map_err(|_| ModuleCallError::TransportFailed)?
 }
