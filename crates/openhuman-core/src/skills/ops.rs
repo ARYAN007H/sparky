@@ -21,14 +21,14 @@
 //!
 //! | Module | Contents |
 //! |---|---|
-//! | [`super::ops_types`] | Core types, constants, and frontmatter helpers |
+//! | [`super::ops_types`] | Host sidecar filenames and trust marker |
 //! | [`super::ops_discover`] | Scanning root directories, scope resolution, collision handling |
 //! | `tinyskills` | Resource inventory and shared bundle parsing |
 //! | [`super::ops_create`] | Scaffolding new SKILL.md-based skills on disk |
 //! | [`super::ops_install`] | URL-based skill installation over HTTPS |
 
-// Re-export everything that was previously public from this file so external
-// callers are unaffected.
+// Host discovery, creation and installation entry points. Portable metadata
+// and parser contracts come directly from `tinyskills`.
 pub use super::bundled::install_bundled_skills;
 pub use super::ops_create::{create_workflow, CreateWorkflowParams, WorkflowCreateInputDef};
 pub use super::ops_discover::{

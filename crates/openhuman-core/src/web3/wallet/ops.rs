@@ -11,7 +11,6 @@ use types::StoredWalletState;
 pub(crate) use types::WalletSecretMaterial;
 use {
     tinywallet_web3::crypto::wallet::WalletAccount, tinywallet_web3::crypto::wallet::WalletChain,
-    tinywallet_web3::crypto::wallet::WalletSetupSource,
     tinywallet_web3::crypto::wallet::WalletStatus,
     tinywallet_web3::quote::WALLET_NOT_CONFIGURED_MESSAGE,
 };
