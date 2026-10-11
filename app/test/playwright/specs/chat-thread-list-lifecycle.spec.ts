@@ -19,11 +19,9 @@
  *
  * # Locators
  *
- * The row action buttons carry `data-analytics-id` rather than a testid, and
- * are `hidden` until `group-hover` (`ThreadList.tsx:236`, `:247`), so each is
- * reached by hovering the row first. Rows are `thread-row-<id>`, the rename
- * field is `thread-title-input-<id>`, and delete goes through an AlertDialog
- * whose confirm button is labelled `common.delete` ("Delete").
+ * Rows are `thread-row-<id>`. Their More options menu contains Rename and
+ * Delete; the inline editor is `thread-title-input-<id>`. Deletion opens the
+ * host confirmation dialog before the thread is removed.
  */
 import { expect, type Page, test } from '@playwright/test';
 
@@ -83,12 +81,13 @@ async function createNewThread(page: Page): Promise<string> {
   return id;
 }
 
-/** Reveal a row's hover-only actions and return the row locator. */
-async function hoverRow(page: Page, threadId: string) {
+/** Open the requested thread's menu and choose its action. */
+async function selectThreadAction(page: Page, threadId: string, action: 'Rename' | 'Delete') {
   const row = page.getByTestId(`thread-row-${threadId}`);
   await expect(row).toBeVisible();
   await row.hover();
-  return row;
+  await row.locator('..').getByRole('button', { name: 'More options', exact: true }).click();
+  await page.getByRole('menuitem', { name: action, exact: true }).click();
 }
 
 test.describe('Chat thread list — create, deep link, rename, delete', () => {
@@ -150,8 +149,7 @@ test.describe('Chat thread list — create, deep link, rename, delete', () => {
     await openChat(page);
     const threadId = await createNewThread(page);
 
-    await hoverRow(page, threadId);
-    await page.locator('[data-analytics-id="chat-sidebar-edit-thread-title"]').first().click();
+    await selectThreadAction(page, threadId, 'Rename');
 
     const input = page.getByTestId(`thread-title-input-${threadId}`);
     await expect(input).toBeVisible();
@@ -177,8 +175,7 @@ test.describe('Chat thread list — create, deep link, rename, delete', () => {
 
     const titleBefore = (await page.getByTestId(`thread-row-${threadId}`).innerText()).trim();
 
-    await hoverRow(page, threadId);
-    await page.locator('[data-analytics-id="chat-sidebar-edit-thread-title"]').first().click();
+    await selectThreadAction(page, threadId, 'Rename');
 
     const input = page.getByTestId(`thread-title-input-${threadId}`);
     await expect(input).toBeVisible();
@@ -200,12 +197,11 @@ test.describe('Chat thread list — create, deep link, rename, delete', () => {
     const keep = await createNewThread(page);
     const doomed = await createNewThread(page);
 
-    await hoverRow(page, doomed);
-    await page.locator('[data-analytics-id="chat-sidebar-delete-thread"]').first().click();
+    await selectThreadAction(page, doomed, 'Delete');
 
     // Confirmation is required — the row must still be there while the dialog
     // is open, or the "are you sure" is decorative.
-    const dialog = page.getByRole('alertdialog');
+    const dialog = page.getByRole('dialog', { name: 'Delete Thread', exact: true });
     await expect(dialog).toBeVisible();
     await expect(page.getByTestId(`thread-row-${doomed}`)).toBeVisible();
 
@@ -220,10 +216,9 @@ test.describe('Chat thread list — create, deep link, rename, delete', () => {
     await openChat(page);
     const threadId = await createNewThread(page);
 
-    await hoverRow(page, threadId);
-    await page.locator('[data-analytics-id="chat-sidebar-delete-thread"]').first().click();
+    await selectThreadAction(page, threadId, 'Delete');
 
-    const dialog = page.getByRole('alertdialog');
+    const dialog = page.getByRole('dialog', { name: 'Delete Thread', exact: true });
     await expect(dialog).toBeVisible();
     await dialog.getByRole('button', { name: 'Cancel' }).click();
 
