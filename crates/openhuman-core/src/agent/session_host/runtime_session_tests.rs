@@ -283,7 +283,9 @@ async fn resumed_mcp_snapshot_survives_a_cold_catalog_and_keeps_its_frozen_spec(
     recorded_spec.parameters = serde_json::json!({"type":"object","frozen":true});
     let recorded = ToolSnapshot::new(vec![recorded_spec.clone()]).expect("recorded snapshot");
     prelude.adopt_recorded_tools(Some(&recorded));
-    prelude.refresh_delegation_tool_surface().expect("cold refresh");
+    prelude
+        .refresh_delegation_tool_surface()
+        .expect("cold refresh");
 
     let cold = prelude
         .prepare(false)

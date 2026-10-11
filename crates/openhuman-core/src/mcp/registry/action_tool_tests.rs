@@ -16,8 +16,7 @@ impl crate::mcp::module_client::McpModulePort for RecoveringModulePort {
         _data_dir: &str,
         _config: &tinymcp_bus::McpClientConfig,
     ) -> Result<tinymcp_bus::OpenConfiguredResponse, crate::modules::client::ModuleCallError> {
-        self.opens
-            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.opens.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         if !self.available.load(std::sync::atomic::Ordering::SeqCst) {
             return Err(crate::modules::client::ModuleCallError::Unavailable);
         }
@@ -57,14 +56,14 @@ impl crate::mcp::module_client::McpModulePort for RecoveringModulePort {
                 .get(0)
                 .cloned()
                 .ok_or(crate::modules::client::ModuleCallError::ModuleFault),
-            tinymcp_bus::names::methods::TOOL_CALL => serde_json::to_value(
-                tinymcp_bus::ToolCallOutcome {
+            tinymcp_bus::names::methods::TOOL_CALL => {
+                serde_json::to_value(tinymcp_bus::ToolCallOutcome {
                     result: json!({"content":[{"type":"text","text":"loaded"}]}),
                     is_error: false,
                     rendered: tinymcp_bus::McpToolResult::success("loaded"),
-                },
-            )
-            .map_err(|_| crate::modules::client::ModuleCallError::ModuleFault),
+                })
+                .map_err(|_| crate::modules::client::ModuleCallError::ModuleFault)
+            }
             tinymcp_bus::names::methods::RENDER_TOOL_OUTPUT => {
                 serde_json::to_value("lazy-loaded forecast")
                     .map_err(|_| crate::modules::client::ModuleCallError::ModuleFault)
@@ -76,20 +75,16 @@ impl crate::mcp::module_client::McpModulePort for RecoveringModulePort {
     async fn prepare_agent_tools(
         &self,
         _request: tinymcp_bus::PrepareAgentToolsRequest,
-    ) -> Result<
-        Vec<tinymcp_bus::McpToolPresentation>,
-        crate::modules::client::ModuleCallError,
-    > {
+    ) -> Result<Vec<tinymcp_bus::McpToolPresentation>, crate::modules::client::ModuleCallError>
+    {
         Ok(Vec::new())
     }
 
     async fn validate_server_arguments(
         &self,
         request: tinymcp_bus::ValidateServerArgumentsRequest,
-    ) -> Result<
-        tinymcp_bus::ServerArgumentsValidation,
-        crate::modules::client::ModuleCallError,
-    > {
+    ) -> Result<tinymcp_bus::ServerArgumentsValidation, crate::modules::client::ModuleCallError>
+    {
         Ok(tinymcp_bus::ServerArgumentsValidation::Valid(
             request.arguments.as_object().cloned().unwrap_or_default(),
         ))
@@ -222,8 +217,11 @@ async fn deferred_executor_retries_lazy_module_open_after_unavailability() {
     let port = RecoveringModulePort::default();
     let opens = Arc::clone(&port.opens);
     let calls = Arc::clone(&port.calls);
-    crate::mcp::module_client::McpConfiguredClient::install_test_port(&config, Box::new(port.clone()))
-        .expect("install module port");
+    crate::mcp::module_client::McpConfiguredClient::install_test_port(
+        &config,
+        Box::new(port.clone()),
+    )
+    .expect("install module port");
     let tools = deferred_connected_tools(
         Arc::new(config),
         &[presentation(
