@@ -58,6 +58,23 @@ describe('walletApi', () => {
     expect(result).toBe(false);
   });
 
+  it('deriveRecoveryMaterial requests module-owned seed and account derivation', async () => {
+    const seed = Array.from({ length: 64 }, (_, index) => index);
+    const accounts = [{ chain: 'evm' as const, address: '0xabc', derivationPath: "m/44'/60'/0'/0/0" }];
+    mockCallCoreRpc.mockResolvedValueOnce({ result: { seed, accounts } });
+
+    const { deriveRecoveryMaterial } = await import('./walletApi');
+    const result = await deriveRecoveryMaterial('secret phrase');
+
+    expect(mockCallCoreRpc).toHaveBeenCalledWith({
+      method: 'openhuman.wallet_derive_recovery_material',
+      params: { phrase: 'secret phrase' },
+    });
+    expect(result.seed).toEqual(Uint8Array.from({ length: 64 }, (_, index) => index));
+    expect(seed).toEqual(new Array(64).fill(0));
+    expect(result.accounts).toEqual(accounts);
+  });
+
   it('setupLocalWallet calls the wallet setup RPC with params', async () => {
     const payload = {
       consentGranted: true,

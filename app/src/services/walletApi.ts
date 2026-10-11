@@ -29,6 +29,12 @@ export interface WalletAccount {
   derivationPath: string;
 }
 
+export interface WalletRecoveryMaterial {
+  /** Standard BIP-39 seed; consumed and cleared by the storage-key KDF. */
+  seed: Uint8Array;
+  accounts: WalletAccount[];
+}
+
 export interface GeneratedRecoveryPhrase {
   phrase: string;
   wordCount: number;
@@ -83,6 +89,19 @@ export const validateRecoveryPhrase = async (phrase: string): Promise<boolean> =
     params: { phrase },
   });
   return response.result.valid;
+};
+
+/** Derive the generic storage-key seed and public accounts through TinyWallet. */
+export const deriveRecoveryMaterial = async (phrase: string): Promise<WalletRecoveryMaterial> => {
+  const response = await callCoreRpc<{
+    result: { seed: number[]; accounts: WalletAccount[] };
+  }>({
+    method: 'openhuman.wallet_derive_recovery_material',
+    params: { phrase },
+  });
+  const seed = Uint8Array.from(response.result.seed);
+  response.result.seed.fill(0);
+  return { seed, accounts: response.result.accounts };
 };
 
 export const setupLocalWallet = async (params: SetupWalletParams): Promise<WalletStatus> => {
