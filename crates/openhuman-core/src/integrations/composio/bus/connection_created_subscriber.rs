@@ -13,10 +13,10 @@ use crate::config::Config;
 use crate::core::events::DomainEvent;
 use crate::integrations::composio::client::{resolve_composio_route, ComposioRoute};
 use crate::integrations::composio::module_client::{self as connectors};
-use tinyconnectors_bus::names::methods;
 use crate::integrations::composio::ops;
 use crate::integrations::composio::types::ComposioConnectionsResponse;
 use crate::integrations::composio::FetchConnectedIntegrationsStatus;
+use tinyconnectors_bus::names::methods;
 
 /// How long to keep polling after `composio_authorize` returns a
 /// `connectUrl`, waiting for the user to finish the hosted OAuth flow.

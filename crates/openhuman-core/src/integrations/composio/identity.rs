@@ -31,9 +31,9 @@
 use crate::config::Config;
 
 use super::module_client::{self as connectors};
-use tinyconnectors_bus::names::methods;
 use super::ops::fetch_connected_integrations;
 use super::types::ComposioUserProfileRequest;
+use tinyconnectors_bus::names::methods;
 
 /// Resolve the connected account's username for the given Composio
 /// toolkit, going through the `tinyconnectors` module's `GetUserProfile`.

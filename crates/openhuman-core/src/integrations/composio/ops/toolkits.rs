@@ -1,9 +1,9 @@
 //! Toolkit and capability listing ops.
 
 use super::super::module_client::{self as connectors};
-use tinyconnectors_bus::names::methods;
 use crate::config::Config;
 use crate::core::Outcome;
+use tinyconnectors_bus::names::methods;
 
 use super::super::contract::agent_ready_toolkits;
 use super::super::types::{ComposioCapabilitiesResponse, ComposioToolkitsResponse};

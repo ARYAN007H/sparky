@@ -37,11 +37,11 @@ async fn fetch_connected_integrations_uncached_inner(
 ) -> Option<Vec<ConnectedIntegration>> {
     use super::super::client::{direct_list_connections, resolve_composio_route, ComposioRoute};
     use super::super::module_client::{self as connectors};
-use tinyconnectors_bus::names::methods;
     use super::super::types::{
         ComposioConnectionsResponse, ComposioListToolsRequest, ComposioToolkitsResponse,
         ComposioToolsResponse,
     };
+    use tinyconnectors_bus::names::methods;
 
     // Route via the mode-aware factory so the chat-agent's
     // "connected_integrations" view reflects the live tenant — backend

@@ -17,9 +17,9 @@ use tinyconnectors_bus::{ComposioDirectConnectionsRequest, ComposioDirectToolsRe
 
 use super::super::direct_auth;
 use super::super::module_client::{self};
-use tinyconnectors_bus::names::methods;
 use super::super::types::{ComposioConnectionsResponse, ComposioToolsResponse};
 use super::DirectCredential;
+use tinyconnectors_bus::names::methods;
 
 /// `ListConnectionsDirect`, with the member failure peeled down to the message
 /// the user is shown.

@@ -9,8 +9,6 @@ mod subscriber;
 
 pub use subscriber::ChannelInboundSubscriber;
 
-pub(crate) use tinychannels::channel::derive_inbound_thread_id;
-
 #[cfg(test)]
 #[path = "bus_inbound_thread_id_tests_tests.rs"]
 mod inbound_thread_id_tests;

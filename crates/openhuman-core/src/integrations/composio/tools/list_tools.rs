@@ -14,7 +14,6 @@ use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolCategory, ToolResult
 
 use super::super::client::{resolve_composio_route, ComposioRoute};
 use super::super::module_client::{self as connectors};
-use tinyconnectors_bus::names::methods;
 use super::super::types::{
     ComposioConnectionsResponse, ComposioListToolsRequest, ComposioToolsResponse,
 };
@@ -22,6 +21,7 @@ use super::visibility::{
     empty_uncurated_toolkits_message, filter_list_tools_response, normalized_scope_toolkits,
     render_tools_markdown, retain_connected_tools,
 };
+use tinyconnectors_bus::names::methods;
 
 pub struct ComposioListToolsTool {
     /// Held instead of a pre-resolved route so the

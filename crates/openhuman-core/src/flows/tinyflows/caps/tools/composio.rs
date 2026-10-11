@@ -25,10 +25,10 @@ use super::{ToolBackend, ToolCallCtx};
 use crate::config::ops as config_rpc;
 use crate::config::Config;
 use crate::integrations::composio::module_client::{self as connectors};
-use tinyconnectors_bus::names::methods;
 use crate::integrations::composio::types::ComposioExecuteRequest;
 use crate::integrations::composio::ComposioExecuteResponse;
 use crate::security::GateDecision;
+use tinyconnectors_bus::names::methods;
 
 /// Dispatches a Composio action slug through the tier, curation, preflight and
 /// approval gates.

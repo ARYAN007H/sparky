@@ -15,8 +15,8 @@ use tinytools::{PermissionLevel, Tool, ToolCategory, ToolResult};
 
 use super::super::client::{direct_list_connections, resolve_composio_route, ComposioRoute};
 use super::super::module_client::{self as connectors};
-use tinyconnectors_bus::names::methods;
 use super::super::types::{ComposioConnectionsResponse, ComposioToolkitsResponse};
+use tinyconnectors_bus::names::methods;
 
 // ── composio_connect (inline approval card, #3993) ──────────────────
 

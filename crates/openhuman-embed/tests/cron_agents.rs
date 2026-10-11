@@ -41,10 +41,7 @@ impl Tool for Ping {
     fn parameters_schema(&self) -> serde_json::Value {
         serde_json::json!({ "type": "object", "properties": {} })
     }
-    async fn execute(
-        &self,
-        _args: serde_json::Value,
-    ) -> anyhow::Result<tinytools::ToolResult> {
+    async fn execute(&self, _args: serde_json::Value) -> anyhow::Result<tinytools::ToolResult> {
         self.seen
             .lock()
             .unwrap()

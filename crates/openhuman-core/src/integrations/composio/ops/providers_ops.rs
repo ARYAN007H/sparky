@@ -10,12 +10,12 @@ use crate::core::Outcome;
 
 use super::super::contract::ProviderUserProfile;
 use super::super::module_client::{self as connectors};
-use tinyconnectors_bus::names::methods;
 use super::super::types::{
     reencode, ComposioRefreshIdentitiesResponse, ComposioUserProfile, ComposioUserProfileRequest,
 };
 use super::connections::resolve_toolkit_for_connection;
 use super::error_utils::{report_composio_op_error, OpResult};
+use tinyconnectors_bus::names::methods;
 
 /// Aggregate result of [`composio_refresh_all_identities`].
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]

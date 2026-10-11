@@ -10,8 +10,9 @@ allowlist of tool-like operations is also exposed over JSON-RPC for the
 desktop shell.
 
 Domain-owned tools (memory, cron, flows, wallet, Composio, skills, voice,
-agent sub-dispatch) live in their own domains. [`mod.rs`](./mod.rs) re-exports them, so a
-single `crate::tools::*` import reaches the full set.
+agent sub-dispatch) live in their own domains. Each domain supplies an explicit
+tool factory; [`ops.rs`](./ops.rs) combines those factories in registry order.
+Callers import individual tools from their owning domain.
 
 ## How it works
 
@@ -120,7 +121,7 @@ step.
 
 | Path | What it does |
 | --- | --- |
-| [`mod.rs`](./mod.rs) | Export hub: submodules, re-exports of built-in and domain tools, the `tinytools` vocabulary, and the `all_tools_*` controller pair. |
+| [`mod.rs`](./mod.rs) | Cross-cutting tool modules, their built-in exports, and the `all_tools_*` controller pair. Domain factories are called explicitly from `ops.rs`; tool contracts come directly from `tinytools`. |
 | [`ops.rs`](./ops.rs) | Registry assembly (`default_tools*`, `all_tools*`), all config and feature gating, and `tool_group`. |
 | [`orchestrator_tools.rs`](./orchestrator_tools.rs) | Per-subagent `delegate_*` tools and deferred Composio action expansion. |
 | [`user_filter.rs`](./user_filter.rs) | `filter_tools_by_user_preference` and the UI toggle to tool-name map. |
