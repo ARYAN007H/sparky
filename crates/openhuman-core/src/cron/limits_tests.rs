@@ -152,3 +152,15 @@ fn stored_rows_that_break_the_limits_are_refused_at_run() {
     let ok = create_agent_job(&config, input(600_000, None), origin()).unwrap();
     limits::check_run(&config, &ok).unwrap();
 }
+
+#[tokio::test]
+async fn run_now_refuses_a_stored_job_that_breaks_the_limits() {
+    let tmp = TempDir::new().unwrap();
+    let mut config = limited(&tmp);
+    config.cron.agent_jobs_only = false;
+    let shell = add_shell_job(&config, None, Schedule::Every { every_ms: 600_000 }, "echo").unwrap();
+    config.cron.agent_jobs_only = true;
+    assert!(crate::cron::ops::run_job_now(&config, &shell.id).await.is_err());
+    assert!(crate::cron::ops::cron_run(&config, &shell.id).await.is_err());
+    assert!(crate::cron::runs::list(&config, &shell.id).is_empty());
+}
