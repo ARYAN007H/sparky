@@ -53,4 +53,3 @@ pub(super) fn join_endpoint(base: &str, path: &str) -> String {
         path.trim_start_matches('/')
     )
 }
-
