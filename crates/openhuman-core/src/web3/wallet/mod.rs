@@ -45,8 +45,7 @@ pub(crate) mod rpc;
 
 #[cfg(feature = "web3")]
 mod schemas;
-/// The wallet agent tools, re-exported from `tinywallet-web3`. The host builds
-/// them over the process-wide engine in `tools/ops.rs`.
+/// Wallet agent tool adapters over the declarations in `tinywallet-bus`.
 #[cfg(feature = "web3")]
 pub mod tools;
 #[cfg(all(test, feature = "web3"))]
