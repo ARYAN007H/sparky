@@ -61,6 +61,8 @@ impl Respond for Script {
                     "schedule":{"kind":"at","at":self.fire_at},"command":"echo hi"}),
             )
         } else if prompt.contains("run shell") && results == 0 {
+            call("tool_search", json!({"query":"cron schedule job"}))
+        } else if prompt.contains("run shell") && results == 1 {
             call("shell", json!({"command":"ls"}))
         } else {
             chat_completion("done")
