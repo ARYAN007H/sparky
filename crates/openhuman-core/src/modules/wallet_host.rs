@@ -90,8 +90,6 @@ pub(crate) fn bind_endpoint_references(
     service: &str,
     references: &[HostEndpointReference],
 ) -> Result<(), String> {
-    use tinywallet_bus::wire::RpcEndpointKey;
-
     let mut resolved = HashMap::new();
     for endpoint in references {
         let url = crate::web3::wallet::endpoints::override_for_endpoint(endpoint.key).ok_or_else(

@@ -77,12 +77,8 @@ impl Tool for WalletModuleTool {
                 };
                 let result = match self.name() {
                     "wallet_tx_status" => outcome_value(
-                        crate::web3::wallet::tx_status(
-                            query.chain,
-                            query.evm_network,
-                            &query.hash,
-                        )
-                        .await,
+                        crate::web3::wallet::tx_status(query.chain, query.evm_network, &query.hash)
+                            .await,
                     ),
                     "wallet_tx_receipt" => outcome_value(
                         crate::web3::wallet::tx_receipt(
@@ -93,12 +89,8 @@ impl Tool for WalletModuleTool {
                         .await,
                     ),
                     _ => outcome_value(
-                        crate::web3::wallet::lookup_tx(
-                            query.chain,
-                            query.evm_network,
-                            &query.hash,
-                        )
-                        .await,
+                        crate::web3::wallet::lookup_tx(query.chain, query.evm_network, &query.hash)
+                            .await,
                     ),
                 };
                 result
