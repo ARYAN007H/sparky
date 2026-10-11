@@ -11,12 +11,11 @@
 //!   ([`crate::agent::registry::find_custom_in_config`] →
 //!   [`crate::agent::registry::definition_from_registry_entry`]).
 //!
-//! The owner contract represents authored definitions and execution policy.
-//! This adapter supplies the existing lookup projection: identity, display
-//! summary, model routing, declared delegates, resolved tools, and tool rules.
-//! OpenHuman still owns prompt builders, sandbox policy, iteration limits,
-//! TokenJuice configuration, and turn graphs; unused owner fields retain their
-//! defaults rather than acquiring new product policy here.
+//! This is `docs/specs/plan-agents.md` Phase 4. The crate-side
+//! [`AgentDefinition`] is inert (`serde` + `std`); OpenHuman's harness
+//! definition is far richer (prompt builders, sandbox mode, iteration policy,
+//! TokenJuice profile, turn graph). Only the six fields the turn loop can act
+//! on cross the seam; everything else stays host-side by design.
 //!
 //! # Contract mismatches resolved here
 //!
@@ -39,13 +38,12 @@
 //! ids are **kept**, matching both [`validate_tier_hierarchy`](crate::agent::registry::agents::validate_tier_hierarchy)'s `continue` and
 //! the trait's note that an authorized id may still fail to resolve.
 //!
-//! **3. Tool visibility is resolved against the host session.** Wildcard
-//! scopes materialize the registered tools and apply the denylist. Without
-//! that tool surface they fail closed. Named scopes retain extra and deferred
-//! tools according to the existing host policy. The resulting explicit list
-//! is encoded as the owner contract's `ToolScope::Named`; empty scopes retain
-//! [`NO_TOOLS_SENTINEL`] so existing lookup consumers cannot interpret an empty
-//! list as unrestricted access.
+//! **3. Tool scopes remain host-materialized.** The portable definition
+//! carries an explicit named scope, after the host applies discovery,
+//! companion-tool and denylist policy. Wildcards are materialized against
+//! [`Self::with_registered_tools`] and fail closed when no catalogue exists.
+//! Empty scopes retain [`NO_TOOLS_SENTINEL`] for compatibility with the host's
+//! existing tool visibility contract; they never become portable wildcards.
 //!
 //! **4. `SubagentEntry::Skills` entries are omitted.** A `{ skills = "*" }`
 //! entry is not an agent id — it expands to the connected integrations'
@@ -122,8 +120,8 @@ pub struct OpenHumanDefinitionRegistry {
     /// Every tool name registered for this session, used to materialize a
     /// [`ToolScope::Wildcard`] definition that also carries a denylist.
     ///
-    /// The crate models tools as an explicit `Vec<String>` with no wildcard
-    /// marker, so a denylist can only be honoured against a concrete list. When
+    /// The host projects named scopes after applying its denylist against a
+    /// concrete catalogue. When
     /// this is absent, a wildcard definition whose `disallowed_tools` is
     /// non-empty cannot be projected faithfully and [`Self::tools_for`] fails
     /// closed rather than re-granting the denied tools.
@@ -157,10 +155,8 @@ pub struct OpenHumanDefinitionRegistry {
 
 /// Outcome of resolving a definition's own scope.
 ///
-/// Modelled explicitly because the crate's `Vec<String>` overloads *empty* to
-/// mean "unrestricted". Inferring wildcard from emptiness is what let a
-/// denylist-emptied scope, an explicitly tool-less scope, and a true wildcard
-/// all collapse onto the same value.
+/// Modelled explicitly so a denylist-emptied scope, an explicitly tool-less
+/// scope and a true wildcard never collapse onto the same host allowlist.
 enum ResolvedScope {
     /// Every registered tool, with no denylist to apply.
     Wildcard,
@@ -196,9 +192,9 @@ impl OpenHumanDefinitionRegistry {
     /// Attaches the session's registered tool names.
     ///
     /// Required to project a [`ToolScope::Wildcard`] definition that also
-    /// carries a `disallowed_tools` denylist: the crate has no wildcard marker,
-    /// so "everything except these" can only be expressed by materializing the
-    /// list. Without it such a definition fails closed — see [`Self::tools_for`].
+    /// carries a `disallowed_tools` denylist: the host materializes the allowed
+    /// names before passing the scope to the harness. Without it such a
+    /// definition fails closed — see [`Self::tools_for`].
     pub fn with_registered_tools(mut self, tools: Arc<Vec<String>>) -> Self {
         self.registered_tools = Some(tools);
         self
@@ -290,9 +286,12 @@ impl OpenHumanDefinitionRegistry {
             // The definition's validated tier is the host assertion the model
             // resolver consumes for workload routing.
             role: Some(def.agent_tier.to_string()),
-            model: model_for(&def.model)
-                .map(tinyagents_definition::ModelSpec::Exact)
-                .unwrap_or_default(),
+            agent_tier: match def.agent_tier {
+                AgentTier::Chat => tinyagents_definition::AgentTier::Chat,
+                AgentTier::Reasoning => tinyagents_definition::AgentTier::Reasoning,
+                AgentTier::Worker => tinyagents_definition::AgentTier::Worker,
+            },
+            model: model_for(&def.model),
             subagents: declared_subagent_ids(def)
                 .into_iter()
                 .map(tinyagents_definition::SubagentEntry::AgentId)
@@ -389,8 +388,12 @@ impl OpenHumanDefinitionRegistry {
         }
     }
 
-    /// Retain the existing host lookup list convention, substituting the
-    /// no-tools sentinel for a genuinely empty named scope.
+    /// Renders a resolved scope into the crate's `Vec<String>`, substituting the
+    /// sentinel for a genuinely empty named scope.
+    ///
+    /// This is the single place the crate's "empty means unrestricted"
+    /// convention is applied, so no caller can accidentally emit a bare empty
+    /// vec that reads as "all tools".
     fn emit(scope: ResolvedScope) -> Vec<String> {
         match scope {
             ResolvedScope::Wildcard => Vec::new(),
@@ -463,17 +466,13 @@ fn declared_subagent_ids(def: &HostAgentDefinition) -> Vec<String> {
         .collect()
 }
 
-/// Maps a host [`ModelSpec`] onto the crate's `Option<String>` model pin.
-///
-/// [`ModelSpec::Inherit`] becomes `None`, which is precisely the crate's "no
-/// preference, the session default applies". `Hint` is resolved through
-/// [`ModelSpec::resolve`] (whose `parent_model` argument is unused for the hint
-/// arm) so the `hint:{hint}` alias spelling has one implementation.
-fn model_for(spec: &ModelSpec) -> Option<String> {
+/// Preserves inherited routing, concrete model pins and routing hints in the
+/// provider-neutral definition vocabulary.
+fn model_for(spec: &ModelSpec) -> tinyagents_definition::ModelSpec {
     match spec {
-        ModelSpec::Inherit => None,
-        ModelSpec::Exact(name) => Some(name.clone()),
-        ModelSpec::Hint(_) => Some(spec.resolve("")),
+        ModelSpec::Inherit => tinyagents_definition::ModelSpec::Inherit,
+        ModelSpec::Exact(name) => tinyagents_definition::ModelSpec::Exact(name.clone()),
+        ModelSpec::Hint(hint) => tinyagents_definition::ModelSpec::Hint(hint.clone()),
     }
 }
 
