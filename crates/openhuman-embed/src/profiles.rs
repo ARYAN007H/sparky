@@ -67,7 +67,7 @@ pub use handle::{ChatReply, ProfileEvents, ProfileHandle, RelayAccepted};
 pub use openhuman_core::channels::providers::relay::RelayInboundParams as RelayMessage;
 /// Validated operator-owned direct inference settings.
 pub use openhuman_core::core::runtime::direct_profile_provider::DirectProfileProvider;
-pub use openhuman_core::core::runtime::saas::SaasSandboxConfig;
+pub use openhuman_core::core::runtime::saas::{SaasCronConfig, SaasSandboxConfig};
 pub use openhuman_core::core::runtime::SaasConfig;
 pub use openhuman_core::profiles::{OpenError, ProfileId, ProfileIdMode, ProfileSummary};
 pub use openhuman_core::storage::lease::LeaseRecord;
