@@ -80,8 +80,8 @@ impl ProfileCapabilities {
             )
             && !name.starts_with("delegate_")
             && !name.starts_with("mcp_")
-            && !crate::tools::toolpacks::pack_for_tool(name)
-                .is_some_and(|pack| pack.id == "workflows")
+            && crate::tools::toolpacks::pack_for_tool(name)
+                .is_none_or(|pack| pack.id != "workflows")
             && self.names.as_ref().is_none_or(|names| names.contains(name))
     }
 
