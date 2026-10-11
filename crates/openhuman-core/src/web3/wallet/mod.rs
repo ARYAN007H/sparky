@@ -46,9 +46,9 @@ mod ops;
 pub(crate) mod rpc;
 
 #[cfg(feature = "web3")]
-mod schemas;
-#[cfg(feature = "web3")]
 pub(crate) mod registration;
+#[cfg(feature = "web3")]
+mod schemas;
 /// The host side of the wallet primitives' `Transport` seam — endpoint resolution,
 /// failover and redaction stay here, where the config lives.
 #[cfg(feature = "web3")]

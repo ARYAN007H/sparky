@@ -2,8 +2,8 @@
 
 use tinytools::Tool;
 use tinywallet_web3::tools::wallet::{
-    WalletChainStatusTool, WalletLookupTxTool, WalletPrepareTransferTool,
-    WalletStatusTool, WalletTxReceiptTool, WalletTxStatusTool,
+    WalletChainStatusTool, WalletLookupTxTool, WalletPrepareTransferTool, WalletStatusTool,
+    WalletTxReceiptTool, WalletTxStatusTool,
 };
 
 /// Build the wallet tool family in its persisted catalogue order.
