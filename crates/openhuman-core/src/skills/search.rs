@@ -102,7 +102,7 @@ fn project(workflow: &Workflow) -> Value {
         // author-controlled text about to be read by a model as if the host had
         // said it. `sanitize_for_llm` strips control characters and instruction
         // fences and caps the length.
-        "description": crate::util::sanitize::sanitize_for_llm(
+        "description": tinytools_std::sanitize::sanitize_for_llm(
             &workflow.description,
             MAX_DESCRIPTION,
         ),
