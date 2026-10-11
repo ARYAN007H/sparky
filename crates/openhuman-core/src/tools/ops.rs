@@ -386,30 +386,34 @@ pub fn all_tools_with_runtime(
         // task_source_add/update/remove) are registered too but ship
         // default-OFF via `tools::user_filter` (their toggle IDs default off
         // in onboarding). The per-call permission ladder still gates them.
-        Box::new(ArtifactListTool::new(config.clone())),
-        Box::new(ArtifactGetTool::new(config.clone())),
-        Box::new(ArtifactDeleteTool::new(config.clone())),
-        Box::new(TaskSourceListTool::new(config.clone())),
-        Box::new(TaskSourceGetTool::new(config.clone())),
-        Box::new(TaskSourceFetchTool::new(config.clone())),
-        Box::new(TaskSourceListTasksTool::new(config.clone())),
-        Box::new(TaskSourcePreviewFilterTool::new(config.clone())),
-        Box::new(TaskSourceStatusTool::new(config.clone())),
-        Box::new(TaskSourceAddTool::new(config.clone())),
-        Box::new(TaskSourceUpdateTool::new(config.clone())),
-        Box::new(TaskSourceRemoveTool::new(config.clone())),
+    ]);
+    tools.extend(crate::agent::artifacts::tools::registered_tools(
+        config.clone(),
+    ));
+    tools.extend(vec![]);
+    tools.extend(crate::integrations::task_sources::tools::registered_tools(
+        config.clone(),
+    ));
+    tools.extend(vec![
         // System & self-management: observability (default-ON) + service
         // lifecycle. doctor/health/cost/dashboard/security reads are default-ON.
         // service_status / daemon_host_prefs_get default-ON; the lifecycle
         // mutators ship default-OFF via `tools::user_filter` (service_lifecycle).
-        Box::new(DoctorHealthTool::new(config.clone())),
-        Box::new(DoctorModelsTool::new(config.clone())),
-        Box::new(HealthSnapshotTool),
-        Box::new(HealthSystemInfoTool),
-        Box::new(CostDashboardTool::new(config.clone())),
-        Box::new(CostDailyHistoryTool::new(config.clone())),
-        Box::new(CostSummaryTool::new(config.clone())),
-        Box::new(DashboardModelHealthTool::new(config.clone())),
+    ]);
+    tools.extend(crate::platform::doctor::tools::registered_tools(
+        config.clone(),
+    ));
+    tools.extend(vec![]);
+    tools.extend(crate::platform::health::tools::registered_tools());
+    tools.extend(vec![]);
+    tools.extend(crate::platform::cost::tools::registered_tools(
+        config.clone(),
+    ));
+    tools.extend(vec![]);
+    tools.extend(crate::desktop::dashboard::tools::registered_tools(
+        config.clone(),
+    ));
+    tools.extend(vec![
         #[cfg(feature = "modules")]
         Box::new(DesktopTool::new(config.clone(), DesktopToolKind::Apps)),
         #[cfg(feature = "modules")]
@@ -428,25 +432,17 @@ pub fn all_tools_with_runtime(
             DesktopToolKind::ContinueGoal,
         )),
         Box::new(SecurityPolicyInfoTool::new(config.clone())),
-        Box::new(ServiceStatusTool::new(config.clone())),
-        Box::new(DaemonHostPrefsGetTool::new(config.clone())),
-        Box::new(ServiceStartTool::new(config.clone())),
-        Box::new(ServiceStopTool::new(config.clone())),
-        Box::new(ServiceRestartTool),
-        Box::new(ServiceShutdownTool),
-        Box::new(ServiceInstallTool::new(config.clone())),
-        Box::new(ServiceUninstallTool::new(config.clone())),
-        Box::new(DaemonHostPrefsSetTool::new(config.clone())),
+    ]);
+    tools.extend(crate::platform::service::tools::registered_tools(
+        config.clone(),
+    ));
+    tools.extend(vec![
         // Config: read-only surface (default-ON). The config_update_* mutators
         // are deferred (their apply fns take non-Deserialize patch structs);
         // see config/tools.rs.
-        Box::new(ConfigSnapshotTool::new(config.clone())),
-        Box::new(ConfigClientConfigTool),
-        Box::new(ConfigAutonomyTool),
-        Box::new(ConfigSearchTool),
-        Box::new(ConfigRuntimeFlagsTool),
-        Box::new(ConfigResolveApiUrlTool),
-        Box::new(ConfigDataPathsTool),
+    ]);
+    tools.extend(crate::config::tools::registered_tools(config.clone()));
+    tools.extend(vec![
         // Account & money. The billing / team / referral agent-tool families were
         // removed: money movement and team administration are dashboard
         // surfaces, not things an agent should reach for mid-turn, and their
@@ -482,11 +478,11 @@ pub fn all_tools_with_runtime(
         Box::new(McpRegistryToolCallTool::new(config.clone())),
         #[cfg(feature = "mcp")]
         Box::new(McpRegistryUninstallTool::new(config.clone())),
-        Box::new(WorkspaceReadPersonaTool::new(config.clone())),
-        Box::new(WorkspaceUpdatePersonaTool::new(config.clone())),
-        Box::new(WorkspaceResetPersonaTool::new(config.clone())),
-        Box::new(WorkspaceInitTool),
     ]);
+    tools.extend(crate::config::workspace::tools::registered_tools(
+        config.clone(),
+    ));
+    tools.extend(vec![]);
 
     // The single `memory` tool (recall | fetch | learn | forget), registered
     // only while memory is on: with no usable engine (signed out, no CortexDB

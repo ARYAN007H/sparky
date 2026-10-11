@@ -16,14 +16,10 @@ pub(crate) mod user_filter;
 #[path = "impl/mod.rs"]
 pub(crate) mod implementations;
 
-pub use crate::agent::artifacts::tools::*;
 pub use crate::agent::orchestration::tools::*;
 pub use crate::agent::tools::*;
-pub use crate::config::tools::*;
-pub use crate::config::workspace::tools::*;
 #[cfg(feature = "modules")]
 pub use crate::desktop::control::tools::*;
-pub use crate::desktop::dashboard::tools::*;
 #[cfg(feature = "flows")]
 pub use crate::flows::builder_tools::*;
 #[cfg(feature = "flows")]
@@ -33,15 +29,10 @@ pub use crate::flows::memory_tools::*;
 #[cfg(feature = "flows")]
 pub use crate::flows::tools::*;
 pub use crate::integrations::composio::tools::*;
-pub use crate::integrations::task_sources::tools::*;
 pub use crate::integrations::tools::*;
 #[cfg(feature = "mcp")]
 pub use crate::mcp::registry::tools::*;
 pub use crate::memory::tools::{MemoryTool, MEMORY_TOOL_NAME};
-pub use crate::platform::cost::tools::*;
-pub use crate::platform::doctor::tools::*;
-pub use crate::platform::health::tools::*;
-pub use crate::platform::service::tools::*;
 #[cfg(feature = "modules")]
 pub use crate::search::TinySearchTool;
 pub use crate::security::credentials::tools::*;
