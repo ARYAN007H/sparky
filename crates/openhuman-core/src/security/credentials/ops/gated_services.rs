@@ -206,7 +206,7 @@ pub async fn stop_credential_gated_services(config: &Config) {
 
     // 5. Dictation listener — abort the hotkey forwarder task so it doesn't
     //    accumulate duplicate rdev listeners across logout → login cycles.
-    crate::voice::dictation_listener::stop();
+    crate::voice::dictation_listener::stop().await;
 
     // 6. Always-on listening — disable the runtime gate so the mic capture loop
     //    stops transcribing/delivering after logout (no audio processed while
