@@ -6,6 +6,7 @@ mod credentials;
 mod delivery_store;
 mod module_providers;
 mod prompt;
+#[cfg(test)]
 mod relay;
 mod start_channels;
 mod turn_parts;

@@ -1,10 +1,8 @@
-//! OpenHuman-side implementations of the portable `tinychannels::host`
-//! capability traits.
+//! OpenHuman callback implementations used by the TinyChannels module.
 //!
-//! Each adapter wraps existing OpenHuman internals (voice factory, inference
-//! ops, approval gate, conversation store, shutdown registry, web event bus)
-//! and exposes them through the portable, `Config`-free trait surface a ported
-//! channel provider consumes. See [`super::build_channel_host`].
+//! Production callbacks translate typed module requests into OpenHuman-owned
+//! voice, persistence, allowlist, and event operations. The legacy portable
+//! provider-trait adapters below exist only for unit-test compatibility.
 
 use std::sync::Arc;
 
@@ -392,7 +390,6 @@ async fn publish_event(
     Ok(())
 }
 
-#[cfg(test)]
 #[cfg(test)]
 #[async_trait]
 impl EventSink for OpenHumanEventSink {

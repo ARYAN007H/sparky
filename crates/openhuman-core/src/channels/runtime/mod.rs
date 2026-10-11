@@ -3,6 +3,7 @@
 mod dispatch;
 pub(crate) mod session;
 mod startup;
+#[cfg(test)]
 mod supervision;
 
 pub(crate) use startup::hydrate_channel_credentials;
