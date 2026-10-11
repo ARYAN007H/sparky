@@ -154,12 +154,6 @@ impl OpenHumanSessionHost {
         host: Option<&super::HostTools>,
         session_id: Option<&str>,
     ) -> Result<Self> {
-        let profile_config = config.profile_providers.as_ref().map(|binding| {
-            let mut direct = config.clone();
-            binding.apply_chat(&mut direct);
-            direct
-        });
-        let config = profile_config.as_ref().unwrap_or(config);
         let workspace_descriptor = derive_turn_workspace_descriptor();
 
         let runtime: Arc<dyn host_runtime::RuntimeAdapter> = Arc::from(
@@ -300,14 +294,6 @@ impl OpenHumanSessionHost {
                 pinned_model
             );
             model_name = pinned_model.to_string();
-        }
-
-        if let Some(model) = config
-            .profile_providers
-            .as_ref()
-            .and_then(|binding| binding.chat_model())
-        {
-            model_name = model.to_owned();
         }
 
         // Resolve the user-configured vision flag for the (now-final) model while
