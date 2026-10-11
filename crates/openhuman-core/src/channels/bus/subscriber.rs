@@ -146,6 +146,17 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
             tokio::select! {
                 biased;
                 _ = session.cancelled() => return,
+                _ = batch_timer.tick(), if !pending.is_empty() => {
+                    if let Err(error) = flush_events(&reply, &mut pending).await {
+                        tracing::error!("[channel-inbound] delivery failed: {error}");
+                        return;
+                    }
+                }
+                _ = tokio::time::sleep_until(deadline) => {
+                    tracing::error!("[channel-inbound] agent timed out after {}s", timeout.as_secs());
+                    let _ = reply.finalize("Sorry, the request timed out.").await;
+                    return;
+                }
                 event = event_rx.recv() => {
                     match event {
                         Ok(ev) if ev.request_id == request_id => {
@@ -252,17 +263,7 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
                         }
                     }
                 }
-                _ = batch_timer.tick(), if !pending.is_empty() => {
-                    if let Err(error) = flush_events(&reply, &mut pending).await {
-                        tracing::error!("[channel-inbound] delivery failed: {error}");
-                        return;
-                    }
-                }
-                _ = tokio::time::sleep_until(deadline) => {
-                    tracing::error!("[channel-inbound] agent timed out after {}s", timeout.as_secs());
-                    let _ = reply.finalize("Sorry, the request timed out.").await;
-                    return;
-                }
+
             }
         }
     }
