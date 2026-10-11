@@ -1610,47 +1610,31 @@ async fn json_rpc_tool_registry_lists_and_gets_entries() {
 }
 
 #[tokio::test]
-async fn json_rpc_harness_init_status_returns_snapshot_envelope() {
+async fn json_rpc_removed_harness_provisioning_is_unavailable() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
     let rpc_base = format!("http://{rpc_addr}");
 
-    // status is read-only — no provisioning is triggered, so it is safe in CI
-    // (we deliberately do NOT call `openhuman.harness_init_run`, which would
-    // attempt real Python/Node/spaCy downloads).
-    let resp = post_json_rpc(
-        &rpc_base,
-        44_711,
-        "openhuman.harness_init_status",
-        json!({}),
-    )
-    .await;
-    let result = assert_no_jsonrpc_error(&resp, "harness_init_status");
-
-    let snapshot = result
-        .get("snapshot")
-        .expect("harness_init_status should return a snapshot object");
-    let overall = snapshot
-        .get("overall")
-        .and_then(Value::as_str)
-        .expect("snapshot.overall should be a string");
-    assert!(
-        ["idle", "running", "done", "failed"].contains(&overall),
-        "overall should be a known lifecycle state, got {overall}"
-    );
-    let steps = snapshot
-        .get("steps")
-        .and_then(Value::as_array)
-        .expect("snapshot.steps should be an array");
-    let ids: Vec<&str> = steps
-        .iter()
-        .filter_map(|s| s.get("id").and_then(Value::as_str))
-        .collect();
-    assert!(
-        ids.contains(&"python_runtime") && ids.contains(&"node_runtime"),
-        "snapshot should list the registered steps, got {ids:?}"
-    );
-
+    // Runtime provisioning was removed; these legacy calls must not start
+    // Python/Node downloads or expose a stale provisioning snapshot.
+    for (id, method, params) in [
+        (44_711, "openhuman.harness_init_status", json!({})),
+        (44_712, "openhuman.harness_init_run", json!({})),
+        (44_713, "openhuman.harness_init_run", json!({ "force": true })),
+    ] {
+        let response = post_json_rpc(&rpc_base, id, method, params).await;
+        assert_eq!(
+            response.pointer("/error/code").and_then(Value::as_i64),
+            Some(-32000),
+            "removed RPC {method} must be unavailable: {response}"
+        );
+        let expected = format!("unknown method: {method}");
+        assert_eq!(
+            response.pointer("/error/message").and_then(Value::as_str),
+            Some(expected.as_str())
+        );
+        assert!(response.get("result").is_none(), "{response}");
+    }
     rpc_join.abort();
 }
 
