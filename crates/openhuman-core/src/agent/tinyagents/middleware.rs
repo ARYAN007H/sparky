@@ -35,6 +35,7 @@ mod fetched_site;
 mod loop_guards;
 mod memory_pack;
 mod packed_tool_route;
+mod repeat_loop_stop;
 mod repeated_failure;
 mod research_budget;
 mod shell_turn_budget;

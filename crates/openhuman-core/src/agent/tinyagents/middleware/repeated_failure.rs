@@ -18,6 +18,7 @@ use tinytools::ToolResult as TaToolResult;
 
 use super::call_effect::{call_effect, dispatch_target, CallEffect, ToolFactsLookup};
 use super::fetched_site::{fetch_host_scope, heuristic_text};
+use super::repeat_loop_stop::{is_correctable_class, repeat_loop_halt_summary, RepeatLoopWitness};
 use super::loop_guards::{
     is_repeat_call_exempt, RECOVERABLE_NO_PROGRESS_FAILURE_THRESHOLD,
     RECOVERABLE_REPEAT_FAILURE_THRESHOLD,
@@ -106,6 +107,13 @@ pub(crate) struct RepeatedToolFailureMiddleware {
     /// The stop note this breaker latched into the shared slot, kept so a
     /// later writer in the same batch cannot replace it (see [`Self::halt`]).
     own_halt: std::sync::Mutex<Option<String>>,
+    /// Repeat-guard refusals and repeated failing calls, to tell a repeat
+    /// loop from a real blocker when the classified ledger stops the run.
+    repeat_loop: RepeatLoopWitness,
+    /// `(tool, error line)` of a latched classified stop on an identical
+    /// re-issue that no refusal has explained yet. A guard refusal later in
+    /// the same batch relabels the stop as a repeat loop.
+    repeat_candidate: std::sync::Mutex<Option<(String, String)>>,
 }
 
 impl RepeatedToolFailureMiddleware {
@@ -132,6 +140,35 @@ impl RepeatedToolFailureMiddleware {
             call_effects: std::sync::Mutex::new(std::collections::HashMap::new()),
             tool_facts: None,
             own_halt: std::sync::Mutex::default(),
+            repeat_loop: RepeatLoopWitness::default(),
+            repeat_candidate: std::sync::Mutex::default(),
+        }
+    }
+
+    /// Relabel this breaker's latched stop as a repeat loop, if it is still
+    /// the run's stop note. Called when a refusal by the repeat guard arrives
+    /// after a classified stop on an identical re-issue in the same batch.
+    fn relabel_as_repeat_loop(&self, refusals: usize) {
+        let Some((tool, error_line)) = self
+            .repeat_candidate
+            .lock()
+            .ok()
+            .and_then(|mut candidate| candidate.take())
+        else {
+            return;
+        };
+        let summary = repeat_loop_halt_summary(&tool, refusals, &error_line);
+        let (Ok(mut slot), Ok(mut own)) = (self.halt_summary.lock(), self.own_halt.lock()) else {
+            return;
+        };
+        if own.is_some() && *slot == *own {
+            tracing::debug!(
+                tool = %tool,
+                refusals,
+                "[tinyagents::mw] classified stop came from a repeat loop; relabelling its stop note"
+            );
+            *slot = Some(summary.clone());
+            *own = Some(summary);
         }
     }
 
@@ -449,6 +486,8 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
                 marker,
                 "[tinyagents::mw] skipping repeat-guard result in failure ladder"
             );
+            let refusals = self.repeat_loop.record_refusal();
+            self.relabel_as_repeat_loop(refusals);
             return Ok(());
         }
         let step = self.step.fetch_add(1, Ordering::SeqCst) + 1;
@@ -469,8 +508,11 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
             false => String::new(),
         };
         let heuristic_failure_text = heuristic_text(tool_name, &failure_text);
+        let failed = result.is_error || body_level_failure;
+        let repeated_failure = failed && self.repeat_loop.record_failure(tool_name, &arg_fp);
 
-        if !result.is_error && !body_level_failure {
+        if !failed {
+            self.repeat_loop.record_success();
             // Only a successful observation against this operation and scope
             // demonstrates that its blocker changed. Unrelated successes do not.
             for class in [
@@ -508,6 +550,23 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
                     );
                     if class == "uncertain_side_effect" {
                         summary.push_str(" The action may already have happened; reconcile its external state before any retry.");
+                    }
+                    // An identical re-issue of a call that already failed,
+                    // made while the repeat guard refuses the calls around it,
+                    // is a repeat loop, not a new blocker.
+                    if repeated_failure && is_correctable_class(class) {
+                        let error_line = first_error_line(&failure_text);
+                        match self.repeat_loop.refusals() {
+                            0 => {
+                                if let Ok(mut candidate) = self.repeat_candidate.lock() {
+                                    *candidate = Some((tool_name.to_owned(), error_line));
+                                }
+                            }
+                            refusals => {
+                                summary =
+                                    repeat_loop_halt_summary(tool_name, refusals, &error_line);
+                            }
+                        }
                     }
                     self.halt(summary);
                     self.tracker.reset();
