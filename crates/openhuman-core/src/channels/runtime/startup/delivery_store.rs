@@ -4,8 +4,8 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex as StdMutex, OnceLock};
 use tinychannels_bus::module_delivery::{
-    DELIVERY_PENDING_CAPACITY, DELIVERY_RECORD_BYTES, DELIVERY_RESULT_CAPACITY,
-    DELIVERY_RESULT_TTL_SECONDS, DeliveryQueueEntry, DeliveryTerminalResult,
+    DeliveryQueueEntry, DeliveryTerminalResult, DELIVERY_PENDING_CAPACITY, DELIVERY_RECORD_BYTES,
+    DELIVERY_RESULT_CAPACITY, DELIVERY_RESULT_TTL_SECONDS,
 };
 use tokio::sync::Mutex;
 

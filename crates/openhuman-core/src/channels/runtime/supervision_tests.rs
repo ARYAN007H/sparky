@@ -1,5 +1,5 @@
-use super::super::super::{Channel, traits};
-use super::{MAX_JITTER_MS, jitter_millis, spawn_supervised_listener};
+use super::super::super::{traits, Channel};
+use super::{jitter_millis, spawn_supervised_listener, MAX_JITTER_MS};
 use std::sync::{Arc, Mutex};
 use tokio::time::Instant;
 

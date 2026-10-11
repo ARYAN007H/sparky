@@ -1,17 +1,21 @@
 //! Per-sender routing and runtime command handling.
 
-use super::context::{
-    clear_sender_history, ChannelRouteSelection, ChannelRuntimeContext,
-};
+use super::context::{clear_sender_history, ChannelRouteSelection, ChannelRuntimeContext};
 use super::traits;
 use super::{Channel, ChannelSendExt, SendMessage};
 use crate::inference::provider;
 use std::sync::Arc;
 #[cfg(test)]
 use tinychannels::remote::{parse_remote_command, RemoteCommand};
-use tinychannels_bus::module_control::{ChannelControlRequest, ChannelControlResult, ProviderDescriptor};
 #[cfg(test)]
-use tinychannels::routes::{parse_runtime_command as parse_portable_runtime_command, resolve_provider_alias as resolve_portable_provider_alias, ChannelRuntimeCommand as PortableCommand};
+use tinychannels::routes::{
+    parse_runtime_command as parse_portable_runtime_command,
+    resolve_provider_alias as resolve_portable_provider_alias,
+    ChannelRuntimeCommand as PortableCommand,
+};
+use tinychannels_bus::module_control::{
+    ChannelControlRequest, ChannelControlResult, ProviderDescriptor,
+};
 
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -115,13 +119,18 @@ struct RouteCallbacks {
 
 #[tinybus::interface(name = "ai.tinyhumans.tinychannels.ChannelsHost")]
 impl RouteCallbacks {
-    async fn dispatch_controller_backend(&self, request: tinychannels_bus::ChannelBackendRequest) -> tinybus::Result<tinychannels_bus::ChannelBackendResult> {
+    async fn dispatch_controller_backend(
+        &self,
+        request: tinychannels_bus::ChannelBackendRequest,
+    ) -> tinybus::Result<tinychannels_bus::ChannelBackendResult> {
         if self.cancellation.is_cancelled() {
             return Err(tinybus::Error::failed("channel session ended"));
         }
         match request {
             tinychannels_bus::ChannelBackendRequest::RemoteControl(request) => {
-                super::host::remote_control::dispatch_callback(&self.context, request).await.map(tinychannels_bus::ChannelBackendResult::RemoteControl)
+                super::host::remote_control::dispatch_callback(&self.context, request)
+                    .await
+                    .map(tinychannels_bus::ChannelBackendResult::RemoteControl)
             }
             _ => Err(tinybus::Error::failed("channel callback unavailable")),
         }
@@ -140,45 +149,91 @@ pub(crate) async fn handle_runtime_command_if_needed(
         return false;
     }
     let current = get_route_selection(ctx, sender_key);
-    let history_len = ctx.conversation_histories.lock().unwrap_or_else(|e| e.into_inner()).get(sender_key).map(Vec::len).unwrap_or(0);
+    let history_len = ctx
+        .conversation_histories
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get(sender_key)
+        .map(Vec::len)
+        .unwrap_or(0);
     let client = super::context::module_client(ctx).await;
     let operation = async {
-        let lease = crate::modules::channel_runtime::ChannelRuntimeLease::open(client, RouteCallbacks {
-            context: ctx.clone(),
-            cancellation: super::runtime::session::channel_session(),
-        }).await?;
-        let response: Result<ChannelControlResult, _> = lease.object().call_confidential(tinychannels_bus::methods::PREPARE_CHANNEL_CONTROL, (ChannelControlRequest::Route {
-            workspace_dir: ctx.workspace_dir.to_string_lossy().into_owned(),
-            message: Box::new(msg.clone()),
-            route: tinychannels_bus::module_remote::RemoteRoute { provider: current.provider, model: current.model },
-            history_len,
-            providers: provider_descriptors(),
-        },)).await;
+        let lease = crate::modules::channel_runtime::ChannelRuntimeLease::open(
+            client,
+            RouteCallbacks {
+                context: ctx.clone(),
+                cancellation: super::runtime::session::channel_session(),
+            },
+        )
+        .await?;
+        let response: Result<ChannelControlResult, _> = lease
+            .object()
+            .call_confidential(
+                tinychannels_bus::methods::PREPARE_CHANNEL_CONTROL,
+                (ChannelControlRequest::Route {
+                    workspace_dir: ctx.workspace_dir.to_string_lossy().into_owned(),
+                    message: Box::new(msg.clone()),
+                    route: tinychannels_bus::module_remote::RemoteRoute {
+                        provider: current.provider,
+                        model: current.model,
+                    },
+                    history_len,
+                    providers: provider_descriptors(),
+                },),
+            )
+            .await;
         let close = lease.close().await;
         let response = response?;
         close?;
         Ok::<_, crate::modules::client::ModuleCallError>(response)
-    }.await;
+    }
+    .await;
     let (reply, next_route, clear_history) = match operation {
-        Ok(ChannelControlResult::Route { reply, next_route, clear_history }) => (reply, next_route, clear_history),
+        Ok(ChannelControlResult::Route {
+            reply,
+            next_route,
+            clear_history,
+        }) => (reply, next_route, clear_history),
         Ok(_) => {
             crate::modules::client::ModuleClient::report_malformed_reply("tinychannels");
             return true;
         }
         Err(_) => {
             if let Some(channel) = target_channel {
-                let _ = channel.send_with_outbound_intent(&SendMessage::new("Channel module unavailable.", &msg.reply_target).in_thread(msg.thread_ts.clone())).await;
+                let _ = channel
+                    .send_with_outbound_intent(
+                        &SendMessage::new("Channel module unavailable.", &msg.reply_target)
+                            .in_thread(msg.thread_ts.clone()),
+                    )
+                    .await;
             }
             return true;
         }
     };
     if let Some(route) = next_route {
-        set_route_selection(ctx, sender_key, ChannelRouteSelection { provider: route.provider, model: route.model });
+        set_route_selection(
+            ctx,
+            sender_key,
+            ChannelRouteSelection {
+                provider: route.provider,
+                model: route.model,
+            },
+        );
     }
-    if clear_history { clear_sender_history(ctx, sender_key); }
-    let Some(reply) = reply else { return false; };
+    if clear_history {
+        clear_sender_history(ctx, sender_key);
+    }
+    let Some(reply) = reply else {
+        return false;
+    };
     if let Some(channel) = target_channel {
-        if channel.send_with_outbound_intent(&SendMessage::new(reply, &msg.reply_target).in_thread(msg.thread_ts.clone())).await.is_err() {
+        if channel
+            .send_with_outbound_intent(
+                &SendMessage::new(reply, &msg.reply_target).in_thread(msg.thread_ts.clone()),
+            )
+            .await
+            .is_err()
+        {
             tracing::warn!("channel command response failed");
         }
     }
