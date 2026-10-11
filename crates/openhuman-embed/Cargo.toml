@@ -138,6 +138,10 @@ required-features = ["channels"]
 
 # Due agent jobs of hosted profiles run once, as their own profile.
 [[test]]
+name = "profile_direct_providers"
+required-features = ["profiles"]
+
+[[test]]
 name = "profile_cron_sweep"
 required-features = ["profiles"]
 
