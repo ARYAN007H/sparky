@@ -138,9 +138,9 @@ async fn scenario() {
                     "delegate",
                     "curl",
                     "install_workflow_from_url",
-            "http_request",
-            "run_workflow",
-            "delegate_to",
+                    "http_request",
+                    "run_workflow",
+                    "delegate_to",
                 ]
                 .into_iter()
                 .map(|name| {
