@@ -114,7 +114,23 @@ impl Respond for CallTools {
                 .iter()
                 .any(|name| name == "tenant_probe")
         {
-            chat_completion(&format!("done: {}", common::last_user_message(&body)))
+            let message = common::last_user_message(&body);
+            let user = if message.contains("alice") {
+                "alice"
+            } else {
+                "bob"
+            };
+            let channel = if message.contains("[Channel context]") {
+                "relay"
+            } else {
+                "chat"
+            };
+            let reopened = if message.contains("after reopening") {
+                "reopened-"
+            } else {
+                ""
+            };
+            chat_completion(&format!("done: {reopened}{channel}:{user}"))
         } else {
             let mut completion = tool_call_completion("tenant_probe", "{}");
             let names = ["tenant_probe"];
@@ -562,10 +578,10 @@ async fn scenario() {
                     .contains(&format!("{}-native-learning", handle.id()))
                     && response
                         .to_string()
-                        .contains(&format!("done: remember {}-native-learning", handle.id()))
+                        .contains(&format!("done: chat:{}", handle.id()))
                     && response
                         .to_string()
-                        .contains(&format!("done: {}: call tenant_probe", handle.id()))
+                        .contains(&format!("done: relay:{}", handle.id()))
                 {
                     break response;
                 }
@@ -582,9 +598,19 @@ async fn scenario() {
             "{response}"
         );
         assert!(
-            text.contains(&format!("done: remember {}-native-learning", handle.id())),
+            text.contains(&format!("done: chat:{}", handle.id())),
             "the deferred chat commit reaches the profile engine: {response}"
         );
+        if handle.id().as_str() == "alice" {
+            assert!(
+                text.contains("done: reopened-chat:alice"),
+                "reopened chat commit: {response}"
+            );
+            assert!(
+                text.contains("done: reopened-relay:alice"),
+                "reopened relay commit: {response}"
+            );
+        }
         assert!(
             text.contains(&format!("{}-native-learning", handle.id())),
             "native memory mutation was persisted: {response}"
