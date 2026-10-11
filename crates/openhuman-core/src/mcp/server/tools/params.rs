@@ -20,11 +20,9 @@ pub async fn build_rpc_params(
     let name = tool_name;
     match tool_name {
         "core.list_tools" | "core.tool_instructions" | "agent.list_subagents" => {
-            reject_unexpected_arguments(&args, &[])?;
             Ok(Map::new())
         }
         "agent.run_subagent" => {
-            reject_unexpected_arguments(&args, SUBAGENT_RUN_ARGUMENTS)?;
             let agent_id = validated_string(&args, "agent_id")?;
             let prompt = validated_string(&args, "prompt")?;
             Ok(Map::from_iter([
@@ -33,7 +31,6 @@ pub async fn build_rpc_params(
             ]))
         }
         "memory.recall" => {
-            reject_unexpected_arguments(&args, MEMORY_RECALL_ARGUMENTS)?;
             let mut params = Map::new();
             params.insert(
                 "question".to_string(),
@@ -43,7 +40,6 @@ pub async fn build_rpc_params(
             Ok(params)
         }
         "memory.fetch" => {
-            reject_unexpected_arguments(&args, MEMORY_FETCH_ARGUMENTS)?;
             let mut params = Map::new();
             params.insert(
                 "query".to_string(),
@@ -58,14 +54,12 @@ pub async fn build_rpc_params(
             Ok(params)
         }
         "memory.list" => {
-            reject_unexpected_arguments(&args, MEMORY_LIST_ARGUMENTS)?;
             let mut params = Map::new();
             insert_filter_and_limit(&args, &mut params)?;
             insert_cursor(&args, &mut params)?;
             Ok(params)
         }
         "memory.learn" => {
-            reject_unexpected_arguments(&args, MEMORY_LEARN_ARGUMENTS)?;
             let mut params = Map::new();
             params.insert(
                 "text".to_string(),
@@ -91,7 +85,6 @@ pub async fn build_rpc_params(
             Ok(params)
         }
         "memory.forget" => {
-            reject_unexpected_arguments(&args, MEMORY_FORGET_ARGUMENTS)?;
             let ids = validated_string_array(&args, "ids")?;
             if ids.len() > MEMORY_FORGET_MAX_IDS {
                 return Err(ToolCallError::InvalidParams(format!(
@@ -107,7 +100,6 @@ pub async fn build_rpc_params(
             } else {
                 SEARXNG_SEARCH_ARGUMENTS
             };
-            reject_unexpected_arguments(&args, allowed)?;
             let query = validated_string(&args, "query")?;
             let mut params = Map::new();
             params.insert("query".to_string(), Value::String(query));
@@ -122,7 +114,6 @@ pub async fn build_rpc_params(
             Ok(params)
         }
         "web_answer" => {
-            reject_unexpected_arguments(&args, WEB_ANSWER_ARGUMENTS)?;
             let query = validated_string(&args, "query")?;
             let mut params = Map::new();
             params.insert("query".to_string(), Value::String(query));

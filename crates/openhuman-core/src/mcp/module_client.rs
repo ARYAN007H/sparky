@@ -172,7 +172,7 @@ impl McpModulePort for TinyMcpPort {
             .await
     }
 
-    pub(crate) async fn validate_server_arguments(
+    async fn validate_server_arguments(
         &self,
         request: ValidateServerArgumentsRequest,
     ) -> Result<ServerArgumentsValidation, ModuleCallError> {
@@ -391,7 +391,7 @@ impl McpConfiguredClient {
         .await
     }
 
-    async fn validate_server_arguments(
+    pub(crate) async fn validate_server_arguments(
         &self,
         request: ValidateServerArgumentsRequest,
     ) -> Result<ServerArgumentsValidation, ModuleCallError> {

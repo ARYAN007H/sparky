@@ -44,7 +44,7 @@ pub async fn call_tool(
         .ok_or_else(|| ToolCallError::InvalidParams(format!("unknown MCP tool `{name}`")))?;
 
     let audit_arguments = arguments.clone();
-    let params = match build_rpc_params(spec.name, arguments) {
+    let params = match build_rpc_params(spec.name, arguments).await {
         Ok(params) => params,
         Err(err) => {
             if write_dispatch::is_write_tool(spec.name) {
@@ -317,10 +317,9 @@ async fn list_subagents() -> Result<Value, ToolCallError> {
 
 async fn run_subagent_tool(params: &Map<String, Value>) -> Result<Value, ToolCallError> {
     use super::super::subagent_depth;
-    use tinymcp::server::args::required_non_empty_string;
 
-    let agent_id = required_non_empty_string(params, "agent_id")?;
-    let prompt = required_non_empty_string(params, "prompt")?;
+    let agent_id = validated_param(params, "agent_id")?;
+    let prompt = validated_param(params, "prompt")?;
     // Bound nested recursion per delegation chain (CC → run_subagent → CC → …).
     // `current_depth()` is the depth of THIS chain (carried across the loopback
     // MCP hop via the depth header); the subagent we're about to spawn sits one
@@ -387,6 +386,13 @@ async fn run_subagent_tool(params: &Map<String, Value>) -> Result<Value, ToolCal
             "response": response,
         }
     }))
+}
+
+fn validated_param<'a>(params: &'a Map<String, Value>, key: &str) -> Result<&'a str, ToolCallError> {
+    params
+        .get(key)
+        .and_then(Value::as_str)
+        .ok_or_else(|| ToolCallError::Internal("MCP module returned invalid arguments".into()))
 }
 
 pub fn tool_success(value: Value) -> Value {
