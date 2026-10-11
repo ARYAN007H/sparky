@@ -146,6 +146,7 @@ async fn scenario() {
         .can_use_tool(|_| Box::pin(async { ToolHookDecision::Proceed }))
         .channel_permissions([("web_channel", PermissionLevel::Execute)])
         .cron_delivery(recorder.clone())
+        .session_store(Arc::new(openhuman_embed::InMemorySessionStores::new()))
         .build()
         .await
         .unwrap();
