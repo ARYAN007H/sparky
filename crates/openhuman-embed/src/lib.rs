@@ -72,6 +72,7 @@ pub use openhuman_core::backend::{
 };
 pub use openhuman_core::config::ComposioHostCredential;
 pub use openhuman_core::config::Config as RuntimeConfig;
+pub use openhuman_core::config::{SearchHostCredential, UnknownKeyedSearchProvider};
 pub use openhuman_core::security::TrustedAccess;
 pub use openhuman_core::tools::toolpacks::{GroupMode, ToolGroups};
 // The seam `AgentSpec::tools` needs: the belt types, and `Tool` itself from the
@@ -213,9 +214,13 @@ pub mod seams {
 /// The session store port: what a host implements to keep every agent's
 /// conversations in its own database ([`RuntimeBuilder::session_store`]),
 /// with the in-memory provider and the conformance suites a host's provider
-/// is held to.
+/// is held to. The persisted record types are the harness's own serde codecs,
+/// so hosts can encode and decode stored state without duplicating wire shapes.
 pub mod session_store {
-    pub use openhuman_core::agent::session_store::{AgentStores, SessionStoreProvider};
+    pub use openhuman_core::agent::session_store::{
+        AgentEvent, AgentObservation, AgentStores, ExecutionStatus, HarnessRunStatus,
+        JournalMessage, SessionDescriptor, SessionStoreProvider, TodoList,
+    };
     pub use tinyagents_session::port::{
         AppendStore, InMemorySessionStores, InMemoryTranscriptLocator, InMemoryTurnStates, Store,
         TurnStates,
