@@ -485,7 +485,8 @@ async fn an_enabled_custom_config_agent_resolves_and_lists() {
         .expect("resolve")
         .expect("an enabled custom agent is in the catalogue");
     assert_eq!(def.display_name(), "Finance Analyst");
-    assert_eq!(def.model.pin().as_deref(), Some("hint:reasoning"));
+    assert_eq!(def.model.hint().as_deref(), Some("reasoning"));
+    assert_eq!(def.model.pin(), None);
     assert_eq!(def.tools.named_tools(), vec!["memory_recall".to_string()]);
 
     let listed = registry.list().await.expect("list");
