@@ -236,7 +236,7 @@ fn a_missing_shell_command_gets_one_correction() {
     );
     // Other tools keep the zero-retry `unsupported` verdict.
     assert_eq!(
-        recovery_policy("browser_open", "executable not found", false),
+        recovery_policy("desktop_launch_app", "executable not found", false),
         Some(("unsupported", 0))
     );
 }

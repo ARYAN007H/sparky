@@ -61,7 +61,7 @@ pub(crate) async fn execute(
         let working_dir = working_dir.to_path_buf();
         let extra_env = extra_env.clone();
         // The worker owns cancellation and resource cleanup if the caller drops its wait.
-        return tokio::spawn(async move {
+        tokio::spawn(async move {
             execute_owned(
                 &config,
                 &policy,
@@ -74,7 +74,7 @@ pub(crate) async fn execute(
             .await
         })
         .await
-        .map_err(|_| anyhow::anyhow!("TinyBox native jail worker did not finish"))?;
+        .map_err(|_| anyhow::anyhow!("TinyBox native jail worker did not finish"))?
     }
     #[cfg(not(feature = "modules"))]
     {
@@ -105,11 +105,11 @@ pub(crate) async fn execute_passthrough(
         let config = config.clone();
         let command = command.to_owned();
         let working_dir = working_dir.to_path_buf();
-        return tokio::spawn(async move {
+        tokio::spawn(async move {
             execute_passthrough_owned(&config, &command, &working_dir, timeout).await
         })
         .await
-        .map_err(|_| anyhow::anyhow!("TinyBox passthrough worker did not finish"))?;
+        .map_err(|_| anyhow::anyhow!("TinyBox passthrough worker did not finish"))?
     }
     #[cfg(not(feature = "modules"))]
     {

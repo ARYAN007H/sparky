@@ -54,7 +54,7 @@ pub fn sandbox_off_value(value: Option<&str>) -> bool {
 /// Whether a command tool must use the sandbox execution path. An explicit
 /// backend in the active config is an operator requirement even when the
 /// agent definition uses the usual `SandboxMode::None` default.
-pub async fn command_requires_sandbox() -> Result<bool, String> {
+pub async fn command_requires_sandbox(sandbox_mode: Option<SandboxMode>) -> Result<bool, String> {
     if crate::core::runtime::is_saas() {
         // Every SaaS command must enter the per-user container path, including
         // language tools whose agent definition does not request a sandbox.
@@ -63,10 +63,7 @@ pub async fn command_requires_sandbox() -> Result<bool, String> {
     if sandbox_disabled_by_host() {
         return Ok(false);
     }
-    if matches!(
-        crate::agent::harness::current_sandbox_mode(),
-        Some(SandboxMode::Sandboxed)
-    ) {
+    if matches!(sandbox_mode, Some(SandboxMode::Sandboxed)) {
         return Ok(true);
     }
     let config = crate::config::ops::load_config_with_timeout().await?;
@@ -227,7 +224,7 @@ pub async fn create_sandbox_backend(policy: &SandboxPolicy) -> SandboxBackendHan
     if policy.backend != SandboxBackendKind::Docker {
         return create_sandbox_backend_with_config(policy, &crate::config::Config::default())
             .await
-            .unwrap_or_else(|_| SandboxBackendHandle {
+            .unwrap_or(SandboxBackendHandle {
                 kind: policy.backend,
                 status: SandboxStatus::Error,
                 backend_id: None,
