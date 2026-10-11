@@ -51,6 +51,7 @@ const START_JAILED_EXEC: &str = contract::METHODS[26];
 const RUN_DOCKER: &str = contract::METHODS[27];
 const DOCKER_STATUS: &str = contract::METHODS[28];
 const CLEANUP_DOCKER: &str = contract::METHODS[29];
+const RUN_DOCKER_WITHOUT_WORKSPACE: &str = contract::METHODS[30];
 const DOCKER_CALL_GRACE: Duration = Duration::from_secs(5);
 
 #[cfg(test)]
@@ -178,6 +179,19 @@ pub async fn run_docker(
     call_run_docker_with_client(&client, request).await
 }
 
+/// Run one bounded Docker-isolated command without mounting a workspace.
+///
+/// This is used by the configured Docker runtime, whose existing behavior
+/// intentionally does not expose host workspace files to the container.
+pub async fn run_docker_without_workspace(
+    config: &Config,
+    request: contract::DockerRunRequest,
+) -> Result<contract::DockerRunOutput, String> {
+    let timeout = Duration::from_millis(request.timeout_ms).saturating_add(DOCKER_CALL_GRACE);
+    let client = ModuleClient::new(config.clone()).with_timeout(timeout);
+    call_run_docker_without_workspace_with_client(&client, request).await
+}
+
 /// Probe the Docker daemon owned by the TinyBox module host.
 pub async fn docker_status(
     config: &Config,
@@ -242,6 +256,13 @@ async fn call_run_docker_with_client(
     request: contract::DockerRunRequest,
 ) -> Result<contract::DockerRunOutput, String> {
     call_with_client(client, RUN_DOCKER, (request,), true).await
+}
+
+async fn call_run_docker_without_workspace_with_client(
+    client: &ModuleClient,
+    request: contract::DockerRunRequest,
+) -> Result<contract::DockerRunOutput, String> {
+    call_with_client(client, RUN_DOCKER_WITHOUT_WORKSPACE, (request,), true).await
 }
 
 /// Read a bounded output batch from a live or completed process.

@@ -72,6 +72,15 @@ impl Interface for MockTinyBox {
             .map_err(tinybus::Error::from),
             DOCKER_STATUS => serde_json::to_value(contract::DockerStatus { available: true })
                 .map_err(tinybus::Error::from),
+            RUN_DOCKER | RUN_DOCKER_WITHOUT_WORKSPACE => {
+                serde_json::to_value(contract::DockerRunOutput {
+                    exit_code: 0,
+                    stdout: "ok".to_owned(),
+                    stderr: String::new(),
+                    timed_out: false,
+                })
+                .map_err(tinybus::Error::from)
+            }
             CLEANUP_DOCKER => serde_json::to_value(contract::CleanupDockerOutput {
                 containers_stopped: 3,
             })
@@ -211,6 +220,7 @@ async fn docker_command_refusal_is_not_retried_as_an_ordinary_call() {
             workspace: "/workspace".to_owned(),
             image: None,
             command: "printf secret".to_owned(),
+            login_shell: false,
             network: None,
             memory_limit_mb: None,
             cpus: None,
@@ -364,8 +374,93 @@ fn every_host_operation_is_a_member_of_the_canonical_contract() {
         RUN_DOCKER,
         DOCKER_STATUS,
         CLEANUP_DOCKER,
+        RUN_DOCKER_WITHOUT_WORKSPACE,
     ];
     assert_eq!(methods, contract::METHODS);
+}
+
+#[tokio::test]
+async fn no_workspace_docker_call_uses_its_typed_member_and_request() {
+    let (_service, client, calls) = mock_client().await;
+    let request = contract::DockerRunRequest {
+        workspace: String::new(),
+        image: Some("local-fixture:latest".to_owned()),
+        command: "printf ok".to_owned(),
+        login_shell: true,
+        network: Some("none".to_owned()),
+        memory_limit_mb: Some(128),
+        cpus: Some(1.5),
+        read_only_rootfs: Some(true),
+        read_only_mounts: Vec::new(),
+        extra_cap_drops: vec!["NET_RAW".to_owned()],
+        env: Default::default(),
+        label: Some("openhuman.runtime=true".to_owned()),
+        timeout_ms: 12_000,
+    };
+    let output: contract::DockerRunOutput = call_with_client(
+        &client,
+        RUN_DOCKER_WITHOUT_WORKSPACE,
+        (request,),
+        false,
+    )
+    .await
+    .expect("the adapter decodes the typed no-workspace result");
+
+    assert_eq!(output.exit_code, 0);
+    let calls = calls.lock().expect("recorded TinyBox calls");
+    let call = calls
+        .iter()
+        .find(|(member, _)| member == RUN_DOCKER_WITHOUT_WORKSPACE)
+        .expect("no-workspace member called");
+    assert_eq!(
+        call.1,
+        json!({
+            "workspace": "",
+            "image": "local-fixture:latest",
+            "command": "printf ok",
+            "login_shell": true,
+            "network": "none",
+            "memory_limit_mb": 128,
+            "cpus": 1.5,
+            "read_only_rootfs": true,
+            "read_only_mounts": [],
+            "extra_cap_drops": ["NET_RAW"],
+            "env": {},
+            "label": "openhuman.runtime=true",
+            "timeout_ms": 12_000
+        })
+    );
+}
+
+#[tokio::test]
+async fn no_workspace_docker_refusal_is_not_retried_as_an_ordinary_call() {
+    let (_service, client, calls) = mock_client().await;
+    let error = call_run_docker_without_workspace_with_client(
+        &client,
+        contract::DockerRunRequest {
+            workspace: String::new(),
+            image: None,
+            command: "printf private".to_owned(),
+            login_shell: true,
+            network: None,
+            memory_limit_mb: None,
+            cpus: None,
+            read_only_rootfs: None,
+            read_only_mounts: Vec::new(),
+            extra_cap_drops: Vec::new(),
+            env: Default::default(),
+            label: None,
+            timeout_ms: 1_000,
+        },
+    )
+    .await
+    .expect_err("an unattested fixture cannot receive a shell command");
+
+    assert!(error.contains("MODULE_CALL_REPORTED"), "{error}");
+    assert!(!error.contains("printf private"));
+    let calls = calls.lock().expect("call log lock");
+    assert_eq!(calls.len(), 1, "only the public capabilities probe ran");
+    assert_eq!(calls[0].0, CAPABILITIES);
 }
 
 #[tokio::test]
