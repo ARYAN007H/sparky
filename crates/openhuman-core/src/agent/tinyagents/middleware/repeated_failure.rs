@@ -411,6 +411,9 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         _state: &(),
         _run: &mut tinyagents_harness::middleware::AgentRun,
     ) -> TaResult<()> {
+        if let Ok(mut candidate) = self.repeat_candidate.lock() {
+            *candidate = None;
+        }
         let own = self.own_halt.lock().ok().and_then(|mut own| own.take());
         if let (Some(own), Ok(mut slot)) = (own, self.halt_summary.lock()) {
             if slot.as_deref().is_some_and(|current| current != own) {
