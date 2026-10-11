@@ -1,13 +1,15 @@
 use super::*;
 use crate::agent::error::AgentError;
 use crate::config::Config;
-use {tinyflows_schedule::types::JobType};
-use {tinyflows_schedule::types::SessionTarget};
-use {crate::cron::self, tinyflows_schedule::types::ActiveHours, tinyflows_schedule::types::DeliveryConfig};
 use crate::security::SecurityPolicy;
 use chrono::{Duration as ChronoDuration, Timelike, Utc};
 use std::sync::Arc;
 use tempfile::TempDir;
+use tinyflows_schedule::types::JobType;
+use tinyflows_schedule::types::SessionTarget;
+use {
+    crate::cron, tinyflows_schedule::types::ActiveHours, tinyflows_schedule::types::DeliveryConfig,
+};
 
 async fn test_config(tmp: &TempDir) -> Config {
     let ws = tmp.path().join("workspace");

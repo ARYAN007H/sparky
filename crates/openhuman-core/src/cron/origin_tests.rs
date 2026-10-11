@@ -1,7 +1,7 @@
 use super::*;
 use crate::agent::turn_origin::{with_origin, TrustedAutomationSource};
-use {tinyflows_schedule::types::Schedule};
 use serde_json::json;
+use tinyflows_schedule::types::Schedule;
 
 fn channel_turn(history_key: Option<&str>) -> AgentTurnOrigin {
     AgentTurnOrigin::ExternalChannel {

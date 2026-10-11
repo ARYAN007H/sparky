@@ -69,6 +69,7 @@ tinymcp-bus = { path = "../../vendor/tinymcp/crates/tinymcp-bus" }
 # the core's so one copy resolves.
 tinyagents-session = { path = "../../vendor/tinyagents/crates/tinyagents-session" }
 # Native cancellation contract, exposed unchanged by the existing stream API.
+tinybus = { path = "../../vendor/tinybus/crates/tinybus", default-features = false }
 tinyagents-harness = { path = "../../vendor/tinyagents/crates/tinyagents-harness", default-features = false }
 # The wire request/response types `complete` converts to; same path as the
 # core's so one copy resolves.

@@ -5,7 +5,7 @@ use crate::config::rpc as config_rpc;
 use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::Outcome;
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
-use {tinyflows_schedule::types::CronJobPatch};
+use tinyflows_schedule::types::CronJobPatch;
 
 fn job_id_input(comment: &'static str) -> FieldSchema {
     FieldSchema {
@@ -316,13 +316,14 @@ fn handle_add(params: Map<String, Value>) -> ControllerFuture {
             .get("agent_id")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
-        let delivery: Option<tinyflows_schedule::types::DeliveryConfig> = match params.get("delivery") {
-            None | Some(Value::Null) => None,
-            Some(v) => Some(
-                serde_json::from_value(v.clone())
-                    .map_err(|e| format!("invalid 'delivery': {e}"))?,
-            ),
-        };
+        let delivery: Option<tinyflows_schedule::types::DeliveryConfig> =
+            match params.get("delivery") {
+                None | Some(Value::Null) => None,
+                Some(v) => Some(
+                    serde_json::from_value(v.clone())
+                        .map_err(|e| format!("invalid 'delivery': {e}"))?,
+                ),
+            };
         let delete_after_run = params
             .get("delete_after_run")
             .and_then(|v| v.as_bool())

@@ -18,8 +18,12 @@
 //! scheduler can't double-deliver.
 
 use crate::config::Config;
-use {crate::cron::add_agent_job_with_definition, crate::cron::dedup_named_jobs, crate::cron::list_jobs, crate::cron::remove_job, tinyflows_schedule::types::DeliveryConfig, tinyflows_schedule::types::Schedule, tinyflows_schedule::types::SessionTarget};
 use anyhow::Result;
+use {
+    crate::cron::add_agent_job_with_definition, crate::cron::dedup_named_jobs,
+    crate::cron::list_jobs, crate::cron::remove_job, tinyflows_schedule::types::DeliveryConfig,
+    tinyflows_schedule::types::Schedule, tinyflows_schedule::types::SessionTarget,
+};
 
 /// Well-known job names used to detect whether seeding has already run.
 const MORNING_BRIEFING_JOB_NAME: &str = "morning_briefing";

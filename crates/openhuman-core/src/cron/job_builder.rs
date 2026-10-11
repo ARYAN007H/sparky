@@ -8,7 +8,12 @@
 //! delivery the caller states explicitly always wins.
 
 use crate::config::Config;
-use {crate::cron::self, tinyflows_schedule::types::delivery_mode, tinyflows_sqlite::schedule::AgentJobSpec, tinyflows_schedule::types::CronJob, tinyflows_schedule::types::DeliveryConfig, tinyflows_schedule::types::JobOrigin, tinyflows_schedule::types::Schedule, tinyflows_schedule::types::SessionTarget};
+use {
+    crate::cron, tinyflows_schedule::types::delivery_mode, tinyflows_schedule::types::CronJob,
+    tinyflows_schedule::types::DeliveryConfig, tinyflows_schedule::types::JobOrigin,
+    tinyflows_schedule::types::Schedule, tinyflows_schedule::types::SessionTarget,
+    tinyflows_sqlite::schedule::AgentJobSpec,
+};
 
 /// What an agent job creation request carries; everything defaults.
 pub struct AgentJobInput {

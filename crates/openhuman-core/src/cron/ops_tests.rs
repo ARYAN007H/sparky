@@ -1,6 +1,6 @@
 use super::*;
-use {tinyflows_schedule::types::ActiveHours};
 use tempfile::TempDir;
+use tinyflows_schedule::types::ActiveHours;
 
 fn test_config(tmp: &TempDir) -> Config {
     let config = Config {

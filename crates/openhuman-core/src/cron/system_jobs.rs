@@ -20,7 +20,11 @@ use crate::config::Config;
 use crate::memory::bus::{RETIRED_CONTEXT_REFRESH_JOB, SOURCES_SYNC_JOB};
 use crate::memory::lifecycle::jobs::{BACKGROUND_INTERVAL_MINS, BACKGROUND_JOB};
 
-use {super::add_flow_schedule_job, super::list_jobs, super::remove_job, super::update_job, tinyflows_schedule::types::CronJob, tinyflows_schedule::types::CronJobPatch, tinyflows_schedule::types::JobType, tinyflows_schedule::types::Schedule};
+use {
+    super::add_flow_schedule_job, super::list_jobs, super::remove_job, super::update_job,
+    tinyflows_schedule::types::CronJob, tinyflows_schedule::types::CronJobPatch,
+    tinyflows_schedule::types::JobType, tinyflows_schedule::types::Schedule,
+};
 
 /// Command prefix that marks a `flow` row as a system job.
 pub const SYSTEM_COMMAND_PREFIX: &str = "system:";

@@ -12,9 +12,8 @@ use std::io::Write as _;
 use std::os::unix::fs::OpenOptionsExt as _;
 
 /// `PairingGuard`, `constant_time_eq`, and the pairing lockout constants now
-/// live in tinychannels (portable, self-contained); re-export them so existing
-/// callers (channels, `core::auth`, tests) keep their paths.
-pub use tinychannels_runtime::security::{
+/// live in tinychannels; consumers import their owning crate directly.
+use tinychannels_runtime::security::{
     constant_time_eq, generate_code, generate_token, hash_token, is_token_hash, PairingGuard,
     MAX_PAIR_ATTEMPTS, PAIR_LOCKOUT_SECS,
 };

@@ -2,9 +2,9 @@
 //! forbidden-path argument scan and a hard timeout.
 
 use crate::config::Config;
-use {tinyflows_schedule::types::CronJob};
 use crate::security::SecurityPolicy;
 use std::process::Stdio;
+use tinyflows_schedule::types::CronJob;
 use tokio::time::{self, Duration};
 
 pub(super) const SHELL_JOB_TIMEOUT_SECS: u64 = 120;

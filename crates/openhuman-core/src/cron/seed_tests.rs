@@ -1,7 +1,10 @@
 use super::*;
-use {crate::cron::add_agent_job_with_definition, crate::cron::list_jobs, tinyflows_schedule::types::Schedule, tinyflows_schedule::types::SessionTarget};
 use chrono::{Duration as ChronoDuration, Utc};
 use tempfile::TempDir;
+use {
+    crate::cron::add_agent_job_with_definition, crate::cron::list_jobs,
+    tinyflows_schedule::types::Schedule, tinyflows_schedule::types::SessionTarget,
+};
 
 fn test_config(tmp: &TempDir) -> Config {
     let config = Config {

@@ -38,8 +38,6 @@ pub use egress::{
 };
 pub use ops as rpc;
 pub use ops::*;
-#[allow(unused_imports)]
-pub use {pairing::ensure_core_rpc_token_for_bind, pairing::is_public_bind, pairing::CoreBindTokenError, tinychannels_runtime::security::PairingGuard, pairing::CORE_TOKEN_ENV_VAR};
 pub use policy::validate_path_within_root;
 #[allow(unused_imports)]
 pub use policy::AutonomyLevel;
@@ -51,6 +49,11 @@ pub use policy::{CommandClass, GateDecision};
 #[allow(unused_imports)]
 pub use policy::{TrustedAccess, TrustedRoot};
 pub use policy::{POLICY_BLOCKED_MARKER, POLICY_DENIED_MARKER};
+#[allow(unused_imports)]
+pub use {
+    pairing::ensure_core_rpc_token_for_bind, pairing::is_public_bind, pairing::CoreBindTokenError,
+    pairing::CORE_TOKEN_ENV_VAR, tinychannels_runtime::security::PairingGuard,
+};
 
 pub use schemas::{
     all_controller_schemas as all_security_controller_schemas,

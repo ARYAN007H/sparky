@@ -1,6 +1,6 @@
 use super::*;
-use {tinyflows_schedule::types::Schedule};
 use tempfile::TempDir;
+use tinyflows_schedule::types::Schedule;
 
 fn config(tmp: &TempDir) -> Config {
     let workspace = tmp.path().join("workspace");

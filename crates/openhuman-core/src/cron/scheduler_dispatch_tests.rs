@@ -6,10 +6,10 @@ use super::*;
 use crate::cron::policy::{set_policy, JobPolicy};
 use crate::cron::system_job_handlers::{register, SystemJobContext};
 use crate::cron::system_jobs::ensure_system_job;
-use {tinyflows_schedule::types::Schedule};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use tempfile::TempDir;
+use tinyflows_schedule::types::Schedule;
 
 fn security(config: &Config) -> Arc<SecurityPolicy> {
     Arc::new(SecurityPolicy::from_config(

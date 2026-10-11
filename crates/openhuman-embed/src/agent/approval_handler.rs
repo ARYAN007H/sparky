@@ -1,8 +1,8 @@
 //! Callback-based approvals, using the same agent-scoped gate as polling.
 use crate::{ApprovalDecision, Approvals, CancellationToken, PendingApproval};
-use {tinybus::EventHandler, tinybus::SubscriptionHandle, openhuman_core::core::bus::BUS};
 use openhuman_core::core::events::DomainEvent;
 use std::sync::Arc;
+use {openhuman_core::core::bus::BUS, tinybus::EventHandler, tinybus::SubscriptionHandle};
 
 /// Decide an agent's sanitized pending permission request asynchronously.
 #[async_trait::async_trait]
