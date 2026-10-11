@@ -29,7 +29,11 @@ fn shell_request_uses_the_platform_shell_and_caller_known_process_resource() -> 
 
     let expected = platform_shell::build_std_command("printf 'one two'");
     let expected_argv = std::iter::once(expected.get_program().to_str().unwrap().to_owned())
-        .chain(expected.get_args().map(|arg| arg.to_str().unwrap().to_owned()))
+        .chain(
+            expected
+                .get_args()
+                .map(|arg| arg.to_str().unwrap().to_owned()),
+        )
         .collect::<Vec<_>>();
     assert_eq!(request.resource, resource);
     assert_eq!(request.argv, expected_argv);
@@ -58,7 +62,10 @@ fn native_jail_request_preserves_grants_and_requires_enforcement() -> anyhow::Re
     let request = jail_request(&policy, vec!["/scratch".to_owned()])?;
 
     assert_eq!(request.read_only, [readonly.path().to_str().unwrap()]);
-    assert_eq!(request.read_write, [readwrite.path().to_str().unwrap(), "/scratch"]);
+    assert_eq!(
+        request.read_write,
+        [readwrite.path().to_str().unwrap(), "/scratch"]
+    );
     assert!(!request.allow_net);
     assert!(request.allow_subprocess);
     assert_eq!(request.enforcement, contract::JailEnforcement::Enforced);
@@ -81,16 +88,20 @@ fn native_jail_environment_keeps_the_sandbox_allowlist_and_scratch_grant() -> an
         env_passthrough: Vec::new(),
         docker_overrides: None,
     };
-    let extra = HashMap::from([(
-        OsString::from("CUSTOM_SAFE"),
-        OsString::from("value"),
-    )]);
+    let extra = HashMap::from([(OsString::from("CUSTOM_SAFE"), OsString::from("value"))]);
     let (env, read_write) = execution_environment(&policy, &extra, scratch.path())?;
 
     assert_eq!(env.get("CUSTOM_SAFE").map(String::as_str), Some("value"));
-    assert_eq!(env.get("TMPDIR").map(String::as_str), scratch.path().to_str());
-    assert!(read_write.iter().any(|path| path == scratch.path().to_str().unwrap()));
-    assert!(!env.keys().any(|name| name.contains("TOKEN") || name.contains("SECRET")));
+    assert_eq!(
+        env.get("TMPDIR").map(String::as_str),
+        scratch.path().to_str()
+    );
+    assert!(read_write
+        .iter()
+        .any(|path| path == scratch.path().to_str().unwrap()));
+    assert!(!env
+        .keys()
+        .any(|name| name.contains("TOKEN") || name.contains("SECRET")));
     Ok(())
 }
 
@@ -114,9 +125,9 @@ impl Drop for BundledModulesRestore {
 async fn released_tinybox_runs_a_native_jail_through_the_pinned_loader() -> anyhow::Result<()> {
     let _environment_lock = crate::config::TEST_ENV_LOCK.lock().await;
     const KEY: &str = "OPENHUMAN_BUNDLED_MODULES";
-    let artifact_root = std::env::var_os(KEY)
-        .map(PathBuf::from)
-        .ok_or_else(|| anyhow::anyhow!("set OPENHUMAN_BUNDLED_MODULES to the downloaded v0.1.20 release assets"))?;
+    let artifact_root = std::env::var_os(KEY).map(PathBuf::from).ok_or_else(|| {
+        anyhow::anyhow!("set OPENHUMAN_BUNDLED_MODULES to the downloaded v0.1.20 release assets")
+    })?;
     let _environment_restore = BundledModulesRestore(std::env::var_os(KEY));
     let record = crate::modules::registry::find("tinybox")
         .ok_or_else(|| anyhow::anyhow!("TinyBox registry record is missing"))?;
@@ -125,7 +136,10 @@ async fn released_tinybox_runs_a_native_jail_through_the_pinned_loader() -> anyh
         .find_map(|host_key| record.asset_for(host_key))
         .ok_or_else(|| anyhow::anyhow!("the pinned TinyBox release does not support this host"))?;
     let archive = artifact_root.join(asset.archive);
-    anyhow::ensure!(archive.is_file(), "missing verified release archive: {archive:?}");
+    anyhow::ensure!(
+        archive.is_file(),
+        "missing verified release archive: {archive:?}"
+    );
 
     let bundled = tempfile::tempdir()?;
     let bundle_asset_dir = bundled

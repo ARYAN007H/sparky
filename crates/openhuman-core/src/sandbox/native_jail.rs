@@ -85,7 +85,15 @@ pub(crate) async fn execute(
     }
     #[cfg(not(feature = "modules"))]
     {
-        let _ = (config, policy, command, working_dir, extra_env, timeout, explicitly_requested);
+        let _ = (
+            config,
+            policy,
+            command,
+            working_dir,
+            extra_env,
+            timeout,
+            explicitly_requested,
+        );
         anyhow::bail!("TinyBox module support is disabled; native jail execution is unavailable")
     }
 }
@@ -138,12 +146,9 @@ async fn execute_owned(
         let (env, read_write) = execution_environment(policy, extra_env, &scratch.path)?;
         let exec = shell_request(&resource, command, working_dir, env)?;
         let jail = jail_request(policy, read_write)?;
-        let process = tinybox::reserve(
-            config,
-            contract::ReserveRequest::Process(resource.clone()),
-        )
-        .await
-        .map_err(|_| anyhow::anyhow!("TinyBox could not reserve a native jail process"))?;
+        let process = tinybox::reserve(config, contract::ReserveRequest::Process(resource.clone()))
+            .await
+            .map_err(|_| anyhow::anyhow!("TinyBox could not reserve a native jail process"))?;
         let process = tinybox::start_jailed_exec(
             config,
             contract::SpawnRequest {
@@ -280,7 +285,9 @@ async fn collect_process(
         if tokio::time::Instant::now() >= deadline {
             tinybox::cancel(config, process.clone())
                 .await
-                .map_err(|_| anyhow::anyhow!("TinyBox could not acknowledge process cancellation"))?;
+                .map_err(|_| {
+                    anyhow::anyhow!("TinyBox could not acknowledge process cancellation")
+                })?;
             break true;
         }
         let batch = tinybox::read_output(config, process.clone(), cursor)
@@ -299,9 +306,9 @@ async fn collect_process(
         match batch.state {
             ExecutionState::Running => tokio::time::sleep(Duration::from_millis(20)).await,
             ExecutionState::Exited { exit_code } => {
-                tinybox::release_output(config, process).await.map_err(|_| {
-                    anyhow::anyhow!("TinyBox could not release native jail output")
-                })?;
+                tinybox::release_output(config, process)
+                    .await
+                    .map_err(|_| anyhow::anyhow!("TinyBox could not release native jail output"))?;
                 return Ok(SandboxExecResult {
                     exit_code,
                     stdout: String::from_utf8_lossy(&stdout).into_owned(),
@@ -313,7 +320,9 @@ async fn collect_process(
             ExecutionState::Failed {
                 code: ExecutionFailure::CleanupFailed,
             } => anyhow::bail!("TinyBox retained native process cleanup for retry"),
-            ExecutionState::Failed { .. } => anyhow::bail!("TinyBox native jailed execution failed"),
+            ExecutionState::Failed { .. } => {
+                anyhow::bail!("TinyBox native jailed execution failed")
+            }
         }
     };
     tinybox::release_output(config, process)

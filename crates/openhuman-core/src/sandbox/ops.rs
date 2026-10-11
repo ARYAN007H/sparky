@@ -2,10 +2,10 @@
 //! routed execution.
 
 use super::docker;
-use super::grants::{JailGrants, resolve_local_jail_grants};
+use super::grants::{resolve_local_jail_grants, JailGrants};
 use super::types::{
-    ELEVATED_TOOLS, ElevatedOp, SandboxBackendHandle, SandboxBackendKind, SandboxExecRequest,
-    SandboxExecResult, SandboxPolicy, SandboxStatus,
+    ElevatedOp, SandboxBackendHandle, SandboxBackendKind, SandboxExecRequest, SandboxExecResult,
+    SandboxPolicy, SandboxStatus, ELEVATED_TOOLS,
 };
 use crate::agent::harness::definition::SandboxMode;
 use crate::agent::platform_shell;
@@ -337,7 +337,9 @@ pub async fn execute_in_sandbox(
                 Some(config) => config,
                 None => crate::config::ops::load_config_with_timeout()
                     .await
-                    .map_err(|error| anyhow::anyhow!("Cannot read module configuration: {error}"))?,
+                    .map_err(|error| {
+                        anyhow::anyhow!("Cannot read module configuration: {error}")
+                    })?,
             };
             super::native_jail::execute(
                 &config,
@@ -482,7 +484,10 @@ impl CallDir {
     pub(super) fn create(root: PathBuf, kind: &'static str) -> anyhow::Result<Self> {
         let path = root.join(uuid::Uuid::new_v4().to_string());
         std::fs::create_dir_all(&path).map_err(|error| {
-            anyhow::anyhow!("Failed to create sandbox {kind} dir {}: {error}", path.display())
+            anyhow::anyhow!(
+                "Failed to create sandbox {kind} dir {}: {error}",
+                path.display()
+            )
         })?;
         tracing::debug!(dir = %path.display(), kind, "[sandbox:local] created per-call dir");
         Ok(Self { path, kind })

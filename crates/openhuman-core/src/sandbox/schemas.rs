@@ -3,8 +3,8 @@
 use serde_json::{Map, Value};
 
 use crate::config::rpc as config_rpc;
-use crate::core::Outcome;
 use crate::core::all::{ControllerFuture, RegisteredController};
+use crate::core::Outcome;
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
 
 pub fn all_controller_schemas() -> Vec<ControllerSchema> {
@@ -206,8 +206,8 @@ fn handle_status(params: Map<String, Value>) -> ControllerFuture {
                 &config.runtime,
                 &config,
             )
-                .await
-                .map_err(|e| e.to_string())?;
+            .await
+            .map_err(|e| e.to_string())?;
         }
         let handle = super::ops::create_sandbox_backend_with_config(&policy, &config).await?;
         to_json(Outcome::new(handle, vec![]))
@@ -265,8 +265,8 @@ fn handle_resolve_policy(params: Map<String, Value>) -> ControllerFuture {
                 &config.runtime,
                 &config,
             )
-                .await
-                .map_err(|e| e.to_string())?;
+            .await
+            .map_err(|e| e.to_string())?;
         }
         to_json(Outcome::new(policy, vec![]))
     })
