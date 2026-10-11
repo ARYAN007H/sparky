@@ -158,8 +158,6 @@ impl TextExtractor for DocumentsTextExtractor {
 
 // ── Marker helpers over `TranscriptMessage` ────────────────────────────────────
 
-pub use tinyagents_harness::multimodal::markers::{parse_file_markers, parse_image_markers};
-
 /// The base64 payload Ollama's `images` array expects, or `None`.
 pub fn extract_ollama_image_payload(image_ref: &str) -> Option<String> {
     markers::extract_ollama_image_payload(image_ref)
