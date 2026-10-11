@@ -93,6 +93,10 @@ impl CronDelivery for Recorder {
 
 #[test]
 fn operator_named_cron_and_time_tools_run_on_a_direct_provider_within_the_iteration_cap() {
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("warn,openhuman_core=info")
+        .with_test_writer()
+        .try_init();
     runtime_without_master_key().block_on(async {
         tokio::spawn(scenario()).await.unwrap();
     });
