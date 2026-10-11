@@ -6,11 +6,11 @@ fn tinycomputer_registry_matches_bus_contract_and_published_release() {
     let desktop = find("tinycomputer").expect("compiled computer module");
     assert_eq!(desktop.bus_name, tinycomputer_bus::names::INTERFACE);
     assert_eq!(desktop.object_path, tinycomputer_bus::names::OBJECT_PATH);
-    assert_eq!(desktop.version, "0.10.1");
+    assert_eq!(desktop.version, "0.11.0");
     assert_eq!(desktop.assets.len(), 7);
     assert_eq!(
         desktop.asset_for("macos-26-arm64").unwrap().sha256,
-        "39d1ca3db737c26b4d39d9a22c16da7845735c6349dd012c59533499498af874"
+        "3a8e20a809262be2154c1b7339fed2a627c13c32b2a7b9de52e4d54ced94a994"
     );
 }
 
