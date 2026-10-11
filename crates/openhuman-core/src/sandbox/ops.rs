@@ -335,7 +335,14 @@ pub async fn execute_in_sandbox(
         }
         SandboxBackendKind::Local => {
             crate::config::ensure_usable_cwd(working_dir)?;
-            execute_local_jail(
+            let config = match module_config {
+                Some(config) => config,
+                None => crate::config::ops::load_config_with_timeout()
+                    .await
+                    .map_err(|error| anyhow::anyhow!("Cannot read module configuration: {error}"))?,
+            };
+            super::native_jail::execute(
+                &config,
                 policy,
                 command,
                 working_dir,
@@ -462,45 +469,25 @@ async fn execute_unsandboxed(
     }
 }
 
-/// Where the local jail captures command output:
-/// `<state_dir>/artifacts/sandbox-capture`. One directory per call lives under
-/// it and is removed once the output has been read.
-pub fn sandbox_capture_root(state_dir: &Path) -> PathBuf {
-    state_dir.join("artifacts").join("sandbox-capture")
-}
-
-/// Where the local jail's per-call writable scratch lives (`TMPDIR` points
-/// here): `<state_dir>/artifacts/sandbox-scratch`.
+/// Where module-owned native jailed executions create a per-call writable scratch area.
 pub fn sandbox_scratch_root(state_dir: &Path) -> PathBuf {
     state_dir.join("artifacts").join("sandbox-scratch")
 }
 
-/// A fresh per-call directory, `<root>/<uuid>`, removed with its contents on
-/// drop so every exit path (spawn failure, wait error, timeout) cleans up.
-struct CallDir {
-    path: PathBuf,
+/// A fresh per-call scratch directory, removed after the module acknowledges execution cleanup.
+pub(super) struct CallDir {
+    pub(super) path: PathBuf,
     kind: &'static str,
 }
 
 impl CallDir {
-    fn create(root: PathBuf, kind: &'static str) -> anyhow::Result<Self> {
+    pub(super) fn create(root: PathBuf, kind: &'static str) -> anyhow::Result<Self> {
         let path = root.join(uuid::Uuid::new_v4().to_string());
-        std::fs::create_dir_all(&path).map_err(|e| {
-            anyhow::anyhow!(
-                "Failed to create sandbox {kind} dir {}: {e}",
-                path.display()
-            )
+        std::fs::create_dir_all(&path).map_err(|error| {
+            anyhow::anyhow!("Failed to create sandbox {kind} dir {}: {error}", path.display())
         })?;
         tracing::debug!(dir = %path.display(), kind, "[sandbox:local] created per-call dir");
         Ok(Self { path, kind })
-    }
-
-    fn stdout(&self) -> PathBuf {
-        self.path.join("stdout")
-    }
-
-    fn stderr(&self) -> PathBuf {
-        self.path.join("stderr")
     }
 }
 
@@ -512,143 +499,13 @@ impl Drop for CallDir {
                 kind = self.kind,
                 "[sandbox:local] removed per-call dir"
             ),
-            Err(e) => tracing::warn!(
+            Err(error) => tracing::warn!(
                 dir = %self.path.display(),
                 kind = self.kind,
-                error = %e,
+                error = %error,
                 "[sandbox:local] failed to remove per-call dir"
             ),
         }
-    }
-}
-
-/// Execute via the OS-level `cwd_jail` backend (Landlock/Seatbelt/AppContainer).
-///
-/// Output capture: some OS backends (macOS Seatbelt) rebuild the command
-/// internally and don't forward piped stdio settings. We capture output
-/// by wrapping the command to redirect stdout/stderr into a fresh per-call
-/// directory under the core's state dir (never the user's project, #6961),
-/// grant the jail write access to that directory for this spawn only, and
-/// read the files back after exit.
-async fn execute_local_jail(
-    policy: &SandboxPolicy,
-    command: &str,
-    working_dir: &Path,
-    extra_env: &HashMap<OsString, OsString>,
-    timeout: Duration,
-    explicitly_requested: bool,
-) -> anyhow::Result<SandboxExecResult> {
-    let mut jail = Jail::new(&policy.workspace_root, "sandbox.agent");
-    if !policy.allow_network {
-        jail = jail.deny_net();
-    }
-    for ro in &policy.read_only_mounts {
-        jail = jail.add_read_only(ro);
-    }
-    for rw in &policy.read_write_mounts {
-        jail = jail.add_read_write(rw);
-    }
-
-    let capture = CallDir::create(sandbox_capture_root(&policy.state_dir), "capture")?;
-    jail = jail.add_read_write(&capture.path);
-    // `/tmp` is not granted, so `mktemp`, compilers and package managers get a
-    // private writable TMPDIR instead; it is removed when the call ends.
-    let scratch = CallDir::create(sandbox_scratch_root(&policy.state_dir), "scratch")?;
-    jail = jail.add_read_write(&scratch.path);
-    let stdout_file = capture.stdout();
-    let stderr_file = capture.stderr();
-    let caller_sets_tmpdir = extra_env.contains_key(std::ffi::OsStr::new("TMPDIR"));
-    let caller_sets_temp = extra_env.contains_key(std::ffi::OsStr::new("TEMP"));
-    let caller_sets_tmp = extra_env.contains_key(std::ffi::OsStr::new("TMP"));
-    // Platform-aware output-capture wrap: `{ … ; } > … 2> …` on sh/bash,
-    // trailing `> … 2> …` on cmd.exe (no brace grouping). Shell binary is
-    // picked by `platform_shell` so this path is Windows-safe (#4705).
-    let wrapped = platform_shell::wrap_with_output_redirection(command, &stdout_file, &stderr_file);
-    let mut cmd = platform_shell::build_std_command(&wrapped);
-    cmd.current_dir(working_dir);
-    cmd.env_clear();
-    for var in SANDBOX_ENV_PASSTHROUGH {
-        if let Ok(val) = std::env::var(var) {
-            if val.is_empty() {
-                anyhow::bail!("sandbox passthrough environment variable {var} is empty");
-            }
-            cmd.env(var, val);
-        }
-    }
-    platform_shell::forward_windows_bootstrap_env_std(&mut cmd)?;
-    for (k, v) in extra_env {
-        cmd.env(k, v);
-    }
-    // Keep every Windows spelling of the temporary directory inside this
-    // per-call grant. `TEMP`/`TMP` are the variables used by Windows tools;
-    // `TMPDIR` covers Unix-oriented tools running on the same host.
-    if !caller_sets_tmpdir {
-        cmd.env("TMPDIR", &scratch.path);
-    }
-    if !caller_sets_temp {
-        cmd.env("TEMP", &scratch.path);
-    }
-    if !caller_sets_tmp {
-        cmd.env("TMP", &scratch.path);
-    }
-
-    let os_backend = cwd_jail::default_backend();
-    if explicitly_requested && (os_backend.name() != "landlock" || !os_backend.is_available()) {
-        anyhow::bail!("Landlock sandbox was explicitly requested but is unavailable");
-    }
-    let spawn_result = if os_backend.is_available() {
-        cwd_jail::spawn_with(os_backend.as_ref(), &jail, cmd)
-    } else {
-        tracing::debug!("[sandbox:local] OS backend unavailable, using noop");
-        cwd_jail::spawn_with(&NoopBackend, &jail, cmd)
-    };
-
-    match spawn_result {
-        Ok(child) => {
-            let wait_result = tokio::task::spawn_blocking(move || {
-                let start = std::time::Instant::now();
-                let mut child = child;
-                loop {
-                    match child.try_wait() {
-                        Ok(Some(status)) => {
-                            return Ok((status.code().unwrap_or(-1), false));
-                        }
-                        Ok(None) => {
-                            if start.elapsed() > timeout {
-                                // The jailed command is a shell with a
-                                // pipeline behind it: signal its whole group,
-                                // then the child itself, and reap it so the
-                                // timeout report is true of every process.
-                                crate::tools::timeout::kill_process_group(child.id());
-                                let _ = child.kill();
-                                let _ = child.wait();
-                                return Ok((-1, true));
-                            }
-                            std::thread::sleep(Duration::from_millis(50));
-                        }
-                        Err(e) => return Err(e),
-                    }
-                }
-            })
-            .await??;
-
-            let stdout = std::fs::read_to_string(&stdout_file).unwrap_or_default();
-            let stderr_content = std::fs::read_to_string(&stderr_file).unwrap_or_default();
-            drop(capture);
-            drop(scratch);
-
-            Ok(SandboxExecResult {
-                exit_code: wait_result.0,
-                stdout,
-                stderr: if wait_result.1 {
-                    format!("Command timed out after {}s", timeout.as_secs())
-                } else {
-                    stderr_content
-                },
-                timed_out: wait_result.1,
-            })
-        }
-        Err(e) => anyhow::bail!("Failed to spawn jailed process: {e}"),
     }
 }
 
