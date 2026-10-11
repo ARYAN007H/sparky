@@ -4053,6 +4053,7 @@ dependencies = [
  "tinyinference-voice",
  "tinymcp",
  "tinymcp-bus",
+ "tinysearch-bus",
  "tinystoragedrivers-core",
  "tinytools",
  "tinytools-agent",
