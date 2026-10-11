@@ -5,16 +5,16 @@
 //! user-facing stop summary is derived from whatever note it holds when the
 //! run ends (`session_host::stop_summary`). A stop only takes effect at the
 //! top of the next iteration, so every remaining result of the batch still
-//! reaches the breakers after one of them stopped the run. Each used to write
-//! the slot unconditionally, so the last breaker to trip in a batch named the
-//! cause, not the first: the repeat guard stopping a run while admitting a
-//! batch of re-reads, then a mistyped path in that batch failing again, was
-//! summarised as "something this needs could not be found".
+//! reaches the breakers after one of them stopped the run. The first breaker
+//! to stop the run is its cause, so no breaker replaces a note already there
+//! (the repeat guard follows the same contract in `tinyagents`). The failure
+//! breaker used to overwrite it: the repeat guard stopping a run while
+//! admitting a batch of re-reads, then a mistyped path in that batch failing
+//! again, was summarised as "something this needs could not be found".
 //!
-//! The latch keeps the first note, puts this breaker's note back if the
-//! repeat guard (which writes unconditionally) replaced it later in the same
-//! batch, and relabels a classified stop that a repeat loop produced (see
-//! [`super::repeat_loop_stop`]).
+//! The latch also relabels a classified stop that a repeat loop produced (see
+//! [`super::repeat_loop_stop`]), and takes the relabel back when the rest of
+//! the batch shows progress.
 
 use std::sync::Mutex;
 
@@ -35,6 +35,9 @@ pub(super) struct StopLatch {
     /// re-issue that no refusal has explained yet. A refusal later in the
     /// same batch relabels the stop as a repeat loop.
     candidate: Mutex<Option<(String, String)>>,
+    /// The classified note a repeat-loop relabel replaced. A success later in
+    /// the batch shows progress and puts it back.
+    relabelled_from: Mutex<Option<String>>,
 }
 
 impl StopLatch {
@@ -46,6 +49,7 @@ impl StopLatch {
             own: Mutex::default(),
             witness: RepeatLoopWitness::default(),
             candidate: Mutex::default(),
+            relabelled_from: Mutex::default(),
         }
     }
 
@@ -81,16 +85,6 @@ impl StopLatch {
         latched
     }
 
-    /// A call ran and succeeded. The run made progress, so neither the
-    /// refusals before it nor a refusal after it can explain a stop latched
-    /// before it as a repeat loop.
-    pub(super) fn record_success(&self) {
-        self.witness.record_success();
-        if let Ok(mut candidate) = self.candidate.lock() {
-            *candidate = None;
-        }
-    }
-
     /// Stop the run for an exhausted classified-failure budget.
     ///
     /// When the failing call is an identical re-issue (`repeated`) of a
@@ -111,61 +105,84 @@ impl StopLatch {
             return;
         }
         let error_line = error_line();
+        // Only the stop that owns the note may be relabelled: a second stop
+        // in the batch must not lend it its tool and error.
+        if !self.halt(summary) {
+            return;
+        }
         match self.witness.refusals() {
-            // Only the stop that owns the note may be relabelled later: a
-            // second stop in the batch must not lend it its tool and error.
             0 => {
-                if self.halt(summary) {
-                    if let Ok(mut candidate) = self.candidate.lock() {
-                        *candidate = Some((tool.to_owned(), error_line));
-                    }
+                if let Ok(mut candidate) = self.candidate.lock() {
+                    *candidate = Some((tool.to_owned(), error_line));
                 }
             }
-            refusals => {
-                self.halt(repeat_loop_halt_summary(tool, refusals, &error_line));
-            }
+            refusals => self.relabel(repeat_loop_halt_summary(tool, refusals, &error_line)),
         }
     }
 
     /// The repeat guard refused a call. Relabels this breaker's classified
-    /// stop as a repeat loop if it is waiting for that evidence and is still
-    /// the run's stop note.
+    /// stop as a repeat loop if it is waiting for that evidence.
     pub(super) fn record_refusal(&self) {
         let refusals = self.witness.record_refusal();
         let Some((tool, error_line)) = self.candidate.lock().ok().and_then(|mut c| c.take()) else {
             return;
         };
-        let (Ok(mut slot), Ok(mut own)) = (self.slot.lock(), self.own.lock()) else {
-            return;
-        };
-        if own.is_some() && *slot == *own {
-            tracing::debug!(
-                tool = %tool,
-                refusals,
-                "[tinyagents::mw] classified stop came from a repeat loop; relabelling its stop note"
-            );
-            let summary = repeat_loop_halt_summary(&tool, refusals, &error_line);
-            *slot = Some(summary.clone());
-            *own = Some(summary);
-        }
+        self.relabel(repeat_loop_halt_summary(&tool, refusals, &error_line));
     }
 
-    /// End of a run: put this breaker's note back if a later writer replaced
-    /// it, and forget the run's latch state. The repeat guard writes the slot
-    /// unconditionally, so a result later in the batch that trips it would
-    /// otherwise relabel a stop this breaker made first.
-    pub(super) fn finish_run(&self) {
+    /// A call ran and succeeded. The run made progress, so neither the
+    /// refusals around it nor a stop latched earlier in its batch can be
+    /// explained as a repeat loop: a pending relabel is dropped and a relabel
+    /// already made is taken back.
+    pub(super) fn record_success(&self) {
+        self.witness.record_success();
         if let Ok(mut candidate) = self.candidate.lock() {
             *candidate = None;
         }
-        let own = self.own.lock().ok().and_then(|mut own| own.take());
-        if let (Some(own), Ok(mut slot)) = (own, self.slot.lock()) {
-            if slot.as_deref().is_some_and(|current| current != own) {
-                tracing::debug!(
-                    "[tinyagents::mw] restoring the failure breaker's stop note replaced later in its batch"
-                );
-                *slot = Some(own);
+        let original = self.relabelled_from.lock().ok().and_then(|mut r| r.take());
+        if let Some(original) = original {
+            tracing::debug!(
+                "[tinyagents::mw] a success followed a repeat-loop stop; restoring the classified stop note"
+            );
+            self.replace_own_note(original);
+        }
+    }
+
+    /// End of a run: forget its latch state.
+    pub(super) fn finish_run(&self) {
+        for state in [&self.own, &self.relabelled_from] {
+            if let Ok(mut state) = state.lock() {
+                *state = None;
             }
         }
+        if let Ok(mut candidate) = self.candidate.lock() {
+            *candidate = None;
+        }
+    }
+
+    /// Replace this breaker's latched note with the repeat-loop `summary`,
+    /// keeping the classified note so progress can restore it.
+    fn relabel(&self, summary: String) {
+        if let Some(original) = self.replace_own_note(summary) {
+            tracing::debug!(
+                "[tinyagents::mw] classified stop came from a repeat loop; relabelled its stop note"
+            );
+            if let Ok(mut relabelled_from) = self.relabelled_from.lock() {
+                relabelled_from.get_or_insert(original);
+            }
+        }
+    }
+
+    /// Swap `summary` in for this breaker's note, if that note is still the
+    /// run's stop note. Returns the note it replaced.
+    fn replace_own_note(&self, summary: String) -> Option<String> {
+        let (Ok(mut slot), Ok(mut own)) = (self.slot.lock(), self.own.lock()) else {
+            return None;
+        };
+        if own.is_none() || *slot != *own {
+            return None;
+        }
+        *slot = Some(summary.clone());
+        own.replace(summary)
     }
 }
