@@ -151,6 +151,33 @@ fn unwrap_response_returns_data_or_the_structured_error() {
         .contains("no result"));
 }
 
+#[test]
+fn a_chrome_path_the_module_refuses_says_where_the_user_fixes_it() {
+    // TinyComputer refuses a task whose Chrome path names no program in its
+    // own words; the agent is told where the user sets that path.
+    let refused: AgentResponse<u32> = AgentResponse {
+        ok: false,
+        data: None,
+        error: Some(AgentError::new(
+            "INVALID_REQUEST",
+            "browser_executable must be the absolute path of a browser binary on this machine",
+            "",
+            false,
+        )),
+    };
+    let error = unwrap_response("StartTask", refused).unwrap_err();
+    assert!(
+        error.starts_with(
+            "browser task StartTask failed [INVALID_REQUEST]: browser_executable must be"
+        ),
+        "{error}"
+    );
+    assert!(
+        error.ends_with(crate::modules::browser::CHROME_PATH_HINT),
+        "{error}"
+    );
+}
+
 #[tokio::test]
 async fn a_task_keeps_the_persistent_profile_only_while_no_other_chrome_holds_it() {
     let mut config = Config::default();

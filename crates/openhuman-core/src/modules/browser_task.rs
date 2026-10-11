@@ -303,15 +303,25 @@ async fn free_profile(request: &mut StartTaskRequest, wait: Duration) {
     }
 }
 
+/// A module reply as its data, or as the error the tool reports: its code,
+/// message and hint, and where the user fixes a Chrome the module was not
+/// given or could not start ([`super::browser::chrome_hint`]).
 fn unwrap_response<Reply>(member: &str, response: AgentResponse<Reply>) -> Result<Reply, String> {
     match (response.ok, response.data, response.error) {
         (true, Some(data), _) => Ok(data),
-        (_, _, Some(error)) => Err(format!(
-            "browser task {member} failed [{}]: {} {}",
-            error.code, error.message, error.hint
-        )
-        .trim_end()
-        .to_owned()),
+        (_, _, Some(error)) => {
+            let host = super::browser::chrome_hint(&error.message).unwrap_or_default();
+            let said = [error.message.as_str(), error.hint.as_str(), host]
+                .into_iter()
+                .map(str::trim)
+                .filter(|part| !part.is_empty())
+                .collect::<Vec<_>>()
+                .join(" ");
+            Err(format!(
+                "browser task {member} failed [{}]: {said}",
+                error.code
+            ))
+        }
         _ => Err(format!("browser task {member} returned no result")),
     }
 }

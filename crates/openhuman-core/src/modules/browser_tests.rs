@@ -153,6 +153,42 @@ fn a_missing_chrome_tells_the_agent_where_the_user_sets_its_path() {
 }
 
 #[test]
+fn tinycomputers_own_words_for_a_missing_or_unusable_chrome_get_the_users_fix() {
+    // TinyComputer 0.11 says why its Chrome would not start in its own words.
+    let failed = |message: &str| -> String {
+        let response: DesktopResponse = serde_json::from_value(serde_json::json!({
+            "version": "2.12",
+            "ok": false,
+            "command": "browser-open-session",
+            "error": {
+                "code": "BROWSER_UNAVAILABLE",
+                "message": message,
+                "details": {"name": "ai.tinyhumans.tinycomputer.Browser.Error.BrowserUnavailable"}
+            }
+        }))
+        .unwrap();
+        BrowserCallError::from_response(&response).to_string()
+    };
+    let missing = failed(
+        "browser unavailable: no Chrome or Chromium was found on this machine; give the path of the browser to use",
+    );
+    assert!(missing.ends_with(CHROME_NOT_FOUND_HINT), "{missing}");
+    let unusable = failed(
+        "browser unavailable: the browser binary given could not be started (Chrome exited before providing DevTools URL); check that its path names Chrome or Chromium",
+    );
+    assert!(unusable.ends_with(CHROME_PATH_HINT), "{unusable}");
+    let other = failed("browser unavailable: CDP connection failed: refused");
+    assert!(other.ends_with("refused"), "{other}");
+    assert_eq!(
+        chrome_hint(
+            "browser_executable must be the absolute path of a browser binary on this machine"
+        ),
+        Some(CHROME_PATH_HINT)
+    );
+    assert_eq!(chrome_hint("Chrome launch timed out"), None);
+}
+
+#[test]
 fn fresh_profile_is_the_default() {
     let config = Config::default();
     assert_eq!(config.browser.profile_mode, "fresh");
