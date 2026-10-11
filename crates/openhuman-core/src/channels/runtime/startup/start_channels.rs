@@ -160,10 +160,24 @@ async fn start_channels_inner(mut config: Config, session: CancellationToken) ->
     let (dispatch_tx, rx) = tokio::sync::mpsc::channel(100);
     let context_slot: Arc<OnceLock<Weak<crate::channels::context::ChannelRuntimeContext>>> =
         Arc::new(OnceLock::new());
+    let preparing = ModuleChannelRuntime::prepare(
+        Arc::new(config.clone()),
+        Arc::clone(&context_slot),
+        dispatch_tx.clone(),
+    );
+    tokio::pin!(preparing);
     let mut module_runtime = tokio::select! {
         biased;
-        _ = session.cancelled() => return Ok(()),
-        prepared = ModuleChannelRuntime::prepare(Arc::new(config.clone()), Arc::clone(&context_slot), dispatch_tx.clone()) => {
+        _ = session.cancelled() => {
+            // Do not drop preparation after it may have acquired a module
+            // lease. Finish it and await the runtime's acknowledged close
+            // before the service supervisor can admit another identity.
+            if let Ok(mut runtime) = preparing.await {
+                runtime.close().await?;
+            }
+            return Ok(());
+        },
+        prepared = &mut preparing => {
             Some(prepared?)
         }
     };
