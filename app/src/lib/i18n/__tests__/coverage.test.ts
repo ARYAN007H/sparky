@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { REASONING_EFFORTS } from '../../../features/conversations/aui/ReasoningEffortPicker';
+import { NODE_KIND_ICON } from '../../../lib/flows/nodeKindIcons';
+import { NODE_GROUP_ORDER } from '../../../lib/flows/nodeKindMeta';
 import enAggregate from '../en';
 
 const LOCALES = [
@@ -57,11 +59,16 @@ describe('i18n coverage', () => {
     expect(extra).toEqual([]);
   });
 
-  it.each(['en', ...LOCALES])('%s translates every reasoning effort option', locale => {
+  it.each(['en', ...LOCALES])('%s translates finite dynamic UI options', locale => {
     const flat = locale === 'en' ? enFlat : loadLocale(locale);
-    const missing = REASONING_EFFORTS.map(effort => `composer.reasoning.${effort}`).filter(
-      key => !(key in flat)
-    );
+    const dynamicKeys = [
+      ...REASONING_EFFORTS.map(effort => `composer.reasoning.${effort}`),
+      ...Object.keys(NODE_KIND_ICON).map(kind => `flows.nodeKind.${kind}`),
+      ...NODE_GROUP_ORDER.map(group => `flows.palette.group.${group}`),
+      ...['none', 'subtle', 'default', 'round'].map(corner => `settings.layout.corners.${corner}`),
+      ...['subtle', 'default', 'strong'].map(contrast => `settings.layout.contrast.${contrast}`),
+    ];
+    const missing = dynamicKeys.filter(key => !(key in flat));
     expect(missing).toEqual([]);
   });
   it('locale tr preserves every interpolation placeholder', () => {
