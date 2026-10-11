@@ -149,19 +149,7 @@ pub async fn install_from_config(config: &crate::config::Config) -> Result<(), S
 
 /// Construct explicit access over the shared process-wide loader.
 fn client(config: &crate::config::Config) -> crate::modules::client::ModuleClient {
-    #[allow(unused_mut)] // Fixture overrides are compiled only into tests.
-    let mut config = config.clone();
-    #[cfg(test)]
-    if let Some(path) = std::env::var_os("TINYJUICE_TEST_MODULE") {
-        config
-            .modules
-            .overrides
-            .push(crate::config::schema::ModuleOverride {
-                id: "tinyjuice".into(),
-                path: path.to_string_lossy().into_owned(),
-            });
-    }
-    crate::modules::client::ModuleClient::new(config)
+    crate::modules::client::ModuleClient::new(config.clone())
 }
 
 /// Everything the module considers about one tool result.
