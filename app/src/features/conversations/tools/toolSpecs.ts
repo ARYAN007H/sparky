@@ -71,7 +71,6 @@ import {
   PackagePlusIcon,
   PackageSearchIcon,
   PlugIcon,
-  PodcastIcon,
   PowerIcon,
   PresentationIcon,
   ReceiptIcon,
@@ -266,13 +265,7 @@ export const EXACT_TOOL_SPECS: Record<string, ToolSpec> = {
   generate_presentation: spec('createPresentation', PresentationIcon, 'media', {
     chip: chip.text('title'),
   }),
-  audio_generate_podcast: spec('generatePodcast', PodcastIcon, 'media', {
-    chip: chip.text('title', 'topic'),
-  }),
-  audio_email_podcast: spec('emailPodcast', PodcastIcon, 'media', { chip: chip.text('to') }),
-  audio_generate_and_email_podcast: spec('createAndEmailPodcast', PodcastIcon, 'media', {
-    chip: chip.text('title', 'topic'),
-  }),
+
 
   // ── Memory ──────────────────────────────────────────────────────────────
   // The single memory tool: recall asks a `question`, fetch a `query`, learn stores `text`.
