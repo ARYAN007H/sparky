@@ -86,7 +86,7 @@ pub async fn doctor_channels(config: Config) -> Result<()> {
 
 /// Selecting configured providers is host configuration orchestration. The
 /// module owns construction, platform support, health I/O and timeout handling.
-fn configured_providers(config: &Config) -> Vec<&'static str> {
+pub(crate) fn configured_providers(config: &Config) -> Vec<&'static str> {
     let channels = &config.channels_config;
     [
         ("telegram", channels.telegram.is_some()),
