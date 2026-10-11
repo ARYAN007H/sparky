@@ -1,20 +1,20 @@
 use super::*;
 
-/// Maps a store-level [`FlowUpdateError`](store::FlowUpdateError) to the RPC
+/// Maps a store-level [`FlowUpdateError`](tinyflows_sqlite::flows::FlowUpdateError) to the RPC
 /// error string. A concurrency conflict is encoded as a JSON object the UI can
 /// parse (`{ code: "version_conflict", message, current }`) so it can offer a
 /// reload/diff instead of silently clobbering; other variants are plain text.
-fn map_flow_update_error(e: store::FlowUpdateError) -> String {
+fn map_flow_update_error(e: tinyflows_sqlite::flows::FlowUpdateError) -> String {
     match e {
-        store::FlowUpdateError::NotFound => "flow not found".to_string(),
-        store::FlowUpdateError::Conflict(current) => serde_json::to_string(&json!({
+        tinyflows_sqlite::flows::FlowUpdateError::NotFound => "flow not found".to_string(),
+        tinyflows_sqlite::flows::FlowUpdateError::Conflict(current) => serde_json::to_string(&json!({
             "code": "version_conflict",
             "message": "This flow changed since you loaded it. Reload to see the latest \
                         version, then reapply your change.",
             "current": *current,
         }))
         .unwrap_or_else(|_| "version_conflict".to_string()),
-        store::FlowUpdateError::Store(err) => err.to_string(),
+        tinyflows_sqlite::flows::FlowUpdateError::Store(err) => err.to_string(),
     }
 }
 

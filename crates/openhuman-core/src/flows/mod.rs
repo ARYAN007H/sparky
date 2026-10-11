@@ -65,10 +65,7 @@ pub use schemas::{
 // live run observer (`tinyflows::observability::FlowRunObserver`, issue G2)
 // lives in the sibling `tinyflows` domain and persists each finished step onto
 // the `flow_runs` row through this function as the run executes.
-pub use node_contracts::{
-    all_node_kind_contracts, node_kind_contract, render_node_kinds_line,
-    render_node_kinds_required, ConfigField, NodeKindContract, PortSpec, NODE_KINDS,
-};
+pub use {node_contracts::all_node_kind_contracts, node_contracts::node_kind_contract, node_contracts::render_node_kinds_line, node_contracts::render_node_kinds_required, tinyflows::catalog::ConfigField, tinyflows::catalog::NodeKindContract, tinyflows::catalog::PortSpec, tinyflows::catalog::NODE_KINDS};
 pub use store::{kv_get, kv_set, upsert_flow_run_step};
 pub use tinyflows_catalog::{
     DraftOrigin, Flow, FlowConnection, FlowDraft, FlowImport, FlowRevision, FlowRun, FlowRunStep,
