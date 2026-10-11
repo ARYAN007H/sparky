@@ -29,14 +29,6 @@ pub use crate::memory::tools::{MemoryTool, MEMORY_TOOL_NAME};
 pub use crate::search::TinySearchTool;
 pub use crate::security::credentials::tools::*;
 pub use crate::security::tools::*;
-#[cfg(feature = "skills")]
-pub use crate::skills::catalog::tools::*;
-#[cfg(feature = "skills")]
-pub use crate::skills::runtime::tools::*;
-#[cfg(feature = "skills")]
-pub use crate::skills::search::SkillSearchTool;
-#[cfg(feature = "skills")]
-pub use crate::skills::tools::*;
 #[cfg(feature = "voice")]
 pub use crate::voice::audio_toolkit::tools::*;
 pub use implementations::*;

@@ -45,6 +45,8 @@ pub mod ops_install;
 #[cfg(feature = "skills")]
 pub mod preflight;
 #[cfg(feature = "skills")]
+pub(crate) mod registration;
+#[cfg(feature = "skills")]
 pub mod registry;
 #[cfg(feature = "skills")]
 pub mod run_log;

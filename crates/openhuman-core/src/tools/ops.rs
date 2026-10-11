@@ -217,45 +217,10 @@ pub fn all_tools_with_runtime(
             security.clone(),
         )),
         Box::new(GmailUnsubscribeTool),
-        // Skills metadata tools. `skill_run` is already exposed by RunSkillTool
-        // above, so it is not duplicated. Reads ship default-ON; the
-        // create/install/uninstall mutators ship default-OFF via
-        // `tools::user_filter` (install also fetches remote content).
-        #[cfg(feature = "skills")]
-        Box::new(WorkflowListTool::new(config.clone())),
-        #[cfg(feature = "skills")]
-        Box::new(WorkflowDescribeTool::new(config.clone())),
-        #[cfg(feature = "skills")]
-        Box::new(SkillSearchTool::new(config.clone())),
-        // Skill registry tools — browse/search/install from remote registries.
-        // Browse and search are read-only (default-ON); install is a write
-        // operation (fetches remote content and writes to disk).
-        #[cfg(feature = "skills")]
-        Box::new(SkillRegistryBrowseTool),
-        #[cfg(feature = "skills")]
-        Box::new(SkillRegistrySearchTool),
-        #[cfg(feature = "skills")]
-        Box::new(SkillRegistryInstallTool::new(config.clone())),
-        #[cfg(feature = "skills")]
-        Box::new(SkillRegistrySourcesTool),
-        #[cfg(feature = "skills")]
-        Box::new(SkillRegistryUninstallTool),
-        // Skill runtime probes — resolve the reusable Node/Python runtimes
-        // that skill execution relies on before a script-backed skill runs.
-        #[cfg(feature = "skills")]
-        Box::new(SkillRuntimeResolveRuntimesTool::new(config.clone())),
-        #[cfg(feature = "skills")]
-        Box::new(WorkflowReadResourceTool::new(config.clone())),
-        #[cfg(feature = "skills")]
-        Box::new(WorkflowRecentRunsTool::new(config.clone())),
-        #[cfg(feature = "skills")]
-        Box::new(WorkflowReadRunLogTool::new(config.clone())),
-        #[cfg(feature = "skills")]
-        Box::new(WorkflowCreateTool::new(config.clone())),
-        #[cfg(feature = "skills")]
-        Box::new(WorkflowInstallFromUrlTool::new(config.clone())),
-        #[cfg(feature = "skills")]
-        Box::new(WorkflowUninstallTool),
+    ]);
+    #[cfg(feature = "skills")]
+    tools.extend(crate::skills::registration::tools(config.clone()));
+    tools.extend(vec![
         // Task & productivity tools (issue: agent-tool expansion).
         // Read/observe + bounded-write tools are registered here; the
         // destructive/overextending siblings (artifact_delete,
