@@ -1,5 +1,5 @@
 use super::*;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
 #[tokio::test]
@@ -95,21 +95,31 @@ async fn clear_session_invalidates_old_channels_and_opens_a_fresh_generation() {
 
 #[tokio::test]
 async fn channel_sign_in_resumes_listener_service_after_logout() {
-    crate::channels::session::invalidate_channel_session();
-    let old = channel_session();
+    let controller = ChannelSessionController::new();
+    let starts = Arc::new(AtomicUsize::new(0));
+    let observed_starts = Arc::clone(&starts);
+    let (started_tx, mut started_rx) = tokio::sync::mpsc::unbounded_channel();
+    let service = spawn_channel_service_with(controller.clone(), move |session| async move {
+        observed_starts.fetch_add(1, Ordering::SeqCst);
+        let _ = started_tx.send(session.clone());
+        session.cancelled().await;
+    });
 
-    let mut resumed = tokio::spawn(crate::channels::session::wait_for_channel_service_resume());
-    tokio::task::yield_now().await;
-    crate::channels::session::resume_channel_service();
+    let old = started_rx.recv().await.expect("initial channel generation");
+    controller.invalidate();
+    controller.resume();
 
-    let current = tokio::time::timeout(std::time::Duration::from_secs(1), &mut resumed)
+    let current = tokio::time::timeout(std::time::Duration::from_secs(1), started_rx.recv())
         .await
         .expect("sign-in wakes the stopped channel service")
-        .expect("channel service resume waiter");
+        .expect("restarted channel generation");
     assert!(old.is_cancelled(), "logout must fence the old generation");
     assert!(
         !current.is_cancelled(),
         "sign-in resumes a fresh generation"
     );
-    assert!(!channel_session().is_cancelled());
+    assert_eq!(starts.load(Ordering::SeqCst), 2);
+
+    controller.invalidate();
+    service.abort();
 }

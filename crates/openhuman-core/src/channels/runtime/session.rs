@@ -86,8 +86,7 @@ impl ChannelSessionController {
     }
 }
 
-static SESSION: LazyLock<ChannelSessionController> =
-    LazyLock::new(ChannelSessionController::new);
+static SESSION: LazyLock<ChannelSessionController> = LazyLock::new(ChannelSessionController::new);
 
 pub(crate) fn channel_session() -> CancellationToken {
     SESSION.current()
