@@ -374,11 +374,14 @@ fn register_shutdown() {
         return;
     }
     crate::core::shutdown::register(|| async {
-        HOOK.store(false, Ordering::SeqCst);
-        if let Err(error) = close_all().await {
-            log::warn!("[voice_capture] shutdown cleanup pending: {error}");
-        }
+        shutdown_capture().await;
     });
+}
+pub(crate) async fn shutdown_capture() {
+    HOOK.store(false, Ordering::SeqCst);
+    if let Err(error) = close_all().await {
+        log::warn!("[voice_capture] shutdown cleanup pending: {error}");
+    }
 }
 #[cfg(test)]
 #[path = "capture_lease_tests.rs"]

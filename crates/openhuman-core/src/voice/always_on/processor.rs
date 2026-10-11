@@ -404,3 +404,7 @@ pub(super) fn spawn_transcription(
         }
     });
 }
+
+#[cfg(test)]
+#[path = "processor_tests.rs"]
+mod tests;
