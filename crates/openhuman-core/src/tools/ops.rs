@@ -216,7 +216,6 @@ pub fn all_tools_with_runtime(
     tools.extend(crate::security::credentials::tools::registered_tools(
         config.clone(),
     ));
-    tools.extend(crate::integrations::tools::registered_tools(config.clone()));
     tools.append(&mut vec![
         // MCP registry and workspace persona. Observe/connect/call tools
         // default-ON; MCP uninstall (mcp_manage), and persona/workspace writers
@@ -488,12 +487,12 @@ pub fn all_tools_with_runtime(
     if let Some(client) = crate::integrations::build_client(root_config) {
         tracing::debug!("[integrations] client built successfully");
         if root_config.integrations.google_places.is_active() {
-            tools.push(Box::new(crate::tools::GooglePlacesSearchTool::new(
-                Arc::clone(&client),
-            )));
-            tools.push(Box::new(crate::tools::GooglePlacesDetailsTool::new(
-                Arc::clone(&client),
-            )));
+            tools.push(Box::new(
+                crate::integrations::tools::GooglePlacesSearchTool::new(Arc::clone(&client)),
+            ));
+            tools.push(Box::new(
+                crate::integrations::tools::GooglePlacesDetailsTool::new(Arc::clone(&client)),
+            ));
             tracing::debug!("[integrations] registered google_places tools");
         } else {
             tracing::debug!("[integrations] google_places disabled — skipping");
@@ -503,21 +502,21 @@ pub fn all_tools_with_runtime(
         // suppresses them too. `integrations.parallel` is parsed for old
         // config files and no longer does anything.
         if root_config.integrations.stock_prices.is_active() {
-            tools.push(Box::new(crate::tools::StockQuoteTool::new(Arc::clone(
-                &client,
-            ))));
-            tools.push(Box::new(crate::tools::StockExchangeRateTool::new(
+            tools.push(Box::new(crate::integrations::tools::StockQuoteTool::new(
                 Arc::clone(&client),
             )));
-            tools.push(Box::new(crate::tools::StockOptionsTool::new(Arc::clone(
-                &client,
-            ))));
-            tools.push(Box::new(crate::tools::StockCryptoSeriesTool::new(
+            tools.push(Box::new(
+                crate::integrations::tools::StockExchangeRateTool::new(Arc::clone(&client)),
+            ));
+            tools.push(Box::new(crate::integrations::tools::StockOptionsTool::new(
                 Arc::clone(&client),
             )));
-            tools.push(Box::new(crate::tools::StockCommodityTool::new(Arc::clone(
-                &client,
-            ))));
+            tools.push(Box::new(
+                crate::integrations::tools::StockCryptoSeriesTool::new(Arc::clone(&client)),
+            ));
+            tools.push(Box::new(
+                crate::integrations::tools::StockCommodityTool::new(Arc::clone(&client)),
+            ));
             tracing::debug!("[integrations] registered stock_prices tools");
         } else {
             tracing::debug!("[integrations] stock_prices disabled — skipping");

@@ -150,8 +150,9 @@ Where the built-in tools come from:
 ## Key types and entry points
 
 - `Tool`, `ToolSpec`, `ToolResult`, `ToolExposure`, `PermissionLevel`,
-  `ToolScope`, `ToolCategory`: re-exported from `tinytools` in `mod.rs` so an
-  embedder implementing a tool reaches the vendored copy.
+  `ToolScope`, `ToolCategory`: imported from the vendored `tinytools`
+  contract. Embedders get `Tool`, `ToolResult`, `ToolExposure` and
+  `PermissionLevel` from the curated `openhuman_embed` facade.
 - `ops::all_tools_with_runtime`: the full registry. Its last parameter,
   `approval_workspace_root`, scopes `file_write`'s approval prompts.
 - `orchestrator_tools::collect_orchestrator_tools` and
