@@ -1,17 +1,17 @@
 //! Per-sender routing and runtime command handling.
 
-use super::context::{clear_sender_history, ChannelRouteSelection, ChannelRuntimeContext};
+use super::context::{ChannelRouteSelection, ChannelRuntimeContext, clear_sender_history};
 use super::traits;
 use super::{Channel, ChannelSendExt, SendMessage};
 use crate::inference::provider;
 use std::sync::Arc;
 #[cfg(test)]
-use tinychannels::remote::{parse_remote_command, RemoteCommand};
+use tinychannels::remote::{RemoteCommand, parse_remote_command};
 #[cfg(test)]
 use tinychannels::routes::{
+    ChannelRuntimeCommand as PortableCommand,
     parse_runtime_command as parse_portable_runtime_command,
     resolve_provider_alias as resolve_portable_provider_alias,
-    ChannelRuntimeCommand as PortableCommand,
 };
 use tinychannels_bus::module_control::{
     ChannelControlRequest, ChannelControlResult, ProviderDescriptor,
@@ -159,11 +159,8 @@ impl RouteCallbacks {
                 };
                 match &self.core_context {
                     Some(core_context) => {
-                        crate::core::runtime::CoreContext::scope(
-                            Arc::clone(core_context),
-                            dispatch,
-                        )
-                        .await
+                        crate::core::runtime::CoreContext::scope(Arc::clone(core_context), dispatch)
+                            .await
                     }
                     None => dispatch.await,
                 }

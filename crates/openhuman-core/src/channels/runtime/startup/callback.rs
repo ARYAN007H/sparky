@@ -238,11 +238,8 @@ impl ChannelHostCallbacks {
                 };
                 match &self.core_context {
                     Some(core_context) => {
-                        crate::core::runtime::CoreContext::scope(
-                            Arc::clone(core_context),
-                            dispatch,
-                        )
-                        .await
+                        crate::core::runtime::CoreContext::scope(Arc::clone(core_context), dispatch)
+                            .await
                     }
                     None => dispatch.await,
                 }

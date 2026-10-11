@@ -1,6 +1,6 @@
 use super::*;
 use crate::channels::context::{
-    conversation_history_key, ChannelRuntimeContext, RouteSelectionMap, TurnModelSourceCacheMap,
+    ChannelRuntimeContext, RouteSelectionMap, TurnModelSourceCacheMap, conversation_history_key,
 };
 use crate::channels::host::ChannelTurnStateSubscriber;
 use crate::channels::traits::ChannelMessage;
@@ -233,10 +233,8 @@ impl Wake for NoopWake {
 
 #[tokio::test]
 async fn sign_out_cancels_remote_invalidation_while_it_waits_for_the_session_table() {
-    let core_context = crate::core::runtime::CoreContext::for_test(
-        crate::core::runtime::DomainSet::full(),
-        None,
-    );
+    let core_context =
+        crate::core::runtime::CoreContext::for_test(crate::core::runtime::DomainSet::full(), None);
     crate::core::runtime::CoreContext::scope(core_context, async {
         let guard = crate::web_chat::ops::lock_thread_sessions_for_test().await;
         let cancellation = tokio_util::sync::CancellationToken::new();
@@ -261,7 +259,10 @@ async fn sign_out_cancels_remote_invalidation_while_it_waits_for_the_session_tab
         );
         cancellation.cancel();
         assert!(
-            matches!(operation.as_mut().poll(&mut task_context), Poll::Ready(Err(_))),
+            matches!(
+                operation.as_mut().poll(&mut task_context),
+                Poll::Ready(Err(_))
+            ),
             "sign-out must cancel the callback before it can mutate session state"
         );
 
@@ -316,9 +317,11 @@ async fn handle_runtime_command_unknown_provider_sends_helpful_error() {
 
     let sent = channel_impl.sent.lock().unwrap();
     assert_eq!(sent.len(), 1);
-    assert!(sent[0]
-        .content
-        .contains("Unknown provider `definitely-not-a-provider`"));
+    assert!(
+        sent[0]
+            .content
+            .contains("Unknown provider `definitely-not-a-provider`")
+    );
     assert_eq!(sent[0].thread_ts.as_deref(), Some("thread-1"));
 }
 
@@ -352,12 +355,13 @@ async fn handle_runtime_command_set_model_clears_sender_history_and_persists_rou
     .await;
     assert!(handled);
 
-    assert!(ctx
-        .conversation_histories
-        .lock()
-        .unwrap()
-        .get(key)
-        .is_none());
+    assert!(
+        ctx.conversation_histories
+            .lock()
+            .unwrap()
+            .get(key)
+            .is_none()
+    );
     assert_eq!(
         get_route_selection(&ctx, key),
         ChannelRouteSelection {
@@ -452,9 +456,11 @@ async fn handle_runtime_command_telegram_help_replies_with_remote_command_list()
     assert!(sent[0].content.contains("`/status`"));
     assert!(sent[0].content.contains("`/sessions`"));
     assert!(sent[0].content.contains("`/new`"));
-    assert!(sent[0]
-        .content
-        .contains("Model routing: `/model`, `/models`"));
+    assert!(
+        sent[0]
+            .content
+            .contains("Model routing: `/model`, `/models`")
+    );
 }
 
 #[tokio::test]
@@ -485,9 +491,11 @@ async fn handle_runtime_command_telegram_sessions_reports_empty_store() {
 
     let sent = channel_impl.sent.lock().unwrap();
     assert_eq!(sent.len(), 1);
-    assert!(sent[0]
-        .content
-        .contains("No conversation threads yet. Send `/new` to create one."));
+    assert!(
+        sent[0]
+            .content
+            .contains("No conversation threads yet. Send `/new` to create one.")
+    );
     assert_eq!(sent[0].thread_ts.as_deref(), Some("42"));
 }
 
@@ -523,12 +531,13 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         )
         .await
     );
-    assert!(ctx
-        .conversation_histories
-        .lock()
-        .unwrap()
-        .get(sender_key)
-        .is_none());
+    assert!(
+        ctx.conversation_histories
+            .lock()
+            .unwrap()
+            .get(sender_key)
+            .is_none()
+    );
 
     ctx.conversation_histories.lock().unwrap().insert(
         sender_key.to_string(),
@@ -600,9 +609,11 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
     let sent = channel_impl.sent.lock().unwrap();
     assert_eq!(sent.len(), 3);
     assert!(sent[0].content.contains("Started new session"));
-    assert!(sent[0]
-        .content
-        .contains("In-memory channel history cleared for this chat."));
+    assert!(
+        sent[0]
+            .content
+            .contains("In-memory channel history cleared for this chat.")
+    );
 
     assert!(sent[1].content.contains("**Status**"));
     assert!(sent[1].content.contains("Thread: `Telegram"));
@@ -613,7 +624,8 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
 
     assert!(sent[2].content.contains("**Recent sessions**"));
     assert!(sent[2].content.contains("→ `Telegram"));
-    assert!(sent
-        .iter()
-        .all(|message| message.thread_ts.as_deref() == Some("42")));
+    assert!(
+        sent.iter()
+            .all(|message| message.thread_ts.as_deref() == Some("42"))
+    );
 }
