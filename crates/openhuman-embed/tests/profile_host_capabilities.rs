@@ -69,33 +69,53 @@ impl Tool for TenantTool {
 struct CallTools;
 impl Respond for CallTools {
     fn respond(&self, request: &Request) -> ResponseTemplate {
-        if !tool_results(request).is_empty() {
-            return ResponseTemplate::new(200).set_body_json(chat_completion("done"));
-        }
-        let mut completion = tool_call_completion("tenant_probe", "{}");
-        let names = [
-            "tenant_probe",
-            "hidden",
-            "shell",
-            "delegate",
-            "curl",
-            "install_workflow_from_url",
-            "http_request",
-            "run_workflow",
-            "delegate_to",
-        ];
-        completion["choices"][0]["message"]["tool_calls"] = json!(names.iter().enumerate().map(|(i, name)| json!({"id":format!("call_{i}"),"type":"function","function":{"name":name,"arguments":"{}"}})).collect::<Vec<_>>());
         let body: Value = serde_json::from_slice(&request.body).unwrap();
-        let message = common::last_user_message(&body);
-        let user = if message.contains("alice") {
-            "alice"
+        let completion = if !tool_results(request).is_empty()
+            || !tool_names(request)
+                .iter()
+                .any(|name| name == "tenant_probe")
+        {
+            chat_completion("done")
         } else {
-            "bob"
+            let mut completion = tool_call_completion("tenant_probe", "{}");
+            let names = [
+                "tenant_probe",
+                "hidden",
+                "shell",
+                "delegate",
+                "curl",
+                "install_workflow_from_url",
+                "http_request",
+                "run_workflow",
+                "delegate_to",
+            ];
+            completion["choices"][0]["message"]["tool_calls"] = json!(names.iter().enumerate().map(|(i, name)| json!({"id":format!("call_{i}"),"type":"function","function":{"name":name,"arguments":"{}"}})).collect::<Vec<_>>());
+            let message = common::last_user_message(&body);
+            let user = if message.contains("alice") {
+                "alice"
+            } else {
+                "bob"
+            };
+            completion["choices"][0]["message"]["tool_calls"].as_array_mut().unwrap().push(json!({
+                "id":"native-memory", "type":"function", "function":{"name":"memory", "arguments":json!({"action":"learn", "text":format!("{user}-native-learning")}).to_string()}
+            }));
+            completion
         };
-        completion["choices"][0]["message"]["tool_calls"].as_array_mut().unwrap().push(json!({
-            "id":"native-memory", "type":"function", "function":{"name":"memory", "arguments":json!({"action":"learn", "text":format!("{user}-native-learning")}).to_string()}
-        }));
-        ResponseTemplate::new(200).set_body_json(completion)
+        if body.get("stream").and_then(Value::as_bool) != Some(true) {
+            return ResponseTemplate::new(200).set_body_json(completion);
+        }
+        let mut delta = completion["choices"][0]["message"].clone();
+        if let Some(calls) = delta["tool_calls"].as_array_mut() {
+            for (index, call) in calls.iter_mut().enumerate() {
+                call["index"] = json!(index);
+            }
+        }
+        let chunk = json!({"id":"fixture", "object":"chat.completion.chunk", "model":"fixture", "choices":[{"index":0,"delta":delta,"finish_reason":null}]});
+        let done = json!({"id":"fixture", "object":"chat.completion.chunk", "model":"fixture", "choices":[{"index":0,"delta":{},"finish_reason":completion["choices"][0]["finish_reason"]}], "usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}});
+        ResponseTemplate::new(200).set_body_raw(
+            format!("data: {chunk}\n\ndata: {done}\n\ndata: [DONE]\n\n"),
+            "text/event-stream",
+        )
     }
 }
 
@@ -109,8 +129,14 @@ fn chat_and_relay_use_only_selected_tools_inside_their_profile() {
 async fn scenario() {
     let inference = wiremock::MockServer::start().await;
     Mock::given(wiremock::matchers::method("POST"))
-        .and(wiremock::matchers::path("/v1/chat/completions"))
+        .and(wiremock::matchers::path_regex(r"chat/completions$"))
         .respond_with(CallTools)
+        .with_priority(1)
+        .mount(&inference)
+        .await;
+    Mock::given(wiremock::matchers::any())
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"success":true,"data":[]})))
+        .with_priority(10)
         .mount(&inference)
         .await;
     PointedTransport::install(&inference.uri());
