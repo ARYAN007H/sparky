@@ -364,8 +364,8 @@ server, listener and always-on mode when gating credentials change),
 
 ## Gotchas
 
-- The `voice` feature is default-on, but `pub mod voice` always compiles as a
-  facade. With the feature off, [`stub.rs`](./stub.rs) replaces the real modules and mirrors
+- The desktop product enables `voice` explicitly; contributor defaults leave
+  it off. `pub mod voice` always compiles as a facade. With the feature off, [`stub.rs`](./stub.rs) replaces the real modules and mirrors
   the surface other code depends on (`server`, `dictation_listener`,
   `always_on`, `streaming`, `live::ws`, `reply_speech`, `cloud_transcribe`,
   `cli`, `create_stt_provider`, `effective_stt_provider`, `SttProvider`,
