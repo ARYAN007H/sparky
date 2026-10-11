@@ -71,8 +71,9 @@ use serde::Serialize;
 use tinywallet_bus::names::methods;
 use tinywallet_bus::wire::{
     DeriveMnemonicSeedRequest, DeriveMnemonicSeedResponse, DerivedAccount, ExportRequest,
-    ExportedKey, GenerateMnemonicRequest, GenerateMnemonicResponse, Scheme, SecretMaterial,
-    SignMessageRequest, SignRequest, Signature, SignedTransaction, TransactionSpec,
+    EncodeErc20TransferRequest, EncodeErc20TransferResponse, ExportedKey,
+    GenerateMnemonicRequest, GenerateMnemonicResponse, Scheme, SecretMaterial, SignMessageRequest,
+    SignRequest, Signature, SignedTransaction, TransactionSpec,
 };
 use zeroize::Zeroize;
 
@@ -193,6 +194,29 @@ pub async fn derive_mnemonic_seed(
     let result = call_confidential(config, methods::DERIVE_MNEMONIC_SEED, &request).await;
     request.mnemonic.zeroize();
     result
+}
+
+/// Encode ERC-20 transfer calldata with the module-owned ABI implementation.
+///
+/// # Errors
+///
+/// Returns [`WalletCallError`] if the module is unavailable or rejects the
+/// recipient or base-unit amount.
+pub async fn encode_erc20_transfer(
+    config: &Config,
+    to_address: &str,
+    amount_raw: &str,
+) -> Result<String, WalletCallError> {
+    let response: EncodeErc20TransferResponse = call(
+        config,
+        methods::ENCODE_ERC20_TRANSFER,
+        &EncodeErc20TransferRequest {
+            to_address: to_address.to_owned(),
+            amount_raw: amount_raw.to_owned(),
+        },
+    )
+    .await?;
+    Ok(response.calldata)
 }
 
 /// Sign opaque bytes with the key derived from `secret`.

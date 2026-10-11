@@ -222,6 +222,14 @@ pub async fn lookup_tx(
     ))
 }
 
+/// Encode ERC-20 transfer calldata in the loaded wallet module.
+pub async fn encode_erc20_transfer(to_address: &str, amount_raw: &str) -> Result<String, String> {
+    let config = config_rpc::load_config_with_timeout().await?;
+    wallet_module::encode_erc20_transfer(&config, to_address, amount_raw)
+        .await
+        .map_err(|error| error.to_string())
+}
+
 /// The quotes that can still be executed. Test support and the introspection
 /// harness read the engine's store through this.
 pub fn prepared_quotes_for_test() -> Vec<PreparedTransaction> {

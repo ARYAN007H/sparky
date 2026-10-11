@@ -4,21 +4,19 @@
 //!
 //! ## Where the logic lives
 //!
-//! The wallet engine — balances, the prepare/confirm/execute flow, the per-chain
-//! signing choreography and the agent tools — lives in
-//! `tinywallet_web3::crypto`. This module is the host adapter over it:
+//! The wallet engine — balances, the prepare/confirm/execute flow, signing,
+//! transaction encoding, provider interaction, and agent tools — lives in the
+//! compiled TinyWallet module. This module holds host configuration, custody,
+//! approvals, product RPC adapters, and module lifecycle:
 //!
 //! - [`ops`] — setup, status, recovery-phrase reveal and `secret_material`
 //!   (keyring, consent, credentials). Stays here: it is the host's state.
-//! - [`execution`] — the engine's operations wrapped in the controller
-//!   contract's `Outcome`.
-//! - [`endpoints`] — the `OPENHUMAN_WALLET_RPC_*` / `OPENHUMAN_SOLANA_CLUSTER`
-//!   environment resolution the engine's `RpcEndpoints` seam asks.
-//! - [`transport`] / [`rpc`] — the host `Transport` seam: endpoint resolution,
-//!   URL redaction and error classification over the shared `reqwest` client.
+//! - [`execution`] — typed module operations adapted to product controller
+//!   responses.
+//! - [`endpoints`] / [`rpc`] — host endpoint configuration and guarded,
+//!   credential-aware transport callbacks.
 //! - `schemas` — the controllers, with their RPC namespace strings.
-//! - The seam implementations and the process-wide engine are in
-//!   [`crate::web3::seams`].
+//! - [`crate::modules::wallet_service`] owns the native module service lifetime.
 //!
 //! ## Compile-time gate (`web3` feature)
 //!
@@ -58,7 +56,7 @@ pub(crate) mod test_support;
 pub use endpoints::solana_cluster;
 #[cfg(feature = "web3")]
 pub use execution::{
-    balances, chain_status, execute_prepared, lookup_tx,
+    balances, chain_status, encode_erc20_transfer, execute_prepared, lookup_tx,
     network_defaults as wallet_network_defaults, prepare_transfer, prepared_quotes_for_test,
     supported_assets, tx_receipt, tx_status, BalanceInfo, ChainStatus, ExecutePreparedParams,
     ExecutionResult, PrepareTransferParams, PreparedKind, PreparedStatus, PreparedTransaction,
@@ -78,8 +76,6 @@ pub use schemas::{
     all_controller_schemas, all_registered_controllers, all_wallet_controller_schemas,
     all_wallet_registered_controllers, schemas, wallet_schemas,
 };
-#[cfg(feature = "web3")]
-pub use tinywallet_web3::crypto::abi::encode_erc20_transfer;
 #[cfg(feature = "web3")]
 pub use tinywallet_bus::wire::{
     EvmNetwork, RpcSource, SolanaCluster, WalletAssetDefinition, WalletNetworkDefaults,
