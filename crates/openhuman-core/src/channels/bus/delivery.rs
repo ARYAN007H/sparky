@@ -7,7 +7,9 @@ use crate::modules::{
 use crate::security::credentials::session_support::{
     get_session_token, is_local_session_token, BackendCredential,
 };
-use serde_json::{json, Value};
+use serde_json::json;
+#[cfg(test)]
+use serde_json::Value;
 use tinychannels_bus::module_progressive::{
     ProgressiveCommand, ProgressiveEvent, ProgressiveResult, ProgressiveTransportRequest,
     ProgressiveTransportResult,
@@ -33,7 +35,8 @@ struct ManagedTransport {
 
 impl ManagedTransport {
     fn capture(config: &crate::config::Config) -> anyhow::Result<Self> {
-        let credential = match get_session_token(config)? {
+        let credential = match get_session_token(config)
+            .map_err(|_| anyhow::anyhow!("Hosted channel credential unavailable"))? {
             Some(token) if !is_local_session_token(&token) => BackendCredential::Session(token),
             _ => anyhow::bail!("Hosted channel credential unavailable"),
         };
