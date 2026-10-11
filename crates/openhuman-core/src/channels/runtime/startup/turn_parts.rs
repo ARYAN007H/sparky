@@ -233,7 +233,6 @@ pub(crate) fn runtime_context(
     parts: ChannelTurnParts,
     channels_by_name: Arc<HashMap<String, Arc<dyn crate::channels::Channel>>>,
 ) -> ChannelRuntimeContext {
-    relay_thread: None,
     ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name,

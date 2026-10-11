@@ -25,7 +25,6 @@ impl Tool for DummyTool {
 }
 
 fn runtime_context() -> ChannelRuntimeContext {
-    relay_thread: None,
     let model: Arc<dyn tinyinference_llm::model::ChatModel<()>> =
         Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec![
             "ok",

@@ -32,4 +32,3 @@ pub use params::{
     MAX_ID_LEN, MAX_SENDER_NAME_CHARS, MAX_TEXT_BYTES, RESERVED_CHANNELS,
 };
 pub use schemas::{all_relay_controller_schemas, all_relay_registered_controllers};
-

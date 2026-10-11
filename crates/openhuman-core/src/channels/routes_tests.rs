@@ -54,7 +54,6 @@ impl Channel for RecordingChannel {
 }
 
 fn runtime_context(workspace_dir: PathBuf) -> ChannelRuntimeContext {
-    relay_thread: None,
     let model: Arc<dyn tinyinference_llm::model::ChatModel<()>> =
         Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec![
             "ok",
