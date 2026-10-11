@@ -125,6 +125,16 @@ test("voice source release matches the artifact used for recording summaries", (
   );
 });
 
+test("wallet source release matches the loaded wallet artifact", () => {
+  const record = [...parseRecords(readRegistry()).values()].find(
+    (record) => record.id === "tinywallet",
+  );
+  assert.ok(record, "wallet adapter requires a registered module");
+  const source = readFileSync(join(REPO_ROOT, "vendor/tinywallet/Cargo.toml"), "utf8");
+  const version = source.match(/^version\s*=\s*"([^"]+)"/m)?.[1];
+  assert.equal(version, record.version, "wallet source must match its loaded artifact");
+});
+
 // ── Registry parsing ──────────────────────────────────────────────────────────
 
 test("parses every record `ALL` lists out of the real registry", () => {
