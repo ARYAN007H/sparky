@@ -1169,41 +1169,6 @@
     "occurrence": 1
   },
   {
-    "rule": "openhuman-upstream-reexport",
-    "path": "crates/openhuman-embed/src/lib.rs",
-    "line": 195,
-    "text": "pub use tinyagents_session::port::{",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-upstream-reexport",
-    "path": "crates/openhuman-embed/src/lib.rs",
-    "line": 199,
-    "text": "pub use tinyagents_session::testkit::conformance::{",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-upstream-reexport",
-    "path": "crates/openhuman-embed/src/lib.rs",
-    "line": 203,
-    "text": "pub use tinyagents_session::transcript::{",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-upstream-reexport",
-    "path": "crates/openhuman-embed/src/lib.rs",
-    "line": 208,
-    "text": "pub use tinyagents_session::turn_state::{TurnLifecycle, TurnState};",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-upstream-reexport",
-    "path": "crates/openhuman-embed/src/lib.rs",
-    "line": 210,
-    "text": "pub use tinyagents_session::{Result as StoreResult, TinyAgentsError as StoreError};",
-    "occurrence": 1
-  },
-  {
     "rule": "tinyagents-moved-symbol-alias",
     "path": "vendor/tinyagents/crates/tinyagents-harness/src/tool/mod.rs",
     "line": 144,
