@@ -92,3 +92,24 @@ async fn clear_session_invalidates_old_channels_and_opens_a_fresh_generation() {
     assert!(old_session.is_cancelled());
     assert!(!channel_session().is_cancelled());
 }
+
+#[tokio::test]
+async fn channel_sign_in_resumes_listener_service_after_logout() {
+    crate::channels::session::invalidate_channel_session();
+    let old = channel_session();
+
+    let mut resumed = tokio::spawn(crate::channels::session::wait_for_channel_service_resume());
+    tokio::task::yield_now().await;
+    crate::channels::session::resume_channel_service();
+
+    let current = tokio::time::timeout(std::time::Duration::from_secs(1), &mut resumed)
+        .await
+        .expect("sign-in wakes the stopped channel service")
+        .expect("channel service resume waiter");
+    assert!(old.is_cancelled(), "logout must fence the old generation");
+    assert!(
+        !current.is_cancelled(),
+        "sign-in resumes a fresh generation"
+    );
+    assert!(!channel_session().is_cancelled());
+}
