@@ -162,6 +162,7 @@
     "run_from_args",
     "schema_for_rpc_method",
     "seams",
+    "secret_storage",
     "session_store",
     "skill_registry",
     "stream",
