@@ -240,11 +240,19 @@ async fn an_unpinned_config_is_reloaded_from_config_path() {
     assert_eq!(current.search.direct_key("tavily"), Some("file-key"));
 }
 
-#[test]
-fn a_recorded_load_configuration_is_what_the_module_holds() {
-    let configuration = serde_json::json!({ "enabled": true, "providers": {} });
-    record_load_configuration(&configuration);
-    assert_eq!(held_fingerprint(), Some(fingerprint(&configuration)));
-    set_held(None);
-    assert_eq!(held_fingerprint(), None);
+#[tokio::test]
+async fn a_recorded_load_configuration_is_what_the_module_holds() {
+    // Under the call lock: the record is process-wide state calls rely on.
+    with_module_lock(|| async {
+        let before = held_fingerprint();
+        let configuration = serde_json::json!({ "enabled": true, "providers": {} });
+        record_load_configuration(&configuration);
+        assert_eq!(held_fingerprint(), Some(fingerprint(&configuration)));
+        set_held(None);
+        assert_eq!(held_fingerprint(), None);
+        set_held(before);
+        Ok::<_, String>(())
+    })
+    .await
+    .unwrap();
 }
