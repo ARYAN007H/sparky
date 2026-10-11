@@ -56,19 +56,16 @@ The listener supervisor reports through `OpenHumanListenerObserver`, which publi
 
 The desktop app usually has no native listeners. Messages for hosted bots arrive over the backend socket instead: [`platform/socket/event_handlers.rs`](../platform/socket/event_handlers.rs) publishes `DomainEvent::ChannelInboundMessage`. `bus::ChannelInboundSubscriber` ([`bus/subscriber.rs`](./bus/subscriber.rs)) handles it. It is registered on the always-on boot path by `register_domain_subscribers` in [`core/runtime/subscribers.rs`](../core/runtime/subscribers.rs), not by `start_channels`, so it works on a core that never starts listeners.
 
-The subscriber derives a thread id from (channel, sender, reply target, thread) with `derive_inbound_thread_id`, starts a turn through `web_chat::start_chat`, and watches the web-channel event stream for that request. The reply is shown progressively with `tinychannels::delivery::progressive::ProgressiveReply`: a draft that is edited as text streams in, typing refreshes, and filler bubbles on slow turns, then a finalize. The transport underneath is `BackendProgressiveSender` ([`bus/delivery.rs`](./bus/delivery.rs)), which sends through `BackendClient` with idempotency keys and maps typed `BackendApiError`s (`ChannelEditUnsupported`, `MessageNotFound`) to the recoveries the progressive driver expects.
+The subscriber obtains the existing thread and client identifiers through confidential `PrepareChannelIdentity`, opens a private module runtime, starts a turn through `web_chat::start_chat`, and projects ordered turn events in bounded batches. `ExecuteProgressive` owns drafts, typing refreshes, filler bubbles, idempotency and final delivery inside the module. The callback in [`bus/delivery.rs`](./bus/delivery.rs) supplies managed REST transport with the credential and channel captured for that turn. Typed backend errors become transport facts that the module uses for recovery. Sign-out cancels the captured transport; close retains the callback until the module acknowledges shutdown.
 
 ```text
  backend socket --> DomainEvent::ChannelInboundMessage
                           |
-                          v
-               ChannelInboundSubscriber
-                          |  web_chat::start_chat(thread_id, ...)
-                          v
-               web channel events --> ProgressiveReply
-                                          |
-                                          v
-                               BackendProgressiveSender --> backend REST
+               PrepareChannelIdentity --> web_chat::start_chat
+                          |
+               ordered turn event batches --> ExecuteProgressive(handle)
+                                                  |
+                                captured managed callback --> backend REST
 ```
 
 ### Path 3: gateway-relayed inbound (`channel_relay_inbound`)
@@ -102,7 +99,7 @@ When a tool call needs approval on a channel whose provider has `chat_approvals`
 | `host/` | The OpenHuman implementation of the `tinychannels::host` boundary: `build_channel_host` and its adapters (`adapters.rs`), the approval-surface and turn-state subscribers (`channel_events.rs`), and the remote-control host (`remote_control.rs`). |
 | `runtime/` | Startup, listener supervision, the account-lifetime session, and the dispatch pipeline. See [runtime/README.md](runtime/README.md). |
 | `controllers/` | The `channels.*` RPC namespace and `OpenHumanChannelBackend`. See [controllers/README.md](controllers/README.md). |
-| [`bus.rs`](./bus.rs), `bus/` | `ChannelInboundSubscriber` (`subscriber.rs`), the backend progressive sender (`delivery.rs`), and the inbound thread-id re-export (`thread_id.rs`). |
+| [`bus.rs`](./bus.rs), `bus/` | `ChannelInboundSubscriber` (`subscriber.rs`), the captured managed transport (`delivery.rs`), and the inbound thread-id re-export (`thread_id.rs`). |
 | `context.rs` | `ChannelRuntimeContext`, per-sender history maps, history compaction, and timeout/backoff constants re-exported from `tinychannels::context`. |
 | `routes.rs` | Slash-command parsing and per-sender route selection (provider and model overrides). |
 | `proactive.rs` | `ProactiveMessageSubscriber` and the active-channel handle. |
