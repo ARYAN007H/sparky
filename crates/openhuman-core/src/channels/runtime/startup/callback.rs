@@ -113,7 +113,6 @@ impl ChannelHostCallbacks {
     }
 
     async fn persist_allowed_identity(&self, channel: String, identity: String) -> Result<()> {
-        use tinychannels::host::AllowlistStore as _;
         crate::channels::host::ConfigAllowlistStore
             .persist_allowed_identity(&channel, &identity)
             .await
@@ -187,30 +186,18 @@ impl ChannelHostCallbacks {
         {
             return Err(Error::failed("transcription callback exceeds its limit"));
         }
-        use tinychannels::host::Transcriber as _;
         crate::channels::host::VoiceTranscriber {
             config: Arc::clone(&self.config),
         }
-        .transcribe(tinychannels::host::TranscriptionRequest {
-            audio_base64: request.audio_base64,
-            mime_type: request.mime_type,
-            file_name: request.file_name,
-            language: request.language,
-        })
+        .transcribe_host(request)
         .await
-        .map(|result| HostTranscriptionResult {
-            text: result.text,
-            language: result.language,
-            duration_secs: result.duration_secs,
-        })
         .map_err(|_| Error::failed("channel transcription failed"))
     }
 
     async fn publish_event(&self, publication: HostEventPublication) -> Result<()> {
         Self::validate_callback_size(&publication)?;
-        use tinychannels::host::EventSink as _;
         crate::channels::host::OpenHumanEventSink
-            .publish(&publication.domain, &publication.kind, publication.payload)
+            .publish_host(&publication.domain, &publication.kind, publication.payload)
             .await
             .map_err(|_| Error::failed("channel event publication failed"))
     }
