@@ -66,6 +66,13 @@ impl McpModulePort for ConfigDocumentPort {
             _ => Err(ModuleCallError::Unavailable),
         }
     }
+
+    async fn prepare_agent_tools(
+        &self,
+        _: tinymcp_bus::PrepareAgentToolsRequest,
+    ) -> Result<Vec<tinymcp_bus::McpToolPresentation>, ModuleCallError> {
+        Ok(Vec::new())
+    }
 }
 
 fn config(workspace: &tempfile::TempDir) -> Config {

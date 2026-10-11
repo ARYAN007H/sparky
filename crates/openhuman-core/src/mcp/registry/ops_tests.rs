@@ -120,6 +120,13 @@ impl McpModulePort for RegistryPort {
             _ => Err(ModuleCallError::IncompatibleContract),
         }
     }
+
+    async fn prepare_agent_tools(
+        &self,
+        _: tinymcp_bus::PrepareAgentToolsRequest,
+    ) -> Result<Vec<tinymcp_bus::McpToolPresentation>, ModuleCallError> {
+        Ok(Vec::new())
+    }
 }
 
 fn status(server_id: &str, qualified_name: &str) -> tinymcp_bus::ConnStatus {
