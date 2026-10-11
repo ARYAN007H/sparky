@@ -42,6 +42,23 @@ fn decode_discord<R: DeserializeOwned>(
         })
 }
 
+/// Prepare a verified connection without running provider behavior in the host.
+pub(crate) async fn prepare_connection(
+    client: &ModuleClient,
+    request: ChannelControllerRequest,
+) -> Result<tinychannels_bus::module_controller::PreparedChannelConnection, ModuleCallError> {
+    let response = client
+        .call_confidential("tinychannels", methods::CHANNEL_CONTROLLER, (request,))
+        .await?;
+    match response {
+        ChannelControllerResult::PreparedConnect(prepared) => Ok(*prepared),
+        _ => {
+            ModuleClient::report_malformed_reply("tinychannels");
+            Err(ModuleCallError::ModuleFault)
+        }
+    }
+}
+
 /// Resolve OpenHuman's proxy scope before transmitting provider configuration.
 pub(crate) fn discord_proxy(config: &crate::config::Config) -> HttpProxyPolicy {
     let proxy = &config.proxy;

@@ -53,6 +53,7 @@ mod browser_task_report;
 pub(crate) mod channel_controller;
 #[cfg(feature = "voice")]
 pub mod channel_email;
+pub(crate) mod channel_health;
 pub mod client;
 #[cfg(feature = "modules")]
 pub mod computer;
@@ -86,6 +87,10 @@ pub mod voice;
 #[cfg(feature = "web3")]
 #[cfg(feature = "modules")]
 pub mod wallet;
+#[cfg(feature = "web3")]
+mod wallet_host;
+#[cfg(feature = "web3")]
+pub(crate) mod wallet_service;
 
 #[cfg(feature = "modules")]
 pub use ops::{ensure_loaded, ensure_loaded_within, state_of, LoadError};

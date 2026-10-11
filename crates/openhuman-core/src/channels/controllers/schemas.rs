@@ -243,20 +243,20 @@ fn handle_connect(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let p = deserialize_params::<ConnectParams>(params)?;
-        let channel = p.channel.trim();
-        let mode: ChannelAuthMode = p
-            .auth_mode
-            .parse()
-            .map_err(|e: String| format!("invalid authMode: {e}"))?;
-        let creds = p.credentials.unwrap_or(Value::Object(Map::new()));
-        let manager = openhuman_channel_manager(config);
-        let result = manager
-            .connect(channel, mode, creds)
-            .await
-            .map_err(|e| e.to_string())?;
-        let logs = connect_logs(channel, mode, result.auth_action.is_some());
-        to_json(Outcome::new(result, logs))
+        connect_with_config(&config, p).await
     })
+}
+
+async fn connect_with_config(config: &Config, p: ConnectParams) -> Result<Value, String> {
+    let channel = p.channel.trim();
+    let mode: ChannelAuthMode = p
+        .auth_mode
+        .parse()
+        .map_err(|error: String| format!("invalid authMode: {error}"))?;
+    let creds = p.credentials.unwrap_or(Value::Object(Map::new()));
+    let outcome = super::ops::connect_channel(config, channel, mode, creds).await?;
+    let logs = connect_logs(channel, mode, outcome.value.auth_action.is_some());
+    to_json(Outcome::new(outcome.value, logs))
 }
 
 fn handle_disconnect(params: Map<String, Value>) -> ControllerFuture {

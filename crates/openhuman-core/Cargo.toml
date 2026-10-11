@@ -159,7 +159,7 @@ tinyagents-registry = { path = "../../vendor/tinyagents/crates/tinyagents-regist
 tinyagents-session = { path = "../../vendor/tinyagents/crates/tinyagents-session", features = ["storage-drivers"] }
 # The storage ports and the URL-to-backend facade (`storage` domain). No driver
 # by default: the `storage-*` features below add them.
-tinystoragedrivers = { path = "../../vendor/tinyagents/vendor/tinystoragedrivers/crates/tinystoragedrivers", default-features = false, features = ["blocking", "secrets", "keyring", "file"] }
+tinystoragedrivers = { path = "../../vendor/tinyagents/vendor/tinystoragedrivers/crates/tinystoragedrivers", default-features = false, features = ["blocking", "secrets", "file"] }
 tinyagents-runtime = { path = "../../vendor/tinyagents/crates/tinyagents-runtime" }
 tinyagents-orchestration = { path = "../../vendor/tinyagents/crates/tinyagents-orchestration" }
 tinyagents-tasks = { path = "../../vendor/tinyagents/crates/tinyagents-tasks" }
@@ -226,18 +226,11 @@ tinyconnectors-bus = { path = "../../vendor/tinyconnectors/crates/tinyconnectors
 # generates a settings schema for the desktop application from those types
 # rather than from a hand-kept copy.
 #
-# The path dependency on `tinymcp` itself is still the step-one arrangement. The
-# registry entry step two calls for now exists — `crates/openhuman-core/src/modules/registry.rs`
-# pins the v0.3.6 release — but the host still calls the library directly, because
-# `tinymcp-bus` v0.3.6 does not yet publish everything this host reaches for:
-# `OAuthComplete`, a member returning the already-exported `ConnectedServerOverview`,
-# the boot-connect and reconnect-supervisor passes, the `ServerDetail` /
-# `AuthDetection` / `AuthKind` reply types, the registry curation helpers, an error
-# anchor for the `McpServerNeedsAuth` classifier coupling test, and
-# `render_tool_result` / `redact_endpoint` for the ungated `gitbooks` tool. It also
-# needs a per-`data_dir` object seam of the shape `modules::memory` already uses,
-# since `mcp::host` keys one store per workspace and a module gets one `data_dir` at
-# load. Those are upstream work in tinyhumansai/tinymcp.
+# `tinymcp` v0.8.1 publishes contract 1.12, including configured directories,
+# explicit close and transition receipts, and cached tool reads. The native
+# registry entry pins the same v0.8.1 release and its verified platform digests.
+# The current host still calls the local library directly; switching those
+# callers to the bus remains a separate host-adapter change.
 #
 # Correcting what this comment used to promise: dropping the path dependency does
 # NOT take reqwest/rusqlite with it. Measured in the kernel profile, `rusqlite` has
@@ -401,7 +394,6 @@ walkdir = "2"
 hostname = "0.4.2"
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
 sysinfo = { version = "0.33", default-features = false, features = ["system"] }
-keyring = { version = "3", features = ["apple-native", "windows-native", "linux-native"] }
 lettre = { version = "0.11.22", default-features = false, features = ["builder"], optional = true }
 # HTTP server framework for the domain-owned routes (`/v1`, dictation, the MCP
 # HTTP transport). Exclusive to the default-ON `http-server`
@@ -464,10 +456,6 @@ tinydocs-bus = { path = "../../vendor/tinydocs/crates/tinydocs-bus", optional = 
 # Optional: exclusive to the `voice` feature — default-OFF, product-ON, the
 # same split as `documents` above.
 tinyvoice-bus = { path = "../../vendor/tinyvoice/crates/tinyvoice-bus", optional = true }
-# `cpal` microphone capture (`voice::audio_capture`, `voice::always_on`) remains
-# on the library path until its module-owned lifecycle contract is released.
-# Hotkeys are already owned by the loaded TinyVoice module.
-tinyvoice = { path = "../../vendor/tinyvoice/crates/tinyvoice", default-features = false, features = ["capture"], optional = true }
 
 # TinyJuice — the compression wire contract, and nothing else.
 #
@@ -524,6 +512,10 @@ tinyhosts-bus = { path = "../../vendor/tinyhosts/crates/tinyhosts-bus", optional
 # derive a known account. Dev-dependency features are not linked into the
 # shipped binary, so that does not undo the shed.
 tinywallet-bus = { path = "../../vendor/tinywallet/crates/tinywallet-bus", default-features = false, features = ["btc", "evm", "solana", "tron", "keccak", "net", "wire", "eip712", "abi", "tx-codec"], optional = true }
+# Transitional adapter dependency: the pre-cutover host WalletEngine still
+# consumes this leaf transport trait. It is removed with the direct engine path
+# once every Wallet/Web3/x402 caller uses the module contract.
+tinywallet-crypto = { path = "../../vendor/tinywallet/crates/tinywallet-crypto", default-features = false, features = ["net", "serde"], optional = true }
 # The x402 payment flow (402 challenge, EVM/Solana payment builders, the
 # spending ledger, the `x402_request` tool), moved out of `web3/x402`. The host
 # keeps signing, proxy policy and RPC controllers and hands them in as seams.
@@ -624,9 +616,8 @@ langfuse = ["tinyagents-harness/langfuse"]
 # `storage-sqlite` is in the contributor set and the product: the small
 # desktop stores (approvals, devices, notifications, task sources) keep their
 # rows in it by default. `storage-mongodb` is in neither; a cloud build turns
-# it on. `storage-keyring` does not exist: the only tinystoragedrivers
-# `keyring` gate is `KeyringSecrets`, which the core does not use (its OS
-# keychain access is the `keyring` crate in `security/keyring`).
+# it on. OS keychain support belongs to openhuman-rpc's `os-keyring` feature,
+# not the core or its storage-driver feature set.
 storage-sqlite = ["tinystoragedrivers/sqlite"]
 storage-mongodb = ["tinystoragedrivers/mongodb"]
 # Always on (the dependency enables `file`); kept so existing feature lists
@@ -766,7 +757,6 @@ voice = [
     # only — `serde` and nothing else.
     "dep:tinyvoice-bus",
     "dep:lettre",
-    "dep:tinyvoice",
     # Podcast SMTP delivery uses the loadable Channels module. The always-on
     # bus dependency provides its upload vocabulary without linking providers.
     # `voice::live`: live voice agent sessions over tinyagents-live.
@@ -794,6 +784,7 @@ web3 = [
     "dep:reqwest13",
     "dep:webpki-roots",
     "dep:tinywallet-bus",
+    "dep:tinywallet-crypto",
     "dep:tinywallet-x402",
     "dep:tinywallet-web3",
     "modules",
