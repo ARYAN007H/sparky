@@ -160,13 +160,51 @@ fn fresh_profile_is_the_default() {
 }
 
 #[test]
-fn shared_fetch_wildcard_does_not_open_browser_by_default() {
+fn allow_all_lets_the_browser_open_any_public_site() {
     if browser_allow_all() {
         return;
     }
+    // "Allow all" is the shared list's `*`, as a fresh config has it; the
+    // browser itself stays off until the user turns it on.
     let config = Config::default();
+    assert_eq!(config.http_request.allowed_domains, vec!["*".to_owned()]);
+    assert!(!config.browser.enabled);
     let client = BrowserClient::new(Arc::new(config));
+    for url in [
+        "https://example.com/",
+        "https://www.makemytrip.com/flights/",
+    ] {
+        assert!(client.check_url(url).is_ok(), "{url}");
+    }
+    for url in [
+        "https://localhost/",
+        "https://192.168.1.1/",
+        "https://127.0.0.1/",
+        "http://example.com/",
+    ] {
+        assert!(client.check_url(url).is_err(), "{url}");
+    }
+    assert_eq!(client.task_origins(), vec!["*"]);
+
+    // A star beside named sites is still "Allow all".
+    let mut config = Config::default();
+    config.http_request.allowed_domains = vec!["selenium.dev".into(), "*".into()];
+    let client = BrowserClient::new(Arc::new(config));
+    assert!(client.check_url("https://example.com/").is_ok());
+    assert_eq!(client.task_origins(), vec!["*"]);
+}
+
+#[test]
+fn a_custom_list_still_keeps_the_browser_to_its_sites() {
+    if browser_allow_all() {
+        return;
+    }
+    let mut config = Config::default();
+    config.http_request.allowed_domains = vec!["oyorooms.com".into()];
+    let client = BrowserClient::new(Arc::new(config));
+    assert!(client.check_url("https://www.oyorooms.com/").is_ok());
     assert!(client.check_url("https://example.com/").is_err());
+    assert_eq!(client.task_origins(), vec!["https://.oyorooms.com"]);
 }
 
 #[test]

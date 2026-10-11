@@ -132,7 +132,7 @@ impl BrowserClient {
     ) -> Result<SessionInfo, BrowserCallError> {
         self.ensure_ready().await?;
         let domains = self.browser_domains();
-        if domains.is_empty() && !browser_allow_all() {
+        if domains.is_empty() && !browser_allow_all() && !self.allows_any_site() {
             return Err(BrowserCallError::Policy(
                 "allowed websites list is empty".into(),
             ));
@@ -321,6 +321,7 @@ impl BrowserClient {
             )));
         }
         if !allow_all
+            && !self.allows_any_site()
             && !self.browser_domains().iter().any(|allowed| {
                 host.eq_ignore_ascii_case(allowed)
                     || host
@@ -345,6 +346,18 @@ impl BrowserClient {
         self.check_url(raw)
     }
 
+    /// Whether the allowed websites are "Allow all" (`*`): the browser may
+    /// open any public site, as web fetch may. Private and local addresses
+    /// stay refused, here by `check_url` and in the module by its own `*`
+    /// rule. The browser itself is off until the user turns it on.
+    fn allows_any_site(&self) -> bool {
+        self.config
+            .http_request
+            .allowed_domains
+            .iter()
+            .any(|domain| domain.trim() == "*")
+    }
+
     fn browser_domains(&self) -> Vec<String> {
         self.config
             .http_request
@@ -355,9 +368,11 @@ impl BrowserClient {
             .collect()
     }
 
-    /// Origins a TinyComputer task may load: the allowed websites, in the
-    /// module's `https://.host` spelling. Empty when none are allowed, which a
-    /// task refuses, since an empty list means any origin to the module.
+    /// Origins a TinyComputer task may open pages on: `*` (any public site)
+    /// under "Allow all", else the allowed websites in the module's
+    /// `https://.host` spelling. Empty when none are allowed, which a task
+    /// refuses, since an empty list means any origin, private ones included,
+    /// to the module.
     pub(crate) fn task_origins(&self) -> Vec<String> {
         self.browser_origins()
     }
@@ -371,6 +386,9 @@ impl BrowserClient {
             // A nonempty, unmatchable origin keeps TinyComputer's document
             // guard active before the caller supplies an explicit URL.
             return vec!["https://.".to_owned()];
+        }
+        if self.allows_any_site() {
+            return vec!["*".to_owned()];
         }
         self.browser_domains()
             .iter()
