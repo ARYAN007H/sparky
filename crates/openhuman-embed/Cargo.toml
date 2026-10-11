@@ -126,6 +126,11 @@ required-features = ["storage-sqlite"]
 name = "saas_profiles"
 required-features = ["channels"]
 
+# Host capability regression exercises the authenticated profile facade.
+[[test]]
+name = "profile_host_capabilities"
+required-features = ["channels"]
+
 [[example]]
 name = "profiles"
 required-features = ["channels"]
