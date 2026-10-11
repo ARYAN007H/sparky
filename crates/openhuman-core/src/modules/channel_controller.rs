@@ -59,6 +59,21 @@ pub(crate) async fn prepare_connection(
     }
 }
 
+/// Normalize rich outbound content and derive its idempotency key inside the module.
+pub(crate) async fn prepare_message(
+    client: &ModuleClient,
+    channel: &str,
+    message: serde_json::Value,
+) -> Result<tinychannels_bus::PreparedChannelIntent, ModuleCallError> {
+    client
+        .call_confidential(
+            "tinychannels",
+            methods::PREPARE_OUTBOUND_INTENT,
+            (channel, tinychannels_bus::ChannelMessagePreparation::Legacy(message)),
+        )
+        .await
+}
+
 /// Resolve OpenHuman's proxy scope before transmitting provider configuration.
 pub(crate) fn discord_proxy(config: &crate::config::Config) -> HttpProxyPolicy {
     let proxy = &config.proxy;

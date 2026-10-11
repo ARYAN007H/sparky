@@ -32,6 +32,30 @@ impl OpenHumanChannelBackend {
         &self.config
     }
 
+    /// Deliver module-prepared content through the configured product transport.
+    pub(crate) async fn send_prepared(
+        &self,
+        prepared: tinychannels_bus::PreparedChannelIntent,
+    ) -> anyhow::Result<ChannelSendMessageResult> {
+        if tinychannels::relay::relay_runtime_fronts_channel(
+            &self.config.channels_config,
+            &prepared.intent.channel_id,
+        ) {
+            if let Some(result) = tinychannels::relay::send_outbound_intent(&prepared.intent).await? {
+                return Ok(result);
+            }
+        }
+        let value = into_anyhow(
+            ops::channel_send_message(
+                &self.config,
+                &prepared.intent.channel_id,
+                prepared.legacy_message,
+            )
+            .await,
+        )?;
+        Ok(parse_or_raw(value))
+    }
+
     fn config_with_channels(&self, channels_config: &ChannelsConfig) -> Config {
         let mut config = self.config.clone();
         config.channels_config = channels_config.clone();
