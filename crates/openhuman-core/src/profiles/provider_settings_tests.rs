@@ -130,6 +130,7 @@ fn private_module_configuration_preserves_direct_urls_and_never_resolves_managed
     let mut config = crate::config::Config::default();
     config.api_key = Some("ambient-managed-key-must-not-be-read".into());
     settings.bind(&mut config);
+    eprintln!("DBG {:?}", crate::search::providers::resolve(&config).iter().map(|p| (p.id,p.enabled,p.usable,p.key_configured,format!("{:?}",p.route))).collect::<Vec<_>>());
     let module = crate::modules::search::module_config(&config);
     assert_eq!(
         module
