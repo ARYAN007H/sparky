@@ -24,7 +24,6 @@ fn build_rpc_params_from_validated(
     tool_name: &str,
     args: &Map<String, Value>,
 ) -> Result<Map<String, Value>, ToolCallError> {
-    let name = tool_name;
     match tool_name {
         "core.list_tools" | "core.tool_instructions" | "agent.list_subagents" => {
             Ok(Map::new())
@@ -102,12 +101,7 @@ fn build_rpc_params_from_validated(
             Ok(Map::from_iter([("ids".to_string(), Value::from(ids))]))
         }
         "searxng_search" | "web_search" => {
-            let allowed = if name == "web_search" {
-                WEB_SEARCH_ARGUMENTS
-            } else {
-                SEARXNG_SEARCH_ARGUMENTS
-            };
-            let query = validated_string(&args, "query")?;
+            let query = validated_string(args, "query")?;
             let mut params = Map::new();
             params.insert("query".to_string(), Value::String(query));
             if let Some(max_results) =
