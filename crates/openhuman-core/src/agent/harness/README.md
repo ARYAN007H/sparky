@@ -26,9 +26,9 @@ used here (not defined here) by [`agent_graph.rs`](./agent_graph.rs) and [`fork_
   own.
 - Carry the task-local plumbing that lets a spawned tool see its parent's
   runtime context (`fork_context.rs`, [`sandbox_context.rs`](./sandbox_context.rs),
-  [`spawn_depth_context.rs`](./spawn_depth_context.rs), [`task_recency_context.rs`](./task_recency_context.rs), `OpenHumanRunContext`).
-- Run the channel/CLI turn graph ([`graph.rs`](./graph.rs)) and let a built-in agent select
-  a bespoke sub-agent turn graph (`agent_graph.rs`).
+  [`spawn_depth_context.rs`](./spawn_depth_context.rs), `OpenHumanRunContext`).
+- Run the channel/CLI turn graph ([`graph.rs`](./graph.rs)); all sub-agents use
+  the shared sub-agent turn graph.
 - Offload oversized worker artifacts to the filesystem, and persist oversized
   tool results as action-workspace artifacts (`artifact_offload/`,
   `tool_result_artifacts/`).
@@ -38,9 +38,8 @@ used here (not defined here) by [`agent_graph.rs`](./agent_graph.rs) and [`fork_
 | Module | Role |
 | --- | --- |
 | `definition*.rs`, [`builtin_definitions.rs`](./builtin_definitions.rs), [`definition_loader.rs`](./definition_loader.rs) | `AgentDefinition`/`AgentDefinitionRegistry`/`SandboxMode`/`ToolScope`/`PromptSource`/`ModelSpec`; loads built-ins from `crate::agent::registry::agents` and user TOML from the workspace/home `agents/` directory. |
-| `fork_context.rs`, `sandbox_context.rs`, `spawn_depth_context.rs`, `task_recency_context.rs` | Task-locals that let a spawned tool see its parent's runtime context: parent handle, sandbox mode, spawn depth, and task-recency window. `fork_context.rs` also carries the `RunQueue` handle (from `tinyagents_harness::run_queue`) down to a forked turn. |
+| `fork_context.rs`, `sandbox_context.rs`, `spawn_depth_context.rs` | Task-locals that let a spawned tool see its parent's runtime context: parent handle, sandbox mode, and spawn depth. `fork_context.rs` also carries the `RunQueue` handle (from `tinyagents_harness::run_queue`) down to a forked turn. |
 | `graph.rs` | `run_channel_turn_via_graph` (`pub(crate)`): the channel/CLI turn graph, thin over `run_turn_via_tinyagents_shared`; called by the `agent.run_turn` native-bus handler in [`agent/bus.rs`](../bus.rs). |
-| `agent_graph.rs` | `AgentGraph` (`Default`/`Custom`), `AgentTurnRequest`, `AgentTurnResult`, `AgentTurnUsage`: per-agent sub-agent turn-graph selection consumed by `../subagent_host/`. Every built-in agent currently selects `Default`. |
 | `artifact_offload/` | The `outputs/` / `workspace/` convention under `action_dir`: prompt half (`contract.rs`) and host policy half (`policy.rs`); mechanics (thresholds, path resolution, pointer rendering, the writer) live in `tinyagents_harness::artifacts` and are re-exported here. |
 | `tool_result_artifacts/` | Wiring only: `new_tool_result_store` hands `tinyagents_harness::artifacts::tool_results` OpenHuman's redactor (`SanitizingRedactor`), `file_read`/`use_skill` names and `FileReadTool::MAX_FILE_SIZE_BYTES`. The store, `[tool_result_preview]` envelope, budgets and paged reads live in the crate. |
 | [`memory_context_safety.rs`](./memory_context_safety.rs) | Trust-tier wrapping of recalled entries that came from connectors (`wrap_untrusted_for_agent`). The read-index, dedupe, write, update-index enforcement state machine for memory-mutating tools (issue #4116) now lives in `tinyagents_harness::middleware` (`MemoryProtocolTracker`). |
@@ -57,10 +56,8 @@ What `harness/mod.rs` actually re-exports:
 - `ParentExecutionContext` and its accessors (`current_parent`,
   `with_parent_context`, `AgentContextPreparedSource`):
   parent runtime context for spawned tools.
-- `current_sandbox_mode`/`with_current_sandbox_mode`,
-  `current_task_recency_window`/`with_task_recency_window`: the other
-  task-local accessors.
-- `AgentGraph`, `AgentTurnRequest`, `AgentTurnResult`, `AgentTurnUsage`.
+- `current_sandbox_mode`/`with_current_sandbox_mode`: sandbox task-local accessors.
+  Briefing task recency belongs to `integrations/composio/task_recency_context.rs`.
 - `artifact_offload::{...}`: reached only via the `artifact_offload::` path
   (see Notes), never flattened into `harness::`.
 
