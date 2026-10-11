@@ -104,10 +104,9 @@ pub mod connections {
     /// Sorted by qualified name, so a prompt built from this does not reshuffle
     /// between turns and cost its cached prefix.
     pub async fn connected_overview() -> Vec<ConnectedServerOverview> {
-        match host::try_service() {
-            Some(service) => service.dynamic().connected_overview().await,
-            None => Vec::new(),
-        }
+        host::ambient_config().map_or_else(Vec::new, |config| async move {
+            connected_overview_for_config(&config).await
+        }.await)
     }
 
     /// Every connected server's identity and advertised tools in `config`'s
@@ -187,20 +186,24 @@ pub mod connections {
 
     /// Every tool on every connected server, paired with its server.
     pub async fn all_connected_tools() -> Vec<(String, String, tinymcp_bus::McpTool)> {
-        match host::try_service() {
-            Some(service) => service.dynamic().connections().all_connected_tools().await,
-            None => Vec::new(),
-        }
+        connected_overview()
+            .await
+            .into_iter()
+            .flat_map(|server| {
+                let server_id = server.server_id;
+                let qualified_name = server.qualified_name;
+                server.tools.into_iter().map(move |tool| {
+                    (server_id.clone(), qualified_name.clone(), tool)
+                })
+            })
+            .collect()
     }
 
     /// The tools one connected server advertises, or `None` when it is not
     /// connected.
     pub async fn tools_for(server_id: &str) -> Option<Vec<tinymcp_bus::McpTool>> {
-        host::try_service()?
-            .dynamic()
-            .connections()
-            .tools_for(server_id)
-            .await
+        let config = host::ambient_config()?;
+        server_tools_for_config(&config, server_id).await
     }
 
     /// The tools one connected server advertises in `config`'s workspace.
@@ -226,16 +229,10 @@ pub mod connections {
 
     /// Whether a server has a live entry.
     pub async fn is_connected(server_id: &str) -> bool {
-        match host::try_service() {
-            Some(service) => {
-                service
-                    .dynamic()
-                    .connections()
-                    .is_connected(server_id)
-                    .await
-            }
-            None => false,
-        }
+        let Some(config) = host::ambient_config() else {
+            return false;
+        };
+        is_connected_for_config(&config, server_id).await
     }
 
     /// Whether a server has a live entry in `config`'s workspace.
@@ -288,10 +285,10 @@ pub mod connections {
     /// Answers `false` when the service is not up, which is the truth: nothing
     /// was holding a connection to drop.
     pub async fn disconnect(server_id: &str) -> bool {
-        match host::try_service() {
-            Some(service) => service.dynamic().connections().disconnect(server_id).await,
-            None => false,
-        }
+        let Some(config) = host::ambient_config() else {
+            return false;
+        };
+        disconnect_for_config(&config, server_id).await
     }
 
     /// Drop a connection held in `config`'s workspace.

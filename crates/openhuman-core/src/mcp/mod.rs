@@ -61,13 +61,10 @@
 #[cfg(feature = "mcp")]
 pub fn start(config: &crate::config::Config) {
     registry::bus::init();
+    host::set_default_config(config);
 
     #[cfg(feature = "modules")]
     module_client::McpConfiguredClient::register_shutdown_hook();
-
-    if let Err(error) = host::init(config) {
-        log::warn!("[mcp] the service could not be opened; continuing without it: {error}");
-    }
 }
 
 #[cfg(feature = "mcp")]

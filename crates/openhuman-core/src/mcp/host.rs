@@ -80,6 +80,7 @@ struct HostEntry {
 /// tools — are addressed by server id alone, because the connection map they
 /// read used to be a process global. They resolve through here.
 static DEFAULT_WORKSPACE: OnceLock<PathBuf> = OnceLock::new();
+static DEFAULT_CONFIG: OnceLock<Config> = OnceLock::new();
 
 /// The three pieces of `tinymcp` this application drives.
 ///
@@ -275,6 +276,8 @@ pub fn lookup(config: &Config) -> anyhow::Result<Arc<McpHost>> {
 pub fn init(config: &Config) -> anyhow::Result<()> {
     for_config(config)?;
 
+    set_default_config(config);
+
     if DEFAULT_WORKSPACE.set(config.workspace_dir.clone()).is_err() {
         tracing::debug!("[mcp] a default workspace was already set; leaving it alone");
         return Ok(());
@@ -282,6 +285,24 @@ pub fn init(config: &Config) -> anyhow::Result<()> {
 
     tracing::info!(workspace = ?config.workspace_dir, "[mcp] service initialised");
     Ok(())
+}
+
+/// Remembers the process config for ambient MCP calls without opening a
+/// TinyMCP implementation in the host.
+pub fn set_default_config(config: &Config) {
+    let _ = DEFAULT_CONFIG.set(config.clone());
+}
+
+/// The config named by the current scoped dispatch, or the process default
+/// outside a tenant scope. Ambient MCP helpers use this rather than resolving
+/// an implementation-owned process registry.
+pub fn ambient_config() -> Option<Config> {
+    match crate::core::runtime::current_tenant() {
+        Ok(tenant) if tenant.is_scoped() => {
+            crate::core::runtime::CoreContext::with_current_embedder_config(Clone::clone)
+        }
+        _ => DEFAULT_CONFIG.get().cloned(),
+    }
 }
 
 /// The service for the paths that have no `Config` to resolve by.
