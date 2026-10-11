@@ -215,8 +215,14 @@ fn projected_model_preserves_inherit_exact_and_hint_routing() {
     use tinyagents_definition::ModelSpec as HarnessModel;
     for (model, expected) in [
         (ModelSpec::Inherit, HarnessModel::Inherit),
-        (ModelSpec::Exact("neocortex-mk1".into()), HarnessModel::Exact("neocortex-mk1".into())),
-        (ModelSpec::Hint("reasoning".into()), HarnessModel::Hint("reasoning".into())),
+        (
+            ModelSpec::Exact("neocortex-mk1".into()),
+            HarnessModel::Exact("neocortex-mk1".into()),
+        ),
+        (
+            ModelSpec::Hint("reasoning".into()),
+            HarnessModel::Hint("reasoning".into()),
+        ),
     ] {
         let mut def = synthetic("routed", AgentTier::Worker, &[]);
         def.model = model;
@@ -262,7 +268,8 @@ fn an_undenied_wildcard_scope_projects_registered_tools() {
         registry_of(vec![def.clone()])
             .with_registered_tools(Arc::new(vec!["file_read".to_string()]))
             .project(&def)
-            .tools.named_tools(),
+            .tools
+            .named_tools(),
         vec!["file_read".to_string()]
     );
 }
@@ -298,16 +305,26 @@ fn named_discovery_scope_authorizes_only_registered_deferred_tools() {
             "blocked_secret".into(),
         ]))
         .project(&def);
-    assert!(projected.tools.named_tools().contains(&"browser_open".to_string()));
-    assert!(projected.tools.named_tools().contains(&"browser".to_string()));
-    assert!(!projected.tools.named_tools().contains(&"blocked_secret".to_string()));
+    assert!(projected
+        .tools
+        .named_tools()
+        .contains(&"browser_open".to_string()));
+    assert!(projected
+        .tools
+        .named_tools()
+        .contains(&"browser".to_string()));
+    assert!(!projected
+        .tools
+        .named_tools()
+        .contains(&"blocked_secret".to_string()));
 
     def.tools = ToolScope::Named(vec!["file_read".into()]);
     let without_discovery = registry_of(vec![def.clone()])
         .with_deferred_tools(Arc::new(vec!["browser_open".into()]))
         .project(&def);
     assert!(!without_discovery
-        .tools.named_tools()
+        .tools
+        .named_tools()
         .contains(&"browser_open".to_string()));
 }
 
@@ -334,7 +351,11 @@ fn a_wildcard_denylist_is_materialized_against_the_registered_tools() {
 
     assert_eq!(projected.tools.named_tools(), vec!["file_read".to_string()]);
     assert!(
-        !projected.tools.named_tools().iter().any(|t| t == "secret_read"),
+        !projected
+            .tools
+            .named_tools()
+            .iter()
+            .any(|t| t == "secret_read"),
         "a denied tool must not survive the wildcard projection"
     );
 }
@@ -365,7 +386,10 @@ fn an_explicitly_tool_less_named_scope_projects_the_no_tools_sentinel() {
     def.extra_tools = Vec::new();
 
     assert_eq!(
-        registry_of(vec![def.clone()]).project(&def).tools.named_tools(),
+        registry_of(vec![def.clone()])
+            .project(&def)
+            .tools
+            .named_tools(),
         vec![NO_TOOLS_SENTINEL.to_string()]
     );
 }
@@ -379,7 +403,10 @@ fn a_named_scope_emptied_by_its_denylist_projects_the_no_tools_sentinel() {
     def.disallowed_tools = vec!["example_tool".to_string()];
 
     assert_eq!(
-        registry_of(vec![def.clone()]).project(&def).tools.named_tools(),
+        registry_of(vec![def.clone()])
+            .project(&def)
+            .tools
+            .named_tools(),
         vec![NO_TOOLS_SENTINEL.to_string()]
     );
 }
@@ -458,7 +485,7 @@ async fn an_enabled_custom_config_agent_resolves_and_lists() {
         .expect("resolve")
         .expect("an enabled custom agent is in the catalogue");
     assert_eq!(def.display_name(), "Finance Analyst");
-    assert_eq!(def.model.as_deref(), Some("hint:reasoning"));
+    assert_eq!(def.model.pin().as_deref(), Some("hint:reasoning"));
     assert_eq!(def.tools.named_tools(), vec!["memory_recall".to_string()]);
 
     let listed = registry.list().await.expect("list");
@@ -489,7 +516,11 @@ async fn a_harness_definition_shadows_a_same_id_config_entry() {
         .await
         .expect("resolve")
         .expect("present");
-    assert_eq!(def.display_name(), "finance display", "harness definition must win");
+    assert_eq!(
+        def.display_name(),
+        "finance display",
+        "harness definition must win"
+    );
     assert_eq!(registry.list().await.expect("list").len(), 1);
 }
 
@@ -572,7 +603,8 @@ async fn the_sessions_own_definition_outranks_a_same_id_registry_entry() {
     // `project` maps `name` from `display_name()`, which only the caller's copy
     // sets — had the registry entry won, this would be its own display name.
     assert_eq!(
-        resolved.display_name(), "the caller's own",
+        resolved.display_name(),
+        "the caller's own",
         "the session's own definition must win over the same-id registry entry"
     );
     // And the tier travels with it: the registry entry is Chat-tier (what the
@@ -633,7 +665,8 @@ fn named_scope_admits_the_tinyjuice_tools_a_handle_names() {
         .with_config(handle_mode_config())
         .with_registered_tools(registered)
         .project(&def)
-        .tools.named_tools();
+        .tools
+        .named_tools();
     for name in [
         "juice_retrieve",
         "juice_find",
@@ -660,7 +693,8 @@ fn named_scope_skips_tinyjuice_tools_that_are_off_or_unregistered() {
         .with_config(Arc::new(off))
         .with_registered_tools(Arc::new(vec!["file_read".into(), "juice_find".into()]))
         .project(&def)
-        .tools.named_tools();
+        .tools
+        .named_tools();
     assert!(!tools.contains(&"juice_find".to_string()), "{tools:?}");
 
     // Active but not registered: an allowlist entry for a tool that does not
@@ -669,7 +703,8 @@ fn named_scope_skips_tinyjuice_tools_that_are_off_or_unregistered() {
         .with_config(handle_mode_config())
         .with_registered_tools(Arc::new(vec!["file_read".into()]))
         .project(&def)
-        .tools.named_tools();
+        .tools
+        .named_tools();
     assert!(!tools.contains(&"juice_find".to_string()), "{tools:?}");
 }
 
@@ -681,6 +716,7 @@ fn zero_tool_scope_stays_zero_tool_with_tinyjuice_active() {
         .with_config(handle_mode_config())
         .with_registered_tools(Arc::new(vec!["juice_find".into()]))
         .project(&def)
-        .tools.named_tools();
+        .tools
+        .named_tools();
     assert!(!tools.contains(&"juice_find".to_string()), "{tools:?}");
 }
