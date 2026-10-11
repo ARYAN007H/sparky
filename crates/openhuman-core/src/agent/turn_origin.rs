@@ -216,11 +216,14 @@ async fn scope_origin<F: std::future::Future>(origin: AgentTurnOrigin, fut: F) -
     AGENT_TURN_ORIGIN.scope(origin, Box::pin(fut)).await
 }
 
-/// Try to read the current origin. Returns `None` when no caller scoped one
+/// Read scoped CoreContext authority before the legacy task-local.
+/// The process default never supplies authority. Returns `None` when no caller scoped one
 /// (legacy callers that haven't been migrated yet — the gate maps this to
 /// [`AgentTurnOrigin::Unknown`] / fail-closed).
 pub fn current() -> Option<AgentTurnOrigin> {
-    AGENT_TURN_ORIGIN.try_with(|o| o.clone()).ok()
+    crate::core::runtime::CoreContext::scoped()
+        .and_then(|_| crate::core::runtime::CoreContext::current_turn_origin())
+        .or_else(|| AGENT_TURN_ORIGIN.try_with(|o| o.clone()).ok())
 }
 
 /// Capture the ambient origin so it can be carried across a `tokio::spawn`
