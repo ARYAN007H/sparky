@@ -135,7 +135,7 @@ fn handle_list_payments(params: Map<String, Value>) -> ControllerFuture {
         let config = crate::config::rpc::load_config_with_timeout()
             .await
             .map_err(|error| format!("x402 list_payments: {error}"))?;
-        let limit = p.limit.unwrap_or(50).clamp(1, 500);
+        let limit = p.limit.unwrap_or(50).min(500);
         let response = crate::modules::x402_service::list_payments(&config, limit)
             .await
             .map_err(|error| format!("x402 list_payments: {error}"))?;
