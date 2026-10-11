@@ -46,7 +46,7 @@ impl ProfileCapabilities {
 
     /// Capabilities of the ambient authenticated profile, never the operator.
     pub fn current() -> Option<Arc<Self>> {
-        let ctx = CoreContext::current()?;
+        let ctx = CoreContext::scoped()?;
         ctx.profile()?;
         ctx.host_overrides()?.profile_capabilities()
     }
@@ -110,7 +110,7 @@ impl ProfileCapabilities {
                     groups = groups.with(pack.id, GroupMode::Advertised);
                 }
             }
-            if let Some(ctx) = CoreContext::current() {
+            if let Some(ctx) = CoreContext::scoped() {
                 // Native construction stays inside the domains registered for this
                 // profile. The named packs narrow registration within those domains.
                 let assembly =
