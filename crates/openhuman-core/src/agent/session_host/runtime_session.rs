@@ -1096,10 +1096,8 @@ impl OpenHumanSessionHost {
                 }
             },
         ));
-        // Bind the native target before any turn so both durable thread
-        // resumes and cold latest-agent resumes can read their recorded tool
-        // declarations before host admission. The hook supplies the same
-        // locator and target; unthreaded runs retain their fresh write stem.
+        // Bind the hook's native target early so both thread and latest-agent
+        // resumes can read recorded declarations before host admission.
         let mut builder = SessionBuilder::new(driver)
             .codec(Arc::new(OpenHumanTranscriptCodec))
             .hooks(hooks)
