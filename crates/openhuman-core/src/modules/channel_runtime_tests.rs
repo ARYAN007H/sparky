@@ -120,7 +120,7 @@ async fn released_runtime_scopes_callbacks_and_replays_one_final_send() {
     let artifact = std::env::var("OPENHUMAN_CHANNELS_TEST_ARTIFACT").expect("verified artifact path");
     let mut config = crate::config::Config::default();
     config.modules.allow_download = false;
-    config.modules.overrides = vec![crate::config::ModuleOverride { id: "tinychannels".into(), path: artifact }];
+    config.modules.overrides = vec![crate::config::schema::ModuleOverride { id: "tinychannels".into(), path: artifact }];
     let first_sends = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let second_sends = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let first = ChannelRuntimeLease::open(ModuleClient::new(config.clone()), TransportFixture(first_sends.clone())).await.unwrap();
