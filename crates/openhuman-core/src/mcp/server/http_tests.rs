@@ -1,12 +1,12 @@
 use super::*;
+use async_trait::async_trait;
 use axum::body::to_bytes;
+use serde_json::{Map, Value};
 use std::{
     collections::BTreeMap,
     future::pending,
     sync::{Arc, Mutex},
 };
-use async_trait::async_trait;
-use serde_json::{Map, Value};
 use tinymcp_bus::{
     ServerCallback, ServerHostCall, ServerHostReply, ServerHttpResponseMetadata,
     ServerHttpSessionConfig, ServerHttpSessionRequest, ServerInput, ServerOperationRef,
@@ -112,8 +112,14 @@ impl ServerPort for HttpFixturePort {
 
 fn http_test_headers(session_id: &str, version: &str) -> HeaderMap {
     let mut headers = HeaderMap::new();
-    headers.insert(HEADER_SESSION_ID, HeaderValue::from_str(session_id).unwrap());
-    headers.insert("mcp-protocol-version", HeaderValue::from_str(version).unwrap());
+    headers.insert(
+        HEADER_SESSION_ID,
+        HeaderValue::from_str(session_id).unwrap(),
+    );
+    headers.insert(
+        "mcp-protocol-version",
+        HeaderValue::from_str(version).unwrap(),
+    );
     headers.insert("accept", HeaderValue::from_static("application/json"));
     headers.insert("content-type", HeaderValue::from_static("application/json"));
     headers
@@ -122,9 +128,19 @@ fn http_test_headers(session_id: &str, version: &str) -> HeaderMap {
 async fn http_test_session(
     port: Arc<dyn ServerPort>,
     state: &HttpState,
-    dispatch: impl Fn(ServerHostCall) -> std::pin::Pin<Box<dyn std::future::Future<Output = ServerHostReply> + Send + 'static>> + Send + Sync + 'static,
+    dispatch: impl Fn(
+            ServerHostCall,
+        )
+            -> std::pin::Pin<Box<dyn std::future::Future<Output = ServerHostReply> + Send + 'static>>
+        + Send
+        + Sync
+        + 'static,
 ) -> Arc<ServerSession> {
-    let session = Arc::new(ServerSession::open_with_port_and_dispatch(port, dispatch).await.unwrap());
+    let session = Arc::new(
+        ServerSession::open_with_port_and_dispatch(port, dispatch)
+            .await
+            .unwrap(),
+    );
     state
         .sessions
         .lock()
