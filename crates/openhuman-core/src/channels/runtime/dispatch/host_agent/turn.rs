@@ -90,7 +90,11 @@ pub(crate) async fn run_host_agent_turn(
     session.set_on_progress(progress);
 
     let text = host
-        .scope(session.run_single_with_origin(&message, Some(origin)))
+        .scope(crate::core::runtime::CoreContext::scope_with_turn_origin(
+            host.context.clone(),
+            Some(origin.clone()),
+            session.run_single_with_origin(&message, Some(origin)),
+        ))
         .await?;
     Ok(AgentTurnResponse::with_resolved_route(
         text,

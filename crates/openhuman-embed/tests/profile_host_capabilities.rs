@@ -70,7 +70,11 @@ struct CallTools;
 impl Respond for CallTools {
     fn respond(&self, request: &Request) -> ResponseTemplate {
         let body: Value = serde_json::from_slice(&request.body).unwrap();
-        let completion = if !tool_results(request).is_empty()
+        let completion = if common::last_user_message(&body).contains("unsafe fixture request") {
+            let mut completion = tool_call_completion("shell", "{}");
+            completion["choices"][0]["message"]["tool_calls"] = json!(["shell", "delegate", "http_request", "run_workflow"].iter().enumerate().map(|(i, name)| json!({"id":format!("unsafe_{i}"),"type":"function","function":{"name":name,"arguments":"{}"}})).collect::<Vec<_>>());
+            completion
+        } else if !tool_results(request).is_empty()
             || !tool_names(request)
                 .iter()
                 .any(|name| name == "tenant_probe")
@@ -111,7 +115,10 @@ impl Respond for CallTools {
 
 #[test]
 fn chat_and_relay_use_only_selected_tools_inside_their_profile() {
-    let _ = tracing_subscriber::fmt().with_env_filter("warn").with_test_writer().try_init();
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("warn")
+        .with_test_writer()
+        .try_init();
     runtime_without_master_key().block_on(async {
         tokio::spawn(scenario()).await.unwrap();
     });
@@ -213,9 +220,20 @@ async fn scenario() {
                 .as_deref(),
             Some(format!("user:{user}").as_str())
         );
-        let profile = handle.scope(async { openhuman_core::profiles::host::current().unwrap() }).await;
+        let profile = handle
+            .scope(async { openhuman_core::profiles::host::current().unwrap() })
+            .await;
         profile.lease_fence().renewed(0);
-        assert!(!handle.scope(async { openhuman_core::memory::engine::is_on(handle.context().embedder_config().unwrap()) }).await, "expired profile memory must fail closed");
+        assert!(
+            !handle
+                .scope(async {
+                    openhuman_core::memory::engine::is_on(
+                        handle.context().embedder_config().unwrap(),
+                    )
+                })
+                .await,
+            "expired profile memory must fail closed"
+        );
         profile.lease_fence().renewed(u64::MAX);
         tokio::time::timeout(
             Duration::from_secs(30),
@@ -271,6 +289,15 @@ async fn scenario() {
             ("bob".into(), Some("channel:telegram/sender/chat".into())),
         ]
     );
+    let executions_before_denied_turn = calls.lock().unwrap().len();
+    assert!(
+        handles[0]
+            .chat("denied", "unsafe fixture request")
+            .await
+            .is_err(),
+        "unregistered unsafe model calls must fail closed"
+    );
+    assert_eq!(calls.lock().unwrap().len(), executions_before_denied_turn);
     // Persistent hooks fail closed if reused under a different profile or
     // after the owning lease is fenced, before the host callback is consulted.
     let hook_context = serde_json::from_value(json!({"event":"PreToolUse", "call_id":"fixture", "tool_name":"tenant_probe", "arguments":{}, "success":null, "duration_ms":null})).unwrap();
@@ -292,6 +319,26 @@ async fn scenario() {
         .scope(alice_hook.before_tool_decision(&hook_context))
         .await
         .is_deny());
+    for name in [
+        "hidden",
+        "shell",
+        "delegate",
+        "curl",
+        "http_request",
+        "run_workflow",
+        "delegate_to",
+        "install_workflow_from_url",
+    ] {
+        let mut denied = hook_context.clone();
+        denied.tool_name = name.to_owned();
+        assert!(
+            handles[0]
+                .scope(alice_hook.before_tool_decision(&denied))
+                .await
+                .is_deny(),
+            "{name} must be refused even with a proceeding host callback"
+        );
+    }
     let no_callback = Arc::new(
         openhuman_core::profiles::capabilities::ProfileCapabilities::new(
             None,

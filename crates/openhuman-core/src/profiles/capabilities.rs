@@ -7,7 +7,7 @@
 use crate::agent::hooks::{ToolHook, ToolHookContext, ToolHookDecision};
 use crate::agent::{HostTools, HostTurnTools, TurnContext};
 use crate::config::Config;
-use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+use crate::core::runtime::{ContextOverlay, CoreContext};
 use crate::tools::toolpacks::{GroupMode, ToolGroups};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -111,13 +111,10 @@ impl ProfileCapabilities {
                 }
             }
             if let Some(ctx) = CoreContext::current() {
-                // Domain selection here is local to native construction. It neither
-                // enables profile RPCs nor adds an unselected tool to the session.
-                let assembly = ctx.derive_with(ContextOverlay::new(
-                    config.clone(),
-                    DomainSet::full(),
-                    groups,
-                ));
+                // Native construction stays inside the domains registered for this
+                // profile. The named packs narrow registration within those domains.
+                let assembly =
+                    ctx.derive_with(ContextOverlay::new(config.clone(), ctx.domains(), groups));
                 let security = Arc::new(crate::security::SecurityPolicy::from_config(
                     &config.autonomy,
                     &config.workspace_dir,

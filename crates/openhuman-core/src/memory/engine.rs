@@ -207,6 +207,9 @@ fn host_engine() -> Option<BoundEngine> {
 pub fn resolve(config: &Config) -> Binding {
     if let Some(capabilities) = crate::profiles::capabilities::ProfileCapabilities::current() {
         if let Some(engine) = &capabilities.memory_engine {
+            if let Err(reason) = crate::profiles::host::ensure_hosted() {
+                return off(None, None, &reason);
+            }
             let profile = crate::core::runtime::current_tenant()
                 .ok()
                 .and_then(|tenant| tenant.profile);
