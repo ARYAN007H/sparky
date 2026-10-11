@@ -205,7 +205,10 @@ fn module_rendered_results_preserve_text_json_error_and_markdown() {
     });
 
     assert!(result.is_error);
-    assert_eq!(result.markdown_formatted.as_deref(), Some("**formatted excerpt**"));
+    assert_eq!(
+        result.markdown_formatted.as_deref(),
+        Some("**formatted excerpt**")
+    );
     assert_eq!(result.content.len(), 2);
     assert!(matches!(
         &result.content[0],
