@@ -38,7 +38,7 @@ use serde_json::{json, Value};
 use tinyflows::caps::MemoryProvider;
 use tinyflows::error::{EngineError, Result};
 
-use crate::agent::harness::memory_context_safety::wrap_untrusted_for_agent;
+use tinymemory_api::wrap_untrusted_for_agent;
 use crate::agent::turn_origin::{self, AgentTurnOrigin, TrustedAutomationSource};
 use crate::config::Config;
 use crate::flows::{

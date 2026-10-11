@@ -26,7 +26,6 @@ pub mod definition;
 pub(crate) mod definition_loader;
 pub mod fork_context;
 pub(crate) mod graph;
-pub(crate) mod memory_context_safety;
 pub(crate) mod spawn_depth_context;
 pub(crate) mod tool_result_artifacts;
 
