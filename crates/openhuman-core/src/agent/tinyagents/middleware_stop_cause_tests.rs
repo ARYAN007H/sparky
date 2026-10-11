@@ -110,17 +110,17 @@ fn response_with(calls: &[TaToolCall]) -> ModelResponse {
     response
 }
 
-/// A seat that keeps re-reading the same files, one of them through a
-/// mistyped path. The repeat guard blocks the identical reads and then stops
-/// the run while it admits a batch; the mistyped read in that same batch
-/// fails again afterwards. The guard stopped the turn, so the summary must
-/// say the agent kept repeating a step, not that something was missing.
-#[tokio::test]
-async fn a_repeat_guard_halt_is_not_overwritten_by_a_later_failure_in_its_batch() {
+/// Drive `rounds` model responses that each re-issue one read per path in
+/// `paths`, through the repeat guard and the failure breaker assembled as
+/// `harness_assembly` does: the guard registered first (outermost), the
+/// breaker after it, both on one stop-note slot. The read-only batch is
+/// admitted whole before any result folds back (concurrent execution); a
+/// call the guard refuses never runs and is answered with its refusal,
+/// stamped with the guard's marker. Stops at the first pause and returns the
+/// rendered stop kind and summary.
+async fn re_read_until_stopped(paths: &[&str], rounds: usize) -> (StopReasonKind, String) {
     let handle = SteeringHandle::allow_all();
     let slot = std::sync::Arc::new(std::sync::Mutex::new(None));
-    // Assembled as `harness_assembly` does: the guard is registered first
-    // (outermost), the failure breaker after it, both on one stop-note slot.
     let guard = RepeatProgressMiddleware::new(
         handle.clone(),
         slot.clone(),
@@ -131,9 +131,7 @@ async fn a_repeat_guard_halt_is_not_overwritten_by_a_later_failure_in_its_batch(
     let breaker = RepeatedToolFailureMiddleware::new(handle.clone(), 3, slot.clone());
     let mut ctx = ctx();
     let mut records = Vec::new();
-    let paths = ["src/lib.rs", "src/main.rs", "src/lbi.rs"];
-    let mut halted = false;
-    for round in 0..12 {
+    for round in 0..rounds {
         let mut calls: Vec<TaToolCall> = paths
             .iter()
             .enumerate()
@@ -149,9 +147,6 @@ async fn a_repeat_guard_halt_is_not_overwritten_by_a_later_failure_in_its_batch(
             .after_model(&mut ctx, &(), &mut response_with(&calls))
             .await
             .unwrap();
-        // Admission: the whole read-only batch is admitted before any result
-        // comes back (concurrent execution). A call the guard refuses never
-        // runs and is answered with the refusal, stamped with its marker.
         let mut results = Vec::new();
         for call in &mut calls {
             let result = match guard.before_tool(&mut ctx, &(), call).await {
@@ -192,19 +187,93 @@ async fn a_repeat_guard_halt_is_not_overwritten_by_a_later_failure_in_its_batch(
             records.push(record("file_read", &result));
         }
         if drain_pause_count(&handle) > 0 {
-            halted = true;
-            break;
+            breaker
+                .after_agent(&mut ctx, &(), &mut AgentRun::new())
+                .await
+                .unwrap();
+            return summary_from(&slot, &records);
         }
     }
-    assert!(halted, "the repeated reads stop the run");
+    panic!("the repeated reads never stopped the run");
+}
 
-    let (kind, summary) = summary_from(&slot, &records);
+/// A seat that keeps re-reading the same files, one of them through a
+/// mistyped path. The repeat guard refuses the identical reads, so nothing
+/// between two runs of the mistyped read clears its `not_found` count, and
+/// the second one stops the turn. The turn was stuck repeating itself: the
+/// summary must say so, not that something was missing.
+#[tokio::test]
+async fn a_not_found_stop_inside_a_repeat_loop_is_summarised_as_repeating() {
+    let (kind, summary) =
+        re_read_until_stopped(&["src/lib.rs", "src/main.rs", "src/lbi.rs"], 12).await;
     assert_eq!(kind, StopReasonKind::RepeatingStep, "{summary}");
-    assert!(
-        summary.contains("kept repeating the same step"),
-        "{summary}"
-    );
+    assert!(summary.contains("kept repeating the same step"), "{summary}");
     assert!(!summary.contains("could not be found"), "{summary}");
+}
+
+/// The same loop with the mistyped read first in the batch: its failure
+/// stops the run before the guard's refusals in that batch fold back, and
+/// they still relabel the stop.
+#[tokio::test]
+async fn a_refusal_later_in_the_batch_relabels_a_repeat_loop_stop() {
+    let (kind, summary) =
+        re_read_until_stopped(&["src/lbi.rs", "src/lib.rs", "src/main.rs"], 12).await;
+    assert_eq!(kind, StopReasonKind::RepeatingStep, "{summary}");
+}
+
+/// One mistyped read among reads that keep returning something new is a
+/// missing file, and is still summarised as one.
+#[tokio::test]
+async fn a_repeated_missing_file_without_a_repeat_loop_stays_not_found() {
+    let handle = SteeringHandle::allow_all();
+    let slot = std::sync::Arc::new(std::sync::Mutex::new(None));
+    let breaker = RepeatedToolFailureMiddleware::new(handle.clone(), 3, slot.clone());
+    let mut ctx = ctx();
+    let mut records = Vec::new();
+    for i in 0..2 {
+        let id = format!("typo-{i}");
+        let mut call = TaToolCall::new(&id, "file_read", json!({ "path": "src/lbi.rs" }));
+        breaker.before_tool(&mut ctx, &(), &mut call).await.unwrap();
+        let mut result = failing_result("file_read", MISTYPED_PATH);
+        breaker
+            .after_tool(&mut ctx, &(), &invocation(&id, "file_read"), &mut result)
+            .await
+            .unwrap();
+        records.push(record("file_read", &result));
+    }
+    assert_eq!(drain_pause_count(&handle), 1);
+    let (kind, summary) = summary_from(&slot, &records);
+    assert_eq!(kind, StopReasonKind::NotFound, "{summary}");
+}
+
+/// The repeat guard stopped the run while admitting a batch; a sibling
+/// failure that trips the failure breaker afterwards must not replace the
+/// guard's stop note.
+#[tokio::test]
+async fn a_failure_halt_keeps_an_earlier_repeat_guard_stop_note() {
+    let handle = SteeringHandle::allow_all();
+    let guard_note = "Stopping: the same successful tool call was blocked 2 times for returning \
+                      the identical result 4 times; the model kept re-issuing it after being \
+                      warned, so the run is stuck cycling without making progress.";
+    let slot = std::sync::Arc::new(std::sync::Mutex::new(Some(guard_note.to_string())));
+    let breaker = RepeatedToolFailureMiddleware::new(handle.clone(), 3, slot.clone());
+    let mut ctx = ctx();
+    for (i, command) in ["cargo build", "touch notes.md"].into_iter().enumerate() {
+        let id = format!("refused-{i}");
+        let mut call = TaToolCall::new(&id, "shell", json!({ "command": command }));
+        breaker.before_tool(&mut ctx, &(), &mut call).await.unwrap();
+        let mut result = failing_result("shell", READ_ONLY_REFUSAL);
+        breaker
+            .after_tool(&mut ctx, &(), &invocation(&id, "shell"), &mut result)
+            .await
+            .unwrap();
+    }
+    assert_eq!(drain_pause_count(&handle), 1, "the breaker still pauses");
+    breaker
+        .after_agent(&mut ctx, &(), &mut AgentRun::new())
+        .await
+        .unwrap();
+    assert_eq!(slot.lock().unwrap().as_deref(), Some(guard_note));
 }
 
 /// The failure breaker owns its stop when it fired first: a repeat-guard
