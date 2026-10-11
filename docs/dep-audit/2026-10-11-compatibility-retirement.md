@@ -32,12 +32,16 @@ accepts 14d. An exact "openhuman.mcp_list" query returned zero matching issues.
 That says nothing about successful calls, and the issue endpoint's event count
 is a lifetime issue total rather than a shipped-client method count.
 
-The organization Discover query with field=rpc.method, field=count(),
-query=has:rpc.method, and statsPeriod=14d returned an empty data array.
-This does not prove zero RPC traffic: no instrumented raw-method coverage or
-release-version coverage was established. No analytics connector or method-count
-helper is available in this session. Accordingly both RPC alias tables remain,
-with synchronized dated comments; no user payloads or credentials were copied.
+The initial Discover query for rpc.method returned no rows. Source inspection
+established that the RPC error reporter tags method, domain=rpc and
+operation=invoke_method instead. Querying those tags over 14d found one event
+for the retained alias tool_registry.diagnostics on shipped release
+openhuman@0.57.52+35b7073d6a3a. This is positive evidence against retiring that
+alias. These counts cover reported failures rather than every successful call;
+they cannot establish that the other old names are unused. No analytics
+connector or successful-call method-count helper is available in this session.
+Accordingly both RPC alias tables remain with synchronized dated comments; no
+user payloads or credentials were copied.
 
 ## Verification
 
