@@ -71,6 +71,7 @@ pub use openhuman_core::backend::{
     BackendTransportError, BaseUrlPurpose, TransportProfile,
 };
 pub use openhuman_core::config::ComposioHostCredential;
+pub use openhuman_core::config::SearchHostCredential;
 pub use openhuman_core::config::Config as RuntimeConfig;
 pub use openhuman_core::security::TrustedAccess;
 pub use openhuman_core::tools::toolpacks::{GroupMode, ToolGroups};
