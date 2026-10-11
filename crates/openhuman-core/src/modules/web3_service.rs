@@ -101,6 +101,26 @@ fn owner() -> Option<QuoteOwner> {
         .ok()
 }
 
+/// Close the active module service on sign-out. The mutex joins any in-flight
+/// quote, route, or execution call before its owner-scoped handles are cleared.
+pub(crate) async fn close_service(config: &Config) -> Result<(), wallet::WalletCallError> {
+    let mut active = service().lock().await;
+    let Some(current) = active.as_ref() else {
+        return Ok(());
+    };
+    wallet::call::<_, ()>(
+        config,
+        methods::WEB3_CLOSE,
+        Web3CloseRequest {
+            service: current.response.service.clone(),
+        },
+    )
+    .await?;
+    wallet_host::clear_endpoint_references(&current.response.service.handle);
+    *active = None;
+    Ok(())
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ExecuteParams {

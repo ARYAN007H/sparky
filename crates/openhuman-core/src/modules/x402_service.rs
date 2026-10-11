@@ -92,6 +92,7 @@ async fn signing_secret(
 
 struct X402Service {
     workspace: PathBuf,
+    accounts: tinywallet_bus::wire::WalletAccountsResponse,
     config: X402ConfigResponse,
     handle: X402ServiceHandle,
 }
@@ -107,11 +108,20 @@ async fn ensure_service(
     active: &mut Option<X402Service>,
 ) -> Result<(), WalletCallError> {
     let workspace = config.workspace_dir.clone();
+    let accounts = super::wallet_host::wallet_accounts_snapshot()
+        .await
+        .map_err(WalletCallError::Failed)?;
     let budget = budget_from(|name| std::env::var(name).ok());
 
     if active
         .as_ref()
-        .is_some_and(|current| current.workspace != workspace)
+        .is_some_and(|current| {
+            current.workspace != workspace
+                || current.accounts != accounts
+                || current.config.per_request_max_atomic != budget.0
+                || current.config.daily_max_atomic != budget.1
+                || current.config.monthly_max_atomic != budget.2
+        })
     {
         if let Some(current) = active.as_ref() {
             wallet::call::<_, ()>(
@@ -144,10 +154,31 @@ async fn ensure_service(
         .await?;
         *active = Some(X402Service {
             workspace,
+            accounts,
             config: service_config,
             handle,
         });
     }
+    Ok(())
+}
+
+/// Close the active module ledger on sign-out after joining any current
+/// operation. If close fails, the handle stays cached so a later lifecycle
+/// attempt can retry instead of silently abandoning pending reservations.
+pub(crate) async fn close_service(config: &Config) -> Result<(), WalletCallError> {
+    let mut active = service().lock().await;
+    let Some(current) = active.as_ref() else {
+        return Ok(());
+    };
+    wallet::call::<_, ()>(
+        config,
+        methods::X402_CLOSE,
+        X402CloseRequest {
+            service: current.handle.clone(),
+        },
+    )
+    .await?;
+    *active = None;
     Ok(())
 }
 
