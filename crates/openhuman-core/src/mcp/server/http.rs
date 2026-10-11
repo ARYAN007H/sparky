@@ -289,3 +289,7 @@ fn text_error(status: StatusCode, body: &'static str) -> Response {
 fn header_value<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
     headers.get(name).and_then(|value| value.to_str().ok())
 }
+
+#[cfg(test)]
+#[path = "http_tests.rs"]
+mod tests;
