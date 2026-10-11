@@ -42,8 +42,14 @@ export function validateMnemonicPhrase(mnemonic: string): boolean {
  * Returns the key as a hex string.
  */
 export function deriveAesKeyFromMnemonic(mnemonic: string): string {
-  // Get the BIP39 seed (512-bit) from the mnemonic
-  const seed = mnemonicToSeedSync(mnemonic);
+  // Keep the application-owned encryption-key derivation independent of the
+  // wallet module. BIP39 seed derivation is PBKDF2-HMAC-SHA512 over the NFKD
+  // mnemonic with the standard empty-passphrase salt.
+  const password = new TextEncoder().encode(mnemonic.normalize('NFKD'));
+  const seed = pbkdf2(sha512, password, new TextEncoder().encode('mnemonic'), {
+    c: 2048,
+    dkLen: 64,
+  });
 
   // Derive a 256-bit AES key using PBKDF2 with the seed
   const salt = new TextEncoder().encode('openhuman-aes-key-v1');
