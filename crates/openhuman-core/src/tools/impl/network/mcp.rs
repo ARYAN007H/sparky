@@ -7,7 +7,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tinytools::{IndirectCall, PermissionLevel, Tool, ToolCallOptions, ToolResult};
 
 use crate::{
@@ -58,7 +58,11 @@ impl Tool for McpListServersTool {
     async fn execute(&self, _args: Value) -> anyhow::Result<ToolResult> {
         let client = match McpConfiguredClient::for_config(&self.config) {
             Ok(client) => client,
-            Err(_) => return Ok(ToolResult::error("mcp_list_servers failed: TinyMCP is unavailable")),
+            Err(_) => {
+                return Ok(ToolResult::error(
+                    "mcp_list_servers failed: TinyMCP is unavailable",
+                ))
+            }
         };
         let config = host::client_config(&self.config);
         let summaries: Vec<tinymcp_bus::StaticServerSummary> = match client
@@ -70,7 +74,11 @@ impl Tool for McpListServersTool {
             .await
         {
             Ok(summaries) => summaries,
-            Err(_) => return Ok(ToolResult::error("mcp_list_servers failed: module call failed")),
+            Err(_) => {
+                return Ok(ToolResult::error(
+                    "mcp_list_servers failed: module call failed",
+                ))
+            }
         };
         let servers = summaries
             .iter()
@@ -162,7 +170,11 @@ impl Tool for McpListToolsTool {
         let server = required_string_arg(&args, "server")?;
         let client = match McpConfiguredClient::for_config(&self.config) {
             Ok(client) => client,
-            Err(_) => return Ok(ToolResult::error("mcp_list_tools failed: TinyMCP is unavailable")),
+            Err(_) => {
+                return Ok(ToolResult::error(
+                    "mcp_list_tools failed: TinyMCP is unavailable",
+                ))
+            }
         };
         let client_config = host::client_config(&self.config);
         let remote: Vec<tinymcp_bus::McpRemoteTool> = match client
@@ -174,14 +186,22 @@ impl Tool for McpListToolsTool {
             .await
         {
             Ok(remote) => remote,
-            Err(_) => return Ok(ToolResult::error("mcp_list_tools failed: module call failed")),
+            Err(_) => {
+                return Ok(ToolResult::error(
+                    "mcp_list_tools failed: module call failed",
+                ))
+            }
         };
         let remote = match client
             .scrub_static_tools(&client_config, &server, remote)
             .await
         {
             Ok(remote) => remote,
-            Err(_) => return Ok(ToolResult::error("mcp_list_tools failed: metadata scrubbing failed")),
+            Err(_) => {
+                return Ok(ToolResult::error(
+                    "mcp_list_tools failed: metadata scrubbing failed",
+                ))
+            }
         };
 
         let mut display = Vec::with_capacity(remote.len());
@@ -195,7 +215,11 @@ impl Tool for McpListToolsTool {
                 .await
             {
                 Ok(projected) => projected,
-                Err(_) => return Ok(ToolResult::error("mcp_list_tools failed: tool display failed")),
+                Err(_) => {
+                    return Ok(ToolResult::error(
+                        "mcp_list_tools failed: tool display failed",
+                    ))
+                }
             };
             display.push((tool, projected));
         }
@@ -235,7 +259,9 @@ impl Tool for McpListToolsTool {
                     .unwrap_or("No description.");
                 let schema = serde_json::to_string(&tool["input_schema"])
                     .unwrap_or_else(|_| "{}".to_owned());
-                markdown.push_str(&format!("\n- **{name}**: {description}\n  - schema: `{schema}`"));
+                markdown.push_str(&format!(
+                    "\n- **{name}**: {description}\n  - schema: `{schema}`"
+                ));
             }
         }
         Ok(ToolResult::success_with_markdown(

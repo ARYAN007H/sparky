@@ -388,7 +388,10 @@ async fn run_subagent_tool(params: &Map<String, Value>) -> Result<Value, ToolCal
     }))
 }
 
-fn validated_param<'a>(params: &'a Map<String, Value>, key: &str) -> Result<&'a str, ToolCallError> {
+fn validated_param<'a>(
+    params: &'a Map<String, Value>,
+    key: &str,
+) -> Result<&'a str, ToolCallError> {
     params
         .get(key)
         .and_then(Value::as_str)

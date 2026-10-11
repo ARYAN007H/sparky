@@ -259,12 +259,8 @@ fn map_module_rendered_result(rendered: tinymcp_bus::McpToolResult) -> ToolResul
             .content
             .into_iter()
             .map(|block| match block {
-                tinymcp_bus::McpToolContent::Text { text } => tinytools::ToolContent::Text {
-                    text,
-                },
-                tinymcp_bus::McpToolContent::Json { data } => tinytools::ToolContent::Json {
-                    data,
-                },
+                tinymcp_bus::McpToolContent::Text { text } => tinytools::ToolContent::Text { text },
+                tinymcp_bus::McpToolContent::Json { data } => tinytools::ToolContent::Json { data },
                 other => {
                     let data = serde_json::to_value(other).unwrap_or(Value::Null);
                     tinytools::ToolContent::Json { data }

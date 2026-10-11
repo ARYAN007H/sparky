@@ -25,9 +25,7 @@ fn build_rpc_params_from_validated(
     args: &Map<String, Value>,
 ) -> Result<Map<String, Value>, ToolCallError> {
     match tool_name {
-        "core.list_tools" | "core.tool_instructions" | "agent.list_subagents" => {
-            Ok(Map::new())
-        }
+        "core.list_tools" | "core.tool_instructions" | "agent.list_subagents" => Ok(Map::new()),
         "agent.run_subagent" => {
             let agent_id = validated_string(args, "agent_id")?;
             let prompt = validated_string(args, "prompt")?;
@@ -104,9 +102,7 @@ fn build_rpc_params_from_validated(
             let query = validated_string(args, "query")?;
             let mut params = Map::new();
             params.insert("query".to_string(), Value::String(query));
-            if let Some(max_results) =
-                optional_u64(args, "max_results")
-            {
+            if let Some(max_results) = optional_u64(args, "max_results") {
                 params.insert("max_results".to_string(), Value::from(max_results));
             }
             if let Some(provider) = optional_string(args, "provider") {
@@ -147,24 +143,76 @@ async fn validate_tool_arguments(
     tool_name: &str,
     arguments: Value,
 ) -> Result<Map<String, Value>, ToolCallError> {
-    use tinymcp_bus::{ServerArgumentRule as Rule, ServerArgumentsValidation, ValidateServerArgumentsRequest};
+    use tinymcp_bus::{
+        ServerArgumentRule as Rule, ServerArgumentsValidation, ValidateServerArgumentsRequest,
+    };
 
-    let required = |key: &str| Rule::RequiredNonEmptyString { key: key.to_owned() };
-    let optional = |key: &str| Rule::OptionalNonEmptyString { key: key.to_owned() };
-    let positive = |key: &str, max| Rule::OptionalPositiveU64 { key: key.to_owned(), max };
-    let array = |key: &str| Rule::RequiredNonEmptyStringArray { key: key.to_owned() };
+    let required = |key: &str| Rule::RequiredNonEmptyString {
+        key: key.to_owned(),
+    };
+    let optional = |key: &str| Rule::OptionalNonEmptyString {
+        key: key.to_owned(),
+    };
+    let positive = |key: &str, max| Rule::OptionalPositiveU64 {
+        key: key.to_owned(),
+        max,
+    };
+    let array = |key: &str| Rule::RequiredNonEmptyStringArray {
+        key: key.to_owned(),
+    };
     let (allowed, rules): (&[&str], Vec<Rule>) = match tool_name {
         "core.list_tools" | "core.tool_instructions" | "agent.list_subagents" => (&[], Vec::new()),
-        "agent.run_subagent" => (SUBAGENT_RUN_ARGUMENTS, vec![required("agent_id"), required("prompt")]),
-        "memory.recall" => (MEMORY_RECALL_ARGUMENTS, vec![required("question"), positive("limit", MEMORY_MAX_LIMIT)]),
-        "memory.fetch" => (MEMORY_FETCH_ARGUMENTS, vec![required("query"), optional("mode"), positive("limit", MEMORY_MAX_LIMIT), optional("cursor")]),
-        "memory.list" => (MEMORY_LIST_ARGUMENTS, vec![positive("limit", MEMORY_MAX_LIMIT), optional("cursor")]),
-        "memory.learn" => (MEMORY_LEARN_ARGUMENTS, vec![required("text"), optional("kind")]),
+        "agent.run_subagent" => (
+            SUBAGENT_RUN_ARGUMENTS,
+            vec![required("agent_id"), required("prompt")],
+        ),
+        "memory.recall" => (
+            MEMORY_RECALL_ARGUMENTS,
+            vec![required("question"), positive("limit", MEMORY_MAX_LIMIT)],
+        ),
+        "memory.fetch" => (
+            MEMORY_FETCH_ARGUMENTS,
+            vec![
+                required("query"),
+                optional("mode"),
+                positive("limit", MEMORY_MAX_LIMIT),
+                optional("cursor"),
+            ],
+        ),
+        "memory.list" => (
+            MEMORY_LIST_ARGUMENTS,
+            vec![positive("limit", MEMORY_MAX_LIMIT), optional("cursor")],
+        ),
+        "memory.learn" => (
+            MEMORY_LEARN_ARGUMENTS,
+            vec![required("text"), optional("kind")],
+        ),
         "memory.forget" => (MEMORY_FORGET_ARGUMENTS, vec![array("ids")]),
-        "searxng_search" => (SEARXNG_SEARCH_ARGUMENTS, vec![required("query"), positive("max_results", SEARCH_MAX_RESULTS as u64), optional("provider")]),
-        "web_search" => (WEB_SEARCH_ARGUMENTS, vec![required("query"), positive("max_results", SEARCH_MAX_RESULTS as u64), optional("provider")]),
-        "web_answer" => (WEB_ANSWER_ARGUMENTS, vec![required("query"), optional("depth")]),
-        _ => return Err(ToolCallError::InvalidParams(format!("unknown MCP tool `{tool_name}`"))),
+        "searxng_search" => (
+            SEARXNG_SEARCH_ARGUMENTS,
+            vec![
+                required("query"),
+                positive("max_results", SEARCH_MAX_RESULTS as u64),
+                optional("provider"),
+            ],
+        ),
+        "web_search" => (
+            WEB_SEARCH_ARGUMENTS,
+            vec![
+                required("query"),
+                positive("max_results", SEARCH_MAX_RESULTS as u64),
+                optional("provider"),
+            ],
+        ),
+        "web_answer" => (
+            WEB_ANSWER_ARGUMENTS,
+            vec![required("query"), optional("depth")],
+        ),
+        _ => {
+            return Err(ToolCallError::InvalidParams(format!(
+                "unknown MCP tool `{tool_name}`"
+            )))
+        }
     };
 
     let config = crate::config::ops::load_current_or_init()
@@ -193,7 +241,10 @@ fn validated_string(args: &Map<String, Value>, key: &str) -> Result<String, Tool
         .ok_or_else(|| ToolCallError::Internal("MCP module returned invalid arguments".into()))
 }
 
-fn validated_string_array(args: &Map<String, Value>, key: &str) -> Result<Vec<String>, ToolCallError> {
+fn validated_string_array(
+    args: &Map<String, Value>,
+    key: &str,
+) -> Result<Vec<String>, ToolCallError> {
     args.get(key)
         .and_then(Value::as_array)
         .and_then(|values| values.iter().map(Value::as_str).collect::<Option<Vec<_>>>())

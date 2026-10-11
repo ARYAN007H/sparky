@@ -330,7 +330,8 @@ impl crate::mcp::module_client::McpModulePort for ToolCallPort {
     async fn prepare_agent_tools(
         &self,
         _request: tinymcp_bus::PrepareAgentToolsRequest,
-    ) -> Result<Vec<tinymcp_bus::McpToolPresentation>, crate::modules::client::ModuleCallError> {
+    ) -> Result<Vec<tinymcp_bus::McpToolPresentation>, crate::modules::client::ModuleCallError>
+    {
         Ok(Vec::new())
     }
 }

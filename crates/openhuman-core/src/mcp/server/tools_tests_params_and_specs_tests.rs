@@ -205,8 +205,8 @@ fn web_search_params_accept_a_pinned_provider() {
 
 #[test]
 fn web_answer_params_validate_depth() {
-    let params =
-        build_rpc_params_for_test("web_answer", json!({"query": "why", "depth": "deep"})).expect("params");
+    let params = build_rpc_params_for_test("web_answer", json!({"query": "why", "depth": "deep"}))
+        .expect("params");
     assert_eq!(params["depth"], "deep");
     let err = build_rpc_params_for_test("web_answer", json!({"query": "why", "depth": "long"}))
         .expect_err("must reject");
@@ -356,13 +356,15 @@ fn memory_recall_maps_question_filter_and_limit() {
 
 #[test]
 fn memory_recall_requires_question_and_omits_unset_fields() {
-    let params = build_rpc_params_for_test("memory.recall", json!({"question": "q"})).expect("params");
+    let params =
+        build_rpc_params_for_test("memory.recall", json!({"question": "q"})).expect("params");
     assert_eq!(params.len(), 1);
 }
 
 #[test]
 fn memory_limit_at_max_is_preserved_in_rpc_params() {
-    let ok = build_rpc_params_for_test("memory.list", json!({ "limit": MEMORY_MAX_LIMIT })).expect("at cap");
+    let ok = build_rpc_params_for_test("memory.list", json!({ "limit": MEMORY_MAX_LIMIT }))
+        .expect("at cap");
     assert_eq!(ok["limit"], MEMORY_MAX_LIMIT);
 }
 
@@ -453,11 +455,13 @@ fn memory_learn_rejects_bad_arguments() {
 
 #[test]
 fn memory_forget_maps_ids_and_bounds_them() {
-    let params = build_rpc_params_for_test("memory.forget", json!({"ids": ["a", "b"]})).expect("params");
+    let params =
+        build_rpc_params_for_test("memory.forget", json!({"ids": ["a", "b"]})).expect("params");
     assert_eq!(params["ids"], json!(["a", "b"]));
     let too_many = (0..=MEMORY_FORGET_MAX_IDS)
         .map(|i| i.to_string())
         .collect::<Vec<_>>();
-    let err = build_rpc_params_for_test("memory.forget", json!({ "ids": too_many })).expect_err("cap");
+    let err =
+        build_rpc_params_for_test("memory.forget", json!({ "ids": too_many })).expect_err("cap");
     assert!(err.message().contains("at most"));
 }

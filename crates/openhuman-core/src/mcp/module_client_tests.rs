@@ -202,7 +202,15 @@ async fn generic_server_argument_validation_uses_the_module_root() {
         .await
         .expect("module validation");
 
-    assert_eq!(result, ServerArgumentsValidation::Valid(serde_json::json!({"query": " topic "}).as_object().unwrap().clone()));
+    assert_eq!(
+        result,
+        ServerArgumentsValidation::Valid(
+            serde_json::json!({"query": " topic "})
+                .as_object()
+                .unwrap()
+                .clone()
+        )
+    );
     assert_eq!(requests.lock().unwrap().as_slice(), &[request]);
 }
 
