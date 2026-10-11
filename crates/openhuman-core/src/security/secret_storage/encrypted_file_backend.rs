@@ -3,27 +3,25 @@
 //! Stores all secrets in a single ChaCha20-Poly1305-encrypted file on disk,
 //! keyed by an app-scoped master key loaded once by [`init_master_key`].
 //! Headless deployments supply [`MASTER_KEY_ENV`] or [`MASTER_KEY_FILE_ENV`];
-//! otherwise initialization uses the OS keychain and caches the result.
+//! otherwise initialization uses a host source or a workspace key file.
 //! The backend avoids repeated OS-keychain prompts in dev-signed macOS builds.
 
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
-use crate::security::keyring::adapter;
-use crate::security::keyring::backend::KeyringBackend;
-use crate::security::keyring::crypto::{self, KEY_LEN};
-use crate::security::keyring::error::KeyringError;
-use crate::security::keyring::file_store;
-use crate::security::keyring::store::BackendKind;
+use crate::security::secret_storage::adapter;
+use crate::security::secret_storage::backend::SecretBackend;
+use crate::security::secret_storage::crypto::{self, KEY_LEN};
+use crate::security::secret_storage::error::SecretStorageError;
+use crate::security::secret_storage::file_store;
+use crate::security::secret_storage::store::BackendKind;
 use tinystoragedrivers::secrets::EncryptedFileSecrets;
 use zeroize::Zeroizing;
 
 #[path = "encrypted_file_backend/key_source.rs"]
-mod key_source;
+pub mod key_source;
 use key_source::{env_value, master_key_from_env};
 
-const KEYCHAIN_SERVICE: &str = "openhuman";
-const KEYCHAIN_MASTER_KEY_USERNAME: &str = "app:master_key";
 /// Environment variable carrying the master key inline as `2 * KEY_LEN` hex
 /// characters (`openssl rand -hex 32`). Lets a headless `openhuman-core
 /// serve` — a container with no Secret Service or keychain — keep the
@@ -46,27 +44,28 @@ type MasterKeyInit = Result<Option<[u8; KEY_LEN]>, String>;
 /// Process-wide master-key outcome, set once by [`init_master_key`].
 static MASTER_KEY: OnceLock<MasterKeyInit> = OnceLock::new();
 
-/// Set when [`init_master_key`] found the OS keychain unable to provide the
+/// Set when [`init_master_key`] found the host source unable to provide the
 /// key, so storage secrets reuse that outcome instead of retrying the
-/// keychain (and its prompt) on their first operation.
-static KEYCHAIN_UNAVAILABLE: OnceLock<()> = OnceLock::new();
+/// source (and any prompt) on their first operation.
+static HOST_KEY_UNAVAILABLE: OnceLock<()> = OnceLock::new();
 
 // ── Public API for core startup ──────────────────────────────────────────────
 
 /// Initialize the keyring subsystem: set the workspace directory and load
-/// the master encryption key (staging/production only) — from
+/// the master encryption key for encrypted storage — from
 /// [`MASTER_KEY_ENV`] or [`MASTER_KEY_FILE_ENV`] when an operator set one,
-/// otherwise from the OS keychain.
+/// otherwise from a host source or `keyring/master.key`.
 ///
-/// Call this once at core startup before any keyring operations. In dev
-/// environments the master key is not loaded (the plain file backend is
-/// used instead). The result is cached process-wide; subsequent calls are
+/// Call this once at core startup before any keyring operations. Explicit
+/// plaintext or OS secret backends skip master-key loading. The result is
+/// cached process-wide; subsequent calls are
 /// no-ops. Which source supplied the key is logged at `info`; the key never
 /// is.
 ///
 /// # Errors
 ///
-/// Returns `Err` only when an operator-supplied source ([`MASTER_KEY_ENV`] /
+/// Returns `Err` when the default workspace key cannot be read or created,
+/// or when an operator-supplied source ([`MASTER_KEY_ENV`] /
 /// [`MASTER_KEY_FILE_ENV`]) is set but unusable — both set, unreadable file,
 /// wrong length, not hex. That is a configuration error the process should
 /// not start with: continuing would run with secrets unreadable and fail
@@ -76,23 +75,22 @@ static KEYCHAIN_UNAVAILABLE: OnceLock<()> = OnceLock::new();
 /// is restored). The outcome, error included, is cached process-wide, so
 /// every later call after a configuration error returns the same `Err`.
 pub fn init_master_key() -> Result<(), String> {
+    crate::security::secret_storage::store::validate_backend_selection()?;
     // Ensure workspace dir is set for the backend before anything else.
-    let dir = crate::security::keyring::store::workspace_dir_for_file_backend();
+    let dir = crate::security::secret_storage::store::workspace_dir_for_file_backend();
     log::info!(
         "[keyring] init_master_key: resolved workspace_dir={}",
         dir.display()
     );
-    crate::security::keyring::init_workspace(&dir);
+    crate::security::secret_storage::init_workspace(&dir);
 
+    let backend_kind = crate::security::secret_storage::store::effective_backend_kind();
+    if backend_kind != BackendKind::EncryptedFile {
+        // Do not cache a no-key outcome: a later host may explicitly install
+        // persistent storage after an ephemeral runtime has stopped.
+        return Ok(());
+    }
     init_once(&MASTER_KEY, || {
-        let backend_kind = crate::security::keyring::store::effective_backend_kind();
-        if backend_kind != BackendKind::EncryptedFile {
-            log::debug!(
-                "[keyring:encrypted_file] skipping master key init backend={backend_kind:?}"
-            );
-            return Ok(None);
-        }
-
         match try_load_master_key() {
             Ok((key, source)) => {
                 log::info!("[keyring:encrypted_file] master key loaded from {source}");
@@ -100,22 +98,22 @@ pub fn init_master_key() -> Result<(), String> {
             }
             Err(MasterKeyError::Configured(e)) => {
                 log::error!(
-                    "[keyring:encrypted_file] operator-supplied master key rejected; refusing \
+                    "[keyring:encrypted_file] master key source rejected; refusing \
                      to start with secrets unreadable. Cause: {e}"
                 );
                 Err(e)
             }
-            Err(MasterKeyError::Keychain(e)) => {
+            Err(MasterKeyError::Host(e)) => {
                 log::error!(
                     "[keyring:encrypted_file] master key load FAILED — refusing to mint a \
                      replacement (that would orphan existing secrets, #3311). Secrets are \
-                     inaccessible this session and recover once OS keychain access is \
+                     inaccessible this session and recover once host key-source access is \
                      restored. Cause: {e}"
                 );
                 // Surface the denied state to the frontend instead of silently
                 // resetting — this is the "warn before reset" the issue asks for.
                 crate::security::keyring_consent::policy::notify_master_key_unavailable(&e);
-                let _ = KEYCHAIN_UNAVAILABLE.set(());
+                let _ = HOST_KEY_UNAVAILABLE.set(());
                 Ok(None)
             }
         }
@@ -125,7 +123,7 @@ pub fn init_master_key() -> Result<(), String> {
 /// The master key that encrypts secrets on a configured storage backend
 /// ([`crate::storage::secrets`]): the key [`init_master_key`] loaded when
 /// there is one, otherwise the same resolution run once for storage —
-/// [`MASTER_KEY_ENV`] / [`MASTER_KEY_FILE_ENV`] first, then the OS keychain.
+/// [`MASTER_KEY_ENV`] / [`MASTER_KEY_FILE_ENV`] first, then a host source or workspace key file.
 ///
 /// # Errors
 ///
@@ -142,8 +140,8 @@ pub(crate) fn storage_master_key() -> Result<[u8; KEY_LEN], String> {
     // `init_master_key` already tried the keychain this session and it
     // failed: reuse that outcome, do not prompt again. (`Ok(None)` alone also
     // means "backend needs no key / init skipped", which must still load.)
-    if KEYCHAIN_UNAVAILABLE.get().is_some() {
-        return Err("OS keychain master key unavailable this session".into());
+    if HOST_KEY_UNAVAILABLE.get().is_some() {
+        return Err("host master key unavailable this session".into());
     }
     if let Some(key) = STORAGE_MASTER_KEY.get() {
         return Ok(*key);
@@ -153,7 +151,7 @@ pub(crate) fn storage_master_key() -> Result<[u8; KEY_LEN], String> {
             log::info!("[keyring:storage] master key loaded from {source}");
             Ok(*STORAGE_MASTER_KEY.get_or_init(|| key))
         }
-        Err(MasterKeyError::Configured(_) | MasterKeyError::Keychain(_)) => {
+        Err(MasterKeyError::Configured(_) | MasterKeyError::Host(_)) => {
             // Fixed message: the underlying error can carry a path taken
             // from `MASTER_KEY_FILE_ENV`.
             log::error!("[keyring:storage] master key unavailable");
@@ -184,30 +182,9 @@ fn init_once(
 enum MasterKeyError {
     /// An operator-supplied source is set but unusable. Fatal at startup.
     Configured(String),
-    /// The OS keychain could not provide (or safely mint) the key. Not fatal:
+    /// The host source could not provide (or safely mint) the key. Not fatal:
     /// the process runs with secrets inaccessible, as before.
-    Keychain(String),
-}
-
-/// Abstraction over the OS-keychain entry that holds the master key.
-///
-/// Exists solely so the load-vs-mint decision in [`load_or_mint_master_key`]
-/// can be unit-tested against injected `keyring::Error` variants. A real
-/// `keyring::Entry` cannot be exercised non-interactively under `cargo test`
-/// (the first access blocks on a GUI permission prompt), so the decision logic
-/// is split out behind this trait and tested with a fake.
-trait MasterKeyEntry {
-    fn get_password(&self) -> Result<String, keyring::Error>;
-    fn set_password(&self, value: &str) -> Result<(), keyring::Error>;
-}
-
-impl MasterKeyEntry for keyring::Entry {
-    fn get_password(&self) -> Result<String, keyring::Error> {
-        keyring::Entry::get_password(self)
-    }
-    fn set_password(&self, value: &str) -> Result<(), keyring::Error> {
-        keyring::Entry::set_password(self, value)
-    }
+    Host(String),
 }
 
 /// Loads the master key, returning it with a human-readable description of
@@ -232,11 +209,15 @@ fn try_load_master_key() -> Result<([u8; KEY_LEN], String), MasterKeyError> {
     {
         return Ok(from_env);
     }
-    let entry = keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_MASTER_KEY_USERNAME)
-        .map_err(|e| MasterKeyError::Keychain(format!("keychain entry creation failed: {e}")))?;
-    load_or_mint_master_key(&entry)
-        .map(|key| (key, "OS keychain".to_string()))
-        .map_err(MasterKeyError::Keychain)
+    let dir = crate::security::secret_storage::store::workspace_dir_for_file_backend();
+    if let Some(source) = key_source::installed_master_key_source() {
+        return key_source::load_or_mint_master_key(source.as_ref())
+            .map(|key| (*key, "host master key source".to_string()))
+            .map_err(|e| MasterKeyError::Host(e.to_string()));
+    }
+    key_source::workspace_master_key(&dir)
+        .map(|key| (*key, "workspace keyring/master.key".to_string()))
+        .map_err(|e| MasterKeyError::Configured(e.to_string()))
 }
 
 /// Reads the file named by [`MASTER_KEY_FILE_ENV`].
@@ -286,65 +267,12 @@ fn parse_master_key_hex(hex: &str) -> Result<[u8; KEY_LEN], String> {
     Ok(key)
 }
 
-/// Load the existing master key, mint a fresh one, or fail safe.
-///
-/// **Only a genuine absence (`NoEntry`) may mint a new key.** Every other error
-/// — access denied, keychain locked, platform failure — returns `Err` WITHOUT
-/// minting or calling `set_password`, leaving the keychain entry untouched.
-///
-/// This is the fix for #3311. A macOS app update can change the binary's
-/// code-signing identity (or the keychain item's ACL trust), so reading the
-/// *existing* master key fails with an access error rather than `NoEntry`. The
-/// previous code conflated the two and minted a brand-new key on access
-/// denial, orphaning every secret encrypted under the old key — a silent
-/// API-key wipe plus disconnected connectors, with no warning. Failing safe
-/// keeps the ciphertext intact so it recovers on the next launch once keychain
-/// access is restored. The catch-all `Err(e)` arm makes this independent of
-/// which exact `keyring` error variant macOS returns on the denial.
-fn load_or_mint_master_key<E: MasterKeyEntry>(entry: &E) -> Result<[u8; KEY_LEN], String> {
-    match entry.get_password() {
-        Ok(hex_str) => {
-            let bytes = crypto::hex_decode(hex_str.trim())?;
-            if bytes.len() != KEY_LEN {
-                return Err(format!(
-                    "master key has wrong length ({} bytes, expected {KEY_LEN})",
-                    bytes.len()
-                ));
-            }
-            let mut key = [0u8; KEY_LEN];
-            key.copy_from_slice(&bytes);
-            Ok(key)
-        }
-        Err(keyring::Error::NoEntry) => {
-            let key_bytes = crypto::generate_random_bytes(KEY_LEN);
-            let hex_value = crypto::hex_encode(&key_bytes);
-            entry
-                .set_password(&hex_value)
-                .map_err(|e| format!("failed to store new master key in keychain: {e}"))?;
-
-            let readback = entry
-                .get_password()
-                .map_err(|e| format!("master key readback failed: {e}"))?;
-            if readback.trim() != hex_value {
-                return Err("master key write verification failed".to_string());
-            }
-
-            let mut key = [0u8; KEY_LEN];
-            key.copy_from_slice(&key_bytes);
-            log::info!(
-                "[keyring:encrypted_file] no existing master key — generated and stored a new one"
-            );
-            Ok(key)
-        }
-        Err(e) => Err(format!(
-            "OS keychain access unavailable; refusing to mint a replacement master key so \
-             existing secrets are preserved (#3311): {e}"
-        )),
-    }
-}
-
 /// Get a reference to the cached master key, if available.
+#[cfg(not(test))]
 fn master_key() -> Option<&'static [u8; KEY_LEN]> {
+    if MASTER_KEY.get().is_none() {
+        let _ = init_master_key();
+    }
     MASTER_KEY
         .get()
         .and_then(|init| init.as_ref().ok())
@@ -352,7 +280,17 @@ fn master_key() -> Option<&'static [u8; KEY_LEN]> {
 }
 
 pub(super) fn master_key_available() -> bool {
-    master_key().is_some()
+    #[cfg(test)]
+    {
+        key_source::workspace_master_key(
+            &crate::security::secret_storage::store::workspace_dir_for_file_backend(),
+        )
+        .is_ok()
+    }
+    #[cfg(not(test))]
+    {
+        master_key().is_some()
+    }
 }
 
 // ── Backend ──────────────────────────────────────────────────────────────────
@@ -365,7 +303,7 @@ pub(super) fn master_key_available() -> bool {
 ///
 /// What stays here, because it is a desktop policy and not a storage format:
 ///
-/// - the master key (env, else OS keychain; see [`init_master_key`]);
+/// - the master key (env, host source, else workspace file; see [`init_master_key`]);
 /// - the one-time import of a legacy plaintext `dev-keychain.json`;
 /// - **corruption recovery**. The driver fails closed on a file that does not
 ///   decrypt or parse and leaves it untouched, which is right for a server
@@ -387,12 +325,26 @@ impl EncryptedFileBackend {
         }
     }
 
+    fn key(&self) -> Option<Zeroizing<[u8; KEY_LEN]>> {
+        #[cfg(test)]
+        {
+            if let Some(source) = key_source::installed_master_key_source() {
+                return key_source::load_or_mint_master_key(source.as_ref()).ok();
+            }
+            key_source::workspace_master_key(&self.workspace_dir).ok()
+        }
+        #[cfg(not(test))]
+        {
+            master_key().map(|key| Zeroizing::new(*key))
+        }
+    }
+
     fn store(&self, key: &[u8; KEY_LEN]) -> EncryptedFileSecrets {
         EncryptedFileSecrets::at_path(self.path.clone(), Zeroizing::new(*key))
     }
 
     /// Run one driver call, recovering once from a corrupt file.
-    fn run<T, F, Fut>(&self, key: &[u8; KEY_LEN], op: F) -> Result<T, KeyringError>
+    fn run<T, F, Fut>(&self, key: &[u8; KEY_LEN], op: F) -> Result<T, SecretStorageError>
     where
         T: Send + 'static,
         F: Fn(EncryptedFileSecrets) -> Fut,
@@ -409,7 +361,7 @@ impl EncryptedFileBackend {
     }
 
     /// Import `dev-keychain.json` into a missing `secrets.enc`, once.
-    fn import_legacy_dev_keychain(&self, key: &[u8; KEY_LEN]) -> Result<(), KeyringError> {
+    fn import_legacy_dev_keychain(&self, key: &[u8; KEY_LEN]) -> Result<(), SecretStorageError> {
         let legacy_path = self.workspace_dir.join(LEGACY_DEV_KEYCHAIN);
         let migrated_path = legacy_path.with_extension("json.migrated");
         if !legacy_path.exists() && !migrated_path.exists() {
@@ -451,13 +403,13 @@ impl EncryptedFileBackend {
             &migrated_path
         };
         let metadata = std::fs::symlink_metadata(source_path).map_err(|source| {
-            KeyringError::MigrationReadFailed {
+            SecretStorageError::MigrationReadFailed {
                 path: source_path.display().to_string(),
                 source,
             }
         })?;
         if !metadata.file_type().is_file() {
-            return Err(KeyringError::Backend(format!(
+            return Err(SecretStorageError::Backend(format!(
                 "legacy {} is not a regular file; preserving it for recovery",
                 source_path.display()
             )));
@@ -466,43 +418,43 @@ impl EncryptedFileBackend {
             "[keyring:encrypted_file] found legacy {} — migrating to encrypted file",
             source_path.display()
         );
-        let bytes =
-            std::fs::read(source_path).map_err(|source| KeyringError::MigrationReadFailed {
+        let bytes = std::fs::read(source_path).map_err(|source| {
+            SecretStorageError::MigrationReadFailed {
                 path: source_path.display().to_string(),
                 source,
-            })?;
+            }
+        })?;
         let map: std::collections::BTreeMap<String, String> = if bytes.is_empty() {
             Default::default()
         } else {
             serde_json::from_slice(&bytes).map_err(|e| {
-                KeyringError::Backend(format!(
+                SecretStorageError::Backend(format!(
                     "legacy {} is invalid JSON; preserving it for recovery: {e}",
                     source_path.display()
                 ))
             })?
         };
 
-        let json = Zeroizing::new(
-            serde_json::to_vec(&map)
-                .map_err(|e| KeyringError::Backend(format!("failed to serialize secrets: {e}")))?,
-        );
+        let json = Zeroizing::new(serde_json::to_vec(&map).map_err(|e| {
+            SecretStorageError::Backend(format!("failed to serialize secrets: {e}"))
+        })?);
         {
             let blob = crypto::chacha20_encrypt(key, &json)
-                .map_err(|e| KeyringError::Backend(format!("encryption failed: {e}")))?;
+                .map_err(|e| SecretStorageError::Backend(format!("encryption failed: {e}")))?;
             file_store::write_atomic(&self.path, &blob)?;
         }
 
         let verified = match self.remove_legacy_if_encrypted_copy_matches(key, source_path, &_guard)
         {
             Ok(verified) => verified,
-            Err(error @ KeyringError::MigrationDeleteFailed { .. }) => {
+            Err(error @ SecretStorageError::MigrationDeleteFailed { .. }) => {
                 log::warn!("[keyring:encrypted_file] could not remove migrated plaintext: {error}");
                 true
             }
             Err(error) => return Err(error),
         };
         if !verified {
-            return Err(KeyringError::Backend(
+            return Err(SecretStorageError::Backend(
                 "encrypted migration result did not verify against its plaintext source".into(),
             ));
         }
@@ -525,7 +477,7 @@ impl EncryptedFileBackend {
         key: &[u8; KEY_LEN],
         legacy_path: &Path,
         destination_lock: &file_store::WriteLock,
-    ) -> Result<bool, KeyringError> {
+    ) -> Result<bool, SecretStorageError> {
         self.remove_legacy_if_encrypted_copy_matches_with_sync(
             key,
             legacy_path,
@@ -539,13 +491,13 @@ impl EncryptedFileBackend {
         key: &[u8; KEY_LEN],
         legacy_path: &Path,
         destination_lock: &file_store::WriteLock,
-        sync_parent: impl FnOnce(&Path, &file_store::WriteLock) -> Result<(), KeyringError>,
-    ) -> Result<bool, KeyringError> {
+        sync_parent: impl FnOnce(&Path, &file_store::WriteLock) -> Result<(), SecretStorageError>,
+    ) -> Result<bool, SecretStorageError> {
         let metadata = match std::fs::symlink_metadata(legacy_path) {
             Ok(metadata) => metadata,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
             Err(source) => {
-                return Err(KeyringError::MigrationReadFailed {
+                return Err(SecretStorageError::MigrationReadFailed {
                     path: legacy_path.display().to_string(),
                     source,
                 });
@@ -554,11 +506,12 @@ impl EncryptedFileBackend {
         if !metadata.file_type().is_file() {
             return Ok(false);
         }
-        let bytes =
-            std::fs::read(legacy_path).map_err(|source| KeyringError::MigrationReadFailed {
+        let bytes = std::fs::read(legacy_path).map_err(|source| {
+            SecretStorageError::MigrationReadFailed {
                 path: legacy_path.display().to_string(),
                 source,
-            })?;
+            }
+        })?;
         let legacy: std::collections::BTreeMap<String, String> = if bytes.is_empty() {
             Default::default()
         } else {
@@ -571,7 +524,7 @@ impl EncryptedFileBackend {
             Ok(blob) => blob,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
             Err(source) => {
-                return Err(KeyringError::MigrationReadFailed {
+                return Err(SecretStorageError::MigrationReadFailed {
                     path: self.path.display().to_string(),
                     source,
                 });
@@ -610,19 +563,19 @@ impl EncryptedFileBackend {
                 Ok(true)
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
-            Err(source) => Err(KeyringError::MigrationDeleteFailed {
+            Err(source) => Err(SecretStorageError::MigrationDeleteFailed {
                 path: legacy_path.display().to_string(),
                 source,
             }),
         }
     }
 
-    /// [`KeyringBackend::get`] under an explicit master key.
+    /// [`SecretBackend::get`] under an explicit master key.
     pub(super) fn get_with_key(
         &self,
         key: &[u8; KEY_LEN],
         namespaced_key: &str,
-    ) -> Result<Option<String>, KeyringError> {
+    ) -> Result<Option<String>, SecretStorageError> {
         use tinystoragedrivers::secrets::SecretStore as _;
         let name = namespaced_key.to_string();
         let value = self.run(key, move |store| {
@@ -632,13 +585,13 @@ impl EncryptedFileBackend {
         adapter::utf8(namespaced_key, value)
     }
 
-    /// [`KeyringBackend::set`] under an explicit master key.
+    /// [`SecretBackend::set`] under an explicit master key.
     pub(super) fn set_with_key(
         &self,
         key: &[u8; KEY_LEN],
         namespaced_key: &str,
         value: &str,
-    ) -> Result<(), KeyringError> {
+    ) -> Result<(), SecretStorageError> {
         use tinystoragedrivers::secrets::SecretStore as _;
         let name = namespaced_key.to_string();
         let value = Zeroizing::new(value.as_bytes().to_vec());
@@ -649,30 +602,30 @@ impl EncryptedFileBackend {
     }
 }
 
-impl KeyringBackend for EncryptedFileBackend {
-    fn get(&self, namespaced_key: &str) -> Result<Option<String>, KeyringError> {
-        let Some(key) = master_key() else {
+impl SecretBackend for EncryptedFileBackend {
+    fn get(&self, namespaced_key: &str) -> Result<Option<String>, SecretStorageError> {
+        let Some(key) = self.key() else {
             return Ok(None);
         };
-        self.get_with_key(key, namespaced_key)
+        self.get_with_key(&key, namespaced_key)
     }
 
-    fn set(&self, namespaced_key: &str, value: &str) -> Result<(), KeyringError> {
-        let Some(key) = master_key() else {
-            return Err(KeyringError::Backend(
+    fn set(&self, namespaced_key: &str, value: &str) -> Result<(), SecretStorageError> {
+        let Some(key) = self.key() else {
+            return Err(SecretStorageError::Backend(
                 "master key unavailable — cannot store secrets".to_string(),
             ));
         };
-        self.set_with_key(key, namespaced_key, value)
+        self.set_with_key(&key, namespaced_key, value)
     }
 
-    fn delete(&self, namespaced_key: &str) -> Result<(), KeyringError> {
+    fn delete(&self, namespaced_key: &str) -> Result<(), SecretStorageError> {
         use tinystoragedrivers::secrets::SecretStore as _;
-        let Some(key) = master_key() else {
+        let Some(key) = self.key() else {
             return Ok(());
         };
         let name = namespaced_key.to_string();
-        self.run(key, move |store| {
+        self.run(&key, move |store| {
             let name = name.clone();
             async move { store.delete(&name).await.map(|_| ()) }
         })

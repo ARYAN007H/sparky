@@ -71,6 +71,7 @@ serde_json = "1"
 # embedded JSON-RPC server and `host::desktop`) and `jev` (the Jev-backed
 # `tool_search` ranker the product ships).
 openhuman-rpc = { path = "../openhuman-rpc", default-features = false, features = [
+    "os-keyring",
     "http-client",
     "server",
     "jev",

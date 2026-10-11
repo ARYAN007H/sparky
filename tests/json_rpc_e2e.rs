@@ -40,14 +40,11 @@ static JSON_RPC_AUTH_INIT: OnceLock<()> = OnceLock::new();
 /// process-global, so parallel tests would clobber each other and hit the wrong `config.toml` or
 /// inherited `VITE_BACKEND_URL`.
 static JSON_RPC_E2E_ENV_LOCK: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
-static JSON_RPC_E2E_KEYRING_INIT: OnceLock<()> = OnceLock::new();
 static CHAT_COMPLETION_MODELS: OnceLock<Mutex<Vec<String>>> = OnceLock::new();
 static CHAT_COMPLETION_REQUESTS: OnceLock<Mutex<Vec<Value>>> = OnceLock::new();
 
 async fn json_rpc_e2e_env_lock_async() -> tokio::sync::MutexGuard<'static, ()> {
-    JSON_RPC_E2E_KEYRING_INIT.get_or_init(|| unsafe {
-        std::env::set_var("OPENHUMAN_KEYRING_BACKEND", "file");
-    });
+    env_guard::init_keyring_workspace();
     let mutex = JSON_RPC_E2E_ENV_LOCK.get_or_init(|| tokio::sync::Mutex::new(()));
     // A tokio mutex is never poisoned, so a panic in one test cannot cascade to the others.
     mutex.lock().await
@@ -1024,11 +1021,10 @@ async fn wait_for_chat_completion_request_with_message(message: &str) -> Value {
 }
 
 async fn encrypt_test_mnemonic() -> String {
-    let _keyring_backend_guard = EnvVarGuard::set("OPENHUMAN_KEYRING_BACKEND", "file");
     let config = openhuman_core::config::load_config_with_timeout()
         .await
         .expect("load config for encrypted test mnemonic");
-    openhuman_core::security::keyring::init_workspace(&config.workspace_dir);
+    openhuman_core::security::secret_storage::init_workspace(&config.workspace_dir);
     openhuman_core::security::encryption::rpc::encrypt_secret(
         &config,
         "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",

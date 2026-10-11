@@ -194,19 +194,33 @@ impl SecretStore {
 
     fn load_or_create_key_from_keyring(&self) -> Result<Zeroizing<Vec<u8>>> {
         let user_id = self.keyring_user_id();
-        match crate::security::keyring::migrate_from_file(
+        if !crate::security::secret_storage::store::backend().is_persistent() {
+            // A volatile provider must not absorb and delete a legacy disk key.
+            // Read existing keys without migration; new keys stay in memory.
+            if self.key_path.exists() {
+                return decode_key_hex(fs::read_to_string(&self.key_path)?.trim());
+            }
+            let key = crate::security::secret_storage::get_or_create_random(
+                &user_id,
+                KEYCHAIN_MASTER_KEY,
+                KEY_LEN,
+            )
+            .map_err(anyhow::Error::new)?;
+            return decode_key_hex(key.trim());
+        }
+        match crate::security::secret_storage::migrate_from_file(
             &user_id,
             KEYCHAIN_MASTER_KEY,
             &self.key_path,
         ) {
-            Ok(crate::security::keyring::MigrationOutcome::MigratedAndDeleted) => {
+            Ok(crate::security::secret_storage::MigrationOutcome::MigratedAndDeleted) => {
                 log::info!(
                     "[security] migrated legacy secret-store key into keychain from {}",
                     self.key_path.display()
                 );
             }
-            Ok(crate::security::keyring::MigrationOutcome::AlreadyMigrated)
-            | Ok(crate::security::keyring::MigrationOutcome::NoSourceFile) => {}
+            Ok(crate::security::secret_storage::MigrationOutcome::AlreadyMigrated)
+            | Ok(crate::security::secret_storage::MigrationOutcome::NoSourceFile) => {}
             Err(error) => {
                 log::warn!(
                     "[security] failed to migrate legacy secret-store key from {}: {error} | detail={}",
@@ -216,14 +230,17 @@ impl SecretStore {
             }
         }
 
-        let hex_key =
-            crate::security::keyring::get_or_create_random(&user_id, KEYCHAIN_MASTER_KEY, KEY_LEN)
-                .map_err(|e| {
-                    anyhow::anyhow!(
-                        "Failed to load secret-store master key from keychain: {e} | detail={}",
-                        e.diagnostic()
-                    )
-                })?;
+        let hex_key = crate::security::secret_storage::get_or_create_random(
+            &user_id,
+            KEYCHAIN_MASTER_KEY,
+            KEY_LEN,
+        )
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to load secret-store master key from keychain: {e} | detail={}",
+                e.diagnostic()
+            )
+        })?;
         decode_key_hex(hex_key.trim())
     }
 

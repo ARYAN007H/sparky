@@ -4126,7 +4126,6 @@ dependencies = [
  "hmac 0.13.0",
  "hostname",
  "iana-time-zone",
- "keyring",
  "lettre",
  "libc",
  "log",
@@ -4331,6 +4330,8 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "futures",
+ "hex",
+ "keyring",
  "log",
  "once_cell",
  "openhuman-tinyhumans",
@@ -4345,6 +4346,7 @@ dependencies = [
  "tinyagents-harness",
  "tinyagents-session",
  "tinyinference-core",
+ "tinystoragedrivers",
  "tokio",
  "tokio-stream",
  "tokio-util",
@@ -4354,6 +4356,7 @@ dependencies = [
  "url",
  "urlencoding",
  "uuid",
+ "zeroize",
 ]
 
 [[package]]
@@ -6871,7 +6874,7 @@ dependencies = [
 
 [[package]]
 name = "tinychannels"
-version = "0.1.17"
+version = "0.1.18"
 dependencies = [
  "anyhow",
  "async-imap",
@@ -6917,7 +6920,7 @@ dependencies = [
 
 [[package]]
 name = "tinychannels-bus"
-version = "0.1.17"
+version = "0.1.18"
 dependencies = [
  "base64 0.23.1",
  "schemars",
@@ -6928,7 +6931,7 @@ dependencies = [
 
 [[package]]
 name = "tinychannels-runtime"
-version = "0.1.17"
+version = "0.1.18"
 dependencies = [
  "anyhow",
  "async-trait",
