@@ -318,8 +318,6 @@ pub fn all_tools_with_runtime(
         Box::new(FlowMemoryRememberTool::new(security.clone())),
         // Wallet tools use bus-owned declarations and route every operation
         // through the loaded TinyWallet module.
-        #[cfg(feature = "web3")]
-        tools.extend(crate::web3::wallet::tools::all_agent_tools()),
         Box::new(ScheduleTool::new(security.clone(), root_config.clone())),
         Box::new(ProxyConfigTool::new(config.clone(), security.clone())),
         Box::new(UpdateCheckTool::new()),
@@ -486,6 +484,11 @@ pub fn all_tools_with_runtime(
         Box::new(WorkspaceResetPersonaTool::new(config.clone())),
         Box::new(WorkspaceInitTool),
     ];
+
+    // Wallet tools are added after the fixed registry literal because each
+    // bus-backed declaration expands into an owned adapter.
+    #[cfg(feature = "web3")]
+    tools.extend(crate::web3::wallet::tools::all_agent_tools());
 
     // The single `memory` tool (recall | fetch | learn | forget), registered
     // only while memory is on: with no usable engine (signed out, no CortexDB

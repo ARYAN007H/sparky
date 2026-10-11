@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
+use zeroize::Zeroize;
 
 use tinywallet_bus::names::methods;
 use tinywallet_bus::wire::{

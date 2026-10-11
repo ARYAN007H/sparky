@@ -347,9 +347,9 @@ fn finish_shutdown_hook_registration(registered: &AtomicBool) {
 pub(super) fn native_wallet_config_request() -> NativeWalletConfigRequest {
     let mut overridden_endpoints = Vec::new();
     for network in EvmNetwork::ALL {
-        let name = crate::web3::wallet::endpoints::evm_rpc_env_var(network);
-        if nonempty_env(name) {
-            overridden_endpoints.push(RpcEndpointKey::Evm { network });
+        let key = RpcEndpointKey::Evm { network };
+        if crate::web3::wallet::endpoints::override_for_endpoint(key).is_some() {
+            overridden_endpoints.push(key);
         }
     }
     for key in [

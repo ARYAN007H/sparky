@@ -76,26 +76,32 @@ impl Tool for WalletModuleTool {
                     }
                 };
                 let result = match self.name() {
-                    "wallet_tx_status" => {
-                        crate::web3::wallet::tx_status(query.chain, query.evm_network, &query.hash)
-                            .await
-                            .map(|outcome| outcome.value)
-                    }
-                    "wallet_tx_receipt" => {
-                        crate::web3::wallet::tx_receipt(query.chain, query.evm_network, &query.hash)
-                            .await
-                            .map(|outcome| outcome.value)
-                    }
-                    _ => {
-                        crate::web3::wallet::lookup_tx(query.chain, query.evm_network, &query.hash)
-                            .await
-                            .map(|outcome| outcome.value)
-                    }
+                    "wallet_tx_status" => outcome_value(
+                        crate::web3::wallet::tx_status(
+                            query.chain,
+                            query.evm_network,
+                            &query.hash,
+                        )
+                        .await,
+                    ),
+                    "wallet_tx_receipt" => outcome_value(
+                        crate::web3::wallet::tx_receipt(
+                            query.chain,
+                            query.evm_network,
+                            &query.hash,
+                        )
+                        .await,
+                    ),
+                    _ => outcome_value(
+                        crate::web3::wallet::lookup_tx(
+                            query.chain,
+                            query.evm_network,
+                            &query.hash,
+                        )
+                        .await,
+                    ),
                 };
-                result.and_then(|value| {
-                    serde_json::to_value(value)
-                        .map_err(|error| format!("failed to serialize wallet result: {error}"))
-                })
+                result
             }
             _ => return Ok(ToolResult::error("unknown wallet tool")),
         };
