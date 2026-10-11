@@ -21,6 +21,7 @@ struct Faults {
     write: AtomicBool,
     delete: AtomicBool,
     calls: Mutex<Vec<(String, String)>>,
+    writes: AtomicUsize,
 }
 
 #[derive(Debug)]
@@ -97,6 +98,9 @@ impl DocumentStore for Documents {
         doc: serde_json::Value,
         precondition: Precondition,
     ) -> StoreResult<Version> {
+        if self.faults.read.load(Ordering::SeqCst) {
+            self.faults.writes.fetch_add(1, Ordering::SeqCst);
+        }
         if collection == POLICIES && self.faults.write.load(Ordering::SeqCst) {
             return Err(StorageError::backend(BACKEND_DETAIL));
         }
@@ -108,6 +112,9 @@ impl DocumentStore for Documents {
         id: &str,
         precondition: Precondition,
     ) -> StoreResult<bool> {
+        if self.faults.read.load(Ordering::SeqCst) {
+            self.faults.writes.fetch_add(1, Ordering::SeqCst);
+        }
         if collection == POLICIES && self.faults.delete.load(Ordering::SeqCst) {
             return Err(StorageError::backend(BACKEND_DETAIL));
         }
