@@ -56,6 +56,7 @@ fn native_jail_request_preserves_grants_and_requires_enforcement() -> anyhow::Re
     let root = tempfile::tempdir()?;
     let readonly = tempfile::tempdir()?;
     let readwrite = tempfile::tempdir()?;
+    let scratch = tempfile::tempdir()?;
     let policy = SandboxPolicy {
         backend: super::super::types::SandboxBackendKind::Local,
         workspace_root: root.path().to_path_buf(),
@@ -66,12 +67,16 @@ fn native_jail_request_preserves_grants_and_requires_enforcement() -> anyhow::Re
         env_passthrough: Vec::new(),
         docker_overrides: None,
     };
-    let request = jail_request(&policy, vec!["/scratch".to_owned()])?;
+    let (_, writable_roots) = execution_environment(&policy, &HashMap::new(), scratch.path())?;
+    let request = jail_request(&policy, writable_roots)?;
 
     assert_eq!(request.read_only, [readonly.path().to_str().unwrap()]);
     assert_eq!(
         request.read_write,
-        [readwrite.path().to_str().unwrap(), "/scratch"]
+        [
+            readwrite.path().to_str().unwrap(),
+            scratch.path().to_str().unwrap()
+        ]
     );
     assert!(!request.allow_net);
     assert!(request.allow_subprocess);
