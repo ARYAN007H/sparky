@@ -334,12 +334,18 @@ async fn a_failure_halt_keeps_an_earlier_repeat_guard_stop_note() {
     assert_eq!(slot.lock().unwrap().as_deref(), Some(guard_note));
 }
 
-/// The failure breaker owns its stop when it fired first: a repeat-guard
-/// halt later in the same batch must not replace its note.
+/// The failure breaker stopped the run first; the repeat guard tripping on a
+/// later result in the same batch must not replace its stop note.
 #[tokio::test]
-async fn a_failure_breaker_halt_survives_a_later_halt_in_its_batch() {
+async fn a_failure_breaker_halt_survives_a_later_repeat_guard_halt_in_its_batch() {
     let handle = SteeringHandle::allow_all();
     let slot = std::sync::Arc::new(std::sync::Mutex::new(None));
+    let guard = RepeatProgressMiddleware::new(
+        handle.clone(),
+        slot.clone(),
+        Arc::new(is_repeat_call_exempt),
+    )
+    .with_config(tinyagents_harness::no_progress::RepeatProgressConfig::immediate_halt());
     let breaker = RepeatedToolFailureMiddleware::new(handle.clone(), 3, slot.clone());
     let mut ctx = ctx();
     for (i, command) in ["cargo build", "touch notes.md"].into_iter().enumerate() {
@@ -352,24 +358,25 @@ async fn a_failure_breaker_halt_survives_a_later_halt_in_its_batch() {
             .await
             .unwrap();
     }
-    // A sibling result in the same batch trips the repeat guard, which
-    // writes its own note into the shared slot.
-    *slot.lock().unwrap() = Some(
-        "Stopping: the same successful tool call returned the identical result 4 times in this \
-         run; re-running steps whose results are already in the conversation adds no new \
-         information, so the run is cycling without making progress."
-            .to_string(),
-    );
-    breaker
-        .after_agent(&mut ctx, &(), &mut AgentRun::new())
-        .await
-        .unwrap();
+    let breaker_note = slot.lock().unwrap().clone().expect("the breaker stopped");
+    // The same successful read, repeated until the guard trips.
+    for round in 0..8 {
+        let id = format!("read-{round}");
+        let calls = [TaToolCall::new(&id, "file_read", json!({ "path": "a.rs" }))];
+        guard
+            .after_model(&mut ctx, &(), &mut response_with(&calls))
+            .await
+            .unwrap();
+        let mut result = tool_result("file_read", "same contents");
+        guard
+            .after_tool(&mut ctx, &(), &invocation(&id, "file_read"), &mut result)
+            .await
+            .unwrap();
+    }
+    assert!(drain_pause_count(&handle) > 1, "the guard tripped as well");
     let note = slot.lock().unwrap().clone().unwrap();
-    assert_eq!(
-        StopReasonKind::from_stop_note(&note),
-        StopReasonKind::Policy,
-        "{note}"
-    );
+    assert_eq!(note, breaker_note);
+    assert_eq!(StopReasonKind::from_stop_note(&note), StopReasonKind::Policy);
 }
 
 /// Feed `breaker` one result of `tool` for `path`, failing with
@@ -443,6 +450,33 @@ async fn a_success_between_the_stop_and_a_refusal_keeps_the_stop_as_is() {
     fold(&breaker, &mut ctx, "a2", "file_read", "src/lbi.rs", false).await;
     fold(&breaker, &mut ctx, "g1", "grep", "src", true).await;
     fold_refusal(&breaker, &mut ctx).await;
+    let note = slot.lock().unwrap().clone().unwrap();
+    assert_eq!(
+        StopReasonKind::from_stop_note(&note),
+        StopReasonKind::NotFound,
+        "{note}"
+    );
+}
+
+/// Refusals, then a repeated correctable failure that stops the run (and is
+/// relabelled as a repeat loop), then a success later in the same batch: the
+/// batch made progress, so the classified stop comes back.
+#[tokio::test]
+async fn a_success_after_a_relabelled_stop_restores_the_classified_note() {
+    let handle = SteeringHandle::allow_all();
+    let slot = std::sync::Arc::new(std::sync::Mutex::new(None));
+    let breaker = RepeatedToolFailureMiddleware::new(handle.clone(), 3, slot.clone());
+    let mut ctx = ctx();
+    fold(&breaker, &mut ctx, "a1", "file_read", "src/lbi.rs", false).await;
+    fold_refusal(&breaker, &mut ctx).await;
+    fold(&breaker, &mut ctx, "a2", "file_read", "src/lbi.rs", false).await;
+    let relabelled = slot.lock().unwrap().clone().unwrap();
+    assert_eq!(
+        StopReasonKind::from_stop_note(&relabelled),
+        StopReasonKind::RepeatingStep,
+        "{relabelled}"
+    );
+    fold(&breaker, &mut ctx, "g1", "grep", "src", true).await;
     let note = slot.lock().unwrap().clone().unwrap();
     assert_eq!(
         StopReasonKind::from_stop_note(&note),

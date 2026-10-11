@@ -330,8 +330,7 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         true
     }
 
-    /// Restore this breaker's stop note if a later writer replaced it (see
-    /// [`StopLatch::finish_run`]).
+    /// Forget the run's stop-latch state (see [`StopLatch::finish_run`]).
     async fn after_agent(
         &self,
         _ctx: &mut RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
