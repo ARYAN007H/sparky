@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tinybus::EventHandler;
-use tinychannels_bus::{capabilities_for, ChannelMessage};
+use tinychannels_bus::{ChannelMessage, capabilities_for};
 
 #[derive(Clone)]
 struct ReplyContext {

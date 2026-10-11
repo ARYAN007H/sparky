@@ -16,12 +16,14 @@ async fn transport_captures_no_local_or_missing_hosted_credential() {
     let _env_lock = crate::config::TEST_ENV_LOCK.lock().await;
     let workspace = tempfile::tempdir().expect("temporary workspace");
     let _workspace_env = EnvVarGuard::workspace_unlocked(workspace.path());
-    assert!(ManagedTransport::capture(
-        &crate::config::Config::default(),
-        "telegram".into(),
-        tokio_util::sync::CancellationToken::new()
-    )
-    .is_err());
+    assert!(
+        ManagedTransport::capture(
+            &crate::config::Config::default(),
+            "telegram".into(),
+            tokio_util::sync::CancellationToken::new()
+        )
+        .is_err()
+    );
 }
 
 #[test]

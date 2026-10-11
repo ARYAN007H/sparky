@@ -462,10 +462,12 @@ async fn set_default_channel_rejects_unknown_and_empty() {
         .await
         .expect("seed discord");
 
-    assert!(set_default_channel(&mut config, "myspace")
-        .await
-        .unwrap_err()
-        .contains("unknown channel"),);
+    assert!(
+        set_default_channel(&mut config, "myspace")
+            .await
+            .unwrap_err()
+            .contains("unknown channel"),
+    );
     assert!(set_default_channel(&mut config, "   ").await.is_err());
 
     // A rejected set must not clobber the previously persisted value.

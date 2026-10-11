@@ -1,13 +1,13 @@
 //! Disconnecting a channel: removing stored credentials and clearing its
 //! runtime config, optionally along with its memory chunks.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::config::Config;
 use crate::core::Outcome;
 use crate::security::credentials;
 
-use super::super::super::definitions::{find_channel_definition, ChannelAuthMode};
+use super::super::super::definitions::{ChannelAuthMode, find_channel_definition};
 use super::memory::clear_channel_memory;
 use super::shared::credential_provider;
 

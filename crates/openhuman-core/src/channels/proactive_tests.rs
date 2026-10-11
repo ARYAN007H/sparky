@@ -1,7 +1,7 @@
 use super::*;
 use crate::channels::traits::ChannelMessage;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::sync::mpsc;
 
 struct MockChannel {
@@ -101,12 +101,14 @@ async fn routes_to_active_external_channel() {
     sub.handle(&proactive_event()).await;
 
     assert_eq!(send_count.load(Ordering::SeqCst), 1);
-    assert!(last_idempotency_key
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .as_deref()
-        .unwrap()
-        .starts_with("legacy-send:telegram:"));
+    assert!(
+        last_idempotency_key
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .as_deref()
+            .unwrap()
+            .starts_with("legacy-send:telegram:")
+    );
 }
 
 #[tokio::test]

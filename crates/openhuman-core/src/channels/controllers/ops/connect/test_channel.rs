@@ -1,7 +1,7 @@
 //! Testing credentials through the module without persisting host configuration.
 
 use serde_json::Value;
-use tinychannels_bus::{methods, ChannelControllerRequest, ChannelControllerResult};
+use tinychannels_bus::{ChannelControllerRequest, ChannelControllerResult, methods};
 
 use crate::config::Config;
 use crate::core::Outcome;

@@ -1,4 +1,4 @@
-use crate::channels::{traits, Channel, SendMessage};
+use crate::channels::{Channel, SendMessage, traits};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;

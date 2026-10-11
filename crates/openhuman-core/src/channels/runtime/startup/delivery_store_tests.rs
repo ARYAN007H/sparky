@@ -106,9 +106,11 @@ async fn removal_and_failed_delivery_are_idempotent_and_durable() {
         reopened.load_failed("failed".into()).await.unwrap(),
         Some(failed)
     );
-    assert!(reopened
-        .load_pending("pending".into())
-        .await
-        .unwrap()
-        .is_none());
+    assert!(
+        reopened
+            .load_pending("pending".into())
+            .await
+            .unwrap()
+            .is_none()
+    );
 }

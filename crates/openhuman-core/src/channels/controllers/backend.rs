@@ -1,18 +1,17 @@
 //! TinyChannels backend implementation for OpenHuman controller operations.
 
-use serde::Serialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::config::{ChannelsConfig, Config};
 use crate::core::Outcome;
 
 use super::ops;
+#[cfg(test)]
+use tinychannels_bus::SendMessage;
 use tinychannels_bus::controllers::{
     ChannelAuthMode, ChannelDisconnectResult, ChannelReactionResult, ChannelSendMessageResult,
     ChannelStatusEntry, ChannelThreadListResult, ChannelThreadResult,
 };
-#[cfg(test)]
-use tinychannels_bus::SendMessage;
 
 /// OpenHuman-owned implementation of the TinyChannels backend contract.
 #[derive(Debug, Clone)]
@@ -101,17 +100,12 @@ impl OpenHumanChannelBackend {
                 .map(Result::Threads),
         }
     }
-
 }
 
 fn into_anyhow<T>(result: Result<Outcome<T>, String>) -> anyhow::Result<T> {
     result
         .map(|outcome| outcome.value)
         .map_err(anyhow::Error::msg)
-}
-
-fn to_raw_value(value: impl Serialize) -> Option<Value> {
-    serde_json::to_value(value).ok()
 }
 
 fn parse_or_raw<T>(value: Value) -> T
@@ -302,7 +296,6 @@ impl OpenHumanChannelBackend {
         let value = into_anyhow(ops::channel_list_threads(&config, channel, active).await)?;
         Ok(parse_or_raw(value))
     }
-
 }
 
 #[cfg(test)]

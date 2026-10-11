@@ -15,10 +15,12 @@ fn channel_message_body_adds_deterministic_idempotency_key() {
     assert_eq!(left["text"], "hello");
     assert_eq!(left["threadId"], "topic-1");
     assert_eq!(left["idempotencyKey"], right["idempotencyKey"]);
-    assert!(left["idempotencyKey"]
-        .as_str()
-        .expect("idempotency key")
-        .starts_with("legacy-send:telegram:"));
+    assert!(
+        left["idempotencyKey"]
+            .as_str()
+            .expect("idempotency key")
+            .starts_with("legacy-send:telegram:")
+    );
 }
 
 #[test]

@@ -7,8 +7,8 @@
 //! schemas the contract defines.
 
 use tinychannels_bus::controllers::{
-    channel_controller_schema, ChannelControllerField, ChannelControllerFieldType,
-    ChannelControllerSchema,
+    ChannelControllerField, ChannelControllerFieldType, ChannelControllerSchema,
+    channel_controller_schema,
 };
 
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};

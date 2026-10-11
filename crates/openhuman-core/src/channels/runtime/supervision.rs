@@ -1,7 +1,7 @@
 //! OpenHuman observer adapter for TinyChannels listener supervision.
 
-use super::super::traits;
 use super::super::Channel;
+use super::super::traits;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 use std::sync::Arc;
@@ -60,7 +60,7 @@ pub(crate) fn spawn_supervised_listener(
 }
 
 #[cfg(test)]
-pub(crate) use tinychannels::runtime::{jitter_millis, MAX_JITTER_MS};
+pub(crate) use tinychannels::runtime::{MAX_JITTER_MS, jitter_millis};
 
 #[cfg(test)]
 #[path = "supervision_tests.rs"]

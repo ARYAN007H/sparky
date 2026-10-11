@@ -1,6 +1,6 @@
 use super::*;
 use std::sync::Arc;
-use tokio::sync::{oneshot, Notify};
+use tokio::sync::{Notify, oneshot};
 
 struct DeferredTyping {
     started: Notify,

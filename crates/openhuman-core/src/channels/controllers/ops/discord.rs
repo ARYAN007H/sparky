@@ -11,8 +11,8 @@ use crate::modules::{
 };
 use crate::security::credentials;
 use tinychannels_bus::{
-    controllers::{BotPermissionCheck, DiscordGuild, DiscordTextChannel},
     ChannelControllerRequest,
+    controllers::{BotPermissionCheck, DiscordGuild, DiscordTextChannel},
 };
 
 use super::super::definitions::ChannelAuthMode;

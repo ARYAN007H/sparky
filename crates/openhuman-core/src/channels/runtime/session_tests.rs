@@ -1,6 +1,6 @@
 use super::*;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 #[tokio::test]
 async fn independent_local_runtime_does_not_need_an_account_session() {
