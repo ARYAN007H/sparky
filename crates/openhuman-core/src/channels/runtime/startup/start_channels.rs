@@ -172,9 +172,8 @@ async fn start_channels_inner(mut config: Config, session: CancellationToken) ->
             // Do not drop preparation after it may have acquired a module
             // lease. Finish it and await the runtime's acknowledged close
             // before the service supervisor can admit another identity.
-            if let Ok(mut runtime) = preparing.await {
-                runtime.close().await?;
-            }
+            let mut runtime = preparing.await?;
+            runtime.close().await?;
             return Ok(());
         },
         prepared = &mut preparing => {
