@@ -347,82 +347,64 @@ pub mod connections {
 #[cfg(feature = "mcp")]
 pub mod boot {
     use crate::config::Config;
-    use crate::mcp::host;
+    use crate::mcp::{host, module_client::McpConfiguredClient};
 
     /// Connects every enabled installed server.
     ///
     /// Never fails: a server that cannot connect is logged and skipped, because
     /// one broken third-party integration must not stop the core coming up.
     pub async fn spawn_installed_servers(config: &Config) {
-        let service = match host::lookup(config) {
-            Ok(service) => service,
+        let client = match McpConfiguredClient::for_config(config) {
+            Ok(client) => client,
             Err(error) => {
                 tracing::warn!("[mcp] the service could not be opened: {error}");
                 return;
             }
         };
 
-        let client = host::client_config(config);
-        let outcome = tinymcp::registry::connect_installed_servers(
-            service.dynamic().store(),
-            service.dynamic().connections(),
-            service.dynamic().oauth(),
-            &client.client_identity,
-            client.proxy.as_ref(),
-        )
-        .await;
-
-        tracing::info!(
-            connected = outcome.connected,
-            failed = outcome.failed,
-            skipped = outcome.skipped,
-            "[mcp] startup connect finished"
-        );
+        // Opening the configured object starts TinyMCP's owned maintenance
+        // task, whose boot pass connects installed servers. A static catalog
+        // read forces that open without recreating connection policy here.
+        if let Err(error) = client
+            .call::<serde_json::Value>(
+                &host::client_config(config),
+                tinymcp_bus::names::methods::STATIC_LIST,
+                (),
+            )
+            .await
+        {
+            tracing::warn!("[mcp] startup module open/connect pass failed: {error}");
+        }
     }
 }
 
 /// Keeping installed servers connected.
 #[cfg(feature = "mcp")]
 pub mod supervisor {
-    use crate::mcp::host;
+    use std::time::Duration;
+
+    use crate::mcp::{module_client::McpConfiguredClient, registry::supervisor_events};
 
     /// Runs the reconnect supervisor until the process ends.
     ///
-    /// One task for every host the process has opened, driven by
-    /// `tinymcp::Supervisor::run_many`: the connection map is per-workspace,
-    /// and a host opened after boot — a workspace switch — is supervised from
-    /// the tick after it appears, with its backoff state kept per workspace.
-    /// The first tick is delayed a whole interval so it does not race the
-    /// startup connect pass.
+    /// One task drains events from every open TinyMCP child. Probe scheduling,
+    /// reconnection, and per-server backoff remain inside the owning module.
+    /// The first poll is delayed a whole interval so it does not race startup.
     pub async fn run() {
-        tinymcp::Supervisor::run_many(
-            tinymcp::SupervisorConfig::default(),
-            // Every host currently open. The identity and proxy each was
-            // opened with ride along, so a reconnect dials the way the host's
-            // own connections do.
-            || {
-                host::all_hosts()
-                    .into_iter()
-                    .map(
-                        |(workspace, registry, identity, proxy)| tinymcp::SupervisedHost {
-                            key: workspace,
-                            registry,
-                            identity,
-                            proxy,
-                        },
-                    )
-                    .collect()
-            },
-            // What the tick observed becomes this domain's events, so a probe
-            // outcome reaches the Event Log and a server that stays down
-            // reaches the user (#5931). The workspace goes with them: a
-            // subscriber that persists or announces one must not take a
-            // switched-away workspace's outage for its own.
-            |workspace, report| {
-                super::supervisor_events::publish(workspace, report);
-            },
-        )
-        .await;
+        loop {
+            tokio::time::sleep(Duration::from_secs(60)).await;
+            for (workspace, client) in McpConfiguredClient::open_clients() {
+                match client.drain_supervisor_events(256).await {
+                    Ok(Some(batch)) => {
+                        supervisor_events::publish_batch(&workspace, &batch);
+                    }
+                    Ok(None) => {}
+                    Err(error) => {
+                        tracing::debug!(?error, workspace = ?workspace, "[mcp] supervisor drain failed");
+                    }
+                }
+            }
+        }
     }
 }
 

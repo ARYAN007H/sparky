@@ -22,6 +22,7 @@ use serde_json::Value;
 use tinymcp_bus::{
     config::{McpClientConfig, OpenConfiguredRequest, OpenConfiguredResponse, TransitionStatus},
     names,
+    SupervisorBatch,
 };
 
 use crate::{
@@ -179,6 +180,48 @@ impl McpConfiguredClient {
         let client = Arc::new(Self::new(&data_dir, config)?);
         clients.insert(data_dir, Arc::clone(&client));
         Ok(client)
+    }
+
+    /// A snapshot of configured workspaces currently retained by the host.
+    /// The supervisor only drains open objects; it never creates a workspace.
+    pub(crate) fn open_clients() -> Vec<(PathBuf, Arc<Self>)> {
+        CLIENTS
+            .get()
+            .map(|clients| {
+                clients
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .iter()
+                    .map(|(workspace, client)| (workspace.clone(), Arc::clone(client)))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Drain observations from the module-owned supervisor for an open child.
+    /// An object that is opening or closing is skipped and will be revisited
+    /// on the next host poll.
+    pub(crate) async fn drain_supervisor_events(
+        &self,
+        limit: usize,
+    ) -> Result<Option<SupervisorBatch>, ModuleCallError> {
+        let state = self.state.lock().await;
+        let State::Open(object) = &*state else {
+            return Ok(None);
+        };
+        let args = serde_json::to_value((limit,)).map_err(|_| ModuleCallError::ModuleFault)?;
+        let reply = self
+            .port
+            .call_object(
+                &object.object_path,
+                names::methods::DRAIN_SUPERVISOR_EVENTS,
+                args,
+                false,
+            )
+            .await?;
+        serde_json::from_value(reply)
+            .map(Some)
+            .map_err(|_| ModuleCallError::ModuleFault)
     }
 
     /// Register this runtime's cleanup. The flag is reset by the drained hook,
