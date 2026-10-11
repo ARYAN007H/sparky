@@ -212,6 +212,8 @@ pub async fn set_credential(
             spawn_integrations_cache_warm(config);
         }
         crate::cron::scheduler_gate::set_signed_out(false);
+        #[cfg(feature = "channels")]
+        crate::channels::session::resume_channel_service();
         tracing::info!(
             domain = "credentials",
             operation = "set_credential",
@@ -341,6 +343,8 @@ pub async fn set_credential(
     // Open the scheduler gate now that a live credential is in place; workers
     // sleeping in the paused poll loop resume at their next iteration.
     crate::cron::scheduler_gate::set_signed_out(false);
+    #[cfg(feature = "channels")]
+    crate::channels::session::resume_channel_service();
     // An API key wins over a session for every backend request. Keep the
     // process identity aligned with that effective credential.
     if api_key::has_api_key(&effective_config) {
