@@ -217,6 +217,10 @@ async fn per_config_auth_failure_surfaces_401_reason_without_cross_workspace_lea
     )
     .await;
 
+    ops::mcp_clients_set_enabled(&config_a, server_id.clone(), true)
+        .await
+        .expect("enable remote server before exercising its 401 response");
+
     assert!(
         ops::mcp_clients_connect(&config_a, server_id.clone())
             .await

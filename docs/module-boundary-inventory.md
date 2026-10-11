@@ -358,3 +358,17 @@ from this migration.
 The active host cutovers are MCP and Channels. Wallet host PR [#7489](https://github.com/tinyhumansai/openhuman/pull/7489) is merged, as is TinyBox host PR [#7469](https://github.com/tinyhumansai/openhuman/pull/7469). This branch integrates the merged Wallet cutover and removes the MCP implementation dependency; the remaining Channels exceptions belong to its separate host PR.
 
 TinyRuntime is excluded as requested. Broader bus error reporting and Sentry coverage are deferred to separate work; the existing reporting path remains in place.
+
+## TinyMCP compatible release pin
+
+TinyMCP v0.14.2 is pinned at canonical merge source
+`e18f289407fac1a9e5695ed75bb4ab5800c79f7b`, contract 1.20. All 17 downloaded
+platform archives match the checksum manifest, GitHub asset digests and sizes.
+The Ubuntu artifact loads through OpenHuman's TinyBus revision and exposes
+all 62 expected contract methods. Registry metadata includes the additional
+Arch ARM archive and the renamed Arch archive basenames.
+
+The native host E2Es and full-crate focused tests are queued for final acceptance;
+release verification does not substitute for those host checks. Actual-source
+HTTP/session regressions pass 11 tests and cover host credential-header removal,
+terminal callback draining, lost-reply retry and rejected DELETE preservation.
