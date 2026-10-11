@@ -6,9 +6,9 @@ TinyMCP owns MCP framing, protocol state, callbacks, and HTTP admission through 
 
 ## Responsibilities
 
-- Implement the MCP JSON-RPC server lifecycle: `initialize`, `ping`, `tools/list`, `tools/call`, `resources/list`, `resources/templates/list`, `resources/read`, plus notifications (`notifications/initialized`, `notifications/cancelled`).
+- Compose TinyMCP's protocol lifecycle for `initialize`, `ping`, tools, resources, prompts, and notifications with OpenHuman's host callbacks.
 - Advertise a fixed catalog of MCP tools (`tool_specs`) with input JSON-schemas and MCP `ToolAnnotations` (`readOnlyHint`/`destructiveHint`/`idempotentHint`/`openWorldHint`).
-- Validate/normalize tool arguments at the MCP layer (explicit rejection over silent clamping), map them to registered core RPC params, and dispatch via `all::try_invoke_registered_rpc`.
+- Map validated module callbacks to registered core RPC params and dispatch via `all::try_invoke_registered_rpc`.
 - Enforce `SecurityPolicy` per call: read tools require `ToolOperation::Read`; `agent.run_subagent` and the two write tools (`memory.learn`, `memory.forget`) require `ToolOperation::Act`.
 - Run write tools (`memory.learn`, `memory.forget`) through a dedicated write-dispatch + audit pipeline that records every attempt (success and rejection) to the MCP write-audit log.
 - Serve bundled prompt assets (`IDENTITY.md`, `SOUL.md`, `USER.md`, and each built-in subagent's `prompt.md`) as static MCP resources under the `openhuman://prompts/...` URI scheme.
@@ -88,7 +88,7 @@ No `store.rs`. The only durable side effect is the **MCP write-audit log**, writ
 - `crate::search::providers`: which search tools the config can serve (`tool_specs_for_config`).
 - `crate::mcp::audit` (`record_write`, `NewMcpWriteRecord`, list/query helpers in tests): durable write-audit log.
 - `crate::mcp::http_client::McpHttpClient`: round-trip test harness for the HTTP transport (test-only).
-- `tinymcp::server` (protocol, sessions, argument validators, stdio + HTTP/SSE transports; HTTP behind `tinymcp/server-http`).
+- `tinymcp_bus` (typed server declarations, callback and replay vocabulary, HTTP metadata); TinyMCP owns protocol validation and transport/session behavior.
 - External crates: `serde_json`, `uuid`, `sha2`/`hex` (slug fallback hash), `chrono` (audit timestamps), `futures-util` (`BoxFuture`).
 
 ## Used by
@@ -104,8 +104,8 @@ No `store.rs`. The only durable side effect is the **MCP write-audit log**, writ
 - **`ToolCallError` variant → JSON-RPC code is deliberate:** `InvalidParams` → `-32602` (client-actionable, including policy denials so the reason text surfaces), `Internal` → `-32603` (config load / platform failures), `ResourceNotFound` → `-32002`. Policy denials are intentionally `InvalidParams`, not `Internal`.
 - **Explicit rejection over silent clamping** throughout: over-cap `k`, oversize/over-count tags, blank required strings, and unexpected arguments all error rather than being trimmed/dropped.
 - **Write audit is fire-and-forget but mandatory:** rejections are audited even before config is loaded (`audit_write_rejection_without_config`), and `dispatch_write_tool` returns `Ok(tool_error(...))` (not `Err`) on RPC-handler failure so the client gets an MCP `isError` result while the failure is still recorded.
-- **Protocol negotiation:** supports `2024-11-05`, `2025-03-26`, `2025-06-18`, and `2025-11-25` (`LATEST_PROTOCOL_VERSION`); unknown requested versions fall back to latest. HTTP enforces an exact session protocol-version match on subsequent requests.
-- **HTTP security:** bearer auth is optional (`--auth-token`); session ids are SHA-256-redacted in logs; default bind is `127.0.0.1:9300`.
+- **Protocol negotiation:** owned by TinyMCP and covered by its module protocol fixtures. The host routes HTTP methods and passes raw headers/frames without parsing MCP methods.
+- **HTTP security:** bearer auth is optional (`--auth-token`); the default bind is `127.0.0.1:9300`.
 - **Resource catalog parity is CI-enforced:** `resources.rs` content is `include_str!`-embedded at compile time and the `catalog_mirrors_builtins` test fails if a built-in subagent lacks a matching `openhuman://prompts/agents/<id>` entry.
 - **`agent.run_subagent` limits:** runs a fresh single-turn agent session tagged with an `mcp:<agent_id>:<uuid>` event context.
 - **stdio logging defaults to `warn`** on stderr (so failures surface in client UIs); `--verbose` → `debug`; a user-set `RUST_LOG` always wins. Stdout is reserved for protocol messages only.
