@@ -627,6 +627,11 @@ fn resumed_thread_with_retired_podcast_tool_remains_usable() {
             .build().expect("archive host");
         first.set_thread_id(Some("retired-audio-thread"));
         first.turn("save this old conversation").await.expect("archive turn");
+        let transcript_path = stem_path(root.path(), &first.session_id().expect("session id"));
+        let archived = read_transcript(&transcript_path).expect("saved transcript");
+        assert!(archived.tools.as_ref().expect("recorded declarations").as_array()
+            .expect("declarations array").iter().any(|spec| spec["name"] == RETIRED));
+        let archived_bytes = std::fs::read(&transcript_path).expect("archived bytes");
         drop(first);
 
         let next = model(vec![
@@ -635,9 +640,9 @@ fn resumed_thread_with_retired_podcast_tool_remains_usable() {
         ], true);
         let mut resumed = build_host(root.path(), next.clone(), true, "retired-audio-thread");
         assert!(resumed.resume_bound_session().await.expect("resume archive"));
-        let runtime = resumed.runtime_session.as_ref().expect("resumed runtime");
-        assert!(runtime.recorded_tools().expect("recorded tools").specs()
-            .iter().any(|spec| spec.name == RETIRED));
+        // An explicit host tool belt is authoritative, while archived declarations
+        // remain intact in the durable transcript.
+        assert_eq!(std::fs::read(&transcript_path).expect("resumed bytes"), archived_bytes);
         resumed.turn("continue this conversation").await.expect("usable resumed turn");
         let requests = serde_json::to_string(&next.requests()).expect("requests");
         assert!(requests.contains("historical audio artifact"), "historical tool results replay");
