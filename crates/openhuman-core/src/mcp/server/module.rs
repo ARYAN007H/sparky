@@ -320,10 +320,12 @@ impl ServerSession {
         tokio::select! {
             _ = cancellation.cancelled() => {
                 self.cancel_input(&pending).await?;
+                self.stop_callback().await?;
                 return Err(ServerError::Cancelled);
             }
             _ = self.terminal.cancelled() => {
                 self.cancel_input(&pending).await?;
+                self.stop_callback().await?;
                 return Err(ServerError::Cancelled);
             }
             result = self.port.submit(&self.id, pending.headers.clone(), pending.input.clone()) => {
@@ -335,10 +337,12 @@ impl ServerSession {
             let snapshot = tokio::select! {
                 _ = cancellation.cancelled() => {
                     self.cancel_input(&pending).await?;
+                    self.stop_callback().await?;
                     return Err(ServerError::Cancelled);
                 }
                 _ = self.terminal.cancelled() => {
                     self.cancel_input(&pending).await?;
+                    self.stop_callback().await?;
                     return Err(ServerError::Cancelled);
                 }
                 result = self.port.poll(&self.id) => result.map_err(ServerError::Module)?,
@@ -353,6 +357,7 @@ impl ServerSession {
                         Ok(reply) => reply,
                         Err(ServerError::Cancelled) => {
                             self.cancel_input(&pending).await?;
+                            self.stop_callback().await?;
                             return Err(ServerError::Cancelled);
                         }
                         Err(error) => return Err(error),
