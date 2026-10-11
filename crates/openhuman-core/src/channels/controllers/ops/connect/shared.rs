@@ -27,6 +27,9 @@ pub(crate) async fn channel_config_connected(
     .filter(|(_, present)| *present)
     .map(|(name, _)| name.to_owned())
     .collect();
+    #[cfg(test)]
+    let client = crate::channels::module_fixture::client().await;
+    #[cfg(not(test))]
     let client = crate::modules::client::ModuleClient::new(config.clone());
     use tinychannels_bus::module_control::{ChannelControlRequest, ChannelControlResult};
     match client
