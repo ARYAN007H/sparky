@@ -340,7 +340,7 @@ fn fallback_reader_matches_main_reader_without_time_based_expiry() {
         guard.get_mut(&key).unwrap().cached_at = Instant::now() - Duration::from_secs(3600);
     }
     assert!(cached_active_integrations(&config).is_some());
-    let stale = cached_active_integrations_including_expired(&config)
+    let stale = cached_active_integrations(&config)
         .expect("expired entry should still be returned by the fallback read");
     assert_eq!(stale.len(), 1);
     assert_eq!(stale[0].toolkit, "gmail");

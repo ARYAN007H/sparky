@@ -10,7 +10,7 @@ use crate::agent::harness::definition::{AgentDefinition, AgentDefinitionRegistry
 use crate::agent::prompts::ConnectedIntegration;
 use crate::config::Config;
 use crate::integrations::composio::{
-    cached_active_integrations_including_expired, fetch_connected_integrations_status,
+    cached_active_integrations, fetch_connected_integrations_status,
     FetchConnectedIntegrationsStatus,
 };
 use crate::tools::orchestrator_tools;
@@ -146,7 +146,7 @@ pub(super) async fn resolve_target_agent(channel: &str) -> AgentScoping {
         // integrations rather than collapse tool-calling to an empty set.
         let connected = connected_with_fallback(
             fetched,
-            cached_active_integrations_including_expired(&config),
+            cached_active_integrations(&config),
         );
         tracing::debug!(
             channel = %channel,
