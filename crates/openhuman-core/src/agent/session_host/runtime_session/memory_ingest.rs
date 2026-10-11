@@ -108,9 +108,8 @@ impl OpenHumanTurnPrelude {
             .pending_memory_turn = Some(PendingMemoryTurn {
             identity: identity.clone(),
             user_index,
-            profile_context: crate::core::runtime::CoreContext::scoped()
-                .filter(|context| context.profile().is_some())
-                .map(|context| Arc::downgrade(&context)),
+            profile_context: crate::profiles::host::host()
+                .and_then(|host| capture_profile_context(&host)),
         });
         let pack = crate::memory::lifecycle::prefetch::pre_turn(
             config.clone(),
@@ -199,18 +198,32 @@ impl OpenHumanTurnPrelude {
             )
             .await;
         };
-        crate::core::runtime::spawn_scoped(async move {
-            match profile_context {
-                Some(context) => {
-                    // A retired profile cannot fall back to the operator or a
-                    // configured external engine when its captured context is gone.
-                    if let Some(context) = context.upgrade() {
-                        crate::core::runtime::CoreContext::scope(context, work).await;
-                    }
-                }
-                None => work.await,
+        crate::core::runtime::spawn_scoped(deferred_memory_work(profile_context, work));
+    }
+}
+
+// Resolve the profile owner at preparation; a canonical commit may run after
+// the immutable turn-origin scope has ended.
+fn capture_profile_context(
+    _host: &crate::profiles::ProfileHost,
+) -> Option<std::sync::Weak<crate::core::runtime::CoreContext>> {
+    crate::core::runtime::CoreContext::scoped()
+        .filter(|context| context.profile().is_some())
+        .map(|context| Arc::downgrade(&context))
+}
+
+async fn deferred_memory_work(
+    profile_context: Option<std::sync::Weak<crate::core::runtime::CoreContext>>,
+    work: impl std::future::Future<Output = ()>,
+) {
+    match profile_context {
+        Some(context) => {
+            // A retired profile cannot fall back to a configured external engine.
+            if let Some(context) = context.upgrade() {
+                crate::core::runtime::CoreContext::scope(context, work).await;
             }
-        });
+        }
+        None => work.await,
     }
 }
 
