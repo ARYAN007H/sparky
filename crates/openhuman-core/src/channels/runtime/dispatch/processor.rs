@@ -20,10 +20,59 @@ mod turn;
 
 use crate::channels::context::ChannelRuntimeContext;
 use std::sync::Arc;
+use tinychannels_bus::{ChannelInboundEnvelope, ChannelMessage};
+
+/// Host-side inbound work item. Relay authentication remains out-of-band and
+/// can only be set by the native callback after receiving the trusted module
+/// callback; it is never reconstructed from envelope metadata.
+#[derive(Debug, Clone)]
+pub(crate) struct RuntimeChannelMessage {
+    pub(crate) message: ChannelMessage,
+    pub(crate) inbound_envelope: Option<ChannelInboundEnvelope>,
+    pub(crate) authenticated_relay: bool,
+    pub(crate) prepared_inbound: Option<tinychannels_bus::module_inbound::PreparedChannelInbound>,
+}
+
+impl RuntimeChannelMessage {
+    pub(crate) fn with_inbound_envelope(
+        message: ChannelMessage,
+        inbound_envelope: ChannelInboundEnvelope,
+    ) -> Self {
+        Self {
+            message,
+            inbound_envelope: Some(inbound_envelope),
+            authenticated_relay: false,
+            prepared_inbound: None,
+        }
+    }
+
+    pub(crate) fn from_authenticated_relay(
+        delivery: tinychannels_bus::module_relay::RelayInboundDelivery,
+    ) -> Self {
+        Self {
+            // The module's PrepareChannelInbound operation supplies the
+            // normalized legacy projection before the processor consumes it.
+            message: ChannelMessage::default(),
+            inbound_envelope: Some(delivery.envelope),
+            authenticated_relay: delivery.delivered_via_authenticated_relay,
+            prepared_inbound: None,
+        }
+    }
+}
+
+impl From<ChannelMessage> for RuntimeChannelMessage {
+    fn from(message: ChannelMessage) -> Self {
+        Self {
+            message,
+            inbound_envelope: None,
+            authenticated_relay: false,
+            prepared_inbound: None,
+        }
+    }
+}
 
 #[cfg(test)]
 pub(crate) use approval::channel_has_approval_surface;
-pub(crate) use tinychannels::runtime::RuntimeChannelMessage;
 pub(crate) use turn::{process_channel_message, process_channel_runtime_message};
 
 /// Run every inbound message through the agent pipeline, at most
