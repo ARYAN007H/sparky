@@ -157,6 +157,8 @@ pub(super) struct ServerSession {
     callback_dispatch: HostCallbackDispatcher,
     id: String,
     next_operation: AtomicU64,
+    operation: tokio::sync::Mutex<()>,
+    terminal: CancellationToken,
     pending_input: tokio::sync::Mutex<Option<PendingInput>>,
     pending_callback: tokio::sync::Mutex<Option<PendingCallback>>,
 }
@@ -239,6 +241,8 @@ impl ServerSession {
             callback_dispatch,
             id,
             next_operation: AtomicU64::new(1),
+            operation: tokio::sync::Mutex::new(()),
+            terminal: CancellationToken::new(),
             pending_input: tokio::sync::Mutex::new(None),
             pending_callback: tokio::sync::Mutex::new(None),
         })
@@ -271,6 +275,8 @@ impl ServerSession {
             callback_dispatch: Arc::new(|call| Box::pin(handler::dispatch(call))),
             id,
             next_operation: AtomicU64::new(1),
+            operation: tokio::sync::Mutex::new(()),
+            terminal: CancellationToken::new(),
             pending_input: tokio::sync::Mutex::new(None),
             pending_callback: tokio::sync::Mutex::new(None),
         })
@@ -286,6 +292,10 @@ impl ServerSession {
         line: String,
         cancellation: &CancellationToken,
     ) -> Result<ServerOperationSnapshot, ServerError> {
+        let _operation = self.operation.lock().await;
+        if self.terminal.is_cancelled() {
+            return Err(ServerError::Cancelled);
+        }
         let pending = {
             let mut current = self.pending_input.lock().await;
             match current.as_ref() {
@@ -307,19 +317,28 @@ impl ServerSession {
                 }
             }
         };
-        self.port
-            .submit(&self.id, pending.headers.clone(), pending.input.clone())
-            .await
-            .map_err(ServerError::Module)?;
+        tokio::select! {
+            _ = cancellation.cancelled() => {
+                self.cancel_input(&pending).await?;
+                return Err(ServerError::Cancelled);
+            }
+            _ = self.terminal.cancelled() => {
+                self.cancel_input(&pending).await?;
+                return Err(ServerError::Cancelled);
+            }
+            result = self.port.submit(&self.id, pending.headers.clone(), pending.input.clone()) => {
+                result.map_err(ServerError::Module)?;
+            }
+        }
 
         loop {
             let snapshot = tokio::select! {
                 _ = cancellation.cancelled() => {
-                    self.port.cancel(ServerOperationRef {
-                        session_id: self.id.clone(),
-                        operation_id: pending.input.operation_id.clone(),
-                    }).await.map_err(ServerError::Module)?;
-                    *self.pending_input.lock().await = None;
+                    self.cancel_input(&pending).await?;
+                    return Err(ServerError::Cancelled);
+                }
+                _ = self.terminal.cancelled() => {
+                    self.cancel_input(&pending).await?;
                     return Err(ServerError::Cancelled);
                 }
                 result = self.port.poll(&self.id) => result.map_err(ServerError::Module)?,
@@ -333,14 +352,7 @@ impl ServerSession {
                     {
                         Ok(reply) => reply,
                         Err(ServerError::Cancelled) => {
-                            self.port
-                                .cancel(ServerOperationRef {
-                                    session_id: self.id.clone(),
-                                    operation_id: pending.input.operation_id.clone(),
-                                })
-                                .await
-                                .map_err(ServerError::Module)?;
-                            *self.pending_input.lock().await = None;
+                            self.cancel_input(&pending).await?;
                             return Err(ServerError::Cancelled);
                         }
                         Err(error) => return Err(error),
@@ -392,6 +404,7 @@ impl ServerSession {
             Some(PendingCallback::Running { task, .. }) => {
                 tokio::select! {
                     _ = cancellation.cancelled() => return Err(ServerError::Cancelled),
+                    _ = self.terminal.cancelled() => return Err(ServerError::Cancelled),
                     result = task => result,
                 }
             }
@@ -409,7 +422,48 @@ impl ServerSession {
     }
 
     pub(super) async fn close(&self) -> Result<(), ServerError> {
-        self.port.close(&self.id).await.map_err(ServerError::Module)
+        let local_cleanup = self.terminate_callbacks().await;
+        let module_cleanup = self.port.close(&self.id).await.map_err(ServerError::Module);
+        local_cleanup.and(module_cleanup)
+    }
+
+    /// Stop host callbacks and pending operations without closing the module's
+    /// HTTP session, which the module already closed through DELETE.
+    pub(super) async fn terminate_callbacks(&self) -> Result<(), ServerError> {
+        self.terminal.cancel();
+        let _operation = self.operation.lock().await;
+        let callback_cleanup = self.stop_callback().await;
+        *self.pending_input.lock().await = None;
+        callback_cleanup
+    }
+
+    async fn cancel_input(&self, pending: &PendingInput) -> Result<(), ServerError> {
+        self.port
+            .cancel(ServerOperationRef {
+                session_id: self.id.clone(),
+                operation_id: pending.input.operation_id.clone(),
+            })
+            .await
+            .map_err(ServerError::Module)?;
+        *self.pending_input.lock().await = None;
+        Ok(())
+    }
+
+    async fn stop_callback(&self) -> Result<(), ServerError> {
+        let task = {
+            let mut pending = self.pending_callback.lock().await;
+            match pending.take() {
+                Some(PendingCallback::Running { task, .. }) => Some(task),
+                Some(PendingCallback::Complete { .. }) | None => None,
+            }
+        };
+        if let Some(task) = task {
+            task.abort();
+            if task.await.is_err_and(|error| !error.is_cancelled()) {
+                return Err(ServerError::Failed("host callback stopped".to_owned()));
+            }
+        }
+        Ok(())
     }
 
     pub(super) async fn http_session(
