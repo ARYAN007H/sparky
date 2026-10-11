@@ -192,9 +192,6 @@ fn spec(name: &str) -> ToolSpec {
 #[cfg(feature = "mcp")]
 #[test]
 fn connected_mcp_actions_enter_search_and_leave_on_disconnect() {
-    use crate::mcp::registry::action_tool::searchable_name;
-    use crate::mcp::registry::types::{ConnectedServerOverview, McpTool};
-
     crate::agent::harness::definition::AgentDefinitionRegistry::init_global_builtins()
         .expect("builtin definitions");
     let tmp = tempfile::tempdir().expect("tempdir");
@@ -219,20 +216,19 @@ fn connected_mcp_actions_enter_search_and_leave_on_disconnect() {
         .mutable
         .lock()
         .expect("prelude state")
-        .connected_mcp_tools = vec![ConnectedServerOverview {
+        .connected_mcp_tools = vec![tinymcp_bus::McpToolPresentation {
+        name: "mcp_weather_forecast_abc123".into(),
+        legacy_name: "mcp_forecast_legacy".into(),
         server_id: "server-1".into(),
-        qualified_name: "example/weather".into(),
-        display_name: "Weather".into(),
-        description: None,
-        instructions: None,
-        tools: vec![McpTool {
-            name: "forecast".into(),
-            description: Some("Get weather forecast".into()),
-            input_schema: serde_json::json!({"type":"object","properties":{}}),
-        }],
+        remote_name: "forecast".into(),
+        family: "example/weather".into(),
+        description: "Weather forecast".into(),
+        parameters: serde_json::json!({"type":"object","properties":{}}),
+        deferred: true,
+        tags: vec!["mcp.server:example/weather".into()],
     }];
 
-    let action = searchable_name("server-1", "example/weather", "forecast");
+    let action = "mcp_weather_forecast_abc123";
     prelude.refresh_delegation_tool_surface().unwrap();
     assert!(prelude.synthesized_tool_names_for_test().contains(&action));
     {
