@@ -1,25 +1,24 @@
-//! A turn in a thread that already made a successful `cron` call must survive
-//! a later turn where a tool call is refused. One runtime and one test: SaaS
-//! operating mode is process-wide.
+//! A refused tool call must not rewrite an earlier turn's result. Providers
+//! reuse tool-call ids across turns (`call_1` again), so a failure in this turn
+//! used to mark the earlier turn's successful `cron` result as failed; the
+//! committed rows then no longer extended the persisted transcript, and the
+//! session opened a successor generation (which collides when a stale session
+//! does it again). One runtime and one test: SaaS operating mode is
+//! process-wide.
 
 mod common;
 
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::sync::Arc;
 
-use common::{
-    chat_completion, chat_requests, runtime_without_master_key, tool_names, PointedTransport,
-};
+use common::{chat_completion, chat_requests, runtime_without_master_key, PointedTransport};
 use openhuman_embed::seams::ToolHookDecision;
 use openhuman_embed::{
-    CronDelivery, CronReply, DirectProfileProvider, JobOrigin, PermissionLevel, ProfileRuntime,
-    SaasConfig, ToolScopeSpec,
+    DirectProfileProvider, InMemorySessionStores, PermissionLevel, ProfileRuntime, SaasConfig,
+    SessionStoreProvider, ToolScopeSpec,
 };
 use serde_json::{json, Value};
 use wiremock::matchers::{header, method, path_regex};
 use wiremock::{Mock, MockServer, Request, Respond, ResponseTemplate};
-
-const CAP: usize = 3;
 
 /// Scripts the model from the last user message.
 struct Script {
@@ -60,10 +59,6 @@ impl Respond for Script {
                 json!({"action":"add","job_type":"shell","name":"sh",
                     "schedule":{"kind":"at","at":self.fire_at},"command":"echo hi"}),
             )
-        } else if prompt.contains("run shell") && results == 0 {
-            call("tool_search", json!({"query":"cron schedule job"}))
-        } else if prompt.contains("run shell") && results == 1 {
-            call("shell", json!({"command":"ls"}))
         } else {
             chat_completion("done")
         };
@@ -85,31 +80,15 @@ impl Respond for Script {
     }
 }
 
-#[derive(Default)]
-struct Recorder(Mutex<Vec<CronReply>>);
-
-#[async_trait::async_trait]
-impl CronDelivery for Recorder {
-    async fn deliver(&self, reply: CronReply) -> Result<(), String> {
-        self.0.lock().unwrap().push(reply);
-        Ok(())
-    }
-}
-
 #[test]
-fn refused_tool_call_after_a_successful_cron_call_in_the_same_thread_does_not_fail_the_turn() {
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter("warn,openhuman_core=info,tinyagents_harness=debug,tinyagents_runtime=debug")
-        .with_test_writer()
-        .try_init();
+fn refused_tool_call_does_not_mark_an_earlier_turns_result_with_the_same_call_id_as_failed() {
     runtime_without_master_key().block_on(async {
         tokio::spawn(scenario()).await.unwrap();
     });
 }
 
 async fn scenario() {
-    let chat = MockServer::start().await;
-    let managed = MockServer::start().await;
+    let (managed, chat) = (MockServer::start().await, MockServer::start().await);
     let fire_at = chrono::Utc::now() + chrono::Duration::seconds(30);
     Mock::given(method("POST"))
         .and(path_regex(r"/v1/chat/completions$"))
@@ -126,9 +105,8 @@ async fn scenario() {
     PointedTransport::install(&managed.uri());
     openhuman_core::storage::install(Arc::new(openhuman_core::storage::MemoryStorage::new()));
 
-    let recorder = Arc::new(Recorder::default());
-    let store = Arc::new(openhuman_embed::InMemorySessionStores::new());
     let root = tempfile::tempdir().unwrap();
+    let store = Arc::new(InMemorySessionStores::new());
     let mut saas = SaasConfig::new(root.path());
     saas.chat_provider = Some(
         DirectProfileProvider::openai_compatible(
@@ -148,7 +126,6 @@ async fn scenario() {
         ))
         .can_use_tool(|_| Box::pin(async { ToolHookDecision::Proceed }))
         .channel_permissions([("web_channel", PermissionLevel::Execute)])
-        .cron_delivery(recorder.clone())
         .session_store(store.clone())
         .build()
         .await
@@ -156,42 +133,10 @@ async fn scenario() {
     runtime.provision("alice").await.unwrap();
     let handle = runtime.open("alice").await.unwrap();
 
+    // Turn 1: the `cron` call (id `call_1`) succeeds. Turn 2: the same id is
+    // used for a shell job the profile refuses.
     handle.chat("t1", "schedule it").await.unwrap();
-    let later = chrono::Utc::now() + chrono::Duration::hours(1);
-    assert_eq!(runtime.sweep_cron_at(later).await.ran, 1);
-    tokio::time::timeout(Duration::from_secs(30), async {
-        while recorder.0.lock().unwrap().is_empty() {
-            tokio::time::sleep(Duration::from_millis(20)).await;
-        }
-    })
-    .await
-    .unwrap();
-    handle
-        .chat("t1", "make a shell job")
-        .await
-        .expect("a refused tool call must not fail the turn");
-    for id in ["orchestrator", "alice", "u-alice"] {
-        use openhuman_embed::SessionStoreProvider;
-        let found = store.for_agent(id).transcripts.root_for_thread("t1");
-        eprintln!("CAND {id}: {}", found.is_some());
-    }
-    let denied = handle.chat("t1", "run shell").await;
-    eprintln!("DENIED TURN: {denied:?}");
-    let denied = handle.chat("t1", "run shell").await;
-    eprintln!("DENIED TURN 2: {denied:?}");
-    let denied = handle.chat("t1", "make a shell job").await;
-    eprintln!("SHELLJOB TURN 3: {denied:?}");
-    let denied = handle.chat("t1", "run shell").await;
-    eprintln!("DENIED TURN 4: {denied:?}");
-    let r = handle.chat("t1", "schedule it").await;
-    eprintln!("RESCHEDULE: {r:?}");
-    eprintln!("SWEEP: {}", runtime.sweep_cron_at(later + chrono::Duration::hours(2)).await.ran);
-    tokio::time::sleep(Duration::from_secs(5)).await;
-    for i in 0..3 {
-        let r = handle.chat("t1", "make a shell job").await;
-        eprintln!("SHELLJOB again {i}: {r:?}");
-    }
-    handle.chat("t1", "and once more").await.unwrap();
+    handle.chat("t1", "make a shell job").await.unwrap();
     let requests = chat_requests(&chat).await;
     assert!(
         requests
@@ -199,4 +144,24 @@ async fn scenario() {
             .any(|r| String::from_utf8_lossy(&r.body).contains("only agent cron jobs are allowed")),
         "the refusal reaches the model"
     );
+
+    let transcript = store
+        .for_agent("alice~default")
+        .transcripts
+        .root_for_thread("t1")
+        .expect("the thread is in the store")
+        .read_session()
+        .unwrap()
+        .unwrap();
+    let scheduled: Vec<_> = transcript
+        .messages
+        .iter()
+        .filter(|m| m.role == "tool" && m.content.contains("\"job_type\": \"agent\""))
+        .collect();
+    assert_eq!(scheduled.len(), 1, "the successful cron result is recorded");
+    assert!(
+        scheduled[0].tool_failure.is_none(),
+        "the successful cron result keeps its status"
+    );
+    handle.chat("t1", "and once more").await.unwrap();
 }
