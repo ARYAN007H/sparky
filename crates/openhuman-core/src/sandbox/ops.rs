@@ -10,7 +10,8 @@ use super::types::{
 use crate::agent::harness::definition::SandboxMode;
 use crate::agent::platform_shell;
 use crate::config::{RuntimeConfig, SandboxBackend, SandboxConfig};
-use crate::sandbox::cwd_jail::{self, Jail, NoopBackend};
+#[cfg(test)]
+use crate::sandbox::cwd_jail;
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -211,20 +212,14 @@ pub fn resolve_sandbox_policy(
 /// depends on whether the machine has an OS jail, so on a host with Seatbelt or
 /// Landlock the noop path is never reached and a regression to "always Ready"
 /// passes unnoticed. That is exactly how the original defect survived.
-pub(crate) fn local_status_for_backend(backend_name: &str) -> SandboxStatus {
-    if backend_name == cwd_jail::NOOP_BACKEND_NAME
-        || backend_name == cwd_jail::detect::UNSUPPORTED_BACKEND_NAME
-    {
-        // The noop backend enforces nothing — it spawns the command as-is. The
-        // `unsupported` backend is what `pick_backend` answers when no OS jail
-        // is usable (no Landlock in the kernel, Windows, ...); it refuses to
-        // spawn, and `execute_local_jail` then falls back to the noop backend,
-        // so commands still run unconfined. Both are a documented passthrough
-        // rather than a failure, so `Inactive` ("backend not initialized") is
-        // the honest report, not `Error`.
-        SandboxStatus::Inactive
-    } else {
+pub(crate) fn local_status_for_jail(
+    available: bool,
+    suitable_for_untrusted_code: bool,
+) -> SandboxStatus {
+    if available && suitable_for_untrusted_code {
         SandboxStatus::Ready
+    } else {
+        SandboxStatus::Inactive
     }
 }
 

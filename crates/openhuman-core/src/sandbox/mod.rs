@@ -16,6 +16,7 @@
 pub use tinybox_jail as cwd_jail;
 pub mod docker;
 pub mod grants;
+mod native_jail;
 pub mod ops;
 pub mod schemas;
 pub mod types;
