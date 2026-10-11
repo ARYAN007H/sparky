@@ -404,7 +404,7 @@ hostname = "0.4.2"
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
 sysinfo = { version = "0.33", default-features = false, features = ["system"] }
 keyring = { version = "3", features = ["apple-native", "windows-native", "linux-native"] }
-lettre = { version = "0.11.22", default-features = false, features = ["builder", "smtp-transport", "rustls-tls"], optional = true }
+lettre = { version = "0.11.22", default-features = false, features = ["builder"], optional = true }
 # HTTP server framework for the domain-owned routes (`/v1`, dictation, the MCP
 # HTTP transport). Exclusive to the default-ON `http-server`
 # feature (#5048); the JSON-RPC server that mounts them lives in
@@ -770,12 +770,8 @@ voice = [
     "dep:tinyvoice-bus",
     "dep:lettre",
     "dep:tinyvoice",
-    # `audio_toolkit::ops` delivers generated podcasts through tinychannels'
-    # EmailChannel, so the provider — and therefore the implementation crate —
-    # has to exist even in a channels-less build. This is the ONE reason a
-    # channels-less build still links the provider stack.
-    "dep:tinychannels",
-    "tinychannels/email",
+    # Podcast SMTP delivery uses the loadable Channels module. The always-on
+    # bus dependency provides its upload vocabulary without linking providers.
     # `voice::live`: live voice agent sessions over tinyagents-live.
     "dep:tinyagents-live",
 ]
@@ -907,39 +903,10 @@ crash-reporting = ["dep:sentry"]
 # `DomainSet::Channels` flag (#4796): this feature narrows the compile-time
 # surface, `DomainSet` gates it at runtime.
 #
-# This gate now owns the `tinychannels` CRATE, not just two of its providers.
-# The three always-on pins that used to make the crate unconditional
-# (`config/schema/channels.rs` re-exporting the config types, `DomainEvent`
-# embedding `ChannelInboundEnvelope`, `security/pairing.rs` re-exporting the
-# pairing helpers) now resolve through `tinychannels-bus`, the transport-free
-# contract crate, which stays unconditional. What is left behind this gate is
-# the provider stack and the relay transport loop.
-#
-# It sheds NO dependencies and is not meant to: measured, the kernel profile is
-# 288 packages / 270 names / 2 native both before and after, and the package-list
-# diff is one line (`tinychannels` out, `tinychannels-bus` in). Every heavy crate
-# tinychannels carried is shared with kernel surface. What the gate buys is
-# compile surface — ~31.7k lines a channels-less build no longer compiles — plus
-# the contract crate the eventual module extraction needs.
-#
-# ONE caveat, and it is the reason a channels-less product build still links
-# the crate: `voice` enables `dep:tinychannels` for `EmailChannel` alone
-# (`audio_toolkit::ops` mails generated podcasts). A build with neither
-# `channels` nor `voice` drops it entirely. (`whatsapp-web` refines this gate —
-# see below — forwarding to the `tinychannels/whatsapp-web` provider feature.)
-#
-# NOTE: the in-app web chat (`openhuman::web_chat`, RPC namespace `channel`) is
-# NOT gated by this feature even though its runtime tag is
-# `DomainGroup::Channels` — it is core product surface and stays always
-# compiled (decoupled from `channels/` in #5002). The `channels::{traits, cli}`
-# carve-outs also stay ungated — `traits` is a 1-line tinychannels re-export and
-# `cli::CliChannel` is the dep-free local REPL used by the always-on agent
-# harness interactive loop. See AGENTS.md "channels gate" + `channels/mod.rs`.
-# The crate itself is now droppable, which it was not before: splitting
-# `tinychannels-bus` out moved every always-on pin into a contract crate. That
-# is a compile-surface and architecture win, NOT a dependency win — see the
-# measured note above before claiming otherwise.
-channels = ["dep:tinychannels", "tinychannels/email", "tinychannels/lark"]
+# Provider runtime remains an audited implementation exception until its bus
+# cutover. Channels-backed operations require the process-wide module loader;
+# serialized configuration/messages come from the always-on bus contract.
+channels = ["modules", "dep:tinychannels", "tinychannels/email", "tinychannels/lark"]
 # The WhatsApp Web provider now lives in tinychannels; forward to its feature.
 # It is a refinement INSIDE the `channels` gate — enabling it pulls in the whole
 # channels domain (the provider re-exports live under `channels/providers/`).
