@@ -228,7 +228,7 @@ fn connected_mcp_actions_enter_search_and_leave_on_disconnect() {
         tags: vec!["mcp.server:example/weather".into()],
     }];
 
-    let action = "mcp_weather_forecast_abc123";
+    let action = "mcp_weather_forecast_abc123".to_string();
     prelude.refresh_delegation_tool_surface().unwrap();
     assert!(prelude.synthesized_tool_names_for_test().contains(&action));
     {
