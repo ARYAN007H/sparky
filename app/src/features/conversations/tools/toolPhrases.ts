@@ -91,7 +91,6 @@ export const TOOL_PHRASES = {
   createDocument: { active: 'Creating document', done: 'Created document' },
   createPresentation: { active: 'Creating presentation', done: 'Created presentation' },
 
-
   // ── Memory ──────────────────────────────────────────────────────────────
   recallMemories: { active: 'Recalling memories', done: 'Recalled memories' },
   saveToMemory: { active: 'Saving to memory', done: 'Saved to memory' },

@@ -266,7 +266,6 @@ export const EXACT_TOOL_SPECS: Record<string, ToolSpec> = {
     chip: chip.text('title'),
   }),
 
-
   // ── Memory ──────────────────────────────────────────────────────────────
   // The single memory tool: recall asks a `question`, fetch a `query`, learn stores `text`.
   memory: spec('searchMemory', BrainIcon, 'memory', {
