@@ -155,10 +155,8 @@ pub struct OpenHumanDefinitionRegistry {
 
 /// Outcome of resolving a definition's own scope.
 ///
-/// Modelled explicitly because the crate's `Vec<String>` overloads *empty* to
-/// mean "unrestricted". Inferring wildcard from emptiness is what let a
-/// denylist-emptied scope, an explicitly tool-less scope, and a true wildcard
-/// all collapse onto the same value.
+/// Modelled explicitly so a denylist-emptied scope, an explicitly tool-less
+/// scope and a true wildcard never collapse onto the same host allowlist.
 enum ResolvedScope {
     /// Every registered tool, with no denylist to apply.
     Wildcard,
@@ -288,6 +286,11 @@ impl OpenHumanDefinitionRegistry {
             // The definition's validated tier is the host assertion the model
             // resolver consumes for workload routing.
             role: Some(def.agent_tier.to_string()),
+            agent_tier: match def.agent_tier {
+                AgentTier::Chat => tinyagents_definition::AgentTier::Chat,
+                AgentTier::Reasoning => tinyagents_definition::AgentTier::Reasoning,
+                AgentTier::Worker => tinyagents_definition::AgentTier::Worker,
+            },
             model: model_for(&def.model),
             subagents: declared_subagent_ids(def)
                 .into_iter()
