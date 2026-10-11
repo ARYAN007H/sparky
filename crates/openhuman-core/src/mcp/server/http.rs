@@ -19,8 +19,7 @@ use axum::{
 use futures_util::stream;
 use serde_json::{Map, Value};
 use tinymcp_bus::{
-    names, ServerHttpSessionMethod, ServerHttpSessionRequest, HEADER_PROTOCOL_VERSION,
-    HEADER_SESSION_ID,
+    ServerHttpSessionMethod, ServerHttpSessionRequest, HEADER_SESSION_ID,
 };
 
 use crate::{config::Config, modules::client::ModuleCallError};
@@ -37,7 +36,6 @@ pub struct HttpServerConfig {
 #[derive(Clone)]
 struct HttpState {
     port: Arc<dyn ServerPort>,
-    config: Config,
     auth_token: Option<String>,
     sessions: Arc<tokio::sync::Mutex<HashMap<String, Arc<tokio::sync::Mutex<ServerSession>>>>>,
 }
@@ -56,7 +54,6 @@ pub async fn run_http_reporting(
     let port = ServerSession::port_for_config(&host_config);
     let state = HttpState {
         port,
-        config: host_config,
         auth_token: config.auth_token,
         sessions: Arc::default(),
     };
@@ -85,9 +82,11 @@ async fn handle_post(State(state): State<HttpState>, headers: HeaderMap, body: B
         Err(_) => return text_error(StatusCode::BAD_REQUEST, "invalid request body"),
     };
     let requested_session_id = header_value(&headers, HEADER_SESSION_ID).map(str::to_owned);
-    let session = requested_session_id
-        .as_deref()
-        .and_then(|id| state.sessions.try_lock().ok()?.get(id).cloned());
+    let session = if let Some(requested_session_id) = requested_session_id.as_deref() {
+        state.sessions.lock().await.get(requested_session_id).cloned()
+    } else {
+        None
+    };
     let known_session = session.is_some();
     let session = match session {
         Some(session) => session,
@@ -113,7 +112,7 @@ async fn handle_post(State(state): State<HttpState>, headers: HeaderMap, body: B
         )
         .await
     {
-        Ok(snapshot) => http_operation_response(&state, &protocol, snapshot).await,
+        Ok(snapshot) => http_operation_response(snapshot),
         Err(error) => server_error(error),
     };
     if is_temporary {
@@ -135,11 +134,7 @@ async fn handle_post(State(state): State<HttpState>, headers: HeaderMap, body: B
     response
 }
 
-async fn http_operation_response(
-    state: &HttpState,
-    session: &ServerSession,
-    snapshot: tinymcp_bus::ServerOperationSnapshot,
-) -> Response {
+fn http_operation_response(snapshot: tinymcp_bus::ServerOperationSnapshot) -> Response {
     let Some(metadata) = snapshot.http_response else {
         return server_error(ServerError::MissingHttpMetadata);
     };
@@ -147,23 +142,7 @@ async fn http_operation_response(
         tinymcp_bus::ServerOperationState::Complete { response } => response.unwrap_or_default(),
         _ => String::new(),
     };
-    let mut response = response_from_metadata(metadata, body);
-    if let Some(wire_id) = response
-        .headers()
-        .get(HEADER_SESSION_ID)
-        .and_then(|header| header.to_str().ok())
-        .map(str::to_owned)
-    {
-        if let Ok(metadata) = session.metadata().await {
-            // The protocol version is retained by the module. Asking it here
-            // validates that the response's new transport session is ready.
-            if metadata.initialized && metadata.protocol_version.is_some() {
-                tracing::debug!("[mcp_server] HTTP session initialized id={}", redact_id(&wire_id));
-            }
-        }
-        let _ = state;
-    }
-    response
+    response_from_metadata(metadata, body)
 }
 
 async fn handle_get(State(state): State<HttpState>, headers: HeaderMap) -> Response {
@@ -183,17 +162,15 @@ async fn http_session_request(
         return response;
     }
     let requested_session_id = header_value(headers, HEADER_SESSION_ID).map(str::to_owned);
-    let session = requested_session_id
-        .as_deref()
-        .and_then(|id| state.sessions.try_lock().ok()?.get(id).cloned());
-    let internal_session_id = session.as_ref().map(|session| {
-        // The state entry was made only from a completed initialization whose
-        // module-created session ID is retained in this client session.
-        session
-            .try_lock()
-            .map(|session| session.id().to_owned())
-            .unwrap_or_default()
-    });
+    let session = if let Some(requested_session_id) = requested_session_id.as_deref() {
+        state.sessions.lock().await.get(requested_session_id).cloned()
+    } else {
+        None
+    };
+    let internal_session_id = match session.as_ref() {
+        Some(session) => Some(session.lock().await.id().to_owned()),
+        None => None,
+    };
     let request = ServerHttpSessionRequest {
         method: method.clone(),
         requested_session_id: requested_session_id.clone(),
@@ -217,7 +194,6 @@ async fn http_session_request(
         if let Some(requested_session_id) = requested_session_id {
             state.sessions.lock().await.remove(&requested_session_id);
         }
-    }
     response
 }
 
@@ -303,32 +279,4 @@ fn text_error(status: StatusCode, body: &'static str) -> Response {
 
 fn header_value<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
     headers.get(name).and_then(|value| value.to_str().ok())
-}
-
-fn redact_id(id: &str) -> String {
-    use sha2::{Digest, Sha256};
-    let digest = Sha256::digest(id.as_bytes());
-    format!("sha256:{:02x}{:02x}{:02x}{:02x}", digest[0], digest[1], digest[2], digest[3])
-}
-
-pub(super) async fn run_http_with_port_for_test(
-    config: HttpServerConfig,
-    port: Arc<dyn ServerPort>,
-    ready: Option<tokio::sync::oneshot::Sender<SocketAddr>>,
-) -> anyhow::Result<()> {
-    let host_config = Config::load_or_init().await?;
-    let state = HttpState {
-        port,
-        config: host_config,
-        auth_token: config.auth_token,
-        sessions: Arc::default(),
-    };
-    let listener = tokio::net::TcpListener::bind(config.bind_addr).await?;
-    let local_addr = listener.local_addr()?;
-    if let Some(sender) = ready {
-        let _ = sender.send(local_addr);
-    }
-    let result = axum::serve(listener, router(state.clone())).await;
-    close_http_sessions(&state).await;
-    result.map_err(anyhow::Error::from)
 }
