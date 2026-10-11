@@ -12,7 +12,7 @@
 
 pub mod docker;
 pub mod grants;
-mod native_jail;
+pub(crate) mod native_jail;
 pub mod ops;
 pub mod schemas;
 pub mod types;

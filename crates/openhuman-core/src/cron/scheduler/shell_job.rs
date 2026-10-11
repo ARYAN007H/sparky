@@ -4,8 +4,11 @@
 use crate::config::Config;
 use crate::cron::CronJob;
 use crate::security::SecurityPolicy;
+use tokio::time::Duration;
+#[cfg(test)]
 use std::process::Stdio;
-use tokio::time::{self, Duration};
+#[cfg(test)]
+use tokio::time;
 
 pub(super) const SHELL_JOB_TIMEOUT_SECS: u64 = 120;
 
@@ -162,47 +165,69 @@ pub(super) async fn run_job_command_with_timeout(
         );
     }
 
-    // Through `platform_shell`, like every other shell spawn in this crate.
-    // `Command::new("sh")` fails at `CreateProcessW` on Windows, which is the
-    // whole reason that module exists — this call site was the one that still
-    // named the program itself.
-    //
-    // The `preserving_pipe_status` variant, not the ordinary one: a job's exit
-    // status is recorded per run and spends a retry budget, so `set -o pipefail`
-    // would flip an existing job ending in a tolerated pipe stage (`false |
-    // true`, a `… | grep -q` that finds nothing) from success to failure. That
-    // is a change to somebody's schedule, not a lint. The `-lc` flag and the
-    // per-platform shell are shared with every other caller.
-    let child = match crate::agent::platform_shell::build_tokio_command_preserving_pipe_status(
-        &job.command,
-    )
-    .current_dir(&config.action_dir)
-    .stdin(Stdio::null())
-    .stdout(Stdio::piped())
-    .stderr(Stdio::piped())
-    .kill_on_drop(true)
-    .spawn()
+    #[cfg(test)]
     {
-        Ok(child) => child,
-        Err(e) => return (false, format!("spawn error: {e}")),
-    };
+        // Scheduler unit fixtures do not load a native TinyBox artifact. The
+        // production branch below always uses the module-owned process path;
+        // the released-artifact fixture covers that bus lifecycle directly.
+        let child = match crate::agent::platform_shell::build_tokio_command_preserving_pipe_status(
+            &job.command,
+        )
+        .current_dir(&config.action_dir)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true)
+        .spawn()
+        {
+            Ok(child) => child,
+            Err(_) => return (false, "Command execution is unavailable.".to_owned()),
+        };
+        return match time::timeout(timeout, child.wait_with_output()).await {
+            Ok(Ok(output)) => {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                let combined = format!(
+                    "status={}\nstdout:\n{}\nstderr:\n{}",
+                    output.status,
+                    stdout.trim(),
+                    stderr.trim()
+                );
+                (output.status.success(), combined)
+            }
+            Ok(Err(_)) => (false, "Command execution failed.".to_owned()),
+            Err(_) => (
+                false,
+                format!("job timed out after {}s", timeout.as_secs_f64()),
+            ),
+        };
+    }
 
-    match time::timeout(timeout, child.wait_with_output()).await {
-        Ok(Ok(output)) => {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            let combined = format!(
-                "status={}\nstdout:\n{}\nstderr:\n{}",
-                output.status,
-                stdout.trim(),
-                stderr.trim()
+    #[cfg(not(test))]
+    {
+        let output = match crate::sandbox::native_jail::execute_passthrough(
+            config,
+            &job.command,
+            &config.action_dir,
+            timeout,
+        )
+        .await
+        {
+            Ok(output) => output,
+            Err(_) => return (false, "Command execution is unavailable.".to_owned()),
+        };
+        if output.timed_out {
+            return (
+                false,
+                format!("job timed out after {}s", timeout.as_secs_f64()),
             );
-            (output.status.success(), combined)
         }
-        Ok(Err(e)) => (false, format!("spawn error: {e}")),
-        Err(_) => (
-            false,
-            format!("job timed out after {}s", timeout.as_secs_f64()),
-        ),
+        let combined = format!(
+            "status=exit code: {}\nstdout:\n{}\nstderr:\n{}",
+            output.exit_code,
+            output.stdout.trim(),
+            output.stderr.trim()
+        );
+        (output.success(), combined)
     }
 }
