@@ -1,13 +1,19 @@
-use crate::util::floor_char_boundary;
 use std::path::{Path, PathBuf};
 
 use super::types::{
-    AutonomyLevel, CommandClass, CommandRiskLevel, GateDecision, SecurityPolicy,
-    POLICY_BLOCKED_MARKER,
+    AutonomyLevel, CommandClass, GateDecision, SecurityPolicy, POLICY_BLOCKED_MARKER,
 };
+#[cfg(test)]
+use crate::util::floor_char_boundary;
+#[cfg(test)]
+use super::types::CommandRiskLevel;
+#[cfg(test)]
 use tinybox_core::shell::classify::{classify_segment, has_hidden_execution};
+#[cfg(test)]
 use tinybox_core::shell::env_guard::has_dangerous_env_prefix;
+#[cfg(test)]
 use tinybox_core::shell::executor::is_command_executor;
+#[cfg(test)]
 use tinybox_core::shell::scan::{
     command_basename, contains_unquoted_char, contains_unquoted_single_ampersand,
     has_leading_env_assignment, normalized_command_name, skip_env_assignments,

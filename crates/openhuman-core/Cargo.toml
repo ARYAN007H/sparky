@@ -141,9 +141,6 @@ tinybox-jail = { path = "../../vendor/tinybox/crates/tinybox-jail" }
 # One-shot `docker run --rm` execution for the Docker sandbox; OpenHuman keeps
 # only the policy mapping (`sandbox::docker`).
 tinybox-docker = { path = "../../vendor/tinybox/crates/tinybox-docker" }
-# Quote-aware shell command-string scanners (`tinybox_core::shell::scan`); the
-# classification policy built on them stays in `security::policy`.
-tinybox-core = { path = "../../vendor/tinybox/crates/tinybox-core" }
 tinybox-bus = { path = "../../vendor/tinybox/crates/tinybox-bus", optional = true }
 tinyagents-definition = { path = "../../vendor/tinyagents/crates/tinyagents-definition" }
 # Live (realtime voice) agent sessions: `tinyagents-live` runs a
@@ -557,6 +554,7 @@ windows-sys = { version = "0.61", features = [
 tokio-tungstenite = { version = "0.29", default-features = false, features = ["connect", "handshake", "rustls-tls-webpki-roots"] }
 
 [dev-dependencies]
+tinybox-core = { path = "../../vendor/tinybox/crates/tinybox-core" }
 # The TinyMemory reference engine (an in-memory `MemoryEngine`) and the
 # behavioural suite every engine must pass. Memory unit tests bind it as the
 # engine instead of talking to CortexDB.
