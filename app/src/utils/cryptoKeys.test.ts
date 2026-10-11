@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { mnemonicToSeedSync } from '@scure/bip39';
 
 import {
   deriveAesKeyFromMnemonic,
+  deriveAesKeyFromSeed,
   deriveBtcAddressFromMnemonic,
   deriveEvmAddressFromMnemonic,
   deriveSolanaAddressFromMnemonic,
@@ -91,6 +93,15 @@ describe('deriveAesKeyFromMnemonic', () => {
     // If this assertion fails, the KDF parameters or salt have changed — update intentionally.
     const key = deriveAesKeyFromMnemonic(KNOWN_MNEMONIC);
     expect(key).toBe('dce707ee483afb0a70cb2e076295f9f914e0c62cc097895eabda1c0c1f2f0cb1');
+  });
+});
+
+describe('deriveAesKeyFromSeed', () => {
+  it('preserves the existing storage key for the canonical BIP-39 seed', () => {
+    const seed = mnemonicToSeedSync(KNOWN_MNEMONIC);
+    expect(deriveAesKeyFromSeed(seed)).toBe(
+      'dce707ee483afb0a70cb2e076295f9f914e0c62cc097895eabda1c0c1f2f0cb1',
+    );
   });
 });
 
