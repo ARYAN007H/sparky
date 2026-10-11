@@ -42,11 +42,7 @@ pub use super::ops_install::{
     MAX_INSTALL_URL_LEN, MAX_WORKFLOW_MD_BYTES,
 };
 #[cfg(test)]
-use {
-    tinyskills::Skill as Workflow, 
-    tinyskills::SkillScope as WorkflowScope,
-    
-};
+use {tinyskills::Skill as Workflow, tinyskills::SkillScope as WorkflowScope};
 
 #[cfg(test)]
 pub(crate) use super::ops_create::create_workflow_inner;
