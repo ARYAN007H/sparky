@@ -418,10 +418,13 @@ pub mod oauth {
     /// Returns a message when the state is unknown or expired, or when the
     /// token exchange fails.
     pub async fn complete(config: &Config, state: &str, code: &str) -> Result<String, String> {
-        let outcome = host::for_config(config)
+        let outcome: tinymcp_bus::ConnectOutcome = super::module_client::McpConfiguredClient::for_config(config)
             .map_err(|error| error.to_string())?
-            .dynamic()
-            .oauth_complete(state, code)
+            .call(
+                &host::client_config(config),
+                tinymcp_bus::names::methods::OAUTH_COMPLETE,
+                (state, code),
+            )
             .await
             .map_err(|error| error.to_string())?;
 
