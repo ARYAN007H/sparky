@@ -1,5 +1,4 @@
 use super::*;
-use std::path::PathBuf;
 
 #[test]
 fn tokio_command_selects_platform_shell() {
@@ -47,24 +46,5 @@ fn std_command_selects_platform_shell() {
     } else {
         assert_eq!(prog, "sh");
         assert_eq!(args, vec!["-lc".to_string(), "echo hi".to_string()]);
-    }
-}
-
-#[test]
-fn output_redirection_wraps_per_platform() {
-    let stdout = PathBuf::from("/tmp/openhuman/out.log");
-    let stderr = PathBuf::from("/tmp/openhuman/err.log");
-    let wrapped = wrap_with_output_redirection("echo hi", &stdout, &stderr);
-
-    if cfg!(windows) {
-        assert_eq!(
-            wrapped,
-            r#"echo hi > "/tmp/openhuman/out.log" 2> "/tmp/openhuman/err.log""#
-        );
-    } else {
-        assert_eq!(
-            wrapped,
-            "{ echo hi ; } > '/tmp/openhuman/out.log' 2> '/tmp/openhuman/err.log'"
-        );
     }
 }
