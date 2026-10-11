@@ -621,6 +621,7 @@ fn resumed_thread_with_retired_podcast_tool_remains_usable() {
         let mut first = crate::agent::SessionHostBuilder::new()
             .chat_model(chat_model)
             .tools(vec![Box::new(ArchivedAudioTool)])
+            .permanent_tool_names(std::collections::HashSet::from([RETIRED.to_string()]))
             .workspace_dir(workspace.clone())
             .action_dir(root.path().to_path_buf())
             .tool_dispatcher(Box::new(tinytools_agent::dialect::NativeDialect))
