@@ -101,7 +101,10 @@ async fn a_failed_cleanup_can_be_retried_without_aborting_pending_work() {
 }
 
 #[derive(Clone)]
-struct TransportFixture(Arc<std::sync::atomic::AtomicUsize>);
+struct TransportFixture {
+    sends: Arc<std::sync::atomic::AtomicUsize>,
+    expected_text: String,
+}
 
 #[allow(
     clippy::unused_async,
@@ -121,7 +124,8 @@ impl TransportFixture {
         };
         let value = if let ProgressiveTransportRequest::Send { message, .. } = request {
             assert!(message["idempotencyKey"].as_str().is_some());
-            self.0.fetch_add(1, Ordering::SeqCst);
+            assert_eq!(message["text"].as_str(), Some(self.expected_text.as_str()));
+            self.sends.fetch_add(1, Ordering::SeqCst);
             serde_json::json!({"messageId":"fixture-message"})
         } else {
             serde_json::Value::Null
@@ -147,17 +151,26 @@ async fn released_runtime_scopes_callbacks_and_replays_one_final_send() {
         id: "tinychannels".into(),
         path: artifact,
     }];
+    // This content fits the module state budget but exceeds the former
+    // 128 KiB serialized-request limit after JSON escaping.
+    let final_text = "\"\\".repeat(192 * 1024);
     let first_sends = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let second_sends = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let first = ChannelRuntimeLease::open(
         ModuleClient::new(config.clone()),
-        TransportFixture(first_sends.clone()),
+        TransportFixture {
+            sends: first_sends.clone(),
+            expected_text: final_text.clone(),
+        },
     )
     .await
     .unwrap();
     let second = ChannelRuntimeLease::open(
         ModuleClient::new(config),
-        TransportFixture(second_sends.clone()),
+        TransportFixture {
+            sends: second_sends.clone(),
+            expected_text: final_text.clone(),
+        },
     )
     .await
     .unwrap();
@@ -182,7 +195,7 @@ async fn released_runtime_scopes_callbacks_and_replays_one_final_send() {
                 methods::EXECUTE_PROGRESSIVE,
                 (ProgressiveCommand::Finish {
                     handle: handle.clone(),
-                    text: "canonical final".into(),
+                    text: final_text.clone(),
                 },),
             )
             .await
