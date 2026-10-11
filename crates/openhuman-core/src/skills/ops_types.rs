@@ -1,10 +1,6 @@
 //! OpenHuman-compatible names for the portable `tinyskills` model.
 
-pub use tinyskills::{
-    Skill as Workflow, SkillFrontmatter as WorkflowFrontmatter, SkillScope as WorkflowScope,
-    MAX_DESCRIPTION_LEN, MAX_NAME_LEN, MAX_RESOURCE_BYTES as MAX_WORKFLOW_RESOURCE_BYTES,
-    RESOURCE_DIRS, SKILL_JSON, SKILL_MD, WORKFLOW_MD,
-};
+use {tinyskills::Skill as Workflow, tinyskills::SkillFrontmatter as WorkflowFrontmatter, tinyskills::SkillScope as WorkflowScope, tinyskills::MAX_DESCRIPTION_LEN, tinyskills::MAX_NAME_LEN, tinyskills::MAX_RESOURCE_BYTES as MAX_WORKFLOW_RESOURCE_BYTES, tinyskills::RESOURCE_DIRS, tinyskills::SKILL_JSON, tinyskills::SKILL_MD, tinyskills::WORKFLOW_MD};
 
 // Host-owned sidecar names and the trust marker are OpenHuman policy.
 

@@ -74,7 +74,7 @@ fn a_materialised_bundle_is_discoverable_and_readable_end_to_end() {
             });
         assert_eq!(
             entry.scope,
-            crate::skills::ops_types::WorkflowScope::Builtin,
+            tinyskills::SkillScope::Builtin,
             "a materialised bundle must carry the Builtin scope"
         );
         assert!(

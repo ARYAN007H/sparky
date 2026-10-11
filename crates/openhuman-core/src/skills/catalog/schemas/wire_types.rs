@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::ControllerSchema;
 use crate::skills::ops_install::SkillInstallOutcome;
-use crate::skills::ops_types::WorkflowScope;
+use {tinyskills::SkillScope as WorkflowScope};
 use {
     crate::skills::catalog::types::CatalogPage, crate::skills::catalog::types::CatalogQuery,
     tinyskills::Facet, tinyskills::Freshness,

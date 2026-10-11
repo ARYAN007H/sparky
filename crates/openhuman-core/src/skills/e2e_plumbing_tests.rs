@@ -33,7 +33,7 @@ use crate::config::{Config, MultimodalConfig, MultimodalFileConfig};
 use crate::skills::ops_create::{
     create_workflow_inner, CreateWorkflowParams, WorkflowCreateInputDef,
 };
-use crate::skills::ops_types::WorkflowScope;
+use {tinyskills::SkillScope as WorkflowScope};
 use crate::skills::registry::get_workflow;
 use crate::skills::run_log;
 use crate::skills::runtime::await_run_outcome;

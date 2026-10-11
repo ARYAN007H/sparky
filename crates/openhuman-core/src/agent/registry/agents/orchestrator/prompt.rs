@@ -16,7 +16,7 @@ use crate::agent::prompts::{
     render_datetime, render_identity, render_tools, render_workspace, ConnectedIntegration,
     PromptContext, ToolCallFormat,
 };
-use crate::skills::ops_types::Workflow;
+use {tinyskills::Skill as Workflow};
 use crate::tools::orchestrator_tools::sanitise_slug;
 use crate::tools::toolpacks;
 use anyhow::Result;
