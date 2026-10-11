@@ -51,11 +51,6 @@ mod schemas;
 /// them over the process-wide engine in `tools/ops.rs`.
 #[cfg(feature = "web3")]
 pub mod tools;
-/// The host side of the wallet primitives' `Transport` seam — endpoint resolution,
-/// failover and redaction stay here, where the config lives.
-#[cfg(feature = "web3")]
-pub(crate) mod transport;
-
 #[cfg(all(test, feature = "web3"))]
 pub(crate) mod test_support;
 
