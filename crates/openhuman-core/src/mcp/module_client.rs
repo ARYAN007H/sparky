@@ -34,6 +34,7 @@ const TRANSITION_TIMEOUT: Duration = Duration::from_secs(30);
 const TRANSITION_POLL_INTERVAL: Duration = Duration::from_millis(20);
 static CLIENTS: OnceLock<Mutex<HashMap<PathBuf, Arc<McpConfiguredClient>>>> = OnceLock::new();
 static SHUTDOWN_REGISTERED: AtomicBool = AtomicBool::new(false);
+static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
 
 #[derive(Clone)]
 struct OpenObject {
@@ -163,6 +164,10 @@ impl McpConfiguredClient {
     /// reachable until `close` confirms cleanup; workspace/config switching is
     /// serialized by the client itself.
     pub(crate) fn for_config(config: &Config) -> Result<Arc<Self>, ModuleCallError> {
+        if SHUTTING_DOWN.load(Ordering::Acquire) {
+            ModuleClient::report_unavailable(MODULE);
+            return Err(ModuleCallError::Unavailable);
+        }
         if !config.modules.enabled {
             ModuleClient::report_unavailable(MODULE);
             return Err(ModuleCallError::Unavailable);
@@ -205,6 +210,9 @@ impl McpConfiguredClient {
         limit: usize,
     ) -> Result<Option<SupervisorBatch>, ModuleCallError> {
         let state = self.state.lock().await;
+        if SHUTTING_DOWN.load(Ordering::Acquire) {
+            return Err(ModuleCallError::Unavailable);
+        }
         let State::Open(object) = &*state else {
             return Ok(None);
         };
@@ -229,7 +237,9 @@ impl McpConfiguredClient {
         if SHUTDOWN_REGISTERED.swap(true, Ordering::AcqRel) {
             return;
         }
+        SHUTTING_DOWN.store(false, Ordering::Release);
         crate::core::shutdown::register(|| async {
+            SHUTTING_DOWN.store(true, Ordering::Release);
             let clients = CLIENTS
                 .get()
                 .map(|clients| {
@@ -324,6 +334,9 @@ impl McpConfiguredClient {
     ) -> Result<R, ModuleCallError> {
         let args = serde_json::to_value(args).map_err(|_| ModuleCallError::ModuleFault)?;
         let mut state = self.state.lock().await;
+        if SHUTTING_DOWN.load(Ordering::Acquire) {
+            return Err(ModuleCallError::Unavailable);
+        }
         let object = self.ensure_open(&mut state, config).await?;
         let reply = self
             .port
