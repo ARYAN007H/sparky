@@ -1,12 +1,52 @@
 use super::{
     consume_approval, native_approval_matches_request, validate_module_endpoint_url,
-    web3_approval_matches_request, ApprovalKind, ApprovalPermit,
+    web3_approval_matches_request, x402_approval_facts, x402_request_owner_matches,
+    ApprovalKind, ApprovalPermit,
 };
 use tinywallet_bus::wire::{
-    AuthorizeNativeWalletExecutionRequest, AuthorizeWeb3ExecutionRequest, EvmNetwork,
-    NativeWalletExecutionIntent, PreparedKind, PreparedStatus, PreparedTransaction,
-    TransactionSpec, WalletChain, Web3ExecutionIntent, Web3QuoteKind, Web3QuoteResponse,
+    AuthorizeNativeWalletExecutionRequest, AuthorizeWeb3ExecutionRequest,
+    AuthorizeX402PaymentRequest, EvmNetwork, NativeWalletExecutionIntent, PreparedKind,
+    PreparedStatus, PreparedTransaction, QuoteOwner, TransactionSpec, WalletChain,
+    Web3ExecutionIntent, Web3QuoteKind, Web3QuoteResponse,
 };
+
+#[test]
+fn x402_approval_is_bound_to_the_exact_chat_owner_and_payment_facts() {
+    let request = AuthorizeX402PaymentRequest {
+        url: "https://pay.example/resource".into(),
+        network: "eip155:8453".into(),
+        asset: "0x1111111111111111111111111111111111111111".into(),
+        recipient: "0x2222222222222222222222222222222222222222".into(),
+        amount_atomic: 2500,
+        owner: Some(QuoteOwner {
+            thread_id: "thread-1".into(),
+            client_id: "client-1".into(),
+        }),
+    };
+    let context = crate::security::approval::ApprovalChatContext {
+        thread_id: "thread-1".into(),
+        client_id: "client-1".into(),
+    };
+    assert!(x402_request_owner_matches(&request, &context));
+
+    let mut other_client = context.clone();
+    other_client.client_id = "client-2".into();
+    assert!(!x402_request_owner_matches(&request, &other_client));
+    let mut other_thread = context.clone();
+    other_thread.thread_id = "thread-2".into();
+    assert!(!x402_request_owner_matches(&request, &other_thread));
+
+    assert_eq!(
+        x402_approval_facts(&request),
+        serde_json::json!({
+            "url": "https://pay.example/resource",
+            "network": "eip155:8453",
+            "asset": "0x1111111111111111111111111111111111111111",
+            "recipient": "0x2222222222222222222222222222222222222222",
+            "amount_atomic": 2500,
+        })
+    );
+}
 
 #[test]
 fn execution_authorization_is_bound_to_one_confirmed_quote_id() {
