@@ -371,3 +371,91 @@ pub(super) async fn policy_reads_refuse_execution_without_consuming_a_slot(case:
     assert!(AgentContextRegistry::deregister("policy-alpha", &alpha));
     assert!(AgentContextRegistry::deregister("policy-beta", &beta));
 }
+
+pub(super) async fn malformed_policy_rows_refuse_execution(case: Case) {
+    let workspace = tempfile::tempdir().unwrap();
+    let config = Config {
+        workspace_dir: workspace.path().join("workspace"),
+        config_path: workspace.path().join("config.toml"),
+        ..Config::default()
+    };
+    tinyhumans_boot::boot();
+    let _runtime = CoreBuilder::new(HostKind::Library)
+        .config(config.clone())
+        .services(ServiceSet::none())
+        .domains(DomainSet::none())
+        .build()
+        .await
+        .unwrap();
+    case.install();
+    let calls = Arc::new(AtomicUsize::new(0));
+    let recorded = Arc::clone(&calls);
+    let _handler = cron::system_job_handlers::register(
+        "malformed-policy-fixture",
+        Arc::new(move |_| {
+            recorded.fetch_add(1, Ordering::SeqCst);
+            Box::pin(async { Ok(()) })
+        }),
+    );
+    let job = cron::system_jobs::ensure_system_job(
+        &config,
+        "malformed-policy-fixture",
+        Schedule::Every {
+            every_ms: 3_600_000,
+        },
+    )
+    .unwrap();
+    let docs = storage::current_scoped().unwrap().unwrap();
+    for doc in [
+        json!({"retries": -1, "single_flight": true}),
+        json!({"retries": 4_294_967_296_u64, "single_flight": true}),
+        json!({"retries": "private-payload", "single_flight": true}),
+        json!({"retries": 0, "single_flight": "private-payload"}),
+        json!({"retries": 0}),
+    ] {
+        docs.documents()
+            .put(POLICIES, &job.id, doc, Precondition::None)
+            .await
+            .unwrap();
+        assert!(
+            policy::get_policy(&config, &job.id).is_err(),
+            "a malformed existing row became a usable policy"
+        );
+        let (success, output) =
+            cron::scheduler::execute_job_now(&config, &job, "malformed-policy-run").await;
+        assert!(!success);
+        assert!(!output.contains("private-payload"));
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+    }
+    for (doc, wanted) in [
+        (
+            json!({"retries": null, "single_flight": false}),
+            JobPolicy::default(),
+        ),
+        (
+            json!({"single_flight": true}),
+            JobPolicy {
+                retries: None,
+                single_flight: true,
+            },
+        ),
+        (
+            json!({"retries": u32::MAX, "single_flight": true}),
+            JobPolicy {
+                retries: Some(u32::MAX),
+                single_flight: true,
+            },
+        ),
+    ] {
+        docs.documents()
+            .put(POLICIES, &job.id, doc, Precondition::None)
+            .await
+            .unwrap();
+        assert_eq!(policy::get_policy(&config, &job.id).unwrap(), wanted);
+    }
+    policy::clear_policy(&config, &job.id).unwrap();
+    assert_eq!(
+        policy::get_policy(&config, &job.id).unwrap(),
+        JobPolicy::default()
+    );
+}
