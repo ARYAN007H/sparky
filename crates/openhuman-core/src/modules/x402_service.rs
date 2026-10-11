@@ -117,9 +117,10 @@ pub(crate) async fn summary(
     config: &Config,
 ) -> Result<X402DetailedSpendingSummary, WalletCallError> {
     let config = config.clone();
-    with_service(&config, |service| async move {
+    let operation_config = config.clone();
+    with_service(&config, move |service| async move {
         wallet::call(
-            &config,
+            &operation_config,
             methods::X402_SPENDING_SUMMARY_DETAILED,
             tinywallet_bus::wire::X402SummaryRequest { service },
         )
