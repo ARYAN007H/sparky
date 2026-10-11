@@ -205,8 +205,18 @@ fn build_tokio_command_with(command: &str, pipefail: PipeFail) -> tokio::process
 /// [`std::process::Command`] variant for adapters that need the platform
 /// shell's program and arguments as an owned request.
 pub fn build_std_command(command: &str) -> std::process::Command {
+    build_std_command_with(command, PipeFail::Surface)
+}
+
+/// [`build_std_command`] without changing a shell pipeline's default exit
+/// status, for callers whose retry/settlement behavior depends on it.
+pub fn build_std_command_preserving_pipe_status(command: &str) -> std::process::Command {
+    build_std_command_with(command, PipeFail::AsShellDefault)
+}
+
+fn build_std_command_with(command: &str, pipefail: PipeFail) -> std::process::Command {
     let mut cmd = std::process::Command::new(shell_program());
-    configure_shell_args(&mut cmd, command, PipeFail::Surface);
+    configure_shell_args(&mut cmd, command, pipefail);
     // Same contract as the tokio builder: the child leads its own process
     // group so a deadline can reach the whole pipeline (see
     // `crate::tools::timeout::kill_process_group`).

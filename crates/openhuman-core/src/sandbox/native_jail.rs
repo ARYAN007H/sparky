@@ -91,6 +91,86 @@ pub(crate) async fn execute(
     }
 }
 
+/// Run a host-authorized command through TinyBox's supervised passthrough
+/// process lifecycle. This is used by cron, whose existing execution surface
+/// runs on the host rather than inside a jail.
+pub(crate) async fn execute_passthrough(
+    config: &Config,
+    command: &str,
+    working_dir: &Path,
+    timeout: Duration,
+) -> anyhow::Result<SandboxExecResult> {
+    #[cfg(feature = "modules")]
+    {
+        let config = config.clone();
+        let command = command.to_owned();
+        let working_dir = working_dir.to_path_buf();
+        return tokio::spawn(async move {
+            execute_passthrough_owned(&config, &command, &working_dir, timeout).await
+        })
+        .await
+        .map_err(|_| anyhow::anyhow!("TinyBox passthrough worker did not finish"))?;
+    }
+    #[cfg(not(feature = "modules"))]
+    {
+        let _ = (config, command, working_dir, timeout);
+        anyhow::bail!("TinyBox module support is disabled; command execution is unavailable")
+    }
+}
+
+#[cfg(feature = "modules")]
+async fn execute_passthrough_owned(
+    config: &Config,
+    command: &str,
+    working_dir: &Path,
+    timeout: Duration,
+) -> anyhow::Result<SandboxExecResult> {
+    let resource = tinybox::reserve(config, contract::ReserveRequest::Resource)
+        .await
+        .map_err(|_| anyhow::anyhow!("TinyBox could not reserve a command resource"))?;
+    let result = async {
+        let workspace = path_string(working_dir, "command working directory")?;
+        tinybox::create(
+            config,
+            contract::CreateRequest {
+                resource: resource.clone(),
+                backend: "passthrough".to_owned(),
+                host: contract::HostConfig::Local,
+                workspace: contract::Workspace::Directory(workspace),
+                network: contract::NetworkPolicy::default(),
+                resources: contract::ResourceLimits::default(),
+                ports: Vec::new(),
+                env: BTreeMap::new(),
+            },
+        )
+        .await
+        .map_err(|_| anyhow::anyhow!("TinyBox could not create a command resource"))?;
+
+        let request = shell_request(&resource, command, working_dir, BTreeMap::new(), true)?;
+        let process = tinybox::reserve(config, contract::ReserveRequest::Process(resource.clone()))
+            .await
+            .map_err(|_| anyhow::anyhow!("TinyBox could not reserve a command process"))?;
+        let process = tinybox::start_exec(
+            config,
+            contract::SpawnRequest {
+                process,
+                command: request,
+            },
+        )
+        .await
+        .map_err(|_| anyhow::anyhow!("TinyBox could not start a command process"))?;
+        collect_process(config, process, timeout).await
+    }
+    .await;
+    let close = tinybox::close(config, resource).await;
+    match (result, close) {
+        (Ok(output), Ok(())) => Ok(output),
+        (Err(error), Ok(())) => Err(error),
+        (Ok(_), Err(_)) => anyhow::bail!("TinyBox did not acknowledge command cleanup"),
+        (Err(error), Err(_)) => Err(error),
+    }
+}
+
 #[cfg(feature = "modules")]
 async fn execute_owned(
     config: &Config,
@@ -137,7 +217,7 @@ async fn execute_owned(
             "scratch",
         )?;
         let (env, read_write) = execution_environment(policy, extra_env, &scratch.path)?;
-        let exec = shell_request(&resource, command, working_dir, env)?;
+        let exec = shell_request(&resource, command, working_dir, env, false)?;
         let jail = jail_request(policy, read_write)?;
         let process = tinybox::reserve(config, contract::ReserveRequest::Process(resource.clone()))
             .await
@@ -217,8 +297,13 @@ fn shell_request(
     command: &str,
     working_dir: &Path,
     env: BTreeMap<String, String>,
+    preserve_pipe_status: bool,
 ) -> anyhow::Result<contract::ExecRequest> {
-    let shell = platform_shell::build_std_command(command);
+    let shell = if preserve_pipe_status {
+        platform_shell::build_std_command_preserving_pipe_status(command)
+    } else {
+        platform_shell::build_std_command(command)
+    };
     let program = shell
         .get_program()
         .to_str()
