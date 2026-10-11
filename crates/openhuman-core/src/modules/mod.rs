@@ -51,6 +51,8 @@ pub mod browser_task;
 mod browser_task_report;
 #[cfg(feature = "channels")]
 pub(crate) mod channel_controller;
+#[cfg(all(feature = "channels", feature = "modules"))]
+pub(crate) mod channel_runtime;
 pub(crate) mod channel_health;
 pub mod client;
 #[cfg(feature = "modules")]

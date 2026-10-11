@@ -147,6 +147,16 @@ impl ModuleClient {
             failure::report(record, failure::Reason::Disabled);
             return Err(ModuleCallError::Unavailable);
         }
+        #[cfg(test)]
+        if let Some(fixture) = &self.fixture {
+            let proxy = fixture.connection().proxy(
+                fixture.destination().as_str(),
+                object_path,
+                fixture.interface().as_str(),
+            ).map_err(|_| ModuleCallError::IncompatibleContract)?;
+            let proxy = self.timeout.map_or(proxy.clone(), |timeout| proxy.with_timeout(timeout));
+            return Ok(ModuleObjectClient { record, proxy });
+        }
         super::ops::ensure_loaded(&self.config, module)
             .await
             .map_err(|_| ModuleCallError::Unavailable)?;
@@ -242,6 +252,7 @@ impl ModuleClient {
 /// This stays crate-private so bus object identities do not become product
 /// state or leak into logs and controller responses.
 #[cfg(feature = "modules")]
+#[derive(Clone)]
 pub(crate) struct ModuleObjectClient {
     record: &'static super::types::ModuleRecord,
     proxy: tinybus::Proxy,
