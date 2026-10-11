@@ -178,17 +178,23 @@ impl ChannelRuntimeLease {
         if self.0.cleanup.closed.load(Ordering::Acquire) {
             return Ok(());
         }
-        let mut closing = self.0.closing.lock().await;
-        if closing.is_none() {
+        join_cleanup(&self.0.closing, || {
             let cleanup = self.0.cleanup.clone();
-            *closing = Some(self.0.runtime.spawn(async move { cleanup.run().await }));
-        }
-        let result = tokio::time::timeout(CLOSE_BUDGET, closing.as_mut().expect("cleanup worker"))
-            .await
-            .map_err(|_| ModuleCallError::TransportFailed)?;
-        closing.take();
-        result.map_err(|_| ModuleCallError::TransportFailed)?
+            self.0.runtime.spawn(async move { cleanup.run().await })
+        }).await
     }
+}
+
+async fn join_cleanup(
+    closing: &Mutex<Option<tokio::task::JoinHandle<Result<(), ModuleCallError>>>>,
+    start: impl FnOnce() -> tokio::task::JoinHandle<Result<(), ModuleCallError>>,
+) -> Result<(), ModuleCallError> {
+    let mut closing = closing.lock().await;
+    if closing.is_none() { *closing = Some(start()); }
+    let result = tokio::time::timeout(CLOSE_BUDGET, closing.as_mut().expect("cleanup worker"))
+        .await.map_err(|_| ModuleCallError::TransportFailed)?;
+    closing.take();
+    result.map_err(|_| ModuleCallError::TransportFailed)?
 }
 
 fn validate_reservation(reservation: &ChannelRuntimeReservation) -> Result<(), ModuleCallError> {
