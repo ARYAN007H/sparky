@@ -324,7 +324,7 @@
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/agent/orchestration/tools.rs",
-    "line": 71,
+    "line": 70,
     "text": "crate::agent::harness::current_parent().map(|parent| {",
     "occurrence": 1
   },
@@ -1110,20 +1110,6 @@
     "path": "crates/openhuman-core/src/inference/mod.rs",
     "line": 48,
     "text": "pub use tinyinference_local::status::{",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-upstream-reexport",
-    "path": "crates/openhuman-core/src/integrations/mod.rs",
-    "line": 17,
-    "text": "pub use tinytools::ToolScope;",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-upstream-reexport",
-    "path": "crates/openhuman-core/src/tools/mod.rs",
-    "line": 70,
-    "text": "pub use tinytools::{",
     "occurrence": 1
   },
   {

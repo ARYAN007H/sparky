@@ -16,7 +16,8 @@ use std::sync::Arc;
 use tinyconnectors_bus::{ComposioDirectConnectionsRequest, ComposioDirectToolsRequest};
 
 use super::super::direct_auth;
-use super::super::module_client::{self, methods};
+use super::super::module_client::{self};
+use tinyconnectors_bus::names::methods;
 use super::super::types::{ComposioConnectionsResponse, ComposioToolsResponse};
 use super::DirectCredential;
 

@@ -9,7 +9,8 @@ use crate::config::Config;
 use crate::core::Outcome;
 
 use super::super::contract::ProviderUserProfile;
-use super::super::module_client::{self as connectors, methods};
+use super::super::module_client::{self as connectors};
+use tinyconnectors_bus::names::methods;
 use super::super::types::{
     reencode, ComposioRefreshIdentitiesResponse, ComposioUserProfile, ComposioUserProfileRequest,
 };

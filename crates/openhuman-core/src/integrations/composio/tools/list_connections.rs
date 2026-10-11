@@ -11,7 +11,8 @@ use crate::config::Config;
 use tinytools::{PermissionLevel, Tool, ToolCategory, ToolResult};
 
 use super::super::client::{direct_list_connections, resolve_composio_route, ComposioRoute};
-use super::super::module_client::{self as connectors, methods};
+use super::super::module_client::{self as connectors};
+use tinyconnectors_bus::names::methods;
 use super::super::types::ComposioConnectionsResponse;
 
 pub struct ComposioListConnectionsTool {

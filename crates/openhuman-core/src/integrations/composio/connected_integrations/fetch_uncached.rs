@@ -36,7 +36,8 @@ async fn fetch_connected_integrations_uncached_inner(
     config: &Config,
 ) -> Option<Vec<ConnectedIntegration>> {
     use super::super::client::{direct_list_connections, resolve_composio_route, ComposioRoute};
-    use super::super::module_client::{self as connectors, methods};
+    use super::super::module_client::{self as connectors};
+use tinyconnectors_bus::names::methods;
     use super::super::types::{
         ComposioConnectionsResponse, ComposioListToolsRequest, ComposioToolkitsResponse,
         ComposioToolsResponse,

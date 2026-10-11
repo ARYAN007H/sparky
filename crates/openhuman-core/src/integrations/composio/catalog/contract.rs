@@ -9,7 +9,8 @@ use crate::config::Config;
 use crate::integrations::composio::client::{
     direct_list_tools, resolve_composio_route, ComposioRoute,
 };
-use crate::integrations::composio::module_client::{self as connectors, methods};
+use crate::integrations::composio::module_client::{self as connectors};
+use tinyconnectors_bus::names::methods;
 use crate::integrations::composio::types::{ComposioListToolsRequest, ComposioToolsResponse};
 use tinyagents_harness::tool::{compute_primary_array_path, response_fields_from_schema};
 

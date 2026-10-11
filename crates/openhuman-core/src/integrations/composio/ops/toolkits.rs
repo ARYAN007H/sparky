@@ -1,6 +1,7 @@
 //! Toolkit and capability listing ops.
 
-use super::super::module_client::{self as connectors, methods};
+use super::super::module_client::{self as connectors};
+use tinyconnectors_bus::names::methods;
 use crate::config::Config;
 use crate::core::Outcome;
 
