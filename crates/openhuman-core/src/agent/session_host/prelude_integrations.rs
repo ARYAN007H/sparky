@@ -301,6 +301,30 @@ impl OpenHumanTurnPrelude {
         )
     }
 
+    /// Builds configured static MCP executors from the module-prepared cache.
+    #[cfg(feature = "mcp")]
+    pub(super) fn collect_configured_mcp_tools(&self) -> Vec<Box<dyn tinytools::Tool>> {
+        let Some(config) = self.runtime_config.as_deref() else {
+            return Vec::new();
+        };
+        let presentations = self
+            .mutable
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .configured_mcp_tools
+            .clone();
+        let security = Arc::new(crate::security::SecurityPolicy::from_config(
+            &config.autonomy,
+            &config.workspace_dir,
+            &config.action_dir,
+        ));
+        crate::tools::implementations::network::configured_server_tools_from_presentations(
+            config,
+            presentations,
+            &security,
+        )
+    }
+
     pub(super) async fn refresh_cold_integrations(&self) {
         let should_fetch = !self
             .mutable

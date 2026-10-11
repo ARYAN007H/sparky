@@ -441,8 +441,17 @@ impl McpConfiguredClient {
                     (server.name.as_str(),),
                 )
                 .await?;
-            let tools = match cached {
-                Some(tools) => tools,
+            let tools: Vec<McpRemoteTool> = match cached {
+                Some(tools) => tools
+                    .into_iter()
+                    .map(|tool| McpRemoteTool {
+                        name: tool.name,
+                        title: None,
+                        description: tool.description,
+                        input_schema: tool.input_schema,
+                        meta: None,
+                    })
+                    .collect(),
                 None => client
                     .call(
                         &client_config,

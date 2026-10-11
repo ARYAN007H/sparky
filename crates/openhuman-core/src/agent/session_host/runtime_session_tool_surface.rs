@@ -15,15 +15,27 @@ impl OpenHumanTurnPrelude {
         let Some(registry) = AgentDefinitionRegistry::current() else {
             return Ok(());
         };
-        let Some(definition) = self.session_definition(&registry) else {
-            return Ok(());
-        };
+        let definition = self.session_definition(&registry);
         let has_recorded_tool_snapshot = self
             .mutable
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .recorded_tool_snapshot_adopted;
-        if definition.subagents.is_empty() && !has_recorded_tool_snapshot {
+        #[cfg(feature = "mcp")]
+        let has_configured_mcp_tools = !self
+            .mutable
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .configured_mcp_tools
+            .is_empty();
+        #[cfg(not(feature = "mcp"))]
+        let has_configured_mcp_tools = false;
+        if !definition
+            .as_ref()
+            .is_some_and(|definition| !definition.subagents.is_empty())
+            && !has_recorded_tool_snapshot
+            && !has_configured_mcp_tools
+        {
             return Ok(());
         }
         let (integrations, integrations_are_authoritative, recorded_tool_snapshot_adopted) = {
@@ -39,20 +51,29 @@ impl OpenHumanTurnPrelude {
         };
         #[cfg(feature = "mcp")]
         let mcp_tools = self.collect_mcp_search_tools();
+        #[cfg(feature = "mcp")]
+        let configured_mcp_tools = self.collect_configured_mcp_tools();
         let mut surface = self
             .tool_surface
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let mut collected = collect_orchestrator_tools(&definition, &registry, &integrations);
+        let mut collected = definition
+            .as_ref()
+            .map(|definition| collect_orchestrator_tools(definition, &registry, &integrations))
+            .unwrap_or_default();
         #[cfg(feature = "mcp")]
         collected.extend(mcp_tools);
-        let rebuilt = self.rebuilt_recorded_tools(
-            &definition,
-            &surface.tools,
-            &collected,
-            &integrations,
-            integrations_are_authoritative,
-        );
+        #[cfg(feature = "mcp")]
+        collected.extend(configured_mcp_tools);
+        let rebuilt = definition.as_ref().map_or_else(Vec::new, |definition| {
+            self.rebuilt_recorded_tools(
+                definition,
+                &surface.tools,
+                &collected,
+                &integrations,
+                integrations_are_authoritative,
+            )
+        });
         collected.extend(rebuilt);
         super::super::managed_tools::reject_synthesized_collisions(
             &surface.permanent_tool_names,
