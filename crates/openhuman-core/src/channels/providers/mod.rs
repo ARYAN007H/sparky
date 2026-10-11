@@ -7,10 +7,14 @@
 
 pub mod relay;
 
+#[cfg(test)]
 pub use tinychannels::providers::email_channel;
+#[cfg(test)]
 pub use tinychannels::providers::lark;
 #[cfg(feature = "whatsapp-web")]
+#[cfg(test)]
 pub use tinychannels::providers::whatsapp_web;
+#[cfg(test)]
 pub use tinychannels::providers::{
     dingtalk, discord, imessage, irc, linq, mattermost, qq, signal, slack, telegram, whatsapp,
     yuanbao,
