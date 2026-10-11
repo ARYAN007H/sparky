@@ -91,7 +91,7 @@ async fn deferred_memory_commit_survives_the_turn_scope_without_pinning_the_prof
     host.provision(&id).await.unwrap();
     let profile = host.open(&id).await.unwrap();
     let captured = CoreContext::scope_with_turn_origin(profile.context().clone(), None, async {
-        capture_profile_context(&host)
+        capture_profile_context(Some(&host))
     })
     .await;
     // The entire temporary turn context is gone before this callback is polled.
@@ -136,7 +136,7 @@ async fn deferred_memory_commit_survives_the_turn_scope_without_pinning_the_prof
         "the pending weak capture cannot pin an idle profile"
     );
     assert!(
-        captured.as_ref().unwrap().upgrade().is_none(),
+        matches!(&captured, ProfileMemoryContext::BoundWeak(context) if context.upgrade().is_none()),
         "the retired owner is not retained"
     );
     deferred_memory_work(captured, async {
@@ -161,9 +161,44 @@ async fn missing_profile_owner_refuses_deferred_memory_instead_of_running_unscop
         )
         .profile("missing-owner"),
     );
-    let captured = CoreContext::scope(missing, async { capture_profile_context(&host) }).await;
+    let captured =
+        CoreContext::scope(missing, async { capture_profile_context(Some(&host)) }).await;
     deferred_memory_work(captured, async {
         panic!("a failed profile owner capture must not run under the configured external engine")
     })
     .await;
+}
+
+#[tokio::test]
+async fn failed_profile_capture_is_denied_but_ordinary_desktop_work_still_runs() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+    use crate::tools::toolpacks::ToolGroups;
+    let operator = CoreContext::for_test(DomainSet::full(), None);
+    for id in ["missing-host", "invalid/owner"] {
+        let profile = operator.derive_with(
+            ContextOverlay::new(
+                crate::config::Config::default(),
+                DomainSet::full(),
+                ToolGroups::none(),
+            )
+            .profile(id),
+        );
+        let captured = CoreContext::scope(profile, async { capture_profile_context(None) }).await;
+        assert!(matches!(captured, ProfileMemoryContext::Denied));
+        deferred_memory_work(captured, async {
+            panic!("a profile without its host cannot resolve an external engine")
+        })
+        .await;
+    }
+    let captured = CoreContext::scope(operator, async { capture_profile_context(None) }).await;
+    assert!(matches!(captured, ProfileMemoryContext::NonProfile));
+    let mut ran = false;
+    deferred_memory_work(captured, async {
+        ran = true;
+    })
+    .await;
+    assert!(
+        ran,
+        "ordinary desktop work retains its existing deferred behavior"
+    );
 }

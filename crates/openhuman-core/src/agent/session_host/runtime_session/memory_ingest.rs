@@ -36,7 +36,15 @@ pub(super) struct PendingMemoryTurn {
     user_index: u32,
     // The canonical runtime can commit on a different task. Restore the
     // authenticated profile captured at preparation, never infer it from config.
-    profile_context: Option<std::sync::Weak<crate::core::runtime::CoreContext>>,
+    profile_context: ProfileMemoryContext,
+}
+
+// Missing profile authority must not be confused with an ordinary desktop turn.
+#[derive(Clone)]
+enum ProfileMemoryContext {
+    NonProfile,
+    BoundWeak(std::sync::Weak<crate::core::runtime::CoreContext>),
+    Denied,
 }
 
 /// Where the prompt's verbatim thread starts, as a user turn index, and
@@ -103,6 +111,10 @@ impl OpenHumanTurnPrelude {
         if self.omit_memory_context {
             identity.recall = false;
         }
+        let profile_context = capture_profile_context(crate::profiles::host::host().as_deref());
+        if matches!(profile_context, ProfileMemoryContext::Denied) {
+            return None;
+        }
         let user_index = hooks::user_turn_index(committed_turns);
         let (in_prompt_from, compacted) = in_prompt_window(history, committed_turns, current);
         self.mutable
@@ -111,8 +123,7 @@ impl OpenHumanTurnPrelude {
             .pending_memory_turn = Some(PendingMemoryTurn {
             identity: identity.clone(),
             user_index,
-            profile_context: crate::profiles::host::host()
-                .and_then(|host| capture_profile_context(&host)),
+            profile_context,
         });
         let pack = crate::memory::lifecycle::prefetch::pre_turn(
             config.clone(),
@@ -207,30 +218,42 @@ impl OpenHumanTurnPrelude {
 
 // Resolve the profile owner at preparation; a canonical commit may run after
 // the immutable turn-origin scope has ended.
-fn capture_profile_context(
-    host: &crate::profiles::ProfileHost,
-) -> Option<std::sync::Weak<crate::core::runtime::CoreContext>> {
-    let context = crate::core::runtime::CoreContext::scoped()?;
-    let id = crate::profiles::ProfileId::parse(context.profile()?).ok()?;
+fn capture_profile_context(host: Option<&crate::profiles::ProfileHost>) -> ProfileMemoryContext {
+    let Some(context) = crate::core::runtime::CoreContext::scoped() else {
+        return if crate::core::runtime::is_saas() {
+            ProfileMemoryContext::Denied
+        } else {
+            ProfileMemoryContext::NonProfile
+        };
+    };
+    let Some(profile_id) = context.profile() else {
+        return ProfileMemoryContext::NonProfile;
+    };
+    let Some(profile) = crate::profiles::ProfileId::parse(profile_id)
+        .ok()
+        .and_then(|id| host.and_then(|host| host.get(&id)))
+    else {
+        return ProfileMemoryContext::Denied;
+    };
     // The host owns this root for the lease's lifetime. A derived turn-origin
     // context ends with the turn, even if its deferred commit is still queued.
     // Keeping only a weak root cannot create an agent/context reference cycle.
-    host.get(&id)
-        .map(|profile| Arc::downgrade(profile.context()))
+    ProfileMemoryContext::BoundWeak(Arc::downgrade(profile.context()))
 }
 
 async fn deferred_memory_work(
-    profile_context: Option<std::sync::Weak<crate::core::runtime::CoreContext>>,
+    profile_context: ProfileMemoryContext,
     work: impl std::future::Future<Output = ()>,
 ) {
     match profile_context {
-        Some(context) => {
+        ProfileMemoryContext::BoundWeak(context) => {
             // A retired profile cannot fall back to a configured external engine.
             if let Some(context) = context.upgrade() {
                 crate::core::runtime::CoreContext::scope(context, work).await;
             }
         }
-        None => work.await,
+        ProfileMemoryContext::NonProfile => work.await,
+        ProfileMemoryContext::Denied => {}
     }
 }
 

@@ -167,7 +167,7 @@ impl Respond for CallTools {
 #[test]
 fn chat_and_relay_use_only_selected_tools_inside_their_profile() {
     let _ = tracing_subscriber::fmt()
-        .with_env_filter("warn,openhuman_core::memory::lifecycle=debug")
+        .with_env_filter("warn")
         .with_test_writer()
         .try_init();
     runtime_without_master_key().block_on(async {

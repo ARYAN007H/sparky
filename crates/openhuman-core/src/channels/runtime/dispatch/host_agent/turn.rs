@@ -88,9 +88,8 @@ pub(crate) async fn run_host_agent_turn(
     session.set_on_progress(progress);
 
     let text = host
-        .scope(crate::core::runtime::CoreContext::scope_with_turn_origin(
-            host.context.clone(),
-            Some(origin.clone()),
+        .scope(crate::agent::turn_origin::with_origin(
+            origin.clone(),
             session.run_single_with_origin(&message, Some(origin)),
         ))
         .await?;
