@@ -393,6 +393,7 @@ async fn publish_event(
 }
 
 #[cfg(test)]
+#[cfg(test)]
 #[async_trait]
 impl EventSink for OpenHumanEventSink {
     async fn publish(

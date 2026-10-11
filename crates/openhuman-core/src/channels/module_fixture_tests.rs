@@ -32,6 +32,7 @@ pub(crate) async fn client() -> ModuleClient {
         .name("tinychannels-test-module".into())
         .spawn(move || {
             let runtime = tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(2)
                 .enable_all()
                 .thread_name("tinychannels-test-bus")
                 .build()

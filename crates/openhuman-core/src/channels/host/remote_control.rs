@@ -1,10 +1,4 @@
-//! OpenHuman's [`RemoteControlHost`]: the host state behind `/status`,
-//! `/sessions` and `/new` on every chat channel.
-//!
-//! Command parsing, rendering and the chat → thread bindings live in
-//! `tinychannels::remote`. This adapter answers from the channel runtime
-//! context (model routes, in-memory history), the conversation store and the
-//! web-chat session cache.
+//! Captured host conversation and session state supplied to the channel module.
 
 use crate::channels::context::{clear_sender_history, ChannelRuntimeContext};
 use crate::threads::store::{self as conversations, CreateConversationThread};
