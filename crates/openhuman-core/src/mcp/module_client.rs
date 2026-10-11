@@ -22,7 +22,8 @@ use serde_json::{Map, Value};
 use tinymcp_bus::{
     agent_tools::{McpToolPresentation, PrepareAgentToolsRequest},
     config::{McpClientConfig, OpenConfiguredRequest, OpenConfiguredResponse, TransitionStatus},
-    names, McpRemoteTool, ScrubStaticToolsRequest, SupervisorBatch,
+    names, McpRemoteTool, ScrubStaticToolsRequest, ServerArgumentsValidation,
+    ValidateServerArgumentsRequest, SupervisorBatch,
 };
 
 use crate::{
@@ -90,6 +91,11 @@ pub(crate) trait McpModulePort: Send + Sync {
         &self,
         request: PrepareAgentToolsRequest,
     ) -> Result<Vec<McpToolPresentation>, ModuleCallError>;
+
+    async fn validate_server_arguments(
+        &self,
+        request: ValidateServerArgumentsRequest,
+    ) -> Result<ServerArgumentsValidation, ModuleCallError>;
 }
 
 struct TinyMcpPort {
@@ -370,6 +376,16 @@ impl McpConfiguredClient {
             },),
         )
         .await
+    }
+
+    async fn validate_server_arguments(
+        &self,
+        request: ValidateServerArgumentsRequest,
+    ) -> Result<ServerArgumentsValidation, ModuleCallError> {
+        if SHUTTING_DOWN.load(Ordering::Acquire) {
+            return Err(ModuleCallError::Unavailable);
+        }
+        self.port.validate_server_arguments(request).await
     }
 
     /// Normalizes host-supplied MCP arguments through TinyMCP's bounded
