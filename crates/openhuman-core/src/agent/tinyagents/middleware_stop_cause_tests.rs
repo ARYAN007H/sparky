@@ -376,7 +376,10 @@ async fn a_failure_breaker_halt_survives_a_later_repeat_guard_halt_in_its_batch(
     assert!(drain_pause_count(&handle) > 1, "the guard tripped as well");
     let note = slot.lock().unwrap().clone().unwrap();
     assert_eq!(note, breaker_note);
-    assert_eq!(StopReasonKind::from_stop_note(&note), StopReasonKind::Policy);
+    assert_eq!(
+        StopReasonKind::from_stop_note(&note),
+        StopReasonKind::Policy
+    );
 }
 
 /// Feed `breaker` one result of `tool` for `path`, failing with
