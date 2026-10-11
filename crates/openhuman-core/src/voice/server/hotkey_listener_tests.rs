@@ -34,6 +34,11 @@ fn push_suppresses_duplicate_physical_edges() {
     assert!(state.event(Up, Push).is_none());
 }
 
+// The paused-clock case must not compete for production admission with a
+// fixture running on another test runtime's real clock.
+#[cfg(feature = "modules")]
+static LISTENER_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 #[cfg(feature = "modules")]
 #[derive(Clone, Default)]
 struct ListenerFixture {
@@ -151,6 +156,7 @@ async fn listener_fixture() -> (
 #[cfg(feature = "modules")]
 #[tokio::test]
 async fn cancelling_startup_still_closes_the_module_owned_listener() {
+    let _serial = LISTENER_TEST_LOCK.lock().await;
     let (client, fixture, _service) = listener_fixture().await;
     let startup = tokio::spawn(async move {
         start_globe_with_client(client, Push, &CancellationToken::new()).await
@@ -171,6 +177,7 @@ async fn cancelling_startup_still_closes_the_module_owned_listener() {
 #[cfg(feature = "modules")]
 #[tokio::test]
 async fn stopping_listener_joins_its_bus_cleanup() {
+    let _serial = LISTENER_TEST_LOCK.lock().await;
     let (client, fixture, _service) = listener_fixture().await;
     fixture.allow_start.notify_one();
     let (handle, _rx) = start_globe_with_client(client, Push, &CancellationToken::new())
@@ -183,6 +190,7 @@ async fn stopping_listener_joins_its_bus_cleanup() {
 #[cfg(feature = "modules")]
 #[tokio::test]
 async fn lost_start_reply_recovers_the_lease_before_releasing_admission() {
+    let _serial = LISTENER_TEST_LOCK.lock().await;
     let (client, fixture, _service) = listener_fixture().await;
     fixture
         .lose_start_reply
@@ -205,6 +213,7 @@ async fn lost_start_reply_recovers_the_lease_before_releasing_admission() {
 #[cfg(feature = "modules")]
 #[tokio::test(start_paused = true)]
 async fn failed_close_retains_ownership_until_the_module_confirms_cleanup() {
+    let _serial = LISTENER_TEST_LOCK.lock().await;
     let (client, fixture, _service) = listener_fixture().await;
     fixture
         .fail_close
