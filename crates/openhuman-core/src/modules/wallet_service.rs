@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 use std::future::Future;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
 
 use tinywallet_bus::names::methods;
@@ -17,6 +18,7 @@ use crate::config::Config;
 use super::wallet::{self, WalletCallError};
 
 struct NativeWalletService {
+    config: Config,
     workspace: PathBuf,
     configuration: NativeWalletConfigRequest,
     accounts: WalletAccountsResponse,
@@ -26,6 +28,7 @@ struct NativeWalletService {
 
 static NATIVE_WALLET_SERVICE: OnceLock<tokio::sync::Mutex<Option<NativeWalletService>>> =
     OnceLock::new();
+static NATIVE_WALLET_SHUTDOWN_HOOK_REGISTERED: AtomicBool = AtomicBool::new(false);
 
 fn native_wallet_service() -> &'static tokio::sync::Mutex<Option<NativeWalletService>> {
     NATIVE_WALLET_SERVICE.get_or_init(|| tokio::sync::Mutex::new(None))
@@ -44,6 +47,7 @@ where
     R: Send,
 {
     let mut active = native_wallet_service().lock().await;
+    register_native_wallet_shutdown_hook();
     let accounts = super::wallet_host::wallet_accounts_snapshot()
         .await
         .map_err(WalletCallError::Failed)?;
@@ -98,24 +102,27 @@ async fn ensure_native_wallet(
             return Err(WalletCallError::Failed(error));
         }
         *active = Some(NativeWalletService {
+            config: config.clone(),
             workspace,
             configuration,
             accounts,
             response,
             prepared_quotes: HashMap::new(),
         });
+        register_native_wallet_shutdown_hook();
     }
     Ok(())
 }
 
-/// Prepare a native transfer through the module and remember only the quote's
-/// chain so the host can select the correct encrypted wallet slot at execution.
+/// Prepare a native transfer through the module and retain its exact quote so
+/// the host can bind approval and signer selection to the same immutable facts.
 pub(crate) async fn prepare_native_transfer(
     config: &Config,
     owner: Option<tinywallet_bus::wire::QuoteOwner>,
     params: tinywallet_bus::wire::PrepareTransferParams,
 ) -> Result<tinywallet_bus::wire::PreparedTransaction, WalletCallError> {
     let mut active = native_wallet_service().lock().await;
+    register_native_wallet_shutdown_hook();
     let accounts = super::wallet_host::wallet_accounts_snapshot()
         .await
         .map_err(WalletCallError::Failed)?;
@@ -165,6 +172,7 @@ pub(crate) async fn execute_native_transfer(
     }
 
     let mut active = native_wallet_service().lock().await;
+    register_native_wallet_shutdown_hook();
     let accounts = super::wallet_host::wallet_accounts_snapshot()
         .await
         .map_err(WalletCallError::Failed)?;
@@ -266,6 +274,65 @@ async fn close_native_wallet(
     .await?;
     super::wallet_host::clear_endpoint_references();
     Ok(())
+}
+
+/// Close the current per-user service on sign-out or process shutdown. The
+/// mutex waits for any in-flight bus call to finish before releasing quote and
+/// endpoint state, so a later user cannot inherit an old handle.
+pub(crate) async fn close_native_wallet_service() -> Result<(), WalletCallError> {
+    register_native_wallet_shutdown_hook();
+    close_native_wallet_service_inner().await
+}
+
+async fn close_native_wallet_service_inner() -> Result<(), WalletCallError> {
+    let mut active = native_wallet_service().lock().await;
+    let config = active.as_ref().map(|service| service.config.clone());
+    close_active_native_wallet_with(&mut active, move |request| async move {
+        let Some(config) = config else {
+            return Ok(());
+        };
+        wallet::call::<_, ()>(&config, methods::NATIVE_WALLET_CLOSE, request).await
+    })
+    .await
+}
+
+async fn close_active_native_wallet_with<F, Fut>(
+    active: &mut Option<NativeWalletService>,
+    close: F,
+) -> Result<(), WalletCallError>
+where
+    F: FnOnce(NativeWalletCloseRequest) -> Fut,
+    Fut: Future<Output = Result<(), WalletCallError>>,
+{
+    if let Some(service) = active.as_ref() {
+        close(NativeWalletCloseRequest {
+            service: service.response.service.clone(),
+        })
+        .await?;
+    }
+    *active = None;
+    super::wallet_host::clear_endpoint_references();
+    Ok(())
+}
+
+fn register_native_wallet_shutdown_hook() {
+    if !begin_shutdown_hook_registration(&NATIVE_WALLET_SHUTDOWN_HOOK_REGISTERED) {
+        return;
+    }
+    crate::core::shutdown::register(|| async {
+        finish_shutdown_hook_registration(&NATIVE_WALLET_SHUTDOWN_HOOK_REGISTERED);
+        if let Err(error) = close_native_wallet_service_inner().await {
+            tracing::warn!(%error, "[modules:wallet] failed to close native wallet service at shutdown");
+        }
+    });
+}
+
+fn begin_shutdown_hook_registration(registered: &AtomicBool) -> bool {
+    !registered.swap(true, Ordering::AcqRel)
+}
+
+fn finish_shutdown_hook_registration(registered: &AtomicBool) {
+    registered.store(false, Ordering::Release);
 }
 
 fn native_wallet_config_request() -> NativeWalletConfigRequest {

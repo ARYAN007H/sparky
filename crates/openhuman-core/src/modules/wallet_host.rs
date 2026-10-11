@@ -96,6 +96,13 @@ pub(crate) fn clear_endpoint_references() {
     }
 }
 
+#[cfg(test)]
+pub(super) fn has_endpoint_reference_for_test(reference: &str) -> bool {
+    endpoint_references()
+        .lock()
+        .is_ok_and(|references| references.contains_key(reference))
+}
+
 pub(crate) async fn wallet_accounts_snapshot(
 ) -> Result<tinywallet_bus::wire::WalletAccountsResponse, String> {
     let status = crate::web3::wallet::status()
