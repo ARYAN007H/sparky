@@ -25,7 +25,7 @@ use tinychannels_bus::{ChannelInboundEnvelope, ChannelMessage};
 /// Host-side inbound work item. Relay authentication remains out-of-band and
 /// can only be set by the native callback after receiving the trusted module
 /// callback; it is never reconstructed from envelope metadata.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(crate) struct RuntimeChannelMessage {
     pub(crate) message: ChannelMessage,
     pub(crate) inbound_envelope: Option<ChannelInboundEnvelope>,
