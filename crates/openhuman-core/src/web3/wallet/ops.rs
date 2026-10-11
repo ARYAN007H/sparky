@@ -10,8 +10,9 @@ mod types;
 use types::StoredWalletState;
 pub(crate) use types::WalletSecretMaterial;
 pub use types::{
-    RevealRecoveryPhraseResult, WalletAccount, WalletChain, WalletSetupParams, WalletSetupSource,
-    WalletStatus, WALLET_NOT_CONFIGURED_MESSAGE,
+    GeneratedRecoveryPhrase, RecoveryPhraseValidation, RevealRecoveryPhraseResult, WalletAccount,
+    WalletChain, WalletRecoveryMaterial, WalletSetupParams, WalletSetupSource, WalletStatus,
+    WALLET_NOT_CONFIGURED_MESSAGE,
 };
 
 use log::debug;
@@ -26,7 +27,6 @@ use state::{
     keychain_load_mnemonic, load_stored_wallet_state_unlocked, save_stored_wallet_state_unlocked,
     to_status, LOG_PREFIX, WALLET_STATE_FILE_LOCK,
 };
-use types::{GeneratedRecoveryPhrase, RecoveryPhraseValidation, WalletRecoveryMaterial};
 
 const VALID_MNEMONIC_WORD_COUNTS: [u8; 5] = [12, 15, 18, 21, 24];
 

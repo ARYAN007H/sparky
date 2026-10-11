@@ -74,7 +74,6 @@ use tinywallet_bus::wire::{
     ExportedKey, GenerateMnemonicRequest, GenerateMnemonicResponse, Scheme, SecretMaterial,
     SignMessageRequest, SignRequest, Signature, SignedTransaction, TransactionSpec,
 };
-use tinywallet_bus::Chain;
 use zeroize::Zeroize;
 
 use super::{host, ops, registry};
