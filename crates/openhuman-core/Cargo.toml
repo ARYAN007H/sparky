@@ -341,8 +341,7 @@ zeroize = "1"
 x25519-dalek = { version = "2", features = ["static_secrets"] }
 hkdf = "0.12"
 hex = "0.4"
-# The SaaS gateway signature. 0.13 on sha2 0.11, the versions tinychannels-bus
-# already brings, so it adds no package to the graph.
+# The host-owned SaaS gateway signature uses HMAC with SHA-256.
 hmac = "0.13"
 sha2_011 = { package = "sha2", version = "0.11" }
 tokio-util = { version = "0.7", features = ["rt", "io"] }
@@ -391,9 +390,7 @@ fs2 = "0.4"
 # behind the `scheduler-gate` feature. CPU sampling uses `sysinfo` above.
 starship-battery = { version = "0.12", optional = true }
 
-# The WhatsApp Web provider (and its `whatsapp-rust` / `wacore` / `serde-big-array`
-# stack) now lives in the tinychannels crate; the `whatsapp-web` feature forwards
-# to `tinychannels/whatsapp-web`.
+# WhatsApp Web provider execution is supplied by the TinyChannels module.
 # TinyDocs — the document wire contract, and nothing else.
 #
 # `tinydocs-bus` is the whole dependency: the spec types, their size limits,
