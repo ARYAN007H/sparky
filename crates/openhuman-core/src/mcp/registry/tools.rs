@@ -27,7 +27,7 @@ use async_trait::async_trait;
 use serde_json::Value;
 
 use crate::config::Config;
-use tinymcp::agent_tools::normalize_tool_arguments;
+use tinymcp::normalize_tool_arguments;
 use tinymcp_bus::agent_tools::{AgentToolEffect, AgentToolSpec, RegistryTool};
 use tinytools::{PermissionLevel, Tool, ToolExposure, ToolResult};
 

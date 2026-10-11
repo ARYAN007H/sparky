@@ -6800,14 +6800,14 @@ dependencies = [
 
 [[package]]
 name = "tinybox-bus"
-version = "0.1.18"
+version = "0.1.19"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "tinybox-core"
-version = "0.1.18"
+version = "0.1.19"
 dependencies = [
  "async-trait",
  "serde",
@@ -6817,7 +6817,7 @@ dependencies = [
 
 [[package]]
 name = "tinybox-docker"
-version = "0.1.18"
+version = "0.1.19"
 dependencies = [
  "async-trait",
  "serde_json",
@@ -6828,7 +6828,7 @@ dependencies = [
 
 [[package]]
 name = "tinybox-jail"
-version = "0.1.18"
+version = "0.1.19"
 dependencies = [
  "landlock",
  "log",
