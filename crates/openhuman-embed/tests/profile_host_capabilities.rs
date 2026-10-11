@@ -74,10 +74,10 @@ impl Tool for TenantTool {
                 assert_eq!(channel, "telegram");
                 assert_eq!(sender.as_deref(), Some("sender"));
                 assert_eq!(reply_target, "chat");
-                assert!(matches!(
-                    message_id.as_str(),
-                    "message" | "reopened-message"
-                ));
+                self.relay_origins
+                    .lock()
+                    .unwrap()
+                    .push((profile.clone(), message_id));
             }
             origin => panic!("unexpected turn origin: {origin:?}"),
         }
