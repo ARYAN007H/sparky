@@ -1,19 +1,9 @@
-//! The `ChannelInboundSubscriber` event handler: runs the agent loop for an
-//! inbound channel message and streams the reply back through the REST API.
-//!
-//! The web-chat event loop is host-owned; the progressive delivery it drives
-//! (draft, thinking and filler bubbles, finalize) is
-//! `tinychannels::delivery::progressive::ProgressiveReply` over
-//! [`BackendProgressiveSender`].
-
-use super::delivery::BackendProgressiveSender;
+//! Host-owned agent turn orchestration with module-owned progressive delivery.
+use super::delivery::ModuleProgressiveReply;
 use crate::core::events::DomainEvent;
 use async_trait::async_trait;
-use std::sync::Arc;
 use tinybus::EventHandler;
-use tinychannels::delivery::progressive::{
-    ProgressiveReply, EDIT_FLUSH_INTERVAL, FILLER_INTERVAL, TYPING_REFRESH_INTERVAL,
-};
+use tinychannels_bus::module_progressive::ProgressiveEvent;
 
 /// Subscribes to `ChannelInboundMessage` events and runs the agent loop,
 /// sending replies back to the originating channel via the backend REST API.
@@ -82,7 +72,7 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
             }
         };
         let identity = match crate::modules::channel_controller::prepare_identity(
-            &crate::modules::client::ModuleClient::new(config),
+            &crate::modules::client::ModuleClient::new(config.clone()),
             tinychannels_bus::module_inbound::PrepareChannelIdentityRequest {
                 channel: channel.clone(),
                 sender: sender.clone(),
@@ -102,7 +92,13 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
         let client_id = identity.client_id;
 
         let mut event_rx = crate::web_chat::subscribe_web_channel_events();
-        let mut reply = ProgressiveReply::new(Arc::new(BackendProgressiveSender), channel.clone());
+        let reply = match ModuleProgressiveReply::open(config, channel.clone()).await {
+            Ok(reply) => reply,
+            Err(error) => {
+                tracing::error!("[channel-inbound] progressive runtime unavailable: {error}");
+                return;
+            }
+        };
 
         let request_id = match crate::web_chat::start_chat(
             &client_id,
@@ -131,46 +127,13 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
             }
             Err(err) => {
                 tracing::error!("[channel-inbound] start_chat failed: {}", err);
-                reply
-                    .send_reply(&format!("Sorry, I couldn't process your message: {err}"))
-                    .await;
+                let _ = reply.finalize(&format!("Sorry, I couldn't process your message: {err}")).await;
                 return;
             }
         };
 
         let timeout = tokio::time::Duration::from_secs(180);
         let deadline = tokio::time::Instant::now() + timeout;
-
-        // ── Progressive-edit timer ────────────────────────────────────
-        // Buffered text/thinking deltas flush as edits on this timer. The
-        // driver latches into atomic-final delivery on channels or backends
-        // that cannot edit.
-        let mut edit_timer = tokio::time::interval(EDIT_FLUSH_INTERVAL);
-        edit_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-        // Don't fire immediately; wait for the first tick.
-        edit_timer.tick().await;
-
-        // ── Typing indicator ──────────────────────────────────────────
-        // Telegram's `sendChatAction` keeps the "typing…" UI alive for
-        // ~5s, so re-send every 4s while the turn is in flight. The first
-        // call fires immediately.
-        let mut typing_timer = tokio::time::interval(TYPING_REFRESH_INTERVAL);
-        typing_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-        // Fire immediately on first tick so the indicator shows up as
-        // soon as the inbound message is received.
-        reply.typing_tick().await;
-        typing_timer.tick().await; // consume the immediate tick
-
-        // ── Filler messages ──────────────────────────────────────────
-        // Once progressive edits + thinking streams go quiet (backend
-        // doesn't support PATCH, reasoning has finished, etc.) the user
-        // can wait 30–90 s seeing no fresh activity. Post a short filler
-        // every FILLER_INTERVAL so the chat keeps moving. All filler ids
-        // are tracked in `StreamingState.filler_message_ids` and deleted
-        // by `ProgressiveReply::finalize` once the real response is on screen.
-        let mut filler_timer = tokio::time::interval(FILLER_INTERVAL);
-        filler_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-        filler_timer.tick().await; // consume the immediate tick — first filler fires after FILLER_INTERVAL
 
         loop {
             tokio::select! {
@@ -180,22 +143,22 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
                             match ev.event.as_str() {
                                 "text_delta" => {
                                     if let Some(delta) = ev.delta.as_ref() {
-                                        reply.on_text_delta(delta);
+                                        if let Err(error) = reply.feed(vec![ProgressiveEvent::TextDelta(delta.clone())]).await { tracing::error!("[channel-inbound] delivery failed: {error}"); return; }
                                     }
                                 }
                                 "tool_call" => {
                                     if let Some(ref name) = ev.tool_name {
-                                        reply.on_tool_call(name);
+                                        if let Err(error) = reply.feed(vec![ProgressiveEvent::ToolCall(name.clone())]).await { tracing::error!("[channel-inbound] delivery failed: {error}"); return; }
                                     }
                                 }
                                 "tool_result" => {
                                     if let Some(ref name) = ev.tool_name {
-                                        reply.on_tool_result(name, ev.success.unwrap_or(true));
+                                        if let Err(error) = reply.feed(vec![ProgressiveEvent::ToolResult { tool_name: name.clone(), success: ev.success.unwrap_or(true) }]).await { tracing::error!("[channel-inbound] delivery failed: {error}"); return; }
                                     }
                                 }
                                 "thinking_delta" => {
                                     if let Some(delta) = ev.delta.as_ref() {
-                                        reply.on_thinking_delta(delta);
+                                        if let Err(error) = reply.feed(vec![ProgressiveEvent::ThinkingDelta(delta.clone())]).await { tracing::error!("[channel-inbound] delivery failed: {error}"); return; }
                                     }
                                 }
                                 "chat_done" | "chat:done" => {
@@ -214,23 +177,20 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
                                         full_response.as_str()
                                     };
                                     tracing::info!(
-                                        "[channel-inbound] agent done, replying to channel='{}' len={} streamed_msg_id={:?}",
+                                        "[channel-inbound] agent done, replying to channel='{}' len={}",
                                         channel,
                                         reply_text.len(),
-                                        reply.state().message_id,
                                     );
                                     // If we've been streaming progressive edits, replace
                                     // the outbound message with the final canonical text.
                                     // Otherwise send a fresh message atomically.
-                                    reply.finalize(reply_text).await;
+                                    if let Err(error) = reply.finalize(reply_text).await { tracing::error!("[channel-inbound] final delivery failed: {error}"); }
                                     return;
                                 }
                                 "chat_error" | "chat:error" => {
                                     let err_msg = ev.message.unwrap_or_else(|| "unknown error".to_string());
                                     tracing::error!("[channel-inbound] agent error: {}", err_msg);
-                                    reply
-                                        .finalize(&format!("Sorry, I encountered an error: {err_msg}"))
-                                        .await;
+                                    let _ = reply.finalize(&format!("Sorry, I encountered an error: {err_msg}")).await;
                                     return;
                                 }
                                 // New terminal event (see web_chat::ops::channel_ops /
@@ -249,7 +209,7 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
                                         "[channel-inbound] turn cancelled reason={:?}",
                                         ev.cancel_reason
                                     );
-                                    reply.finalize("Cancelled.").await;
+                                    let _ = reply.finalize("Cancelled.").await;
                                     return;
                                 }
                                 _ => {}
@@ -265,15 +225,9 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
                         }
                     }
                 }
-                // Draft/thinking/filler bubbles need edit+delete support; the
-                // driver skips them on channels without it (Discord) so they
-                // never leave un-cleanable placeholder messages.
-                _ = edit_timer.tick() => reply.edit_tick().await,
-                _ = typing_timer.tick() => reply.typing_tick().await,
-                _ = filler_timer.tick() => reply.filler_tick().await,
                 _ = tokio::time::sleep_until(deadline) => {
                     tracing::error!("[channel-inbound] agent timed out after {}s", timeout.as_secs());
-                    reply.finalize("Sorry, the request timed out.").await;
+                    let _ = reply.finalize("Sorry, the request timed out.").await;
                     return;
                 }
             }
