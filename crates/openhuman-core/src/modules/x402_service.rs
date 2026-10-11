@@ -7,7 +7,8 @@ use tinywallet_bus::names::methods;
 use tinywallet_bus::wire::{
     X402CloseRequest, X402ConfigResponse, X402ConfigureRequest, X402DetailedSpendingSummary,
     X402ListPaymentsRequest, X402ListPaymentsResponse, X402PreparePaymentRequest,
-    X402PreparePaymentResponse, X402RecordPaymentRequest, X402ServiceHandle, X402UpdateBudgetRequest,
+    X402PreparePaymentResponse, X402RecordPaymentRequest, X402ServiceHandle,
+    X402UpdateBudgetRequest,
 };
 
 use crate::config::Config;
@@ -77,13 +78,11 @@ async fn signing_secret(
     let stored = crate::web3::wallet::secret_material(chain)
         .await
         .map_err(WalletCallError::Failed)?;
-    let phrase = crate::security::encryption::rpc::decrypt_secret(
-        config,
-        &stored.encrypted_mnemonic,
-    )
-    .await
-    .map_err(|error| WalletCallError::Failed(error.to_string()))?
-    .value;
+    let phrase =
+        crate::security::encryption::rpc::decrypt_secret(config, &stored.encrypted_mnemonic)
+            .await
+            .map_err(|error| WalletCallError::Failed(error.to_string()))?
+            .value;
     Ok(tinywallet_bus::wire::SecretMaterial {
         mnemonic: phrase,
         derivation_path: stored.derivation_path,

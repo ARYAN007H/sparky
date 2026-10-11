@@ -1,7 +1,7 @@
 use super::{
     consume_approval, native_approval_matches_request, validate_module_endpoint_url,
-    web3_approval_matches_request, x402_approval_facts, x402_request_owner_matches,
-    ApprovalKind, ApprovalPermit,
+    web3_approval_matches_request, x402_approval_facts, x402_request_owner_matches, ApprovalKind,
+    ApprovalPermit,
 };
 use tinywallet_bus::wire::{
     AuthorizeNativeWalletExecutionRequest, AuthorizeWeb3ExecutionRequest,
