@@ -139,7 +139,7 @@ const messages: TranslationMap = {
   'feedback.submit.success': 'Dziękujemy! Twoja opinia jest już na tablicy.',
   'feedback.submit.rejected': 'Nie udało się opublikować Twojej opinii.',
   'feedback.submit.error': 'Coś poszło nie tak. Spróbuj ponownie.',
-  'feedback.admin.status': 'Status',
+  'feedback.admin.status': 'Stan',
   'feedback.admin.updateFailed': 'Nie udało się zaktualizować statusu',
   'feedback.comments.empty': 'Brak komentarzy.',
   'feedback.comments.placeholder': 'Dodaj komentarz',
@@ -147,8 +147,8 @@ const messages: TranslationMap = {
   'feedback.comments.loadError': 'Nie udało się załadować komentarzy',
   'feedback.comments.postError': 'Nie udało się opublikować komentarza',
   'feedback.comments.you': 'Ty',
-  'conversations.backgroundTasks.statusRunning': 'Running',
-  'conversations.backgroundTasks.close': 'Close',
+  'conversations.backgroundTasks.statusRunning': 'W trakcie',
+  'conversations.backgroundTasks.close': 'Zamknij',
   'conversations.backgroundTasks.sectionThisChat': 'W tym czacie',
   'conversations.backgroundTasks.sectionScheduled': 'Zaplanowane zadania',
   'conversations.backgroundTasks.sectionMemory': 'Synchronizacja pamięci',
@@ -444,7 +444,7 @@ const messages: TranslationMap = {
   'chat.reasoning.thought': 'Przemyślane',
   'chat.reasoning.elapsedSeconds': '{n} s',
   'chat.reasoning.elapsedMinutes': '{m} min {s} s',
-  'scope.legacy': 'Legacy',
+  'scope.legacy': 'Dziedzictwo',
   'scope.user': 'Użytkownik',
   'scope.project': 'Projekt',
   'skills.noResults': 'Nie znaleziono połączeń',
@@ -475,8 +475,8 @@ const messages: TranslationMap = {
   'skills.rows.edit': 'Edytuj {name}',
   'skills.rows.remove': 'Usuń {name}',
   'skills.explorer.searchPlaceholder': 'Szukaj skilli...',
-  'skills.explorer.scopeUser': 'User',
-  'skills.explorer.scopeProject': 'Project',
+  'skills.explorer.scopeUser': 'Użytkownik',
+  'skills.explorer.scopeProject': 'Projekt',
   'skills.explorer.scopeLegacy': 'Legacy',
   'skills.explorer.noDescription': 'Nie podano opisu.',
   'skills.explorer.uninstallSuccess': 'Skill odinstalowany pomyślnie.',
@@ -987,7 +987,7 @@ const messages: TranslationMap = {
     'Lokalne polecenie lub zdalny punkt końcowy wraz z tym, czego potrzebuje do uwierzytelnienia. Zapisywane w twoim mcp.json.',
   'mcp.form.name': 'Nazwa',
   'mcp.form.nameHint': 'Litery, cyfry, kropki, myślniki. To klucz w mcp.json.',
-  'mcp.form.transport': 'Transport',
+  'mcp.form.transport': 'Transportu',
   'mcp.form.transportStdio': 'Lokalne polecenie (stdio)',
   'mcp.form.transportHttp': 'Zdalny URL (HTTP)',
   'mcp.form.command': 'Polecenie',
@@ -1475,7 +1475,7 @@ const messages: TranslationMap = {
   'notifications.category.messages': 'Wiadomości',
   'notifications.category.agents': 'Agenci',
   'notifications.category.skills': 'Umiejętności',
-  'notifications.category.system': 'System',
+  'notifications.category.system': 'Systemu',
   'notifications.category.meetings': 'Spotkania',
   'notifications.category.reminders': 'Przypomnienia',
   'notifications.category.important': 'Ważne',
@@ -1920,7 +1920,7 @@ const messages: TranslationMap = {
   'conversations.subagent.answerSent': 'Odpowiedź wysłana',
   'conversations.subagent.transcript.instruction': 'instrukcja',
   'conversations.subagent.transcript.agent': 'agent',
-  'conversations.subagent.transcript.system': 'system',
+  'conversations.subagent.transcript.system': 'systemu',
   'conversations.tasks.taskOne': 'zadanie',
   'conversations.tasks.taskOther': 'zadań',
   'conversations.tasks.running': 'w trakcie',
@@ -1959,7 +1959,7 @@ const messages: TranslationMap = {
     'Ponowna próba się nie powiodła. Pobierz najnowszą wersję aplikacji i spróbuj ponownie.',
   'daemon.serviceBlockingGate.retrying': 'Ponawianie...',
   'daemon.serviceBlockingGate.title': 'Rdzeń OpenHuman jest niedostępny',
-  'worktree.label': 'Worktree',
+  'worktree.label': 'Drzewo pracy',
   'worktree.dirty': 'Niezatwierdzone zmiany',
   'worktree.clean': 'Czyste',
   'worktree.removing': 'Usuwanie…',
@@ -1970,7 +1970,7 @@ const messages: TranslationMap = {
   'worktree.dirtyConfirm':
     'To worktree ma niezatwierdzone zmiany. Jego usunięcie odrzuci tę pracę. Gałąź workera zostaje zachowana.',
   'worktree.action.open': 'Otwórz folder',
-  'worktree.action.diff': 'Diff',
+  'worktree.action.diff': 'Różnica',
   'worktree.action.hideDiff': 'Ukryj diff',
   'worktree.action.remove': 'Usuń',
   'worktree.action.removeAnyway': 'Odrzuć i usuń',
@@ -2585,7 +2585,7 @@ const messages: TranslationMap = {
   'settings.ai.slugInUseError': 'Ta nazwa dostawcy jest już używana.',
   'settings.ai.slugReservedError': 'Wybierz inną nazwę dostawcy.',
   'settings.ai.providerNamePlaceholder': 'Mój dostawca',
-  'settings.ai.slugLabel': 'Slug identyfikatora:',
+  'settings.ai.slugLabel': 'Slug:',
   'settings.ai.openAiUrlLabel': 'URL OpenAI',
   'settings.ai.caCertificateLabel': 'Certyfikat CA (opcjonalnie)',
   'settings.ai.caCertificateTooLarge': 'Certyfikat CA nie może przekraczać 256 KB',
@@ -2623,27 +2623,27 @@ const messages: TranslationMap = {
   'settings.ai.routing.backgroundTasks': 'Zadania w tle',
   'settings.ai.routing.bgTasksDesc':
     'Modele używane poza głównym przepływem rozmowy do podsumowywania.',
-  'settings.ai.routing.workload.chat.label': 'Chat',
+  'settings.ai.routing.workload.chat.label': 'Czat',
   'settings.ai.routing.workload.chat.description':
     'Bezpośrednia konwersacja tam i z powrotem: tryb „Szybki” w Rozmowach',
   'settings.ai.routing.workload.chat.hint':
     'Zalecane: tani lub średni model szybkiego czatu z dużą liczbą tokenów/s i niskim opóźnieniem. Modele lokalne typu open source mogą się tutaj dobrze sprawdzić, jeśli wydają się responsywne.',
-  'settings.ai.routing.workload.reasoning.label': 'Reasoning',
+  'settings.ai.routing.workload.reasoning.label': 'Rozumowanie',
   'settings.ai.routing.workload.reasoning.description':
     'Główny agent czatu, podsumowanie spotkania: tryb „Rozumowanie” w Rozmowach',
   'settings.ai.routing.workload.reasoning.hint':
     'Zalecane: droższy model graniczny lub silny model rozumowania do głębokiego myślenia. Służy do głównego agenta czatu, podsumowań spotkań i cięższej syntezy odpowiedzi.',
-  'settings.ai.routing.workload.agentic.label': 'Agentic',
+  'settings.ai.routing.workload.agentic.label': 'Agent',
   'settings.ai.routing.workload.agentic.description':
     'Biegacze podagenci, pętle narzędzi, decyzje GIF',
   'settings.ai.routing.workload.agentic.hint':
     'Zalecane: niezawodny model zgodny z instrukcją i wymagający dużego użycia narzędzi. Modele graniczne o średniej cenie są zwykle najbezpieczniejsze; zdolne modele open source mogą działać, jeśli wywoływanie narzędzi jest stabilne.',
-  'settings.ai.routing.workload.coding.label': 'Coding',
+  'settings.ai.routing.workload.coding.label': 'Kodowanie',
   'settings.ai.routing.workload.coding.description':
     'Generowanie kodu i refaktoryzacja przebiegają',
   'settings.ai.routing.workload.coding.hint':
     'Zalecane: model dostosowany do kodowania z dokładnym przestrzeganiem instrukcji, jakością edycji i wydajnością w długim kontekście. Zwykle warto na to wydać więcej.',
-  'settings.ai.routing.workload.vision.label': 'Vision',
+  'settings.ai.routing.workload.vision.label': 'Wizja',
   'settings.ai.routing.workload.vision.description':
     'Zrozumienie obrazu dla subagenta ds. wizji: zawsze multimodalne',
   'settings.ai.routing.workload.vision.hint':
@@ -2971,7 +2971,7 @@ const messages: TranslationMap = {
   'settings.sandbox.detectedBackend': 'Backend systemu operacyjnego',
   'settings.sandbox.enableLabel': 'Włącz wykonanie w piaskownicy',
   'settings.sandbox.enableDesc': 'Uruchamiaj narzędzia agenta w izolowanym środowisku piaskownicy.',
-  'settings.sandbox.backendLabel': 'Backend',
+  'settings.sandbox.backendLabel': 'Zaplecze',
   'settings.sandbox.backendDesc':
     'Wybierz backend izolacji do użycia przy wykonaniu w piaskownicy.',
   'settings.sandbox.dockerSettings': 'Ustawienia Docker',
@@ -2987,16 +2987,16 @@ const messages: TranslationMap = {
   'settings.approvalHistory.title': 'Historia zatwierdzeń',
   'settings.approvalHistory.subtitle':
     'Ostatnie decyzje o zatwierdzeniu narzędzi, najnowsze najpierw.',
-  'settings.approvalHistory.refresh': 'Refresh',
+  'settings.approvalHistory.refresh': 'Odśwież',
   'settings.approvalHistory.loading': 'Ładowanie historii zatwierdzeń…',
-  'settings.approvalHistory.retry': 'Retry',
+  'settings.approvalHistory.retry': 'Spróbuj ponownie',
   'settings.approvalHistory.emptyState': 'Brak zarejestrowanych decyzji o zatwierdzeniu.',
   'settings.approvalHistory.errorGeneric':
     'Nie udało się załadować historii zatwierdzeń. Spróbuj ponownie.',
   'settings.approvalHistory.decision.approveOnce': 'Zatwierdzone raz',
   'settings.approvalHistory.decision.approveAlways': 'Zawsze dozwolone',
   'settings.approvalHistory.decision.approveAlwaysFlow': 'Zawsze dozwolone (przepływ)',
-  'settings.approvalHistory.decision.deny': 'Denied',
+  'settings.approvalHistory.decision.deny': 'Odmówiono',
   'settings.theme.variantLight': 'Jasny',
   'settings.theme.variantDark': 'Ciemny',
   'settings.theme.variantAuto': 'Automatyczny',
@@ -3163,7 +3163,7 @@ const messages: TranslationMap = {
   'skills.create.description': 'Opis',
   'skills.create.descriptionPlaceholder': 'Co robi ta umiejętność?',
   'skills.create.optional': '(opcjonalnie)',
-  'skills.create.inputs.heading': 'Inputs',
+  'skills.create.inputs.heading': 'Wejścia',
   'skills.create.inputs.help':
     'Zadeklaruj parametry potrzebne umiejętności. Skills Runner wyrenderuje dla nich formularz w czasie działania.',
   'skills.create.inputs.add': 'Dodaj dane wejściowe',
@@ -3173,11 +3173,11 @@ const messages: TranslationMap = {
     'Tylko litery, cyfry, podkreślenia i myślniki; musi zaczynać się od litery.',
   'skills.create.inputs.row.description': 'Opis danych wejściowych',
   'skills.create.inputs.row.descriptionPlaceholder': 'Co należy wpisać w tym polu?',
-  'skills.create.inputs.row.type': 'Type',
-  'skills.create.inputs.row.required': 'Required',
+  'skills.create.inputs.row.type': 'Wpisz',
+  'skills.create.inputs.row.required': 'Wymagane',
   'skills.create.inputs.row.remove': 'Usuń dane wejściowe',
-  'skills.create.inputs.type.string': 'Text',
-  'skills.create.inputs.type.integer': 'Number',
+  'skills.create.inputs.type.string': 'Tekst',
+  'skills.create.inputs.type.integer': 'Numer',
   'skills.create.inputs.type.boolean': 'Tak / Nie',
   'skills.create.name': 'Nazwa',
   'skills.create.namePlaceholder': 'np. Dziennik transakcji',
@@ -3351,9 +3351,9 @@ const messages: TranslationMap = {
   'walletBalances.colAddress': 'Adres',
   'walletBalances.colBalance': 'Saldo',
   'walletBalances.colActions': 'Akcje',
-  'walletBalances.refresh': 'Refresh',
+  'walletBalances.refresh': 'Odśwież',
   'walletBalances.loading': 'Ładowanie sald…',
-  'walletBalances.retry': 'Retry',
+  'walletBalances.retry': 'Spróbuj ponownie',
   'walletBalances.emptyState':
     'Brak kont portfela: skonfiguruj portfel w sekcji Fraza odzyskiwania.',
   'walletBalances.copyAddress': 'Kopiuj adres',
@@ -3403,9 +3403,9 @@ const messages: TranslationMap = {
   'workflows.create.title': 'Nowy przepływ pracy',
   'workflows.create.subtitle': 'Zdefiniuj zestaw reguł powiązany z cyklem życia agenta.',
   'workflows.create.createBtn': 'Utwórz przepływ pracy',
-  'workflows.create.creating': 'Creating…',
+  'workflows.create.creating': 'Tworzenie…',
   'workflows.create.createError': 'Nie udało się utworzyć przepływu pracy',
-  'workflows.phase.toolScope.allow': 'Allow',
+  'workflows.phase.toolScope.allow': 'Zezwól',
   'activity.tabs.automations': 'Automatyzacje',
   'activity.tabs.automationsDescription':
     'Wielokrotnego użytku, uruchamialne procedury: cel i kroki do jego osiągnięcia.',
@@ -3611,7 +3611,7 @@ const messages: TranslationMap = {
     'Po zalogowaniu wklej adres przekierowania z przeglądarki.',
   'settings.ai.openaiOauthDisconnectError': 'Nie udało się odłączyć ChatGPT. Spróbuj ponownie.',
   'flows.canvas.sidePanelToggle': 'Panel boczny',
-  'flows.canvas.legendTab': 'Ręczny',
+  'flows.canvas.legendTab': 'Manual',
 
   // Privacy status pill + per-action egress disclosure (#4437 / S3)
   // Data Sync layered pipeline status (GH-4690)
@@ -4507,11 +4507,9 @@ const messages: TranslationMap = {
     'OpenHuman nie potrafi jeszcze zrobić tego automatycznie.',
   'conversations.toolFailure.unsupported.next': 'Zrób to ręcznie lub poproś o inną opcję.',
   'settings.layout.corners.none': 'Brak',
-  'settings.layout.corners.subtle': 'Delikatne',
+
   'settings.layout.corners.default': 'Domyślne',
-  'settings.layout.corners.round': 'Okrągłe',
-  'settings.layout.contrast.subtle': 'Delikatny',
-  'settings.layout.contrast.default': 'Domyślny',
+
   'settings.layout.contrast.strong': 'Mocny',
   'desktop.action.click': 'Kliknij',
   'desktop.action.type_text': 'Wpisz tekst w',
@@ -4562,7 +4560,7 @@ const messages: TranslationMap = {
   'channels.telegram.fields.allowed_users.label': 'Dozwoleni użytkownicy',
   'channels.telegram.fields.allowed_users.placeholder':
     'Oddzielone przecinkami nazwy użytkowników Telegrama',
-  'conversations.runMode.plan': 'Plan',
+
   'conversations.taskCard.state.working': 'W toku',
   'conversations.taskCard.state.waiting': 'Oczekuje',
   'conversations.taskCard.state.done': 'Gotowe',
@@ -4577,18 +4575,14 @@ const messages: TranslationMap = {
   'flows.allRuns.status.cancelled': 'Anulowano',
   'flows.allRuns.status.interrupted': 'Przerwano',
   'flows.nodeKind.agent': 'Agent',
-  'flows.nodeKind.tool_call': 'Wywołanie narzędzia',
-  'flows.nodeKind.http_request': 'Żądanie HTTP',
-  'flows.nodeKind.code': 'Kod',
+
   'flows.nodeKind.condition': 'Warunek',
   'flows.nodeKind.switch': 'Przełącznik',
   'flows.nodeKind.merge': 'Scal',
-  'flows.nodeKind.split_out': 'Podziel wyjście',
-  'flows.nodeKind.transform': 'Transformacja',
-  'flows.nodeKind.output_parser': 'Parser wyjścia',
+
   'flows.nodeKind.sub_workflow': 'Podprzepływ pracy',
   'flows.nodeKind.memory': 'Pamięć',
-  'flows.nodeKind.dedup': 'Deduplikacja',
+
   'flows.nodeKind.loop': 'Pętla',
   'flows.editor.confirm.runTitle': 'Uruchomić przepływ pracy?',
   'flows.editor.confirm.runBody': 'Spowoduje to natychmiastowe uruchomienie przepływu pracy.',
@@ -4633,20 +4627,14 @@ const messages: TranslationMap = {
   'keyring.settings.mode.localPlaintextFile': 'Niezaszyfrowany plik',
   'keyring.settings.mode.consentPending': 'Nie skonfigurowano',
   'keyring.settings.mode.declined': 'Odrzucono',
-  'composer.reasoning.default': 'Rozumowanie: automatyczne',
-  'composer.reasoning.none': 'Rozumowanie: wyłączone',
-  'composer.reasoning.low': 'Rozumowanie: niskie',
-  'composer.reasoning.medium': 'Rozumowanie: średnie',
-  'composer.reasoning.high': 'Rozumowanie: wysokie',
-  'composer.reasoning.xhigh': 'Rozumowanie: maksymalne',
-  'composer.reasoning.minimal': 'Myślenie: minimalne',
+
   'orchestration.runStatus.pending': 'Oczekujące',
   'userErrors.scope.chat': 'Czat',
   'userErrors.scope.cron': 'Zaplanowane zadanie',
   'userErrors.scope.workspace': 'Obszar roboczy',
   'userErrors.scope.memory': 'Pamięć',
   'flows.palette.group.triggers': 'Wyzwalacze',
-  'flows.palette.group.actions': 'Akcje',
+
   'flows.palette.group.logic': 'Logika',
   'settings.gateway.where.here': 'Na tym komputerze',
   'settings.gateway.where.ssh': 'Na innej maszynie, przez SSH',
@@ -5122,6 +5110,48 @@ const messages: TranslationMap = {
     'Konfiguracja zarządzana wymaga logowania do OpenHuman i jest niedostępna w trybie lokalnym.',
   'onboarding.custom.localDefaultDisabledReason':
     'Konfiguracja zarządzana wymaga konta OpenHuman. W sesji lokalnej każdą usługę konfigurujesz samodzielnie.',
+
+  // UI keys referenced by the app but missing from the locale maps.
+  'channels.discord.oauthStartFailed':
+    'Nie udało się rozpocząć logowania do Discorda. Spróbuj ponownie.',
+  'mcp.json.loading': 'Ładowanie…',
+  'settings.embeddings.testUnavailableCustom':
+    'Testowanie niestandardowego punktu końcowego nie jest jeszcze obsługiwane ; zapisz go i sprawdź stan w panelu Osadzania.',
+  'walletSend.to': 'Do',
+  'walletSend.availableBalance': 'Dostępne: {{amount}} {{symbol}}',
+  'settings.skillsRunner.error.listWorkflows': 'Nie udało się załadować przepływów pracy:',
+  'conversations.runMode.plan': 'Planuj',
+  'channels.oauth.connectRecoverFailed':
+    'Nie można dokończyć łączenia {channel}. Okno logowania zamknęło się przed przyznaniem dostępu ; spróbuj ponownie.',
+  'channels.savedRestartRequired': 'Kanał zapisany. Zrestartuj aplikację, aby go aktywować.',
+  'channels.connect': 'Połącz',
+  connectProvider: 'Połącz dostawcę',
+  'walletSend.title': 'Wyślij',
+  'composer.reasoning.default': 'Domyślne',
+  'composer.reasoning.none': 'Wyłączone',
+  'composer.reasoning.minimal': 'Minimalny',
+  'composer.reasoning.low': 'Niski',
+  'composer.reasoning.medium': 'Średni',
+  'composer.reasoning.high': 'Wysoki',
+  'composer.reasoning.xhigh': 'Bardzo wysoki',
+
+  'flows.nodeKind.tool_call': 'Akcja',
+  'flows.nodeKind.http_request': 'Żądanie sieciowe',
+  'flows.nodeKind.code': 'Uruchom kod',
+
+  'flows.nodeKind.split_out': 'Podziel',
+  'flows.nodeKind.transform': 'Przekształć',
+  'flows.nodeKind.output_parser': 'Przetwórz wynik',
+
+  'flows.nodeKind.dedup': 'Pomiń duplikaty',
+
+  'flows.palette.group.actions': 'Działania',
+
+  'settings.layout.corners.subtle': 'Subtelny',
+
+  'settings.layout.corners.round': 'Zaokrąglone',
+  'settings.layout.contrast.subtle': 'Subtelny',
+  'settings.layout.contrast.default': 'Domyślne',
 };
 
 export default messages;

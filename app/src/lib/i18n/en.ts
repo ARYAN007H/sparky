@@ -4683,7 +4683,7 @@ const en: TranslationMap = {
   'settings.layout.corners.none': 'None',
   'settings.layout.corners.subtle': 'Subtle',
   'settings.layout.corners.default': 'Default',
-  'settings.layout.corners.round': 'Round',
+
   'settings.layout.contrast.subtle': 'Subtle',
   'settings.layout.contrast.default': 'Default',
   'settings.layout.contrast.strong': 'Strong',
@@ -4806,18 +4806,48 @@ const en: TranslationMap = {
   'flows.allRuns.status.cancelled': 'Cancelled',
   'flows.allRuns.status.interrupted': 'Interrupted',
   'flows.nodeKind.agent': 'Agent',
-  'flows.nodeKind.tool_call': 'Tool call',
-  'flows.nodeKind.http_request': 'HTTP request',
-  'flows.nodeKind.code': 'Code',
+
   'flows.nodeKind.condition': 'Condition',
   'flows.nodeKind.switch': 'Switch',
   'flows.nodeKind.merge': 'Merge',
-  'flows.nodeKind.split_out': 'Split out',
+
   'flows.nodeKind.transform': 'Transform',
-  'flows.nodeKind.output_parser': 'Output parser',
+
   'flows.nodeKind.sub_workflow': 'Sub-workflow',
   'flows.nodeKind.memory': 'Memory',
-  'flows.nodeKind.dedup': 'Dedup',
+
+  // UI keys referenced by the app but missing from the locale maps.
+  'channels.savedRestartRequired': 'Channel saved. Restart the app to activate it.',
+  'channels.connect': 'Connect',
+  'channels.discord.oauthStartFailed': "Couldn't start Discord sign-in. Try again.",
+  'mcp.json.loading': 'Loading…',
+  'settings.embeddings.testUnavailableCustom':
+    'Testing a custom endpoint is not supported yet ; save it and check the status on the Embeddings panel.',
+  connectProvider: 'Connect',
+  'walletSend.title': 'Send',
+  'walletSend.to': 'To',
+  'walletSend.availableBalance': 'Available: {{amount}} {{symbol}}',
+  'settings.skillsRunner.error.listWorkflows': 'Failed to load workflows:',
+
+  'channels.oauth.connectRecoverFailed':
+    "Couldn't finish connecting {channel}. The sign-in window closed before access was granted ; try again.",
+  'composer.reasoning.default': 'Default',
+  'composer.reasoning.none': 'Off',
+  'composer.reasoning.minimal': 'Minimal',
+  'composer.reasoning.low': 'Low',
+  'composer.reasoning.medium': 'Medium',
+  'composer.reasoning.high': 'High',
+  'composer.reasoning.xhigh': 'Extra high',
+
+  'flows.nodeKind.tool_call': 'Action',
+  'flows.nodeKind.http_request': 'Web request',
+  'flows.nodeKind.code': 'Run code',
+
+  'flows.nodeKind.split_out': 'Split',
+
+  'flows.nodeKind.output_parser': 'Parse output',
+
+  'flows.nodeKind.dedup': 'Skip duplicates',
   'flows.nodeKind.loop': 'Loop',
   'flows.palette.group.triggers': 'Triggers',
   'flows.palette.group.actions': 'Actions',
@@ -4876,13 +4906,7 @@ const en: TranslationMap = {
   'keyring.settings.mode.localPlaintextFile': 'Unencrypted file',
   'keyring.settings.mode.consentPending': 'Not configured',
   'keyring.settings.mode.declined': 'Declined',
-  'composer.reasoning.default': 'Thinking: auto',
-  'composer.reasoning.none': 'Thinking: off',
-  'composer.reasoning.low': 'Thinking: low',
-  'composer.reasoning.medium': 'Thinking: medium',
-  'composer.reasoning.high': 'Thinking: high',
-  'composer.reasoning.xhigh': 'Thinking: max',
-  'composer.reasoning.minimal': 'Thinking: minimal',
+
   'userErrors.scope.chat': 'Chat',
   'userErrors.scope.cron': 'Scheduled job',
   'userErrors.scope.workspace': 'Workspace',
@@ -5332,6 +5356,8 @@ const en: TranslationMap = {
     'A reasoning-tier agent plans the brief, a chat-tier agent drafts it, then the result is shaped for you.',
   'settings.appearance.chatHeading': 'Chat',
   'settings.appearance.showChatMascot': 'Show Tiny on the message box',
+
+  'settings.layout.corners.round': 'Rounded',
 };
 
 export default en;

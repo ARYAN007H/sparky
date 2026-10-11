@@ -414,7 +414,7 @@ const messages: TranslationMap = {
   'skills.explorer.scopeLegacy': 'レガシー',
   'skills.explorer.noDescription': '説明がありません。',
   'skills.explorer.uninstallSuccess': 'スキルを正常にアンインストールしました。',
-  'skills.explorer.runnerTab': 'ランナー',
+  'skills.explorer.runnerTab': 'Runner',
   'skills.explorer.registryTab': 'レジストリ',
   'skills.explorer.installedTab': 'インストール済み',
   'skills.explorer.refreshRegistry': 'レジストリを更新',
@@ -2489,7 +2489,7 @@ const messages: TranslationMap = {
   'flows.canvas.sidePanelToggle': 'サイドパネル',
   // The palette tab is labelled "Manual" (build by hand) as the counterpart to
   // the AI "Copilot" tab; the key name stays `legendTab` for the node palette.
-  'flows.canvas.legendTab': 'マニュアル',
+  'flows.canvas.legendTab': 'Manual',
   'flows.canvas.runTab': '実行',
   'flows.canvas.toolbar': 'キャンバスコントロール',
   'flows.canvas.zoomIn': '拡大',
@@ -3022,7 +3022,7 @@ const messages: TranslationMap = {
   'settings.ai.slugInUseError': 'そのプロバイダー名はすでに使用されています。',
   'settings.ai.slugReservedError': '別のプロバイダー名を選択してください。',
   'settings.ai.providerNamePlaceholder': 'マイプロバイダー',
-  'settings.ai.slugLabel': 'スラッグ:',
+  'settings.ai.slugLabel': 'Slug:',
   'settings.ai.openAiUrlLabel': 'OpenAI URL',
   'settings.ai.caCertificateLabel': 'CA 証明書（任意）',
   'settings.ai.caCertificateTooLarge': 'CA 証明書は 256 KB 以下にしてください',
@@ -4755,10 +4755,10 @@ const messages: TranslationMap = {
   'settings.layout.corners.none': 'なし',
   'settings.layout.corners.subtle': '控えめ',
   'settings.layout.corners.default': 'デフォルト',
-  'settings.layout.corners.round': '丸みあり',
+
   'settings.layout.contrast.subtle': '控えめ',
   'settings.layout.contrast.default': 'デフォルト',
-  'settings.layout.contrast.strong': '強い',
+
   'desktop.action.click': 'クリック',
   'desktop.action.type_text': 'テキストを入力',
   'desktop.action.check': 'チェック',
@@ -4824,7 +4824,7 @@ const messages: TranslationMap = {
   'channels.telegram.fields.bot_token.placeholder': '123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11',
   'channels.telegram.fields.allowed_users.label': '許可されたユーザー',
   'channels.telegram.fields.allowed_users.placeholder': 'カンマ区切りのTelegramユーザー名',
-  'conversations.runMode.plan': 'プラン',
+
   'conversations.toolFailure.missingPermission.cause':
     'OpenHuman にこの操作を行う権限がありません。',
   'conversations.toolFailure.missingPermission.next':
@@ -4884,18 +4884,47 @@ const messages: TranslationMap = {
   'flows.allRuns.status.cancelled': 'キャンセル済み',
   'flows.allRuns.status.interrupted': '中断',
   'flows.nodeKind.agent': 'エージェント',
-  'flows.nodeKind.tool_call': 'ツール呼び出し',
-  'flows.nodeKind.http_request': 'HTTP リクエスト',
-  'flows.nodeKind.code': 'コード',
+
+  // UI keys referenced by the app but missing from the locale maps.
+  'channels.discord.oauthStartFailed':
+    'Discord のサインインを開始できませんでした。もう一度やり直してください。',
+  'mcp.json.loading': '読み込み中…',
+  'settings.embeddings.testUnavailableCustom':
+    'カスタム エンドポイントのテストはまだサポートされていません。保存して、[埋め込み] パネルでステータスを確認してください。',
+  'walletSend.to': 'に',
+  'walletSend.availableBalance': '利用可能: {{amount}} {{symbol}}',
+  'settings.skillsRunner.error.listWorkflows': 'ワークフローの読み込みに失敗しました:',
+  'conversations.runMode.plan': '計画',
+  'channels.oauth.connectRecoverFailed':
+    '{channel} の接続を完了できませんでした。アクセスが許可される前にサインイン ウィンドウが閉じました。もう一度お試しください。',
+  'channels.savedRestartRequired':
+    'チャンネルを保存しました。有効にするにはアプリを再起動してください。',
+  'channels.connect': '接続',
+  connectProvider: '接続',
+  'walletSend.title': '送金',
+  'composer.reasoning.default': 'デフォルト',
+  'composer.reasoning.none': 'オフ',
+  'composer.reasoning.minimal': '最小',
+  'composer.reasoning.low': '低',
+  'composer.reasoning.medium': '中',
+  'composer.reasoning.high': '高',
+  'composer.reasoning.xhigh': '非常に高い',
+
+  'flows.nodeKind.tool_call': 'アクション',
+  'flows.nodeKind.http_request': 'Web リクエスト',
+  'flows.nodeKind.code': 'コード実行',
   'flows.nodeKind.condition': '条件',
   'flows.nodeKind.switch': 'スイッチ',
   'flows.nodeKind.merge': 'マージ',
   'flows.nodeKind.split_out': '分割',
   'flows.nodeKind.transform': '変換',
-  'flows.nodeKind.output_parser': '出力パーサー',
+
   'flows.nodeKind.sub_workflow': 'サブワークフロー',
-  'flows.nodeKind.memory': 'メモリー',
-  'flows.nodeKind.dedup': '重複排除',
+
+  'flows.nodeKind.output_parser': '出力解析',
+
+  'flows.nodeKind.memory': 'メモリ',
+  'flows.nodeKind.dedup': '重複をスキップ',
   'flows.nodeKind.loop': 'ループ',
   'flows.palette.group.triggers': 'トリガー',
   'flows.palette.group.actions': 'アクション',
@@ -4955,13 +4984,7 @@ const messages: TranslationMap = {
   'keyring.settings.mode.localPlaintextFile': '非暗号化ファイル',
   'keyring.settings.mode.consentPending': '未設定',
   'keyring.settings.mode.declined': '拒否済み',
-  'composer.reasoning.default': '思考: 自動',
-  'composer.reasoning.none': '思考: オフ',
-  'composer.reasoning.low': '思考: 低',
-  'composer.reasoning.medium': '思考: 中',
-  'composer.reasoning.high': '思考: 高',
-  'composer.reasoning.xhigh': '思考: 最大',
-  'composer.reasoning.minimal': '思考: 最小',
+
   'userErrors.scope.chat': 'チャット',
   'userErrors.scope.cron': 'スケジュールジョブ',
   'userErrors.scope.workspace': 'ワークスペース',
@@ -5411,6 +5434,10 @@ const messages: TranslationMap = {
   'settings.appearance.showChatMascot': 'メッセージボックスにTinyを表示',
   'onboarding.custom.localDefaultDisabledReason':
     'マネージド設定にはOpenHumanアカウントが必要です。ローカルセッションでは、各サービスを自分で設定します。',
+
+  'settings.layout.corners.round': '丸み',
+
+  'settings.layout.contrast.strong': '強',
 };
 
 export default messages;

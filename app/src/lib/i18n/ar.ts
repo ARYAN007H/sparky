@@ -710,7 +710,7 @@ const messages: TranslationMap = {
   'settings.costDashboard.model': 'النموذج',
   'settings.costDashboard.provider': 'المزوّد',
   'settings.costDashboard.cost': 'التكلفة',
-  'settings.costDashboard.tokens': 'الرموز',
+  'settings.costDashboard.tokens': 'رموز',
   'settings.costDashboard.requests': 'الطلبات',
   'settings.costDashboard.percentOfTotal': 'النسبة المئوية من المجموع',
   'settings.costDashboard.inputTokens': 'المدخلات',
@@ -2501,7 +2501,7 @@ const messages: TranslationMap = {
   'settings.ai.slugInUseError': 'اسم الموفر هذا قيد الاستخدام بالفعل.',
   'settings.ai.slugReservedError': 'اختر اسم موفر مختلف.',
   'settings.ai.providerNamePlaceholder': 'موفر الخدمة الخاص بي',
-  'settings.ai.slugLabel': 'الارتباط الثابت:',
+  'settings.ai.slugLabel': 'Slug:',
   'settings.ai.openAiUrlLabel': 'عنوان URL لـ OpenAI',
   'settings.ai.caCertificateLabel': 'شهادة المرجع المصدق (اختياري)',
   'settings.ai.caCertificateTooLarge': 'يجب ألا يتجاوز حجم الشهادة 256 كيلوبايت',
@@ -2741,7 +2741,7 @@ const messages: TranslationMap = {
   'settings.developerMenu.eventLog.filterAgent': '(فيلتر)',
   'settings.developerMenu.eventLog.download': 'تحميل',
   'settings.developerMenu.eventLog.events': 'أحداث',
-  'settings.developerMenu.eventLog.live': 'الحياة',
+  'settings.developerMenu.eventLog.live': 'مباشر',
   'settings.developerMenu.eventLog.disconnected': 'مفصولة',
   'settings.developerMenu.eventLog.waiting': 'ننتظر الأحداث...',
   'settings.developerMenu.eventLog.waitingHint':
@@ -3485,7 +3485,7 @@ const messages: TranslationMap = {
   'settings.ai.openaiOauthCallbackRequired': 'الصق عنوان إعادة التوجيه من متصفحك بعد تسجيل الدخول.',
   'settings.ai.openaiOauthDisconnectError': 'تعذّر قطع الاتصال بـ ChatGPT. يُرجى المحاولة مجددًا.',
   'flows.canvas.sidePanelToggle': 'اللوحة الجانبية',
-  'flows.canvas.legendTab': 'يدوي',
+  'flows.canvas.legendTab': 'Manual',
 
   // Privacy status pill + per-action egress disclosure (#4437 / S3)
   // Data Sync layered pipeline status (GH-4690)
@@ -3641,7 +3641,7 @@ const messages: TranslationMap = {
   'migration.vendor.hermesDesc': 'المذكرات والملاحظات الواردة من Hermes',
   'migration.sourceHeadingDesc': 'اختر المساعد للاستيراد من',
   'migration.confirmTitle': 'استيراد إلى مكان العمل هذا؟',
-  'skills.explorer.runnerTab': 'المشغّل',
+  'skills.explorer.runnerTab': 'Runner',
   'desktop.enableLabel': 'دع العميل يتحكم في تطبيقات',
   'desktop.statusSetupNeeded': 'الإنشاءات اللازمة',
   'desktop.permissionState.granted': 'منح',
@@ -4347,9 +4347,9 @@ const messages: TranslationMap = {
   'conversations.toolFailure.unsupported.cause': 'لا يستطيع OpenHuman القيام بذلك تلقائيًا بعد.',
   'conversations.toolFailure.unsupported.next': 'قم بذلك يدويًا، أو اطلب خيارًا آخر.',
   'settings.layout.corners.none': 'بلا',
-  'settings.layout.corners.subtle': 'خفيفة',
+
   'settings.layout.corners.default': 'افتراضي',
-  'settings.layout.corners.round': 'مستديرة',
+
   'settings.layout.contrast.subtle': 'خفيف',
   'settings.layout.contrast.default': 'افتراضي',
   'settings.layout.contrast.strong': 'قوي',
@@ -4416,19 +4416,9 @@ const messages: TranslationMap = {
   'flows.allRuns.status.failed': 'فشل',
   'flows.allRuns.status.cancelled': 'أُلغي',
   'flows.allRuns.status.interrupted': 'تمت المقاطعة',
-  'flows.nodeKind.agent': 'الوكيل',
-  'flows.nodeKind.tool_call': 'استدعاء أداة',
-  'flows.nodeKind.http_request': 'طلب HTTP',
-  'flows.nodeKind.code': 'الكود',
-  'flows.nodeKind.condition': 'الشرط',
-  'flows.nodeKind.switch': 'المحول',
-  'flows.nodeKind.merge': 'الدمج',
-  'flows.nodeKind.split_out': 'تقسيم المخرجات',
-  'flows.nodeKind.transform': 'التحويل',
-  'flows.nodeKind.output_parser': 'محلل المخرجات',
-  'flows.nodeKind.sub_workflow': 'سير عمل فرعي',
+
   'flows.nodeKind.memory': 'الذاكرة',
-  'flows.nodeKind.dedup': 'إزالة التكرار',
+
   'flows.nodeKind.loop': 'حلقة',
   'flows.editor.confirm.runTitle': 'تشغيل سير العمل؟',
   'flows.editor.confirm.runBody': 'سيؤدي هذا إلى تنفيذ سير العمل الآن.',
@@ -4473,19 +4463,13 @@ const messages: TranslationMap = {
   'keyring.settings.mode.localPlaintextFile': 'ملف غير مشفَّر',
   'keyring.settings.mode.consentPending': 'غير مُهيَّأ',
   'keyring.settings.mode.declined': 'مرفوض',
-  'composer.reasoning.default': 'التفكير: تلقائي',
-  'composer.reasoning.none': 'التفكير: متوقف',
-  'composer.reasoning.low': 'التفكير: منخفض',
-  'composer.reasoning.medium': 'التفكير: متوسط',
-  'composer.reasoning.high': 'التفكير: مرتفع',
-  'composer.reasoning.xhigh': 'التفكير: أقصى',
-  'composer.reasoning.minimal': 'التفكير: أدنى',
+
   'orchestration.runStatus.pending': 'قيد الانتظار',
   'userErrors.scope.chat': 'الدردشة',
   'userErrors.scope.cron': 'مهمة مجدوَلة',
   'userErrors.scope.workspace': 'مساحة العمل',
   'userErrors.scope.memory': 'الذاكرة',
-  'flows.palette.group.triggers': 'المشغّلات',
+
   'flows.palette.group.actions': 'الإجراءات',
   'flows.palette.group.logic': 'المنطق',
   'settings.gateway.where.here': 'على هذا الحاسوب',
@@ -4957,6 +4941,48 @@ const messages: TranslationMap = {
     'يتطلب الإعداد المُدار تسجيل الدخول إلى OpenHuman وغير متاح في الوضع المحلي.',
   'onboarding.custom.localDefaultDisabledReason':
     'يتطلب الإعداد المُدار حساب OpenHuman. في الجلسة المحلية تقوم بإعداد كل خدمة بنفسك.',
+
+  // UI keys referenced by the app but missing from the locale maps.
+  'channels.discord.oauthStartFailed': 'تعذر بدء تسجيل الدخول إلى Discord. حاول ثانية.',
+  'mcp.json.loading': 'جارٍ التحميل…',
+  'settings.embeddings.testUnavailableCustom':
+    'اختبار نقطة نهاية مخصصة غير مدعوم حتى الآن ; احفظه وتحقق من الحالة في لوحة Embeddings.',
+  'walletSend.to': 'ل',
+  'walletSend.availableBalance': 'متاح: {{amount}} {{symbol}}',
+  'settings.skillsRunner.error.listWorkflows': 'فشل تحميل مهام سير العمل:',
+
+  'channels.oauth.connectRecoverFailed':
+    'تعذر إنهاء الاتصال {channel}. تم إغلاق نافذة تسجيل الدخول قبل منح الوصول - حاول مرة أخرى.',
+  'channels.savedRestartRequired': 'تم حفظ القناة. أعد تشغيل التطبيق لتفعيلها.',
+  'channels.connect': 'اتصال',
+  connectProvider: 'ربط مزود',
+  'walletSend.title': 'إرسال',
+  'composer.reasoning.default': 'افتراضي',
+  'composer.reasoning.none': 'إيقاف',
+  'composer.reasoning.minimal': 'ضئيل',
+  'composer.reasoning.low': 'منخفض',
+  'composer.reasoning.medium': 'متوسط',
+  'composer.reasoning.high': 'مرتفع',
+  'composer.reasoning.xhigh': 'مرتفع جدًا',
+  'flows.nodeKind.agent': 'وكيل',
+  'flows.nodeKind.tool_call': 'إجراء',
+  'flows.nodeKind.http_request': 'طلب ويب',
+  'flows.nodeKind.code': 'تشغيل الكود',
+  'flows.nodeKind.condition': 'شرط',
+  'flows.nodeKind.switch': 'تبديل',
+  'flows.nodeKind.merge': 'دمج',
+  'flows.nodeKind.split_out': 'تقسيم',
+  'flows.nodeKind.transform': 'تحويل',
+  'flows.nodeKind.output_parser': 'تحليل الإخراج',
+  'flows.nodeKind.sub_workflow': 'مسار عمل فرعي',
+
+  'flows.nodeKind.dedup': 'تخطي التكرارات',
+
+  'flows.palette.group.triggers': 'المشغلات',
+
+  'settings.layout.corners.subtle': 'خفيف',
+
+  'settings.layout.corners.round': 'مستدير',
 };
 
 export default messages;
