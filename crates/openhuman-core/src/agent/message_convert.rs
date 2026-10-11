@@ -27,8 +27,7 @@ use tinyagents_runtime::transcript::reasoning_from_content;
 #[cfg(test)]
 use tinyagents_runtime::transcript::{
     message_to_flat_transcript as message_to_chat_message,
-    message_to_native_transcript as message_to_native_chat_message,
-    REASONING_EXT_KEY,
+    message_to_native_transcript as message_to_native_chat_message, REASONING_EXT_KEY,
 };
 use tinyagents_session::transcript::TranscriptMessage;
 
@@ -182,7 +181,9 @@ pub(crate) fn user_message_from_text(text: &str) -> Message {
 /// is exactly [`Message::text`].
 pub(crate) fn user_text_with_markers(msg: &Message) -> String {
     match msg {
-        Message::User(user) => user_row(msg, user).display_content(),
+        Message::User(_) => tinyagents_runtime::transcript::message_to_native_transcript(msg)
+            .expect("user messages have a native transcript projection")
+            .display_content(),
         other => other.text(),
     }
 }
