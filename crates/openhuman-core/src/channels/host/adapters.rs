@@ -344,49 +344,45 @@ fn json_str(payload: &serde_json::Value, key: &str) -> String {
         .to_string()
 }
 
-async fn publish_event(
-    domain: &str,
-    kind: &str,
-    payload: serde_json::Value,
-) -> anyhow::Result<()> {
-        match domain {
-            "web" => {
-                let event: crate::web_chat::WebChannelEvent = serde_json::from_value(payload)
-                    .map_err(|e| {
-                        anyhow::anyhow!(
-                            "{LOG_PREFIX} web event payload not a WebChannelEvent ({kind}): {e}"
-                        )
-                    })?;
-                crate::web_chat::publish_web_channel_event(event);
-            }
-            "channel" => {
-                use crate::core::bus::BUS;
-                use crate::core::events::DomainEvent;
-                let event = match kind {
-                    "reaction_received" => DomainEvent::ChannelReactionReceived {
-                        channel: json_str(&payload, "channel"),
-                        sender: json_str(&payload, "sender"),
-                        target_message_id: json_str(&payload, "target_message_id"),
-                        emoji: json_str(&payload, "emoji"),
-                    },
-                    "reaction_sent" => DomainEvent::ChannelReactionSent {
-                        channel: json_str(&payload, "channel"),
-                        target_message_id: json_str(&payload, "target_message_id"),
-                        emoji: json_str(&payload, "emoji"),
-                        success: payload
-                            .get("success")
-                            .and_then(|v| v.as_bool())
-                            .unwrap_or(false),
-                    },
-                    other => {
-                        tracing::warn!("{LOG_PREFIX} unmapped channel event kind: {other}");
-                        return Ok(());
-                    }
-                };
-                BUS.publish(event);
-            }
-            other => tracing::warn!("{LOG_PREFIX} unmapped event domain: {other}"),
+async fn publish_event(domain: &str, kind: &str, payload: serde_json::Value) -> anyhow::Result<()> {
+    match domain {
+        "web" => {
+            let event: crate::web_chat::WebChannelEvent =
+                serde_json::from_value(payload).map_err(|e| {
+                    anyhow::anyhow!(
+                        "{LOG_PREFIX} web event payload not a WebChannelEvent ({kind}): {e}"
+                    )
+                })?;
+            crate::web_chat::publish_web_channel_event(event);
         }
+        "channel" => {
+            use crate::core::bus::BUS;
+            use crate::core::events::DomainEvent;
+            let event = match kind {
+                "reaction_received" => DomainEvent::ChannelReactionReceived {
+                    channel: json_str(&payload, "channel"),
+                    sender: json_str(&payload, "sender"),
+                    target_message_id: json_str(&payload, "target_message_id"),
+                    emoji: json_str(&payload, "emoji"),
+                },
+                "reaction_sent" => DomainEvent::ChannelReactionSent {
+                    channel: json_str(&payload, "channel"),
+                    target_message_id: json_str(&payload, "target_message_id"),
+                    emoji: json_str(&payload, "emoji"),
+                    success: payload
+                        .get("success")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false),
+                },
+                other => {
+                    tracing::warn!("{LOG_PREFIX} unmapped channel event kind: {other}");
+                    return Ok(());
+                }
+            };
+            BUS.publish(event);
+        }
+        other => tracing::warn!("{LOG_PREFIX} unmapped event domain: {other}"),
+    }
     Ok(())
 }
 
