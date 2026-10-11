@@ -1,11 +1,7 @@
 //! `gitbooks` — answer questions about OpenHuman through the TinyMCP module's
 //! confidential one-shot tool-call contract.
 
-use crate::{
-    config::Config,
-    mcp::http_client::redact_endpoint,
-    modules::client::ModuleClient,
-};
+use crate::{config::Config, mcp::http_client::redact_endpoint, modules::client::ModuleClient};
 use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::time::Duration;
@@ -95,7 +91,11 @@ impl Tool for GitbooksSearchTool {
         );
 
         Ok(self
-            .call("searchDocumentation", json!({ "query": query }), "gitbooks_search")
+            .call(
+                "searchDocumentation",
+                json!({ "query": query }),
+                "gitbooks_search",
+            )
             .await)
     }
 }
@@ -190,15 +190,29 @@ impl Tool for GitbooksGetPageTool {
 
 impl GitbooksSearchTool {
     async fn call(&self, tool: &str, arguments: Value, label: &str) -> ToolResult {
-        configured_call(&self.client, &self.endpoint, self.timeout_secs, tool, arguments, label)
-            .await
+        configured_call(
+            &self.client,
+            &self.endpoint,
+            self.timeout_secs,
+            tool,
+            arguments,
+            label,
+        )
+        .await
     }
 }
 
 impl GitbooksGetPageTool {
     async fn call(&self, tool: &str, arguments: Value, label: &str) -> ToolResult {
-        configured_call(&self.client, &self.endpoint, self.timeout_secs, tool, arguments, label)
-            .await
+        configured_call(
+            &self.client,
+            &self.endpoint,
+            self.timeout_secs,
+            tool,
+            arguments,
+            label,
+        )
+        .await
     }
 }
 

@@ -49,9 +49,7 @@ impl MockTinyMcp {
 }
 
 #[cfg(feature = "modules")]
-async fn mock_module_client(
-    state: MockProviderState,
-) -> (ModuleClient, tinybus::Connection) {
+async fn mock_module_client(state: MockProviderState) -> (ModuleClient, tinybus::Connection) {
     use tinybus::{broker::Broker, transport::memory::MemoryBus, Connection, ObjectPath};
 
     let bus = MemoryBus::new();
@@ -112,7 +110,10 @@ async fn mock_gitbooks_provider() -> (String, std::sync::Arc<std::sync::Mutex<Ve
                             {"name": "getPage", "inputSchema": {"type": "object"}}
                         ]}),
                         "tools/call" => {
-                            calls.lock().expect("provider request log").push(body["params"].clone());
+                            calls
+                                .lock()
+                                .expect("provider request log")
+                                .push(body["params"].clone());
                             let name = body["params"]["name"].as_str().unwrap_or_default();
                             let text = match name {
                                 "searchDocumentation" => "search fixture result",
@@ -159,7 +160,10 @@ async fn gitbooks_tools_use_confidential_one_shot_module_calls() {
     assert!(!page_result.is_error, "{}", page_result.output());
     assert!(page_result.output().contains("page fixture markdown"));
     assert_eq!(
-        provider_calls.lock().expect("provider request log").as_slice(),
+        provider_calls
+            .lock()
+            .expect("provider request log")
+            .as_slice(),
         [
             serde_json::json!({"name": "searchDocumentation", "arguments": {"query": "module migration"}}),
             serde_json::json!({"name": "getPage", "arguments": {"url": "https://docs.example.test/guide"}}),
