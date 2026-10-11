@@ -4966,7 +4966,6 @@ const messages: TranslationMap = {
   'conversations.tools.createDocument.done': 'Dokument erstellt',
   'conversations.tools.createPresentation.active': 'Präsentation wird erstellt',
   'conversations.tools.createPresentation.done': 'Präsentation erstellt',
-    'Podcast wird erstellt und per E-Mail gesendet',
   'conversations.tools.recallMemories.active': 'Erinnerungen werden abgerufen',
   'conversations.tools.recallMemories.done': 'Erinnerungen abgerufen',
   'conversations.tools.saveToMemory.active': 'Wird im Gedächtnis gespeichert',
