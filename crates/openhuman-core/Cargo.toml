@@ -863,8 +863,8 @@ crash-reporting = ["dep:sentry"]
 # `DomainSet::Channels` flag (#4796): this feature narrows the compile-time
 # surface, `DomainSet` gates it at runtime.
 #
-# Provider runtime remains an audited implementation exception until its bus
-# cutover. Channels-backed operations require the process-wide module loader;
+# Provider runtime executes inside the compiled TinyChannels module.
+# Channels-backed operations require the process-wide module loader;
 # serialized configuration/messages come from the always-on bus contract.
 channels = ["modules"]
 # Retained only to gate legacy provider test fixtures; production channel
