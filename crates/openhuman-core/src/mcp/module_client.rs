@@ -92,7 +92,7 @@ pub(crate) trait McpModulePort: Send + Sync {
         request: PrepareAgentToolsRequest,
     ) -> Result<Vec<McpToolPresentation>, ModuleCallError>;
 
-    async fn validate_server_arguments(
+    pub(crate) async fn validate_server_arguments(
         &self,
         request: ValidateServerArgumentsRequest,
     ) -> Result<ServerArgumentsValidation, ModuleCallError>;
