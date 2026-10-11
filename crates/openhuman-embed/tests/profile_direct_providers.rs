@@ -9,11 +9,13 @@ mod common;
 use common::{
     chat_completion, chat_requests, runtime_without_master_key, tool_names, PointedTransport,
 };
+use openhuman_embed::config::{
+    SearchConfig, SearchEngineCredentials, SearchPresentation, SearchProviderSettings, SearchRole,
+};
 use openhuman_embed::profiles::ProfileCredentialKind;
 use openhuman_embed::seams::ToolHookDecision;
 use openhuman_embed::{
-    DirectProfileProvider, PermissionLevel, ProfileRuntime, SaasConfig, SearchConfig,
-    SearchEngineCredentials, SearchPresentation, SearchProviderSettings, SearchRole, ToolScopeSpec,
+    DirectProfileProvider, PermissionLevel, ProfileRuntime, SaasConfig, ToolScopeSpec,
 };
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
