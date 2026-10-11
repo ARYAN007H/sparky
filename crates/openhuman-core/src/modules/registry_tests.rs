@@ -29,12 +29,13 @@ fn tinywallet_registry_matches_the_verified_v016_release_manifest() {
         "https://github.com/tinyhumansai/tinywallet/releases/tag/v0.16.0"
     );
 
-    let actual = wallet
+    let mut actual = wallet
         .assets
         .iter()
         .map(|asset| (asset.host_key, asset.archive, asset.sha256))
         .collect::<Vec<_>>();
-    let published = [
+    assert_eq!(wallet.assets.len(), 17);
+    let mut published = [
         (
             "archlinux-arm64",
             "tinywallet-module-0.16.0-archlinux-arm64.tar.gz",
@@ -121,6 +122,8 @@ fn tinywallet_registry_matches_the_verified_v016_release_manifest() {
             "44f5fc5764616645020c739edc6ba66744eaaa9455f6a39d1fe63257f3852372",
         ),
     ];
+    actual.sort_unstable();
+    published.sort_unstable();
     assert_eq!(actual, published);
 }
 
