@@ -29,6 +29,9 @@ pub(crate) async fn authorize_shell_command(
             Err(_) => {
                 #[cfg(test)]
                 {
+                    if !config.modules.enabled {
+                        return Err("Command analysis is unavailable.".to_owned());
+                    }
                     // Scheduler unit tests exercise process and retry behavior
                     // without loading a native artifact. Production has no
                     // parser fallback and fails closed below.
