@@ -382,7 +382,29 @@ async fn scenario() {
         };
         assert!(!text.contains(&format!("{other}-secret")), "{response}");
     }
+    let forced_config = alice_profile.config.clone();
+    let mut escaped_config = forced_config.clone();
+    escaped_config.memory.root = Some("user:bob".into());
+    assert!(
+        !handles[0]
+            .scope(async { openhuman_core::memory::engine::is_on(&escaped_config) })
+            .await
+    );
+    alice_profile.lease_fence().renewed(0);
+    assert!(
+        !handles[0]
+            .scope(async { openhuman_core::memory::engine::is_on(&forced_config) })
+            .await,
+        "an expired profile must not resolve the shared engine"
+    );
+    alice_profile.lease_fence().renewed(u64::MAX);
     alice_profile.lease_fence().fence();
+    assert!(
+        !handles[0]
+            .scope(async { openhuman_core::memory::engine::is_on(&forced_config) })
+            .await,
+        "a latched profile must not resolve the shared engine"
+    );
     assert!(handles[0]
         .scope(alice_hook.before_tool_decision(&hook_context))
         .await
