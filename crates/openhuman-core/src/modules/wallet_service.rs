@@ -9,7 +9,7 @@ use std::sync::OnceLock;
 use tinywallet_bus::names::methods;
 use tinywallet_bus::wire::{
     EvmNetwork, NativeWalletCloseRequest, NativeWalletConfigRequest, NativeWalletConfigResponse,
-    NativeWalletServiceHandle, RpcEndpointKey, SolanaCluster, WalletAccountsResponse,
+    NativeWalletServiceHandle, RpcEndpointKey, WalletAccountsResponse,
 };
 use zeroize::Zeroize;
 
