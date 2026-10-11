@@ -352,31 +352,16 @@ pub(super) fn native_wallet_config_request() -> NativeWalletConfigRequest {
             overridden_endpoints.push(RpcEndpointKey::Evm { network });
         }
     }
-    for (chain, key) in [
-        (crate::web3::wallet::WalletChain::Btc, RpcEndpointKey::Btc),
-        (
-            crate::web3::wallet::WalletChain::Solana,
-            RpcEndpointKey::Solana,
-        ),
-        (crate::web3::wallet::WalletChain::Tron, RpcEndpointKey::Tron),
-    ] {
-        let name = crate::web3::wallet::endpoints::env_var_for_chain(chain);
-        if nonempty_env(name) {
+    for key in [RpcEndpointKey::Btc, RpcEndpointKey::Solana, RpcEndpointKey::Tron] {
+        if crate::web3::wallet::endpoints::override_for_endpoint(key).is_some() {
             overridden_endpoints.push(key);
         }
     }
-    let solana_cluster = match crate::web3::wallet::solana_cluster() {
-        tinywallet_bus::wire::SolanaCluster::Mainnet => SolanaCluster::Mainnet,
-        tinywallet_bus::wire::SolanaCluster::Devnet => SolanaCluster::Devnet,
-    };
+    let solana_cluster = crate::web3::wallet::solana_cluster();
     NativeWalletConfigRequest {
         solana_cluster,
         overridden_endpoints,
     }
-}
-
-fn nonempty_env(name: &str) -> bool {
-    std::env::var(name).is_ok_and(|value| !value.trim().is_empty())
 }
 
 #[cfg(test)]

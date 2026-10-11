@@ -2,16 +2,47 @@
 
 use serde::{Deserialize, Serialize};
 
-// The wallet's vocabulary lives in `tinywallet-web3`, which the engine and the
-// tools share; the host keeps only the persisted shape and the setup params.
-pub use tinywallet_web3::crypto::wallet::{
-    WalletAccount, WalletChain, WalletSetupSource, WalletStatus,
-};
-/// Error message returned when the wallet has not been set up yet. Downstream
-/// boundaries match against it to classify the condition as an expected user
-/// state, so it stays out of Sentry; it is defined once in `tinywallet-web3`
-/// so the producer and any classifier cannot drift apart.
-pub use tinywallet_web3::quote::WALLET_NOT_CONFIGURED_MESSAGE;
+/// Wallet chain identifiers are shared contract vocabulary.
+pub use tinywallet_bus::wire::WalletChain;
+
+/// Error returned when no local wallet has been configured.
+pub const WALLET_NOT_CONFIGURED_MESSAGE: &str =
+    "wallet is not configured; run wallet setup first";
+
+/// How the host's local wallet state was created.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum WalletSetupSource {
+    Generated,
+    Imported,
+}
+
+/// A public account retained in OpenHuman's wallet setup state.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct WalletAccount {
+    pub chain: WalletChain,
+    pub address: String,
+    pub derivation_path: String,
+}
+
+/// Host-owned wallet setup status exposed by the existing RPC surface.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+#[allow(clippy::struct_excessive_bools)]
+pub struct WalletStatus {
+    pub configured: bool,
+    pub onboarding_completed: bool,
+    pub consent_granted: bool,
+    pub secret_stored: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<WalletSetupSource>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mnemonic_word_count: Option<u8>,
+    pub accounts: Vec<WalletAccount>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updated_at_ms: Option<u64>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

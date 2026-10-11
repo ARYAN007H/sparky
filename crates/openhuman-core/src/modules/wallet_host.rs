@@ -94,20 +94,8 @@ pub(crate) fn bind_endpoint_references(
 
     let mut resolved = HashMap::new();
     for endpoint in references {
-        let url = match endpoint.key {
-            RpcEndpointKey::Evm { network } => {
-                crate::web3::wallet::endpoints::rpc_url_for_evm_network(network)
-            }
-            RpcEndpointKey::Btc => crate::web3::wallet::endpoints::rpc_url_for_chain(
-                crate::web3::wallet::WalletChain::Btc,
-            ),
-            RpcEndpointKey::Solana => crate::web3::wallet::endpoints::rpc_url_for_chain(
-                crate::web3::wallet::WalletChain::Solana,
-            ),
-            RpcEndpointKey::Tron => crate::web3::wallet::endpoints::rpc_url_for_chain(
-                crate::web3::wallet::WalletChain::Tron,
-            ),
-        };
+        let url = crate::web3::wallet::endpoints::override_for_endpoint(endpoint.key)
+            .ok_or_else(|| "wallet module referenced an endpoint without a host override".to_string())?;
         if endpoint.reference.trim().is_empty()
             || resolved
                 .insert(
