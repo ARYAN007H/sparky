@@ -609,7 +609,7 @@ async fn nudges_for_a_hoisting_model_add_no_system_message() {
     let mut request = nudge_request(&leading);
 
     injector
-        .before_model(&mut run_ctx, &(), &mut request)
+        .before_model_dispatch(&mut run_ctx, &(), &mut request)
         .await
         .unwrap();
 
@@ -632,7 +632,7 @@ async fn nudges_for_other_models_stay_tail_system_messages() {
     let mut request = nudge_request(&leading);
 
     mw.nudge_injector()
-        .before_model(&mut run_ctx, &(), &mut request)
+        .before_model_dispatch(&mut run_ctx, &(), &mut request)
         .await
         .unwrap();
 
