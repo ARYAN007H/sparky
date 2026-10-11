@@ -10,6 +10,7 @@ use std::sync::Arc;
 use tinytools_std::network::{
     AsyncHtmlExtractor, HttpLimits, HttpRequestTool, NetGate, WebFetchTool,
 };
+use tinytools::{PermissionLevel, Tool, ToolResult};
 
 use crate::config::HttpRequestConfig;
 use crate::inference::tokenjuice::focus::{summary_focus_property, SUMMARY_FOCUS_ARG};
@@ -66,6 +67,58 @@ pub fn http_request_tool(
     tool
 }
 
+/// Dedicated x402 agent entry point backed by the same host HTTP policy and
+/// the module payment hook used by `http_request`.
+#[cfg(feature = "web3")]
+pub fn x402_request_tool(
+    gate: Arc<dyn NetGate>,
+    allowed_domains: Vec<String>,
+    max_response_size: usize,
+    timeout_secs: u64,
+) -> impl Tool {
+    X402RequestTool {
+        gate: Arc::clone(&gate),
+        inner: http_request_tool(gate, allowed_domains, max_response_size, timeout_secs),
+    }
+}
+
+#[cfg(feature = "web3")]
+#[derive(Debug)]
+struct X402RequestTool {
+    gate: Arc<dyn NetGate>,
+    inner: HttpRequestTool,
+}
+
+#[cfg(feature = "web3")]
+#[async_trait::async_trait]
+impl Tool for X402RequestTool {
+    fn name(&self) -> &'static str {
+        tinywallet_bus::tools::x402_request_tool_declaration().name
+    }
+
+    fn description(&self) -> &'static str {
+        tinywallet_bus::tools::x402_request_tool_declaration().description
+    }
+
+    fn parameters_schema(&self) -> serde_json::Value {
+        tinywallet_bus::tools::x402_request_tool_declaration()
+            .parameters
+            .clone()
+    }
+
+    fn permission_level(&self) -> PermissionLevel {
+        PermissionLevel::Write
+    }
+
+    fn external_effect_with_args(&self, _args: &serde_json::Value) -> bool {
+        self.gate.network_needs_approval()
+    }
+
+    async fn execute(&self, args: serde_json::Value) -> anyhow::Result<ToolResult> {
+        self.inner.execute(args).await
+    }
+}
+
 /// `web_fetch`, converting HTML through TinyJuice and opting into TinyJuice's
 /// optional `summary_focus` argument.
 pub fn web_fetch_tool(
@@ -91,7 +144,7 @@ mod x402 {
     //! x402 machine payment for `http_request`'s `402 Payment Required` retry.
 
     use async_trait::async_trait;
-    use tinytools_std::network::{PaymentAttempt, PaymentHook, PaymentOutcome};
+    use tinytools_std::network::{PaymentAttempt, PaymentHook};
 
     use crate::modules::x402_service;
 
