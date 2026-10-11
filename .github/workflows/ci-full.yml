@@ -90,6 +90,9 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
           submodules: recursive
+      - name: Trust container checkout and submodules
+        shell: bash
+        run: bash scripts/ci/trust-checkout.sh
 
       - name: Cache pnpm store
         id: pnpm-cache
@@ -156,6 +159,9 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
           submodules: recursive
+      - name: Trust container checkout and submodules
+        shell: bash
+        run: bash scripts/ci/trust-checkout.sh
 
       - name: Cache pnpm store
         id: pnpm-cache
@@ -253,6 +259,9 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
           submodules: recursive
+      - name: Trust container checkout and submodules
+        shell: bash
+        run: bash scripts/ci/trust-checkout.sh
 
       - name: Cache pnpm store
         id: pnpm-cache

@@ -99,6 +99,9 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
           submodules: recursive
+      - name: Trust container checkout and submodules
+        shell: bash
+        run: bash scripts/ci/trust-checkout.sh
 
       - name: Cache pnpm store
         uses: actions/cache@v6
@@ -213,6 +216,9 @@ jobs:
           ref: ${{ inputs.ref }}
           fetch-depth: 1
           submodules: recursive
+      - name: Trust container checkout and submodules
+        shell: bash
+        run: bash scripts/ci/trust-checkout.sh
 
       - name: Cache pnpm store
         uses: actions/cache@v6
@@ -290,6 +296,9 @@ jobs:
           ref: ${{ inputs.ref }}
           fetch-depth: 1
           submodules: recursive
+      - name: Trust container checkout and submodules
+        shell: bash
+        run: bash scripts/ci/trust-checkout.sh
 
       - name: Cache pnpm store
         uses: actions/cache@v6
@@ -412,6 +421,9 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
           submodules: recursive
+      - name: Trust container checkout and submodules
+        shell: bash
+        run: bash scripts/ci/trust-checkout.sh
 
       - name: Cache pnpm store
         uses: actions/cache@v6
