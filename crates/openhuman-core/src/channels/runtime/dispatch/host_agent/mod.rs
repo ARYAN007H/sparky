@@ -55,7 +55,7 @@ pub(crate) fn bound_agent_id<'a>(config: &'a Config, channel: &str) -> Option<&'
 pub(crate) fn route(ctx: &ChannelRuntimeContext, channel: &str) -> HostRoute {
     if let Some(capabilities) = crate::profiles::capabilities::ProfileCapabilities::current() {
         if let (Some(context), Some(config), Some(definitions)) = (
-            crate::core::runtime::CoreContext::current(),
+            crate::core::runtime::CoreContext::scoped(),
             ctx.config.as_ref(),
             crate::agent::harness::definition::AgentDefinitionRegistry::current(),
         ) {
