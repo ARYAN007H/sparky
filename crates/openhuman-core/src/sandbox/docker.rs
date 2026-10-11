@@ -196,7 +196,11 @@ pub async fn cleanup_orphaned_containers(_config: &Config) -> anyhow::Result<u32
 /// Create a handle representing the Docker backend state.
 pub async fn docker_backend_handle(config: &Config) -> Result<SandboxBackendHandle, String> {
     let available = is_docker_available(config).await?;
-    Ok(SandboxBackendHandle {
+    Ok(docker_handle_for_status(available))
+}
+
+fn docker_handle_for_status(available: bool) -> SandboxBackendHandle {
+    SandboxBackendHandle {
         kind: SandboxBackendKind::Docker,
         status: if available {
             SandboxStatus::Ready
@@ -204,7 +208,7 @@ pub async fn docker_backend_handle(config: &Config) -> Result<SandboxBackendHand
             SandboxStatus::Error
         },
         backend_id: None,
-    })
+    }
 }
 
 /// Validate that a sandbox policy's Docker configuration doesn't have
