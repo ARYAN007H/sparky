@@ -389,13 +389,20 @@ async fn scenario() {
             .unwrap();
     }
     for handle in &handles {
+        assert!(
+            handle
+                .call::<Value>(
+                    "openhuman.memory_items_list",
+                    json!({"filter":{"reach":{"at":"","descendants":true,"inherit":true}}})
+                )
+                .await
+                .is_err(),
+            "a global reach must be refused"
+        );
         let response: Value = tokio::time::timeout(Duration::from_secs(30), async {
             loop {
                 let response: Value = handle
-                    .call(
-                        "openhuman.memory_items_list",
-                        json!({"filter":{"reach":{"at":"","descendants":true,"inherit":true}}}),
-                    )
+                    .call("openhuman.memory_items_list", json!({}))
                     .await
                     .unwrap();
                 if response
