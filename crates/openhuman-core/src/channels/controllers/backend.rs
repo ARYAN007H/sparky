@@ -1,6 +1,5 @@
 //! TinyChannels backend implementation for OpenHuman controller operations.
 
-use async_trait::async_trait;
 use serde::Serialize;
 use serde_json::{json, Value};
 
@@ -8,7 +7,6 @@ use crate::config::{ChannelsConfig, Config};
 use crate::core::Outcome;
 
 use super::ops;
-use tinychannels::{ChannelBackend, ChannelOutboundIntent, SendMessage};
 use tinychannels_bus::controllers::{
     ChannelAuthMode, ChannelConnectionResult, ChannelDisconnectResult, ChannelReactionResult,
     ChannelSendMessageResult, ChannelStatusEntry, ChannelTestResult, ChannelThreadListResult,
@@ -16,6 +14,7 @@ use tinychannels_bus::controllers::{
     DiscordGuildListResult, DiscordLinkCheckResult, DiscordLinkStartResult,
     DiscordPermissionCheckResult, TelegramLoginCheckResult, TelegramLoginStartResult,
 };
+use tinychannels_bus::{ChannelOutboundIntent, SendMessage};
 
 /// OpenHuman-owned implementation of the TinyChannels backend contract.
 #[derive(Debug, Clone)]
@@ -37,25 +36,14 @@ impl OpenHumanChannelBackend {
         &self,
         prepared: tinychannels_bus::module_runtime::PreparedChannelIntent,
     ) -> anyhow::Result<ChannelSendMessageResult> {
-        if tinychannels::relay::relay_runtime_fronts_channel(
-            &self.config.channels_config,
-            &prepared.intent.channel_id,
-        ) {
-            if let Some(result) =
-                tinychannels::relay::send_outbound_intent(&prepared.intent).await?
-            {
-                return Ok(result);
-            }
-        }
-        let value = into_anyhow(
-            ops::channel_send_message(
-                &self.config,
-                &prepared.intent.channel_id,
-                prepared.legacy_message,
+        crate::modules::client::ModuleClient::new(self.config.clone())
+            .call_confidential(
+                "tinychannels",
+                tinychannels_bus::methods::SEND_CHANNEL_INTENT,
+                (prepared.intent.channel_id.clone(), prepared.intent),
             )
-            .await,
-        )?;
-        Ok(parse_or_raw(value))
+            .await
+            .map_err(anyhow::Error::new)
     }
 
     fn config_with_channels(&self, channels_config: &ChannelsConfig) -> Config {
@@ -70,7 +58,6 @@ impl OpenHumanChannelBackend {
         &self,
         request: tinychannels_bus::ChannelBackendRequest,
     ) -> anyhow::Result<tinychannels_bus::ChannelBackendResult> {
-        use tinychannels::backend::ChannelBackend as _;
         use tinychannels_bus::{ChannelBackendRequest as Request, ChannelBackendResult as Result};
 
         match request {
@@ -117,88 +104,6 @@ impl OpenHumanChannelBackend {
         }
     }
 
-    /// Disconnect through the host's config and credential owner.
-    pub(crate) async fn disconnect_channel(
-        &self,
-        channels_config: &ChannelsConfig,
-        channel: &str,
-        auth_mode: ChannelAuthMode,
-        clear_memory: bool,
-    ) -> anyhow::Result<ChannelDisconnectResult> {
-        tinychannels::backend::ChannelBackend::disconnect_channel(
-            self,
-            channels_config,
-            channel,
-            auth_mode,
-            clear_memory,
-        )
-        .await
-    }
-
-    /// Read host-owned channel connection state.
-    pub(crate) async fn channel_status(
-        &self,
-        channels_config: &ChannelsConfig,
-        channel: Option<&str>,
-    ) -> anyhow::Result<Vec<ChannelStatusEntry>> {
-        tinychannels::backend::ChannelBackend::channel_status(self, channels_config, channel).await
-    }
-
-    /// Run a reaction operation through the product controller.
-    pub(crate) async fn send_reaction(
-        &self,
-        channels_config: &ChannelsConfig,
-        channel: &str,
-        reaction: Value,
-    ) -> anyhow::Result<ChannelReactionResult> {
-        tinychannels::backend::ChannelBackend::send_reaction(
-            self,
-            channels_config,
-            channel,
-            reaction,
-        )
-        .await
-    }
-
-    /// Create a provider thread through the product controller.
-    pub(crate) async fn create_thread(
-        &self,
-        channels_config: &ChannelsConfig,
-        channel: &str,
-        title: &str,
-    ) -> anyhow::Result<ChannelThreadResult> {
-        tinychannels::backend::ChannelBackend::create_thread(self, channels_config, channel, title)
-            .await
-    }
-
-    /// Update or close one provider thread through the product controller.
-    pub(crate) async fn update_thread(
-        &self,
-        channels_config: &ChannelsConfig,
-        channel: &str,
-        thread_id: &str,
-        action: &str,
-    ) -> anyhow::Result<ChannelThreadResult> {
-        tinychannels::backend::ChannelBackend::update_thread(
-            self,
-            channels_config,
-            channel,
-            thread_id,
-            action,
-        )
-        .await
-    }
-
-    /// List provider threads through the product controller.
-    pub(crate) async fn list_threads(
-        &self,
-        channels_config: &ChannelsConfig,
-        channel: &str,
-        active: Option<bool>,
-    ) -> anyhow::Result<ChannelThreadListResult> {
-        tinychannels::backend::ChannelBackend::list_threads(self, channels_config, channel, active)
-            .await
-    }
 }
 
 /// The managed-bot link flows need a TinyHumans account, so the core does not
@@ -342,8 +247,7 @@ fn disconnect_result(
     }
 }
 
-#[async_trait]
-impl ChannelBackend for OpenHumanChannelBackend {
+impl OpenHumanChannelBackend {
     async fn connect_channel(
         &self,
         channels_config: &ChannelsConfig,
@@ -417,19 +321,14 @@ impl ChannelBackend for OpenHumanChannelBackend {
         channels_config: &ChannelsConfig,
         intent: ChannelOutboundIntent,
     ) -> anyhow::Result<ChannelSendMessageResult> {
-        if tinychannels::relay::relay_runtime_fronts_channel(channels_config, &intent.channel_id) {
-            if let Some(result) = tinychannels::relay::send_outbound_intent(&intent).await? {
-                return Ok(result);
-            }
-        }
-
-        let channel = intent.channel_id.clone();
-        self.send_message_value(
-            channels_config,
-            &channel,
-            tinychannels::legacy_message_value_from_outbound_intent(&intent),
-        )
-        .await
+        crate::modules::client::ModuleClient::new(self.config_with_channels(channels_config))
+            .call_confidential(
+                "tinychannels",
+                tinychannels_bus::methods::SEND_CHANNEL_INTENT,
+                (intent.channel_id.clone(), intent),
+            )
+            .await
+            .map_err(anyhow::Error::new)
     }
 
     async fn send_reaction(
