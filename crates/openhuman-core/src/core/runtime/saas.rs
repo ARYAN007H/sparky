@@ -32,6 +32,15 @@ pub struct SaasConfig {
     /// Root of every user's state and the operator's own. Must be an absolute,
     /// existing directory that is not world-writable.
     pub root: PathBuf,
+    /// Validated direct inference defaults shared by profile chat, relay, and cron.
+    #[serde(default)]
+    pub chat_provider: Option<super::direct_profile_provider::DirectProfileProvider>,
+    /// Operator-owned direct Exa/Gemini policy; never a user settings RPC.
+    #[serde(default)]
+    pub search: Option<crate::config::SearchConfig>,
+    /// Advertised names for the three search roles. Missing entries retain canonical names.
+    #[serde(default)]
+    pub search_role_names: std::collections::BTreeMap<tinysearch_bus::Role, String>,
     /// The gateway's bearer, one line in a `0600` file. Defaults to
     /// `<root>/service.token`.
     #[serde(default)]
@@ -97,6 +106,45 @@ pub struct SaasConfig {
     /// nodes sharing one root each set their own.
     #[serde(default)]
     pub operator_dir: Option<PathBuf>,
+    /// Cron limits forced onto every profile; a user's own config cannot
+    /// loosen them.
+    #[serde(default)]
+    pub cron: SaasCronConfig,
+}
+
+/// `[cron]`: the operator's cron limits for hosted profiles (see
+/// [`crate::cron::limits`]).
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SaasCronConfig {
+    /// Allow only agent jobs bound to the conversation that created them:
+    /// no shell or flow jobs, no chosen delivery destination.
+    #[serde(default)]
+    pub agent_jobs_only: bool,
+    /// With `agent_jobs_only`: seconds between runs of a recurring job, at least.
+    #[serde(default = "default_cron_min_interval_secs")]
+    pub min_interval_secs: u64,
+    /// With `agent_jobs_only`: most enabled jobs one profile may hold.
+    #[serde(default = "default_cron_max_active_jobs")]
+    pub max_active_jobs: u32,
+}
+
+impl Default for SaasCronConfig {
+    fn default() -> Self {
+        Self {
+            agent_jobs_only: false,
+            min_interval_secs: default_cron_min_interval_secs(),
+            max_active_jobs: default_cron_max_active_jobs(),
+        }
+    }
+}
+
+fn default_cron_min_interval_secs() -> u64 {
+    300
+}
+
+fn default_cron_max_active_jobs() -> u32 {
+    20
 }
 
 /// `[sandbox]`: the one-shot container a user's shell command runs in. The
@@ -169,6 +217,9 @@ impl SaasConfig {
     pub fn new(root: impl Into<PathBuf>) -> Self {
         Self {
             root: root.into(),
+            chat_provider: None,
+            search: None,
+            search_role_names: std::collections::BTreeMap::new(),
             service_token_file: None,
             tool_allowlist: Vec::new(),
             sandbox: SaasSandboxConfig::default(),
@@ -184,6 +235,7 @@ impl SaasConfig {
             advertise_url: None,
             lease_ttl_secs: default_lease_ttl_secs(),
             operator_dir: None,
+            cron: SaasCronConfig::default(),
         }
     }
 
@@ -191,8 +243,10 @@ impl SaasConfig {
     pub fn load(path: &Path) -> anyhow::Result<Self> {
         let raw = std::fs::read_to_string(path)
             .map_err(|e| anyhow::anyhow!("reading SaaS config {}: {e}", path.display()))?;
-        let config: Self = toml::from_str(&raw)
-            .map_err(|e| anyhow::anyhow!("parsing SaaS config {}: {e}", path.display()))?;
+        let config: Self = toml::from_str(&raw).map_err(|e| {
+            // `message()` omits the source excerpt, which could hold a key.
+            anyhow::anyhow!("parsing SaaS config {}: {}", path.display(), e.message())
+        })?;
         log::debug!(
             "[saas] loaded operator config from {} (root={})",
             path.display(),
@@ -318,6 +372,7 @@ pub async fn build_with_profile_capabilities(
     port: Option<u16>,
     capabilities: Option<Arc<crate::profiles::capabilities::ProfileCapabilities>>,
 ) -> anyhow::Result<CoreRuntime> {
+    crate::profiles::provider_settings::ProfileProviderSettings::from_saas(&config)?;
     if CoreContext::current().is_some() {
         anyhow::bail!(
             "[saas] a core is already running in this process; a SaaS core must be the only one"

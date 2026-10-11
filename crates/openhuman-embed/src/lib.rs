@@ -189,7 +189,8 @@ pub use harness::{
 pub use harness::{HttpHeader, McpAuthConfig, McpServer};
 #[cfg(feature = "channels")]
 pub use profiles::{
-    ChatReply, OpenError, ProfileError, ProfileEvents, ProfileHandle, ProfileId, ProfileIdMode,
+    ChatReply, CronDelivery, CronReply, CronSweepReport, DirectProfileProvider, JobOrigin,
+    OpenError, ProfileError, ProfileEvents, ProfileHandle, ProfileId, ProfileIdMode,
     ProfileRuntime, ProfileRuntimeBuilder, ProfileSummary, Provisioned, RelayAccepted,
     RelayMessage, SaasConfig,
 };
