@@ -134,7 +134,7 @@ execution refuses to run without the required provider.
 | [`mod.rs`](./mod.rs) | Sandbox module declarations and public host API. |
 | [`types.rs`](./types.rs) | `SandboxBackendKind`, `SandboxPolicy`, `DockerOverrides`, exec request and result, handle and status, `ElevatedOp`, `ELEVATED_TOOLS`. |
 | [`ops.rs`](./ops.rs) | Policy resolution, backend creation, routed execution (None and Local paths), scratch ownership, the env allowlist, the host off switch, elevated ops. |
-| [`native_jail.rs`](./native_jail.rs) | TinyBox native-jail request mapping, process/output lifecycle, and fail-closed status checks. |
+| [`native_jail.rs`](./native_jail.rs) | TinyBox native-jail and cron passthrough request mapping, process/output lifecycle, and fail-closed status checks. |
 | [`grants.rs`](./grants.rs) | The Local jail's filesystem grant set and its credential floor. |
 | [`docker.rs`](./docker.rs) | Policy-to-`RunDocker` mapping, module status/cleanup calls, Docker policy validation. |
 | [`schemas.rs`](./schemas.rs) | The `sandbox.*` controllers. |

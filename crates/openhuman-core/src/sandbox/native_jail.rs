@@ -1,4 +1,4 @@
-//! Host policy and lifecycle for TinyBox-owned native jailed executions.
+//! Host policy and lifecycle adapters for TinyBox-owned native and passthrough execution.
 
 use std::{collections::HashMap, ffi::OsString, path::Path, time::Duration};
 

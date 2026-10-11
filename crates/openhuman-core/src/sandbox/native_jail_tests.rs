@@ -271,5 +271,14 @@ async fn released_tinybox_runs_a_native_jail_through_the_pinned_loader() -> anyh
     )
     .await?;
     assert!(output.success(), "cron preserves default pipeline status");
+
+    let output = execute_passthrough(
+        &config,
+        "sleep 10",
+        workspace.path(),
+        Duration::from_millis(50),
+    )
+    .await?;
+    assert!(output.timed_out, "cron timeout is acknowledged by TinyBox");
     Ok(())
 }

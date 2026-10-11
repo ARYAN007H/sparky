@@ -223,7 +223,7 @@ pub(super) async fn run_job_command_with_timeout(
             );
         }
         let combined = format!(
-            "status=exit code: {}\nstdout:\n{}\nstderr:\n{}",
+            "status=exit status: {}\nstdout:\n{}\nstderr:\n{}",
             output.exit_code,
             output.stdout.trim(),
             output.stderr.trim()

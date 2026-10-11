@@ -124,12 +124,12 @@ fn tinywallet_registry_matches_the_verified_v013_release_manifest() {
 }
 
 #[test]
-fn tinybox_registry_matches_the_published_v0119_release_manifest() {
+fn tinybox_registry_matches_the_published_v0120_release_manifest() {
     let record = find("tinybox").expect("compiled TinyBox module");
-    assert_eq!(record.version, "0.1.19");
+    assert_eq!(record.version, "0.1.20");
     assert_eq!(
         record.release_url,
-        "https://github.com/tinyhumansai/tinybox/releases/tag/v0.1.19"
+        "https://github.com/tinyhumansai/tinybox/releases/tag/v0.1.20"
     );
 
     let actual = record
@@ -140,58 +140,58 @@ fn tinybox_registry_matches_the_published_v0119_release_manifest() {
     let published = [
         (
             "ubuntu-24.04-x86_64",
-            "tinybox-0.1.19-ubuntu-24.04-x86_64.tar.gz",
-            "a1dae0e4af4a1ba84fc37b048ad1d1ef0e226ec2c2b312d7607a8ec08d09d134",
+            "tinybox-0.1.20-ubuntu-24.04-x86_64.tar.gz",
+            "1127df2da56b2141f1f94ef02abc78930017055d4319b8a810d9d20686c78d66",
         ),
         (
             "ubuntu-24.04-arm64",
-            "tinybox-0.1.19-ubuntu-24.04-arm64.tar.gz",
-            "245eaf3ab5465e9e01da207ef63bf930c46069b3858fe9ce9da8e71559c0faf8",
+            "tinybox-0.1.20-ubuntu-24.04-arm64.tar.gz",
+            "da624b4b6939fadb0622d996797d0375ceb62f366544543dc29be6cae0c7562b",
         ),
         (
             "ubuntu-22.04-x86_64",
-            "tinybox-0.1.19-ubuntu-22.04-x86_64.tar.gz",
-            "c23102c295b8e5ceef428d1ed178ac910031a23640eaebceb7ebfe3c19a2e05c",
+            "tinybox-0.1.20-ubuntu-22.04-x86_64.tar.gz",
+            "83211cb7a1472340208cda8ad2caf0363a6c10416d93e42450975e0bb04cf00c",
         ),
         (
             "ubuntu-22.04-arm64",
-            "tinybox-0.1.19-ubuntu-22.04-arm64.tar.gz",
-            "b81e147875a5f21b9b681dffa633c480cfa0bf0121e3ea309feb859d7206d866",
+            "tinybox-0.1.20-ubuntu-22.04-arm64.tar.gz",
+            "63f613de1c905e574b05065e26c1ddc7cd0b37ffaff12ce301a47d5ceb3b0628",
         ),
         (
             "macos-26-arm64",
-            "tinybox-0.1.19-macos-26-arm64.tar.gz",
-            "437ae2b09337b30ad1af85f3fe95be5cc0d8134986f401a231448a37c340f54b",
+            "tinybox-0.1.20-macos-26-arm64.tar.gz",
+            "bbbd1e8164b4a0f05b74d3f769d9ca7e40b1bd7c3769b82c3c1a28fdce0f33d2",
         ),
         (
             "macos-26-x86_64",
-            "tinybox-0.1.19-macos-26-x86_64.tar.gz",
-            "24c3397596e20e3661e6fc6d0ba28f2f36a8c3d7f4e5106030f674d5d3703f6d",
+            "tinybox-0.1.20-macos-26-x86_64.tar.gz",
+            "1a49a3317785db436651e672d60aa916c1083ef1e1cbec59c59f44a7d035a6d7",
         ),
         (
             "macos-15-arm64",
-            "tinybox-0.1.19-macos-15-arm64.tar.gz",
-            "61145d8dbb56d866d85610702938973b7c8f523093154ec3a27790dc060565bd",
+            "tinybox-0.1.20-macos-15-arm64.tar.gz",
+            "316070571983195ff7f176fa388c8ebd3a10779458f4280bbe68b683f2e20ccf",
         ),
         (
             "macos-15-x86_64",
-            "tinybox-0.1.19-macos-15-x86_64.tar.gz",
-            "8e68322fe3ff762ad6b31a55413cfd7772174b2bdadc0b5391d1816d36a6b373",
+            "tinybox-0.1.20-macos-15-x86_64.tar.gz",
+            "5e65b572acb5bf67d438bc1937ebb186ec7bcb4c7105a1294f0f663edb3f108c",
         ),
         (
             "windows-2025-x86_64",
-            "tinybox-0.1.19-windows-2025-x86_64.zip",
-            "8ac5b73f23deee35d2f61209b801a5fcb6465277e35afc45dac4e91cfe528ce0",
+            "tinybox-0.1.20-windows-2025-x86_64.zip",
+            "ed6b5d58ab809f10d17622b9a8dfa7e64edb52229816df91ccf1a8ec165c34a3",
         ),
         (
             "windows-2022-x86_64",
-            "tinybox-0.1.19-windows-2022-x86_64.zip",
-            "f2682b28908c9736382fab57c0f579db4a17ae3e037d9422f185a0f949e69143",
+            "tinybox-0.1.20-windows-2022-x86_64.zip",
+            "33c083c624c3bf1fd842b6e804b0dc370eab22c876914dfe092d5c17e787b203",
         ),
         (
             "windows-11-arm64",
-            "tinybox-0.1.19-windows-11-arm64.zip",
-            "50873a041c05d009f8f65812e6ac95fef001b1d71a897383da1f34fac1f2a7d0",
+            "tinybox-0.1.20-windows-11-arm64.zip",
+            "b2130424d6589a1b689152a9869e82955e04aa3f0a1f5a992f1074a0c0825611",
         ),
     ];
 
