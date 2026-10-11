@@ -433,7 +433,7 @@ opt-ins, the profile lease fence and channel permission ceilings remain
 stronger than the callback. With no callback, execution is denied.
 
 The factory receives the exact durable chat or relay thread through
-`TurnContext::session_id`; its ambient tenant is the owning profile. During
+`TurnContext::session_id`; its ambient tenant (`openhuman_embed::current_tenant`) is the owning profile. During
 execution, `openhuman_embed::current_turn_origin` exposes the task's original
 `AgentTurnOrigin`, including channel sender and reply target. Concurrent
 messages do not mutate another turn's routing context.
