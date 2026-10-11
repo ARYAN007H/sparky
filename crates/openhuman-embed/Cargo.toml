@@ -136,6 +136,11 @@ required-features = ["channels"]
 name = "profile_cron_sweep"
 required-features = ["channels"]
 
+# Operator-admitted cron and time tools, the iteration cap, no backend credential.
+[[test]]
+name = "profile_operator_tools"
+required-features = ["channels"]
+
 [[example]]
 name = "profiles"
 required-features = ["channels"]
