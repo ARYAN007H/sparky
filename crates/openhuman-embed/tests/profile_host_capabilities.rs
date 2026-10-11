@@ -121,7 +121,7 @@ impl Respond for CallTools {
 
 #[test]
 fn chat_and_relay_use_only_selected_tools_inside_their_profile() {
-    let _ = env_logger::builder().is_test(true).try_init();
+    let _ = tracing_subscriber::fmt().with_env_filter("warn").with_test_writer().try_init();
     runtime_without_master_key().block_on(async {
         tokio::spawn(scenario()).await.unwrap();
     });
