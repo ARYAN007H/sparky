@@ -596,6 +596,7 @@ fn regenerate_session_compat() {
 }
 
 /// Archived declarations survive replay, but retired executors never return.
+#[cfg(feature = "voice")]
 #[test]
 fn resumed_thread_with_retired_podcast_tool_remains_usable() {
     run_async(async {
