@@ -4090,8 +4090,10 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 2.0.20",
+ "tinyagents-graph",
  "tinyagents-harness",
  "tinyagents-session",
+ "tinybus",
  "tinyinference-embeddings",
  "tinyinference-llm",
  "tinymcp-bus",
@@ -6594,14 +6596,14 @@ dependencies = [
 
 [[package]]
 name = "tinybox-bus"
-version = "0.1.21"
+version = "0.1.19"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "tinybox-core"
-version = "0.1.21"
+version = "0.1.19"
 dependencies = [
  "async-trait",
  "serde",
