@@ -45,8 +45,7 @@ pub trait Channel: Send + Sync {
 
     /// Start a module-owned periodic refresh and return its opaque lifecycle
     /// handle. Implementations without provider-side refresh support return
-    /// `None`, allowing the host's compatibility adapter to retain its legacy
-    /// timer for local test doubles only.
+    /// `None`; the host does not create a local refresh timer.
     async fn begin_typing_refresh(
         &self,
         _recipient: &str,
