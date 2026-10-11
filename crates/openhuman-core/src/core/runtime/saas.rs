@@ -385,7 +385,9 @@ pub async fn build_with_profile_capabilities(
     let token = ServiceToken::read(&config.service_token_path());
     let env: Vec<(String, String)> = std::env::vars().collect();
     let sandbox_available = if boot_guard::needs_sandbox(&config) {
-        crate::sandbox::docker::is_docker_available().await
+        crate::sandbox::docker::is_docker_available(&crate::config::Config::default())
+            .await
+            .unwrap_or(false)
     } else {
         false
     };
