@@ -204,7 +204,7 @@ async fn scenario() {
         for advertised in ["web_search", "web_answer", "web_contents"] {
             assert!(
                 names.iter().any(|n| n == advertised),
-                "{advertised} advertised"
+                "{advertised} advertised: {names:?}"
             );
         }
         assert!(
