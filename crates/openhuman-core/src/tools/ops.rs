@@ -110,7 +110,7 @@ pub fn all_tools_with_runtime(
         action_dir,
         root_config,
     ));
-    tools.extend(vec![
+    tools.append(&mut vec![
         Box::new(CurrentTimeTool::new()),
         // Reversibility for native tool-output compaction (Stage 1a): when a
         // large result is compacted with a `retrieve_tool_output("<hash>")`
@@ -135,7 +135,7 @@ pub fn all_tools_with_runtime(
     tools.extend(crate::flows::registration::tools(config.clone(), security));
     #[cfg(feature = "web3")]
     tools.extend(crate::web3::wallet::registration::tools());
-    tools.extend(vec![
+    tools.append(&mut vec![
         Box::new(ScheduleTool::new(security.clone(), root_config.clone())),
         Box::new(ProxyConfigTool::new(config.clone(), security.clone())),
         Box::new(UpdateCheckTool::new()),
@@ -161,10 +161,10 @@ pub fn all_tools_with_runtime(
         config.clone(),
         security,
     ));
-    tools.extend(vec![Box::new(GmailUnsubscribeTool)]);
+    tools.push(Box::new(GmailUnsubscribeTool));
     #[cfg(feature = "skills")]
     tools.extend(crate::skills::registration::tools(config.clone()));
-    tools.extend(vec![
+    tools.append(&mut vec![
         // Task & productivity tools (issue: agent-tool expansion).
         // Read/observe + bounded-write tools are registered here; the
         // destructive/overextending siblings (artifact_delete,
@@ -178,12 +178,11 @@ pub fn all_tools_with_runtime(
     tools.extend(crate::integrations::task_sources::tools::registered_tools(
         config.clone(),
     ));
-    tools.extend(vec![
-        // System & self-management: observability (default-ON) + service
-        // lifecycle. doctor/health/cost/dashboard/security reads are default-ON.
-        // service_status / daemon_host_prefs_get default-ON; the lifecycle
-        // mutators ship default-OFF via `tools::user_filter` (service_lifecycle).
-    ]);
+
+    // System & self-management: observability (default-ON) + service
+    // lifecycle. doctor/health/cost/dashboard/security reads are default-ON.
+    // service_status / daemon_host_prefs_get default-ON; the lifecycle
+    // mutators ship default-OFF via `tools::user_filter` (service_lifecycle).
     tools.extend(crate::platform::doctor::tools::registered_tools(
         config.clone(),
     ));
@@ -194,14 +193,11 @@ pub fn all_tools_with_runtime(
     tools.extend(crate::desktop::dashboard::tools::registered_tools(
         config.clone(),
     ));
-    tools.extend(vec![]);
     #[cfg(feature = "modules")]
     tools.extend(crate::desktop::control::tools::registered_tools(
         config.clone(),
     ));
-    tools.extend(vec![]);
     tools.extend(crate::security::tools::registered_tools(config.clone()));
-    tools.extend(vec![]);
     tools.extend(crate::platform::service::tools::registered_tools(
         config.clone(),
     ));
@@ -210,7 +206,7 @@ pub fn all_tools_with_runtime(
     // are deferred (their apply fns take non-Deserialize patch structs);
     // see config/tools.rs.
     tools.extend(crate::config::tools::registered_tools(config.clone()));
-    tools.extend(vec![
+    tools.append(&mut vec![
         // Account & money. The billing / team / referral agent-tool families were
         // removed: money movement and team administration are dashboard
         // surfaces, not things an agent should reach for mid-turn, and their
@@ -220,9 +216,8 @@ pub fn all_tools_with_runtime(
     tools.extend(crate::security::credentials::tools::registered_tools(
         config.clone(),
     ));
-    tools.extend(vec![]);
     tools.extend(crate::integrations::tools::registered_tools(config.clone()));
-    tools.extend(vec![
+    tools.append(&mut vec![
         // MCP registry and workspace persona. Observe/connect/call tools
         // default-ON; MCP uninstall (mcp_manage), and persona/workspace writers
         // (workspace_manage) ship default-OFF via `tools::user_filter`. There
@@ -236,7 +231,6 @@ pub fn all_tools_with_runtime(
     tools.extend(crate::mcp::registry::tools::registered_tools(
         config.clone(),
     ));
-    tools.extend(vec![]);
     tools.extend(crate::config::workspace::tools::registered_tools(
         config.clone(),
     ));
