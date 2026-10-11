@@ -141,8 +141,9 @@ fn stored_rows_that_break_the_limits_are_refused_at_run() {
         add_shell_job(&config, None, Schedule::Every { every_ms: 600_000 }, "echo").unwrap();
     let announce =
         create_agent_job(&config, input(600_000, Some(delivery("announce"))), None).unwrap();
-    let fast = create_agent_job(&config, input(1_000, None), None).unwrap();
+    let fast = create_agent_job(&config, input(600_000, None), None).unwrap();
     config.cron.agent_jobs_only = true;
+    config.cron.min_interval_secs = 1_200;
     for job in [shell, announce, fast] {
         assert!(
             limits::check_run(&config, &job).is_err(),
@@ -150,7 +151,7 @@ fn stored_rows_that_break_the_limits_are_refused_at_run() {
             job.job_type
         );
     }
-    let ok = create_agent_job(&config, input(600_000, None), origin()).unwrap();
+    let ok = create_agent_job(&config, input(1_200_000, None), origin()).unwrap();
     limits::check_run(&config, &ok).unwrap();
 }
 
