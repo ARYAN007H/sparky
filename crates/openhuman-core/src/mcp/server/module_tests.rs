@@ -214,7 +214,7 @@ async fn closing_session_aborts_and_joins_a_running_host_callback() {
     let port = Arc::new(FixturePort(Mutex::new(PortState::default())));
     let (started_tx, started_rx) = tokio::sync::oneshot::channel();
     let started_tx = Arc::new(Mutex::new(Some(started_tx)));
-    let (dropped_tx, dropped_rx) = tokio::sync::oneshot::channel();
+    let (dropped_tx, mut dropped_rx) = tokio::sync::oneshot::channel();
     let dropped_tx = Arc::new(Mutex::new(Some(dropped_tx)));
     let release = CancellationToken::new();
     let dispatch = {
