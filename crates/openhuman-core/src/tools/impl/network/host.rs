@@ -7,6 +7,7 @@
 
 use std::sync::Arc;
 
+#[cfg(feature = "web3")]
 use tinytools::{PermissionLevel, Tool, ToolResult};
 use tinytools_std::network::{
     AsyncHtmlExtractor, HttpLimits, HttpRequestTool, NetGate, WebFetchTool,

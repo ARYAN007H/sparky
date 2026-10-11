@@ -634,8 +634,8 @@ describe('RecoveryPhrasePanel — import mode word inputs and valid/invalid styl
     let finishPersist!: () => void;
     mockPersistLocalWalletFromMnemonic.mockImplementationOnce(
       () =>
-        new Promise<void>(resolve => {
-          finishPersist = resolve;
+        new Promise<undefined>(resolve => {
+          finishPersist = () => resolve(undefined);
         })
     );
 
