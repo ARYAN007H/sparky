@@ -8,7 +8,7 @@ use super::execution::{
     balances, chain_status, execute_prepared, lookup_tx, network_defaults, prepare_transfer,
     supported_assets, tx_receipt, tx_status, ExecutePreparedParams, PrepareTransferParams,
 };
-use super::ops::{WalletAccount, WalletSetupParams, WalletSetupSource};
+use {tinywallet_web3::crypto::wallet::WalletAccount, super::ops::WalletSetupParams, tinywallet_web3::crypto::wallet::WalletSetupSource};
 use super::{encode_erc20_transfer, EvmNetwork, WalletChain};
 
 #[derive(Debug, Deserialize)]
