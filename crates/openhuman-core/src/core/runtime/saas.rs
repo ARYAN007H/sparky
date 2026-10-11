@@ -32,6 +32,15 @@ pub struct SaasConfig {
     /// Root of every user's state and the operator's own. Must be an absolute,
     /// existing directory that is not world-writable.
     pub root: PathBuf,
+    /// Validated direct inference defaults shared by profile chat, relay, and cron.
+    #[serde(default)]
+    pub chat_provider: Option<super::direct_profile_provider::DirectProfileProvider>,
+    /// Operator-owned direct Exa/Gemini policy; never a user settings RPC.
+    #[serde(default)]
+    pub search: Option<crate::config::SearchConfig>,
+    /// Advertised names for the three search roles. Missing entries retain canonical names.
+    #[serde(default)]
+    pub search_role_names: std::collections::BTreeMap<tinysearch_bus::Role, String>,
     /// The gateway's bearer, one line in a `0600` file. Defaults to
     /// `<root>/service.token`.
     #[serde(default)]
@@ -169,6 +178,9 @@ impl SaasConfig {
     pub fn new(root: impl Into<PathBuf>) -> Self {
         Self {
             root: root.into(),
+            chat_provider: None,
+            search: None,
+            search_role_names: std::collections::BTreeMap::new(),
             service_token_file: None,
             tool_allowlist: Vec::new(),
             sandbox: SaasSandboxConfig::default(),
