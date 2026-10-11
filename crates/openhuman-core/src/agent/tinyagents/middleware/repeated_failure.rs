@@ -12,7 +12,7 @@ use tinyagents_harness::middleware::{repeat_guard_marker, Middleware, ToolInvoca
 use tinyagents_harness::no_progress::{
     ClassifiedFailure, ClassifiedFailureTracker, NoProgress, NoProgressTracker, ToolAttempt,
 };
-use tinyagents_harness::steering::{SteeringCommand, SteeringHandle};
+use tinyagents_harness::steering::SteeringHandle;
 use tinyinference_llm::tool::ToolCall as TaToolCall;
 use tinytools::ToolResult as TaToolResult;
 
