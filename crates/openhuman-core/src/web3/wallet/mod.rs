@@ -75,9 +75,8 @@ pub(crate) use ops::secret_material;
 pub use ops::{
     derive_recovery_material, generate_recovery_phrase, reveal_recovery_phrase, setup, status,
     validate_recovery_phrase, GeneratedRecoveryPhrase, RecoveryPhraseValidation,
-    RevealRecoveryPhraseResult, WalletAccount, WalletChain,
-    WalletRecoveryMaterial, WalletSetupParams, WalletSetupSource, WalletStatus,
-    WALLET_NOT_CONFIGURED_MESSAGE,
+    RevealRecoveryPhraseResult, WalletAccount, WalletChain, WalletRecoveryMaterial,
+    WalletSetupParams, WalletSetupSource, WalletStatus, WALLET_NOT_CONFIGURED_MESSAGE,
 };
 #[cfg(feature = "web3")]
 pub use schemas::{

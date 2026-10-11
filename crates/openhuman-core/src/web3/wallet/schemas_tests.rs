@@ -15,21 +15,33 @@ fn recovery_phrase_controllers_are_registered_with_the_expected_inputs() {
     let generate = wallet_schemas("generate_mnemonic");
     assert_eq!(generate.namespace, "wallet");
     assert_eq!(
-        generate.inputs.iter().map(|field| field.name).collect::<Vec<_>>(),
+        generate
+            .inputs
+            .iter()
+            .map(|field| field.name)
+            .collect::<Vec<_>>(),
         vec!["wordCount"]
     );
 
     let validate = wallet_schemas("validate_mnemonic");
     assert_eq!(validate.namespace, "wallet");
     assert_eq!(
-        validate.inputs.iter().map(|field| field.name).collect::<Vec<_>>(),
+        validate
+            .inputs
+            .iter()
+            .map(|field| field.name)
+            .collect::<Vec<_>>(),
         vec!["phrase"]
     );
     assert!(validate.inputs[0].required);
 
     let derive = wallet_schemas("derive_recovery_material");
     assert_eq!(
-        derive.inputs.iter().map(|field| field.name).collect::<Vec<_>>(),
+        derive
+            .inputs
+            .iter()
+            .map(|field| field.name)
+            .collect::<Vec<_>>(),
         vec!["phrase"]
     );
 }
