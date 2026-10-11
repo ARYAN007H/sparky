@@ -186,10 +186,17 @@ async fn scenario() {
         .unwrap()
         .iter()
         .map(|r| format!("{} {}", r.method, r.url.path()))
+        // Unrelated control-plane reads (Composio catalog, memory events) are
+        // not inference or search.
+        .filter(|p| {
+            ["chat", "completions", "openai", "search", "gemini", "exa"]
+                .iter()
+                .any(|k| p.contains(k))
+        })
         .collect();
     assert!(
         managed_paths.is_empty(),
-        "managed traffic: {managed_paths:?}"
+        "managed inference or search traffic: {managed_paths:?}"
     );
 
     if module {
