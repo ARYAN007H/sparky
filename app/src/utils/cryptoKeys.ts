@@ -45,7 +45,16 @@ export function deriveAesKeyFromMnemonic(mnemonic: string): string {
   // Get the BIP39 seed (512-bit) from the mnemonic
   const seed = mnemonicToSeedSync(mnemonic);
 
-  // Derive a 256-bit AES key using PBKDF2 with the seed
+  return deriveAesKeyFromSeed(seed);
+}
+
+/**
+ * Derive the existing 256-bit local storage key from a BIP-39 seed.
+ *
+ * The wallet module owns phrase validation and seed derivation; this helper
+ * keeps only OpenHuman's generic storage-key KDF and its compatibility values.
+ */
+export function deriveAesKeyFromSeed(seed: Uint8Array): string {
   const salt = new TextEncoder().encode('openhuman-aes-key-v1');
   const derivedKey = pbkdf2(sha256, seed, salt, { c: 100000, dkLen: 32 });
 
