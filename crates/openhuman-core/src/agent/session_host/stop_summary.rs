@@ -132,7 +132,8 @@ impl StopReasonKind {
 
     /// Read the kind from a breaker stop note. The notes come from a fixed
     /// set of host and harness templates (`ClassifiedFailureTracker`,
-    /// `NoProgressTracker`, `inference::failure_copy::halt`), so this matches
+    /// `NoProgressTracker`, `RepeatProgressMiddleware`,
+    /// `inference::failure_copy::halt`), so this matches
     /// their fixed wording, never the tool output they quote.
     pub(crate) fn from_stop_note(note: &str) -> Self {
         let note = note.trim();
