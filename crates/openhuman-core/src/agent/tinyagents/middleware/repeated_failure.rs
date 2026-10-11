@@ -430,7 +430,7 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         let repeated_failure = failed && self.stop.witness().record_failure(tool_name, &arg_fp);
 
         if !failed {
-            self.stop.witness().record_success();
+            self.stop.record_success();
             // Only a successful observation against this operation and scope
             // demonstrates that its blocker changed. Unrelated successes do not.
             for class in [

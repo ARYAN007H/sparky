@@ -56,23 +56,39 @@ impl StopLatch {
 
     /// Stop the run, recording `summary` as its stop note unless another
     /// breaker already stopped it. The pause is sent either way; it is
-    /// idempotent.
-    pub(super) fn halt(&self, summary: String) {
-        if let Ok(mut slot) = self.slot.lock() {
-            match slot.as_deref() {
-                Some(existing) => tracing::debug!(
-                    existing = %crate::util::truncate_with_ellipsis(existing, 80),
-                    "[tinyagents::mw] run already stopped by an earlier breaker; keeping its stop note"
-                ),
+    /// idempotent. Returns whether `summary` became the stop note.
+    pub(super) fn halt(&self, summary: String) -> bool {
+        let latched = match self.slot.lock() {
+            Ok(mut slot) => match slot.as_deref() {
+                Some(existing) => {
+                    tracing::debug!(
+                        existing = %crate::util::truncate_with_ellipsis(existing, 80),
+                        "[tinyagents::mw] run already stopped by an earlier breaker; keeping its stop note"
+                    );
+                    false
+                }
                 None => {
                     *slot = Some(summary.clone());
                     if let Ok(mut own) = self.own.lock() {
                         *own = Some(summary);
                     }
+                    true
                 }
-            }
-        }
+            },
+            Err(_) => false,
+        };
         self.handle.send(SteeringCommand::Pause);
+        latched
+    }
+
+    /// A call ran and succeeded. The run made progress, so neither the
+    /// refusals before it nor a refusal after it can explain a stop latched
+    /// before it as a repeat loop.
+    pub(super) fn record_success(&self) {
+        self.witness.record_success();
+        if let Ok(mut candidate) = self.candidate.lock() {
+            *candidate = None;
+        }
     }
 
     /// Stop the run for an exhausted classified-failure budget.
@@ -91,17 +107,23 @@ impl StopLatch {
         error_line: impl FnOnce() -> String,
     ) {
         if !(repeated && is_correctable_class(class)) {
-            return self.halt(summary);
+            self.halt(summary);
+            return;
         }
         let error_line = error_line();
         match self.witness.refusals() {
+            // Only the stop that owns the note may be relabelled later: a
+            // second stop in the batch must not lend it its tool and error.
             0 => {
-                if let Ok(mut candidate) = self.candidate.lock() {
-                    *candidate = Some((tool.to_owned(), error_line));
+                if self.halt(summary) {
+                    if let Ok(mut candidate) = self.candidate.lock() {
+                        *candidate = Some((tool.to_owned(), error_line));
+                    }
                 }
-                self.halt(summary);
             }
-            refusals => self.halt(repeat_loop_halt_summary(tool, refusals, &error_line)),
+            refusals => {
+                self.halt(repeat_loop_halt_summary(tool, refusals, &error_line));
+            }
         }
     }
 
