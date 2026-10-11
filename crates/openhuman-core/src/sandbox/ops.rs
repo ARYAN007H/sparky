@@ -227,7 +227,7 @@ pub async fn create_sandbox_backend(policy: &SandboxPolicy) -> SandboxBackendHan
     if policy.backend != SandboxBackendKind::Docker {
         return create_sandbox_backend_with_config(policy, &crate::config::Config::default())
             .await
-            .unwrap_or_else(|_| SandboxBackendHandle {
+            .unwrap_or(SandboxBackendHandle {
                 kind: policy.backend,
                 status: SandboxStatus::Error,
                 backend_id: None,
