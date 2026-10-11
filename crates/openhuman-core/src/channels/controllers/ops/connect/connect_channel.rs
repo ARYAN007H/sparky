@@ -2,6 +2,7 @@
 //! any live pre-verification).
 
 use serde_json::Value;
+use tinychannels_runtime::controllers::ChannelDefinitionExt as _;
 
 use crate::channels::email_channel::EmailConfig;
 use crate::channels::providers::yuanbao::YuanbaoConfig;

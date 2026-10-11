@@ -225,8 +225,10 @@ download, its `dlopen`, or its resident memory.
 | [`search/proxy.rs`](search/proxy.rs) | `tinysearch` | Lazy load, private reinitialization on configuration change, and serialized `list_tools` / `execute_tool`; `refresh_loaded` after settings saves and credential changes. |
 | [`tokenjuice_host.rs`](tokenjuice_host.rs) | `tinyjuice` | The reverse direction: an `MlHost` object the host serves at the contract's `ML_HOST_NAME` / `ML_HOST_PATH` for the module's tool-less summary model call. |
 
-`tinymcp`, `tinybox`, `tinychannels` and `tinyhosts` have registry records but
-no host file in this folder.
+`channel_email.rs` delivers podcast attachments through TinyChannels' bounded
+confidential upload members. `tinybox.rs` supplies the pre-core gateway client.
+The remaining channel runtime, MCP and core sandbox callers are still being
+migrated; their dependency exceptions remain explicit.
 
 ## Key types and entry points
 
