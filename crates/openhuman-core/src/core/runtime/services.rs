@@ -292,28 +292,33 @@ pub fn spawn_channels_service() -> Option<tokio::task::JoinHandle<()>> {
     {
         // Capture before loading config: logout during that await must also
         // invalidate a listener that has not finished starting yet.
-        let channel_session = crate::channels::session::channel_session();
-        return Some(tokio::spawn(async move {
-            let config = match crate::config::Config::load_or_init().await {
-                Ok(c) => c,
-                Err(e) => {
-                    log::warn!("[channels] could not load config for listeners: {e}");
-                    return;
-                }
-            };
-            if !crate::channels::has_listener_configuration(&config) {
-                log::debug!(
-                    "[channels] no channel integrations configured; not spawning listeners"
-                );
-                return;
-            }
-            log::info!("[channels] spawning in-process realtime listeners (Telegram, Discord, …)");
-            if let Err(e) =
-                crate::channels::start_channels_with_session(config, channel_session).await
-            {
-                log::error!("[channels] start_channels ended with error: {e}");
-            }
-        }));
+        return Some(
+            crate::channels::session::spawn_current_channel_service_with(
+                |channel_session| async move {
+                    let config = match crate::config::Config::load_or_init().await {
+                        Ok(c) => c,
+                        Err(e) => {
+                            log::warn!("[channels] could not load config for listeners: {e}");
+                            return;
+                        }
+                    };
+                    if !crate::channels::has_listener_configuration(&config) {
+                        log::debug!(
+                            "[channels] no channel integrations configured; not spawning listeners"
+                        );
+                        return;
+                    }
+                    log::info!(
+                        "[channels] spawning in-process realtime listeners (Telegram, Discord, …)"
+                    );
+                    if let Err(e) =
+                        crate::channels::start_channels_with_session(config, channel_session).await
+                    {
+                        log::error!("[channels] start_channels ended with error: {e}");
+                    }
+                },
+            ),
+        );
     }
     #[cfg(feature = "channels")]
     {

@@ -112,6 +112,14 @@ where
     tokio::spawn(run(controller.current()))
 }
 
+pub(crate) fn spawn_current_channel_service_with<F, Fut>(run: F) -> tokio::task::JoinHandle<()>
+where
+    F: FnOnce(CancellationToken) -> Fut + Send + 'static,
+    Fut: Future<Output = ()> + Send + 'static,
+{
+    spawn_channel_service_with(SESSION.clone(), run)
+}
+
 /// Stop the host dispatch generation on logout, even with independent model auth.
 pub(super) async fn run_in_session(
     session: CancellationToken,
