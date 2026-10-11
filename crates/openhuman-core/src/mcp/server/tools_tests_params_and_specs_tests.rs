@@ -361,7 +361,7 @@ fn memory_recall_requires_question_and_omits_unset_fields() {
 }
 
 #[test]
-fn memory_limit_at_max_is_preserved() {
+fn memory_limit_at_max_is_preserved_in_rpc_params() {
     let ok = build_rpc_params_for_test("memory.list", json!({ "limit": MEMORY_MAX_LIMIT })).expect("at cap");
     assert_eq!(ok["limit"], MEMORY_MAX_LIMIT);
 }
@@ -380,7 +380,7 @@ fn memory_fetch_maps_query_mode_cursor() {
 }
 
 #[test]
-fn memory_fetch_rejects_unknown_mode_and_missing_query() {
+fn memory_fetch_rejects_unknown_host_domain_mode() {
     let err = build_rpc_params_for_test("memory.fetch", json!({"query": "q", "mode": "fuzzy"}))
         .expect_err("bad mode");
     assert!(err.message().contains("`mode` must be one of"));
