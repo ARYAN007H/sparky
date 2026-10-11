@@ -7,8 +7,8 @@ import { useCoreState } from '../../../providers/CoreStateProvider';
 import {
   fetchWalletStatus,
   generateRecoveryPhrase,
-  type WalletStatus,
   validateRecoveryPhrase,
+  type WalletStatus,
 } from '../../../services/walletApi';
 import { MNEMONIC_GENERATE_WORD_COUNT } from '../../../utils/cryptoKeys';
 import { Alert } from '../../ui/Alert';

@@ -13,9 +13,7 @@ const {
   mockPersistLocalWalletFromMnemonic,
   mockRevealRecoveryPhrase,
 } = vi.hoisted(() => ({
-  mockGenerateMnemonicPhrase: vi.fn<
-    () => string | { phrase: string; wordCount: number }
-  >(() => ({
+  mockGenerateMnemonicPhrase: vi.fn<() => string | { phrase: string; wordCount: number }>(() => ({
     phrase: 'word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12',
     wordCount: 12,
   })),
@@ -635,9 +633,10 @@ describe('RecoveryPhrasePanel — import mode word inputs and valid/invalid styl
   it('filling a valid BIP39 phrase and saving shows the valid-phrase banner then persists', async () => {
     let finishPersist!: () => void;
     mockPersistLocalWalletFromMnemonic.mockImplementationOnce(
-      () => new Promise<void>(resolve => {
-        finishPersist = resolve;
-      })
+      () =>
+        new Promise<void>(resolve => {
+          finishPersist = resolve;
+        })
     );
 
     renderWithProviders(<RecoveryPhrasePanel />);
