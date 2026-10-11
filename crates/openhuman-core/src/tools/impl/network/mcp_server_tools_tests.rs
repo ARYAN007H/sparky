@@ -17,14 +17,17 @@ fn presentation(server_id: &str, deferred: bool) -> tinymcp_bus::McpToolPresenta
 
 fn config() -> Config {
     let mut config = Config::default();
-    config.mcp_client.servers.push(crate::config::McpServerConfig {
-        server: tinymcp_bus::McpServerConfig {
-            name: "weather".into(),
-            endpoint: "https://example.test/mcp".into(),
+    config
+        .mcp_client
+        .servers
+        .push(crate::config::McpServerConfig {
+            server: tinymcp_bus::McpServerConfig {
+                name: "weather".into(),
+                endpoint: "https://example.test/mcp".into(),
+                ..Default::default()
+            },
             ..Default::default()
-        },
-        ..Default::default()
-    });
+        });
     config
 }
 
@@ -45,7 +48,10 @@ fn module_prepared_static_tool_keeps_its_contract_and_exposure() {
     let tool = tools.pop().expect("prepared tool");
     assert_eq!(tool.name(), "mcp_weather_forecast");
     assert_eq!(tool.description(), "Read the forecast");
-    assert_eq!(tool.parameters_schema()["properties"]["city"]["type"], "string");
+    assert_eq!(
+        tool.parameters_schema()["properties"]["city"]["type"],
+        "string"
+    );
     assert_eq!(tool.exposure(), ToolExposure::Deferred);
     assert_eq!(tool.family(), Some("weather"));
 }

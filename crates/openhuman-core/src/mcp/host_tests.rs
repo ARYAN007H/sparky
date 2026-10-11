@@ -39,18 +39,27 @@ fn declared_server_fields_and_identity_survive_conversion() {
     assert_eq!(server.endpoint, "https://example.test/mcp");
     assert_eq!(server.command, "npx");
     assert_eq!(server.args, ["-y", "weather-mcp"]);
-    assert_eq!(server.env.get("API_KEY").map(String::as_str), Some("secret"));
+    assert_eq!(
+        server.env.get("API_KEY").map(String::as_str),
+        Some("secret")
+    );
     assert_eq!(server.cwd.as_deref(), Some("/workspace"));
     assert_eq!(server.description.as_deref(), Some("Weather lookups"));
     assert!(!server.enabled);
     assert_eq!(server.allowed_tools, ["forecast"]);
     assert_eq!(server.disallowed_tools, ["debug"]);
     assert_eq!(server.timeout_secs, 9);
-    assert_eq!(server.auth, McpAuthConfig::BearerToken { token: "t".into() });
+    assert_eq!(
+        server.auth,
+        McpAuthConfig::BearerToken { token: "t".into() }
+    );
     assert_eq!(converted.client_identity.name, "openhuman-core");
     assert_eq!(converted.client_identity.title, "OpenHuman Core MCP Client");
     assert_eq!(converted.client_identity.version, "9.9.9");
-    assert_eq!(converted.registry_auth.smithery_api_key.as_deref(), Some("smithery"));
+    assert_eq!(
+        converted.registry_auth.smithery_api_key.as_deref(),
+        Some("smithery")
+    );
 }
 
 #[test]
@@ -58,13 +67,30 @@ fn every_credential_kind_converts_without_shape_changes() {
     let cases = [
         McpAuthConfig::None,
         McpAuthConfig::BearerToken { token: "t".into() },
-        McpAuthConfig::Basic { username: "u".into(), password: "p".into() },
-        McpAuthConfig::Header { name: "X-Key".into(), value: "v".into() },
-        McpAuthConfig::QueryParam { name: "key".into(), value: "v".into() },
-        McpAuthConfig::Headers { headers: vec![
-            HttpHeader { name: "X-Key".into(), value: "k".into() },
-            HttpHeader { name: "Authorization".into(), value: "Bearer s".into() },
-        ] },
+        McpAuthConfig::Basic {
+            username: "u".into(),
+            password: "p".into(),
+        },
+        McpAuthConfig::Header {
+            name: "X-Key".into(),
+            value: "v".into(),
+        },
+        McpAuthConfig::QueryParam {
+            name: "key".into(),
+            value: "v".into(),
+        },
+        McpAuthConfig::Headers {
+            headers: vec![
+                HttpHeader {
+                    name: "X-Key".into(),
+                    value: "k".into(),
+                },
+                HttpHeader {
+                    name: "Authorization".into(),
+                    value: "Bearer s".into(),
+                },
+            ],
+        },
     ];
 
     for auth in cases {
