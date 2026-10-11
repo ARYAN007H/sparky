@@ -173,7 +173,7 @@ pub async fn run_docker(
     config: &Config,
     request: contract::DockerRunRequest,
 ) -> Result<contract::DockerRunOutput, String> {
-    let timeout = docker_control_deadline(request.timeout_ms);
+    let timeout = docker_control_deadline(request.timeout_ms, DOCKER_CALL_GRACE);
     let client = ModuleClient::new(config.clone()).with_timeout(timeout);
     call_run_docker_with_client(&client, request).await
 }
@@ -183,9 +183,7 @@ pub async fn docker_status(
     config: &Config,
     request: contract::DockerStatusRequest,
 ) -> Result<contract::DockerStatus, String> {
-    let timeout = docker_control_deadline(request.timeout_ms);
-    let client = module_client(config).with_timeout(timeout);
-    call_docker_status_with_client(&client, request).await
+    call_docker_status_with_client(&module_client(config), request).await
 }
 
 /// Stop TinyBox-owned containers matching the supplied label.
@@ -193,27 +191,37 @@ pub async fn cleanup_docker(
     config: &Config,
     request: contract::CleanupDockerRequest,
 ) -> Result<contract::CleanupDockerOutput, String> {
-    let timeout = docker_control_deadline(request.timeout_ms);
-    let client = module_client(config).with_timeout(timeout);
-    call_cleanup_docker_with_client(&client, request).await
+    call_cleanup_docker_with_client(&module_client(config), request).await
 }
 
-fn docker_control_deadline(timeout_ms: u64) -> Duration {
-    Duration::from_millis(timeout_ms).saturating_add(DOCKER_CALL_GRACE)
+fn docker_control_deadline(timeout_ms: u64, grace: Duration) -> Duration {
+    Duration::from_millis(timeout_ms).saturating_add(grace)
 }
 
 async fn call_docker_status_with_client(
     client: &ModuleClient,
     request: contract::DockerStatusRequest,
 ) -> Result<contract::DockerStatus, String> {
-    call_with_client(client, DOCKER_STATUS, (request,), false).await
+    call_docker_status_with_grace(client, request, DOCKER_CALL_GRACE).await
+}
+
+async fn call_docker_status_with_grace(
+    client: &ModuleClient,
+    request: contract::DockerStatusRequest,
+    grace: Duration,
+) -> Result<contract::DockerStatus, String> {
+    let client = client.clone();
+    call_with_client(&client, DOCKER_STATUS, (request,), false).await
 }
 
 async fn call_cleanup_docker_with_client(
     client: &ModuleClient,
     request: contract::CleanupDockerRequest,
 ) -> Result<contract::CleanupDockerOutput, String> {
-    call_with_client(client, CLEANUP_DOCKER, (request,), false).await
+    let client = client
+        .clone()
+        .with_timeout(docker_control_deadline(request.timeout_ms, DOCKER_CALL_GRACE));
+    call_with_client(&client, CLEANUP_DOCKER, (request,), false).await
 }
 
 async fn call_run_docker_with_client(

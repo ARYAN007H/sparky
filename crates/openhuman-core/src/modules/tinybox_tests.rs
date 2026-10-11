@@ -26,6 +26,7 @@ impl Drop for EnvironmentRestore {
 
 struct MockTinyBox {
     calls: Arc<Mutex<Vec<(String, Value)>>>,
+    docker_control_delay: std::time::Duration,
 }
 
 #[async_trait::async_trait]
@@ -42,6 +43,11 @@ impl Interface for MockTinyBox {
     }
 
     async fn call(&self, member: &MemberName, args: Value) -> tinybus::Result<Value> {
+        if matches!(member.as_str(), DOCKER_STATUS | CLEANUP_DOCKER)
+            && !self.docker_control_delay.is_zero()
+        {
+            tokio::time::sleep(self.docker_control_delay).await;
+        }
         self.calls
             .lock()
             .expect("call log lock")
@@ -80,6 +86,12 @@ impl Interface for MockTinyBox {
 }
 
 async fn mock_client() -> (Connection, ModuleClient, Arc<Mutex<Vec<(String, Value)>>>) {
+    mock_client_with_docker_control_delay(std::time::Duration::ZERO).await
+}
+
+async fn mock_client_with_docker_control_delay(
+    docker_control_delay: std::time::Duration,
+) -> (Connection, ModuleClient, Arc<Mutex<Vec<(String, Value)>>>) {
     let bus = MemoryBus::new();
     Broker::new().spawn(bus.clone());
     let service = Connection::connect(bus.connect().await.expect("service transport"))
@@ -91,6 +103,7 @@ async fn mock_client() -> (Connection, ModuleClient, Arc<Mutex<Vec<(String, Valu
             ObjectPath::new(contract::OBJECT_PATH).expect("TinyBox path"),
             MockTinyBox {
                 calls: Arc::clone(&calls),
+                docker_control_delay,
             },
         )
         .await
@@ -403,11 +416,26 @@ async fn docker_controls_use_typed_calls_with_validated_contract_capability()
 #[test]
 fn docker_control_transport_deadline_tracks_the_bounded_module_operation() {
     assert_eq!(
-        docker_control_deadline(10_000),
+        docker_control_deadline(10_000, DOCKER_CALL_GRACE),
         std::time::Duration::from_secs(15)
     );
     assert_eq!(
-        docker_control_deadline(1),
+        docker_control_deadline(1, DOCKER_CALL_GRACE),
         std::time::Duration::from_millis(5_001)
     );
+}
+
+#[tokio::test]
+async fn docker_status_transport_uses_its_bounded_deadline() {
+    let (_service, client, _) =
+        mock_client_with_docker_control_delay(std::time::Duration::from_millis(100)).await;
+    let error = call_docker_status_with_grace(
+        &client,
+        contract::DockerStatusRequest { timeout_ms: 5 },
+        std::time::Duration::from_millis(5),
+    )
+    .await
+    .expect_err("transport must stop waiting at operation deadline plus grace");
+
+    assert!(error.contains("MODULE_CALL_REPORTED"), "{error}");
 }
