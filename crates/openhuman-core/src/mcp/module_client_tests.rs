@@ -105,25 +105,25 @@ impl McpModulePort for FakePort {
         &self,
         request: PrepareAgentToolsRequest,
     ) -> Result<Vec<McpToolPresentation>, ModuleCallError> {
-        self.prepared_requests
-            .lock()
-            .unwrap()
-            .push(request.clone());
+        self.prepared_requests.lock().unwrap().push(request.clone());
         Ok(request
             .sources
             .into_iter()
             .flat_map(|source| {
-                source.tools.into_iter().map(move |tool| McpToolPresentation {
-                    name: format!("module:{}:{}", source.server_id, tool.name),
-                    legacy_name: format!("legacy:{}:{}", source.server_id, tool.name),
-                    server_id: source.server_id.clone(),
-                    remote_name: tool.name,
-                    family: source.family.clone(),
-                    description: String::new(),
-                    parameters: Value::Null,
-                    deferred: false,
-                    tags: vec![format!("mcp.server_id:{}", source.server_id)],
-                })
+                source
+                    .tools
+                    .into_iter()
+                    .map(move |tool| McpToolPresentation {
+                        name: format!("module:{}:{}", source.server_id, tool.name),
+                        legacy_name: format!("legacy:{}:{}", source.server_id, tool.name),
+                        server_id: source.server_id.clone(),
+                        remote_name: tool.name,
+                        family: source.family.clone(),
+                        description: String::new(),
+                        parameters: Value::Null,
+                        deferred: false,
+                        tags: vec![format!("mcp.server_id:{}", source.server_id)],
+                    })
             })
             .collect())
     }

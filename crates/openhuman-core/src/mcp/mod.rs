@@ -160,8 +160,9 @@ pub(crate) async fn refresh_configured_tool_cache(config: &crate::config::Config
 fn spawn_reconnect_supervisor() {
     static SUPERVISOR_SPAWNED: std::sync::atomic::AtomicBool =
         std::sync::atomic::AtomicBool::new(false);
-    static SUPERVISOR_TASK: std::sync::OnceLock<tokio::sync::Mutex<Option<tokio::task::JoinHandle<()>>>> =
-        std::sync::OnceLock::new();
+    static SUPERVISOR_TASK: std::sync::OnceLock<
+        tokio::sync::Mutex<Option<tokio::task::JoinHandle<()>>>,
+    > = std::sync::OnceLock::new();
     use std::sync::atomic::Ordering;
 
     if SUPERVISOR_SPAWNED.swap(true, Ordering::AcqRel) {

@@ -162,11 +162,7 @@ impl McpModulePort for TinyMcpPort {
         request: PrepareAgentToolsRequest,
     ) -> Result<Vec<McpToolPresentation>, ModuleCallError> {
         self.root
-            .call(
-                MODULE,
-                names::methods::PREPARE_AGENT_TOOLS,
-                (request,),
-            )
+            .call(MODULE, names::methods::PREPARE_AGENT_TOOLS, (request,))
             .await
     }
 }

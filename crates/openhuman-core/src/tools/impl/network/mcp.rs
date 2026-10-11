@@ -165,7 +165,12 @@ impl Tool for McpCallTool {
             }
         };
 
-        Ok(classified_result(call, &server, &tool, options.prefer_markdown))
+        Ok(classified_result(
+            call,
+            &server,
+            &tool,
+            options.prefer_markdown,
+        ))
     }
 
     async fn execute(&self, args: Value) -> anyhow::Result<ToolResult> {
@@ -243,10 +248,7 @@ fn unavailable_outcome(server: &str, tool: &str) -> tinymcp_bus::McpCallOutcome 
     )
 }
 
-fn with_outcome(
-    mut result: ToolResult,
-    outcome: &tinymcp_bus::McpCallOutcome,
-) -> ToolResult {
+fn with_outcome(mut result: ToolResult, outcome: &tinymcp_bus::McpCallOutcome) -> ToolResult {
     result.metadata = serde_json::to_value(outcome).ok();
     result
 }

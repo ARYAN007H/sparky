@@ -2,7 +2,7 @@ use super::*;
 
 use std::sync::{Arc, Mutex};
 
-use crate::mcp::module_client::{McpModulePort, McpConfiguredClient};
+use crate::mcp::module_client::{McpConfiguredClient, McpModulePort};
 use tinymcp_bus::{
     McpToolPresentation, OpenConfiguredResponse, PrepareAgentToolsRequest, TransitionStatus,
 };
@@ -55,21 +55,24 @@ impl McpModulePort for PreparePort {
             .sources
             .into_iter()
             .flat_map(|source| {
-                source.tools.into_iter().map(move |tool| McpToolPresentation {
-                    name: format!("owner:{}:{}", source.server_id, tool.name),
-                    legacy_name: format!("legacy:{}:{}", source.server_id, tool.name),
-                    server_id: source.server_id.clone(),
-                    remote_name: tool.name,
-                    family: source.family.clone(),
-                    description: String::new(),
-                    parameters: Value::Null,
-                    deferred: false,
-                    tags: vec![
-                        format!("mcp.server:{}", source.family),
-                        format!("mcp.server_id:{}", source.server_id),
-                        format!("mcp.tool:{}", tool.name),
-                    ],
-                })
+                source
+                    .tools
+                    .into_iter()
+                    .map(move |tool| McpToolPresentation {
+                        name: format!("owner:{}:{}", source.server_id, tool.name),
+                        legacy_name: format!("legacy:{}:{}", source.server_id, tool.name),
+                        server_id: source.server_id.clone(),
+                        remote_name: tool.name,
+                        family: source.family.clone(),
+                        description: String::new(),
+                        parameters: Value::Null,
+                        deferred: false,
+                        tags: vec![
+                            format!("mcp.server:{}", source.family),
+                            format!("mcp.server_id:{}", source.server_id),
+                            format!("mcp.tool:{}", tool.name),
+                        ],
+                    })
             })
             .collect())
     }
