@@ -7,16 +7,7 @@ icon: code
 
 An agent's web-search tools (`web_search_tool`, `web_answer_tool`, `web_contents_tool`) run through the process-wide TinySearch module. Several agents in one runtime can each search with their own provider key: pin it on that agent's config, and it is never written to `config.toml`, the environment, or a log.
 
-```rust
-use openhuman_embed::SearchHostCredential;
-
-let spec = spec.config(|config| {
-    config
-        .search
-        .pin_host_credential("brave", SearchHostCredential::new(brave_key))
-        .expect("brave takes an API key");
-});
-```
+In the agent's `AgentSpec::config` closure, call `config.search.pin_host_credential("brave", SearchHostCredential::new(key))`. `SearchHostCredential` is exported from `openhuman_embed`.
 
 `pin_host_credential` accepts `brave`, `exa`, `gemini`, `parallel`, `querit`, `tavily` and `tinyfish`, and refuses any other provider with `UnknownKeyedSearchProvider`. It turns search on and puts that provider on its direct route, the route a key authenticates; a pinned `gemini` key also serves deep research. `SearchHostCredential::with_base_url` sends the provider's calls to another endpoint, such as a proxy or a local stand-in under test.
 
