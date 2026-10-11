@@ -141,6 +141,21 @@ pub fn role_order(config: &Config, role: Role) -> Vec<String> {
         .collect()
 }
 
+/// The configured provider order for `role` with no default fallback: an
+/// unset or empty role stays empty. Used by direct profiles, whose operator
+/// fixes exactly which providers serve which role.
+pub fn exact_role_order(config: &Config, role: Role) -> Vec<String> {
+    config
+        .search
+        .roles
+        .get(role_key(role))
+        .into_iter()
+        .flatten()
+        .filter(|provider| provider_roles(provider).contains(&role))
+        .cloned()
+        .collect()
+}
+
 /// Usable providers for `role`, in serving order. The first one answers; the
 /// rest are fallbacks.
 pub fn effective_role_providers(
