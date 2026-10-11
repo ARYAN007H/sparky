@@ -11,8 +11,11 @@ pub mod scheduler_gate;
 
 pub mod bus;
 pub mod channel_bridge;
+pub mod claims;
 pub mod completion_owner;
+pub mod host_delivery;
 pub mod job_builder;
+pub mod limits;
 pub mod ops;
 pub mod origin;
 /// Per-job run policy (retry budget, single-flight) kept beside the job store.
