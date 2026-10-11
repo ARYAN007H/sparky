@@ -120,10 +120,10 @@ fn clear_and_compact_sender_history_update_cached_messages() {
 #[tokio::test]
 async fn overflow_detection_covers_edge_cases() {
     let ctx = runtime_context();
-    assert!(is_context_window_overflow_error(&anyhow::anyhow!(
+    assert!(is_context_window_overflow_error(&ctx, &anyhow::anyhow!(
         "Maximum context length exceeded"
-    )));
-    assert!(!is_context_window_overflow_error(&anyhow::anyhow!(
+    )).await.unwrap());
+    assert!(!is_context_window_overflow_error(&ctx, &anyhow::anyhow!(
         "network timeout"
-    )));
+    )).await.unwrap());
 }

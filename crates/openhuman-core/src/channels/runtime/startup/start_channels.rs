@@ -254,7 +254,7 @@ async fn start_channels_inner(mut config: Config, session: CancellationToken) ->
         &config,
         parts,
         Arc::clone(&channels_by_name),
-        Some(message_timeout_secs),
+        message_timeout_secs,
     ));
     context_slot
         .set(Arc::downgrade(&runtime_ctx))
