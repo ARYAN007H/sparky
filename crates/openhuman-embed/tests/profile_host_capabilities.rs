@@ -148,10 +148,7 @@ async fn scenario() {
     let engine = Arc::new(ReferenceEngine::new());
     let runtime = ProfileRuntime::builder(SaasConfig::new(root.path()))
         .tools(move |turn| {
-            let profile = openhuman_embed::current_tenant()
-                .unwrap()
-                .profile
-                .unwrap();
+            let profile = openhuman_embed::current_tenant().unwrap().profile.unwrap();
             factory_sessions
                 .lock()
                 .unwrap()
