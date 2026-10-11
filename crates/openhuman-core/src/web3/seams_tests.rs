@@ -201,7 +201,11 @@ async fn a_prepared_quote_is_bound_to_the_chat_thread_that_prepared_it() {
         quote_id: quote_id.clone(),
         confirmed,
     };
-    let not_found = format!("quote '{quote_id}' not found");
+    // The native-wallet module wraps the owner gate's message in its
+    // declared TinyBus error, just as it does for an absent quote.
+    let not_found = format!(
+        "ai.tinyhumans.tinywallet.Error.NativeWalletOperationFailed: quote '{quote_id}' not found"
+    );
 
     // Another thread gets the same answer as for a quote that never existed.
     let from_b = APPROVAL_CHAT_CONTEXT
