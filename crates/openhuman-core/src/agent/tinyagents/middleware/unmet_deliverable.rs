@@ -377,7 +377,6 @@ impl<C: Send + Sync> Middleware<(), C> for UnmetDeliverableMiddleware {
                 "[unmet_deliverable] late note: stop exploring, meet the stated limits"
             );
             append_note(result, &late_note(&clock));
-            ctx.request_reasoning();
             return Ok(());
         }
         if (HALF_TIME_BAND..LATE_BAND).contains(&band) && !half_noted {
@@ -392,7 +391,6 @@ impl<C: Send + Sync> Middleware<(), C> for UnmetDeliverableMiddleware {
                     "[unmet_deliverable] half-time note: requested paths still absent"
                 );
                 append_note(result, &half_time_note(&missing, &clock));
-                ctx.request_reasoning();
             }
         }
         Ok(())
