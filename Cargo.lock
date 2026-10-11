@@ -4802,6 +4802,7 @@ dependencies = [
  "tinyinference-voice",
  "tinymcp",
  "tinymcp-bus",
+ "tinysearch-bus",
  "tinytools",
  "tinytools-agent",
  "tokio",
