@@ -39,6 +39,7 @@ mod repeat_loop_stop;
 mod repeated_failure;
 mod research_budget;
 mod shell_turn_budget;
+mod stop_latch;
 mod tool_exposure;
 mod tool_outcome_capture;
 mod tool_output;

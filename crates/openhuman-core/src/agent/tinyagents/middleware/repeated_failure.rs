@@ -22,7 +22,7 @@ use super::loop_guards::{
     is_repeat_call_exempt, RECOVERABLE_NO_PROGRESS_FAILURE_THRESHOLD,
     RECOVERABLE_REPEAT_FAILURE_THRESHOLD,
 };
-use super::repeat_loop_stop::{is_correctable_class, repeat_loop_halt_summary, RepeatLoopWitness};
+use super::stop_latch::StopLatch;
 pub(crate) use crate::inference::failure_copy::user_actionable_escalation;
 use crate::inference::failure_copy::{
     recoverable_identical_halt_summary, recoverable_no_progress_halt_summary,
@@ -57,8 +57,8 @@ use tinyinference_llm::failure::is_recoverable_failure_text as is_recoverable_to
 ///   mechanism as the stop-hook / cap pausers), then [`reset`](NoProgressTracker::reset)
 ///   so a resumed run does not immediately re-pause on the latched state.
 pub(crate) struct RepeatedToolFailureMiddleware {
-    handle: SteeringHandle,
-    halt_summary: crate::agent::tinyagents::HaltSummarySlot,
+    /// Pauses the run and records why in the shared stop-note slot.
+    stop: StopLatch,
     /// Crate no-progress escalation ladder — the single source of the
     /// identical-failure / varied-failure / hard-reject logic (tinyagents 1.5.0).
     tracker: NoProgressTracker,
@@ -104,16 +104,6 @@ pub(crate) struct RepeatedToolFailureMiddleware {
     /// The registered tools' declarations (read-only policy, external effect,
     /// permission level). Without it only tool names are read.
     tool_facts: Option<ToolFactsLookup>,
-    /// The stop note this breaker latched into the shared slot, kept so a
-    /// later writer in the same batch cannot replace it (see [`Self::halt`]).
-    own_halt: std::sync::Mutex<Option<String>>,
-    /// Repeat-guard refusals and repeated failing calls, to tell a repeat
-    /// loop from a real blocker when the classified ledger stops the run.
-    repeat_loop: RepeatLoopWitness,
-    /// `(tool, error line)` of a latched classified stop on an identical
-    /// re-issue that no refusal has explained yet. A guard refusal later in
-    /// the same batch relabels the stop as a repeat loop.
-    repeat_candidate: std::sync::Mutex<Option<(String, String)>>,
 }
 
 impl RepeatedToolFailureMiddleware {
@@ -126,8 +116,7 @@ impl RepeatedToolFailureMiddleware {
         halt_summary: crate::agent::tinyagents::HaltSummarySlot,
     ) -> Self {
         Self {
-            handle,
-            halt_summary,
+            stop: StopLatch::new(handle, halt_summary),
             tracker: NoProgressTracker::new(identical_threshold),
             classified: ClassifiedFailureTracker::default(),
             last_exit_report: std::sync::Mutex::default(),
@@ -139,66 +128,7 @@ impl RepeatedToolFailureMiddleware {
             pending_nudges: EphemeralInstructionQueue::new(),
             call_effects: std::sync::Mutex::new(std::collections::HashMap::new()),
             tool_facts: None,
-            own_halt: std::sync::Mutex::default(),
-            repeat_loop: RepeatLoopWitness::default(),
-            repeat_candidate: std::sync::Mutex::default(),
         }
-    }
-
-    /// Relabel this breaker's latched stop as a repeat loop, if it is still
-    /// the run's stop note. Called when a refusal by the repeat guard arrives
-    /// after a classified stop on an identical re-issue in the same batch.
-    fn relabel_as_repeat_loop(&self, refusals: usize) {
-        let Some((tool, error_line)) = self
-            .repeat_candidate
-            .lock()
-            .ok()
-            .and_then(|mut candidate| candidate.take())
-        else {
-            return;
-        };
-        let summary = repeat_loop_halt_summary(&tool, refusals, &error_line);
-        let (Ok(mut slot), Ok(mut own)) = (self.halt_summary.lock(), self.own_halt.lock()) else {
-            return;
-        };
-        if own.is_some() && *slot == *own {
-            tracing::debug!(
-                tool = %tool,
-                refusals,
-                "[tinyagents::mw] classified stop came from a repeat loop; relabelling its stop note"
-            );
-            *slot = Some(summary.clone());
-            *own = Some(summary);
-        }
-    }
-
-    /// Stop the run, recording `summary` as its stop note unless another
-    /// breaker already stopped it.
-    ///
-    /// The note slot is shared with the repeat guard and the stop hooks, and
-    /// the first breaker to stop the run is the cause the user is told. A
-    /// stop only takes effect at the next iteration, so the rest of the batch
-    /// still reaches this breaker: the repeat guard halting while it admits a
-    /// batch of re-reads, then a mistyped path in that batch failing again,
-    /// used to replace the guard's note, and the turn was summarised as
-    /// "something this needs could not be found". The pause is sent either
-    /// way; it is idempotent.
-    fn halt(&self, summary: String) {
-        if let Ok(mut slot) = self.halt_summary.lock() {
-            match slot.as_deref() {
-                Some(existing) => tracing::debug!(
-                    existing = %crate::util::truncate_with_ellipsis(existing, 80),
-                    "[tinyagents::mw] run already stopped by an earlier breaker; keeping its stop note"
-                ),
-                None => {
-                    *slot = Some(summary.clone());
-                    if let Ok(mut own) = self.own_halt.lock() {
-                        *own = Some(summary);
-                    }
-                }
-            }
-        }
-        self.handle.send(SteeringCommand::Pause);
     }
 
     /// Judge each call's side effect from the registered tools' own
@@ -400,29 +330,15 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         true
     }
 
-    /// Put this breaker's stop note back if a later writer replaced it.
-    ///
-    /// [`Self::halt`] never replaces an earlier note, but the repeat guard
-    /// writes the shared slot unconditionally, so a result later in the batch
-    /// that trips it would otherwise relabel a stop this breaker made first.
+    /// Restore this breaker's stop note if a later writer replaced it (see
+    /// [`StopLatch::finish_run`]).
     async fn after_agent(
         &self,
         _ctx: &mut RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
         _state: &(),
         _run: &mut tinyagents_harness::middleware::AgentRun,
     ) -> TaResult<()> {
-        if let Ok(mut candidate) = self.repeat_candidate.lock() {
-            *candidate = None;
-        }
-        let own = self.own_halt.lock().ok().and_then(|mut own| own.take());
-        if let (Some(own), Ok(mut slot)) = (own, self.halt_summary.lock()) {
-            if slot.as_deref().is_some_and(|current| current != own) {
-                tracing::debug!(
-                    "[tinyagents::mw] restoring the failure breaker's stop note replaced later in its batch"
-                );
-                *slot = Some(own);
-            }
-        }
+        self.stop.finish_run();
         Ok(())
     }
 
@@ -489,8 +405,7 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
                 marker,
                 "[tinyagents::mw] skipping repeat-guard result in failure ladder"
             );
-            let refusals = self.repeat_loop.record_refusal();
-            self.relabel_as_repeat_loop(refusals);
+            self.stop.record_refusal();
             return Ok(());
         }
         let step = self.step.fetch_add(1, Ordering::SeqCst) + 1;
@@ -512,10 +427,10 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         };
         let heuristic_failure_text = heuristic_text(tool_name, &failure_text);
         let failed = result.is_error || body_level_failure;
-        let repeated_failure = failed && self.repeat_loop.record_failure(tool_name, &arg_fp);
+        let repeated_failure = failed && self.stop.witness().record_failure(tool_name, &arg_fp);
 
         if !failed {
-            self.repeat_loop.record_success();
+            self.stop.witness().record_success();
             // Only a successful observation against this operation and scope
             // demonstrates that its blocker changed. Unrelated successes do not.
             for class in [
@@ -554,24 +469,12 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
                     if class == "uncertain_side_effect" {
                         summary.push_str(" The action may already have happened; reconcile its external state before any retry.");
                     }
-                    // An identical re-issue of a call that already failed,
-                    // made while the repeat guard refuses the calls around it,
-                    // is a repeat loop, not a new blocker.
-                    if repeated_failure && is_correctable_class(class) {
-                        let error_line = first_error_line(&failure_text);
-                        match self.repeat_loop.refusals() {
-                            0 => {
-                                if let Ok(mut candidate) = self.repeat_candidate.lock() {
-                                    *candidate = Some((tool_name.to_owned(), error_line));
-                                }
-                            }
-                            refusals => {
-                                summary =
-                                    repeat_loop_halt_summary(tool_name, refusals, &error_line);
-                            }
-                        }
-                    }
-                    self.halt(summary);
+                    // An identical re-issue made while the repeat guard
+                    // refuses the calls around it is a repeat loop.
+                    self.stop
+                        .halt_classified(summary, class, tool_name, repeated_failure, || {
+                            first_error_line(&failure_text)
+                        });
                     self.tracker.reset();
                     return Ok(());
                 }
@@ -644,7 +547,7 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
                     kind = ?kind,
                     "[tinyagents::mw] terminal delegated-inference failure — halting on first occurrence with root cause"
                 );
-                self.halt(terminal_inference_halt_summary(
+                self.stop.halt(terminal_inference_halt_summary(
                     kind,
                     tool_name,
                     &failure_text,
@@ -706,7 +609,7 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
                     tool = tool_name,
                     "[tinyagents::mw] recoverable-failure headroom exhausted — halting run so the root cause surfaces"
                 );
-                self.halt(summary);
+                self.stop.halt(summary);
                 self.reset_recoverable_streak();
             }
             // Recoverable failures never feed the crate tracker — its fixed 3/6
@@ -804,7 +707,7 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
                 // resumed run does not immediately re-pause on the latched state
                 // (the crate also resets internally on a halt; this is explicit
                 // and idempotent).
-                self.halt(summary);
+                self.stop.halt(summary);
                 self.tracker.reset();
             }
         }
