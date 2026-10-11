@@ -236,6 +236,14 @@ name = "keyring_headless_e2e"
 path = "../../tests/keyring_headless_e2e.rs"
 
 [[test]]
+# Its own binary: it installs the process's global tracing subscriber to prove
+# no log line carries a pinned search key, and drives the process-wide
+# TinySearch module.
+name = "search_pinned_keys_e2e"
+path = "../../tests/search_pinned_keys_e2e.rs"
+required-features = ["modules"]
+
+[[test]]
 name = "keyring_secretstore_e2e"
 path = "../../tests/keyring_secretstore_e2e.rs"
 
