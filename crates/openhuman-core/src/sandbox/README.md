@@ -35,8 +35,8 @@ backend, execute.
        +--------------+------------------+
        v              v                  v
      None           Local              Docker
-  host shell     tinybox-jail        tinybox_docker::OneShot
-  (env cleared)  rooted at           docker run --rm, action_dir
+  host shell     tinybox-jail        TinyBox module
+  (env cleared)  rooted at           RunDocker, action_dir
                  action_dir          mounted at /workspace
 ```
 
@@ -115,21 +115,23 @@ environment.
 
 ### The Docker backend
 
-`docker::docker_exec` maps the policy onto `tinybox_docker::OneShot` and runs
-it with `DockerCli::run_one_shot`. The container is `docker run --rm` with the
-host action dir mounted read-write at `/workspace`, network `none` by default,
-`--cap-drop ALL` plus any extra drops, `--security-opt no-new-privileges`, a
-read-only rootfs with `/tmp` and `/var/tmp` tmpfs mounts, memory and CPU
-limits (512 MB and 1 CPU by default), and only the passthrough env plus the
-request's env. Containers carry the label `openhuman.sandbox=true` so
-`cleanup_orphaned_containers` can kill leftovers. `validate_docker_policy`
-rejects host networking and a mount or workspace root of `/`, `/etc`,
-`/proc`, `/sys` or the Docker socket.
+`docker::docker_exec` maps the policy to TinyBox's confidential `RunDocker`
+member. TinyBox runs `docker run --rm` with the host action dir mounted
+read-write at `/workspace`, network `none` by default, `--cap-drop ALL` plus
+any extra drops, `--security-opt no-new-privileges`, a read-only rootfs with
+`/tmp` and `/var/tmp` tmpfs mounts, memory and CPU limits (512 MB and 1 CPU by
+default), and only the passthrough env plus the request's env. Containers
+carry the label `openhuman.sandbox=true`; TinyBox owns the bounded daemon status
+probe and label-scoped orphan cleanup. `validate_docker_policy` rejects host
+networking and a mount or workspace root of `/`, `/etc`, `/proc`, `/sys` or the
+Docker socket.
 
 ### Backend status
 
 `create_sandbox_backend` returns a `SandboxBackendHandle`. None is always
-`Ready`. Docker is `Ready` when the daemon answers and `Error` otherwise.
+`Ready`. Docker is `Ready` when the TinyBox status operation reports the daemon
+available and `Error` otherwise. A module or transport failure is surfaced by
+the status RPC rather than probed with a host-local Docker CLI.
 Local derives its status from which jail backend was picked
 (`local_status_for_backend`): the `noop` and `unsupported` backends report
 `Inactive`, since neither confines anything, and anything else reports
