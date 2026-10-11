@@ -69,8 +69,10 @@ fn workspace_retention_leaves_legacy_project_artifacts_alone() {
 
     build_artifact_store(&workspace, "current");
 
-    assert!(stale.exists(), "project files are outside workspace retention");
+    assert!(
+        stale.exists(),
+        "project files are outside workspace retention"
+    );
     assert!(fresh.join("call.txt").exists(), "a fresh one is kept");
     assert!(!detached_stale.exists(), "the workspace store is swept too");
 }
-

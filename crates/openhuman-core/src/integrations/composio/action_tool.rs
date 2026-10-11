@@ -35,11 +35,11 @@ use serde_json::Value;
 
 use super::providers::ToolScope;
 use super::tools::resolve_action_scope;
-use crate::agent::tinyagents::host::run_context::sandbox_mode_for_tool;
 use crate::agent::harness::definition::SandboxMode;
+use crate::agent::tinyagents::host::run_context::sandbox_mode_for_tool;
 use crate::config::rpc as config_rpc;
 use crate::config::Config;
-use tinytools::{PermissionLevel, Tool, ToolCategory, ToolResult, ToolCallOptions, ToolRunContext};
+use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolCategory, ToolResult, ToolRunContext};
 
 /// A single Composio action exposed as a first-class tool.
 pub struct ComposioActionTool {
@@ -243,12 +243,15 @@ impl Tool for ComposioActionTool {
         super::tools::redact_composio_outcome(&config, outcome)
     }
     async fn execute_with_context(
-        &self, args: Value, _options: ToolCallOptions, context: Option<&dyn ToolRunContext>,
+        &self,
+        args: Value,
+        _options: ToolCallOptions,
+        context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
-        let (config, outcome) = Box::pin(self.execute_unredacted(args, sandbox_mode_for_tool(context))).await;
+        let (config, outcome) =
+            Box::pin(self.execute_unredacted(args, sandbox_mode_for_tool(context))).await;
         super::tools::redact_composio_outcome(&config, outcome)
     }
-
 }
 
 impl ComposioActionTool {
@@ -256,7 +259,11 @@ impl ComposioActionTool {
     /// outcome, so [`Tool::execute`] always redacts against the same
     /// credential that dispatched — for both a spawn-time config and a
     /// deferred instance with none.
-    async fn execute_unredacted(&self, args: Value, sandbox_mode: Option<SandboxMode>) -> (Box<Config>, anyhow::Result<ToolResult>) {
+    async fn execute_unredacted(
+        &self,
+        args: Value,
+        sandbox_mode: Option<SandboxMode>,
+    ) -> (Box<Config>, anyhow::Result<ToolResult>) {
         // Boxed from the moment it exists, not just at the return: this
         // local is held across every await point below, and `Config` is a
         // large top-level struct — inlining it by value in the generated

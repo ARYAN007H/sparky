@@ -9,11 +9,11 @@ use serde_json::{json, Value};
 
 use super::live_config::live_composio_config;
 use super::redact::redact_composio_outcome;
-use crate::agent::tinyagents::host::run_context::sandbox_mode_for_tool;
 use crate::agent::harness::definition::SandboxMode;
+use crate::agent::tinyagents::host::run_context::sandbox_mode_for_tool;
 use crate::config::Config;
 use crate::integrations::composio::task_recency_context::current_task_recency_window;
-use tinytools::{PermissionLevel, Tool, ToolCategory, ToolResult, ToolCallOptions, ToolRunContext};
+use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolCategory, ToolResult, ToolRunContext};
 
 use super::super::ops::load_user_scope_pref;
 use super::super::providers::{toolkit_from_slug, ToolScope};
@@ -104,12 +104,15 @@ impl Tool for ComposioExecuteTool {
         redact_composio_outcome(&config, outcome)
     }
     async fn execute_with_context(
-        &self, args: Value, _options: ToolCallOptions, context: Option<&dyn ToolRunContext>,
+        &self,
+        args: Value,
+        _options: ToolCallOptions,
+        context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
-        let (config, outcome) = Box::pin(self.execute_unredacted(args, sandbox_mode_for_tool(context))).await;
+        let (config, outcome) =
+            Box::pin(self.execute_unredacted(args, sandbox_mode_for_tool(context))).await;
         redact_composio_outcome(&config, outcome)
     }
-
 }
 
 impl ComposioExecuteTool {
@@ -117,7 +120,11 @@ impl ComposioExecuteTool {
     /// so [`Tool::execute`] redacts against the same credential that ran —
     /// not the possibly-stale snapshot captured when this tool was
     /// registered.
-    async fn execute_unredacted(&self, args: Value, sandbox_mode: Option<SandboxMode>) -> (Box<Config>, anyhow::Result<ToolResult>) {
+    async fn execute_unredacted(
+        &self,
+        args: Value,
+        sandbox_mode: Option<SandboxMode>,
+    ) -> (Box<Config>, anyhow::Result<ToolResult>) {
         let tool = args
             .get("tool")
             .and_then(|v| v.as_str())

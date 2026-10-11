@@ -21,8 +21,7 @@ use crate::agent::harness::definition::{
 };
 use crate::agent::harness::fork_context::ParentExecutionContext;
 use crate::agent::harness::{
-    spawn_depth_context::current_spawn_depth, with_current_sandbox_mode, with_spawn_depth,
-    MAX_SPAWN_DEPTH,
+    spawn_depth_context::current_spawn_depth, with_spawn_depth, MAX_SPAWN_DEPTH,
 };
 use crate::agent::prompts::{
     render_subagent_system_prompt_with_format, PromptContext, SubagentRenderOptions,
@@ -338,7 +337,7 @@ pub(crate) async fn run_subagent_direct(
         }
         let run_result = Box::pin(with_spawn_depth(attempted_depth, async {
             crate::memory::scope::within_agent(&definition.id, with_file_state_agent_id(task_id.clone(), async {
-                with_current_sandbox_mode(definition.sandbox_mode, async {
+                async {
                     Box::pin(run_typed_mode(
                         definition,
                         task_prompt,
@@ -348,7 +347,7 @@ pub(crate) async fn run_subagent_direct(
                         &loaded_config,
                     ))
                     .await
-                })
+                }
                 .await
             }))
             .await

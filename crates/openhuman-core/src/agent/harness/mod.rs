@@ -27,7 +27,6 @@ pub(crate) mod definition_loader;
 pub mod fork_context;
 pub(crate) mod graph;
 pub(crate) mod memory_context_safety;
-pub mod sandbox_context;
 pub(crate) mod spawn_depth_context;
 pub(crate) mod tool_result_artifacts;
 
@@ -41,7 +40,6 @@ pub use definition::{
 pub use fork_context::{
     current_parent, with_parent_context, AgentContextPreparedSource, ParentExecutionContext,
 };
-pub use sandbox_context::{current_sandbox_mode, with_current_sandbox_mode};
 pub(crate) use spawn_depth_context::{with_spawn_depth, MAX_SPAWN_DEPTH};
 
 pub(crate) use graph::run_channel_turn_via_graph;

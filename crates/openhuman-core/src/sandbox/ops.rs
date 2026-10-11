@@ -64,10 +64,7 @@ pub async fn command_requires_sandbox(sandbox_mode: Option<SandboxMode>) -> Resu
     if sandbox_disabled_by_host() {
         return Ok(false);
     }
-    if matches!(
-        sandbox_mode,
-        Some(SandboxMode::Sandboxed)
-    ) {
+    if matches!(sandbox_mode, Some(SandboxMode::Sandboxed)) {
         return Ok(true);
     }
     let config = crate::config::ops::load_config_with_timeout().await?;

@@ -135,9 +135,13 @@ fn sandbox_read_only_blocks_per_action_write_call() {
         host.sandbox_mode = Some(SandboxMode::ReadOnly);
         let run = host.into_tinyagents(tinyagents_harness::context::RunConfig::new("read-only"));
         let context = tinyagents_harness::tool::ToolExecutionContext::from_run_context(
-            &run, tinyagents_harness::ids::CallId::new("action"),
+            &run,
+            tinyagents_harness::ids::CallId::new("action"),
         );
-        let result = t.execute_with_context(serde_json::json!({}), Default::default(), Some(&context)).await.unwrap();
+        let result = t
+            .execute_with_context(serde_json::json!({}), Default::default(), Some(&context))
+            .await
+            .unwrap();
         assert!(
             result.is_error,
             "per-action Write under read-only must error"
@@ -161,9 +165,13 @@ fn sandbox_read_only_blocks_per_action_admin_call() {
         host.sandbox_mode = Some(SandboxMode::ReadOnly);
         let run = host.into_tinyagents(tinyagents_harness::context::RunConfig::new("read-only"));
         let context = tinyagents_harness::tool::ToolExecutionContext::from_run_context(
-            &run, tinyagents_harness::ids::CallId::new("action"),
+            &run,
+            tinyagents_harness::ids::CallId::new("action"),
         );
-        let result = t.execute_with_context(serde_json::json!({}), Default::default(), Some(&context)).await.unwrap();
+        let result = t
+            .execute_with_context(serde_json::json!({}), Default::default(), Some(&context))
+            .await
+            .unwrap();
         assert!(result.is_error);
         let msg = error_text(&result);
         assert!(msg.contains("`admin`"), "got: {msg}");
@@ -487,7 +495,8 @@ fn deferred_instance_returns_live_config_for_redaction() {
         );
 
         // Boxed exactly like `Tool::execute` does.
-        let (live_config, outcome) = Box::pin(t.execute_unredacted(serde_json::json!({}), None)).await;
+        let (live_config, outcome) =
+            Box::pin(t.execute_unredacted(serde_json::json!({}), None)).await;
         let first = outcome.expect("contract-gate surface is Ok(error result)");
         assert!(
             first.is_error && error_text(&first).contains("Input JSON schema"),

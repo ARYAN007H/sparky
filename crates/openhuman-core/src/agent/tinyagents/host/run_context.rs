@@ -380,10 +380,14 @@ pub(crate) struct HostOperationContext {
 
 /// Reads the calling agent's sandbox policy from the explicit tool carrier.
 /// Direct tool dispatch has no agent-specific mode.
-pub(crate) fn sandbox_mode_for_tool(context: Option<&dyn tinytools::ToolRunContext>) -> Option<SandboxMode> {
+pub(crate) fn sandbox_mode_for_tool(
+    context: Option<&dyn tinytools::ToolRunContext>,
+) -> Option<SandboxMode> {
     context
         .and_then(tinytools::ToolRunContext::host_extension)
-        .and_then(|extension| extension.downcast_ref::<tinyagents_harness::tool::ToolExecutionContext>())
+        .and_then(|extension| {
+            extension.downcast_ref::<tinyagents_harness::tool::ToolExecutionContext>()
+        })
         .and_then(|context| context.state::<HostOperationContext>())
         .and_then(|host| host.sandbox_mode)
 }
