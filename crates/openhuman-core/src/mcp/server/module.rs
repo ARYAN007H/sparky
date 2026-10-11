@@ -44,6 +44,8 @@ pub(super) enum ServerError {
     MissingHttpMetadata,
     #[error("MCP server module returned an invalid HTTP status")]
     InvalidHttpStatus,
+    #[error("a previous MCP request is still pending for this session")]
+    PendingRequest,
 }
 
 #[async_trait]
@@ -177,6 +179,25 @@ pub(super) struct ServerSession {
     port: Arc<dyn ServerPort>,
     id: String,
     next_operation: AtomicU64,
+    pending_input: tokio::sync::Mutex<Option<PendingInput>>,
+    pending_callback: tokio::sync::Mutex<Option<PendingCallback>>,
+}
+
+#[derive(Clone)]
+struct PendingInput {
+    headers: Map<String, Value>,
+    input: ServerInput,
+}
+
+enum PendingCallback {
+    Running {
+        id: String,
+        task: tokio::task::JoinHandle<ServerHostReply>,
+    },
+    Complete {
+        id: String,
+        reply: ServerHostReply,
+    },
 }
 
 impl ServerSession {
@@ -206,6 +227,8 @@ impl ServerSession {
             port,
             id,
             next_operation: AtomicU64::new(1),
+            pending_input: tokio::sync::Mutex::new(None),
+            pending_callback: tokio::sync::Mutex::new(None),
         })
     }
 
@@ -235,6 +258,8 @@ impl ServerSession {
             port,
             id,
             next_operation: AtomicU64::new(1),
+            pending_input: tokio::sync::Mutex::new(None),
+            pending_callback: tokio::sync::Mutex::new(None),
         })
     }
 
@@ -252,18 +277,32 @@ impl ServerSession {
         line: String,
         cancellation: &CancellationToken,
     ) -> Result<ServerOperationSnapshot, ServerError> {
-        let operation_id = Uuid::from_u128(u128::from(
-            self.next_operation.fetch_add(1, Ordering::Relaxed).max(1),
-        ))
-        .to_string();
+        let pending = {
+            let mut current = self.pending_input.lock().await;
+            match current.as_ref() {
+                Some(pending) if pending.headers == headers && pending.input.line == line => {
+                    pending.clone()
+                }
+                Some(_) => return Err(ServerError::PendingRequest),
+                None => {
+                    let input = ServerInput {
+                        operation_id: Uuid::from_u128(u128::from(
+                            self.next_operation.fetch_add(1, Ordering::Relaxed).max(1),
+                        ))
+                        .to_string(),
+                        line,
+                    };
+                    let pending = PendingInput { headers, input };
+                    *current = Some(pending.clone());
+                    pending
+                }
+            }
+        };
         self.port
             .submit(
                 &self.id,
-                headers,
-                ServerInput {
-                    operation_id: operation_id.clone(),
-                    line,
-                },
+                pending.headers.clone(),
+                pending.input.clone(),
             )
             .await
             .map_err(ServerError::Module)?;
@@ -273,8 +312,9 @@ impl ServerSession {
                 _ = cancellation.cancelled() => {
                     self.port.cancel(ServerOperationRef {
                         session_id: self.id.clone(),
-                        operation_id,
+                        operation_id: pending.input.operation_id.clone(),
                     }).await.map_err(ServerError::Module)?;
+                    *self.pending_input.lock().await = None;
                     return Err(ServerError::Cancelled);
                 }
                 result = self.port.poll(&self.id) => result.map_err(ServerError::Module)?,
@@ -282,20 +322,84 @@ impl ServerSession {
             match snapshot.state.clone() {
                 ServerOperationState::Pending => tokio::time::sleep(POLL_INTERVAL).await,
                 ServerOperationState::Callback { callback } => {
-                    let reply = handler::dispatch(callback.call).await;
+                    let reply = match self
+                        .host_reply(callback.id.clone(), callback.call, cancellation)
+                        .await
+                    {
+                        Ok(reply) => reply,
+                        Err(ServerError::Cancelled) => {
+                            self.port
+                                .cancel(ServerOperationRef {
+                                    session_id: self.id.clone(),
+                                    operation_id: pending.input.operation_id.clone(),
+                                })
+                                .await
+                                .map_err(ServerError::Module)?;
+                            *self.pending_input.lock().await = None;
+                            return Err(ServerError::Cancelled);
+                        }
+                        Err(error) => return Err(error),
+                    };
                     self.port
                         .complete(&self.id, &callback.id, reply)
                         .await
                         .map_err(ServerError::Module)?;
                 }
-                ServerOperationState::Complete { .. } => return Ok(snapshot),
-                ServerOperationState::Cancelled => return Err(ServerError::Cancelled),
+                ServerOperationState::Complete { .. } => {
+                    *self.pending_input.lock().await = None;
+                    *self.pending_callback.lock().await = None;
+                    return Ok(snapshot);
+                }
+                ServerOperationState::Cancelled => {
+                    *self.pending_input.lock().await = None;
+                    return Err(ServerError::Cancelled);
+                }
                 ServerOperationState::Failed { message } => {
+                    *self.pending_input.lock().await = None;
                     return Err(ServerError::Failed(message));
                 }
                 ServerOperationState::Unknown => return Err(ServerError::UnknownState),
             }
         }
+    }
+
+    async fn host_reply(
+        &self,
+        callback_id: String,
+        call: tinymcp_bus::ServerHostCall,
+        cancellation: &CancellationToken,
+    ) -> Result<ServerHostReply, ServerError> {
+        let mut pending = self.pending_callback.lock().await;
+        if let Some(PendingCallback::Complete { id, reply }) = pending.as_ref() {
+            if id == &callback_id {
+                return Ok(reply.clone());
+            }
+        }
+        if !matches!(pending.as_ref(), Some(PendingCallback::Running { id, .. }) if id == &callback_id)
+        {
+            *pending = Some(PendingCallback::Running {
+                id: callback_id.clone(),
+                task: tokio::spawn(handler::dispatch(call)),
+            });
+        }
+        let result = match pending.as_mut() {
+            Some(PendingCallback::Running { task, .. }) => {
+                tokio::select! {
+                    _ = cancellation.cancelled() => return Err(ServerError::Cancelled),
+                    result = task => result,
+                }
+            }
+            Some(PendingCallback::Complete { reply, .. }) => return Ok(reply.clone()),
+            None => return Err(ServerError::UnknownState),
+        };
+        let reply = result.unwrap_or_else(|_| ServerHostReply::Internal {
+            message: "host callback stopped".to_owned(),
+        });
+        *pending = Some(PendingCallback::Complete {
+            id: callback_id,
+            reply: reply.clone(),
+        });
+        Ok(reply)
     }
 
     pub(super) async fn close(&self) -> Result<(), ServerError> {
