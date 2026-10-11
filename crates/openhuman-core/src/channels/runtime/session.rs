@@ -20,7 +20,6 @@ pub(crate) fn invalidate_channel_session() {
 }
 
 /// Stop the host dispatch generation on logout, even with independent model auth.
-/// Module resource owners explicitly drain their handles when dispatch ends.
 pub(super) async fn run_in_session(
     session: CancellationToken,
     runtime: impl Future<Output = anyhow::Result<()>>,
