@@ -161,6 +161,11 @@ async fn use_skill_dispatch_keeps_authorized_target_after_registry_rebind() {
         .bind_call(&arguments)
         .expect("bind succeeds")
         .expect("known packed target binds");
+    assert_eq!(
+        pinned.output_origin(),
+        tinyagents_harness::host::ContentOrigin::Agent,
+        "typed packed dispatch must keep the delegated-agent output policy"
+    );
 
     let replacement: Arc<Vec<Box<dyn Tool>>> = Arc::new(vec![
         Box::new(UseSkillTool::new(
