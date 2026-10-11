@@ -7,8 +7,8 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use common::{
-    PointedTransport, chat_completion, chat_requests, runtime_without_master_key,
-    tool_call_completion, tool_names, tool_results,
+    chat_completion, chat_requests, runtime_without_master_key, tool_call_completion, tool_names,
+    tool_results, PointedTransport,
 };
 use openhuman_embed::memory::api::conformance::ReferenceEngine;
 use openhuman_embed::memory::api::{LearningKind, MemoryEngine, MemoryMeta, StoreItem};
@@ -18,7 +18,7 @@ use openhuman_embed::{
     HostTurnTools, PermissionLevel, ProfileRuntime, RelayMessage, SaasConfig, Tool, ToolResult,
     ToolScopeSpec,
 };
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use wiremock::{Mock, Request, Respond, ResponseTemplate};
 
 struct TenantTool {
@@ -96,9 +96,19 @@ async fn scenario() {
     let root = tempfile::tempdir().unwrap();
     let calls = Arc::new(Mutex::new(Vec::new()));
     let factory_calls = calls.clone();
+    let sessions = Arc::new(Mutex::new(Vec::new()));
+    let factory_sessions = sessions.clone();
     let engine = Arc::new(ReferenceEngine::new());
     let runtime = ProfileRuntime::builder(SaasConfig::new(root.path()))
-        .tools(move |_| {
+        .tools(move |turn| {
+            let profile = openhuman_core::core::runtime::current_tenant()
+                .unwrap()
+                .profile
+                .unwrap();
+            factory_sessions
+                .lock()
+                .unwrap()
+                .push((profile, turn.session_id().map(str::to_owned)));
             HostTurnTools::advertised(
                 [
                     "tenant_probe",
@@ -204,7 +214,20 @@ async fn scenario() {
             "tenant_probe:bob"
         ]
     );
-    for request in chat_requests(&inference).await {
+    assert_eq!(
+        *sessions.lock().unwrap(),
+        [
+            ("alice".into(), Some("t1".into())),
+            ("bob".into(), Some("t1".into())),
+            ("alice".into(), Some("channel:telegram/sender/chat".into())),
+            ("bob".into(), Some("channel:telegram/sender/chat".into())),
+        ]
+    );
+    let requests = chat_requests(&inference).await;
+    assert!(requests
+        .iter()
+        .any(|request| !tool_names(request).is_empty()));
+    for request in requests {
         let mut names = tool_names(&request);
         names.sort();
         if !names.is_empty() {
@@ -244,7 +267,10 @@ async fn scenario() {
             text.contains(&format!("{}-secret", handle.id())),
             "{response}"
         );
-        assert!(text.contains(&format!("{}-native-learning", handle.id())), "native memory mutation was persisted: {response}");
+        assert!(
+            text.contains(&format!("{}-native-learning", handle.id())),
+            "native memory mutation was persisted: {response}"
+        );
         let other = if handle.id().as_str() == "alice" {
             "bob"
         } else {

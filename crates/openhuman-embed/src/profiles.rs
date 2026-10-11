@@ -178,7 +178,14 @@ impl ProfileRuntimeBuilder {
             None
         };
 
-        let core = match openhuman_core::core::runtime::saas::build_with_profile_capabilities(config, None, None, Some(capabilities)).await {
+        let core = match openhuman_core::core::runtime::saas::build_with_profile_capabilities(
+            config,
+            None,
+            None,
+            Some(capabilities),
+        )
+        .await
+        {
             Ok(core) => core,
             Err(e) => {
                 // Boot failed; restore the previous session store if we installed one.

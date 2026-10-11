@@ -72,16 +72,23 @@ impl HostAgent {
         self.hooks.clone().sync_scope(|| {
             CoreContext::sync_scope(Arc::clone(&self.context), || {
                 if crate::profiles::capabilities::ProfileCapabilities::current().is_some() {
-                    return OpenHumanSessionHost::from_config_host_only(config, &self.definition, self.host_tools.as_ref(), session_id);
+                    return OpenHumanSessionHost::from_config_host_only(
+                        config,
+                        &self.definition,
+                        self.host_tools.as_ref(),
+                        session_id,
+                    );
                 }
                 match &self.host_tools {
-                Some(host) => OpenHumanSessionHost::from_config_with_host_tools(
-                    config,
-                    &self.definition,
-                    host,
-                    session_id,
-                ),
-                None => OpenHumanSessionHost::from_config_with_definition(config, &self.definition),
+                    Some(host) => OpenHumanSessionHost::from_config_with_host_tools(
+                        config,
+                        &self.definition,
+                        host,
+                        session_id,
+                    ),
+                    None => {
+                        OpenHumanSessionHost::from_config_with_definition(config, &self.definition)
+                    }
                 }
             })
         })

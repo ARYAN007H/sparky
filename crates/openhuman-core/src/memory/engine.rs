@@ -207,10 +207,25 @@ fn host_engine() -> Option<BoundEngine> {
 pub fn resolve(config: &Config) -> Binding {
     if let Some(capabilities) = crate::profiles::capabilities::ProfileCapabilities::current() {
         if let Some(engine) = &capabilities.memory_engine {
-            let profile = crate::core::runtime::current_tenant().ok().and_then(|tenant| tenant.profile);
-            let valid = profile.as_ref().is_some_and(|id| config.memory.agent_id.as_ref() == Some(id) && config.memory.root.as_deref() == Some(format!("user:{id}").as_str()));
-            if !valid { return off(None, None, "profile memory binding requires its forced namespace"); }
-            return Binding::On(BoundEngine { id: engine.descriptor().id.to_string(), endpoint: HOST_ENGINE_ENDPOINT.to_string(), engine: super::guard::ScrubbingEngine::wrap(Arc::clone(engine)) });
+            let profile = crate::core::runtime::current_tenant()
+                .ok()
+                .and_then(|tenant| tenant.profile);
+            let valid = profile.as_ref().is_some_and(|id| {
+                config.memory.agent_id.as_ref() == Some(id)
+                    && config.memory.root.as_deref() == Some(format!("user:{id}").as_str())
+            });
+            if !valid {
+                return off(
+                    None,
+                    None,
+                    "profile memory binding requires its forced namespace",
+                );
+            }
+            return Binding::On(BoundEngine {
+                id: engine.descriptor().id.to_string(),
+                endpoint: HOST_ENGINE_ENDPOINT.to_string(),
+                engine: super::guard::ScrubbingEngine::wrap(Arc::clone(engine)),
+            });
         }
     }
     #[cfg(test)]

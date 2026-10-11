@@ -43,8 +43,14 @@ impl std::fmt::Debug for HostOverrides {
 
 impl HostOverrides {
     /// Resolve inherited profile adapters without installing process globals.
-    pub fn profile_capabilities(&self) -> Option<Arc<crate::profiles::capabilities::ProfileCapabilities>> {
-        self.profile_capabilities.clone().or_else(|| self.parent.as_ref().and_then(|parent| parent.profile_capabilities()))
+    pub fn profile_capabilities(
+        &self,
+    ) -> Option<Arc<crate::profiles::capabilities::ProfileCapabilities>> {
+        self.profile_capabilities.clone().or_else(|| {
+            self.parent
+                .as_ref()
+                .and_then(|parent| parent.profile_capabilities())
+        })
     }
 
     /// Resolve the instance barrier inherited by derived turn contexts.

@@ -168,7 +168,10 @@ impl ProfileHost {
     }
 
     /// Install immutable operator adapters before this host is shared.
-    pub fn with_capabilities(mut self, capabilities: Option<Arc<super::capabilities::ProfileCapabilities>>) -> Self {
+    pub fn with_capabilities(
+        mut self,
+        capabilities: Option<Arc<super::capabilities::ProfileCapabilities>>,
+    ) -> Self {
         self.capabilities = capabilities;
         self
     }
@@ -297,7 +300,9 @@ impl ProfileHost {
             return Err(OpenError::Storage(error));
         }
         let mut config = layout::profile_config(&layout, id);
-        if let Some(capabilities) = &self.capabilities { capabilities.configure(&mut config); }
+        if let Some(capabilities) = &self.capabilities {
+            capabilities.configure(&mut config);
+        }
         let fence = super::fence::for_grant(
             Arc::clone(&self.leases),
             &self.node,
@@ -306,12 +311,17 @@ impl ProfileHost {
             self.saas.lease_ttl(),
         );
         let mut overlay = ContextOverlay::new(config.clone(), user_domains(), ToolGroups::none())
-            .without_user_skill_roots().profile(id.as_str()).agent_policy(profile_policy(&config));
+            .without_user_skill_roots()
+            .profile(id.as_str())
+            .agent_policy(profile_policy(&config));
         if let Some(capabilities) = &self.capabilities {
             let mut overrides = crate::agent::host_overrides::HostOverrides::default();
             overrides.parent = self.operator.host_overrides();
             overrides.profile_capabilities = Some(Arc::clone(capabilities));
-            overrides.tool_hook("profile.can_use_tool", Some(capabilities.hook(id, Arc::clone(&fence))));
+            overrides.tool_hook(
+                "profile.can_use_tool",
+                Some(capabilities.hook(id, Arc::clone(&fence))),
+            );
             overlay = overlay.host_overrides(Arc::new(overrides));
         }
         let context = self.operator.derive_with(overlay);

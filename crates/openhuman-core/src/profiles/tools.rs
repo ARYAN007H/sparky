@@ -181,9 +181,13 @@ pub fn gate_verdict_with(tool: &str, groups: &[SaasToolGroup]) -> Result<(), Str
 
 /// [`gate_verdict_with`] for the running deployment.
 pub fn gate_verdict(tool: &str) -> Result<(), String> {
-    let verdict = if super::capabilities::ProfileCapabilities::current().is_some_and(|caps| caps.authorizes_approval(tool)) {
+    let verdict = if super::capabilities::ProfileCapabilities::current()
+        .is_some_and(|caps| caps.authorizes_approval(tool))
+    {
         super::host::ensure_hosted()
-    } else { gate_verdict_with(tool, &allowlisted()) };
+    } else {
+        gate_verdict_with(tool, &allowlisted())
+    };
     log::debug!(
         "[profiles][tools] approval gate tool={tool} allowed={}",
         verdict.is_ok()
