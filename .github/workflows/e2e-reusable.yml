@@ -438,32 +438,12 @@ jobs:
 
       - name: Install checksum-pinned native test modules
         run: |
-          # Keep module-backed RPC coverage independent of release-metadata
-          # lookup. tinybus validates every directory ancestor, so keep each
-          # fixture outside the checkout owned by the host runner.
-          # Version and digest are the ubuntu-22.04-x86_64 registry pin; do
-          # not derive a replacement checksum from a local build.
-          juice_version="0.5.2"
-          juice_sha256="1a9bc9479ce51c87d82a6f145408cfcbe7d06de4613b0ca7cec1fd04bbc2b5b5"
+          # Keep fixtures in a trusted tree and resolve their verified releases
+          # from the same registry the product uses.
           module_root="/opt/openhuman-test-modules/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          juice_dir="$module_root/tinyjuice"
-          connectors_dir="$module_root/tinyconnectors"
-          juice_archive="$juice_dir/tinyjuice-module-${juice_version}-ubuntu-22.04-x86_64.tar.gz"
-          rm -rf "$juice_dir" "$connectors_dir"
-          mkdir -p "$juice_dir" "$connectors_dir"
-          curl --fail --location --silent --show-error --retry 4 --retry-delay 2 \
-            "https://github.com/tinyhumansai/tinyjuice/releases/download/v${juice_version}/$(basename "$juice_archive")" \
-            --output "$juice_archive"
-          echo "${juice_sha256}  $juice_archive" | sha256sum --check
-          tar --no-same-owner -xzf "$juice_archive" -C "$juice_dir"
-          bash scripts/ci-cancel-aware.sh cargo build --release \
-            --manifest-path vendor/tinyconnectors/crates/tinyconnectors/Cargo.toml
-          cp vendor/tinyconnectors/target/release/libtinyconnectors.so \
-            "$connectors_dir/libtinyconnectors.so"
-          echo "TINYJUICE_TEST_MODULE=$juice_dir/libtinyjuice_module.so" \
-            >> "$GITHUB_ENV"
-          echo "TINYCONNECTORS_TEST_MODULE=$connectors_dir/libtinyconnectors.so" \
-            >> "$GITHUB_ENV"
+          bash scripts/ci/self-hosted/install-test-modules.sh \
+            "$module_root" "$module_root/modules.env"
+          cat "$module_root/modules.env" >> "$GITHUB_ENV"
 
       - name: Run Rust E2E suite (tests/*_e2e.rs vs mock backend)
         run: bash scripts/ci-cancel-aware.sh pnpm test:rust:e2e
