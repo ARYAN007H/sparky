@@ -103,9 +103,6 @@ pub(crate) struct RepeatedToolFailureMiddleware {
     /// The registered tools' declarations (read-only policy, external effect,
     /// permission level). Without it only tool names are read.
     tool_facts: Option<ToolFactsLookup>,
-    /// The stop note this breaker latched into the shared slot, kept so a
-    /// later writer in the same batch cannot replace it (see [`Self::halt`]).
-    own_halt: std::sync::Mutex<Option<String>>,
 }
 
 impl RepeatedToolFailureMiddleware {
@@ -131,37 +128,7 @@ impl RepeatedToolFailureMiddleware {
             pending_nudges: EphemeralInstructionQueue::new(),
             call_effects: std::sync::Mutex::new(std::collections::HashMap::new()),
             tool_facts: None,
-            own_halt: std::sync::Mutex::default(),
         }
-    }
-
-    /// Stop the run, recording `summary` as its stop note unless another
-    /// breaker already stopped it.
-    ///
-    /// The note slot is shared with the repeat guard and the stop hooks, and
-    /// the first breaker to stop the run is the cause the user is told. A
-    /// stop only takes effect at the next iteration, so the rest of the batch
-    /// still reaches this breaker: the repeat guard halting while it admits a
-    /// batch of re-reads, then a mistyped path in that batch failing again,
-    /// used to replace the guard's note, and the turn was summarised as
-    /// "something this needs could not be found". The pause is sent either
-    /// way; it is idempotent.
-    fn halt(&self, summary: String) {
-        if let Ok(mut slot) = self.halt_summary.lock() {
-            match slot.as_deref() {
-                Some(existing) => tracing::debug!(
-                    existing = %crate::util::truncate_with_ellipsis(existing, 80),
-                    "[tinyagents::mw] run already stopped by an earlier breaker; keeping its stop note"
-                ),
-                None => {
-                    *slot = Some(summary.clone());
-                    if let Ok(mut own) = self.own_halt.lock() {
-                        *own = Some(summary);
-                    }
-                }
-            }
-        }
-        self.handle.send(SteeringCommand::Pause);
     }
 
     /// Judge each call's side effect from the registered tools' own
@@ -363,29 +330,6 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         true
     }
 
-    /// Put this breaker's stop note back if a later writer replaced it.
-    ///
-    /// [`Self::halt`] never replaces an earlier note, but the repeat guard
-    /// writes the shared slot unconditionally, so a result later in the batch
-    /// that trips it would otherwise relabel a stop this breaker made first.
-    async fn after_agent(
-        &self,
-        _ctx: &mut RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
-        _state: &(),
-        _run: &mut tinyagents_harness::middleware::AgentRun,
-    ) -> TaResult<()> {
-        let own = self.own_halt.lock().ok().and_then(|mut own| own.take());
-        if let (Some(own), Ok(mut slot)) = (own, self.halt_summary.lock()) {
-            if slot.as_deref().is_some_and(|current| current != own) {
-                tracing::debug!(
-                    "[tinyagents::mw] restoring the failure breaker's stop note replaced later in its batch"
-                );
-                *slot = Some(own);
-            }
-        }
-        Ok(())
-    }
-
     async fn before_tool(
         &self,
         _ctx: &mut RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
@@ -509,7 +453,10 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
                     if class == "uncertain_side_effect" {
                         summary.push_str(" The action may already have happened; reconcile its external state before any retry.");
                     }
-                    self.halt(summary);
+                    if let Ok(mut slot) = self.halt_summary.lock() {
+                        *slot = Some(summary);
+                    }
+                    self.handle.send(SteeringCommand::Pause);
                     self.tracker.reset();
                     return Ok(());
                 }
@@ -582,11 +529,14 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
                     kind = ?kind,
                     "[tinyagents::mw] terminal delegated-inference failure — halting on first occurrence with root cause"
                 );
-                self.halt(terminal_inference_halt_summary(
-                    kind,
-                    tool_name,
-                    &failure_text,
-                ));
+                if let Ok(mut slot) = self.halt_summary.lock() {
+                    *slot = Some(terminal_inference_halt_summary(
+                        kind,
+                        tool_name,
+                        &failure_text,
+                    ));
+                }
+                self.handle.send(SteeringCommand::Pause);
                 self.tracker.reset();
                 self.reset_recoverable_streak();
                 return Ok(());
@@ -644,7 +594,10 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
                     tool = tool_name,
                     "[tinyagents::mw] recoverable-failure headroom exhausted — halting run so the root cause surfaces"
                 );
-                self.halt(summary);
+                if let Ok(mut slot) = self.halt_summary.lock() {
+                    *slot = Some(summary);
+                }
+                self.handle.send(SteeringCommand::Pause);
                 self.reset_recoverable_streak();
             }
             // Recoverable failures never feed the crate tracker — its fixed 3/6
@@ -737,12 +690,15 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
                     user_actionable,
                     "[tinyagents::mw] repeated tool failure — halting run so the root cause surfaces"
                 );
+                if let Ok(mut slot) = self.halt_summary.lock() {
+                    *slot = Some(summary);
+                }
                 // Pause at the top of the next iteration (before the next model
                 // call), matching the stop-hook / cap pause path. Reset so a
                 // resumed run does not immediately re-pause on the latched state
                 // (the crate also resets internally on a halt; this is explicit
                 // and idempotent).
-                self.halt(summary);
+                self.handle.send(SteeringCommand::Pause);
                 self.tracker.reset();
             }
         }
