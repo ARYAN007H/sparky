@@ -47,9 +47,9 @@ impl Tool for TenantTool {
             .and_then(tinytools::ToolRunContext::thread_id)
             .expect("every hosted tool has its durable conversation key");
         let expected = match openhuman_embed::current_turn_origin().unwrap() {
-            openhuman_embed::AgentTurnOrigin::WebChat { .. } => "t1",
+            openhuman_embed::AgentTurnOrigin::WebChat { thread_id, .. } => thread_id,
             openhuman_embed::AgentTurnOrigin::ExternalChannel { .. } => {
-                "channel:telegram/sender/chat"
+                "channel:telegram/sender/chat".to_owned()
             }
             other => panic!("unexpected origin {other:?}"),
         };
@@ -61,7 +61,7 @@ impl Tool for TenantTool {
         let profile = tenant.profile.expect("profile tool always has a tenant");
         match openhuman_embed::current_turn_origin().expect("a host turn has its original route") {
             openhuman_embed::AgentTurnOrigin::WebChat { thread_id, .. } => {
-                assert_eq!(thread_id, "t1")
+                assert!(matches!(thread_id.as_str(), "t1" | "callback-denied"))
             }
             openhuman_embed::AgentTurnOrigin::ExternalChannel {
                 channel,
@@ -89,7 +89,9 @@ struct CallTools;
 impl Respond for CallTools {
     fn respond(&self, request: &Request) -> ResponseTemplate {
         let body: Value = serde_json::from_slice(&request.body).unwrap();
-        let completion = if common::last_user_message(&body).contains("unsafe fixture request") {
+        let completion = if common::last_user_message(&body).contains("deny callback request") && tool_results(request).is_empty() {
+            tool_call_completion("tenant_probe", r#"{"deny":true}"#)
+        } else if common::last_user_message(&body).contains("unsafe fixture request") {
             let mut completion = tool_call_completion("shell", "{}");
             completion["choices"][0]["message"]["tool_calls"] = json!(["shell", "delegate", "http_request", "run_workflow"].iter().enumerate().map(|(i, name)| json!({"id":format!("unsafe_{i}"),"type":"function","function":{"name":name,"arguments":"{}"}})).collect::<Vec<_>>());
             completion
@@ -206,7 +208,13 @@ async fn scenario() {
             "run_workflow".into(),
             "delegate_to".into(),
         ]))
-        .can_use_tool(|_| Box::pin(async { ToolHookDecision::Proceed }))
+        .can_use_tool(|context| Box::pin(async move {
+            if context.arguments.get("deny").and_then(Value::as_bool) == Some(true) {
+                ToolHookDecision::Deny("operator refused this call".into())
+            } else {
+                ToolHookDecision::Proceed
+            }
+        }))
         .channel_permissions([
             ("cli", PermissionLevel::Execute),
             ("web_channel", PermissionLevel::Execute),
@@ -316,6 +324,8 @@ async fn scenario() {
             .is_err(),
         "unregistered unsafe model calls must fail closed"
     );
+    assert_eq!(calls.lock().unwrap().len(), executions_before_denied_turn);
+    assert!(handles[0].chat("callback-denied", "deny callback request").await.is_err(), "the operator callback must refuse even a registered safe name");
     assert_eq!(calls.lock().unwrap().len(), executions_before_denied_turn);
     // Persistent hooks fail closed if reused under a different profile or
     // after the owning lease is fenced, before the host callback is consulted.
