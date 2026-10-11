@@ -1,10 +1,6 @@
-//! Host adapters over the wallet engine: the read and write operations wrapped
-//! in the controller contract's [`Outcome`].
-//!
-//! The logic (balances, transfers, lookups, the quote store) lives in
-//! `tinywallet_web3::crypto`. What this file adds is the `Outcome` envelope and
-//! its log lines, and the engine the operations run on
-//! ([`crate::web3::seams::engine`]).
+//! Typed TinyWallet module operations adapted to product controller results.
+//! This host supplies configuration, custody, transport and approvals; wallet
+//! algorithms and user-scoped service state remain in the compiled module.
 
 use crate::config::rpc as config_rpc;
 use crate::core::Outcome;

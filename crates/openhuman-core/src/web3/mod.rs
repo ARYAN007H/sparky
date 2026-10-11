@@ -1,13 +1,13 @@
-//! High-level web3 surface built on top of the [`crate::web3::wallet`]
-//! signing primitives. Focuses on EVM/Solana dapp interactions: swaps, bridges,
-//! and generic contract calls.
+//! High-level Web3 product surface for swaps, bridges, dapp calls, and wallet
+//! operations. The host owns RPC policy and user approval; TinyWallet owns
+//! chain-specific algorithms and module-scoped quote state.
 //!
-//! The swap/bridge/dapp logic (quote preparation, the confirm-then-execute quote
-//! store, the agent tools) lives in `tinywallet_web3::crypto::service`. What
-//! stays here is the host adapter: the RPC controllers and their schemas (the
-//! namespace strings are wire contracts), the [`client`] over the backend's
-//! deBridge proxy (`/agent-integrations/crypto/*`), and [`seams`], which holds
-//! the host implementations of the crate's seams and the process-wide service.
+//! Quote preparation, signing, calldata encoding, provider algorithms, and the
+//! confirm-then-execute quote store run inside the compiled TinyWallet module.
+//! This host layer keeps product RPC controllers and schemas (their namespace
+//! strings are wire contracts), the [`client`] for the backend deBridge proxy
+//! (`/agent-integrations/crypto/*`), and adapters for configuration, custody,
+//! approval, and generic network transport.
 //! Three sub-modules expose distinct RPC namespaces:
 //! - [`swap`] (`web3_swap`) — single-chain swaps (cross-chain → `web3_bridge`).
 //! - [`bridge`] (`web3_bridge`) — cross-chain DLN bridges.
