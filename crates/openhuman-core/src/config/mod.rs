@@ -54,7 +54,7 @@ pub use schema::{
     ObservabilityConfig, OrchestratorModelConfig, PrivacyConfig, PrivacyMode, ProxyConfig,
     ProxyScope, ReliabilityConfig, ResourceLimitsConfig, RuntimeConfig, SandboxBackend,
     SandboxConfig, SchedulerConfig, SchedulerGateConfig, SchedulerGateMode, SearchConfig,
-    SearchEngineCredentials, SearchHostCredential, SearchPresentation, SearchProviderSettings,
+    SearchEngineCredentials, SearchHostCredential, SearchPresentation, SearchProviderSettings, UnknownKeyedSearchProvider,
     SearchRoute,
     SearxngConfig, SecretsConfig, SecurityConfig, ShellConfig, SlackConfig, StreamMode, SttEngine,
     TeamModelConfig, TelegramConfig, TokenjuiceConfig, UpdateConfig, UpdateRestartStrategy,

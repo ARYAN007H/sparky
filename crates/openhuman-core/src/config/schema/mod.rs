@@ -121,7 +121,7 @@ pub use tools::{
     ComposioHostCredential, CurlConfig, GitbooksConfig, HttpHeader, HttpRequestConfig,
     IntegrationToggle, IntegrationsConfig, LegacySearchInputs, McpAuthConfig, McpClientConfig,
     McpClientIdentityConfig, McpServerConfig, McpToolExposure, MultimodalConfig,
-    MultimodalFileConfig, SearchConfig, SearchEngineCredentials, SearchHostCredential,
+    MultimodalFileConfig, SearchConfig, SearchEngineCredentials, SearchHostCredential, UnknownKeyedSearchProvider,
     SearchPresentation, SearchProviderSettings, SearchRoute, SearxngConfig, SecretsConfig, SeltzConfig,
     WebSearchConfig, COMPOSIO_MODE_BACKEND, COMPOSIO_MODE_DIRECT, COMPOSIO_MODE_DISABLED,
     MANAGED_SEARCH_PROVIDERS, SEARCH_ENGINE_BRAVE, SEARCH_ENGINE_DISABLED, SEARCH_ENGINE_EXA,
