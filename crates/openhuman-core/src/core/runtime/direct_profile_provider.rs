@@ -15,7 +15,8 @@ pub struct DirectProfileProvider {
 
 impl std::fmt::Debug for DirectProfileProvider {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.debug_struct("DirectProfileProvider")
+        formatter
+            .debug_struct("DirectProfileProvider")
             .field("route", &self.route)
             .field("model", &self.model)
             .finish()
@@ -46,12 +47,18 @@ impl DirectProfileProvider {
             anyhow::bail!("direct profile provider requires a nonblank model");
         }
         Ok(Self {
-            route: EphemeralRoute { endpoint, api_key, headers: Vec::new() },
+            route: EphemeralRoute {
+                endpoint,
+                api_key,
+                headers: Vec::new(),
+            },
             model,
         })
     }
 
-    pub(crate) fn model(&self) -> &str { &self.model }
+    pub(crate) fn model(&self) -> &str {
+        &self.model
+    }
 
     pub(crate) fn apply(&self, config: &mut crate::config::Config) {
         config.default_model = Some(self.model.clone());
@@ -85,7 +92,11 @@ impl<'de> Deserialize<'de> for DirectProfileProvider {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         #[derive(Deserialize)]
         #[serde(deny_unknown_fields)]
-        struct Input { endpoint: String, api_key: String, model: String }
+        struct Input {
+            endpoint: String,
+            api_key: String,
+            model: String,
+        }
         let input = Input::deserialize(deserializer)?;
         Self::openai_compatible(input.endpoint, input.api_key, input.model)
             .map_err(serde::de::Error::custom)

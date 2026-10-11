@@ -302,7 +302,11 @@ impl OpenHumanSessionHost {
             model_name = pinned_model.to_string();
         }
 
-        if let Some(model) = config.profile_providers.as_ref().and_then(|binding| binding.chat_model()) {
+        if let Some(model) = config
+            .profile_providers
+            .as_ref()
+            .and_then(|binding| binding.chat_model())
+        {
             model_name = model.to_owned();
         }
 

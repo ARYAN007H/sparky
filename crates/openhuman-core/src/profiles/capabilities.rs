@@ -95,7 +95,6 @@ impl ProfileCapabilities {
             && !name.starts_with("mcp_")
             && !crate::tools::toolpacks::pack_for_tool(name)
                 .is_some_and(|pack| pack.id == "workflows")
-
     }
 
     /// An explicitly named operation can pass the supervised gate only with a host callback.
@@ -120,8 +119,12 @@ impl ProfileCapabilities {
             let mut groups = ToolGroups::none();
             for name in names.iter().filter(|name| self.admits(name)) {
                 let binding = super::provider_settings::ProfileProviderSettings::current();
-                let canonical = binding.as_ref().and_then(|binding| binding.policy_name(name));
-                if let Some(pack) = crate::tools::toolpacks::pack_for_tool(canonical.as_deref().unwrap_or(name)) {
+                let canonical = binding
+                    .as_ref()
+                    .and_then(|binding| binding.policy_name(name));
+                if let Some(pack) =
+                    crate::tools::toolpacks::pack_for_tool(canonical.as_deref().unwrap_or(name))
+                {
                     groups = groups.with(pack.id, GroupMode::Advertised);
                 }
             }
@@ -222,29 +225,35 @@ impl ToolHook for ProfilePermission {
         match &self.capabilities.permission {
             Some(permission) => {
                 let binding = super::provider_settings::ProfileProviderSettings::current();
-                let canonical = binding.as_ref().and_then(|binding| binding.canonical_role_name(&context.tool_name));
+                let canonical = binding
+                    .as_ref()
+                    .and_then(|binding| binding.canonical_role_name(&context.tool_name));
                 let mut advertised = context.clone();
                 let mut rewritten = false;
                 if let Some(canonical) = canonical.filter(|name| *name != context.tool_name) {
                     if !self.capabilities.admits_capability(canonical) {
-                        return ToolHookDecision::Deny("canonical search capability is denied".into());
+                        return ToolHookDecision::Deny(
+                            "canonical search capability is denied".into(),
+                        );
                     }
                     let mut original = context.clone();
                     original.tool_name = canonical.to_owned();
                     match permission.before_tool_decision(&original).await {
-                        ToolHookDecision::Proceed => {},
+                        ToolHookDecision::Proceed => {}
                         ToolHookDecision::ProceedWith(arguments) => {
                             advertised.arguments = arguments;
                             rewritten = true;
-                        },
+                        }
                         refusal => return refusal,
                     }
                 }
                 match permission.before_tool_decision(&advertised).await {
-                    ToolHookDecision::Proceed if rewritten => ToolHookDecision::ProceedWith(advertised.arguments),
+                    ToolHookDecision::Proceed if rewritten => {
+                        ToolHookDecision::ProceedWith(advertised.arguments)
+                    }
                     decision => decision,
                 }
-            },
+            }
             None => {
                 ToolHookDecision::Deny("this profile has no host tool permission callback".into())
             }

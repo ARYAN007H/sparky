@@ -68,7 +68,10 @@ pub struct EphemeralRoute {
 impl std::fmt::Debug for EphemeralRoute {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("EphemeralRoute")
-            .field("endpoint", &crate::inference::provider::factory::redact_endpoint(&self.endpoint))
+            .field(
+                "endpoint",
+                &crate::inference::provider::factory::redact_endpoint(&self.endpoint),
+            )
             .field("api_key", &"[redacted]")
             .field("header_count", &self.headers.len())
             .finish()

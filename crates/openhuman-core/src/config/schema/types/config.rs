@@ -58,7 +58,8 @@ pub struct Config {
     #[serde(skip)]
     #[schemars(skip)]
     #[doc(hidden)]
-    pub profile_providers: Option<std::sync::Arc<crate::profiles::provider_settings::ProfileProviderSettings>>,
+    pub profile_providers:
+        Option<std::sync::Arc<crate::profiles::provider_settings::ProfileProviderSettings>>,
     #[serde(skip)]
     pub workspace_dir: PathBuf,
     /// Agent action sandbox root — the default cwd for shell/file/git tools.

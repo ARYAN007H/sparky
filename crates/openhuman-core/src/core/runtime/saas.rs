@@ -203,8 +203,12 @@ impl SaasConfig {
     pub fn load(path: &Path) -> anyhow::Result<Self> {
         let raw = std::fs::read_to_string(path)
             .map_err(|e| anyhow::anyhow!("reading SaaS config {}: {e}", path.display()))?;
-        let config: Self = toml::from_str(&raw)
-            .map_err(|_| anyhow::anyhow!("parsing SaaS config {}: invalid operator settings", path.display()))?;
+        let config: Self = toml::from_str(&raw).map_err(|_| {
+            anyhow::anyhow!(
+                "parsing SaaS config {}: invalid operator settings",
+                path.display()
+            )
+        })?;
         log::debug!(
             "[saas] loaded operator config from {} (root={})",
             path.display(),
