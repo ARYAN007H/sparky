@@ -4094,6 +4094,7 @@ dependencies = [
  "tinyagents-harness",
  "tinyagents-session",
  "tinybus",
+ "tinyflows-schedule",
  "tinyinference-embeddings",
  "tinyinference-llm",
  "tinymcp-bus",
