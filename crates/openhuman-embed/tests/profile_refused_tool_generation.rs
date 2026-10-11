@@ -127,6 +127,7 @@ async fn scenario() {
     openhuman_core::storage::install(Arc::new(openhuman_core::storage::MemoryStorage::new()));
 
     let recorder = Arc::new(Recorder::default());
+    let store = Arc::new(openhuman_embed::InMemorySessionStores::new());
     let root = tempfile::tempdir().unwrap();
     let mut saas = SaasConfig::new(root.path());
     saas.chat_provider = Some(
@@ -148,7 +149,7 @@ async fn scenario() {
         .can_use_tool(|_| Box::pin(async { ToolHookDecision::Proceed }))
         .channel_permissions([("web_channel", PermissionLevel::Execute)])
         .cron_delivery(recorder.clone())
-        .session_store(Arc::new(openhuman_embed::InMemorySessionStores::new()))
+        .session_store(store.clone())
         .build()
         .await
         .unwrap();
@@ -169,6 +170,11 @@ async fn scenario() {
         .chat("t1", "make a shell job")
         .await
         .expect("a refused tool call must not fail the turn");
+    for id in ["orchestrator", "alice", "u-alice"] {
+        use openhuman_embed::SessionStoreProvider;
+        let found = store.for_agent(id).transcripts.root_for_thread("t1");
+        eprintln!("CAND {id}: {}", found.is_some());
+    }
     let denied = handle.chat("t1", "run shell").await;
     eprintln!("DENIED TURN: {denied:?}");
     let denied = handle.chat("t1", "run shell").await;
