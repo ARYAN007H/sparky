@@ -129,6 +129,39 @@ impl ModuleChannelRuntime {
         Arc::clone(&self.channels)
     }
 
+    pub(super) async fn runtime_limits(
+        &self,
+        timeout_secs: u64,
+        listener_count: usize,
+    ) -> Result<(u64, usize)> {
+        use tinychannels_bus::module_control::{ChannelControlRequest, ChannelControlResult};
+
+        let result: ChannelControlResult = self
+            .lease
+            .object()
+            .call_confidential(
+                tinychannels_bus::methods::PREPARE_CHANNEL_CONTROL,
+                (ChannelControlRequest::RuntimeLimits {
+                    timeout_secs,
+                    listener_count,
+                },),
+            )
+            .await?;
+        match result {
+            ChannelControlResult::RuntimeLimits {
+                timeout_secs,
+                max_in_flight,
+            } if timeout_secs >= 30 && max_in_flight > 0 => {
+                Ok((timeout_secs, max_in_flight))
+            }
+            _ => {
+                ModuleClient::report_malformed_reply("tinychannels");
+                Err(anyhow::Error::new(ModuleCallError::ModuleFault)
+                    .context("channel runtime returned invalid runtime limits"))
+            }
+        }
+    }
+
     pub(super) async fn start(&mut self, config: &Config) -> Result<()> {
         let policy = ChannelSupervisionPolicy {
             initial_backoff_secs: config

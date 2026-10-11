@@ -145,7 +145,7 @@ pub(crate) async fn handle_runtime_command_if_needed(
     let operation = async {
         let lease = crate::modules::channel_runtime::ChannelRuntimeLease::open(client, RouteCallbacks {
             context: ctx.clone(),
-            cancellation: super::runtime::session::capture_channel_cancellation(),
+            cancellation: super::runtime::session::channel_session(),
         }).await?;
         let response: Result<ChannelControlResult, _> = lease.object().call_confidential(tinychannels_bus::methods::PREPARE_CHANNEL_CONTROL, (ChannelControlRequest::Route {
             workspace_dir: ctx.workspace_dir.to_string_lossy().into_owned(),

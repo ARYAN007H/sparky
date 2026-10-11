@@ -239,8 +239,11 @@ async fn start_channels_inner(mut config: Config, session: CancellationToken) ->
     tracing::debug!("[channels] registered turn-state and approval-surface subscribers");
 
     let listener_count = channels.len() + usize::from(relay_configured);
-    let max_in_flight_messages =
-        tinychannels::runtime::compute_max_in_flight_messages(listener_count);
+    let (message_timeout_secs, max_in_flight_messages) = module_runtime
+        .as_ref()
+        .expect("runtime prepared when providers are configured")
+        .runtime_limits(config.channels_config.message_timeout_secs, listener_count)
+        .await?;
 
     println!("  🚦 In-flight message limit: {max_in_flight_messages}");
 
@@ -248,6 +251,7 @@ async fn start_channels_inner(mut config: Config, session: CancellationToken) ->
         &config,
         parts,
         Arc::clone(&channels_by_name),
+        Some(message_timeout_secs),
     ));
     context_slot
         .set(Arc::downgrade(&runtime_ctx))

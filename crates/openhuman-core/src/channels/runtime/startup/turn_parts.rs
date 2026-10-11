@@ -232,6 +232,7 @@ pub(crate) fn runtime_context(
     config: &Config,
     parts: ChannelTurnParts,
     channels_by_name: Arc<HashMap<String, Arc<dyn crate::channels::Channel>>>,
+    prepared_message_timeout_secs: Option<u64>,
 ) -> ChannelRuntimeContext {
     ChannelRuntimeContext {
         channels_by_name,
@@ -250,9 +251,9 @@ pub(crate) fn runtime_context(
         reliability: Arc::new(config.reliability.clone()),
         provider_runtime_options: parts.provider_runtime_options,
         workspace_dir: Arc::new(config.workspace_dir.clone()),
-        message_timeout_secs: effective_channel_message_timeout_secs(
-            config.channels_config.message_timeout_secs,
-        ),
+        message_timeout_secs: prepared_message_timeout_secs.unwrap_or_else(|| {
+            effective_channel_message_timeout_secs(config.channels_config.message_timeout_secs)
+        }),
         multimodal: config.multimodal.clone(),
         multimodal_files: config.multimodal_files.clone(),
         // Crate-native turn models for the channel turn (Phase 3 P3-B).

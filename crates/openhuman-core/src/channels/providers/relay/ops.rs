@@ -139,7 +139,12 @@ pub(crate) async fn run_relay_turn(
 
     let mut channels_by_name: HashMap<String, Arc<dyn crate::channels::Channel>> = HashMap::new();
     channels_by_name.insert(params.channel.clone(), channel.clone());
-    let ctx = Arc::new(runtime_context(&config, parts, Arc::new(channels_by_name)));
+    let ctx = Arc::new(runtime_context(
+        &config,
+        parts,
+        Arc::new(channels_by_name),
+        None,
+    ));
 
     // The thread is the conversation's memory: seed the pipeline's per-chat
     // history from it, since this runtime context lives for one message.

@@ -6,7 +6,12 @@ use crate::channels::traits;
 /// Maximum characters shown in the debug reply println.
 pub(super) const REPLY_LOG_TRUNCATE_CHARS: usize = 200;
 
-pub(super) use tinychannels::runtime::{log_worker_join_result, select_acknowledgment_reaction};
+#[cfg(test)]
+pub(super) use tinychannels::runtime::select_acknowledgment_reaction;
+
+pub(super) fn log_worker_join_result(result: Result<(), tokio::task::JoinError>) {
+    if let Err(error) = result { tracing::warn!("channel worker failed: {error}"); }
+}
 
 /// Start the portable typing lifecycle with OpenHuman's configured interval.
 pub(super) fn spawn_scoped_typing_task(

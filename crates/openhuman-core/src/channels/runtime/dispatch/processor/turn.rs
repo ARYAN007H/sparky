@@ -22,8 +22,7 @@ use tokio_util::sync::CancellationToken;
 use tokio_util::task::AbortOnDropHandle;
 
 use super::super::helpers::{
-    build_channel_context_block, log_worker_join_result, select_acknowledgment_reaction,
-    spawn_scoped_typing_task, REPLY_LOG_TRUNCATE_CHARS,
+    build_channel_context_block, log_worker_join_result,     spawn_scoped_typing_task, REPLY_LOG_TRUNCATE_CHARS,
 };
 use super::super::host_agent::{self, run_host_agent_turn, seed_rows, HostChannelTurn, HostRoute};
 use super::approval::{channel_has_approval_surface, try_route_approval_reply};
@@ -158,7 +157,13 @@ pub(crate) async fn process_channel_runtime_message(
     let mut _acknowledgment_task = None;
     if let Some(channel) = target_channel.as_ref() {
         if channel.supports_reactions() && msg.thread_ts.is_some() {
-            let ack_emoji = select_acknowledgment_reaction(&msg.content);
+            let ack_result = crate::channels::context::module_client(&ctx).await.call_confidential::<tinychannels_bus::module_control::ChannelControlResult>("tinychannels", tinychannels_bus::methods::PREPARE_CHANNEL_CONTROL, (tinychannels_bus::module_control::ChannelControlRequest::Acknowledgment { content: msg.content.clone() },)).await;
+            let ack_emoji = match ack_result {
+                Ok(tinychannels_bus::module_control::ChannelControlResult::Acknowledgment(emoji)) => Some(emoji),
+                Ok(_) => { crate::modules::client::ModuleClient::report_malformed_reply("tinychannels"); None },
+                Err(_) => None,
+            };
+            if let Some(ack_emoji) = ack_emoji {
             tracing::debug!(
                 channel = msg.channel,
                 emoji = ack_emoji,
@@ -176,6 +181,7 @@ pub(crate) async fn process_channel_runtime_message(
                     tracing::debug!("[dispatch] Acknowledgment reaction failed: {e}");
                 }
             })));
+            }
         }
     }
 
@@ -498,7 +504,7 @@ pub(crate) async fn process_channel_runtime_message(
             (true, response_text, resolved_provider, resolved_model)
         }
         Ok(Err(e)) => {
-            if is_context_window_overflow_error(&e) {
+            if is_context_window_overflow_error(&ctx, &e).await.unwrap_or(false) {
                 let compacted = compact_sender_history(ctx.as_ref(), &history_key);
                 let error_text = if compacted {
                     "⚠️ Context window exceeded for this conversation. I compacted recent history and kept the latest context. Please resend your last message."
