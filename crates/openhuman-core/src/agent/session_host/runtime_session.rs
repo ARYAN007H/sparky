@@ -19,12 +19,18 @@ pub(super) use turn::begin_turn_resume;
 use std::sync::Arc;
 
 use anyhow::Result;
+use tinyagents_graph::goals::ThreadGoalStatus;
 use tinyagents_runtime::{
     CommitReceipt, ResumePreparation, SessionBuilder, SessionTerminal, ToolSnapshot,
     TranscriptTarget, TurnPreparation,
 };
 use tinyinference_llm::message::Message;
 
+use super::announcement_notes::{
+    integration_announcement_note, mcp_announcement_note, skill_announcement_note,
+    skill_retraction_note,
+};
+use super::types::OpenHumanSessionHost;
 use crate::agent::{
     message_convert::{user_message_from_text, user_text_with_markers},
     session_host::{
@@ -32,12 +38,6 @@ use crate::agent::{
     },
     tinyagents::{host::OpenHumanRunContext, TurnContextMiddleware},
 };
-
-use super::announcement_notes::{
-    integration_announcement_note, mcp_announcement_note, skill_announcement_note,
-    skill_retraction_note,
-};
-use super::types::OpenHumanSessionHost;
 
 #[path = "runtime_session_progress.rs"]
 mod progress;
@@ -422,12 +422,7 @@ impl OpenHumanTurnPrelude {
             )
             .await;
             match loaded {
-                Some(goal)
-                    if matches!(
-                        goal.status,
-                        tinyagents_graph::goals::ThreadGoalStatus::Paused
-                    ) =>
-                {
+                Some(goal) if matches!(goal.status, ThreadGoalStatus::Paused) => {
                     crate::agent::goals::runtime::resume_for_thread(
                         &self.workspace_dir,
                         self.thread_id.as_deref(),

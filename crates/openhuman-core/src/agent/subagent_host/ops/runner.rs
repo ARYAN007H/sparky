@@ -11,6 +11,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::agent::harness::agent_graph::{AgentTurnRequest, AgentTurnUsage};
+use crate::agent::harness::artifact_offload::{new_artifact_offload, offload_oversized_result};
 use crate::agent::harness::definition::{
     validate_tier_transition, AgentDefinition, AgentDefinitionRegistry, AgentTier, IterationPolicy,
     PromptSource, SandboxMode as AgentSandboxMode,
@@ -31,17 +32,12 @@ use crate::agent::subagent_host::types::{
     SubagentMode, SubagentRunError, SubagentRunOptions, SubagentRunOutcome,
 };
 use crate::inference::provider::AGENT_TURN_MAX_OUTPUT_TOKENS;
+use tinyagents_harness::artifacts::{
+    effective_offload_threshold, extract_artifact_paths, note_artifact_handoff,
+    DEFAULT_OFFLOAD_THRESHOLD_BYTES, HANDOFF_STAGE_RECORDED,
+};
 use tinytools::{SandboxMode as TinyagentsSandboxMode, ToolSpec, WorkspaceDescriptor};
 use tinytools_std::file_state::with_file_state_agent_id;
-use {
-    crate::agent::harness::artifact_offload::new_artifact_offload,
-    crate::agent::harness::artifact_offload::offload_oversized_result,
-    tinyagents_harness::artifacts::effective_offload_threshold,
-    tinyagents_harness::artifacts::extract_artifact_paths,
-    tinyagents_harness::artifacts::note_artifact_handoff,
-    tinyagents_harness::artifacts::DEFAULT_OFFLOAD_THRESHOLD_BYTES,
-    tinyagents_harness::artifacts::HANDOFF_STAGE_RECORDED,
-};
 
 use super::prompt::{
     append_artifact_offload_contract, append_subagent_role_contract, dedup_tool_specs_by_name,
