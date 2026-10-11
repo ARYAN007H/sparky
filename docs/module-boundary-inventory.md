@@ -356,7 +356,7 @@ those callers and their dependency graphs are cut over.
 
 ## Channel message preparation and hosted ingress
 
-The host now pins verified TinyChannels v0.1.25 (contract 15, operation 1.16).
+The host now pins verified TinyChannels v0.1.26 (contract 16, operation 1.17).
 All eleven published archives and their checksum manifest were checked against
 actual downloaded bytes, GitHub digests, and sizes. Published Linux module
 fixtures pass with both the owning loader and OpenHuman's shipped TinyBus kernel.
