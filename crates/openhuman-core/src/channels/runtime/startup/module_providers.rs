@@ -283,36 +283,50 @@ impl Channel for ModuleChannel {
         self.interact(ChannelInteraction::StartTyping {
             recipient: recipient.to_owned(),
         })
-        .await?;
-        if let Err(error) = self
-            .interact(ChannelInteraction::StartTypingRefresh {
-                recipient: recipient.to_owned(),
-                interval_secs: crate::channels::context::CHANNEL_TYPING_REFRESH_INTERVAL_SECS,
-            })
-            .await
-        {
-            let _ = self
-                .interact(ChannelInteraction::StopTyping {
-                    recipient: recipient.to_owned(),
-                })
-                .await;
-            return Err(error);
-        }
-        Ok(())
+        .await
     }
 
     async fn stop_typing(&self, recipient: &str) -> anyhow::Result<()> {
-        let refresh = self
-            .interact(ChannelInteraction::StopTypingRefresh {
-                recipient: recipient.to_owned(),
-            })
-            .await;
-        let stopped = self
-            .interact(ChannelInteraction::StopTyping {
-                recipient: recipient.to_owned(),
-            })
-            .await;
-        refresh.and(stopped)
+        self.interact(ChannelInteraction::StopTyping {
+            recipient: recipient.to_owned(),
+        })
+        .await
+    }
+
+    async fn begin_typing_refresh(
+        &self,
+        recipient: &str,
+        interval_secs: u64,
+    ) -> anyhow::Result<Option<String>> {
+        match self
+            .object
+            .call_confidential::<ChannelInteractionResult>(
+                tinychannels_bus::methods::CHANNEL_INTERACTION,
+                tinychannels_bus::ChannelInteractionRequest {
+                    channel: self.name.clone(),
+                    interaction: ChannelInteraction::StartTypingRefresh {
+                        recipient: recipient.to_owned(),
+                        interval_secs,
+                    },
+                },
+            )
+            .await
+            .map_err(anyhow::Error::new)?
+        {
+            ChannelInteractionResult::TypingRefresh { handle }
+                if !handle.is_empty() && handle.len() <= 128 =>
+            {
+                Ok(Some(handle))
+            }
+            _ => anyhow::bail!("channel returned an invalid typing refresh handle"),
+        }
+    }
+
+    async fn end_typing_refresh(&self, handle: &str) -> anyhow::Result<()> {
+        self.interact(ChannelInteraction::StopTypingRefresh {
+            handle: handle.to_owned(),
+        })
+        .await
     }
 
     fn capabilities(&self) -> tinychannels_bus::ChannelCapabilities {

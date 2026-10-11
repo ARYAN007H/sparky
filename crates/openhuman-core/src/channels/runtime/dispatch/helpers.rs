@@ -15,12 +15,45 @@ pub(super) fn spawn_scoped_typing_task(
     recipient: String,
     cancellation_token: tokio_util::sync::CancellationToken,
 ) -> tokio::task::JoinHandle<()> {
-    tinychannels::runtime::spawn_scoped_typing_task(
-        channel,
-        recipient,
-        cancellation_token,
-        Duration::from_secs(CHANNEL_TYPING_REFRESH_INTERVAL_SECS),
-    )
+    tokio::spawn(async move {
+        let handle = match channel
+            .begin_typing_refresh(
+                &recipient,
+                CHANNEL_TYPING_REFRESH_INTERVAL_SECS,
+            )
+            .await
+        {
+            Ok(handle) => handle,
+            Err(error) => {
+                tracing::debug!(channel = channel.name(), "typing refresh could not start: {error}");
+                let _ = channel.stop_typing(&recipient).await;
+                return;
+            }
+        };
+
+        if let Some(handle) = &handle {
+            cancellation_token.cancelled().await;
+            if let Err(error) = channel.end_typing_refresh(handle).await {
+                tracing::debug!(channel = channel.name(), "typing refresh cleanup failed: {error}");
+            }
+        } else {
+            // Compatibility for non-module test doubles. Production module
+            // providers return an opaque handle and own the refresh timer.
+            loop {
+                tokio::select! {
+                    () = cancellation_token.cancelled() => break,
+                    () = tokio::time::sleep(Duration::from_secs(CHANNEL_TYPING_REFRESH_INTERVAL_SECS)) => {
+                        if let Err(error) = channel.start_typing(&recipient).await {
+                            tracing::debug!(channel = channel.name(), "typing start failed: {error}");
+                        }
+                    }
+                }
+            }
+        }
+        if let Err(error) = channel.stop_typing(&recipient).await {
+            tracing::debug!(channel = channel.name(), "typing stop failed: {error}");
+        }
+    })
 }
 
 /// Build the `[Channel context]` block for a channel turn.
