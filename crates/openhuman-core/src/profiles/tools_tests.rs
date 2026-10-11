@@ -187,9 +187,15 @@ fn a_missing_sandbox_is_refused() {
 
 #[test]
 fn only_the_scheduler_and_clock_tools_are_operator_admittable() {
-    assert_eq!(OPERATOR_ADMITTABLE, ["cron", "current_time", "resolve_time"]);
+    assert_eq!(
+        OPERATOR_ADMITTABLE,
+        ["cron", "current_time", "resolve_time"]
+    );
     for tool in OPERATOR_ADMITTABLE {
         assert!(!is_hard_denied(tool), "{tool}");
-        assert!(!admits_with(tool, false, &[]), "{tool} stays off without a scope");
+        assert!(
+            !admits_with(tool, false, &[]),
+            "{tool} stays off without a scope"
+        );
     }
 }
