@@ -357,9 +357,7 @@ fn handle_add(params: Map<String, Value>) -> ControllerFuture {
                     &config.action_dir,
                 );
                 crate::cron::scheduler::shell_job::authorize_shell_command(
-                    &config,
-                    &security,
-                    &cmd,
+                    &config, &security, &cmd,
                 )
                 .await?;
                 crate::cron::store::add_shell_job(&config, name, schedule, &cmd)

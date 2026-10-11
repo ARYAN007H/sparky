@@ -398,14 +398,10 @@ async fn no_workspace_docker_call_uses_its_typed_member_and_request() {
         label: Some("openhuman.runtime=true".to_owned()),
         timeout_ms: 12_000,
     };
-    let output: contract::DockerRunOutput = call_with_client(
-        &client,
-        RUN_DOCKER_WITHOUT_WORKSPACE,
-        (request,),
-        false,
-    )
-    .await
-    .expect("the adapter decodes the typed no-workspace result");
+    let output: contract::DockerRunOutput =
+        call_with_client(&client, RUN_DOCKER_WITHOUT_WORKSPACE, (request,), false)
+            .await
+            .expect("the adapter decodes the typed no-workspace result");
 
     assert_eq!(output.exit_code, 0);
     let calls = calls.lock().expect("recorded TinyBox calls");

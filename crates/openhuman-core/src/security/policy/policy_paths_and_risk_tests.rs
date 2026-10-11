@@ -210,7 +210,10 @@ fn tinybox_fact_allowlist_treats_heredoc_as_data_and_unknown_commands_as_writes(
         literal_words: vec!["unrecognized-tool".into(), "--flag".into()],
     };
     assert!(!policy.is_command_allowed_analysis(&unknown_write));
-    assert_eq!(policy.check_gated_command_analysis(&unknown_write), Ok(CommandClass::Write));
+    assert_eq!(
+        policy.check_gated_command_analysis(&unknown_write),
+        Ok(CommandClass::Write)
+    );
 }
 
 #[test]
