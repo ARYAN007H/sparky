@@ -47,12 +47,17 @@ static SINK: RwLock<Option<Arc<dyn CronDelivery>>> = RwLock::new(None);
 
 /// Install the process's host delivery, returning the one it replaces.
 pub fn install(sink: Arc<dyn CronDelivery>) -> Option<Arc<dyn CronDelivery>> {
-    SINK.write().unwrap_or_else(|e| e.into_inner()).replace(sink)
+    SINK.write()
+        .unwrap_or_else(|e| e.into_inner())
+        .replace(sink)
 }
 
 /// Remove the installed delivery. Returns whether there was one.
 pub fn clear() -> bool {
-    SINK.write().unwrap_or_else(|e| e.into_inner()).take().is_some()
+    SINK.write()
+        .unwrap_or_else(|e| e.into_inner())
+        .take()
+        .is_some()
 }
 
 /// The installed delivery, if any.

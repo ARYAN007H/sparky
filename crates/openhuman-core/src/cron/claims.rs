@@ -50,7 +50,10 @@ pub async fn claim_occurrence(
         "claimed_at_ms": now_ms,
         "lease_until_ms": now_ms + CLAIM_LEASE_MS,
     });
-    match docs.put(CLAIMS, &id, doc.clone(), Precondition::Absent).await {
+    match docs
+        .put(CLAIMS, &id, doc.clone(), Precondition::Absent)
+        .await
+    {
         Ok(_) => return Ok(true),
         Err(error) if error.kind() == ErrorKind::Conflict => {}
         Err(error) => return Err(error).context("claiming the occurrence"),

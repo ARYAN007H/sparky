@@ -104,7 +104,10 @@ pub async fn sweep(host: &ProfileHost, now: DateTime<Utc>) -> SweepReport {
                 Ok(true) => claimed.push(job),
                 Ok(false) => report.skipped += 1,
                 Err(error) => {
-                    log::warn!("[profiles][cron] profile={id} job={} claim: {error}", job.id);
+                    log::warn!(
+                        "[profiles][cron] profile={id} job={} claim: {error}",
+                        job.id
+                    );
                     report.skipped += 1;
                 }
             }
