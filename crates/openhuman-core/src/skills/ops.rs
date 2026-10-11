@@ -43,9 +43,9 @@ pub use super::ops_install::{
 };
 #[cfg(test)]
 use {
-    tinyskills::Skill as Workflow, tinyskills::SkillFrontmatter as WorkflowFrontmatter,
+    tinyskills::Skill as Workflow, 
     tinyskills::SkillScope as WorkflowScope,
-    tinyskills::MAX_RESOURCE_BYTES as MAX_WORKFLOW_RESOURCE_BYTES,
+    
 };
 
 #[cfg(test)]
