@@ -596,9 +596,10 @@ async fn nudges_for_a_hoisting_model_add_no_system_message() {
     let injector = mw.nudge_injector();
     // The injector must remain in the before-model pass after a prior
     // middleware requests retry control, or the queued correction is lost.
-    assert!(tinyagents_harness::middleware::Middleware::is_observer(
-        &injector
-    ));
+    assert!(tinyagents_harness::middleware::Middleware::<
+        (),
+        crate::agent::tinyagents::host::OpenHumanRunContext,
+    >::is_observer(&injector));
     run_ctx.model_profile = Some(tinyinference_llm::model::ModelProfile {
         hoists_system_messages: true,
         mid_conversation_system_messages: true,

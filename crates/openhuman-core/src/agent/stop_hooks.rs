@@ -21,10 +21,7 @@ use crate::agent::cost::TurnCost;
 use async_trait::async_trait;
 use std::sync::Arc;
 
-pub use tinyagents_harness::middleware::library::{StopDecision, StopHook};
-
-/// Host accounting snapshot supplied to the harness-owned policy contract.
-pub type TurnState<'a> = tinyagents_harness::middleware::library::TurnState<'a, TurnCost>;
+use tinyagents_harness::middleware::{StopDecision, StopHook, TurnState};
 
 tokio::task_local! {
     static CURRENT_STOP_HOOKS: Vec<Arc<dyn StopHook<TurnCost>>>;
@@ -65,7 +62,7 @@ impl StopHook<TurnCost> for BudgetStopHook {
         "budget"
     }
 
-    async fn check(&self, ctx: &TurnState<'_>) -> StopDecision {
+    async fn check(&self, ctx: &TurnState<'_, TurnCost>) -> StopDecision {
         if !self.max_usd.is_finite() || self.max_usd <= 0.0 {
             return StopDecision::Stop {
                 reason: format!("invalid budget cap configured: max_usd={}", self.max_usd),

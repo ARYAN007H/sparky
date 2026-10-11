@@ -2,10 +2,11 @@
 //! turn-deadline wind-down, the two graceful pauses of a top-level turn.
 
 use super::*;
-use crate::agent::stop_hooks::{BudgetStopHook, StopDecision, StopHook, TurnState};
+use crate::agent::stop_hooks::BudgetStopHook;
 use crate::agent::tinyagents::TurnModelSource;
 use async_trait::async_trait;
 use std::sync::Arc;
+use tinyagents_harness::middleware::{StopDecision, StopHook, TurnState};
 use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
 use tinyinference_llm::tool::ToolCall;
 use tinyinference_llm::usage::Usage;
@@ -82,7 +83,7 @@ impl StopHook<crate::agent::cost::TurnCost> for RecordingBudgetStopHook {
         self.inner.name()
     }
 
-    async fn check(&self, state: &TurnState<'_>) -> StopDecision {
+    async fn check(&self, state: &TurnState<'_, crate::agent::cost::TurnCost>) -> StopDecision {
         let decision = self.inner.check(state).await;
         if let StopDecision::Stop { reason } = &decision {
             *self.reason.lock().expect("stop reason lock") = Some(reason.clone());
