@@ -10,7 +10,7 @@ use std::sync::{Arc, RwLock};
 use crate::agent::hooks::{PostTurnHook, ToolHook};
 use tinyinference_llm::model::ChatModel;
 
-pub use tinyagents_harness::cancel::CancellationToken;
+use tinyagents_harness::cancel::CancellationToken;
 
 /// Runtime or agent host adapters, shared by every context derived from it.
 #[derive(Default)]

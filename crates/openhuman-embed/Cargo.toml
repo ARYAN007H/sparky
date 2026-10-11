@@ -68,6 +68,8 @@ tinymcp-bus = { path = "../../vendor/tinymcp/crates/tinymcp-bus" }
 # conversations in its own database, and the in-memory provider; same path as
 # the core's so one copy resolves.
 tinyagents-session = { path = "../../vendor/tinyagents/crates/tinyagents-session" }
+# Native cancellation contract, exposed unchanged by the existing stream API.
+tinyagents-harness = { path = "../../vendor/tinyagents/crates/tinyagents-harness", default-features = false }
 # The wire request/response types `complete` converts to; same path as the
 # core's so one copy resolves.
 tinyinference-llm = { path = "../../vendor/tinyagents/vendor/tinyinference/crates/tinyinference-llm" }

@@ -31,7 +31,7 @@ function check(files) {
 }
 
 const contracts = {
-  'crates/openhuman-core/src/agent/host_overrides.rs': 'pub use tinyagents_harness::cancel::CancellationToken;\n',
+  'crates/openhuman-embed/src/stream.rs': 'pub use tinyagents_harness::cancel::CancellationToken;\n',
   'crates/openhuman-embed/src/config.rs': 'pub use tinytools::{\n DefaultEffect, Patterns, RuleEffect, Surface, ToolMatcher, ToolRule, ToolRules,\n};\n',
   'crates/openhuman-embed/src/lib.rs': 'pub mod providers {\n pub use tinyinference_llm::message::MessageDelta;\n pub use tinyinference_llm::model::{\n ChatModel, DeferredHandle, DeferredStatus, ModelProfile, ModelRequest, ModelResponse,\n ModelStream, ModelStreamItem, ModelStreamMetadata,\n };\n pub use tinyinference_llm::{Error, Result};\n}\n',
 };
@@ -48,7 +48,7 @@ test('the public contract allowance does not admit another export in an approved
 });
 
 test('the same native contract remains forbidden outside its owning adapter', () => {
-  const result = check({ 'crates/openhuman-core/src/other/mod.rs': contracts['crates/openhuman-core/src/agent/host_overrides.rs'] });
+  const result = check({ 'crates/openhuman-core/src/other/mod.rs': contracts['crates/openhuman-embed/src/stream.rs'] });
   assert.equal(result.status, 1, result.output);
   assert.match(result.output, /openhuman-upstream-reexport/);
 });
@@ -64,6 +64,7 @@ test('Embed preserves its existing native tool, session and budget injection con
 
 test('native injection allowances reject expanded or core compatibility exports', () => {
   for (const files of [
+    { 'crates/openhuman-core/src/agent/host_overrides.rs': 'pub use tinyagents_harness::cancel::CancellationToken;\n' },
     { 'crates/openhuman-embed/src/lib.rs': 'pub use tinytools::{PermissionLevel, Tool, ToolExposure, ToolResult, ToolRegistry};\n' },
     { 'crates/openhuman-core/src/tools/mod.rs': 'pub use tinytools::{PermissionLevel, Tool, ToolExposure, ToolResult};\n' },
     { 'crates/openhuman-core/src/agent/session_store/mod.rs': 'pub use tinyagents_session::port::{AgentStores, SessionStoreProvider};\n' },
