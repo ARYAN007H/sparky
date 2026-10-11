@@ -123,7 +123,26 @@ function isInferenceRequest(req) {
 
 function upstreamPath(requestUrl) {
   const basePath = upstream.pathname.replace(/\/$/, "");
-  return `${basePath}${requestUrl || "/"}`;
+  return `${basePath}${originForm(requestUrl)}`;
+}
+
+/**
+ * A client that reaches the proxy through `HTTP_PROXY` sends the absolute form
+ * (`POST http://openrouter.ai/api/v1/chat/completions`). That is how a core is
+ * captured while its endpoint still names `openrouter.ai`, which the provider
+ * factory keys on to add OpenRouter's `cache_control` markers and routing
+ * options; pointing the endpoint at the loopback proxy instead measures a
+ * different request. Reduce the absolute form to its path and query.
+ */
+function originForm(requestUrl) {
+  if (!requestUrl) return "/";
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(requestUrl)) return requestUrl;
+  try {
+    const parsed = new URL(requestUrl);
+    return `${parsed.pathname}${parsed.search}`;
+  } catch {
+    return requestUrl;
+  }
 }
 
 /**
