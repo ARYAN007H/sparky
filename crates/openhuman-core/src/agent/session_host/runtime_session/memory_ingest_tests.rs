@@ -144,3 +144,26 @@ async fn deferred_memory_commit_survives_the_turn_scope_without_pinning_the_prof
     })
     .await;
 }
+
+#[tokio::test]
+async fn missing_profile_owner_refuses_deferred_memory_instead_of_running_unscoped() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet, SaasConfig};
+    use crate::profiles::ProfileHost;
+    use crate::tools::toolpacks::ToolGroups;
+    let root = tempfile::tempdir().unwrap();
+    let operator = CoreContext::for_test(DomainSet::full(), None);
+    let host = ProfileHost::new(SaasConfig::new(root.path()), operator.clone());
+    let missing = operator.derive_with(
+        ContextOverlay::new(
+            crate::config::Config::default(),
+            DomainSet::full(),
+            ToolGroups::none(),
+        )
+        .profile("missing-owner"),
+    );
+    let captured = CoreContext::scope(missing, async { capture_profile_context(&host) }).await;
+    deferred_memory_work(captured, async {
+        panic!("a failed profile owner capture must not run under the configured external engine")
+    })
+    .await;
+}

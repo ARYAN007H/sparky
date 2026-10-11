@@ -120,7 +120,7 @@ impl Respond for CallTools {
             } else {
                 "bob"
             };
-            let channel = if message.contains("[Channel context]") {
+            let channel = if message.contains("\"telegram\" channel") {
                 "relay"
             } else {
                 "chat"
@@ -570,7 +570,7 @@ async fn scenario() {
         let response: Value = tokio::time::timeout(Duration::from_secs(30), async {
             loop {
                 let response: Value = handle
-                    .call("openhuman.memory_items_list", json!({}))
+                    .call("openhuman.memory_items_list", json!({"limit":100}))
                     .await
                     .unwrap();
                 if response
@@ -582,6 +582,9 @@ async fn scenario() {
                     && response
                         .to_string()
                         .contains(&format!("done: relay:{}", handle.id()))
+                    && (handle.id().as_str() != "alice"
+                        || (response.to_string().contains("done: reopened-chat:alice")
+                            && response.to_string().contains("done: reopened-relay:alice")))
                 {
                     break response;
                 }
