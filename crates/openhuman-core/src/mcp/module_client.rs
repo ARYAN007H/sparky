@@ -20,6 +20,7 @@ use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
 use tinymcp_bus::{
+    agent_tools::{McpToolPresentation, PrepareAgentToolsRequest},
     config::{McpClientConfig, OpenConfiguredRequest, OpenConfiguredResponse, TransitionStatus},
     names, SupervisorBatch,
 };
@@ -84,6 +85,11 @@ pub(crate) trait McpModulePort: Send + Sync {
         args: Value,
         confidential: bool,
     ) -> Result<Value, ModuleCallError>;
+
+    async fn prepare_agent_tools(
+        &self,
+        request: PrepareAgentToolsRequest,
+    ) -> Result<Vec<McpToolPresentation>, ModuleCallError>;
 }
 
 struct TinyMcpPort {
@@ -149,6 +155,19 @@ impl McpModulePort for TinyMcpPort {
             let _ = (object_path, member, args, confidential);
             Err(ModuleCallError::Unavailable)
         }
+    }
+
+    async fn prepare_agent_tools(
+        &self,
+        request: PrepareAgentToolsRequest,
+    ) -> Result<Vec<McpToolPresentation>, ModuleCallError> {
+        self.root
+            .call(
+                MODULE,
+                names::methods::PREPARE_AGENT_TOOLS,
+                (request,),
+            )
+            .await
     }
 }
 
@@ -323,6 +342,19 @@ impl McpConfiguredClient {
         args: impl Serialize,
     ) -> Result<R, ModuleCallError> {
         self.call_inner(config, member, args, true).await
+    }
+
+    /// Asks the module to prepare owner-derived names and rule facts for
+    /// host-screened tools. This root operation needs no configured server
+    /// object or credentials.
+    pub(crate) async fn prepare_agent_tools(
+        &self,
+        request: PrepareAgentToolsRequest,
+    ) -> Result<Vec<McpToolPresentation>, ModuleCallError> {
+        if SHUTTING_DOWN.load(Ordering::Acquire) {
+            return Err(ModuleCallError::Unavailable);
+        }
+        self.port.prepare_agent_tools(request).await
     }
 
     async fn call_inner<R: DeserializeOwned>(
