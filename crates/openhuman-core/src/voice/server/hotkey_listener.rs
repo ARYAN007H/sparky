@@ -1,5 +1,5 @@
-//! Hotkey listener dispatch: rdev everywhere except the macOS Fn/Globe key,
-//! which needs the Swift-based globe listener instead.
+//! Hotkey listener dispatch. TinyVoice owns native listeners; macOS Globe
+//! input remains a host-fed composition over TinyComputer facts.
 
 #[cfg(any(target_os = "macos", test))]
 use std::time::Duration;
@@ -10,12 +10,14 @@ use tokio_util::sync::CancellationToken;
 
 use crate::voice::hotkey;
 
-#[cfg(any(target_os = "macos", test))]
 use super::LOG_PREFIX;
 
 /// Opaque handle that keeps the hotkey listener alive. Drop to stop.
-pub(super) enum HotkeyListenerKind {
-    Rdev(hotkey::HotkeyListenerHandle),
+pub(crate) enum HotkeyListenerKind {
+    Module {
+        cancel: CancellationToken,
+        task: tokio::task::JoinHandle<()>,
+    },
     #[cfg(any(target_os = "macos", test))]
     Globe {
         cancel: CancellationToken,
@@ -24,9 +26,12 @@ pub(super) enum HotkeyListenerKind {
 }
 
 impl HotkeyListenerKind {
-    pub(super) async fn stop(self) {
+    pub(crate) async fn stop(self) {
         match self {
-            HotkeyListenerKind::Rdev(handle) => handle.stop(),
+            HotkeyListenerKind::Module { cancel, task } => {
+                cancel.cancel();
+                let _ = task.await;
+            }
             #[cfg(any(target_os = "macos", test))]
             HotkeyListenerKind::Globe { cancel, task } => {
                 cancel.cancel();
@@ -45,7 +50,7 @@ impl HotkeyListenerKind {
 /// `dispatch_assert_queue(main_queue)` inside that API and kills the process
 /// with `EXC_BREAKPOINT` (`dispatch_assert_queue_fail`). Configure
 /// `hotkey = "fn"` to avoid this. (#2677)
-pub(super) async fn start_hotkey_listener(
+pub(crate) async fn start_hotkey_listener(
     config: &crate::config::Config,
     hotkey_str: &str,
     mode: hotkey::ActivationMode,
@@ -75,29 +80,225 @@ pub(super) async fn start_hotkey_listener(
         ))
     }
 
-    // Non-macOS: rdev-based listener for all keys.
+    // Non-macOS: TinyVoice owns its native listener and cleanup worker.
     #[cfg(not(target_os = "macos"))]
     {
-        // `server_cancel` is only consumed by the macOS Swift-globe listener
-        // branch above; the rdev listener manages its own lifecycle, so bind it
-        // here to keep the shared signature warning-free on non-macOS.
-        let _ = (config, server_cancel);
-        let combo = hotkey::parse_hotkey(hotkey_str).map_err(|e| e.to_string())?;
-        let (handle, mut source) =
-            hotkey::start_listener(combo, mode).map_err(|e| e.to_string())?;
-        let (tx, rx) = tokio::sync::mpsc::channel(65);
-        tokio::spawn(async move {
-            loop {
-                let event = tokio::select! {
-                    _ = tx.closed() => break,
-                    event = source.recv() => match event { Some(event) => event, None => break },
-                };
-                if tx.send(event).await.is_err() {
+        start_module_hotkey_listener(config, hotkey_str, mode, server_cancel).await
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+async fn start_module_hotkey_listener(
+    config: &crate::config::Config,
+    hotkey_str: &str,
+    mode: hotkey::ActivationMode,
+    server_cancel: &CancellationToken,
+) -> Result<
+    (
+        HotkeyListenerKind,
+        tokio::sync::mpsc::Receiver<hotkey::HotkeyEvent>,
+    ),
+    String,
+> {
+    use crate::modules::voice;
+    use std::time::Duration;
+
+    let handle = voice::reserve_hotkey(
+        config,
+        hotkey::HotkeyRequest {
+            key: hotkey_str.to_string(),
+            mode,
+            source: hotkey::HotkeySource::Native,
+        },
+    )
+    .await
+    .map_err(|error| error.to_string())?
+    .map_err(|error| format!("hotkey reservation failed: {error:?}"))?;
+
+    let task_cancel = server_cancel.child_token();
+    let worker_cancel = task_cancel.clone();
+    let task_config = config.clone();
+    let (events_tx, events_rx) = tokio::sync::mpsc::channel(65);
+    let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
+    let worker_handle = handle.clone();
+    let task = tokio::spawn(async move {
+        let generation = loop {
+            if worker_cancel.is_cancelled() || events_tx.is_closed() {
+                break None;
+            }
+            match voice::start_hotkey(&task_config, worker_handle.clone()).await {
+                Ok(Ok(status)) if status.state == hotkey::HotkeyState::Running => {
+                    break status.generation;
+                }
+                Ok(Ok(_)) => break None,
+                Ok(Err(error)) => {
+                    let _ = ready_tx.send(Err(format!("hotkey startup failed: {error:?}")));
+                    close_module_hotkey(&task_config, worker_handle).await;
+                    return;
+                }
+                Err(error) => {
+                    tokio::select! {
+                        _ = worker_cancel.cancelled() => break None,
+                        _ = tokio::time::sleep(Duration::from_millis(250)) => {}
+                    }
+                    log::debug!("{LOG_PREFIX} retrying uncertain hotkey start: {error}");
+                }
+            }
+        };
+        let Some(generation) = generation else {
+            let _ = ready_tx.send(Err("hotkey startup canceled".into()));
+            close_module_hotkey(&task_config, worker_handle).await;
+            return;
+        };
+        if ready_tx.send(Ok(())).is_err() {
+            close_module_hotkey(&task_config, worker_handle).await;
+            return;
+        }
+
+        let mut delivery = HotkeyDelivery::new(generation);
+        let mut interval = tokio::time::interval(Duration::from_millis(25));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            tokio::select! {
+                _ = worker_cancel.cancelled() => break,
+                _ = events_tx.closed() => break,
+                _ = interval.tick() => {}
+            }
+            // A batch is capped at 64 events. Reserve one slot for the
+            // inactive edge delivered when the module reports a reset.
+            if events_tx.capacity() != 65 {
+                continue;
+            }
+            let batch = match voice::read_hotkey(
+                &task_config,
+                hotkey::HotkeyReadRequest {
+                    handle: worker_handle.clone(),
+                    acknowledged_batch: delivery.acknowledged_batch,
+                },
+            )
+            .await
+            {
+                Ok(Ok(batch)) => batch,
+                Ok(Err(error)) => {
+                    log::warn!("{LOG_PREFIX} module hotkey read failed: {error:?}");
+                    break;
+                }
+                Err(error) => {
+                    log::warn!("{LOG_PREFIX} module hotkey read unavailable: {error}");
+                    continue;
+                }
+            };
+            let events = match delivery.accept(&batch) {
+                Ok(events) => events,
+                Err(()) => {
+                    log::warn!("{LOG_PREFIX} invalid TinyVoice hotkey batch continuity");
+                    break;
+                }
+            };
+            let mut delivered = true;
+            for event in events {
+                if events_tx.send(event).await.is_err() {
+                    delivered = false;
                     break;
                 }
             }
-        });
-        Ok((HotkeyListenerKind::Rdev(handle), rx))
+            if !delivered {
+                break;
+            }
+        }
+        close_module_hotkey(&task_config, worker_handle).await;
+    });
+
+    tokio::select! {
+        result = ready_rx => result.map_err(|_| "TinyVoice hotkey startup task ended".to_string())??,
+        _ = server_cancel.cancelled() => return Err("hotkey startup canceled".into()),
+    }
+    Ok((
+        HotkeyListenerKind::Module {
+            cancel: task_cancel,
+            task,
+        },
+        events_rx,
+    ))
+}
+
+#[cfg(not(target_os = "macos"))]
+async fn close_module_hotkey(config: &crate::config::Config, handle: hotkey::HotkeyHandle) {
+    loop {
+        match crate::modules::voice::stop_hotkey(config, handle.clone()).await {
+            Ok(Ok(status)) if status.state == hotkey::HotkeyState::Stopped => return,
+            Ok(Ok(status)) => {
+                log::warn!(
+                    "{LOG_PREFIX} hotkey cleanup still active: {:?}",
+                    status.state
+                )
+            }
+            Ok(Err(hotkey::HotkeyError::UnknownHandle)) => return,
+            Ok(Err(error)) => log::warn!("{LOG_PREFIX} hotkey cleanup pending: {error:?}"),
+            Err(error) => log::warn!("{LOG_PREFIX} hotkey cleanup unavailable: {error}"),
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+    }
+}
+
+/// Validate and translate one replayable module batch before acknowledging it.
+/// The queue stays bounded to one batch, so acknowledgment means every event
+/// has been admitted to the host's receiver.
+#[cfg(not(target_os = "macos"))]
+struct HotkeyDelivery {
+    generation: u64,
+    acknowledged_batch: Option<u64>,
+    active: bool,
+    last_sequence: Option<u64>,
+}
+
+#[cfg(not(target_os = "macos"))]
+impl HotkeyDelivery {
+    fn new(generation: u64) -> Self {
+        Self {
+            generation,
+            acknowledged_batch: None,
+            active: false,
+            last_sequence: None,
+        }
+    }
+
+    fn accept(&mut self, batch: &hotkey::HotkeyBatch) -> Result<Vec<hotkey::HotkeyEvent>, ()> {
+        if batch.generation != self.generation
+            || batch.events.len() > 64
+            || batch.batch != self.acknowledged_batch.unwrap_or(0).saturating_add(1)
+        {
+            return Err(());
+        }
+
+        let mut active = self.active;
+        let mut last_sequence = self.last_sequence;
+        let mut output = Vec::with_capacity(batch.events.len() + usize::from(batch.reset));
+        if batch.reset {
+            if active {
+                output.push(hotkey::HotkeyEvent::Released);
+            }
+            active = false;
+            last_sequence = None;
+        }
+        for event in &batch.events {
+            if event.generation != self.generation
+                || last_sequence.is_some_and(|last| event.sequence <= last)
+            {
+                return Err(());
+            }
+            active = event.event == hotkey::HotkeyEvent::Pressed;
+            last_sequence = Some(event.sequence);
+            output.push(event.event);
+        }
+        if active != batch.active {
+            return Err(());
+        }
+
+        self.acknowledged_batch = Some(batch.batch);
+        self.active = active;
+        self.last_sequence = last_sequence;
+        Ok(output)
     }
 }
 

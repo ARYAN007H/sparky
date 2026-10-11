@@ -5,6 +5,81 @@ use hotkey::{
 };
 use tinycomputer_bus::accessibility::GlobeEvent::{Down, Up};
 
+#[cfg(not(target_os = "macos"))]
+use tinyvoice_bus::hotkey::{HotkeyBatch, SequencedHotkeyEvent};
+
+#[cfg(not(target_os = "macos"))]
+fn batch(
+    generation: u64,
+    batch: u64,
+    events: &[(u64, hotkey::HotkeyEvent)],
+    reset: bool,
+    active: bool,
+) -> HotkeyBatch {
+    HotkeyBatch {
+        generation,
+        batch,
+        events: events
+            .iter()
+            .map(|(sequence, event)| SequencedHotkeyEvent {
+                generation,
+                sequence: *sequence,
+                event: *event,
+            })
+            .collect(),
+        reset,
+        active,
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+#[test]
+fn native_hotkey_batches_ack_only_after_ordered_event_state_is_valid() {
+    let mut delivery = HotkeyDelivery::new(4);
+    assert_eq!(
+        delivery
+            .accept(&batch(4, 1, &[(1, Pressed)], false, true))
+            .unwrap(),
+        [Pressed]
+    );
+    assert_eq!(delivery.acknowledged_batch, Some(1));
+
+    let invalid = batch(4, 2, &[(2, Released)], false, true);
+    assert!(delivery.accept(&invalid).is_err());
+    assert_eq!(delivery.acknowledged_batch, Some(1));
+    assert!(delivery.active);
+
+    assert_eq!(
+        delivery
+            .accept(&batch(4, 2, &[(2, Released)], false, false))
+            .unwrap(),
+        [Released]
+    );
+    assert_eq!(delivery.acknowledged_batch, Some(2));
+}
+
+#[cfg(not(target_os = "macos"))]
+#[test]
+fn native_hotkey_reset_releases_active_state_and_accepts_fresh_sequence() {
+    let mut delivery = HotkeyDelivery::new(9);
+    delivery
+        .accept(&batch(9, 1, &[(4, Pressed)], false, true))
+        .unwrap();
+    assert_eq!(
+        delivery.accept(&batch(9, 2, &[], true, false)).unwrap(),
+        [Released]
+    );
+    assert_eq!(delivery.acknowledged_batch, Some(2));
+    assert_eq!(
+        delivery
+            .accept(&batch(9, 3, &[(8, Pressed)], false, true))
+            .unwrap(),
+        [Pressed]
+    );
+    assert_eq!(delivery.acknowledged_batch, Some(3));
+    assert!(delivery.active);
+}
+
 #[test]
 fn overflow_stops_activation_and_waits_for_physical_release() {
     for mode in [Push, Tap] {

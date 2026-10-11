@@ -161,7 +161,7 @@ impl VoiceServer {
 
                     // Forward hotkey event to the dictation bus so Socket.IO
                     // clients receive dictation:toggle events even when the
-                    // dictation_listener is not running (single rdev listener).
+                    // dictation_listener is not running (single TinyVoice listener).
                     {
                         use crate::voice::dictation_listener;
                         let event_type = match event {
