@@ -49,6 +49,8 @@ const READ_OUTPUT: &str = contract::METHODS[24];
 const RELEASE_OUTPUT: &str = contract::METHODS[25];
 const START_JAILED_EXEC: &str = contract::METHODS[26];
 const RUN_DOCKER: &str = contract::METHODS[27];
+const DOCKER_STATUS: &str = contract::METHODS[28];
+const CLEANUP_DOCKER: &str = contract::METHODS[29];
 const DOCKER_CALL_GRACE: Duration = Duration::from_secs(5);
 
 #[cfg(test)]
@@ -174,6 +176,22 @@ pub async fn run_docker(
     let timeout = Duration::from_millis(request.timeout_ms).saturating_add(DOCKER_CALL_GRACE);
     let client = ModuleClient::new(config.clone()).with_timeout(timeout);
     call_run_docker_with_client(&client, request).await
+}
+
+/// Probe the Docker daemon owned by the TinyBox module host.
+pub async fn docker_status(
+    config: &Config,
+    request: contract::DockerStatusRequest,
+) -> Result<contract::DockerStatus, String> {
+    call(config, DOCKER_STATUS, (request,), false).await
+}
+
+/// Stop TinyBox-owned containers matching the supplied label.
+pub async fn cleanup_docker(
+    config: &Config,
+    request: contract::CleanupDockerRequest,
+) -> Result<contract::CleanupDockerOutput, String> {
+    call(config, CLEANUP_DOCKER, (request,), false).await
 }
 
 async fn call_run_docker_with_client(
