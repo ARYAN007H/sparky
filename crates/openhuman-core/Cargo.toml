@@ -517,6 +517,10 @@ tinyhosts-bus = { path = "../../vendor/tinyhosts/crates/tinyhosts-bus", optional
 # derive a known account. Dev-dependency features are not linked into the
 # shipped binary, so that does not undo the shed.
 tinywallet-bus = { path = "../../vendor/tinywallet/crates/tinywallet-bus", default-features = false, features = ["btc", "evm", "solana", "tron", "keccak", "net", "wire", "eip712", "abi", "tx-codec"], optional = true }
+# Transitional adapter dependency: the pre-cutover host WalletEngine still
+# consumes this leaf transport trait. It is removed with the direct engine path
+# once every Wallet/Web3/x402 caller uses the module contract.
+tinywallet-crypto = { path = "../../vendor/tinywallet/crates/tinywallet-crypto", default-features = false, features = ["net", "serde"], optional = true }
 # The x402 payment flow (402 challenge, EVM/Solana payment builders, the
 # spending ledger, the `x402_request` tool), moved out of `web3/x402`. The host
 # keeps signing, proxy policy and RPC controllers and hands them in as seams.
@@ -787,6 +791,7 @@ web3 = [
     "dep:reqwest13",
     "dep:webpki-roots",
     "dep:tinywallet-bus",
+    "dep:tinywallet-crypto",
     "dep:tinywallet-x402",
     "dep:tinywallet-web3",
     "modules",
