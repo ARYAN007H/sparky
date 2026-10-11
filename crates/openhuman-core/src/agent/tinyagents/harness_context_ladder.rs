@@ -372,14 +372,14 @@ pub(super) fn microcompact_middleware(
     keep_recent: usize,
     context_window: Option<u64>,
 ) -> tinyagents_harness::middleware::MicrocompactMiddleware {
-    let mw = tinyagents_harness::middleware::MicrocompactMiddleware::new(
+    let window = context_window
+        .filter(|w| *w > 0)
+        .unwrap_or(UNKNOWN_WINDOW_FALLBACK_TOKENS);
+    tinyagents_harness::middleware::MicrocompactMiddleware::new(
         keep_recent,
         crate::agent::context::CLEARED_PLACEHOLDER,
-    );
-    match context_window.filter(|w| *w > 0) {
-        Some(window) => mw.with_token_budget(legacy_max_input_tokens(window).max(1)),
-        None => mw,
-    }
+    )
+    .with_token_budget(legacy_max_input_tokens(window).max(1))
 }
 
 /// Share of the context window a compaction keeps verbatim as its tail.
