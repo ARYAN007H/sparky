@@ -173,7 +173,7 @@ pub async fn run_docker(
     config: &Config,
     request: contract::DockerRunRequest,
 ) -> Result<contract::DockerRunOutput, String> {
-    let timeout = docker_control_deadline(request.timeout_ms, DOCKER_CALL_GRACE);
+    let timeout = Duration::from_millis(request.timeout_ms).saturating_add(DOCKER_CALL_GRACE);
     let client = ModuleClient::new(config.clone()).with_timeout(timeout);
     call_run_docker_with_client(&client, request).await
 }
@@ -195,7 +195,8 @@ pub async fn cleanup_docker(
 }
 
 fn docker_control_deadline(timeout_ms: u64, grace: Duration) -> Duration {
-    Duration::from_millis(timeout_ms).saturating_add(grace)
+    Duration::from_millis(timeout_ms.min(contract::MAX_DOCKER_CONTROL_TIMEOUT_MS))
+        .saturating_add(grace)
 }
 
 fn docker_control_client(client: &ModuleClient, timeout_ms: u64, grace: Duration) -> ModuleClient {

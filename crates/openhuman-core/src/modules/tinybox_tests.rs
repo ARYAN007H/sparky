@@ -423,6 +423,11 @@ fn docker_control_transport_deadline_tracks_the_bounded_module_operation() {
         docker_control_deadline(1, DOCKER_CALL_GRACE),
         std::time::Duration::from_millis(5_001)
     );
+    assert_eq!(
+        docker_control_deadline(u64::MAX, DOCKER_CALL_GRACE),
+        std::time::Duration::from_secs(65),
+        "an invalid oversized request must not create an effectively unbounded bus wait"
+    );
 }
 
 #[tokio::test]
