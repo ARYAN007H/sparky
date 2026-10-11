@@ -17,9 +17,9 @@ use crate::config::Config;
 /// stale secret on next startup, and the channel would fail auth until
 /// the user reconnected or cleared credentials manually.
 pub(super) fn resolve_yuanbao_app_secret(
-    mut yb_cfg: crate::channels::providers::yuanbao::YuanbaoConfig,
+    mut yb_cfg: tinychannels_bus::config::YuanbaoConfig,
     config: &Config,
-) -> crate::channels::providers::yuanbao::YuanbaoConfig {
+) -> tinychannels_bus::config::YuanbaoConfig {
     if !yb_cfg.app_secret.is_empty() {
         return yb_cfg;
     }
@@ -80,11 +80,10 @@ impl tinychannels::HttpClientFactory for RuntimeProxyClients {
 
 /// Resolve channel secrets that live outside the config file.
 ///
-/// `tinychannels::build_channels` cannot do this: secrets may sit in the
-/// keyring, an environment variable or the config, and only this host knows
-/// which. It therefore expects an already-hydrated config, and this is where
-/// that happens — on a clone, so the persisted config is never mutated.
-pub(crate) fn hydrate_channel_credentials(config: &Config) -> tinychannels::ChannelsConfig {
+/// Secrets may sit in the keyring, an environment variable or the config, and
+/// only this host knows which. Hydration operates on a clone so the persisted
+/// config is never mutated before the module receives it confidentially.
+pub(crate) fn hydrate_channel_credentials(config: &Config) -> tinychannels_bus::ChannelsConfig {
     let mut hydrated = config.channels_config.clone();
     if let Some(email_cfg) = hydrated.email.take() {
         hydrated.email = Some(resolve_email_password(email_cfg, config));
