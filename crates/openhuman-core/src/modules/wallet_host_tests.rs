@@ -147,7 +147,7 @@ fn module_selected_rpc_endpoints_are_public_http_urls_without_credentials() {
         "file:///tmp/rpc",
         "ftp://rpc.example.test",
         "https://user:secret@rpc.example.test",
-        "https:///missing-host",
+        "not a URL",
     ] {
         assert!(
             validate_module_endpoint_url(unsafe_url).is_err(),
