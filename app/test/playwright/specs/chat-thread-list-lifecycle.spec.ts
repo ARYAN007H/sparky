@@ -201,7 +201,7 @@ test.describe('Chat thread list — create, deep link, rename, delete', () => {
 
     // Confirmation is required — the row must still be there while the dialog
     // is open, or the "are you sure" is decorative.
-    const dialog = page.getByRole('dialog', { name: 'Delete Thread', exact: true });
+    const dialog = page.getByRole('alertdialog');
     await expect(dialog).toBeVisible();
     await expect(page.getByTestId(`thread-row-${doomed}`)).toBeVisible();
 
@@ -218,7 +218,7 @@ test.describe('Chat thread list — create, deep link, rename, delete', () => {
 
     await selectThreadAction(page, threadId, 'Delete');
 
-    const dialog = page.getByRole('dialog', { name: 'Delete Thread', exact: true });
+    const dialog = page.getByRole('alertdialog');
     await expect(dialog).toBeVisible();
     await dialog.getByRole('button', { name: 'Cancel' }).click();
 
