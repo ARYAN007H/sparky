@@ -1,5 +1,6 @@
 use super::*;
 use std::sync::Mutex;
+use tinymcp_bus::ServerHostCall;
 
 #[derive(Default)]
 struct PortState {
