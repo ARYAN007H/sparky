@@ -33,7 +33,9 @@ describe('walletApi', () => {
   });
 
   it('generateRecoveryPhrase requests the module-owned 12-word phrase', async () => {
-    mockCallCoreRpc.mockResolvedValueOnce({ result: { phrase: 'word1 ... word12', wordCount: 12 } });
+    mockCallCoreRpc.mockResolvedValueOnce({
+      result: { phrase: 'word1 ... word12', wordCount: 12 },
+    });
 
     const { generateRecoveryPhrase } = await import('./walletApi');
     const result = await generateRecoveryPhrase();
@@ -60,7 +62,9 @@ describe('walletApi', () => {
 
   it('deriveRecoveryMaterial requests module-owned seed and account derivation', async () => {
     const seed = Array.from({ length: 64 }, (_, index) => index);
-    const accounts = [{ chain: 'evm' as const, address: '0xabc', derivationPath: "m/44'/60'/0'/0/0" }];
+    const accounts = [
+      { chain: 'evm' as const, address: '0xabc', derivationPath: "m/44'/60'/0'/0/0" },
+    ];
     mockCallCoreRpc.mockResolvedValueOnce({ result: { seed, accounts } });
 
     const { deriveRecoveryMaterial } = await import('./walletApi');

@@ -93,9 +93,7 @@ export const validateRecoveryPhrase = async (phrase: string): Promise<boolean> =
 
 /** Derive the generic storage-key seed and public accounts through TinyWallet. */
 export const deriveRecoveryMaterial = async (phrase: string): Promise<WalletRecoveryMaterial> => {
-  const response = await callCoreRpc<{
-    result: { seed: number[]; accounts: WalletAccount[] };
-  }>({
+  const response = await callCoreRpc<{ result: { seed: number[]; accounts: WalletAccount[] } }>({
     method: 'openhuman.wallet_derive_recovery_material',
     params: { phrase },
   });
