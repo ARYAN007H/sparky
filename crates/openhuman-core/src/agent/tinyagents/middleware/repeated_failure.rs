@@ -3,7 +3,6 @@
 //! OpenHuman's recoverable-failure headroom and terminal-inference fast-halt.
 
 use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 
