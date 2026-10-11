@@ -32,6 +32,7 @@ mod draft_store;
 pub mod memory_tools;
 pub mod node_contracts;
 pub mod ops;
+pub(crate) mod registration;
 mod schemas;
 /// Skills this domain ships inside the binary. Needs BOTH gates: the pages
 /// teach flows authoring, and `BundledSkill` is part of the skills subsystem.
