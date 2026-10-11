@@ -53,7 +53,7 @@ pub(crate) fn lookup_pricing(model: &str) -> Option<ModelPricing> {
             output_per_mtok_usd: 0.0,
         });
     }
-    let price = crate::platform::cost::catalog::lookup(model.trim())?;
+    let price = tinyagents_registry::pricing::lookup(model.trim())?;
     Some(ModelPricing {
         model: price.model_id,
         input_per_mtok_usd: price.input_per_mtok_usd,
