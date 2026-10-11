@@ -141,6 +141,7 @@ impl ProfileHost {
         operator: Arc<CoreContext>,
         backend: Option<Arc<dyn StorageBackend>>,
     ) -> Result<Self, String> {
+        super::provider_settings::ProfileProviderSettings::from_saas(&saas).map_err(|error| error.to_string())?;
         let node = saas.resolve_node_id(None).to_owned();
         let leases = profile_lease::store_for(
             &saas.root,
@@ -300,6 +301,9 @@ impl ProfileHost {
             return Err(OpenError::Storage(error));
         }
         let mut config = layout::profile_config(&layout, id);
+        let providers = super::provider_settings::ProfileProviderSettings::from_saas(&self.saas)
+            .map_err(|error| OpenError::Storage(error.to_string()))?;
+        providers.bind(&mut config);
         if let Some(capabilities) = &self.capabilities {
             capabilities.configure(&mut config);
         }

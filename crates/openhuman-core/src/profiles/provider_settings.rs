@@ -8,6 +8,8 @@
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 use tinysearch_bus::Role;
+/// Search capability vocabulary for operator presentation settings.
+pub use tinysearch_bus::Role as SearchRole;
 use crate::config::{Config, SearchConfig, SearchPresentation, SearchProviderSettings, SearchRoute};
 use crate::core::runtime::direct_profile_provider::{DirectProfileProvider, validate_endpoint};
 use crate::core::runtime::SaasConfig;
