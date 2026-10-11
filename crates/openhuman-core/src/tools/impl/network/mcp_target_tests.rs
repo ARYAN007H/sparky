@@ -5,9 +5,9 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use crate::mcp::module_client::{McpConfiguredClient, McpModulePort};
 use async_trait::async_trait;
 use serde_json::Value;
-use crate::mcp::module_client::{McpConfiguredClient, McpModulePort};
 use tinymcp_bus::{
     McpToolPresentation, OpenConfiguredResponse, PrepareAgentToolsRequest, TransitionStatus,
 };
@@ -135,5 +135,8 @@ async fn indirect_mcp_target_fails_closed_when_modules_are_disabled() {
         }))
         .await;
 
-    assert!(result.is_err(), "unavailable owner must not omit target facts");
+    assert!(
+        result.is_err(),
+        "unavailable owner must not omit target facts"
+    );
 }
