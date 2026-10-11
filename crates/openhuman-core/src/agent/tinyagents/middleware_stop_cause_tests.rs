@@ -215,11 +215,13 @@ async fn a_not_found_stop_inside_a_repeat_loop_is_summarised_as_repeating() {
     assert!(!summary.contains("could not be found"), "{summary}");
 }
 
-/// The same loop behind a search that finds something new every round: the
-/// mistyped read stops the run before any refusal in its batch has folded
-/// back, and the refusals that follow still relabel the stop.
+/// The same loop behind a search that finds something new every round. The
+/// mistyped read reaches its second failure in the round where the guard
+/// refuses a repeated read for the second time, which stops the run while
+/// the batch is admitted, before any result folds back. The guard's stop
+/// note stands.
 #[tokio::test]
-async fn a_refusal_later_in_the_batch_relabels_a_repeat_loop_stop() {
+async fn a_repeat_guard_stop_at_admission_keeps_its_note_over_a_sibling_failure() {
     let batch = [
         ("grep", "src"),
         ("file_read", "src/lbi.rs"),
@@ -227,6 +229,54 @@ async fn a_refusal_later_in_the_batch_relabels_a_repeat_loop_stop() {
     ];
     let (kind, summary) = re_read_until_stopped(&batch, 12).await;
     assert_eq!(kind, StopReasonKind::RepeatingStep, "{summary}");
+}
+
+/// A mistyped read re-issued unchanged stops the run before the guard's
+/// refusal of a sibling read in the same batch folds back: that refusal
+/// shows the batch was a repeat, and relabels the stop.
+#[tokio::test]
+async fn a_refusal_later_in_the_batch_relabels_a_repeat_loop_stop() {
+    let handle = SteeringHandle::allow_all();
+    let slot = std::sync::Arc::new(std::sync::Mutex::new(None));
+    let breaker = RepeatedToolFailureMiddleware::new(handle.clone(), 3, slot.clone());
+    let mut ctx = ctx();
+    let mut records = Vec::new();
+    for i in 0..2 {
+        let id = format!("typo-{i}");
+        let mut call = TaToolCall::new(&id, "file_read", json!({ "path": "src/lbi.rs" }));
+        breaker.before_tool(&mut ctx, &(), &mut call).await.unwrap();
+        let mut result = failing_result("file_read", MISTYPED_PATH);
+        breaker
+            .after_tool(&mut ctx, &(), &invocation(&id, "file_read"), &mut result)
+            .await
+            .unwrap();
+        records.push(record("file_read", &result));
+    }
+    let mut refused = TaToolResult::error(
+        "Blocked: this exact call has already returned the identical result 4 times and was \
+         not executed again.",
+    );
+    refused.metadata = Some(json!({ REPEAT_GUARD_METADATA_KEY: REPEAT_GUARD_BLOCKED }));
+    breaker
+        .after_tool(
+            &mut ctx,
+            &(),
+            &invocation("reread", "file_read"),
+            &mut refused,
+        )
+        .await
+        .unwrap();
+    records.push(record("file_read", &refused));
+    breaker
+        .after_agent(&mut ctx, &(), &mut AgentRun::new())
+        .await
+        .unwrap();
+
+    let (kind, summary) = summary_from(&slot, &records);
+    assert_eq!(kind, StopReasonKind::RepeatingStep, "{summary}");
+    let note = slot.lock().unwrap().clone().unwrap();
+    assert!(note.contains("`file_read`"), "{note}");
+    assert!(note.contains("No such file or directory"), "{note}");
 }
 
 /// One mistyped read among reads that keep returning something new is a
