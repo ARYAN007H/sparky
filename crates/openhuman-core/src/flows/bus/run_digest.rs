@@ -6,7 +6,7 @@
 use crate::config::Config;
 use crate::core::events::DomainEvent;
 use crate::flows::store;
-use crate::flows::{flow_meta, flow_tag, FlowRun};
+use {crate::flows::flow_meta, crate::flows::flow_tag, tinyflows_catalog::FlowRun};
 use crate::memory::types::{ForgetParams, ItemsListParams, MAX_LIMIT};
 use crate::memory::{MemoryError, MemoryResult};
 use async_trait::async_trait;

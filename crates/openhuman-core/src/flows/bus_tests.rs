@@ -1,5 +1,5 @@
 use super::*;
-use crate::flows::Flow;
+use {tinyflows_catalog::Flow};
 use serde_json::json;
 use tinyflows::model::{Node, NodeKind, WorkflowGraph};
 

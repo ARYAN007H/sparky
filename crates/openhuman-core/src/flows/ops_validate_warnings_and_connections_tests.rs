@@ -508,7 +508,7 @@ async fn list_suggestions_filters_by_status() {
     seed_suggestion(&config, "s1");
     seed_suggestion(&config, "s2");
 
-    let active = flows_list_suggestions(&config, Some(crate::flows::SuggestionStatus::New))
+    let active = flows_list_suggestions(&config, Some(tinyflows_catalog::SuggestionStatus::New))
         .await
         .unwrap();
     assert_eq!(active.value.len(), 2);
@@ -531,7 +531,7 @@ async fn dismiss_and_mark_built_move_suggestions_out_of_active() {
     assert_eq!(b.value["built"], json!(true));
 
     // Neither is in the active (New) set anymore.
-    let active = flows_list_suggestions(&config, Some(crate::flows::SuggestionStatus::New))
+    let active = flows_list_suggestions(&config, Some(tinyflows_catalog::SuggestionStatus::New))
         .await
         .unwrap();
     assert!(active.value.is_empty());

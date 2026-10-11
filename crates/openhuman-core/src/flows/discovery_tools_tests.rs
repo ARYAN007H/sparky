@@ -1,7 +1,7 @@
 use super::*;
 use crate::config::Config;
 use crate::flows::store;
-use crate::flows::types::SuggestionStatus;
+use tinyflows_catalog::types::SuggestionStatus;
 use serde_json::json;
 use std::sync::Arc;
 use tempfile::TempDir;

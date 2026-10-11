@@ -235,7 +235,7 @@ pub fn flows_get_history(
     config: &Config,
     id: &str,
     limit: usize,
-) -> Result<Outcome<Vec<crate::flows::FlowRevision>>, String> {
+) -> Result<Outcome<Vec<tinyflows_catalog::FlowRevision>>, String> {
     let revisions = store::list_revisions(config, id, limit).map_err(|e| e.to_string())?;
     let count = revisions.len();
     Ok(Outcome::single_log(

@@ -75,12 +75,9 @@ pub use schemas::{
     all_wallet_registered_controllers, schemas, wallet_schemas,
 };
 #[cfg(feature = "web3")]
-pub use tinywallet_web3::crypto::abi::encode_erc20_transfer;
+use {tinywallet_web3::crypto::abi::encode_erc20_transfer};
 #[cfg(feature = "web3")]
-pub use tinywallet_web3::crypto::defaults::{
-    evm_asset_catalog, explorer_tx_url, EvmNetwork, RpcSource, SolanaCluster,
-    WalletAssetDefinition, WalletNetworkDefaults,
-};
+use {tinywallet_web3::crypto::defaults::evm_asset_catalog, tinywallet_web3::crypto::defaults::explorer_tx_url, tinywallet_web3::crypto::defaults::EvmNetwork, tinywallet_web3::crypto::defaults::RpcSource, tinywallet_web3::crypto::defaults::SolanaCluster, tinywallet_web3::crypto::defaults::WalletAssetDefinition, tinywallet_web3::crypto::defaults::WalletNetworkDefaults};
 #[cfg(feature = "web3")]
 pub use {
     ops::reveal_recovery_phrase, ops::setup, ops::status, ops::RevealRecoveryPhraseResult,

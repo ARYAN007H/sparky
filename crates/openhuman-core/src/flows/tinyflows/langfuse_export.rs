@@ -29,7 +29,7 @@ use tinyagents_harness::{LangfuseAuth, LangfuseClient, LangfuseTraceConfig};
 use tinyflows::engine::GraphObservation as FlowObservation;
 
 use crate::config::Config;
-use crate::flows::FlowRunTrigger;
+use {tinyflows_catalog::FlowRunTrigger};
 use crate::security::credentials::session_support::direct_backend_credential;
 
 const LOG_TARGET: &str = "flows::langfuse";

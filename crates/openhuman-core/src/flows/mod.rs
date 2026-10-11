@@ -49,8 +49,8 @@ pub mod tools;
 // a library of workflows. These aliases keep the existing
 // `flows::types::…` / `flows::run_registry::…` / `flows::n8n_import::…` call
 // sites resolving unchanged while the definitions live upstream.
-pub use tinyflows_catalog::import::n8n as n8n_import;
-pub use tinyflows_catalog::{build_registry, run_registry, types};
+use tinyflows_catalog::import::n8n as n8n_import;
+use {tinyflows_catalog::build_registry, tinyflows_catalog::run_registry, tinyflows_catalog::types};
 
 pub use schemas::{
     all_controller_schemas as all_flows_controller_schemas,
@@ -66,10 +66,7 @@ pub use schemas::{
 // lives in the sibling `tinyflows` domain and persists each finished step onto
 // the `flow_runs` row through this function as the run executes.
 pub use store::{kv_get, kv_set, upsert_flow_run_step};
-pub use tinyflows_catalog::{
-    DraftOrigin, Flow, FlowConnection, FlowDraft, FlowImport, FlowRevision, FlowRun, FlowRunStep,
-    FlowRunTrigger, FlowSuggestion, FlowValidation, FlowValidationError, SuggestionStatus,
-};
+use {tinyflows_catalog::DraftOrigin, tinyflows_catalog::Flow, tinyflows_catalog::FlowConnection, tinyflows_catalog::FlowDraft, tinyflows_catalog::FlowImport, tinyflows_catalog::FlowRevision, tinyflows_catalog::FlowRun, tinyflows_catalog::FlowRunStep, tinyflows_catalog::FlowRunTrigger, tinyflows_catalog::FlowSuggestion, tinyflows_catalog::FlowValidation, tinyflows_catalog::FlowValidationError, tinyflows_catalog::SuggestionStatus};
 pub use {
     node_contracts::all_node_kind_contracts, node_contracts::node_kind_contract,
     node_contracts::render_node_kinds_line, node_contracts::render_node_kinds_required,
