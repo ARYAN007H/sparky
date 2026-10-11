@@ -11,6 +11,9 @@ use tinystoragedrivers_core::{
 };
 use tinytools::Tool;
 
+#[path = "cron_policy_model.rs"]
+mod recording_model;
+
 type StoreResult<T> = Result<T, StorageError>;
 const POLICIES: &str = "cron_job_policies";
 const BACKEND_DETAIL: &str = "mongodb://policy-user:secret@backend/private-payload";
@@ -167,11 +170,18 @@ pub(super) async fn policy_reads_refuse_execution_without_consuming_a_slot(case:
         inner: case.backend(),
         faults: Arc::clone(&faults),
     }));
+    let model_calls = Arc::new(AtomicUsize::new(0));
+    let mut overrides = openhuman_core::agent::host_overrides::HostOverrides::default();
+    overrides.model = Some(Arc::new(recording_model::RecordingModel(Arc::clone(
+        &model_calls,
+    ))));
+    let overrides = Arc::new(overrides);
     let profile = |name: &str| {
         let ctx = CoreContext::current().unwrap().derive_with(
             ContextOverlay::new(config.clone(), DomainSet::none(), Default::default())
                 .session_agent(name)
-                .profile(name),
+                .profile(name)
+                .host_overrides(Arc::clone(&overrides)),
         );
         AgentContextRegistry::register(name, &ctx);
         ctx
@@ -264,16 +274,20 @@ pub(super) async fn policy_reads_refuse_execution_without_consuming_a_slot(case:
     })
     .await;
     let scheduled_calls = calls.load(Ordering::SeqCst);
-    let (direct, manual, queued, tool) = CoreContext::scope(Arc::clone(&alpha), async {
+    let mut agent_job = job.clone();
+    agent_job.job_type = cron::JobType::Agent;
+    agent_job.prompt = Some("complete the fixture".into());
+    let (direct, agent, manual, queued, tool) = CoreContext::scope(Arc::clone(&alpha), async {
         assert!(policy::get_policy(&config, &job.id).is_err());
         let direct = cron::scheduler::execute_job_now(&config, &job, "policy-direct").await;
+        let agent = cron::scheduler::execute_job_now(&config, &agent_job, "policy-agent").await;
         let manual = cron::ops::run_job_now(&config, &job.id).await;
         let queued = cron::ops::cron_run(&config, &job.id).await;
         let tool = cron::tools::CronRunTool::new(Arc::new(config.clone()))
             .execute(json!({"job_id": job.id}))
             .await
             .unwrap();
-        (direct, manual, queued, tool)
+        (direct, agent, manual, queued, tool)
     })
     .await;
     assert_eq!(
@@ -307,7 +321,7 @@ pub(super) async fn policy_reads_refuse_execution_without_consuming_a_slot(case:
         0,
         "manual paths executed the job"
     );
-    assert!(!format!("{direct:?}{manual:?}{queued:?}{tool:?}").contains("secret"));
+    assert!(!format!("{direct:?}{agent:?}{manual:?}{queued:?}{tool:?}").contains("secret"));
     assert!(
         !config.workspace_dir.join("cron/jobs.db").exists(),
         "configured storage fell back to SQLite"
@@ -334,6 +348,17 @@ pub(super) async fn policy_reads_refuse_execution_without_consuming_a_slot(case:
         calls.load(Ordering::SeqCst),
         1,
         "missing policy row must still run with defaults"
+    );
+    CoreContext::scope(Arc::clone(&alpha), async {
+        let (success, output) =
+            cron::scheduler::execute_job_now(&config, &agent_job, "valid-policy-agent").await;
+        assert!(success, "recording model fixture failed: {output}");
+    })
+    .await;
+    assert_eq!(
+        model_calls.load(Ordering::SeqCst),
+        1,
+        "the native model fixture must actually serve agent turns"
     );
     // Losing the backend after a failed attempt must stop further attempts.
     let retry_calls = Arc::new(AtomicUsize::new(0));
