@@ -15,7 +15,7 @@ copying its implementation into a host, or accepting weaker isolation.
 | --- | --- | --- | --- | --- |
 | tinyjuice | none (module loaded through TinyBus) | tinyjuice-bus | core tools, compression, CCR REPL | Complete: PR #59 provides module-owned compression, CCR queries, HTML extraction, schemas and declarations; the host retains turn-bound model callbacks and artifact authorization |
 | tinyconnectors | none | tinyconnectors-bus | core integrations, credentials and triggers | Module-backed argument preparation, action execution and trigger archives; host credential reconciliation and frozen tool restoration remain in OpenHuman |
-| tinymcp | tinymcp | tinymcp-bus | core MCP registry, supervisor, CLI stdio/HTTP server | Supervisor notifications, server protocol operations and callbacks for approved host tools/resources/prompts |
+| tinymcp | none in normal/build host dependencies | tinymcp-bus | core MCP registry, supervisor, CLI stdio/HTTP server | Host adapters use contract 1.20 for registry, supervisor, server protocol and approved host callbacks. Compatible release artifacts and final native host tests remain under validation; frozen recorded tool declarations are restored independently of the current catalog |
 | tinychannels | tinychannels, tinychannels-runtime (remaining runtime callers) | tinychannels-bus | core channels, TinyHumans host, CLI REPL | Contract is pure; v0.1.18 supplies complete Discord response vocabulary provider connection preparation and health observations. Discord discovery/permission checks, credential tests and connection validation/defaults and `doctor channels` health checks use confidential module calls. Remaining runtime callers need bus cutover with inbound/status callbacks and shutdown draining |
 | tinyhosts | none | tinyhosts-bus | core hosting tools | Released Execute/Providers contract consumed through the module; workspace authorization, credentials and approval policy remain in OpenHuman |
 | tinywallet | none in normal/build host dependencies | tinywallet-bus | core wallet/web3/x402 | Complete: v0.19.0 contract 1.13 owns mnemonic validation/derivation, native transactions, Web3 quotes/execution, ERC-20 encoding, and x402 payment parsing/budgets/ledger. OpenHuman retains encrypted-key custody, authenticated transport, explicit approval, and lifecycle orchestration |
@@ -352,3 +352,9 @@ matched every downloaded archive against its GitHub digest and the embedded
 operation and signing E2E. The module-boundary audit reports zero violations
 and no remaining Wallet implementation exceptions. TinyRuntime remains excluded
 from this migration.
+
+## Current delivery scope
+
+The active host cutovers are MCP and Channels. Wallet host PR [#7489](https://github.com/tinyhumansai/openhuman/pull/7489) is merged, as is TinyBox host PR [#7469](https://github.com/tinyhumansai/openhuman/pull/7469). This branch integrates the merged Wallet cutover and removes the MCP implementation dependency; the remaining Channels exceptions belong to its separate host PR.
+
+TinyRuntime is excluded as requested. Broader bus error reporting and Sentry coverage are deferred to separate work; the existing reporting path remains in place.
