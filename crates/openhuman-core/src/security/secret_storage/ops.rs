@@ -1,14 +1,14 @@
 //! Core keyring operations: get, set, delete, probe, random generation, and migration.
 //!
-//! All public functions delegate to the active backend selected by [`crate::security::keyring::store`].
+//! All public functions delegate to the active backend selected by [`crate::security::secret_storage::store`].
 
 use std::path::Path;
 
 use chacha20poly1305::aead::{rand_core::RngCore, OsRng};
 use parking_lot::Mutex;
 
-use crate::security::keyring::error::KeyringError;
-use crate::security::keyring::store::backend;
+use crate::security::secret_storage::error::SecretStorageError;
+use crate::security::secret_storage::store::backend;
 
 // Cached result of the keychain probe. A single Mutex<Option<bool>> is used
 // instead of a separate AtomicBool + RwLock pair to eliminate the race where
@@ -47,13 +47,14 @@ pub enum MigrationOutcome {
 // belong to this process, not to an agent.
 
 /// The storage-backed secret store for this call, when one is configured.
-fn storage_secrets() -> Result<Option<tinystoragedrivers::secrets::DocumentSecrets>, KeyringError> {
+fn storage_secrets(
+) -> Result<Option<tinystoragedrivers::secrets::DocumentSecrets>, SecretStorageError> {
     crate::storage::secrets::current()
-        .map_err(|error| KeyringError::Backend(format!("storage secrets: {error}")))
+        .map_err(|error| SecretStorageError::Backend(format!("storage secrets: {error}")))
 }
 
-fn storage_error(error: crate::storage::StorageError) -> KeyringError {
-    KeyringError::Backend(format!("storage secrets: {error}"))
+fn storage_error(error: crate::storage::StorageError) -> SecretStorageError {
+    SecretStorageError::Backend(format!("storage secrets: {error}"))
 }
 
 /// Retrieve a secret: from the storage backend when one is configured,
@@ -61,7 +62,7 @@ fn storage_error(error: crate::storage::StorageError) -> KeyringError {
 ///
 /// Returns `Ok(None)` when no entry exists for this user + key combination.
 /// Never logs the secret value.
-pub fn get(user_id: &str, key: &str) -> Result<Option<String>, KeyringError> {
+pub fn get(user_id: &str, key: &str) -> Result<Option<String>, SecretStorageError> {
     let Some(secrets) = storage_secrets()? else {
         return process_get(user_id, key);
     };
@@ -75,7 +76,7 @@ pub fn get(user_id: &str, key: &str) -> Result<Option<String>, KeyringError> {
 /// authoritative once configured, so a failing legacy backend must not fail
 /// the read; it is logged so a broken OS keychain does not look like
 /// "nothing stored".
-fn legacy_or_warn(result: Result<Option<String>, KeyringError>) -> Option<String> {
+fn legacy_or_warn(result: Result<Option<String>, SecretStorageError>) -> Option<String> {
     match result {
         Ok(value) => value,
         Err(error) => {
@@ -93,7 +94,7 @@ fn get_adopting(
     name: &str,
     key: &str,
     legacy: impl FnOnce() -> Option<String>,
-) -> Result<Option<String>, KeyringError> {
+) -> Result<Option<String>, SecretStorageError> {
     use tinystoragedrivers::secrets::SecretStore as _;
     let write_back = secrets.clone();
     let owned = name.to_string();
@@ -113,7 +114,7 @@ fn get_adopting(
     };
     String::from_utf8(value.to_vec())
         .map(Some)
-        .map_err(|source| KeyringError::InvalidUtf8 {
+        .map_err(|source| SecretStorageError::InvalidUtf8 {
             key: key.to_string(),
             source,
         })
@@ -121,7 +122,7 @@ fn get_adopting(
 
 /// Store a secret: in the storage backend when one is configured, else in
 /// the process backend. Overwrites any existing entry. Never logs the value.
-pub fn set(user_id: &str, key: &str, value: &str) -> Result<(), KeyringError> {
+pub fn set(user_id: &str, key: &str, value: &str) -> Result<(), SecretStorageError> {
     use tinystoragedrivers::secrets::SecretStore as _;
     let Some(secrets) = storage_secrets()? else {
         return process_set(user_id, key, value);
@@ -134,7 +135,7 @@ pub fn set(user_id: &str, key: &str, value: &str) -> Result<(), KeyringError> {
 
 /// Delete a secret: from the storage backend when one is configured, else
 /// from the process backend. Idempotent.
-pub fn delete(user_id: &str, key: &str) -> Result<(), KeyringError> {
+pub fn delete(user_id: &str, key: &str) -> Result<(), SecretStorageError> {
     use tinystoragedrivers::secrets::SecretStore as _;
     let Some(secrets) = storage_secrets()? else {
         return process_delete(user_id, key);
@@ -156,7 +157,7 @@ pub fn delete(user_id: &str, key: &str) -> Result<(), KeyringError> {
 ///
 /// Returns `Ok(None)` when no entry exists for this user + key combination.
 /// Never logs the secret value.
-pub(crate) fn process_get(user_id: &str, key: &str) -> Result<Option<String>, KeyringError> {
+pub(crate) fn process_get(user_id: &str, key: &str) -> Result<Option<String>, SecretStorageError> {
     log::debug!("[keyring] get");
     let namespaced = namespaced_key(user_id, key);
     let result = backend().get(&namespaced);
@@ -171,7 +172,7 @@ pub(crate) fn process_get(user_id: &str, key: &str) -> Result<Option<String>, Ke
 /// Store a secret in the process backend.
 ///
 /// Overwrites any existing entry for this user + key. Never logs the value.
-pub(crate) fn process_set(user_id: &str, key: &str, value: &str) -> Result<(), KeyringError> {
+pub(crate) fn process_set(user_id: &str, key: &str, value: &str) -> Result<(), SecretStorageError> {
     log::debug!("[keyring] set");
     let namespaced = namespaced_key(user_id, key);
     let result = backend().set(&namespaced, value);
@@ -185,7 +186,7 @@ pub(crate) fn process_set(user_id: &str, key: &str, value: &str) -> Result<(), K
 /// Delete a secret from the process backend.
 ///
 /// Returns `Ok(())` even if no entry existed (idempotent).
-pub(crate) fn process_delete(user_id: &str, key: &str) -> Result<(), KeyringError> {
+pub(crate) fn process_delete(user_id: &str, key: &str) -> Result<(), SecretStorageError> {
     log::debug!("[keyring] delete");
     let namespaced = namespaced_key(user_id, key);
     let result = backend().delete(&namespaced);
@@ -249,13 +250,13 @@ fn probe_availability() -> bool {
     let b = backend();
     if let Some(available) = backend_availability_without_probe(
         b.name(),
-        super::encrypted_file_backend::master_key_available(),
+        b.name() == "encrypted_file" && super::encrypted_file_backend::master_key_available(),
     ) {
         log::debug!("[keyring] is_available={available} (non-os backend)");
         return available;
     }
 
-    let result = (|| -> Result<bool, KeyringError> {
+    let result = (|| -> Result<bool, SecretStorageError> {
         // Delete any leftover probe key from a previous launch before writing.
         // Without this, `set` fails with "item already exists" (-25299) on
         // every launch after the first, causing `is_available` to incorrectly
@@ -288,7 +289,7 @@ fn probe_availability() -> bool {
 
 fn backend_availability_without_probe(name: &str, encrypted_key_available: bool) -> Option<bool> {
     match name {
-        "file" | "mock" => Some(true),
+        "memory" | "file" | "mock" => Some(true),
         "encrypted_file" => Some(encrypted_key_available),
         _ => None,
     }
@@ -304,11 +305,11 @@ pub fn get_or_create_random(
     user_id: &str,
     key: &str,
     len_bytes: usize,
-) -> Result<String, KeyringError> {
+) -> Result<String, SecretStorageError> {
     log::debug!("[keyring] get_or_create_random user_id={user_id} key={key} len_bytes={len_bytes}");
 
     if len_bytes == 0 {
-        return Err(KeyringError::Backend(
+        return Err(SecretStorageError::Backend(
             "get_or_create_random requires len_bytes > 0".to_string(),
         ));
     }
@@ -334,7 +335,7 @@ pub fn get_or_create_random(
         log::warn!(
             "[keyring] get_or_create_random write verification failed user_id={user_id} key={key}"
         );
-        return Err(KeyringError::VerifyFailed {
+        return Err(SecretStorageError::VerifyFailed {
             key: key.to_string(),
         });
     }
@@ -351,13 +352,14 @@ pub fn get_or_create_random(
 ///   [`MigrationOutcome::MigratedAndDeleted`].
 /// - If neither exists → [`MigrationOutcome::NoSourceFile`].
 ///
+/// Volatile backends reject migration and retain the durable source.
 /// On any failure after the file has been read but before it can be deleted,
 /// the file is **not** deleted and `Err` is returned so the caller can retry.
 pub fn migrate_from_file(
     user_id: &str,
     key: &str,
     path: &Path,
-) -> Result<MigrationOutcome, KeyringError> {
+) -> Result<MigrationOutcome, SecretStorageError> {
     log::debug!(
         "[keyring] migrate_from_file user_id={user_id} key={key} path={}",
         path.display()
@@ -378,13 +380,19 @@ pub fn migrate_from_file(
         return Ok(MigrationOutcome::NoSourceFile);
     }
 
+    if !backend().is_persistent() {
+        return Err(SecretStorageError::Backend(
+            "file migration requires persistent secret storage; source retained".into(),
+        ));
+    }
+
     // Step 3: read the file.
     log::debug!(
         "[keyring] migrate_from_file reading source file path={}",
         path.display()
     );
     let file_content =
-        std::fs::read_to_string(path).map_err(|e| KeyringError::MigrationReadFailed {
+        std::fs::read_to_string(path).map_err(|e| SecretStorageError::MigrationReadFailed {
             path: path.display().to_string(),
             source: e,
         })?;
@@ -400,7 +408,7 @@ pub fn migrate_from_file(
         log::warn!(
             "[keyring] migrate_from_file verification failed user_id={user_id} key={key}; NOT deleting source file"
         );
-        return Err(KeyringError::VerifyFailed {
+        return Err(SecretStorageError::VerifyFailed {
             key: key.to_string(),
         });
     }
@@ -410,7 +418,7 @@ pub fn migrate_from_file(
         "[keyring] migrate_from_file deleting source file path={}",
         path.display()
     );
-    std::fs::remove_file(path).map_err(|e| KeyringError::MigrationDeleteFailed {
+    std::fs::remove_file(path).map_err(|e| SecretStorageError::MigrationDeleteFailed {
         path: path.display().to_string(),
         source: e,
     })?;
@@ -446,10 +454,10 @@ pub(crate) fn hex_encode(data: &[u8]) -> String {
 /// (i.e. in a dedicated test binary or at the very start of a test).
 #[cfg(test)]
 pub(crate) fn force_backend_for_test(
-    b: Box<dyn crate::security::keyring::backend::KeyringBackend>,
+    b: Box<dyn crate::security::secret_storage::backend::SecretBackend>,
 ) {
-    use crate::security::keyring::store::BACKEND;
-    if BACKEND.set(b).is_err() {
+    use crate::security::secret_storage::store::BACKEND;
+    if BACKEND.set(std::sync::Arc::from(b)).is_err() {
         panic!("force_backend_for_test must be called before BACKEND initialization");
     }
 }

@@ -43,3 +43,12 @@ Owns the `channels.*` RPC namespace: provider metadata, connect/disconnect lifec
 - [tinychannels](../../../../../vendor/tinychannels/README.md)
 
 Credential testing (`test_channel`) delegates structural validation and IMAP verification through the released module’s confidential controller member. Config persistence and credential custody remain in OpenHuman.
+
+Connection preparation uses TinyChannels' confidential `ChannelController`
+`PrepareConnect` operation. The module validates credentials, prepares provider
+defaults and verifies native login before returning a typed configuration update.
+OpenHuman persists only the requested provider, retains encrypted credential
+custody, and removes email passwords and Yuanbao application secrets from TOML.
+An unavailable module fails both `connect` and `test`; neither operation executes
+provider validation locally. Host persistence tests use recorded contract
+results; provider verification/defaulting regressions live in TinyChannels.
