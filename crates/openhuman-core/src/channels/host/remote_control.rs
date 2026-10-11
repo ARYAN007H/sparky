@@ -6,11 +6,16 @@ use crate::threads::store::{self as conversations, CreateConversationThread};
 /// Serves product-owned conversation state to the captured module runtime.
 pub(crate) async fn dispatch_callback(
     ctx: &ChannelRuntimeContext,
+    tenant: &crate::core::runtime::Tenant,
+    cancellation: &tokio_util::sync::CancellationToken,
     request: tinychannels_bus::module_remote::RemoteHostRequest,
 ) -> tinybus::Result<tinychannels_bus::module_remote::RemoteHostResult> {
     use tinychannels_bus::module_remote::{
         RemoteHostRequest as Request, RemoteHostResult as Response,
     };
+    if cancellation.is_cancelled() {
+        return Err(tinybus::Error::failed("channel session ended"));
+    }
     match request {
         Request::ListThreads => {
             let threads = conversations::list_threads(ctx.workspace_dir.to_path_buf())
@@ -30,6 +35,9 @@ pub(crate) async fn dispatch_callback(
             ))
         }
         Request::CreateThread(thread) => {
+            if cancellation.is_cancelled() {
+                return Err(tinybus::Error::failed("channel session ended"));
+            }
             conversations::ensure_thread(
                 ctx.workspace_dir.to_path_buf(),
                 CreateConversationThread {
@@ -46,11 +54,22 @@ pub(crate) async fn dispatch_callback(
             Ok(Response::Completed)
         }
         Request::ClearHistory { sender_key } => {
+            if cancellation.is_cancelled() {
+                return Err(tinybus::Error::failed("channel session ended"));
+            }
             clear_sender_history(ctx, &sender_key);
             Ok(Response::Completed)
         }
         Request::InvalidateThread { thread_id } => {
-            crate::web_chat::invalidate_thread_sessions(&thread_id).await;
+            let _removed = crate::web_chat::invalidate_thread_sessions_for_tenant(
+                tenant,
+                &thread_id,
+                cancellation,
+            )
+            .await;
+            if cancellation.is_cancelled() {
+                return Err(tinybus::Error::failed("channel session ended"));
+            }
             Ok(Response::Completed)
         }
     }

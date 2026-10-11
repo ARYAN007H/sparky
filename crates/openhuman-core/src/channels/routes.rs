@@ -114,7 +114,25 @@ pub(crate) async fn get_or_create_turn_model_source(
 
 struct RouteCallbacks {
     context: ChannelRuntimeContext,
+    core_context: Option<Arc<crate::core::runtime::CoreContext>>,
+    tenant: crate::core::runtime::Tenant,
     cancellation: tokio_util::sync::CancellationToken,
+}
+
+impl RouteCallbacks {
+    fn new(
+        context: ChannelRuntimeContext,
+        cancellation: tokio_util::sync::CancellationToken,
+    ) -> Self {
+        Self {
+            context,
+            core_context: crate::core::runtime::CoreContext::current(),
+            tenant: crate::core::runtime::tenant::current_tenant_or_isolated(
+                "channel_remote_control",
+            ),
+            cancellation,
+        }
+    }
 }
 
 #[tinybus::interface(name = "ai.tinyhumans.tinychannels.ChannelsHost")]
@@ -123,14 +141,32 @@ impl RouteCallbacks {
         &self,
         request: tinychannels_bus::ChannelBackendRequest,
     ) -> tinybus::Result<tinychannels_bus::ChannelBackendResult> {
-        if self.cancellation.is_cancelled() {
-            return Err(tinybus::Error::failed("channel session ended"));
-        }
         match request {
             tinychannels_bus::ChannelBackendRequest::RemoteControl(request) => {
-                super::host::remote_control::dispatch_callback(&self.context, request)
-                    .await
-                    .map(tinychannels_bus::ChannelBackendResult::RemoteControl)
+                let dispatch = async {
+                    tokio::select! {
+                        biased;
+                        _ = self.cancellation.cancelled() => {
+                            Err(tinybus::Error::failed("channel session ended"))
+                        }
+                        result = super::host::remote_control::dispatch_callback(
+                            &self.context,
+                            &self.tenant,
+                            &self.cancellation,
+                            request,
+                        ) => result.map(tinychannels_bus::ChannelBackendResult::RemoteControl),
+                    }
+                };
+                match &self.core_context {
+                    Some(core_context) => {
+                        crate::core::runtime::CoreContext::scope(
+                            Arc::clone(core_context),
+                            dispatch,
+                        )
+                        .await
+                    }
+                    None => dispatch.await,
+                }
             }
             _ => Err(tinybus::Error::failed("channel callback unavailable")),
         }
@@ -160,10 +196,7 @@ pub(crate) async fn handle_runtime_command_if_needed(
     let operation = async {
         let lease = crate::modules::channel_runtime::ChannelRuntimeLease::open(
             client,
-            RouteCallbacks {
-                context: ctx.clone(),
-                cancellation: super::runtime::session::channel_session(),
-            },
+            RouteCallbacks::new(ctx.clone(), super::runtime::session::channel_session()),
         )
         .await?;
         let response: Result<ChannelControlResult, _> = lease
