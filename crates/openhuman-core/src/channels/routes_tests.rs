@@ -8,7 +8,7 @@ use crate::core::events::DomainEvent;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::future::Future;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, Wake, Waker};
 use tinyagents_session::transcript::TranscriptMessage;
@@ -83,6 +83,51 @@ fn runtime_context(workspace_dir: PathBuf) -> ChannelRuntimeContext {
         multimodal: crate::config::MultimodalConfig::default(),
         multimodal_files: crate::config::MultimodalFileConfig::default(),
         config: None,
+    }
+}
+
+#[cfg(feature = "modules")]
+async fn module_route_help_response(
+    workspace_dir: &Path,
+    content: &str,
+    providers: Vec<tinychannels_bus::module_control::ProviderDescriptor>,
+) -> String {
+    use tinychannels_bus::module_control::{ChannelControlRequest, ChannelControlResult};
+    use tinychannels_bus::module_remote::RemoteRoute;
+
+    let request = ChannelControlRequest::Route {
+        workspace_dir: workspace_dir.to_string_lossy().into_owned(),
+        message: Box::new(ChannelMessage {
+            id: "help-fixture".into(),
+            sender: "operator".into(),
+            reply_target: "chat".into(),
+            content: content.into(),
+            channel: "telegram".into(),
+            timestamp: 0,
+            thread_ts: None,
+            sender_name: None,
+        }),
+        route: RemoteRoute {
+            provider: "openai".into(),
+            model: "gpt-5".into(),
+        },
+        history_len: 0,
+        providers,
+    };
+    let response: ChannelControlResult = crate::channels::module_fixture::client()
+        .await
+        .call_confidential(
+            "tinychannels",
+            tinychannels_bus::methods::PREPARE_CHANNEL_CONTROL,
+            (request,),
+        )
+        .await
+        .expect("the owning module should prepare command help");
+    match response {
+        ChannelControlResult::Route {
+            reply: Some(reply), ..
+        } => reply,
+        other => panic!("expected module-generated help text, got {other:?}"),
     }
 }
 
@@ -174,8 +219,9 @@ fn provider_alias_and_route_selection_round_trip() {
     assert!(ctx.route_overrides.lock().unwrap().is_empty());
 }
 
-#[test]
-fn cached_models_and_help_responses_render_expected_text() {
+#[cfg(feature = "modules")]
+#[tokio::test]
+async fn cached_models_and_help_responses_render_expected_text() {
     let tempdir = tempfile::tempdir().unwrap();
     let state_dir = tempdir.path().join("state");
     std::fs::create_dir_all(&state_dir).unwrap();
@@ -193,18 +239,29 @@ fn cached_models_and_help_responses_render_expected_text() {
     )
     .unwrap();
 
-    let current = ChannelRouteSelection {
-        provider: "openai".into(),
-        model: "gpt-5".into(),
-    };
-    let models = build_models_help_response(&current, tempdir.path());
+    let models = module_route_help_response(tempdir.path(), "/model", Vec::new()).await;
     assert!(models.contains("Current provider: `openai`"));
     assert!(models.contains("Cached model IDs"));
     assert!(models.contains("- `gpt-5-mini`"));
 
-    let providers = build_providers_help_response(&current, &provider_descriptors());
+    let providers = module_route_help_response(
+        tempdir.path(),
+        "/models",
+        vec![
+            tinychannels_bus::module_control::ProviderDescriptor {
+                name: "openai".into(),
+                aliases: vec!["oa".into()],
+            },
+            tinychannels_bus::module_control::ProviderDescriptor {
+                name: "anthropic".into(),
+                aliases: Vec::new(),
+            },
+        ],
+    )
+    .await;
     assert!(providers.contains("Switch provider with `/models <provider>`"));
     assert!(providers.contains("Available providers:"));
+    assert!(providers.contains("openai (aliases: oa)"));
 }
 
 #[test]
@@ -231,13 +288,14 @@ impl Wake for NoopWake {
     fn wake(self: Arc<Self>) {}
 }
 
+#[cfg(feature = "modules")]
 #[tokio::test]
 async fn sign_out_cancels_remote_invalidation_while_it_waits_for_the_session_table() {
     let core_context =
         crate::core::runtime::CoreContext::for_test(crate::core::runtime::DomainSet::full(), None);
     let expected_core_context = Arc::clone(&core_context);
     crate::core::runtime::CoreContext::scope(core_context, async {
-        let guard = crate::web_chat::ops::lock_thread_sessions_for_test().await;
+        let guard = crate::web_chat::lock_thread_sessions_for_test().await;
         let cancellation = tokio_util::sync::CancellationToken::new();
         let callback = RouteCallbacks::new(
             runtime_context(PathBuf::from("/tmp/channel-callback")),
@@ -276,8 +334,9 @@ async fn sign_out_cancels_remote_invalidation_while_it_waits_for_the_session_tab
     .await;
 }
 
-#[test]
-fn load_cached_model_preview_returns_empty_when_cache_json_is_invalid() {
+#[cfg(feature = "modules")]
+#[tokio::test]
+async fn load_cached_model_preview_returns_empty_when_cache_json_is_invalid() {
     let tempdir = tempfile::tempdir().unwrap();
     let state_dir = tempdir.path().join("state");
     std::fs::create_dir_all(&state_dir).unwrap();
@@ -287,11 +346,7 @@ fn load_cached_model_preview_returns_empty_when_cache_json_is_invalid() {
     )
     .unwrap();
 
-    let current = ChannelRouteSelection {
-        provider: "openai".into(),
-        model: "gpt-5".into(),
-    };
-    let response = build_models_help_response(&current, tempdir.path());
+    let response = module_route_help_response(tempdir.path(), "/model", Vec::new()).await;
     assert!(response.contains("No cached model list found for `openai`"));
 }
 

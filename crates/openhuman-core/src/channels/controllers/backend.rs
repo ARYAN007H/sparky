@@ -229,7 +229,7 @@ fn disconnect_result(
 }
 
 impl OpenHumanChannelBackend {
-    async fn disconnect_channel(
+    pub(crate) async fn disconnect_channel(
         &self,
         channels_config: &ChannelsConfig,
         channel: &str,
@@ -242,7 +242,7 @@ impl OpenHumanChannelBackend {
         Ok(disconnect_result(channel, auth_mode, value))
     }
 
-    async fn channel_status(
+    pub(crate) async fn channel_status(
         &self,
         channels_config: &ChannelsConfig,
         channel: Option<&str>,
@@ -251,7 +251,7 @@ impl OpenHumanChannelBackend {
         into_anyhow(ops::channel_status(&config, channel).await)
     }
 
-    async fn send_reaction(
+    pub(crate) async fn send_reaction(
         &self,
         channels_config: &ChannelsConfig,
         channel: &str,
@@ -262,7 +262,7 @@ impl OpenHumanChannelBackend {
         Ok(parse_or_raw(value))
     }
 
-    async fn create_thread(
+    pub(crate) async fn create_thread(
         &self,
         channels_config: &ChannelsConfig,
         channel: &str,
@@ -273,7 +273,7 @@ impl OpenHumanChannelBackend {
         Ok(parse_or_raw(value))
     }
 
-    async fn update_thread(
+    pub(crate) async fn update_thread(
         &self,
         channels_config: &ChannelsConfig,
         channel: &str,
@@ -286,7 +286,7 @@ impl OpenHumanChannelBackend {
         Ok(parse_or_raw(value))
     }
 
-    async fn list_threads(
+    pub(crate) async fn list_threads(
         &self,
         channels_config: &ChannelsConfig,
         channel: &str,

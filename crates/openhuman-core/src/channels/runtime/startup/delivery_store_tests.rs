@@ -93,13 +93,22 @@ async fn terminal_result_is_replayed_and_conflicts_are_rejected() {
 async fn removal_and_failed_delivery_are_idempotent_and_durable() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("delivery.json");
-    let store = store(&path);
+    let delivery_store = store(&path);
     let failed = entry("failed", 1);
-    store.save_failed(failed.clone()).await.unwrap();
-    store.save_failed(failed.clone()).await.unwrap();
-    store.save_pending(entry("pending", 2)).await.unwrap();
-    store.remove_pending("pending".into()).await.unwrap();
-    store.remove_pending("pending".into()).await.unwrap();
+    delivery_store.save_failed(failed.clone()).await.unwrap();
+    delivery_store.save_failed(failed.clone()).await.unwrap();
+    delivery_store
+        .save_pending(entry("pending", 2))
+        .await
+        .unwrap();
+    delivery_store
+        .remove_pending("pending".into())
+        .await
+        .unwrap();
+    delivery_store
+        .remove_pending("pending".into())
+        .await
+        .unwrap();
 
     let reopened = store(&path);
     assert_eq!(
