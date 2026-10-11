@@ -375,6 +375,17 @@ pub struct OpenHumanRunContext {
 #[derive(Clone, Debug, Default)]
 pub(crate) struct HostOperationContext {
     pub(crate) origin: Option<AgentTurnOrigin>,
+    pub(crate) sandbox_mode: Option<SandboxMode>,
+}
+
+/// Reads the calling agent's sandbox policy from the explicit tool carrier.
+/// Direct tool dispatch has no agent-specific mode.
+pub(crate) fn sandbox_mode_for_tool(context: Option<&dyn tinytools::ToolRunContext>) -> Option<SandboxMode> {
+    context
+        .and_then(tinytools::ToolRunContext::host_extension)
+        .and_then(|extension| extension.downcast_ref::<tinyagents_harness::tool::ToolExecutionContext>())
+        .and_then(|context| context.state::<HostOperationContext>())
+        .and_then(|host| host.sandbox_mode)
 }
 
 impl Default for OpenHumanRunContext {
@@ -549,6 +560,7 @@ impl OpenHumanRunContext {
         let workspace = self.workspace.clone();
         let host_operations = Arc::new(HostOperationContext {
             origin: self.origin.clone(),
+            sandbox_mode: self.sandbox_mode,
         });
         let context = tinyagents_harness::context::RunContext::new(config, self)
             .with_cancellation(cancellation)
