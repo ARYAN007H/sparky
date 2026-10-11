@@ -1065,20 +1065,6 @@
   },
   {
     "rule": "openhuman-upstream-reexport",
-    "path": "crates/openhuman-core/src/inference/host_runtime/service/mod.rs",
-    "line": 6,
-    "text": "pub use tinyinference_local::service::LocalAiService;",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-upstream-reexport",
-    "path": "crates/openhuman-core/src/inference/mod.rs",
-    "line": 48,
-    "text": "pub use tinyinference_local::status::{",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-upstream-reexport",
     "path": "crates/openhuman-embed/src/embeddings.rs",
     "line": 18,
     "text": "pub use tinyinference_embeddings::{",
