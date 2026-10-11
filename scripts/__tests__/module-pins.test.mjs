@@ -105,7 +105,6 @@ function submodulesPresent() {
   }
 }
 
-
 // This reads the release manifest directly, so a stale voice gitlink is caught
 // even in a shallow checkout without the tags used by the general pin gate.
 test("voice source release matches the artifact used for recording summaries", () => {
@@ -150,9 +149,7 @@ test("parses every record `ALL` lists out of the real registry", () => {
 
 test("parses per-platform assets, digests included", () => {
   const src = readRegistry();
-  const rec = [...parseRecords(src).values()].find(
-    (r) => r.id === "tinyjuice",
-  );
+  const rec = [...parseRecords(src).values()].find((r) => r.id === "tinyjuice");
   assert.ok(rec, "tinyjuice record not found");
   assert.ok(rec.assets.length > 0, "tinyjuice publishes no assets?");
   for (const a of rec.assets) {
@@ -417,8 +414,7 @@ test("an unparseable registry fails the gate instead of passing", () => {
 });
 
 test("a missing registry file fails the gate instead of passing", () => {
-  const root = fixtureRoot({
-  });
+  const root = fixtureRoot({});
   try {
     const r = run(PINS_CLI, [root]);
     assert.notEqual(r.status, 0, "a missing registry must FAIL");
