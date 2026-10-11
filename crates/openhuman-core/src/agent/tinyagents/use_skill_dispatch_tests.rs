@@ -32,10 +32,11 @@ use tinytools::{Tool, ToolCallOptions, ToolResult};
 /// A stub archetype-delegate tool: only its name has to match `image_agent`'s
 /// `delegate_name` ("create_image", set in
 /// `agent/registry/agents/image_agent/agent.toml`) for
-/// `DelegationDispatch::for_tool` to select the archetype path. Real
-/// archetype dispatch never calls the wrapped tool's own `execute` — it
-/// dispatches straight to `execute_archetype_delegation_with_live_parent` —
-/// so this stub's body is unreachable in a passing run.
+/// `DelegationDispatch::for_tool` to select the archetype path. The typed
+/// archetype test dispatches straight to
+/// `execute_archetype_delegation_with_live_parent`; the separate packed-target
+/// binding regression intentionally exercises this stub's own authorization
+/// and execution methods.
 struct StubCreateImage(&'static str);
 
 #[async_trait]
