@@ -8,7 +8,7 @@
 #![cfg(feature = "mcp")]
 
 use openhuman_core::config::{schema::ModuleOverride, Config};
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 
 const MODULE_ARTIFACT_ENV: &str = "OPENHUMAN_TINYMCP_TEST_MODULE";
 
@@ -37,7 +37,9 @@ fn fresh_workspace_config() -> (tempfile::TempDir, Config) {
 }
 
 async fn install_server(config: &Config, name: &str, server: Value) -> String {
-    let document = json!({"mcpServers": {name: server}});
+    let document = json!({
+        "mcpServers": Map::from([(name.to_owned(), server)])
+    });
     openhuman_core::mcp::registry::config_ops::mcp_clients_config_set(config, document)
         .await
         .expect("apply mcp.json through the module");
