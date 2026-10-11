@@ -96,6 +96,32 @@ fn tinybox_command_facts_drive_policy_and_keep_the_path_floor_when_disabled() {
         background: false,
         literal_words: vec!["ls".into(), "-la".into()],
     };
+    let supervised = SecurityPolicy {
+        enabled: true,
+        autonomy: AutonomyLevel::Supervised,
+        ..SecurityPolicy::default()
+    };
+    assert!(supervised.is_command_allowed_analysis(&analysis));
+    assert!(!supervised.is_command_allowed_analysis(&CommandAnalysis {
+        redirection: true,
+        ..analysis.clone()
+    }));
+    assert!(!supervised.is_command_allowed_analysis(&CommandAnalysis {
+        segments: vec![CommandSegment {
+            leading_env_assignment: true,
+            ..analysis.segments[0].clone()
+        }],
+        ..analysis.clone()
+    }));
+    assert!(!supervised.is_command_allowed_analysis(&CommandAnalysis {
+        segments: vec![CommandSegment {
+            normalized_name: "python3".into(),
+            executor: true,
+            ..analysis.segments[0].clone()
+        }],
+        ..analysis.clone()
+    }));
+
     let readonly = SecurityPolicy {
         enabled: true,
         autonomy: AutonomyLevel::ReadOnly,
