@@ -151,6 +151,7 @@ fn build_use_skill_dispatch() -> UseSkillDispatch {
 
 #[tokio::test]
 async fn use_skill_dispatch_keeps_authorized_target_after_registry_rebind() {
+    let _ = AgentDefinitionRegistry::init_global_builtins();
     let (dispatch, handle) = build_use_skill_dispatch_with_handle();
     let arguments = json!({
         "skill": "media",
