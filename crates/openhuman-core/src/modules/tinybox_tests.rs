@@ -399,3 +399,15 @@ async fn docker_controls_use_typed_calls_with_validated_contract_capability()
     );
     Ok(())
 }
+
+#[test]
+fn docker_control_transport_deadline_tracks_the_bounded_module_operation() {
+    assert_eq!(
+        docker_control_deadline(10_000),
+        std::time::Duration::from_secs(15)
+    );
+    assert_eq!(
+        docker_control_deadline(1),
+        std::time::Duration::from_millis(5_001)
+    );
+}

@@ -173,7 +173,7 @@ pub async fn run_docker(
     config: &Config,
     request: contract::DockerRunRequest,
 ) -> Result<contract::DockerRunOutput, String> {
-    let timeout = Duration::from_millis(request.timeout_ms).saturating_add(DOCKER_CALL_GRACE);
+    let timeout = docker_control_deadline(request.timeout_ms);
     let client = ModuleClient::new(config.clone()).with_timeout(timeout);
     call_run_docker_with_client(&client, request).await
 }
@@ -183,7 +183,9 @@ pub async fn docker_status(
     config: &Config,
     request: contract::DockerStatusRequest,
 ) -> Result<contract::DockerStatus, String> {
-    call_docker_status_with_client(&module_client(config), request).await
+    let timeout = docker_control_deadline(request.timeout_ms);
+    let client = module_client(config).with_timeout(timeout);
+    call_docker_status_with_client(&client, request).await
 }
 
 /// Stop TinyBox-owned containers matching the supplied label.
@@ -191,7 +193,13 @@ pub async fn cleanup_docker(
     config: &Config,
     request: contract::CleanupDockerRequest,
 ) -> Result<contract::CleanupDockerOutput, String> {
-    call_cleanup_docker_with_client(&module_client(config), request).await
+    let timeout = docker_control_deadline(request.timeout_ms);
+    let client = module_client(config).with_timeout(timeout);
+    call_cleanup_docker_with_client(&client, request).await
+}
+
+fn docker_control_deadline(timeout_ms: u64) -> Duration {
+    Duration::from_millis(timeout_ms).saturating_add(DOCKER_CALL_GRACE)
 }
 
 async fn call_docker_status_with_client(
