@@ -266,7 +266,6 @@ pub fn all_tools_with_runtime(
     tools.extend(crate::agent::artifacts::tools::registered_tools(
         config.clone(),
     ));
-    tools.extend(vec![]);
     tools.extend(crate::integrations::task_sources::tools::registered_tools(
         config.clone(),
     ));
@@ -279,13 +278,10 @@ pub fn all_tools_with_runtime(
     tools.extend(crate::platform::doctor::tools::registered_tools(
         config.clone(),
     ));
-    tools.extend(vec![]);
     tools.extend(crate::platform::health::tools::registered_tools());
-    tools.extend(vec![]);
     tools.extend(crate::platform::cost::tools::registered_tools(
         config.clone(),
     ));
-    tools.extend(vec![]);
     tools.extend(crate::desktop::dashboard::tools::registered_tools(
         config.clone(),
     ));
@@ -312,11 +308,10 @@ pub fn all_tools_with_runtime(
     tools.extend(crate::platform::service::tools::registered_tools(
         config.clone(),
     ));
-    tools.extend(vec![
-        // Config: read-only surface (default-ON). The config_update_* mutators
-        // are deferred (their apply fns take non-Deserialize patch structs);
-        // see config/tools.rs.
-    ]);
+
+    // Config: read-only surface (default-ON). The config_update_* mutators
+    // are deferred (their apply fns take non-Deserialize patch structs);
+    // see config/tools.rs.
     tools.extend(crate::config::tools::registered_tools(config.clone()));
     tools.extend(vec![
         // Account & money. The billing / team / referral agent-tool families were
@@ -358,7 +353,6 @@ pub fn all_tools_with_runtime(
     tools.extend(crate::config::workspace::tools::registered_tools(
         config.clone(),
     ));
-    tools.extend(vec![]);
 
     // The single `memory` tool (recall | fetch | learn | forget), registered
     // only while memory is on: with no usable engine (signed out, no CortexDB
