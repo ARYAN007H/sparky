@@ -447,5 +447,9 @@ their read-only posture. Dangerous profile ceilings are refused.
 `memory_engine` supplies the existing `MemoryEngine` contract through each
 profile's local adapters. Requests retain the forced `user:<profile-id>` root;
 a mismatched config fails closed. The process-global host engine is still
-ignored in SaaS. Provider credentials and scheduled profile turn resolution
+ignored in SaaS. Resolution refuses a profile whose lease expired or was
+latched, including queued workers resolving after lease loss. This is an
+admission check: an external engine call already admitted can still finish
+if lease loss happens while it is in flight; the generic `MemoryEngine`
+contract does not provide atomic storage fencing. Provider credentials and scheduled profile turn resolution
 are separate capabilities; selecting a native tool does not start a driver.
