@@ -55,3 +55,37 @@ fn current_schema_does_not_reapply_the_decoder_migration() {
     rewrite_document(&mut document).unwrap();
     assert_eq!(document, before);
 }
+
+#[tokio::test]
+async fn failed_upgrade_save_retains_version_and_model_for_retry() {
+    let dir = tempfile::tempdir().unwrap();
+    let blocked = dir.path().join("blocked.toml");
+    std::fs::create_dir(&blocked).unwrap();
+    let mut config = crate::config::Config {
+        schema_version: 13,
+        config_path: blocked,
+        workspace_dir: dir.path().join("workspace"),
+        cloud_providers: vec![crate::config::schema::cloud_providers::CloudProviderCreds {
+            id: "provider".into(),
+            slug: "anthropic".into(),
+            default_model: Some("claude-sonnet-4".into()),
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    crate::config::migrations::run_pending(&mut config).await;
+    assert_eq!(config.schema_version, 13);
+    assert_eq!(
+        config.cloud_providers[0].default_model.as_deref(),
+        Some("claude-sonnet-4")
+    );
+    config.config_path = dir.path().join("retry.toml");
+    crate::config::migrations::run_pending(&mut config).await;
+    assert_eq!(config.schema_version, 14);
+    let persisted: crate::config::Config =
+        toml::from_str(&std::fs::read_to_string(config.config_path).unwrap()).unwrap();
+    assert_eq!(
+        persisted.cloud_providers[0].default_model.as_deref(),
+        Some("claude-sonnet-4")
+    );
+}
