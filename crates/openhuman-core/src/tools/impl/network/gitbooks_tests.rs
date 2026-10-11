@@ -181,7 +181,12 @@ fn redact_endpoint_keeps_only_origin() {
 
 #[tokio::test]
 async fn search_rejects_empty_query() {
-    let t = GitbooksSearchTool::new("https://example.com/mcp".into(), 5).expect("a client builds");
+    let t = GitbooksSearchTool::new(
+        "https://example.com/mcp".into(),
+        5,
+        crate::config::Config::default(),
+    )
+    .expect("a tool builds");
     let result = t.execute(json!({"query": "   "})).await.unwrap();
     assert!(result.is_error);
     assert!(result.output().contains("empty"));
@@ -189,7 +194,12 @@ async fn search_rejects_empty_query() {
 
 #[tokio::test]
 async fn get_page_rejects_empty_url() {
-    let t = GitbooksGetPageTool::new("https://example.com/mcp".into(), 5).expect("a client builds");
+    let t = GitbooksGetPageTool::new(
+        "https://example.com/mcp".into(),
+        5,
+        crate::config::Config::default(),
+    )
+    .expect("a tool builds");
     let result = t.execute(json!({"url": ""})).await.unwrap();
     assert!(result.is_error);
 }

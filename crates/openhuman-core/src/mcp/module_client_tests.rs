@@ -8,6 +8,7 @@ struct FakePort {
     closed: Arc<Mutex<Vec<String>>>,
     calls: Arc<Mutex<Vec<(String, String, Value, bool)>>>,
     prepared_requests: Arc<Mutex<Vec<PrepareAgentToolsRequest>>>,
+    validation_requests: Arc<Mutex<Vec<ValidateServerArgumentsRequest>>>,
     open_started: Arc<Notify>,
     close_started: Arc<Notify>,
     call_started: Arc<Notify>,
@@ -149,6 +150,15 @@ impl McpModulePort for FakePort {
             })
             .collect())
     }
+
+    async fn validate_server_arguments(
+        &self,
+        request: ValidateServerArgumentsRequest,
+    ) -> Result<ServerArgumentsValidation, ModuleCallError> {
+        let arguments = request.arguments.as_object().cloned().unwrap_or_default();
+        self.validation_requests.lock().unwrap().push(request);
+        Ok(ServerArgumentsValidation::Valid(arguments))
+    }
 }
 
 #[tokio::test]
@@ -171,6 +181,28 @@ async fn agent_tool_names_are_requested_from_the_module_root() {
     let prepared = client.prepare_agent_tools(request.clone()).await.unwrap();
 
     assert_eq!(prepared[0].name, "module:docs:whoami");
+    assert_eq!(requests.lock().unwrap().as_slice(), &[request]);
+}
+
+#[tokio::test]
+async fn generic_server_argument_validation_uses_the_module_root() {
+    let port = FakePort::default();
+    let requests = Arc::clone(&port.validation_requests);
+    let client = client(port);
+    let request = ValidateServerArgumentsRequest {
+        arguments: serde_json::json!({"query": " topic "}),
+        allowed: vec!["query".to_owned()],
+        rules: vec![tinymcp_bus::ServerArgumentRule::RequiredNonEmptyString {
+            key: "query".to_owned(),
+        }],
+    };
+
+    let result = client
+        .validate_server_arguments(request.clone())
+        .await
+        .expect("module validation");
+
+    assert_eq!(result, ServerArgumentsValidation::Valid(serde_json::json!({"query": " topic "}).as_object().unwrap().clone()));
     assert_eq!(requests.lock().unwrap().as_slice(), &[request]);
 }
 
