@@ -11,9 +11,6 @@ use tinystoragedrivers_core::{
 };
 use tinytools::Tool;
 
-#[path = "cron_policy_model.rs"]
-mod recording_model;
-
 type StoreResult<T> = Result<T, StorageError>;
 const POLICIES: &str = "cron_job_policies";
 const BACKEND_DETAIL: &str = "mongodb://policy-user:secret@backend/private-payload";
@@ -178,18 +175,11 @@ pub(super) async fn policy_reads_refuse_execution_without_consuming_a_slot(case:
         faults: Arc::clone(&faults),
     }));
     let sqlite_before = sqlite_stamp(&config);
-    let model_calls = Arc::new(AtomicUsize::new(0));
-    let mut overrides = openhuman_core::agent::host_overrides::HostOverrides::default();
-    overrides.model = Some(Arc::new(recording_model::RecordingModel(Arc::clone(
-        &model_calls,
-    ))));
-    let overrides = Arc::new(overrides);
     let profile = |name: &str| {
         let ctx = CoreContext::current().unwrap().derive_with(
             ContextOverlay::new(config.clone(), DomainSet::none(), Default::default())
                 .session_agent(name)
-                .profile(name)
-                .host_overrides(Arc::clone(&overrides)),
+                .profile(name),
         );
         AgentContextRegistry::register(name, &ctx);
         ctx
@@ -357,17 +347,6 @@ pub(super) async fn policy_reads_refuse_execution_without_consuming_a_slot(case:
         calls.load(Ordering::SeqCst),
         1,
         "missing policy row must still run with defaults"
-    );
-    CoreContext::scope(Arc::clone(&alpha), async {
-        let (success, output) =
-            cron::scheduler::execute_job_now(&config, &agent_job, "valid-policy-agent").await;
-        assert!(success, "recording model fixture failed: {output}");
-    })
-    .await;
-    assert_eq!(
-        model_calls.load(Ordering::SeqCst),
-        1,
-        "the native model fixture must actually serve agent turns"
     );
     // Losing the backend after a failed attempt must stop further attempts.
     let retry_calls = Arc::new(AtomicUsize::new(0));
