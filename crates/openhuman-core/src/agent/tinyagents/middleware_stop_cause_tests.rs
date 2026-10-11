@@ -371,3 +371,82 @@ async fn a_failure_breaker_halt_survives_a_later_halt_in_its_batch() {
         "{note}"
     );
 }
+
+/// Feed `breaker` one result of `tool` for `path`, failing with
+/// `MISTYPED_PATH` unless `ok`.
+async fn fold(
+    breaker: &RepeatedToolFailureMiddleware,
+    ctx: &mut RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+    id: &str,
+    tool: &str,
+    path: &str,
+    ok: bool,
+) {
+    let mut call = TaToolCall::new(id, tool, json!({ "path": path }));
+    breaker.before_tool(ctx, &(), &mut call).await.unwrap();
+    let mut result = if ok {
+        tool_result(tool, "fresh output")
+    } else {
+        failing_result(tool, MISTYPED_PATH)
+    };
+    breaker
+        .after_tool(ctx, &(), &invocation(id, tool), &mut result)
+        .await
+        .unwrap();
+}
+
+/// A refusal folded back after the stop: the repeat guard refused a sibling.
+async fn fold_refusal(
+    breaker: &RepeatedToolFailureMiddleware,
+    ctx: &mut RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+) {
+    let mut refused = TaToolResult::error("Blocked: this exact call was not executed again.");
+    refused.metadata = Some(json!({ REPEAT_GUARD_METADATA_KEY: REPEAT_GUARD_BLOCKED }));
+    breaker
+        .after_tool(ctx, &(), &invocation("reread", "file_read"), &mut refused)
+        .await
+        .unwrap();
+}
+
+/// Two correctable stops in one batch: only the one that owns the stop note
+/// may be relabelled, and with its own tool, not the later one's.
+#[tokio::test]
+async fn a_relabelled_stop_keeps_the_tool_of_the_stop_that_owns_the_note() {
+    let handle = SteeringHandle::allow_all();
+    let slot = std::sync::Arc::new(std::sync::Mutex::new(None));
+    let breaker = RepeatedToolFailureMiddleware::new(handle.clone(), 3, slot.clone());
+    let mut ctx = ctx();
+    fold(&breaker, &mut ctx, "a1", "file_read", "src/lbi.rs", false).await;
+    fold(&breaker, &mut ctx, "a2", "file_read", "src/lbi.rs", false).await;
+    fold(&breaker, &mut ctx, "b1", "list_files", "src/lbi.rs", false).await;
+    fold(&breaker, &mut ctx, "b2", "list_files", "src/lbi.rs", false).await;
+    fold_refusal(&breaker, &mut ctx).await;
+    let note = slot.lock().unwrap().clone().unwrap();
+    assert_eq!(
+        StopReasonKind::from_stop_note(&note),
+        StopReasonKind::RepeatingStep,
+        "{note}"
+    );
+    assert!(note.contains("`file_read`"), "{note}");
+    assert!(!note.contains("`list_files`"), "{note}");
+}
+
+/// A success folded back between the stop and a refusal shows the batch
+/// made progress: the stop is not relabelled as a repeat loop.
+#[tokio::test]
+async fn a_success_between_the_stop_and_a_refusal_keeps_the_stop_as_is() {
+    let handle = SteeringHandle::allow_all();
+    let slot = std::sync::Arc::new(std::sync::Mutex::new(None));
+    let breaker = RepeatedToolFailureMiddleware::new(handle.clone(), 3, slot.clone());
+    let mut ctx = ctx();
+    fold(&breaker, &mut ctx, "a1", "file_read", "src/lbi.rs", false).await;
+    fold(&breaker, &mut ctx, "a2", "file_read", "src/lbi.rs", false).await;
+    fold(&breaker, &mut ctx, "g1", "grep", "src", true).await;
+    fold_refusal(&breaker, &mut ctx).await;
+    let note = slot.lock().unwrap().clone().unwrap();
+    assert_eq!(
+        StopReasonKind::from_stop_note(&note),
+        StopReasonKind::NotFound,
+        "{note}"
+    );
+}
