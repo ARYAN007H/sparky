@@ -20,6 +20,110 @@ fn tinycomputer_registry_matches_bus_contract_and_published_release() {
 }
 
 #[test]
+fn tinywallet_registry_matches_the_verified_v013_release_manifest() {
+    let wallet = find("tinywallet").expect("compiled TinyWallet module");
+    assert_eq!(wallet.version, "0.13.0");
+    assert_eq!(
+        wallet.release_url,
+        "https://github.com/tinyhumansai/tinywallet/releases/tag/v0.13.0"
+    );
+
+    let actual = wallet
+        .assets
+        .iter()
+        .map(|asset| (asset.host_key, asset.archive, asset.sha256))
+        .collect::<Vec<_>>();
+    let published = [
+        (
+            "ubuntu-24.04-x86_64",
+            "tinywallet-module-0.13.0-ubuntu-24.04-x86_64.tar.gz",
+            "284983d01c548109b3e9d5bbca1951787912f713b4a98920b9b45cfd034b6760",
+        ),
+        (
+            "ubuntu-24.04-arm64",
+            "tinywallet-module-0.13.0-ubuntu-24.04-arm64.tar.gz",
+            "18ef8ffe518f731dc594d1606554ca12c840219e54f230382937061c395ab860",
+        ),
+        (
+            "ubuntu-22.04-x86_64",
+            "tinywallet-module-0.13.0-ubuntu-22.04-x86_64.tar.gz",
+            "92d0d0fe9ab20fdf4c44aa58d762b7e28b6a08876899a5b2d368df3feabcd2d5",
+        ),
+        (
+            "ubuntu-22.04-arm64",
+            "tinywallet-module-0.13.0-ubuntu-22.04-arm64.tar.gz",
+            "4d0e17d778c0c84df17e4c5b7fa60aa9296efecc5726902008946409b3a3c9e1",
+        ),
+        (
+            "macos-26-arm64",
+            "tinywallet-module-0.13.0-macos-26-arm64.tar.gz",
+            "e01a70efbcece8e134abfa84c70181425802415525303d7ba2a7798afbab1041",
+        ),
+        (
+            "macos-26-x86_64",
+            "tinywallet-module-0.13.0-macos-26-x86_64.tar.gz",
+            "c48f1f7807d0b25c2b54dca97237f6e64d02ec3a9396370cd8e3b1857419296a",
+        ),
+        (
+            "macos-15-arm64",
+            "tinywallet-module-0.13.0-macos-15-arm64.tar.gz",
+            "95f69f2e17ff1785d032f6e1017e12de5c6dc09af9633e67fc9c225dfcef9ce6",
+        ),
+        (
+            "macos-15-x86_64",
+            "tinywallet-module-0.13.0-macos-15-x86_64.tar.gz",
+            "f3114694e2d666ea1b030db952c589f08d79c60ab79aadb844327e273c5faaf5",
+        ),
+        (
+            "windows-2025-x86_64",
+            "tinywallet-module-0.13.0-windows-2025-x86_64.zip",
+            "7b79a25a1fccef17a4c6e0d400f49646c3a5f321821bb03ddc23e76d6030717a",
+        ),
+        (
+            "windows-2022-x86_64",
+            "tinywallet-module-0.13.0-windows-2022-x86_64.zip",
+            "0b7126be04b23dd5fad883d7f1dd33dd65c1042af68f93593590ea07c5daa95e",
+        ),
+        (
+            "windows-11-arm64",
+            "tinywallet-module-0.13.0-windows-11-arm64.zip",
+            "483d3fda2c46de71c8efd5dfa4ec828c0b6c86bb164c8362c1356f85cb8ec231",
+        ),
+        (
+            "archlinux-arm64",
+            "tinywallet-module-0.13.0-archlinux-arm64.tar.gz",
+            "ad2222bd1d2dd680568f486e40389c0b963cf5ba2d170f9d658985f31cabb511",
+        ),
+        (
+            "archlinux-x86_64",
+            "tinywallet-module-0.13.0-archlinux-x86_64.tar.gz",
+            "d67f541330f7712106238b90d993550d2e2e55f33d3c8c9f50669a1a51c1e981",
+        ),
+        (
+            "fedora-43-arm64",
+            "tinywallet-module-0.13.0-fedora-43-arm64.tar.gz",
+            "a2d62b03f2e99008ee3fe7ea84290fd050e12016ce36e89fda24d5449e795261",
+        ),
+        (
+            "fedora-43-x86_64",
+            "tinywallet-module-0.13.0-fedora-43-x86_64.tar.gz",
+            "0c8c5dbf2aa7b7caa371aa6366c7cfdd232fda41e2dbd894d2ef344c7c2cfa0a",
+        ),
+        (
+            "fedora-44-arm64",
+            "tinywallet-module-0.13.0-fedora-44-arm64.tar.gz",
+            "272b535910fc4bc84099887b7ccfbdd9d41a6d187616086c174f86cb77f21757",
+        ),
+        (
+            "fedora-44-x86_64",
+            "tinywallet-module-0.13.0-fedora-44-x86_64.tar.gz",
+            "3dcad60a65d4f0bbb1af838468a2f52d648d22b2fbc849ae0548a30ed9806646",
+        ),
+    ];
+    assert_eq!(actual, published);
+}
+
+#[test]
 fn tinybox_registry_matches_the_published_v0119_release_manifest() {
     let record = find("tinybox").expect("compiled TinyBox module");
     assert_eq!(record.version, "0.1.19");
@@ -368,4 +472,78 @@ fn a_record_publishes_for_every_host_or_for_none() {
 fn find_resolves_known_ids_only() {
     assert!(find("tinydocs").is_some());
     assert!(find("not-a-module").is_none());
+}
+
+#[test]
+fn tinychannels_registry_matches_prepared_connection_release() {
+    let record = find("tinychannels").expect("compiled TinyChannels module");
+    assert_eq!(record.version, "0.1.17");
+    assert_eq!(tinychannels_bus::CONTRACT_VERSION, 7);
+    assert_eq!(
+        tinychannels_bus::module_relay::MODULE_OPERATION_VERSION,
+        (1, 8)
+    );
+    let expected = [
+        (
+            "macos-15-arm64",
+            "tinychannels-module-0.1.17-macos-15-arm64.tar.gz",
+            "79a0c1f14258d9a8230eb6a9bd962f243d84ca57381e48e0840e6696b3d86ce2",
+        ),
+        (
+            "macos-15-x86_64",
+            "tinychannels-module-0.1.17-macos-15-x86_64.tar.gz",
+            "9beeb0697a0eee6016aae0aeb27999ffa115945c20a7786742ade1c09dfb3d84",
+        ),
+        (
+            "macos-26-arm64",
+            "tinychannels-module-0.1.17-macos-26-arm64.tar.gz",
+            "bc08c3d3d2ec1ba7f07593fd67e7e2b394757478e4de9e8e66dc6ba9a9cb2413",
+        ),
+        (
+            "macos-26-x86_64",
+            "tinychannels-module-0.1.17-macos-26-x86_64.tar.gz",
+            "0eeb60e6f55f4d7f6ded815ea95d1722917285e13ebad6fa5c1e2211766c335b",
+        ),
+        (
+            "ubuntu-22.04-arm64",
+            "tinychannels-module-0.1.17-ubuntu-22.04-arm64.tar.gz",
+            "fa5f5aeedeca8ab03cfd31a5865c1f69e0ee7a935a7461c3f87c7fc491f6765d",
+        ),
+        (
+            "ubuntu-22.04-x86_64",
+            "tinychannels-module-0.1.17-ubuntu-22.04-x86_64.tar.gz",
+            "ab6c61dc697637e9ef07067d17d369e99f4bc3284815320f68048ce456271355",
+        ),
+        (
+            "ubuntu-24.04-arm64",
+            "tinychannels-module-0.1.17-ubuntu-24.04-arm64.tar.gz",
+            "cae106ae240d9f7d5022e397a33df4f851c8114c205292c4b5d84d817a9aba1a",
+        ),
+        (
+            "ubuntu-24.04-x86_64",
+            "tinychannels-module-0.1.17-ubuntu-24.04-x86_64.tar.gz",
+            "896af998236d9a27df67da8d99badee8a17b971aca3a7158700679baea267c49",
+        ),
+        (
+            "windows-11-arm64",
+            "tinychannels-module-0.1.17-windows-11-arm64.zip",
+            "534415e3d59bed642e0b4e9ca623e2706a4f53e544fb2331dbcc5d27d4fb1833",
+        ),
+        (
+            "windows-2022-x86_64",
+            "tinychannels-module-0.1.17-windows-2022-x86_64.zip",
+            "5a1be7f484d67282612f98325a8a72503b70f5ea5c9b4fba01dc92077624f759",
+        ),
+        (
+            "windows-2025-x86_64",
+            "tinychannels-module-0.1.17-windows-2025-x86_64.zip",
+            "9fb1d787045bd835c3422b555133db34b158bb5f0ec2a7033249ebf713a16c46",
+        ),
+    ];
+    assert_eq!(record.assets.len(), expected.len());
+    for (key, archive, sha256) in expected {
+        let asset = record.asset_for(key).expect("supported platform asset");
+        assert_eq!(asset.archive, archive);
+        assert_eq!(asset.sha256, sha256);
+    }
 }

@@ -47,7 +47,7 @@ async fn discord_credentials_never_reach_an_unattested_bus() {
         )
         .unwrap();
     let result = discord::<Vec<DiscordGuild>>(
-        &ModuleClient::fixture(proxy),
+        &ModuleClient::fixture(proxy.clone()),
         ChannelControllerRequest::DiscordListGuilds {
             config: Default::default(),
             bot_token: "fixture-token".into(),
@@ -57,6 +57,18 @@ async fn discord_credentials_never_reach_an_unattested_bus() {
     )
     .await;
     assert_eq!(result.unwrap_err(), ModuleCallError::TransportFailed);
+    let prepared = prepare_connection(
+        &ModuleClient::fixture(proxy),
+        ChannelControllerRequest::PrepareConnect {
+            config: Default::default(),
+            channel: "discord".into(),
+            auth_mode: tinychannels_bus::ChannelAuthMode::BotToken,
+            credentials: json!({"bot_token":"fixture-token"}),
+            proxy: Default::default(),
+        },
+    )
+    .await;
+    assert!(matches!(prepared, Err(ModuleCallError::TransportFailed)));
     assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
 }
 
