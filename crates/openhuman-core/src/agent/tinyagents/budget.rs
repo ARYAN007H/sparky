@@ -1,8 +1,6 @@
 //! Host budget policy, scoped once at admission and carried explicitly to children.
 use std::sync::Arc;
-use tinyinference_llm::model::budget::{
-    Budget, BudgetExceeded, BudgetSnapshot, CallBudget, Spend, SpendLimits,
-};
+use tinyinference_llm::model::budget::{Budget, CallBudget};
 use tinyinference_llm::model::ChatModel;
 
 /// A shared ledger and conservative reservation bounds for every physical call.
