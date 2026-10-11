@@ -17,7 +17,6 @@ pub mod encryption;
 pub mod keyring_consent;
 pub mod live_policy;
 pub mod pairing;
-pub mod pii;
 pub mod policy;
 pub mod prompt_injection;
 pub mod scrub;
@@ -59,6 +58,3 @@ pub use schemas::{
     all_controller_schemas as all_security_controller_schemas,
     all_registered_controllers as all_security_registered_controllers,
 };
-
-#[allow(unused_imports)]
-pub use pii::{scan as scan_pii, CategoryHit, PiiCategory, PiiScanResult, RiskLevel};
