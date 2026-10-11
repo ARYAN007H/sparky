@@ -7,13 +7,15 @@ use super::*;
 fn map_flow_update_error(e: tinyflows_sqlite::flows::FlowUpdateError) -> String {
     match e {
         tinyflows_sqlite::flows::FlowUpdateError::NotFound => "flow not found".to_string(),
-        tinyflows_sqlite::flows::FlowUpdateError::Conflict(current) => serde_json::to_string(&json!({
-            "code": "version_conflict",
-            "message": "This flow changed since you loaded it. Reload to see the latest \
-                        version, then reapply your change.",
-            "current": *current,
-        }))
-        .unwrap_or_else(|_| "version_conflict".to_string()),
+        tinyflows_sqlite::flows::FlowUpdateError::Conflict(current) => {
+            serde_json::to_string(&json!({
+                "code": "version_conflict",
+                "message": "This flow changed since you loaded it. Reload to see the latest \
+                            version, then reapply your change.",
+                "current": *current,
+            }))
+            .unwrap_or_else(|_| "version_conflict".to_string())
+        }
         tinyflows_sqlite::flows::FlowUpdateError::Store(err) => err.to_string(),
     }
 }

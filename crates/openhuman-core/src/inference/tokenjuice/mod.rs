@@ -7,15 +7,13 @@ pub mod repl_tools;
 pub mod savings;
 pub mod schemas;
 pub mod tools;
-pub mod types;
 
 use tinyjuice_bus::names::methods;
 
 pub use repl_tools::{is_repl_tool, repl_tools, repl_tools_for, REPL_TOOL_NAMES};
 pub use tools::TokenjuiceRetrieveTool;
-pub use {tinyjuice_bus::types::AgentTokenjuiceCompression, tinyjuice_bus::types::CompressorKind, tinyjuice_bus::types::ContentKind};
 
-use {tinyjuice_bus::wire::InstallRequest};
+use tinyjuice_bus::wire::InstallRequest;
 
 pub const RETRIEVE_TOOL_NAME: &str = "juice_retrieve";
 pub const LEGACY_TINYJUICE_RETRIEVE_TOOL_NAME: &str = "tinyjuice_retrieve";
@@ -303,7 +301,11 @@ pub async fn compact_tool_output(call: ToolOutputCompaction<'_>) -> CompactedToo
     };
     let response = match client(&config)
         .with_timeout(COMPACT_WITH_TIMEOUT)
-        .call::<tinyjuice_bus::wire::CompactResponse>("tinyjuice", methods::COMPACT_WITH, (request,))
+        .call::<tinyjuice_bus::wire::CompactResponse>(
+            "tinyjuice",
+            methods::COMPACT_WITH,
+            (request,),
+        )
         .await
     {
         Ok(response) => response,
@@ -338,7 +340,10 @@ fn record_savings(response: &tinyjuice_bus::wire::CompactResponse) {
     );
 }
 
-pub async fn detect(content: String, hint: tinyjuice_bus::types::ContentHint) -> Result<String, String> {
+pub async fn detect(
+    content: String,
+    hint: tinyjuice_bus::types::ContentHint,
+) -> Result<String, String> {
     let config = crate::config::Config::load_or_init()
         .await
         .map_err(|error| error.to_string())?;
@@ -442,3 +447,7 @@ pub async fn extract_html(html: String) -> Result<String, String> {
         .map_err(|e| e.to_string())?;
     response.map_err(|_| "juice: HTML input exceeds module limit".into())
 }
+
+#[cfg(test)]
+#[path = "mod_contract_tests.rs"]
+mod contract_tests;

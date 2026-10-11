@@ -1,4 +1,5 @@
 use super::*;
+use tinyjuice_bus::types::{CompressOptions, ContentHint, ContentKind};
 
 #[test]
 fn compress_options_accept_omitted_fields() {
