@@ -154,6 +154,11 @@ required-features = ["profiles"]
 name = "profile_operator_tools"
 required-features = ["channels"]
 
+# A refused tool call must not fail a turn in a thread that already ran `cron`.
+[[test]]
+name = "profile_refused_tool_generation"
+required-features = ["channels"]
+
 [[example]]
 name = "profiles"
 required-features = ["profiles"]
