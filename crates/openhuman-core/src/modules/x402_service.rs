@@ -6,12 +6,90 @@ use std::sync::OnceLock;
 use tinywallet_bus::names::methods;
 use tinywallet_bus::wire::{
     X402CloseRequest, X402ConfigResponse, X402ConfigureRequest, X402DetailedSpendingSummary,
-    X402ListPaymentsRequest, X402ListPaymentsResponse, X402ServiceHandle, X402UpdateBudgetRequest,
+    X402ListPaymentsRequest, X402ListPaymentsResponse, X402PreparePaymentRequest,
+    X402PreparePaymentResponse, X402RecordPaymentRequest, X402ServiceHandle, X402UpdateBudgetRequest,
 };
 
 use crate::config::Config;
 
 use super::wallet::{self, WalletCallError};
+
+/// Prepare and sign a 402 challenge inside TinyWallet. Both supported rails'
+/// secret material is sent only through the attested confidential call; the
+/// module parses the challenge and selects the matching chain.
+pub(crate) async fn prepare_payment(
+    config: &Config,
+    url: String,
+    payment_required: String,
+    owner: Option<tinywallet_bus::wire::QuoteOwner>,
+) -> Result<(X402ServiceHandle, X402PreparePaymentResponse), WalletCallError> {
+    let mut active = service().lock().await;
+    ensure_service(config, &mut active).await?;
+    let service_handle = active
+        .as_ref()
+        .ok_or_else(|| WalletCallError::Failed("x402 service is unavailable".into()))?
+        .handle
+        .clone();
+
+    let evm = signing_secret(config, crate::web3::wallet::WalletChain::Evm).await?;
+    let solana = signing_secret(config, crate::web3::wallet::WalletChain::Solana).await?;
+    let mut request = X402PreparePaymentRequest {
+        service: service_handle.clone(),
+        url,
+        payment_required,
+        owner,
+        secret: evm,
+        additional_secrets: vec![solana],
+    };
+    let response = wallet::call_confidential(config, methods::X402_PREPARE_PAYMENT, &request).await;
+    request.secret.mnemonic.zeroize();
+    for secret in &mut request.additional_secrets {
+        secret.mnemonic.zeroize();
+    }
+    Ok((service_handle, response?))
+}
+
+/// Record the retry result through the same module-owned payment ledger.
+pub(crate) async fn record_payment(
+    config: &Config,
+    service: X402ServiceHandle,
+    payment_id: String,
+    response_status: u16,
+    settlement_response: Option<String>,
+) -> Result<(), WalletCallError> {
+    wallet::call(
+        config,
+        methods::X402_RECORD_PAYMENT,
+        X402RecordPaymentRequest {
+            service,
+            payment_id,
+            response_status,
+            settlement_response,
+        },
+    )
+    .await
+}
+
+async fn signing_secret(
+    config: &Config,
+    chain: crate::web3::wallet::WalletChain,
+) -> Result<tinywallet_bus::wire::SecretMaterial, WalletCallError> {
+    let stored = crate::web3::wallet::secret_material(chain)
+        .await
+        .map_err(WalletCallError::Failed)?;
+    let phrase = crate::security::encryption::rpc::decrypt_secret(
+        config,
+        &stored.encrypted_mnemonic,
+    )
+    .await
+    .map_err(|error| WalletCallError::Failed(error.to_string()))?
+    .value;
+    Ok(tinywallet_bus::wire::SecretMaterial {
+        mnemonic: phrase,
+        derivation_path: stored.derivation_path,
+        chain: chain.to_chain(),
+    })
+}
 
 struct X402Service {
     workspace: PathBuf,
