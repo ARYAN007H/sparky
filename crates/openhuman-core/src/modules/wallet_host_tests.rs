@@ -26,6 +26,7 @@ fn x402_approval_is_bound_to_the_exact_chat_owner_and_payment_facts() {
     let context = crate::security::approval::ApprovalChatContext {
         thread_id: "thread-1".into(),
         client_id: "client-1".into(),
+        request_id: Some("request-1".into()),
     };
     assert!(x402_request_owner_matches(&request, &context));
 
