@@ -159,7 +159,7 @@ tinyagents-registry = { path = "../../vendor/tinyagents/crates/tinyagents-regist
 tinyagents-session = { path = "../../vendor/tinyagents/crates/tinyagents-session", features = ["storage-drivers"] }
 # The storage ports and the URL-to-backend facade (`storage` domain). No driver
 # by default: the `storage-*` features below add them.
-tinystoragedrivers = { path = "../../vendor/tinyagents/vendor/tinystoragedrivers/crates/tinystoragedrivers", default-features = false, features = ["blocking", "secrets", "keyring", "file"] }
+tinystoragedrivers = { path = "../../vendor/tinyagents/vendor/tinystoragedrivers/crates/tinystoragedrivers", default-features = false, features = ["blocking", "secrets", "file"] }
 tinyagents-runtime = { path = "../../vendor/tinyagents/crates/tinyagents-runtime" }
 tinyagents-orchestration = { path = "../../vendor/tinyagents/crates/tinyagents-orchestration" }
 tinyagents-tasks = { path = "../../vendor/tinyagents/crates/tinyagents-tasks" }
@@ -394,7 +394,6 @@ walkdir = "2"
 hostname = "0.4.2"
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
 sysinfo = { version = "0.33", default-features = false, features = ["system"] }
-keyring = { version = "3", features = ["apple-native", "windows-native", "linux-native"] }
 lettre = { version = "0.11.22", default-features = false, features = ["builder"], optional = true }
 # HTTP server framework for the domain-owned routes (`/v1`, dictation, the MCP
 # HTTP transport). Exclusive to the default-ON `http-server`
@@ -621,9 +620,8 @@ langfuse = ["tinyagents-harness/langfuse"]
 # `storage-sqlite` is in the contributor set and the product: the small
 # desktop stores (approvals, devices, notifications, task sources) keep their
 # rows in it by default. `storage-mongodb` is in neither; a cloud build turns
-# it on. `storage-keyring` does not exist: the only tinystoragedrivers
-# `keyring` gate is `KeyringSecrets`, which the core does not use (its OS
-# keychain access is the `keyring` crate in `security/keyring`).
+# it on. OS keychain support belongs to openhuman-rpc's `os-keyring` feature,
+# not the core or its storage-driver feature set.
 storage-sqlite = ["tinystoragedrivers/sqlite"]
 storage-mongodb = ["tinystoragedrivers/mongodb"]
 # Always on (the dependency enables `file`); kept so existing feature lists

@@ -1,11 +1,11 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
 use parking_lot::Mutex;
 
-use super::{build_backend_at, KeyringBackend};
+use super::{build_backend_at, SecretBackend};
 
 thread_local! {
     /// Workspace bound by [`ScopedWorkspace`] on this thread, if any.
@@ -18,7 +18,7 @@ static PROCESS_DEFAULT: OnceLock<PathBuf> = OnceLock::new();
 
 /// One backend per resolved workspace directory.
 #[allow(clippy::type_complexity)]
-static BACKENDS: OnceLock<Mutex<HashMap<PathBuf, &'static dyn KeyringBackend>>> = OnceLock::new();
+static BACKENDS: OnceLock<Mutex<HashMap<PathBuf, Arc<dyn SecretBackend>>>> = OnceLock::new();
 
 /// The keyring workspace for the calling thread.
 pub(crate) fn current_workspace() -> PathBuf {
@@ -33,18 +33,19 @@ pub(crate) fn current_workspace() -> PathBuf {
 }
 
 /// The backend rooted at `dir`, built once per directory.
-pub(crate) fn backend_for(dir: &Path) -> &'static dyn KeyringBackend {
+pub(crate) fn backend_for(dir: &Path) -> Arc<dyn SecretBackend> {
     let registry = BACKENDS.get_or_init(|| Mutex::new(HashMap::new()));
-    if let Some(existing) = registry.lock().get(dir).copied() {
+    if let Some(existing) = registry.lock().get(dir).cloned() {
         return existing;
     }
     // Built outside the registry lock: backend construction can re-enter the
     // keyring module, and holding the lock across it would deadlock.
-    let candidate: &'static dyn KeyringBackend = Box::leak(build_backend_at(dir));
-    *registry
+    let candidate = build_backend_at(dir);
+    registry
         .lock()
         .entry(dir.to_path_buf())
         .or_insert(candidate)
+        .clone()
 }
 
 /// Binds the calling thread's keyring workspace for the guard's lifetime.

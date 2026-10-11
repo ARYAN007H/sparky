@@ -8,34 +8,12 @@ use tinystoragedrivers::secrets::{EncryptedFileSecrets, SecretStore as _};
 use tinystoragedrivers::{ErrorKind, StorageError};
 use zeroize::Zeroizing;
 
-use crate::security::keyring::error::KeyringError;
-use crate::security::keyring::file_store;
+use crate::security::secret_storage::error::SecretStorageError;
+use crate::security::secret_storage::file_store;
 
-/// A driver error as a [`KeyringError::Backend`], for the file store.
-pub(super) fn backend_error(error: StorageError) -> KeyringError {
-    KeyringError::Backend(format!("secret store: {error}"))
-}
-
-/// A driver error as the [`KeyringError::Os`] the OS-keychain callers (and
-/// the credential-ref error classifier) have always seen. A locked or denied
-/// store keeps its `NoStorageAccess` identity; the driver's error rides along
-/// as the source (it never carries a secret value).
-pub(super) fn os_error(key: &str, error: StorageError) -> KeyringError {
-    let source = if error.kind() == ErrorKind::Unavailable {
-        keyring::Error::NoStorageAccess(Box::new(error))
-    } else {
-        keyring::Error::PlatformFailure(Box::new(error))
-    };
-    KeyringError::Os {
-        key: key.to_string(),
-        source,
-    }
-}
-
-/// Whether the keychain refused access rather than failed: reads and deletes
-/// treat that as "nothing there", as they always have.
-pub(super) fn is_no_access(error: &StorageError) -> bool {
-    error.kind() == ErrorKind::Unavailable
+/// A driver error as a [`SecretStorageError::Backend`], for the file store.
+pub(super) fn backend_error(error: StorageError) -> SecretStorageError {
+    SecretStorageError::Backend(format!("secret store: {error}"))
 }
 
 /// Whether the driver reports the secrets file itself as unreadable
@@ -48,10 +26,10 @@ pub(super) fn is_corruption(error: &StorageError) -> bool {
 pub(super) fn utf8(
     key: &str,
     value: Option<Zeroizing<Vec<u8>>>,
-) -> Result<Option<String>, KeyringError> {
+) -> Result<Option<String>, SecretStorageError> {
     value
         .map(|bytes| {
-            String::from_utf8(bytes.to_vec()).map_err(|source| KeyringError::InvalidUtf8 {
+            String::from_utf8(bytes.to_vec()).map_err(|source| SecretStorageError::InvalidUtf8 {
                 key: key.to_string(),
                 source,
             })
@@ -79,7 +57,7 @@ pub(super) fn recover_corrupt_file(
     path: &Path,
     key: &[u8; 32],
     cause: &StorageError,
-) -> Result<(), KeyringError> {
+) -> Result<(), SecretStorageError> {
     let _guard = file_store::lock_for_write(path)?;
     let store = EncryptedFileSecrets::at_path(path, Zeroizing::new(*key));
     match crate::storage::block_on(async move { store.list("").await }) {
@@ -99,7 +77,7 @@ pub(super) fn recover_corrupt_file(
         cause.message()
     );
     if file_store::quarantine_corrupt(path, "enc").is_none() {
-        return Err(KeyringError::Backend(
+        return Err(SecretStorageError::Backend(
             "secrets file is unreadable and could not be moved aside".to_string(),
         ));
     }

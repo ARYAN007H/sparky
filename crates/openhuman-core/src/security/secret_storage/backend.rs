@@ -1,109 +1,31 @@
-//! Backend implementations for the keyring module.
-//!
-//! Two concrete backends are provided:
-//!
-//! - [`OsBackend`]: Wraps the `keyring` crate to use the native OS credential
-//!   store (macOS Keychain, Windows Credential Manager, Linux Secret Service).
-//!   This is the production backend.
-//!
-//! - [`FileBackend`]: Stores secrets in a plain JSON file at
-//!   `{workspace}/dev-keychain.json`.  **This file is NOT encrypted** — it is a
-//!   test/debug artifact only and must never be used in production.
-//!
-//! Backend selection happens once at first use (see [`super::selected_backend`]).
+//! Host-installable secret-storage contract and the explicit plaintext debug backend.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use tinystoragedrivers::secrets::KeyringSecrets;
-
-use crate::security::keyring::adapter;
-use crate::security::keyring::error::KeyringError;
-use crate::security::keyring::file_store;
+use crate::security::secret_storage::error::SecretStorageError;
+use crate::security::secret_storage::file_store;
 
 // ── Trait ─────────────────────────────────────────────────────────────────────
 
 /// Abstraction over a secret-storage backend.
 ///
-/// All implementations must be `Send + Sync` so they can live inside a
-/// `OnceLock<Box<dyn KeyringBackend>>`.
-pub trait KeyringBackend: Send + Sync {
+/// All implementations must be `Send + Sync` so they can live inside
+/// the host install slot.
+pub trait SecretBackend: Send + Sync {
     /// Retrieve a secret.  Returns `Ok(None)` when no entry exists.
-    fn get(&self, namespaced_key: &str) -> Result<Option<String>, KeyringError>;
+    fn get(&self, namespaced_key: &str) -> Result<Option<String>, SecretStorageError>;
     /// Store (or overwrite) a secret.
-    fn set(&self, namespaced_key: &str, value: &str) -> Result<(), KeyringError>;
+    fn set(&self, namespaced_key: &str, value: &str) -> Result<(), SecretStorageError>;
     /// Delete a secret.  Must be idempotent (no error if the entry is absent).
-    fn delete(&self, namespaced_key: &str) -> Result<(), KeyringError>;
+    fn delete(&self, namespaced_key: &str) -> Result<(), SecretStorageError>;
+    /// Whether verified writes survive a process restart. Volatile providers
+    /// must return false so migration never deletes their durable source.
+    fn is_persistent(&self) -> bool {
+        true
+    }
     /// Human-readable name used in log lines.
     fn name(&self) -> &'static str;
-}
-
-// ── OsBackend ─────────────────────────────────────────────────────────────────
-
-/// Production backend: the native OS credential store, through
-/// `tinystoragedrivers`' [`KeyringSecrets`] (the `SecretStore` port) over the
-/// synchronous bridge.
-///
-/// The layout is unchanged: service `openhuman`, one credential per
-/// `"{user_id}:{key}"`, so every entry written by the previous direct
-/// `keyring::Entry` implementation reads back.
-pub struct OsBackend {
-    store: KeyringSecrets,
-}
-
-const SERVICE_NAME: &str = "openhuman";
-
-impl OsBackend {
-    /// The backend over the platform credential store.
-    pub fn new() -> Self {
-        Self::with_store(KeyringSecrets::new(SERVICE_NAME))
-    }
-
-    /// The backend over an explicit store (a mock credential builder in tests).
-    pub fn with_store(store: KeyringSecrets) -> Self {
-        Self { store }
-    }
-}
-
-impl Default for OsBackend {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl KeyringBackend for OsBackend {
-    fn get(&self, namespaced_key: &str) -> Result<Option<String>, KeyringError> {
-        use tinystoragedrivers::secrets::SecretStore as _;
-        let (store, name) = (self.store.clone(), namespaced_key.to_string());
-        match crate::storage::block_on(async move { store.get(&name).await }) {
-            Ok(value) => adapter::utf8(namespaced_key, value),
-            // A locked or denied store reads as "nothing there", as before.
-            Err(e) if adapter::is_no_access(&e) => Ok(None),
-            Err(e) => Err(adapter::os_error(namespaced_key, e)),
-        }
-    }
-
-    fn set(&self, namespaced_key: &str, value: &str) -> Result<(), KeyringError> {
-        use tinystoragedrivers::secrets::SecretStore as _;
-        let (store, name) = (self.store.clone(), namespaced_key.to_string());
-        let value = zeroize::Zeroizing::new(value.as_bytes().to_vec());
-        crate::storage::block_on(async move { store.set(&name, &value).await })
-            .map_err(|e| adapter::os_error(namespaced_key, e))
-    }
-
-    fn delete(&self, namespaced_key: &str) -> Result<(), KeyringError> {
-        use tinystoragedrivers::secrets::SecretStore as _;
-        let (store, name) = (self.store.clone(), namespaced_key.to_string());
-        match crate::storage::block_on(async move { store.delete(&name).await.map(|_| ()) }) {
-            Ok(()) => Ok(()),
-            Err(e) if adapter::is_no_access(&e) => Ok(()),
-            Err(e) => Err(adapter::os_error(namespaced_key, e)),
-        }
-    }
-
-    fn name(&self) -> &'static str {
-        "os"
-    }
 }
 
 // ── FileBackend ───────────────────────────────────────────────────────────────
@@ -154,14 +76,15 @@ impl FileBackend {
     /// - Writing (`true`): quarantine the bytes and fail. Returning empty here
     ///   is what turned a corrupt file into a *wipe*, because the write that
     ///   followed persisted a map holding nothing but the key being set.
-    fn read_map(&self, for_write: bool) -> Result<HashMap<String, String>, KeyringError> {
+    fn read_map(&self, for_write: bool) -> Result<HashMap<String, String>, SecretStorageError> {
         if !self.path.exists() {
             return Ok(HashMap::new());
         }
-        let bytes = std::fs::read(&self.path).map_err(|e| KeyringError::MigrationReadFailed {
-            path: self.path.display().to_string(),
-            source: e,
-        })?;
+        let bytes =
+            std::fs::read(&self.path).map_err(|e| SecretStorageError::MigrationReadFailed {
+                path: self.path.display().to_string(),
+                source: e,
+            })?;
         if bytes.is_empty() {
             return Ok(HashMap::new());
         }
@@ -169,7 +92,7 @@ impl FileBackend {
             Ok(map) => Ok(map),
             Err(e) if for_write => {
                 file_store::quarantine_corrupt(&self.path, "json");
-                Err(KeyringError::Backend(format!(
+                Err(SecretStorageError::Backend(format!(
                     "dev-keychain.json at {} could not be parsed ({e}); it was moved aside \
                      rather than overwritten",
                     self.path.display()
@@ -185,25 +108,25 @@ impl FileBackend {
         }
     }
 
-    fn write_map(&self, map: &HashMap<String, String>) -> Result<(), KeyringError> {
+    fn write_map(&self, map: &HashMap<String, String>) -> Result<(), SecretStorageError> {
         // Propagate serialization failure so callers are not silently fed empty
         // data on a write error.
         let json = serde_json::to_vec_pretty(map).map_err(|e| {
-            KeyringError::Backend(format!("failed to serialize dev keychain map: {e}"))
+            SecretStorageError::Backend(format!("failed to serialize dev keychain map: {e}"))
         })?;
         file_store::write_atomic(&self.path, &json)
     }
 }
 
-impl KeyringBackend for FileBackend {
-    fn get(&self, namespaced_key: &str) -> Result<Option<String>, KeyringError> {
+impl SecretBackend for FileBackend {
+    fn get(&self, namespaced_key: &str) -> Result<Option<String>, SecretStorageError> {
         // No lock: `write_atomic` publishes by rename, so a reader sees either
         // the whole previous file or the whole next one, never a mix.
         let map = self.read_map(false)?;
         Ok(map.get(namespaced_key).cloned())
     }
 
-    fn set(&self, namespaced_key: &str, value: &str) -> Result<(), KeyringError> {
+    fn set(&self, namespaced_key: &str, value: &str) -> Result<(), SecretStorageError> {
         // Held across the read as well as the write: taking it around the write
         // alone would still let a stale map overwrite a concurrent one.
         let _guard = file_store::lock_for_write(&self.path)?;
@@ -212,7 +135,7 @@ impl KeyringBackend for FileBackend {
         self.write_map(&map)
     }
 
-    fn delete(&self, namespaced_key: &str) -> Result<(), KeyringError> {
+    fn delete(&self, namespaced_key: &str) -> Result<(), SecretStorageError> {
         let _guard = file_store::lock_for_write(&self.path)?;
         let mut map = self.read_map(true)?;
         if map.remove(namespaced_key).is_some() {
@@ -228,7 +151,7 @@ impl KeyringBackend for FileBackend {
 
 // ── MockBackend (test only) ───────────────────────────────────────────────────
 
-/// In-memory backend used in tests and when `OPENHUMAN_KEYRING_BACKEND=mock`.
+/// In-memory backend used only in unit tests.
 #[cfg(test)]
 pub struct MockBackend {
     store: std::sync::Mutex<HashMap<String, String>>,
@@ -251,12 +174,12 @@ impl MockBackend {
 }
 
 #[cfg(test)]
-impl KeyringBackend for MockBackend {
-    fn get(&self, namespaced_key: &str) -> Result<Option<String>, KeyringError> {
+impl SecretBackend for MockBackend {
+    fn get(&self, namespaced_key: &str) -> Result<Option<String>, SecretStorageError> {
         Ok(self.store.lock().unwrap().get(namespaced_key).cloned())
     }
 
-    fn set(&self, namespaced_key: &str, value: &str) -> Result<(), KeyringError> {
+    fn set(&self, namespaced_key: &str, value: &str) -> Result<(), SecretStorageError> {
         self.store
             .lock()
             .unwrap()
@@ -264,7 +187,7 @@ impl KeyringBackend for MockBackend {
         Ok(())
     }
 
-    fn delete(&self, namespaced_key: &str) -> Result<(), KeyringError> {
+    fn delete(&self, namespaced_key: &str) -> Result<(), SecretStorageError> {
         self.store.lock().unwrap().remove(namespaced_key);
         Ok(())
     }

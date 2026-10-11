@@ -21,7 +21,7 @@ use super::test_scope::ScopedWorkspace;
 use super::{resolve_workspace_dir, workspace_dir_for_file_backend};
 use crate::config::test_env::EnvVarGuard;
 use crate::config::TEST_ENV_LOCK;
-use crate::security::keyring;
+use crate::security::secret_storage;
 
 /// The root-cause pin: in test builds the keyring workspace must not be
 /// steerable by a process-wide env var, because any test can set it while
@@ -82,28 +82,28 @@ fn scoped_workspaces_do_not_share_secrets() {
 
     {
         let _scope = ScopedWorkspace::new(one.path());
-        keyring::set("user", "scoped-key", "value-one").expect("set in workspace one");
+        secret_storage::set("user", "scoped-key", "value-one").expect("set in workspace one");
     }
     {
         let _scope = ScopedWorkspace::new(two.path());
         assert_eq!(
-            keyring::get("user", "scoped-key").expect("get in workspace two"),
+            secret_storage::get("user", "scoped-key").expect("get in workspace two"),
             None,
             "workspace two must not see workspace one's secrets"
         );
-        keyring::set("user", "scoped-key", "value-two").expect("set in workspace two");
+        secret_storage::set("user", "scoped-key", "value-two").expect("set in workspace two");
     }
     {
         let _scope = ScopedWorkspace::new(one.path());
         assert_eq!(
-            keyring::get("user", "scoped-key").expect("re-read workspace one"),
+            secret_storage::get("user", "scoped-key").expect("re-read workspace one"),
             Some("value-one".to_string()),
             "workspace one's secret must be untouched by workspace two"
         );
     }
 
-    assert!(one.path().join("dev-keychain.json").exists());
-    assert!(two.path().join("dev-keychain.json").exists());
+    assert!(!one.path().join("secrets.enc").exists());
+    assert!(!two.path().join("secrets.enc").exists());
 }
 
 /// The exact failure mode that produced the flake: a test binds a temp
@@ -111,17 +111,17 @@ fn scoped_workspaces_do_not_share_secrets() {
 /// disturb secrets belonging to the default (unscoped) store.
 #[test]
 fn a_deleted_scoped_workspace_does_not_reset_the_default_store() {
-    keyring::set("isolation-regression", "session", "kept").expect("seed default store");
+    secret_storage::set("isolation-regression", "session", "kept").expect("seed default store");
 
     {
         let tmp = tempfile::tempdir().expect("tempdir");
         let _scope = ScopedWorkspace::new(tmp.path());
-        keyring::set("isolation-regression", "session", "discarded").expect("set in scope");
+        secret_storage::set("isolation-regression", "session", "discarded").expect("set in scope");
         // `tmp` is dropped here — the directory and its dev-keychain.json vanish.
     }
 
     assert_eq!(
-        keyring::get("isolation-regression", "session").expect("re-read default store"),
+        secret_storage::get("isolation-regression", "session").expect("re-read default store"),
         Some("kept".to_string()),
         "a vanished scoped workspace must not reset the default credential store"
     );

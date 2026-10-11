@@ -133,6 +133,7 @@ pub mod profiles;
 /// Explicit ordered fallback and truncation policies.
 pub mod routing;
 mod runtime;
+pub mod secret_storage;
 mod turn;
 mod turn_cancellation;
 mod turn_meter;
