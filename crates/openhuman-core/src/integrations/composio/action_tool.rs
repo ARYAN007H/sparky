@@ -379,7 +379,7 @@ impl ComposioActionTool {
         // baked into a client this tool captured at construction.
         let res = super::module_client::call::<_, super::types::ComposioExecuteResponse>(
             &live_config,
-            super::module_client::methods::EXECUTE,
+            tinyconnectors_bus::names::methods::EXECUTE,
             super::types::ComposioExecuteRequest {
                 tool: self.action_name.clone(),
                 arguments: args,
