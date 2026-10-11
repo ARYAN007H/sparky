@@ -97,16 +97,6 @@ impl ServerPort for FixturePort {
         unreachable!()
     }
 
-    async fn metadata(
-        &self,
-        _session: &str,
-    ) -> Result<tinymcp_bus::ServerSessionMetadata, ModuleCallError> {
-        unreachable!()
-    }
-
-    async fn shutdown(&self) -> Result<usize, ModuleCallError> {
-        Ok(0)
-    }
 }
 
 #[tokio::test]

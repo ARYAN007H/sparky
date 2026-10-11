@@ -2,14 +2,13 @@
 
 use std::{
     sync::{
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc,
     },
     time::Duration,
 };
 
 use async_trait::async_trait;
-use serde::Serialize;
 use serde_json::{Map, Value};
 use tinymcp_bus::{
     names, ServerHostReply, ServerHttpResponseMetadata, ServerHttpSessionConfig,
@@ -29,6 +28,7 @@ use super::handler;
 const MODULE: &str = "tinymcp";
 const POLL_INTERVAL: Duration = Duration::from_millis(5);
 static NEXT_SESSION_ID: AtomicU64 = AtomicU64::new(1);
+static SHUTDOWN_REGISTERED: AtomicBool = AtomicBool::new(false);
 
 #[derive(Debug, thiserror::Error)]
 pub(super) enum ServerError {
@@ -42,8 +42,6 @@ pub(super) enum ServerError {
     Failed(String),
     #[error("MCP server module returned no response metadata")]
     MissingHttpMetadata,
-    #[error("MCP server module returned an invalid HTTP status")]
-    InvalidHttpStatus,
     #[error("a previous MCP request is still pending for this session")]
     PendingRequest,
 }
@@ -72,11 +70,6 @@ pub(super) trait ServerPort: Send + Sync {
         &self,
         request: ServerHttpSessionRequest,
     ) -> Result<ServerHttpResponseMetadata, ModuleCallError>;
-    async fn metadata(
-        &self,
-        session: &str,
-    ) -> Result<tinymcp_bus::ServerSessionMetadata, ModuleCallError>;
-    async fn shutdown(&self) -> Result<usize, ModuleCallError>;
 }
 
 struct TinyMcpPort {
@@ -155,24 +148,6 @@ impl ServerPort for TinyMcpPort {
             .await
     }
 
-    async fn metadata(
-        &self,
-        session: &str,
-    ) -> Result<tinymcp_bus::ServerSessionMetadata, ModuleCallError> {
-        self.client
-            .call(
-                MODULE,
-                names::methods::SERVER_SESSION_METADATA,
-                (session.to_owned(),),
-            )
-            .await
-    }
-
-    async fn shutdown(&self) -> Result<usize, ModuleCallError> {
-        self.client
-            .call(MODULE, names::methods::SERVER_SHUTDOWN, ())
-            .await
-    }
 }
 
 pub(super) struct ServerSession {
@@ -202,9 +177,29 @@ enum PendingCallback {
 
 impl ServerSession {
     pub(super) fn port_for_config(config: &Config) -> Arc<dyn ServerPort> {
+        Self::register_shutdown_hook(config.clone());
         Arc::new(TinyMcpPort {
             client: ModuleClient::new(config.clone()),
         })
+    }
+
+    fn register_shutdown_hook(config: Config) {
+        if SHUTDOWN_REGISTERED.swap(true, Ordering::AcqRel) {
+            return;
+        }
+        crate::core::shutdown::register(move || {
+            let config = config.clone();
+            async move {
+                let client = ModuleClient::new(config);
+                if let Err(error) = client
+                    .call::<usize>(MODULE, names::methods::SERVER_SHUTDOWN, ())
+                    .await
+                {
+                    tracing::warn!(?error, "[mcp_server] module shutdown failed");
+                }
+                SHUTDOWN_REGISTERED.store(false, Ordering::Release);
+            }
+        });
     }
 
     pub(super) async fn open(config: &Config) -> Result<Self, ServerError> {
@@ -265,10 +260,6 @@ impl ServerSession {
 
     pub(super) fn id(&self) -> &str {
         &self.id
-    }
-
-    pub(super) fn port(&self) -> Arc<dyn ServerPort> {
-        Arc::clone(&self.port)
     }
 
     pub(super) async fn submit(
@@ -419,42 +410,12 @@ impl ServerSession {
             .map_err(ServerError::Module)
     }
 
-    pub(super) async fn metadata(
-        &self,
-    ) -> Result<tinymcp_bus::ServerSessionMetadata, ServerError> {
-        self.port
-            .metadata(&self.id)
-            .await
-            .map_err(ServerError::Module)
-    }
-
-    pub(super) async fn shutdown(&self) -> Result<usize, ServerError> {
-        self.port.shutdown().await.map_err(ServerError::Module)
-    }
 }
 
 pub(super) fn headers_object(headers: impl Iterator<Item = (String, String)>) -> Map<String, Value> {
     headers
         .map(|(name, value)| (name, Value::String(value)))
         .collect()
-}
-
-pub(super) fn session_config(
-    session_id: String,
-    info: Value,
-    source_type_prefix: String,
-    resources: Vec<Value>,
-) -> ServerSessionConfig {
-    ServerSessionConfig {
-        session_id,
-        info,
-        source_type_prefix,
-        resources,
-    }
-}
-
-pub(super) fn module_string<T: Serialize>(value: &T) -> Result<String, serde_json::Error> {
-    serde_json::to_string(value)
 }
 
 #[cfg(test)]
