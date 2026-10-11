@@ -7,7 +7,6 @@
 //! [`BackendProgressiveSender`].
 
 use super::delivery::BackendProgressiveSender;
-use super::thread_id::{derive_inbound_client_id, derive_inbound_thread_id};
 use crate::core::events::DomainEvent;
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -75,32 +74,32 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
             return;
         }
 
-        // Mirror `channels::context::conversation_history_key`: the inbound
-        // path must key on `(channel, sender, reply_target, thread_ts)` —
-        // not channel alone — or distinct participants in a shared
-        // Discord / Slack channel get collapsed into one cached agent
-        // session, and the second sender resumes the first's in-flight
-        // state (including any prepared wallet quote).
-        //
-        // Legacy publishers that don't fill in `sender` fall back to the
-        // old channel-only key so existing single-DM flows keep working.
-        let thread_id = derive_inbound_thread_id(
-            channel,
-            sender.as_deref(),
-            reply_target.as_deref(),
-            thread_ts.as_deref(),
-        );
-        // Per-sender client_id so the `AGENT_TURN_ORIGIN.WebChat.client_id`
-        // and the wallet `QuoteOwner.client_id` paired with it differ across
-        // distinct senders in the same shared channel. The thread_id is
-        // already per-sender via `derive_inbound_thread_id`, and the
-        // wallet/approval gates compare both halves of the (thread_id,
-        // client_id) owner pair for equality — but a single shared
-        // `client_id="inbound"` collapses the surface for any downstream
-        // consumer that keys on client_id alone (audit logs, future
-        // session-scoped caches, etc.). Build a stable per-sender label
-        // here so the surface stays segregated end-to-end.
-        let client_id = derive_inbound_client_id(channel, sender.as_deref());
+        let config = match crate::config::rpc::load_config_with_timeout().await {
+            Ok(config) => config,
+            Err(error) => {
+                tracing::error!("[channel-inbound] failed to load configuration: {error}");
+                return;
+            }
+        };
+        let identity = match crate::modules::channel_controller::prepare_identity(
+            &crate::modules::client::ModuleClient::new(config),
+            tinychannels_bus::module_inbound::PrepareChannelIdentityRequest {
+                channel: channel.clone(),
+                sender: sender.clone(),
+                reply_target: reply_target.clone(),
+                thread_ts: thread_ts.clone(),
+            },
+        )
+        .await
+        {
+            Ok(identity) => identity,
+            Err(error) => {
+                tracing::error!("[channel-inbound] identity preparation failed: {error}");
+                return;
+            }
+        };
+        let thread_id = identity.thread_id;
+        let client_id = identity.client_id;
 
         let mut event_rx = crate::web_chat::subscribe_web_channel_events();
         let mut reply = ProgressiveReply::new(Arc::new(BackendProgressiveSender), channel.clone());

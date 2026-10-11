@@ -77,6 +77,20 @@ pub(crate) async fn prepare_message(
         .await
 }
 
+/// Derive persisted hosted-ingress identifiers inside the channel module.
+pub(crate) async fn prepare_identity(
+    client: &ModuleClient,
+    request: tinychannels_bus::module_inbound::PrepareChannelIdentityRequest,
+) -> Result<tinychannels_bus::module_inbound::PreparedChannelIdentity, ModuleCallError> {
+    client
+        .call_confidential(
+            "tinychannels",
+            methods::PREPARE_CHANNEL_IDENTITY,
+            (request,),
+        )
+        .await
+}
+
 /// Resolve OpenHuman's proxy scope before transmitting provider configuration.
 pub(crate) fn discord_proxy(config: &crate::config::Config) -> HttpProxyPolicy {
     let proxy = &config.proxy;
