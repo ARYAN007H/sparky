@@ -691,6 +691,7 @@ fn assert_retired_tool_replay(identity_bound: bool) {
                 .await
                 .expect("resume archive"));
         } else {
+            resumed.ensure_runtime_session().expect("cold runtime session");
             assert!(matches!(
                 resumed.turn_resume_mode(),
                 tinyagents_runtime::ResumeMode::LatestForAgent
