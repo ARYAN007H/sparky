@@ -39,7 +39,6 @@ use tinybus::events::EventBusConfig;
 // Consumers import the shared event contracts from TinyBus directly.
 use tinybus::global::OnceBus;
 use tinybus::version::{InterfaceVersion, PeerManifest, Version};
-use tinybus::{EventHandler, SubscriptionHandle};
 
 use crate::core::events::DomainEvent;
 
