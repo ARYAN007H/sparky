@@ -82,8 +82,24 @@ pub(crate) async fn run_message_dispatch_loop(
     ctx: Arc<ChannelRuntimeContext>,
     max_in_flight_messages: usize,
 ) {
-    tinychannels::runtime::run_dispatch_loop(rx, max_in_flight_messages, move |msg| {
-        process_channel_runtime_message(Arc::clone(&ctx), msg)
-    })
-    .await;
+    let mut rx = rx;
+    let mut workers = tokio::task::JoinSet::new();
+    while let Some(message) = rx.recv().await {
+        while workers.len() >= max_in_flight_messages.max(1) {
+            if let Some(Err(error)) = workers.join_next().await {
+                tracing::warn!("channel dispatch worker failed: {error}");
+            }
+        }
+        workers.spawn(process_channel_runtime_message(Arc::clone(&ctx), message));
+        while let Some(result) = workers.try_join_next() {
+            if let Err(error) = result {
+                tracing::warn!("channel dispatch worker failed: {error}");
+            }
+        }
+    }
+    while let Some(result) = workers.join_next().await {
+        if let Err(error) = result {
+            tracing::warn!("channel dispatch worker failed: {error}");
+        }
+    }
 }
