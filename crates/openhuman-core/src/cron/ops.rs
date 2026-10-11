@@ -84,7 +84,8 @@ pub fn resume_job(config: &Config, id: &str) -> Result<CronJob> {
 /// `expression` and `tz` are merged with the existing [`Schedule::Cron`] fields; the
 /// existing `active_hours` is always preserved as-is.  To set or clear `active_hours`
 /// directly, use the RPC path (`cron.update` with a full [`CronJobPatch`]).
-pub async fn update_cron_job(
+#[cfg(test)]
+pub fn update_cron_job(
     config: &Config,
     id: &str,
     expression: Option<String>,
@@ -123,9 +124,9 @@ pub async fn update_cron_job(
             &config.workspace_dir,
             &config.action_dir,
         );
-        crate::cron::scheduler::shell_job::authorize_shell_command(config, &security, cmd)
-            .await
-            .map_err(anyhow::Error::msg)?;
+        if !security.is_command_allowed(cmd) {
+            anyhow::bail!("Command blocked by security policy: {cmd}");
+        }
     }
 
     let patch = CronJobPatch {
@@ -189,7 +190,6 @@ pub async fn cron_update(
         );
         crate::cron::scheduler::shell_job::authorize_shell_command(config, &security, command)
             .await?;
-        }
     }
 
     let updated = cron::update_job(config, job_id.trim(), patch).map_err(|e| e.to_string())?;
