@@ -14,7 +14,7 @@
 //! `propose_workflow` description all read the *overlaid* view via
 //! [`all_node_kind_contracts`] / [`node_kind_contract`].
 
-pub use tinyflows::catalog::{ConfigField, NodeKindContract, PortSpec, NODE_KINDS};
+use tinyflows::catalog::{ConfigField, NodeKindContract, PortSpec, NODE_KINDS};
 
 /// Appends this host's vendor-specific caveats to a portable tinyflows
 /// contract. One arm per kind that has host-owned facts; the rest pass through

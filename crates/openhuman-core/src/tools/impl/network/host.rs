@@ -33,7 +33,7 @@ impl AsyncHtmlExtractor for TinyJuiceHtml {
     async fn looks_like_html(&self, body: &str) -> anyhow::Result<bool> {
         let kind = crate::inference::tokenjuice::detect(
             body.to_string(),
-            crate::inference::tokenjuice::types::ContentHint::default(),
+            tinyjuice_bus::types::ContentHint::default(),
         )
         .await
         .map_err(anyhow::Error::msg)?;

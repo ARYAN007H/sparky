@@ -3,7 +3,7 @@
 
 use serde::Serialize;
 
-pub use tinyskills::{
+use tinyskills::{
     CatalogEntry, Facet, Freshness, RegistryErrorKind, RegistryErrorSummary, RegistryFacets,
 };
 

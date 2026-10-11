@@ -15,11 +15,11 @@
 //! values the `tinyjuice` library itself uses and envelopes that exist only on
 //! the bus. Nothing here needs to care which is which.
 
-pub use tinyjuice_bus::types::{
+use tinyjuice_bus::types::{
     AgentTokenjuiceCompression, CompressOptions, CompressedOutput, CompressorKind, ContentHint,
     ContentKind, LlmSummaryMode,
 };
-pub use tinyjuice_bus::wire::{
+use tinyjuice_bus::wire::{
     CacheStats, CompactRequest, CompactResponse, GenerateRequest, InstallRequest, RangeUnit,
     RetrieveRange,
 };
