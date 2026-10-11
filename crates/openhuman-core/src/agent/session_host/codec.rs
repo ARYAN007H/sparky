@@ -20,6 +20,7 @@ pub struct OpenHumanTranscriptCodec;
 
 impl TranscriptCodec<OpenHumanRunContext> for OpenHumanTranscriptCodec {
     fn decode_history(&self, transcript: &SessionTranscript) -> Result<Vec<Message>, RuntimeError> {
+        tinyagents_runtime::transcript::native_transcript_to_messages(&transcript.messages)?;
         Ok(message_convert::history_to_messages(&transcript.messages))
     }
 
