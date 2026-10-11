@@ -14,7 +14,7 @@ Cancellation is the tinyagents steering channel (`SteeringCommand` in
 `crate::agent::tinyagents`); there is no in-house interrupt fence or
 cancellation token owned here. The message queue that lets a caller steer or
 follow up on an in-flight turn is `tinyagents_harness::run_queue::RunQueue`,
-used here (not defined here) by [`agent_graph.rs`](./agent_graph.rs) and [`fork_context.rs`](./fork_context.rs).
+used here (not defined here) by [`fork_context.rs`](./fork_context.rs).
 
 ## Responsibilities
 
@@ -111,7 +111,7 @@ turn lifecycle are in `../session_host/`; `run_subagent`,
 
 ## Notes / gotchas
 
-- `agent_graph.rs`, [`artifact_offload/mod.rs`](./artifact_offload/mod.rs), and
+- [`artifact_offload/mod.rs`](./artifact_offload/mod.rs) and
   [`../subagent_host/ops/runner.rs`](../subagent_host/ops/runner.rs) cite `docs/specs/plan-agents.md` as the
   plan for moving durable state, the sub-agent graph, and offload mechanics
   onto TinyAgents primitives. That file is not checked into this repo, so the
