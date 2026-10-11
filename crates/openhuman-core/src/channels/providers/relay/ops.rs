@@ -3,15 +3,15 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use super::channel::RelayChannel;
 use super::params::RelayInboundParams;
 use super::store::{self, Recorded};
 use crate::channels::context::MAX_CHANNEL_HISTORY;
 use crate::channels::runtime::{
-    build_channel_turn_parts, prepare_runtime_limits, process_channel_runtime_message,
-    runtime_context, PromptToolDescs,
+    PromptToolDescs, build_channel_turn_parts, prepare_runtime_limits,
+    process_channel_runtime_message, runtime_context,
 };
 use crate::config::Config;
 use crate::core::Outcome;
@@ -114,27 +114,23 @@ pub(crate) async fn run_relay_turn(
     ));
 
     let client = crate::modules::client::ModuleClient::new(config.clone());
-    let (message_timeout_secs, _) = match prepare_runtime_limits(
-        &client,
-        config.channels_config.message_timeout_secs,
-        1,
-    )
-    .await
-    {
-        Ok(limits) => limits,
-        Err(error) => {
-            tracing::warn!("relayed channel runtime limits unavailable: {error}");
-            let reply =
-                "⚠️ This chat's assistant is not available right now. Please try again later.";
-            let _ = crate::channels::traits::Channel::send(
-                channel.as_ref(),
-                &crate::channels::SendMessage::new(reply, &params.chat_id),
-            )
-            .await;
-            record(&workspace_dir, &params, &thread_id, &channel.sent()).await;
-            return channel.sent();
-        }
-    };
+    let (message_timeout_secs, _) =
+        match prepare_runtime_limits(&client, config.channels_config.message_timeout_secs, 1).await
+        {
+            Ok(limits) => limits,
+            Err(error) => {
+                tracing::warn!("relayed channel runtime limits unavailable: {error}");
+                let reply =
+                    "⚠️ This chat's assistant is not available right now. Please try again later.";
+                let _ = crate::channels::traits::Channel::send(
+                    channel.as_ref(),
+                    &crate::channels::SendMessage::new(reply, &params.chat_id),
+                )
+                .await;
+                record(&workspace_dir, &params, &thread_id, &channel.sent()).await;
+                return channel.sent();
+            }
+        };
 
     let security = Arc::new(
         SecurityPolicy::from_config(&config.autonomy, &config.workspace_dir, &config.action_dir)

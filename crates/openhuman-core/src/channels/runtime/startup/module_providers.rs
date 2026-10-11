@@ -441,8 +441,7 @@ impl ModuleChannel {
             .await
             .map_err(anyhow::Error::new)?;
         if let Some(relay) = self.relay.as_ref().filter(|_| self.relay_fronted) {
-            self
-                .object
+            self.object
                 .call_confidential::<tinychannels_bus::controllers::ChannelSendMessageResult>(
                     tinychannels_bus::methods::SEND_RELAY_INTENT,
                     (relay.clone(), prepared.intent),

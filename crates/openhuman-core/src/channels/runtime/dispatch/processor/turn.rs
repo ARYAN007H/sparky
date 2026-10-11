@@ -5,7 +5,7 @@
 use crate::agent::bus::AgentTurnResponse;
 use crate::agent::progress::AgentProgress;
 use crate::channels::context::{
-    compact_sender_history, is_context_window_overflow_error, ChannelRuntimeContext,
+    ChannelRuntimeContext, compact_sender_history, is_context_window_overflow_error,
 };
 use crate::channels::routes::{
     get_or_create_turn_model_source, get_route_selection, handle_runtime_command_if_needed,
@@ -22,12 +22,13 @@ use tokio_util::sync::CancellationToken;
 use tokio_util::task::AbortOnDropHandle;
 
 use super::super::helpers::{
-    build_channel_context_block, log_worker_join_result,     spawn_scoped_typing_task, REPLY_LOG_TRUNCATE_CHARS,
+    REPLY_LOG_TRUNCATE_CHARS, build_channel_context_block, log_worker_join_result,
+    spawn_scoped_typing_task,
 };
-use super::super::host_agent::{self, run_host_agent_turn, seed_rows, HostChannelTurn, HostRoute};
+use super::super::host_agent::{self, HostChannelTurn, HostRoute, run_host_agent_turn, seed_rows};
+use super::RuntimeChannelMessage;
 use super::approval::{channel_has_approval_surface, try_route_approval_reply};
 use super::bus_turn::dispatch_bus_turn;
-use super::RuntimeChannelMessage;
 
 pub(crate) async fn process_channel_message(
     ctx: Arc<ChannelRuntimeContext>,
@@ -106,7 +107,9 @@ pub(crate) async fn process_channel_runtime_message(
     });
 
     let target_channel = ctx.channels_by_name.get(&msg.channel).cloned();
-    if handle_runtime_command_if_needed(ctx.as_ref(), &msg, target_channel.as_ref(), &history_key).await {
+    if handle_runtime_command_if_needed(ctx.as_ref(), &msg, target_channel.as_ref(), &history_key)
+        .await
+    {
         return;
     }
 
@@ -157,30 +160,46 @@ pub(crate) async fn process_channel_runtime_message(
     let mut _acknowledgment_task = None;
     if let Some(channel) = target_channel.as_ref() {
         if channel.supports_reactions() && msg.thread_ts.is_some() {
-            let ack_result = crate::channels::context::module_client(&ctx).await.call_confidential::<tinychannels_bus::module_control::ChannelControlResult>("tinychannels", tinychannels_bus::methods::PREPARE_CHANNEL_CONTROL, (tinychannels_bus::module_control::ChannelControlRequest::Acknowledgment { content: msg.content.clone() },)).await;
+            let ack_result = crate::channels::context::module_client(&ctx)
+                .await
+                .call_confidential::<tinychannels_bus::module_control::ChannelControlResult>(
+                    "tinychannels",
+                    tinychannels_bus::methods::PREPARE_CHANNEL_CONTROL,
+                    (
+                        tinychannels_bus::module_control::ChannelControlRequest::Acknowledgment {
+                            content: msg.content.clone(),
+                        },
+                    ),
+                )
+                .await;
             let ack_emoji = match ack_result {
-                Ok(tinychannels_bus::module_control::ChannelControlResult::Acknowledgment(emoji)) => Some(emoji),
-                Ok(_) => { crate::modules::client::ModuleClient::report_malformed_reply("tinychannels"); None },
+                Ok(tinychannels_bus::module_control::ChannelControlResult::Acknowledgment(
+                    emoji,
+                )) => Some(emoji),
+                Ok(_) => {
+                    crate::modules::client::ModuleClient::report_malformed_reply("tinychannels");
+                    None
+                }
                 Err(_) => None,
             };
             if let Some(ack_emoji) = ack_emoji {
-            tracing::debug!(
-                channel = msg.channel,
-                emoji = ack_emoji,
-                "[dispatch] Sending acknowledgment reaction"
-            );
-            let react_content = format!("[REACTION:{ack_emoji}]");
-            let channel_for_react = Arc::clone(channel);
-            let react_msg =
-                SendMessage::new(react_content, &msg.reply_target).in_thread(msg.thread_ts.clone());
-            _acknowledgment_task = Some(AbortOnDropHandle::new(tokio::spawn(async move {
-                if let Err(e) = channel_for_react
-                    .send_with_outbound_intent(&react_msg)
-                    .await
-                {
-                    tracing::debug!("[dispatch] Acknowledgment reaction failed: {e}");
-                }
-            })));
+                tracing::debug!(
+                    channel = msg.channel,
+                    emoji = ack_emoji,
+                    "[dispatch] Sending acknowledgment reaction"
+                );
+                let react_content = format!("[REACTION:{ack_emoji}]");
+                let channel_for_react = Arc::clone(channel);
+                let react_msg = SendMessage::new(react_content, &msg.reply_target)
+                    .in_thread(msg.thread_ts.clone());
+                _acknowledgment_task = Some(AbortOnDropHandle::new(tokio::spawn(async move {
+                    if let Err(e) = channel_for_react
+                        .send_with_outbound_intent(&react_msg)
+                        .await
+                    {
+                        tracing::debug!("[dispatch] Acknowledgment reaction failed: {e}");
+                    }
+                })));
             }
         }
     }
@@ -201,9 +220,9 @@ pub(crate) async fn process_channel_runtime_message(
                 );
                 let safe_err = tinyinference_core::sanitize::sanitize_api_error(&err.to_string());
                 let message = format!(
-                "⚠️ Failed to initialize provider `{}`. Please run `/models` to choose another provider.\nDetails: {safe_err}",
-                route.provider
-            );
+                    "⚠️ Failed to initialize provider `{}`. Please run `/models` to choose another provider.\nDetails: {safe_err}",
+                    route.provider
+                );
                 if let Some(channel) = target_channel.as_ref() {
                     let _ = channel
                         .send_with_outbound_intent(
@@ -351,7 +370,9 @@ pub(crate) async fn process_channel_runtime_message(
     };
 
     let typing_cancellation = target_channel.as_ref().map(|_| CancellationToken::new());
-    let _typing_cancel_on_drop = typing_cancellation.as_ref().map(|token| token.clone().drop_guard());
+    let _typing_cancel_on_drop = typing_cancellation
+        .as_ref()
+        .map(|token| token.clone().drop_guard());
     // Typing was already started early (before memory/provider setup). Here we only
     // spawn the background refresh task that keeps the indicator alive during long turns.
     let typing_task = match (target_channel.as_ref(), typing_cancellation.as_ref()) {
@@ -504,7 +525,10 @@ pub(crate) async fn process_channel_runtime_message(
             (true, response_text, resolved_provider, resolved_model)
         }
         Ok(Err(e)) => {
-            if is_context_window_overflow_error(&ctx, &e).await.unwrap_or(false) {
+            if is_context_window_overflow_error(&ctx, &e)
+                .await
+                .unwrap_or(false)
+            {
                 let compacted = compact_sender_history(ctx.as_ref(), &history_key);
                 let error_text = if compacted {
                     "⚠️ Context window exceeded for this conversation. I compacted recent history and kept the latest context. Please resend your last message."

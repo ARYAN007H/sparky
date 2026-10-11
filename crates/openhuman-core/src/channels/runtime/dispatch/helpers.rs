@@ -10,7 +10,9 @@ pub(super) const REPLY_LOG_TRUNCATE_CHARS: usize = 200;
 pub(super) use tinychannels::runtime::select_acknowledgment_reaction;
 
 pub(super) fn log_worker_join_result(result: Result<(), tokio::task::JoinError>) {
-    if let Err(error) = result { tracing::warn!("channel worker failed: {error}"); }
+    if let Err(error) = result {
+        tracing::warn!("channel worker failed: {error}");
+    }
 }
 
 /// Start the portable typing lifecycle with OpenHuman's configured interval.
@@ -23,7 +25,10 @@ pub(super) fn spawn_scoped_typing_task(
     // The worker retains ownership across cancellation of the caller while
     // StartTypingRefresh is in flight, then closes the returned module handle.
     tokio::spawn(async move {
-        match channel.begin_typing_refresh(&recipient, CHANNEL_TYPING_REFRESH_INTERVAL_SECS).await {
+        match channel
+            .begin_typing_refresh(&recipient, CHANNEL_TYPING_REFRESH_INTERVAL_SECS)
+            .await
+        {
             Ok(Some(handle)) => {
                 cancellation_token.cancelled().await;
                 if channel.end_typing_refresh(&handle).await.is_err() {
@@ -38,7 +43,9 @@ pub(super) fn spawn_scoped_typing_task(
         }
         let _ = finished_tx.send(());
     });
-    tokio::spawn(async move { let _ = finished_rx.await; })
+    tokio::spawn(async move {
+        let _ = finished_rx.await;
+    })
 }
 
 /// Build the `[Channel context]` block for a channel turn.
