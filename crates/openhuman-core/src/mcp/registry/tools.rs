@@ -27,7 +27,6 @@ use async_trait::async_trait;
 use serde_json::Value;
 
 use crate::config::Config;
-use tinymcp::normalize_tool_arguments;
 use tinymcp_bus::agent_tools::{AgentToolEffect, AgentToolSpec, RegistryTool};
 use tinytools::{PermissionLevel, Tool, ToolExposure, ToolResult};
 
@@ -259,11 +258,25 @@ impl Tool for McpRegistryToolCallTool {
         // Tolerant at execution, unchanged in the schema: an object that
         // arrived JSON-encoded in a string is decoded, and anything that
         // cannot hold one is refused here, naming what arrived.
-        let arguments = normalize_tool_arguments(args.get("arguments").cloned())
-            .map(Value::Object)
-            .map_err(|error| anyhow::anyhow!("mcp_registry_tool_call: {error}"))?;
+        let client = crate::mcp::module_client::McpConfiguredClient::for_config(&self.config)
+            .map_err(|_| anyhow::anyhow!("mcp_registry_tool_call: MCP module is unavailable"))?;
+        let client_config = crate::mcp::host::client_config(&self.config);
+        let normalized: serde_json::Map<String, Value> = client
+            .call(
+                &client_config,
+                tinymcp_bus::names::methods::NORMALIZE_TOOL_ARGUMENTS,
+                (args.get("arguments").cloned(),),
+            )
+            .await
+            .map_err(|_| anyhow::anyhow!("mcp_registry_tool_call: invalid tool arguments"))?;
         emit!(
-            ops::mcp_clients_tool_call(&self.config, sid, tool_name, arguments).await,
+            ops::mcp_clients_tool_call(
+                &self.config,
+                sid,
+                tool_name,
+                Value::Object(normalized),
+            )
+            .await,
             "mcp_registry_tool_call"
         )
     }
