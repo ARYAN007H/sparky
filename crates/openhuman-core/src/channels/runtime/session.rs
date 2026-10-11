@@ -107,12 +107,21 @@ fn spawn_channel_service_with<F, Fut>(
 ) -> tokio::task::JoinHandle<()>
 where
     F: FnMut(CancellationToken) -> Fut + Send + 'static,
-    Fut: Future<Output = ()> + Send + 'static,
+    Fut: Future<Output = anyhow::Result<()>> + Send + 'static,
 {
     tokio::spawn(async move {
-        let mut session = controller.current();
+        // A logout can race the service task's first poll. Do not let a
+        // service created during that window start with the replacement
+        // token before a credential has been installed again.
+        let mut session = controller.wait_for_resume().await;
         loop {
-            run(session.clone()).await;
+            if let Err(error) = run(session.clone()).await {
+                tracing::error!(domain = "channels", operation = "service", error = %error, "channel service generation stopped");
+                // In particular, a failed close must retain ownership and
+                // stop here instead of admitting a second listener against
+                // the still-live generation.
+                return;
+            }
             if !session.is_cancelled() {
                 return;
             }
@@ -124,7 +133,7 @@ where
 pub(crate) fn spawn_current_channel_service_with<F, Fut>(run: F) -> tokio::task::JoinHandle<()>
 where
     F: FnMut(CancellationToken) -> Fut + Send + 'static,
-    Fut: Future<Output = ()> + Send + 'static,
+    Fut: Future<Output = anyhow::Result<()>> + Send + 'static,
 {
     spawn_channel_service_with(SESSION.clone(), run)
 }
