@@ -92,16 +92,14 @@
       "name": "tinyhosts-bus",
       "manifest": "vendor/tinyhosts/crates/tinyhosts-bus/Cargo.toml",
       "owner": "https://github.com/tinyhumansai/tinyhosts"
-    }
-  ],
-  "pendingContracts": [
+    },
     {
       "name": "tinybox-bus",
       "manifest": "vendor/tinybox/crates/tinybox-bus/Cargo.toml",
-      "owner": "https://github.com/tinyhumansai/tinybox",
-      "reason": "Sandbox execution, shell analysis and pre-core gateways need a bus contract."
+      "owner": "https://github.com/tinyhumansai/tinybox"
     }
   ],
+  "pendingContracts": [],
   "exceptions": [
     {
       "scope": "hosts",
@@ -131,16 +129,6 @@
     {
       "scope": "hosts",
       "package": "tinybox-docker",
-      "reason": "Sandbox execution, shell analysis and pre-core gateways need a bus contract."
-    },
-    {
-      "scope": "hosts",
-      "package": "tinybox-host",
-      "reason": "Sandbox execution, shell analysis and pre-core gateways need a bus contract."
-    },
-    {
-      "scope": "hosts",
-      "package": "tinybox-ssh",
       "reason": "Sandbox execution, shell analysis and pre-core gateways need a bus contract."
     },
     {
