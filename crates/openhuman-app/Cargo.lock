@@ -9430,7 +9430,3 @@ dependencies = [
  "syn 3.0.6",
  "winnow 1.0.4",
 ]
-
-[[patch.unused]]
-name = "tinychannels"
-version = "0.1.26"
