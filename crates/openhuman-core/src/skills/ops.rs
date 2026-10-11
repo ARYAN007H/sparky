@@ -41,6 +41,7 @@ pub use super::ops_install::{
     UninstallWorkflowParams, DEFAULT_INSTALL_TIMEOUT_SECS, MAX_INSTALL_TIMEOUT_SECS,
     MAX_INSTALL_URL_LEN, MAX_WORKFLOW_MD_BYTES,
 };
+#[cfg(test)]
 use {
     tinyskills::Skill as Workflow, tinyskills::SkillFrontmatter as WorkflowFrontmatter,
     tinyskills::SkillScope as WorkflowScope,
