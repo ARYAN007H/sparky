@@ -65,6 +65,25 @@ fn endpoint_references() -> &'static Mutex<HashMap<String, EndpointReference>> {
     ENDPOINT_REFERENCES.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+fn x402_request_owner_matches(
+    request: &AuthorizeX402PaymentRequest,
+    context: &crate::security::approval::ApprovalChatContext,
+) -> bool {
+    request.owner.as_ref().is_some_and(|owner| {
+        owner.thread_id == context.thread_id && owner.client_id == context.client_id
+    })
+}
+
+fn x402_approval_facts(request: &AuthorizeX402PaymentRequest) -> serde_json::Value {
+    serde_json::json!({
+        "url": request.url,
+        "network": request.network,
+        "asset": request.asset,
+        "recipient": request.recipient,
+        "amount_atomic": request.amount_atomic,
+    })
+}
+
 /// Bind module-issued opaque endpoint aliases to the current host configuration.
 /// Actual URLs remain in this process and are never serialized onto TinyBus.
 pub(crate) fn bind_endpoint_references(
@@ -647,11 +666,32 @@ impl WalletHost {
     /// absent an active guard scope, payment signing fails closed.
     async fn authorize_x402_payment(
         &self,
-        _request: AuthorizeX402PaymentRequest,
+        request: AuthorizeX402PaymentRequest,
     ) -> tinybus::Result<HostResponse> {
+        let owner_matches = crate::security::approval::APPROVAL_CHAT_CONTEXT
+            .try_with(|context| x402_request_owner_matches(&request, context))
+            .unwrap_or(false);
+        let approved = if owner_matches {
+            if let Some(gate) = crate::security::approval::ApprovalGate::try_global() {
+                matches!(
+                    gate.intercept_forced(
+                        "x402_payment",
+                        "Approve this exact x402 payment",
+                        x402_approval_facts(&request),
+                    )
+                    .await,
+                    crate::security::approval::GateOutcome::Allow
+                )
+            } else {
+                false
+            }
+        } else {
+            false
+        };
         Ok(HostResponse::Authorization(AuthorizationResult {
-            approved: false,
-            reason: Some("x402 payment has no active host authorization".into()),
+            approved,
+            reason: (!approved)
+                .then(|| "x402 payment was not explicitly approved for this chat".into()),
         }))
     }
 }
