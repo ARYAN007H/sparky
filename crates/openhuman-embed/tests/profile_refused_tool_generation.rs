@@ -45,17 +45,23 @@ impl Respond for Script {
         let completion = if prompt.contains("loop forever") {
             call("current_time", json!({}))
         } else if prompt.contains("schedule it") && results == 0 {
+            call("tool_search", json!({"query":"cron schedule job"}))
+        } else if prompt.contains("schedule it") && results == 1 {
             call(
                 "cron",
                 json!({"action":"add","job_type":"agent","name":"ping",
                     "schedule":{"kind":"at","at":self.fire_at},"prompt":"reminder ping"}),
             )
         } else if prompt.contains("shell job") && results == 0 {
+            call("tool_search", json!({"query":"cron schedule job"}))
+        } else if prompt.contains("shell job") && results == 1 {
             call(
                 "cron",
                 json!({"action":"add","job_type":"shell","name":"sh",
                     "schedule":{"kind":"at","at":self.fire_at},"command":"echo hi"}),
             )
+        } else if prompt.contains("run shell") && results == 0 {
+            call("shell", json!({"command":"ls"}))
         } else if prompt.contains("reminder ping") {
             chat_completion("pong")
         } else {
@@ -158,6 +164,10 @@ async fn scenario() {
         .chat("t1", "make a shell job")
         .await
         .expect("a refused tool call must not fail the turn");
+    handle
+        .chat("t1", "run shell")
+        .await
+        .expect("an unknown tool call must not fail the turn");
     handle.chat("t1", "and once more").await.unwrap();
     let requests = chat_requests(&chat).await;
     assert!(
