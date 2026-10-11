@@ -197,8 +197,10 @@ else is agent-only.
 - Search provider resolution and the TinySearch bridge are `crate::search`
   (see [`../search/README.md`](../search/README.md)); the module itself is
   `tinysearch`.
-- New domain tools go in the owning domain's `tools.rs` and are re-exported
-  through `mod.rs`. Only cross-cutting families belong under [`impl/`](./impl/).
+- New domain tools go in the owning domain's `tools.rs`. Its registration
+  function builds that family, and `ops.rs` composes the families before
+  applying capability filters. Preserve catalogue order when moving
+  registrations. Only cross-cutting families belong under [`impl/`](./impl/).
 - This folder has no persistence and no event-bus subscriber. Approval
   routing reads `Tool::external_effect_with_args`; the gate itself is
   `security/approval/`.
