@@ -20,6 +20,110 @@ fn tinycomputer_registry_matches_bus_contract_and_published_release() {
 }
 
 #[test]
+fn tinywallet_registry_matches_the_verified_v013_release_manifest() {
+    let wallet = find("tinywallet").expect("compiled TinyWallet module");
+    assert_eq!(wallet.version, "0.13.0");
+    assert_eq!(
+        wallet.release_url,
+        "https://github.com/tinyhumansai/tinywallet/releases/tag/v0.13.0"
+    );
+
+    let actual = wallet
+        .assets
+        .iter()
+        .map(|asset| (asset.host_key, asset.archive, asset.sha256))
+        .collect::<Vec<_>>();
+    let published = [
+        (
+            "ubuntu-24.04-x86_64",
+            "tinywallet-module-0.13.0-ubuntu-24.04-x86_64.tar.gz",
+            "284983d01c548109b3e9d5bbca1951787912f713b4a98920b9b45cfd034b6760",
+        ),
+        (
+            "ubuntu-24.04-arm64",
+            "tinywallet-module-0.13.0-ubuntu-24.04-arm64.tar.gz",
+            "18ef8ffe518f731dc594d1606554ca12c840219e54f230382937061c395ab860",
+        ),
+        (
+            "ubuntu-22.04-x86_64",
+            "tinywallet-module-0.13.0-ubuntu-22.04-x86_64.tar.gz",
+            "92d0d0fe9ab20fdf4c44aa58d762b7e28b6a08876899a5b2d368df3feabcd2d5",
+        ),
+        (
+            "ubuntu-22.04-arm64",
+            "tinywallet-module-0.13.0-ubuntu-22.04-arm64.tar.gz",
+            "4d0e17d778c0c84df17e4c5b7fa60aa9296efecc5726902008946409b3a3c9e1",
+        ),
+        (
+            "macos-26-arm64",
+            "tinywallet-module-0.13.0-macos-26-arm64.tar.gz",
+            "e01a70efbcece8e134abfa84c70181425802415525303d7ba2a7798afbab1041",
+        ),
+        (
+            "macos-26-x86_64",
+            "tinywallet-module-0.13.0-macos-26-x86_64.tar.gz",
+            "c48f1f7807d0b25c2b54dca97237f6e64d02ec3a9396370cd8e3b1857419296a",
+        ),
+        (
+            "macos-15-arm64",
+            "tinywallet-module-0.13.0-macos-15-arm64.tar.gz",
+            "95f69f2e17ff1785d032f6e1017e12de5c6dc09af9633e67fc9c225dfcef9ce6",
+        ),
+        (
+            "macos-15-x86_64",
+            "tinywallet-module-0.13.0-macos-15-x86_64.tar.gz",
+            "f3114694e2d666ea1b030db952c589f08d79c60ab79aadb844327e273c5faaf5",
+        ),
+        (
+            "windows-2025-x86_64",
+            "tinywallet-module-0.13.0-windows-2025-x86_64.zip",
+            "7b79a25a1fccef17a4c6e0d400f49646c3a5f321821bb03ddc23e76d6030717a",
+        ),
+        (
+            "windows-2022-x86_64",
+            "tinywallet-module-0.13.0-windows-2022-x86_64.zip",
+            "0b7126be04b23dd5fad883d7f1dd33dd65c1042af68f93593590ea07c5daa95e",
+        ),
+        (
+            "windows-11-arm64",
+            "tinywallet-module-0.13.0-windows-11-arm64.zip",
+            "483d3fda2c46de71c8efd5dfa4ec828c0b6c86bb164c8362c1356f85cb8ec231",
+        ),
+        (
+            "archlinux-arm64",
+            "tinywallet-module-0.13.0-archlinux-arm64.tar.gz",
+            "ad2222bd1d2dd680568f486e40389c0b963cf5ba2d170f9d658985f31cabb511",
+        ),
+        (
+            "archlinux-x86_64",
+            "tinywallet-module-0.13.0-archlinux-x86_64.tar.gz",
+            "d67f541330f7712106238b90d993550d2e2e55f33d3c8c9f50669a1a51c1e981",
+        ),
+        (
+            "fedora-43-arm64",
+            "tinywallet-module-0.13.0-fedora-43-arm64.tar.gz",
+            "a2d62b03f2e99008ee3fe7ea84290fd050e12016ce36e89fda24d5449e795261",
+        ),
+        (
+            "fedora-43-x86_64",
+            "tinywallet-module-0.13.0-fedora-43-x86_64.tar.gz",
+            "0c8c5dbf2aa7b7caa371aa6366c7cfdd232fda41e2dbd894d2ef344c7c2cfa0a",
+        ),
+        (
+            "fedora-44-arm64",
+            "tinywallet-module-0.13.0-fedora-44-arm64.tar.gz",
+            "272b535910fc4bc84099887b7ccfbdd9d41a6d187616086c174f86cb77f21757",
+        ),
+        (
+            "fedora-44-x86_64",
+            "tinywallet-module-0.13.0-fedora-44-x86_64.tar.gz",
+            "3dcad60a65d4f0bbb1af838468a2f52d648d22b2fbc849ae0548a30ed9806646",
+        ),
+    ];
+    assert_eq!(actual, published);
+}
+
+#[test]
 fn tinybox_registry_matches_the_published_v0118_release_manifest() {
     let record = find("tinybox").expect("compiled TinyBox module");
     assert_eq!(record.version, "0.1.18");

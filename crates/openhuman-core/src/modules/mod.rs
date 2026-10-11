@@ -82,6 +82,10 @@ pub mod voice;
 #[cfg(feature = "web3")]
 #[cfg(feature = "modules")]
 pub mod wallet;
+#[cfg(feature = "web3")]
+mod wallet_host;
+#[cfg(feature = "web3")]
+pub(crate) mod wallet_service;
 
 #[cfg(feature = "modules")]
 pub use ops::{ensure_loaded, ensure_loaded_within, state_of, LoadError};
