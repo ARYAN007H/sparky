@@ -1,4 +1,6 @@
 use super::*;
+use tinyinference_llm::message::{AssistantMessage, SystemMessage, ToolMessage};
+use tinyagents_session::transcript::{TranscriptPart, TranscriptToolCall};
 
 #[test]
 fn durable_upload_parts_survive_message_row_replay_without_inline_payloads() {
