@@ -45,6 +45,9 @@ use tokio_util::sync::CancellationToken;
 #[cfg(feature = "server")]
 pub use crate::server::EmbeddedReadySignal;
 
+#[path = "host/secret_storage.rs"]
+mod secret_storage;
+
 /// The CLI host's builder: the `cli` preset with this crate's server as the
 /// `run` / `serve` launcher and the `http_host.*` controllers registered.
 #[cfg(feature = "server")]
@@ -97,8 +100,7 @@ pub fn cli(args: &[String]) -> anyhow::Result<()> {
          in that file will not be seen"
         );
     }
-    #[cfg(feature = "os-keyring")]
-    crate::keyring::install();
+    secret_storage::install();
     let mut builder = cli_builder();
     if cli_command_uses_storage(args, |namespace| {
         // `subsystems` only renders status; it never touches stored state.
@@ -265,8 +267,7 @@ pub async fn desktop(
     shutdown_token: CancellationToken,
     ready_tx: tokio::sync::oneshot::Sender<EmbeddedReadySignal>,
 ) -> anyhow::Result<()> {
-    #[cfg(feature = "os-keyring")]
-    crate::keyring::install();
+    secret_storage::install();
     log::debug!("[rpc:host] desktop options={options:?}");
     serve_desktop(desktop_builder(&options), shutdown_token, ready_tx).await
 }
@@ -315,8 +316,7 @@ pub fn tui_builder() -> RuntimeBuilder {
 /// could not be built.
 #[cfg(feature = "session-store")]
 pub async fn tui() -> anyhow::Result<openhuman_tinyhumans::embed::Runtime> {
-    #[cfg(feature = "os-keyring")]
-    crate::keyring::install();
+    secret_storage::install();
     log::debug!("[rpc:host] tui: building connected runtime");
     let session_store = crate::session_store::provider_for_host().await?;
     let runtime = tui_builder()

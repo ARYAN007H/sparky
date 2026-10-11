@@ -1,6 +1,6 @@
 //! Encrypted-file corruption and import policy over the secret-store port.
 use super::*;
-use crate::security::keyring::encrypted_file_backend::EncryptedFileBackend;
+use crate::security::secret_storage::encrypted_file_backend::EncryptedFileBackend;
 use std::collections::HashMap;
 use tinystoragedrivers::secrets::crypto;
 // ── EncryptedFileBackend ─────────────────────────────────────────────────────
@@ -105,7 +105,7 @@ fn recovery_never_quarantines_a_file_that_is_not_confirmed_corrupt() {
     std::fs::create_dir(&path).unwrap();
     let cause = tinystoragedrivers::StorageError::crypto("earlier failure");
     let error = recover_corrupt_file(&path, &KEY, &cause).unwrap_err();
-    assert!(matches!(error, KeyringError::Backend(_)), "{error:?}");
+    assert!(matches!(error, SecretStorageError::Backend(_)), "{error:?}");
     assert!(path.is_dir(), "left in place");
 }
 

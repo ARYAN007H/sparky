@@ -19,7 +19,7 @@ This is the root of trust for local secrets. OpenHuman does not keep user creden
 
 The keyring holds two kinds of secret.
 
-**Credential entries.** Locally stored provider API keys, session and bearer tokens, and wallet secret material use user-scoped credential slots. By default, these slots live in the encrypted `secrets.enc` file, protected by the master key in the OS keyring. The explicit `OPENHUMAN_KEYRING_BACKEND=os` setting stores the slots directly in the platform keyring, under OpenHuman's own namespace.
+**Credential entries.** In the desktop app, locally stored provider API keys, session and bearer tokens, and wallet secret material use user-scoped credential slots. By default, these slots live in the encrypted `secrets.enc` file, protected by the master key in the OS keyring. The explicit `OPENHUMAN_KEYRING_BACKEND=os` setting stores the slots directly in the platform keyring, under OpenHuman's own namespace.
 
 **The master encryption key.** Some sensitive values must live inside local files, because the app's configuration is file-based. OpenHuman splits the storage. The secret value is stored on disk as encrypted ciphertext. The master key that decrypts it lives in the OS keyring. Your config and state files can hold encrypted values without the decryption key sitting next to them.
 
@@ -82,22 +82,36 @@ Desktop, CLI and TUI hosts install the OS keychain providers through
 name (`openhuman`) and master-key account (`app:master_key`) are unchanged,
 so existing desktop workspaces continue to decrypt with the same key.
 
-The core and embedded library do not depend on an OS keychain. Without a
-host-installed provider, they use encrypted storage in `secrets.enc` and
-create a master key at `{workspace}/keyring/master.key` on first use. On
-Unix this key file has mode `0600`. Back up the key with the workspace;
-anyone who can read both can decrypt its secrets.
+The core owns the platform-independent `security::secret_storage` module:
+user-scoped secret access, encrypted files, and master-key resolution. RPC owns
+`keyring`, the native OS providers, and installs them through core's `SecretBackend`
+and `MasterKeySource` contracts.
 
-An operator can supply `OPENHUMAN_KEYRING_MASTER_KEY` (64 hex characters)
-or `OPENHUMAN_KEYRING_MASTER_KEY_FILE` instead. Set exactly one. Environment
-keys take precedence over a host provider, which takes precedence over the
-workspace key file. An inaccessible host key never falls back to a newly
-created file key.
+The core and embedded library default to `MemoryBackend`: a thread-safe,
+unencrypted map held only in the process. It needs no OS keychain, master key,
+or secrets file. Secrets disappear when the process exits. Use it for ephemeral
+library runtimes; choose persistent storage when credentials must survive a restart.
 
-`OPENHUMAN_KEYRING_BACKEND=file` remains an explicit plaintext debug option.
-`encrypted_file` selects encrypted storage. `os` requires a host-installed
-OS backend; a standalone core cannot enable native keychain access itself.
-Development mode also defaults to encrypted storage.
+Embedders can install a provider before boot through
+`openhuman_embed::secret_storage::install_secret_backend(Arc::new(provider))`.
+The same facade exposes `MemoryBackend`, `EncryptedFileBackend`, `SecretBackend`
+and `SecretStorageError`. The provider is process-wide, matching the one-runtime
+contract; install it before building the runtime.
+
+CLI, desktop and TUI hosts explicitly retain encrypted-file storage by default.
+With native support enabled, its master key stays in the OS keychain. A host
+without that support creates `{workspace}/keyring/master.key` instead (Unix mode
+`0600`). Back up that key with the workspace.
+
+`OPENHUMAN_KEYRING_BACKEND=memory` selects the basic volatile backend explicitly;
+`file` selects the plaintext debug file, `encrypted_file` selects persistent
+encrypted storage, and `os` requires RPC's native provider. Installed providers
+win over environment selection.
+
+For encrypted storage, an operator can supply `OPENHUMAN_KEYRING_MASTER_KEY`
+(64 hex characters) or `OPENHUMAN_KEYRING_MASTER_KEY_FILE`. Set exactly one.
+Environment keys take precedence over a host source, then the workspace key file.
+An inaccessible host key never falls back to a newly created file key.
 
 ### Moving a desktop workspace to a server
 

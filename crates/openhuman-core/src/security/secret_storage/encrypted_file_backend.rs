@@ -9,12 +9,12 @@
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
-use crate::security::keyring::adapter;
-use crate::security::keyring::backend::KeyringBackend;
-use crate::security::keyring::crypto::{self, KEY_LEN};
-use crate::security::keyring::error::KeyringError;
-use crate::security::keyring::file_store;
-use crate::security::keyring::store::BackendKind;
+use crate::security::secret_storage::adapter;
+use crate::security::secret_storage::backend::SecretBackend;
+use crate::security::secret_storage::crypto::{self, KEY_LEN};
+use crate::security::secret_storage::error::SecretStorageError;
+use crate::security::secret_storage::file_store;
+use crate::security::secret_storage::store::BackendKind;
 use tinystoragedrivers::secrets::EncryptedFileSecrets;
 use zeroize::Zeroizing;
 
@@ -75,24 +75,22 @@ static HOST_KEY_UNAVAILABLE: OnceLock<()> = OnceLock::new();
 /// is restored). The outcome, error included, is cached process-wide, so
 /// every later call after a configuration error returns the same `Err`.
 pub fn init_master_key() -> Result<(), String> {
-    crate::security::keyring::store::validate_backend_selection()?;
+    crate::security::secret_storage::store::validate_backend_selection()?;
     // Ensure workspace dir is set for the backend before anything else.
-    let dir = crate::security::keyring::store::workspace_dir_for_file_backend();
+    let dir = crate::security::secret_storage::store::workspace_dir_for_file_backend();
     log::info!(
         "[keyring] init_master_key: resolved workspace_dir={}",
         dir.display()
     );
-    crate::security::keyring::init_workspace(&dir);
+    crate::security::secret_storage::init_workspace(&dir);
 
+    let backend_kind = crate::security::secret_storage::store::effective_backend_kind();
+    if backend_kind != BackendKind::EncryptedFile {
+        // Do not cache a no-key outcome: a later host may explicitly install
+        // persistent storage after an ephemeral runtime has stopped.
+        return Ok(());
+    }
     init_once(&MASTER_KEY, || {
-        let backend_kind = crate::security::keyring::store::effective_backend_kind();
-        if backend_kind != BackendKind::EncryptedFile {
-            log::debug!(
-                "[keyring:encrypted_file] skipping master key init backend={backend_kind:?}"
-            );
-            return Ok(None);
-        }
-
         match try_load_master_key() {
             Ok((key, source)) => {
                 log::info!("[keyring:encrypted_file] master key loaded from {source}");
@@ -211,7 +209,7 @@ fn try_load_master_key() -> Result<([u8; KEY_LEN], String), MasterKeyError> {
     {
         return Ok(from_env);
     }
-    let dir = crate::security::keyring::store::workspace_dir_for_file_backend();
+    let dir = crate::security::secret_storage::store::workspace_dir_for_file_backend();
     if let Some(source) = key_source::installed_master_key_source() {
         return key_source::load_or_mint_master_key(source.as_ref())
             .map(|key| (*key, "host master key source".to_string()))
@@ -285,7 +283,7 @@ pub(super) fn master_key_available() -> bool {
     #[cfg(test)]
     {
         key_source::workspace_master_key(
-            &crate::security::keyring::store::workspace_dir_for_file_backend(),
+            &crate::security::secret_storage::store::workspace_dir_for_file_backend(),
         )
         .is_ok()
     }
@@ -346,7 +344,7 @@ impl EncryptedFileBackend {
     }
 
     /// Run one driver call, recovering once from a corrupt file.
-    fn run<T, F, Fut>(&self, key: &[u8; KEY_LEN], op: F) -> Result<T, KeyringError>
+    fn run<T, F, Fut>(&self, key: &[u8; KEY_LEN], op: F) -> Result<T, SecretStorageError>
     where
         T: Send + 'static,
         F: Fn(EncryptedFileSecrets) -> Fut,
@@ -363,7 +361,7 @@ impl EncryptedFileBackend {
     }
 
     /// Import `dev-keychain.json` into a missing `secrets.enc`, once.
-    fn import_legacy_dev_keychain(&self, key: &[u8; KEY_LEN]) -> Result<(), KeyringError> {
+    fn import_legacy_dev_keychain(&self, key: &[u8; KEY_LEN]) -> Result<(), SecretStorageError> {
         let legacy_path = self.workspace_dir.join(LEGACY_DEV_KEYCHAIN);
         let migrated_path = legacy_path.with_extension("json.migrated");
         if !legacy_path.exists() && !migrated_path.exists() {
@@ -405,13 +403,13 @@ impl EncryptedFileBackend {
             &migrated_path
         };
         let metadata = std::fs::symlink_metadata(source_path).map_err(|source| {
-            KeyringError::MigrationReadFailed {
+            SecretStorageError::MigrationReadFailed {
                 path: source_path.display().to_string(),
                 source,
             }
         })?;
         if !metadata.file_type().is_file() {
-            return Err(KeyringError::Backend(format!(
+            return Err(SecretStorageError::Backend(format!(
                 "legacy {} is not a regular file; preserving it for recovery",
                 source_path.display()
             )));
@@ -420,43 +418,43 @@ impl EncryptedFileBackend {
             "[keyring:encrypted_file] found legacy {} — migrating to encrypted file",
             source_path.display()
         );
-        let bytes =
-            std::fs::read(source_path).map_err(|source| KeyringError::MigrationReadFailed {
+        let bytes = std::fs::read(source_path).map_err(|source| {
+            SecretStorageError::MigrationReadFailed {
                 path: source_path.display().to_string(),
                 source,
-            })?;
+            }
+        })?;
         let map: std::collections::BTreeMap<String, String> = if bytes.is_empty() {
             Default::default()
         } else {
             serde_json::from_slice(&bytes).map_err(|e| {
-                KeyringError::Backend(format!(
+                SecretStorageError::Backend(format!(
                     "legacy {} is invalid JSON; preserving it for recovery: {e}",
                     source_path.display()
                 ))
             })?
         };
 
-        let json = Zeroizing::new(
-            serde_json::to_vec(&map)
-                .map_err(|e| KeyringError::Backend(format!("failed to serialize secrets: {e}")))?,
-        );
+        let json = Zeroizing::new(serde_json::to_vec(&map).map_err(|e| {
+            SecretStorageError::Backend(format!("failed to serialize secrets: {e}"))
+        })?);
         {
             let blob = crypto::chacha20_encrypt(key, &json)
-                .map_err(|e| KeyringError::Backend(format!("encryption failed: {e}")))?;
+                .map_err(|e| SecretStorageError::Backend(format!("encryption failed: {e}")))?;
             file_store::write_atomic(&self.path, &blob)?;
         }
 
         let verified = match self.remove_legacy_if_encrypted_copy_matches(key, source_path, &_guard)
         {
             Ok(verified) => verified,
-            Err(error @ KeyringError::MigrationDeleteFailed { .. }) => {
+            Err(error @ SecretStorageError::MigrationDeleteFailed { .. }) => {
                 log::warn!("[keyring:encrypted_file] could not remove migrated plaintext: {error}");
                 true
             }
             Err(error) => return Err(error),
         };
         if !verified {
-            return Err(KeyringError::Backend(
+            return Err(SecretStorageError::Backend(
                 "encrypted migration result did not verify against its plaintext source".into(),
             ));
         }
@@ -479,7 +477,7 @@ impl EncryptedFileBackend {
         key: &[u8; KEY_LEN],
         legacy_path: &Path,
         destination_lock: &file_store::WriteLock,
-    ) -> Result<bool, KeyringError> {
+    ) -> Result<bool, SecretStorageError> {
         self.remove_legacy_if_encrypted_copy_matches_with_sync(
             key,
             legacy_path,
@@ -493,13 +491,13 @@ impl EncryptedFileBackend {
         key: &[u8; KEY_LEN],
         legacy_path: &Path,
         destination_lock: &file_store::WriteLock,
-        sync_parent: impl FnOnce(&Path, &file_store::WriteLock) -> Result<(), KeyringError>,
-    ) -> Result<bool, KeyringError> {
+        sync_parent: impl FnOnce(&Path, &file_store::WriteLock) -> Result<(), SecretStorageError>,
+    ) -> Result<bool, SecretStorageError> {
         let metadata = match std::fs::symlink_metadata(legacy_path) {
             Ok(metadata) => metadata,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
             Err(source) => {
-                return Err(KeyringError::MigrationReadFailed {
+                return Err(SecretStorageError::MigrationReadFailed {
                     path: legacy_path.display().to_string(),
                     source,
                 });
@@ -508,11 +506,12 @@ impl EncryptedFileBackend {
         if !metadata.file_type().is_file() {
             return Ok(false);
         }
-        let bytes =
-            std::fs::read(legacy_path).map_err(|source| KeyringError::MigrationReadFailed {
+        let bytes = std::fs::read(legacy_path).map_err(|source| {
+            SecretStorageError::MigrationReadFailed {
                 path: legacy_path.display().to_string(),
                 source,
-            })?;
+            }
+        })?;
         let legacy: std::collections::BTreeMap<String, String> = if bytes.is_empty() {
             Default::default()
         } else {
@@ -525,7 +524,7 @@ impl EncryptedFileBackend {
             Ok(blob) => blob,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
             Err(source) => {
-                return Err(KeyringError::MigrationReadFailed {
+                return Err(SecretStorageError::MigrationReadFailed {
                     path: self.path.display().to_string(),
                     source,
                 });
@@ -564,19 +563,19 @@ impl EncryptedFileBackend {
                 Ok(true)
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
-            Err(source) => Err(KeyringError::MigrationDeleteFailed {
+            Err(source) => Err(SecretStorageError::MigrationDeleteFailed {
                 path: legacy_path.display().to_string(),
                 source,
             }),
         }
     }
 
-    /// [`KeyringBackend::get`] under an explicit master key.
+    /// [`SecretBackend::get`] under an explicit master key.
     pub(super) fn get_with_key(
         &self,
         key: &[u8; KEY_LEN],
         namespaced_key: &str,
-    ) -> Result<Option<String>, KeyringError> {
+    ) -> Result<Option<String>, SecretStorageError> {
         use tinystoragedrivers::secrets::SecretStore as _;
         let name = namespaced_key.to_string();
         let value = self.run(key, move |store| {
@@ -586,13 +585,13 @@ impl EncryptedFileBackend {
         adapter::utf8(namespaced_key, value)
     }
 
-    /// [`KeyringBackend::set`] under an explicit master key.
+    /// [`SecretBackend::set`] under an explicit master key.
     pub(super) fn set_with_key(
         &self,
         key: &[u8; KEY_LEN],
         namespaced_key: &str,
         value: &str,
-    ) -> Result<(), KeyringError> {
+    ) -> Result<(), SecretStorageError> {
         use tinystoragedrivers::secrets::SecretStore as _;
         let name = namespaced_key.to_string();
         let value = Zeroizing::new(value.as_bytes().to_vec());
@@ -603,24 +602,24 @@ impl EncryptedFileBackend {
     }
 }
 
-impl KeyringBackend for EncryptedFileBackend {
-    fn get(&self, namespaced_key: &str) -> Result<Option<String>, KeyringError> {
+impl SecretBackend for EncryptedFileBackend {
+    fn get(&self, namespaced_key: &str) -> Result<Option<String>, SecretStorageError> {
         let Some(key) = self.key() else {
             return Ok(None);
         };
         self.get_with_key(&key, namespaced_key)
     }
 
-    fn set(&self, namespaced_key: &str, value: &str) -> Result<(), KeyringError> {
+    fn set(&self, namespaced_key: &str, value: &str) -> Result<(), SecretStorageError> {
         let Some(key) = self.key() else {
-            return Err(KeyringError::Backend(
+            return Err(SecretStorageError::Backend(
                 "master key unavailable — cannot store secrets".to_string(),
             ));
         };
         self.set_with_key(&key, namespaced_key, value)
     }
 
-    fn delete(&self, namespaced_key: &str) -> Result<(), KeyringError> {
+    fn delete(&self, namespaced_key: &str) -> Result<(), SecretStorageError> {
         use tinystoragedrivers::secrets::SecretStore as _;
         let Some(key) = self.key() else {
             return Ok(());

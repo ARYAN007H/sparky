@@ -32,7 +32,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use fs2::FileExt;
 
-use crate::security::keyring::error::KeyringError;
+use crate::security::secret_storage::error::SecretStorageError;
 
 /// Distinguishes concurrent temp files written by one process.
 ///
@@ -63,14 +63,14 @@ pub struct WriteLock {
 ///
 /// # Errors
 ///
-/// Returns [`KeyringError::Backend`] when the lock file's directory cannot be
+/// Returns [`SecretStorageError::Backend`] when the lock file's directory cannot be
 /// created, the lock file cannot be opened, or the lock cannot be taken. Failing
 /// the operation is deliberate: proceeding unlocked is what loses secrets.
-pub fn lock_for_write(path: &Path) -> Result<WriteLock, KeyringError> {
+pub fn lock_for_write(path: &Path) -> Result<WriteLock, SecretStorageError> {
     let lock_path = lock_path_for(path);
     if let Some(parent) = lock_path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| {
-            KeyringError::Backend(format!(
+            SecretStorageError::Backend(format!(
                 "could not create {} for the keyring lock: {e}",
                 parent.display()
             ))
@@ -83,13 +83,13 @@ pub fn lock_for_write(path: &Path) -> Result<WriteLock, KeyringError> {
         .truncate(false)
         .open(&lock_path)
         .map_err(|e| {
-            KeyringError::Backend(format!(
+            SecretStorageError::Backend(format!(
                 "could not open the keyring lock at {}: {e}",
                 lock_path.display()
             ))
         })?;
     file.lock_exclusive().map_err(|e| {
-        KeyringError::Backend(format!(
+        SecretStorageError::Backend(format!(
             "could not lock the keyring at {}: {e}",
             lock_path.display()
         ))
@@ -121,12 +121,12 @@ fn parent_dir(path: &Path) -> &Path {
 ///
 /// # Errors
 ///
-/// Returns [`KeyringError::Backend`] when the parent directory cannot be
+/// Returns [`SecretStorageError::Backend`] when the parent directory cannot be
 /// created, or the temp file cannot be written or renamed.
-pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), KeyringError> {
+pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), SecretStorageError> {
     let parent = parent_dir(path);
     std::fs::create_dir_all(parent).map_err(|e| {
-        KeyringError::Backend(format!(
+        SecretStorageError::Backend(format!(
             "could not create {} for a keyring write: {e}",
             parent.display()
         ))
@@ -151,7 +151,7 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), KeyringError> {
     };
     write().map_err(|e| {
         let _ = std::fs::remove_file(&tmp_path);
-        KeyringError::Backend(format!(
+        SecretStorageError::Backend(format!(
             "could not stage a keyring write at {}: {e}",
             tmp_path.display()
         ))
@@ -159,7 +159,7 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), KeyringError> {
 
     replace_durably(&tmp_path, path).map_err(|e| {
         let _ = std::fs::remove_file(&tmp_path);
-        KeyringError::Backend(format!(
+        SecretStorageError::Backend(format!(
             "could not replace the keyring file at {}: {e}",
             path.display()
         ))
@@ -181,7 +181,10 @@ fn replace_durably(source: &Path, destination: &Path) -> std::io::Result<()> {
 ///
 /// This retries an earlier publication that returned an error after the
 /// destination had already appeared.
-pub fn sync_parent_dir(path: &Path, destination_lock: &WriteLock) -> Result<(), KeyringError> {
+pub fn sync_parent_dir(
+    path: &Path,
+    destination_lock: &WriteLock,
+) -> Result<(), SecretStorageError> {
     #[cfg(unix)]
     {
         let _ = destination_lock;
@@ -189,7 +192,7 @@ pub fn sync_parent_dir(path: &Path, destination_lock: &WriteLock) -> Result<(), 
         File::open(parent)
             .and_then(|directory| directory.sync_all())
             .map_err(|error| {
-                KeyringError::Backend(format!(
+                SecretStorageError::Backend(format!(
                     "could not sync keyring directory {}: {error}",
                     parent.display()
                 ))
@@ -208,19 +211,20 @@ pub fn sync_parent_dir(path: &Path, destination_lock: &WriteLock) -> Result<(), 
 fn sync_parent_dir_with_republish(
     path: &Path,
     _destination_lock: &WriteLock,
-    republish: impl FnOnce(&Path, &[u8]) -> Result<(), KeyringError>,
-) -> Result<(), KeyringError> {
-    let expected = std::fs::read(path).map_err(|source| KeyringError::MigrationReadFailed {
-        path: path.display().to_string(),
-        source,
-    })?;
+    republish: impl FnOnce(&Path, &[u8]) -> Result<(), SecretStorageError>,
+) -> Result<(), SecretStorageError> {
+    let expected =
+        std::fs::read(path).map_err(|source| SecretStorageError::MigrationReadFailed {
+            path: path.display().to_string(),
+            source,
+        })?;
     republish(path, &expected)?;
-    let actual = std::fs::read(path).map_err(|source| KeyringError::MigrationReadFailed {
+    let actual = std::fs::read(path).map_err(|source| SecretStorageError::MigrationReadFailed {
         path: path.display().to_string(),
         source,
     })?;
     if actual != expected {
-        return Err(KeyringError::Backend(format!(
+        return Err(SecretStorageError::Backend(format!(
             "durable keyring publication at {} failed verification",
             path.display()
         )));
@@ -273,7 +277,7 @@ compile_error!("keyring durable replacement requires a platform implementation")
 /// Reserve a fresh temp file, advancing past leftovers from crashed writers.
 fn reserve_temp_file(
     mut next_path: impl FnMut() -> PathBuf,
-) -> Result<(PathBuf, File), KeyringError> {
+) -> Result<(PathBuf, File), SecretStorageError> {
     loop {
         let tmp_path = next_path();
         match OpenOptions::new()
@@ -284,7 +288,7 @@ fn reserve_temp_file(
             Ok(file) => break Ok((tmp_path, file)),
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(e) => {
-                return Err(KeyringError::Backend(format!(
+                return Err(SecretStorageError::Backend(format!(
                     "could not stage a keyring write at {}: {e}",
                     tmp_path.display()
                 )));

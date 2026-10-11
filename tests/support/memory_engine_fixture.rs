@@ -416,7 +416,7 @@ pub static AUTH_INIT: OnceLock<()> = OnceLock::new();
 pub static SEAMS_INIT: OnceLock<()> = OnceLock::new();
 
 pub fn env_lock() -> std::sync::MutexGuard<'static, ()> {
-    openhuman_core::security::keyring::init_workspace(shared_workspace());
+    openhuman_core::security::secret_storage::init_workspace(shared_workspace());
     match ENV_LOCK.get_or_init(|| Mutex::new(())).lock() {
         Ok(guard) => guard,
         Err(poisoned) => poisoned.into_inner(),

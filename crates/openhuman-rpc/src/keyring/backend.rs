@@ -1,6 +1,6 @@
 //! Native OS secret storage, preserving service `openhuman` and `{user}:{key}`.
 
-use crate::core_host::security::keyring::{KeyringBackend, KeyringError};
+use crate::core_host::security::secret_storage::{SecretBackend, SecretStorageError};
 use tinystoragedrivers::secrets::KeyringSecrets;
 use tinystoragedrivers::{ErrorKind, StorageError};
 use zeroize::Zeroizing;
@@ -38,8 +38,8 @@ impl Default for OsKeyringBackend {
     }
 }
 
-impl KeyringBackend for OsKeyringBackend {
-    fn get(&self, namespaced_key: &str) -> Result<Option<String>, KeyringError> {
+impl SecretBackend for OsKeyringBackend {
+    fn get(&self, namespaced_key: &str) -> Result<Option<String>, SecretStorageError> {
         use tinystoragedrivers::secrets::SecretStore as _;
         let (store, name) = (self.store.clone(), namespaced_key.to_string());
         match crate::core_host::storage::block_on(async move { store.get(&name).await }) {
@@ -50,7 +50,7 @@ impl KeyringBackend for OsKeyringBackend {
         }
     }
 
-    fn set(&self, namespaced_key: &str, value: &str) -> Result<(), KeyringError> {
+    fn set(&self, namespaced_key: &str, value: &str) -> Result<(), SecretStorageError> {
         use tinystoragedrivers::secrets::SecretStore as _;
         let (store, name) = (self.store.clone(), namespaced_key.to_string());
         let value = zeroize::Zeroizing::new(value.as_bytes().to_vec());
@@ -58,7 +58,7 @@ impl KeyringBackend for OsKeyringBackend {
             .map_err(|e| os_error(namespaced_key, e))
     }
 
-    fn delete(&self, namespaced_key: &str) -> Result<(), KeyringError> {
+    fn delete(&self, namespaced_key: &str) -> Result<(), SecretStorageError> {
         use tinystoragedrivers::secrets::SecretStore as _;
         let (store, name) = (self.store.clone(), namespaced_key.to_string());
         match crate::core_host::storage::block_on(
@@ -75,16 +75,19 @@ impl KeyringBackend for OsKeyringBackend {
     }
 }
 
-fn os_error(_key: &str, error: StorageError) -> KeyringError {
-    KeyringError::Backend(format!("OS keychain: {error}"))
+fn os_error(_key: &str, error: StorageError) -> SecretStorageError {
+    SecretStorageError::Backend(format!("OS keychain: {error}"))
 }
 fn is_no_access(error: &StorageError) -> bool {
     error.kind() == ErrorKind::Unavailable
 }
-fn utf8(key: &str, value: Option<Zeroizing<Vec<u8>>>) -> Result<Option<String>, KeyringError> {
+fn utf8(
+    key: &str,
+    value: Option<Zeroizing<Vec<u8>>>,
+) -> Result<Option<String>, SecretStorageError> {
     value
         .map(|bytes| {
-            String::from_utf8(bytes.to_vec()).map_err(|source| KeyringError::InvalidUtf8 {
+            String::from_utf8(bytes.to_vec()).map_err(|source| SecretStorageError::InvalidUtf8 {
                 key: key.into(),
                 source,
             })

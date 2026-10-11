@@ -49,8 +49,8 @@ pub(super) fn master_key_from_env(
 /// a locked or denied source must return an error so the core never replaces
 /// an inaccessible key with a new one.
 pub trait MasterKeySource: Send + Sync {
-    fn load(&self) -> Result<Option<Zeroizing<[u8; 32]>>, KeyringError>;
-    fn store(&self, key: &[u8; 32]) -> Result<(), KeyringError>;
+    fn load(&self) -> Result<Option<Zeroizing<[u8; 32]>>, SecretStorageError>;
+    fn store(&self, key: &[u8; 32]) -> Result<(), SecretStorageError>;
 }
 
 #[path = "key_source_install.rs"]
@@ -62,7 +62,7 @@ pub use install::{
 /// Mint only on genuine absence, and verify the published key before use.
 pub(super) fn load_or_mint_master_key(
     source: &dyn MasterKeySource,
-) -> Result<Zeroizing<[u8; 32]>, KeyringError> {
+) -> Result<Zeroizing<[u8; 32]>, SecretStorageError> {
     if let Some(key) = source.load()? {
         return Ok(key);
     }
@@ -72,9 +72,9 @@ pub(super) fn load_or_mint_master_key(
     source.store(&key)?;
     let readback = source
         .load()?
-        .ok_or_else(|| KeyringError::Backend("master key readback missing".into()))?;
+        .ok_or_else(|| SecretStorageError::Backend("master key readback missing".into()))?;
     if *readback != *key {
-        return Err(KeyringError::Backend(
+        return Err(SecretStorageError::Backend(
             "master key write verification failed".into(),
         ));
     }
@@ -84,13 +84,15 @@ pub(super) fn load_or_mint_master_key(
 /// Load or durably create the workspace key under the cross-process write
 /// lock. Never replace a malformed or unreadable existing key. The atomic
 /// file writer creates the key with Unix mode `0600` before publication.
-pub(super) fn workspace_master_key(workspace: &Path) -> Result<Zeroizing<[u8; 32]>, KeyringError> {
+pub(super) fn workspace_master_key(
+    workspace: &Path,
+) -> Result<Zeroizing<[u8; 32]>, SecretStorageError> {
     let path = workspace.join("keyring/master.key");
     let _lock = file_store::lock_for_write(&path)?;
     match std::fs::symlink_metadata(&path) {
         Ok(metadata) => {
             if !metadata.file_type().is_file() {
-                return Err(KeyringError::Backend(
+                return Err(SecretStorageError::Backend(
                     "workspace master key must be a regular file".into(),
                 ));
             }
@@ -98,18 +100,17 @@ pub(super) fn workspace_master_key(workspace: &Path) -> Result<Zeroizing<[u8; 32
             {
                 use std::os::unix::fs::PermissionsExt;
                 if metadata.permissions().mode() & 0o077 != 0 {
-                    return Err(KeyringError::Backend(
+                    return Err(SecretStorageError::Backend(
                         "workspace master key requires permissions 0600".into(),
                     ));
                 }
             }
-            let text =
-                Zeroizing::new(std::fs::read_to_string(&path).map_err(|_| {
-                    KeyringError::Backend("cannot read workspace master key".into())
-                })?);
+            let text = Zeroizing::new(std::fs::read_to_string(&path).map_err(|_| {
+                SecretStorageError::Backend("cannot read workspace master key".into())
+            })?);
             parse_master_key_hex(text.trim())
                 .map(Zeroizing::new)
-                .map_err(KeyringError::Backend)
+                .map_err(SecretStorageError::Backend)
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
             let bytes = Zeroizing::new(crypto::generate_random_bytes(KEY_LEN));
@@ -119,7 +120,7 @@ pub(super) fn workspace_master_key(workspace: &Path) -> Result<Zeroizing<[u8; 32
             file_store::write_atomic(&path, hex.as_bytes())?;
             Ok(key)
         }
-        Err(_) => Err(KeyringError::Backend(
+        Err(_) => Err(SecretStorageError::Backend(
             "cannot inspect workspace master key".into(),
         )),
     }

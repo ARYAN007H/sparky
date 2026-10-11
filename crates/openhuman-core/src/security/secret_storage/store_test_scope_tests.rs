@@ -5,7 +5,7 @@ use std::sync::{Arc, OnceLock};
 
 use parking_lot::Mutex;
 
-use super::{build_backend_at, KeyringBackend};
+use super::{build_backend_at, SecretBackend};
 
 thread_local! {
     /// Workspace bound by [`ScopedWorkspace`] on this thread, if any.
@@ -18,7 +18,7 @@ static PROCESS_DEFAULT: OnceLock<PathBuf> = OnceLock::new();
 
 /// One backend per resolved workspace directory.
 #[allow(clippy::type_complexity)]
-static BACKENDS: OnceLock<Mutex<HashMap<PathBuf, Arc<dyn KeyringBackend>>>> = OnceLock::new();
+static BACKENDS: OnceLock<Mutex<HashMap<PathBuf, Arc<dyn SecretBackend>>>> = OnceLock::new();
 
 /// The keyring workspace for the calling thread.
 pub(crate) fn current_workspace() -> PathBuf {
@@ -33,7 +33,7 @@ pub(crate) fn current_workspace() -> PathBuf {
 }
 
 /// The backend rooted at `dir`, built once per directory.
-pub(crate) fn backend_for(dir: &Path) -> Arc<dyn KeyringBackend> {
+pub(crate) fn backend_for(dir: &Path) -> Arc<dyn SecretBackend> {
     let registry = BACKENDS.get_or_init(|| Mutex::new(HashMap::new()));
     if let Some(existing) = registry.lock().get(dir).cloned() {
         return existing;

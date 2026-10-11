@@ -1,7 +1,7 @@
 //! A headless core persists both secret slots and config ciphertext across
-//! process restarts, without an OS provider or keyring environment overrides.
+//! process restarts with explicit encrypted storage, without an OS provider or key injection.
 
-use openhuman_core::security::keyring;
+use openhuman_core::security::secret_storage;
 use std::process::Command;
 
 #[test]
@@ -9,14 +9,14 @@ fn headless_core_reuses_its_workspace_key_after_restart() {
     const STAGE: &str = "OPENHUMAN_TEST_HEADLESS_KEYRING_STAGE";
     if let Ok(stage) = std::env::var(STAGE) {
         let workspace = std::path::PathBuf::from(std::env::var("OPENHUMAN_WORKSPACE").unwrap());
-        keyring::init_workspace(&workspace);
-        keyring::init_master_key().unwrap();
-        assert_eq!(keyring::backend_name(), "encrypted_file");
-        assert!(keyring::is_available());
-        let config_secrets = keyring::SecretStore::new(&workspace, true);
+        secret_storage::init_workspace(&workspace);
+        secret_storage::init_master_key().unwrap();
+        assert_eq!(secret_storage::backend_name(), "encrypted_file");
+        assert!(secret_storage::is_available());
+        let config_secrets = secret_storage::SecretStore::new(&workspace, true);
         let ciphertext_path = workspace.join("config-secret.txt");
         if stage == "write" {
-            keyring::set("test-user", "token", "persisted-token").unwrap();
+            secret_storage::set("test-user", "token", "persisted-token").unwrap();
             std::fs::write(
                 &ciphertext_path,
                 config_secrets.encrypt("config-secret").unwrap(),
@@ -24,7 +24,9 @@ fn headless_core_reuses_its_workspace_key_after_restart() {
             .unwrap();
         } else {
             assert_eq!(
-                keyring::get("test-user", "token").unwrap().as_deref(),
+                secret_storage::get("test-user", "token")
+                    .unwrap()
+                    .as_deref(),
                 Some("persisted-token")
             );
             let ciphertext = std::fs::read_to_string(&ciphertext_path).unwrap();
@@ -49,7 +51,7 @@ fn headless_core_reuses_its_workspace_key_after_restart() {
             .env(STAGE, stage)
             .env("OPENHUMAN_WORKSPACE", dir.path())
             .env("OPENHUMAN_APP_ENV", "development")
-            .env_remove("OPENHUMAN_KEYRING_BACKEND")
+            .env("OPENHUMAN_KEYRING_BACKEND", "encrypted_file")
             .env_remove("OPENHUMAN_KEYRING_MASTER_KEY")
             .env_remove("OPENHUMAN_KEYRING_MASTER_KEY_FILE")
             .env_remove("OPENHUMAN_STORAGE_URL")

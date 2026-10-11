@@ -1024,7 +1024,7 @@ async fn encrypt_test_mnemonic() -> String {
     let config = openhuman_core::config::load_config_with_timeout()
         .await
         .expect("load config for encrypted test mnemonic");
-    openhuman_core::security::keyring::init_workspace(&config.workspace_dir);
+    openhuman_core::security::secret_storage::init_workspace(&config.workspace_dir);
     openhuman_core::security::encryption::rpc::encrypt_secret(
         &config,
         "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",

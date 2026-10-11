@@ -90,7 +90,7 @@ const STORAGE_LIB_FILTERS = [
   "flows::",
   "security::approval::",
   "security::devices::",
-  "security::keyring::",
+  "security::secret_storage::",
   "security::credentials::",
   "desktop::notifications::",
   "integrations::task_sources::",

@@ -7,7 +7,7 @@ use std::io::Write as _;
 use tempfile::NamedTempFile;
 use tempfile::TempDir;
 
-use super::backend::{FileBackend, KeyringBackend};
+use super::backend::{FileBackend, SecretBackend};
 use super::*;
 
 // ── FileBackend: round-trip ───────────────────────────────────────────────────
@@ -192,7 +192,7 @@ fn run_migrate(
     user_id: &str,
     key: &str,
     src_path: Option<&std::path::Path>,
-) -> Result<MigrationOutcome, KeyringError> {
+) -> Result<MigrationOutcome, SecretStorageError> {
     let nk = format!("{user_id}:{key}");
 
     // -- Step 1: already migrated? --
@@ -207,10 +207,11 @@ fn run_migrate(
     };
 
     // -- Step 3: read --
-    let content = std::fs::read_to_string(path).map_err(|e| KeyringError::MigrationReadFailed {
-        path: path.display().to_string(),
-        source: e,
-    })?;
+    let content =
+        std::fs::read_to_string(path).map_err(|e| SecretStorageError::MigrationReadFailed {
+            path: path.display().to_string(),
+            source: e,
+        })?;
     let value = content.trim().to_string();
 
     // -- Step 4: write --
@@ -219,13 +220,13 @@ fn run_migrate(
     // -- Step 5: verify --
     let readback = fb.get(&nk)?;
     if readback.as_deref() != Some(value.as_str()) {
-        return Err(KeyringError::VerifyFailed {
+        return Err(SecretStorageError::VerifyFailed {
             key: key.to_string(),
         });
     }
 
     // -- Step 6: delete source file --
-    std::fs::remove_file(path).map_err(|e| KeyringError::MigrationDeleteFailed {
+    std::fs::remove_file(path).map_err(|e| SecretStorageError::MigrationDeleteFailed {
         path: path.display().to_string(),
         source: e,
     })?;

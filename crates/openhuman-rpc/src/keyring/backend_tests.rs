@@ -6,9 +6,9 @@ use std::sync::{Arc, Mutex};
 use tempfile::NamedTempFile;
 
 use keyring::credential::{Credential, CredentialApi, CredentialBuilderApi};
-use tinystoragedrivers::secrets::{crypto, KeyringSecrets};
+use tinystoragedrivers::secrets::KeyringSecrets;
 
-use crate::core_host::security::keyring::KeyringBackend;
+use crate::core_host::security::secret_storage::SecretBackend;
 
 type Shared = Arc<Mutex<HashMap<(String, String), Vec<u8>>>>;
 
@@ -144,7 +144,7 @@ fn a_locked_keychain_reads_empty_and_deletes_quietly_but_fails_a_write() {
     assert_eq!(os.get("u:k").unwrap(), None);
     os.delete("u:k").unwrap();
     let error = os.set("u:k", "v").unwrap_err();
-    assert!(matches!(error, KeyringError::Backend(_)), "{error:?}");
+    assert!(matches!(error, SecretStorageError::Backend(_)), "{error:?}");
 }
 
 #[test]
@@ -199,13 +199,13 @@ fn os_user_id_isolation() {
 
 #[test]
 fn availability_probe_handles_a_leftover_os_entry_and_caches_success() {
-    use crate::core_host::security::keyring::{
-        clear_keyring_backend, install_keyring_backend, is_available,
+    use crate::core_host::security::secret_storage::{
+        clear_secret_backend, install_secret_backend, is_available,
     };
     let b = Arc::new(fake_os_backend());
     let probe_key = "__probe__:__openhuman_keyring_probe__";
     b.set(probe_key, "__probe_value__").unwrap();
-    install_keyring_backend(b.clone());
+    install_secret_backend(b.clone());
     assert!(is_available());
     assert_eq!(
         b.get(probe_key).unwrap(),
@@ -213,7 +213,7 @@ fn availability_probe_handles_a_leftover_os_entry_and_caches_success() {
         "probe must remove its entry"
     );
     assert!(is_available());
-    clear_keyring_backend();
+    clear_secret_backend();
 }
 
 #[test]

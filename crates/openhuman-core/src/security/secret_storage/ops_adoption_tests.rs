@@ -7,8 +7,8 @@ use std::sync::Arc;
 use tinystoragedrivers::secrets::{DerivedKeys, SecretStore as _};
 use zeroize::Zeroizing;
 
-use crate::security::keyring::backend::MockBackend;
-use crate::security::keyring::KeyringBackend;
+use crate::security::secret_storage::backend::MockBackend;
+use crate::security::secret_storage::SecretBackend;
 use crate::storage::{MemoryStorage, Scope, StorageBackend};
 
 #[test]
@@ -114,7 +114,7 @@ fn adopted_secrets_do_not_cross_scopes() {
 #[test]
 fn a_failing_legacy_backend_reads_as_nothing_to_adopt() {
     assert_eq!(
-        legacy_or_warn(Err(KeyringError::Backend("locked".into()))),
+        legacy_or_warn(Err(SecretStorageError::Backend("locked".into()))),
         None
     );
     assert_eq!(legacy_or_warn(Ok(Some("v".into()))).as_deref(), Some("v"));
@@ -122,7 +122,7 @@ fn a_failing_legacy_backend_reads_as_nothing_to_adopt() {
     let storage = MemoryStorage::new();
     let secrets = storage_secrets_in(&storage, "local");
     let read = get_adopting(secrets, "alice:k", "k", || {
-        legacy_or_warn(Err(KeyringError::Backend("locked".into())))
+        legacy_or_warn(Err(SecretStorageError::Backend("locked".into())))
     })
     .unwrap();
     assert_eq!(read, None);

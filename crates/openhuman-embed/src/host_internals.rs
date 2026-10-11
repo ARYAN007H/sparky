@@ -208,11 +208,12 @@ pub mod integrations {
 /// Socket.IO approvals, bind policy).
 pub mod security {
     /// Host-supplied secret storage and encryption-key sources.
-    pub mod keyring {
-        pub use openhuman_core::security::keyring::{
-            clear_keyring_backend, clear_master_key_source, install_keyring_backend,
-            install_master_key_source, installed_keyring_backend, installed_master_key_source,
-            is_available, KeyringBackend, KeyringError, MasterKeySource,
+    pub mod secret_storage {
+        pub use openhuman_core::security::secret_storage::{
+            clear_master_key_source, clear_secret_backend, init_workspace,
+            install_master_key_source, install_secret_backend, installed_master_key_source,
+            installed_secret_backend, is_available, store::workspace_dir_for_file_backend,
+            EncryptedFileBackend, MasterKeySource, SecretBackend, SecretStorageError,
         };
     }
     pub mod credentials {

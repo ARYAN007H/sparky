@@ -2,9 +2,9 @@ use thiserror::Error;
 
 /// Errors that can occur during secret-storage operations.
 #[derive(Debug, Error)]
-pub enum KeyringError {
-    /// The keychain returned a value but it was not valid UTF-8.
-    #[error("Keychain value for key '{key}' is not valid UTF-8: {source}")]
+pub enum SecretStorageError {
+    /// The secret backend returned a value but it was not valid UTF-8.
+    #[error("Stored secret for key '{key}' is not valid UTF-8: {source}")]
     InvalidUtf8 {
         key: String,
         #[source]
@@ -19,9 +19,9 @@ pub enum KeyringError {
         source: std::io::Error,
     },
 
-    /// Writing to keychain succeeded but read-back verification failed.
+    /// Writing to the secret backend succeeded but read-back verification failed.
     #[error(
-        "Keychain write verification failed for key '{key}': wrote value did not match read-back"
+        "Secret write verification failed for key '{key}': wrote value did not match read-back"
     )]
     VerifyFailed { key: String },
 
@@ -38,15 +38,15 @@ pub enum KeyringError {
     RandomGeneration(String),
 
     /// Encryption or decryption of the secrets file failed.
-    #[error("Keyring crypto error: {0}")]
+    #[error("Secret-storage crypto error: {0}")]
     Crypto(String),
 
     /// A backend-internal operation failed (e.g. serialization).
-    #[error("Keyring backend error: {0}")]
+    #[error("Secret-storage backend error: {0}")]
     Backend(String),
 }
 
-impl KeyringError {
+impl SecretStorageError {
     /// Log-safe diagnostic detail. Backend implementations must never include
     /// secret values in errors.
     pub fn diagnostic(&self) -> String {

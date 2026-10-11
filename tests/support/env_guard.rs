@@ -83,5 +83,5 @@ pub async fn env_lock_async() -> MutexGuard<'static, ()> {
 pub fn init_keyring_workspace() {
     static WORKSPACE: OnceLock<tempfile::TempDir> = OnceLock::new();
     let workspace = WORKSPACE.get_or_init(|| tempfile::tempdir().expect("test key workspace"));
-    openhuman_core::security::keyring::init_workspace(workspace.path());
+    openhuman_core::security::secret_storage::init_workspace(workspace.path());
 }

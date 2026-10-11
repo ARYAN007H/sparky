@@ -1,6 +1,6 @@
 //! The desktop master-key entry, with the existing service and account names.
 
-use crate::core_host::security::keyring::{KeyringError, MasterKeySource};
+use crate::core_host::security::secret_storage::{MasterKeySource, SecretStorageError};
 use zeroize::Zeroizing;
 
 /// Native master-key source. The entry is created lazily, so installing the
@@ -11,7 +11,7 @@ pub struct OsMasterKeySource {
 }
 
 impl OsMasterKeySource {
-    fn entry(&self) -> Result<std::sync::Arc<keyring::Entry>, KeyringError> {
+    fn entry(&self) -> Result<std::sync::Arc<keyring::Entry>, SecretStorageError> {
         if let Some(entry) = &self.entry {
             return Ok(entry.clone());
         }
@@ -23,7 +23,7 @@ impl OsMasterKeySource {
 
 // Native errors can contain stored bytes or credential objects. Project only
 // their category into the core's diagnostic string, never their payload.
-fn native_error(context: &str, error: &keyring::Error) -> KeyringError {
+fn native_error(context: &str, error: &keyring::Error) -> SecretStorageError {
     let reason = match error {
         keyring::Error::NoEntry => "entry does not exist",
         keyring::Error::NoStorageAccess(_) => "credential store access denied or unavailable",
@@ -34,16 +34,16 @@ fn native_error(context: &str, error: &keyring::Error) -> KeyringError {
         keyring::Error::Ambiguous(_) => "multiple matching credentials",
         _ => "unknown native credential store error",
     };
-    KeyringError::Backend(format!("{context}: {reason}"))
+    SecretStorageError::Backend(format!("{context}: {reason}"))
 }
 
-fn load_entry(entry: &keyring::Entry) -> Result<Option<Zeroizing<[u8; 32]>>, KeyringError> {
+fn load_entry(entry: &keyring::Entry) -> Result<Option<Zeroizing<[u8; 32]>>, SecretStorageError> {
     match entry.get_password() {
         Ok(value) => {
             let value = Zeroizing::new(value);
             let mut key = Zeroizing::new([0; 32]);
             hex::decode_to_slice(value.trim(), &mut key[..]).map_err(|_| {
-                KeyringError::Backend("OS master key must be 64 hex characters".into())
+                SecretStorageError::Backend("OS master key must be 64 hex characters".into())
             })?;
             Ok(Some(key))
         }
@@ -56,11 +56,11 @@ fn load_entry(entry: &keyring::Entry) -> Result<Option<Zeroizing<[u8; 32]>>, Key
 }
 
 impl MasterKeySource for OsMasterKeySource {
-    fn load(&self) -> Result<Option<Zeroizing<[u8; 32]>>, KeyringError> {
+    fn load(&self) -> Result<Option<Zeroizing<[u8; 32]>>, SecretStorageError> {
         let entry = self.entry()?;
         load_entry(&entry)
     }
-    fn store(&self, key: &[u8; 32]) -> Result<(), KeyringError> {
+    fn store(&self, key: &[u8; 32]) -> Result<(), SecretStorageError> {
         let entry = self.entry()?;
         let encoded = Zeroizing::new(hex::encode(key));
         entry

@@ -95,7 +95,7 @@ fn existing_encrypted_file_does_not_remove_plaintext_until_directory_sync_succee
         &key,
         &legacy_path,
         &destination_lock,
-        |_, _| Err(KeyringError::Backend("directory sync failed".into())),
+        |_, _| Err(SecretStorageError::Backend("directory sync failed".into())),
     );
     assert!(result.is_err());
     assert!(
@@ -429,7 +429,7 @@ fn a_secret_written_under_a_configured_key_reads_back_after_a_restart() {
         .with(MASTER_KEY_FILE_ENV, &key_path);
 
     // First "process": load the configured key and store a secret through the
-    // same lock → read → encrypt → write path `KeyringBackend::set` uses.
+    // same lock → read → encrypt → write path `SecretBackend::set` uses.
     // `get`/`set` read the key from the process-wide `MASTER_KEY`, which
     // this test must not populate, so the key is passed explicitly.
     {

@@ -9,14 +9,14 @@ struct FakeSource {
     wrong_readback: bool,
 }
 impl MasterKeySource for FakeSource {
-    fn load(&self) -> Result<Option<Zeroizing<[u8; 32]>>, KeyringError> {
+    fn load(&self) -> Result<Option<Zeroizing<[u8; 32]>>, SecretStorageError> {
         if self.denied {
-            return Err(KeyringError::Backend("access denied".into()));
+            return Err(SecretStorageError::Backend("access denied".into()));
         }
         let key = *self.key.lock().unwrap();
         Ok(key.map(|key| Zeroizing::new(if self.wrong_readback { [9; 32] } else { key })))
     }
-    fn store(&self, key: &[u8; 32]) -> Result<(), KeyringError> {
+    fn store(&self, key: &[u8; 32]) -> Result<(), SecretStorageError> {
         *self.writes.lock().unwrap() += 1;
         *self.key.lock().unwrap() = Some(*key);
         Ok(())
@@ -131,7 +131,8 @@ fn installed_source_wins_over_workspace_file_and_does_not_leak_threads() {
         .without(MASTER_KEY_ENV)
         .without(MASTER_KEY_FILE_ENV);
     let dir = tempfile::tempdir().unwrap();
-    let _workspace = crate::security::keyring::store::test_scope::ScopedWorkspace::new(dir.path());
+    let _workspace =
+        crate::security::secret_storage::store::test_scope::ScopedWorkspace::new(dir.path());
     install_master_key_source(Arc::new(FakeSource {
         key: Mutex::new(Some([7; 32])),
         ..Default::default()
@@ -174,7 +175,8 @@ fn denied_host_source_does_not_fall_back_to_workspace_key() {
         .without(MASTER_KEY_ENV)
         .without(MASTER_KEY_FILE_ENV);
     let dir = tempfile::tempdir().unwrap();
-    let _workspace = crate::security::keyring::store::test_scope::ScopedWorkspace::new(dir.path());
+    let _workspace =
+        crate::security::secret_storage::store::test_scope::ScopedWorkspace::new(dir.path());
     install_master_key_source(Arc::new(FakeSource {
         denied: true,
         ..Default::default()

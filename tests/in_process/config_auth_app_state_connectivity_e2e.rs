@@ -4144,7 +4144,7 @@ fn credentials_profile_store_keychain_migration_and_fallback_paths_are_determini
     let hit_dir = tmp.path().join("keychain-hit");
     std::fs::create_dir_all(&hit_dir).expect("create keychain hit dir");
     let hit_profile_id = "github:main";
-    openhuman_core::security::keyring::set(
+    openhuman_core::security::secret_storage::set(
         "keychain-hit",
         &format!("auth:{hit_profile_id}"),
         &json!({
@@ -4243,7 +4243,7 @@ fn credentials_profile_store_keychain_migration_and_fallback_paths_are_determini
             .and_then(|profile| profile.token.as_deref()),
         Some("plain-token-for-migration")
     );
-    let migrated_keychain = openhuman_core::security::keyring::get(
+    let migrated_keychain = openhuman_core::security::secret_storage::get(
         "keychain-migrate",
         &format!("auth:{migrate_profile_id}"),
     )
@@ -4257,7 +4257,7 @@ fn credentials_profile_store_keychain_migration_and_fallback_paths_are_determini
     let fallback_dir = tmp.path().join("keychain-fallback");
     std::fs::create_dir_all(&fallback_dir).expect("create keychain fallback dir");
     let fallback_profile_id = "slack:bot";
-    openhuman_core::security::keyring::set(
+    openhuman_core::security::secret_storage::set(
         "keychain-fallback",
         &format!("auth:{fallback_profile_id}"),
         "not-json",
@@ -4303,7 +4303,7 @@ fn credentials_profile_store_keychain_migration_and_fallback_paths_are_determini
         "migrated profile should be removable"
     );
     assert!(
-        openhuman_core::security::keyring::get(
+        openhuman_core::security::secret_storage::get(
             "keychain-migrate",
             &format!("auth:{migrate_profile_id}"),
         )
