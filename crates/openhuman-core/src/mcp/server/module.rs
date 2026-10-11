@@ -1,6 +1,8 @@
 //! TinyMCP server-protocol adapter over the published bus contract.
 
 use std::{
+    future::Future,
+    pin::Pin,
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc,
@@ -11,7 +13,7 @@ use std::{
 use async_trait::async_trait;
 use serde_json::{Map, Value};
 use tinymcp_bus::{
-    names, ServerHostReply, ServerHttpResponseMetadata, ServerHttpSessionConfig,
+    names, ServerHostCall, ServerHostReply, ServerHttpResponseMetadata, ServerHttpSessionConfig,
     ServerHttpSessionRequest, ServerInput, ServerOperationRef, ServerOperationSnapshot,
     ServerOperationState, ServerSessionConfig,
 };
@@ -70,6 +72,9 @@ pub(super) trait ServerPort: Send + Sync {
         request: ServerHttpSessionRequest,
     ) -> Result<ServerHttpResponseMetadata, ModuleCallError>;
 }
+
+type HostCallbackFuture = Pin<Box<dyn Future<Output = ServerHostReply> + Send + 'static>>;
+type HostCallbackDispatcher = Arc<dyn Fn(ServerHostCall) -> HostCallbackFuture + Send + Sync>;
 
 struct TinyMcpPort {
     client: ModuleClient,
@@ -149,6 +154,7 @@ impl ServerPort for TinyMcpPort {
 
 pub(super) struct ServerSession {
     port: Arc<dyn ServerPort>,
+    callback_dispatch: HostCallbackDispatcher,
     id: String,
     next_operation: AtomicU64,
     pending_input: tokio::sync::Mutex<Option<PendingInput>>,
@@ -204,6 +210,19 @@ impl ServerSession {
     }
 
     async fn open_with_port(port: Arc<dyn ServerPort>) -> Result<Self, ServerError> {
+        Self::open_with_port_and_dispatch(port, |call| Box::pin(handler::dispatch(call))).await
+    }
+
+    async fn open_with_port_and_dispatch<F, Fut>(
+        port: Arc<dyn ServerPort>,
+        dispatch: F,
+    ) -> Result<Self, ServerError>
+    where
+        F: Fn(ServerHostCall) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = ServerHostReply> + Send + 'static,
+    {
+        let callback_dispatch: HostCallbackDispatcher =
+            Arc::new(move |call| Box::pin(dispatch(call)));
         let (info, source_type_prefix, resources) = handler::declarations();
         let sequence = NEXT_SESSION_ID.fetch_add(1, Ordering::Relaxed).max(1);
         let id = port
@@ -217,6 +236,7 @@ impl ServerSession {
             .map_err(ServerError::Module)?;
         Ok(Self {
             port,
+            callback_dispatch,
             id,
             next_operation: AtomicU64::new(1),
             pending_input: tokio::sync::Mutex::new(None),
@@ -248,6 +268,7 @@ impl ServerSession {
             .map_err(ServerError::Module)?;
         Ok(Self {
             port,
+            callback_dispatch: Arc::new(|call| Box::pin(handler::dispatch(call))),
             id,
             next_operation: AtomicU64::new(1),
             pending_input: tokio::sync::Mutex::new(None),
@@ -364,7 +385,7 @@ impl ServerSession {
         {
             *pending = Some(PendingCallback::Running {
                 id: callback_id.clone(),
-                task: tokio::spawn(handler::dispatch(call)),
+                task: tokio::spawn((self.callback_dispatch)(call)),
             });
         }
         let result = match pending.as_mut() {
