@@ -502,10 +502,10 @@ fn find_resolves_known_ids_only() {
 fn tinychannels_registry_matches_scoped_runtime_release() {
     let record = find("tinychannels").expect("compiled TinyChannels module");
     assert_eq!(record.version, "0.1.25");
-    assert_eq!(tinychannels_bus::CONTRACT_VERSION, 14);
+    assert_eq!(tinychannels_bus::CONTRACT_VERSION, 15);
     assert_eq!(
         tinychannels_bus::module_relay::MODULE_OPERATION_VERSION,
-        (1, 15)
+        (1, 16)
     );
     let expected = [
         (
