@@ -165,7 +165,7 @@ describe('RecoveryPhrasePanel — mode-switch state reset', () => {
     expect(screen.queryByRole('checkbox')).toBeNull();
 
     fireEvent.click(screen.getByText(/Create a New Wallet/i));
-    const regeneratedCheckbox = screen.getByRole('checkbox');
+    const regeneratedCheckbox = await screen.findByRole('checkbox');
     expect(regeneratedCheckbox).not.toBeChecked();
   });
 
@@ -176,7 +176,7 @@ describe('RecoveryPhrasePanel — mode-switch state reset', () => {
     expect(screen.getByText(/Enter your recovery phrase below/i)).toBeTruthy();
 
     fireEvent.click(screen.getByText(/Create a New Wallet/i));
-    expect(screen.getByText(/can never be recovered if lost/i)).toBeTruthy();
+    expect(await screen.findByText(/can never be recovered if lost/i)).toBeTruthy();
   });
 });
 
@@ -633,6 +633,13 @@ describe('RecoveryPhrasePanel — import mode word inputs and valid/invalid styl
 
   // Covers line 650 (importValid===true banner), line 640 (sage border on valid inputs).
   it('filling a valid BIP39 phrase and saving shows the valid-phrase banner then persists', async () => {
+    let finishPersist!: () => void;
+    mockPersistLocalWalletFromMnemonic.mockImplementationOnce(
+      () => new Promise<void>(resolve => {
+        finishPersist = resolve;
+      })
+    );
+
     renderWithProviders(<RecoveryPhrasePanel />);
     await waitFor(() => screen.getByText(/I already have a recovery phrase/i));
 
@@ -657,6 +664,8 @@ describe('RecoveryPhrasePanel — import mode word inputs and valid/invalid styl
     const callArgs = mockPersistLocalWalletFromMnemonic.mock.calls[0][0];
     expect(callArgs.mnemonic).toBe(VALID_12_WORDS.join(' '));
     expect(callArgs.source).toBe('imported');
+    finishPersist();
+    await waitFor(() => expect(screen.queryByText(/Recovery phrase saved/i)).toBeTruthy());
   });
 
   // Covers line 608 (handleWordCountChange via the word-count toggle buttons).
