@@ -32,14 +32,17 @@ impl Respond for SearchScript {
             .unwrap()
             .iter()
             .any(|message| message["role"] == "tool");
-        let message = if has_results || !tool_names(request).iter().any(|n| n == "web_search") {
+        let canonical = common::last_user_message(&body).contains("canonical");
+        let message = if canonical && !has_results {
+            let call = json!({"id":"c0","type":"function","function":{"name":"web_search_tool","arguments":"{\"query\":\"q\"}"}});
+            json!({"role":"assistant","content":null,"tool_calls":[call]})
+        } else if has_results || !tool_names(request).iter().any(|n| n == "web_search") {
             json!({"role":"assistant","content":"done"})
         } else {
             let calls: Vec<Value> = [
                 ("web_search", json!({"query":"q"})),
                 ("web_answer", json!({"query":"q"})),
                 ("web_contents", json!({"urls":["https://example.com/a"]})),
-                ("web_search_tool", json!({"query":"q"})),
             ]
             .iter()
             .enumerate()
@@ -75,7 +78,10 @@ impl Respond for SearchScript {
 
 #[test]
 fn profile_uses_operator_direct_chat_and_search_with_no_managed_traffic() {
-    let _ = tracing_subscriber::fmt().with_env_filter("warn,openhuman_core=debug").with_test_writer().try_init();
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("warn,openhuman_core=debug")
+        .with_test_writer()
+        .try_init();
     runtime_without_master_key().block_on(async {
         tokio::spawn(scenario()).await.unwrap();
     });
@@ -227,10 +233,11 @@ async fn scenario() {
             !gemini.received_requests().await.unwrap().is_empty(),
             "gemini answered"
         );
-        let last = requests.last().unwrap();
+        let exa_before = exa.received_requests().await.unwrap().len();
         assert!(
-            common::tool_results(last).contains("not advertised"),
-            "canonical call refused"
+            handle.chat("t2", "use the canonical name").await.is_err(),
+            "a canonical role name is not callable"
         );
+        assert_eq!(exa.received_requests().await.unwrap().len(), exa_before);
     }
 }
