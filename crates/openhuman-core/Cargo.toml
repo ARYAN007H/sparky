@@ -226,18 +226,11 @@ tinyconnectors-bus = { path = "../../vendor/tinyconnectors/crates/tinyconnectors
 # generates a settings schema for the desktop application from those types
 # rather than from a hand-kept copy.
 #
-# The path dependency on `tinymcp` itself is still the step-one arrangement. The
-# registry entry step two calls for now exists — `crates/openhuman-core/src/modules/registry.rs`
-# pins the v0.3.6 release — but the host still calls the library directly, because
-# `tinymcp-bus` v0.3.6 does not yet publish everything this host reaches for:
-# `OAuthComplete`, a member returning the already-exported `ConnectedServerOverview`,
-# the boot-connect and reconnect-supervisor passes, the `ServerDetail` /
-# `AuthDetection` / `AuthKind` reply types, the registry curation helpers, an error
-# anchor for the `McpServerNeedsAuth` classifier coupling test, and
-# `render_tool_result` / `redact_endpoint` for the ungated `gitbooks` tool. It also
-# needs a per-`data_dir` object seam of the shape `modules::memory` already uses,
-# since `mcp::host` keys one store per workspace and a module gets one `data_dir` at
-# load. Those are upstream work in tinyhumansai/tinymcp.
+# `tinymcp` v0.8.1 publishes contract 1.12, including configured directories,
+# explicit close and transition receipts, and cached tool reads. The native
+# registry entry pins the same v0.8.1 release and its verified platform digests.
+# The current host still calls the local library directly; switching those
+# callers to the bus remains a separate host-adapter change.
 #
 # Correcting what this comment used to promise: dropping the path dependency does
 # NOT take reqwest/rusqlite with it. Measured in the kernel profile, `rusqlite` has
@@ -256,20 +249,18 @@ tinymcp = { path = "../../vendor/tinymcp/crates/tinymcp", default-features = fal
 ] }
 tinymcp-bus = { path = "../../vendor/tinymcp/crates/tinymcp-bus", features = ["schemars"] }
 # The transport-free channel vocabulary: inbound envelopes, outbound intents,
-# the config schema, controller metadata, relay frames and the session-key
-# rules. UNCONDITIONAL, and deliberately so — `DomainEvent` embeds
+# the config schema, controller metadata and relay frames. UNCONDITIONAL — `DomainEvent` embeds
 # `ChannelInboundEnvelope`, `config/schema/channels.rs` re-exports the config
-# types and `security/pairing.rs` re-exports the pairing helpers, so this
-# vocabulary is always-on kernel surface. It costs serde/schemars and nothing
+# types, so this vocabulary is always-on kernel surface. It costs serde/schemars and nothing
 # this build did not already have.
 tinychannels-bus = { version = "0.1", path = "../../vendor/tinychannels/crates/tinychannels-bus" }
-# `CliChannel` (always compiled) and the channel runtime helpers.
+# Remaining channel runtime helpers and provider traits (temporary migration dependency).
 tinychannels-runtime = { version = "0.1", path = "../../vendor/tinychannels/crates/tinychannels-runtime" }
 # The provider stack that IMPLEMENTS that vocabulary — Telegram, Discord,
 # Slack, IMAP, WhatsApp, the relay transport loop. Optional: it owns the
 # `reqwest` / `rusqlite` / `rustls` / `tokio-tungstenite` cohort, which a
-# workflow-only build has no use for. Enabled by `channels`, and by `voice`
-# for `EmailChannel` alone.
+# workflow-only build has no use for. Enabled by `channels`; voice-only podcast
+# email executes through the separately loaded TinyChannels module.
 tinychannels = { version = "0.1", features = ["relay-websocket"], optional = true }
 # tinybus — the message bus. Owns what `crates/openhuman-core/src/core/event_bus/` used to: the typed
 # pub/sub surface (`EventBus`, `EventHandler`, `SubscriptionHandle`), the
@@ -404,7 +395,7 @@ hostname = "0.4.2"
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
 sysinfo = { version = "0.33", default-features = false, features = ["system"] }
 keyring = { version = "3", features = ["apple-native", "windows-native", "linux-native"] }
-lettre = { version = "0.11.22", default-features = false, features = ["builder", "smtp-transport", "rustls-tls"], optional = true }
+lettre = { version = "0.11.22", default-features = false, features = ["builder"], optional = true }
 # HTTP server framework for the domain-owned routes (`/v1`, dictation, the MCP
 # HTTP transport). Exclusive to the default-ON `http-server`
 # feature (#5048); the JSON-RPC server that mounts them lives in
@@ -466,11 +457,10 @@ tinydocs-bus = { path = "../../vendor/tinydocs/crates/tinydocs-bus", optional = 
 # Optional: exclusive to the `voice` feature — default-OFF, product-ON, the
 # same split as `documents` above.
 tinyvoice-bus = { path = "../../vendor/tinyvoice/crates/tinyvoice-bus", optional = true }
-# The global push-to-talk hotkey listener (`voice::hotkey`) and the `cpal`
-# microphone capture (`voice::audio_capture`, `voice::always_on`) live in the
-# `tinyvoice` library behind its off-by-default `hotkey` and `capture` features (it owns the
-# `rdev` dependency). Linked as a library, not loaded as the module.
-tinyvoice = { path = "../../vendor/tinyvoice/crates/tinyvoice", default-features = false, features = ["hotkey", "capture"], optional = true }
+# `cpal` microphone capture (`voice::audio_capture`, `voice::always_on`) remains
+# on the library path until its module-owned lifecycle contract is released.
+# Hotkeys are already owned by the loaded TinyVoice module.
+tinyvoice = { path = "../../vendor/tinyvoice/crates/tinyvoice", default-features = false, features = ["capture"], optional = true }
 
 # TinyJuice — the compression wire contract, and nothing else.
 #
@@ -774,12 +764,8 @@ voice = [
     "dep:tinyvoice-bus",
     "dep:lettre",
     "dep:tinyvoice",
-    # `audio_toolkit::ops` delivers generated podcasts through tinychannels'
-    # EmailChannel, so the provider — and therefore the implementation crate —
-    # has to exist even in a channels-less build. This is the ONE reason a
-    # channels-less build still links the provider stack.
-    "dep:tinychannels",
-    "tinychannels/email",
+    # Podcast SMTP delivery uses the loadable Channels module. The always-on
+    # bus dependency provides its upload vocabulary without linking providers.
     # `voice::live`: live voice agent sessions over tinyagents-live.
     "dep:tinyagents-live",
 ]
@@ -912,39 +898,10 @@ crash-reporting = ["dep:sentry"]
 # `DomainSet::Channels` flag (#4796): this feature narrows the compile-time
 # surface, `DomainSet` gates it at runtime.
 #
-# This gate now owns the `tinychannels` CRATE, not just two of its providers.
-# The three always-on pins that used to make the crate unconditional
-# (`config/schema/channels.rs` re-exporting the config types, `DomainEvent`
-# embedding `ChannelInboundEnvelope`, `security/pairing.rs` re-exporting the
-# pairing helpers) now resolve through `tinychannels-bus`, the transport-free
-# contract crate, which stays unconditional. What is left behind this gate is
-# the provider stack and the relay transport loop.
-#
-# It sheds NO dependencies and is not meant to: measured, the kernel profile is
-# 288 packages / 270 names / 2 native both before and after, and the package-list
-# diff is one line (`tinychannels` out, `tinychannels-bus` in). Every heavy crate
-# tinychannels carried is shared with kernel surface. What the gate buys is
-# compile surface — ~31.7k lines a channels-less build no longer compiles — plus
-# the contract crate the eventual module extraction needs.
-#
-# ONE caveat, and it is the reason a channels-less product build still links
-# the crate: `voice` enables `dep:tinychannels` for `EmailChannel` alone
-# (`audio_toolkit::ops` mails generated podcasts). A build with neither
-# `channels` nor `voice` drops it entirely. (`whatsapp-web` refines this gate —
-# see below — forwarding to the `tinychannels/whatsapp-web` provider feature.)
-#
-# NOTE: the in-app web chat (`openhuman::web_chat`, RPC namespace `channel`) is
-# NOT gated by this feature even though its runtime tag is
-# `DomainGroup::Channels` — it is core product surface and stays always
-# compiled (decoupled from `channels/` in #5002). The `channels::{traits, cli}`
-# carve-outs also stay ungated — `traits` is a 1-line tinychannels re-export and
-# `cli::CliChannel` is the dep-free local REPL used by the always-on agent
-# harness interactive loop. See AGENTS.md "channels gate" + `channels/mod.rs`.
-# The crate itself is now droppable, which it was not before: splitting
-# `tinychannels-bus` out moved every always-on pin into a contract crate. That
-# is a compile-surface and architecture win, NOT a dependency win — see the
-# measured note above before claiming otherwise.
-channels = ["dep:tinychannels", "tinychannels/email", "tinychannels/lark"]
+# Provider runtime remains an audited implementation exception until its bus
+# cutover. Channels-backed operations require the process-wide module loader;
+# serialized configuration/messages come from the always-on bus contract.
+channels = ["modules", "dep:tinychannels", "tinychannels/email", "tinychannels/lark"]
 # The WhatsApp Web provider now lives in tinychannels; forward to its feature.
 # It is a refinement INSIDE the `channels` gate — enabling it pulls in the whole
 # channels domain (the provider re-exports live under `channels/providers/`).
