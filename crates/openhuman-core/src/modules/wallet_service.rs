@@ -352,7 +352,11 @@ pub(super) fn native_wallet_config_request() -> NativeWalletConfigRequest {
             overridden_endpoints.push(RpcEndpointKey::Evm { network });
         }
     }
-    for key in [RpcEndpointKey::Btc, RpcEndpointKey::Solana, RpcEndpointKey::Tron] {
+    for key in [
+        RpcEndpointKey::Btc,
+        RpcEndpointKey::Solana,
+        RpcEndpointKey::Tron,
+    ] {
         if crate::web3::wallet::endpoints::override_for_endpoint(key).is_some() {
             overridden_endpoints.push(key);
         }

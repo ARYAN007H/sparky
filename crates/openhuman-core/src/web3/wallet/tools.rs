@@ -62,42 +62,40 @@ impl Tool for WalletModuleTool {
             "wallet_prepare_transfer" => {
                 let params = match serde_json::from_value(args) {
                     Ok(params) => params,
-                    Err(error) => return Ok(ToolResult::error(format!("invalid arguments: {error}"))),
+                    Err(error) => {
+                        return Ok(ToolResult::error(format!("invalid arguments: {error}")))
+                    }
                 };
                 outcome_value(crate::web3::wallet::prepare_transfer(params).await)
             }
             "wallet_tx_status" | "wallet_tx_receipt" | "wallet_lookup_tx" => {
                 let query: TxQuery = match serde_json::from_value(args) {
                     Ok(query) => query,
-                    Err(error) => return Ok(ToolResult::error(format!("invalid arguments: {error}"))),
+                    Err(error) => {
+                        return Ok(ToolResult::error(format!("invalid arguments: {error}")))
+                    }
                 };
                 let result = match self.name() {
-                    "wallet_tx_status" => crate::web3::wallet::tx_status(
-                        query.chain,
-                        query.evm_network,
-                        &query.hash,
-                    )
-                    .await
-                    .map(|outcome| outcome.value),
-                    "wallet_tx_receipt" => crate::web3::wallet::tx_receipt(
-                        query.chain,
-                        query.evm_network,
-                        &query.hash,
-                    )
-                    .await
-                    .map(|outcome| outcome.value),
-                    _ => crate::web3::wallet::lookup_tx(
-                        query.chain,
-                        query.evm_network,
-                        &query.hash,
-                    )
-                    .await
-                    .map(|outcome| outcome.value),
+                    "wallet_tx_status" => {
+                        crate::web3::wallet::tx_status(query.chain, query.evm_network, &query.hash)
+                            .await
+                            .map(|outcome| outcome.value)
+                    }
+                    "wallet_tx_receipt" => {
+                        crate::web3::wallet::tx_receipt(query.chain, query.evm_network, &query.hash)
+                            .await
+                            .map(|outcome| outcome.value)
+                    }
+                    _ => {
+                        crate::web3::wallet::lookup_tx(query.chain, query.evm_network, &query.hash)
+                            .await
+                            .map(|outcome| outcome.value)
+                    }
                 };
                 result.and_then(|value| {
-                        serde_json::to_value(value)
-                            .map_err(|error| format!("failed to serialize wallet result: {error}"))
-                    })
+                    serde_json::to_value(value)
+                        .map_err(|error| format!("failed to serialize wallet result: {error}"))
+                })
             }
             _ => return Ok(ToolResult::error("unknown wallet tool")),
         };

@@ -94,8 +94,9 @@ pub(crate) fn bind_endpoint_references(
 
     let mut resolved = HashMap::new();
     for endpoint in references {
-        let url = crate::web3::wallet::endpoints::override_for_endpoint(endpoint.key)
-            .ok_or_else(|| "wallet module referenced an endpoint without a host override".to_string())?;
+        let url = crate::web3::wallet::endpoints::override_for_endpoint(endpoint.key).ok_or_else(
+            || "wallet module referenced an endpoint without a host override".to_string(),
+        )?;
         if endpoint.reference.trim().is_empty()
             || resolved
                 .insert(

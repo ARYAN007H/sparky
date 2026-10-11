@@ -137,7 +137,9 @@ fn register_shutdown_hook() {
         };
         let config = crate::config::rpc::load_config_with_timeout().await;
         let Ok(config) = config else {
-            tracing::warn!("[modules:web3] could not load configuration to close service at shutdown");
+            tracing::warn!(
+                "[modules:web3] could not load configuration to close service at shutdown"
+            );
             return;
         };
         match wallet::call::<_, ()>(
@@ -153,7 +155,9 @@ fn register_shutdown_hook() {
                 wallet_host::clear_endpoint_references(&current.response.service.handle);
                 *active = None;
             }
-            Err(error) => tracing::warn!(%error, "[modules:web3] failed to close service at shutdown"),
+            Err(error) => {
+                tracing::warn!(%error, "[modules:web3] failed to close service at shutdown")
+            }
         }
     });
 }

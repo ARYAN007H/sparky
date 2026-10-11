@@ -70,8 +70,8 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tinywallet_bus::names::methods;
 use tinywallet_bus::wire::{
-    DeriveMnemonicSeedRequest, DeriveMnemonicSeedResponse, DerivedAccount, ExportRequest,
-    EncodeErc20TransferRequest, EncodeErc20TransferResponse, ExportedKey,
+    DeriveMnemonicSeedRequest, DeriveMnemonicSeedResponse, DerivedAccount,
+    EncodeErc20TransferRequest, EncodeErc20TransferResponse, ExportRequest, ExportedKey,
     GenerateMnemonicRequest, GenerateMnemonicResponse, Scheme, SecretMaterial, SignMessageRequest,
     SignRequest, Signature, SignedTransaction, TransactionSpec,
 };

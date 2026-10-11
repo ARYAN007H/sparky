@@ -6,8 +6,7 @@ use serde::{Deserialize, Serialize};
 pub use tinywallet_bus::wire::WalletChain;
 
 /// Error returned when no local wallet has been configured.
-pub const WALLET_NOT_CONFIGURED_MESSAGE: &str =
-    "wallet is not configured; run wallet setup first";
+pub const WALLET_NOT_CONFIGURED_MESSAGE: &str = "wallet is not configured; run wallet setup first";
 
 /// How the host's local wallet state was created.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

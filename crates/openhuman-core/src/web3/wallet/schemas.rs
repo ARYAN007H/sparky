@@ -5,9 +5,9 @@ use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
 
 use super::execution::{
-    balances, chain_status, encode_erc20_transfer, execute_prepared, lookup_tx,
-    network_defaults, prepare_transfer, supported_assets, tx_receipt, tx_status,
-    ExecutePreparedParams, PrepareTransferParams,
+    balances, chain_status, encode_erc20_transfer, execute_prepared, lookup_tx, network_defaults,
+    prepare_transfer, supported_assets, tx_receipt, tx_status, ExecutePreparedParams,
+    PrepareTransferParams,
 };
 use super::ops::{WalletAccount, WalletSetupParams, WalletSetupSource};
 use super::{EvmNetwork, WalletChain};
@@ -472,7 +472,7 @@ fn handle_encode_erc20_transfer(params: Map<String, Value>) -> ControllerFuture 
             return Err("encode_erc20_transfer only supports the evm chain".to_string());
         }
         serde_json::to_value(encode_erc20_transfer(&parsed.to_address, &parsed.amount_raw).await?)
-        .map_err(|e| format!("failed to encode ERC20 transfer output: {e}"))
+            .map_err(|e| format!("failed to encode ERC20 transfer output: {e}"))
     })
 }
 

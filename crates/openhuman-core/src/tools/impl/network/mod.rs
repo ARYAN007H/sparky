@@ -22,9 +22,9 @@ mod mcp_server_tools;
 
 pub use gitbooks::{GitbooksGetPageTool, GitbooksSearchTool};
 pub use gmail_unsubscribe::GmailUnsubscribeTool;
-pub use host::{http_request_tool, web_fetch_tool};
 #[cfg(feature = "web3")]
 pub(crate) use host::x402_request_tool;
+pub use host::{http_request_tool, web_fetch_tool};
 #[cfg(feature = "mcp")]
 pub use mcp::{mcp_call_tool, McpListServersTool, McpListToolsTool};
 #[cfg(feature = "mcp")]

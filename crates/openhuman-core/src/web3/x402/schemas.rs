@@ -201,7 +201,11 @@ fn summary_value(summary: tinywallet_bus::wire::X402DetailedSpendingSummary) -> 
     })
 }
 
-fn budget_value(per_request_max_atomic: u64, daily_max_atomic: u64, monthly_max_atomic: u64) -> Value {
+fn budget_value(
+    per_request_max_atomic: u64,
+    daily_max_atomic: u64,
+    monthly_max_atomic: u64,
+) -> Value {
     json!({
         "budget": {
             "perRequestMaxAtomic": per_request_max_atomic,

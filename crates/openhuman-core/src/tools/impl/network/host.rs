@@ -7,10 +7,10 @@
 
 use std::sync::Arc;
 
+use tinytools::{PermissionLevel, Tool, ToolResult};
 use tinytools_std::network::{
     AsyncHtmlExtractor, HttpLimits, HttpRequestTool, NetGate, WebFetchTool,
 };
-use tinytools::{PermissionLevel, Tool, ToolResult};
 
 use crate::config::HttpRequestConfig;
 use crate::inference::tokenjuice::focus::{summary_focus_property, SUMMARY_FOCUS_ARG};
@@ -162,7 +162,9 @@ mod x402 {
                 .get("PAYMENT-REQUIRED")
                 .or_else(|| response_headers.get("X-PAYMENT-REQUIRED"))
                 .and_then(|value| value.to_str().ok())
-                .ok_or_else(|| "402 response is missing a valid PAYMENT-REQUIRED header".to_string())?;
+                .ok_or_else(|| {
+                    "402 response is missing a valid PAYMENT-REQUIRED header".to_string()
+                })?;
             let config = crate::config::rpc::load_config_with_timeout()
                 .await
                 .map_err(|error| format!("x402 payment failed: {error}"))?;
@@ -172,14 +174,10 @@ mod x402 {
                     client_id: context.client_id.clone(),
                 })
                 .ok();
-            let (service, payment) = x402_service::prepare_payment(
-                &config,
-                url.to_owned(),
-                challenge.to_owned(),
-                owner,
-            )
-            .await
-            .map_err(|error| format!("x402 payment failed: {error}"))?;
+            let (service, payment) =
+                x402_service::prepare_payment(&config, url.to_owned(), challenge.to_owned(), owner)
+                    .await
+                    .map_err(|error| format!("x402 payment failed: {error}"))?;
 
             log::debug!(
                 "[tool.http_request] retrying with x402 payment header amount={} asset={}",
@@ -203,11 +201,15 @@ mod x402 {
                             )
                             .await
                             {
-                                log::warn!("[tool.http_request] x402 settlement recording failed: {error}");
+                                log::warn!(
+                                    "[tool.http_request] x402 settlement recording failed: {error}"
+                                );
                             }
                         });
                     } else {
-                        log::warn!("[tool.http_request] x402 settlement not recorded: runtime unavailable");
+                        log::warn!(
+                            "[tool.http_request] x402 settlement not recorded: runtime unavailable"
+                        );
                     }
                 }),
             })

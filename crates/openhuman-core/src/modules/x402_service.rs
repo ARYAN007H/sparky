@@ -116,16 +116,13 @@ async fn ensure_service(
         .map_err(WalletCallError::Failed)?;
     let budget = budget_from(|name| std::env::var(name).ok());
 
-    if active
-        .as_ref()
-        .is_some_and(|current| {
-            current.workspace != workspace
-                || current.accounts != accounts
-                || current.config.per_request_max_atomic != budget.0
-                || current.config.daily_max_atomic != budget.1
-                || current.config.monthly_max_atomic != budget.2
-        })
-    {
+    if active.as_ref().is_some_and(|current| {
+        current.workspace != workspace
+            || current.accounts != accounts
+            || current.config.per_request_max_atomic != budget.0
+            || current.config.daily_max_atomic != budget.1
+            || current.config.monthly_max_atomic != budget.2
+    }) {
         if let Some(current) = active.as_ref() {
             wallet::call::<_, ()>(
                 config,
@@ -197,7 +194,9 @@ fn register_shutdown_hook() {
             return;
         };
         let Ok(config) = crate::config::rpc::load_config_with_timeout().await else {
-            tracing::warn!("[modules:x402] could not load configuration to close service at shutdown");
+            tracing::warn!(
+                "[modules:x402] could not load configuration to close service at shutdown"
+            );
             return;
         };
         match wallet::call::<_, ()>(
@@ -210,7 +209,9 @@ fn register_shutdown_hook() {
         .await
         {
             Ok(()) => *active = None,
-            Err(error) => tracing::warn!(%error, "[modules:x402] failed to close service at shutdown"),
+            Err(error) => {
+                tracing::warn!(%error, "[modules:x402] failed to close service at shutdown")
+            }
         }
     });
 }

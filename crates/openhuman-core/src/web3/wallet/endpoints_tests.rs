@@ -43,8 +43,14 @@ fn solana_cluster_keeps_the_host_environment_compatibility() {
 fn only_explicit_nonblank_endpoint_overrides_are_exposed_to_transport() {
     with_env(
         &[
-            ("OPENHUMAN_WALLET_RPC_BTC", Some("  https://btc.example/rpc  ")),
-            ("OPENHUMAN_WALLET_RPC_BASE", Some("https://base.example/rpc")),
+            (
+                "OPENHUMAN_WALLET_RPC_BTC",
+                Some("  https://btc.example/rpc  "),
+            ),
+            (
+                "OPENHUMAN_WALLET_RPC_BASE",
+                Some("https://base.example/rpc"),
+            ),
             ("OPENHUMAN_WALLET_RPC_TRON", Some("   ")),
         ],
         || {
