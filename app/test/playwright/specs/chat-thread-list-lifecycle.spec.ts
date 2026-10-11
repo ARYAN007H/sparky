@@ -182,6 +182,14 @@ test.describe('Chat thread list — create, deep link, rename, delete', () => {
     await expect(input).toBeVisible();
     await input.fill('this-must-not-stick-5t8y1u');
 
+    console.log('rename-focus-before-Escape', await input.evaluate(element => ({
+      focused: document.activeElement === element,
+      menus: [...document.querySelectorAll('[role="menu"]')].map(menu => ({
+        state: menu.getAttribute('data-state'),
+        slot: menu.getAttribute('data-slot'),
+      })),
+    })));
+
     // Escape is an explicit cancel and must suppress the commit the ensuing
     // blur would otherwise fire (`ThreadList.tsx:183-187`).
     await input.press('Escape');
