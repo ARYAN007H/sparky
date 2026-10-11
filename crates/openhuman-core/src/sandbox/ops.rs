@@ -10,8 +10,6 @@ use super::types::{
 use crate::agent::harness::definition::SandboxMode;
 use crate::agent::platform_shell;
 use crate::config::{RuntimeConfig, SandboxBackend, SandboxConfig};
-#[cfg(test)]
-use crate::sandbox::cwd_jail;
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};

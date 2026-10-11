@@ -135,9 +135,6 @@ tinyagents-harness = { path = "../../vendor/tinyagents/crates/tinyagents-harness
     "multimodal",
     "builtin-tools",
 ] }
-# Per-process directory jail (Landlock / Seatbelt / AppContainer / noop). Owned by
-# tinybox; OpenHuman keeps only the policy of when to jail (`sandbox::ops`).
-tinybox-jail = { path = "../../vendor/tinybox/crates/tinybox-jail" }
 tinybox-bus = { path = "../../vendor/tinybox/crates/tinybox-bus", optional = true }
 tinyagents-definition = { path = "../../vendor/tinyagents/crates/tinyagents-definition" }
 # Live (realtime voice) agent sessions: `tinyagents-live` runs a
