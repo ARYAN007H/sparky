@@ -135,6 +135,13 @@ impl ModuleClient {
         }
     }
 
+    /// Report a registered module that advertises an older wire contract.
+    pub(crate) fn report_incompatible_contract(module: &str) {
+        if let Some(record) = registry::find(module) {
+            failure::report(record, failure::Reason::IncompatibleContract);
+        }
+    }
+
     /// Report a known module that does not provide the requested capability.
     pub(crate) fn report_unavailable(module: &str) {
         if let Some(record) = registry::find(module) {

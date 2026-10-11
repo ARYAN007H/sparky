@@ -71,6 +71,8 @@ pub mod schemas;
 #[cfg(feature = "modules")]
 pub mod search;
 #[cfg(feature = "modules")]
+pub mod tinybox;
+#[cfg(feature = "modules")]
 mod tokenjuice_host;
 pub mod types;
 #[cfg(feature = "voice")]
