@@ -411,7 +411,7 @@ async fn no_workspace_docker_call_uses_its_typed_member_and_request() {
         .expect("no-workspace member called");
     assert_eq!(
         call.1,
-        json!({
+        json!([{
             "workspace": "",
             "image": "local-fixture:latest",
             "command": "printf ok",
@@ -425,7 +425,7 @@ async fn no_workspace_docker_call_uses_its_typed_member_and_request() {
             "env": {},
             "label": "openhuman.runtime=true",
             "timeout_ms": 12_000
-        })
+        }])
     );
 }
 
@@ -486,14 +486,14 @@ async fn docker_controls_use_typed_calls_with_validated_contract_capability(
         .iter()
         .find(|(member, _)| member == DOCKER_STATUS)
         .expect("status member called");
-    assert_eq!(status_call.1, json!({ "timeout_ms": 2_000 }));
+    assert_eq!(status_call.1, json!([{ "timeout_ms": 2_000 }]));
     let cleanup_call = calls
         .iter()
         .find(|(member, _)| member == CLEANUP_DOCKER)
         .expect("cleanup member called");
     assert_eq!(
         cleanup_call.1,
-        json!({ "label": "openhuman.sandbox=true", "timeout_ms": 2_000 })
+        json!([{ "label": "openhuman.sandbox=true", "timeout_ms": 2_000 }])
     );
     assert_eq!(
         calls
