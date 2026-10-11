@@ -1,8 +1,8 @@
 use super::*;
+use crate::hosted::test_support::store_session;
 use openhuman_embed::__host::core::observability::{
     expected_error_kind, is_api_key_rejected_message, is_session_expired_message,
 };
-use openhuman_embed::__host::security::credentials::{AuthService, APP_SESSION_PROVIDER};
 use serde_json::json;
 use tempfile::TempDir;
 use wiremock::matchers::{header, method, path};
@@ -16,18 +16,6 @@ fn test_config(tmp: &TempDir, api_url: &str) -> Config {
         api_url: Some(api_url.to_string()),
         ..Config::default()
     }
-}
-
-fn store_session(config: &Config, token: &str) {
-    AuthService::from_config(config)
-        .store_provider_token(
-            APP_SESSION_PROVIDER,
-            "default",
-            token,
-            std::collections::HashMap::new(),
-            true,
-        )
-        .expect("store session token");
 }
 
 #[test]
