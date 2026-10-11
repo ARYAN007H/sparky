@@ -416,6 +416,77 @@ impl McpConfiguredClient {
         .await
     }
 
+    /// Loads and prepares configured-server tools from TinyMCP's persistent
+    /// cache, listing a server only when no cached catalog exists. The host
+    /// applies its prompt-injection filter before TinyMCP creates the stable
+    /// model-facing declarations.
+    pub(crate) async fn configured_tool_presentations(
+        config: &Config,
+    ) -> Result<Vec<McpToolPresentation>, ModuleCallError> {
+        if !config.mcp_client.enabled {
+            return Ok(Vec::new());
+        }
+        let client = Self::for_config(config)?;
+        let client_config = crate::mcp::host::client_config(config);
+        let mut sources = Vec::new();
+        for declared in &config.mcp_client.servers {
+            let server = &declared.server;
+            if !server.enabled {
+                continue;
+            }
+            let cached: Option<Vec<tinymcp_bus::McpTool>> = client
+                .call(
+                    &client_config,
+                    names::methods::STATIC_CACHED_LIST_TOOLS,
+                    (server.name.as_str(),),
+                )
+                .await?;
+            let tools = match cached {
+                Some(tools) => tools,
+                None => client
+                    .call(
+                        &client_config,
+                        names::methods::STATIC_LIST_TOOLS,
+                        (server.name.as_str(),),
+                    )
+                    .await?,
+            };
+            let tools: Vec<McpRemoteTool> = client
+                .scrub_static_tools(&client_config, &server.name, tools)
+                .await?;
+            let tools = crate::mcp::registry::tools_safe_for_agent(
+                &server.name,
+                tools
+                    .into_iter()
+                    .map(|tool| tinymcp_bus::McpTool {
+                        name: tool.name,
+                        description: tool.description.or(tool.title),
+                        input_schema: tool.input_schema,
+                    })
+                    .collect(),
+            );
+            sources.push(tinymcp_bus::McpToolSourceSpec {
+                server_id: server.name.clone(),
+                label: server.name.clone(),
+                family: server.name.clone(),
+                display_name: server.name.clone(),
+                tools,
+                default_exposure: match declared.expose {
+                    crate::config::McpToolExposure::Direct => {
+                        tinymcp_bus::McpToolExposure::Direct
+                    }
+                    crate::config::McpToolExposure::Deferred => {
+                        tinymcp_bus::McpToolExposure::Deferred
+                    }
+                },
+                direct_tools: declared.direct_tools.clone(),
+            });
+        }
+        client
+            .prepare_agent_tools(PrepareAgentToolsRequest { sources })
+            .await
+    }
+
     async fn call_inner<R: DeserializeOwned>(
         &self,
         config: &McpClientConfig,
