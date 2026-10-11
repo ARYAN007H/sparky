@@ -27,10 +27,13 @@ use crate::memory::lifecycle::hooks::{
 use crate::memory::scope::ResolvedIdentity;
 
 /// The memory side of the turn in flight, held from pre-turn to commit.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(super) struct PendingMemoryTurn {
     identity: ResolvedIdentity,
     user_index: u32,
+    // The canonical runtime can commit on a different task. Restore the
+    // authenticated profile captured at preparation, never infer it from config.
+    profile_context: Option<std::sync::Weak<crate::core::runtime::CoreContext>>,
 }
 
 /// Where the prompt's verbatim thread starts, as a user turn index, and
@@ -105,6 +108,9 @@ impl OpenHumanTurnPrelude {
             .pending_memory_turn = Some(PendingMemoryTurn {
             identity: identity.clone(),
             user_index,
+            profile_context: crate::core::runtime::CoreContext::scoped()
+                .filter(|context| context.profile().is_some())
+                .map(|context| Arc::downgrade(&context)),
         });
         let pack = crate::memory::lifecycle::prefetch::pre_turn(
             config.clone(),
@@ -175,7 +181,8 @@ impl OpenHumanTurnPrelude {
             return;
         };
         let prelude = self.clone();
-        crate::core::runtime::spawn_scoped(async move {
+        let profile_context = pending.profile_context.clone();
+        let work = async move {
             let Some(config) = prelude.memory_config().await else {
                 return;
             };
@@ -191,6 +198,18 @@ impl OpenHumanTurnPrelude {
                 },
             )
             .await;
+        };
+        crate::core::runtime::spawn_scoped(async move {
+            match profile_context {
+                Some(context) => {
+                    // A retired profile cannot fall back to the operator or a
+                    // configured external engine when its captured context is gone.
+                    if let Some(context) = context.upgrade() {
+                        crate::core::runtime::CoreContext::scope(context, work).await;
+                    }
+                }
+                None => work.await,
+            }
         });
     }
 }

@@ -68,14 +68,12 @@ pub(crate) async fn run_host_agent_turn(
         "[channels::dispatch::host_agent] running channel turn as host agent"
     );
 
+    let relay_thread = crate::channels::providers::relay::current_thread_id();
     let mut session = host.session_host(
         &config,
-        Some(
-            crate::channels::providers::relay::current_thread_id()
-                .as_deref()
-                .unwrap_or(&history_key),
-        ),
+        Some(relay_thread.as_deref().unwrap_or(&history_key)),
     )?;
+    session.set_thread_id(relay_thread.as_deref());
     // The channel names the session, which also selects the channel's
     // permission ceiling in the session's tool policy.
     session.set_event_context(history_key, channel);

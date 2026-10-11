@@ -37,11 +37,20 @@ impl Tool for TenantTool {
     fn parameters_schema(&self) -> Value {
         json!({"type":"object","properties":{}})
     }
-    async fn execute_with_context(&self, args: Value, _: tinytools::ToolCallOptions, context: Option<&dyn tinytools::ToolRunContext>) -> anyhow::Result<ToolResult> {
-        let thread = context.and_then(tinytools::ToolRunContext::thread_id).expect("every hosted tool has its durable conversation key");
+    async fn execute_with_context(
+        &self,
+        args: Value,
+        _: tinytools::ToolCallOptions,
+        context: Option<&dyn tinytools::ToolRunContext>,
+    ) -> anyhow::Result<ToolResult> {
+        let thread = context
+            .and_then(tinytools::ToolRunContext::thread_id)
+            .expect("every hosted tool has its durable conversation key");
         let expected = match openhuman_embed::current_turn_origin().unwrap() {
             openhuman_embed::AgentTurnOrigin::WebChat { .. } => "t1",
-            openhuman_embed::AgentTurnOrigin::ExternalChannel { .. } => "channel:telegram/sender/chat",
+            openhuman_embed::AgentTurnOrigin::ExternalChannel { .. } => {
+                "channel:telegram/sender/chat"
+            }
             other => panic!("unexpected origin {other:?}"),
         };
         assert_eq!(thread, expected);
@@ -382,7 +391,15 @@ async fn scenario() {
             );
         }
     }
-    assert!(inference.received_requests().await.unwrap().iter().all(|request| !request.url.path().contains("memory/experience")), "deferred profile memory must keep its bound host engine");
+    assert!(
+        inference
+            .received_requests()
+            .await
+            .unwrap()
+            .iter()
+            .all(|request| !request.url.path().contains("memory/experience")),
+        "deferred profile memory must keep its bound host engine"
+    );
     // Shared backend contents are independent of the actor: actual contract
     // requests, including a malicious global-root filter, must stay confined.
     for user in ["alice", "bob"] {
