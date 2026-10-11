@@ -73,6 +73,10 @@ tinymcp-bus = { path = "../../vendor/tinymcp/crates/tinymcp-bus" }
 # the core's so one copy resolves.
 tinyagents-harness = { path = "../../vendor/tinyagents/crates/tinyagents-harness", default-features = false }
 tinyagents-session = { path = "../../vendor/tinyagents/crates/tinyagents-session" }
+# Native persisted todo codec exposed by the existing session-store contract.
+tinyagents-graph = { path = "../../vendor/tinyagents/crates/tinyagents-graph", default-features = false }
+# Native cancellation contract, exposed unchanged by the existing stream API.
+tinybus = { path = "../../vendor/tinybus/crates/tinybus", default-features = false }
 # The wire request/response types `complete` converts to; same path as the
 # core's so one copy resolves.
 tinyinference-llm = { path = "../../vendor/tinyagents/vendor/tinyinference/crates/tinyinference-llm" }
@@ -89,6 +93,8 @@ uuid = { version = "1", features = ["v4"] }
 async-trait = "0.1"
 tinymemory-api = { path = "../../vendor/tinymemory/crates/tinymemory-api", features = ["conformance"] }
 dirs = "6"
+# `cron_tests` builds core `CronJob`s, whose schedule types live in tinyflows.
+tinyflows-schedule = { path = "../../vendor/tinyflows/crates/tinyflows-schedule" }
 env_logger = "0.11"
 # The profile tests and example implement a stub `BackendTransport`, whose
 # `http_client` hands out a `reqwest::Client`. Same features as the core's, so
@@ -152,6 +158,11 @@ required-features = ["profiles"]
 # Operator-admitted cron and time tools, the iteration cap, no backend credential.
 [[test]]
 name = "profile_operator_tools"
+required-features = ["channels"]
+
+# A refused tool call must not fail a turn in a thread that already ran `cron`.
+[[test]]
+name = "profile_refused_tool_generation"
 required-features = ["channels"]
 
 [[example]]
