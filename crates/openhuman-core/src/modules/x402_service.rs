@@ -33,9 +33,10 @@ async fn ensure_service(
     let workspace = config.workspace_dir.clone();
     let budget = budget_from(|name| std::env::var(name).ok());
 
-    if active.as_ref().is_some_and(|current| {
-        current.workspace != workspace || !same_budget(&current.config, budget)
-    }) {
+    if active
+        .as_ref()
+        .is_some_and(|current| current.workspace != workspace)
+    {
         if let Some(current) = active.as_ref() {
             wallet::call::<_, ()>(
                 config,
@@ -70,6 +71,25 @@ async fn ensure_service(
             config: service_config,
             handle,
         });
+    } else if active
+        .as_ref()
+        .is_some_and(|current| !same_budget(&current.config, budget))
+    {
+        let current = active.as_mut().expect("active service checked above");
+        let summary: tinywallet_bus::wire::X402SpendingSummary = wallet::call(
+            config,
+            methods::X402_UPDATE_BUDGET,
+            X402UpdateBudgetRequest {
+                service: current.handle.clone(),
+                per_request_max_atomic: Some(budget.0),
+                daily_max_atomic: Some(budget.1),
+                monthly_max_atomic: Some(budget.2),
+            },
+        )
+        .await?;
+        current.config.per_request_max_atomic = summary.per_request_max_atomic;
+        current.config.daily_max_atomic = summary.daily_max_atomic;
+        current.config.monthly_max_atomic = summary.monthly_max_atomic;
     }
     Ok(())
 }
@@ -96,9 +116,10 @@ where
 pub(crate) async fn summary(
     config: &Config,
 ) -> Result<X402DetailedSpendingSummary, WalletCallError> {
-    with_service(config, |service| async move {
+    let config = config.clone();
+    with_service(&config, |service| async move {
         wallet::call(
-            config,
+            &config,
             methods::X402_SPENDING_SUMMARY_DETAILED,
             tinywallet_bus::wire::X402SummaryRequest { service },
         )
@@ -112,9 +133,11 @@ pub(crate) async fn list_payments(
     config: &Config,
     limit: u64,
 ) -> Result<X402ListPaymentsResponse, WalletCallError> {
-    with_service(config, |service| async move {
+    let config = config.clone();
+    let operation_config = config.clone();
+    with_service(&config, move |service| async move {
         wallet::call(
-            config,
+            &operation_config,
             methods::X402_LIST_PAYMENTS,
             X402ListPaymentsRequest { service, limit },
         )
@@ -130,9 +153,11 @@ pub(crate) async fn update_budget(
     daily_max_atomic: Option<u64>,
     monthly_max_atomic: Option<u64>,
 ) -> Result<tinywallet_bus::wire::X402SpendingSummary, WalletCallError> {
-    with_service(config, |service| async move {
+    let config = config.clone();
+    let operation_config = config.clone();
+    let result: tinywallet_bus::wire::X402SpendingSummary = with_service(&config, move |service| async move {
         wallet::call(
-            config,
+            &operation_config,
             methods::X402_UPDATE_BUDGET,
             X402UpdateBudgetRequest {
                 service,
@@ -143,7 +168,14 @@ pub(crate) async fn update_budget(
         )
         .await
     })
-    .await
+    .await?;
+    let mut active = service().lock().await;
+    if let Some(current) = active.as_mut() {
+        current.config.per_request_max_atomic = result.per_request_max_atomic;
+        current.config.daily_max_atomic = result.daily_max_atomic;
+        current.config.monthly_max_atomic = result.monthly_max_atomic;
+    }
+    Ok(result)
 }
 
 fn budget_from(get: impl Fn(&str) -> Option<String>) -> (u64, u64, u64) {
