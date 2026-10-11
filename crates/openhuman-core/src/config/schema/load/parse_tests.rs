@@ -100,3 +100,23 @@ fn a_non_finite_optional_float_is_rejected_not_unset() {
         "agent.nested.values[1]: non-finite float inf is not a valid config value"
     );
 }
+
+#[test]
+fn legacy_cloud_provider_document_migrates_before_typed_decode_and_keeps_model() {
+    let config = config_from_toml_str(r#"
+schema_version = 13
+[[cloud_providers]]
+id = "legacy-anthropic"
+type = "anthropic"
+default_model = "claude-sonnet-4"
+"#).expect("legacy config parses");
+    let provider = &config.cloud_providers[0];
+    assert_eq!(provider.slug, "anthropic");
+    assert_eq!(provider.label, "Anthropic");
+    assert_eq!(provider.endpoint, "https://api.anthropic.com/v1");
+    assert_eq!(provider.auth_style, crate::config::schema::cloud_providers::AuthStyle::Anthropic);
+    let saved = toml::to_string(&config).unwrap();
+    let reloaded = config_from_toml_str(&saved).unwrap();
+    assert_eq!(reloaded.cloud_providers[0].default_model.as_deref(), Some("claude-sonnet-4"));
+    assert!(!saved.contains("type = \"anthropic\""));
+}
