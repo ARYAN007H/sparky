@@ -34,9 +34,9 @@ pub mod task_recency_context;
 pub(crate) mod tool_result_artifacts;
 
 pub use agent_graph::{AgentGraph, AgentTurnRequest, AgentTurnResult, AgentTurnUsage};
-// NOTE: deliberately no flat re-export here. `artifact_offload::ArtifactKind`
+// NOTE: deliberately no flat re-export here. `tinyagents_artifacts::ArtifactKind`
 // would shadow the unrelated `openhuman::agent::artifacts::ArtifactKind` for anyone
-// glob-importing this module; callers use the `artifact_offload::` path.
+// glob-importing this module; callers import the owning library directly.
 pub use definition::{
     AgentDefinition, AgentDefinitionRegistry, DefinitionSource, ModelSpec, PromptSource,
     SandboxMode, ToolScope,
