@@ -149,12 +149,17 @@ impl ModuleClient {
         }
         #[cfg(test)]
         if let Some(fixture) = &self.fixture {
-            let proxy = fixture.connection().proxy(
-                fixture.destination().as_str(),
-                object_path,
-                fixture.interface().as_str(),
-            ).map_err(|_| ModuleCallError::IncompatibleContract)?;
-            let proxy = self.timeout.map_or(proxy.clone(), |timeout| proxy.with_timeout(timeout));
+            let proxy = fixture
+                .connection()
+                .proxy(
+                    fixture.destination().as_str(),
+                    object_path,
+                    fixture.interface().as_str(),
+                )
+                .map_err(|_| ModuleCallError::IncompatibleContract)?;
+            let proxy = self
+                .timeout
+                .map_or(proxy.clone(), |timeout| proxy.with_timeout(timeout));
             return Ok(ModuleObjectClient { record, proxy });
         }
         super::ops::ensure_loaded(&self.config, module)

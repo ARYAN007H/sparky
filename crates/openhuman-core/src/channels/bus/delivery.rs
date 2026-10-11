@@ -1,15 +1,25 @@
 //! Captured managed transport for module-owned progressive replies.
 use crate::backend::{BackendApiError, BackendClient};
-use crate::security::credentials::session_support::{get_session_token, is_local_session_token, BackendCredential};
-use crate::modules::{channel_runtime::ChannelRuntimeLease, client::{ModuleClient, ModuleCallError}};
-use tinychannels_bus::{ChannelBackendRequest, ChannelBackendResult, methods};
-use tinychannels_bus::module_progressive::{ProgressiveCommand, ProgressiveEvent, ProgressiveResult, ProgressiveTransportRequest, ProgressiveTransportResult};
+use crate::modules::{
+    channel_runtime::ChannelRuntimeLease,
+    client::{ModuleCallError, ModuleClient},
+};
+use crate::security::credentials::session_support::{
+    get_session_token, is_local_session_token, BackendCredential,
+};
 use serde_json::{json, Value};
+use tinychannels_bus::module_progressive::{
+    ProgressiveCommand, ProgressiveEvent, ProgressiveResult, ProgressiveTransportRequest,
+    ProgressiveTransportResult,
+};
+use tinychannels_bus::{methods, ChannelBackendRequest, ChannelBackendResult};
 
 /// Transport refusals are typed facts; recovery and retry budgets belong to the module.
 pub(super) fn map_backend_error(error: anyhow::Error) -> ProgressiveTransportResult {
     match error.downcast_ref::<BackendApiError>() {
-        Some(BackendApiError::ChannelEditUnsupported { .. }) => ProgressiveTransportResult::EditUnsupported,
+        Some(BackendApiError::ChannelEditUnsupported { .. }) => {
+            ProgressiveTransportResult::EditUnsupported
+        }
         Some(BackendApiError::MessageNotFound { .. }) => ProgressiveTransportResult::MessageGone,
         _ => ProgressiveTransportResult::Failed,
     }
@@ -27,27 +37,66 @@ impl ManagedTransport {
             Some(token) if !is_local_session_token(&token) => BackendCredential::Session(token),
             _ => anyhow::bail!("Hosted channel credential unavailable"),
         };
-        Ok(Self { client: BackendClient::from_config(config)?, credential })
+        Ok(Self {
+            client: BackendClient::from_config(config)?,
+            credential,
+        })
     }
 
     async fn execute(&self, request: ProgressiveTransportRequest) -> ProgressiveTransportResult {
         let result = match request {
-            ProgressiveTransportRequest::Send { channel, message } => self.client.send_channel_message(&channel, &self.credential, message).await,
-            ProgressiveTransportRequest::Edit { channel, message_id, text } => self.client.send_channel_edit(&channel, &message_id, &self.credential, json!({"text":text})).await,
-            ProgressiveTransportRequest::Delete { channel, message_id } => self.client.send_channel_delete(&channel, &message_id, &self.credential).await,
-            ProgressiveTransportRequest::Typing { channel } => self.client.send_channel_typing(&channel, &self.credential).await,
+            ProgressiveTransportRequest::Send { channel, message } => {
+                self.client
+                    .send_channel_message(&channel, &self.credential, message)
+                    .await
+            }
+            ProgressiveTransportRequest::Edit {
+                channel,
+                message_id,
+                text,
+            } => {
+                self.client
+                    .send_channel_edit(
+                        &channel,
+                        &message_id,
+                        &self.credential,
+                        json!({"text":text}),
+                    )
+                    .await
+            }
+            ProgressiveTransportRequest::Delete {
+                channel,
+                message_id,
+            } => {
+                self.client
+                    .send_channel_delete(&channel, &message_id, &self.credential)
+                    .await
+            }
+            ProgressiveTransportRequest::Typing { channel } => {
+                self.client
+                    .send_channel_typing(&channel, &self.credential)
+                    .await
+            }
         };
-        match result { Ok(value) => ProgressiveTransportResult::Success(value), Err(error) => map_backend_error(error) }
+        match result {
+            Ok(value) => ProgressiveTransportResult::Success(value),
+            Err(error) => map_backend_error(error),
+        }
     }
 }
 
 #[tinybus::interface(name = "ai.tinyhumans.tinychannels.ChannelsHost")]
 impl ManagedTransport {
-    async fn dispatch_controller_backend(&self, request: ChannelBackendRequest) -> tinybus::Result<ChannelBackendResult> {
+    async fn dispatch_controller_backend(
+        &self,
+        request: ChannelBackendRequest,
+    ) -> tinybus::Result<ChannelBackendResult> {
         let ChannelBackendRequest::ProgressiveTransport(request) = request else {
             return Err(tinybus::Error::failed("callback capability unavailable"));
         };
-        Ok(ChannelBackendResult::ProgressiveTransport(self.execute(request).await))
+        Ok(ChannelBackendResult::ProgressiveTransport(
+            self.execute(request).await,
+        ))
     }
 }
 
@@ -58,25 +107,65 @@ pub(super) struct ModuleProgressiveReply {
 }
 
 impl ModuleProgressiveReply {
-    pub(super) async fn open(config: crate::config::Config, channel: String) -> anyhow::Result<Self> {
+    pub(super) async fn open(
+        config: crate::config::Config,
+        channel: String,
+    ) -> anyhow::Result<Self> {
         let callback = ManagedTransport::capture(&config)?;
         let runtime = ChannelRuntimeLease::open(ModuleClient::new(config), callback).await?;
-        let result: ProgressiveResult = runtime.object().call_confidential(methods::EXECUTE_PROGRESSIVE, (ProgressiveCommand::Open { channel },)).await?;
+        let result: ProgressiveResult = runtime
+            .object()
+            .call_confidential(
+                methods::EXECUTE_PROGRESSIVE,
+                (ProgressiveCommand::Open { channel },),
+            )
+            .await?;
         match result {
-            ProgressiveResult::Opened { handle } if !handle.is_empty() && handle.len() <= 128 => Ok(Self { runtime, handle }),
-            _ => { ModuleClient::report_malformed_reply("tinychannels"); Err(ModuleCallError::ModuleFault.into()) }
+            ProgressiveResult::Opened { handle } if !handle.is_empty() && handle.len() <= 128 => {
+                Ok(Self { runtime, handle })
+            }
+            _ => {
+                ModuleClient::report_malformed_reply("tinychannels");
+                Err(ModuleCallError::ModuleFault.into())
+            }
         }
     }
 
     pub(super) async fn feed(&self, events: Vec<ProgressiveEvent>) -> Result<(), ModuleCallError> {
-        let result: ProgressiveResult = self.runtime.object().call_confidential(methods::EXECUTE_PROGRESSIVE, (ProgressiveCommand::Feed { handle: self.handle.clone(), events },)).await?;
-        if result != ProgressiveResult::Updated { ModuleClient::report_malformed_reply("tinychannels"); return Err(ModuleCallError::ModuleFault); }
+        let result: ProgressiveResult = self
+            .runtime
+            .object()
+            .call_confidential(
+                methods::EXECUTE_PROGRESSIVE,
+                (ProgressiveCommand::Feed {
+                    handle: self.handle.clone(),
+                    events,
+                },),
+            )
+            .await?;
+        if result != ProgressiveResult::Updated {
+            ModuleClient::report_malformed_reply("tinychannels");
+            return Err(ModuleCallError::ModuleFault);
+        }
         Ok(())
     }
 
     pub(super) async fn finalize(&self, text: &str) -> Result<(), ModuleCallError> {
-        let result: ProgressiveResult = self.runtime.object().call_confidential(methods::EXECUTE_PROGRESSIVE, (ProgressiveCommand::Finish { handle: self.handle.clone(), text: text.into() },)).await?;
-        if result != ProgressiveResult::Closed { ModuleClient::report_malformed_reply("tinychannels"); return Err(ModuleCallError::ModuleFault); }
+        let result: ProgressiveResult = self
+            .runtime
+            .object()
+            .call_confidential(
+                methods::EXECUTE_PROGRESSIVE,
+                (ProgressiveCommand::Finish {
+                    handle: self.handle.clone(),
+                    text: text.into(),
+                },),
+            )
+            .await?;
+        if result != ProgressiveResult::Closed {
+            ModuleClient::report_malformed_reply("tinychannels");
+            return Err(ModuleCallError::ModuleFault);
+        }
         self.runtime.close().await
     }
 }

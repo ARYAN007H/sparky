@@ -1,11 +1,16 @@
 //! Identity-scoped channel objects and cancellation-safe callback ownership.
 
-use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
-use std::time::Duration;
-use tokio::sync::Mutex;
-use tinybus::{Connection, ObjectPath, Proxy};
-use tinychannels_bus::{methods, ChannelRuntimeReservation, HOST_BUS_NAME, HOST_OBJECT_PATH, OBJECT_PATH};
 use super::client::{ModuleCallError, ModuleClient, ModuleObjectClient};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
+use std::time::Duration;
+use tinybus::{Connection, ObjectPath, Proxy};
+use tinychannels_bus::{
+    methods, ChannelRuntimeReservation, HOST_BUS_NAME, HOST_OBJECT_PATH, OBJECT_PATH,
+};
+use tokio::sync::Mutex;
 
 const CLOSE_BUDGET: Duration = Duration::from_secs(15);
 
@@ -37,8 +42,10 @@ impl Cleanup {
         }
         // Stop is idempotent. A transport deadline never licenses removal of
         // the adapter: the module may still own listeners or pending sends.
-        let result: tinybus::Result<()> = self.proxy
-            .call_confidential(methods::STOP_RUNTIME, (self.handle.clone(),)).await;
+        let result: tinybus::Result<()> = self
+            .proxy
+            .call_confidential(methods::STOP_RUNTIME, (self.handle.clone(),))
+            .await;
         result.map_err(|error| {
             let record = super::registry::find("tinychannels").expect("registered channel module");
             if !self.reported.swap(true, Ordering::AcqRel) {
@@ -85,9 +92,12 @@ impl ChannelRuntimeLease {
     ) -> Result<Self, ModuleCallError> {
         // This check performs lazy admission before starting any callback work.
         let reservation: ChannelRuntimeReservation = client
-            .call_confidential("tinychannels", methods::RESERVE_RUNTIME, ()).await?;
+            .call_confidential("tinychannels", methods::RESERVE_RUNTIME, ())
+            .await?;
         validate_reservation(&reservation)?;
-        let runtime = super::host::runtime().await.map_err(|_| ModuleCallError::TransportFailed)?;
+        let runtime = super::host::runtime()
+            .await
+            .map_err(|_| ModuleCallError::TransportFailed)?;
         let (sender, receiver) = tokio::sync::oneshot::channel();
         runtime.spawn(async move {
             let result = Self::activate(client, reservation, callback, runtime).await;
@@ -95,7 +105,9 @@ impl ChannelRuntimeLease {
             // activation task itself is independent of the requesting runtime.
             let _ = sender.send(result);
         });
-        receiver.await.map_err(|_| ModuleCallError::TransportFailed)?
+        receiver
+            .await
+            .map_err(|_| ModuleCallError::TransportFailed)?
     }
 
     async fn activate(
@@ -107,42 +119,73 @@ impl ChannelRuntimeLease {
         let connection = runtime.connection().clone();
         let callback_path = ObjectPath::new(&reservation.host_object_path)
             .map_err(|_| ModuleCallError::ModuleFault)?;
-        let proxy = runtime.proxy(tinychannels_bus::BUS_NAME, OBJECT_PATH)
+        let proxy = runtime
+            .proxy(tinychannels_bus::BUS_NAME, OBJECT_PATH)
             .map_err(|_| ModuleCallError::IncompatibleContract)?;
         let cleanup = Cleanup {
-            proxy, connection: connection.clone(), callback: callback_path.clone(),
-            handle: reservation.handle.clone(), closed: Arc::new(AtomicBool::new(false)),
+            proxy,
+            connection: connection.clone(),
+            callback: callback_path.clone(),
+            handle: reservation.handle.clone(),
+            closed: Arc::new(AtomicBool::new(false)),
             reported: Arc::new(AtomicBool::new(false)),
         };
         // Acquire an owned lease before exporting the adapter. Any subsequent
         // failure follows the same acknowledged-stop path as explicit close.
-        let object = match client.object_client("tinychannels", &reservation.object_path).await {
+        let object = match client
+            .object_client("tinychannels", &reservation.object_path)
+            .await
+        {
             Ok(object) => object,
             Err(error) => {
-                runtime.spawn(async move { while cleanup.run().await.is_err() {
-                    tokio::time::sleep(Duration::from_secs(5)).await;
-                }});
+                runtime.spawn(async move {
+                    while cleanup.run().await.is_err() {
+                        tokio::time::sleep(Duration::from_secs(5)).await;
+                    }
+                });
                 return Err(error);
             }
         };
-        let lease = Self(Arc::new(LeaseState { object, cleanup, closing: Mutex::new(None), runtime }));
-        connection.request_name(HOST_BUS_NAME).await.map_err(|_| ModuleCallError::TransportFailed)?;
-        connection.serve_at(callback_path, callback).await.map_err(|_| ModuleCallError::TransportFailed)?;
-        client.call_confidential::<()>("tinychannels", methods::START_RUNTIME, (reservation.handle,)).await?;
+        let lease = Self(Arc::new(LeaseState {
+            object,
+            cleanup,
+            closing: Mutex::new(None),
+            runtime,
+        }));
+        connection
+            .request_name(HOST_BUS_NAME)
+            .await
+            .map_err(|_| ModuleCallError::TransportFailed)?;
+        connection
+            .serve_at(callback_path, callback)
+            .await
+            .map_err(|_| ModuleCallError::TransportFailed)?;
+        client
+            .call_confidential::<()>(
+                "tinychannels",
+                methods::START_RUNTIME,
+                (reservation.handle,),
+            )
+            .await?;
         Ok(lease)
     }
 
-    pub(crate) fn object(&self) -> &ModuleObjectClient { &self.0.object }
+    pub(crate) fn object(&self) -> &ModuleObjectClient {
+        &self.0.object
+    }
 
     pub(crate) async fn close(&self) -> Result<(), ModuleCallError> {
-        if self.0.cleanup.closed.load(Ordering::Acquire) { return Ok(()); }
+        if self.0.cleanup.closed.load(Ordering::Acquire) {
+            return Ok(());
+        }
         let mut closing = self.0.closing.lock().await;
         if closing.is_none() {
             let cleanup = self.0.cleanup.clone();
             *closing = Some(self.0.runtime.spawn(async move { cleanup.run().await }));
         }
         let result = tokio::time::timeout(CLOSE_BUDGET, closing.as_mut().expect("cleanup worker"))
-            .await.map_err(|_| ModuleCallError::TransportFailed)?;
+            .await
+            .map_err(|_| ModuleCallError::TransportFailed)?;
         closing.take();
         result.map_err(|_| ModuleCallError::TransportFailed)?
     }
@@ -150,9 +193,13 @@ impl ChannelRuntimeLease {
 
 fn validate_reservation(reservation: &ChannelRuntimeReservation) -> Result<(), ModuleCallError> {
     if reservation.handle.len() != 32
-        || !reservation.handle.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+        || !reservation
+            .handle
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
         || reservation.object_path != format!("{OBJECT_PATH}/runtime_{}", reservation.handle)
-        || reservation.host_object_path != format!("{HOST_OBJECT_PATH}/runtime_{}", reservation.handle)
+        || reservation.host_object_path
+            != format!("{HOST_OBJECT_PATH}/runtime_{}", reservation.handle)
     {
         ModuleClient::report_malformed_reply("tinychannels");
         return Err(ModuleCallError::ModuleFault);

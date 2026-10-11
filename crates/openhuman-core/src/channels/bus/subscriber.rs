@@ -127,7 +127,9 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
             }
             Err(err) => {
                 tracing::error!("[channel-inbound] start_chat failed: {}", err);
-                let _ = reply.finalize(&format!("Sorry, I couldn't process your message: {err}")).await;
+                let _ = reply
+                    .finalize(&format!("Sorry, I couldn't process your message: {err}"))
+                    .await;
                 return;
             }
         };
