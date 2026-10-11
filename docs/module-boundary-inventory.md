@@ -332,3 +332,23 @@ This cut removes the `tinyvoice` and `cpal` host exceptions, leaving nine
 implementation exceptions for Channels, MCP, Box and Wallet. The resolved
 voice-only normal/build graph falls from 323 packages to 318; this is a
 dependency count, with no inferred binary size or build-time reduction.
+
+## Scoped channel runtime prerequisites
+
+Upstream [tinychannels#68](https://github.com/tinyhumansai/tinychannels/pull/68)
+moves listener reconnect supervision into the module.
+[tinychannels#69](https://github.com/tinyhumansai/tinychannels/pull/69) adds
+inert runtime reservations and private provider/callback objects. Runtime
+activation and cleanup remain owned by the module when a caller cancels.
+Each private object retains its original callback destination through shutdown;
+stopping one runtime cannot close another identity's provider with the same name.
+
+Released v0.1.20 supplies contract revision 10 and operation version 1.11.
+All eleven archives and the checksum manifest were verified against downloaded
+bytes, GitHub asset digests and asset sizes. The released Linux artifact passed
+a runtime-isolation and cleanup fixture using OpenHuman's current TinyBus kernel.
+The owner workspace passed 1,306 tests and two actual compiled-artifact fixtures.
+
+These are upstream prerequisites. The host provider, relay and delivery adapters
+still need migration; both Channels implementation exceptions remain until
+those callers and their dependency graphs are cut over.
