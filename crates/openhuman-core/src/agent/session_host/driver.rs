@@ -143,7 +143,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
         let mut messages: Vec<TranscriptMessage> = request
             .history
             .iter()
-            .filter_map(crate::agent::message_convert::message_to_native_chat_message)
+            .filter_map(tinyagents_runtime::transcript::message_to_native_transcript)
             .collect();
         if crate::agent::multimodal::has_image_placeholders(&messages) {
             messages = crate::agent::multimodal::rehydrate_image_placeholders(&messages);

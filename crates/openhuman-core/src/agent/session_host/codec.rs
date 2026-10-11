@@ -32,7 +32,7 @@ impl TranscriptCodec<OpenHumanRunContext> for OpenHumanTranscriptCodec {
     ) -> Result<Vec<TranscriptMessage>, RuntimeError> {
         let mut rows = next
             .iter()
-            .filter_map(message_convert::message_to_native_chat_message)
+            .filter_map(tinyagents_runtime::transcript::message_to_native_transcript)
             .collect::<Vec<_>>();
 
         // `Message` intentionally cannot represent all durable transcript
