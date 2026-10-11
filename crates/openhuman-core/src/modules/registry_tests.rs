@@ -199,13 +199,13 @@ fn tinybox_registry_matches_the_published_v0119_release_manifest() {
 }
 
 #[test]
-fn tinymcp_registry_matches_the_published_v081_release_manifest() {
+fn tinymcp_registry_matches_the_published_v090_release_manifest() {
     let record = find("tinymcp").expect("compiled TinyMCP module");
-    assert_eq!(record.version, "0.8.1");
-    assert_eq!(tinymcp_bus::CONTRACT_VERSION, (1, 12));
+    assert_eq!(record.version, "0.9.0");
+    assert_eq!(tinymcp_bus::CONTRACT_VERSION, (1, 13));
     assert_eq!(
         record.release_url,
-        "https://github.com/tinyhumansai/tinymcp/releases/tag/v0.8.1"
+        "https://github.com/tinyhumansai/tinymcp/releases/tag/v0.9.0"
     );
 
     let actual = record
@@ -215,65 +215,89 @@ fn tinymcp_registry_matches_the_published_v081_release_manifest() {
         .collect::<Vec<_>>();
     let published = [
         (
-            "ubuntu-24.04-x86_64",
-            "tinymcp-0.8.1-ubuntu-24.04-x86_64.tar.gz",
-            "54e05304cc088f83aeb858780426d06aebe4ed604c8a92d8d66136c532807c21",
+            "tinymcp-0.9.0-archlinux-rolling-x86_64",
+            "tinymcp-0.9.0-archlinux-rolling-x86_64.tar.gz",
+            "57a72dac5b7e69444ba10688d5e3516cb4d5c0760663a59774c94060952c744f",
         ),
         (
-            "ubuntu-24.04-arm64",
-            "tinymcp-0.8.1-ubuntu-24.04-arm64.tar.gz",
-            "78bfa9a7e6751b6f7b7c2d6242f6e5f9369421e4ff54e5aef990f1324a386325",
+            "tinymcp-0.9.0-fedora-43-arm64",
+            "tinymcp-0.9.0-fedora-43-arm64.tar.gz",
+            "6e5b4623debc566d1c1ed7dacbc1d81330e9d63723fcfd67753cb8af73e073cd",
         ),
         (
-            "ubuntu-22.04-x86_64",
-            "tinymcp-0.8.1-ubuntu-22.04-x86_64.tar.gz",
-            "eb190c7af70801d17592027dba60c4669e804244b3111859444ca641c209a588",
+            "tinymcp-0.9.0-fedora-43-x86_64",
+            "tinymcp-0.9.0-fedora-43-x86_64.tar.gz",
+            "b5e27c097d3f694d40343ea61c4acc4b3aa0fed13630a9d63dcd339c00823fd0",
         ),
         (
-            "ubuntu-22.04-arm64",
-            "tinymcp-0.8.1-ubuntu-22.04-arm64.tar.gz",
-            "59dffc24b69552854bc9c6dd1f2d4c07293d15e44d3a4de44a86387b1afb0725",
+            "tinymcp-0.9.0-fedora-44-arm64",
+            "tinymcp-0.9.0-fedora-44-arm64.tar.gz",
+            "1908e9fa46bf3b0ecc3917c45e9b98064a0d162833c5331831b896a32526ff3f",
         ),
         (
-            "macos-26-arm64",
-            "tinymcp-0.8.1-macos-26-arm64.tar.gz",
-            "05df5adc80296ba4a6882d5aa519fcdbd7ccd8671ee94ad8b647268bc0cd0523",
+            "tinymcp-0.9.0-fedora-44-x86_64",
+            "tinymcp-0.9.0-fedora-44-x86_64.tar.gz",
+            "7937d3a6bc549cffdfb70f89e21dc4a26057c0700ed2a02cb08cfa5252869655",
         ),
         (
-            "macos-26-x86_64",
-            "tinymcp-0.8.1-macos-26-x86_64.tar.gz",
-            "9e4047d0fc1b54f9ec9aa531a604771e2037390a5178413e652248a9e64eef91",
+            "tinymcp-0.9.0-macos-15-arm64",
+            "tinymcp-0.9.0-macos-15-arm64.tar.gz",
+            "bceb6a3b50f78285e47d319951e92d279cc99da153dc660e671b6df9190dd197",
         ),
         (
-            "macos-15-arm64",
-            "tinymcp-0.8.1-macos-15-arm64.tar.gz",
-            "cdf409f7e2e93e9d75f35d8f4e7186ddd090a583a48eddf33ef62b1d83c2af89",
+            "tinymcp-0.9.0-macos-15-x86_64",
+            "tinymcp-0.9.0-macos-15-x86_64.tar.gz",
+            "0310c91e11dc44c93609e2003057a18b20919b0aee739e9b99ab8911350af334",
         ),
         (
-            "macos-15-x86_64",
-            "tinymcp-0.8.1-macos-15-x86_64.tar.gz",
-            "0bc9156d0c2bcf9ba6e9277ee9ad3846185dc2192624f5989ab1331ed12ddaf6",
+            "tinymcp-0.9.0-macos-26-arm64",
+            "tinymcp-0.9.0-macos-26-arm64.tar.gz",
+            "6083044b9e2b38733014570fa91068f74ac23120cc4ef790c934984bc1812640",
         ),
         (
-            "windows-2025-x86_64",
-            "tinymcp-0.8.1-windows-2025-x86_64.zip",
-            "f2a32c36fe35c7d24e1bcccf489a686e01c3fb875ec10662be45c2858a24e280",
+            "tinymcp-0.9.0-macos-26-x86_64",
+            "tinymcp-0.9.0-macos-26-x86_64.tar.gz",
+            "6d8c90efb63743523fa901d74b0e8e6939d30bacd0a96d77650a1af61602ac9d",
         ),
         (
-            "windows-2022-x86_64",
-            "tinymcp-0.8.1-windows-2022-x86_64.zip",
-            "e9b14fd191d2269bb6cc088c76e3ff96a8d97197be9554b0ac8fddd9365c92cc",
+            "tinymcp-0.9.0-ubuntu-22.04-arm64",
+            "tinymcp-0.9.0-ubuntu-22.04-arm64.tar.gz",
+            "53bbdc087a444e0deb1e770ad4ea9cc23f77ffc4db6072124da819543dfabfd4",
         ),
         (
-            "windows-11-arm64",
-            "tinymcp-0.8.1-windows-11-arm64.zip",
-            "6fe315376f651a9f425c437d76f4bf50f0a8838d783a94d0fecf61fb2adb71a9",
+            "tinymcp-0.9.0-ubuntu-22.04-x86_64",
+            "tinymcp-0.9.0-ubuntu-22.04-x86_64.tar.gz",
+            "c1c1255bedd611ba32f70beb82c02452cba7dbe9a08de5d0fd3a2dde0216003d",
+        ),
+        (
+            "tinymcp-0.9.0-ubuntu-24.04-arm64",
+            "tinymcp-0.9.0-ubuntu-24.04-arm64.tar.gz",
+            "b1fb9348917a4f828768fd41e92fa7b52eb010cb90022cb3be66800c06a95857",
+        ),
+        (
+            "tinymcp-0.9.0-ubuntu-24.04-x86_64",
+            "tinymcp-0.9.0-ubuntu-24.04-x86_64.tar.gz",
+            "38681621198eb5bfaf170154c619ae8c3dcfae1d233ba82c2cad039d165fe557",
+        ),
+        (
+            "tinymcp-0.9.0-windows-11-arm64",
+            "tinymcp-0.9.0-windows-11-arm64.zip",
+            "6e8c65385acb52ff116ba08e29a895434114e46d3379a019953d7013bc22e38b",
+        ),
+        (
+            "tinymcp-0.9.0-windows-2022-x86_64",
+            "tinymcp-0.9.0-windows-2022-x86_64.zip",
+            "4a821cabaeba893ecb2358e3eef92e3392e18def07e9b59a4865ae1e8a232f57",
+        ),
+        (
+            "tinymcp-0.9.0-windows-2025-x86_64",
+            "tinymcp-0.9.0-windows-2025-x86_64.zip",
+            "4a18d8a76f9be30bf64224c5a2e7165f70716bd584e3b8fbaa88f5e70854905b",
         ),
     ];
 
     assert_eq!(actual, published);
 }
-
 #[test]
 fn ids_and_bus_names_are_unique() {
     // Two records claiming one bus name is a conflict tinybus would only
