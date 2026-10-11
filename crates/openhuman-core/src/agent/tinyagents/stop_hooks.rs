@@ -43,7 +43,9 @@ fn record_halt_summary(
     halt_summary: &super::HaltSummarySlot,
     report: &tinyagents_harness::middleware::library::StopReport,
 ) {
-    *halt_summary.lock().expect("stop-hook halt mutex poisoned") = Some(format!(
+    *halt_summary
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(format!(
         "Stopping after {} model call(s): {}",
         report.iteration, report.reason
     ));
