@@ -21,12 +21,16 @@ async fn the_module_defers_a_summary_until_requested() {
         );
         return;
     }
-    let seen = std::sync::Arc::new(std::sync::Mutex::new(None::<tinyjuice_bus::wire::GenerateRequest>));
+    let seen = std::sync::Arc::new(std::sync::Mutex::new(
+        None::<tinyjuice_bus::wire::GenerateRequest>,
+    ));
     let sink = seen.clone();
-    let ticket = generate::register(Box::new(move |request: tinyjuice_bus::wire::GenerateRequest| {
-        *sink.lock().unwrap() = Some(request);
-        Box::pin(async { Ok("the rate limit is 60 requests a minute".to_string()) })
-    }));
+    let ticket = generate::register(Box::new(
+        move |request: tinyjuice_bus::wire::GenerateRequest| {
+            *sink.lock().unwrap() = Some(request);
+            Box::pin(async { Ok("the rate limit is 60 requests a minute".to_string()) })
+        },
+    ));
     // Over the default 4000-token threshold the test config installs.
     let content = "Rate limiting. Requests are limited per key. ".repeat(500);
 
@@ -277,7 +281,10 @@ async fn released_queries_keep_cached_originals_in_the_module_and_accept_artifac
         .call(
             "tinyjuice",
             methods::COMPRESS,
-            (content.clone(), tinyjuice_bus::types::ContentHint::default()),
+            (
+                content.clone(),
+                tinyjuice_bus::types::ContentHint::default(),
+            ),
         )
         .await
         .unwrap();

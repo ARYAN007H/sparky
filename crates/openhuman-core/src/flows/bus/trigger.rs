@@ -6,13 +6,13 @@
 use crate::config::Config;
 use crate::core::events::DomainEvent;
 use crate::flows::store;
-use {tinyflows_catalog::Flow};
 use async_trait::async_trait;
 use serde_json::Value;
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use tinybus::EventHandler;
 use tinyflows::model::TriggerKind;
+use tinyflows_catalog::Flow;
 
 /// Reads `trigger_kind` from a flow's trigger node config, deserializing into
 /// `tinyflows::model::TriggerKind`. Returns `None` when the flow doesn't have

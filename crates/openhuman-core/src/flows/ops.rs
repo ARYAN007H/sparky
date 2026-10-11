@@ -54,17 +54,17 @@ use crate::config::Config;
 use crate::core::Outcome;
 use crate::flows::bus;
 use crate::flows::draft_store;
-use {tinyflows_catalog::run_registry};
 use crate::flows::store;
-use tinyflows_catalog::types::{
-    FlowConnection, FlowRunStep, FlowRunTrigger, FlowSuggestion, SuggestionStatus,
-};
-use {tinyflows_catalog::Flow, tinyflows_catalog::FlowRun};
 use crate::security::approval::{
     ApprovalChatContext, FlowRunContext, APPROVAL_CHAT_CONTEXT, APPROVAL_COPILOT_STREAM_CONTEXT,
     APPROVAL_FLOW_RUN_CONTEXT,
 };
 use tinyflows_catalog::build_registry;
+use tinyflows_catalog::run_registry;
+use tinyflows_catalog::types::{
+    FlowConnection, FlowRunStep, FlowRunTrigger, FlowSuggestion, SuggestionStatus,
+};
+use {tinyflows_catalog::Flow, tinyflows_catalog::FlowRun};
 
 /// Overall safety bound on a single `flows_run` / `flows_resume`. Individual
 /// capabilities have their own timeouts (HTTP, sandbox), but a hung LLM/tool

@@ -1,6 +1,6 @@
 use super::*;
-use tinyflows_catalog::types::FlowRun;
 use tinyflows::model::TriggerKind;
+use tinyflows_catalog::types::FlowRun;
 
 #[test]
 fn pinned_trigger_inputs_reads_values_an_author_fixed_for_unattended_runs() {
