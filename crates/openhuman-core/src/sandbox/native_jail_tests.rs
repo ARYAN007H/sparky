@@ -1,6 +1,7 @@
 //! Host-side request mapping for TinyBox native-jail execution.
 
 use super::*;
+use std::path::PathBuf;
 
 #[test]
 fn jail_status_is_ready_only_above_the_isolation_floor() {

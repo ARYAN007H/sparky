@@ -3,7 +3,7 @@
 use std::{
     collections::{BTreeMap, HashMap},
     ffi::{OsStr, OsString},
-    path::{Path, PathBuf},
+    path::Path,
     time::Duration,
 };
 
@@ -177,7 +177,7 @@ fn execution_environment(
     for name in super::ops::SANDBOX_ENV_PASSTHROUGH {
         if let Some(value) = std::env::var_os(name) {
             env.insert(
-                name.to_owned(),
+                (*name).to_owned(),
                 value
                     .into_string()
                     .map_err(|_| anyhow::anyhow!("sandbox environment is not UTF-8"))?,
