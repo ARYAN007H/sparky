@@ -244,6 +244,7 @@ async fn scenario() {
             text.contains(&format!("{}-secret", handle.id())),
             "{response}"
         );
+        assert!(text.contains(&format!("{}-native-learning", handle.id())), "native memory mutation was persisted: {response}");
         let other = if handle.id().as_str() == "alice" {
             "bob"
         } else {
