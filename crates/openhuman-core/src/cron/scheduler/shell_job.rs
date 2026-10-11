@@ -56,6 +56,7 @@ pub(crate) async fn authorize_shell_command(
     }
 }
 
+#[cfg(test)]
 pub(super) fn is_env_assignment(word: &str) -> bool {
     word.contains('=')
         && word
@@ -64,10 +65,12 @@ pub(super) fn is_env_assignment(word: &str) -> bool {
             .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
 }
 
+#[cfg(test)]
 pub(super) fn strip_wrapping_quotes(token: &str) -> &str {
     token.trim_matches(|c| c == '"' || c == '\'')
 }
 
+#[cfg(test)]
 pub(super) fn forbidden_path_argument(security: &SecurityPolicy, command: &str) -> Option<String> {
     let mut normalized = command.to_string();
     for sep in ["&&", "||"] {
