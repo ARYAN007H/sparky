@@ -204,6 +204,7 @@ impl BrowserClient {
         } else {
             None
         };
+        fresh_if_held(&mut options, super::browser_profile::SESSION_PROFILE_WAIT).await;
         options.download_dir = browser.download_dir.clone();
         options.default_timeout_ms = browser.task_timeout_secs.saturating_mul(1000);
         options.allowed_origins =
@@ -478,6 +479,23 @@ fn parsed_browser_url(raw: &str) -> Result<url::Url, BrowserCallError> {
     url::Url::parse(raw)
         .or_else(|_| url::Url::parse(&format!("https://{raw}")))
         .map_err(|_| BrowserCallError::Policy("invalid URL".into()))
+}
+
+/// Leaves `options` its persistent profile only when no other Chrome holds
+/// it within `wait`. Chrome lets one browser at a time use a profile folder:
+/// a second one hands its window to the first and exits, and a session in
+/// one conversation found the profile held by another conversation's
+/// browser, or a task's. Such a session uses a fresh profile instead.
+async fn fresh_if_held(options: &mut SessionOptions, wait: std::time::Duration) {
+    let Some(profile) = options.user_data_dir.clone() else {
+        return;
+    };
+    if !super::browser_profile::free_within(std::path::Path::new(&profile), wait).await {
+        tracing::warn!(
+            "[browser] another Chrome holds the persistent profile; this session uses a fresh profile"
+        );
+        options.user_data_dir = None;
+    }
 }
 
 fn browser_allow_all() -> bool {

@@ -188,6 +188,35 @@ fn tinycomputers_own_words_for_a_missing_or_unusable_chrome_get_the_users_fix() 
     assert_eq!(chrome_hint("Chrome launch timed out"), None);
 }
 
+#[tokio::test]
+async fn a_session_opens_in_a_fresh_profile_while_another_chrome_holds_it() {
+    // Live, a second conversation's browser found the profile held by the
+    // first's, and Chrome exited at once.
+    let profile =
+        std::env::temp_dir().join(format!("openhuman-session-profile-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&profile);
+    std::fs::create_dir_all(&profile).unwrap();
+    let held = profile.to_string_lossy().into_owned();
+    let mut options = SessionOptions {
+        user_data_dir: Some(held.clone()),
+        ..SessionOptions::default()
+    };
+    fresh_if_held(&mut options, std::time::Duration::from_millis(50)).await;
+    assert_eq!(options.user_data_dir.as_deref(), Some(held.as_str()));
+    #[cfg(not(windows))]
+    {
+        let here = sysinfo::System::host_name().unwrap_or_default();
+        std::os::unix::fs::symlink(
+            format!("{here}-{}", std::process::id()),
+            profile.join("SingletonLock"),
+        )
+        .unwrap();
+        fresh_if_held(&mut options, std::time::Duration::from_millis(50)).await;
+        assert!(options.user_data_dir.is_none());
+    }
+    let _ = std::fs::remove_dir_all(&profile);
+}
+
 #[test]
 fn fresh_profile_is_the_default() {
     let config = Config::default();

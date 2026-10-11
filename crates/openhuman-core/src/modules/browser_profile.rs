@@ -3,10 +3,11 @@
 //!
 //! Chrome lets one browser at a time use a profile folder: a second one
 //! started on it hands its window to the first and exits, so a browser task
-//! given the persistent profile while another Chrome holds it could not
-//! start its browser. A task waits up to [`PROFILE_WAIT`] for a Chrome that
-//! is closing (the one the task before it closes as it ends), and otherwise
-//! runs in a fresh profile.
+//! or session given the persistent profile while another Chrome holds it
+//! could not start its browser. A task waits up to [`PROFILE_WAIT`] for a
+//! Chrome that is closing (the one the task before it closes as it ends), a
+//! session up to [`SESSION_PROFILE_WAIT`], and otherwise each runs in a fresh
+//! profile.
 
 use std::path::Path;
 use std::time::Duration;
@@ -14,6 +15,12 @@ use std::time::Duration;
 /// How long a task waits for the Chrome holding its persistent profile to
 /// let it go before it runs in a fresh profile instead.
 pub(crate) const PROFILE_WAIT: Duration = Duration::from_secs(5);
+
+/// How long a browser session waits for the same, before it opens in a
+/// fresh profile: shorter than a task's, as a person waits on it, and the
+/// Chrome holding the profile is most often another conversation's, which
+/// does not close.
+pub(crate) const SESSION_PROFILE_WAIT: Duration = Duration::from_secs(1);
 
 /// How often the profile is looked at while waiting.
 const PROFILE_POLL: Duration = Duration::from_millis(250);
