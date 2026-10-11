@@ -58,7 +58,14 @@ pub(crate) async fn deliver_response(
     timing: Option<super::turn_timing::TurnTimingSnapshot>,
     suggest_follow_ups: bool,
 ) {
-    persist_reply(thread_id, request_id, full_response, citations, workspace_dir).await;
+    persist_reply(
+        thread_id,
+        request_id,
+        full_response,
+        citations,
+        workspace_dir,
+    )
+    .await;
     announce_reply(
         client_id,
         thread_id,

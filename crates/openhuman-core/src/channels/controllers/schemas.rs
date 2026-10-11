@@ -222,7 +222,10 @@ pub fn schemas(function: &str) -> ControllerSchema {
 
 fn handle_list(_params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        to_json(Outcome::new(super::definitions::all_channel_definitions(), vec![]))
+        to_json(Outcome::new(
+            super::definitions::all_channel_definitions(),
+            vec![],
+        ))
     })
 }
 

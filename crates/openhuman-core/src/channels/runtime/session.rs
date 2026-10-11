@@ -1,21 +1,35 @@
-//! Explicit logout invalidates channel runtimes, independently of model auth.
-//!
-//! The session mechanics live in `tinychannels::runtime`; this module owns the
-//! process's single session.
-use std::sync::LazyLock;
-use tinychannels::runtime::ChannelSession;
+//! Host-owned logout generation and cancellation for channel orchestration.
+use std::future::Future;
+use std::sync::{LazyLock, Mutex};
 use tokio_util::sync::CancellationToken;
 
-pub(super) use tinychannels::runtime::run_in_session;
-
-static SESSION: LazyLock<ChannelSession> = LazyLock::new(ChannelSession::new);
+static SESSION: LazyLock<Mutex<CancellationToken>> =
+    LazyLock::new(|| Mutex::new(CancellationToken::new()));
 
 pub(crate) fn channel_session() -> CancellationToken {
-    SESSION.current()
+    SESSION
+        .lock()
+        .unwrap_or_else(|error| error.into_inner())
+        .clone()
 }
 
 pub(crate) fn invalidate_channel_session() {
-    SESSION.invalidate();
+    let mut current = SESSION.lock().unwrap_or_else(|error| error.into_inner());
+    current.cancel();
+    *current = CancellationToken::new();
+}
+
+/// Stop the host dispatch generation on logout, even with independent model auth.
+/// Module resource owners explicitly drain their handles when dispatch ends.
+pub(super) async fn run_in_session(
+    session: CancellationToken,
+    runtime: impl Future<Output = anyhow::Result<()>>,
+) -> anyhow::Result<()> {
+    tokio::select! {
+        biased;
+        _ = session.cancelled() => Ok(()),
+        result = runtime => result,
+    }
 }
 
 #[cfg(test)]
