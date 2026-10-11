@@ -45,7 +45,7 @@ pub use schemas::{
 pub use host_runtime::all_local_inference_controller_schemas;
 pub use host_runtime::all_local_inference_registered_controllers;
 pub use model_context::context_window_for_model;
-pub use tinyinference_local::status::{
+use tinyinference_local::status::{
     LocalAiEmbeddingResult, LocalAiSpeechResult, LocalAiStatus, LocalAiTtsResult,
 };
 
