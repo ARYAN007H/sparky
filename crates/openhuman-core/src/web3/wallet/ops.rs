@@ -30,6 +30,12 @@ use types::{GeneratedRecoveryPhrase, RecoveryPhraseValidation, WalletRecoveryMat
 
 const VALID_MNEMONIC_WORD_COUNTS: [u8; 5] = [12, 15, 18, 21, 24];
 
+fn is_valid_mnemonic_word_count(count: usize) -> bool {
+    VALID_MNEMONIC_WORD_COUNTS
+        .iter()
+        .any(|valid| usize::from(*valid) == count)
+}
+
 /// Generate recovery material through the attested wallet module.
 pub async fn generate_recovery_phrase(
     word_count: u8,
@@ -59,7 +65,7 @@ pub async fn derive_recovery_material(
     mnemonic: String,
 ) -> Result<Outcome<WalletRecoveryMaterial>, String> {
     let word_count = mnemonic.split_whitespace().count();
-    if !VALID_MNEMONIC_WORD_COUNTS.contains(&(word_count as u8)) {
+    if !is_valid_mnemonic_word_count(word_count) {
         return Err(format!(
             "recovery phrase must contain one of {} words",
             VALID_MNEMONIC_WORD_COUNTS
@@ -71,6 +77,7 @@ pub async fn derive_recovery_material(
     }
 
     let config = config_rpc::load_config_with_timeout().await?;
+    let mnemonic = Zeroizing::new(mnemonic);
     let mnemonic = Zeroizing::new(mnemonic.split_whitespace().collect::<Vec<_>>().join(" "));
     let seed = crate::modules::wallet::derive_mnemonic_seed(&config, mnemonic.to_string())
         .await
@@ -121,9 +128,12 @@ pub async fn validate_recovery_phrase(
     let config = config_rpc::load_config_with_timeout().await?;
     let valid = match crate::modules::wallet::derive_mnemonic_seed(&config, mnemonic).await {
         Ok(mut response) => {
-            let valid = response.seed.len() == 64;
+            if response.seed.len() != 64 {
+                response.seed.zeroize();
+                return Err("wallet module returned an invalid BIP-39 seed length".to_string());
+            }
             response.seed.zeroize();
-            valid
+            true
         }
         Err(WalletCallError::InvalidInput(_)) => false,
         Err(error) => return Err(error.to_string()),
