@@ -29,6 +29,11 @@ export interface WalletAccount {
   derivationPath: string;
 }
 
+export interface GeneratedRecoveryPhrase {
+  phrase: string;
+  wordCount: number;
+}
+
 export interface WalletStatus {
   configured: boolean;
   onboardingCompleted: boolean;
@@ -60,6 +65,24 @@ export const fetchWalletStatus = async (): Promise<WalletStatus> => {
     method: 'openhuman.wallet_status',
   });
   return response.result;
+};
+
+/** Generate recovery material through the confidentially called TinyWallet module. */
+export const generateRecoveryPhrase = async (): Promise<GeneratedRecoveryPhrase> => {
+  const response = await callCoreRpc<{ result: GeneratedRecoveryPhrase }>({
+    method: 'openhuman.wallet_generate_mnemonic',
+    params: { wordCount: 12 },
+  });
+  return response.result;
+};
+
+/** Validate an imported phrase in the TinyWallet module without local derivation. */
+export const validateRecoveryPhrase = async (phrase: string): Promise<boolean> => {
+  const response = await callCoreRpc<{ result: { valid: boolean } }>({
+    method: 'openhuman.wallet_validate_mnemonic',
+    params: { phrase },
+  });
+  return response.result.valid;
 };
 
 export const setupLocalWallet = async (params: SetupWalletParams): Promise<WalletStatus> => {
