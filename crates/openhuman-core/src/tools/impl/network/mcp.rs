@@ -277,3 +277,7 @@ fn required_string_arg(args: &Value, key: &str) -> anyhow::Result<String> {
 #[cfg(test)]
 #[path = "mcp_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "mcp_target_tests.rs"]
+mod target_tests;

@@ -1,0 +1,106 @@
+use super::*;
+
+use std::sync::{Arc, Mutex};
+
+use crate::mcp::module_client::{McpModulePort, McpConfiguredClient};
+use tinymcp_bus::{
+    McpToolPresentation, OpenConfiguredResponse, PrepareAgentToolsRequest, TransitionStatus,
+};
+
+#[derive(Clone, Default)]
+struct PreparePort {
+    requests: Arc<Mutex<Vec<PrepareAgentToolsRequest>>>,
+}
+
+#[async_trait]
+impl McpModulePort for PreparePort {
+    async fn open_configured(
+        &self,
+        _: &str,
+        _: &tinymcp_bus::McpClientConfig,
+    ) -> Result<OpenConfiguredResponse, crate::modules::client::ModuleCallError> {
+        unreachable!("target preparation is a root operation")
+    }
+
+    async fn close(
+        &self,
+        _: &str,
+    ) -> Result<Option<String>, crate::modules::client::ModuleCallError> {
+        unreachable!("target preparation does not open a workspace")
+    }
+
+    async fn transition_status(
+        &self,
+        _: &str,
+    ) -> Result<TransitionStatus, crate::modules::client::ModuleCallError> {
+        unreachable!("target preparation does not open a workspace")
+    }
+
+    async fn call_object(
+        &self,
+        _: &str,
+        _: &str,
+        _: Value,
+        _: bool,
+    ) -> Result<Value, crate::modules::client::ModuleCallError> {
+        unreachable!("target preparation is a root operation")
+    }
+
+    async fn prepare_agent_tools(
+        &self,
+        request: PrepareAgentToolsRequest,
+    ) -> Result<Vec<McpToolPresentation>, crate::modules::client::ModuleCallError> {
+        self.requests.lock().unwrap().push(request.clone());
+        Ok(request
+            .sources
+            .into_iter()
+            .flat_map(|source| {
+                source.tools.into_iter().map(move |tool| McpToolPresentation {
+                    name: format!("owner:{}:{}", source.server_id, tool.name),
+                    legacy_name: format!("legacy:{}:{}", source.server_id, tool.name),
+                    server_id: source.server_id.clone(),
+                    remote_name: tool.name,
+                    family: source.family.clone(),
+                    description: String::new(),
+                    parameters: Value::Null,
+                    deferred: false,
+                    tags: vec![
+                        format!("mcp.server:{}", source.family),
+                        format!("mcp.server_id:{}", source.server_id),
+                        format!("mcp.tool:{}", tool.name),
+                    ],
+                })
+            })
+            .collect())
+    }
+}
+
+#[tokio::test]
+async fn indirect_mcp_target_uses_module_prepared_identity_and_facts() {
+    let workspace = tempfile::tempdir().unwrap();
+    let mut config = Config::default();
+    config.workspace_dir = workspace.path().to_path_buf();
+    config.modules.enabled = true;
+    let port = PreparePort::default();
+    McpConfiguredClient::install_test_port(&config, Box::new(port.clone())).unwrap();
+    let tool = mcp_call_tool(Arc::new(config), Arc::new(SecurityPolicy::default()));
+
+    let call = tool
+        .indirect_target_async(&json!({
+            "server": "docs",
+            "tool": "whoami",
+            "arguments": {"query": "status"}
+        }))
+        .await
+        .unwrap()
+        .expect("module returns the target presentation");
+
+    assert_eq!(call.target.name, "owner:docs:whoami");
+    assert_eq!(call.target.family.as_deref(), Some("docs"));
+    assert_eq!(
+        call.target.tags,
+        ["mcp.server:docs", "mcp.server_id:docs", "mcp.tool:whoami"]
+    );
+    assert_eq!(call.arguments, Some(json!({"query": "status"})));
+    assert_eq!(port.requests.lock().unwrap().len(), 1);
+}
