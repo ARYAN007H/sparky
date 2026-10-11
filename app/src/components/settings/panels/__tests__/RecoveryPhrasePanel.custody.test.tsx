@@ -47,7 +47,9 @@ const {
   mockPersistLocalWalletFromMnemonic,
   mockRevealRecoveryPhrase,
 } = vi.hoisted(() => ({
-  mockGenerateMnemonicPhrase: vi.fn(async () => ({ phrase: '', wordCount: 12 })),
+  mockGenerateMnemonicPhrase: vi.fn<
+    () => string | { phrase: string; wordCount: number }
+  >(() => ({ phrase: '', wordCount: 12 })),
   mockValidateRecoveryPhrase: vi.fn(async () => true),
   mockFetchWalletStatus: vi.fn(async () => ({}) as WalletStatus),
   mockPersistLocalWalletFromMnemonic: vi.fn(async (_args: unknown) => undefined),
@@ -63,7 +65,10 @@ vi.mock('../../../../providers/CoreStateProvider', () => ({
 
 vi.mock('../../../../services/walletApi', () => ({
   fetchWalletStatus: mockFetchWalletStatus,
-  generateRecoveryPhrase: mockGenerateMnemonicPhrase,
+  generateRecoveryPhrase: async () => {
+    const generated = await mockGenerateMnemonicPhrase();
+    return typeof generated === 'string' ? { phrase: generated, wordCount: 12 } : generated;
+  },
   validateRecoveryPhrase: mockValidateRecoveryPhrase,
   setupLocalWallet: vi.fn(async () => ({}) as WalletStatus),
   revealRecoveryPhrase: mockRevealRecoveryPhrase,

@@ -13,7 +13,9 @@ const {
   mockPersistLocalWalletFromMnemonic,
   mockRevealRecoveryPhrase,
 } = vi.hoisted(() => ({
-  mockGenerateMnemonicPhrase: vi.fn(async () => ({
+  mockGenerateMnemonicPhrase: vi.fn<
+    () => string | { phrase: string; wordCount: number }
+  >(() => ({
     phrase: 'word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12',
     wordCount: 12,
   })),
@@ -49,7 +51,10 @@ vi.mock('../../../../providers/CoreStateProvider', () => ({
 // Default: no existing wallet. Individual describe blocks override in beforeEach.
 vi.mock('../../../../services/walletApi', () => ({
   fetchWalletStatus: mockFetchWalletStatus,
-  generateRecoveryPhrase: mockGenerateMnemonicPhrase,
+  generateRecoveryPhrase: async () => {
+    const generated = await mockGenerateMnemonicPhrase();
+    return typeof generated === 'string' ? { phrase: generated, wordCount: 12 } : generated;
+  },
   validateRecoveryPhrase: mockValidateRecoveryPhrase,
   setupLocalWallet: vi.fn(async () => ({
     configured: true,
@@ -603,6 +608,7 @@ describe('RecoveryPhrasePanel — import mode word inputs and valid/invalid styl
 
   // Covers lines 640 (importValid===false invalid border), 638, and 707 (error alert).
   it('clicking Save with an invalid phrase shows the error alert (line 707)', async () => {
+    mockValidateRecoveryPhrase.mockResolvedValueOnce(false);
     renderWithProviders(<RecoveryPhrasePanel />);
     await waitFor(() => screen.getByText(/I already have a recovery phrase/i));
 
