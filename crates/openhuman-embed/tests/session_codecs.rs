@@ -4,12 +4,15 @@ use openhuman_embed::session_store::{
     AgentEvent, AgentObservation, ExecutionStatus, HarnessRunStatus, JournalMessage,
     SessionDescriptor, TodoList,
 };
-use serde::{Serialize, de::DeserializeOwned};
-use serde_json::{Value, json};
+use serde::{de::DeserializeOwned, Serialize};
+use serde_json::{json, Value};
 
 fn roundtrip<T: DeserializeOwned + Serialize>(wire: Value) -> T {
     let decoded: T = serde_json::from_value(wire.clone()).expect("persisted record decodes");
-    assert_eq!(serde_json::to_value(&decoded).expect("record encodes"), wire);
+    assert_eq!(
+        serde_json::to_value(&decoded).expect("record encodes"),
+        wire
+    );
     decoded
 }
 
@@ -39,7 +42,15 @@ fn public_session_codecs_preserve_event_lineage_and_execution_status() {
         "event": event
     }));
     assert_eq!(observation.offset, 4);
-    for label in ["pending", "running", "interrupted", "completed", "failed", "cancelled", "drained"] {
+    for label in [
+        "pending",
+        "running",
+        "interrupted",
+        "completed",
+        "failed",
+        "cancelled",
+        "drained",
+    ] {
         roundtrip::<ExecutionStatus>(json!(label));
     }
 }
