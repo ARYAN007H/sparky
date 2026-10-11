@@ -40,6 +40,24 @@ impl Tool for TenantTool {
     async fn execute(&self, _: Value) -> anyhow::Result<ToolResult> {
         let tenant = openhuman_core::core::runtime::current_tenant()?;
         let profile = tenant.profile.expect("profile tool always has a tenant");
+        match openhuman_embed::current_turn_origin().expect("a host turn has its original route") {
+            openhuman_embed::AgentTurnOrigin::WebChat { thread_id, .. } => {
+                assert_eq!(thread_id, "t1")
+            }
+            openhuman_embed::AgentTurnOrigin::ExternalChannel {
+                channel,
+                sender,
+                reply_target,
+                message_id,
+                ..
+            } => {
+                assert_eq!(channel, "telegram");
+                assert_eq!(sender.as_deref(), Some("sender"));
+                assert_eq!(reply_target, "chat");
+                assert_eq!(message_id, "message");
+            }
+            origin => panic!("unexpected turn origin: {origin:?}"),
+        }
         self.calls
             .lock()
             .unwrap()
@@ -223,6 +241,45 @@ async fn scenario() {
             ("bob".into(), Some("channel:telegram/sender/chat".into())),
         ]
     );
+    // Persistent hooks fail closed if reused under a different profile or
+    // after the owning lease is fenced, before the host callback is consulted.
+    let hook_context = serde_json::from_value(json!({"event":"PreToolUse", "call_id":"fixture", "tool_name":"tenant_probe", "arguments":{}, "success":null, "duration_ms":null})).unwrap();
+    let alice_hook = handles[0]
+        .context()
+        .host_overrides()
+        .unwrap()
+        .tool_hooks()
+        .into_iter()
+        .find(|hook| hook.name() == "profile.can_use_tool")
+        .unwrap();
+    assert!(matches!(
+        handles[0]
+            .scope(alice_hook.before_tool_decision(&hook_context))
+            .await,
+        ToolHookDecision::Proceed
+    ));
+    assert!(handles[1]
+        .scope(alice_hook.before_tool_decision(&hook_context))
+        .await
+        .is_deny());
+    let no_callback = Arc::new(
+        openhuman_core::profiles::capabilities::ProfileCapabilities::new(
+            None,
+            Some(["tenant_probe".to_string()].into_iter().collect()),
+            None,
+            Default::default(),
+            Vec::new(),
+            None,
+        ),
+    );
+    let alice_profile = handles[0]
+        .scope(async { openhuman_core::profiles::current().unwrap() })
+        .await;
+    let closed_hook = no_callback.hook(handles[0].id(), alice_profile.lease_fence().clone());
+    assert!(handles[0]
+        .scope(closed_hook.before_tool_decision(&hook_context))
+        .await
+        .is_deny());
     let requests = chat_requests(&inference).await;
     assert!(requests
         .iter()
@@ -278,5 +335,10 @@ async fn scenario() {
         };
         assert!(!text.contains(&format!("{other}-secret")), "{response}");
     }
+    alice_profile.lease_fence().fence();
+    assert!(handles[0]
+        .scope(alice_hook.before_tool_decision(&hook_context))
+        .await
+        .is_deny());
     runtime.shutdown().await;
 }

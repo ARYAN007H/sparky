@@ -66,6 +66,16 @@
 /// Complete definition accepted by [`AgentDefinitionSpec::from_base`].
 pub use openhuman_core::agent::harness::definition::AgentDefinition;
 pub use openhuman_core::agent::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
+
+/// The origin of the executing turn, with its original chat or channel route.
+///
+/// Read this inside a host tool or permission callback. The value belongs to
+/// this task's turn, so overlapping messages never replace its sender or
+/// reply target. `None` means the caller installed no origin; it grants no
+/// authority. Scheduled turns retain their existing automation origin.
+pub fn current_turn_origin() -> Option<AgentTurnOrigin> {
+    openhuman_core::agent::turn_origin::current()
+}
 pub use openhuman_core::backend::{
     install_backend_transport, installed_backend_transport, BackendRequest, BackendTransport,
     BackendTransportError, BaseUrlPurpose, TransportProfile,
