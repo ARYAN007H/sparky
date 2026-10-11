@@ -61,7 +61,7 @@ use std::time::SystemTime;
 use openhuman_core::config::Config;
 use openhuman_core::cron::policy::{self, JobPolicy};
 use openhuman_core::cron::system_jobs::SYSTEM_COMMAND_PREFIX;
-use openhuman_core::cron::{CronJob, CronJobPatch, JobType, Schedule};
+use {tinyflows_schedule::types::CronJob, tinyflows_schedule::types::CronJobPatch, tinyflows_schedule::types::JobType, tinyflows_schedule::types::Schedule};
 
 pub use openhuman_core::cron::system_job_handlers::SystemJobContext;
 
@@ -528,7 +528,7 @@ fn create(
                 Some(name.to_string()),
                 schedule,
                 prompt,
-                openhuman_core::cron::SessionTarget::Isolated,
+                tinyflows_schedule::types::SessionTarget::Isolated,
                 None,
                 None,
                 false,

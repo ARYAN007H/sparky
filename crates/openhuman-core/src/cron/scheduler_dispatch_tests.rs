@@ -6,7 +6,7 @@ use super::*;
 use crate::cron::policy::{set_policy, JobPolicy};
 use crate::cron::system_job_handlers::{register, SystemJobContext};
 use crate::cron::system_jobs::ensure_system_job;
-use crate::cron::Schedule;
+use {tinyflows_schedule::types::Schedule};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use tempfile::TempDir;
@@ -33,7 +33,7 @@ fn due_system_job(config: &Config, name: &str) -> CronJob {
     crate::cron::update_job(
         config,
         &job.id,
-        crate::cron::CronJobPatch {
+        tinyflows_schedule::types::CronJobPatch {
             schedule: Some(Schedule::Every {
                 every_ms: 3_600_000,
             }),

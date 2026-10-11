@@ -1,8 +1,6 @@
 use crate::config::Config;
 use crate::core::Outcome;
-use crate::cron::{
-    self, add_shell_job, get_job, update_job, CronJob, CronJobPatch, CronRun, Schedule,
-};
+use {crate::cron::self, crate::cron::add_shell_job, crate::cron::get_job, crate::cron::update_job, tinyflows_schedule::types::CronJob, tinyflows_schedule::types::CronJobPatch, tinyflows_schedule::types::CronRun, tinyflows_schedule::types::Schedule};
 use crate::security::SecurityPolicy;
 use anyhow::Result;
 use once_cell::sync::Lazy;

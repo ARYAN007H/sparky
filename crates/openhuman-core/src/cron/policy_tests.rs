@@ -1,5 +1,5 @@
 use super::*;
-use crate::cron::Schedule;
+use {tinyflows_schedule::types::Schedule};
 use tempfile::TempDir;
 
 fn config(tmp: &TempDir) -> Config {

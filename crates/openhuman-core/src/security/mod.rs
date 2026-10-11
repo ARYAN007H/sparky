@@ -39,10 +39,7 @@ pub use egress::{
 pub use ops as rpc;
 pub use ops::*;
 #[allow(unused_imports)]
-pub use pairing::{
-    ensure_core_rpc_token_for_bind, is_public_bind, CoreBindTokenError, PairingGuard,
-    CORE_TOKEN_ENV_VAR,
-};
+pub use {pairing::ensure_core_rpc_token_for_bind, pairing::is_public_bind, pairing::CoreBindTokenError, tinychannels_runtime::security::PairingGuard, pairing::CORE_TOKEN_ENV_VAR};
 pub use policy::validate_path_within_root;
 #[allow(unused_imports)]
 pub use policy::AutonomyLevel;

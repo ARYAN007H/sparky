@@ -1,6 +1,6 @@
 use super::*;
 use crate::agent::turn_origin::{with_origin, TrustedAutomationSource};
-use crate::cron::Schedule;
+use {tinyflows_schedule::types::Schedule};
 use serde_json::json;
 
 fn channel_turn(history_key: Option<&str>) -> AgentTurnOrigin {
@@ -84,12 +84,12 @@ fn job_with_origin(origin: Option<JobOrigin>) -> CronJob {
         command: String::new(),
         prompt: Some("p".into()),
         name: None,
-        job_type: crate::cron::JobType::Agent,
-        session_target: crate::cron::SessionTarget::Current,
+        job_type: tinyflows_schedule::types::JobType::Agent,
+        session_target: tinyflows_schedule::types::SessionTarget::Current,
         model: None,
         agent_id: None,
         enabled: true,
-        delivery: crate::cron::DeliveryConfig::default(),
+        delivery: tinyflows_schedule::types::DeliveryConfig::default(),
         delete_after_run: false,
         created_at: chrono::Utc::now(),
         next_run: chrono::Utc::now(),

@@ -1,7 +1,7 @@
 //! Content-free runtime observations with bounded, explicit backpressure.
 
 use futures_core::Stream;
-use openhuman_core::core::bus::{EventHandler, SubscriptionHandle, BUS};
+use {tinybus::EventHandler, tinybus::SubscriptionHandle, openhuman_core::core::bus::BUS};
 use openhuman_core::core::events::DomainEvent;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
