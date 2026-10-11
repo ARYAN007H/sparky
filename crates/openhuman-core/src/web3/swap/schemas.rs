@@ -8,7 +8,7 @@ use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::{ControllerSchema, FieldSchema, Outcome, TypeSchema};
 
 use super::super::seams::service;
-use super::super::types::{ExecuteQuoteParams, SwapQuoteParams};
+use tinywallet_web3::crypto::service::{ExecuteQuoteParams, SwapQuoteParams};
 use super::super::{execute_inputs, json_result, opt_str, req_json};
 
 pub fn schemas() -> Vec<ControllerSchema> {
