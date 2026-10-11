@@ -3140,17 +3140,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "landlock"
-version = "0.4.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4cca98e95f35b29d469dade6724c6f96cec9236640f745a0e99b0334ec320ab1"
-dependencies = [
- "enumflags2",
- "libc",
- "thiserror 2.0.20",
-]
-
-[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4041,9 +4030,6 @@ dependencies = [
  "tinyagents-session",
  "tinyagents-tasks",
  "tinybox-bus",
- "tinybox-core",
- "tinybox-docker",
- "tinybox-jail",
  "tinybus",
  "tinychannels",
  "tinychannels-bus",
@@ -7009,42 +6995,9 @@ dependencies = [
 
 [[package]]
 name = "tinybox-bus"
-version = "0.1.19"
+version = "0.1.20"
 dependencies = [
  "serde",
-]
-
-[[package]]
-name = "tinybox-core"
-version = "0.1.19"
-dependencies = [
- "async-trait",
- "serde",
- "thiserror 2.0.20",
- "tinybox-bus",
-]
-
-[[package]]
-name = "tinybox-docker"
-version = "0.1.19"
-dependencies = [
- "async-trait",
- "serde_json",
- "tinybox-core",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "tinybox-jail"
-version = "0.1.19"
-dependencies = [
- "landlock",
- "log",
- "serde",
- "serde_json",
- "tinybox-core",
- "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7469,7 +7422,7 @@ dependencies = [
 
 [[package]]
 name = "tinymcp"
-version = "0.8.1"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7498,7 +7451,7 @@ dependencies = [
 
 [[package]]
 name = "tinymcp-bus"
-version = "0.8.1"
+version = "0.9.0"
 dependencies = [
  "schemars 1.2.2",
  "serde",
