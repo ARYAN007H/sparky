@@ -44,6 +44,7 @@ fn shutdown_hook_guard_allows_registration_after_hooks_are_drained() {
 
 #[tokio::test]
 async fn explicit_close_retains_state_for_retry_then_releases_user_state_once() {
+    let _rpc_env = crate::web3::wallet::test_support::UnreachableRpcGuard::set();
     let mut active = Some(service());
     active
         .as_mut()

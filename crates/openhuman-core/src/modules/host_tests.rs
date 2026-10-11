@@ -39,11 +39,21 @@ async fn wallet_host_callback_is_served_before_the_module_is_loaded() {
         .expect("wallet callback contract names are valid");
 
     let response: tinywallet_bus::wire::HostResponse = proxy
-        .call(tinywallet_bus::names::host_methods::WALLET_ACCOUNTS, ())
+        .call(
+            tinywallet_bus::names::host_methods::AUTHORIZE_X402_PAYMENT,
+            tinywallet_bus::wire::AuthorizeX402PaymentRequest {
+                url: "https://resource.example/".into(),
+                network: "eip155:1".into(),
+                asset: "0x0000000000000000000000000000000000000001".into(),
+                recipient: "0x0000000000000000000000000000000000000002".into(),
+                amount_atomic: 1,
+                owner: None,
+            },
+        )
         .await
         .expect("the host must serve callbacks before resolving the wallet module");
     assert!(matches!(
         response,
-        tinywallet_bus::wire::HostResponse::WalletAccounts(_)
+        tinywallet_bus::wire::HostResponse::Authorization(result) if !result.approved
     ));
 }
