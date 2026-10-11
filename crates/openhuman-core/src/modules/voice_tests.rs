@@ -386,9 +386,8 @@ async fn every_entry_point_degrades_rather_than_hanging_when_the_module_is_gone(
 
 #[test]
 fn every_member_this_client_calls_is_one_the_contract_declares() {
-    // The host's outbound members must be dispatched by the module. The
-    // module also serves native recording operations that this client does
-    // not use; additional server capabilities do not invalidate a client.
+    // Host adapters use contract constants for call sites. Keep the curated
+    // surface, including capture leases and hotkeys, aligned with the module.
     use tinyvoice_bus::names::methods;
     let called = [
         methods::ROUTE,
@@ -405,11 +404,18 @@ fn every_member_this_client_calls_is_one_the_contract_declares() {
         methods::ENCODE_WAV,
         methods::ENCODE_WAV_PCM16,
         methods::PREPARE_CAPTURE,
-        methods::RESERVE_CAPTURE,
-        methods::CAPTURE_START,
         methods::CAPTURE_POLL,
-        methods::CAPTURE_STOP,
         methods::CAPTURE_SHUTDOWN,
+        methods::CAPTURE_START,
+        methods::CAPTURE_STOP,
+        methods::RESERVE_CAPTURE,
+        methods::LIST_INPUT_DEVICES,
+        methods::RECORDING_START,
+        methods::RECORDING_FINISH,
+        methods::RECORDING_SUMMARY,
+        methods::RECORDING_CANCEL,
+        methods::READ_AUDIO_OUTPUT,
+        methods::RELEASE_AUDIO_OUTPUT,
         methods::HOTKEY_RESERVE,
         methods::HOTKEY_START,
         methods::HOTKEY_READ,

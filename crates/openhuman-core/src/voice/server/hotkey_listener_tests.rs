@@ -112,9 +112,6 @@ fn push_suppresses_duplicate_physical_edges() {
 // The paused-clock case must not compete for production admission with a
 // fixture running on another test runtime's real clock.
 #[cfg(feature = "modules")]
-static LISTENER_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
-
-#[cfg(feature = "modules")]
 #[derive(Clone, Default)]
 struct ListenerFixture {
     entered: std::sync::Arc<tokio::sync::Notify>,
@@ -230,8 +227,8 @@ async fn listener_fixture() -> (
 
 #[cfg(feature = "modules")]
 #[tokio::test]
-async fn cancelling_startup_still_closes_the_module_owned_listener() {
-    let _serial = LISTENER_TEST_LOCK.lock().await;
+#[ignore = "invoked by the isolated lifecycle regression"]
+async fn cancelling_startup_still_closes_the_module_owned_listener_fixture() {
     let (client, fixture, _service) = listener_fixture().await;
     let startup = tokio::spawn(async move {
         start_globe_with_client(client, Push, &CancellationToken::new()).await
@@ -251,8 +248,8 @@ async fn cancelling_startup_still_closes_the_module_owned_listener() {
 
 #[cfg(feature = "modules")]
 #[tokio::test]
-async fn stopping_listener_joins_its_bus_cleanup() {
-    let _serial = LISTENER_TEST_LOCK.lock().await;
+#[ignore = "invoked by the isolated lifecycle regression"]
+async fn stopping_listener_joins_its_bus_cleanup_fixture() {
     let (client, fixture, _service) = listener_fixture().await;
     fixture.allow_start.notify_one();
     let (handle, _rx) = start_globe_with_client(client, Push, &CancellationToken::new())
@@ -264,8 +261,8 @@ async fn stopping_listener_joins_its_bus_cleanup() {
 
 #[cfg(feature = "modules")]
 #[tokio::test]
-async fn lost_start_reply_recovers_the_lease_before_releasing_admission() {
-    let _serial = LISTENER_TEST_LOCK.lock().await;
+#[ignore = "invoked by the isolated lifecycle regression"]
+async fn lost_start_reply_recovers_the_lease_before_releasing_admission_fixture() {
     let (client, fixture, _service) = listener_fixture().await;
     fixture
         .lose_start_reply
@@ -287,8 +284,8 @@ async fn lost_start_reply_recovers_the_lease_before_releasing_admission() {
 
 #[cfg(feature = "modules")]
 #[tokio::test(start_paused = true)]
-async fn failed_close_retains_ownership_until_the_module_confirms_cleanup() {
-    let _serial = LISTENER_TEST_LOCK.lock().await;
+#[ignore = "invoked by the isolated lifecycle regression"]
+async fn failed_close_retains_ownership_until_the_module_confirms_cleanup_fixture() {
     let (client, fixture, _service) = listener_fixture().await;
     fixture
         .fail_close
@@ -299,4 +296,48 @@ async fn failed_close_retains_ownership_until_the_module_confirms_cleanup() {
         .unwrap();
     handle.stop().await;
     assert_eq!(fixture.closes.load(std::sync::atomic::Ordering::SeqCst), 1);
+}
+
+// Each fixture owns the process-wide Globe admission lock and its cleanup tasks.
+// Separate processes prevent paused-clock fixtures from timing out on another
+// fixture's in-flight cleanup, and runtime teardown cannot strand a shared lock.
+#[cfg(feature = "modules")]
+fn run_lifecycle_fixture(name: &str) {
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--ignored", "--exact", "--nocapture"])
+        .arg(format!(
+            "voice::server::hotkey_listener::tests::{name}_fixture"
+        ))
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success() && String::from_utf8_lossy(&output.stdout).contains("1 passed"),
+        "lifecycle fixture failed: {}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+}
+
+#[cfg(feature = "modules")]
+#[test]
+fn cancelling_startup_still_closes_the_module_owned_listener() {
+    run_lifecycle_fixture("cancelling_startup_still_closes_the_module_owned_listener");
+}
+
+#[cfg(feature = "modules")]
+#[test]
+fn stopping_listener_joins_its_bus_cleanup() {
+    run_lifecycle_fixture("stopping_listener_joins_its_bus_cleanup");
+}
+
+#[cfg(feature = "modules")]
+#[test]
+fn lost_start_reply_recovers_the_lease_before_releasing_admission() {
+    run_lifecycle_fixture("lost_start_reply_recovers_the_lease_before_releasing_admission");
+}
+
+#[cfg(feature = "modules")]
+#[test]
+fn failed_close_retains_ownership_until_the_module_confirms_cleanup() {
+    run_lifecycle_fixture("failed_close_retains_ownership_until_the_module_confirms_cleanup");
 }
