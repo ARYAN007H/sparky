@@ -41,7 +41,9 @@ impl OpenHumanChannelBackend {
             &self.config.channels_config,
             &prepared.intent.channel_id,
         ) {
-            if let Some(result) = tinychannels::relay::send_outbound_intent(&prepared.intent).await? {
+            if let Some(result) =
+                tinychannels::relay::send_outbound_intent(&prepared.intent).await?
+            {
                 return Ok(result);
             }
         }

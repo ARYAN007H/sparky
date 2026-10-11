@@ -69,7 +69,10 @@ pub(crate) async fn prepare_message(
         .call_confidential(
             "tinychannels",
             methods::PREPARE_OUTBOUND_INTENT,
-            (channel, tinychannels_bus::ChannelMessagePreparation::Legacy(message)),
+            (
+                channel,
+                tinychannels_bus::ChannelMessagePreparation::Legacy(message),
+            ),
         )
         .await
 }

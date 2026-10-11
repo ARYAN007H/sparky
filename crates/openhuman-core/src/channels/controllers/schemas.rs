@@ -354,9 +354,10 @@ fn handle_discord_check_permissions(params: Map<String, Value>) -> ControllerFut
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let p = deserialize_params::<DiscordCheckPermissionsParams>(params)?;
-        to_json(super::ops::discord_check_permissions(
-            &config, p.guild_id.trim(), p.channel_id.trim(),
-        ).await?)
+        to_json(
+            super::ops::discord_check_permissions(&config, p.guild_id.trim(), p.channel_id.trim())
+                .await?,
+        )
     })
 }
 
@@ -380,7 +381,10 @@ async fn send_with_config(config: &Config, p: SendMessageParams) -> Result<Value
         .send_prepared(prepared)
         .await
         .map_err(|error| error.to_string())?;
-    to_json(Outcome::new(raw_or_typed(result.raw.clone(), &result)?, vec![]))
+    to_json(Outcome::new(
+        raw_or_typed(result.raw.clone(), &result)?,
+        vec![],
+    ))
 }
 
 fn handle_send_reaction(params: Map<String, Value>) -> ControllerFuture {
