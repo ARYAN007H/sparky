@@ -96,8 +96,9 @@ pub(crate) const TINYDOCS: ModuleRecord = ModuleRecord {
 /// a signer locally; OpenHuman itself does not call it.
 ///
 /// The pinned v0.15.0 release carries the native wallet, Web3, and x402 bus
-/// operations, including typed configured-endpoint references. Secret-bearing operations remain confidential and require both
-/// attestation and a matching pinned digest.
+/// operations, including typed configured-endpoint references. Secret-bearing
+/// operations remain confidential and require both attestation and a matching
+/// pinned digest.
 pub(crate) const TINYWALLET: ModuleRecord = ModuleRecord {
     id: "tinywallet",
     description: "Transaction building and assembly for Bitcoin, EVM, Solana and Tron",
@@ -109,7 +110,7 @@ pub(crate) const TINYWALLET: ModuleRecord = ModuleRecord {
         PlatformAsset {
             host_key: "ubuntu-24.04-x86_64",
             archive: "tinywallet-module-0.15.0-ubuntu-24.04-x86_64.tar.gz",
-            sha256: "a2643add85f2a7fb930638ecab86d530578af7baa2eac9983b4139338e52333e",
+            sha256: "631b6304b7298522333a6570a52877aec9403ffb120601fc5e65a37e2cd3a8a7",
         },
         PlatformAsset {
             host_key: "ubuntu-24.04-arm64",

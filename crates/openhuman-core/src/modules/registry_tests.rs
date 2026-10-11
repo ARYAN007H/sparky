@@ -20,10 +20,10 @@ fn tinycomputer_registry_matches_bus_contract_and_published_release() {
 }
 
 #[test]
-fn tinywallet_registry_matches_the_verified_v0141_release_manifest() {
+fn tinywallet_registry_matches_the_verified_v015_release_manifest() {
     let wallet = find("tinywallet").expect("compiled TinyWallet module");
     assert_eq!(wallet.version, "0.15.0");
-    assert_eq!(tinywallet_bus::CONTRACT_VERSION, (1, 8));
+    assert_eq!(tinywallet_bus::CONTRACT_VERSION, (1, 9));
     assert_eq!(
         wallet.release_url,
         "https://github.com/tinyhumansai/tinywallet/releases/tag/v0.15.0"
@@ -38,7 +38,7 @@ fn tinywallet_registry_matches_the_verified_v0141_release_manifest() {
         (
             "ubuntu-24.04-x86_64",
             "tinywallet-module-0.15.0-ubuntu-24.04-x86_64.tar.gz",
-            "a2643add85f2a7fb930638ecab86d530578af7baa2eac9983b4139338e52333e",
+            "631b6304b7298522333a6570a52877aec9403ffb120601fc5e65a37e2cd3a8a7",
         ),
         (
             "ubuntu-24.04-arm64",
