@@ -37,6 +37,16 @@ impl Tool for TenantTool {
     fn parameters_schema(&self) -> Value {
         json!({"type":"object","properties":{}})
     }
+    async fn execute_with_context(&self, args: Value, _: tinytools::ToolCallOptions, context: Option<&dyn tinytools::ToolRunContext>) -> anyhow::Result<ToolResult> {
+        let thread = context.and_then(tinytools::ToolRunContext::thread_id).expect("every hosted tool has its durable conversation key");
+        let expected = match openhuman_embed::current_turn_origin().unwrap() {
+            openhuman_embed::AgentTurnOrigin::WebChat { .. } => "t1",
+            openhuman_embed::AgentTurnOrigin::ExternalChannel { .. } => "channel:telegram/sender/chat",
+            other => panic!("unexpected origin {other:?}"),
+        };
+        assert_eq!(thread, expected);
+        self.execute(args).await
+    }
     async fn execute(&self, _: Value) -> anyhow::Result<ToolResult> {
         let tenant = openhuman_embed::current_tenant()?;
         let profile = tenant.profile.expect("profile tool always has a tenant");
