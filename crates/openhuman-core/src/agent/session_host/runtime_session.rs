@@ -1106,17 +1106,13 @@ impl OpenHumanSessionHost {
             .retain_recorded_tools(
                 !self.host_only && crate::agent::tool_snapshot_scope::retain_recorded_tools(),
             );
-        if let Some(session) = self.session.clone() {
-            builder = builder.session(session_locator, session, self.runtime_transcript_meta());
-        } else {
-            builder = builder
-                .transcript(
-                    session_locator,
-                    self.runtime_transcript_stem(),
-                    self.runtime_transcript_meta(),
-                )
-                .resume_agent(self.agent_definition_name.clone());
-        }
+        let meta = self.runtime_transcript_meta();
+        builder = match self.session.clone() {
+            Some(session) => builder.session(session_locator, session, meta),
+            None => builder
+                .transcript(session_locator, self.runtime_transcript_stem(), meta)
+                .resume_agent(self.agent_definition_name.clone()),
+        };
         self.runtime_session = Some(
             builder
                 .build()
