@@ -23,7 +23,7 @@
 //! |---|---|
 //! | [`super::ops_types`] | Core types, constants, and frontmatter helpers |
 //! | [`super::ops_discover`] | Scanning root directories, scope resolution, collision handling |
-//! | [`super::ops_parse`] | SKILL.md parsing, resource inventory, skill-resource reading |
+//! | `tinyskills` | Resource inventory and shared bundle parsing |
 //! | [`super::ops_create`] | Scaffolding new SKILL.md-based skills on disk |
 //! | [`super::ops_install`] | URL-based skill installation over HTTPS |
 
@@ -41,7 +41,6 @@ pub use super::ops_install::{
     UninstallWorkflowParams, DEFAULT_INSTALL_TIMEOUT_SECS, MAX_INSTALL_TIMEOUT_SECS,
     MAX_INSTALL_URL_LEN, MAX_WORKFLOW_MD_BYTES,
 };
-pub use tinyskills::inventory_resources;
 pub use super::ops_types::{
     Workflow, WorkflowFrontmatter, WorkflowScope, MAX_WORKFLOW_RESOURCE_BYTES,
 };

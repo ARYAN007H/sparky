@@ -11,28 +11,12 @@
 //! (The `tools` glob is `#[cfg(feature = "skills")]` at its re-export site in
 //! `tools/mod.rs`, so the stub omits it — mirroring the `voice` gate.)
 //!
-//! ### Type carve-out (why `types` + `ops_types` are NOT gated)
+//! Workflow metadata in [`ops_types`] remains available with the feature off,
+//! because always-on agent and prompt code uses it. Generic tool result types
+//! come directly from `tinytools` and are independent of this feature.
 //!
-//! [`types`] and [`ops_types`] stay compiled in **both** directions. They are
-//! inert serde/std-only type definitions with zero coupling to the gated
-//! siblings, and they are load-bearing far outside this domain:
-//! `tools::traits` re-exports `ToolResult`/`ToolContent` out of [`types`] as
-//! the crate's unified tool-result type (`mcp` and
-//! ~236 files consume it), and `Workflow`/`WorkflowFrontmatter`/
-//! `WorkflowScope` from [`ops_types`] appear in always-on agent-harness and
-//! prompt signatures. Gating them would take down the entire tool trait
-//! system, MCP, and the Node runtime.
-//!
-//! The generalizable rule: **put inert types in a dep-free submodule and leave
-//! it ungated; stub only the behaviour.** The stub below therefore mirrors
-//! FUNCTIONS ONLY and re-exports the real types — zero type duplication, so
-//! strictly less drift surface than the `voice` stub (which had to re-declare
-//! `SttResult` + the `SttProvider` trait because those live inside its gated
-//! tree).
-//!
-//! Signatures in [`stub`] must match the real ones exactly — the disabled
-//! build (`cargo check --no-default-features`)
-//! is the only thing that catches drift.
+//! The disabled facade mirrors behavior functions and preserves those metadata
+//! types. Check both feature directions when changing its signatures.
 
 // Type carve-out: always compiled, both feature directions. See module docs.
 pub mod ops_types;
