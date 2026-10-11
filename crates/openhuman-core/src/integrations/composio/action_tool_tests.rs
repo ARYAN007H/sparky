@@ -1,5 +1,4 @@
 use super::*;
-use crate::agent::harness::with_current_sandbox_mode;
 use crate::config::test_env::EnvVarGuard;
 
 /// Build a minimal `Arc<Config>` with `composio.mode = "backend"`
@@ -132,10 +131,13 @@ fn sandbox_read_only_blocks_per_action_write_call() {
             "send a gmail message".to_string(),
             None,
         );
-        let result = with_current_sandbox_mode(SandboxMode::ReadOnly, async {
-            t.execute(serde_json::json!({})).await.unwrap()
-        })
-        .await;
+        let mut host = crate::agent::tinyagents::host::OpenHumanRunContext::new();
+        host.sandbox_mode = Some(SandboxMode::ReadOnly);
+        let run = host.into_tinyagents(tinyagents_harness::context::RunConfig::new("read-only"));
+        let context = tinyagents_harness::tool::ToolExecutionContext::from_run_context(
+            &run, tinyagents_harness::ids::CallId::new("action"),
+        );
+        let result = t.execute_with_context(serde_json::json!({}), Default::default(), Some(&context)).await.unwrap();
         assert!(
             result.is_error,
             "per-action Write under read-only must error"
@@ -155,10 +157,13 @@ fn sandbox_read_only_blocks_per_action_admin_call() {
             "destructive".to_string(),
             None,
         );
-        let result = with_current_sandbox_mode(SandboxMode::ReadOnly, async {
-            t.execute(serde_json::json!({})).await.unwrap()
-        })
-        .await;
+        let mut host = crate::agent::tinyagents::host::OpenHumanRunContext::new();
+        host.sandbox_mode = Some(SandboxMode::ReadOnly);
+        let run = host.into_tinyagents(tinyagents_harness::context::RunConfig::new("read-only"));
+        let context = tinyagents_harness::tool::ToolExecutionContext::from_run_context(
+            &run, tinyagents_harness::ids::CallId::new("action"),
+        );
+        let result = t.execute_with_context(serde_json::json!({}), Default::default(), Some(&context)).await.unwrap();
         assert!(result.is_error);
         let msg = error_text(&result);
         assert!(msg.contains("`admin`"), "got: {msg}");
