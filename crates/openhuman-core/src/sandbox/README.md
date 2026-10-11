@@ -195,7 +195,7 @@ The settings surface (`get_sandbox_settings`, `[security.sandbox]` and
 - Shell construction for each platform is `agent::platform_shell`.
 - The agent's `SandboxMode` is declared in its definition
   (`agent::harness::definition`) and read per call through
-  `agent::harness::current_sandbox_mode()`.
+  the explicit agent sandbox mode supplied by the tool execution context.
 
 ## Gotchas
 
