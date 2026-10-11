@@ -148,18 +148,9 @@ struct OpenHumanTurnPreludeMutable {
     pending_integration_announcement: Vec<String>,
     announced_mcp_servers: std::collections::HashSet<String>,
     pending_mcp_announcement: Vec<String>,
-    /// Live MCP tool definitions for this workspace, refreshed before each
-    /// turn so disconnects remove their deferred executors immediately.
+    /// Current catalogs and frozen names retained by the module tool adapter.
     #[cfg(feature = "mcp")]
-    connected_mcp_tools: Vec<tinymcp_bus::McpToolPresentation>,
-    /// Configured static MCP tool declarations fetched through TinyMCP's
-    /// owner cache and refreshed with the connected-server catalog.
-    #[cfg(feature = "mcp")]
-    configured_mcp_tools: Vec<tinymcp_bus::McpToolPresentation>,
-    /// `mcp_*` tool names a resumed thread was sent, so a tool recorded under
-    /// its pre-readable hashed name is restored under that name too.
-    #[cfg(feature = "mcp")]
-    recorded_mcp_tool_names: std::collections::HashSet<String>,
+    mcp_tools: prelude_integrations::McpToolCatalog,
     announced_skills: std::collections::HashSet<String>,
     pending_skill_announcement: Vec<String>,
     pending_skill_retraction: Vec<String>,
@@ -864,11 +855,7 @@ impl OpenHumanSessionHost {
                     announced_mcp_servers: self.announced_mcp_servers.clone(),
                     pending_mcp_announcement: self.pending_mcp_announcement.clone(),
                     #[cfg(feature = "mcp")]
-                    connected_mcp_tools: Vec::new(),
-                    #[cfg(feature = "mcp")]
-                    configured_mcp_tools: Vec::new(),
-                    #[cfg(feature = "mcp")]
-                    recorded_mcp_tool_names: std::collections::HashSet::new(),
+                    mcp_tools: prelude_integrations::McpToolCatalog::default(),
                     announced_skills: self.announced_skills.clone(),
                     pending_skill_announcement: self.pending_skill_announcement.clone(),
                     pending_skill_retraction: self.pending_skill_retraction.clone(),

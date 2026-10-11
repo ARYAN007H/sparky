@@ -216,7 +216,8 @@ fn connected_mcp_actions_enter_search_and_leave_on_disconnect() {
         .mutable
         .lock()
         .expect("prelude state")
-        .connected_mcp_tools = vec![tinymcp_bus::McpToolPresentation {
+        .mcp_tools
+        .connected = vec![tinymcp_bus::McpToolPresentation {
         name: "mcp_weather_forecast_abc123".into(),
         legacy_name: "mcp_forecast_legacy".into(),
         server_id: "server-1".into(),
@@ -241,7 +242,8 @@ fn connected_mcp_actions_enter_search_and_leave_on_disconnect() {
         .mutable
         .lock()
         .expect("prelude state")
-        .connected_mcp_tools
+        .mcp_tools
+        .connected
         .clear();
     prelude.refresh_delegation_tool_surface().unwrap();
     assert!(!prelude.synthesized_tool_names_for_test().contains(&action));
@@ -308,7 +310,8 @@ async fn resumed_mcp_snapshot_survives_a_cold_catalog_and_keeps_its_frozen_spec(
         .mutable
         .lock()
         .expect("prelude state")
-        .connected_mcp_tools = vec![tinymcp_bus::McpToolPresentation {
+        .mcp_tools
+        .connected = vec![tinymcp_bus::McpToolPresentation {
         name: name.into(),
         legacy_name: "mcp_forecast_legacy".into(),
         server_id: "server-1".into(),

@@ -26,7 +26,8 @@ impl OpenHumanTurnPrelude {
             .mutable
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .configured_mcp_tools
+            .mcp_tools
+            .configured
             .is_empty();
         #[cfg(not(feature = "mcp"))]
         let has_configured_mcp_tools = false;

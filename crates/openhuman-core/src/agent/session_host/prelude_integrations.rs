@@ -9,6 +9,15 @@ use tinyagents_runtime::ToolSnapshot;
 
 use super::OpenHumanTurnPrelude;
 
+/// Module-projected catalogs and the names frozen in the resumed transcript.
+#[cfg(feature = "mcp")]
+#[derive(Default)]
+pub(super) struct McpToolCatalog {
+    pub(super) connected: Vec<tinymcp_bus::McpToolPresentation>,
+    pub(super) configured: Vec<tinymcp_bus::McpToolPresentation>,
+    pub(super) recorded_names: std::collections::HashSet<String>,
+}
+
 impl OpenHumanTurnPrelude {
     /// The session's own definition, else the catalogue's entry for its id.
     pub(super) fn session_definition(
@@ -67,7 +76,7 @@ impl OpenHumanTurnPrelude {
         // knew under the pre-readable hashed name keeps resolving.
         #[cfg(feature = "mcp")]
         {
-            mutable.recorded_mcp_tool_names = recorded
+            mutable.mcp_tools.recorded_names = recorded
                 .specs()
                 .iter()
                 .filter(|spec| spec.name.starts_with("mcp_"))
@@ -193,7 +202,8 @@ impl OpenHumanTurnPrelude {
                 self.mutable
                     .lock()
                     .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .connected_mcp_tools
+                    .mcp_tools
+                    .connected
                     .clear();
                 return;
             }
@@ -237,7 +247,8 @@ impl OpenHumanTurnPrelude {
         self.mutable
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .connected_mcp_tools = prepared;
+            .mcp_tools
+            .connected = prepared;
     }
 
     /// Refreshes configured static-server declarations from TinyMCP's
@@ -249,7 +260,8 @@ impl OpenHumanTurnPrelude {
             self.mutable
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .configured_mcp_tools
+                .mcp_tools
+                .configured
                 .clear();
             return;
         };
@@ -268,7 +280,8 @@ impl OpenHumanTurnPrelude {
         self.mutable
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .configured_mcp_tools = presentations;
+            .mcp_tools
+            .configured = presentations;
     }
 
     /// Construct searchable MCP actions from the workspace's current snapshot.
@@ -295,8 +308,8 @@ impl OpenHumanTurnPrelude {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             (
-                mutable.connected_mcp_tools.clone(),
-                mutable.recorded_mcp_tool_names.clone(),
+                mutable.mcp_tools.connected.clone(),
+                mutable.mcp_tools.recorded_names.clone(),
             )
         };
         crate::mcp::registry::action_tool::deferred_connected_tools_with_legacy(
@@ -316,7 +329,8 @@ impl OpenHumanTurnPrelude {
             .mutable
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .configured_mcp_tools
+            .mcp_tools
+            .configured
             .clone();
         let security = Arc::new(crate::security::SecurityPolicy::from_config(
             &config.autonomy,
