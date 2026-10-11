@@ -229,12 +229,29 @@ pub(crate) fn local_status_for_backend(backend_name: &str) -> SandboxStatus {
 }
 
 pub async fn create_sandbox_backend(policy: &SandboxPolicy) -> SandboxBackendHandle {
+    let config = match crate::config::ops::load_config_with_timeout().await {
+        Ok(config) => config,
+        Err(_) if policy.backend == SandboxBackendKind::Docker => {
+            return docker_error_handle();
+        }
+        Err(_) => crate::config::Config::default(),
+    };
+    create_sandbox_backend_with_config(policy, &config)
+        .await
+        .unwrap_or_else(|_| docker_error_handle())
+}
+
+/// Resolve backend status with the caller's loaded configuration.
+pub async fn create_sandbox_backend_with_config(
+    policy: &SandboxPolicy,
+    config: &crate::config::Config,
+) -> Result<SandboxBackendHandle, String> {
     match policy.backend {
-        SandboxBackendKind::None => SandboxBackendHandle {
+        SandboxBackendKind::None => Ok(SandboxBackendHandle {
             kind: SandboxBackendKind::None,
             status: SandboxStatus::Ready,
             backend_id: None,
-        },
+        }),
         SandboxBackendKind::Local => {
             let os_backend = cwd_jail::default_backend();
             let backend_name = os_backend.name();
@@ -263,13 +280,21 @@ pub async fn create_sandbox_backend(policy: &SandboxPolicy) -> SandboxBackendHan
                      the handle reports inactive"
                 );
             }
-            SandboxBackendHandle {
+            Ok(SandboxBackendHandle {
                 kind: SandboxBackendKind::Local,
                 status,
                 backend_id: Some(backend_name.to_string()),
-            }
+            })
         }
-        SandboxBackendKind::Docker => docker::docker_backend_handle().await,
+        SandboxBackendKind::Docker => docker::docker_backend_handle(config).await,
+    }
+}
+
+fn docker_error_handle() -> SandboxBackendHandle {
+    SandboxBackendHandle {
+        kind: SandboxBackendKind::Docker,
+        status: SandboxStatus::Error,
+        backend_id: None,
     }
 }
 

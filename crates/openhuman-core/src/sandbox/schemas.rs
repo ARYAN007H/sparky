@@ -203,7 +203,7 @@ fn handle_status(params: Map<String, Value>) -> ControllerFuture {
             super::ops::apply_requested_backend(&mut policy, &config.sandbox, &config.runtime)
                 .map_err(|e| e.to_string())?;
         }
-        let handle = super::ops::create_sandbox_backend(&policy).await;
+        let handle = super::ops::create_sandbox_backend_with_config(&policy, &config).await?;
         to_json(Outcome::new(handle, vec![]))
     })
 }
@@ -262,7 +262,11 @@ fn handle_resolve_policy(params: Map<String, Value>) -> ControllerFuture {
 
 fn handle_cleanup_orphans(_params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async {
-        match super::docker::cleanup_orphaned_containers().await {
+        let config = match crate::config::ops::load_config_with_timeout().await {
+            Ok(config) => config,
+            Err(error) => return Err(error),
+        };
+        match super::docker::cleanup_orphaned_containers(&config).await {
             Ok(count) => to_json(Outcome::new(
                 serde_json::json!({ "cleaned": count }),
                 vec![],
