@@ -1,5 +1,5 @@
 use super::*;
-use crate::channels::context::{ChannelRuntimeContext, RouteSelectionMap, TurnModelSourceCacheMap};
+use crate::channels::context::{conversation_history_key, ChannelRuntimeContext, RouteSelectionMap, TurnModelSourceCacheMap};
 use crate::channels::host::ChannelTurnStateSubscriber;
 use crate::channels::traits::ChannelMessage;
 use crate::core::events::DomainEvent;
@@ -256,7 +256,7 @@ async fn handle_runtime_command_unknown_provider_sends_helpful_error() {
         sender_name: None,
     };
 
-    let handled = handle_runtime_command_if_needed(&ctx, &msg, Some(&channel)).await;
+    let handled = handle_runtime_command_if_needed(&ctx, &msg, Some(&channel), &conversation_history_key(&msg)).await;
     assert!(handled);
 
     let sent = channel_impl.sent.lock().unwrap();
@@ -288,7 +288,7 @@ async fn handle_runtime_command_set_model_clears_sender_history_and_persists_rou
         sender_name: None,
     };
 
-    let handled = handle_runtime_command_if_needed(&ctx, &msg, Some(&channel)).await;
+    let handled = handle_runtime_command_if_needed(&ctx, &msg, Some(&channel), &conversation_history_key(&msg)).await;
     assert!(handled);
 
     assert!(ctx
@@ -326,7 +326,7 @@ async fn handle_runtime_command_telegram_status_replies_without_agent() {
         sender_name: None,
     };
 
-    let handled = handle_runtime_command_if_needed(&ctx, &msg, Some(&channel)).await;
+    let handled = handle_runtime_command_if_needed(&ctx, &msg, Some(&channel), &conversation_history_key(&msg)).await;
     assert!(handled);
 
     let sent = channel_impl.sent.lock().unwrap();
@@ -349,7 +349,7 @@ async fn handle_runtime_command_without_target_channel_still_consumes_command() 
         sender_name: None,
     };
 
-    let handled = handle_runtime_command_if_needed(&ctx, &msg, None).await;
+    let handled = handle_runtime_command_if_needed(&ctx, &msg, None, &conversation_history_key(&msg)).await;
     assert!(handled);
 }
 
@@ -369,7 +369,7 @@ async fn handle_runtime_command_telegram_help_replies_with_remote_command_list()
         sender_name: None,
     };
 
-    let handled = handle_runtime_command_if_needed(&ctx, &msg, Some(&channel)).await;
+    let handled = handle_runtime_command_if_needed(&ctx, &msg, Some(&channel), &conversation_history_key(&msg)).await;
     assert!(handled);
 
     let sent = channel_impl.sent.lock().unwrap();
@@ -400,7 +400,7 @@ async fn handle_runtime_command_telegram_sessions_reports_empty_store() {
         sender_name: None,
     };
 
-    let handled = handle_runtime_command_if_needed(&ctx, &msg, Some(&channel)).await;
+    let handled = handle_runtime_command_if_needed(&ctx, &msg, Some(&channel), &conversation_history_key(&msg)).await;
     assert!(handled);
 
     let sent = channel_impl.sent.lock().unwrap();
@@ -434,7 +434,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         thread_ts: Some("42".into()),
         sender_name: None,
     };
-    assert!(handle_runtime_command_if_needed(&ctx, &new_msg, Some(&channel)).await);
+    assert!(handle_runtime_command_if_needed(&ctx, &new_msg, Some(&channel), &conversation_history_key(&new_msg)).await);
     assert!(ctx
         .conversation_histories
         .lock()
@@ -479,7 +479,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         thread_ts: Some("42".into()),
         sender_name: None,
     };
-    assert!(handle_runtime_command_if_needed(&ctx, &status_msg, Some(&channel)).await);
+    assert!(handle_runtime_command_if_needed(&ctx, &status_msg, Some(&channel), &conversation_history_key(&status_msg)).await);
 
     let sessions_msg = ChannelMessage {
         id: "4".into(),
@@ -491,7 +491,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         thread_ts: Some("42".into()),
         sender_name: None,
     };
-    assert!(handle_runtime_command_if_needed(&ctx, &sessions_msg, Some(&channel)).await);
+    assert!(handle_runtime_command_if_needed(&ctx, &sessions_msg, Some(&channel), &conversation_history_key(&sessions_msg)).await);
 
     let sent = channel_impl.sent.lock().unwrap();
     assert_eq!(sent.len(), 3);

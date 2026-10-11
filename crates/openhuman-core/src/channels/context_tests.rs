@@ -117,8 +117,9 @@ fn clear_and_compact_sender_history_update_cached_messages() {
         .contains_key(sender));
 }
 
-#[test]
-fn overflow_detection_covers_edge_cases() {
+#[tokio::test]
+async fn overflow_detection_covers_edge_cases() {
+    let ctx = runtime_context();
     assert!(is_context_window_overflow_error(&anyhow::anyhow!(
         "Maximum context length exceeded"
     )));

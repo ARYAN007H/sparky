@@ -226,7 +226,7 @@ async fn start_channels_inner(mut config: Config, session: CancellationToken) ->
     // Remote-control turn state (`/status` shows "in progress") for every
     // channel with the `remote_control` capability.
     let _turn_state_handle = bus.subscribe(Arc::new(
-        crate::channels::host::ChannelTurnStateSubscriber::new(config.workspace_dir.clone()),
+        crate::channels::host::ChannelTurnStateSubscriber::with_config(Arc::new(config.clone())),
     ));
     // In-chat approvals (sub-issue 2 of #3098) for every channel with the
     // `chat_approvals` capability: `Prompt`-class tool calls are gated for the
@@ -234,7 +234,10 @@ async fn start_channels_inner(mut config: Config, session: CancellationToken) ->
     // each such turn in an `ApprovalChatContext` and intercepting `yes`/`no`
     // replies for parked approvals.
     let _approval_surface_handle = bus.subscribe(Arc::new(
-        crate::channels::host::ChannelApprovalSurfaceSubscriber::new(Arc::clone(&channels_by_name)),
+        crate::channels::host::ChannelApprovalSurfaceSubscriber::with_config(
+            Arc::clone(&channels_by_name),
+            Arc::new(config.clone()),
+        ),
     ));
     tracing::debug!("[channels] registered turn-state and approval-surface subscribers");
 
