@@ -27,6 +27,10 @@ const embedContractExports = new Map(
       ["pub use tinyagents_harness::cancel::CancellationToken;"],
     ],
     [
+      "crates/openhuman-embed/src/budget.rs",
+      ["pub use tinyinference_llm::model::budget::{Budget, BudgetExceeded, BudgetSnapshot, CallBudget, Spend, SpendLimits};"],
+    ],
+    [
       "crates/openhuman-embed/src/config.rs",
       [
         "pub use tinytools::{DefaultEffect, Patterns, RuleEffect, Surface, ToolMatcher, ToolRule, ToolRules};",
@@ -36,6 +40,7 @@ const embedContractExports = new Map(
       "crates/openhuman-embed/src/lib.rs",
       [
         "pub use tinytools::ToolPolicy;",
+        "pub use tinyagents_session::port::{AgentStores, SessionStoreProvider};",
         // Existing embed tool injection API now names its contract directly.
         "pub use tinytools::{PermissionLevel, Tool, ToolExposure, ToolResult};",
         "pub use tinyinference_llm::message::MessageDelta;",

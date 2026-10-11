@@ -1065,13 +1065,6 @@
   },
   {
     "rule": "openhuman-upstream-reexport",
-    "path": "crates/openhuman-core/src/agent/goals/mod.rs",
-    "line": 13,
-    "text": "pub use tinyagents_graph::goals::{ThreadGoal, ThreadGoalStatus};",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-upstream-reexport",
     "path": "crates/openhuman-core/src/agent/harness/artifact_offload/mod.rs",
     "line": 67,
     "text": "pub use tinyagents_harness::artifacts::{",
@@ -1079,23 +1072,9 @@
   },
   {
     "rule": "openhuman-upstream-reexport",
-    "path": "crates/openhuman-core/src/agent/multimodal.rs",
-    "line": 29,
-    "text": "pub use tinyagents_harness::multimodal::{FilePayload, MultimodalError};",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-upstream-reexport",
     "path": "crates/openhuman-core/src/agent/orchestration/types.rs",
     "line": 12,
     "text": "pub use tinyagents_tasks::OrchestrationTaskStatus;",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-upstream-reexport",
-    "path": "crates/openhuman-core/src/agent/session_store/mod.rs",
-    "line": 20,
-    "text": "pub use tinyagents_session::port::{AgentStores, SessionStoreProvider};",
     "occurrence": 1
   },
   {
