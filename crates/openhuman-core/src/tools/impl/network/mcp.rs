@@ -69,6 +69,7 @@ impl Tool for McpCallTool {
             .map_err(|_| anyhow::anyhow!("missing MCP tool identifier"))?;
         let client = McpConfiguredClient::for_config(&self.config)
             .map_err(|_| anyhow::anyhow!("TinyMCP module is unavailable"))?;
+        let client_config = host::client_config(&self.config);
         let prepared = client
             .prepare_agent_tools(tinymcp_bus::PrepareAgentToolsRequest {
                 sources: vec![tinymcp_bus::McpToolSourceSpec {
@@ -101,7 +102,9 @@ impl Tool for McpCallTool {
             .get("arguments")
             .cloned()
             .ok_or_else(|| anyhow::anyhow!("missing MCP tool arguments"))?;
-        let arguments = crate::normalize_tool_arguments(arguments)
+        let arguments = client
+            .normalize_tool_arguments(&client_config, arguments)
+            .await
             .map_err(|_| anyhow::anyhow!("invalid MCP tool arguments"))?;
         Ok(Some(call.with_arguments(Value::Object(arguments))))
     }
@@ -121,21 +124,6 @@ impl Tool for McpCallTool {
             .get("arguments")
             .cloned()
             .ok_or_else(|| anyhow::anyhow!("missing required `arguments` object"))?;
-        let arguments = match crate::normalize_tool_arguments(arguments) {
-            Ok(arguments) => Value::Object(arguments),
-            Err(error) => {
-                let outcome = tinymcp_bus::McpCallOutcome::failed(
-                    &server,
-                    &tool,
-                    tinymcp_bus::McpCallError::new(tinymcp_bus::errors::INVALID_ARGUMENTS),
-                );
-                return Ok(with_outcome(
-                    ToolResult::error(format!("`arguments`: {error}")),
-                    &outcome,
-                ));
-            }
-        };
-
         let client = match McpConfiguredClient::for_config(&self.config) {
             Ok(client) => client,
             Err(_) => {
@@ -147,6 +135,23 @@ impl Tool for McpCallTool {
             }
         };
         let client_config = host::client_config(&self.config);
+        let arguments = match client
+            .normalize_tool_arguments(&client_config, arguments)
+            .await
+        {
+            Ok(arguments) => Value::Object(arguments),
+            Err(_) => {
+                let outcome = tinymcp_bus::McpCallOutcome::failed(
+                    &server,
+                    &tool,
+                    tinymcp_bus::McpCallError::new(tinymcp_bus::errors::INVALID_ARGUMENTS),
+                );
+                return Ok(with_outcome(
+                    ToolResult::error("`arguments`: invalid MCP tool arguments"),
+                    &outcome,
+                ));
+            }
+        };
         let call: tinymcp_bus::ClassifiedStaticToolCall = match client
             .call(
                 &client_config,

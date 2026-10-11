@@ -18,7 +18,7 @@ use std::{
 
 use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
-use serde_json::Value;
+use serde_json::{Map, Value};
 use tinymcp_bus::{
     agent_tools::{McpToolPresentation, PrepareAgentToolsRequest},
     config::{McpClientConfig, OpenConfiguredRequest, OpenConfiguredResponse, TransitionStatus},
@@ -368,6 +368,21 @@ impl McpConfiguredClient {
                 server: server.to_owned(),
                 tools,
             },),
+        )
+        .await
+    }
+
+    /// Normalizes host-supplied MCP arguments through TinyMCP's bounded
+    /// implementation operation.
+    pub(crate) async fn normalize_tool_arguments(
+        &self,
+        config: &McpClientConfig,
+        arguments: Value,
+    ) -> Result<Map<String, Value>, ModuleCallError> {
+        self.call_confidential(
+            config,
+            names::methods::NORMALIZE_TOOL_ARGUMENTS,
+            (Some(arguments),),
         )
         .await
     }
