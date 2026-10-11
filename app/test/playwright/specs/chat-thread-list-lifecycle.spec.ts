@@ -164,6 +164,7 @@ test.describe('Chat thread list — create, deep link, rename, delete', () => {
     // And it survives a reload — proves the rename was committed to the
     // backend, not just held in local component state.
     await page.goto('/#/chat');
+    await page.reload();
     await waitForAppReady(page);
     await dismissWalkthroughIfPresent(page);
     await expect(page.getByTestId(`thread-row-${threadId}`)).toContainText(RENAMED);
