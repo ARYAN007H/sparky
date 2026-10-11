@@ -11,7 +11,10 @@ use crate::modules::client::ModuleCallError;
 use async_trait::async_trait;
 use serde_json::Value;
 use std::sync::{Arc, Mutex};
-use tinymcp_bus::{OpenConfiguredResponse, TransitionStatus};
+use tinymcp_bus::{
+    OpenConfiguredResponse, ServerArgumentsValidation, TransitionStatus,
+    ValidateServerArgumentsRequest,
+};
 
 #[test]
 fn a_blank_identifier_is_refused_with_the_field_name() {
@@ -126,6 +129,13 @@ impl McpModulePort for RegistryPort {
         _: tinymcp_bus::PrepareAgentToolsRequest,
     ) -> Result<Vec<tinymcp_bus::McpToolPresentation>, ModuleCallError> {
         Ok(Vec::new())
+    }
+
+    async fn validate_server_arguments(
+        &self,
+        _: ValidateServerArgumentsRequest,
+    ) -> Result<ServerArgumentsValidation, ModuleCallError> {
+        std::future::ready(Err(ModuleCallError::IncompatibleContract)).await
     }
 }
 

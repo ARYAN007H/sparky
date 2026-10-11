@@ -26,6 +26,8 @@ pub use host::{http_request_tool, web_fetch_tool};
 #[cfg(feature = "mcp")]
 pub use mcp::{mcp_call_tool, McpListServersTool, McpListToolsTool};
 #[cfg(feature = "mcp")]
+pub use mcp_server_tools::configured_server_tools_from_presentations;
+#[cfg(all(feature = "mcp", test))]
 pub use mcp_server_tools::{configured_server_tools, ConfiguredMcpServerTool};
 
 /// Shared test helper for the network tools' local-only enforcement tests

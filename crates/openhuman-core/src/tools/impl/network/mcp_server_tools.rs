@@ -16,16 +16,22 @@
 //! definitions, and the secret scrubber on output, exactly as `mcp_call_tool`
 //! applies them.
 
-use std::collections::HashSet;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::Value;
+#[cfg(test)]
+use std::collections::HashSet;
+#[cfg(test)]
 use tinymcp::tools::{McpExposure, McpServerTool, McpToolInvoker, McpToolSource, SecretScrubber};
+#[cfg(test)]
 use tinymcp::McpRemoteToolExt;
 use tinytools::{PermissionLevel, Tool, ToolCategory, ToolExposure, ToolResult};
 
-use crate::config::{Config, McpToolExposure};
+use crate::config::Config;
+#[cfg(test)]
+use crate::config::McpToolExposure;
+#[cfg(test)]
 use crate::mcp::config_servers::McpServerRegistry;
 use crate::security::{SecurityPolicy, ToolOperation};
 
@@ -180,6 +186,7 @@ impl Tool for ModuleConfiguredMcpServerTool {
 ///
 /// `reserved` names are never produced — the generic bridge tools and
 /// anything else already registered keep their names.
+#[cfg(test)]
 pub fn configured_server_tools(
     config: &Config,
     registry: &Arc<McpServerRegistry>,
@@ -238,6 +245,7 @@ pub fn configured_server_tools(
 }
 
 /// The exposure `config` asks for on the server named `server`.
+#[cfg(test)]
 fn exposure_for(config: &Config, server: &str) -> McpExposure {
     let Some(declared) = config
         .mcp_client
@@ -257,6 +265,7 @@ fn exposure_for(config: &Config, server: &str) -> McpExposure {
 }
 
 /// Lists and caches `servers` off the tool-assembly path.
+#[cfg(test)]
 fn warm_in_background(
     host: Arc<crate::mcp::host::McpHost>,
     registry: Arc<McpServerRegistry>,
@@ -287,6 +296,7 @@ fn warm_in_background(
 }
 
 /// A configured server's tool under this application's call policy.
+#[cfg(test)]
 pub struct ConfiguredMcpServerTool {
     inner: McpServerTool,
     registry: Arc<McpServerRegistry>,
@@ -296,6 +306,7 @@ pub struct ConfiguredMcpServerTool {
     workspace_dir: std::path::PathBuf,
 }
 
+#[cfg(test)]
 impl ConfiguredMcpServerTool {
     fn new(
         inner: McpServerTool,
@@ -317,6 +328,7 @@ impl ConfiguredMcpServerTool {
 }
 
 #[async_trait]
+#[cfg(test)]
 impl Tool for ConfiguredMcpServerTool {
     fn name(&self) -> &str {
         self.inner.name()

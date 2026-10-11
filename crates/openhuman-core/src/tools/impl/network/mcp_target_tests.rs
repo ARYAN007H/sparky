@@ -7,9 +7,10 @@ use std::{
 
 use crate::mcp::module_client::{McpConfiguredClient, McpModulePort};
 use async_trait::async_trait;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tinymcp_bus::{
-    McpToolPresentation, OpenConfiguredResponse, PrepareAgentToolsRequest, TransitionStatus,
+    McpToolPresentation, OpenConfiguredResponse, PrepareAgentToolsRequest,
+    ServerArgumentsValidation, TransitionStatus, ValidateServerArgumentsRequest,
 };
 
 #[derive(Clone, Default)]
@@ -80,6 +81,16 @@ impl McpModulePort for PreparePort {
                     })
             })
             .collect())
+    }
+
+    async fn validate_server_arguments(
+        &self,
+        _: ValidateServerArgumentsRequest,
+    ) -> Result<ServerArgumentsValidation, crate::modules::client::ModuleCallError> {
+        std::future::ready(Err(
+            crate::modules::client::ModuleCallError::IncompatibleContract,
+        ))
+        .await
     }
 }
 
