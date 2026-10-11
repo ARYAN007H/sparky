@@ -43,7 +43,10 @@ pub(crate) async fn run_host_agent_turn(
         progress,
     } = turn;
     let mut config = host.config.clone();
-    if let Some(ceiling) = posture::tool_ceiling(&origin) {
+    let profile_ceiling = host.context.host_overrides().and_then(|host| host.profile_capabilities()).map(|caps| caps.channel_permission(&channel));
+    if let Some(ceiling) = profile_ceiling.filter(|level| *level > tinytools::PermissionLevel::ReadOnly) {
+        posture::cap_channel(&mut config, &channel, ceiling);
+    } else if let Some(ceiling) = posture::tool_ceiling(&origin) {
         posture::cap_channel(&mut config, &channel, ceiling);
         host.host_tools = host
             .host_tools
@@ -59,7 +62,7 @@ pub(crate) async fn run_host_agent_turn(
         "[channels::dispatch::host_agent] running channel turn as host agent"
     );
 
-    let mut session = host.session_host(&config, Some(&history_key))?;
+    let mut session = host.session_host(&config, Some(crate::channels::providers::relay::current_thread_id().as_deref().unwrap_or(&history_key)))?;
     // The channel names the session, which also selects the channel's
     // permission ceiling in the session's tool policy.
     session.set_event_context(history_key, channel);

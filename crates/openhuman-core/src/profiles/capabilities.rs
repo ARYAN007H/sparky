@@ -21,12 +21,12 @@ pub struct ProfileCapabilities {
     channels: HashMap<String, PermissionLevel>,
     groups: Vec<super::tools::SaasToolGroup>,
     /// The shared engine, resolved only under the forced profile memory root.
-    pub memory_engine: Option<Arc<dyn tinymemory::MemoryEngine>>,
+    pub memory_engine: Option<Arc<dyn tinymemory_api::MemoryEngine>>,
 }
 
 impl ProfileCapabilities {
     /// Construct immutable adapters. `None` names select only supplied host tools.
-    pub fn new(host: Option<HostTools>, names: Option<HashSet<String>>, permission: Option<Arc<dyn ToolHook>>, channels: HashMap<String, PermissionLevel>, groups: Vec<super::tools::SaasToolGroup>, memory_engine: Option<Arc<dyn tinymemory::MemoryEngine>>) -> Self {
+    pub fn new(host: Option<HostTools>, names: Option<HashSet<String>>, permission: Option<Arc<dyn ToolHook>>, channels: HashMap<String, PermissionLevel>, groups: Vec<super::tools::SaasToolGroup>, memory_engine: Option<Arc<dyn tinymemory_api::MemoryEngine>>) -> Self {
         Self { host, names, permission, channels, groups, memory_engine }
     }
 
@@ -118,11 +118,11 @@ impl ToolHook for ProfilePermission {
     async fn before_tool_decision(&self, context: &ToolHookContext) -> ToolHookDecision {
         let tenant = crate::core::runtime::current_tenant().ok().and_then(|tenant| tenant.profile);
         if tenant.as_deref() != Some(self.profile.as_str()) || self.fence.check_local(super::lease::now_ms()).is_err() || !self.capabilities.admits(&context.tool_name) {
-            return ToolHookDecision::Deny { reason: "tool is outside the hosted profile capability boundary".into() };
+            return ToolHookDecision::Deny("tool is outside the hosted profile capability boundary".into());
         }
         match &self.capabilities.permission {
             Some(permission) => permission.before_tool_decision(context).await,
-            None => ToolHookDecision::Deny { reason: "this profile has no host tool permission callback".into() },
+            None => ToolHookDecision::Deny("this profile has no host tool permission callback".into()),
         }
     }
 }

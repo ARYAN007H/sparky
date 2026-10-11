@@ -78,6 +78,14 @@ impl OpenHumanSessionHost {
     /// The welcome agent uses this entry point when routed from the
     /// Tauri web channel (see `channels::provider::web::build_session_agent`).
     pub fn from_config_for_agent(config: &Config, agent_id: &str) -> Result<Self> {
+        Self::from_config_for_agent_session(config, agent_id, None)
+    }
+
+    /// Build a config-routed agent with its caller's exact conversation key.
+    ///
+    /// # Errors
+    /// As [`Self::from_config_for_agent`].
+    pub fn from_config_for_agent_session(config: &Config, agent_id: &str, session_id: Option<&str>) -> Result<Self> {
         // Look up the target definition up front so we can fail fast
         // with a clear error instead of building half an agent and then
         // discovering the id is unknown. See `resolve_target_definition`
@@ -111,7 +119,12 @@ impl OpenHumanSessionHost {
                 .unwrap_or(config.default_temperature)
         );
 
-        Self::build_session_agent_inner(config, agent_id, target_def.as_ref(), false, None, None)
+        if let Some(capabilities) = crate::profiles::capabilities::ProfileCapabilities::current() {
+            let definition = target_def.ok_or_else(|| anyhow::anyhow!("profile agent definition is unavailable"))?;
+            let factory = capabilities.factory(config);
+            return Self::from_config_host_only(config, &definition, Some(&factory), session_id);
+        }
+        Self::build_session_agent_inner(config, agent_id, target_def.as_ref(), false, None, session_id)
     }
 
     /// Build a session agent from a definition the caller already holds,

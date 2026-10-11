@@ -12,7 +12,7 @@ pub(super) struct ProfileHostOptions {
     scope: Option<ToolScopeSpec>,
     permission: Option<Arc<dyn ToolHook>>,
     channels: HashMap<String, PermissionLevel>,
-    memory: Option<Arc<dyn tinymemory::MemoryEngine>>,
+    memory: Option<Arc<dyn tinymemory_api::MemoryEngine>>,
 }
 
 impl ProfileHostOptions {
@@ -63,7 +63,7 @@ impl ProfileRuntimeBuilder {
     /// Bind an existing engine through each profile's forced memory namespace.
     /// The binding is profile-local; the global SaaS engine refusal stays intact.
     #[must_use]
-    pub fn memory_engine(mut self, engine: Arc<dyn tinymemory::MemoryEngine>) -> Self {
+    pub fn memory_engine(mut self, engine: Arc<dyn tinymemory_api::MemoryEngine>) -> Self {
         self.host_options.memory = Some(engine); self
     }
 }
