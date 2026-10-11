@@ -19,32 +19,32 @@ use crate::{
 /// Lists configured MCP servers through TinyMCP's safe summary operation.
 pub struct McpListServersTool {
     config: Arc<Config>,
+    spec: tinymcp_bus::agent_tools::AgentToolSpec,
 }
 
 impl McpListServersTool {
     /// Builds the server-list tool for one configured workspace.
     #[must_use]
     pub fn new(config: Arc<Config>) -> Self {
-        Self { config }
+        Self {
+            config,
+            spec: bridge_tool_spec("mcp_list_servers"),
+        }
     }
 }
 
 #[async_trait]
 impl Tool for McpListServersTool {
     fn name(&self) -> &str {
-        "mcp_list_servers"
+        &self.spec.name
     }
 
     fn description(&self) -> &str {
-        "List named remote MCP servers registered in OpenHuman core. Use this before browsing tools on a specific MCP server."
+        &self.spec.description
     }
 
     fn parameters_schema(&self) -> Value {
-        json!({
-            "type": "object",
-            "properties": {},
-            "additionalProperties": false
-        })
+        self.spec.parameters.clone()
     }
 
     fn permission_level(&self) -> PermissionLevel {
