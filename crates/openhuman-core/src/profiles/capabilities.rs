@@ -22,6 +22,8 @@ pub struct ProfileCapabilities {
     groups: Vec<super::tools::SaasToolGroup>,
     /// The shared engine, resolved only under the forced profile memory root.
     pub memory_engine: Option<Arc<dyn tinymemory_api::MemoryEngine>>,
+    /// The operator's whole system prompt, when set.
+    system_prompt: Option<String>,
 }
 
 impl ProfileCapabilities {
@@ -41,6 +43,26 @@ impl ProfileCapabilities {
             channels,
             groups,
             memory_engine,
+            system_prompt: None,
+        }
+    }
+
+    /// Replace every profile's system prompt with `prompt`, verbatim: no
+    /// SOUL/IDENTITY files, routing text, tool guidance or style block.
+    #[must_use]
+    pub fn with_system_prompt(mut self, prompt: Option<String>) -> Self {
+        self.system_prompt = prompt;
+        self
+    }
+
+    /// Make `definition` render the operator's system prompt, if one is set.
+    pub fn apply_system_prompt(
+        &self,
+        definition: &mut crate::agent::harness::definition::AgentDefinition,
+    ) {
+        if let Some(prompt) = &self.system_prompt {
+            definition.system_prompt =
+                crate::agent::harness::definition::PromptSource::Verbatim(prompt.clone());
         }
     }
 
@@ -65,8 +87,32 @@ impl ProfileCapabilities {
         );
     }
 
+    /// Whether the operator named `name` in its tool scope and it is one of
+    /// [`OPERATOR_ADMITTABLE`](super::tools::OPERATOR_ADMITTABLE), the tools
+    /// registered although their domain family is off for profiles.
+    pub fn names_admittable(&self, name: &str) -> bool {
+        super::tools::OPERATOR_ADMITTABLE.contains(&name)
+            && self
+                .names
+                .as_ref()
+                .is_some_and(|names| names.contains(name))
+    }
+
     /// Whether a selected name may reach the host permission decision.
     pub fn admits(&self, name: &str) -> bool {
+        let binding = super::provider_settings::ProfileProviderSettings::current();
+        let canonical = match &binding {
+            Some(binding) => match binding.policy_name(name) {
+                Some(canonical) => canonical,
+                None => return false,
+            },
+            None => std::borrow::Cow::Borrowed(name),
+        };
+        self.admits_capability(&canonical)
+            && self.names.as_ref().is_none_or(|names| names.contains(name))
+    }
+
+    fn admits_capability(&self, name: &str) -> bool {
         super::tools::admits_with(name, true, &self.groups)
             && !matches!(
                 crate::tools::ops::tool_group(name),
@@ -80,9 +126,8 @@ impl ProfileCapabilities {
             )
             && !name.starts_with("delegate_")
             && !name.starts_with("mcp_")
-            && !crate::tools::toolpacks::pack_for_tool(name)
-                .is_some_and(|pack| pack.id == "workflows")
-            && self.names.as_ref().is_none_or(|names| names.contains(name))
+            && crate::tools::toolpacks::pack_for_tool(name)
+                .is_none_or(|pack| pack.id != "workflows")
     }
 
     /// An explicitly named operation can pass the supervised gate only with a host callback.
@@ -106,7 +151,13 @@ impl ProfileCapabilities {
         if let Some(names) = &self.names {
             let mut groups = ToolGroups::none();
             for name in names.iter().filter(|name| self.admits(name)) {
-                if let Some(pack) = crate::tools::toolpacks::pack_for_tool(name) {
+                let binding = super::provider_settings::ProfileProviderSettings::current();
+                let canonical = binding
+                    .as_ref()
+                    .and_then(|binding| binding.policy_name(name));
+                if let Some(pack) =
+                    crate::tools::toolpacks::pack_for_tool(canonical.as_deref().unwrap_or(name))
+                {
                     groups = groups.with(pack.id, GroupMode::Advertised);
                 }
             }
@@ -137,9 +188,24 @@ impl ProfileCapabilities {
                     .iter()
                     .map(|t| t.name().to_string())
                     .collect();
-                supplied.tools.extend(native.into_iter().filter(|tool| {
-                    self.admits(tool.name()) && !supplied_names.contains(tool.name())
-                }));
+                // Search tools are classified as ordinary platform tools, which
+                // a profile's domain set withholds. The operator's direct search
+                // settings are the profile-owned source for them, so add the
+                // roles the binding advertises; `admits` still applies.
+                let search = if config.profile_providers.is_some() {
+                    crate::search::build_search_tools(config)
+                } else {
+                    Vec::new()
+                };
+                supplied.tools.extend(
+                    native
+                        .into_iter()
+                        .filter(|tool| tool.name() != "web_search_tool")
+                        .chain(search)
+                        .filter(|tool| {
+                            self.admits(tool.name()) && !supplied_names.contains(tool.name())
+                        }),
+                );
             }
         }
         // Metadata from the host cannot widen registration or hide a registered
@@ -205,7 +271,37 @@ impl ToolHook for ProfilePermission {
             );
         }
         match &self.capabilities.permission {
-            Some(permission) => permission.before_tool_decision(context).await,
+            Some(permission) => {
+                let binding = super::provider_settings::ProfileProviderSettings::current();
+                let canonical = binding
+                    .as_ref()
+                    .and_then(|binding| binding.canonical_role_name(&context.tool_name));
+                let mut advertised = context.clone();
+                let mut rewritten = false;
+                if let Some(canonical) = canonical.filter(|name| *name != context.tool_name) {
+                    if !self.capabilities.admits_capability(canonical) {
+                        return ToolHookDecision::Deny(
+                            "canonical search capability is denied".into(),
+                        );
+                    }
+                    let mut original = context.clone();
+                    original.tool_name = canonical.to_owned();
+                    match permission.before_tool_decision(&original).await {
+                        ToolHookDecision::Proceed => {}
+                        ToolHookDecision::ProceedWith(arguments) => {
+                            advertised.arguments = arguments;
+                            rewritten = true;
+                        }
+                        refusal => return refusal,
+                    }
+                }
+                match permission.before_tool_decision(&advertised).await {
+                    ToolHookDecision::Proceed if rewritten => {
+                        ToolHookDecision::ProceedWith(advertised.arguments)
+                    }
+                    decision => decision,
+                }
+            }
             None => {
                 ToolHookDecision::Deny("this profile has no host tool permission callback".into())
             }
