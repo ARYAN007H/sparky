@@ -90,7 +90,7 @@ impl Tool for ScheduleTool {
                 if let Some(blocked) = self.enforce_mutation_allowed(action) {
                     return Ok(blocked);
                 }
-                self.handle_create_like(action, &args)
+                self.handle_create_like(action, &args).await
             }
             "cancel" | "remove" => {
                 if let Some(blocked) = self.enforce_mutation_allowed(action) {
@@ -225,7 +225,11 @@ impl ScheduleTool {
         }
     }
 
-    fn handle_create_like(&self, action: &str, args: &serde_json::Value) -> Result<ToolResult> {
+    async fn handle_create_like(
+        &self,
+        action: &str,
+        args: &serde_json::Value,
+    ) -> Result<ToolResult> {
         let command = args
             .get("command")
             .and_then(|value| value.as_str())

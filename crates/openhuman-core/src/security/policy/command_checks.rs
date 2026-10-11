@@ -240,7 +240,16 @@ impl SecurityPolicy {
             let base = normalized_command_name(base_raw);
             let args: Vec<String> = words.map(|w| w.to_ascii_lowercase()).collect();
             let joined = cmd_part.to_ascii_lowercase();
-            class = class.max(classify_segment(&base, &args, &joined));
+            let segment_class = match classify_segment(&base, &args, &joined) {
+                tinybox_core::shell::classify::CommandClass::Read => CommandClass::Read,
+                tinybox_core::shell::classify::CommandClass::Write => CommandClass::Write,
+                tinybox_core::shell::classify::CommandClass::Network => CommandClass::Network,
+                tinybox_core::shell::classify::CommandClass::Install => CommandClass::Install,
+                tinybox_core::shell::classify::CommandClass::Destructive => {
+                    CommandClass::Destructive
+                }
+            };
+            class = class.max(segment_class);
         }
         // A redirect or `tee` writes a file regardless of the base command.
         if contains_unquoted_char(command, '>')
