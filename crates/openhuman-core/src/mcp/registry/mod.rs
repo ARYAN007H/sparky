@@ -1,22 +1,18 @@
-//! MCP Registry — the host half of the user-installed server surface.
+//! MCP Registry — the host adapter for user-installed servers.
 //!
-//! The registry itself moved to `tinymcp`: the Smithery and official catalogs,
-//! the SQLite store, the live connection map, the subprocess supervisor and the
-//! browser sign-in flow all live there now. What is left here is what belongs
-//! to *this* application. A server is declared in the user's `mcp.json`
-//! (`tinymcp::registry::config_doc`); there is no install-from-catalog RPC. The
-//! app's Registry tab declares a hosted server there in one step.
+//! TinyMCP owns the catalogs, store, connections, protocol, supervisor, OAuth,
+//! and `mcp.json` document behavior. This module owns the OpenHuman RPC and
+//! agent-tool surface, product admission policy, and event translation. A
+//! server is declared in the user's `mcp.json`; there is no install-from-catalog
+//! RPC.
 //!
 //! # Modules
 //!
 //! - [`bus`] — the lifecycle subscriber that logs this domain's events.
-//! - [`store`] — the one direct reach into the registry's store that outlives
-//!   the extraction: an end-to-end test seeding the upstream response cache.
-//! - [`ops`] — the `mcp_clients` RPC handlers, delegating to the service
-//!   [`super::host`] holds and publishing this application's own events.
+//! - [`ops`] — the `mcp_clients` RPC handlers, calling the module and
+//!   publishing this application's own events.
 //! - [`config_ops`] — the `config_get` / `config_set` handlers over the
-//!   `mcp.json` document; the document contract and the reconciliation are
-//!   `tinymcp::registry::config_doc`.
+//!   module-owned `mcp.json` document.
 //! - `schemas` — the controller schemas and dispatch.
 //! - [`supervisor_events`] — what the reconnect supervisor observed each
 //!   tick, as this domain's events; the Event Log and the notification bridge
@@ -31,10 +27,8 @@
 //!
 //! # Types come from the contract
 //!
-//! Everything this module used to define — the install record, the tool shape,
-//! the status summary, the catalog records — is re-exported from
-//! `tinymcp_bus`. A parallel set of types here would mean a conversion at every
-//! call site that nothing checks.
+//! Registry payloads are re-exported from `tinymcp_bus`. A parallel set of
+//! types here would mean a conversion at every call site that nothing checks.
 
 #[cfg(feature = "mcp")]
 pub mod action_tool;
@@ -74,14 +68,11 @@ pub mod types {
 
 pub use types::{ConnStatus, InstalledServer, McpTool};
 
-/// The live connection map.
+/// Typed views over the module-owned live connection state.
 ///
-/// A thin view over the service [`super::host`] holds. It exists because the
-/// map used to be a process global and callers reached it through free
-/// functions; `tinymcp` owns it instead, so those functions become lookups
-/// through the holder. Everything here answers as though nothing were connected
-/// when the service is not up yet, which is what a caller running before boot
-/// completes should see.
+/// These adapters query TinyMCP over the bus. Before the module is available,
+/// read-only lookups report the empty state expected by callers that run before
+/// boot completes.
 #[cfg(feature = "mcp")]
 pub mod connections {
     use crate::config::Config;
