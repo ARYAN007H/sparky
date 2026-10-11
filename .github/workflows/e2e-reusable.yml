@@ -346,20 +346,12 @@ jobs:
 
       - name: Install native E2E test modules
         run: |
-          # Every shard calls Composio RPCs. Supply the connectors module
-          # (built from the checked-out submodule) so the packaged app never
-          # depends on release metadata or a runner-owned cache while tests
-          # are running.
+          # Stage all native capabilities under a trusted tree, including
+          # release manifests for confidential wallet and channel calls.
           module_root="/opt/openhuman-test-modules/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          connectors_dir="$module_root/tinyconnectors"
-          rm -rf "$connectors_dir"
-          mkdir -p "$connectors_dir"
-          bash scripts/ci-cancel-aware.sh cargo build --release \
-            --manifest-path vendor/tinyconnectors/crates/tinyconnectors/Cargo.toml
-          node scripts/ci/stage-connector-test-module.mjs \
-            vendor/tinyconnectors/target/release/libtinyconnectors.so "$connectors_dir"
-          echo "TINYCONNECTORS_TEST_MODULE=$connectors_dir/libtinyconnectors.so" \
-            >> "$GITHUB_ENV"
+          bash scripts/ci/self-hosted/install-test-modules.sh \
+            "$module_root" "$module_root/modules.env"
+          cat "$module_root/modules.env" >> "$GITHUB_ENV"
 
       - name: Run E2E shard (${{ matrix.shard.name }} — suites=${{ matrix.shard.suites }})
         env:

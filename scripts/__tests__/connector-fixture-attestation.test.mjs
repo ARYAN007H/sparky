@@ -55,18 +55,82 @@ test("native E2E installation attests the connector module before launching the 
     const command = block[1]
       .replace(/^          /gm, "")
       .replace("/opt/openhuman-test-modules", join(root, "modules"));
-    const source = join(root, "vendor/tinyconnectors/target/release");
-    mkdirSync(source, { recursive: true });
     const bytes = "pinned native connector module";
-    writeFileSync(join(source, "libtinyconnectors.so"), bytes);
-    mkdirSync(join(root, "scripts/ci"), { recursive: true });
+    const bin = join(root, "bin");
+    const cache = join(root, "cache");
+    mkdirSync(bin);
+    mkdirSync(join(cache, "blobs"), { recursive: true });
+    const rustcVersion = "fixture rustc\n";
+    const rustcDigest = createHash("sha256")
+      .update(rustcVersion)
+      .digest("hex")
+      .slice(0, 12);
+    writeFileSync(
+      join(cache, "blobs", `tinyconnectors-fixture-${rustcDigest}.so`),
+      bytes,
+    );
+    const assets = [];
+    for (const id of [
+      "tinyjuice",
+      "tinysearch",
+      "tinydocs",
+      "tinywallet",
+      "tinychannels",
+    ]) {
+      const archive = `${id}.tar.gz`;
+      const contents = join(root, `archive-${id}`);
+      mkdirSync(contents);
+      writeFileSync(join(contents, "module-fixture.so"), `released ${id}`);
+      const packed = spawnSync("tar", [
+        "-czf",
+        join(root, archive),
+        "-C",
+        contents,
+        ".",
+      ]);
+      assert.equal(packed.status, 0, packed.stderr?.toString());
+      const sha = createHash("sha256")
+        .update(readFileSync(join(root, archive)))
+        .digest("hex");
+      writeFileSync(
+        join(cache, "blobs", `${sha}-${archive}`),
+        readFileSync(join(root, archive)),
+      );
+      assets.push(
+        [id, "https://fixture.invalid/unused", archive, sha].join("\t"),
+      );
+    }
+    writeFileSync(join(root, "assets.tsv"), assets.join("\n") + "\n");
+    writeFileSync(
+      join(bin, "node"),
+      `#!/bin/sh\ncase "$1" in *test-module-assets.mjs) cat assets.tsv;; *) exec '${process.execPath}' "$@";; esac\n`,
+      { mode: 0o755 },
+    );
+    writeFileSync(
+      join(bin, "git"),
+      '#!/bin/sh\ncase "$*" in *rev-parse*) echo fixture;; esac\n',
+      { mode: 0o755 },
+    );
+    writeFileSync(join(bin, "rustc"), `#!/bin/sh\nprintf '${rustcVersion}'\n`, {
+      mode: 0o755,
+    });
+    for (const command of ["curl", "cargo"]) {
+      writeFileSync(
+        join(bin, command),
+        "#!/bin/sh\necho unexpected build or download >&2\nexit 99\n",
+        { mode: 0o755 },
+      );
+    }
+    mkdirSync(join(root, "scripts/ci/self-hosted"), { recursive: true });
     writeFileSync(
       join(root, "scripts/ci/stage-connector-test-module.mjs"),
       readFileSync(stage),
     );
     writeFileSync(
-      join(root, "scripts/ci-cancel-aware.sh"),
-      'test "$1" = cargo && test "$2" = build && test "$3" = --release\n',
+      join(root, "scripts/ci/self-hosted/install-test-modules.sh"),
+      readFileSync(
+        new URL("../ci/self-hosted/install-test-modules.sh", import.meta.url),
+      ),
     );
     const envFile = join(root, "env");
     const result = spawnSync("bash", ["-c", command], {
@@ -77,6 +141,9 @@ test("native E2E installation attests the connector module before launching the 
         GITHUB_RUN_ID: "fixture",
         GITHUB_RUN_ATTEMPT: "1",
         GITHUB_ENV: envFile,
+        PATH: `${bin}:${process.env.PATH}`,
+        CI_CACHE_DIR: cache,
+        OPENHUMAN_MODULE_PATH: "",
       },
     });
     assert.equal(result.status, 0, result.stdout + result.stderr);
@@ -91,7 +158,12 @@ test("native E2E installation attests the connector module before launching the 
     );
     assert.equal(
       readFileSync(envFile, "utf8").trim(),
-      `TINYCONNECTORS_TEST_MODULE=${destination}/libtinyconnectors.so`,
+      [
+        `TINYJUICE_TEST_MODULE=${join(root, "modules/fixture-1/tinyjuice/libtinyjuice_module.so")}`,
+        `TINYSEARCH_TEST_MODULE=${join(root, "modules/fixture-1/tinysearch/libtinysearch.so")}`,
+        `OPENHUMAN_MODULE_PATH=${["tinydocs", "tinywallet", "tinychannels"].map((id) => join(root, "modules/fixture-1", id)).join(":")}`,
+        `TINYCONNECTORS_TEST_MODULE=${destination}/libtinyconnectors.so`,
+      ].join("\n"),
     );
   } finally {
     rmSync(root, { recursive: true, force: true });

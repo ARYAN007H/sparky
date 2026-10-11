@@ -83,3 +83,19 @@ for (const [description, resolverExit] of [
     }
   });
 }
+
+for (const id of ["tinywallet", "tinychannels"]) {
+  test(`native ${id} regressions receive their pinned release fixture`, () => {
+    const assets = resolveTestModuleAssets(
+      readRegistrySource(),
+      "ubuntu-22.04-x86_64",
+    );
+    const artifact = assets.find((asset) => asset.id === id);
+    assert.ok(
+      artifact,
+      `${id} must not fall back to an untrusted runner cache`,
+    );
+    assert.match(artifact.sha256, /^[a-f0-9]{64}$/);
+    assert.match(artifact.url, /\/releases\/download\/v/);
+  });
+}
