@@ -72,11 +72,20 @@ async fn invalid_module_http_status_fails_closed_as_internal_server_error() {
 #[test]
 fn module_protocol_headers_exclude_host_authentication_secrets() {
     let mut headers = HeaderMap::new();
-    headers.insert(AUTHORIZATION, HeaderValue::from_static("Bearer private-host-token"));
-    headers.insert("proxy-authorization", HeaderValue::from_static("Basic private-proxy-token"));
+    headers.insert(
+        AUTHORIZATION,
+        HeaderValue::from_static("Bearer private-host-token"),
+    );
+    headers.insert(
+        "proxy-authorization",
+        HeaderValue::from_static("Basic private-proxy-token"),
+    );
     headers.insert("cookie", HeaderValue::from_static("session=private-cookie"));
     headers.insert(HEADER_SESSION_ID, HeaderValue::from_static("session-7"));
-    headers.insert("mcp-protocol-version", HeaderValue::from_static("2025-11-25"));
+    headers.insert(
+        "mcp-protocol-version",
+        HeaderValue::from_static("2025-11-25"),
+    );
     headers.insert("accept", HeaderValue::from_static("application/json"));
     let forwarded = request_headers(&headers);
     assert!(!forwarded.contains_key("authorization"));

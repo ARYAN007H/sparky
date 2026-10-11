@@ -234,7 +234,10 @@ fn request_headers(headers: &HeaderMap) -> Map<String, Value> {
     headers_object(headers.iter().filter_map(|(name, value)| {
         // Authentication is checked by the host. Its credentials are never
         // protocol input for the module's ordinary bus calls.
-        if matches!(name.as_str(), "authorization" | "proxy-authorization" | "cookie") {
+        if matches!(
+            name.as_str(),
+            "authorization" | "proxy-authorization" | "cookie"
+        ) {
             return None;
         }
         value
