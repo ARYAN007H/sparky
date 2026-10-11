@@ -9,6 +9,34 @@ use tokio::time::{self, Duration};
 
 pub(super) const SHELL_JOB_TIMEOUT_SECS: u64 = 120;
 
+/// Check a scheduled shell command using the parser facts from the pinned
+/// TinyBox module. The host owns the allowlist and protected-path decisions;
+/// a missing module is a refusal, never a request to parse locally.
+pub(crate) async fn authorize_shell_command(
+    config: &Config,
+    security: &SecurityPolicy,
+    command: &str,
+) -> Result<(), String> {
+    #[cfg(feature = "modules")]
+    {
+        let analysis = crate::modules::tinybox::analyze_command(config, command.to_owned())
+            .await
+            .map_err(|_| "Command analysis is unavailable.".to_owned())?;
+        security
+            .check_gated_command_analysis(&analysis)
+            .map_err(|_| "blocked by security policy: command rejected".to_owned())?;
+        if !security.is_command_allowed_analysis(&analysis) {
+            return Err("blocked by security policy: command not allowed".to_owned());
+        }
+        Ok(())
+    }
+    #[cfg(not(feature = "modules"))]
+    {
+        let _ = (config, security, command);
+        Err("Command analysis is unavailable.".to_owned())
+    }
+}
+
 pub(super) fn is_env_assignment(word: &str) -> bool {
     word.contains('=')
         && word
@@ -101,21 +129,8 @@ pub(super) async fn run_job_command_with_timeout(
         );
     }
 
-    if !security.is_command_allowed(&job.command) {
-        return (
-            false,
-            format!(
-                "blocked by security policy: command not allowed: {}",
-                job.command
-            ),
-        );
-    }
-
-    if let Some(path) = forbidden_path_argument(security, &job.command) {
-        return (
-            false,
-            format!("blocked by security policy: forbidden path argument: {path}"),
-        );
+    if let Err(reason) = authorize_shell_command(config, security, &job.command).await {
+        return (false, reason);
     }
 
     if !security.record_action() {
