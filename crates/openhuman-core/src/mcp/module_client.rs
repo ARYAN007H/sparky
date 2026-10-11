@@ -171,6 +171,19 @@ impl McpModulePort for TinyMcpPort {
             .call(MODULE, names::methods::PREPARE_AGENT_TOOLS, (request,))
             .await
     }
+
+    async fn validate_server_arguments(
+        &self,
+        request: ValidateServerArgumentsRequest,
+    ) -> Result<ServerArgumentsValidation, ModuleCallError> {
+        self.root
+            .call_confidential(
+                MODULE,
+                names::methods::VALIDATE_SERVER_ARGUMENTS,
+                (request,),
+            )
+            .await
+    }
 }
 
 /// One workspace's serialized TinyMCP lifecycle and private object proxy.
