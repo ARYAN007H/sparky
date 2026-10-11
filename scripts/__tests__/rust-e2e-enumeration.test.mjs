@@ -224,6 +224,12 @@ test("the E2E runner builds and exports its pinned search module fixture", () =>
   const end = source.indexOf('echo "[rust-e2e] Running', start);
   assert.ok(start >= 0 && end > start, "module preparation block exists");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rust-e2e-modules-"));
+  const connectorDir = path.join(dir, "vendor/tinyconnectors/target/release");
+  fs.mkdirSync(connectorDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(connectorDir, "libtinyconnectors.so"),
+    "pinned connector fixture",
+  );
   const runLog = path.join(dir, "runs.log");
   const cargo = path.join(dir, "cargo");
   fs.writeFileSync(
@@ -255,6 +261,13 @@ test("the E2E runner builds and exports its pinned search module fixture", () =>
         `search=${dir}/vendor/tinysearch/target/release/libtinysearch.so`,
       ),
       output,
+    );
+    assert.match(
+      fs.readFileSync(
+        path.join(dir, "target/test-modules/tinyconnectors/modules.toml"),
+        "utf8",
+      ),
+      /"libtinyconnectors\.so" = "[a-f0-9]{64}"/,
     );
     assert.ok(
       fs

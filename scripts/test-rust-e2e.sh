@@ -177,7 +177,9 @@ if [ -z "${TINYCONNECTORS_TEST_MODULE:-}" ]; then
   connectors_module="vendor/tinyconnectors/target/release/libtinyconnectors.so"
   echo "[rust-e2e] Building pinned TinyConnectors test module ..."
   "$CARGO_BIN" build --release --manifest-path "$connectors_manifest"
-  export TINYCONNECTORS_TEST_MODULE="$REPO_ROOT/$connectors_module"
+  connectors_module="$(node scripts/ci/stage-connector-test-module.mjs \
+    "$REPO_ROOT/$connectors_module" "$REPO_ROOT/target/test-modules/tinyconnectors")"
+  export TINYCONNECTORS_TEST_MODULE="$connectors_module"
 fi
 
 # The isolated module-admission suite requires a real native search module.

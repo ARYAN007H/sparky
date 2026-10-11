@@ -79,6 +79,8 @@ fi
 touch "${conn_cached}"
 mkdir -p "${dest}/tinyconnectors"
 cp "${conn_cached}" "${dest}/tinyconnectors/libtinyconnectors.so"
+node scripts/ci/stage-connector-test-module.mjs \
+  "${dest}/tinyconnectors/libtinyconnectors.so" "${dest}/tinyconnectors" > /dev/null
 
 {
   echo "TINYJUICE_TEST_MODULE=${dest}/tinyjuice/libtinyjuice_module.so"

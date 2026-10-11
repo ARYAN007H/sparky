@@ -174,6 +174,8 @@ if [ -z "${TINYCONNECTORS_TEST_MODULE:-}" ]; then
   connectors_module="$REPO_ROOT/vendor/tinyconnectors/target/release/libtinyconnectors.$module_ext"
   echo "Building TinyConnectors test module from the pinned submodule ..."
   cargo build --release --manifest-path "$connectors_manifest"
+  connectors_module="$(node scripts/ci/stage-connector-test-module.mjs \
+    "$connectors_module" "$REPO_ROOT/target/test-modules/tinyconnectors")"
 fi
 
 cargo_test() {
