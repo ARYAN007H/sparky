@@ -641,6 +641,7 @@ fn resumed_thread_with_retired_podcast_tool_remains_usable() {
         let requests = serde_json::to_string(&next.requests()).expect("requests");
         assert!(requests.contains("historical audio artifact"), "historical tool results replay");
         assert!(requests.contains("retired-call"), "missing tool call is returned to the model");
+        assert!(requests.contains("unknown tool"), "missing executor is a recoverable tool error");
 
         let config = crate::config::Config {
             workspace_dir: workspace,
