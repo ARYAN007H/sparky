@@ -236,8 +236,9 @@ async fn start_channels_inner(mut config: Config, session: CancellationToken) ->
     ));
     tracing::debug!("[channels] registered turn-state and approval-surface subscribers");
 
-    let listener_count = channels.len() + relay_config.as_ref().map(|_| 1).unwrap_or_default();
-    let max_in_flight_messages = compute_max_in_flight_messages(listener_count);
+    let listener_count = channels.len() + usize::from(relay_configured);
+    let max_in_flight_messages =
+        tinychannels::runtime::compute_max_in_flight_messages(listener_count);
 
     println!("  🚦 In-flight message limit: {max_in_flight_messages}");
 
