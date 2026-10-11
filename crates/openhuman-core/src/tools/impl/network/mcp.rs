@@ -7,7 +7,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use serde_json::Value;
+use serde_json::{Value, json};
 use tinytools::{IndirectCall, PermissionLevel, Tool, ToolCallOptions, ToolResult};
 
 use crate::{
@@ -16,7 +16,131 @@ use crate::{
     security::{SecurityPolicy, ToolOperation},
 };
 
-pub use tinymcp::tools::{McpListServersTool, McpListToolsTool};
+pub use tinymcp::tools::McpListServersTool;
+
+/// The host adapter for browsing tools on one configured static server.
+pub struct McpListToolsTool {
+    config: Arc<Config>,
+    spec: tinymcp_bus::agent_tools::AgentToolSpec,
+}
+
+impl McpListToolsTool {
+    /// Builds the browsing tool for one configured MCP client.
+    #[must_use]
+    pub fn new(config: Arc<Config>) -> Self {
+        let spec = bridge_tool_spec("mcp_list_tools");
+        Self { config, spec }
+    }
+}
+
+#[async_trait]
+impl Tool for McpListToolsTool {
+    fn name(&self) -> &str {
+        &self.spec.name
+    }
+
+    fn description(&self) -> &str {
+        &self.spec.description
+    }
+
+    fn parameters_schema(&self) -> Value {
+        self.spec.parameters.clone()
+    }
+
+    fn permission_level(&self) -> PermissionLevel {
+        PermissionLevel::ReadOnly
+    }
+
+    fn supports_markdown(&self) -> bool {
+        true
+    }
+
+    async fn execute(&self, args: Value) -> anyhow::Result<ToolResult> {
+        let server = required_string_arg(&args, "server")?;
+        let client = match McpConfiguredClient::for_config(&self.config) {
+            Ok(client) => client,
+            Err(_) => return Ok(ToolResult::error("mcp_list_tools failed: TinyMCP is unavailable")),
+        };
+        let client_config = host::client_config(&self.config);
+        let remote: Vec<tinymcp_bus::McpRemoteTool> = match client
+            .call(
+                &client_config,
+                tinymcp_bus::names::methods::STATIC_LIST_TOOLS,
+                (server.as_str(),),
+            )
+            .await
+        {
+            Ok(remote) => remote,
+            Err(_) => return Ok(ToolResult::error("mcp_list_tools failed: module call failed")),
+        };
+        let remote = match client
+            .scrub_static_tools(&client_config, &server, remote)
+            .await
+        {
+            Ok(remote) => remote,
+            Err(_) => return Ok(ToolResult::error("mcp_list_tools failed: metadata scrubbing failed")),
+        };
+
+        let mut display = Vec::with_capacity(remote.len());
+        for tool in remote {
+            let projected: tinymcp_bus::RemoteToolDisplay = match client
+                .call(
+                    &client_config,
+                    tinymcp_bus::names::methods::DISPLAY_REMOTE_TOOL,
+                    (tool.clone(),),
+                )
+                .await
+            {
+                Ok(projected) => projected,
+                Err(_) => return Ok(ToolResult::error("mcp_list_tools failed: tool display failed")),
+            };
+            display.push((tool, projected));
+        }
+
+        let policy_tools = display
+            .iter()
+            .map(|(tool, projected)| tinymcp_bus::McpTool {
+                name: tool.name.clone(),
+                description: projected.description.clone().or(projected.title.clone()),
+                input_schema: tool.input_schema.clone(),
+            })
+            .collect();
+        let safe = crate::mcp::registry::tools_safe_for_agent(&server, policy_tools);
+        let safe_names: std::collections::HashSet<_> =
+            safe.into_iter().map(|tool| tool.name).collect();
+        let payload = display
+            .into_iter()
+            .filter(|(tool, _)| safe_names.contains(&tool.name))
+            .map(|(tool, projected)| {
+                json!({
+                    "name": tool.name,
+                    "title": projected.title,
+                    "description": projected.description,
+                    "input_schema": tool.input_schema,
+                })
+            })
+            .collect::<Vec<_>>();
+        let mut markdown = format!("# MCP Tools: `{server}`\n");
+        if payload.is_empty() {
+            markdown.push_str("\nNo tools were returned by the remote server.");
+        } else {
+            for tool in &payload {
+                let name = tool["name"].as_str().unwrap_or_default();
+                let description = tool["description"]
+                    .as_str()
+                    .or_else(|| tool["title"].as_str())
+                    .unwrap_or("No description.");
+                let schema = serde_json::to_string(&tool["input_schema"])
+                    .unwrap_or_else(|_| "{}".to_owned());
+                markdown.push_str(&format!("\n- **{name}**: {description}\n  - schema: `{schema}`"));
+            }
+        }
+        Ok(ToolResult::success_with_markdown(
+            json!({ "server": server, "tools": payload }),
+            markdown,
+        ))
+    }
+}
 
 /// The host's `mcp_call_tool`, backed by TinyMCP's module-owned static server
 /// call operation.
@@ -28,16 +152,20 @@ pub struct McpCallTool {
 
 impl McpCallTool {
     fn new(config: Arc<Config>, security: Arc<SecurityPolicy>) -> Self {
-        let spec = tinymcp_bus::agent_tools::bridge_tool_specs()
-            .into_iter()
-            .find(|spec| spec.name == "mcp_call_tool")
-            .expect("TinyMCP bridge contract includes mcp_call_tool");
+        let spec = bridge_tool_spec("mcp_call_tool");
         Self {
             config,
             security,
             spec,
         }
     }
+}
+
+fn bridge_tool_spec(name: &str) -> tinymcp_bus::agent_tools::AgentToolSpec {
+    tinymcp_bus::agent_tools::bridge_tool_specs()
+        .into_iter()
+        .find(|spec| spec.name == name)
+        .expect("TinyMCP bridge contract includes the requested tool")
 }
 
 #[async_trait]
