@@ -19,13 +19,13 @@ use tokio::sync::mpsc::Sender;
 use crate::agent::harness::definition::SandboxMode;
 use crate::agent::harness::fork_context::{AgentContextPreparedSource, ParentExecutionContext};
 use crate::agent::progress::AgentProgress;
-use crate::agent::stop_hooks::StopHook;
 use crate::agent::subagent_host::SubagentUsage;
 use crate::agent::tinyagents::turn_outcome::ToolOutcomeSink;
 use crate::agent::tinyagents::{
     turn_outcome::ToolCallOutcome, turn_policy::ToolPolicyEnforcement, TurnContextMiddleware,
 };
 use crate::agent::turn_origin::AgentTurnOrigin;
+use tinyagents_harness::middleware::StopHook;
 use tinyagents_harness::store::InMemoryStore as ToolResultArtifactIndexStore;
 use tinyinference_llm::model::ResolvedModelRoute;
 
@@ -279,7 +279,7 @@ pub struct OpenHumanRunContext {
     /// UI/event progress receiver for this turn tree.
     pub progress: Option<Sender<AgentProgress>>,
     /// Stop policies evaluated after each model call.
-    pub stop_hooks: Vec<Arc<dyn StopHook>>,
+    pub stop_hooks: Vec<Arc<dyn StopHook<crate::agent::cost::TurnCost>>>,
     /// Wall-clock deadline of the top-level turn this run belongs to, set
     /// only by the session turn entry point from the web backstop
     /// (`agent::turn_deadline`). The harness winds the run down and clamps
