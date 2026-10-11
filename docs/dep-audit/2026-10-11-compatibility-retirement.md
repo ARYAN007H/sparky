@@ -54,5 +54,7 @@ endpoint/auth values. Existing native tests cover policy-context redaction,
 cache fallback, route-based local usage and scoped cancellation.
 
 The issue names scripts/e2e-core.sh, which is absent at this base. The supported
-mock-backed runner is scripts/test-rust-e2e.sh --suite json_rpc_e2e, with test
-filters forwarded after --. Actual command results belong in the PR body.
+full-product mock-backed runner is scripts/test-rust-e2e.sh --suite json_rpc_e2e.
+This change verifies affected JSON-RPC cases directly through the native Cargo
+target; that does not claim a full-product runner or compose pass. Actual
+command results belong in the PR body.
