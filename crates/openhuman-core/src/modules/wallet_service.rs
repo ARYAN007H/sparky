@@ -90,7 +90,10 @@ async fn ensure_native_wallet(
             configuration.clone(),
         )
         .await?;
-        if let Err(error) = super::wallet_host::bind_endpoint_references(&response) {
+        if let Err(error) = super::wallet_host::bind_endpoint_references(
+            &response.service.handle,
+            &response.endpoint_references,
+        ) {
             let _ = wallet::call::<_, ()>(
                 config,
                 methods::NATIVE_WALLET_CLOSE,
@@ -207,6 +210,7 @@ pub(crate) async fn execute_native_transfer(
         super::wallet_host::ApprovalKind::Native,
         &params.quote_id,
         Some(quote),
+        None,
         wallet::call_confidential(config, methods::NATIVE_WALLET_EXECUTE_PREPARED, &request),
     )
     .await;
@@ -272,7 +276,7 @@ async fn close_native_wallet(
         },
     )
     .await?;
-    super::wallet_host::clear_endpoint_references();
+    super::wallet_host::clear_endpoint_references(&service.response.service.handle);
     Ok(())
 }
 
@@ -304,14 +308,19 @@ where
     F: FnOnce(NativeWalletCloseRequest) -> Fut,
     Fut: Future<Output = Result<(), WalletCallError>>,
 {
-    if let Some(service) = active.as_ref() {
+    let handle = if let Some(service) = active.as_ref() {
         close(NativeWalletCloseRequest {
             service: service.response.service.clone(),
         })
         .await?;
-    }
+        Some(service.response.service.handle.clone())
+    } else {
+        None
+    };
     *active = None;
-    super::wallet_host::clear_endpoint_references();
+    if let Some(handle) = handle {
+        super::wallet_host::clear_endpoint_references(&handle);
+    }
     Ok(())
 }
 
@@ -335,7 +344,7 @@ fn finish_shutdown_hook_registration(registered: &AtomicBool) {
     registered.store(false, Ordering::Release);
 }
 
-fn native_wallet_config_request() -> NativeWalletConfigRequest {
+pub(super) fn native_wallet_config_request() -> NativeWalletConfigRequest {
     let mut overridden_endpoints = Vec::new();
     for network in EvmNetwork::ALL {
         let name = crate::web3::wallet::endpoints::evm_rpc_env_var(network);

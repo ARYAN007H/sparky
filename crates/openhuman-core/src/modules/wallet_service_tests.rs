@@ -74,14 +74,17 @@ async fn explicit_close_retains_state_for_retry_then_releases_user_state_once() 
         );
     let configured = tinywallet_bus::wire::NativeWalletConfigResponse {
         service: NativeWalletServiceHandle {
-            handle: "old-user-service".into(),
+            handle: "opaque-service-handle".into(),
         },
         endpoint_references: vec![tinywallet_bus::wire::HostEndpointReference {
             key: tinywallet_bus::wire::RpcEndpointKey::Btc,
             reference: "old-user-endpoint".into(),
         }],
     };
-    super::super::wallet_host::bind_endpoint_references(&configured)
+    super::super::wallet_host::bind_endpoint_references(
+        &configured.service.handle,
+        &configured.endpoint_references,
+    )
         .expect("fixture endpoint alias should bind");
     let close_calls = Arc::new(AtomicUsize::new(0));
     let observed_calls = close_calls.clone();

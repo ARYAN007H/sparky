@@ -30,6 +30,8 @@ pub mod client;
 #[cfg(feature = "web3")]
 pub mod dapp;
 #[cfg(feature = "web3")]
+mod module_tools;
+#[cfg(feature = "web3")]
 pub mod seams;
 #[cfg(feature = "web3")]
 pub mod swap;
@@ -129,19 +131,13 @@ pub fn all_web3_registered_controllers() -> Vec<RegisteredController> {
 /// gracefully (rather than being hidden) when the user is not signed in.
 #[cfg(feature = "web3")]
 pub fn all_web3_agent_tools() -> Vec<Box<dyn Tool>> {
-    use tinywallet_web3::tools::web3::{
-        Web3BridgeExecuteTool, Web3BridgeQuoteTool, Web3DappCallTool, Web3DappExecuteTool,
-        Web3SwapExecuteTool, Web3SwapQuoteTool, Web3SwapRoutesTool,
-    };
-
-    let service = seams::service();
-    vec![
-        Box::new(Web3SwapQuoteTool::new(service.clone())),
-        Box::new(Web3SwapExecuteTool::new(service.clone())),
-        Box::new(Web3SwapRoutesTool::new(service.clone())),
-        Box::new(Web3BridgeQuoteTool::new(service.clone())),
-        Box::new(Web3BridgeExecuteTool::new(service.clone())),
-        Box::new(Web3DappCallTool::new(service.clone())),
-        Box::new(Web3DappExecuteTool::new(service)),
-    ]
+    tinywallet_bus::tools::web3_tool_declarations()
+        .iter()
+        .map(|declaration| {
+            Box::new(module_tools::Web3ModuleTool::new(
+                tinywallet_bus::tools::find_web3_tool_declaration(declaration.name)
+                    .expect("the declaration came from the shipped Web3 list"),
+            )) as Box<dyn Tool>
+        })
+        .collect()
 }
