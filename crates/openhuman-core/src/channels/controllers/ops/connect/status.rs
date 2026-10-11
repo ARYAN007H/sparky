@@ -1,7 +1,7 @@
 //! Channel connection status, the default proactive-delivery channel, and
 //! the merged set of currently-connected channel slugs.
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use crate::config::Config;
 use crate::core::Outcome;

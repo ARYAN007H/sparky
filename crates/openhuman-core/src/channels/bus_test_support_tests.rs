@@ -2,7 +2,7 @@
 
 use super::*;
 use tinychannels::delivery::progressive::{
-    StreamingState, extract_message_id, latest_thinking_snippet,
+    extract_message_id, latest_thinking_snippet, StreamingState,
 };
 
 pub fn extract_message_id_for_test(resp: &serde_json::Value) -> Option<String> {

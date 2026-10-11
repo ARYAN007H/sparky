@@ -21,8 +21,8 @@
 
 use crate::channels::{Channel, ChannelSendExt, SendMessage};
 use crate::core::events::DomainEvent;
-use crate::web_chat::WebChannelEvent;
 use crate::web_chat::publish_web_channel_event;
+use crate::web_chat::WebChannelEvent;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};

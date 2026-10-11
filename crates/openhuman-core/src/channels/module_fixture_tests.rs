@@ -109,10 +109,10 @@ async fn linked_module_prepares_runtime_limits_over_confidential_bus_call() {
 
 #[tokio::test]
 async fn linked_module_prepares_legacy_inbound_facts_over_confidential_bus_call() {
-    use tinychannels_bus::ChannelMessage;
     use tinychannels_bus::module_inbound::{
         ChannelInboundSource, PrepareChannelInboundRequest, PreparedChannelInbound,
     };
+    use tinychannels_bus::ChannelMessage;
 
     let message = ChannelMessage {
         id: "message-1".into(),

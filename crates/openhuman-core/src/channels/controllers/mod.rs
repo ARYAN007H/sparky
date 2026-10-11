@@ -8,8 +8,8 @@ mod schemas;
 pub use backend::OpenHumanChannelBackend;
 
 pub use definitions::{
-    AuthModeSpec, ChannelAuthMode, ChannelCapability, ChannelDefinition, FieldRequirement,
-    all_channel_definitions, find_channel_definition,
+    all_channel_definitions, find_channel_definition, AuthModeSpec, ChannelAuthMode,
+    ChannelCapability, ChannelDefinition, FieldRequirement,
 };
 
 pub use schemas::all_controller_schemas as all_channels_controller_schemas;
