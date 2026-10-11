@@ -645,7 +645,7 @@ pub fn all_tools_with_runtime(
             tools.push(Box::new(McpListServersTool::new(Arc::clone(&mcp_registry))));
             tools.push(Box::new(McpListToolsTool::new(Arc::clone(&mcp_registry))));
             tools.push(Box::new(mcp_call_tool(
-                Arc::clone(&mcp_registry),
+                Arc::new(root_config.clone()),
                 security.clone(),
             )));
             tracing::debug!(
