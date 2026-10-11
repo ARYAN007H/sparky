@@ -38,7 +38,7 @@ impl Tool for TenantTool {
         json!({"type":"object","properties":{}})
     }
     async fn execute(&self, _: Value) -> anyhow::Result<ToolResult> {
-        let tenant = openhuman_core::core::runtime::current_tenant()?;
+        let tenant = openhuman_embed::current_tenant()?;
         let profile = tenant.profile.expect("profile tool always has a tenant");
         match openhuman_embed::current_turn_origin().expect("a host turn has its original route") {
             openhuman_embed::AgentTurnOrigin::WebChat { thread_id, .. } => {
@@ -148,7 +148,7 @@ async fn scenario() {
     let engine = Arc::new(ReferenceEngine::new());
     let runtime = ProfileRuntime::builder(SaasConfig::new(root.path()))
         .tools(move |turn| {
-            let profile = openhuman_core::core::runtime::current_tenant()
+            let profile = openhuman_embed::current_tenant()
                 .unwrap()
                 .profile
                 .unwrap();
