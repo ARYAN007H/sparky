@@ -42,25 +42,17 @@ pub(crate) fn try_acquire_run(job_id: &str) -> Option<ActiveRunGuard> {
     })
 }
 
-pub async fn add_once(config: &Config, delay: &str, command: &str) -> Result<CronJob> {
+pub fn add_once(config: &Config, delay: &str, command: &str) -> Result<CronJob> {
     let duration = parse_human_delay(delay)?;
     let at = chrono::Utc::now() + duration;
-    add_once_at(config, at, command).await
+    add_once_at(config, at, command)
 }
 
-pub async fn add_once_at(
+pub fn add_once_at(
     config: &Config,
     at: chrono::DateTime<chrono::Utc>,
     command: &str,
 ) -> Result<CronJob> {
-    let security = SecurityPolicy::from_config(
-        &config.autonomy,
-        &config.workspace_dir,
-        &config.action_dir,
-    );
-    crate::cron::scheduler::shell_job::authorize_shell_command(config, &security, command)
-        .await
-        .map_err(anyhow::Error::msg)?;
     let schedule = Schedule::At { at };
     add_shell_job(config, None, schedule, command)
 }

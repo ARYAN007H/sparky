@@ -367,6 +367,15 @@ impl ScheduleTool {
 
         // ── Shell job (command provided) ─────────────────────────────
         let command = command.unwrap();
+        if let Err(reason) = crate::cron::scheduler::shell_job::authorize_shell_command(
+            &self.config,
+            &self.security,
+            command,
+        )
+        .await
+        {
+            return Ok(ToolResult::error(reason));
+        }
 
         if let Some(value) = expression {
             let job = cron::add_job(&self.config, value, command)?;
@@ -380,7 +389,7 @@ impl ScheduleTool {
         }
 
         if let Some(value) = delay {
-            let job = cron::add_once(&self.config, value, command).await?;
+            let job = cron::add_once(&self.config, value, command)?;
             return Ok(ToolResult::success(format!(
                 "Created one-shot job {} (runs at: {}, cmd: {})",
                 job.id,
@@ -394,7 +403,7 @@ impl ScheduleTool {
             .map_err(|error| anyhow::anyhow!("Invalid run_at timestamp: {error}"))?
             .with_timezone(&Utc);
 
-        let job = cron::add_once_at(&self.config, run_at_parsed, command).await?;
+        let job = cron::add_once_at(&self.config, run_at_parsed, command)?;
         Ok(ToolResult::success(format!(
             "Created one-shot job {} (runs at: {}, cmd: {})",
             job.id,
