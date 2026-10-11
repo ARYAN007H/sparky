@@ -39,7 +39,7 @@ fn fresh_workspace_config() -> (tempfile::TempDir, Config) {
 
 async fn install_server(config: &Config, name: &str, server: Value) -> String {
     let document = json!({"mcpServers": {name: server}});
-    let applied = openhuman_core::mcp::registry::config_ops::mcp_clients_config_set(config, document)
+    openhuman_core::mcp::registry::config_ops::mcp_clients_config_set(config, document)
         .await
         .expect("apply mcp.json through the module");
     let status = openhuman_core::mcp::registry::ops::mcp_clients_status(config)
@@ -47,18 +47,7 @@ async fn install_server(config: &Config, name: &str, server: Value) -> String {
         .expect("list the module-owned installs");
     status.value["servers"]
         .as_array()
-        .and_then(|servers| {
-            servers.iter().find(|entry| {
-                entry["qualified_name"] == name
-                    || entry["name"] == name
-                    || entry["server_id"].as_str().is_some_and(|id| {
-                        applied.value["added"]
-                            .as_array()
-                            .is_some_and(|added| added.iter().any(|added| added == name))
-                            && !id.is_empty()
-                    })
-            })
-        })
+        .and_then(|servers| servers.iter().find(|entry| entry["qualified_name"] == name))
         .and_then(|entry| entry["server_id"].as_str())
         .map(str::to_owned)
         .expect("applied server appears in module status")
@@ -81,13 +70,9 @@ fn http_server(url: &str) -> Value {
 async fn module_tool_call_reports_unknown_tool_as_error() {
     let (_tmp, config) = fresh_workspace_config();
     let server_id = install_server(&config, "@openhuman-test/echo", stdio_server()).await;
-    openhuman_core::mcp::registry::ops::mcp_clients_set_enabled(
-        &config,
-        server_id.clone(),
-        true,
-    )
-    .await
-    .expect("enable server");
+    openhuman_core::mcp::registry::ops::mcp_clients_set_enabled(&config, server_id.clone(), true)
+        .await
+        .expect("enable server");
     openhuman_core::mcp::registry::ops::mcp_clients_connect(&config, server_id.clone())
         .await
         .expect("connect stdio fixture through TinyBus");
@@ -112,35 +97,23 @@ async fn module_tool_call_reports_unknown_tool_as_error() {
 async fn disabling_server_drops_its_live_module_connection() {
     let (_tmp, config) = fresh_workspace_config();
     let server_id = install_server(&config, "@openhuman-test/echo", stdio_server()).await;
-    openhuman_core::mcp::registry::ops::mcp_clients_set_enabled(
-        &config,
-        server_id.clone(),
-        true,
-    )
-    .await
-    .expect("enable server");
+    openhuman_core::mcp::registry::ops::mcp_clients_set_enabled(&config, server_id.clone(), true)
+        .await
+        .expect("enable server");
     openhuman_core::mcp::registry::ops::mcp_clients_connect(&config, server_id.clone())
         .await
         .expect("connect stdio fixture through TinyBus");
     assert!(
-        openhuman_core::mcp::registry::connections::is_connected_for_config(
-            &config, &server_id
-        )
-        .await
+        openhuman_core::mcp::registry::connections::is_connected_for_config(&config, &server_id)
+            .await
     );
 
-    openhuman_core::mcp::registry::ops::mcp_clients_set_enabled(
-        &config,
-        server_id.clone(),
-        false,
-    )
-    .await
-    .expect("disable server");
+    openhuman_core::mcp::registry::ops::mcp_clients_set_enabled(&config, server_id.clone(), false)
+        .await
+        .expect("disable server");
     assert!(
-        !openhuman_core::mcp::registry::connections::is_connected_for_config(
-            &config, &server_id
-        )
-        .await,
+        !openhuman_core::mcp::registry::connections::is_connected_for_config(&config, &server_id)
+            .await,
         "disabling an install must close the module-owned connection"
     );
 }
@@ -155,20 +128,15 @@ async fn disabled_server_accepts_environment_update_without_reconnecting() {
     let mut env = HashMap::new();
     env.insert("API_KEY".to_owned(), "test-only-secret".to_owned());
 
-    let result = openhuman_core::mcp::registry::ops::mcp_clients_update_env(
-        &config,
-        server_id.clone(),
-        env,
-    )
-    .await
-    .expect("confidential disabled-server update succeeds");
+    let result =
+        openhuman_core::mcp::registry::ops::mcp_clients_update_env(&config, server_id.clone(), env)
+            .await
+            .expect("confidential disabled-server update succeeds");
     assert_eq!(result.value["status"], "disabled");
     assert_eq!(result.value["env_keys"], json!(["API_KEY"]));
     assert!(
-        !openhuman_core::mcp::registry::connections::is_connected_for_config(
-            &config, &server_id
-        )
-        .await
+        !openhuman_core::mcp::registry::connections::is_connected_for_config(&config, &server_id)
+            .await
     );
 }
 
