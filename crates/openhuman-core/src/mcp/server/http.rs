@@ -181,14 +181,6 @@ async fn http_session_request(
         internal_session_id: internal_session_id.clone(),
         headers: request_headers(headers),
     };
-    let local_cleanup = if method == ServerHttpSessionMethod::Delete {
-        match session.as_ref() {
-            Some(session) => session.terminate_callbacks().await.err(),
-            None => None,
-        }
-    } else {
-        None
-    };
     let metadata = match state.port.http_session(request).await {
         Ok(metadata) => metadata,
         Err(error) => return server_error(ServerError::Module(error)),
@@ -204,6 +196,10 @@ async fn http_session_request(
             .into_response();
     }
     if method == ServerHttpSessionMethod::Delete && response.status() == StatusCode::NO_CONTENT {
+        let local_cleanup = match session.as_ref() {
+            Some(session) => session.terminate_callbacks().await.err(),
+            None => None,
+        };
         if let Some(requested_session_id) = requested_session_id {
             state.sessions.lock().await.remove(&requested_session_id);
         }
