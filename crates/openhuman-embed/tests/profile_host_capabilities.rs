@@ -347,13 +347,15 @@ async fn scenario() {
             .unwrap();
     }
     for handle in &handles {
-        let response: Value = handle
-            .call(
-                "openhuman.memory_items_list",
-                json!({"filter":{"reach":{"at":"","descendants":true,"inherit":true}}}),
-            )
-            .await
-            .unwrap();
+        let response: Value = tokio::time::timeout(Duration::from_secs(30), async {
+            loop {
+                let response: Value = handle.call("openhuman.memory_items_list", json!({"filter":{"reach":{"at":"","descendants":true,"inherit":true}}})).await.unwrap();
+                if response.to_string().contains(&format!("{}-native-learning", handle.id())) { break response; }
+                // Native writes acknowledge their durable local queue. Await the
+                // queued worker's store before checking the real engine contents.
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        }).await.expect("the native memory write reaches the shared engine");
         let text = response.to_string();
         assert!(
             text.contains(&format!("{}-secret", handle.id())),
