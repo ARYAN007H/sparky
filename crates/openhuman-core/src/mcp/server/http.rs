@@ -194,6 +194,7 @@ async fn http_session_request(
         if let Some(requested_session_id) = requested_session_id {
             state.sessions.lock().await.remove(&requested_session_id);
         }
+    }
     response
 }
 

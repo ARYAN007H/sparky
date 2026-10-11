@@ -34,6 +34,8 @@ mod http;
 #[cfg(feature = "mcp")]
 mod local;
 #[cfg(feature = "mcp")]
+mod module;
+#[cfg(feature = "mcp")]
 mod resources;
 #[cfg(feature = "mcp")]
 mod stdio;
