@@ -210,7 +210,9 @@ async fn call_docker_status_with_grace(
     request: contract::DockerStatusRequest,
     grace: Duration,
 ) -> Result<contract::DockerStatus, String> {
-    let client = client.clone();
+    let client = client
+        .clone()
+        .with_timeout(docker_control_deadline(request.timeout_ms, grace));
     call_with_client(&client, DOCKER_STATUS, (request,), false).await
 }
 
