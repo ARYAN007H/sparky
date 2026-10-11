@@ -222,8 +222,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
 
 fn handle_list(_params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let manager = ChannelManager::new(ChannelsConfig::default(), ());
-        to_json(Outcome::new(manager.list_definitions(), vec![]))
+        to_json(Outcome::new(super::definitions::all_channel_definitions(), vec![]))
     })
 }
 
@@ -231,9 +230,7 @@ fn handle_describe(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<DescribeParams>(params)?;
         let channel = p.channel.trim();
-        let manager = ChannelManager::new(ChannelsConfig::default(), ());
-        let definition = manager
-            .describe(channel)
+        let definition = super::definitions::find_channel_definition(channel)
             .ok_or_else(|| format!("unknown channel: {channel}"))?;
         to_json(Outcome::new(definition, vec![]))
     })
