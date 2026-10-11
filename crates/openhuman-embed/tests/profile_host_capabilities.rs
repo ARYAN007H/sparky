@@ -214,9 +214,9 @@ async fn scenario() {
             Some(format!("user:{user}").as_str())
         );
         let profile = handle.scope(async { openhuman_core::profiles::host::current().unwrap() }).await;
-        profile.fence.renewed(0);
+        profile.lease_fence().renewed(0);
         assert!(!handle.scope(async { openhuman_core::memory::engine::is_on(handle.context().embedder_config().unwrap()) }).await, "expired profile memory must fail closed");
-        profile.fence.renewed(u64::MAX);
+        profile.lease_fence().renewed(u64::MAX);
         tokio::time::timeout(
             Duration::from_secs(30),
             handle.chat(
