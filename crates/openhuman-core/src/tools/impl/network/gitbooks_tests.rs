@@ -216,8 +216,9 @@ async fn live_search_smoke() {
     let t = GitbooksSearchTool::new(
         "https://tinyhumans.gitbook.io/openhuman/~gitbook/mcp".into(),
         30,
+        crate::config::Config::default(),
     )
-    .expect("a client builds");
+    .expect("a tool builds");
     let result = t
         .execute(json!({"query": "what is openhuman"}))
         .await
