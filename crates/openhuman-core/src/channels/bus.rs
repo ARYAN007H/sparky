@@ -22,6 +22,6 @@ mod inbound_thread_id_tests;
 #[path = "bus_tests.rs"]
 mod tests;
 
-#[cfg(any(test, debug_assertions))]
+#[cfg(test)]
 #[path = "bus_test_support_tests.rs"]
 pub mod test_support;

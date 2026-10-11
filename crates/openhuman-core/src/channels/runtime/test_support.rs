@@ -1,8 +1,6 @@
 //! Debug-build harnesses for raw integration coverage of the channel runtime.
 
-pub use super::dispatch::test_support::{
-    build_channel_context_block_for_test, select_acknowledgment_reaction_for_test,
-};
+pub use super::dispatch::test_support::build_channel_context_block_for_test;
 use super::dispatch::{
     process_channel_message, process_channel_runtime_message, RuntimeChannelMessage,
 };
@@ -33,7 +31,7 @@ pub struct DispatchHarnessOptions {
     pub channel_name: String,
     pub content: String,
     pub thread_ts: Option<String>,
-    pub inbound_envelope: Option<tinychannels::ChannelInboundEnvelope>,
+    pub inbound_envelope: Option<tinychannels_bus::ChannelInboundEnvelope>,
     pub streaming: bool,
     pub supports_reactions: bool,
     pub response_text: Option<String>,
@@ -131,7 +129,7 @@ pub struct DispatchHarnessObservation {
     pub sends: Vec<ObservedSend>,
     pub start_typing_calls: usize,
     pub stop_typing_calls: usize,
-    pub received_event_envelope: Option<tinychannels::ChannelInboundEnvelope>,
+    pub received_event_envelope: Option<tinychannels_bus::ChannelInboundEnvelope>,
     pub handler_history_roles: Vec<String>,
     pub handler_history_text: String,
     pub handler_provider_name: String,
