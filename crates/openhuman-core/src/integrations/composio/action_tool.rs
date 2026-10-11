@@ -33,7 +33,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde_json::Value;
 
-use super::providers::ToolScope;
+use super::contract::ToolScope;
 use super::tools::resolve_action_scope;
 use crate::agent::harness::current_sandbox_mode;
 use crate::agent::harness::definition::SandboxMode;
