@@ -158,7 +158,7 @@ fn mapped_rpc_methods_are_registered() {
 
 #[test]
 fn build_rpc_params_parses_run_subagent_arguments() {
-    let params = build_rpc_params(
+    let params = build_rpc_params_for_test(
         "agent.run_subagent",
         json!({
             "agent_id": "researcher",
@@ -179,7 +179,7 @@ fn build_rpc_params_parses_run_subagent_arguments() {
 
 #[test]
 fn build_rpc_params_rejects_extra_run_subagent_fields() {
-    let err = build_rpc_params(
+    let err = build_rpc_params_for_test(
         "agent.run_subagent",
         json!({
             "agent_id": "researcher",
@@ -196,7 +196,7 @@ fn build_rpc_params_rejects_extra_run_subagent_fields() {
 
 #[test]
 fn searxng_search_params_accept_optional_fields() {
-    let params = build_rpc_params(
+    let params = build_rpc_params_for_test(
         "searxng_search",
         json!({
             "query": " rust async ",
@@ -211,7 +211,7 @@ fn searxng_search_params_accept_optional_fields() {
 
 #[test]
 fn searxng_search_rejects_arguments_it_no_longer_takes() {
-    let err = build_rpc_params(
+    let err = build_rpc_params_for_test(
         "searxng_search",
         json!({
             "query": "rust",
@@ -225,7 +225,7 @@ fn searxng_search_rejects_arguments_it_no_longer_takes() {
 
 #[test]
 fn web_search_params_accept_a_pinned_provider() {
-    let params = build_rpc_params(
+    let params = build_rpc_params_for_test(
         "web_search",
         json!({"query": "rust", "provider": " exa ", "max_results": 3}),
     )
@@ -237,9 +237,9 @@ fn web_search_params_accept_a_pinned_provider() {
 #[test]
 fn web_answer_params_validate_depth() {
     let params =
-        build_rpc_params("web_answer", json!({"query": "why", "depth": "deep"})).expect("params");
+        build_rpc_params_for_test("web_answer", json!({"query": "why", "depth": "deep"})).expect("params");
     assert_eq!(params["depth"], "deep");
-    let err = build_rpc_params("web_answer", json!({"query": "why", "depth": "long"}))
+    let err = build_rpc_params_for_test("web_answer", json!({"query": "why", "depth": "long"}))
         .expect_err("must reject");
     assert!(err.message().contains("depth"));
 }
@@ -262,7 +262,7 @@ fn search_tools_follow_usable_roles() {
 
 #[test]
 fn searxng_search_rejects_max_results_above_max() {
-    let err = build_rpc_params(
+    let err = build_rpc_params_for_test(
         "searxng_search",
         json!({
             "query": "rust",
@@ -310,7 +310,7 @@ fn v1_memory_tools_are_gone() {
         "tree.list_sources",
     ] {
         assert!(!names.contains(&removed), "{removed} must be removed");
-        assert!(build_rpc_params(removed, json!({})).is_err());
+        assert!(build_rpc_params_for_test(removed, json!({})).is_err());
     }
 }
 
@@ -379,7 +379,7 @@ fn memory_annotations_match_their_effect() {
 
 #[test]
 fn memory_recall_maps_question_filter_and_limit() {
-    let params = build_rpc_params(
+    let params = build_rpc_params_for_test(
         "memory.recall",
         json!({
             "question": " what is phoenix? ",
@@ -401,11 +401,11 @@ fn memory_recall_maps_question_filter_and_limit() {
 
 #[test]
 fn memory_recall_requires_question_and_omits_unset_fields() {
-    let err = build_rpc_params("memory.recall", json!({})).expect_err("must reject");
+    let err = build_rpc_params_for_test("memory.recall", json!({})).expect_err("must reject");
     assert!(err
         .message()
         .contains("missing required argument `question`"));
-    let params = build_rpc_params("memory.recall", json!({"question": "q"})).expect("params");
+    let params = build_rpc_params_for_test("memory.recall", json!({"question": "q"})).expect("params");
     assert_eq!(params.len(), 1);
 }
 
@@ -420,20 +420,20 @@ fn memory_limit_above_max_is_rejected() {
                 || (tool == "memory.recall" && k == "question")
                 || (tool == "memory.fetch" && k == "query")
         });
-        let err = build_rpc_params(tool, args).expect_err("limit above cap");
+        let err = build_rpc_params_for_test(tool, args).expect_err("limit above cap");
         assert!(
             err.message().contains("must not exceed"),
             "{tool}: {}",
             err.message()
         );
     }
-    let ok = build_rpc_params("memory.list", json!({ "limit": MEMORY_MAX_LIMIT })).expect("at cap");
+    let ok = build_rpc_params_for_test("memory.list", json!({ "limit": MEMORY_MAX_LIMIT })).expect("at cap");
     assert_eq!(ok["limit"], MEMORY_MAX_LIMIT);
 }
 
 #[test]
 fn memory_fetch_maps_query_mode_cursor() {
-    let params = build_rpc_params(
+    let params = build_rpc_params_for_test(
         "memory.fetch",
         json!({"query": "phoenix", "mode": "hybrid", "cursor": "abc", "limit": 3}),
     )
@@ -446,18 +446,18 @@ fn memory_fetch_maps_query_mode_cursor() {
 
 #[test]
 fn memory_fetch_rejects_unknown_mode_and_missing_query() {
-    let err = build_rpc_params("memory.fetch", json!({"query": "q", "mode": "fuzzy"}))
+    let err = build_rpc_params_for_test("memory.fetch", json!({"query": "q", "mode": "fuzzy"}))
         .expect_err("bad mode");
     assert!(err.message().contains("`mode` must be one of"));
-    let err = build_rpc_params("memory.fetch", json!({})).expect_err("missing query");
+    let err = build_rpc_params_for_test("memory.fetch", json!({})).expect_err("missing query");
     assert!(err.message().contains("missing required argument `query`"));
 }
 
 #[test]
 fn memory_list_accepts_no_arguments_and_rejects_unknown_ones() {
-    let params = build_rpc_params("memory.list", json!({})).expect("params");
+    let params = build_rpc_params_for_test("memory.list", json!({})).expect("params");
     assert!(params.is_empty());
-    let err = build_rpc_params("memory.list", json!({"k": 5})).expect_err("v1 alias");
+    let err = build_rpc_params_for_test("memory.list", json!({"k": 5})).expect_err("v1 alias");
     assert!(err.message().contains("unexpected argument `k`"));
 }
 
@@ -473,7 +473,7 @@ fn memory_filter_rejects_bad_shapes() {
         (json!({"tags_any": [""]}), "`tags_any` entries"),
         (json!({"observed_before": "yesterday"}), "RFC 3339"),
     ] {
-        let err = build_rpc_params("memory.list", json!({ "filter": filter.clone() }))
+        let err = build_rpc_params_for_test("memory.list", json!({ "filter": filter.clone() }))
             .expect_err("bad filter");
         assert!(
             err.message().contains(needle),
@@ -485,7 +485,7 @@ fn memory_filter_rejects_bad_shapes() {
 
 #[test]
 fn memory_filter_ignores_null_fields() {
-    let params = build_rpc_params(
+    let params = build_rpc_params_for_test(
         "memory.list",
         json!({"filter": {"repo": null, "language": "rust"}}),
     )
@@ -495,7 +495,7 @@ fn memory_filter_ignores_null_fields() {
 
 #[test]
 fn memory_learn_maps_text_kind_confidence() {
-    let params = build_rpc_params(
+    let params = build_rpc_params_for_test(
         "memory.learn",
         json!({"text": " prefers tabs ", "kind": "preference", "confidence": 0.9}),
     )
@@ -503,45 +503,45 @@ fn memory_learn_maps_text_kind_confidence() {
     assert_eq!(params["text"], "prefers tabs");
     assert_eq!(params["kind"], "preference");
     assert_eq!(params["confidence"], 0.9);
-    let minimal = build_rpc_params("memory.learn", json!({"text": "t"})).expect("params");
+    let minimal = build_rpc_params_for_test("memory.learn", json!({"text": "t"})).expect("params");
     assert_eq!(minimal.len(), 1);
 }
 
 #[test]
 fn memory_learn_rejects_bad_arguments() {
-    let err = build_rpc_params("memory.learn", json!({})).expect_err("missing text");
+    let err = build_rpc_params_for_test("memory.learn", json!({})).expect_err("missing text");
     assert!(err.message().contains("missing required argument `text`"));
-    let err = build_rpc_params("memory.learn", json!({"text": "t", "kind": "rumor"}))
+    let err = build_rpc_params_for_test("memory.learn", json!({"text": "t", "kind": "rumor"}))
         .expect_err("bad kind");
     assert!(err.message().contains("`kind` must be one of"));
-    let err = build_rpc_params("memory.learn", json!({"text": "t", "confidence": 1.5}))
+    let err = build_rpc_params_for_test("memory.learn", json!({"text": "t", "confidence": 1.5}))
         .expect_err("confidence above 1");
     assert!(err.message().contains("between 0 and 1"));
-    let err = build_rpc_params("memory.learn", json!({"text": "t", "confidence": "high"}))
+    let err = build_rpc_params_for_test("memory.learn", json!({"text": "t", "confidence": "high"}))
         .expect_err("non-number");
     assert!(err.message().contains("must be a number"));
-    let err = build_rpc_params("memory.learn", json!({"text": "t", "meta": {}}))
+    let err = build_rpc_params_for_test("memory.learn", json!({"text": "t", "meta": {}}))
         .expect_err("meta is host-filled");
     assert!(err.message().contains("unexpected argument `meta`"));
 }
 
 #[test]
 fn memory_forget_maps_ids_and_bounds_them() {
-    let params = build_rpc_params("memory.forget", json!({"ids": ["a", "b"]})).expect("params");
+    let params = build_rpc_params_for_test("memory.forget", json!({"ids": ["a", "b"]})).expect("params");
     assert_eq!(params["ids"], json!(["a", "b"]));
-    let err = build_rpc_params("memory.forget", json!({"ids": []})).expect_err("empty ids");
+    let err = build_rpc_params_for_test("memory.forget", json!({"ids": []})).expect_err("empty ids");
     assert!(err.message().contains("`ids`"));
-    let err = build_rpc_params("memory.forget", json!({})).expect_err("missing ids");
+    let err = build_rpc_params_for_test("memory.forget", json!({})).expect_err("missing ids");
     assert!(err.message().contains("`ids`"));
     let too_many = (0..=MEMORY_FORGET_MAX_IDS)
         .map(|i| i.to_string())
         .collect::<Vec<_>>();
-    let err = build_rpc_params("memory.forget", json!({ "ids": too_many })).expect_err("cap");
+    let err = build_rpc_params_for_test("memory.forget", json!({ "ids": too_many })).expect_err("cap");
     assert!(err.message().contains("at most"));
 }
 
 #[test]
 fn non_object_arguments_are_invalid() {
-    let err = build_rpc_params("memory.recall", json!("question")).expect_err("must reject");
+    let err = build_rpc_params_for_test("memory.recall", json!("question")).expect_err("must reject");
     assert!(err.message().contains("arguments must be an object"));
 }

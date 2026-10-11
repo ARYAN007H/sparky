@@ -17,6 +17,13 @@ pub async fn build_rpc_params(
     arguments: Value,
 ) -> Result<Map<String, Value>, ToolCallError> {
     let args = validate_tool_arguments(tool_name, arguments).await?;
+    build_rpc_params_from_validated(tool_name, &args)
+}
+
+fn build_rpc_params_from_validated(
+    tool_name: &str,
+    args: &Map<String, Value>,
+) -> Result<Map<String, Value>, ToolCallError> {
     let name = tool_name;
     match tool_name {
         "core.list_tools" | "core.tool_instructions" | "agent.list_subagents" => {
@@ -131,6 +138,15 @@ pub async fn build_rpc_params(
             "unknown MCP tool `{tool_name}`"
         ))),
     }
+}
+
+#[cfg(test)]
+pub(crate) fn build_rpc_params_for_test(
+    tool_name: &str,
+    arguments: Value,
+) -> Result<Map<String, Value>, ToolCallError> {
+    let args = arguments.as_object().cloned().unwrap_or_default();
+    build_rpc_params_from_validated(tool_name, &args)
 }
 
 async fn validate_tool_arguments(

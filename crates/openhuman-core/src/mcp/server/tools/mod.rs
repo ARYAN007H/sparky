@@ -45,6 +45,8 @@ pub use crate::config::rpc as config_rpc;
 pub use crate::core::all;
 #[cfg(all(test, feature = "mcp"))]
 pub use params::build_rpc_params;
+#[cfg(test)]
+pub(crate) use params::build_rpc_params_for_test;
 #[cfg(all(test, feature = "mcp"))]
 pub use serde_json::{json, Value};
 #[cfg(all(test, feature = "mcp"))]

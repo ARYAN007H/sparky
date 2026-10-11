@@ -1,7 +1,11 @@
 //! `gitbooks` — answer questions about OpenHuman through the TinyMCP module's
 //! confidential one-shot tool-call contract.
 
-use crate::{config::Config, modules::client::ModuleClient};
+use crate::{
+    config::Config,
+    inference::provider::factory::redact_endpoint,
+    modules::client::ModuleClient,
+};
 use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::time::Duration;
@@ -294,22 +298,6 @@ fn bound_rendered_json(data: Value) -> Value {
     } else {
         Value::String(format!("[{} bytes elided]", serialized.len()))
     }
-}
-
-fn redact_endpoint(raw: &str) -> String {
-    let Ok(url) = url::Url::parse(raw.trim()) else {
-        return "<redacted>".to_owned();
-    };
-    if !matches!(url.scheme(), "http" | "https")
-        || url.host_str().is_none()
-        || !url.username().is_empty()
-        || url.password().is_some()
-    {
-        return "<redacted>".to_owned();
-    }
-
-    let port = url.port().map_or_else(String::new, |port| format!(":{port}"));
-    format!("{}://{}{port}", url.scheme(), url.host_str().unwrap_or_default())
 }
 
 #[cfg(test)]

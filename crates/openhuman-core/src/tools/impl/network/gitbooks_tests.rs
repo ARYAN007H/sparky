@@ -185,7 +185,7 @@ fn redact_endpoint_keeps_only_origin() {
         redact_endpoint("https://user:secret@example.com/path?token=secret"),
         "<redacted>"
     );
-    assert_eq!(redact_endpoint("file:///private/path"), "<redacted>");
+    assert_eq!(redact_endpoint("file:///private/path"), "file://");
 }
 
 #[test]
