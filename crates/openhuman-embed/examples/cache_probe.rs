@@ -43,15 +43,17 @@ async fn run() -> anyhow::Result<()> {
                 AgentDefinitionSpec::new()
                     .bare_prompt(long_prompt())
                     .tools(ToolScopeSpec::HostOnly)
-                    .max_iterations(6)
+                    .max_iterations(10)
                     .temperature(0.2),
             )
             .tools(|_| openhuman_embed::HostTurnTools::advertised(vec![Box::new(Lookup)])),
     )?;
     for turn in 0..turns {
         let msg = format!(
-            "## Your desk\nturn {turn}\n\n## New on your desk since your last turn\n[{}] @peer (note): item {} looks fine to me, please check the ledger via lookup_ledger for item {} and then answer in one line.\n\nEnd with a one line verdict.",
+            "## Your desk\nturn {turn}\n\n## New on your desk since your last turn\n[{}] @peer (note): item {} looks fine to me, please check the ledger via lookup_ledger for items {} then {}+100 then {}+200, calling the tool for ONE item at a time and waiting for each result before the next call, then answer in one line.\n\nEnd with a one line verdict.",
             turn * 3,
+            turn,
+            turn,
             turn,
             turn
         );
