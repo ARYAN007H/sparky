@@ -72,3 +72,7 @@ pub(super) fn build_channel_context_block(msg: &traits::ChannelMessage) -> Strin
          target.\n\n"
     )
 }
+
+#[cfg(test)]
+#[path = "helpers_tests.rs"]
+mod tests;
