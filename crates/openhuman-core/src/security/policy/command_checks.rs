@@ -54,7 +54,7 @@ impl SecurityPolicy {
             if base.is_empty() || !self.allowed_commands.iter().any(|allowed| allowed == base) {
                 return false;
             }
-            if !self.is_args_safe(base, &segment.arguments) {
+            if !self.is_analysis_args_safe(base, &segment.arguments) {
                 return false;
             }
         }
@@ -106,6 +106,7 @@ impl SecurityPolicy {
     }
 
     /// Classify command risk. Any high-risk segment marks the whole command high.
+    #[cfg(test)]
     pub fn command_risk_level(&self, command: &str) -> CommandRiskLevel {
         let mut saw_medium = false;
 
@@ -217,6 +218,7 @@ impl SecurityPolicy {
     /// This is the deterministic floor the harness gate keys on; an LLM-declared
     /// category may only *raise* it (`gate = max(rust_floor, llm_declared)`),
     /// never lower it.
+    #[cfg(test)]
     pub fn classify_command(&self, command: &str) -> CommandClass {
         // A quoted heredoc body is document text, not shell. Without this the
         // splitter chops the body into "commands" and a prose line containing
@@ -290,6 +292,7 @@ impl SecurityPolicy {
     ///   literal command. Full is trusted and skips the structural guard.
     ///
     /// Returns the classified [`CommandClass`] on success.
+    #[cfg(test)]
     pub fn check_gated_command(&self, command: &str) -> Result<CommandClass, String> {
         let class = self.classify_command(command);
         self.check_protected_path_literals(command)?;
@@ -318,6 +321,7 @@ impl SecurityPolicy {
     /// a command, including when the autonomy policy is disabled. This is a
     /// guard for direct path arguments and source literals; arbitrary shell or
     /// interpreter code still needs a filesystem sandbox to enforce the floor.
+    #[cfg(test)]
     pub fn check_protected_path_literals(&self, input: &str) -> Result<(), String> {
         let words = strip_quoted_heredoc_bodies(input)
             .split(|c: char| {
@@ -389,6 +393,7 @@ impl SecurityPolicy {
     }
 
     /// Validate full command execution policy (allowlist + risk gate).
+    #[cfg(test)]
     pub fn validate_command_execution(
         &self,
         command: &str,
@@ -473,6 +478,7 @@ impl SecurityPolicy {
     /// - Blocks single `&` background chaining (`&&` remains supported)
     /// - Blocks output redirections (`>`, `>>`) that could write outside workspace
     /// - Blocks dangerous arguments (e.g. `find -exec`, `git config`)
+    #[cfg(test)]
     pub fn is_command_allowed(&self, command: &str) -> bool {
         if !self.enabled {
             return true;
@@ -569,7 +575,7 @@ impl SecurityPolicy {
 
             // Validate arguments for the command
             let args: Vec<String> = words.map(|w| w.to_ascii_lowercase()).collect();
-            if !self.is_args_safe(base_cmd, &args) {
+            if is_command_executor(base_cmd) || !self.is_args_safe(base_cmd, &args) {
                 return false;
             }
         }
@@ -585,10 +591,11 @@ impl SecurityPolicy {
 
     /// Check for dangerous arguments that allow sub-command execution.
     fn is_args_safe(&self, base: &str, args: &[String]) -> bool {
+        self.is_analysis_args_safe(base, args)
+    }
+
+    fn is_analysis_args_safe(&self, base: &str, args: &[String]) -> bool {
         let base = base.to_ascii_lowercase();
-        if is_command_executor(base.as_str()) {
-            return false;
-        }
 
         match base.as_str() {
             "find" => {
