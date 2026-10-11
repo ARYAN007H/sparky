@@ -259,14 +259,24 @@ jobs:
               # environment. A single parallel libtest process lets one case
               # leak its route into another; run each case in a fresh process,
               # matching scripts/test-rust-with-mock.sh and test-rust-e2e.sh.
+              if ! listing="$(
+                cargo test -p openhuman-cli --features "${CLI_FEATURES}" \
+                  --test "${target}" -- --list
+              )"; then
+                echo "::error::could not enumerate JSON-RPC tests"
+                exit 1
+              fi
+              test_names="$(printf '%s\n' "$listing" | sed -n 's/: test$//p')"
+              if [ -z "$test_names" ]; then
+                echo "::error::JSON-RPC enumeration returned no tests"
+                exit 1
+              fi
               while IFS= read -r test_name; do
-                [ -n "${test_name}" ] || continue
                 echo "[test-reusable] JSON-RPC E2E test: ${test_name}"
-                bash scripts/ci-cancel-aware.sh cargo test -p openhuman-cli --test "${target}" "${test_name}" -- --exact --test-threads=1
-              done < <(
-                cargo test -p openhuman-cli --test "${target}" -- --list \
-                  | sed -n 's/: test$//p'
-              )
+                bash scripts/ci-cancel-aware.sh cargo test -p openhuman-cli \
+                  --features "${CLI_FEATURES}" --test "${target}" "${test_name}" \
+                  -- --exact --test-threads=1
+              done <<< "$test_names"
             else
               bash scripts/ci-cancel-aware.sh cargo test -p openhuman-cli --features "${CLI_FEATURES}" --test "${target}"
             fi
