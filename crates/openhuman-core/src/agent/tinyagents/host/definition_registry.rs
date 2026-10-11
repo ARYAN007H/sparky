@@ -11,11 +11,12 @@
 //!   ([`crate::agent::registry::find_custom_in_config`] →
 //!   [`crate::agent::registry::definition_from_registry_entry`]).
 //!
-//! This is `docs/specs/plan-agents.md` Phase 4. The crate-side
-//! [`AgentDefinition`] is inert (`serde` + `std`); OpenHuman's harness
-//! definition is far richer (prompt builders, sandbox mode, iteration policy,
-//! TokenJuice profile, turn graph). Only the six fields the turn loop can act
-//! on cross the seam; everything else stays host-side by design.
+//! The owner contract represents authored definitions and execution policy.
+//! This adapter supplies the existing lookup projection: identity, display
+//! summary, model routing, declared delegates, resolved tools, and tool rules.
+//! OpenHuman still owns prompt builders, sandbox policy, iteration limits,
+//! TokenJuice configuration, and turn graphs; unused owner fields retain their
+//! defaults rather than acquiring new product policy here.
 //!
 //! # Contract mismatches resolved here
 //!
@@ -38,25 +39,13 @@
 //! ids are **kept**, matching both [`validate_tier_hierarchy`](crate::agent::registry::agents::validate_tier_hierarchy)'s `continue` and
 //! the trait's note that an authorized id may still fail to resolve.
 //!
-//! **3. `ToolScope::Wildcard` has no crate representation.** The crate models
-//! tools as an explicit `Vec<String>` in which **empty means unrestricted**,
-//! matching the session builder ("an empty `visible` set means no filter" —
-//! `agent/session_host/builder/factory.rs`). So an unrestricted wildcard
-//! agent maps to an empty `tools` vec.
-//!
-//! That one value must not be made to carry three meanings. Three distinct
-//! situations would otherwise all collapse onto "empty", and each would read
-//! back as *every tool*:
-//!
-//! * a named scope configured with **no** tools,
-//! * a named scope whose every entry the denylist removed,
-//! * a wildcard scope carrying a denylist the crate cannot express.
-//!
-//! [`ResolvedScope`] therefore models wildcard-ness explicitly and never infers
-//! it from emptiness. A genuinely empty scope emits
-//! [`NO_TOOLS_SENTINEL`] — an unregistered name that matches nothing —
-//! and a wildcard-with-denylist is materialized against
-//! [`Self::with_registered_tools`], failing closed when that is absent.
+//! **3. Tool visibility is resolved against the host session.** Wildcard
+//! scopes materialize the registered tools and apply the denylist. Without
+//! that tool surface they fail closed. Named scopes retain extra and deferred
+//! tools according to the existing host policy. The resulting explicit list
+//! is encoded as the owner contract's `ToolScope::Named`; empty scopes retain
+//! [`NO_TOOLS_SENTINEL`] so existing lookup consumers cannot interpret an empty
+//! list as unrestricted access.
 //!
 //! **4. `SubagentEntry::Skills` entries are omitted.** A `{ skills = "*" }`
 //! entry is not an agent id — it expands to the connected integrations'
@@ -400,12 +389,8 @@ impl OpenHumanDefinitionRegistry {
         }
     }
 
-    /// Renders a resolved scope into the crate's `Vec<String>`, substituting the
-    /// sentinel for a genuinely empty named scope.
-    ///
-    /// This is the single place the crate's "empty means unrestricted"
-    /// convention is applied, so no caller can accidentally emit a bare empty
-    /// vec that reads as "all tools".
+    /// Retain the existing host lookup list convention, substituting the
+    /// no-tools sentinel for a genuinely empty named scope.
     fn emit(scope: ResolvedScope) -> Vec<String> {
         match scope {
             ResolvedScope::Wildcard => Vec::new(),
