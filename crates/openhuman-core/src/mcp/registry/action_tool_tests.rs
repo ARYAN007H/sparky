@@ -2,6 +2,100 @@ use super::*;
 use serde_json::json;
 use tinytools::{PermissionLevel, ToolExposure};
 
+#[derive(Clone, Default)]
+struct RecoveringModulePort {
+    available: Arc<std::sync::atomic::AtomicBool>,
+    opens: Arc<std::sync::atomic::AtomicUsize>,
+    calls: Arc<std::sync::Mutex<Vec<String>>>,
+}
+
+#[async_trait::async_trait]
+impl crate::mcp::module_client::McpModulePort for RecoveringModulePort {
+    async fn open_configured(
+        &self,
+        _data_dir: &str,
+        _config: &tinymcp_bus::McpClientConfig,
+    ) -> Result<tinymcp_bus::OpenConfiguredResponse, crate::modules::client::ModuleCallError> {
+        self.opens
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        if !self.available.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(crate::modules::client::ModuleCallError::Unavailable);
+        }
+        Ok(tinymcp_bus::OpenConfiguredResponse {
+            object_path: "/test/mcp".into(),
+            transition_id: "open-test".into(),
+        })
+    }
+
+    async fn close(
+        &self,
+        _data_dir: &str,
+    ) -> Result<Option<String>, crate::modules::client::ModuleCallError> {
+        Ok(None)
+    }
+
+    async fn transition_status(
+        &self,
+        _transition_id: &str,
+    ) -> Result<tinymcp_bus::TransitionStatus, crate::modules::client::ModuleCallError> {
+        Ok(tinymcp_bus::TransitionStatus::Complete)
+    }
+
+    async fn call_object(
+        &self,
+        _object_path: &str,
+        member: &str,
+        args: serde_json::Value,
+        _confidential: bool,
+    ) -> Result<serde_json::Value, crate::modules::client::ModuleCallError> {
+        if !self.available.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(crate::modules::client::ModuleCallError::Unavailable);
+        }
+        self.calls.lock().unwrap().push(member.to_owned());
+        match member {
+            tinymcp_bus::names::methods::NORMALIZE_TOOL_ARGUMENTS => args
+                .get(0)
+                .cloned()
+                .ok_or(crate::modules::client::ModuleCallError::ModuleFault),
+            tinymcp_bus::names::methods::TOOL_CALL => serde_json::to_value(
+                tinymcp_bus::ToolCallOutcome {
+                    result: json!({"content":[{"type":"text","text":"loaded"}]}),
+                    is_error: false,
+                    rendered: tinymcp_bus::McpToolResult::success("loaded"),
+                },
+            )
+            .map_err(|_| crate::modules::client::ModuleCallError::ModuleFault),
+            tinymcp_bus::names::methods::RENDER_TOOL_OUTPUT => {
+                serde_json::to_value("lazy-loaded forecast")
+                    .map_err(|_| crate::modules::client::ModuleCallError::ModuleFault)
+            }
+            _ => Err(crate::modules::client::ModuleCallError::IncompatibleContract),
+        }
+    }
+
+    async fn prepare_agent_tools(
+        &self,
+        _request: tinymcp_bus::PrepareAgentToolsRequest,
+    ) -> Result<
+        Vec<tinymcp_bus::McpToolPresentation>,
+        crate::modules::client::ModuleCallError,
+    > {
+        Ok(Vec::new())
+    }
+
+    async fn validate_server_arguments(
+        &self,
+        request: tinymcp_bus::ValidateServerArgumentsRequest,
+    ) -> Result<
+        tinymcp_bus::ServerArgumentsValidation,
+        crate::modules::client::ModuleCallError,
+    > {
+        Ok(tinymcp_bus::ServerArgumentsValidation::Valid(
+            request.arguments.as_object().cloned().unwrap_or_default(),
+        ))
+    }
+}
+
 fn presentation(
     server_id: &str,
     name: &str,
@@ -113,4 +207,56 @@ async fn unavailable_module_returns_a_tool_error_without_a_host_fallback() {
     let result = tools[0].execute(json!({ "city": "London" })).await.unwrap();
     assert!(result.is_error);
     assert!(!result.text().is_empty());
+}
+
+#[tokio::test]
+async fn deferred_executor_retries_lazy_module_open_after_unavailability() {
+    let workspace = tempfile::tempdir().expect("temp workspace");
+    let mut config = Config {
+        workspace_dir: workspace.path().join("workspace"),
+        action_dir: workspace.path().join("workspace"),
+        config_path: workspace.path().join("config.toml"),
+        ..Default::default()
+    };
+    config.modules.enabled = true;
+    let port = RecoveringModulePort::default();
+    let opens = Arc::clone(&port.opens);
+    let calls = Arc::clone(&port.calls);
+    crate::mcp::module_client::McpConfiguredClient::install_test_port(&config, Box::new(port.clone()))
+        .expect("install module port");
+    let tools = deferred_connected_tools(
+        Arc::new(config),
+        &[presentation(
+            "server-1",
+            "mcp_weather_forecast_abc123",
+            "legacy-forecast",
+        )],
+    );
+    let tool = &tools[0];
+
+    let unavailable = tool
+        .execute(json!({"city":"London"}))
+        .await
+        .expect("unavailable tool result");
+    assert!(unavailable.is_error);
+    assert_eq!(opens.load(std::sync::atomic::Ordering::SeqCst), 1);
+    assert!(calls.lock().unwrap().is_empty());
+
+    port.available
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let recovered = tool
+        .execute(json!({"city":"London"}))
+        .await
+        .expect("recovered tool result");
+    assert!(!recovered.is_error, "{}", recovered.text());
+    assert_eq!(recovered.text(), "lazy-loaded forecast");
+    assert_eq!(opens.load(std::sync::atomic::Ordering::SeqCst), 2);
+    assert_eq!(
+        calls.lock().unwrap().as_slice(),
+        [
+            tinymcp_bus::names::methods::NORMALIZE_TOOL_ARGUMENTS,
+            tinymcp_bus::names::methods::TOOL_CALL,
+            tinymcp_bus::names::methods::RENDER_TOOL_OUTPUT,
+        ]
+    );
 }
