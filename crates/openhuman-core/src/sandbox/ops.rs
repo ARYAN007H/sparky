@@ -105,7 +105,8 @@ pub(crate) async fn resolve_command_policy(
         false,
     );
     if config.sandbox.enabled != Some(false) && !sandbox_disabled_by_host() {
-        apply_requested_backend(&mut policy, &config.sandbox, &config.runtime)
+        apply_requested_backend(&mut policy, &config.sandbox, &config.runtime, &config)
+            .await
             .map_err(|error| error.to_string())?;
     }
     Ok(policy)
@@ -307,7 +308,13 @@ pub async fn execute_in_sandbox(
         if config.sandbox.enabled == Some(false) {
             false
         } else {
-            apply_requested_backend(&mut effective_policy, &config.sandbox, &config.runtime)?
+            apply_requested_backend(
+                &mut effective_policy,
+                &config.sandbox,
+                &config.runtime,
+                &config,
+            )
+            .await?
         }
     };
     let policy = &effective_policy;
@@ -361,10 +368,11 @@ pub async fn execute_in_sandbox(
 
 /// Apply an operator-selected backend. Auto retains the caller's existing
 /// policy. None opts out only when no agent-level sandbox is required.
-pub(crate) fn apply_requested_backend(
+pub(crate) async fn apply_requested_backend(
     policy: &mut SandboxPolicy,
     sandbox: &SandboxConfig,
     runtime: &RuntimeConfig,
+    config: &crate::config::Config,
 ) -> anyhow::Result<bool> {
     match &sandbox.backend {
         SandboxBackend::Auto => Ok(false),
@@ -387,10 +395,7 @@ pub(crate) fn apply_requested_backend(
             Ok(true)
         }
         SandboxBackend::Landlock => {
-            let backend = cwd_jail::default_backend();
-            if backend.name() != "landlock" || !backend.is_available() {
-                anyhow::bail!("Landlock sandbox was explicitly requested but is unavailable");
-            }
+            super::native_jail::require_backend(config, "landlock").await?;
             if policy.backend != SandboxBackendKind::Local {
                 let grants = host_local_jail_grants(runtime);
                 policy.read_only_mounts = grants.read_only;
