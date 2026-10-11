@@ -1,6 +1,7 @@
 //! Testing a channel's credentials without persisting anything.
 
 use serde_json::Value;
+use tinychannels_runtime::controllers::ChannelDefinitionExt as _;
 
 use crate::config::Config;
 use crate::core::Outcome;

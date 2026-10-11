@@ -49,6 +49,8 @@ pub(crate) mod browser_sites;
 pub mod browser_task;
 #[cfg(feature = "modules")]
 mod browser_task_report;
+#[cfg(feature = "voice")]
+pub mod channel_email;
 pub mod client;
 #[cfg(feature = "modules")]
 pub mod computer;
