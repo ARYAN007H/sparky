@@ -227,7 +227,8 @@ fn valid_identifier(name: &str) -> bool {
 fn collides(name: &str) -> bool {
     tinysearch_bus::role_for_tool(name).is_some()
         || tinysearch_bus::provider_tool_specs()
-            .iter()
+            .values()
+            .flatten()
             .any(|tool| tool.name == name)
         || crate::tools::toolpacks::pack_for_tool(name).is_some()
         || super::tools::HARD_DENIED.contains(&name)
