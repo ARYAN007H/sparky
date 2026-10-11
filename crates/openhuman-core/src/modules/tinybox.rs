@@ -6,7 +6,7 @@
 
 use std::time::Duration;
 
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Serialize};
 pub use tinybox_bus as contract;
 
 use crate::config::Config;
@@ -220,9 +220,10 @@ async fn call_cleanup_docker_with_client(
     client: &ModuleClient,
     request: contract::CleanupDockerRequest,
 ) -> Result<contract::CleanupDockerOutput, String> {
-    let client = client
-        .clone()
-        .with_timeout(docker_control_deadline(request.timeout_ms, DOCKER_CALL_GRACE));
+    let client = client.clone().with_timeout(docker_control_deadline(
+        request.timeout_ms,
+        DOCKER_CALL_GRACE,
+    ));
     call_with_client(&client, CLEANUP_DOCKER, (request,), false).await
 }
 

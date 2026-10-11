@@ -1,12 +1,12 @@
 use std::path::{Path, PathBuf};
 
+#[cfg(test)]
+use super::types::CommandRiskLevel;
 use super::types::{
     AutonomyLevel, CommandClass, GateDecision, SecurityPolicy, POLICY_BLOCKED_MARKER,
 };
 #[cfg(test)]
 use crate::util::floor_char_boundary;
-#[cfg(test)]
-use super::types::CommandRiskLevel;
 #[cfg(test)]
 use tinybox_core::shell::classify::{classify_segment, has_hidden_execution};
 #[cfg(test)]
