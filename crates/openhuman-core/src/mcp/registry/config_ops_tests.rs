@@ -87,7 +87,7 @@ async fn config_document_handlers_use_the_configured_module_and_confidential_app
 
     let get = mcp_clients_config_get(&config).await.unwrap();
     assert_eq!(get.value["mcpServers"]["local"]["command"], "mcp");
-    assert_eq!(get.notes, ["config_get rendered 1 servers"]);
+    assert_eq!(get.logs, ["config_get rendered 1 servers"]);
 
     let requested = serde_json::json!({"mcpServers": {"local": {"command": "mcp"}}});
     let set = mcp_clients_config_set(&config, requested.clone())
@@ -100,7 +100,10 @@ async fn config_document_handlers_use_the_configured_module_and_confidential_app
     assert_eq!(calls.len(), 2);
     assert_eq!(calls[0].0, tinymcp_bus::names::methods::CONFIG_DOCUMENT_GET);
     assert!(!calls[0].2);
-    assert_eq!(calls[1].0, tinymcp_bus::names::methods::CONFIG_DOCUMENT_APPLY);
+    assert_eq!(
+        calls[1].0,
+        tinymcp_bus::names::methods::CONFIG_DOCUMENT_APPLY
+    );
     assert_eq!(calls[1].1, serde_json::json!([requested]));
     assert!(calls[1].2);
 }
