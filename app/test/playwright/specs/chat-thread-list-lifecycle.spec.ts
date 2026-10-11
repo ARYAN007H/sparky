@@ -191,6 +191,14 @@ test.describe('Chat thread list — create, deep link, rename, delete', () => {
       'this-must-not-stick-5t8y1u'
     );
     await expect(page.getByTestId(`thread-row-${threadId}`)).toContainText(titleBefore);
+
+    await page.reload();
+    await waitForAppReady(page);
+    await dismissWalkthroughIfPresent(page);
+    await expect(page.getByTestId(`thread-row-${threadId}`)).toContainText(titleBefore);
+    await expect(page.getByTestId(`thread-row-${threadId}`)).not.toContainText(
+      'this-must-not-stick-5t8y1u'
+    );
   });
 
   test('deleting a thread asks for confirmation and removes the row', async ({ page }) => {
