@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { REASONING_EFFORTS } from '../../../features/conversations/aui/ReasoningEffortPicker';
 import enAggregate from '../en';
 
 const LOCALES = [
@@ -56,6 +57,13 @@ describe('i18n coverage', () => {
     expect(extra).toEqual([]);
   });
 
+  it.each(['en', ...LOCALES])('%s translates every reasoning effort option', locale => {
+    const flat = locale === 'en' ? enFlat : loadLocale(locale);
+    const missing = REASONING_EFFORTS.map(effort => `composer.reasoning.${effort}`).filter(
+      key => !(key in flat)
+    );
+    expect(missing).toEqual([]);
+  });
   it('locale tr preserves every interpolation placeholder', () => {
     const turkish = loadLocale('tr');
     const placeholders = (value: string) => (value.match(/\{+[^{}]+\}+/g) ?? []).sort();
