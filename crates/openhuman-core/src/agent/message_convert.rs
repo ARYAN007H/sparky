@@ -304,6 +304,12 @@ pub(crate) fn messages_to_history(messages: &[Message]) -> Vec<TranscriptMessage
         .collect()
 }
 
+// The product dialect stores provider reasoning in passthrough metadata.
+fn reasoning_extra_metadata(content: &[ContentBlock]) -> Option<serde_json::Value> {
+    tinyagents_runtime::transcript::reasoning_from_content(content)
+        .map(|reasoning| serde_json::json!({ tinyagents_runtime::transcript::REASONING_EXT_KEY: reasoning }))
+}
+
 /// Convert a harness transcript into typed dialect entries, preserving
 /// assistant tool-call structure (`AssistantToolCalls`) and tool results
 /// (`ToolResults`) instead of flattening tool calls to text.
