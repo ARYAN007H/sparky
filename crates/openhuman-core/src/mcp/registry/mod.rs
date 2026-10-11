@@ -104,9 +104,10 @@ pub mod connections {
     /// Sorted by qualified name, so a prompt built from this does not reshuffle
     /// between turns and cost its cached prefix.
     pub async fn connected_overview() -> Vec<ConnectedServerOverview> {
-        host::ambient_config().map_or_else(Vec::new, |config| {
-            async move { connected_overview_for_config(&config).await }.await
-        })
+        let Some(config) = host::ambient_config() else {
+            return Vec::new();
+        };
+        connected_overview_for_config(&config).await
     }
 
     /// Every connected server's identity and advertised tools in `config`'s
