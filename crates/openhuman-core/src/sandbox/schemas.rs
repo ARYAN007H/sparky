@@ -200,7 +200,13 @@ fn handle_status(params: Map<String, Value>) -> ControllerFuture {
             is_remote,
         );
         if !crate::core::runtime::is_saas() {
-            super::ops::apply_requested_backend(&mut policy, &config.sandbox, &config.runtime)
+            super::ops::apply_requested_backend(
+                &mut policy,
+                &config.sandbox,
+                &config.runtime,
+                &config,
+            )
+                .await
                 .map_err(|e| e.to_string())?;
         }
         let handle = super::ops::create_sandbox_backend_with_config(&policy, &config).await?;
@@ -253,7 +259,13 @@ fn handle_resolve_policy(params: Map<String, Value>) -> ControllerFuture {
             is_remote,
         );
         if !crate::core::runtime::is_saas() {
-            super::ops::apply_requested_backend(&mut policy, &config.sandbox, &config.runtime)
+            super::ops::apply_requested_backend(
+                &mut policy,
+                &config.sandbox,
+                &config.runtime,
+                &config,
+            )
+                .await
                 .map_err(|e| e.to_string())?;
         }
         to_json(Outcome::new(policy, vec![]))
