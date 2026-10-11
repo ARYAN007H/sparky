@@ -679,7 +679,7 @@ fn assert_retired_tool_replay(identity_bound: bool) {
             crate::agent::SessionHostBuilder::new()
                 .chat_model(chat_model)
                 .tools(tools())
-                .workspace_dir(workspace)
+                .workspace_dir(workspace.clone())
                 .action_dir(root.path().to_path_buf())
                 .tool_dispatcher(Box::new(tinytools_agent::dialect::NativeDialect))
                 .build()
