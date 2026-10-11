@@ -131,6 +131,14 @@ async fn a_disabled_host_reports_unavailable_without_starting_a_broker() {
         super::extract_document(&config, b"%PDF-1.4\n", &extraction).await,
         Err(DocumentCallError::Unavailable(_))
     ));
+    assert!(matches!(
+        super::convert_markdown(&config, b"%PDF-1.4\n", tinydocs_bus::DocumentFormat::Pdf).await,
+        Err(DocumentCallError::Unavailable(_))
+    ));
+    assert!(matches!(
+        super::inspect_image(&config, b"image").await,
+        Err(DocumentCallError::Unavailable(_))
+    ));
     let rendering = tinydocs_bus::RenderPdfSpec {
         pages: vec![1],
         max_dimension: 256,
@@ -168,6 +176,8 @@ fn every_member_this_client_calls_is_one_the_contract_declares() {
         methods::GENERATE_PPTX,
         methods::EXTRACT_TEXT,
         methods::EXTRACT_DOCUMENT,
+        methods::CONVERT_MARKDOWN,
+        methods::INSPECT_IMAGE,
         methods::RENDER_PDF,
         methods::READ_OUTPUT,
         methods::RELEASE_OUTPUT,

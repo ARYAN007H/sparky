@@ -387,6 +387,58 @@ pub async fn extract_document(
         .map_err(|e| classify(&e))
 }
 
+/// Convert an Office/PDF document to Markdown through the module's held-output contract.
+///
+/// # Errors
+/// Returns a module/transfer failure or rejects non-UTF-8 output.
+pub async fn convert_markdown(
+    config: &Config,
+    document: &[u8],
+    format: tinydocs_bus::DocumentFormat,
+) -> Result<String, DocumentCallError> {
+    let (runtime, record) = ready(config).await?;
+    let proxy = proxy(runtime, record)?;
+    let (destination, path, interface) = address(record)?;
+    let handle: OutputRef = runtime
+        .connection()
+        .call_with_stream(
+            destination,
+            path,
+            interface,
+            member(methods::CONVERT_MARKDOWN)?,
+            |stream| serde_json::json!([format, stream]),
+            document,
+        )
+        .await
+        .map_err(|error| classify(&error))?;
+    String::from_utf8(collect(&proxy, handle).await?)
+        .map_err(|_| DocumentCallError::Failed("converted Markdown was not valid UTF-8".into()))
+}
+
+/// Identify and measure encoded image bytes in the owning TinyDocs module.
+///
+/// # Errors
+/// Returns the module's input rejection or a module/transfer failure.
+pub async fn inspect_image(
+    config: &Config,
+    image: &[u8],
+) -> Result<tinydocs_bus::ImageFacts, DocumentCallError> {
+    let (runtime, record) = ready(config).await?;
+    let (destination, path, interface) = address(record)?;
+    runtime
+        .connection()
+        .call_with_stream(
+            destination,
+            path,
+            interface,
+            member(methods::INSPECT_IMAGE)?,
+            |stream| serde_json::json!([stream]),
+            image,
+        )
+        .await
+        .map_err(|error| classify(&error))
+}
+
 /// Render selected PDF pages and collect/release every held PNG output.
 pub async fn render_pdf(
     config: &Config,
