@@ -1,6 +1,7 @@
 //! User-scoped lifecycle for the module-owned x402 ledger.
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
 
 use tinywallet_bus::names::methods;
@@ -98,6 +99,7 @@ struct X402Service {
 }
 
 static X402_SERVICE: OnceLock<tokio::sync::Mutex<Option<X402Service>>> = OnceLock::new();
+static X402_SHUTDOWN_HOOK_REGISTERED: AtomicBool = AtomicBool::new(false);
 
 fn service() -> &'static tokio::sync::Mutex<Option<X402Service>> {
     X402_SERVICE.get_or_init(|| tokio::sync::Mutex::new(None))
@@ -107,6 +109,7 @@ async fn ensure_service(
     config: &Config,
     active: &mut Option<X402Service>,
 ) -> Result<(), WalletCallError> {
+    register_shutdown_hook();
     let workspace = config.workspace_dir.clone();
     let accounts = super::wallet_host::wallet_accounts_snapshot()
         .await
@@ -166,6 +169,7 @@ async fn ensure_service(
 /// operation. If close fails, the handle stays cached so a later lifecycle
 /// attempt can retry instead of silently abandoning pending reservations.
 pub(crate) async fn close_service(config: &Config) -> Result<(), WalletCallError> {
+    register_shutdown_hook();
     let mut active = service().lock().await;
     let Some(current) = active.as_ref() else {
         return Ok(());
@@ -180,6 +184,35 @@ pub(crate) async fn close_service(config: &Config) -> Result<(), WalletCallError
     .await?;
     *active = None;
     Ok(())
+}
+
+fn register_shutdown_hook() {
+    if X402_SHUTDOWN_HOOK_REGISTERED.swap(true, Ordering::AcqRel) {
+        return;
+    }
+    crate::core::shutdown::register(|| async {
+        X402_SHUTDOWN_HOOK_REGISTERED.store(false, Ordering::Release);
+        let mut active = service().lock().await;
+        let Some(current) = active.as_ref() else {
+            return;
+        };
+        let Ok(config) = crate::config::rpc::load_config_with_timeout().await else {
+            tracing::warn!("[modules:x402] could not load configuration to close service at shutdown");
+            return;
+        };
+        match wallet::call::<_, ()>(
+            &config,
+            methods::X402_CLOSE,
+            X402CloseRequest {
+                service: current.handle.clone(),
+            },
+        )
+        .await
+        {
+            Ok(()) => *active = None,
+            Err(error) => tracing::warn!(%error, "[modules:x402] failed to close service at shutdown"),
+        }
+    });
 }
 
 async fn with_service<R, F, Fut>(config: &Config, operation: F) -> Result<R, WalletCallError>

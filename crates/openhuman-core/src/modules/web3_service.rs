@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
 
 use serde::Deserialize;
@@ -24,6 +25,7 @@ struct Web3Service {
 }
 
 static WEB3_SERVICE: OnceLock<tokio::sync::Mutex<Option<Web3Service>>> = OnceLock::new();
+static WEB3_SHUTDOWN_HOOK_REGISTERED: AtomicBool = AtomicBool::new(false);
 
 fn service() -> &'static tokio::sync::Mutex<Option<Web3Service>> {
     WEB3_SERVICE.get_or_init(|| tokio::sync::Mutex::new(None))
@@ -33,6 +35,7 @@ async fn ensure_service(
     config: &Config,
     active: &mut Option<Web3Service>,
 ) -> Result<(), wallet::WalletCallError> {
+    register_shutdown_hook();
     let accounts = wallet_host::wallet_accounts_snapshot()
         .await
         .map_err(wallet::WalletCallError::Failed)?;
@@ -104,6 +107,7 @@ fn owner() -> Option<QuoteOwner> {
 /// Close the active module service on sign-out. The mutex joins any in-flight
 /// quote, route, or execution call before its owner-scoped handles are cleared.
 pub(crate) async fn close_service(config: &Config) -> Result<(), wallet::WalletCallError> {
+    register_shutdown_hook();
     let mut active = service().lock().await;
     let Some(current) = active.as_ref() else {
         return Ok(());
@@ -119,6 +123,39 @@ pub(crate) async fn close_service(config: &Config) -> Result<(), wallet::WalletC
     wallet_host::clear_endpoint_references(&current.response.service.handle);
     *active = None;
     Ok(())
+}
+
+fn register_shutdown_hook() {
+    if WEB3_SHUTDOWN_HOOK_REGISTERED.swap(true, Ordering::AcqRel) {
+        return;
+    }
+    crate::core::shutdown::register(|| async {
+        WEB3_SHUTDOWN_HOOK_REGISTERED.store(false, Ordering::Release);
+        let mut active = service().lock().await;
+        let Some(current) = active.as_ref() else {
+            return;
+        };
+        let config = crate::config::rpc::load_config_with_timeout().await;
+        let Ok(config) = config else {
+            tracing::warn!("[modules:web3] could not load configuration to close service at shutdown");
+            return;
+        };
+        match wallet::call::<_, ()>(
+            &config,
+            methods::WEB3_CLOSE,
+            Web3CloseRequest {
+                service: current.response.service.clone(),
+            },
+        )
+        .await
+        {
+            Ok(()) => {
+                wallet_host::clear_endpoint_references(&current.response.service.handle);
+                *active = None;
+            }
+            Err(error) => tracing::warn!(%error, "[modules:web3] failed to close service at shutdown"),
+        }
+    });
 }
 
 #[derive(Deserialize)]
