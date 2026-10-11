@@ -1196,9 +1196,13 @@ async fn json_rpc_legacy_provider_type_preserves_default_endpoint() {
             }),
         )
         .await;
-        assert_no_jsonrpc_error(&updated, "legacy provider endpoint update");
+        let snapshot = peel_logs_envelope(assert_no_jsonrpc_error(
+            &updated,
+            "legacy provider endpoint update",
+        ));
+        let path = snapshot["config_path"].as_str().expect("saved config path");
         let persisted: openhuman_core::config::Config =
-            toml::from_str(&std::fs::read_to_string(home.join(".openhuman/config.toml")).unwrap())
+            toml::from_str(&std::fs::read_to_string(path).unwrap())
                 .unwrap();
         let provider = persisted
             .cloud_providers
