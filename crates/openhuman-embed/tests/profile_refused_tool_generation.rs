@@ -116,6 +116,7 @@ async fn scenario() {
     PointedTransport::install(&managed.uri());
     openhuman_core::storage::install(Arc::new(openhuman_core::storage::MemoryStorage::new()));
 
+    let recorder = Arc::new(Recorder::default());
     let root = tempfile::tempdir().unwrap();
     let mut saas = SaasConfig::new(root.path());
     saas.chat_provider = Some(
@@ -136,6 +137,7 @@ async fn scenario() {
         ))
         .can_use_tool(|_| Box::pin(async { ToolHookDecision::Proceed }))
         .channel_permissions([("web_channel", PermissionLevel::Execute)])
+        .cron_delivery(recorder.clone())
         .build()
         .await
         .unwrap();
@@ -143,6 +145,15 @@ async fn scenario() {
     let handle = runtime.open("alice").await.unwrap();
 
     handle.chat("t1", "schedule it").await.unwrap();
+    let later = chrono::Utc::now() + chrono::Duration::hours(1);
+    assert_eq!(runtime.sweep_cron_at(later).await.ran, 1);
+    tokio::time::timeout(Duration::from_secs(30), async {
+        while recorder.0.lock().unwrap().is_empty() {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .unwrap();
     handle
         .chat("t1", "make a shell job")
         .await
