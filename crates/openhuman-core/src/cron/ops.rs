@@ -228,8 +228,11 @@ pub async fn cron_run(config: &Config, job_id: &str) -> Result<Outcome<serde_jso
 
     // Fail closed before queueing anything: an unreadable policy refuses the run.
     cron::policy::get_policy(config, job_id).map_err(|e| e.to_string())?;
-    cron::limits::check_run(config, &cron::get_job(config, job_id).map_err(|e| e.to_string())?)
-        .map_err(|e| e.to_string())?;
+    cron::limits::check_run(
+        config,
+        &cron::get_job(config, job_id).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())?;
 
     // Guard against duplicate concurrent executions for the same job.
     {
