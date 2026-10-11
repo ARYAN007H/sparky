@@ -239,8 +239,8 @@ The subfolders register their own namespaces: `approval.*` ([`approval/`](./appr
 ## Boundaries
 
 - Sandbox backends do not live here. `crates/openhuman-core/src/sandbox/`
-  picks a backend per session and delegates local confinement to
-  `tinybox-jail` (`vendor/tinybox`).
+  picks a backend per session and delegates native confinement and process
+  ownership to the loaded TinyBox module (`vendor/tinybox`).
 - Shell parsing and command classification primitives are owned by
   `tinybox` (`tinybox_core::shell`). Policy over them stays here.
 - Secret and PII scrubbers are TinyMemory's

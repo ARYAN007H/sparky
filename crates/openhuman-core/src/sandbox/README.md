@@ -6,6 +6,9 @@ spawn processes (`shell`) and the
 flows code-runner capability call into it when the agent runs in sandboxed
 mode. The core process itself always runs on the host; only the spawned
 command is confined.
+Cron shell jobs use TinyBox's supervised passthrough process lifecycle after
+host authorization; they retain host execution semantics rather than entering
+the Local jail.
 
 [`mod.rs`](./mod.rs) names three separate questions. Where a tool runs is this folder.
 Which tools are allowed is the security and tool policy
