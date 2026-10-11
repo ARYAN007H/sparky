@@ -41,15 +41,12 @@ impl Tool for Ping {
     fn parameters_schema(&self) -> serde_json::Value {
         serde_json::json!({ "type": "object", "properties": {} })
     }
-    async fn execute(
-        &self,
-        _args: serde_json::Value,
-    ) -> anyhow::Result<openhuman_core::tools::ToolResult> {
+    async fn execute(&self, _args: serde_json::Value) -> anyhow::Result<tinytools::ToolResult> {
         self.seen
             .lock()
             .unwrap()
             .push(openhuman_core::agent::turn_origin::current());
-        Ok(openhuman_core::tools::ToolResult::success("pinged"))
+        Ok(tinytools::ToolResult::success("pinged"))
     }
 }
 
