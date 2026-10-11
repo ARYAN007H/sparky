@@ -21,6 +21,9 @@ const MAX_CONTROLLER_BYTES: usize = 1024 * 1024;
 /// lease -> TinyBus connection -> callback -> runtime context.
 pub(super) struct ChannelHostCallbacks {
     config: Arc<Config>,
+    core_context: Option<Arc<crate::core::runtime::CoreContext>>,
+    tenant: crate::core::runtime::Tenant,
+    cancellation: tokio_util::sync::CancellationToken,
     context: Arc<OnceLock<Weak<ChannelRuntimeContext>>>,
     dispatch: mpsc::Sender<RuntimeChannelMessage>,
     delivery: ChannelDeliveryStore,
@@ -35,6 +38,11 @@ impl ChannelHostCallbacks {
         let delivery = ChannelDeliveryStore::for_workspace(&config.workspace_dir);
         Self {
             config,
+            core_context: crate::core::runtime::CoreContext::current(),
+            tenant: crate::core::runtime::tenant::current_tenant_or_isolated(
+                "channel_host_callback",
+            ),
+            cancellation: crate::channels::runtime::session::channel_session(),
             context,
             dispatch,
             delivery,
@@ -211,12 +219,33 @@ impl ChannelHostCallbacks {
         }
         match request {
             ChannelBackendRequest::RemoteControl(request) => {
-                crate::channels::host::remote_control::dispatch_callback(
-                    self.context()?.as_ref(),
-                    request,
-                )
-                .await
-                .map(ChannelBackendResult::RemoteControl)
+                let context = self.context()?;
+                let tenant = &self.tenant;
+                let cancellation = &self.cancellation;
+                let dispatch = async {
+                    tokio::select! {
+                        biased;
+                        _ = cancellation.cancelled() => {
+                            Err(Error::failed("channel session ended"))
+                        }
+                        result = crate::channels::host::remote_control::dispatch_callback(
+                            context.as_ref(),
+                            tenant,
+                            cancellation,
+                            request,
+                        ) => result.map(ChannelBackendResult::RemoteControl),
+                    }
+                };
+                match &self.core_context {
+                    Some(core_context) => {
+                        crate::core::runtime::CoreContext::scope(
+                            Arc::clone(core_context),
+                            dispatch,
+                        )
+                        .await
+                    }
+                    None => dispatch.await,
+                }
             }
             ChannelBackendRequest::ProgressiveTransport(_) => Err(Error::failed(
                 "progressive transport callback is unavailable",
