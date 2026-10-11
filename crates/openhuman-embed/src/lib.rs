@@ -191,9 +191,10 @@ pub use harness::{HttpHeader, McpAuthConfig, McpServer};
 pub use profiles::{
     ChatReply, CronDelivery, CronReply, CronSweepReport, DirectProfileProvider, JobOrigin,
     OpenError, ProfileError, ProfileEvents, ProfileHandle, ProfileId, ProfileIdMode,
-    ProfileRuntime, ProfileRuntimeBuilder, ProfileSummary, Provisioned, RelayAccepted,
-    RelayMessage, SaasConfig,
+    ProfileRuntime, ProfileRuntimeBuilder, ProfileSummary, Provisioned, SaasConfig,
 };
+#[cfg(all(feature = "profiles", feature = "channels"))]
+pub use profiles::{RelayAccepted, RelayMessage};
 pub use runtime::builder::DEFAULT_MAX_AGENTS;
 /// Read-only view of a [`RuntimeBuilder`], for the layered crates' tests.
 #[doc(hidden)]
