@@ -246,14 +246,17 @@ async fn configured_call(
     {
         Ok(call) if call.outcome.ok => call
             .rendered
-            .map(map_module_rendered_result)
+            .map(|rendered| map_module_rendered_result(rendered, call.envelope))
             .unwrap_or_else(|| ToolResult::error(format!("{label} failed: empty module result"))),
         Ok(_) => ToolResult::error(format!("{label} failed: MCP server call failed")),
         Err(error) => ToolResult::error(format!("{label} failed: {error}")),
     }
 }
 
-fn map_module_rendered_result(rendered: tinymcp_bus::McpToolResult) -> ToolResult {
+fn map_module_rendered_result(
+    rendered: tinymcp_bus::McpToolResult,
+    envelope: Option<tinymcp_bus::McpResultEnvelope>,
+) -> ToolResult {
     ToolResult {
         content: rendered
             .content
@@ -269,6 +272,7 @@ fn map_module_rendered_result(rendered: tinymcp_bus::McpToolResult) -> ToolResul
             .collect(),
         is_error: rendered.is_error,
         markdown_formatted: rendered.markdown_formatted,
+        metadata: envelope.map(|value| value.to_metadata()),
         ..ToolResult::default()
     }
 }

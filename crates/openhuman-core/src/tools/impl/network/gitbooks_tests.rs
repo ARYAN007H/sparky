@@ -190,19 +190,37 @@ fn redact_endpoint_keeps_only_origin() {
 
 #[test]
 fn module_rendered_results_preserve_text_json_error_and_markdown() {
-    let result = map_module_rendered_result(tinymcp_bus::McpToolResult {
-        content: vec![
-            tinymcp_bus::McpToolContent::Text {
-                text: "plain excerpt".to_owned(),
-            },
-            tinymcp_bus::McpToolContent::Json {
-                data: json!({"title": "Guide", "rank": 1}),
-            },
-        ],
-        is_error: true,
-        markdown_formatted: Some("**formatted excerpt**".to_owned()),
-        ..Default::default()
-    });
+    let envelope = tinymcp_bus::McpResultEnvelope {
+        kind: tinymcp_bus::MCP_RESULT_KIND.to_owned(),
+        server: "openhuman-gitbooks".to_owned(),
+        tool: "searchDocumentation".to_owned(),
+        structured_content: Some(json!({"title": "Guide", "rank": 1})),
+        meta: Some(json!({"source": "fixture"})),
+        resources: vec![tinymcp_bus::McpResourceContents {
+            uri: "ui://guide".to_owned(),
+            mime_type: Some("text/markdown".to_owned()),
+            text: Some("# Guide".to_owned()),
+            blob: None,
+            meta: None,
+        }],
+        outcome: None,
+    };
+    let result = map_module_rendered_result(
+        tinymcp_bus::McpToolResult {
+            content: vec![
+                tinymcp_bus::McpToolContent::Text {
+                    text: "plain excerpt".to_owned(),
+                },
+                tinymcp_bus::McpToolContent::Json {
+                    data: json!({"title": "Guide", "rank": 1}),
+                },
+            ],
+            is_error: true,
+            markdown_formatted: Some("**formatted excerpt**".to_owned()),
+            ..Default::default()
+        },
+        Some(envelope.clone()),
+    );
 
     assert!(result.is_error);
     assert_eq!(
@@ -218,6 +236,7 @@ fn module_rendered_results_preserve_text_json_error_and_markdown() {
         &result.content[1],
         tinytools::ToolContent::Json { data } if data == &json!({"title": "Guide", "rank": 1})
     ));
+    assert_eq!(result.metadata, Some(envelope.to_metadata()));
 }
 
 #[tokio::test]
