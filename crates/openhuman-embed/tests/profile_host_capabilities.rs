@@ -167,7 +167,7 @@ impl Respond for CallTools {
 #[test]
 fn chat_and_relay_use_only_selected_tools_inside_their_profile() {
     let _ = tracing_subscriber::fmt()
-        .with_env_filter("warn")
+        .with_env_filter("warn,openhuman_core::memory::lifecycle=debug")
         .with_test_writer()
         .try_init();
     runtime_without_master_key().block_on(async {
@@ -567,12 +567,14 @@ async fn scenario() {
                 .is_err(),
             "a global reach must be refused"
         );
+        let mut last_response = Value::Null;
         let response: Value = tokio::time::timeout(Duration::from_secs(30), async {
             loop {
                 let response: Value = handle
                     .call("openhuman.memory_items_list", json!({"limit":100}))
                     .await
                     .unwrap();
+                last_response = response.clone();
                 if response
                     .to_string()
                     .contains(&format!("{}-native-learning", handle.id()))
@@ -594,7 +596,9 @@ async fn scenario() {
             }
         })
         .await
-        .expect("the native memory write reaches the shared engine");
+        .unwrap_or_else(|error| {
+            panic!("memory persistence timed out: {error}; last response: {last_response}")
+        });
         let text = response.to_string();
         assert!(
             text.contains(&format!("{}-secret", handle.id())),
