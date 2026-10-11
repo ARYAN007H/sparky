@@ -73,7 +73,10 @@ impl Tool for TenantTool {
                 assert_eq!(channel, "telegram");
                 assert_eq!(sender.as_deref(), Some("sender"));
                 assert_eq!(reply_target, "chat");
-                assert!(matches!(message_id.as_str(), "message" | "reopened-message"));
+                assert!(matches!(
+                    message_id.as_str(),
+                    "message" | "reopened-message"
+                ));
             }
             origin => panic!("unexpected turn origin: {origin:?}"),
         }
@@ -110,7 +113,7 @@ impl Respond for CallTools {
                 .iter()
                 .any(|name| name == "tenant_probe")
         {
-            chat_completion("done")
+            chat_completion(&format!("done: {}", common::last_user_message(&body)))
         } else {
             let mut completion = tool_call_completion("tenant_probe", "{}");
             let names = ["tenant_probe"];
@@ -544,7 +547,12 @@ async fn scenario() {
                 if response
                     .to_string()
                     .contains(&format!("{}-native-learning", handle.id()))
-                    && response.to_string().contains("done")
+                    && response
+                        .to_string()
+                        .contains(&format!("done: remember {}-native-learning", handle.id()))
+                    && response
+                        .to_string()
+                        .contains(&format!("done: {}: call tenant_probe", handle.id()))
                 {
                     break response;
                 }
@@ -561,8 +569,8 @@ async fn scenario() {
             "{response}"
         );
         assert!(
-            text.contains("done"),
-            "the deferred committed reply reaches the profile engine: {response}"
+            text.contains(&format!("done: remember {}-native-learning", handle.id())),
+            "the deferred chat commit reaches the profile engine: {response}"
         );
         assert!(
             text.contains(&format!("{}-native-learning", handle.id())),
