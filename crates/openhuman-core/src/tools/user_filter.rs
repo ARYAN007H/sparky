@@ -120,6 +120,8 @@ const TOOL_FAMILIES: &[ToolFamily] = &[
         ],
         default_enabled: false,
     },
+    // keep until v0.66 (review after 2027-01-11): persisted opt-in snapshots need
+    // a one-shot skill_manage -> workflow_manage migration before retirement.
     // Legacy alias: pre-rename `enabled_tool_names` snapshots stored this
     // family as `skill_manage`. Retain it (same rust_names) so users who had
     // already opted in keep these default-OFF tools enabled after the
