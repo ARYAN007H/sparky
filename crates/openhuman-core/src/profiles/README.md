@@ -422,7 +422,6 @@ channel threads, `409`) and `crates/openhuman-embed/tests/saas_profiles.rs`
   the storage backend.
 - Existing `agents/u-*` data is orphaned.
 
-
 ## In-process host capabilities
 
 `openhuman_embed::ProfileRuntimeBuilder` accepts the existing `HostTools`
@@ -433,7 +432,8 @@ opt-ins, the profile lease fence and channel permission ceilings remain
 stronger than the callback. With no callback, execution is denied.
 
 The factory receives the exact durable chat or relay thread through
-`TurnContext::session_id`; its ambient tenant (`openhuman_embed::current_tenant`) is the owning profile. During
+`TurnContext::session_id`; its ambient tenant
+(`openhuman_embed::current_tenant`) is the owning profile. During
 execution, `openhuman_embed::current_turn_origin` exposes the task's original
 `AgentTurnOrigin`, including channel sender and reply target. Concurrent
 messages do not mutate another turn's routing context.
@@ -451,5 +451,10 @@ ignored in SaaS. Resolution refuses a profile whose lease expired or was
 latched, including queued workers resolving after lease loss. This is an
 admission check: an external engine call already admitted can still finish
 if lease loss happens while it is in flight; the generic `MemoryEngine`
-contract does not provide atomic storage fencing. Provider credentials and scheduled profile turn resolution
-are separate capabilities; selecting a native tool does not start a driver.
+contract does not provide atomic storage fencing.
+
+Native assembly remains within the profile domain families registered at boot.
+Currently that includes memory and threads; selecting another family does not
+enable it. Provider credentials, operator-selected additional native domains
+and scheduled profile turn resolution are separate capabilities; selecting a
+native tool does not start a driver.
