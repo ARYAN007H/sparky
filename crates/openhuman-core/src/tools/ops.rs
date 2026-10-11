@@ -309,23 +309,10 @@ pub fn all_tools_with_runtime(
         Box::new(FlowMemoryRecallTool::new()),
         #[cfg(feature = "flows")]
         Box::new(FlowMemoryRememberTool::new(security.clone())),
-        // Wallet tools — expose wallet operations to the agent tool-call pipeline
-        // so the crypto sub-agent can prepare transfers, check status, etc.
-        // Gated with the `web3` feature (the wallet domain is compiled out when
-        // web3 is disabled; the concrete tool types live in `tinywallet-web3`,
-        // re-exported under `wallet::tools`, and run over the process-wide engine).
-        #[cfg(feature = "web3")]
-        Box::new(WalletStatusTool::new(crate::web3::seams::engine())),
-        #[cfg(feature = "web3")]
-        Box::new(WalletChainStatusTool::new(crate::web3::seams::engine())),
-        #[cfg(feature = "web3")]
-        Box::new(WalletPrepareTransferTool::new(crate::web3::seams::engine())),
-        #[cfg(feature = "web3")]
-        Box::new(WalletTxStatusTool::new(crate::web3::seams::engine())),
-        #[cfg(feature = "web3")]
-        Box::new(WalletTxReceiptTool::new(crate::web3::seams::engine())),
-        #[cfg(feature = "web3")]
-        Box::new(WalletLookupTxTool::new(crate::web3::seams::engine())),
+    ];
+    #[cfg(feature = "web3")]
+    tools.extend(crate::web3::wallet::registration::tools());
+    tools.extend(vec![
         Box::new(ScheduleTool::new(security.clone(), root_config.clone())),
         Box::new(ProxyConfigTool::new(config.clone(), security.clone())),
         Box::new(UpdateCheckTool::new()),
@@ -506,7 +493,7 @@ pub fn all_tools_with_runtime(
         Box::new(WorkspaceUpdatePersonaTool::new(config.clone())),
         Box::new(WorkspaceResetPersonaTool::new(config.clone())),
         Box::new(WorkspaceInitTool),
-    ];
+    ]);
 
     // The single `memory` tool (recall | fetch | learn | forget), registered
     // only while memory is on: with no usable engine (signed out, no CortexDB

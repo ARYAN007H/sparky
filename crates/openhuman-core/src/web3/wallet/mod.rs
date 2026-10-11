@@ -47,10 +47,8 @@ pub(crate) mod rpc;
 
 #[cfg(feature = "web3")]
 mod schemas;
-/// The wallet agent tools, re-exported from `tinywallet-web3`. The host builds
-/// them over the process-wide engine in `tools/ops.rs`.
 #[cfg(feature = "web3")]
-pub mod tools;
+pub(crate) mod registration;
 /// The host side of the wallet primitives' `Transport` seam — endpoint resolution,
 /// failover and redaction stay here, where the config lives.
 #[cfg(feature = "web3")]

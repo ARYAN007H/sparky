@@ -57,8 +57,6 @@ pub use crate::skills::search::SkillSearchTool;
 pub use crate::skills::tools::*;
 #[cfg(feature = "voice")]
 pub use crate::voice::audio_toolkit::tools::*;
-#[cfg(feature = "web3")]
-pub use crate::web3::wallet::tools::*;
 pub use implementations::*;
 pub use schemas::{
     all_controller_schemas as all_tools_controller_schemas,
