@@ -20,27 +20,7 @@ pub struct OpenHumanTranscriptCodec;
 
 impl TranscriptCodec<OpenHumanRunContext> for OpenHumanTranscriptCodec {
     fn decode_history(&self, transcript: &SessionTranscript) -> Result<Vec<Message>, RuntimeError> {
-        // Old unpaired trims could persist tool results immediately after the
-        // frozen system prefix (#6721). Apply the host's existing adoption
-        // policy before strict native replay validation; later orphan results
-        // still fail validation, and the durable source is never rewritten.
-        let prefix = transcript.messages.iter().take_while(|row| row.role == "system").count();
-        let orphan_count = transcript.messages[prefix..]
-            .iter()
-            .take_while(|row| row.role == "tool")
-            .count();
-        let rows: std::borrow::Cow<'_, [TranscriptMessage]> = if orphan_count == 0 {
-            std::borrow::Cow::Borrowed(&transcript.messages)
-        } else {
-            tracing::warn!(orphan_count, "[session_host::codec] repaired legacy orphaned tool head");
-            std::borrow::Cow::Owned(
-                transcript.messages[..prefix]
-                    .iter()
-                    .chain(&transcript.messages[prefix + orphan_count..])
-                    .cloned()
-                    .collect(),
-            )
-        };
+        let rows = replayable_host_rows(&transcript.messages);
         tinyagents_runtime::transcript::native_transcript_to_messages(&rows)?;
         Ok(message_convert::history_to_messages(&rows))
     }
@@ -52,6 +32,9 @@ impl TranscriptCodec<OpenHumanRunContext> for OpenHumanTranscriptCodec {
         next: &[Message],
         options: &TranscriptTurnOptions<OpenHumanRunContext>,
     ) -> Result<Vec<TranscriptMessage>, RuntimeError> {
+        // Match against the same adopted view used by decode_history; dropped
+        // legacy head results must not shift retained rows' metadata.
+        let prior = replayable_host_rows(prior);
         let mut rows = next
             .iter()
             .filter_map(tinyagents_runtime::transcript::message_to_native_transcript)
@@ -328,5 +311,23 @@ fn attach_text_dialect_rounds(
             tool_calls: calls,
             iteration,
         });
+    }
+}
+
+
+/// Apply OpenHuman's historical orphan-head adoption to the replay view only.
+fn replayable_host_rows(rows: &[TranscriptMessage]) -> std::borrow::Cow<'_, [TranscriptMessage]> {
+    // Old unpaired trims could persist tool results immediately after the
+    // frozen system prefix (#6721). Later orphan results still fail native
+    // validation. Merely resuming never rewrites the durable source.
+    let prefix = rows.iter().take_while(|row| row.role == "system").count();
+    let orphan_count = rows[prefix..].iter().take_while(|row| row.role == "tool").count();
+    if orphan_count == 0 {
+        std::borrow::Cow::Borrowed(rows)
+    } else {
+        tracing::warn!(orphan_count, "[session_host::codec] repaired legacy orphaned tool head");
+        std::borrow::Cow::Owned(
+            rows[..prefix].iter().chain(&rows[prefix + orphan_count..]).cloned().collect(),
+        )
     }
 }

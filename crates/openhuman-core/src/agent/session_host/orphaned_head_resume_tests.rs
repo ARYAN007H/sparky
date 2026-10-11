@@ -115,7 +115,21 @@ async fn resumed_orphaned_tool_head_is_repaired_before_the_request() {
     assert!(!decoded.iter().any(
         |message| matches!(message, Message::Tool(tool) if tool.tool_call_id.starts_with("call_orphan"))
     ));
+    assert_eq!(
+        std::fs::read_to_string(&transcripts[0]).unwrap(),
+        spliced.join("\n") + "\n",
+        "adoption must not rewrite the durable source merely on resume",
+    );
     assert_eq!(host.turn("second message").await.unwrap(), "second reply");
+    let committed_history = host.runtime_session.as_ref().unwrap().history().to_vec();
+    let mut resumed_again = new_host();
+    resumed_again.set_thread_id(Some("thread-orphaned-head"));
+    assert!(resumed_again.resume_bound_session().await.unwrap());
+    assert_eq!(
+        resumed_again.runtime_session.as_ref().unwrap().history(),
+        committed_history.as_slice(),
+        "the healed committed head must retain aligned native rows across a fresh resume",
+    );
 
     let requests = model.requests();
     let sent = &requests
