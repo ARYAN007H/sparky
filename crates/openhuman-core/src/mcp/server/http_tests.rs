@@ -335,7 +335,7 @@ fn module_protocol_headers_exclude_host_authentication_secrets() {
     assert!(!forwarded.contains_key("authorization"));
     assert!(!forwarded.contains_key("proxy-authorization"));
     assert!(!forwarded.contains_key("cookie"));
-    assert_eq!(forwarded[HEADER_SESSION_ID], "session-7");
+    assert_eq!(forwarded[&HEADER_SESSION_ID.to_ascii_lowercase()], "session-7");
     assert_eq!(forwarded["mcp-protocol-version"], "2025-11-25");
     assert_eq!(forwarded["accept"], "application/json");
 }
