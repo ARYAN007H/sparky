@@ -372,6 +372,7 @@ async fn scenario() {
             );
         }
     }
+    assert!(inference.received_requests().await.unwrap().iter().all(|request| !request.url.path().contains("memory/experience")), "deferred profile memory must keep its bound host engine");
     // Shared backend contents are independent of the actor: actual contract
     // requests, including a malicious global-root filter, must stay confined.
     for user in ["alice", "bob"] {
