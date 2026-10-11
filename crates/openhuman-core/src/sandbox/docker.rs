@@ -158,6 +158,7 @@ fn build_docker_request(
         workspace,
         image: overrides.and_then(|config| config.image.clone()),
         command: request.command.clone(),
+        login_shell: false,
         network: overrides.and_then(|config| config.network.clone()),
         memory_limit_mb: overrides.and_then(|config| config.memory_limit_mb),
         cpus: overrides.and_then(|config| config.cpu_limit),

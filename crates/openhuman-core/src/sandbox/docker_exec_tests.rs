@@ -79,6 +79,7 @@ fn module_request_preserves_policy_and_only_forwards_allowed_environment() {
             workspace: workspace.to_string_lossy().into_owned(),
             image: Some("debian:12".to_owned()),
             command: "make test".to_owned(),
+            login_shell: false,
             network: Some("bridge".to_owned()),
             memory_limit_mb: Some(2048),
             cpus: Some(2.5),

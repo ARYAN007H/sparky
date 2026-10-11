@@ -24,6 +24,8 @@
 //!   and rejects `set -o pipefail`, so this is gated on bash actually
 //!   being present; otherwise we fall back to plain sh.
 
+use std::path::Path;
+
 /// Which shell family [`build_tokio_command`] / [`build_std_command`] spawn.
 ///
 /// A value rather than a bare `cfg!(windows)` so what is *told* to the model
