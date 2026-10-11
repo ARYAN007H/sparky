@@ -16,9 +16,9 @@ copying its implementation into a host, or accepting weaker isolation.
 | tinyjuice | none (module loaded through TinyBus) | tinyjuice-bus | core tools, compression, CCR REPL | Complete: PR #59 provides module-owned compression, CCR queries, HTML extraction, schemas and declarations; the host retains turn-bound model callbacks and artifact authorization |
 | tinyconnectors | tinyconnectors, tinyconnectors-sync | tinyconnectors-bus | core integrations, credentials and triggers | Argument preparation, calendar defaults, task windows, structured provider errors, trigger archives; preserve sign-in/out reconciliation |
 | tinymcp | tinymcp | tinymcp-bus | core MCP registry, supervisor, CLI stdio/HTTP server | Supervisor notifications, server protocol operations and callbacks for approved host tools/resources/prompts |
-| tinychannels | tinychannels, tinychannels-runtime (remaining runtime callers) | tinychannels-bus | core channels and podcast email, TinyHumans host, CLI REPL | Contract is pure; v0.1.17 supplies complete Discord response vocabulary and provider connection preparation. Podcast SMTP, Discord discovery/permission checks, credential tests and connection validation/defaults use confidential module calls. Remaining runtime callers need bus cutover with inbound/status callbacks and shutdown draining |
+| tinychannels | tinychannels, tinychannels-runtime (remaining runtime callers) | tinychannels-bus | core channels and podcast email, TinyHumans host, CLI REPL | Contract is pure; v0.1.18 supplies complete Discord response vocabulary provider connection preparation and health observations. Podcast SMTP, Discord discovery/permission checks, credential tests and connection validation/defaults and `doctor channels` health checks use confidential module calls. Remaining runtime callers need bus cutover with inbound/status callbacks and shutdown draining |
 | tinyhosts | tinyhosts | tinyhosts-bus | core hosting tools | Consume released Execute/Providers contract; keep workspace authorization, credentials, and approval policy in OpenHuman |
-| tinywallet | tinywallet-crypto, tinywallet-web3, tinywallet-x402 via bus and direct imports | tinywallet-bus | core wallet/web3/x402 | Move behavioral re-exports out of bus; validation, transaction construction, quotes, swaps, payments, budgets, ledger; retain host custody/approval and confidential attestation |
+| tinywallet | tinywallet-crypto, tinywallet-web3, tinywallet-x402 through remaining host imports | tinywallet-bus | core wallet/web3/x402 | Contract is pure at v0.13.0; native transfer preparation/execution use confidential module calls with host custody, exact approval binding and explicit close. Initialization, remaining validation, Web3 quotes/swaps, x402 payments, budgets and ledger still need host cutover |
 | tinybox | tinybox-core, tinybox-jail, tinybox-docker, tinybox-host, tinybox-ssh | tinybox-bus | core sandbox and security, desktop gateways | Pre-core gateways use the released v0.1.18 bus client. Core sandbox execution and shell analysis still require cutover |
 | tinycomputer | tinycomputer-accessibility | tinycomputer-bus | core voice, paste/focus and permission checks | Permission, focus, paste, Globe listener vocabulary/operations; preserve native thread and target rules |
 | tinyvoice | tinyvoice, cpal (also through accessibility probe) | tinyvoice-bus | core voice capture/hotkeys | Devices, recording/capture and hotkey lifecycle, bounded event batches; computer module permission decisions |
@@ -51,8 +51,8 @@ serialization closure.
 Exceptions are exact package/scope pairs with reasons. Host exceptions still
 traverse their descendants. Contract exceptions stop at the first unsafe edge:
 its implementation closure is not approved, and that edge must be removed with
-the owning migration. The channel and wallet contract migrations remain
-explicitly outstanding. An unused exception fails, prompting removal instead
+the owning migration. Channels and Wallet now have pure released contracts.
+An unused exception fails, prompting removal instead
 of leaving future regressions silently exempted.
 
 `pnpm rust:module-boundaries:complete` also fails while any exception or pending
@@ -305,3 +305,17 @@ a lost start reply, retried cleanup, ordering, and overflow recovery. The
 AppImage regression first failed on the obsolete host libxdo NEEDED requirement
 and passes after explicit module runtime staging. The full pin audit now reports
 only the existing MCP source/artifact drift, pending its separate cutover.
+
+## Module-owned channel health checks
+
+TinyChannels v0.1.18 contains the merged upstream health operation
+([tinychannels#67](https://github.com/tinyhumansai/tinychannels/pull/67)).
+`doctor channels` sends hydrated configuration and the host proxy policy over
+a confidential bus call. The module builds providers and checks each with a
+ten-second budget without starting listeners; OpenHuman formats the returned
+observations. An unavailable module fails the requested check explicitly.
+
+The desktop lockfile also catches up the already-merged Wallet v0.13.0 pin.
+Its pure contract removes the two stale contract exceptions; eleven host
+implementation exceptions remain. Runtime channel dispatch and relay delivery
+still need migration.
