@@ -12,7 +12,7 @@ use std::sync::Arc;
 use common::{chat_requests, offline_config, route, runtime, scripted_provider, stub_backend};
 use openhuman_core::core::runtime::{AgentContextRegistry, CoreContext};
 use openhuman_core::mcp::registry::types::{CommandKind, InstalledServer, Transport};
-use openhuman_core::tools::Tool;
+use tinytools::Tool;
 use openhuman_embed::{Access, AgentSpec, Runtime, Workspace};
 use serde_json::{json, Value};
 

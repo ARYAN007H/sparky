@@ -29,8 +29,8 @@ impl Tool for Marker {
     async fn execute(
         &self,
         _: serde_json::Value,
-    ) -> anyhow::Result<openhuman_core::tools::ToolResult> {
-        Ok(openhuman_core::tools::ToolResult::success("accepted"))
+    ) -> anyhow::Result<tinytools::ToolResult> {
+        Ok(tinytools::ToolResult::success("accepted"))
     }
 }
 #[test]
