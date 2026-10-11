@@ -105,21 +105,6 @@
       "scope": "hosts",
       "package": "tinymcp",
       "reason": "Protocol servers and supervisor operations still call the implementation."
-    },
-    {
-      "scope": "hosts",
-      "package": "tinywallet-crypto",
-      "reason": "Validation, transaction construction, web3 and x402 need module operations."
-    },
-    {
-      "scope": "hosts",
-      "package": "tinywallet-web3",
-      "reason": "Validation, transaction construction, web3 and x402 need module operations."
-    },
-    {
-      "scope": "hosts",
-      "package": "tinywallet-x402",
-      "reason": "Validation, transaction construction, web3 and x402 need module operations."
     }
   ],
   "excludedSubsystems": [
