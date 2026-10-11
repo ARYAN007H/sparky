@@ -151,7 +151,7 @@ struct OpenHumanTurnPreludeMutable {
     /// Live MCP tool definitions for this workspace, refreshed before each
     /// turn so disconnects remove their deferred executors immediately.
     #[cfg(feature = "mcp")]
-    connected_mcp_tools: Vec<crate::mcp::registry::types::ConnectedServerOverview>,
+    connected_mcp_tools: Vec<tinymcp_bus::McpToolPresentation>,
     /// `mcp_*` tool names a resumed thread was sent, so a tool recorded under
     /// its pre-readable hashed name is restored under that name too.
     #[cfg(feature = "mcp")]

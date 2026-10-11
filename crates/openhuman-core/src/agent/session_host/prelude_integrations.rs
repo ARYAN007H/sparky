@@ -185,26 +185,64 @@ impl OpenHumanTurnPrelude {
     /// not connected.
     #[cfg(feature = "mcp")]
     async fn refresh_connected_mcp_tools(&self) {
-        let servers = match self.runtime_config.as_deref() {
+        let config = match self.runtime_config.as_deref() {
             Some(config) => {
-                crate::mcp::registry::connections::cached_overview_for_config(config).await
+                config
             }
-            None => Vec::new(),
+            None => {
+                self.mutable
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .connected_mcp_tools
+                    .clear();
+                return;
+            }
         };
-        let count = servers
-            .iter()
-            .map(|server| server.tools.len())
-            .sum::<usize>();
+        let servers = crate::mcp::registry::connections::cached_overview_for_config(config).await;
+        let sources = servers
+            .into_iter()
+            .map(|server| tinymcp_bus::McpToolSourceSpec {
+                server_id: server.server_id.clone(),
+                label: server.qualified_name.clone(),
+                family: server.qualified_name,
+                display_name: server.display_name,
+                tools: crate::mcp::registry::tools_safe_for_agent(
+                    &server.server_id,
+                    server.tools,
+                ),
+                default_exposure: tinymcp_bus::McpToolExposure::Deferred,
+                direct_tools: Vec::new(),
+            })
+            .collect::<Vec<_>>();
+        let prepared = match crate::mcp::module_client::McpConfiguredClient::for_config(config) {
+            Ok(client) => {
+                client
+                    .call(
+                        &crate::mcp::host::client_config(config),
+                        tinymcp_bus::names::methods::PREPARE_AGENT_TOOLS,
+                        (tinymcp_bus::PrepareAgentToolsRequest { sources },),
+                    )
+                    .await
+                    .unwrap_or_else(|error| {
+                        tracing::debug!(?error, "[mcp] module tool presentation unavailable");
+                        Vec::new()
+                    })
+            }
+            Err(error) => {
+                tracing::debug!(?error, "[mcp] no module for tool presentation");
+                Vec::new()
+            }
+        };
+        let count = prepared.len();
         tracing::debug!(
             agent = %self.agent_definition_id,
-            servers = servers.len(),
             tools = count,
             "[mcp] refreshed deferred tool catalogue"
         );
         self.mutable
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .connected_mcp_tools = servers;
+            .connected_mcp_tools = prepared;
     }
 
     /// Construct searchable MCP actions from the workspace's current snapshot.
