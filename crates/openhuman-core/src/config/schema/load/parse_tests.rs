@@ -129,3 +129,37 @@ default_model = "claude-sonnet-4"
     );
     assert!(!saved.contains("type = \"anthropic\""));
 }
+
+#[tokio::test]
+async fn old_cloud_provider_config_is_persisted_once_without_losing_its_model() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = dir.path().join("config.toml");
+    let workspace = dir.path().join("workspace");
+    std::fs::create_dir(&workspace).unwrap();
+    std::fs::write(
+        &config_path,
+        r#"
+schema_version = 13
+[[cloud_providers]]
+id = "legacy-anthropic"
+type = "anthropic"
+default_model = "claude-sonnet-4"
+"#,
+    )
+    .unwrap();
+    let loaded = Config::load_from_config_path(&config_path, &workspace)
+        .await
+        .unwrap();
+    assert_eq!(loaded.schema_version, 14);
+    let once = std::fs::read_to_string(&config_path).unwrap();
+    assert!(once.contains("schema_version = 14"));
+    assert!(!once.contains("type = \"anthropic\""));
+    let reloaded = Config::load_from_config_path(&config_path, &workspace)
+        .await
+        .unwrap();
+    assert_eq!(
+        reloaded.cloud_providers[0].default_model.as_deref(),
+        Some("claude-sonnet-4")
+    );
+    assert_eq!(std::fs::read_to_string(config_path).unwrap(), once);
+}
