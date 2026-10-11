@@ -7,7 +7,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use serde_json::{Value, json};
+use serde_json::Value;
 use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolResult};
 
 use crate::{
@@ -66,7 +66,7 @@ impl Tool for McpCallTool {
         let server = required_string_arg(args, "server").ok()?;
         let tool = required_string_arg(args, "tool").ok()?;
         let mut target = tinytools::ToolSubject::named(
-            tinymcp_bus::agent_tools::naming::disambiguated_tool_name(&server, &server, &tool),
+            tinymcp::tools::naming::disambiguated_tool_name(&server, &server, &tool),
         )
         .with_family(server.clone())
         .with_tag(format!("mcp.server:{server}"))
@@ -179,7 +179,7 @@ fn classified_result(
         let outcome = tinymcp_bus::McpCallOutcome::failed(
             server,
             tool,
-            tinymcp_bus::McpCallError::new(tinymcp_bus::errors::INVALID_RESPONSE),
+            tinymcp_bus::McpCallError::new(tinymcp_bus::errors::SERIALIZATION),
         );
         return with_outcome(ToolResult::error("mcp_call_tool failed"), &outcome);
     };
@@ -220,7 +220,7 @@ fn unavailable_outcome(server: &str, tool: &str) -> tinymcp_bus::McpCallOutcome 
     tinymcp_bus::McpCallOutcome::failed(
         server,
         tool,
-        tinymcp_bus::McpCallError::new(tinymcp_bus::errors::MODULE_UNAVAILABLE),
+        tinymcp_bus::McpCallError::new(tinymcp_bus::errors::BUS),
     )
 }
 
