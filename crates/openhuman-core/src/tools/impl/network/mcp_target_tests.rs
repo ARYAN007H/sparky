@@ -7,7 +7,7 @@ use std::{
 
 use crate::mcp::module_client::{McpConfiguredClient, McpModulePort};
 use async_trait::async_trait;
-use serde_json::Value;
+use serde_json::{Value, json};
 use tinymcp_bus::{
     McpToolPresentation, OpenConfiguredResponse, PrepareAgentToolsRequest, TransitionStatus,
 };

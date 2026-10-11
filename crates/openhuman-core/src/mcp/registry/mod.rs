@@ -421,7 +421,7 @@ pub mod oauth {
     /// token exchange fails.
     pub async fn complete(config: &Config, state: &str, code: &str) -> Result<String, String> {
         let outcome: tinymcp_bus::ConnectOutcome =
-            super::module_client::McpConfiguredClient::for_config(config)
+            crate::mcp::module_client::McpConfiguredClient::for_config(config)
                 .map_err(|error| error.to_string())?
                 .call(
                     &host::client_config(config),
