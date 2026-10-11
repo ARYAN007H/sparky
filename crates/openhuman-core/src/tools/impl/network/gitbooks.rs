@@ -4,7 +4,7 @@
 use crate::{
     config::Config,
     mcp::http_client::redact_endpoint,
-    modules::client::{ModuleCallError, ModuleClient},
+    modules::client::ModuleClient,
 };
 use async_trait::async_trait;
 use serde_json::{json, Value};
@@ -232,11 +232,7 @@ async fn configured_call(
             .rendered
             .map(tinymcp::tools::tool_result)
             .unwrap_or_else(|| ToolResult::error(format!("{label} failed: empty module result"))),
-        Ok(call) => ToolResult::error(format!(
-            "{label} failed: {}",
-            call.error_message
-                .unwrap_or_else(|| "MCP server call failed".to_owned())
-        )),
+        Ok(_) => ToolResult::error(format!("{label} failed: MCP server call failed")),
         Err(error) => ToolResult::error(format!("{label} failed: {error}")),
     }
 }
