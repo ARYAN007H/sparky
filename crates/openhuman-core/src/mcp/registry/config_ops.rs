@@ -131,3 +131,7 @@ pub async fn mcp_clients_config_set(config: &Config, doc: Value) -> Result<Outco
 
     Ok(Outcome::new(rendered, vec![note]))
 }
+
+#[cfg(test)]
+#[path = "config_ops_tests.rs"]
+mod tests;
