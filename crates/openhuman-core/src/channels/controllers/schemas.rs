@@ -14,7 +14,6 @@ use super::backend::OpenHumanChannelBackend;
 use super::definitions::ChannelAuthMode;
 use crate::channels::contract_schema::from_channel_controller_schema;
 use crate::security::credentials::channel_credential_provider;
-use tinychannels::ChannelManager;
 use tinychannels_bus::controllers::{all_channel_controller_schemas, channel_controller_schema};
 
 // ---------------------------------------------------------------------------
@@ -268,9 +267,9 @@ fn handle_disconnect(params: Map<String, Value>) -> ControllerFuture {
             .auth_mode
             .parse()
             .map_err(|e: String| format!("invalid authMode: {e}"))?;
-        let manager = openhuman_channel_manager(config);
-        let result = manager
-            .disconnect(channel, mode, p.clear_memory)
+        let backend = OpenHumanChannelBackend::new(config.clone());
+        let result = backend
+            .disconnect_channel(&config.channels_config, channel, mode, p.clear_memory)
             .await
             .map_err(|e| e.to_string())?;
         to_json(Outcome::single_log(
@@ -296,8 +295,11 @@ fn handle_status(params: Map<String, Value>) -> ControllerFuture {
             .as_deref()
             .map(str::trim)
             .filter(|s| !s.is_empty());
-        let manager = openhuman_channel_manager(config);
-        let result = manager.status(filter).await.map_err(|e| e.to_string())?;
+        let backend = OpenHumanChannelBackend::new(config.clone());
+        let result = backend
+            .channel_status(&config.channels_config, filter)
+            .await
+            .map_err(|e| e.to_string())?;
         to_json(Outcome::new(result, vec![]))
     })
 }
@@ -391,9 +393,9 @@ fn handle_send_reaction(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let p = deserialize_params::<SendReactionParams>(params)?;
-        let manager = openhuman_channel_manager(config);
-        let result = manager
-            .send_reaction(p.channel.trim(), p.reaction)
+        let backend = OpenHumanChannelBackend::new(config.clone());
+        let result = backend
+            .send_reaction(&config.channels_config, p.channel.trim(), p.reaction)
             .await
             .map_err(|e| e.to_string())?;
         to_json(Outcome::new(
@@ -407,9 +409,9 @@ fn handle_create_thread(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let p = deserialize_params::<CreateThreadParams>(params)?;
-        let manager = openhuman_channel_manager(config);
-        let result = manager
-            .create_thread(p.channel.trim(), p.title.trim())
+        let backend = OpenHumanChannelBackend::new(config.clone());
+        let result = backend
+            .create_thread(&config.channels_config, p.channel.trim(), p.title.trim())
             .await
             .map_err(|e| e.to_string())?;
         to_json(Outcome::new(
@@ -423,9 +425,14 @@ fn handle_update_thread(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let p = deserialize_params::<UpdateThreadParams>(params)?;
-        let manager = openhuman_channel_manager(config);
-        let result = manager
-            .update_thread(p.channel.trim(), p.thread_id.trim(), p.action.trim())
+        let backend = OpenHumanChannelBackend::new(config.clone());
+        let result = backend
+            .update_thread(
+                &config.channels_config,
+                p.channel.trim(),
+                p.thread_id.trim(),
+                p.action.trim(),
+            )
             .await
             .map_err(|e| e.to_string())?;
         to_json(Outcome::new(
@@ -439,9 +446,9 @@ fn handle_list_threads(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let p = deserialize_params::<ListThreadsParams>(params)?;
-        let manager = openhuman_channel_manager(config);
-        let result = manager
-            .list_threads(p.channel.trim(), p.active)
+        let backend = OpenHumanChannelBackend::new(config.clone());
+        let result = backend
+            .list_threads(&config.channels_config, p.channel.trim(), p.active)
             .await
             .map_err(|e| e.to_string())?;
         to_json(Outcome::new(
@@ -457,13 +464,6 @@ fn handle_list_threads(params: Map<String, Value>) -> ControllerFuture {
 
 fn deserialize_params<T: DeserializeOwned>(params: Map<String, Value>) -> Result<T, String> {
     serde_json::from_value(Value::Object(params)).map_err(|e| format!("invalid params: {e}"))
-}
-
-fn openhuman_channel_manager(config: Config) -> ChannelManager<OpenHumanChannelBackend> {
-    ChannelManager::new(
-        config.channels_config.clone(),
-        OpenHumanChannelBackend::new(config),
-    )
 }
 
 fn connect_logs(channel: &str, mode: ChannelAuthMode, pending_auth: bool) -> Vec<String> {
