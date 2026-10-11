@@ -25,16 +25,25 @@ use crate::modules::tinybox::{self, contract};
 /// Label applied to all sandbox containers for orphan cleanup.
 const CONTAINER_LABEL: &str = "openhuman.sandbox=true";
 
+#[cfg(feature = "modules")]
+fn status_request() -> contract::DockerStatusRequest {
+    contract::DockerStatusRequest {
+        timeout_ms: contract::DEFAULT_DOCKER_CONTROL_TIMEOUT_MS,
+    }
+}
+
+#[cfg(feature = "modules")]
+fn cleanup_request() -> contract::CleanupDockerRequest {
+    contract::CleanupDockerRequest {
+        label: CONTAINER_LABEL.to_owned(),
+        timeout_ms: contract::DEFAULT_DOCKER_CONTROL_TIMEOUT_MS,
+    }
+}
+
 /// Check whether Docker is available and responsive.
 #[cfg(feature = "modules")]
 pub async fn is_docker_available(config: &Config) -> Result<bool, String> {
-    let status = tinybox::docker_status(
-        config,
-        contract::DockerStatusRequest {
-            timeout_ms: contract::DEFAULT_DOCKER_CONTROL_TIMEOUT_MS,
-        },
-    )
-    .await?;
+    let status = tinybox::docker_status(config, status_request()).await?;
     Ok(status.available)
 }
 
@@ -174,15 +183,9 @@ fn path_string(path: &std::path::Path, kind: &str) -> anyhow::Result<String> {
 /// OpenHuman label.
 #[cfg(feature = "modules")]
 pub async fn cleanup_orphaned_containers(config: &Config) -> anyhow::Result<u32> {
-    let output = tinybox::cleanup_docker(
-        config,
-        contract::CleanupDockerRequest {
-            label: CONTAINER_LABEL.to_owned(),
-            timeout_ms: contract::DEFAULT_DOCKER_CONTROL_TIMEOUT_MS,
-        },
-    )
-    .await
-    .map_err(|error| anyhow::anyhow!("{error}"))?;
+    let output = tinybox::cleanup_docker(config, cleanup_request())
+        .await
+        .map_err(|error| anyhow::anyhow!("{error}"))?;
     let count = output.containers_stopped;
     tracing::debug!(count = count, "[sandbox:docker] orphan cleanup finished");
     Ok(count)

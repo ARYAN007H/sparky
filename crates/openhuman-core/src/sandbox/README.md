@@ -145,7 +145,7 @@ Local derives its status from which jail backend was picked
 | [`types.rs`](./types.rs) | `SandboxBackendKind`, `SandboxPolicy`, `DockerOverrides`, exec request and result, handle and status, `ElevatedOp`, `ELEVATED_TOOLS`. |
 | [`ops.rs`](./ops.rs) | Policy resolution, backend creation, routed execution (None and Local paths), the env allowlist, the host off switch, elevated ops. |
 | [`grants.rs`](./grants.rs) | The Local jail's filesystem grant set and its credential floor. |
-| [`docker.rs`](./docker.rs) | Policy-to-`OneShot` mapping, availability probe, orphan cleanup, Docker policy validation. |
+| [`docker.rs`](./docker.rs) | Policy-to-`RunDocker` mapping, module status/cleanup calls, Docker policy validation. |
 | [`schemas.rs`](./schemas.rs) | The `sandbox.*` controllers. |
 
 ## Key types and entry points
@@ -187,9 +187,10 @@ The settings surface (`get_sandbox_settings`, `[security.sandbox]` and
 ## Boundaries
 
 - The OS jail (Landlock, Seatbelt, AppContainer, noop) is `tinybox-jail` in
-  `vendor/tinybox/crates/tinybox-jail`. The one-shot container command line
-  is `tinybox-docker`. Both belong to the `tinybox` repo; this folder keeps
-  only the policy of when and how to confine.
+  `vendor/tinybox/crates/tinybox-jail`. Docker execution, daemon status, and
+  label-scoped cleanup run through TinyBox's loadable module. Both providers
+  belong to the `tinybox` repo; this folder keeps the policy of when and how to
+  confine.
 - Permission to run a command at all, the approval gate and the path checks
   are `security/`. The autonomy policy is off by default there, so for a
   default install the sandbox and the `is_always_forbidden` floor are what

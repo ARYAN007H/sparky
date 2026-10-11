@@ -289,9 +289,11 @@ async fn execute_in_sandbox_none_backend_runs_on_every_os() {
 fn env_passthrough_includes_safe_vars() {
     assert!(SANDBOX_ENV_PASSTHROUGH.contains(&"PATH"));
     assert!(SANDBOX_ENV_PASSTHROUGH.contains(&"HOME"));
-    assert!(!SANDBOX_ENV_PASSTHROUGH
-        .iter()
-        .any(|v| v.contains("KEY") || v.contains("SECRET")));
+    assert!(
+        !SANDBOX_ENV_PASSTHROUGH
+            .iter()
+            .any(|v| v.contains("KEY") || v.contains("SECRET"))
+    );
 }
 
 // ── the security-relevant decision, tested independently of the host ─────────

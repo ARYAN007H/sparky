@@ -1,6 +1,6 @@
 use super::*;
-use crate::core::runtime::context::CoreContext;
 use crate::core::runtime::DomainSet;
+use crate::core::runtime::context::CoreContext;
 
 /// Scope a `Config` onto the embedder-config seam that `load_config_with_timeout()`
 /// prefers, so a handler reads it instead of doing live disk I/O against

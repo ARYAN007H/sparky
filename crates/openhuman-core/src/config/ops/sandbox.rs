@@ -51,7 +51,9 @@ pub async fn get_sandbox_settings() -> Result<Outcome<serde_json::Value>, String
         "detected_backend": detected_backend,
         "env_passthrough": crate::sandbox::ops::SANDBOX_ENV_PASSTHROUGH,
     });
-    log::debug!("[config][sandbox] get_sandbox_settings: backend={backend_str}, docker_available={docker_available}");
+    log::debug!(
+        "[config][sandbox] get_sandbox_settings: backend={backend_str}, docker_available={docker_available}"
+    );
     Ok(Outcome::single_log(value, "sandbox settings read"))
 }
 

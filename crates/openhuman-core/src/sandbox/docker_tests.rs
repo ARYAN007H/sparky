@@ -61,6 +61,26 @@ fn validate_docker_policy_multiple_issues() {
     assert!(issues.len() >= 3);
 }
 
+#[cfg(feature = "modules")]
+#[test]
+fn daemon_status_and_orphan_cleanup_use_bounded_tinybox_requests() {
+    use crate::modules::tinybox::contract::DEFAULT_DOCKER_CONTROL_TIMEOUT_MS;
+
+    assert_eq!(
+        status_request(),
+        crate::modules::tinybox::contract::DockerStatusRequest {
+            timeout_ms: DEFAULT_DOCKER_CONTROL_TIMEOUT_MS,
+        }
+    );
+    assert_eq!(
+        cleanup_request(),
+        crate::modules::tinybox::contract::CleanupDockerRequest {
+            label: "openhuman.sandbox=true".to_owned(),
+            timeout_ms: DEFAULT_DOCKER_CONTROL_TIMEOUT_MS,
+        }
+    );
+}
+
 #[test]
 fn docker_backend_handle_maps_module_status_truthfully() {
     let available = docker_handle_for_status(true);

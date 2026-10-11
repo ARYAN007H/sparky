@@ -2,10 +2,10 @@
 //! routed execution.
 
 use super::docker;
-use super::grants::{resolve_local_jail_grants, JailGrants};
+use super::grants::{JailGrants, resolve_local_jail_grants};
 use super::types::{
-    ElevatedOp, SandboxBackendHandle, SandboxBackendKind, SandboxExecRequest, SandboxExecResult,
-    SandboxPolicy, SandboxStatus, ELEVATED_TOOLS,
+    ELEVATED_TOOLS, ElevatedOp, SandboxBackendHandle, SandboxBackendKind, SandboxExecRequest,
+    SandboxExecResult, SandboxPolicy, SandboxStatus,
 };
 use crate::agent::harness::definition::SandboxMode;
 use crate::agent::platform_shell;
@@ -426,10 +426,14 @@ pub(crate) fn apply_requested_backend(
             Ok(true)
         }
         SandboxBackend::Firejail => {
-            anyhow::bail!("Firejail sandbox was explicitly requested but this build has no Firejail execution backend")
+            anyhow::bail!(
+                "Firejail sandbox was explicitly requested but this build has no Firejail execution backend"
+            )
         }
         SandboxBackend::Bubblewrap => {
-            anyhow::bail!("Bubblewrap sandbox was explicitly requested but this build has no Bubblewrap execution backend")
+            anyhow::bail!(
+                "Bubblewrap sandbox was explicitly requested but this build has no Bubblewrap execution backend"
+            )
         }
     }
 }
