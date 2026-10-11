@@ -6,6 +6,7 @@ use crate::security::{AuditLogger, SecurityPolicy};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tinyagents_harness::tools::{CurrentTimeTool, ResolveTimeTool};
+use tinymcp::tools::{McpListServersTool, McpListToolsTool};
 use tinytools::Tool;
 use tinytools_std::detect_tools::DetectToolsTool;
 use tinytools_std::filesystem::{
