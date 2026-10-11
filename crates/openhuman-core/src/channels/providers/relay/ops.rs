@@ -216,8 +216,7 @@ pub(crate) async fn run_relay_turn(
         request_id = %request_id,
         "[channels::relay] dispatching relayed turn"
     );
-    let mut runtime_message =
-        crate::channels::runtime::dispatch::RuntimeChannelMessage::from(message);
+    let mut runtime_message = crate::channels::runtime::RuntimeChannelMessage::from(message);
     runtime_message.prepared_inbound = Some(prepared);
     super::with_thread(
         thread_id.clone(),

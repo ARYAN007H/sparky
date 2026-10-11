@@ -86,7 +86,7 @@ pub(crate) async fn process_channel_runtime_message(
     let msg = prepared.message;
     let history_key = prepared.history_key;
     let mut envelope = prepared.envelope;
-    envelope.delivered_via_upstream_relay = authenticated_relay;
+    envelope.access.delivered_via_upstream_relay = authenticated_relay;
 
     println!(
         "  💬 [{}] from {}: {}",
