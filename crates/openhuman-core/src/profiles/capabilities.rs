@@ -93,7 +93,8 @@ impl ProfileCapabilities {
             )
             && !name.starts_with("delegate_")
             && !name.starts_with("mcp_")
-            && crate::tools::toolpacks::pack_for_tool(name).is_none_or(|pack| pack.id != "workflows")
+            && crate::tools::toolpacks::pack_for_tool(name)
+                .is_none_or(|pack| pack.id != "workflows")
     }
 
     /// An explicitly named operation can pass the supervised gate only with a host callback.

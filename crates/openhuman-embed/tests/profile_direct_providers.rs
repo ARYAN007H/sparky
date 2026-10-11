@@ -122,19 +122,21 @@ async fn scenario() {
         .await;
     PointedTransport::install(&managed.uri());
 
-    let mut search = SearchConfig {
+    let search = SearchConfig {
         presentation: SearchPresentation::Roles,
         providers: BTreeMap::from([
-        ("exa".into(), SearchProviderSettings::direct()),
-        ("gemini".into(), SearchProviderSettings::direct()),
-    ]);
-    search.exa = SearchEngineCredentials {
-        api_key: Some("operator-exa-key".into()),
-        base_url: Some(exa.uri()),
-    };
-    search.gemini = SearchEngineCredentials {
-        api_key: Some("operator-gemini-key".into()),
-        base_url: Some(gemini.uri()),
+            ("exa".into(), SearchProviderSettings::direct()),
+            ("gemini".into(), SearchProviderSettings::direct()),
+        ]),
+        exa: SearchEngineCredentials {
+            api_key: Some("operator-exa-key".into()),
+            base_url: Some(exa.uri()),
+        },
+        gemini: SearchEngineCredentials {
+            api_key: Some("operator-gemini-key".into()),
+            base_url: Some(gemini.uri()),
+        },
+        ..SearchConfig::default()
     };
     let root = tempfile::tempdir().unwrap();
     let mut saas = SaasConfig::new(root.path());
