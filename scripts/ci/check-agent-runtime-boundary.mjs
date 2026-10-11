@@ -422,6 +422,24 @@ function assertSelfTests() {
     throw new Error(
       "agent-runtime boundary self-test: host tool policy export must stay exact",
     );
+  const toolExport =
+    "pub use tinytools::{PermissionLevel, Tool, ToolExposure, ToolResult};";
+  if (
+    !isEmbedContractExport(embedPath, [{ text: toolExport }], 0) ||
+    isEmbedContractExport(
+      "crates/openhuman-core/src/tools/mod.rs",
+      [{ text: toolExport }],
+      0,
+    ) ||
+    isEmbedContractExport(
+      embedPath,
+      [{ text: toolExport.replace("ToolResult", "ToolResult, ToolRegistry") }],
+      0,
+    )
+  )
+    throw new Error(
+      "agent-runtime boundary self-test: embed tool injection contract must stay exact",
+    );
   const sdkPath = "crates/openhuman-core/src/agent/tinyagents/budget.rs";
   const sdkStatement =
     "pub use tinyinference_llm::model::budget::{Budget, BudgetExceeded, BudgetSnapshot, CallBudget, Spend, SpendLimits};";
