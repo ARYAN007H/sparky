@@ -436,6 +436,7 @@ async fn scenario() {
                 if response
                     .to_string()
                     .contains(&format!("{}-native-learning", handle.id()))
+                    && response.to_string().contains("done")
                 {
                     break response;
                 }
@@ -450,6 +451,10 @@ async fn scenario() {
         assert!(
             text.contains(&format!("{}-secret", handle.id())),
             "{response}"
+        );
+        assert!(
+            text.contains("done"),
+            "the deferred committed reply reaches the profile engine: {response}"
         );
         assert!(
             text.contains(&format!("{}-native-learning", handle.id())),
