@@ -186,9 +186,7 @@ impl OpenHumanTurnPrelude {
     #[cfg(feature = "mcp")]
     async fn refresh_connected_mcp_tools(&self) {
         let config = match self.runtime_config.as_deref() {
-            Some(config) => {
-                config
-            }
+            Some(config) => config,
             None => {
                 self.mutable
                     .lock()
@@ -206,28 +204,23 @@ impl OpenHumanTurnPrelude {
                 label: server.qualified_name.clone(),
                 family: server.qualified_name,
                 display_name: server.display_name,
-                tools: crate::mcp::registry::tools_safe_for_agent(
-                    &server.server_id,
-                    server.tools,
-                ),
+                tools: crate::mcp::registry::tools_safe_for_agent(&server.server_id, server.tools),
                 default_exposure: tinymcp_bus::McpToolExposure::Deferred,
                 direct_tools: Vec::new(),
             })
             .collect::<Vec<_>>();
         let prepared = match crate::mcp::module_client::McpConfiguredClient::for_config(config) {
-            Ok(client) => {
-                client
-                    .call(
-                        &crate::mcp::host::client_config(config),
-                        tinymcp_bus::names::methods::PREPARE_AGENT_TOOLS,
-                        (tinymcp_bus::PrepareAgentToolsRequest { sources },),
-                    )
-                    .await
-                    .unwrap_or_else(|error| {
-                        tracing::debug!(?error, "[mcp] module tool presentation unavailable");
-                        Vec::new()
-                    })
-            }
+            Ok(client) => client
+                .call(
+                    &crate::mcp::host::client_config(config),
+                    tinymcp_bus::names::methods::PREPARE_AGENT_TOOLS,
+                    (tinymcp_bus::PrepareAgentToolsRequest { sources },),
+                )
+                .await
+                .unwrap_or_else(|error| {
+                    tracing::debug!(?error, "[mcp] module tool presentation unavailable");
+                    Vec::new()
+                }),
             Err(error) => {
                 tracing::debug!(?error, "[mcp] no module for tool presentation");
                 Vec::new()

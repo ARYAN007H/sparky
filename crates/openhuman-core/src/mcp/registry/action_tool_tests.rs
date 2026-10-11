@@ -2,7 +2,11 @@ use super::*;
 use serde_json::json;
 use tinytools::{PermissionLevel, ToolExposure};
 
-fn presentation(server_id: &str, name: &str, legacy_name: &str) -> tinymcp_bus::McpToolPresentation {
+fn presentation(
+    server_id: &str,
+    name: &str,
+    legacy_name: &str,
+) -> tinymcp_bus::McpToolPresentation {
     tinymcp_bus::McpToolPresentation {
         name: name.into(),
         legacy_name: legacy_name.into(),
@@ -28,7 +32,11 @@ fn presentation(server_id: &str, name: &str, legacy_name: &str) -> tinymcp_bus::
 fn host_adapter_uses_the_module_prepared_name_schema_and_policy_tags() {
     let tools = deferred_connected_tools(
         Arc::new(Config::default()),
-        &[presentation("server-1", "mcp_weather_read_goals_abc123", "legacy-goals")],
+        &[presentation(
+            "server-1",
+            "mcp_weather_read_goals_abc123",
+            "legacy-goals",
+        )],
     );
     assert_eq!(tools.len(), 1);
     let tool = &tools[0];
