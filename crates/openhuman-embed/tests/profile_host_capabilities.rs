@@ -147,6 +147,9 @@ async fn scenario() {
     let factory_sessions = sessions.clone();
     let engine = Arc::new(ReferenceEngine::new());
     let runtime = ProfileRuntime::builder(SaasConfig::new(root.path()))
+        // Keep automatic renewals beyond this bounded scenario so the final
+        // synthetic expiry check cannot race a heartbeat.
+        .configure(|config| config.lease_ttl_secs = 3600)
         .tools(move |turn| {
             let profile = openhuman_embed::current_tenant().unwrap().profile.unwrap();
             factory_sessions
