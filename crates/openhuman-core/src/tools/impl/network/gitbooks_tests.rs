@@ -1,6 +1,9 @@
 use super::*;
 
 #[cfg(feature = "modules")]
+use crate::modules::client::ModuleClient;
+
+#[cfg(feature = "modules")]
 #[derive(Clone, Default)]
 struct MockProviderState {
     calls: std::sync::Arc<std::sync::Mutex<Vec<Value>>>,
@@ -84,7 +87,7 @@ async fn mock_module_client(
 
 #[cfg(feature = "modules")]
 async fn mock_gitbooks_provider() -> (String, std::sync::Arc<std::sync::Mutex<Vec<Value>>>) {
-    use axum::{extract::State, routing::post, Json, Router};
+    use axum::{extract::State, response::IntoResponse, routing::post, Json, Router};
 
     let calls = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
     let app = Router::new()
