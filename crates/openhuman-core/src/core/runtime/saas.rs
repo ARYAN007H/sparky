@@ -204,7 +204,7 @@ impl SaasConfig {
         let raw = std::fs::read_to_string(path)
             .map_err(|e| anyhow::anyhow!("reading SaaS config {}: {e}", path.display()))?;
         let config: Self = toml::from_str(&raw)
-            .map_err(|e| anyhow::anyhow!("parsing SaaS config {}: {e}", path.display()))?;
+            .map_err(|_| anyhow::anyhow!("parsing SaaS config {}: invalid operator settings", path.display()))?;
         log::debug!(
             "[saas] loaded operator config from {} (root={})",
             path.display(),
@@ -330,6 +330,7 @@ pub async fn build_with_profile_capabilities(
     port: Option<u16>,
     capabilities: Option<Arc<crate::profiles::capabilities::ProfileCapabilities>>,
 ) -> anyhow::Result<CoreRuntime> {
+    crate::profiles::provider_settings::ProfileProviderSettings::from_saas(&config)?;
     if CoreContext::current().is_some() {
         anyhow::bail!(
             "[saas] a core is already running in this process; a SaaS core must be the only one"

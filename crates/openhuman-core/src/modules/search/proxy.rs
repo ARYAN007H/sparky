@@ -174,7 +174,11 @@ pub async fn list_tools(config: &Config) -> Result<ListToolsResponse, String> {
         let mut listed: ListToolsResponse = proxy(&current).await?
             .call(names::methods::LIST_TOOLS, ()).await
             .map_err(|error| format!("search ListTools failed: {error}"))?;
-        if let Some(binding) = &current.profile_providers { binding.present(&mut listed.tools); }
+        if let Some(binding) = &current.profile_providers {
+            binding.present(&mut listed.tools);
+            let capabilities = crate::profiles::capabilities::ProfileCapabilities::current();
+            listed.tools.retain(|tool| capabilities.as_ref().is_some_and(|capabilities| capabilities.admits(&tool.name)));
+        }
         Ok(listed)
     }).await
 }
@@ -182,6 +186,9 @@ pub async fn list_tools(config: &Config) -> Result<ListToolsResponse, String> {
 /// The presentation and route boundary is checked before any module load or call.
 fn canonical_request(config: &Config, mut request: ExecuteToolRequest) -> Result<ExecuteToolRequest, String> {
     let Some(binding) = &config.profile_providers else { return Ok(request) };
+    if !crate::profiles::capabilities::ProfileCapabilities::current().is_some_and(|capabilities| capabilities.admits(&request.name)) {
+        return Err("search tool is outside the profile capability boundary".into());
+    }
     let canonical = binding.canonical_role_name(&request.name)
         .ok_or_else(|| "search tool was not advertised by this profile".to_owned())?;
     if !super::configured_tool_specs(config).iter().any(|tool| tool.name == request.name) {
