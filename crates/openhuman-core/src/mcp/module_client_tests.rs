@@ -98,6 +98,14 @@ impl McpModulePort for FakePort {
         if self.block_calls.load(std::sync::atomic::Ordering::SeqCst) {
             self.release_call.notified().await;
         }
+        if member == names::methods::STATIC_SCRUB_TOOLS {
+            let tools = args
+                .get(0)
+                .and_then(|request| request.get("tools"))
+                .cloned()
+                .ok_or(ModuleCallError::ModuleFault)?;
+            return Ok(tools);
+        }
         Ok(Value::Bool(true))
     }
 
@@ -150,6 +158,34 @@ async fn agent_tool_names_are_requested_from_the_module_root() {
 
     assert_eq!(prepared[0].name, "module:docs:whoami");
     assert_eq!(requests.lock().unwrap().as_slice(), &[request]);
+}
+
+#[tokio::test]
+async fn static_tool_metadata_scrubbing_uses_confidential_module_delivery() {
+    let port = FakePort::default();
+    let calls = Arc::clone(&port.calls);
+    let client = client(port);
+    let config = configured("docs");
+    let tool = McpRemoteTool {
+        name: "search".to_owned(),
+        title: Some("Docs search".to_owned()),
+        description: Some("Search docs".to_owned()),
+        input_schema: serde_json::json!({"type":"object"}),
+        meta: Some(serde_json::json!({"ui":{"resourceUri":"ui://search"}})),
+    };
+
+    let returned = client
+        .scrub_static_tools(&config, "docs", vec![tool.clone()])
+        .await
+        .unwrap();
+
+    assert_eq!(returned, [tool]);
+    let calls = calls.lock().unwrap();
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0].1, names::methods::STATIC_SCRUB_TOOLS);
+    assert_eq!(calls[0].2[0]["server"], "docs");
+    assert_eq!(calls[0].2[0]["tools"][0]["name"], "search");
+    assert!(calls[0].3, "raw remote metadata must cross confidentially");
 }
 
 #[tokio::test]

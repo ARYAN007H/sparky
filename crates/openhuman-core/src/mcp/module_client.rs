@@ -22,7 +22,7 @@ use serde_json::Value;
 use tinymcp_bus::{
     agent_tools::{McpToolPresentation, PrepareAgentToolsRequest},
     config::{McpClientConfig, OpenConfiguredRequest, OpenConfiguredResponse, TransitionStatus},
-    names, SupervisorBatch,
+    names, McpRemoteTool, ScrubStaticToolsRequest, SupervisorBatch,
 };
 
 use crate::{
@@ -351,6 +351,25 @@ impl McpConfiguredClient {
             return Err(ModuleCallError::Unavailable);
         }
         self.port.prepare_agent_tools(request).await
+    }
+
+    /// Scrubs configured credentials from static remote tool metadata inside
+    /// TinyMCP before the host screens or presents that metadata.
+    pub(crate) async fn scrub_static_tools(
+        &self,
+        config: &McpClientConfig,
+        server: &str,
+        tools: Vec<McpRemoteTool>,
+    ) -> Result<Vec<McpRemoteTool>, ModuleCallError> {
+        self.call_confidential(
+            config,
+            names::methods::STATIC_SCRUB_TOOLS,
+            (ScrubStaticToolsRequest {
+                server: server.to_owned(),
+                tools,
+            },),
+        )
+        .await
     }
 
     async fn call_inner<R: DeserializeOwned>(
