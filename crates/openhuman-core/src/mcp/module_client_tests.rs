@@ -106,6 +106,20 @@ impl McpModulePort for FakePort {
                 .ok_or(ModuleCallError::ModuleFault)?;
             return Ok(tools);
         }
+        if member == names::methods::STATIC_SERVER_SUMMARIES {
+            return serde_json::to_value(vec![tinymcp_bus::StaticServerSummary {
+                name: "docs".to_owned(),
+                endpoint: "https://docs.example.test/mcp".to_owned(),
+                description: Some("Documentation".to_owned()),
+                timeout_secs: 19,
+                allowed_tools: vec!["search".to_owned()],
+                disallowed_tools: Vec::new(),
+                auth_configured: true,
+                auth_kind: "bearer_token".to_owned(),
+                source: "config".to_owned(),
+            }])
+            .map_err(|_| ModuleCallError::ModuleFault);
+        }
         Ok(Value::Bool(true))
     }
 
@@ -186,6 +200,29 @@ async fn static_tool_metadata_scrubbing_uses_confidential_module_delivery() {
     assert_eq!(calls[0].2[0]["server"], "docs");
     assert_eq!(calls[0].2[0]["tools"][0]["name"], "search");
     assert!(calls[0].3, "raw remote metadata must cross confidentially");
+}
+
+#[tokio::test]
+async fn static_server_summaries_use_the_confidential_module_member() {
+    let port = FakePort::default();
+    let calls = Arc::clone(&port.calls);
+    let client = client(port);
+
+    let summaries: Vec<tinymcp_bus::StaticServerSummary> = client
+        .call_confidential(
+            &configured("docs"),
+            names::methods::STATIC_SERVER_SUMMARIES,
+            (),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(summaries[0].auth_kind, "bearer_token");
+    assert_eq!(summaries[0].endpoint, "https://docs.example.test/mcp");
+    let calls = calls.lock().unwrap();
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0].1, names::methods::STATIC_SERVER_SUMMARIES);
+    assert!(calls[0].3, "server metadata must use confidential delivery");
 }
 
 #[tokio::test]
