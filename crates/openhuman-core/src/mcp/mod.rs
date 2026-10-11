@@ -14,11 +14,9 @@
 //!   agent-facing tools, and the prompt-injection scan over remote tool
 //!   definitions.
 //! - [`audit`] — the RPC surface over the write-audit log.
-//! - [`server`] — the `openhuman mcp` stdio and HTTP server that exposes this
-//!   application's own tools to external MCP hosts. This is the *server* side
-//!   and did not move: it is bound to the tool registry, the permission model
-//!   and the agent turn machinery, none of which a client library should know
-//!   about.
+//! - [`server`] — the `openhuman mcp` host adapter for stdio and HTTP entry
+//!   points. The tool catalog, permission model, and agent dispatch stay here;
+//!   TinyMCP owns protocol sessions and transport behavior.
 //!
 //! # Where the boundary fell
 //!
@@ -45,19 +43,16 @@
 //! and `audit` keep their own gate and their `stub`, so a build without the
 //! feature still serves `/rpc` without those namespaces.
 
-/// Brings this domain up: its lifecycle subscriber and its service.
+/// Registers the host-side MCP subscriber and lifecycle integration.
 ///
-/// The one entry point core startup calls. It exists so that `crates/openhuman-core/src/core/` — which
-/// is transport, and carries no business logic — does not have to know that this
-/// domain has a service, that opening one can fail, or what to do when it does.
+/// Core startup calls this without knowing the MCP adapter details. This
+/// remembers the process default configuration and registers cleanup for the
+/// configured module client; opening the module remains lazy until a caller
+/// needs it.
 ///
-/// Never fails. MCP being unavailable must not stop the core coming up, and
-/// every caller in the domain already handles an absent service, so a failure is
-/// logged here and the process continues without it.
-///
-/// Idempotent: the subscriber registers once and the service opens once, so the
-/// two startup paths that call this — the RPC domain enable point and the
-/// boot-jobs path, which are gated separately — can both call it.
+/// Idempotent: the subscriber and configured-client shutdown hook register at
+/// most once, so the RPC domain enable point and boot-jobs path can both call
+/// this function.
 #[cfg(feature = "mcp")]
 pub fn start(config: &crate::config::Config) {
     registry::bus::init();
@@ -77,11 +72,10 @@ pub fn start(_config: &crate::config::Config) {}
 /// Boots the domain from the runtime's startup path.
 ///
 /// This is MCP's one entry in `start_boot_once_jobs`, alongside the
-/// skill-catalog refresh. The orchestration here —
-/// that the service must exist before installed servers can dial it, and that
-/// the reconnect supervisor must run until the process ends — is this domain's
-/// own, and the `Once` guard on the supervisor keeps a repeated boot from
-/// spawning a second one. `src/core` only knows it should call one function.
+/// skill-catalog refresh. It asks TinyMCP to open the configured module object
+/// and start its installed-server and reconnect work. The `Once` guard keeps
+/// the host's poll task from spawning twice; `src/core` only knows it should
+/// call one function.
 #[cfg(feature = "mcp")]
 pub fn start_boot_jobs(config: &crate::config::Config) {
     start(config);
@@ -151,11 +145,10 @@ pub(crate) async fn refresh_configured_tool_cache(config: &crate::config::Config
 
 /// Spawns the reconnect supervisor exactly once per process.
 ///
-/// The supervisor walks every workspace host the process has opened, so the
-/// single task covers a host opened after boot — a workspace switch, a second
-/// embedder — as well as the one booted against. It takes no configuration
-/// because it reads the host map each tick rather than binding to one
-/// workspace.
+/// The supervisor polls every configured module client the process has opened,
+/// so the one task covers later workspace switches as well as the initial
+/// workspace. It takes no configuration because it reads the client map each
+/// tick rather than binding to one workspace.
 #[cfg(feature = "mcp")]
 fn spawn_reconnect_supervisor() {
     static SUPERVISOR_SPAWNED: std::sync::atomic::AtomicBool =
