@@ -15,8 +15,8 @@ use crate::agent::harness::definition::SandboxMode;
 use crate::config::Config;
 use tinytools::{PermissionLevel, Tool, ToolCategory, ToolResult};
 
-use super::super::ops::load_user_scope_pref;
 use super::super::contract::{toolkit_from_slug, ToolScope};
+use super::super::ops::load_user_scope_pref;
 use super::visibility::{
     action_mutates_external_state, evaluate_tool_visibility, resolve_action_scope,
     scope_error_message, ToolDecision,

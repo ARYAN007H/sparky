@@ -415,8 +415,8 @@ pub(crate) fn handle_voice_test_provider(params: Map<String, Value>) -> Controll
 
 pub(crate) fn handle_voice_server_start(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        use tinyvoice_bus::hotkey::ActivationMode;
         use crate::voice::server::{global_server, VoiceServerConfig};
+        use tinyvoice_bus::hotkey::ActivationMode;
 
         let config = config_rpc::load_config_with_timeout().await?;
 

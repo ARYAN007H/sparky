@@ -144,10 +144,10 @@ async fn flow_tool_allowed(
     slug: &str,
     connected_toolkits: Option<&[String]>,
 ) -> bool {
-    use crate::integrations::composio::ops::load_user_scope_pref;
     use crate::integrations::composio::contract::{
         catalog_for_toolkit, classify_unknown, find_curated, toolkit_from_slug,
     };
+    use crate::integrations::composio::ops::load_user_scope_pref;
 
     let Some(toolkit) = toolkit_from_slug(slug) else {
         tracing::debug!(target: "flows", %slug, "[flows] tool_call curation: reject — slug has no extractable toolkit prefix");
