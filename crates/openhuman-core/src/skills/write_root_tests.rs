@@ -23,7 +23,7 @@ fn user_workflow(name: &str) -> CreateWorkflowParams {
     }
 }
 
-fn names(workflows: &[crate::skills::Workflow]) -> Vec<String> {
+fn names(workflows: &[tinyskills::Skill]) -> Vec<String> {
     workflows
         .iter()
         .map(|workflow| workflow.name.clone())

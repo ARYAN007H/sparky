@@ -258,7 +258,7 @@ pub struct OpenHumanSessionHost {
     /// resolve their default cwd to its root. `None` preserves the shared
     /// `action_dir` cwd behaviour.
     pub(super) workspace_descriptor: Option<tinytools::WorkspaceDescriptor>,
-    pub(super) workflows: Vec<crate::skills::Workflow>,
+    pub(super) workflows: Vec<tinyskills::Skill>,
     /// Last per-turn context block (active goal, running sub-agents) built for
     /// the current turn. Stored so it can be forwarded to subagents via
     /// `ParentExecutionContext`.
@@ -568,7 +568,7 @@ pub struct SessionHostBuilder {
     /// Optional turn workspace descriptor forwarded to [`OpenHumanSessionHost`] at build time.
     /// Defaults to `None` (shared `action_dir` cwd).
     pub(super) workspace_descriptor: Option<tinytools::WorkspaceDescriptor>,
-    pub(super) workflows: Option<Vec<crate::skills::Workflow>>,
+    pub(super) workflows: Option<Vec<tinyskills::Skill>>,
     /// OpenHumanSessionHost workflows to surface in the prompt. Populated from `load_workflows`
     /// at session start; defaults to empty when not explicitly set.
     pub(super) post_turn_hooks: Vec<Arc<dyn PostTurnHook>>,

@@ -174,7 +174,7 @@ struct OpenHumanTurnPreludeMutable {
     /// Distinguishes a new session from a resumed session whose recorded tool
     /// snapshot simply had no TinyJuice declarations.
     recorded_tool_snapshot_adopted: bool,
-    workflows: Vec<crate::skills::Workflow>,
+    workflows: Vec<tinyskills::Skill>,
     composio_events: Option<tinybus::events::EventReceiver<crate::core::events::DomainEvent>>,
     skill_events: Option<tinybus::events::EventReceiver<crate::core::events::DomainEvent>>,
     /// The user-authored text of the in-flight turn, held until commit so the

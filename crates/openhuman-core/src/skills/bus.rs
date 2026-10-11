@@ -13,7 +13,7 @@
 
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
-use crate::skills::Workflow;
+use {tinyskills::Skill as Workflow};
 use async_trait::async_trait;
 use std::sync::{Arc, OnceLock};
 use tinybus::EventHandler;

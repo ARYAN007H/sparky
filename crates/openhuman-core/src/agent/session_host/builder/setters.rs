@@ -224,7 +224,7 @@ impl SessionHostBuilder {
     }
 
     /// Sets the skills available to the agent.
-    pub fn workflows(mut self, skills: Vec<crate::skills::Workflow>) -> Self {
+    pub fn workflows(mut self, skills: Vec<tinyskills::Skill>) -> Self {
         self.workflows = Some(skills);
         self
     }

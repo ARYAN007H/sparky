@@ -14,7 +14,7 @@ use crate::channels::system_prompt::{ChannelPromptInputs, ChannelSystemPrompt};
 use crate::config::Config;
 use crate::inference::provider;
 use crate::security::SecurityPolicy;
-use crate::skills::Workflow;
+use {tinyskills::Skill as Workflow};
 use crate::tools;
 use anyhow::Result;
 use std::collections::HashMap;

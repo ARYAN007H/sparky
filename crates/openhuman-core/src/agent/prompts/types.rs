@@ -6,7 +6,7 @@
 //! the sibling `mod.rs` so type edits don't pull in the whole 2 000-line
 //! renderer.
 
-use crate::skills::Workflow;
+use {tinyskills::Skill as Workflow};
 use anyhow::Result;
 use std::path::Path;
 use tinytools::Tool;

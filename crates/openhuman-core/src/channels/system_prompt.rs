@@ -24,7 +24,7 @@ use crate::agent::context::channels_prompt::{
     build_system_prompt_with_identity, render_project_context, ProjectContextPlacement,
     PromptIdentityOverride,
 };
-use crate::skills::Workflow;
+use {tinyskills::Skill as Workflow};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
