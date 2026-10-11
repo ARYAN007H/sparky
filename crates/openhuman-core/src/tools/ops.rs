@@ -158,11 +158,6 @@ pub fn all_tools_with_runtime(
             action_dir.to_path_buf(),
         )),
     ]);
-    #[cfg(feature = "voice")]
-    tools.extend(crate::voice::audio_toolkit::tools::registered_tools(
-        config.clone(),
-        security,
-    ));
     tools.push(Box::new(GmailUnsubscribeTool));
     #[cfg(feature = "skills")]
     tools.extend(crate::skills::registration::tools(config.clone()));

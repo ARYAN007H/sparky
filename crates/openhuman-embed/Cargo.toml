@@ -68,6 +68,8 @@ tinymcp-bus = { path = "../../vendor/tinymcp/crates/tinymcp-bus" }
 # conversations in its own database, and the in-memory provider; same path as
 # the core's so one copy resolves.
 tinyagents-session = { path = "../../vendor/tinyagents/crates/tinyagents-session" }
+# Native persisted todo codec exposed by the existing session-store contract.
+tinyagents-graph = { path = "../../vendor/tinyagents/crates/tinyagents-graph", default-features = false }
 # Native cancellation contract, exposed unchanged by the existing stream API.
 tinybus = { path = "../../vendor/tinybus/crates/tinybus", default-features = false }
 tinyagents-harness = { path = "../../vendor/tinyagents/crates/tinyagents-harness", default-features = false }

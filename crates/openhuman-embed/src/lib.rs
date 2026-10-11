@@ -72,6 +72,7 @@ pub use openhuman_core::backend::{
 };
 pub use openhuman_core::config::ComposioHostCredential;
 pub use openhuman_core::config::Config as RuntimeConfig;
+pub use openhuman_core::config::{SearchHostCredential, UnknownKeyedSearchProvider};
 pub use openhuman_core::security::TrustedAccess;
 pub use openhuman_core::tools::toolpacks::{GroupMode, ToolGroups};
 // The seam `AgentSpec::tools` needs: the belt types, and `Tool` itself from the
@@ -213,8 +214,13 @@ pub mod seams {
 /// The session store port: what a host implements to keep every agent's
 /// conversations in its own database ([`RuntimeBuilder::session_store`]),
 /// with the in-memory provider and the conformance suites a host's provider
-/// is held to.
+/// is held to. The persisted record types are the harness's own serde codecs,
+/// so hosts can encode and decode stored state without duplicating wire shapes.
 pub mod session_store {
+    pub use tinyagents_graph::todos::TodoList;
+    pub use tinyagents_harness::events::{AgentEvent, HarnessRunStatus};
+    pub use tinyagents_harness::ids::ExecutionStatus;
+    pub use tinyagents_harness::observability::AgentObservation;
     pub use tinyagents_session::port::{AgentStores, SessionStoreProvider};
     pub use tinyagents_session::port::{
         AppendStore, InMemorySessionStores, InMemoryTranscriptLocator, InMemoryTurnStates, Store,
@@ -223,6 +229,7 @@ pub mod session_store {
     pub use tinyagents_session::testkit::conformance::{
         session_store_conformance, session_store_isolation_conformance,
     };
+    pub use tinyagents_session::transcript::import::types::{JournalMessage, SessionDescriptor};
     /// The transcript seam a provider's [`AgentStores::transcripts`] implements.
     pub use tinyagents_session::transcript::{
         SessionRef, SessionTranscript, TranscriptHistory, TranscriptLocator, TranscriptMessage,

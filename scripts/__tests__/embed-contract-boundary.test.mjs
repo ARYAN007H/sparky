@@ -75,3 +75,24 @@ test('native injection allowances reject expanded or core compatibility exports'
     assert.match(result.output, /openhuman-upstream-reexport/);
   }
 });
+
+
+test("Embed preserves native persisted codecs without admitting core facades", () => {
+  const codecs = [
+    "pub use tinyagents_graph::todos::TodoList;",
+    "pub use tinyagents_harness::events::{AgentEvent, HarnessRunStatus};",
+    "pub use tinyagents_harness::ids::ExecutionStatus;",
+    "pub use tinyagents_harness::observability::AgentObservation;",
+    "pub use tinyagents_session::transcript::import::types::{JournalMessage, SessionDescriptor};",
+  ].join("\n");
+  const allowed = check({ "crates/openhuman-embed/src/lib.rs": codecs });
+  assert.equal(allowed.status, 0, allowed.output);
+  for (const files of [
+    { "crates/openhuman-core/src/agent/session_store/mod.rs": codecs },
+    { "crates/openhuman-embed/src/lib.rs": codecs.replace("AgentEvent, HarnessRunStatus", "AgentEvent, HarnessRunStatus, UnreviewedType") },
+  ]) {
+    const rejected = check(files);
+    assert.equal(rejected.status, 1, rejected.output);
+    assert.match(rejected.output, /openhuman-upstream-reexport/);
+  }
+});
