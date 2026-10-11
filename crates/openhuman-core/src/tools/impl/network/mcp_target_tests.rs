@@ -1,7 +1,12 @@
 use super::*;
 
-use std::sync::{Arc, Mutex};
+use std::{
+    result::Result,
+    sync::{Arc, Mutex},
+};
 
+use async_trait::async_trait;
+use serde_json::Value;
 use crate::mcp::module_client::{McpConfiguredClient, McpModulePort};
 use tinymcp_bus::{
     McpToolPresentation, OpenConfiguredResponse, PrepareAgentToolsRequest, TransitionStatus,
