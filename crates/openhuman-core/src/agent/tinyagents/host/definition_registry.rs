@@ -120,8 +120,8 @@ pub struct OpenHumanDefinitionRegistry {
     /// Every tool name registered for this session, used to materialize a
     /// [`ToolScope::Wildcard`] definition that also carries a denylist.
     ///
-    /// The crate models tools as an explicit `Vec<String>` with no wildcard
-    /// marker, so a denylist can only be honoured against a concrete list. When
+    /// The host projects named scopes after applying its denylist against a
+    /// concrete catalogue. When
     /// this is absent, a wildcard definition whose `disallowed_tools` is
     /// non-empty cannot be projected faithfully and [`Self::tools_for`] fails
     /// closed rather than re-granting the denied tools.
@@ -192,9 +192,9 @@ impl OpenHumanDefinitionRegistry {
     /// Attaches the session's registered tool names.
     ///
     /// Required to project a [`ToolScope::Wildcard`] definition that also
-    /// carries a `disallowed_tools` denylist: the crate has no wildcard marker,
-    /// so "everything except these" can only be expressed by materializing the
-    /// list. Without it such a definition fails closed — see [`Self::tools_for`].
+    /// carries a `disallowed_tools` denylist: the host materializes the allowed
+    /// names before passing the scope to the harness. Without it such a
+    /// definition fails closed — see [`Self::tools_for`].
     pub fn with_registered_tools(mut self, tools: Arc<Vec<String>>) -> Self {
         self.registered_tools = Some(tools);
         self
