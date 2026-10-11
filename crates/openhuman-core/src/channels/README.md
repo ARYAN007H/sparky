@@ -148,6 +148,7 @@ The in-app web chat (RPC namespace `channel`, singular) is a separate domain in 
 - Config schema types come from `tinychannels_bus::config` through [`config/schema/channels.rs`](../config/schema/channels.rs).
 - Conversation memory ingestion and `forget_channel` are in `memory/conversations/`.
 - Backend REST calls go through `backend::BackendClient`; Telegram and Discord link flows that need a TinyHumans account live in `openhuman-tinyhumans`.
+- Discord bot guild/channel discovery and permission checks call the released TinyChannels module through the confidential `ChannelController` member. The host resolves stored credentials and proxy scope, and the bus contract preserves the existing RPC response fields.
 - Speech-to-text and text-to-speech are the `voice/` domain, reached through the `host/` adapters.
 - Web-chat turns, the web-channel event stream, and the surface subscribers are `web_chat/`.
 - Cron delivery is [`cron/bus.rs`](../cron/bus.rs) (`CronDeliverySubscriber`) and [`cron/channel_bridge.rs`](../cron/channel_bridge.rs); `start_channels` hands them the started channel map.
