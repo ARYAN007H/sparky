@@ -321,7 +321,7 @@ implementation exceptions remain. Runtime channel dispatch and relay delivery
 still need migration.
 
 
-TinyVoice capture uses released v0.1.15 (contract 1.5), including owner-computed
+TinyVoice capture uses released v0.1.16 (contract 1.5), including owner-computed
 recording summaries. The host holds opaque reservations, reads WAV output in
 256 KiB slices, polls at most two continuous chunks per request, and releases
 leases on cancellation, sign-out and shutdown. Failed cleanup stays registered
