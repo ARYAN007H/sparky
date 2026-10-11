@@ -462,13 +462,6 @@
     "occurrence": 3
   },
   {
-    "rule": "bare-spawn",
-    "path": "crates/openhuman-core/src/core/runtime/services.rs",
-    "line": 476,
-    "text": "tokio::spawn(async move {",
-    "occurrence": 4
-  },
-  {
     "rule": "ambient-config",
     "path": "crates/openhuman-core/src/core/runtime/services.rs",
     "line": 478,

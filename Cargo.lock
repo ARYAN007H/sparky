@@ -4349,6 +4349,7 @@ dependencies = [
  "tinyinference-voice",
  "tinymcp",
  "tinymcp-bus",
+ "tinysearch-bus",
  "tinytools",
  "tinytools-agent",
  "tokio",
@@ -7361,7 +7362,7 @@ dependencies = [
 
 [[package]]
 name = "tinymcp"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7378,6 +7379,7 @@ dependencies = [
  "thiserror 2.0.20",
  "tinymcp-bus",
  "tinytools",
+ "tinytools-std",
  "tokio",
  "tokio-stream",
  "tracing",
@@ -7388,7 +7390,7 @@ dependencies = [
 
 [[package]]
 name = "tinymcp-bus"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "schemars",
  "serde",

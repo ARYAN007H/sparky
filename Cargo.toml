@@ -51,6 +51,7 @@ openhuman-tinyhumans = { path = "crates/openhuman-tinyhumans", default-features 
 # `Tool` trait. Without this, MCP tools would not satisfy the harness's trait.
 tinytools = { path = "vendor/tinyagents/vendor/tinytools/crates/tinytools" }
 tinytools-agent = { path = "vendor/tinyagents/vendor/tinytools/crates/tinytools-agent" }
+tinytools-std = { path = "vendor/tinyagents/vendor/tinytools/crates/tinytools-std" }
 
 [patch."https://github.com/tinyhumansai/tinystoragedrivers"]
 # tinyflows names the storage crates by git tag so it can build on its own.

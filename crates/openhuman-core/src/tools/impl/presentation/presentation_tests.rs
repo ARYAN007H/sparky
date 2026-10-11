@@ -284,6 +284,14 @@ async fn execute_embeds_file_image_into_deck() {
 
 #[tokio::test]
 async fn execute_skips_unsupported_mime_image_with_warning() {
+    struct UnsupportedImage;
+    #[async_trait]
+    impl ImageInspector for UnsupportedImage {
+        async fn inspect(&self, bytes: &[u8]) -> Result<tinydocs_bus::ImageFacts, String> {
+            assert_eq!(bytes, b"i am plain text, not an image");
+            Err("unsupported image type (only PNG and JPEG are embeddable)".into())
+        }
+    }
     let ws = workspace();
     let txt_path = ws.path().join("notanimage.txt");
     std::fs::write(&txt_path, b"i am plain text, not an image").expect("write txt");
@@ -298,7 +306,9 @@ async fn execute_skips_unsupported_mime_image_with_warning() {
         }]
     });
     let input: GeneratePresentationInput = serde_json::from_value(args).expect("args parse");
-    let (resolved, warnings) = tool.resolve_images(&input).await;
+    let (resolved, warnings) = tool
+        .resolve_images_with_inspector(&input, &UnsupportedImage)
+        .await;
     // Partial success: the deck still renders, the bad image is reported.
     assert!(
         resolved.iter().all(Vec::is_empty),

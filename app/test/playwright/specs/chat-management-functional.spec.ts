@@ -90,7 +90,7 @@ async function startFreshConversation(page: Page): Promise<void> {
           return (
             thread?.selectedThreadId === threadId &&
             thread.isLoadingMessages === false &&
-            Object.hasOwn(thread.messagesByThreadId ?? {}, threadId)
+            Object.prototype.hasOwnProperty.call(thread.messagesByThreadId ?? {}, threadId)
           );
         }, previousId)
       )
