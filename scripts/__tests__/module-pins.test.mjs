@@ -117,7 +117,7 @@ test("voice source release matches the artifact used for recording summaries", (
     join(REPO_ROOT, "vendor/tinyvoice/crates/tinyvoice-module/Cargo.toml"),
     "utf8",
   );
-  const version = source.match(/^version\\s*=\\s*"([^"]+)"/m)?.[1];
+  const version = source.match(/^version\s*=\s*"([^"]+)"/m)?.[1];
   assert.ok(version, "voice module source must declare its release version");
   assert.equal(
     version,
