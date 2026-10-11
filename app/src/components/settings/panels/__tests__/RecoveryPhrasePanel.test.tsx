@@ -9,12 +9,15 @@ import RecoveryPhrasePanel from '../RecoveryPhrasePanel';
 const {
   mockGenerateMnemonicPhrase,
   mockFetchWalletStatus,
+  mockValidateRecoveryPhrase,
   mockPersistLocalWalletFromMnemonic,
   mockRevealRecoveryPhrase,
 } = vi.hoisted(() => ({
-  mockGenerateMnemonicPhrase: vi.fn(
-    () => 'word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12'
-  ),
+  mockGenerateMnemonicPhrase: vi.fn(async () => ({
+    phrase: 'word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12',
+    wordCount: 12,
+  })),
+  mockValidateRecoveryPhrase: vi.fn(async () => true),
   mockFetchWalletStatus: vi.fn(
     async (): Promise<WalletStatus> => ({
       configured: false,
@@ -36,11 +39,6 @@ const {
   })),
 }));
 
-vi.mock('../../../../utils/cryptoKeys', async importOriginal => {
-  const original = await importOriginal<typeof import('../../../../utils/cryptoKeys')>();
-  return { ...original, generateMnemonicPhrase: mockGenerateMnemonicPhrase };
-});
-
 vi.mock('../../../../providers/CoreStateProvider', () => ({
   useCoreState: () => ({
     snapshot: { currentUser: { _id: 'test-user-id' } },
@@ -51,6 +49,8 @@ vi.mock('../../../../providers/CoreStateProvider', () => ({
 // Default: no existing wallet. Individual describe blocks override in beforeEach.
 vi.mock('../../../../services/walletApi', () => ({
   fetchWalletStatus: mockFetchWalletStatus,
+  generateRecoveryPhrase: mockGenerateMnemonicPhrase,
+  validateRecoveryPhrase: mockValidateRecoveryPhrase,
   setupLocalWallet: vi.fn(async () => ({
     configured: true,
     onboardingCompleted: true,

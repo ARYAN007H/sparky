@@ -43,19 +43,16 @@ const PHRASE_12 = 'word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 
 const {
   mockGenerateMnemonicPhrase,
   mockFetchWalletStatus,
+  mockValidateRecoveryPhrase,
   mockPersistLocalWalletFromMnemonic,
   mockRevealRecoveryPhrase,
 } = vi.hoisted(() => ({
-  mockGenerateMnemonicPhrase: vi.fn(() => ''),
+  mockGenerateMnemonicPhrase: vi.fn(async () => ({ phrase: '', wordCount: 12 })),
+  mockValidateRecoveryPhrase: vi.fn(async () => true),
   mockFetchWalletStatus: vi.fn(async () => ({}) as WalletStatus),
   mockPersistLocalWalletFromMnemonic: vi.fn(async (_args: unknown) => undefined),
   mockRevealRecoveryPhrase: vi.fn(async () => ({ phrase: '', wordCount: 12 })),
 }));
-
-vi.mock('../../../../utils/cryptoKeys', async importOriginal => {
-  const original = await importOriginal<typeof import('../../../../utils/cryptoKeys')>();
-  return { ...original, generateMnemonicPhrase: mockGenerateMnemonicPhrase };
-});
 
 vi.mock('../../../../providers/CoreStateProvider', () => ({
   useCoreState: () => ({
@@ -66,6 +63,8 @@ vi.mock('../../../../providers/CoreStateProvider', () => ({
 
 vi.mock('../../../../services/walletApi', () => ({
   fetchWalletStatus: mockFetchWalletStatus,
+  generateRecoveryPhrase: mockGenerateMnemonicPhrase,
+  validateRecoveryPhrase: mockValidateRecoveryPhrase,
   setupLocalWallet: vi.fn(async () => ({}) as WalletStatus),
   revealRecoveryPhrase: mockRevealRecoveryPhrase,
 }));
