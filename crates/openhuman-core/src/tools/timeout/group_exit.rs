@@ -44,7 +44,7 @@ fn active_members(group: u32) -> std::io::Result<bool> {
 
 /// Zombies and dead tasks cannot execute further side effects.
 #[cfg(target_os = "linux")]
-fn is_active_member(stat: &str, group: u32) -> bool {
+pub(super) fn is_active_member(stat: &str, group: u32) -> bool {
     let Some((_, fields)) = stat.rsplit_once(") ") else {
         return false;
     };
