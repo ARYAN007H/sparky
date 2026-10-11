@@ -1188,7 +1188,7 @@ async fn json_rpc_legacy_provider_type_preserves_default_endpoint() {
     {
         let updated = post_json_rpc(
             &rpc_base,
-            41_250 + index as u64,
+            41_250 + index as i64,
             method,
             json!({
                 "cloud_providers": [{"slug": "legacy", "endpoint": "", "type": "anthropic",
