@@ -15,7 +15,7 @@
 use crate::env_guard::EnvVarGuard;
 use std::net::SocketAddr;
 use std::path::Path;
-use std::sync::{OnceLock};
+use std::sync::OnceLock;
 use std::time::Duration;
 
 use axum::http::header::AUTHORIZATION;
@@ -48,7 +48,8 @@ fn env_lock() -> tokio::sync::MutexGuard<'static, ()> {
 async fn env_lock_async() -> tokio::sync::MutexGuard<'static, ()> {
     ENV_LOCK
         .get_or_init(|| tokio::sync::Mutex::new(()))
-        .lock().await
+        .lock()
+        .await
 }
 
 /// Initialise the process RPC token (idempotent) and return the bearer the
@@ -90,7 +91,7 @@ chat_onboarding_completed = true
 encrypt = false
 
 [local_ai]
-enabled = false
+runtime_enabled = false
 
 
 "#;
@@ -99,7 +100,7 @@ enabled = false
 fn assert_offline_config() -> openhuman_core::config::Config {
     let parsed: openhuman_core::config::Config =
         toml::from_str(TEST_CONFIG_TOML).expect("test config must match the Config schema");
-    assert!(!parsed.local_ai.enabled);
+    assert!(!parsed.local_ai.runtime_enabled);
     assert_eq!(parsed.api_url.as_deref(), Some("http://127.0.0.1:9"));
     parsed
 }
@@ -820,8 +821,15 @@ async fn managed_runtime_provisioning_rpcs_are_not_registered() {
         (2703, "openhuman.harness_init_status", json!({})),
     ] {
         let response = h.rpc(id, method, params).await;
-        assert_eq!(response.pointer("/error/code").and_then(Value::as_i64),
-            Some(-32601), "removed RPC {method} must be unavailable: {response}");
+        assert_eq!(
+            response.pointer("/error/code").and_then(Value::as_i64),
+            Some(-32000),
+            "removed RPC {method} must be unavailable: {response}"
+        );
+        let message = response["error"]["message"]
+            .as_str()
+            .expect("unknown method error");
+        assert_eq!(message, format!("unknown method: {method}"));
     }
     h.join.abort();
 }
