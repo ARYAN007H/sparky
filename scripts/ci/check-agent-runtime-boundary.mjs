@@ -23,7 +23,7 @@ const noBaseline = process.argv.includes("--no-baseline");
 const embedContractExports = new Map(
   [
     [
-      "crates/openhuman-core/src/agent/host_overrides.rs",
+      "crates/openhuman-embed/src/stream.rs",
       ["pub use tinyagents_harness::cancel::CancellationToken;"],
     ],
     [
