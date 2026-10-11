@@ -11,7 +11,7 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn long_prompt() -> String {
-    let mut s = String::from("You are a careful analyst seat in a research hive. Follow the protocol.\n");
+    let mut s = format!("You are a careful analyst seat in a research hive (run {}). Follow the protocol.\n", std::env::var("CACHE_PROBE_NONCE").unwrap_or_default());
     for i in 0..220 {
         s.push_str(&format!(
             "Rule {i}: when a claim about item {i} is made, check it against the ledger entry for item {i}, record the verdict, and never assume entry {} matches.\n",
