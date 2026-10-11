@@ -171,7 +171,12 @@ pub fn add_agent_job_with_definition(
 
 /// Adds an agent job described by `spec`, including its origin conversation.
 pub fn add_agent_job_from_spec(config: &Config, spec: AgentJobSpec) -> Result<CronJob> {
-    limits::check_new(config, &JobType::Agent, &spec.schedule, spec.delivery.as_ref())?;
+    limits::check_new(
+        config,
+        &JobType::Agent,
+        &spec.schedule,
+        spec.delivery.as_ref(),
+    )?;
     if let Some(docs) = documents(config)? {
         return run(async move { docs.add_agent_job_from_spec(spec).await });
     }
