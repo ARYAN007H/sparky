@@ -18,8 +18,6 @@
 // this file is plain field access on OpenHuman's own `Config`.
 use crate::config::Config;
 use crate::core::runtime::ServiceSet;
-#[cfg(feature = "channels")]
-use tinychannels_runtime::config::ChannelsConfigExt as _;
 
 /// The long-lived background services a runtime started, so it can stop them.
 ///
@@ -303,7 +301,7 @@ pub fn spawn_channels_service() -> Option<tokio::task::JoinHandle<()>> {
                     return;
                 }
             };
-            if !config.channels_config.has_listening_integrations() {
+            if !crate::channels::has_listener_configuration(&config) {
                 log::debug!(
                     "[channels] no channel integrations configured; not spawning listeners"
                 );

@@ -110,6 +110,17 @@ pub(crate) fn configured_providers(config: &Config) -> Vec<&'static str> {
     .collect()
 }
 
+/// Whether config contains a channel or relay that needs the native module
+/// runtime. Push webhooks remain host-server work and do not start listeners.
+pub(crate) fn has_listener_configuration(config: &Config) -> bool {
+    !configured_providers(config).is_empty()
+        || config
+            .channels_config
+            .relay
+            .as_ref()
+            .is_some_and(|relay| !relay.url.trim().is_empty() && !relay.identities.is_empty())
+}
+
 #[cfg(test)]
 #[path = "commands_tests.rs"]
 mod tests;

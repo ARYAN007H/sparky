@@ -19,6 +19,8 @@ pub mod bus;
 #[cfg(feature = "channels")]
 mod commands;
 #[cfg(feature = "channels")]
+pub(crate) use commands::{configured_providers, has_listener_configuration};
+#[cfg(feature = "channels")]
 pub(crate) mod context;
 #[cfg(feature = "channels")]
 pub mod controllers;
@@ -42,66 +44,66 @@ pub(crate) use system_prompt::ChannelSystemPrompt;
 mod tests;
 
 // Stable `channels::<provider>` paths (implementation lives under `providers/`).
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use providers::dingtalk;
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use providers::discord;
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use providers::email_channel;
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use providers::imessage;
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use providers::irc;
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use providers::lark;
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use providers::linq;
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use providers::mattermost;
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use providers::qq;
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use providers::signal;
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use providers::slack;
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use providers::telegram;
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use providers::whatsapp;
-#[cfg(feature = "whatsapp-web")]
+#[cfg(all(feature = "whatsapp-web", test))]
 pub use providers::whatsapp_web;
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use providers::yuanbao;
 
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use dingtalk::DingTalkChannel;
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use discord::DiscordChannel;
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use email_channel::EmailChannel;
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use imessage::IMessageChannel;
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use irc::IrcChannel;
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use lark::LarkChannel;
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use linq::LinqChannel;
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use mattermost::MattermostChannel;
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use qq::QQChannel;
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use signal::SignalChannel;
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use slack::SlackChannel;
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use telegram::TelegramChannel;
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use whatsapp::WhatsAppChannel;
-#[cfg(feature = "whatsapp-web")]
+#[cfg(all(feature = "whatsapp-web", test))]
 pub use whatsapp_web::WhatsAppWebChannel;
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "channels", test))]
 pub use yuanbao::YuanbaoChannel;
 
 #[cfg(all(feature = "channels", any(test, debug_assertions)))]

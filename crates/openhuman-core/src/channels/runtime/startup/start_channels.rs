@@ -143,7 +143,7 @@ async fn start_channels_inner(mut config: Config, session: CancellationToken) ->
         );
     }
 
-    let configured = crate::channels::commands::configured_providers(&config);
+    let configured = crate::channels::configured_providers(&config);
     let relay_configured = config
         .channels_config
         .relay
