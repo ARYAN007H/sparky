@@ -73,7 +73,7 @@ impl Tool for TenantTool {
                 assert_eq!(channel, "telegram");
                 assert_eq!(sender.as_deref(), Some("sender"));
                 assert_eq!(reply_target, "chat");
-                assert_eq!(message_id, "message");
+                assert!(matches!(message_id.as_str(), "message" | "reopened-message"));
             }
             origin => panic!("unexpected turn origin: {origin:?}"),
         }
@@ -441,7 +441,7 @@ async fn scenario() {
                 "telegram",
                 "chat",
                 "sender",
-                "message",
+                "reopened-message",
                 "alice: call tenant_probe after reopening"
             ))
             .await
