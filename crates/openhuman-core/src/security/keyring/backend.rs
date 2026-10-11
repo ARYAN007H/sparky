@@ -1,23 +1,8 @@
-//! Backend implementations for the keyring module.
-//!
-//! Two concrete backends are provided:
-//!
-//! - [`OsBackend`]: Wraps the `keyring` crate to use the native OS credential
-//!   store (macOS Keychain, Windows Credential Manager, Linux Secret Service).
-//!   This is the production backend.
-//!
-//! - [`FileBackend`]: Stores secrets in a plain JSON file at
-//!   `{workspace}/dev-keychain.json`.  **This file is NOT encrypted** — it is a
-//!   test/debug artifact only and must never be used in production.
-//!
-//! Backend selection happens once at first use (see [`super::selected_backend`]).
+//! Host-installable secret-storage contract and the explicit plaintext debug backend.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use tinystoragedrivers::secrets::KeyringSecrets;
-
-use crate::security::keyring::adapter;
 use crate::security::keyring::error::KeyringError;
 use crate::security::keyring::file_store;
 
@@ -26,7 +11,7 @@ use crate::security::keyring::file_store;
 /// Abstraction over a secret-storage backend.
 ///
 /// All implementations must be `Send + Sync` so they can live inside a
-/// `OnceLock<Box<dyn KeyringBackend>>`.
+/// the host install slot.
 pub trait KeyringBackend: Send + Sync {
     /// Retrieve a secret.  Returns `Ok(None)` when no entry exists.
     fn get(&self, namespaced_key: &str) -> Result<Option<String>, KeyringError>;
@@ -36,74 +21,6 @@ pub trait KeyringBackend: Send + Sync {
     fn delete(&self, namespaced_key: &str) -> Result<(), KeyringError>;
     /// Human-readable name used in log lines.
     fn name(&self) -> &'static str;
-}
-
-// ── OsBackend ─────────────────────────────────────────────────────────────────
-
-/// Production backend: the native OS credential store, through
-/// `tinystoragedrivers`' [`KeyringSecrets`] (the `SecretStore` port) over the
-/// synchronous bridge.
-///
-/// The layout is unchanged: service `openhuman`, one credential per
-/// `"{user_id}:{key}"`, so every entry written by the previous direct
-/// `keyring::Entry` implementation reads back.
-pub struct OsBackend {
-    store: KeyringSecrets,
-}
-
-const SERVICE_NAME: &str = "openhuman";
-
-impl OsBackend {
-    /// The backend over the platform credential store.
-    pub fn new() -> Self {
-        Self::with_store(KeyringSecrets::new(SERVICE_NAME))
-    }
-
-    /// The backend over an explicit store (a mock credential builder in tests).
-    pub fn with_store(store: KeyringSecrets) -> Self {
-        Self { store }
-    }
-}
-
-impl Default for OsBackend {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl KeyringBackend for OsBackend {
-    fn get(&self, namespaced_key: &str) -> Result<Option<String>, KeyringError> {
-        use tinystoragedrivers::secrets::SecretStore as _;
-        let (store, name) = (self.store.clone(), namespaced_key.to_string());
-        match crate::storage::block_on(async move { store.get(&name).await }) {
-            Ok(value) => adapter::utf8(namespaced_key, value),
-            // A locked or denied store reads as "nothing there", as before.
-            Err(e) if adapter::is_no_access(&e) => Ok(None),
-            Err(e) => Err(adapter::os_error(namespaced_key, e)),
-        }
-    }
-
-    fn set(&self, namespaced_key: &str, value: &str) -> Result<(), KeyringError> {
-        use tinystoragedrivers::secrets::SecretStore as _;
-        let (store, name) = (self.store.clone(), namespaced_key.to_string());
-        let value = zeroize::Zeroizing::new(value.as_bytes().to_vec());
-        crate::storage::block_on(async move { store.set(&name, &value).await })
-            .map_err(|e| adapter::os_error(namespaced_key, e))
-    }
-
-    fn delete(&self, namespaced_key: &str) -> Result<(), KeyringError> {
-        use tinystoragedrivers::secrets::SecretStore as _;
-        let (store, name) = (self.store.clone(), namespaced_key.to_string());
-        match crate::storage::block_on(async move { store.delete(&name).await.map(|_| ()) }) {
-            Ok(()) => Ok(()),
-            Err(e) if adapter::is_no_access(&e) => Ok(()),
-            Err(e) => Err(adapter::os_error(namespaced_key, e)),
-        }
-    }
-
-    fn name(&self) -> &'static str {
-        "os"
-    }
 }
 
 // ── FileBackend ───────────────────────────────────────────────────────────────
@@ -228,7 +145,7 @@ impl KeyringBackend for FileBackend {
 
 // ── MockBackend (test only) ───────────────────────────────────────────────────
 
-/// In-memory backend used in tests and when `OPENHUMAN_KEYRING_BACKEND=mock`.
+/// In-memory backend used only in unit tests.
 #[cfg(test)]
 pub struct MockBackend {
     store: std::sync::Mutex<HashMap<String, String>>,

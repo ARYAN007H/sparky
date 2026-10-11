@@ -7,7 +7,7 @@ icon: key
 
 # OS keyring and secret storage
 
-OpenHuman uses your operating system's secure credential store to protect the secrets that must live on your device:
+The OpenHuman desktop app uses your operating system's secure credential store to protect the master key for local secrets:
 
 - **macOS:** Keychain
 - **Windows:** Credential Manager
@@ -19,7 +19,7 @@ This is the root of trust for local secrets. OpenHuman does not keep user creden
 
 The keyring holds two kinds of secret.
 
-**Credential entries.** When a feature needs a local credential slot, OpenHuman stores it in the platform keyring instead of a normal config file. Examples are locally stored provider API keys, session and bearer tokens that must stay on the device, and wallet secret material where applicable. Entries sit under OpenHuman's own key namespace, so they do not collide with other apps.
+**Credential entries.** Locally stored provider API keys, session and bearer tokens, and wallet secret material use user-scoped credential slots. By default, these slots live in the encrypted `secrets.enc` file, protected by the master key in the OS keyring. The explicit `OPENHUMAN_KEYRING_BACKEND=os` setting stores the slots directly in the platform keyring, under OpenHuman's own namespace.
 
 **The master encryption key.** Some sensitive values must live inside local files, because the app's configuration is file-based. OpenHuman splits the storage. The secret value is stored on disk as encrypted ciphertext. The master key that decrypts it lives in the OS keyring. Your config and state files can hold encrypted values without the decryption key sitting next to them.
 
@@ -75,9 +75,38 @@ Auth profiles, config secrets, the wallet mnemonic and the `secrets.enc` backend
 | `ConsentRequired` | The keyring is unavailable and there is no consent yet. Block and prompt. |
 | `Declined` | You refused local storage. Skip the secret operation. |
 
-## Platform note
+## Embedded and server hosts
 
-This page describes the desktop app (Tauri) on macOS, Windows and Linux. Development and test environments may use test-specific overrides so automated runs do not need an interactive keychain. That is a developer convenience, not the end-user security model.
+Desktop, CLI and TUI hosts install the OS keychain providers through
+`openhuman-rpc`'s `os-keyring` feature before starting the core. The service
+name (`openhuman`) and master-key account (`app:master_key`) are unchanged,
+so existing desktop workspaces continue to decrypt with the same key.
+
+The core and embedded library do not depend on an OS keychain. Without a
+host-installed provider, they use encrypted storage in `secrets.enc` and
+create a master key at `{workspace}/keyring/master.key` on first use. On
+Unix this key file has mode `0600`. Back up the key with the workspace;
+anyone who can read both can decrypt its secrets.
+
+An operator can supply `OPENHUMAN_KEYRING_MASTER_KEY` (64 hex characters)
+or `OPENHUMAN_KEYRING_MASTER_KEY_FILE` instead. Set exactly one. Environment
+keys take precedence over a host provider, which takes precedence over the
+workspace key file. An inaccessible host key never falls back to a newly
+created file key.
+
+`OPENHUMAN_KEYRING_BACKEND=file` remains an explicit plaintext debug option.
+`encrypted_file` selects encrypted storage. `os` requires a host-installed
+OS backend; a standalone core cannot enable native keychain access itself.
+Development mode also defaults to encrypted storage.
+
+### Moving a desktop workspace to a server
+
+A desktop workspace encrypted with an OS keychain key needs that same key
+when opened by a host without OS keychain support. Supply it through the
+master-key environment or file option before boot. A newly generated
+workspace key cannot decrypt the desktop ciphertext. Unreadable
+`secrets.enc` files are quarantined as `secrets.enc.corrupt.<timestamp>`
+for recovery rather than overwritten; keep the original key and backups.
 
 ## See also
 

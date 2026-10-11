@@ -1,17 +1,7 @@
 //! Unit tests for the keyring module.
 //!
-//! Tests are structured in three groups:
-//!
-//! 1. **OS backend tests** — use the real OS keychain.  On macOS / Windows
-//!    these run unconditionally; on Linux they are skipped when the Secret
-//!    Service daemon is not available.  All test keys are prefixed with
-//!    `__openhuman_test__` to make cleanup easy.
-//!
-//! 2. **FileBackend tests** — run against a temp directory.  Always run,
-//!    no OS dependency.
-//!
-//! 3. **Backend selection tests** — verify that `OPENHUMAN_KEYRING_BACKEND`
-//!    is honoured and that the file backend round-trips correctly.
+//! File backends and namespaced operations. Native-keychain tests live with
+//! their host implementation in `openhuman-rpc/src/keyring/`.
 
 use std::io::Write as _;
 use tempfile::NamedTempFile;
@@ -19,31 +9,6 @@ use tempfile::TempDir;
 
 use super::backend::{FileBackend, KeyringBackend};
 use super::*;
-
-// ── OS backend helpers ────────────────────────────────────────────────────────
-
-/// Returns true ONLY when the user has explicitly opted into hitting the real
-/// OS keychain by setting `OPENHUMAN_TEST_OS_KEYCHAIN=1`.
-///
-/// Why opt-in instead of probe-first: on macOS, the first `keyring::Entry::set`
-/// from an unsigned/changing debug binary blocks on a GUI permission prompt —
-/// in non-interactive `cargo test` runs (CI, pre-push hook, agent shells) that
-/// hangs the suite indefinitely. We keep `cargo test` defaulting to the
-/// FileBackend path so it never touches the OS keychain.
-fn os_keychain_available() -> bool {
-    if std::env::var("OPENHUMAN_TEST_OS_KEYCHAIN").as_deref() != Ok("1") {
-        return false;
-    }
-    let b = backend::OsBackend::new();
-    let probe_key = "__openhuman_probe_test__";
-    let probe_val = "__probe_ok__";
-    if b.set(probe_key, probe_val).is_err() {
-        return false;
-    }
-    let ok = b.get(probe_key).ok().flatten().as_deref() == Some(probe_val);
-    let _ = b.delete(probe_key);
-    ok
-}
 
 // ── FileBackend: round-trip ───────────────────────────────────────────────────
 
@@ -386,56 +351,6 @@ fn file_backend_env_var_explicit_file() {
 
 // ── OS backend tests (skipped when OS keychain unavailable) ───────────────────
 
-#[test]
-fn os_round_trip_get_set_delete() {
-    if !os_keychain_available() {
-        eprintln!("skip: OS keychain not available");
-        return;
-    }
-    let b = backend::OsBackend::new();
-    let nk = "__openhuman_test__rtgsd:round_trip_key_001";
-    let _ = b.delete(nk);
-
-    assert!(b.get(nk).unwrap().is_none(), "absent before set");
-    b.set(nk, "my_secret_value").unwrap();
-    assert_eq!(b.get(nk).unwrap().as_deref(), Some("my_secret_value"));
-    b.delete(nk).unwrap();
-    assert!(b.get(nk).unwrap().is_none(), "absent after delete");
-}
-
-#[test]
-fn os_delete_nonexistent_is_ok() {
-    if !os_keychain_available() {
-        eprintln!("skip: OS keychain not available");
-        return;
-    }
-    backend::OsBackend::new()
-        .delete("__openhuman_test__del_ne:__nonexistent__")
-        .expect("idempotent delete");
-}
-
-#[test]
-fn os_user_id_isolation() {
-    if !os_keychain_available() {
-        eprintln!("skip: OS keychain not available");
-        return;
-    }
-    let b = backend::OsBackend::new();
-    let nk_a = "__openhuman_test__user_a_iso:__shared_key_iso__";
-    let nk_b = "__openhuman_test__user_b_iso:__shared_key_iso__";
-    let _ = b.delete(nk_a);
-    let _ = b.delete(nk_b);
-
-    b.set(nk_a, "value_for_a").unwrap();
-    b.set(nk_b, "value_for_b").unwrap();
-    assert_eq!(b.get(nk_a).unwrap().as_deref(), Some("value_for_a"));
-    assert_eq!(b.get(nk_b).unwrap().as_deref(), Some("value_for_b"));
-    assert_ne!(b.get(nk_a).unwrap(), b.get(nk_b).unwrap());
-
-    let _ = b.delete(nk_a);
-    let _ = b.delete(nk_b);
-}
-
 // ── get_or_create_random (OS backend — skipped when unavailable) ──────────────
 
 #[test]
@@ -463,66 +378,4 @@ fn get_or_create_random_idempotent_file_backend() {
     // Reading it back returns the same value.
     let second = fb.get(&nk).unwrap().unwrap();
     assert_eq!(first, second, "idempotent read-back");
-}
-
-// ── is_available probe: idempotency (OS backend only) ─────────────────────────
-
-#[test]
-fn is_available_returns_true_on_repeated_calls_os_backend() {
-    // End-to-end: the real `is_available()` must return true on consecutive
-    // calls even when the OS backend retains the probe key between runs.
-    // Guarded by OPENHUMAN_TEST_OS_KEYCHAIN=1 to avoid blocking CI on a
-    // Keychain permission dialog.
-    if !os_keychain_available() {
-        eprintln!("skip: set OPENHUMAN_TEST_OS_KEYCHAIN=1 to run OS keychain tests");
-        return;
-    }
-    // Use the OsBackend directly to simulate the cross-launch residue.
-    let b = backend::OsBackend::new();
-    let probe_key = "__probe__:__openhuman_keyring_probe__";
-    // Pre-seed to mimic a leftover from a previous app launch.
-    let _ = b.set(probe_key, "__probe_value__");
-    // `is_available()` must still return true.
-    assert!(
-        super::ops::is_available(),
-        "is_available must return true even with pre-existing probe key in OS keychain"
-    );
-    // Repeated call should also stay true (exercises the OnceLock cached path).
-    assert!(
-        super::ops::is_available(),
-        "is_available must remain true on repeated calls (cached result)"
-    );
-    // Cleanup.
-    let _ = b.delete(probe_key);
-}
-
-// ── migrate_from_file (via module functions, requires OS keychain or file backend) ──
-
-#[test]
-fn migrate_from_file_happy_path_os() {
-    if !os_keychain_available() {
-        eprintln!("skip: OS keychain not available");
-        return;
-    }
-    let b = backend::OsBackend::new();
-    let user_id = "__openhuman_test__mig_hp";
-    let key = "__migrate_key_hp__";
-    let nk = format!("{user_id}:{key}");
-    let _ = b.delete(&nk);
-
-    let mut tmp = NamedTempFile::new().expect("temp file");
-    write!(tmp, "  migrated_secret_value  ").expect("write temp");
-    let path = tmp.path().to_path_buf();
-    let _ = tmp.keep();
-
-    // Test the OsBackend directly.
-    let value = std::fs::read_to_string(&path).unwrap();
-    let value = value.trim();
-    b.set(&nk, value).unwrap();
-    assert_eq!(
-        b.get(&nk).unwrap().as_deref(),
-        Some("migrated_secret_value")
-    );
-    std::fs::remove_file(&path).unwrap();
-    let _ = b.delete(&nk);
 }

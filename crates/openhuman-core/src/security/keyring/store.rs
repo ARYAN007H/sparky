@@ -5,7 +5,7 @@
 //! - [`BACKEND`] — the selected backend, initialized on first use.
 
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
 use crate::security::keyring::backend::{self, KeyringBackend};
 
@@ -25,7 +25,7 @@ pub(super) enum BackendKind {
 pub(super) static WORKSPACE_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 /// The selected backend, initialized on first use.
-pub(super) static BACKEND: OnceLock<Box<dyn KeyringBackend>> = OnceLock::new();
+pub(super) static BACKEND: OnceLock<Arc<dyn KeyringBackend>> = OnceLock::new();
 
 // ── Initialization ────────────────────────────────────────────────────────────
 
@@ -47,8 +47,8 @@ pub fn init_workspace(workspace_dir: &Path) {
 /// serves exactly one workspace, so the resolved path never changes and the
 /// `OnceLock` is a pure cache.
 #[cfg(not(test))]
-pub(super) fn backend() -> &'static dyn KeyringBackend {
-    BACKEND.get_or_init(build_backend).as_ref()
+pub(super) fn backend() -> Arc<dyn KeyringBackend> {
+    super::installed_keyring_backend().unwrap_or_else(|| BACKEND.get_or_init(build_backend).clone())
 }
 
 /// Test builds resolve the backend **per workspace** instead of latching one
@@ -64,29 +64,35 @@ pub(super) fn backend() -> &'static dyn KeyringBackend {
 /// [`super::ops::force_backend_for_test`] still pins [`BACKEND`] process-wide
 /// and is honoured first.
 #[cfg(test)]
-pub(super) fn backend() -> &'static dyn KeyringBackend {
+pub(super) fn backend() -> Arc<dyn KeyringBackend> {
+    if let Some(installed) = super::installed_keyring_backend() {
+        return installed;
+    }
     if let Some(existing) = BACKEND.get() {
-        return existing.as_ref();
+        return existing.clone();
     }
     test_scope::backend_for(&workspace_dir_for_file_backend())
 }
 
-pub(super) fn build_backend() -> Box<dyn KeyringBackend> {
+pub(super) fn build_backend() -> Arc<dyn KeyringBackend> {
     build_backend_at(&workspace_dir_for_file_backend())
 }
 
 /// Build a backend rooted at an explicit directory.
 ///
 /// Split out of [`build_backend`] so test builds can construct one backend per
-/// workspace. Selection priority is unchanged.
-pub(super) fn build_backend_at(path: &Path) -> Box<dyn KeyringBackend> {
+/// workspace. An installed host provider takes precedence.
+pub(super) fn build_backend_at(path: &Path) -> Arc<dyn KeyringBackend> {
+    if let Some(installed) = super::installed_keyring_backend() {
+        return installed;
+    }
     let path = path.to_path_buf();
-    // Priority 1: explicit env var override.
+    // Explicit override after the host provider: explicit env var override.
     if let Ok(env_val) = std::env::var("OPENHUMAN_KEYRING_BACKEND") {
         match backend_kind_from_env_value(&env_val) {
             Some(BackendKind::Os) => {
                 log::info!("[keyring] backend=os (OPENHUMAN_KEYRING_BACKEND override)");
-                return Box::new(backend::OsBackend::new());
+                return Arc::new(UnavailableOsBackend);
             }
             Some(BackendKind::File) => {
                 log::info!(
@@ -94,14 +100,14 @@ pub(super) fn build_backend_at(path: &Path) -> Box<dyn KeyringBackend> {
                     path.display(),
                     path.display()
                 );
-                return Box::new(backend::FileBackend::new(&path));
+                return Arc::new(backend::FileBackend::new(&path));
             }
             Some(BackendKind::EncryptedFile) => {
                 log::info!(
                     "[keyring] backend=encrypted_file path={} (OPENHUMAN_KEYRING_BACKEND override)",
                     path.display()
                 );
-                return Box::new(super::encrypted_file_backend::EncryptedFileBackend::new(
+                return Arc::new(super::encrypted_file_backend::EncryptedFileBackend::new(
                     &path,
                 ));
             }
@@ -114,30 +120,47 @@ pub(super) fn build_backend_at(path: &Path) -> Box<dyn KeyringBackend> {
         }
     }
 
-    // Priority 2: unit tests → file backend for deterministic isolation.
-    if cfg!(test) {
-        log::info!("[keyring] backend=file path={} (cfg(test))", path.display());
-        return Box::new(backend::FileBackend::new(&path));
-    }
+    Arc::new(super::encrypted_file_backend::EncryptedFileBackend::new(
+        &path,
+    ))
+}
 
-    // Priority 3: encrypt by default, including headless deployments where
-    // OPENHUMAN_APP_ENV is unset. Plain files require an explicit dev mode.
-    if default_to_encrypted_file(std::env::var("OPENHUMAN_APP_ENV").as_deref().ok()) {
-        log::info!("[keyring] backend=encrypted_file path={}", path.display());
-        Box::new(super::encrypted_file_backend::EncryptedFileBackend::new(
-            &path,
-        ))
-    } else {
-        log::info!(
-            "[keyring] backend=file dir={} file={}/dev-keychain.json (dev environment)",
-            path.display(),
-            path.display()
-        );
-        Box::new(backend::FileBackend::new(&path))
+const OS_BACKEND_UNAVAILABLE: &str =
+    "OPENHUMAN_KEYRING_BACKEND=os requires a host-installed OS keyring backend";
+
+struct UnavailableOsBackend;
+impl KeyringBackend for UnavailableOsBackend {
+    fn get(&self, _: &str) -> Result<Option<String>, super::KeyringError> {
+        Err(super::KeyringError::Backend(OS_BACKEND_UNAVAILABLE.into()))
+    }
+    fn set(&self, _: &str, _: &str) -> Result<(), super::KeyringError> {
+        Err(super::KeyringError::Backend(OS_BACKEND_UNAVAILABLE.into()))
+    }
+    fn delete(&self, _: &str) -> Result<(), super::KeyringError> {
+        Err(super::KeyringError::Backend(OS_BACKEND_UNAVAILABLE.into()))
+    }
+    fn name(&self) -> &'static str {
+        "unavailable_os"
     }
 }
 
+pub(super) fn validate_backend_selection() -> Result<(), String> {
+    if super::installed_keyring_backend().is_none()
+        && std::env::var("OPENHUMAN_KEYRING_BACKEND")
+            .ok()
+            .as_deref()
+            .and_then(backend_kind_from_env_value)
+            == Some(BackendKind::Os)
+    {
+        return Err(OS_BACKEND_UNAVAILABLE.into());
+    }
+    Ok(())
+}
+
 pub(super) fn effective_backend_kind() -> BackendKind {
+    if let Some(installed) = super::installed_keyring_backend() {
+        return backend_kind_from_env_value(installed.name()).unwrap_or(BackendKind::Os);
+    }
     effective_backend_kind_for(
         std::env::var("OPENHUMAN_APP_ENV").as_deref().ok(),
         std::env::var("OPENHUMAN_KEYRING_BACKEND").as_deref().ok(),
@@ -146,21 +169,13 @@ pub(super) fn effective_backend_kind() -> BackendKind {
 }
 
 fn effective_backend_kind_for(
-    app_env: Option<&str>,
+    _app_env: Option<&str>,
     backend_override: Option<&str>,
-    cfg_test: bool,
+    _cfg_test: bool,
 ) -> BackendKind {
-    if let Some(kind) = backend_override.and_then(backend_kind_from_env_value) {
-        return kind;
-    }
-    if cfg_test {
-        return BackendKind::File;
-    }
-    if default_to_encrypted_file(app_env) {
-        BackendKind::EncryptedFile
-    } else {
-        BackendKind::File
-    }
+    backend_override
+        .and_then(backend_kind_from_env_value)
+        .unwrap_or(BackendKind::EncryptedFile)
 }
 
 fn backend_kind_from_env_value(value: &str) -> Option<BackendKind> {
@@ -170,10 +185,6 @@ fn backend_kind_from_env_value(value: &str) -> Option<BackendKind> {
         "encrypted_file" => Some(BackendKind::EncryptedFile),
         _ => None,
     }
-}
-
-fn default_to_encrypted_file(app_env: Option<&str>) -> bool {
-    !matches!(app_env.map(str::trim), Some("development") | Some("dev"))
 }
 
 /// Derive the directory for keyring files (`secrets.enc`, `dev-keychain.json`).

@@ -3,7 +3,7 @@
 //! Stores all secrets in a single ChaCha20-Poly1305-encrypted file on disk,
 //! keyed by an app-scoped master key loaded once by [`init_master_key`].
 //! Headless deployments supply [`MASTER_KEY_ENV`] or [`MASTER_KEY_FILE_ENV`];
-//! otherwise initialization uses the OS keychain and caches the result.
+//! otherwise initialization uses a host source or a workspace key file.
 //! The backend avoids repeated OS-keychain prompts in dev-signed macOS builds.
 
 use std::path::{Path, PathBuf};
@@ -19,11 +19,9 @@ use tinystoragedrivers::secrets::EncryptedFileSecrets;
 use zeroize::Zeroizing;
 
 #[path = "encrypted_file_backend/key_source.rs"]
-mod key_source;
+pub mod key_source;
 use key_source::{env_value, master_key_from_env};
 
-const KEYCHAIN_SERVICE: &str = "openhuman";
-const KEYCHAIN_MASTER_KEY_USERNAME: &str = "app:master_key";
 /// Environment variable carrying the master key inline as `2 * KEY_LEN` hex
 /// characters (`openssl rand -hex 32`). Lets a headless `openhuman-core
 /// serve` — a container with no Secret Service or keychain — keep the
@@ -46,27 +44,28 @@ type MasterKeyInit = Result<Option<[u8; KEY_LEN]>, String>;
 /// Process-wide master-key outcome, set once by [`init_master_key`].
 static MASTER_KEY: OnceLock<MasterKeyInit> = OnceLock::new();
 
-/// Set when [`init_master_key`] found the OS keychain unable to provide the
+/// Set when [`init_master_key`] found the host source unable to provide the
 /// key, so storage secrets reuse that outcome instead of retrying the
-/// keychain (and its prompt) on their first operation.
-static KEYCHAIN_UNAVAILABLE: OnceLock<()> = OnceLock::new();
+/// source (and any prompt) on their first operation.
+static HOST_KEY_UNAVAILABLE: OnceLock<()> = OnceLock::new();
 
 // ── Public API for core startup ──────────────────────────────────────────────
 
 /// Initialize the keyring subsystem: set the workspace directory and load
-/// the master encryption key (staging/production only) — from
+/// the master encryption key for encrypted storage — from
 /// [`MASTER_KEY_ENV`] or [`MASTER_KEY_FILE_ENV`] when an operator set one,
-/// otherwise from the OS keychain.
+/// otherwise from a host source or `keyring/master.key`.
 ///
-/// Call this once at core startup before any keyring operations. In dev
-/// environments the master key is not loaded (the plain file backend is
-/// used instead). The result is cached process-wide; subsequent calls are
+/// Call this once at core startup before any keyring operations. Explicit
+/// plaintext or OS secret backends skip master-key loading. The result is
+/// cached process-wide; subsequent calls are
 /// no-ops. Which source supplied the key is logged at `info`; the key never
 /// is.
 ///
 /// # Errors
 ///
-/// Returns `Err` only when an operator-supplied source ([`MASTER_KEY_ENV`] /
+/// Returns `Err` when the default workspace key cannot be read or created,
+/// or when an operator-supplied source ([`MASTER_KEY_ENV`] /
 /// [`MASTER_KEY_FILE_ENV`]) is set but unusable — both set, unreadable file,
 /// wrong length, not hex. That is a configuration error the process should
 /// not start with: continuing would run with secrets unreadable and fail
@@ -76,6 +75,7 @@ static KEYCHAIN_UNAVAILABLE: OnceLock<()> = OnceLock::new();
 /// is restored). The outcome, error included, is cached process-wide, so
 /// every later call after a configuration error returns the same `Err`.
 pub fn init_master_key() -> Result<(), String> {
+    crate::security::keyring::store::validate_backend_selection()?;
     // Ensure workspace dir is set for the backend before anything else.
     let dir = crate::security::keyring::store::workspace_dir_for_file_backend();
     log::info!(
@@ -100,22 +100,22 @@ pub fn init_master_key() -> Result<(), String> {
             }
             Err(MasterKeyError::Configured(e)) => {
                 log::error!(
-                    "[keyring:encrypted_file] operator-supplied master key rejected; refusing \
+                    "[keyring:encrypted_file] master key source rejected; refusing \
                      to start with secrets unreadable. Cause: {e}"
                 );
                 Err(e)
             }
-            Err(MasterKeyError::Keychain(e)) => {
+            Err(MasterKeyError::Host(e)) => {
                 log::error!(
                     "[keyring:encrypted_file] master key load FAILED — refusing to mint a \
                      replacement (that would orphan existing secrets, #3311). Secrets are \
-                     inaccessible this session and recover once OS keychain access is \
+                     inaccessible this session and recover once host key-source access is \
                      restored. Cause: {e}"
                 );
                 // Surface the denied state to the frontend instead of silently
                 // resetting — this is the "warn before reset" the issue asks for.
                 crate::security::keyring_consent::policy::notify_master_key_unavailable(&e);
-                let _ = KEYCHAIN_UNAVAILABLE.set(());
+                let _ = HOST_KEY_UNAVAILABLE.set(());
                 Ok(None)
             }
         }
@@ -125,7 +125,7 @@ pub fn init_master_key() -> Result<(), String> {
 /// The master key that encrypts secrets on a configured storage backend
 /// ([`crate::storage::secrets`]): the key [`init_master_key`] loaded when
 /// there is one, otherwise the same resolution run once for storage —
-/// [`MASTER_KEY_ENV`] / [`MASTER_KEY_FILE_ENV`] first, then the OS keychain.
+/// [`MASTER_KEY_ENV`] / [`MASTER_KEY_FILE_ENV`] first, then a host source or workspace key file.
 ///
 /// # Errors
 ///
@@ -142,8 +142,8 @@ pub(crate) fn storage_master_key() -> Result<[u8; KEY_LEN], String> {
     // `init_master_key` already tried the keychain this session and it
     // failed: reuse that outcome, do not prompt again. (`Ok(None)` alone also
     // means "backend needs no key / init skipped", which must still load.)
-    if KEYCHAIN_UNAVAILABLE.get().is_some() {
-        return Err("OS keychain master key unavailable this session".into());
+    if HOST_KEY_UNAVAILABLE.get().is_some() {
+        return Err("host master key unavailable this session".into());
     }
     if let Some(key) = STORAGE_MASTER_KEY.get() {
         return Ok(*key);
@@ -153,7 +153,7 @@ pub(crate) fn storage_master_key() -> Result<[u8; KEY_LEN], String> {
             log::info!("[keyring:storage] master key loaded from {source}");
             Ok(*STORAGE_MASTER_KEY.get_or_init(|| key))
         }
-        Err(MasterKeyError::Configured(_) | MasterKeyError::Keychain(_)) => {
+        Err(MasterKeyError::Configured(_) | MasterKeyError::Host(_)) => {
             // Fixed message: the underlying error can carry a path taken
             // from `MASTER_KEY_FILE_ENV`.
             log::error!("[keyring:storage] master key unavailable");
@@ -184,30 +184,9 @@ fn init_once(
 enum MasterKeyError {
     /// An operator-supplied source is set but unusable. Fatal at startup.
     Configured(String),
-    /// The OS keychain could not provide (or safely mint) the key. Not fatal:
+    /// The host source could not provide (or safely mint) the key. Not fatal:
     /// the process runs with secrets inaccessible, as before.
-    Keychain(String),
-}
-
-/// Abstraction over the OS-keychain entry that holds the master key.
-///
-/// Exists solely so the load-vs-mint decision in [`load_or_mint_master_key`]
-/// can be unit-tested against injected `keyring::Error` variants. A real
-/// `keyring::Entry` cannot be exercised non-interactively under `cargo test`
-/// (the first access blocks on a GUI permission prompt), so the decision logic
-/// is split out behind this trait and tested with a fake.
-trait MasterKeyEntry {
-    fn get_password(&self) -> Result<String, keyring::Error>;
-    fn set_password(&self, value: &str) -> Result<(), keyring::Error>;
-}
-
-impl MasterKeyEntry for keyring::Entry {
-    fn get_password(&self) -> Result<String, keyring::Error> {
-        keyring::Entry::get_password(self)
-    }
-    fn set_password(&self, value: &str) -> Result<(), keyring::Error> {
-        keyring::Entry::set_password(self, value)
-    }
+    Host(String),
 }
 
 /// Loads the master key, returning it with a human-readable description of
@@ -232,11 +211,15 @@ fn try_load_master_key() -> Result<([u8; KEY_LEN], String), MasterKeyError> {
     {
         return Ok(from_env);
     }
-    let entry = keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_MASTER_KEY_USERNAME)
-        .map_err(|e| MasterKeyError::Keychain(format!("keychain entry creation failed: {e}")))?;
-    load_or_mint_master_key(&entry)
-        .map(|key| (key, "OS keychain".to_string()))
-        .map_err(MasterKeyError::Keychain)
+    let dir = crate::security::keyring::store::workspace_dir_for_file_backend();
+    if let Some(source) = key_source::installed_master_key_source() {
+        return key_source::load_or_mint_master_key(source.as_ref())
+            .map(|key| (*key, "host master key source".to_string()))
+            .map_err(|e| MasterKeyError::Host(e.to_string()));
+    }
+    key_source::workspace_master_key(&dir)
+        .map(|key| (*key, "workspace keyring/master.key".to_string()))
+        .map_err(|e| MasterKeyError::Configured(e.to_string()))
 }
 
 /// Reads the file named by [`MASTER_KEY_FILE_ENV`].
@@ -286,65 +269,12 @@ fn parse_master_key_hex(hex: &str) -> Result<[u8; KEY_LEN], String> {
     Ok(key)
 }
 
-/// Load the existing master key, mint a fresh one, or fail safe.
-///
-/// **Only a genuine absence (`NoEntry`) may mint a new key.** Every other error
-/// — access denied, keychain locked, platform failure — returns `Err` WITHOUT
-/// minting or calling `set_password`, leaving the keychain entry untouched.
-///
-/// This is the fix for #3311. A macOS app update can change the binary's
-/// code-signing identity (or the keychain item's ACL trust), so reading the
-/// *existing* master key fails with an access error rather than `NoEntry`. The
-/// previous code conflated the two and minted a brand-new key on access
-/// denial, orphaning every secret encrypted under the old key — a silent
-/// API-key wipe plus disconnected connectors, with no warning. Failing safe
-/// keeps the ciphertext intact so it recovers on the next launch once keychain
-/// access is restored. The catch-all `Err(e)` arm makes this independent of
-/// which exact `keyring` error variant macOS returns on the denial.
-fn load_or_mint_master_key<E: MasterKeyEntry>(entry: &E) -> Result<[u8; KEY_LEN], String> {
-    match entry.get_password() {
-        Ok(hex_str) => {
-            let bytes = crypto::hex_decode(hex_str.trim())?;
-            if bytes.len() != KEY_LEN {
-                return Err(format!(
-                    "master key has wrong length ({} bytes, expected {KEY_LEN})",
-                    bytes.len()
-                ));
-            }
-            let mut key = [0u8; KEY_LEN];
-            key.copy_from_slice(&bytes);
-            Ok(key)
-        }
-        Err(keyring::Error::NoEntry) => {
-            let key_bytes = crypto::generate_random_bytes(KEY_LEN);
-            let hex_value = crypto::hex_encode(&key_bytes);
-            entry
-                .set_password(&hex_value)
-                .map_err(|e| format!("failed to store new master key in keychain: {e}"))?;
-
-            let readback = entry
-                .get_password()
-                .map_err(|e| format!("master key readback failed: {e}"))?;
-            if readback.trim() != hex_value {
-                return Err("master key write verification failed".to_string());
-            }
-
-            let mut key = [0u8; KEY_LEN];
-            key.copy_from_slice(&key_bytes);
-            log::info!(
-                "[keyring:encrypted_file] no existing master key — generated and stored a new one"
-            );
-            Ok(key)
-        }
-        Err(e) => Err(format!(
-            "OS keychain access unavailable; refusing to mint a replacement master key so \
-             existing secrets are preserved (#3311): {e}"
-        )),
-    }
-}
-
 /// Get a reference to the cached master key, if available.
+#[cfg(not(test))]
 fn master_key() -> Option<&'static [u8; KEY_LEN]> {
+    if MASTER_KEY.get().is_none() {
+        let _ = init_master_key();
+    }
     MASTER_KEY
         .get()
         .and_then(|init| init.as_ref().ok())
@@ -352,7 +282,17 @@ fn master_key() -> Option<&'static [u8; KEY_LEN]> {
 }
 
 pub(super) fn master_key_available() -> bool {
-    master_key().is_some()
+    #[cfg(test)]
+    {
+        key_source::workspace_master_key(
+            &crate::security::keyring::store::workspace_dir_for_file_backend(),
+        )
+        .is_ok()
+    }
+    #[cfg(not(test))]
+    {
+        master_key().is_some()
+    }
 }
 
 // ── Backend ──────────────────────────────────────────────────────────────────
@@ -365,7 +305,7 @@ pub(super) fn master_key_available() -> bool {
 ///
 /// What stays here, because it is a desktop policy and not a storage format:
 ///
-/// - the master key (env, else OS keychain; see [`init_master_key`]);
+/// - the master key (env, host source, else workspace file; see [`init_master_key`]);
 /// - the one-time import of a legacy plaintext `dev-keychain.json`;
 /// - **corruption recovery**. The driver fails closed on a file that does not
 ///   decrypt or parse and leaves it untouched, which is right for a server
@@ -384,6 +324,20 @@ impl EncryptedFileBackend {
         Self {
             path: workspace_dir.join(SECRETS_FILENAME),
             workspace_dir: workspace_dir.to_path_buf(),
+        }
+    }
+
+    fn key(&self) -> Option<Zeroizing<[u8; KEY_LEN]>> {
+        #[cfg(test)]
+        {
+            if let Some(source) = key_source::installed_master_key_source() {
+                return key_source::load_or_mint_master_key(source.as_ref()).ok();
+            }
+            key_source::workspace_master_key(&self.workspace_dir).ok()
+        }
+        #[cfg(not(test))]
+        {
+            master_key().map(|key| Zeroizing::new(*key))
         }
     }
 
@@ -651,28 +605,28 @@ impl EncryptedFileBackend {
 
 impl KeyringBackend for EncryptedFileBackend {
     fn get(&self, namespaced_key: &str) -> Result<Option<String>, KeyringError> {
-        let Some(key) = master_key() else {
+        let Some(key) = self.key() else {
             return Ok(None);
         };
-        self.get_with_key(key, namespaced_key)
+        self.get_with_key(&key, namespaced_key)
     }
 
     fn set(&self, namespaced_key: &str, value: &str) -> Result<(), KeyringError> {
-        let Some(key) = master_key() else {
+        let Some(key) = self.key() else {
             return Err(KeyringError::Backend(
                 "master key unavailable — cannot store secrets".to_string(),
             ));
         };
-        self.set_with_key(key, namespaced_key, value)
+        self.set_with_key(&key, namespaced_key, value)
     }
 
     fn delete(&self, namespaced_key: &str) -> Result<(), KeyringError> {
         use tinystoragedrivers::secrets::SecretStore as _;
-        let Some(key) = master_key() else {
+        let Some(key) = self.key() else {
             return Ok(());
         };
         let name = namespaced_key.to_string();
-        self.run(key, move |store| {
+        self.run(&key, move |store| {
             let name = name.clone();
             async move { store.delete(&name).await.map(|_| ()) }
         })

@@ -197,7 +197,6 @@ pub fn preflight(
 fn keyring_error_kind(e: &keyring::KeyringError) -> &'static str {
     use keyring::KeyringError as E;
     match e {
-        E::Os { .. } => "os-backend",
         E::InvalidUtf8 { .. } => "invalid-utf8",
         E::Crypto(_) => "crypto",
         E::VerifyFailed { .. }

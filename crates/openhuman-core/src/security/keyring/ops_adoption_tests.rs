@@ -7,7 +7,7 @@ use std::sync::Arc;
 use tinystoragedrivers::secrets::{DerivedKeys, SecretStore as _};
 use zeroize::Zeroizing;
 
-use crate::security::keyring::adapter::tests::fake_os_backend;
+use crate::security::keyring::backend::MockBackend;
 use crate::security::keyring::KeyringBackend;
 use crate::storage::{MemoryStorage, Scope, StorageBackend};
 
@@ -44,7 +44,7 @@ fn storage_secrets_in(
 
 #[test]
 fn an_os_keyring_secret_is_adopted_into_storage_on_first_read() {
-    let os = fake_os_backend();
+    let os = MockBackend::new();
     os.set("alice:token", "from-the-os-keychain").unwrap();
     let storage = MemoryStorage::new();
     let secrets = storage_secrets_in(&storage, "local");
@@ -72,7 +72,7 @@ fn an_os_keyring_secret_is_adopted_into_storage_on_first_read() {
 
 #[test]
 fn a_secret_absent_everywhere_stays_absent_and_storage_wins_over_the_os() {
-    let os = fake_os_backend();
+    let os = MockBackend::new();
     let storage = MemoryStorage::new();
     let secrets = storage_secrets_in(&storage, "local");
     assert_eq!(
@@ -97,7 +97,7 @@ fn a_secret_absent_everywhere_stays_absent_and_storage_wins_over_the_os() {
 
 #[test]
 fn adopted_secrets_do_not_cross_scopes() {
-    let os = fake_os_backend();
+    let os = MockBackend::new();
     os.set("u:k", "v").unwrap();
     let storage = MemoryStorage::new();
     get_adopting(storage_secrets_in(&storage, "alice"), "u:k", "k", || {

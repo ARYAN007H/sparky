@@ -1,9 +1,9 @@
-//! Resolve operator-supplied master keys from environment variables.
+//! Resolve environment, host-provided, and workspace-file master keys.
 
 use super::*;
 
 /// Only `NotPresent` means unset. Invalid Unicode must not fall through to the
-/// OS keychain, where a new key could orphan the encrypted secrets.
+/// next source, where a new key could orphan the encrypted secrets.
 pub(super) fn env_value(
     name: &str,
     raw: Result<String, std::env::VarError>,
@@ -18,7 +18,7 @@ pub(super) fn env_value(
 }
 
 /// Resolve an operator-supplied master key from either supported environment
-/// source. Empty values fall through to the OS keychain; errors never include
+/// source. Empty values fall through to the next source; errors never include
 /// secret values or paths. `read_file` keeps the decision testable.
 pub(super) fn master_key_from_env(
     inline: Option<&str>,
@@ -44,3 +44,87 @@ pub(super) fn master_key_from_env(
         }
     }
 }
+
+/// Host-owned source for the encryption key. Only `Ok(None)` means absent;
+/// a locked or denied source must return an error so the core never replaces
+/// an inaccessible key with a new one.
+pub trait MasterKeySource: Send + Sync {
+    fn load(&self) -> Result<Option<Zeroizing<[u8; 32]>>, KeyringError>;
+    fn store(&self, key: &[u8; 32]) -> Result<(), KeyringError>;
+}
+
+#[path = "key_source_install.rs"]
+mod install;
+pub use install::{
+    clear_master_key_source, install_master_key_source, installed_master_key_source,
+};
+
+/// Mint only on genuine absence, and verify the published key before use.
+pub(super) fn load_or_mint_master_key(
+    source: &dyn MasterKeySource,
+) -> Result<Zeroizing<[u8; 32]>, KeyringError> {
+    if let Some(key) = source.load()? {
+        return Ok(key);
+    }
+    let bytes = Zeroizing::new(crypto::generate_random_bytes(KEY_LEN));
+    let mut key = Zeroizing::new([0; KEY_LEN]);
+    key.copy_from_slice(&bytes);
+    source.store(&key)?;
+    let readback = source
+        .load()?
+        .ok_or_else(|| KeyringError::Backend("master key readback missing".into()))?;
+    if *readback != *key {
+        return Err(KeyringError::Backend(
+            "master key write verification failed".into(),
+        ));
+    }
+    Ok(key)
+}
+
+/// Load or durably create the workspace key under the cross-process write
+/// lock. Never replace a malformed or unreadable existing key. The atomic
+/// file writer creates the key with Unix mode `0600` before publication.
+pub(super) fn workspace_master_key(workspace: &Path) -> Result<Zeroizing<[u8; 32]>, KeyringError> {
+    let path = workspace.join("keyring/master.key");
+    let _lock = file_store::lock_for_write(&path)?;
+    match std::fs::symlink_metadata(&path) {
+        Ok(metadata) => {
+            if !metadata.file_type().is_file() {
+                return Err(KeyringError::Backend(
+                    "workspace master key must be a regular file".into(),
+                ));
+            }
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                if metadata.permissions().mode() & 0o077 != 0 {
+                    return Err(KeyringError::Backend(
+                        "workspace master key requires permissions 0600".into(),
+                    ));
+                }
+            }
+            let text =
+                Zeroizing::new(std::fs::read_to_string(&path).map_err(|_| {
+                    KeyringError::Backend("cannot read workspace master key".into())
+                })?);
+            parse_master_key_hex(text.trim())
+                .map(Zeroizing::new)
+                .map_err(KeyringError::Backend)
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            let bytes = Zeroizing::new(crypto::generate_random_bytes(KEY_LEN));
+            let mut key = Zeroizing::new([0; KEY_LEN]);
+            key.copy_from_slice(&bytes);
+            let hex = Zeroizing::new(crypto::hex_encode(&key[..]));
+            file_store::write_atomic(&path, hex.as_bytes())?;
+            Ok(key)
+        }
+        Err(_) => Err(KeyringError::Backend(
+            "cannot inspect workspace master key".into(),
+        )),
+    }
+}
+
+#[cfg(test)]
+#[path = "key_source_tests.rs"]
+mod tests;

@@ -102,8 +102,8 @@ fn scoped_workspaces_do_not_share_secrets() {
         );
     }
 
-    assert!(one.path().join("dev-keychain.json").exists());
-    assert!(two.path().join("dev-keychain.json").exists());
+    assert!(one.path().join("secrets.enc").exists());
+    assert!(two.path().join("secrets.enc").exists());
 }
 
 /// The exact failure mode that produced the flake: a test binds a temp

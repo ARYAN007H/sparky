@@ -71,6 +71,8 @@ mod envelope;
 pub mod host;
 #[cfg(feature = "server")]
 pub mod http_host;
+#[cfg(feature = "os-keyring")]
+pub mod keyring;
 mod origin;
 #[cfg(feature = "server")]
 pub mod server;

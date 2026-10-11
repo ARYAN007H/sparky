@@ -207,6 +207,14 @@ pub mod integrations {
 /// tinyhumans (credentials for the hosted client) and rpc (server auth,
 /// Socket.IO approvals, bind policy).
 pub mod security {
+    /// Host-supplied secret storage and encryption-key sources.
+    pub mod keyring {
+        pub use openhuman_core::security::keyring::{
+            clear_keyring_backend, clear_master_key_source, install_keyring_backend,
+            install_master_key_source, installed_keyring_backend, installed_master_key_source,
+            is_available, KeyringBackend, KeyringError, MasterKeySource,
+        };
+    }
     pub mod credentials {
         pub use openhuman_core::security::credentials::{
             channel_credential_provider, AuthService, APP_SESSION_PROVIDER,
@@ -283,8 +291,8 @@ pub mod platform {
 
 pub mod storage {
     pub use openhuman_core::storage::{
-        block_on_anyhow, clear, configured_url, driver_is_shared, install, installed, open,
-        url_from, StorageBackend, STORAGE_URL_VAR,
+        block_on, block_on_anyhow, clear, configured_url, driver_is_shared, install, installed,
+        open, url_from, StorageBackend, STORAGE_URL_VAR,
     };
 }
 

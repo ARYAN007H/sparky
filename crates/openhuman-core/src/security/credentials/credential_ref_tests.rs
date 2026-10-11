@@ -288,13 +288,7 @@ fn keyring_error_kinds_are_fixed_labels_that_carry_no_key() {
 
     let invalid_utf8 = String::from_utf8(vec![0xff]).expect_err("0xff is not utf-8");
     let cases: Vec<(KeyringError, &str)> = vec![
-        (
-            KeyringError::Os {
-                key: SECRET_NAME.to_string(),
-                source: ::keyring::Error::NoEntry,
-            },
-            "os-backend",
-        ),
+        (KeyringError::Backend(SECRET_NAME.to_string()), "backend"),
         (
             KeyringError::InvalidUtf8 {
                 key: SECRET_NAME.to_string(),

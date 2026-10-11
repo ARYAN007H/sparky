@@ -249,7 +249,7 @@ fn probe_availability() -> bool {
     let b = backend();
     if let Some(available) = backend_availability_without_probe(
         b.name(),
-        super::encrypted_file_backend::master_key_available(),
+        b.name() == "encrypted_file" && super::encrypted_file_backend::master_key_available(),
     ) {
         log::debug!("[keyring] is_available={available} (non-os backend)");
         return available;
@@ -449,7 +449,7 @@ pub(crate) fn force_backend_for_test(
     b: Box<dyn crate::security::keyring::backend::KeyringBackend>,
 ) {
     use crate::security::keyring::store::BACKEND;
-    if BACKEND.set(b).is_err() {
+    if BACKEND.set(std::sync::Arc::from(b)).is_err() {
         panic!("force_backend_for_test must be called before BACKEND initialization");
     }
 }

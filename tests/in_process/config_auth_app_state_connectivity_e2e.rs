@@ -3810,7 +3810,7 @@ fn credentials_profile_store_public_api_persists_updates_and_recovers_bad_files(
 #[test]
 fn credentials_auth_service_selects_active_default_and_requested_profiles() {
     let _lock = env_lock();
-    let _keyring_guard = EnvVarGuard::set("OPENHUMAN_KEYRING_BACKEND", "disabled");
+    let _keyring_guard = EnvVarGuard::set("OPENHUMAN_KEYRING_BACKEND", "encrypted_file");
     let tmp = tempdir().expect("tempdir");
     let service = AuthService::new(&tmp.path().join("auth-service"), false);
 
@@ -4081,7 +4081,7 @@ fn credentials_profile_store_recovers_dropped_entries_empty_files_and_datetime_e
 #[test]
 fn credentials_profile_store_round_trips_oauth_secret_fields_after_backend_selection() {
     let _lock = env_lock();
-    let _keyring_guard = EnvVarGuard::set("OPENHUMAN_KEYRING_BACKEND", "disabled");
+    let _keyring_guard = EnvVarGuard::set("OPENHUMAN_KEYRING_BACKEND", "encrypted_file");
     let tmp = tempdir().expect("tempdir");
     let state_dir = tmp.path().join("json-fallback");
     let store = AuthProfilesStore::new(&state_dir, false);

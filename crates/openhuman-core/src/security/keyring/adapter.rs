@@ -16,28 +16,6 @@ pub(super) fn backend_error(error: StorageError) -> KeyringError {
     KeyringError::Backend(format!("secret store: {error}"))
 }
 
-/// A driver error as the [`KeyringError::Os`] the OS-keychain callers (and
-/// the credential-ref error classifier) have always seen. A locked or denied
-/// store keeps its `NoStorageAccess` identity; the driver's error rides along
-/// as the source (it never carries a secret value).
-pub(super) fn os_error(key: &str, error: StorageError) -> KeyringError {
-    let source = if error.kind() == ErrorKind::Unavailable {
-        keyring::Error::NoStorageAccess(Box::new(error))
-    } else {
-        keyring::Error::PlatformFailure(Box::new(error))
-    };
-    KeyringError::Os {
-        key: key.to_string(),
-        source,
-    }
-}
-
-/// Whether the keychain refused access rather than failed: reads and deletes
-/// treat that as "nothing there", as they always have.
-pub(super) fn is_no_access(error: &StorageError) -> bool {
-    error.kind() == ErrorKind::Unavailable
-}
-
 /// Whether the driver reports the secrets file itself as unreadable
 /// (undecryptable under this key, or not the expected JSON).
 pub(super) fn is_corruption(error: &StorageError) -> bool {
