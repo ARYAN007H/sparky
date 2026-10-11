@@ -181,6 +181,40 @@ fn redact_endpoint_keeps_only_origin() {
         redact_endpoint("http://example.com:8080/path?token=secret"),
         "http://example.com:8080"
     );
+    assert_eq!(
+        redact_endpoint("https://user:secret@example.com/path?token=secret"),
+        "<redacted>"
+    );
+    assert_eq!(redact_endpoint("file:///private/path"), "<redacted>");
+}
+
+#[test]
+fn module_rendered_results_preserve_text_json_error_and_markdown() {
+    let result = map_module_rendered_result(tinymcp_bus::McpToolResult {
+        content: vec![
+            tinymcp_bus::McpToolContent::Text {
+                text: "plain excerpt".to_owned(),
+            },
+            tinymcp_bus::McpToolContent::Json {
+                data: json!({"title": "Guide", "rank": 1}),
+            },
+        ],
+        is_error: true,
+        markdown_formatted: Some("**formatted excerpt**".to_owned()),
+        ..Default::default()
+    });
+
+    assert!(result.is_error);
+    assert_eq!(result.markdown_formatted.as_deref(), Some("**formatted excerpt**"));
+    assert_eq!(result.content.len(), 2);
+    assert!(matches!(
+        &result.content[0],
+        tinytools::ToolContent::Text { text } if text == "plain excerpt"
+    ));
+    assert!(matches!(
+        &result.content[1],
+        tinytools::ToolContent::Json { data } if data == &json!({"title": "Guide", "rank": 1})
+    ));
 }
 
 #[tokio::test]
