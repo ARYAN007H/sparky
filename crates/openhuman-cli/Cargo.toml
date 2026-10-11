@@ -172,8 +172,7 @@ required-features = ["voice"]
 name = "raw_coverage_all"
 path = "../../tests/raw_coverage_all.rs"
 # The merged raw-coverage target spans ~76 former files, so it reaches the
-# widest surface of any single target: `lettre` (pulled in through the voice
-# gate's `tinychannels/email`) and the local inference download service.
+# widest surface of any single target: voice and the local inference download service.
 required-features = ["voice", "inference"]
 
 # ~20 former `tests/*.rs` targets folded into one binary (one link of the
@@ -324,7 +323,6 @@ base64 = "0.22"
 flate2 = "1"
 futures-util = "0.3"
 hex = "0.4"
-lettre = { version = "0.11.22", default-features = false, features = ["builder", "smtp-transport", "rustls-tls"] }
 parking_lot = "0.12"
 rusqlite = { version = "=0.40.2", features = ["bundled"] }
 sha2 = "0.10"
