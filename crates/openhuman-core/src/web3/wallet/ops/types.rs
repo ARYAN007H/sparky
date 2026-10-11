@@ -29,6 +29,41 @@ pub struct WalletSetupParams {
     pub force: bool,
 }
 
+/// Phrase generated or validated by TinyWallet and the derived accounts used
+/// by the local wallet setup flow.
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct WalletRecoveryMaterial {
+    /// Standard BIP-39 seed bytes. The frontend uses these only for the
+    /// existing OpenHuman storage-key KDF and clears its temporary buffer.
+    pub seed: Vec<u8>,
+    /// Public addresses and derivation paths for the four supported chains.
+    pub accounts: Vec<WalletAccount>,
+}
+
+impl std::fmt::Debug for WalletRecoveryMaterial {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WalletRecoveryMaterial")
+            .field("seed", &"<redacted>")
+            .field("accounts", &self.accounts)
+            .finish()
+    }
+}
+
+/// Generated recovery phrase returned for encryption and user confirmation.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct GeneratedRecoveryPhrase {
+    pub phrase: String,
+    pub word_count: u8,
+}
+
+/// Result of checking a recovery phrase with TinyWallet.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RecoveryPhraseValidation {
+    pub valid: bool,
+}
+
 /// Persisted on-disk (and/or keychain-backed) representation of wallet state.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

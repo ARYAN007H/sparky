@@ -70,9 +70,12 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tinywallet_bus::names::methods;
 use tinywallet_bus::wire::{
-    DerivedAccount, ExportRequest, ExportedKey, Scheme, SecretMaterial, SignMessageRequest,
-    SignRequest, Signature, SignedTransaction, TransactionSpec,
+    DeriveMnemonicSeedRequest, DeriveMnemonicSeedResponse, DerivedAccount, ExportRequest,
+    ExportedKey, GenerateMnemonicRequest, GenerateMnemonicResponse, Scheme, SecretMaterial,
+    SignMessageRequest, SignRequest, Signature, SignedTransaction, TransactionSpec,
 };
+use tinywallet_bus::Chain;
+use zeroize::Zeroize;
 
 use super::{host, ops, registry};
 use crate::config::Config;
@@ -147,15 +150,50 @@ pub async fn derive_account(
     config: &Config,
     secret: &SecretMaterial,
 ) -> Result<DerivedAccount, WalletCallError> {
-    let proxy = attested_proxy(config).await?;
     log::debug!(
         "[modules:wallet] derive_account chain={:?} module={MODULE_ID} (confidential)",
         secret.chain
     );
-    proxy
-        .call_confidential(methods::DERIVE_ACCOUNT, (secret.clone(),))
-        .await
-        .map_err(|error| classify(&error))
+    let mut request = secret.clone();
+    let result = call_confidential(config, methods::DERIVE_ACCOUNT, &request).await;
+    request.mnemonic.zeroize();
+    result
+}
+
+/// Generate a recovery phrase inside the attested TinyWallet module.
+///
+/// # Errors
+///
+/// [`WalletCallError`]. The phrase is returned to the host for encryption and
+/// custody, but generation and BIP-39 vocabulary remain module-owned.
+pub async fn generate_mnemonic(
+    config: &Config,
+    word_count: u8,
+) -> Result<GenerateMnemonicResponse, WalletCallError> {
+    call_confidential(
+        config,
+        methods::GENERATE_MNEMONIC,
+        &GenerateMnemonicRequest { word_count },
+    )
+    .await
+}
+
+/// Derive a standard BIP-39 seed inside the attested module.
+///
+/// The caller uses the seed only for OpenHuman's generic storage-key KDF.
+///
+/// # Errors
+///
+/// [`WalletCallError`]. Invalid or unsupported phrases are classified as
+/// [`WalletCallError::InvalidInput`].
+pub async fn derive_mnemonic_seed(
+    config: &Config,
+    mnemonic: String,
+) -> Result<DeriveMnemonicSeedResponse, WalletCallError> {
+    let mut request = DeriveMnemonicSeedRequest { mnemonic };
+    let result = call_confidential(config, methods::DERIVE_MNEMONIC_SEED, &request).await;
+    request.mnemonic.zeroize();
+    result
 }
 
 /// Sign opaque bytes with the key derived from `secret`.

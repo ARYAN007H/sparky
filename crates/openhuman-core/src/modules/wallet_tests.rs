@@ -129,6 +129,19 @@ async fn a_disabled_host_reports_unavailable_without_starting_a_broker() {
         super::ensure_ready(&config).await,
         Err(WalletCallError::Unavailable(_))
     ));
+    assert!(matches!(
+        super::generate_mnemonic(&config, 12).await,
+        Err(WalletCallError::Unavailable(_))
+    ));
+    assert!(matches!(
+        super::derive_mnemonic_seed(
+            &config,
+            "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+                .to_string(),
+        )
+        .await,
+        Err(WalletCallError::Unavailable(_))
+    ));
 }
 
 // ---------------------------------------------------------------------------
