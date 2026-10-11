@@ -215,7 +215,7 @@ pub mod seams {
 /// with the in-memory provider and the conformance suites a host's provider
 /// is held to.
 pub mod session_store {
-    pub use openhuman_core::agent::session_store::{AgentStores, SessionStoreProvider};
+    pub use tinyagents_session::port::{AgentStores, SessionStoreProvider};
     pub use tinyagents_session::port::{
         AppendStore, InMemorySessionStores, InMemoryTranscriptLocator, InMemoryTurnStates, Store,
         TurnStates,

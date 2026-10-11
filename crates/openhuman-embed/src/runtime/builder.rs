@@ -14,12 +14,12 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use openhuman_core::agent::session_store::SessionStoreProvider;
 use openhuman_core::backend::BackendTransport;
 use openhuman_core::config::Config;
 use openhuman_core::core::runtime::{DomainSet, ServiceSet, TokenSource};
 use openhuman_core::core::types::HostKind;
 use openhuman_core::tools::toolpacks::ToolGroups;
+use tinyagents_session::port::SessionStoreProvider;
 
 use super::seams::HostSeams;
 use super::ApiKey;

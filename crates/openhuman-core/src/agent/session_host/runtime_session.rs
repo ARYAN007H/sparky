@@ -423,7 +423,10 @@ impl OpenHumanTurnPrelude {
             .await;
             match loaded {
                 Some(goal)
-                    if matches!(goal.status, crate::agent::goals::ThreadGoalStatus::Paused) =>
+                    if matches!(
+                        goal.status,
+                        tinyagents_graph::goals::ThreadGoalStatus::Paused
+                    ) =>
                 {
                     crate::agent::goals::runtime::resume_for_thread(
                         &self.workspace_dir,

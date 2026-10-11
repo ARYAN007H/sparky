@@ -3,10 +3,10 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use openhuman_core::agent::session_store::SessionStoreProvider;
 use openhuman_core::config::Config;
 use openhuman_core::core::runtime::CoreBuilder;
 use openhuman_core::core::types::HostKind;
+use tinyagents_session::port::SessionStoreProvider;
 
 use super::builder::{requests_background_services, ConfigSource};
 use super::presets::{default_domains, default_services};

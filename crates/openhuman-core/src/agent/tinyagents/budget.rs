@@ -1,6 +1,6 @@
 //! Host budget policy, scoped once at admission and carried explicitly to children.
 use std::sync::Arc;
-pub use tinyinference_llm::model::budget::{
+use tinyinference_llm::model::budget::{
     Budget, BudgetExceeded, BudgetSnapshot, CallBudget, Spend, SpendLimits,
 };
 use tinyinference_llm::model::ChatModel;
