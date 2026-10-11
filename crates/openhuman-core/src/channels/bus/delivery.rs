@@ -31,10 +31,13 @@ pub(super) fn map_backend_error(error: anyhow::Error) -> ProgressiveTransportRes
 struct ManagedTransport {
     client: BackendClient,
     credential: BackendCredential,
+    channel: String,
+    session: tokio_util::sync::CancellationToken,
 }
 
 impl ManagedTransport {
-    fn capture(config: &crate::config::Config) -> anyhow::Result<Self> {
+    fn capture(config: &crate::config::Config, channel: String, session: tokio_util::sync::CancellationToken) -> anyhow::Result<Self> {
+        anyhow::ensure!(!session.is_cancelled(), "Channel session closed");
         let credential = match get_session_token(config)
             .map_err(|_| anyhow::anyhow!("Hosted channel credential unavailable"))? {
             Some(token) if !is_local_session_token(&token) => BackendCredential::Session(token),
@@ -43,10 +46,23 @@ impl ManagedTransport {
         Ok(Self {
             client: BackendClient::from_config(config)?,
             credential,
+            channel,
+            session,
         })
     }
 
     async fn execute(&self, request: ProgressiveTransportRequest) -> ProgressiveTransportResult {
+        if request_channel(&request) != self.channel {
+            return ProgressiveTransportResult::Failed;
+        }
+        tokio::select! {
+            biased;
+            _ = self.session.cancelled() => ProgressiveTransportResult::Unavailable,
+            result = self.execute_transport(request) => result,
+        }
+    }
+
+    async fn execute_transport(&self, request: ProgressiveTransportRequest) -> ProgressiveTransportResult {
         let result = match request {
             ProgressiveTransportRequest::Send { channel, message } => {
                 self.client
@@ -88,6 +104,15 @@ impl ManagedTransport {
     }
 }
 
+fn request_channel(request: &ProgressiveTransportRequest) -> &str {
+    match request {
+        ProgressiveTransportRequest::Send { channel, .. }
+        | ProgressiveTransportRequest::Edit { channel, .. }
+        | ProgressiveTransportRequest::Delete { channel, .. }
+        | ProgressiveTransportRequest::Typing { channel } => channel,
+    }
+}
+
 #[tinybus::interface(name = "ai.tinyhumans.tinychannels.ChannelsHost")]
 impl ManagedTransport {
     async fn dispatch_controller_backend(
@@ -113,8 +138,9 @@ impl ModuleProgressiveReply {
     pub(super) async fn open(
         config: crate::config::Config,
         channel: String,
+        session: tokio_util::sync::CancellationToken,
     ) -> anyhow::Result<Self> {
-        let callback = ManagedTransport::capture(&config)?;
+        let callback = ManagedTransport::capture(&config, channel.clone(), session)?;
         let runtime = ChannelRuntimeLease::open(ModuleClient::new(config), callback).await?;
         let result: ProgressiveResult = runtime
             .object()

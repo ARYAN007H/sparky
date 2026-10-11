@@ -64,6 +64,7 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
             return;
         }
 
+        let session = crate::channels::runtime::session::channel_session();
         let config = match crate::config::rpc::load_config_with_timeout().await {
             Ok(config) => config,
             Err(error) => {
@@ -92,7 +93,7 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
         let client_id = identity.client_id;
 
         let mut event_rx = crate::web_chat::subscribe_web_channel_events();
-        let reply = match ModuleProgressiveReply::open(config, channel.clone()).await {
+        let reply = match ModuleProgressiveReply::open(config, channel.clone(), session.clone()).await {
             Ok(reply) => reply,
             Err(error) => {
                 tracing::error!("[channel-inbound] progressive runtime unavailable: {error}");
@@ -142,6 +143,8 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
         batch_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         loop {
             tokio::select! {
+                biased;
+                _ = session.cancelled() => return,
                 event = event_rx.recv() => {
                     match event {
                         Ok(ev) if ev.request_id == request_id => {
