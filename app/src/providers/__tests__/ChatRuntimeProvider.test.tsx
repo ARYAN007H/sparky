@@ -136,6 +136,9 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
             thread_id: 'unmounted-snapshot',
             request_id: 'unmounted-request',
             full_response: 'Delivered reply',
+            rounds_used: 1,
+            total_input_tokens: 0,
+            total_output_tokens: 0,
           });
         });
         expect(threadApi.getTurnState).toHaveBeenCalledWith('unmounted-snapshot');
