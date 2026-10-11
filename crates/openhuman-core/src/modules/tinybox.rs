@@ -183,7 +183,7 @@ pub async fn docker_status(
     config: &Config,
     request: contract::DockerStatusRequest,
 ) -> Result<contract::DockerStatus, String> {
-    call(config, DOCKER_STATUS, (request,), false).await
+    call_docker_status_with_client(&module_client(config), request).await
 }
 
 /// Stop TinyBox-owned containers matching the supplied label.
@@ -191,7 +191,21 @@ pub async fn cleanup_docker(
     config: &Config,
     request: contract::CleanupDockerRequest,
 ) -> Result<contract::CleanupDockerOutput, String> {
-    call(config, CLEANUP_DOCKER, (request,), false).await
+    call_cleanup_docker_with_client(&module_client(config), request).await
+}
+
+async fn call_docker_status_with_client(
+    client: &ModuleClient,
+    request: contract::DockerStatusRequest,
+) -> Result<contract::DockerStatus, String> {
+    call_with_client(client, DOCKER_STATUS, (request,), false).await
+}
+
+async fn call_cleanup_docker_with_client(
+    client: &ModuleClient,
+    request: contract::CleanupDockerRequest,
+) -> Result<contract::CleanupDockerOutput, String> {
+    call_with_client(client, CLEANUP_DOCKER, (request,), false).await
 }
 
 async fn call_run_docker_with_client(

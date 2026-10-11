@@ -64,6 +64,12 @@ impl Interface for MockTinyBox {
                 literal_words: vec!["printf".to_owned(), "hello".to_owned()],
             })
             .map_err(tinybus::Error::from),
+            DOCKER_STATUS => serde_json::to_value(contract::DockerStatus { available: true })
+                .map_err(tinybus::Error::from),
+            CLEANUP_DOCKER => serde_json::to_value(contract::CleanupDockerOutput {
+                containers_stopped: 3,
+            })
+            .map_err(tinybus::Error::from),
             EXEC => Err(tinybus::Error::MethodFailed {
                 name: "ai.tinyhumans.tinybox.Error.Backend".to_owned(),
                 message: "private argument /home/user/token leaked by provider".to_owned(),
@@ -343,6 +349,53 @@ fn every_host_operation_is_a_member_of_the_canonical_contract() {
         RELEASE_OUTPUT,
         START_JAILED_EXEC,
         RUN_DOCKER,
+        DOCKER_STATUS,
+        CLEANUP_DOCKER,
     ];
     assert_eq!(methods, contract::METHODS);
+}
+
+#[tokio::test]
+async fn docker_controls_use_typed_calls_with_validated_contract_capability()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (_service, client, calls) = mock_client().await;
+    let status = call_docker_status_with_client(
+        &client,
+        contract::DockerStatusRequest { timeout_ms: 2_000 },
+    )
+    .await?;
+    assert!(status.available);
+
+    let cleanup = call_cleanup_docker_with_client(
+        &client,
+        contract::CleanupDockerRequest {
+            label: "openhuman.sandbox=true".to_owned(),
+            timeout_ms: 2_000,
+        },
+    )
+    .await?;
+    assert_eq!(cleanup.containers_stopped, 3);
+
+    let calls = calls.lock().expect("recorded TinyBox calls");
+    let status_call = calls
+        .iter()
+        .find(|(member, _)| member == DOCKER_STATUS)
+        .expect("status member called");
+    assert_eq!(status_call.1, json!({ "timeout_ms": 2_000 }));
+    let cleanup_call = calls
+        .iter()
+        .find(|(member, _)| member == CLEANUP_DOCKER)
+        .expect("cleanup member called");
+    assert_eq!(
+        cleanup_call.1,
+        json!({ "label": "openhuman.sandbox=true", "timeout_ms": 2_000 })
+    );
+    assert_eq!(
+        calls
+            .iter()
+            .filter(|(member, _)| member == CAPABILITIES)
+            .count(),
+        2
+    );
+    Ok(())
 }
