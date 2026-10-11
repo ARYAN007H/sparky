@@ -168,7 +168,7 @@ async fn released_search_artifact_serves_host_contract_and_rejects_disabled_exec
         )
         .expect("published artifact is admitted by the host loader");
     assert_eq!(info.name, "tinysearch");
-    assert_eq!(info.version, "0.4.1");
+    assert_eq!(info.version, "0.4.2");
     let client = tinybus::Connection::connect(bus.connect().await.unwrap())
         .await
         .unwrap();
