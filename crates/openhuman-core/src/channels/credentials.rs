@@ -18,7 +18,13 @@ pub(crate) fn resolve_email_password(
         return email_cfg;
     }
     let auth = crate::security::credentials::AuthService::from_config(config);
-    match auth.get_profile("channel:email:api_key", None) {
+    match auth.get_profile(
+        &crate::security::credentials::channel_credential_provider(
+            "email",
+            tinychannels_bus::controllers::ChannelAuthMode::ApiKey,
+        ),
+        None,
+    ) {
         Ok(Some(profile)) => {
             let stored_username = profile.metadata.get("username").map(String::as_str);
             if stored_username != Some(email_cfg.username.as_str()) {
