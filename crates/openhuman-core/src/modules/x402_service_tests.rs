@@ -15,16 +15,3 @@ fn budget_defaults_and_environment_overrides_match_the_host_contract() {
     });
     assert_eq!(configured, (2_500, 10_000_000, 9_000_000));
 }
-
-#[test]
-fn service_reuse_requires_the_same_workspace_and_budgets() {
-    let config = X402ConfigResponse {
-        workspace_dir: "/workspace/one".to_string(),
-        session_id: "x402-session".to_string(),
-        per_request_max_atomic: 1,
-        daily_max_atomic: 2,
-        monthly_max_atomic: 3,
-    };
-    assert!(same_budget(&config, (1, 2, 3)));
-    assert!(!same_budget(&config, (1, 2, 4)));
-}

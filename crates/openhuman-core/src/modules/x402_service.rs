@@ -70,25 +70,6 @@ async fn ensure_service(
             config: service_config,
             handle,
         });
-    } else if active
-        .as_ref()
-        .is_some_and(|current| !same_budget(&current.config, budget))
-    {
-        let current = active.as_mut().expect("active service checked above");
-        let summary: tinywallet_bus::wire::X402SpendingSummary = wallet::call(
-            config,
-            methods::X402_UPDATE_BUDGET,
-            X402UpdateBudgetRequest {
-                service: current.handle.clone(),
-                per_request_max_atomic: Some(budget.0),
-                daily_max_atomic: Some(budget.1),
-                monthly_max_atomic: Some(budget.2),
-            },
-        )
-        .await?;
-        current.config.per_request_max_atomic = summary.per_request_max_atomic;
-        current.config.daily_max_atomic = summary.daily_max_atomic;
-        current.config.monthly_max_atomic = summary.monthly_max_atomic;
     }
     Ok(())
 }
@@ -150,29 +131,25 @@ pub(crate) async fn update_budget(
     daily_max_atomic: Option<u64>,
     monthly_max_atomic: Option<u64>,
 ) -> Result<tinywallet_bus::wire::X402SpendingSummary, WalletCallError> {
-    let config = config.clone();
-    let operation_config = config.clone();
-    let result: tinywallet_bus::wire::X402SpendingSummary =
-        with_service(&config, move |service| async move {
-            wallet::call(
-                &operation_config,
-                methods::X402_UPDATE_BUDGET,
-                X402UpdateBudgetRequest {
-                    service,
-                    per_request_max_atomic,
-                    daily_max_atomic,
-                    monthly_max_atomic,
-                },
-            )
-            .await
-        })
-        .await?;
     let mut active = service().lock().await;
-    if let Some(current) = active.as_mut() {
-        current.config.per_request_max_atomic = result.per_request_max_atomic;
-        current.config.daily_max_atomic = result.daily_max_atomic;
-        current.config.monthly_max_atomic = result.monthly_max_atomic;
-    }
+    ensure_service(config, &mut active).await?;
+    let current = active
+        .as_mut()
+        .ok_or_else(|| WalletCallError::Failed("x402 service is unavailable".into()))?;
+    let result: tinywallet_bus::wire::X402SpendingSummary = wallet::call(
+        config,
+        methods::X402_UPDATE_BUDGET,
+        X402UpdateBudgetRequest {
+            service: current.handle.clone(),
+            per_request_max_atomic,
+            daily_max_atomic,
+            monthly_max_atomic,
+        },
+    )
+    .await?;
+    current.config.per_request_max_atomic = result.per_request_max_atomic;
+    current.config.daily_max_atomic = result.daily_max_atomic;
+    current.config.monthly_max_atomic = result.monthly_max_atomic;
     Ok(result)
 }
 
@@ -191,12 +168,6 @@ fn budget_from(get: impl Fn(&str) -> Option<String>) -> (u64, u64, u64) {
         monthly_max_atomic = value;
     }
     (per_request_max_atomic, daily_max_atomic, monthly_max_atomic)
-}
-
-fn same_budget(config: &X402ConfigResponse, budget: (u64, u64, u64)) -> bool {
-    config.per_request_max_atomic == budget.0
-        && config.daily_max_atomic == budget.1
-        && config.monthly_max_atomic == budget.2
 }
 
 #[cfg(test)]
