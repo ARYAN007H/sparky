@@ -209,7 +209,8 @@ pub mod integrations {
 pub mod security {
     pub mod credentials {
         pub use openhuman_core::security::credentials::{
-            AuthService, APP_SESSION_PROVIDER, DEFAULT_AUTH_PROFILE_NAME,
+            channel_credential_provider, AuthService, APP_SESSION_PROVIDER,
+            DEFAULT_AUTH_PROFILE_NAME,
         };
         pub mod ops {
             pub use openhuman_core::security::credentials::ops::{

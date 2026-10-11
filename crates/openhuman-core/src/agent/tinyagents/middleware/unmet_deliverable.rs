@@ -335,8 +335,7 @@ impl<C: Send + Sync> Middleware<(), C> for UnmetDeliverableMiddleware {
     /// The clock-driven rungs: at half-time a requested path that still does
     /// not exist is pointed out on the tool result the model is about to
     /// read, and at 80% the note says to stop exploring and meet the stated
-    /// limits. Each is appended once per run, and each asks the loop for
-    /// reasoning on the next call: these are the moments thinking pays.
+    /// limits. Each note is appended once per run.
     async fn after_tool(
         &self,
         ctx: &mut RunContext<C>,

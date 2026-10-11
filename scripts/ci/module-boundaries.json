@@ -92,16 +92,14 @@
       "name": "tinyhosts-bus",
       "manifest": "vendor/tinyhosts/crates/tinyhosts-bus/Cargo.toml",
       "owner": "https://github.com/tinyhumansai/tinyhosts"
-    }
-  ],
-  "pendingContracts": [
+    },
     {
       "name": "tinybox-bus",
       "manifest": "vendor/tinybox/crates/tinybox-bus/Cargo.toml",
-      "owner": "https://github.com/tinyhumansai/tinybox",
-      "reason": "Sandbox execution, shell analysis and pre-core gateways need a bus contract."
+      "owner": "https://github.com/tinyhumansai/tinybox"
     }
   ],
+  "pendingContracts": [],
   "exceptions": [
     {
       "scope": "hosts",
@@ -135,16 +133,6 @@
     },
     {
       "scope": "hosts",
-      "package": "tinybox-host",
-      "reason": "Sandbox execution, shell analysis and pre-core gateways need a bus contract."
-    },
-    {
-      "scope": "hosts",
-      "package": "tinybox-ssh",
-      "reason": "Sandbox execution, shell analysis and pre-core gateways need a bus contract."
-    },
-    {
-      "scope": "hosts",
       "package": "tinyvoice",
       "reason": "Capture and hotkey lifecycles need module operations."
     },
@@ -162,61 +150,6 @@
       "scope": "hosts",
       "package": "tinywallet-x402",
       "reason": "Validation, transaction construction, web3 and x402 need module operations."
-    },
-    {
-      "scope": "tinychannels-bus",
-      "package": "anyhow",
-      "reason": "Channel trait, relay signing and pairing implementations remain in the contract; move them to the module."
-    },
-    {
-      "scope": "tinychannels-bus",
-      "package": "async-trait",
-      "reason": "Channel trait, relay signing and pairing implementations remain in the contract; move them to the module."
-    },
-    {
-      "scope": "tinychannels-bus",
-      "package": "base64",
-      "reason": "Channel trait, relay signing and pairing implementations remain in the contract; move them to the module."
-    },
-    {
-      "scope": "tinychannels-bus",
-      "package": "hex",
-      "reason": "Channel trait, relay signing and pairing implementations remain in the contract; move them to the module."
-    },
-    {
-      "scope": "tinychannels-bus",
-      "package": "hmac",
-      "reason": "Channel trait, relay signing and pairing implementations remain in the contract; move them to the module."
-    },
-    {
-      "scope": "tinychannels-bus",
-      "package": "parking_lot",
-      "reason": "Channel trait, relay signing and pairing implementations remain in the contract; move them to the module."
-    },
-    {
-      "scope": "tinychannels-bus",
-      "package": "rand",
-      "reason": "Channel trait, relay signing and pairing implementations remain in the contract; move them to the module."
-    },
-    {
-      "scope": "tinychannels-bus",
-      "package": "sha2",
-      "reason": "Channel trait, relay signing and pairing implementations remain in the contract; move them to the module."
-    },
-    {
-      "scope": "tinychannels-bus",
-      "package": "tokio",
-      "reason": "Channel trait, relay signing and pairing implementations remain in the contract; move them to the module."
-    },
-    {
-      "scope": "tinychannels-bus",
-      "package": "tracing",
-      "reason": "Channel trait, relay signing and pairing implementations remain in the contract; move them to the module."
-    },
-    {
-      "scope": "tinychannels-bus",
-      "package": "uuid",
-      "reason": "Channel trait, relay signing and pairing implementations remain in the contract; move them to the module."
     },
     {
       "scope": "tinywallet-bus",
