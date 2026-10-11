@@ -4121,6 +4121,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 2.0.20",
+ "tinyagents-harness",
  "tinyagents-session",
  "tinyinference-embeddings",
  "tinyinference-llm",
