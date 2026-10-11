@@ -152,16 +152,6 @@
       "reason": "Validation, transaction construction, web3 and x402 need module operations."
     },
     {
-      "scope": "tinywallet-bus",
-      "package": "tinywallet-crypto",
-      "reason": "Compatibility behavioral re-exports still link implementation; move vocabulary into the contract."
-    },
-    {
-      "scope": "tinywallet-bus",
-      "package": "tinywallet-x402",
-      "reason": "Compatibility behavioral re-exports still link implementation; move vocabulary into the contract."
-    },
-    {
       "scope": "hosts",
       "package": "cpal",
       "reason": "Voice capture and the accessibility microphone probe still link host audio-device access."

@@ -4224,6 +4224,7 @@ dependencies = [
  "tinyvoice",
  "tinyvoice-bus",
  "tinywallet-bus",
+ "tinywallet-crypto",
  "tinywallet-web3",
  "tinywallet-x402",
  "tokio",
@@ -7223,7 +7224,7 @@ dependencies = [
 
 [[package]]
 name = "tinychannels"
-version = "0.1.17"
+version = "0.1.18"
 dependencies = [
  "anyhow",
  "async-imap",
@@ -7265,7 +7266,7 @@ dependencies = [
 
 [[package]]
 name = "tinychannels-bus"
-version = "0.1.17"
+version = "0.1.18"
 dependencies = [
  "base64 0.23.1",
  "schemars 1.2.2",
@@ -7276,7 +7277,7 @@ dependencies = [
 
 [[package]]
 name = "tinychannels-runtime"
-version = "0.1.17"
+version = "0.1.18"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7910,16 +7911,16 @@ dependencies = [
 
 [[package]]
 name = "tinywallet-bus"
-version = "0.8.0"
+version = "0.13.0"
 dependencies = [
  "serde",
- "tinywallet-crypto",
- "tinywallet-x402",
+ "serde_json",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
 name = "tinywallet-crypto"
-version = "0.8.0"
+version = "0.13.0"
 dependencies = [
  "async-trait",
  "bech32",
@@ -7930,11 +7931,12 @@ dependencies = [
  "sha2 0.11.0",
  "sha3",
  "thiserror 2.0.20",
+ "tinywallet-bus",
 ]
 
 [[package]]
 name = "tinywallet-web3"
-version = "0.8.0"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7955,7 +7957,7 @@ dependencies = [
 
 [[package]]
 name = "tinywallet-x402"
-version = "0.8.0"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7972,6 +7974,7 @@ dependencies = [
  "sha3",
  "thiserror 2.0.20",
  "tinytools",
+ "tinywallet-bus",
  "tinywallet-crypto",
  "uuid",
 ]
