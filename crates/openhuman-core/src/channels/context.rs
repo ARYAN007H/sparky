@@ -59,6 +59,15 @@ pub(crate) struct ChannelRuntimeContext {
     pub(crate) config: Option<Arc<crate::config::Config>>,
 }
 
+/// Resolve the configured module client; unit tests use an attested bus fixture.
+pub(crate) async fn module_client(ctx: &ChannelRuntimeContext) -> crate::modules::client::ModuleClient {
+    #[cfg(test)]
+    if ctx.config.is_none() {
+        return super::module_fixture::client().await;
+    }
+    crate::modules::client::ModuleClient::new(ctx.config.as_deref().cloned().unwrap_or_default())
+}
+
 pub(crate) fn conversation_history_key(msg: &super::traits::ChannelMessage) -> String {
     tinychannels::context::conversation_history_key(msg)
 }

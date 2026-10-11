@@ -51,7 +51,6 @@ pub(crate) async fn process_channel_runtime_message(
     let prepared = match prepared_inbound {
         Some(prepared) => prepared,
         None => {
-            let config = ctx.config.as_deref().cloned().unwrap_or_default();
             let source = if message.channel.is_empty() {
                 let Some(envelope) = inbound_envelope else {
                     return;
@@ -67,7 +66,7 @@ pub(crate) async fn process_channel_runtime_message(
                 }
             };
             match crate::modules::channel_controller::prepare_inbound(
-                &crate::modules::client::ModuleClient::new(config),
+                &crate::channels::context::module_client(&ctx).await,
                 PrepareChannelInboundRequest {
                     source,
                     namespace: "main".into(),
