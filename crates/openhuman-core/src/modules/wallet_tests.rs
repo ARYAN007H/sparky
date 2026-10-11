@@ -140,7 +140,7 @@ async fn a_disabled_host_reports_unavailable_without_starting_a_broker() {
 /// handed over. The rest of the guard — that an attestation exists at all — is
 /// enforced by tinybus and covered by its own tests against a real `dlopen`.
 mod attestation_guard {
-    use super::super::digest_is_pinned;
+    use super::super::{digest_is_pinned, PINNED_WALLET_LIBRARIES};
     use crate::modules::registry;
 
     fn record() -> &'static crate::modules::ModuleRecord {
@@ -188,6 +188,25 @@ mod attestation_guard {
             &unpinned_record,
             "7b6fdd843622a29b610633e0f5cabf6f48c8aa7566a466696916e99d1221eb08"
         ));
+    }
+
+    #[test]
+    fn every_pinned_platform_archive_has_one_verified_library() {
+        for asset in record().assets {
+            let libraries: Vec<_> = PINNED_WALLET_LIBRARIES
+                .iter()
+                .filter(|(archive, _)| archive.eq_ignore_ascii_case(asset.sha256))
+                .collect();
+            assert_eq!(
+                libraries.len(),
+                1,
+                "refresh the verified library checksum for {}",
+                asset.archive
+            );
+            let (_, library) = libraries[0];
+            assert!(digest_is_pinned(record(), library));
+            assert!(digest_is_pinned(record(), &library.to_ascii_uppercase()));
+        }
     }
 
     #[test]

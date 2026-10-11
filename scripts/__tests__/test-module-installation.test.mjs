@@ -84,7 +84,7 @@ for (const [description, resolverExit] of [
   });
 }
 
-for (const id of ["tinywallet", "tinychannels"]) {
+for (const id of ["tinywallet", "tinychannels", "tinymcp"]) {
   test(`native ${id} regressions receive their pinned release fixture`, () => {
     const assets = resolveTestModuleAssets(
       readRegistrySource(),

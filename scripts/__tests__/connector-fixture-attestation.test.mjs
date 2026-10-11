@@ -76,6 +76,7 @@ test("native E2E installation attests the connector module before launching the 
       "tinydocs",
       "tinywallet",
       "tinychannels",
+      "tinymcp",
     ]) {
       const archive = `${id}.tar.gz`;
       const contents = join(root, `archive-${id}`);
@@ -161,7 +162,7 @@ test("native E2E installation attests the connector module before launching the 
       [
         `TINYJUICE_TEST_MODULE=${join(root, "modules/fixture-1/tinyjuice/libtinyjuice_module.so")}`,
         `TINYSEARCH_TEST_MODULE=${join(root, "modules/fixture-1/tinysearch/libtinysearch.so")}`,
-        `OPENHUMAN_MODULE_PATH=${["tinydocs", "tinywallet", "tinychannels"].map((id) => join(root, "modules/fixture-1", id)).join(":")}`,
+        `OPENHUMAN_MODULE_PATH=${["tinydocs", "tinywallet", "tinychannels", "tinymcp"].map((id) => join(root, "modules/fixture-1", id)).join(":")}`,
         `TINYCONNECTORS_TEST_MODULE=${destination}/libtinyconnectors.so`,
       ].join("\n"),
     );
