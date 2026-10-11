@@ -8,7 +8,7 @@ binary: `tinycomputer`, `tinysearch`, `tinydocs`, `tinywallet`, `tinyjuice`,
 GitHub release, checks it against a digest compiled into this crate, lets
 tinybus admit it, attaches it to a private in-process broker, and then calls
 it like any other bus service. Domains reach a module through the per-module
-host files here ([`documents.rs`](./documents.rs), [`wallet.rs`](./wallet.rs), [`voice.rs`](./voice.rs), ...) rather than
+host files here ([`documents.rs`](./documents.rs), [`wallet.rs`](./wallet.rs), [`voice.rs`](./voice.rs), [`accessibility.rs`](./accessibility.rs), ...) rather than
 talking to tinybus themselves.
 
 The `//!` comments in [`mod.rs`](mod.rs), [`host.rs`](host.rs) and

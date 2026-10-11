@@ -265,3 +265,43 @@ drift. Their pending host cutovers must reconcile these pins; no new exception
 hides this mismatch. All eleven Juice v0.7.1 archive bytes were independently
 verified against the host registry, release checksum manifest, and GitHub asset
 digests. Local Docs and Hosts archives also match the registry SHA-256 pins.
+
+## Computer accessibility cutover (2026-10-11)
+
+The Computer host cutover pins TinyComputer v0.11.0 at source
+`8f50df63e46455a86f2b57f295f86ab8569df99e`, compiling contract 2.12.
+All sixteen release archives were downloaded and verified against both the
+published checksum manifest and GitHub asset digests. The published Linux
+artifact loads through the real TinyBus host. The Linux registry now covers
+permission probes as well as the existing macOS and Windows surfaces.
+
+OpenHuman retains its one-shot and continuous microphone permission policies,
+focus capture for later target validation, and push/tap activation policy.
+Permission queries, permission requests, confidential focus/paste/validation,
+and the native Globe listener execute inside the module. An owned listener
+task recovers uncertain start replies and retains its admission guard until
+cleanup succeeds. Acknowledged batches and a bounded host queue preserve
+ordering; overflow resets activation until a physical release is observed.
+
+The shipped and voice feature graphs shed `tinycomputer-accessibility`,
+`arboard`, and `enigo`. The boundary audit has zero violations and zero stale
+exceptions, with 26 temporary exceptions and one pending contract. The flows
+profile measures 325 packages and 303 names; the all-feature profile measures
+513 packages and 471 names, nine fewer of each than the preceding cutover.
+Both profiles still contain the two native builds `libsqlite3-sys` and `ring`.
+These counts do not measure binary size or build time. TinyVoice capture and
+non-macOS hotkeys remain a separate host migration.
+
+Linux packaging explicitly stages `libxdo.so.3` and `libasound.so.2` for loaded
+modules in both AppImage layouts, checking the target ELF architecture before
+copying. Final artifact validation requires these libraries independently of
+the host binary's NEEDED entries. Debian declares the ALSA runtime alternatives
+as well as libxdo3. Packaging fixtures cover missing libraries, invalid source
+ELFs, repeated staging, and both launcher layouts.
+
+Verification passed 51 focused Rust tests, including the published native
+artifact and loader-disabled errors. Globe fixtures cover startup cancellation,
+a lost start reply, retried cleanup, ordering, and overflow recovery. The
+AppImage regression first failed on the obsolete host libxdo NEEDED requirement
+and passes after explicit module runtime staging. The full pin audit now reports
+only the existing MCP source/artifact drift, pending its separate cutover.

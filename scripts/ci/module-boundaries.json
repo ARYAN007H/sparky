@@ -145,11 +145,6 @@
     },
     {
       "scope": "hosts",
-      "package": "tinycomputer-accessibility",
-      "reason": "Focus, paste, permission and Globe-listener operations need bus members."
-    },
-    {
-      "scope": "hosts",
       "package": "tinyvoice",
       "reason": "Capture and hotkey lifecycles need module operations."
     },

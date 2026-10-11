@@ -32,8 +32,8 @@ channels
 # The media_generate_* agent tools.
 media
 
-# Local audio-device access (cpal): voice recording plus the accessibility
-# microphone-permission probe. `voice` requires it.
+# Compatibility marker for inference-backed features. Native microphone
+# permission checks execute through TinyComputer; `voice` requires this gate.
 inference
 
 # STT/TTS, dictation server, reply speech. Shipped MISSING from v0.58.19 to
