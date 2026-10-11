@@ -16,19 +16,21 @@
 //! resulting transcript back out, so a turn can run on the `tinyagents`
 //! agent-loop while callers keep speaking the row vocabulary.
 
-use tinyinference_llm::message::{
-    ContentBlock, ImageRef, MediaRef, Message, UserMessage,
-};
+use tinyinference_llm::message::{ContentBlock, ImageRef, MediaRef, Message, UserMessage};
 use tinyinference_llm::tool::ToolCall as TaToolCall;
 use tinytools_agent::dialect::{
     DialectMessage, DialectResponse, DialectRole, ToolDialect, ToolResultEntry, TranscriptEntry,
 };
 
 use crate::inference::provider::ChatResponse;
-use tinyagents_session::transcript::TranscriptMessage;
 use tinyagents_runtime::transcript::reasoning_from_content;
 #[cfg(test)]
-use tinyagents_runtime::transcript::{REASONING_EXT_KEY, reasoning_content_block, message_to_flat_transcript as message_to_chat_message, message_to_native_transcript as message_to_native_chat_message};
+use tinyagents_runtime::transcript::{
+    message_to_flat_transcript as message_to_chat_message,
+    message_to_native_transcript as message_to_native_chat_message, reasoning_content_block,
+    REASONING_EXT_KEY,
+};
+use tinyagents_session::transcript::TranscriptMessage;
 
 /// Convert the host provider response at its boundary into the canonical
 /// dialect input. The dialect crate owns all parsing after this field-wise map.
@@ -296,7 +298,10 @@ pub(crate) fn history_to_messages(history: &[TranscriptMessage]) -> Vec<Message>
 
 /// Project provider-facing flat history through the owner contract.
 pub(crate) fn messages_to_history(messages: &[Message]) -> Vec<TranscriptMessage> {
-    messages.iter().filter_map(tinyagents_runtime::transcript::message_to_flat_transcript).collect()
+    messages
+        .iter()
+        .filter_map(tinyagents_runtime::transcript::message_to_flat_transcript)
+        .collect()
 }
 
 /// Convert a harness transcript into typed dialect entries, preserving
