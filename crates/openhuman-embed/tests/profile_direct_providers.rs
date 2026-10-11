@@ -75,6 +75,7 @@ impl Respond for SearchScript {
 
 #[test]
 fn profile_uses_operator_direct_chat_and_search_with_no_managed_traffic() {
+    let _ = tracing_subscriber::fmt().with_env_filter("warn,openhuman_core=debug").with_test_writer().try_init();
     runtime_without_master_key().block_on(async {
         tokio::spawn(scenario()).await.unwrap();
     });
