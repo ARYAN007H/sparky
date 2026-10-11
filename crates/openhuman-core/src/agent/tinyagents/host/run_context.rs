@@ -336,6 +336,10 @@ pub struct OpenHumanRunContext {
     /// Exact executable dynamic/delegation tools selected with
     /// [`Self::current_tools`] for this turn.
     pub(crate) current_synthesized_tools: Option<Arc<Vec<Box<dyn tinytools::Tool>>>>,
+    /// Native session declarations recorded before this turn. These names
+    /// explain historical declarations without granting an executable source.
+    pub(crate) recorded_tool_names: Arc<std::collections::HashSet<String>>,
+
     /// Tools the session serves through `tool_search` for this turn although
     /// their own exposure is `Direct` (the agent definition's
     /// `deferred_tools`). Turn assembly registers them as `Deferred`, so the
@@ -414,6 +418,7 @@ impl OpenHumanRunContext {
             tool_policy: None,
             current_tools: None,
             current_synthesized_tools: None,
+            recorded_tool_names: Arc::new(std::collections::HashSet::new()),
             deferred_tool_names: Arc::new(std::collections::HashSet::new()),
             tool_rules: None,
             context_middleware: None,
