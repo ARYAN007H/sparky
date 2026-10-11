@@ -150,6 +150,27 @@ describe('ThreadList', () => {
     expect(onRequestDelete).toHaveBeenCalledWith(expect.objectContaining({ id: 't1' }));
   });
 
+  it('cancels a rename on Escape without committing the subsequent blur', async () => {
+    const onRenameThread = vi.fn(async () => {});
+    renderList({ onRenameThread });
+    await userEvent.click(
+      within(screen.getByTestId('thread-row-t1').parentElement!).getByRole('button', {
+        name: 'assistantUi.threadList.moreOptions',
+      })
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'assistantUi.threadList.rename' })
+    );
+    const input = screen.getByTestId('thread-title-input-t1');
+    await userEvent.clear(input);
+    await userEvent.type(input, 'Must not be committed');
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByTestId('thread-title-input-t1')).toBeNull());
+    expect(onRenameThread).not.toHaveBeenCalled();
+    expect(screen.getByTestId('thread-row-t1')).toHaveTextContent('Fix Gmail OAuth');
+    expect(screen.getByTestId('thread-row-t1')).toHaveFocus();
+  });
+
   it('puts the working folder name in the row tooltip', () => {
     renderList();
     expect(screen.getByTestId('thread-row-t4')).toHaveAttribute(
