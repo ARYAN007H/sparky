@@ -71,3 +71,45 @@ fn rejects_managed_routes_extra_providers_and_provider_native_presentation() {
     native.search.as_mut().unwrap().presentation = SearchPresentation::AllTools;
     assert!(ProfileProviderSettings::from_saas(&native).is_err());
 }
+
+#[cfg(feature = "modules")]
+#[test]
+fn private_module_configuration_preserves_direct_urls_and_never_resolves_managed_routes() {
+    let deployment = deployment(Some("exa-fixture-key"), Some("gemini-fixture-key"));
+    let settings = ProfileProviderSettings::from_saas(&deployment).unwrap();
+    let mut config = crate::config::Config::default();
+    config.api_key = Some("ambient-managed-key-must-not-be-read".into());
+    settings.bind(&mut config);
+    let module = crate::modules::search::module_config(&config);
+    assert_eq!(module.providers.keys().map(String::as_str).collect::<Vec<_>>(), ["exa", "gemini"]);
+    assert_eq!(module.providers["exa"].base_url.as_deref(), Some("http://127.0.0.1:1234"));
+    assert_eq!(module.providers["gemini"].base_url.as_deref(), Some("http://127.0.0.1:2345"));
+    assert_eq!(module.providers["exa"].credential.as_deref(), Some("exa-fixture-key"));
+    assert_eq!(module.providers["gemini"].credential.as_deref(), Some("gemini-fixture-key"));
+    assert!(module.backend.credential.is_none());
+    assert!(module.backend.base_url.is_none());
+    assert_eq!(module.presentation.roles[&Role::Search], ["exa", "gemini"]);
+    assert_eq!(module.presentation.roles[&Role::Answer], ["gemini"]);
+    assert_eq!(module.presentation.roles[&Role::Contents], ["exa"]);
+    assert_eq!(crate::modules::search::configured_tool_specs(&config).iter().map(|spec| spec.name.as_str()).collect::<Vec<_>>(), ["web_search", "web_answer", "web_contents"]);
+}
+
+#[cfg(feature = "modules")]
+#[test]
+fn blank_search_keys_remove_tools_instead_of_inheriting_managed_defaults() {
+    for (exa, gemini, expected) in [
+        (None, None, vec![]),
+        (Some(" "), Some("\t"), vec![]),
+        (Some("key"), None, vec!["web_search", "web_contents"]),
+        (None, Some("key"), vec!["web_search", "web_answer"]),
+    ] {
+        let settings = ProfileProviderSettings::from_saas(&deployment(exa, gemini)).unwrap();
+        let mut config = crate::config::Config::default();
+        settings.bind(&mut config);
+        let module = crate::modules::search::module_config(&config);
+        assert_eq!(module.enabled, !expected.is_empty());
+        assert_eq!(crate::modules::search::configured_tool_specs(&config).iter().map(|spec| spec.name.as_str()).collect::<Vec<_>>(), expected);
+        assert!(module.backend.base_url.is_none());
+        assert!(module.backend.credential.is_none());
+    }
+}
