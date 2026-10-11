@@ -6821,9 +6821,13 @@ dependencies = [
 name = "tinyagents-definition"
 version = "2.1.4"
 dependencies = [
+ "anyhow",
  "async-trait",
  "serde",
+ "serde_json",
  "tinytools",
+ "toml 0.8.2",
+ "tracing",
 ]
 
 [[package]]
@@ -6907,6 +6911,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.20",
+ "tinyagents-definition",
  "tinyagents-graph",
  "tinyagents-harness",
  "tinyagents-runtime",
