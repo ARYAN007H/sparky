@@ -10,6 +10,7 @@ use crate::config::{
 };
 use crate::core::runtime::direct_profile_provider::{validate_endpoint, DirectProfileProvider};
 use crate::core::runtime::SaasConfig;
+use crate::search::providers;
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 use tinysearch_bus::Role;
@@ -201,6 +202,16 @@ impl ProfileProviderSettings {
             let Some(role) = tinysearch_bus::role_for_tool(&spec.name) else {
                 return false;
             };
+            // The module treats an empty role as its default order, which could
+            // add a provider the operator left out (Exa answers); keep it off.
+            if self
+                .search
+                .roles
+                .get(providers::role_key(role))
+                .is_none_or(Vec::is_empty)
+            {
+                return false;
+            }
             spec.name = self.advertised_role_name(role).to_owned();
             // Deep research is a separate capability the deployment never grants.
             if let Some(properties) = spec

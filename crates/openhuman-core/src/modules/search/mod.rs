@@ -140,16 +140,7 @@ pub fn module_config(config: &Config) -> ModuleSearchConfig {
 
     let roles = ROLES
         .into_iter()
-        .map(|role| {
-            let order = if direct_profile {
-                // A profile's role order is exact: an empty role is off, never
-                // the default fallback order (which could add Exa answers).
-                providers::exact_role_order(config, role)
-            } else {
-                providers::role_order(config, role)
-            };
-            (role, order)
-        })
+        .map(|role| (role, providers::role_order(config, role)))
         .collect();
     let presentation = PresentationConfig {
         mode: match config.search.presentation {
