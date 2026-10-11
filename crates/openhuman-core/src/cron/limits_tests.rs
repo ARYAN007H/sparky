@@ -40,7 +40,7 @@ fn input(every_ms: u64, delivery: Option<DeliveryConfig>) -> AgentJobInput {
 fn delivery(mode: &str) -> DeliveryConfig {
     DeliveryConfig {
         mode: mode.into(),
-        channel: Some("telegram".into()),
+        channel: Some("web".into()),
         to: Some("42".into()),
         best_effort: true,
     }
