@@ -320,10 +320,15 @@ Its pure contract removes the two stale contract exceptions; eleven host
 implementation exceptions remain. Runtime channel dispatch and relay delivery
 still need migration.
 
-
 TinyVoice capture uses released v0.1.16 (contract 1.5), including owner-computed
-recording summaries. The host holds opaque reservations, reads WAV output in
+recording summaries and cancellation that waits for native finish cleanup. The
+host holds opaque reservations, reads WAV output in
 256 KiB slices, polls at most two continuous chunks per request, and releases
 leases on cancellation, sign-out and shutdown. Failed cleanup stays registered
 for retry. Microphone authorization remains a TinyComputer call; the host does
 not link TinyVoice or CPAL. The existing hotkey adapter remains module-backed.
+
+This cut removes the `tinyvoice` and `cpal` host exceptions, leaving nine
+implementation exceptions for Channels, MCP, Box and Wallet. The resolved
+voice-only normal/build graph falls from 323 packages to 318; this is a
+dependency count, with no inferred binary size or build-time reduction.
