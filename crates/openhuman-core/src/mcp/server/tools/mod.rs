@@ -5,10 +5,11 @@
 //!   - `specs`    — tool spec builders, schema helpers, and the conversion to
 //!     `tinymcp_bus::ServerToolSpec`
 //!   - `params`   — OpenHuman's per-tool argument policy and RPC param
-//!     construction, over `tinymcp::server::args`' generic validators
+//!     construction, with generic MCP argument validation delegated to the
+//!     configured TinyMCP module
 //!   - `dispatch` — `call_tool`, `list_tool_specs`, agent/subagent handlers
 //!
-//! `ToolCallError` is `tinymcp`'s, re-exported here for the sibling modules.
+//! `ToolCallError` is part of `tinymcp_bus` and shared with the module.
 
 //! ## Compile-time gate (`mcp` feature)
 //!

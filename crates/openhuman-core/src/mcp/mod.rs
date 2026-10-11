@@ -1,15 +1,15 @@
 //! MCP family — the host half of Model Context Protocol support.
 //!
-//! The client moved out to `tinymcp`: both transports, the static
-//! config-declared server set, the dynamic registry with its store, supervisor
-//! and browser sign-in, and the write-audit log all live there now.
+//! MCP protocol and client behavior run in the TinyMCP module. This family is
+//! the OpenHuman host adapter for configuration, product policy, lifecycle,
+//! events, audit RPCs, and the local MCP server entry points.
 //!
 //! What is here is what belongs to this application.
 //!
 //! # Members
 //!
-//! - [`host`] — the one `tinymcp` service this process holds, and the
-//!   conversion from this application's configuration into what it takes.
+//! - [`host`] — conversion from this application's configuration into the
+//!   TinyMCP bus contract and host-owned proxy policy.
 //! - [`registry`] — the `mcp_clients` RPC surface, the
 //!   agent-facing tools, and the prompt-injection scan over remote tool
 //!   definitions.
