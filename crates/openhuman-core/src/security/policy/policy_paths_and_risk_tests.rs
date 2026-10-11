@@ -152,6 +152,67 @@ fn tinybox_command_facts_drive_policy_and_keep_the_path_floor_when_disabled() {
     assert!(disabled.check_gated_command_analysis(&nul_path).is_err());
 }
 
+#[cfg(feature = "modules")]
+#[test]
+fn tinybox_fact_allowlist_treats_heredoc_as_data_and_unknown_commands_as_writes() {
+    use crate::modules::tinybox::contract::{
+        CommandAnalysis, CommandClass as ModuleClass, CommandSegment,
+    };
+
+    let policy = SecurityPolicy {
+        enabled: true,
+        autonomy: AutonomyLevel::Supervised,
+        ..SecurityPolicy::default()
+    };
+    // This is the `AnalyzeCommand` reply shape for a quoted heredoc: body text
+    // does not appear among live segments or literal words, while the command
+    // that writes the document remains classified as a write.
+    let heredoc = CommandAnalysis {
+        segments: vec![CommandSegment {
+            source: "cat > notes.txt << 'EOF'".into(),
+            command: "cat > notes.txt".into(),
+            basename: "cat".into(),
+            normalized_name: "cat".into(),
+            arguments: vec!["notes.txt".into()],
+            class: ModuleClass::Write,
+            leading_env_assignment: false,
+            dangerous_env_prefix: false,
+            executor: false,
+        }],
+        hidden_execution: false,
+        redirection: true,
+        expansion: false,
+        tee: false,
+        background: false,
+        literal_words: vec!["cat".into(), "notes.txt".into()],
+    };
+    assert!(!policy.is_command_allowed_analysis(&heredoc));
+
+    // The module's conservative unknown-command default is Write. OpenHuman's
+    // supervised allowlist still rejects a name it does not explicitly allow.
+    let unknown_write = CommandAnalysis {
+        segments: vec![CommandSegment {
+            source: "unrecognized-tool --flag".into(),
+            command: "unrecognized-tool --flag".into(),
+            basename: "unrecognized-tool".into(),
+            normalized_name: "unrecognized-tool".into(),
+            arguments: vec!["--flag".into()],
+            class: ModuleClass::Write,
+            leading_env_assignment: false,
+            dangerous_env_prefix: false,
+            executor: false,
+        }],
+        hidden_execution: false,
+        redirection: false,
+        expansion: false,
+        tee: false,
+        background: false,
+        literal_words: vec!["unrecognized-tool".into(), "--flag".into()],
+    };
+    assert!(!policy.is_command_allowed_analysis(&unknown_write));
+    assert_eq!(policy.check_gated_command_analysis(&unknown_write), Ok(CommandClass::Write));
+}
+
 #[test]
 fn command_risk_medium_for_command_executors() {
     // Interpreters / code executors are medium-risk now (not high): a coding
