@@ -308,7 +308,7 @@ pub fn all_tools_with_runtime(
     // or SPL payment signing, and ledger recording. Gated with the `web3`
     // feature (the x402 domain is compiled out when web3 is disabled).
     #[cfg(feature = "web3")]
-    tools.push(Box::new(crate::web3::x402::request_tool(
+    tools.push(Box::new(crate::tools::x402_request_tool(
         security.clone(),
         http_config.allowed_domains.clone(),
     )));

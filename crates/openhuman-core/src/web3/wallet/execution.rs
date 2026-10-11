@@ -16,7 +16,7 @@ pub use tinywallet_bus::wire::{
 
 use tinywallet_bus::wire::{EvmNetwork, WalletNetworkDefaults};
 
-use tinywallet_web3::crypto::wallet::WalletChain;
+use super::ops::WalletChain;
 
 /// Default row for every supported network, with the host's endpoints.
 pub async fn network_defaults() -> Result<Outcome<Vec<WalletNetworkDefaults>>, String> {
