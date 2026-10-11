@@ -45,11 +45,10 @@ impl OpenHumanSessionHost {
         if matches!(
             options.resume,
             ResumeMode::Session | ResumeMode::LatestForAgent
-        )
-            && self
-                .runtime_session
-                .as_ref()
-                .is_some_and(|session| session.history().is_empty())
+        ) && self
+            .runtime_session
+            .as_ref()
+            .is_some_and(|session| session.history().is_empty())
         {
             let runtime = self
                 .runtime_session
