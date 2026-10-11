@@ -221,3 +221,40 @@ fn the_pre_rename_max_agents_open_key_still_sets_the_limit() {
     std::fs::write(&path, "root = \"/srv/openhuman\"\nmax_agents_open = 7\n").unwrap();
     assert_eq!(SaasConfig::load(&path).unwrap().max_profiles_open, 7);
 }
+
+#[test]
+fn direct_profile_provider_requires_complete_safe_route_and_model() {
+    use super::super::direct_profile_provider::DirectProfileProvider;
+    for (endpoint, key, model) in [
+        ("", "private-key", "model"),
+        ("https://fixture.example/v1", " ", "model"),
+        ("https://fixture.example/v1", "private-key", " "),
+        ("file:///secret", "private-key", "model"),
+        ("http://public.example/v1", "private-key", "model"),
+        ("https://user:password@fixture.example/v1", "private-key", "model"),
+        ("https://fixture.example/v1?token=secret", "private-key", "model"),
+    ] {
+        let error = DirectProfileProvider::openai_compatible(endpoint, key, model).unwrap_err();
+        assert!(!error.to_string().contains("private-key"));
+    }
+    let direct = DirectProfileProvider::openai_compatible(
+        "http://127.0.0.1:1234/v1", "private-key", "fixture-model",
+    ).unwrap();
+    let mut config = crate::config::Config::default();
+    direct.apply(&mut config);
+    assert_eq!(config.default_model.as_deref(), Some("fixture-model"));
+    assert_eq!(config.ephemeral_route.as_ref().unwrap().endpoint, "http://127.0.0.1:1234/v1");
+    assert!(!toml::to_string(&config).unwrap().contains("private-key"));
+    assert!(!format!("{direct:?}").contains("private-key"));
+}
+
+#[test]
+fn operator_deserialization_validates_direct_provider_without_echoing_input() {
+    let invalid = "root = '/srv/oh'\n[chat_provider]\nendpoint = 'file:///private'\napi_key = 'unique-deserialize-key'\nmodel = 'fixture'\n";
+    let error = toml::from_str::<SaasConfig>(invalid).unwrap_err();
+    assert!(!error.message().contains("unique-deserialize-key"));
+    let valid = invalid.replace("file:///private", "https://fixture.example/v1");
+    let config: SaasConfig = toml::from_str(&valid).unwrap();
+    assert!(config.chat_provider.is_some());
+    assert!(!format!("{config:?}").contains("unique-deserialize-key"));
+}
