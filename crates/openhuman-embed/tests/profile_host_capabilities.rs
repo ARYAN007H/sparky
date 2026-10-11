@@ -90,9 +90,16 @@ impl Respond for CallTools {
     fn respond(&self, request: &Request) -> ResponseTemplate {
         let body: Value = serde_json::from_slice(&request.body).unwrap();
         let messages = body["messages"].as_array().unwrap();
-        let last_user = messages.iter().rposition(|message| message["role"] == "user").unwrap();
-        let has_tool_results = messages[last_user + 1..].iter().any(|message| message["role"] == "tool");
-        let completion = if common::last_user_message(&body).contains("deny callback request") && !has_tool_results {
+        let last_user = messages
+            .iter()
+            .rposition(|message| message["role"] == "user")
+            .unwrap();
+        let has_tool_results = messages[last_user + 1..]
+            .iter()
+            .any(|message| message["role"] == "tool");
+        let completion = if common::last_user_message(&body).contains("deny callback request")
+            && !has_tool_results
+        {
             tool_call_completion("tenant_probe", r#"{"deny":true}"#)
         } else if common::last_user_message(&body).contains("unsafe fixture request") {
             let mut completion = tool_call_completion("shell", "{}");
@@ -211,13 +218,15 @@ async fn scenario() {
             "run_workflow".into(),
             "delegate_to".into(),
         ]))
-        .can_use_tool(|context| Box::pin(async move {
-            if context.arguments.get("deny").and_then(Value::as_bool) == Some(true) {
-                ToolHookDecision::Deny("operator refused this call".into())
-            } else {
-                ToolHookDecision::Proceed
-            }
-        }))
+        .can_use_tool(|context| {
+            Box::pin(async move {
+                if context.arguments.get("deny").and_then(Value::as_bool) == Some(true) {
+                    ToolHookDecision::Deny("operator refused this call".into())
+                } else {
+                    ToolHookDecision::Proceed
+                }
+            })
+        })
         .channel_permissions([
             ("cli", PermissionLevel::Execute),
             ("web_channel", PermissionLevel::Execute),
@@ -328,7 +337,13 @@ async fn scenario() {
         "unregistered unsafe model calls must fail closed"
     );
     assert_eq!(calls.lock().unwrap().len(), executions_before_denied_turn);
-    assert!(handles[0].chat("callback-denied", "deny callback request").await.is_err(), "the operator callback must refuse even a registered safe name");
+    assert!(
+        handles[0]
+            .chat("callback-denied", "deny callback request")
+            .await
+            .is_err(),
+        "the operator callback must refuse even a registered safe name"
+    );
     assert_eq!(calls.lock().unwrap().len(), executions_before_denied_turn);
     // Persistent hooks fail closed if reused under a different profile or
     // after the owning lease is fenced, before the host callback is consulted.
@@ -398,27 +413,77 @@ async fn scenario() {
     tokio::time::timeout(Duration::from_secs(30), async {
         loop {
             match runtime.release(&alice_id).await {
-                Ok(released) => { assert!(released); break; }
+                Ok(released) => {
+                    assert!(released);
+                    break;
+                }
                 Err(_) => tokio::time::sleep(Duration::from_millis(20)).await,
             }
         }
-    }).await.expect("completed turns leave the profile releasable");
+    })
+    .await
+    .expect("completed turns leave the profile releasable");
     let reopened = runtime.open("alice").await.unwrap();
-    assert!(reopened.threads().await.unwrap().iter().any(|thread| thread.id == "t1"));
-    reopened.chat("t1", "alice: call tenant_probe after reopening").await.unwrap();
+    assert!(reopened
+        .threads()
+        .await
+        .unwrap()
+        .iter()
+        .any(|thread| thread.id == "t1"));
+    reopened
+        .chat("t1", "alice: call tenant_probe after reopening")
+        .await
+        .unwrap();
     let mut events = reopened.events();
-    assert!(reopened.relay_inbound(RelayMessage::new("telegram", "chat", "sender", "message", "alice: call tenant_probe after reopening")).await.unwrap().accepted);
+    assert!(
+        reopened
+            .relay_inbound(RelayMessage::new(
+                "telegram",
+                "chat",
+                "sender",
+                "message",
+                "alice: call tenant_probe after reopening"
+            ))
+            .await
+            .unwrap()
+            .accepted
+    );
     tokio::time::timeout(Duration::from_secs(30), async {
         while events.recv().await.unwrap().event != "channel_outbound" {}
-    }).await.unwrap();
-    assert_eq!(&calls.lock().unwrap()[4..], ["tenant_probe:alice", "tenant_probe:alice"]);
+    })
+    .await
+    .unwrap();
+    assert_eq!(
+        &calls.lock().unwrap()[4..],
+        ["tenant_probe:alice", "tenant_probe:alice"]
+    );
     let reopened_sessions = sessions.lock().unwrap();
-    assert_eq!(&reopened_sessions[reopened_sessions.len() - 2..], [("alice".into(), Some("t1".into())), ("alice".into(), Some("channel:telegram/sender/chat".into()))]);
+    assert_eq!(
+        &reopened_sessions[reopened_sessions.len() - 2..],
+        [
+            ("alice".into(), Some("t1".into())),
+            ("alice".into(), Some("channel:telegram/sender/chat".into()))
+        ]
+    );
     drop(reopened_sessions);
     handles.insert(0, reopened);
-    let alice_profile = handles[0].scope(async { openhuman_core::profiles::current().unwrap() }).await;
-    let alice_hook = handles[0].context().host_overrides().unwrap().tool_hooks().into_iter().find(|hook| hook.name() == "profile.can_use_tool").unwrap();
-    assert!(matches!(handles[0].scope(alice_hook.before_tool_decision(&hook_context)).await, ToolHookDecision::Proceed));
+    let alice_profile = handles[0]
+        .scope(async { openhuman_core::profiles::current().unwrap() })
+        .await;
+    let alice_hook = handles[0]
+        .context()
+        .host_overrides()
+        .unwrap()
+        .tool_hooks()
+        .into_iter()
+        .find(|hook| hook.name() == "profile.can_use_tool")
+        .unwrap();
+    assert!(matches!(
+        handles[0]
+            .scope(alice_hook.before_tool_decision(&hook_context))
+            .await,
+        ToolHookDecision::Proceed
+    ));
     let requests = chat_requests(&inference).await;
     assert!(requests
         .iter()
