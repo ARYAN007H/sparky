@@ -16,11 +16,11 @@
 //! [`Runtime`](crate::Runtime).
 
 pub use tinyinference_embeddings::{
-    format_embedding_signature, set_rate_limit, CohereEmbeddingModel, EmbeddingModel,
-    MockEmbeddingModel, NoopEmbeddingModel, OllamaEmbeddingModel, OpenAiEmbeddingModel,
-    VoyageEmbeddingModel, COHERE_API_BASE, COHERE_DEFAULT_DIMENSIONS, COHERE_DEFAULT_MODEL,
+    COHERE_API_BASE, COHERE_DEFAULT_DIMENSIONS, COHERE_DEFAULT_MODEL, CohereEmbeddingModel,
     DEFAULT_OLLAMA_DIMENSIONS, DEFAULT_OLLAMA_MODEL, DEFAULT_OLLAMA_URL,
-    DEFAULT_REQUESTS_PER_MINUTE, VOYAGE_API_BASE, VOYAGE_DEFAULT_DIMENSIONS, VOYAGE_DEFAULT_MODEL,
+    DEFAULT_REQUESTS_PER_MINUTE, EmbeddingModel, MockEmbeddingModel, NoopEmbeddingModel,
+    OllamaEmbeddingModel, OpenAiEmbeddingModel, VOYAGE_API_BASE, VOYAGE_DEFAULT_DIMENSIONS,
+    VOYAGE_DEFAULT_MODEL, VoyageEmbeddingModel, format_embedding_signature, set_rate_limit,
 };
 /// Errors the embedding models return.
 pub use tinyinference_embeddings::{Error as EmbeddingError, Result as EmbeddingResult};

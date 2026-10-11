@@ -1,7 +1,7 @@
 //! Content-free runtime observations with bounded, explicit backpressure.
 
 use futures_core::Stream;
-use openhuman_core::core::bus::{EventHandler, SubscriptionHandle, BUS};
+use openhuman_core::core::bus::{BUS, EventHandler, SubscriptionHandle};
 use openhuman_core::core::events::DomainEvent;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -9,7 +9,7 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex, Weak};
 use std::task::{Context, Poll};
 use tokio::sync::broadcast;
-use tokio_stream::wrappers::{errors::BroadcastStreamRecvError, BroadcastStream};
+use tokio_stream::wrappers::{BroadcastStream, errors::BroadcastStreamRecvError};
 
 /// Metadata about one runtime transition; never includes user/tool payloads.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

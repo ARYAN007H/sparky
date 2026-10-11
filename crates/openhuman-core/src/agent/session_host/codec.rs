@@ -314,20 +314,33 @@ fn attach_text_dialect_rounds(
     }
 }
 
-
 /// Apply OpenHuman's historical orphan-head adoption to the replay view only.
 fn replayable_host_rows(rows: &[TranscriptMessage]) -> std::borrow::Cow<'_, [TranscriptMessage]> {
     // Old unpaired trims could persist tool results immediately after the
     // frozen system prefix (#6721). Later orphan results still fail native
     // validation. Merely resuming never rewrites the durable source.
     let prefix = rows.iter().take_while(|row| row.role == "system").count();
-    let orphan_count = rows[prefix..].iter().take_while(|row| row.role == "tool").count();
+    let orphan_count = rows[prefix..]
+        .iter()
+        .take_while(|row| row.role == "tool")
+        .count();
     if orphan_count == 0 {
         std::borrow::Cow::Borrowed(rows)
     } else {
-        tracing::warn!(orphan_count, "[session_host::codec] repaired legacy orphaned tool head");
+        tracing::warn!(
+            orphan_count,
+            "[session_host::codec] repaired legacy orphaned tool head"
+        );
         std::borrow::Cow::Owned(
-            rows[..prefix].iter().chain(&rows[prefix + orphan_count..]).cloned().collect(),
+            rows[..prefix]
+                .iter()
+                .chain(&rows[prefix + orphan_count..])
+                .cloned()
+                .collect(),
         )
     }
 }
+
+#[cfg(test)]
+#[path = "codec_adoption_tests.rs"]
+mod adoption_tests;

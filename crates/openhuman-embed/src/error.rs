@@ -20,8 +20,8 @@
 //! facade classifies it. A host that cannot make that distinction renders a
 //! scary red error where it should simply hide a tab.
 
-use openhuman_core::core::dispatch::UNKNOWN_METHOD_PREFIX;
 use openhuman_core::core::StructuredRpcError;
+use openhuman_core::core::dispatch::UNKNOWN_METHOD_PREFIX;
 
 /// Error returned by every typed facade call.
 #[derive(Debug, thiserror::Error)]

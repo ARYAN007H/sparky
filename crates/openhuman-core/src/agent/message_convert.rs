@@ -26,8 +26,8 @@ use crate::inference::provider::ChatResponse;
 use tinyagents_runtime::transcript::reasoning_from_content;
 #[cfg(test)]
 use tinyagents_runtime::transcript::{
-    message_to_display_transcript as message_to_chat_message,
-    message_to_native_transcript as message_to_native_chat_message, REASONING_EXT_KEY,
+    REASONING_EXT_KEY, message_to_display_transcript as message_to_chat_message,
+    message_to_native_transcript as message_to_native_chat_message,
 };
 use tinyagents_session::transcript::TranscriptMessage;
 
@@ -307,7 +307,7 @@ pub(crate) fn messages_to_history(messages: &[Message]) -> Vec<TranscriptMessage
 
 // The product dialect stores provider reasoning in passthrough metadata.
 fn reasoning_extra_metadata(content: &[ContentBlock]) -> Option<serde_json::Value> {
-    tinyagents_runtime::transcript::reasoning_from_content(content)
+    reasoning_from_content(content)
         .map(|reasoning| serde_json::json!({ tinyagents_runtime::transcript::REASONING_EXT_KEY: reasoning }))
 }
 

@@ -104,14 +104,25 @@ async fn resumed_orphaned_tool_head_is_repaired_before_the_request() {
     // The raw durable source still contains both leading orphans; the codec
     // must heal only its model-visible replay view before strict validation.
     let raw = tinyagents_session::transcript::read_transcript(&transcripts[0]).unwrap();
-    let raw_prefix = raw.messages.iter().take_while(|row| row.role == "system").count();
+    let raw_prefix = raw
+        .messages
+        .iter()
+        .take_while(|row| row.role == "system")
+        .count();
     assert_eq!(
-        raw.messages[raw_prefix..].iter().take_while(|row| row.role == "tool")
-            .map(|row| row.id.as_deref().unwrap()).collect::<Vec<_>>(),
+        raw.messages[raw_prefix..]
+            .iter()
+            .take_while(|row| row.role == "tool")
+            .map(|row| row.id.as_deref().unwrap())
+            .collect::<Vec<_>>(),
         ["call_orphan_a", "call_orphan_b"],
     );
     assert!(host.resume_bound_session().await.unwrap());
-    let decoded = host.runtime_session.as_ref().expect("resumed runtime session").history();
+    let decoded = host
+        .runtime_session
+        .as_ref()
+        .expect("resumed runtime session")
+        .history();
     assert!(!decoded.iter().any(
         |message| matches!(message, Message::Tool(tool) if tool.tool_call_id.starts_with("call_orphan"))
     ));
@@ -169,7 +180,9 @@ async fn resumed_orphaned_tool_head_is_repaired_before_the_request() {
         !matches!(first_non_system, Message::Tool(_)),
         "the request must not open on an orphaned tool result, got {first_non_system:?}"
     );
-    assert!(!sent
-        .iter()
-        .any(|m| matches!(m, Message::Tool(t) if t.tool_call_id.starts_with("call_orphan"))));
+    assert!(
+        !sent
+            .iter()
+            .any(|m| matches!(m, Message::Tool(t) if t.tool_call_id.starts_with("call_orphan")))
+    );
 }
