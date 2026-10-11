@@ -99,10 +99,18 @@ pub(super) fn handle_update_model_settings(params: Map<String, Value>) -> Contro
                                     "cloud provider slug must not be empty".to_string()
                                 );
                             }
-                            let legacy_auth = e.legacy_type.as_deref()
-                                .and_then(builtin_cloud_provider)
+                            let legacy_provider = e.legacy_type.as_deref()
+                                .map(str::trim)
+                                .and_then(builtin_cloud_provider);
+                            let legacy_auth = legacy_provider
                                 .map(|provider| provider.auth_style.as_str())
                                 .unwrap_or("bearer");
+                            let endpoint = if e.endpoint.is_empty() {
+                                legacy_provider.map(|provider| provider.endpoint.to_string())
+                                    .unwrap_or(e.endpoint)
+                            } else {
+                                e.endpoint
+                            };
                             let auth_style = match e
                                 .auth_style
                                 .as_deref()
@@ -133,7 +141,7 @@ pub(super) fn handle_update_model_settings(params: Map<String, Value>) -> Contro
                                 id,
                                 slug,
                                 label,
-                                endpoint: e.endpoint,
+                                endpoint,
                                 auth_style,
                                 default_model: e.default_model,
                             };

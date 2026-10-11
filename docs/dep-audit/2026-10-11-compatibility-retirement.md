@@ -48,7 +48,9 @@ user payloads or credentials were copied.
 The old-provider fixture covers type-to-slug/default endpoint/auth migration
 and model survival across save/reload. Migration fixtures also cover explicit
 values, unknown provider slugs, malformed discriminator rejection, idempotence,
-and a schema-14 no-op. Existing native tests cover policy-context redaction,
+a schema-14 no-op, and failed-save retry. A real JSON-RPC fixture covers both
+settings controllers retaining incoming type defaults while preserving explicit
+endpoint/auth values. Existing native tests cover policy-context redaction,
 cache fallback, route-based local usage and scoped cancellation.
 
 The issue names scripts/e2e-core.sh, which is absent at this base. The supported

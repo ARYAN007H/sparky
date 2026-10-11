@@ -183,10 +183,18 @@ pub(super) fn handle_inference_update_model_settings(
                             if slug.is_empty() {
                                 return Err("cloud provider slug must not be empty".to_string());
                             }
-                            let legacy_auth = entry.legacy_type.as_deref()
-                                .and_then(builtin_cloud_provider)
+                            let legacy_provider = entry.legacy_type.as_deref()
+                                .map(str::trim)
+                                .and_then(builtin_cloud_provider);
+                            let legacy_auth = legacy_provider
                                 .map(|provider| provider.auth_style.as_str())
                                 .unwrap_or("bearer");
+                            let endpoint = if entry.endpoint.is_empty() {
+                                legacy_provider.map(|provider| provider.endpoint.to_string())
+                                    .unwrap_or(entry.endpoint)
+                            } else {
+                                entry.endpoint
+                            };
                             let auth_style = match entry
                                 .auth_style
                                 .as_deref()
@@ -217,7 +225,7 @@ pub(super) fn handle_inference_update_model_settings(
                                 id,
                                 slug,
                                 label,
-                                endpoint: entry.endpoint,
+                                endpoint,
                                 auth_style,
                                 default_model: entry.default_model,
                             };
