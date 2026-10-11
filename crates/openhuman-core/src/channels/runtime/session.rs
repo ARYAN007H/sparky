@@ -103,18 +103,27 @@ pub(crate) fn resume_channel_service() {
 
 fn spawn_channel_service_with<F, Fut>(
     controller: ChannelSessionController,
-    run: F,
+    mut run: F,
 ) -> tokio::task::JoinHandle<()>
 where
-    F: FnOnce(CancellationToken) -> Fut + Send + 'static,
+    F: FnMut(CancellationToken) -> Fut + Send + 'static,
     Fut: Future<Output = ()> + Send + 'static,
 {
-    tokio::spawn(run(controller.current()))
+    tokio::spawn(async move {
+        let mut session = controller.current();
+        loop {
+            run(session.clone()).await;
+            if !session.is_cancelled() {
+                return;
+            }
+            session = controller.wait_for_resume().await;
+        }
+    })
 }
 
 pub(crate) fn spawn_current_channel_service_with<F, Fut>(run: F) -> tokio::task::JoinHandle<()>
 where
-    F: FnOnce(CancellationToken) -> Fut + Send + 'static,
+    F: FnMut(CancellationToken) -> Fut + Send + 'static,
     Fut: Future<Output = ()> + Send + 'static,
 {
     spawn_channel_service_with(SESSION.clone(), run)
