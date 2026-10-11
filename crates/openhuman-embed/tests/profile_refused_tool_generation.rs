@@ -168,6 +168,12 @@ async fn scenario() {
         .expect("a refused tool call must not fail the turn");
     let denied = handle.chat("t1", "run shell").await;
     eprintln!("DENIED TURN: {denied:?}");
+    let denied = handle.chat("t1", "run shell").await;
+    eprintln!("DENIED TURN 2: {denied:?}");
+    let denied = handle.chat("t1", "make a shell job").await;
+    eprintln!("SHELLJOB TURN 3: {denied:?}");
+    let denied = handle.chat("t1", "run shell").await;
+    eprintln!("DENIED TURN 4: {denied:?}");
     handle.chat("t1", "and once more").await.unwrap();
     let requests = chat_requests(&chat).await;
     assert!(
