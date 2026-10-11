@@ -289,7 +289,7 @@ pub(super) async fn policy_reads_refuse_execution_without_consuming_a_slot(case:
         queued.is_err(),
         "queued Run now must refuse before enqueueing"
     );
-    assert!(!tool.success, "run tool must refuse an unreadable policy");
+    assert!(tool.is_error, "run tool must refuse an unreadable policy");
     assert_eq!(
         calls.load(Ordering::SeqCst),
         0,
