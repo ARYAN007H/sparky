@@ -1620,7 +1620,11 @@ async fn json_rpc_removed_harness_provisioning_is_unavailable() {
     for (id, method, params) in [
         (44_711, "openhuman.harness_init_status", json!({})),
         (44_712, "openhuman.harness_init_run", json!({})),
-        (44_713, "openhuman.harness_init_run", json!({ "force": true })),
+        (
+            44_713,
+            "openhuman.harness_init_run",
+            json!({ "force": true }),
+        ),
     ] {
         let response = post_json_rpc(&rpc_base, id, method, params).await;
         assert_eq!(
