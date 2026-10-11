@@ -180,10 +180,16 @@ async fn scenario() {
         let body: Value = serde_json::from_slice(&request.body).unwrap();
         assert_eq!(body["model"], "fixture-model");
     }
-    assert_eq!(
-        managed.received_requests().await.unwrap().len(),
-        0,
-        "no managed traffic"
+    let managed_paths: Vec<_> = managed
+        .received_requests()
+        .await
+        .unwrap()
+        .iter()
+        .map(|r| format!("{} {}", r.method, r.url.path()))
+        .collect();
+    assert!(
+        managed_paths.is_empty(),
+        "managed traffic: {managed_paths:?}"
     );
 
     if module {
