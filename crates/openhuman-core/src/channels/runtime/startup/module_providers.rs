@@ -11,7 +11,6 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock, Weak};
-use std::time::Duration;
 use tinychannels_bus::module_runtime::{
     ChannelIngressKind, ChannelMessagePreparation, ConfiguredChannelInfo,
 };
@@ -22,7 +21,6 @@ use tokio::sync::mpsc;
 /// Channel objects sharing one captured config, callback object and module lease.
 pub(super) struct ModuleChannelRuntime {
     lease: ChannelRuntimeLease,
-    client: ModuleClient,
     config: tinychannels_bus::ChannelsConfig,
     proxy: tinychannels_bus::HttpProxyPolicy,
     infos: Vec<ConfiguredChannelInfo>,
@@ -118,7 +116,6 @@ impl ModuleChannelRuntime {
             .collect();
         Ok(Self {
             lease,
-            client,
             config: hydrated,
             proxy,
             infos,
@@ -199,7 +196,6 @@ impl ModuleChannelRuntime {
         if self.closed {
             return Ok(());
         }
-        self.closed = true;
         let mut failure = None;
         if let Some(relay) = &self.relay {
             if let Err(error) = self
@@ -219,8 +215,11 @@ impl ModuleChannelRuntime {
         {
             failure.get_or_insert_with(|| anyhow::Error::new(error));
         }
-        if let Err(error) = self.lease.close().await {
-            failure.get_or_insert_with(|| anyhow::Error::new(error));
+        match self.lease.close().await {
+            Ok(()) => self.closed = true,
+            Err(error) => {
+                failure.get_or_insert_with(|| anyhow::Error::new(error));
+            }
         }
         match failure {
             Some(error) => Err(error),
@@ -431,19 +430,15 @@ impl ModuleChannel {
             )
             .await
             .map_err(anyhow::Error::new)?;
-        let method = if self.relay_fronted && self.relay.is_some() {
-            let result: tinychannels_bus::controllers::ChannelSendMessageResult = self
+        if let Some(relay) = self.relay.as_ref().filter(|_| self.relay_fronted) {
+            self
                 .object
-                .call_confidential(
+                .call_confidential::<tinychannels_bus::controllers::ChannelSendMessageResult>(
                     tinychannels_bus::methods::SEND_RELAY_INTENT,
-                    (
-                        self.relay.clone().expect("checked relay handle"),
-                        prepared.intent,
-                    ),
+                    (relay.clone(), prepared.intent),
                 )
                 .await
                 .map_err(anyhow::Error::new)?;
-            result
         } else {
             self.object
                 .call_confidential::<tinychannels_bus::controllers::ChannelSendMessageResult>(
@@ -453,7 +448,6 @@ impl ModuleChannel {
                 .await
                 .map_err(anyhow::Error::new)?
         };
-        let _ = method;
         Ok(())
     }
 
