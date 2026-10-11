@@ -41,7 +41,10 @@ const OUTPUT = join(ROOT, "crates/openhuman-app/bundled-modules");
 const LIBRARY_EXTENSIONS = [".dll", ".so", ".dylib"];
 
 /** The registry host key to bundle for a Node `platform`/`arch` pair. */
-export function defaultHostKey(platform = process.platform, arch = process.arch) {
+export function defaultHostKey(
+  platform = process.platform,
+  arch = process.arch,
+) {
   const archKey = { x64: "x86_64", arm64: "arm64" }[arch];
   if (!archKey) throw new Error(`no bundled modules for architecture ${arch}`);
   switch (platform) {
@@ -93,7 +96,8 @@ export function bundledAssets(source, hostKey) {
   const ids = names.map((name) => {
     const record = records.get(name);
     if (!record) throw new Error(`missing module record ${name}`);
-    if (!urls.has(record.id)) throw new Error(`missing release URL for ${record.id}`);
+    if (!urls.has(record.id))
+      throw new Error(`missing release URL for ${record.id}`);
     return record.id;
   });
   // A module that publishes nothing for this OS is not bundled there;
@@ -107,8 +111,16 @@ export function bundledAssets(source, hostKey) {
   const assets = resolveTestModuleAssets(source, hostKey, wanted);
   return assets.map((asset) => {
     const record = [...records.values()].find((r) => r.id === asset.id);
-    for (const component of [record.id, record.version, hostKey, asset.archive]) {
-      if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(component) || component === "..") {
+    for (const component of [
+      record.id,
+      record.version,
+      hostKey,
+      asset.archive,
+    ]) {
+      if (
+        !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(component) ||
+        component === ".."
+      ) {
         throw new Error(`unsafe registry path component for ${record.id}`);
       }
     }
@@ -121,7 +133,8 @@ function librariesUnder(dir) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) return librariesUnder(path);
     const name = entry.name.toLowerCase();
-    return entry.isFile() && LIBRARY_EXTENSIONS.some((ext) => name.endsWith(ext))
+    return entry.isFile() &&
+      LIBRARY_EXTENSIONS.some((ext) => name.endsWith(ext))
       ? [path]
       : [];
   });
@@ -173,7 +186,8 @@ export function normalizeStagedPermissions(root) {
   const stat = lstatSync(root);
   if (stat.isDirectory()) {
     chmodSync(root, 0o755);
-    for (const name of readdirSync(root)) normalizeStagedPermissions(join(root, name));
+    for (const name of readdirSync(root))
+      normalizeStagedPermissions(join(root, name));
   } else if (stat.isFile()) {
     chmodSync(root, 0o644);
   }
@@ -187,7 +201,11 @@ const DOWNLOAD_TIMEOUT_MS = 120_000;
  * `Content-Encoding: gzip` body, and the registry pin covers the archive's
  * own bytes. Each attempt has a deadline that also covers the body.
  */
-export async function download(url, destination, timeoutMs = DOWNLOAD_TIMEOUT_MS) {
+export async function download(
+  url,
+  destination,
+  timeoutMs = DOWNLOAD_TIMEOUT_MS,
+) {
   let lastError;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
@@ -223,19 +241,29 @@ export async function stageModules({
     mkdirSync(dir, { recursive: true });
     const archive = join(dir, asset.archive);
     await download(asset.url, archive);
-    const actual = createHash("sha256").update(readFileSync(archive)).digest("hex");
+    const actual = createHash("sha256")
+      .update(readFileSync(archive))
+      .digest("hex");
     if (actual !== asset.sha256.toLowerCase()) {
-      throw new Error(`${asset.id}: downloaded archive does not match the compiled registry pin`);
+      throw new Error(
+        `${asset.id}: downloaded archive does not match the compiled registry pin`,
+      );
     }
     extractArchive(archive, dir);
     if (librariesUnder(dir).length !== 1) {
-      throw new Error(`${asset.id}: expected exactly one native library in the release archive`);
+      throw new Error(
+        `${asset.id}: expected exactly one native library in the release archive`,
+      );
     }
     if (!keepsArchive(asset.hostKey)) replaceArchiveWithMarker(archive, actual);
-    console.log(`[bundled-modules] staged ${asset.id} ${asset.version} (${asset.hostKey})`);
+    console.log(
+      `[bundled-modules] staged ${asset.id} ${asset.version} (${asset.hostKey})`,
+    );
   }
   normalizeStagedPermissions(output);
-  console.log(`[bundled-modules] staged ${assets.length} verified releases for ${hostKey}`);
+  console.log(
+    `[bundled-modules] staged ${assets.length} verified releases for ${hostKey}`,
+  );
   return output;
 }
 
@@ -247,7 +275,9 @@ function option(name) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const target = option("--target");
   await stageModules({
-    hostKey: option("--host-key") ?? (target ? hostKeyForTarget(target) : defaultHostKey()),
+    hostKey:
+      option("--host-key") ??
+      (target ? hostKeyForTarget(target) : defaultHostKey()),
     output: option("--output") ? resolve(option("--output")) : OUTPUT,
   });
 }
