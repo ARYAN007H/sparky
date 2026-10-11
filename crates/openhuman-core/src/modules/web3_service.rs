@@ -42,14 +42,11 @@ async fn ensure_service(
         solana_cluster: native_configuration.solana_cluster,
         overridden_endpoints: native_configuration.overridden_endpoints,
     };
-    if active
-        .as_ref()
-        .is_some_and(|current| {
-            current.workspace != workspace
-                || current.accounts != accounts
-                || current.configuration != configuration
-        })
-    {
+    if active.as_ref().is_some_and(|current| {
+        current.workspace != workspace
+            || current.accounts != accounts
+            || current.configuration != configuration
+    }) {
         if let Some(current) = active.as_ref() {
             wallet::call::<_, ()>(
                 config,

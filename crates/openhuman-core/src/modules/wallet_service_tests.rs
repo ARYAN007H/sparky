@@ -85,7 +85,7 @@ async fn explicit_close_retains_state_for_retry_then_releases_user_state_once() 
         &configured.service.handle,
         &configured.endpoint_references,
     )
-        .expect("fixture endpoint alias should bind");
+    .expect("fixture endpoint alias should bind");
     let close_calls = Arc::new(AtomicUsize::new(0));
     let observed_calls = close_calls.clone();
 

@@ -10,12 +10,12 @@ use std::future::Future;
 use std::sync::{Mutex, OnceLock};
 
 use tinybus::ObjectPath;
+use tinywallet_bus::wire::HostEndpointReference;
 use tinywallet_bus::wire::{
     AuthorizationResult, AuthorizeNativeWalletExecutionRequest, AuthorizeWeb3ExecutionRequest,
     AuthorizeX402PaymentRequest, ChainTransportRequest, ChainTransportResult, HostResponse,
     WalletAccountInfo, WalletAccountsResponse, WalletBackendRequest, WalletBackendResponse,
 };
-use tinywallet_bus::wire::HostEndpointReference;
 
 const HOST_ERROR_NAME: &str = "ai.tinyhumans.tinywallet.Host.Error.CallbackFailed";
 
@@ -38,9 +38,7 @@ static NATIVE_APPROVAL_QUOTES: OnceLock<
 static WEB3_APPROVAL_QUOTES: OnceLock<
     Mutex<HashMap<String, tinywallet_bus::wire::Web3QuoteResponse>>,
 > = OnceLock::new();
-static ENDPOINT_REFERENCES: OnceLock<
-    Mutex<HashMap<String, EndpointReference>>,
-> = OnceLock::new();
+static ENDPOINT_REFERENCES: OnceLock<Mutex<HashMap<String, EndpointReference>>> = OnceLock::new();
 
 #[derive(Debug, Clone)]
 struct EndpointReference {
@@ -58,8 +56,8 @@ fn native_approval_quotes(
     NATIVE_APPROVAL_QUOTES.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-fn web3_approval_quotes(
-) -> &'static Mutex<HashMap<String, tinywallet_bus::wire::Web3QuoteResponse>> {
+fn web3_approval_quotes() -> &'static Mutex<HashMap<String, tinywallet_bus::wire::Web3QuoteResponse>>
+{
     WEB3_APPROVAL_QUOTES.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
@@ -93,11 +91,14 @@ pub(crate) fn bind_endpoint_references(
         };
         if endpoint.reference.trim().is_empty()
             || resolved
-                .insert(endpoint.reference.clone(), EndpointReference {
-                    service: service.to_owned(),
-                    key: endpoint.key,
-                    url,
-                })
+                .insert(
+                    endpoint.reference.clone(),
+                    EndpointReference {
+                        service: service.to_owned(),
+                        key: endpoint.key,
+                        url,
+                    },
+                )
                 .is_some()
         {
             return Err("wallet module returned an invalid endpoint reference".into());
@@ -223,7 +224,7 @@ fn web3_approval_matches_request(
     quote: &tinywallet_bus::wire::Web3QuoteResponse,
     request: &AuthorizeWeb3ExecutionRequest,
 ) -> bool {
-    use tinywallet_bus::wire::{Web3ExecutionIntent, Web3QuoteKind, WalletChain};
+    use tinywallet_bus::wire::{WalletChain, Web3ExecutionIntent, Web3QuoteKind};
 
     let operation_matches = matches!(
         (quote.kind, request.operation.as_str()),
@@ -281,9 +282,7 @@ fn web3_approval_matches_request(
                             .get("to")
                             .and_then(serde_json::Value::as_str)
                             .is_some_and(|expected| expected.eq_ignore_ascii_case(to))
-                            && transaction
-                                .get("data")
-                                .and_then(serde_json::Value::as_str)
+                            && transaction.get("data").and_then(serde_json::Value::as_str)
                                 == data.as_deref()
                             && decimal_json(transaction.get("value")).as_deref()
                                 == Some(value.as_str())
@@ -291,10 +290,7 @@ fn web3_approval_matches_request(
                 }
             }
         }
-        (
-            Web3ExecutionIntent::Solana { tx_blob_hex },
-            WalletChain::Solana,
-        ) => {
+        (Web3ExecutionIntent::Solana { tx_blob_hex }, WalletChain::Solana) => {
             let expected = quote
                 .quote
                 .get("tx")
@@ -308,9 +304,9 @@ fn web3_approval_matches_request(
 }
 
 fn known_evm_chain(network: &str, chain_id: u64) -> bool {
-    tinywallet_bus::wire::EvmNetwork::ALL.into_iter().any(|known| {
-        known.as_str() == network && known.chain_id() == chain_id
-    })
+    tinywallet_bus::wire::EvmNetwork::ALL
+        .into_iter()
+        .any(|known| known.as_str() == network && known.chain_id() == chain_id)
 }
 
 fn decimal_json(value: Option<&serde_json::Value>) -> Option<String> {
@@ -470,12 +466,7 @@ pub(crate) async fn with_confirmed_execution<F: Future>(
     expected_web3_quote: Option<tinywallet_bus::wire::Web3QuoteResponse>,
     future: F,
 ) -> F::Output {
-    let _permit = ApprovalPermit::new(
-        kind,
-        quote_id,
-        expected_native_quote,
-        expected_web3_quote,
-    );
+    let _permit = ApprovalPermit::new(kind, quote_id, expected_native_quote, expected_web3_quote);
     future.await
 }
 
@@ -578,16 +569,14 @@ impl WalletHost {
                 body,
                 content_type,
                 ..
-            } => {
-                crate::web3::wallet::rpc::rest_post_text(
-                    &join_endpoint(&endpoint_url, &path),
-                    &body,
-                    &content_type,
-                )
-                .await
-                .map(serde_json::Value::String)
-                .map_err(classify_transport_error)
-            }
+            } => crate::web3::wallet::rpc::rest_post_text(
+                &join_endpoint(&endpoint_url, &path),
+                &body,
+                &content_type,
+            )
+            .await
+            .map(serde_json::Value::String)
+            .map_err(classify_transport_error),
         };
         let response = match result {
             Ok(body) => ChainTransportResult::Ok { body },

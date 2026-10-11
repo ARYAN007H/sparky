@@ -40,51 +40,43 @@ impl Tool for Web3ModuleTool {
             Err(error) => return Ok(ToolResult::error(error)),
         };
         let result: anyhow::Result<Value> = match self.name() {
-            "web3_swap_quote" => {
-                crate::modules::web3_service::quote(
-                    &config,
-                    tinywallet_bus::names::methods::WEB3_SWAP_QUOTE,
-                    args,
-                )
-                .await
-                .map_err(|error| anyhow::anyhow!(error.to_string()))
-                .and_then(|value| serde_json::to_value(value).map_err(Into::into))
-            }
-            "web3_bridge_quote" => {
-                crate::modules::web3_service::quote(
-                    &config,
-                    tinywallet_bus::names::methods::WEB3_BRIDGE_QUOTE,
-                    args,
-                )
-                .await
-                .map_err(|error| anyhow::anyhow!(error.to_string()))
-                .and_then(|value| serde_json::to_value(value).map_err(Into::into))
-            }
-            "web3_dapp_call" => {
-                crate::modules::web3_service::quote(
-                    &config,
-                    tinywallet_bus::names::methods::WEB3_DAPP_QUOTE,
-                    args,
-                )
-                .await
-                .map_err(|error| anyhow::anyhow!(error.to_string()))
-                .and_then(|value| serde_json::to_value(value).map_err(Into::into))
-            }
+            "web3_swap_quote" => crate::modules::web3_service::quote(
+                &config,
+                tinywallet_bus::names::methods::WEB3_SWAP_QUOTE,
+                args,
+            )
+            .await
+            .map_err(|error| anyhow::anyhow!(error.to_string()))
+            .and_then(|value| serde_json::to_value(value).map_err(Into::into)),
+            "web3_bridge_quote" => crate::modules::web3_service::quote(
+                &config,
+                tinywallet_bus::names::methods::WEB3_BRIDGE_QUOTE,
+                args,
+            )
+            .await
+            .map_err(|error| anyhow::anyhow!(error.to_string()))
+            .and_then(|value| serde_json::to_value(value).map_err(Into::into)),
+            "web3_dapp_call" => crate::modules::web3_service::quote(
+                &config,
+                tinywallet_bus::names::methods::WEB3_DAPP_QUOTE,
+                args,
+            )
+            .await
+            .map_err(|error| anyhow::anyhow!(error.to_string()))
+            .and_then(|value| serde_json::to_value(value).map_err(Into::into)),
             "web3_swap_routes" => crate::modules::web3_service::routes(&config)
                 .await
                 .map_err(|error| anyhow::anyhow!(error.to_string())),
             "web3_swap_execute" | "web3_bridge_execute" | "web3_dapp_execute" => {
                 match serde_json::from_value::<crate::modules::web3_service::ExecuteParams>(args) {
-                    Ok(params) => {
-                        crate::modules::web3_service::execute(
-                            &config,
-                            params.quote_id,
-                            params.confirmed,
-                        )
-                        .await
-                        .map_err(|error| anyhow::anyhow!(error.to_string()))
-                        .and_then(|value| serde_json::to_value(value).map_err(Into::into))
-                    }
+                    Ok(params) => crate::modules::web3_service::execute(
+                        &config,
+                        params.quote_id,
+                        params.confirmed,
+                    )
+                    .await
+                    .map_err(|error| anyhow::anyhow!(error.to_string()))
+                    .and_then(|value| serde_json::to_value(value).map_err(Into::into)),
                     Err(error) => {
                         return Ok(ToolResult::error(format!("invalid arguments: {error}")));
                     }

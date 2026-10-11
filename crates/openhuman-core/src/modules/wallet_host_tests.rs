@@ -4,8 +4,8 @@ use super::{
 };
 use tinywallet_bus::wire::{
     AuthorizeNativeWalletExecutionRequest, AuthorizeWeb3ExecutionRequest, EvmNetwork,
-    NativeWalletExecutionIntent, PreparedKind, PreparedStatus, PreparedTransaction, TransactionSpec,
-    WalletChain, Web3ExecutionIntent, Web3QuoteKind, Web3QuoteResponse,
+    NativeWalletExecutionIntent, PreparedKind, PreparedStatus, PreparedTransaction,
+    TransactionSpec, WalletChain, Web3ExecutionIntent, Web3QuoteKind, Web3QuoteResponse,
 };
 
 #[test]
@@ -27,12 +27,8 @@ fn execution_authorization_is_bound_to_one_confirmed_quote_id() {
 fn an_unconsumed_confirmation_is_removed_when_the_execution_ends() {
     {
         let quote = native_quote("quote-cancelled");
-        let _permit = ApprovalPermit::new(
-            ApprovalKind::Native,
-            "quote-cancelled",
-            Some(quote),
-            None,
-        );
+        let _permit =
+            ApprovalPermit::new(ApprovalKind::Native, "quote-cancelled", Some(quote), None);
     }
     assert!(!consume_approval(ApprovalKind::Native, "quote-cancelled"));
 }
@@ -90,7 +86,12 @@ fn native_approval_accepts_the_exact_confirmed_quote_and_signer_intent_once() {
 #[test]
 fn web3_approval_requires_the_cached_quote_operation_chain_and_transaction() {
     let quote = web3_quote("web3-valid-quote");
-    let permit = ApprovalPermit::new(ApprovalKind::Web3, &quote.quote_id, None, Some(quote.clone()));
+    let permit = ApprovalPermit::new(
+        ApprovalKind::Web3,
+        &quote.quote_id,
+        None,
+        Some(quote.clone()),
+    );
     let request = AuthorizeWeb3ExecutionRequest {
         quote_id: quote.quote_id.clone(),
         operation: "dapp_call".into(),
@@ -113,7 +114,12 @@ fn web3_approval_requires_the_cached_quote_operation_chain_and_transaction() {
 #[test]
 fn web3_approval_rejects_changed_quote_intent_before_signing() {
     let quote = web3_quote("web3-changed-quote");
-    let permit = ApprovalPermit::new(ApprovalKind::Web3, &quote.quote_id, None, Some(quote.clone()));
+    let permit = ApprovalPermit::new(
+        ApprovalKind::Web3,
+        &quote.quote_id,
+        None,
+        Some(quote.clone()),
+    );
     let request = AuthorizeWeb3ExecutionRequest {
         quote_id: quote.quote_id.clone(),
         operation: "dapp_call".into(),
