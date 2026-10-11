@@ -23,6 +23,22 @@ pub struct ProfileProviderSettings {
 }
 
 impl ProfileProviderSettings {
+    /// Binding of the authenticated task's own profile, never a process fallback.
+    pub fn current() -> Option<Arc<Self>> {
+        let context = crate::core::runtime::CoreContext::scoped()?;
+        context.profile()?;
+        context.embedder_config()?.profile_providers.clone()
+    }
+
+    /// Canonical capability for a registered name. A renamed canonical role is
+    /// refused rather than being allowed to bypass its advertised scope.
+    pub(crate) fn policy_name<'a>(&self, name: &'a str) -> Option<std::borrow::Cow<'a, str>> {
+        if let Some(canonical) = self.canonical_role_name(name) {
+            return Some(std::borrow::Cow::Borrowed(canonical));
+        }
+        tinysearch_bus::role_for_tool(name).is_none().then(|| std::borrow::Cow::Borrowed(name))
+    }
+
     /// Validate operator-owned direct routes and their presentation.
     ///
     /// # Errors
