@@ -41,7 +41,7 @@ impl ProfileProviderSettings {
         }
         tinysearch_bus::role_for_tool(name)
             .is_none()
-            .then(|| std::borrow::Cow::Borrowed(name))
+            .then_some(std::borrow::Cow::Borrowed(name))
     }
 
     /// Validate operator-owned direct routes and their presentation.

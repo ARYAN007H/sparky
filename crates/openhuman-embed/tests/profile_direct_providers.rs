@@ -122,9 +122,9 @@ async fn scenario() {
         .await;
     PointedTransport::install(&managed.uri());
 
-    let mut search = SearchConfig::default();
-    search.presentation = SearchPresentation::Roles;
-    search.providers = BTreeMap::from([
+    let mut search = SearchConfig {
+        presentation: SearchPresentation::Roles,
+        providers: BTreeMap::from([
         ("exa".into(), SearchProviderSettings::direct()),
         ("gemini".into(), SearchProviderSettings::direct()),
     ]);
