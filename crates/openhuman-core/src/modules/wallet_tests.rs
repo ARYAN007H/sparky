@@ -161,16 +161,32 @@ mod attestation_guard {
     }
 
     #[test]
-    fn the_attested_linux_release_library_is_accepted() {
+    fn the_current_attested_linux_release_library_is_accepted() {
         assert!(digest_is_pinned(
             record(),
-            "d2e663e465c6c245cbf9b37c037ae655db7df0f93a0df9b7fa17a28027ebaa9d"
+            "7b6fdd843622a29b610633e0f5cabf6f48c8aa7566a466696916e99d1221eb08"
         ));
-        // The v0.5.1 library this constant used to name is no longer the
-        // pinned release, so it must not be sent a key.
+    }
+
+    #[test]
+    fn libraries_from_retired_releases_are_refused() {
+        for digest in [
+            "d2e663e465c6c245cbf9b37c037ae655db7df0f93a0df9b7fa17a28027ebaa9d",
+            "2bd70433707c44dbfe6b3cc3b4cc835299fe951fcb375b49c940d8d3fc1d4061",
+        ] {
+            assert!(!digest_is_pinned(record(), digest));
+        }
+    }
+
+    #[test]
+    fn a_release_library_requires_its_archive_to_remain_pinned() {
+        let unpinned_record = crate::modules::ModuleRecord {
+            assets: &[],
+            ..*record()
+        };
         assert!(!digest_is_pinned(
-            record(),
-            "2bd70433707c44dbfe6b3cc3b4cc835299fe951fcb375b49c940d8d3fc1d4061"
+            &unpinned_record,
+            "7b6fdd843622a29b610633e0f5cabf6f48c8aa7566a466696916e99d1221eb08"
         ));
     }
 
