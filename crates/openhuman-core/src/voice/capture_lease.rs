@@ -378,6 +378,7 @@ fn register_shutdown() {
     });
 }
 pub(crate) async fn shutdown_capture() {
+    super::always_on::shutdown().await;
     HOOK.store(false, Ordering::SeqCst);
     if let Err(error) = close_all().await {
         log::warn!("[voice_capture] shutdown cleanup pending: {error}");

@@ -11,6 +11,7 @@ fn core_shutdown_stops_and_joins_always_on_processing() {
         ])
         .output()
         .unwrap();
+    assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed"));
     assert!(
         output.status.success(),
         "shutdown fixture failed: {}{}",
