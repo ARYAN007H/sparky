@@ -82,3 +82,7 @@ mod yuanbao_secret_tests;
 #[cfg(test)]
 #[path = "startup_email_secret_tests_tests.rs"]
 mod email_secret_tests;
+
+#[cfg(all(test, feature = "modules"))]
+#[path = "startup/runtime_limits_tests.rs"]
+mod runtime_limits_tests;
