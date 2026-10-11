@@ -135,8 +135,8 @@ impl RepeatedToolFailureMiddleware {
         }
     }
 
-    /// Stop the run with `summary` as its stop note, unless another breaker
-    /// already stopped it.
+    /// Stop the run, recording `summary` as its stop note unless another
+    /// breaker already stopped it.
     ///
     /// The note slot is shared with the repeat guard and the stop hooks, and
     /// the first breaker to stop the run is the cause the user is told. A
@@ -144,26 +144,24 @@ impl RepeatedToolFailureMiddleware {
     /// still reaches this breaker: the repeat guard halting while it admits a
     /// batch of re-reads, then a mistyped path in that batch failing again,
     /// used to replace the guard's note, and the turn was summarised as
-    /// "something this needs could not be found". Returns whether this note
-    /// was latched.
-    fn halt(&self, summary: String) -> bool {
-        let Ok(mut slot) = self.halt_summary.lock() else {
-            return false;
-        };
-        if let Some(existing) = slot.as_deref() {
-            tracing::debug!(
-                existing = %crate::util::truncate_with_ellipsis(existing, 80),
-                "[tinyagents::mw] run already stopped by an earlier breaker; keeping its stop note"
-            );
-            return false;
-        }
-        *slot = Some(summary.clone());
-        drop(slot);
-        if let Ok(mut own) = self.own_halt.lock() {
-            *own = Some(summary);
+    /// "something this needs could not be found". The pause is sent either
+    /// way; it is idempotent.
+    fn halt(&self, summary: String) {
+        if let Ok(mut slot) = self.halt_summary.lock() {
+            match slot.as_deref() {
+                Some(existing) => tracing::debug!(
+                    existing = %crate::util::truncate_with_ellipsis(existing, 80),
+                    "[tinyagents::mw] run already stopped by an earlier breaker; keeping its stop note"
+                ),
+                None => {
+                    *slot = Some(summary.clone());
+                    if let Ok(mut own) = self.own_halt.lock() {
+                        *own = Some(summary);
+                    }
+                }
+            }
         }
         self.handle.send(SteeringCommand::Pause);
-        true
     }
 
     /// Judge each call's side effect from the registered tools' own
