@@ -63,11 +63,10 @@ fn the_store_is_rooted_in_the_workspace_not_the_action_dir() {
     }
 }
 
-/// Artifacts older builds left in the project keep being swept with the age
-/// rule they always had, while a fresh one (a concurrent older session) and the
-/// current session are left alone.
+/// Workspace retention never deletes files from the agent's project after
+/// retiring the old action-directory migration sweep.
 #[test]
-fn stale_artifacts_left_in_the_project_by_older_builds_are_swept() {
+fn workspace_retention_leaves_legacy_project_artifacts_alone() {
     let tmp = tempfile::tempdir().unwrap();
     let workspace = tmp.path().join("workspace");
     let action = tmp.path().join("project");
@@ -80,7 +79,7 @@ fn stale_artifacts_left_in_the_project_by_older_builds_are_swept() {
 
     build_artifact_store(&workspace, None, &action, "current");
 
-    assert!(!stale.exists(), "a stale legacy session is swept");
+    assert!(stale.exists(), "project files are outside workspace retention");
     assert!(fresh.join("call.txt").exists(), "a fresh one is kept");
     assert!(!detached_stale.exists(), "the workspace store is swept too");
 }
