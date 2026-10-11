@@ -93,6 +93,8 @@ mod wallet_host;
 pub(crate) mod wallet_service;
 #[cfg(feature = "web3")]
 pub(crate) mod web3_service;
+#[cfg(feature = "web3")]
+pub(crate) mod x402_service;
 
 #[cfg(feature = "modules")]
 pub use ops::{ensure_loaded, ensure_loaded_within, state_of, LoadError};
