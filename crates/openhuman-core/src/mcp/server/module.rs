@@ -215,7 +215,7 @@ impl ServerSession {
         Self::open_with_port_and_dispatch(port, |call| Box::pin(handler::dispatch(call))).await
     }
 
-    async fn open_with_port_and_dispatch<F, Fut>(
+    pub(super) async fn open_with_port_and_dispatch<F, Fut>(
         port: Arc<dyn ServerPort>,
         dispatch: F,
     ) -> Result<Self, ServerError>
