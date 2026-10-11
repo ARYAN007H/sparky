@@ -2,6 +2,23 @@ use super::*;
 use crate::core::TypeSchema;
 use serde_json::json;
 
+#[tokio::test]
+async fn channel_test_handler_requires_module_before_provider_field_validation() {
+    let mut config = Config::default();
+    config.modules.enabled = false;
+    let error = test_with_config(
+        &config,
+        TestParams {
+            channel: " telegram ".into(),
+            auth_mode: "bot_token".into(),
+            credentials: Value::Null,
+        },
+    )
+    .await
+    .unwrap_err();
+    assert!(error.contains("module unavailable"), "{error}");
+}
+
 #[test]
 fn schema_handler_parity() {
     let schemas = all_controller_schemas();

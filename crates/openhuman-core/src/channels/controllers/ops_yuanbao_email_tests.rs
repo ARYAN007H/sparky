@@ -302,8 +302,9 @@ async fn connect_email_rejects_invalid_port_before_network() {
 }
 
 #[tokio::test]
-async fn test_channel_email_rejects_invalid_port_before_network() {
-    let config = Config::default();
+async fn test_channel_email_requires_the_module_before_native_verification() {
+    let mut config = Config::default();
+    config.modules.enabled = false;
     let err = test_channel(
         &config,
         "email",
@@ -317,6 +318,6 @@ async fn test_channel_email_rejects_invalid_port_before_network() {
         }),
     )
     .await
-    .expect_err("invalid smtp port must be rejected");
-    assert!(err.contains("smtp_port"), "{err}");
+    .expect_err("an unavailable module must not trigger host IMAP verification");
+    assert!(err.contains("module unavailable"), "{err}");
 }
