@@ -7362,7 +7362,7 @@ dependencies = [
 
 [[package]]
 name = "tinymcp"
-version = "0.7.0"
+version = "0.8.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7370,6 +7370,7 @@ dependencies = [
  "base64 0.23.1",
  "dirs 7.0.0",
  "futures-util",
+ "libc",
  "parking_lot",
  "reqwest 0.12.28",
  "rusqlite",
@@ -7390,7 +7391,7 @@ dependencies = [
 
 [[package]]
 name = "tinymcp-bus"
-version = "0.7.0"
+version = "0.8.1"
 dependencies = [
  "schemars",
  "serde",
