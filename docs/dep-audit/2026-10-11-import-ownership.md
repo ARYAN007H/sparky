@@ -6,7 +6,7 @@ The twelve shim files named in the issue have been removed. Callers import the
 owning crate or domain directly. The wallet tool module now owns a concrete
 six-tool factory rather than forwarding historical names. `tools/mod.rs` lists
 explicit domain factories; it no longer glob-reexports domain tools. The ordered
-187 tool constructor sites match the pre-change registration order.
+184 tool constructor sites match the pre-change registration order.
 
 Generic agent goals, todos, session vocabulary, cancellation, budgets,
 artifact helpers, tool types, skill metadata, flow catalog records, wallet
