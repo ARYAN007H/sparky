@@ -7,7 +7,10 @@
 //! commit, [`OpenHumanTurnPrelude::memory_post_turn`] logs the reply with its
 //! tool calls. Both run under the session's own config, so a host binding set
 //! on a derived context (`[memory] agent_id` / `root`) is honoured, and both
-//! resolve the identity the turn runs as (`memory::scope`).
+//! resolve the identity the turn runs as (`memory::scope`). Deferred profile
+//! commits retain a weak reference to the lease-owned root context, so ending
+//! a temporary turn scope does not lose the engine binding or pin an idle
+//! profile. A retired root cannot fall back to a configured external engine.
 //!
 //! The committed turn is also published as
 //! `DomainEvent::ConversationTurnCommitted` for observers.
@@ -205,11 +208,15 @@ impl OpenHumanTurnPrelude {
 // Resolve the profile owner at preparation; a canonical commit may run after
 // the immutable turn-origin scope has ended.
 fn capture_profile_context(
-    _host: &crate::profiles::ProfileHost,
+    host: &crate::profiles::ProfileHost,
 ) -> Option<std::sync::Weak<crate::core::runtime::CoreContext>> {
-    crate::core::runtime::CoreContext::scoped()
-        .filter(|context| context.profile().is_some())
-        .map(|context| Arc::downgrade(&context))
+    let context = crate::core::runtime::CoreContext::scoped()?;
+    let id = crate::profiles::ProfileId::parse(context.profile()?).ok()?;
+    // The host owns this root for the lease's lifetime. A derived turn-origin
+    // context ends with the turn, even if its deferred commit is still queued.
+    // Keeping only a weak root cannot create an agent/context reference cycle.
+    host.get(&id)
+        .map(|profile| Arc::downgrade(profile.context()))
 }
 
 async fn deferred_memory_work(
