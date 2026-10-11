@@ -38,10 +38,9 @@ pub async fn mcp_clients_config_get(config: &Config) -> Result<Outcome<Value>, S
 
 /// Replaces the install store with what `doc` declares.
 ///
-/// A replace, not a merge — see `McpRegistry::apply_config_doc`. Every added
-/// or updated server that is enabled is connected in the background; the
-/// status poll reports how that went. The reply carries the re-rendered
-/// document and what changed, so the editor can show both.
+/// A replace, not a merge — TinyMCP applies the document and returns the
+/// re-rendered result plus a change report. Enabled additions and updates
+/// connect in the background; the status poll reports how that went.
 pub async fn mcp_clients_config_set(config: &Config, doc: Value) -> Result<Outcome<Value>, String> {
     let client = super::super::module_client::McpConfiguredClient::for_config(config)
         .map_err(|error| error.to_string())?;
