@@ -3945,7 +3945,6 @@ dependencies = [
  "hmac 0.13.0",
  "hostname",
  "iana-time-zone",
- "lettre",
  "libc",
  "log",
  "nu-ansi-term",
@@ -4059,7 +4058,6 @@ dependencies = [
  "futures",
  "futures-util",
  "hex",
- "lettre",
  "libc",
  "log",
  "openhuman",
@@ -4089,6 +4087,7 @@ dependencies = [
  "tinymcp",
  "tinymcp-bus",
  "tinysearch-bus",
+ "tinystoragedrivers-core",
  "tinytools",
  "tinytools-agent",
  "tokio",
@@ -4124,6 +4123,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 2.0.20",
+ "tinyagents-harness",
  "tinyagents-session",
  "tinyinference-embeddings",
  "tinyinference-llm",
@@ -7077,7 +7077,7 @@ dependencies = [
 
 [[package]]
 name = "tinymcp"
-version = "0.8.1"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7106,7 +7106,7 @@ dependencies = [
 
 [[package]]
 name = "tinymcp-bus"
-version = "0.8.1"
+version = "0.9.0"
 dependencies = [
  "schemars",
  "serde",
