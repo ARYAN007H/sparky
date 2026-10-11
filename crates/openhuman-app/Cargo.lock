@@ -4007,7 +4007,6 @@ dependencies = [
  "hmac 0.13.0",
  "hostname",
  "iana-time-zone",
- "lettre",
  "libc",
  "log",
  "nu-ansi-term",
