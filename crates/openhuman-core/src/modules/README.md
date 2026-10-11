@@ -227,6 +227,10 @@ download, its `dlopen`, or its resident memory.
 
 `channel_email.rs` delivers podcast attachments through TinyChannels' bounded
 confidential upload members. `tinybox.rs` supplies the pre-core gateway client.
+`channel_controller.rs` invokes TinyChannels' confidential controller member for
+Discord guild/channel discovery and permission checks, preserving the complete
+legacy RPC result types from the bus contract. OpenHuman resolves credentials
+and proxy scope; the module performs provider requests and permission analysis.
 The remaining channel runtime, MCP and core sandbox callers are still being
 migrated; their dependency exceptions remain explicit.
 
