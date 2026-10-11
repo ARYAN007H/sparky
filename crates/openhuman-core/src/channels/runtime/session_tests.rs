@@ -97,19 +97,36 @@ async fn clear_session_invalidates_old_channels_and_opens_a_fresh_generation() {
 async fn channel_sign_in_resumes_listener_service_after_logout() {
     let controller = ChannelSessionController::new();
     let starts = Arc::new(AtomicUsize::new(0));
+    let cleanups = Arc::new(AtomicUsize::new(0));
     let observed_starts = Arc::clone(&starts);
+    let observed_cleanups = Arc::clone(&cleanups);
     let (started_tx, mut started_rx) = tokio::sync::mpsc::unbounded_channel();
-    let service = spawn_channel_service_with(controller.clone(), move |session| async move {
-        observed_starts.fetch_add(1, Ordering::SeqCst);
-        let _ = started_tx.send(session.clone());
-        session.cancelled().await;
+    let (cleaned_tx, mut cleaned_rx) = tokio::sync::mpsc::unbounded_channel();
+    let service = spawn_channel_service_with(controller.clone(), move |session| {
+        let starts = Arc::clone(&observed_starts);
+        let cleanups = Arc::clone(&observed_cleanups);
+        let started_tx = started_tx.clone();
+        let cleaned_tx = cleaned_tx.clone();
+        async move {
+            let generation = starts.fetch_add(1, Ordering::SeqCst) + 1;
+            let cleanups_before_start = cleanups.load(Ordering::SeqCst);
+            let _ = started_tx.send((session.clone(), cleanups_before_start));
+            session.cancelled().await;
+            let completed_cleanup = cleanups.fetch_add(1, Ordering::SeqCst) + 1;
+            let _ = cleaned_tx.send((generation, completed_cleanup));
+        }
     });
 
-    let old = started_rx.recv().await.expect("initial channel generation");
+    let (old, initial_cleanups) = started_rx.recv().await.expect("initial channel generation");
+    assert_eq!(initial_cleanups, 0);
     controller.invalidate();
     controller.resume();
+    controller.resume(); // Duplicate sign-in notifications must not fork a listener.
 
-    let current = tokio::time::timeout(std::time::Duration::from_secs(1), started_rx.recv())
+    let (current, cleanups_before_restart) = tokio::time::timeout(
+        std::time::Duration::from_secs(1),
+        started_rx.recv(),
+    )
         .await
         .expect("sign-in wakes the stopped channel service")
         .expect("restarted channel generation");
@@ -118,8 +135,17 @@ async fn channel_sign_in_resumes_listener_service_after_logout() {
         !current.is_cancelled(),
         "sign-in resumes a fresh generation"
     );
+    assert_eq!(cleanups_before_restart, 1, "old runtime cleanup must finish before restart");
     assert_eq!(starts.load(Ordering::SeqCst), 2);
 
     controller.invalidate();
+    assert_eq!(
+        tokio::time::timeout(std::time::Duration::from_secs(1), cleaned_rx.recv())
+            .await
+            .expect("second generation cleanup completes")
+            .expect("cleanup notification")
+            .0,
+        2
+    );
     service.abort();
 }
