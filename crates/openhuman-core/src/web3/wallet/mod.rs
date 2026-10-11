@@ -56,7 +56,7 @@ pub(crate) mod test_support;
 pub use endpoints::solana_cluster;
 #[cfg(feature = "web3")]
 pub use execution::{
-    balances, chain_status, encode_erc20_transfer, execute_prepared, lookup_tx,
+    balances, chain_status, execute_prepared, lookup_tx,
     network_defaults as wallet_network_defaults, prepare_transfer, prepared_quotes_for_test,
     supported_assets, tx_receipt, tx_status, BalanceInfo, ChainStatus, ExecutePreparedParams,
     ExecutionResult, PrepareTransferParams, PreparedKind, PreparedStatus, PreparedTransaction,
