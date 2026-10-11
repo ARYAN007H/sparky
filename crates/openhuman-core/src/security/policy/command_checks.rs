@@ -15,6 +15,52 @@ use tinybox_core::shell::scan::{
 };
 
 impl SecurityPolicy {
+    /// Apply the supervised allowlist to parser facts returned by TinyBox.
+    /// The module owns shell structure; this host owns the permission policy.
+    #[cfg(feature = "modules")]
+    pub fn is_command_allowed_analysis(
+        &self,
+        analysis: &crate::modules::tinybox::contract::CommandAnalysis,
+    ) -> bool {
+        if !self.enabled {
+            return true;
+        }
+        if self.autonomy == AutonomyLevel::ReadOnly {
+            return false;
+        }
+        // Full access deliberately bypasses the supervised command allowlist.
+        if self.autonomy == AutonomyLevel::Full {
+            return true;
+        }
+        if analysis.hidden_execution
+            || analysis.expansion
+            || analysis.background
+            || analysis.redirection
+            || analysis.tee
+        {
+            return false;
+        }
+
+        let mut saw_command = false;
+        for segment in &analysis.segments {
+            if segment.command.trim().is_empty() {
+                continue;
+            }
+            saw_command = true;
+            if segment.leading_env_assignment || segment.dangerous_env_prefix || segment.executor {
+                return false;
+            }
+            let base = segment.normalized_name.as_str();
+            if base.is_empty() || !self.allowed_commands.iter().any(|allowed| allowed == base) {
+                return false;
+            }
+            if !self.is_args_safe(base, &segment.arguments) {
+                return false;
+            }
+        }
+        saw_command
+    }
+
     /// Apply OpenHuman's shell policy to generic facts returned by TinyBox.
     /// The module supplies parsing facts, while this host owns path checks,
     /// autonomy tiers, and approval decisions.
