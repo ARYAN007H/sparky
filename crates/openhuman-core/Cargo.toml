@@ -226,18 +226,11 @@ tinyconnectors-bus = { path = "../../vendor/tinyconnectors/crates/tinyconnectors
 # generates a settings schema for the desktop application from those types
 # rather than from a hand-kept copy.
 #
-# The path dependency on `tinymcp` itself is still the step-one arrangement. The
-# registry entry step two calls for now exists — `crates/openhuman-core/src/modules/registry.rs`
-# pins the v0.3.6 release — but the host still calls the library directly, because
-# `tinymcp-bus` v0.3.6 does not yet publish everything this host reaches for:
-# `OAuthComplete`, a member returning the already-exported `ConnectedServerOverview`,
-# the boot-connect and reconnect-supervisor passes, the `ServerDetail` /
-# `AuthDetection` / `AuthKind` reply types, the registry curation helpers, an error
-# anchor for the `McpServerNeedsAuth` classifier coupling test, and
-# `render_tool_result` / `redact_endpoint` for the ungated `gitbooks` tool. It also
-# needs a per-`data_dir` object seam of the shape `modules::memory` already uses,
-# since `mcp::host` keys one store per workspace and a module gets one `data_dir` at
-# load. Those are upstream work in tinyhumansai/tinymcp.
+# `tinymcp` v0.8.0 publishes contract 1.12, including configured directories,
+# explicit close and transition receipts, and cached tool reads. The native
+# registry entry pins the same v0.8.0 release and its verified platform digests.
+# The current host still calls the local library directly; switching those
+# callers to the bus remains a separate host-adapter change.
 #
 # Correcting what this comment used to promise: dropping the path dependency does
 # NOT take reqwest/rusqlite with it. Measured in the kernel profile, `rusqlite` has
