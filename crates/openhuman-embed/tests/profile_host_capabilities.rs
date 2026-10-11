@@ -64,6 +64,16 @@ impl Respond for CallTools {
             "install_workflow_from_url",
         ];
         completion["choices"][0]["message"]["tool_calls"] = json!(names.iter().enumerate().map(|(i, name)| json!({"id":format!("call_{i}"),"type":"function","function":{"name":name,"arguments":"{}"}})).collect::<Vec<_>>());
+        let body: Value = serde_json::from_slice(&request.body).unwrap();
+        let message = common::last_user_message(&body);
+        let user = if message.contains("alice") {
+            "alice"
+        } else {
+            "bob"
+        };
+        completion["choices"][0]["message"]["tool_calls"].as_array_mut().unwrap().push(json!({
+            "id":"native-memory", "type":"function", "function":{"name":"memory", "arguments":json!({"action":"learn", "text":format!("{user}-native-learning")}).to_string()}
+        }));
         ResponseTemplate::new(200).set_body_json(completion)
     }
 }
@@ -151,7 +161,10 @@ async fn scenario() {
         );
         tokio::time::timeout(
             Duration::from_secs(30),
-            handle.chat("t1", "call tenant_probe"),
+            handle.chat(
+                "t1",
+                &format!("remember {user}-native-learning and call tenant_probe"),
+            ),
         )
         .await
         .unwrap()
@@ -166,7 +179,7 @@ async fn scenario() {
                 "chat",
                 "sender",
                 "message",
-                "call tenant_probe",
+                &format!("{}: call tenant_probe", handle.id()),
             ))
             .await
             .unwrap();
