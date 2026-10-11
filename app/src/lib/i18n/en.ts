@@ -4640,6 +4640,13 @@ const en: TranslationMap = {
   'conversations.runMode.plan': 'Plan',
   'channels.oauth.connectRecoverFailed':
     "Couldn't finish connecting {channel}. The sign-in window closed before access was granted — try again.",
+  'composer.reasoning.default': 'Default',
+  'composer.reasoning.none': 'Off',
+  'composer.reasoning.minimal': 'Minimal',
+  'composer.reasoning.low': 'Low',
+  'composer.reasoning.medium': 'Medium',
+  'composer.reasoning.high': 'High',
+  'composer.reasoning.xhigh': 'Extra high',
 };
 
 export default en;
