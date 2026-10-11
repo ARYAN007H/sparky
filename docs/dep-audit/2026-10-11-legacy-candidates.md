@@ -7,12 +7,12 @@ This record selects the defaults for six follow-ups. It changes no runtime behav
 
 | Candidate | Decision | Follow-up |
 | --- | --- | --- |
-| TinyMemes | Keep the opt-in capability; move remix behavior into the TinyMemes compiled module. Preserve the current runtime-off default. | Pending issue links |
-| File-based hooks | Keep for the CLI, with an explicit host compile/runtime gate; omit from the standard desktop product. | Pending issue link |
-| WhatsApp Web | Remove the unshipped OpenHuman feature and its unsupported message-reading advertisement. | Pending issue link |
-| rss-bench | Keep the off-by-default core instrumentation gate used by the external profiling binaries. | Pending issue link |
-| Four ComingSoon entries | Remove these unimplemented or redundant promises; retain implemented capability entries. | Pending issue link |
-| Profiles | Keep shared desktop identity/layout; gate only SaaS profile orchestration behind an opt-in feature. | Pending issue link |
+| TinyMemes | Keep the opt-in capability; move remix behavior into the TinyMemes compiled module. Preserve the current runtime-off default. | [TinyMemes #2](https://github.com/tinyhumansai/tinymemes/issues/2), [OpenHuman #7446](https://github.com/tinyhumansai/openhuman/issues/7446) |
+| File-based hooks | Keep for the CLI, with an explicit host compile/runtime gate; omit from the standard desktop product. | [OpenHuman #7447](https://github.com/tinyhumansai/openhuman/issues/7447) |
+| WhatsApp Web | Remove the unshipped OpenHuman feature and its unsupported message-reading advertisement. | [OpenHuman #7448](https://github.com/tinyhumansai/openhuman/issues/7448) |
+| rss-bench | Keep the off-by-default core instrumentation gate used by the external profiling binaries. | [openhuman-benchmarks #36](https://github.com/tinyhumansai/openhuman-benchmarks/issues/36) |
+| Four ComingSoon entries | Remove these unimplemented or redundant promises; retain implemented capability entries. | [OpenHuman #7449](https://github.com/tinyhumansai/openhuman/issues/7449) |
+| Profiles | Keep shared desktop identity/layout; gate only SaaS profile orchestration behind an opt-in feature. | [OpenHuman #7450](https://github.com/tinyhumansai/openhuman/issues/7450) |
 
 ## TinyMemes: keep and move to its owner
 
