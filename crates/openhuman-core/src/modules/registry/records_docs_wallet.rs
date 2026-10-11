@@ -95,7 +95,7 @@ pub(crate) const TINYDOCS: ModuleRecord = ModuleRecord {
 /// The contract also exposes `ExportKey` for downstream hosts that must drive
 /// a signer locally; OpenHuman itself does not call it.
 ///
-/// The pinned v0.14.1 release carries the native wallet, Web3, and x402 bus
+/// The pinned v0.15.0 release carries the native wallet, Web3, and x402 bus
 /// operations, including typed configured-endpoint references. Secret-bearing operations remain confidential and require both
 /// attestation and a matching pinned digest.
 pub(crate) const TINYWALLET: ModuleRecord = ModuleRecord {
@@ -103,93 +103,93 @@ pub(crate) const TINYWALLET: ModuleRecord = ModuleRecord {
     description: "Transaction building and assembly for Bitcoin, EVM, Solana and Tron",
     bus_name: "ai.tinyhumans.tinywallet.Wallet",
     object_path: "/ai/tinyhumans/tinywallet/Wallet",
-    version: "0.14.1",
-    release_url: "https://github.com/tinyhumansai/tinywallet/releases/tag/v0.14.1",
+    version: "0.15.0",
+    release_url: "https://github.com/tinyhumansai/tinywallet/releases/tag/v0.15.0",
     assets: &[
         PlatformAsset {
             host_key: "ubuntu-24.04-x86_64",
-            archive: "tinywallet-module-0.14.1-ubuntu-24.04-x86_64.tar.gz",
-            sha256: "4165b555daaa88305aedffc58aaa05cbb9349b2024ae88d1f27b85497d12f34c",
+            archive: "tinywallet-module-0.15.0-ubuntu-24.04-x86_64.tar.gz",
+            sha256: "a2643add85f2a7fb930638ecab86d530578af7baa2eac9983b4139338e52333e",
         },
         PlatformAsset {
             host_key: "ubuntu-24.04-arm64",
-            archive: "tinywallet-module-0.14.1-ubuntu-24.04-arm64.tar.gz",
-            sha256: "36ef748e79eca9b3ef38b8fbc76f1cd084ee68b1db776d783ee9ec0be00fa1eb",
+            archive: "tinywallet-module-0.15.0-ubuntu-24.04-arm64.tar.gz",
+            sha256: "cf3ff1cef431375e59a749ebf260868ed3452f5d4cae683d0e7c4cdd48805863",
         },
         PlatformAsset {
             host_key: "ubuntu-22.04-x86_64",
-            archive: "tinywallet-module-0.14.1-ubuntu-22.04-x86_64.tar.gz",
-            sha256: "313f6d7fc9e744236ec7a923070b8a3267798b4834a501935dfe108dde5cf3e8",
+            archive: "tinywallet-module-0.15.0-ubuntu-22.04-x86_64.tar.gz",
+            sha256: "a2643add85f2a7fb930638ecab86d530578af7baa2eac9983b4139338e52333e",
         },
         PlatformAsset {
             host_key: "ubuntu-22.04-arm64",
-            archive: "tinywallet-module-0.14.1-ubuntu-22.04-arm64.tar.gz",
-            sha256: "3f47a5eaa3db37a3ecb846ba93d83630a6c62188224248557b230f60dbfa3000",
+            archive: "tinywallet-module-0.15.0-ubuntu-22.04-arm64.tar.gz",
+            sha256: "f602b30ac0287a58e04ef5c4d49cc62a89964460be4811e8f4d89c6fec2ec7be",
         },
         PlatformAsset {
             host_key: "macos-26-arm64",
-            archive: "tinywallet-module-0.14.1-macos-26-arm64.tar.gz",
-            sha256: "06154b2fe6fb222e2332a8891c7384acb0b42b45e442d9832932351cd1d95bcc",
+            archive: "tinywallet-module-0.15.0-macos-26-arm64.tar.gz",
+            sha256: "31e14662f3637cd8b00769f2e1d4a6cf509d94f597eede667328d380637205aa",
         },
         PlatformAsset {
             host_key: "macos-26-x86_64",
-            archive: "tinywallet-module-0.14.1-macos-26-x86_64.tar.gz",
-            sha256: "d51d954794620fc106c5bf90ca67b2f35b5fcf7d54752c777af14e1c4189ede2",
+            archive: "tinywallet-module-0.15.0-macos-26-x86_64.tar.gz",
+            sha256: "ba2e2f59b4fdead0c02cab44e96420b94bfe2e021fed45131c7b589fb2666e4e",
         },
         PlatformAsset {
             host_key: "macos-15-arm64",
-            archive: "tinywallet-module-0.14.1-macos-15-arm64.tar.gz",
-            sha256: "aa0e77605cd7da33aed7f3c535f6dca3d9eadc0ba01b7030d5d675097562c502",
+            archive: "tinywallet-module-0.15.0-macos-15-arm64.tar.gz",
+            sha256: "c55b08432dc8bf3329ce558ba9b62e7d171da4fe54e5c2ee4e92fb0481c43235",
         },
         PlatformAsset {
             host_key: "macos-15-x86_64",
-            archive: "tinywallet-module-0.14.1-macos-15-x86_64.tar.gz",
-            sha256: "25cbba1d1898d3bfdff2f7d7d8bbccb3a8d55bc2b25fcb5e800bbbb3cbbc63e4",
+            archive: "tinywallet-module-0.15.0-macos-15-x86_64.tar.gz",
+            sha256: "3d00f23da0c9837dfc578cea9e1cb807bc517f0270e981527256b43b96af0f7f",
         },
         PlatformAsset {
             host_key: "windows-2025-x86_64",
-            archive: "tinywallet-module-0.14.1-windows-2025-x86_64.zip",
-            sha256: "628b67ebf7e52dc2c40bb58e09b56af6cd1bb4698634297b15023bbfd092eb78",
+            archive: "tinywallet-module-0.15.0-windows-2025-x86_64.zip",
+            sha256: "2664e202bd355f74a551325494e3a77ace12e6049b0ddfa6cb620dd5496bfa7b",
         },
         PlatformAsset {
             host_key: "windows-2022-x86_64",
-            archive: "tinywallet-module-0.14.1-windows-2022-x86_64.zip",
-            sha256: "b11b0a92daba13b2fa1afe0c9cefb5632c085a3ddea61ef5477b97cfd335d6b0",
+            archive: "tinywallet-module-0.15.0-windows-2022-x86_64.zip",
+            sha256: "01a8323144765f17a6443e514d6ed220ac0055215619c32e32931480544d27a4",
         },
         PlatformAsset {
             host_key: "windows-11-arm64",
-            archive: "tinywallet-module-0.14.1-windows-11-arm64.zip",
-            sha256: "7459aec5c7f0e0e8ab0c3dd11461938b0d7a99c8ba7e9a0ee4beaeb894db8907",
+            archive: "tinywallet-module-0.15.0-windows-11-arm64.zip",
+            sha256: "1c0400bbfeff838c9039023d51179910f5cbf096ee080d6dea6b17450b64d62d",
         },
         PlatformAsset {
             host_key: "archlinux-arm64",
-            archive: "tinywallet-module-0.14.1-archlinux-arm64.tar.gz",
-            sha256: "4e8eddcedbab8dd7f4d03ffdba9d1f8f7f00003240ff55abb9b22381d4ebcc00",
+            archive: "tinywallet-module-0.15.0-archlinux-arm64.tar.gz",
+            sha256: "de5f50fb1b5578173f53c723a2a0fcd92a3aff47596a2a60a77b4e5b6646cae5",
         },
         PlatformAsset {
             host_key: "archlinux-x86_64",
-            archive: "tinywallet-module-0.14.1-archlinux-x86_64.tar.gz",
-            sha256: "1e267ec642d89fdc9a630d6ab963abdd1d311fea054b2fae5a2b1055be8261bc",
+            archive: "tinywallet-module-0.15.0-archlinux-x86_64.tar.gz",
+            sha256: "f2bc144f0a75e665dd1fc3a0602eb9b897277e821dae4a119c366f07f8c843b9",
         },
         PlatformAsset {
             host_key: "fedora-43-arm64",
-            archive: "tinywallet-module-0.14.1-fedora-43-arm64.tar.gz",
-            sha256: "df9f1ad060cb4282a369f8c353e2859b88f92dc5511b328922f14efd7411d6bd",
+            archive: "tinywallet-module-0.15.0-fedora-43-arm64.tar.gz",
+            sha256: "dfb5d03aa5c75c37f94483754c821ea0b9c1bf01eb9b9b27ece18be01ec2bf4e",
         },
         PlatformAsset {
             host_key: "fedora-43-x86_64",
-            archive: "tinywallet-module-0.14.1-fedora-43-x86_64.tar.gz",
-            sha256: "4b178adbd9d1ff7e59d9066299f5cd8fef9d686f8a35d1afed6410162fa1a0bd",
+            archive: "tinywallet-module-0.15.0-fedora-43-x86_64.tar.gz",
+            sha256: "badc0e82c239ec7944f35c6a2374e65e5d862e902cafe7ce87046995c2dce0f3",
         },
         PlatformAsset {
             host_key: "fedora-44-arm64",
-            archive: "tinywallet-module-0.14.1-fedora-44-arm64.tar.gz",
-            sha256: "e3da4a7f315d3d4d90563a37ae72d617dbd4c2f0042f835222e7fa86e04eb82e",
+            archive: "tinywallet-module-0.15.0-fedora-44-arm64.tar.gz",
+            sha256: "7e53b20a334ed3091740774a4308b97ef5d3bf1fa6d3fe6d285d92b5229baebd",
         },
         PlatformAsset {
             host_key: "fedora-44-x86_64",
-            archive: "tinywallet-module-0.14.1-fedora-44-x86_64.tar.gz",
-            sha256: "d7ddd11719ab9b6431d6a4c264d6bd8d24764037f2724cb6e280b714793db6fc",
+            archive: "tinywallet-module-0.15.0-fedora-44-x86_64.tar.gz",
+            sha256: "795d1b96af1c8483f3b6f8e2d7e42c2af5375da61ae8c9887e917809c0b4957f",
         },
     ],
     load: LoadPolicy::Lazy,
