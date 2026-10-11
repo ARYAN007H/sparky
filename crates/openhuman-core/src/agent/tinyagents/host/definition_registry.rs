@@ -293,21 +293,27 @@ impl OpenHumanDefinitionRegistry {
     fn project(&self, def: &HostAgentDefinition) -> AgentDefinition {
         AgentDefinition {
             id: def.id.clone(),
-            name: def.display_name().to_string(),
+            display_name: Some(def.display_name().to_string()),
             // `when_to_use` is exactly the trait's "capability summary shown to
             // a delegating parent" — the same string the harness feeds into a
             // synthesised `delegate_*` tool description.
-            description: def.when_to_use.clone(),
+            when_to_use: def.when_to_use.clone(),
             // The definition's validated tier is the host assertion the model
             // resolver consumes for workload routing.
             role: Some(def.agent_tier.to_string()),
-            model: model_for(&def.model),
-            subagents: declared_subagent_ids(def),
-            tools: self.tools_for(def),
+            model: model_for(&def.model)
+                .map(tinyagents_definition::ModelSpec::Exact)
+                .unwrap_or_default(),
+            subagents: declared_subagent_ids(def)
+                .into_iter()
+                .map(tinyagents_definition::SubagentEntry::AgentId)
+                .collect(),
+            tools: tinyagents_definition::ToolScope::Named(self.tools_for(def)),
             // The definition's rule layer (its `tool_rules` plus its
             // `disallowed_tools` as a deny), enforced by the harness gate on
             // the catalogue, `tool_search` and every call of a hosted run.
             tool_rules: crate::tools::rules::agent_rule_layer(def),
+            ..Default::default()
         }
     }
 
