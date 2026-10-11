@@ -192,5 +192,18 @@ async fn released_tinybox_runs_a_native_jail_through_the_pinned_loader() -> anyh
     assert!(output.success());
     assert_eq!(output.stdout, "tinybox-jailed-ok");
     assert_eq!(output.stderr, "safe-error");
+
+    let output = execute(
+        &config,
+        &policy,
+        "i=0; while [ \\"$i\\" -lt 1500 ]; do printf 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'; i=$((i + 1)); done",
+        workspace.path(),
+        &HashMap::new(),
+        Duration::from_secs(10),
+        false,
+    )
+    .await?;
+    assert!(output.success());
+    assert_eq!(output.stdout.len(), 150_000, "all terminal output batches are read");
     Ok(())
 }

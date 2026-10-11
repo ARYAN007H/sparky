@@ -281,14 +281,15 @@ async fn collect_process(
     let mut cursor = 0;
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
+    let mut requested_cancel = false;
     let timed_out = loop {
-        if tokio::time::Instant::now() >= deadline {
+        if !requested_cancel && tokio::time::Instant::now() >= deadline {
             tinybox::cancel(config, process.clone())
                 .await
                 .map_err(|_| {
                     anyhow::anyhow!("TinyBox could not acknowledge process cancellation")
                 })?;
-            break true;
+            requested_cancel = true;
         }
         let batch = tinybox::read_output(config, process.clone(), cursor)
             .await
@@ -296,6 +297,8 @@ async fn collect_process(
         if !batch.chunks.is_empty() && batch.next_sequence <= cursor {
             anyhow::bail!("TinyBox returned an invalid native jail output cursor");
         }
+        let has_chunks = !batch.chunks.is_empty();
+        let state = batch.state;
         for chunk in batch.chunks {
             match chunk.stream {
                 OutputStream::Stdout => stdout.extend_from_slice(&chunk.bytes),
@@ -303,8 +306,9 @@ async fn collect_process(
             }
         }
         cursor = batch.next_sequence;
-        match batch.state {
+        match state {
             ExecutionState::Running => tokio::time::sleep(Duration::from_millis(20)).await,
+            ExecutionState::Exited { .. } if has_chunks => continue,
             ExecutionState::Exited { exit_code } => {
                 tinybox::release_output(config, process)
                     .await
@@ -316,7 +320,8 @@ async fn collect_process(
                     timed_out: false,
                 });
             }
-            ExecutionState::Cancelled => break false,
+            ExecutionState::Cancelled if has_chunks => continue,
+            ExecutionState::Cancelled => break requested_cancel,
             ExecutionState::Failed {
                 code: ExecutionFailure::CleanupFailed,
             } => anyhow::bail!("TinyBox retained native process cleanup for retry"),
