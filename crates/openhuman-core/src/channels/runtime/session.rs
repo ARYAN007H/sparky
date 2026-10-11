@@ -1,22 +1,116 @@
 //! Host-owned logout generation and cancellation for channel orchestration.
 use std::future::Future;
-use std::sync::{LazyLock, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 use tokio_util::sync::CancellationToken;
 
-static SESSION: LazyLock<Mutex<CancellationToken>> =
-    LazyLock::new(|| Mutex::new(CancellationToken::new()));
+struct SessionState {
+    token: CancellationToken,
+    paused: bool,
+}
+
+/// Controls one listener-service generation and its post-logout restart signal.
+#[derive(Clone)]
+pub(crate) struct ChannelSessionController(Arc<ControllerState>);
+
+struct ControllerState {
+    session: Mutex<SessionState>,
+    resume: tokio::sync::Notify,
+}
+
+impl ChannelSessionController {
+    fn new() -> Self {
+        Self(Arc::new(ControllerState {
+            session: Mutex::new(SessionState {
+                token: CancellationToken::new(),
+                paused: false,
+            }),
+            resume: tokio::sync::Notify::new(),
+        }))
+    }
+
+    fn current(&self) -> CancellationToken {
+        self.0
+            .session
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .token
+            .clone()
+    }
+
+    fn invalidate(&self) {
+        let mut state = self
+            .0
+            .session
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        state.token.cancel();
+        state.token = CancellationToken::new();
+        state.paused = true;
+    }
+
+    fn resume(&self) {
+        let resumed = {
+            let mut state = self
+                .0
+                .session
+                .lock()
+                .unwrap_or_else(|error| error.into_inner());
+            if state.paused {
+                state.paused = false;
+                true
+            } else {
+                false
+            }
+        };
+        if resumed {
+            self.0.resume.notify_one();
+        }
+    }
+
+    async fn wait_for_resume(&self) -> CancellationToken {
+        loop {
+            let resumed = self.0.resume.notified();
+            let token = {
+                let state = self
+                    .0
+                    .session
+                    .lock()
+                    .unwrap_or_else(|error| error.into_inner());
+                (!state.paused).then(|| state.token.clone())
+            };
+            if let Some(token) = token {
+                return token;
+            }
+            resumed.await;
+        }
+    }
+}
+
+static SESSION: LazyLock<ChannelSessionController> =
+    LazyLock::new(ChannelSessionController::new);
 
 pub(crate) fn channel_session() -> CancellationToken {
-    SESSION
-        .lock()
-        .unwrap_or_else(|error| error.into_inner())
-        .clone()
+    SESSION.current()
 }
 
 pub(crate) fn invalidate_channel_session() {
-    let mut current = SESSION.lock().unwrap_or_else(|error| error.into_inner());
-    current.cancel();
-    *current = CancellationToken::new();
+    SESSION.invalidate();
+}
+
+/// Resume channel listeners after a credential has been successfully installed.
+pub(crate) fn resume_channel_service() {
+    SESSION.resume();
+}
+
+fn spawn_channel_service_with<F, Fut>(
+    controller: ChannelSessionController,
+    run: F,
+) -> tokio::task::JoinHandle<()>
+where
+    F: FnOnce(CancellationToken) -> Fut + Send + 'static,
+    Fut: Future<Output = ()> + Send + 'static,
+{
+    tokio::spawn(run(controller.current()))
 }
 
 /// Stop the host dispatch generation on logout, even with independent model auth.
