@@ -25,11 +25,13 @@ impl Tool for DummyTool {
 }
 
 fn runtime_context() -> ChannelRuntimeContext {
+    relay_thread: None,
     let model: Arc<dyn tinyinference_llm::model::ChatModel<()>> =
         Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec![
             "ok",
         ]));
     ChannelRuntimeContext {
+        relay_thread: None,
         channels_by_name: Arc::new(HashMap::new()),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(model)),
         default_provider: Arc::new("default".into()),
