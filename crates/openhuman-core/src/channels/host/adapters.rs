@@ -8,8 +8,11 @@
 
 use std::sync::Arc;
 
+#[cfg(test)]
 use async_trait::async_trait;
+#[cfg(test)]
 use parking_lot::Mutex;
+#[cfg(test)]
 use tinychannels::host::{
     AllowlistStore, ApprovalDecision, ApprovalGate, ConversationMessage, ConversationStore,
     EventSink, LifecycleRegistry, ShutdownHook, SpeechRequest, SpeechResult, SpeechSynthesizer,
@@ -26,8 +29,10 @@ const LOG_PREFIX: &str = "[channels_host]";
 
 /// Bridges [`LifecycleRegistry`] onto the process-global async shutdown hook
 /// registry. Providers register teardown that runs once on shutdown.
+#[cfg(test)]
 pub struct CoreShutdownRegistry;
 
+#[cfg(test)]
 impl LifecycleRegistry for CoreShutdownRegistry {
     fn register_shutdown(&self, name: &str, hook: ShutdownHook) {
         let name = name.to_string();
@@ -58,23 +63,16 @@ pub struct VoiceTranscriber {
     pub config: Arc<Config>,
 }
 
-#[async_trait]
-impl Transcriber for VoiceTranscriber {
-    fn name(&self) -> &str {
-        "openhuman-voice"
-    }
-
-    async fn transcribe(
+impl VoiceTranscriber {
+    pub(crate) async fn transcribe_host(
         &self,
-        request: TranscriptionRequest,
-    ) -> anyhow::Result<TranscriptionResult> {
+        request: tinychannels_bus::HostTranscriptionRequest,
+    ) -> anyhow::Result<tinychannels_bus::HostTranscriptionResult> {
         let provider = crate::voice::effective_stt_provider(&self.config);
         tracing::debug!(
             "{LOG_PREFIX} transcribe provider={provider} bytes_b64={}",
             request.audio_base64.len()
         );
-        // Empty model lets a configured external provider use its registry
-        // default; the cloud provider resolves its own backend default.
         let stt = crate::voice::create_stt_provider(&provider, "", &self.config)?;
         let outcome = stt
             .transcribe(
@@ -86,10 +84,36 @@ impl Transcriber for VoiceTranscriber {
             )
             .await
             .map_err(|e| anyhow::anyhow!(e))?;
-        Ok(TranscriptionResult {
+        Ok(tinychannels_bus::HostTranscriptionResult {
             text: outcome.value.text,
             language: request.language,
             duration_secs: None,
+        })
+    }
+}
+
+#[cfg(test)]
+#[async_trait]
+impl Transcriber for VoiceTranscriber {
+    fn name(&self) -> &str {
+        "openhuman-voice"
+    }
+
+    async fn transcribe(
+        &self,
+        request: TranscriptionRequest,
+    ) -> anyhow::Result<TranscriptionResult> {
+        self.transcribe_host(tinychannels_bus::HostTranscriptionRequest {
+            audio_base64: request.audio_base64,
+            mime_type: request.mime_type,
+            file_name: request.file_name,
+            language: request.language,
+        })
+        .await
+        .map(|result| TranscriptionResult {
+            text: result.text,
+            language: result.language,
+            duration_secs: result.duration_secs,
         })
     }
 }
@@ -99,10 +123,12 @@ impl Transcriber for VoiceTranscriber {
 // ---------------------------------------------------------------------------
 
 /// Text-to-speech backed by the hosted reply-speech synthesizer.
+#[cfg(test)]
 pub struct VoiceSynthesizer {
     pub config: Arc<Config>,
 }
 
+#[cfg(test)]
 #[async_trait]
 impl SpeechSynthesizer for VoiceSynthesizer {
     async fn synthesize(&self, request: SpeechRequest) -> anyhow::Result<SpeechResult> {
@@ -138,8 +164,10 @@ impl SpeechSynthesizer for VoiceSynthesizer {
 /// Parses inbound approval replies via the OpenHuman approval gate. Raising
 /// interactive approvals stays host-internal (the tool gate), so only
 /// [`ApprovalGate::parse_reply`] is implemented.
+#[cfg(test)]
 pub struct CoreApprovalGate;
 
+#[cfg(test)]
 impl ApprovalGate for CoreApprovalGate {
     fn parse_reply(&self, message: &str) -> Option<ApprovalDecision> {
         crate::security::approval::parse_approval_reply(message).map(|decision| {
@@ -169,10 +197,12 @@ impl ApprovalGate for CoreApprovalGate {
 // ---------------------------------------------------------------------------
 
 /// Durable conversation history backed by the OpenHuman conversation store.
+#[cfg(test)]
 pub struct ConversationHistoryStore {
     pub workspace_dir: std::path::PathBuf,
 }
 
+#[cfg(test)]
 #[async_trait]
 impl ConversationStore for ConversationHistoryStore {
     async fn history(
@@ -232,9 +262,12 @@ impl ConversationStore for ConversationHistoryStore {
 /// `~/.openhuman/config.toml`, append to the channel's `allowed_users`, save).
 pub struct ConfigAllowlistStore;
 
-#[async_trait]
-impl AllowlistStore for ConfigAllowlistStore {
-    async fn persist_allowed_identity(&self, channel: &str, identity: &str) -> anyhow::Result<()> {
+impl ConfigAllowlistStore {
+    pub(crate) async fn persist_allowed_identity(
+        &self,
+        channel: &str,
+        identity: &str,
+    ) -> anyhow::Result<()> {
         use anyhow::Context;
         let normalized = identity.trim().trim_start_matches('@').to_string();
         if normalized.is_empty() {
@@ -271,6 +304,14 @@ impl AllowlistStore for ConfigAllowlistStore {
         }
         tracing::debug!("{LOG_PREFIX} persisted allowed identity for channel={channel}");
         Ok(())
+    }
+}
+
+#[cfg(test)]
+#[async_trait]
+impl AllowlistStore for ConfigAllowlistStore {
+    async fn persist_allowed_identity(&self, channel: &str, identity: &str) -> anyhow::Result<()> {
+        ConfigAllowlistStore::persist_allowed_identity(self, channel, identity).await
     }
 }
 
