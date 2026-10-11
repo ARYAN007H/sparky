@@ -85,7 +85,7 @@ node scripts/ci/stage-connector-test-module.mjs \
 {
   echo "TINYJUICE_TEST_MODULE=${dest}/tinyjuice/libtinyjuice_module.so"
   echo "TINYSEARCH_TEST_MODULE=${dest}/tinysearch/libtinysearch.so"
-  echo "OPENHUMAN_MODULE_PATH=${dest}/tinydocs:${dest}/tinywallet:${dest}/tinychannels${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
+  echo "OPENHUMAN_MODULE_PATH=${dest}/tinydocs:${dest}/tinywallet:${dest}/tinychannels:${dest}/tinymcp${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
   echo "TINYCONNECTORS_TEST_MODULE=${dest}/tinyconnectors/libtinyconnectors.so"
 } > "${env_file}"
 log "wrote ${env_file}"
