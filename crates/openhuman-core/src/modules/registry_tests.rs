@@ -369,3 +369,77 @@ fn find_resolves_known_ids_only() {
     assert!(find("tinydocs").is_some());
     assert!(find("not-a-module").is_none());
 }
+
+#[test]
+fn tinychannels_registry_matches_prepared_connection_release() {
+    let record = find("tinychannels").expect("compiled TinyChannels module");
+    assert_eq!(record.version, "0.1.17");
+    assert_eq!(tinychannels_bus::CONTRACT_VERSION, 7);
+    assert_eq!(
+        tinychannels_bus::module_relay::MODULE_OPERATION_VERSION,
+        (1, 8)
+    );
+    let expected = [
+        (
+            "macos-15-arm64",
+            "tinychannels-module-0.1.17-macos-15-arm64.tar.gz",
+            "79a0c1f14258d9a8230eb6a9bd962f243d84ca57381e48e0840e6696b3d86ce2",
+        ),
+        (
+            "macos-15-x86_64",
+            "tinychannels-module-0.1.17-macos-15-x86_64.tar.gz",
+            "9beeb0697a0eee6016aae0aeb27999ffa115945c20a7786742ade1c09dfb3d84",
+        ),
+        (
+            "macos-26-arm64",
+            "tinychannels-module-0.1.17-macos-26-arm64.tar.gz",
+            "bc08c3d3d2ec1ba7f07593fd67e7e2b394757478e4de9e8e66dc6ba9a9cb2413",
+        ),
+        (
+            "macos-26-x86_64",
+            "tinychannels-module-0.1.17-macos-26-x86_64.tar.gz",
+            "0eeb60e6f55f4d7f6ded815ea95d1722917285e13ebad6fa5c1e2211766c335b",
+        ),
+        (
+            "ubuntu-22.04-arm64",
+            "tinychannels-module-0.1.17-ubuntu-22.04-arm64.tar.gz",
+            "fa5f5aeedeca8ab03cfd31a5865c1f69e0ee7a935a7461c3f87c7fc491f6765d",
+        ),
+        (
+            "ubuntu-22.04-x86_64",
+            "tinychannels-module-0.1.17-ubuntu-22.04-x86_64.tar.gz",
+            "ab6c61dc697637e9ef07067d17d369e99f4bc3284815320f68048ce456271355",
+        ),
+        (
+            "ubuntu-24.04-arm64",
+            "tinychannels-module-0.1.17-ubuntu-24.04-arm64.tar.gz",
+            "cae106ae240d9f7d5022e397a33df4f851c8114c205292c4b5d84d817a9aba1a",
+        ),
+        (
+            "ubuntu-24.04-x86_64",
+            "tinychannels-module-0.1.17-ubuntu-24.04-x86_64.tar.gz",
+            "896af998236d9a27df67da8d99badee8a17b971aca3a7158700679baea267c49",
+        ),
+        (
+            "windows-11-arm64",
+            "tinychannels-module-0.1.17-windows-11-arm64.zip",
+            "534415e3d59bed642e0b4e9ca623e2706a4f53e544fb2331dbcc5d27d4fb1833",
+        ),
+        (
+            "windows-2022-x86_64",
+            "tinychannels-module-0.1.17-windows-2022-x86_64.zip",
+            "5a1be7f484d67282612f98325a8a72503b70f5ea5c9b4fba01dc92077624f759",
+        ),
+        (
+            "windows-2025-x86_64",
+            "tinychannels-module-0.1.17-windows-2025-x86_64.zip",
+            "9fb1d787045bd835c3422b555133db34b158bb5f0ec2a7033249ebf713a16c46",
+        ),
+    ];
+    assert_eq!(record.assets.len(), expected.len());
+    for (key, archive, sha256) in expected {
+        let asset = record.asset_for(key).expect("supported platform asset");
+        assert_eq!(asset.archive, archive);
+        assert_eq!(asset.sha256, sha256);
+    }
+}
