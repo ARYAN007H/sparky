@@ -1,6 +1,7 @@
 //! Host-side request mapping for TinyBox native-jail execution.
 
 use super::*;
+#[cfg(all(feature = "modules", target_os = "linux"))]
 use std::path::PathBuf;
 
 #[test]
@@ -105,6 +106,41 @@ fn native_jail_environment_keeps_the_sandbox_allowlist_and_scratch_grant() -> an
     Ok(())
 }
 
+#[cfg(feature = "modules")]
+#[tokio::test]
+async fn disabled_tinybox_module_never_falls_back_to_host_execution() -> anyhow::Result<()> {
+    let workspace = tempfile::tempdir()?;
+    let state = tempfile::tempdir()?;
+    let marker = workspace.path().join("must-not-run");
+    let policy = SandboxPolicy {
+        backend: super::super::types::SandboxBackendKind::Local,
+        workspace_root: workspace.path().to_path_buf(),
+        state_dir: state.path().to_path_buf(),
+        read_only_mounts: Vec::new(),
+        read_write_mounts: Vec::new(),
+        allow_network: true,
+        env_passthrough: Vec::new(),
+        docker_overrides: None,
+    };
+    let mut config = crate::config::Config::default();
+    config.modules.enabled = false;
+
+    let result = execute(
+        &config,
+        &policy,
+        &format!("touch '{}'", marker.display()),
+        workspace.path(),
+        &HashMap::new(),
+        Duration::from_secs(5),
+        false,
+    )
+    .await;
+
+    assert!(result.is_err(), "native jail must refuse without TinyBox");
+    assert!(!marker.exists(), "refusal must never run the host command");
+    Ok(())
+}
+
 #[cfg(all(feature = "modules", target_os = "linux"))]
 struct BundledModulesRestore(Option<OsString>);
 
@@ -196,7 +232,7 @@ async fn released_tinybox_runs_a_native_jail_through_the_pinned_loader() -> anyh
     let output = execute(
         &config,
         &policy,
-        "i=0; while [ \\"$i\\" -lt 1500 ]; do printf 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'; i=$((i + 1)); done",
+        "i=0; while [ $i -lt 1500 ]; do printf 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'; i=$((i + 1)); done",
         workspace.path(),
         &HashMap::new(),
         Duration::from_secs(10),

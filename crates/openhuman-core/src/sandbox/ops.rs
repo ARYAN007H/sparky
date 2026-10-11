@@ -211,6 +211,7 @@ pub fn resolve_sandbox_policy(
 /// depends on whether the machine has an OS jail, so on a host with Seatbelt or
 /// Landlock the noop path is never reached and a regression to "always Ready"
 /// passes unnoticed. That is exactly how the original defect survived.
+#[cfg(any(feature = "modules", test))]
 pub(crate) fn local_status_for_jail(
     available: bool,
     suitable_for_untrusted_code: bool,
@@ -226,7 +227,11 @@ pub async fn create_sandbox_backend(policy: &SandboxPolicy) -> SandboxBackendHan
     if policy.backend != SandboxBackendKind::Docker {
         return create_sandbox_backend_with_config(policy, &crate::config::Config::default())
             .await
-            .unwrap_or_else(|_| docker_error_handle());
+            .unwrap_or_else(|_| SandboxBackendHandle {
+                kind: policy.backend,
+                status: SandboxStatus::Error,
+                backend_id: None,
+            });
     }
     let config = match crate::config::ops::load_config_with_timeout().await {
         Ok(config) => config,
@@ -470,16 +475,19 @@ async fn execute_unsandboxed(
 }
 
 /// Where module-owned native jailed executions create a per-call writable scratch area.
+#[cfg(feature = "modules")]
 pub fn sandbox_scratch_root(state_dir: &Path) -> PathBuf {
     state_dir.join("artifacts").join("sandbox-scratch")
 }
 
 /// A fresh per-call scratch directory, removed after the module acknowledges execution cleanup.
+#[cfg(feature = "modules")]
 pub(super) struct CallDir {
     pub(super) path: PathBuf,
     kind: &'static str,
 }
 
+#[cfg(feature = "modules")]
 impl CallDir {
     pub(super) fn create(root: PathBuf, kind: &'static str) -> anyhow::Result<Self> {
         let path = root.join(uuid::Uuid::new_v4().to_string());
@@ -494,6 +502,7 @@ impl CallDir {
     }
 }
 
+#[cfg(feature = "modules")]
 impl Drop for CallDir {
     fn drop(&mut self) {
         match std::fs::remove_dir_all(&self.path) {

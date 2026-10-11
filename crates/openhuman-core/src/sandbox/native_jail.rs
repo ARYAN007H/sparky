@@ -1,11 +1,9 @@
 //! Host policy and lifecycle for TinyBox-owned native jailed executions.
 
-use std::{
-    collections::{BTreeMap, HashMap},
-    ffi::{OsStr, OsString},
-    path::Path,
-    time::Duration,
-};
+use std::{collections::HashMap, ffi::OsString, path::Path, time::Duration};
+
+#[cfg(feature = "modules")]
+use std::{collections::BTreeMap, ffi::OsStr};
 
 use super::types::{SandboxExecResult, SandboxPolicy, SandboxStatus};
 use crate::{agent::platform_shell, config::Config};
@@ -17,14 +15,9 @@ use crate::modules::tinybox::{self, contract};
 #[cfg(feature = "modules")]
 pub(crate) async fn status(config: &Config) -> Result<(String, SandboxStatus), String> {
     let status = tinybox::jail_status(config).await?;
-    let ready = status.available && status.suitable_for_untrusted_code;
     Ok((
         status.backend,
-        if ready {
-            SandboxStatus::Ready
-        } else {
-            SandboxStatus::Inactive
-        },
+        super::ops::local_status_for_jail(status.available, status.suitable_for_untrusted_code),
     ))
 }
 
