@@ -340,6 +340,8 @@ const TOOL_LESS: &[crate::core::all::DomainGroup] = {
         G::Security,
         G::Modules,
         G::Channels,
+        // Voice retains RPC and dictation capabilities, but owns no agent tools.
+        G::Voice,
         G::Hosted,
         G::Operator,
         // Reserved domain after managed runtime tools were removed.
