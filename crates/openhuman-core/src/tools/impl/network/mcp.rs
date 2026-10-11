@@ -420,7 +420,7 @@ pub fn mcp_call_tool(config: Arc<Config>, security: Arc<SecurityPolicy>) -> McpC
     McpCallTool::new(config, security)
 }
 
-fn classified_result(
+pub(super) fn classified_result(
     call: tinymcp_bus::ClassifiedStaticToolCall,
     server: &str,
     tool: &str,

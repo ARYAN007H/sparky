@@ -168,6 +168,8 @@ impl OpenHumanTurnPrelude {
         self.refresh_cold_integrations().await;
         #[cfg(feature = "mcp")]
         self.refresh_connected_mcp_tools().await;
+        #[cfg(feature = "mcp")]
+        self.refresh_configured_mcp_tools().await;
         if !cold {
             self.refresh_dynamic_announcements().await;
         }
@@ -236,6 +238,32 @@ impl OpenHumanTurnPrelude {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .connected_mcp_tools = prepared;
+    }
+
+    /// Refreshes configured static-server declarations from TinyMCP's
+    /// persistent owner cache, listing only when a server has no cached
+    /// catalog yet.
+    #[cfg(feature = "mcp")]
+    async fn refresh_configured_mcp_tools(&self) {
+        let Some(config) = self.runtime_config.as_deref() else {
+            self.mutable
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .configured_mcp_tools
+                .clear();
+            return;
+        };
+        let presentations = match crate::mcp::module_client::McpConfiguredClient::configured_tool_presentations(config).await {
+            Ok(presentations) => presentations,
+            Err(error) => {
+                tracing::debug!(?error, "[mcp] configured tool catalog is unavailable");
+                Vec::new()
+            }
+        };
+        self.mutable
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .configured_mcp_tools = presentations;
     }
 
     /// Construct searchable MCP actions from the workspace's current snapshot.
