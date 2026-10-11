@@ -324,6 +324,10 @@ impl ToolDispatch<(), OpenHumanRunContext> for BoundUseSkillDispatch {
             })
     }
 
+    fn admission_target(&self) -> Option<(&dyn Tool, &Value)> {
+        Some((self.inner.as_deref()?, &self.inner_arguments))
+    }
+
     async fn execute(
         &self,
         state: &(),
