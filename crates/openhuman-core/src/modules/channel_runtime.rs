@@ -116,12 +116,9 @@ impl ChannelRuntimeLease {
         callback: impl tinybus::service::Interface,
         runtime: &'static super::host::ModuleRuntime,
     ) -> Result<Self, ModuleCallError> {
-        let connection = runtime.connection().clone();
         let callback_path = ObjectPath::new(&reservation.host_object_path)
             .map_err(|_| ModuleCallError::ModuleFault)?;
-        let proxy = runtime
-            .proxy(tinychannels_bus::BUS_NAME, OBJECT_PATH)
-            .map_err(|_| ModuleCallError::IncompatibleContract)?;
+        let (connection, proxy) = runtime_transport(&client, runtime)?;
         let cleanup = Cleanup {
             proxy,
             connection: connection.clone(),
@@ -199,6 +196,23 @@ async fn join_cleanup(
         .map_err(|_| ModuleCallError::TransportFailed)?;
     closing.take();
     result.map_err(|_| ModuleCallError::TransportFailed)?
+}
+
+fn runtime_transport(
+    client: &ModuleClient,
+    runtime: &'static super::host::ModuleRuntime,
+) -> Result<(Connection, Proxy), ModuleCallError> {
+    #[cfg(test)]
+    if let Some(proxy) = client.fixture_proxy() {
+        return Ok((proxy.connection().clone(), proxy));
+    }
+    let _ = client;
+    Ok((
+        runtime.connection().clone(),
+        runtime
+            .proxy(tinychannels_bus::BUS_NAME, OBJECT_PATH)
+            .map_err(|_| ModuleCallError::IncompatibleContract)?,
+    ))
 }
 
 fn validate_reservation(reservation: &ChannelRuntimeReservation) -> Result<(), ModuleCallError> {

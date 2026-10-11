@@ -65,6 +65,11 @@ impl ModuleClient {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) fn fixture_proxy(&self) -> Option<tinybus::Proxy> {
+        self.fixture.clone()
+    }
+
     /// Override the TinyBus deadline for every call made through this client.
     ///
     /// Use this for module operations whose contract has a longer bounded
