@@ -10,9 +10,9 @@ use serde_json::{json, Value};
 use super::live_config::live_composio_config;
 use super::redact::redact_composio_outcome;
 use crate::agent::harness::current_sandbox_mode;
-use crate::agent::harness::current_task_recency_window;
 use crate::agent::harness::definition::SandboxMode;
 use crate::config::Config;
+use crate::integrations::composio::task_recency_context::current_task_recency_window;
 use tinytools::{PermissionLevel, Tool, ToolCategory, ToolResult};
 
 use super::super::ops::load_user_scope_pref;
