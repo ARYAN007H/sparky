@@ -48,3 +48,16 @@ fn std_command_selects_platform_shell() {
         assert_eq!(args, vec!["-lc".to_string(), "echo hi".to_string()]);
     }
 }
+
+#[test]
+fn std_preserving_builder_does_not_add_pipefail() {
+    let command = "false | true";
+    let std = build_std_command_preserving_pipe_status(command);
+    let tokio = build_tokio_command_preserving_pipe_status(command);
+
+    assert_eq!(std.get_program(), tokio.as_std().get_program());
+    assert_eq!(
+        std.get_args().collect::<Vec<_>>(),
+        tokio.as_std().get_args().collect::<Vec<_>>()
+    );
+}
