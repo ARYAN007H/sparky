@@ -1,10 +1,9 @@
 //! Channel contracts and OpenHuman runtime orchestration.
 //!
-//! Provider orchestration is gated by `channels`. Serialized configuration,
-//! messages, and schemas come from `tinychannels-bus`.
-//!
-//! The local REPL is host orchestration. The legacy provider trait remains an
-//! explicit implementation exception during the runtime migration to TinyBus.
+//! Provider orchestration is gated by `channels` and runs through the
+//! TinyChannels TinyBus module. Serialized configuration, messages, and
+//! schemas come from `tinychannels-bus`; OpenHuman retains host policy and
+//! lifecycle orchestration.
 
 // Always-compiled carve-outs (see module docs).
 pub mod contract_schema;
@@ -43,7 +42,8 @@ pub(crate) use system_prompt::ChannelSystemPrompt;
 #[cfg(all(feature = "channels", test))]
 mod tests;
 
-// Stable `channels::<provider>` paths (implementation lives under `providers/`).
+// Legacy provider paths are retained for unit fixtures only. Production callers
+// use the module-backed runtime and the portable bus contracts above.
 #[cfg(all(feature = "channels", test))]
 pub use providers::dingtalk;
 #[cfg(all(feature = "channels", test))]
