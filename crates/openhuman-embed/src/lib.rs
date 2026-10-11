@@ -197,9 +197,9 @@ pub use runtime::{
 /// so the trait unifies — re-exporting it here would break the
 /// agent-runtime ownership boundary.
 pub mod seams {
+    pub use openhuman_core::agent::cost::TurnCost;
     pub use openhuman_core::agent::hooks::{PostTurnHook, ToolHook};
     pub use openhuman_core::agent::hooks::{ToolHookContext, ToolHookDecision, TurnContext};
-    pub use openhuman_core::agent::cost::TurnCost;
     pub use openhuman_core::agent::stop_hooks::{
         BudgetStopHook, StopDecision, StopHook, TurnState,
     };

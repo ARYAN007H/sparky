@@ -6,7 +6,7 @@ use common::{
     chat_completion, chat_requests, offline_config, route, runtime, scripted_provider,
     stub_backend, tool_call_completion,
 };
-use openhuman_embed::seams::{StopDecision, StopHook, TurnState, TurnCost};
+use openhuman_embed::seams::{StopDecision, StopHook, TurnCost, TurnState};
 use openhuman_embed::{
     AgentDefinitionSpec, AgentSpec, HostTurnTools, Runtime, Tool, ToolScopeSpec, Workspace,
 };
