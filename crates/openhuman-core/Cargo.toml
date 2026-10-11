@@ -456,10 +456,6 @@ tinydocs-bus = { path = "../../vendor/tinydocs/crates/tinydocs-bus", optional = 
 # Optional: exclusive to the `voice` feature — default-OFF, product-ON, the
 # same split as `documents` above.
 tinyvoice-bus = { path = "../../vendor/tinyvoice/crates/tinyvoice-bus", optional = true }
-# `cpal` microphone capture (`voice::audio_capture`, `voice::always_on`) remains
-# on the library path until its module-owned lifecycle contract is released.
-# Hotkeys are already owned by the loaded TinyVoice module.
-tinyvoice = { path = "../../vendor/tinyvoice/crates/tinyvoice", default-features = false, features = ["capture"], optional = true }
 
 # TinyJuice — the compression wire contract, and nothing else.
 #
@@ -761,7 +757,6 @@ voice = [
     # only — `serde` and nothing else.
     "dep:tinyvoice-bus",
     "dep:lettre",
-    "dep:tinyvoice",
     # Podcast SMTP delivery uses the loadable Channels module. The always-on
     # bus dependency provides its upload vocabulary without linking providers.
     # `voice::live`: live voice agent sessions over tinyagents-live.
