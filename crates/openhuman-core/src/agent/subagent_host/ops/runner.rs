@@ -9,10 +9,10 @@
 use std::collections::HashSet;
 use std::time::Instant;
 
-use crate::agent::harness::artifact_offload::{
-    effective_offload_threshold, extract_artifact_paths, new_artifact_offload,
-    note_artifact_handoff, offload_oversized_result, DEFAULT_OFFLOAD_THRESHOLD_BYTES,
-    HANDOFF_STAGE_RECORDED,
+use crate::agent::harness::artifact_offload::{new_artifact_offload, offload_oversized_result};
+use tinyagents_harness::artifacts::{
+    effective_offload_threshold, extract_artifact_paths, note_artifact_handoff,
+    DEFAULT_OFFLOAD_THRESHOLD_BYTES, HANDOFF_STAGE_RECORDED,
 };
 use crate::agent::harness::definition::{
     validate_tier_transition, AgentDefinition, AgentDefinitionRegistry, AgentTier, IterationPolicy,
