@@ -19,9 +19,8 @@ use crate::agent::harness::definition::{
     PromptSource, SandboxMode as AgentSandboxMode,
 };
 use crate::agent::harness::fork_context::ParentExecutionContext;
-use crate::agent::harness::{
-    spawn_depth_context::current_spawn_depth, with_spawn_depth, MAX_SPAWN_DEPTH,
-};
+use crate::agent::tinyagents::budget::MAX_SPAWN_DEPTH;
+use tinyagents_harness::context::{current_run_depth, with_run_depth, RunConfig, RunDepth};
 use crate::agent::prompts::{
     render_subagent_system_prompt_with_format, PromptContext, SubagentRenderOptions,
 };
@@ -115,7 +114,7 @@ use result_cap::apply_max_result_chars;
 pub(crate) async fn run_subagent_direct(
     definition: &AgentDefinition,
     task_prompt: &str,
-    options: SubagentRunOptions,
+    mut options: SubagentRunOptions,
 ) -> Result<SubagentRunOutcome, SubagentRunError> {
     // Unconditionally heap-allocate the entire run_subagent body so
     // every caller doesn't have to carry this future's state inline.
@@ -223,32 +222,17 @@ pub(crate) async fn run_subagent_direct(
             .clone()
             .ok_or(SubagentRunError::NoParentContext)?;
         let started = Instant::now();
-        // Typed callers carry their depth in the run context. Direct callers
-        // are scoped by `with_spawn_depth`; honor both authorities and count
-        // this child spawn exactly once.
-        let attempted_depth = options
-            .run_context
-            .spawn_depth
-            .max(current_spawn_depth().saturating_add(1));
-
-        // Synchronous pre-dispatch projection of the single depth authority
-        // (`MAX_SPAWN_DEPTH`, also fed to the crate's `RunPolicy.limits.max_depth`).
-        // This surfaces `SpawnDepthExceeded` before a provider round-trip and
-        // across the MCP process hop; the crate's `TinyAgentsError::SubAgentDepth`
-        // maps onto this same error shape for over-deep in-process runs.
-        if attempted_depth > crate::agent::tinyagents::budget::depth(&options.run_context) {
-            tracing::warn!(
-                agent_id = %definition.id,
-                task_id = %task_id,
-                attempted_depth,
-                max_depth = MAX_SPAWN_DEPTH,
-                "[subagent_host] spawn depth exceeded"
-            );
-            return Err(SubagentRunError::SpawnDepthExceeded {
-                attempted_depth,
-                max_depth: crate::agent::tinyagents::budget::depth(&options.run_context),
-            });
-        }
+        // The host carries an already-derived child depth; native and MCP
+        // callers expose their parent depth through TinyAgents' context.
+        let parent_depth = options.run_context.spawn_depth.saturating_sub(1)
+            .max(current_run_depth().map_or(0, |facts| facts.depth));
+        let max_depth = crate::agent::tinyagents::budget::depth(&options.run_context);
+        let attempted_depth = RunConfig::checked_child_depth(parent_depth, max_depth)
+            .map_err(|_| SubagentRunError::SpawnDepthExceeded {
+                attempted_depth: parent_depth.saturating_add(1),
+                max_depth,
+            })?;
+        options.run_context.spawn_depth = attempted_depth;
 
         // Runtime spawn-hierarchy (tier) gate — defense-in-depth alongside the
         // depth gate above. The loader validates *declared* `subagents` pairs
@@ -334,7 +318,7 @@ pub(crate) async fn run_subagent_direct(
                 "[subagent_host] worktree-isolated worker: descriptor will route acting-tool CWD"
             );
         }
-        let run_result = Box::pin(with_spawn_depth(attempted_depth, async {
+        let run_result = Box::pin(with_run_depth(RunDepth { depth: attempted_depth, max_depth }, async {
             crate::memory::scope::within_agent(&definition.id, with_file_state_agent_id(task_id.clone(), async {
                 async {
                     Box::pin(run_typed_mode(
