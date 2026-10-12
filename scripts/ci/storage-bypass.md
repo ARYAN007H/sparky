@@ -54,8 +54,8 @@ known indirect host opens. New rules mask Rust comments and quoted fixtures;
 original core rule identities retain their existing lexical behavior.
 
 Real CI uses the canonical merge base and fails if the base, original baseline,
-or recorded vendor source is unavailable. `--root` supports isolated source
-fixtures; those tests independently exercise the manifest comparison policy.
+or recorded vendor source is unavailable. `--root` also checks history when it names a real Git checkout; it supports isolated source
+fixtures without Git; those tests independently exercise the manifest comparison policy.
 Do not use a synthetic fixture result as proof of actual host storage isolation.
 
 The embed Tokio writer and five additional coverage/regeneration cases genuinely

@@ -23,6 +23,7 @@
 //   node scripts/ci/check-storage-bypass.mjs --write-baseline
 //   node scripts/ci/check-storage-bypass.mjs --root <dir>   (tests)
 
+import { execFileSync } from "node:child_process";
 import { stripRustComments } from "./check-crate-chain.mjs";
 import {
   validateCoverageDebt,
@@ -43,6 +44,21 @@ const baselinePath = resolve(
   "scripts/ci/storage-bypass-baseline.json",
 );
 const writeBaseline = process.argv.includes("--write-baseline");
+const enforceHistory =
+  rootFlag === -1 ||
+  (() => {
+    try {
+      return (
+        execFileSync("git", ["rev-parse", "--show-toplevel"], {
+          cwd: repoRoot,
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "pipe"],
+        }).trim() === repoRoot
+      );
+    } catch {
+      return false;
+    }
+  })();
 
 export const CURATED_VENDOR_ROOTS = [
   "vendor/tinyagents/crates/tinyagents-session/src/run_ledger",
@@ -265,11 +281,11 @@ async function main() {
   }
   const raw = await collectFindings(repoRoot, { includeAllowed: true });
   let debtErrors = validateCoverageDebt(findings, baseline, extension);
-  if (rootFlag === -1)
+  if (enforceHistory)
     debtErrors.push(...validateAllowances(raw, auditedReasons));
   // Fixture roots without Git history exercise source scanning; CI always checks
   // the real checkout against its canonical merge base and retained records.
-  if (rootFlag === -1) {
+  if (enforceHistory) {
     const history = historicalFindings(repoRoot, {
       scan,
       withoutAllowed,
