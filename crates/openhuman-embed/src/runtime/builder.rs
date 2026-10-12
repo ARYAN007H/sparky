@@ -99,6 +99,7 @@ pub struct RuntimeBuilder {
     pub(super) backend_transport: Option<Arc<dyn BackendTransport>>,
     pub(super) memory_engine: Option<Arc<dyn tinymemory_api::MemoryEngine>>,
     pub(super) session_store: Option<Arc<dyn SessionStoreProvider>>,
+    pub(super) cron_delivery: Option<Arc<dyn openhuman_core::cron::host_delivery::CronDelivery>>,
     pub(super) seams: HostSeams,
     pub(super) max_agents: usize,
     pub(super) agent_defaults: super::AgentDefaults,
@@ -144,6 +145,7 @@ impl RuntimeBuilder {
             backend_transport: None,
             memory_engine: None,
             session_store: None,
+            cron_delivery: None,
             seams: HostSeams::default(),
             max_agents: DEFAULT_MAX_AGENTS,
             agent_defaults: super::AgentDefaults::default(),
@@ -258,6 +260,24 @@ impl RuntimeBuilder {
     /// is removed with the runtime.
     pub fn session_store(mut self, provider: Arc<dyn SessionStoreProvider>) -> Self {
         self.session_store = Some(provider);
+        self
+    }
+
+    /// Route the replies of the agents' scheduled jobs yourself.
+    ///
+    /// An `origin`-mode run of an agent's cron job hands its output to
+    /// [`CronDelivery::deliver`](crate::CronDelivery::deliver) with the agent
+    /// id, the thread the job was created in and its
+    /// [`JobOrigin`](crate::JobOrigin), instead of writing into a local thread
+    /// or channel; a run that answers `NO_REPLY`, or fails, is never delivered.
+    /// Jobs still run only while their agent is live (the scheduler service
+    /// must be on). It is process-wide, as the runtime is, and the core has no
+    /// uninstall for it: it stays installed for the life of the process.
+    pub fn cron_delivery(
+        mut self,
+        delivery: Arc<dyn openhuman_core::cron::host_delivery::CronDelivery>,
+    ) -> Self {
+        self.cron_delivery = Some(delivery);
         self
     }
 

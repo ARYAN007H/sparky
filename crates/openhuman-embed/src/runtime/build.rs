@@ -218,6 +218,10 @@ impl RuntimeBuilder {
         if let Some(engine) = self.memory_engine.clone() {
             openhuman_core::memory::engine::install_host_engine(engine);
         }
+        if let Some(delivery) = self.cron_delivery.clone() {
+            log::debug!("[embed][runtime] host cron delivery installed");
+            openhuman_core::cron::host_delivery::install(delivery);
+        }
 
         // Install only after all fallible workspace/config resolution has
         // completed; core boot performs recovery against this provider.
