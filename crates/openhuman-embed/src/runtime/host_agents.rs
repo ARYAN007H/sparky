@@ -22,6 +22,7 @@ pub(crate) type AgentMap = Mutex<AgentRegistry>;
 #[derive(Clone)]
 pub(crate) struct PendingCleanup {
     pub(crate) cleanup: Option<openhuman_core::mcp::host::AgentMcpCleanup>,
+    pub(crate) directory: openhuman_core::mcp::host::AgentDirectoryCleanup,
     pub(crate) instance: Weak<AgentInner>,
     pub(crate) home: std::path::PathBuf,
     pub(crate) purge: bool,

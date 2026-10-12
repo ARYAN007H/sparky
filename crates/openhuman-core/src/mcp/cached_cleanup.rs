@@ -213,7 +213,7 @@ impl McpConfiguredClient {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .get(data_dir)
             .is_some_and(|stored| Arc::ptr_eq(stored, &reservation));
-        if !is_current {
+        if !is_current || reservation.host_completion_pending.load(Ordering::Acquire) {
             return false;
         }
         let mut clients = if let Some(client) = client.as_ref() {
@@ -242,6 +242,9 @@ impl McpConfiguredClient {
         let mut reservations = reservations
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if reservation.host_completion_pending.load(Ordering::Acquire) {
+            return false;
+        }
         if reservations
             .get(data_dir)
             .is_some_and(|stored| Arc::ptr_eq(stored, &reservation))

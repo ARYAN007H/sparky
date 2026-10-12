@@ -85,3 +85,63 @@ where
             .map_err(|_| ModuleCallError::Unavailable)
     }
 }
+
+/// A process-local directory reservation with no runtime guard or callback.
+/// Dropping the token retains the fence; only confirmed host completion clears it.
+#[derive(Clone)]
+pub struct AgentDirectoryCleanup {
+    directory: PathBuf,
+    reservation: Arc<CleanupReservation>,
+}
+
+/// Reserve an agent's directory until host-owned cleanup succeeds.
+/// This never creates a client or loads a module.
+pub fn reserve_agent_directory(
+    workspace: &std::path::Path,
+    agent_id: &str,
+) -> AgentDirectoryCleanup {
+    let directory = workspace.join("agents").join(agent_id);
+    let mut reservations = CLEANUP_RESERVATIONS
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let reservation = Arc::clone(
+        reservations
+            .entry(directory.clone())
+            .or_insert_with(|| Arc::new(CleanupReservation::default())),
+    );
+    reservation
+        .host_completion_pending
+        .store(true, Ordering::Release);
+    AgentDirectoryCleanup {
+        directory,
+        reservation,
+    }
+}
+
+impl AgentDirectoryCleanup {
+    /// Release this exact reservation after module close and host purge succeed.
+    /// An independently registered canonical callback keeps its own reservation.
+    pub fn complete(&self) {
+        let after_close = self
+            .reservation
+            .after_close
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut reservations = CLEANUP_RESERVATIONS
+            .get_or_init(|| Mutex::new(HashMap::new()))
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if reservations
+            .get(&self.directory)
+            .is_some_and(|current| Arc::ptr_eq(current, &self.reservation))
+        {
+            self.reservation
+                .host_completion_pending
+                .store(false, Ordering::Release);
+            if after_close.is_none() {
+                reservations.remove(&self.directory);
+            }
+        }
+    }
+}

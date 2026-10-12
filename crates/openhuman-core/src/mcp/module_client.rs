@@ -40,6 +40,7 @@ type CleanupAction = Arc<dyn Fn() -> bool + Send + Sync>;
 #[derive(Default)]
 struct CleanupReservation {
     after_close: Mutex<Option<CleanupAction>>,
+    host_completion_pending: AtomicBool,
 }
 
 static CLEANUP_RESERVATIONS: OnceLock<Mutex<HashMap<PathBuf, Arc<CleanupReservation>>>> =

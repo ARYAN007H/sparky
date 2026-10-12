@@ -25,6 +25,7 @@ pub(crate) fn finish_removal(
             source,
         })?;
     }
+    pending.directory.complete();
     agents.remove(id);
     agents.pending.remove(id);
     Ok(())
@@ -169,6 +170,10 @@ impl AgentInner {
             .entry(self.id.clone())
             .or_insert_with(|| PendingCleanup {
                 cleanup,
+                directory: openhuman_core::mcp::host::reserve_agent_directory(
+                    &self.config.workspace_dir,
+                    &self.id,
+                ),
                 instance,
                 home: self.layout.home.clone(),
                 purge,

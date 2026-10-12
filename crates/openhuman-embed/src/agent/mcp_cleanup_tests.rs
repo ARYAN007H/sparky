@@ -3,6 +3,10 @@ use super::*;
 fn pending(home: std::path::PathBuf) -> PendingCleanup {
     PendingCleanup {
         cleanup: None,
+        directory: openhuman_core::mcp::host::reserve_agent_directory(
+            home.parent().unwrap(),
+            home.file_name().unwrap().to_str().unwrap(),
+        ),
         instance: Weak::new(),
         home,
         purge: true,

@@ -10,7 +10,8 @@ use std::sync::OnceLock;
 use crate::config::Config;
 
 pub use super::module_client::agent_cleanup::{
-    spawn_agent_cleanup, take_agent_cleanup, AgentMcpCleanup,
+    reserve_agent_directory, spawn_agent_cleanup, take_agent_cleanup, AgentDirectoryCleanup,
+    AgentMcpCleanup,
 };
 
 const PROXY_SERVICE_KEY: &str = "tool.mcp_client";
