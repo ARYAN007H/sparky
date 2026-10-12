@@ -152,9 +152,7 @@ mod x402 {
     /// `Err("COMPONENT_DISABLED:wallet")` when `[components] wallet` is off:
     /// the hook declines before any quote, signing or module load. The 402
     /// response then surfaces to the caller unpaid.
-    pub(super) fn declined_when_wallet_off(
-        config: &crate::config::Config,
-    ) -> Result<(), String> {
+    pub(super) fn declined_when_wallet_off(config: &crate::config::Config) -> Result<(), String> {
         if config.components.wallet {
             return Ok(());
         }
