@@ -104,6 +104,14 @@ pub(crate) trait McpModulePort: Send + Sync {
     ) -> Result<Map<String, Value>, ModuleCallError> {
         Err(ModuleCallError::IncompatibleContract)
     }
+
+    /// Applies a TinyMCP-owned text transformation through the root operation.
+    async fn transform_text(
+        &self,
+        _request: tinymcp_bus::TransformTextRequest,
+    ) -> Result<String, ModuleCallError> {
+        Err(ModuleCallError::IncompatibleContract)
+    }
 }
 
 struct TinyMcpPort {
@@ -203,6 +211,15 @@ impl McpModulePort for TinyMcpPort {
                 names::methods::NORMALIZE_TOOL_ARGUMENTS,
                 (arguments,),
             )
+            .await
+    }
+
+    async fn transform_text(
+        &self,
+        request: tinymcp_bus::TransformTextRequest,
+    ) -> Result<String, ModuleCallError> {
+        self.root
+            .call_confidential(MODULE, names::methods::TRANSFORM_TEXT, (request,))
             .await
     }
 }
@@ -432,6 +449,23 @@ impl McpConfiguredClient {
             return Err(ModuleCallError::Unavailable);
         }
         self.port.normalize_tool_arguments(Some(arguments)).await
+    }
+
+    /// Normalizes a model-supplied MCP identifier in TinyMCP.
+    pub(crate) async fn normalize_identifier(
+        &self,
+        value: &str,
+    ) -> Result<String, ModuleCallError> {
+        if SHUTTING_DOWN.load(Ordering::Acquire) {
+            return Err(ModuleCallError::Unavailable);
+        }
+        self.port
+            .transform_text(tinymcp_bus::TransformTextRequest {
+                operation: tinymcp_bus::TextTransform::NormalizeIdentifier,
+                text: value.to_owned(),
+                max_bytes: tinymcp_bus::MAX_PROCESSING_BYTES,
+            })
+            .await
     }
 
     /// Loads and prepares configured-server tools from TinyMCP's persistent
