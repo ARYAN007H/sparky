@@ -48,8 +48,8 @@ static SHUTDOWN_REGISTERED: AtomicBool = AtomicBool::new(false);
 static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
 
 #[cfg(test)]
-static AFTER_CONTEXT_CHECK:
-    OnceLock<Mutex<Option<(PathBuf, tokio::sync::oneshot::Sender<()>)>>> = OnceLock::new();
+static AFTER_CONTEXT_CHECK: OnceLock<Mutex<Option<(PathBuf, tokio::sync::oneshot::Sender<()>)>>> =
+    OnceLock::new();
 
 #[derive(Clone)]
 struct OpenObject {
