@@ -371,10 +371,10 @@ async fn removal_reserves_ids_until_cleanup_finishes(runtime: Arc<Runtime>, scra
             runtime.agent_ids().iter().any(|reserved| reserved == id),
             "removal must retain the id reservation until cleanup finishes"
         );
-        assert!(
-            openhuman_core::agent::host_agents::resolve(id).is_none(),
-            "removed agents must not admit new sessions through core drivers"
-        );
+            assert!(
+                openhuman_core::agent::host_agents::resolve(id).is_none(),
+                "removed agents must not admit new sessions through core drivers"
+            );
         assert!(
             matches!(runtime.remove_agent(id).await, Err(AgentError::UnknownId(ref removed)) if removed == id),
             "a second removal cannot claim the same cleanup reservation"
@@ -387,10 +387,15 @@ async fn removal_reserves_ids_until_cleanup_finishes(runtime: Arc<Runtime>, scra
         if cancel {
             removing.abort();
             assert!(removing.await.unwrap_err().is_cancelled());
-            assert!(
-                !home.exists(),
-                "cancelling removal still performs requested purge"
-            );
+            // Cancellation transfers the purge to the close task. It must not
+            // delete module-owned state before the module acknowledges close.
+            tokio::time::timeout(Duration::from_secs(10), async {
+                while home.exists() {
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .expect("deferred purge follows module close acknowledgment");
             barrier.release();
         } else {
             barrier.release();
