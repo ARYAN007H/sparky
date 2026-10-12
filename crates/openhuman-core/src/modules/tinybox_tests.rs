@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinybus::broker::Broker;
 use tinybus::service::Interface;
 use tinybus::transport::memory::MemoryBus;
@@ -308,7 +308,7 @@ async fn pinned_loader_serves_the_published_tinybox_release() {
 
     crate::modules::ops::ensure_loaded(&config, MODULE_ID)
         .await
-        .expect("the OpenHuman release registry and TinyBus loader admit v0.1.20");
+        .expect("the OpenHuman release registry and TinyBus loader admit v0.1.24");
     let capabilities = super::capabilities(&config)
         .await
         .expect("the loaded release serves TinyBus capabilities");
@@ -340,6 +340,102 @@ async fn pinned_loader_serves_the_published_tinybox_release() {
     assert_eq!(output.exit_code, 0);
     assert!(!output.timed_out);
     assert_eq!(output.stdout, "tinybox-module-run-ok");
+}
+
+#[tokio::test]
+#[ignore = "requires the downloaded, checksum-verified TinyBox v0.1.24 archive"]
+async fn pinned_loader_serves_resolve_local_grants_from_tinybox_v0124() {
+    let _environment_lock = crate::config::TEST_ENV_LOCK.lock().await;
+    let archive = std::env::var_os("TINYBOX_RELEASE_ARTIFACT")
+        .map(std::path::PathBuf::from)
+        .expect("set TINYBOX_RELEASE_ARTIFACT to the verified v0.1.24 archive");
+    assert!(
+        archive.is_file(),
+        "missing verified release archive: {archive:?}"
+    );
+
+    let record = crate::modules::registry::find(MODULE_ID).expect("TinyBox registry record");
+    assert_eq!(record.version, "0.1.24");
+    assert_eq!(contract::CONTRACT_VERSION, (1, 14));
+    let asset = tinybus::module::platform::host_candidates()
+        .iter()
+        .find_map(|host_key| record.asset_for(host_key))
+        .expect("the pinned release supports this host");
+    assert_eq!(
+        archive.file_name().and_then(std::ffi::OsStr::to_str),
+        Some(asset.archive)
+    );
+
+    let bundled = tempfile::tempdir().expect("temporary installer bundle root");
+    let bundle_asset_dir = bundled
+        .path()
+        .join(MODULE_ID)
+        .join(record.version)
+        .join(asset.host_key);
+    std::fs::create_dir_all(&bundle_asset_dir).expect("create TinyBus bundle layout");
+    if asset.archive.ends_with(".tar.gz") {
+        let archive_file = std::fs::File::open(&archive).expect("open verified release archive");
+        let decoder = flate2::read::GzDecoder::new(archive_file);
+        tar::Archive::new(decoder)
+            .unpack(&bundle_asset_dir)
+            .expect("extract verified release archive");
+    } else if asset.archive.ends_with(".zip") {
+        let archive_file = std::fs::File::open(&archive).expect("open verified release archive");
+        zip::ZipArchive::new(archive_file)
+            .expect("read verified release archive")
+            .extract(&bundle_asset_dir)
+            .expect("extract verified release archive");
+    } else {
+        panic!(
+            "unsupported pinned release archive format: {}",
+            asset.archive
+        );
+    }
+    std::fs::copy(&archive, bundle_asset_dir.join(asset.archive))
+        .expect("stage verified release archive in TinyBus bundle layout");
+    std::fs::write(
+        bundle_asset_dir.join(format!("{}.sha256", asset.archive)),
+        format!("{}\n", asset.sha256),
+    )
+    .expect("stage the release digest marker required by TinyBus");
+
+    let key = crate::modules::ops::BUNDLED_MODULES_ENV;
+    let _environment_restore = EnvironmentRestore {
+        key,
+        previous: std::env::var_os(key),
+    };
+    std::env::set_var(key, bundled.path());
+
+    let install = tempfile::tempdir().expect("temporary verified module cache");
+    let mut config = Config::default();
+    config.modules.enabled = true;
+    config.modules.allow_download = false;
+    config.modules.install_dir = Some(install.path().display().to_string());
+    crate::modules::ops::ensure_loaded(&config, MODULE_ID)
+        .await
+        .expect("the TinyBus loader admits the published v0.1.24 artifact");
+
+    let home = tempfile::tempdir().expect("temporary operator home");
+    let allowed = home.path().join("workspace");
+    std::fs::create_dir(&allowed).expect("create an allowed grant");
+    let request = contract::ResolveLocalGrantsRequest {
+        home: Some(home.path().display().to_string()),
+        config: contract::LocalGrantConfig {
+            toolchain_homes: false,
+            extra_read_only: vec!["~/workspace".to_owned()],
+            ..contract::LocalGrantConfig::default()
+        },
+        protected: contract::ProtectedPaths::default(),
+    };
+    let grants: contract::LocalGrants = super::module_client(&config)
+        .call(MODULE_ID, contract::METHODS[31], (request,))
+        .await
+        .expect("the published artifact serves ResolveLocalGrants");
+    assert_eq!(
+        grants.read_only,
+        vec![allowed.canonicalize().unwrap().display().to_string()]
+    );
+    assert!(grants.read_write.is_empty());
 }
 
 #[test]
@@ -461,8 +557,8 @@ async fn no_workspace_docker_refusal_is_not_retried_as_an_ordinary_call() {
 }
 
 #[tokio::test]
-async fn docker_controls_use_typed_calls_with_validated_contract_capability(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn docker_controls_use_typed_calls_with_validated_contract_capability()
+-> Result<(), Box<dyn std::error::Error>> {
     let (_service, client, calls) = mock_client().await;
     let status = call_docker_status_with_client(
         &client,

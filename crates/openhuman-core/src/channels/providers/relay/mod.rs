@@ -26,24 +26,10 @@ mod params;
 mod schemas;
 mod store;
 
-pub use channel::{RelayChannel, CHANNEL_OUTBOUND_EVENT};
+pub use channel::{CHANNEL_OUTBOUND_EVENT, RelayChannel};
 pub use ops::channel_relay_inbound;
 pub use params::{
-    validate_channel, validate_id, RelayInboundParams, DEFAULT_RELAY_CLIENT_ID, MAX_CHANNEL_LEN,
-    MAX_ID_LEN, MAX_SENDER_NAME_CHARS, MAX_TEXT_BYTES, RESERVED_CHANNELS,
+    DEFAULT_RELAY_CLIENT_ID, MAX_CHANNEL_LEN, MAX_ID_LEN, MAX_SENDER_NAME_CHARS, MAX_TEXT_BYTES,
+    RESERVED_CHANNELS, RelayInboundParams, validate_channel, validate_id,
 };
 pub use schemas::{all_relay_controller_schemas, all_relay_registered_controllers};
-
-// The durable conversation key belongs to this inbound relay call, not a
-// process-global last sender. The dispatch future carries it to session build.
-tokio::task_local! { static RELAY_THREAD: String; }
-
-pub(crate) fn current_thread_id() -> Option<String> {
-    RELAY_THREAD.try_with(Clone::clone).ok()
-}
-
-pub(crate) async fn with_thread<F: std::future::Future>(thread: String, future: F) -> F::Output {
-    // Keep the dispatch future on the heap through task-local wrappers;
-    // embedding it multiplies debug-build stack frames on ordinary worker threads.
-    RELAY_THREAD.scope(thread, Box::pin(future)).await
-}
