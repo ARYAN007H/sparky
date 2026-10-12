@@ -154,10 +154,15 @@ for (const [runner, archiveVariable, directoryVariable] of [
       mkdirSync(destination);
       writeFileSync(join(payload, "module.so"), "native module fixture");
       const archive = join(root, "module.tar.gz");
-      const packed = spawnSync("tar", [
-        "--owner=12345", "--group=12345", "--numeric-owner",
-        "-czf", archive, "-C", payload, "module.so",
-      ], { encoding: "utf8" });
+      const packed = spawnSync("python3", ["-c", [
+        "import sys, tarfile",
+        "with tarfile.open(sys.argv[1], 'w:gz') as archive:",
+        "    info = archive.gettarinfo(sys.argv[2], arcname='module.so')",
+        "    info.uid = info.gid = 12345",
+        "    info.uname = info.gname = ''",
+        "    with open(sys.argv[2], 'rb') as payload:",
+        "        archive.addfile(info, payload)",
+      ].join("\n"), archive, join(payload, "module.so")], { encoding: "utf8" });
       assert.equal(packed.status, 0, packed.stderr);
       // Force the superuser default even on unprivileged developer machines.
       // The runner's --no-same-owner must override it on the real tar command.

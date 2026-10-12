@@ -186,7 +186,7 @@ if [ ! -f "$tinybox_dir/libtinybox.$module_ext" ]; then
   else
     echo "${tinybox_sha256}  $tinybox_archive" | sha256sum --check
   fi
-  tar -xzf "$tinybox_archive" -C "$tinybox_dir"
+  tar --no-same-owner -xzf "$tinybox_archive" -C "$tinybox_dir"
 fi
 export OPENHUMAN_MODULE_PATH="$tinybox_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
 
