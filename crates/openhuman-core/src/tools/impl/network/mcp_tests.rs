@@ -18,6 +18,28 @@ fn required_mcp_identifier_rejects_empty_values() {
 }
 
 #[test]
+fn module_failures_keep_transport_and_unavailability_categories() {
+    use crate::modules::client::ModuleCallError;
+
+    assert_eq!(
+        input_module_error_code(ModuleCallError::Unavailable),
+        tinymcp_bus::errors::BUS
+    );
+    assert_eq!(
+        input_module_error_code(ModuleCallError::IncompatibleContract),
+        tinymcp_bus::errors::BUS
+    );
+    assert_eq!(
+        input_module_error_code(ModuleCallError::TransportFailed),
+        tinymcp_bus::errors::TRANSPORT
+    );
+    assert_eq!(
+        input_module_error_code(ModuleCallError::ModuleFault),
+        tinymcp_bus::errors::INVALID_ARGUMENTS
+    );
+}
+
+#[test]
 fn classified_result_maps_rendered_content_and_preserves_outcome_metadata() {
     let call = tinymcp_bus::ClassifiedStaticToolCall {
         outcome: tinymcp_bus::McpCallOutcome::answered("docs", "search"),
