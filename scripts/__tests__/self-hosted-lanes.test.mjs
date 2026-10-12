@@ -243,6 +243,7 @@ test("untouched areas leave only the always-on gates", () => {
     "static:feature-forwarding",
     "static:crate-chain",
     "static:process-statics",
+    "static:module-source",
     "static:module-pins",
     "static:submodule-monotonic",
   ]);
@@ -280,6 +281,7 @@ test("the storage area arms only the storage-drivers lane, with the sqlite and f
         "static:feature-forwarding",
         "static:crate-chain",
         "static:process-statics",
+        "static:module-source",
         "static:module-pins",
         "static:submodule-monotonic",
       ],

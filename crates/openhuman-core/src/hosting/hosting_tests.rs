@@ -193,12 +193,13 @@ fn the_module_registry_pins_the_released_hosts_artifact_set() {
 
 #[cfg(feature = "modules")]
 #[tokio::test]
-#[ignore = "requires OPENHUMAN_TINYHOSTS_TEST_MODULE pointing to the released v0.3.0 native artifact"]
+#[ignore = "requires a TinyHosts library: node scripts/modules/build.mjs tinyhosts, then OPENHUMAN_MODULE_SOURCE_DIR"]
 async fn released_artifact_serves_providers_and_confidential_local_preparation() {
     use base64::Engine as _;
 
-    let artifact = std::env::var_os("OPENHUMAN_TINYHOSTS_TEST_MODULE")
-        .expect("set OPENHUMAN_TINYHOSTS_TEST_MODULE to the released TinyHosts v0.3.0 library");
+    let artifact = crate::modules::local_artifact("tinyhosts").expect(
+        "build tinyhosts with scripts/modules/build.mjs and set OPENHUMAN_MODULE_SOURCE_DIR",
+    );
     let workspace = tempfile::tempdir().expect("workspace");
     let site = workspace.path().join("site");
     std::fs::create_dir(&site).expect("site directory");
@@ -210,10 +211,10 @@ async fn released_artifact_serves_providers_and_confidential_local_preparation()
     config
         .modules
         .overrides
-        .push(crate::config::schema::ModuleOverride {
-            id: "tinyhosts".to_owned(),
-            path: artifact.to_string_lossy().into_owned(),
-        });
+        .push(crate::config::schema::ModuleOverride::with_path(
+            "tinyhosts",
+            artifact.to_string_lossy().into_owned(),
+        ));
     let account = Account::connect_with_config("vercel", "fixture-api-key", None, config)
         .expect("account configuration");
     let workspace = workspace

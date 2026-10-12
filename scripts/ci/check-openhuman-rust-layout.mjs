@@ -76,7 +76,7 @@ function allRustFiles(directory) {
   });
 }
 
-const INLINE_TEST_MODULE_RE =
+const INLINE_TESTS_MODULE_RE =
   /^\s*#\[cfg\([^\n]*\btest\b[^\n]*\)\]\s*\n(?:\s*#\[[^\n]+\]\s*\n)*\s*(?:pub(?:\([^)]*\))?\s+)?mod\s+\w+\s*\{/m;
 
 const failures = [];
@@ -113,7 +113,7 @@ for (const file of allRustFiles(CRATES_ROOT)) {
       `${file}: test modules must use a descriptive *_tests.rs filename`,
     );
   }
-  if (INLINE_TEST_MODULE_RE.test(source)) {
+  if (INLINE_TESTS_MODULE_RE.test(source)) {
     failures.push(
       `${file}: inline test module; move it to a sibling *_tests.rs file`,
     );

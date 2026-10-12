@@ -238,6 +238,12 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           run: "bash scripts/ci-cancel-aware.sh node scripts/ci/check-process-statics.mjs",
         },
         {
+          // CI runs the pinned release only; linked/source are local-dev modes.
+          name: "module-source",
+          when: true,
+          run: "node scripts/ci/check-ci-module-source.mjs",
+        },
+        {
           name: "module-boundaries",
           when: rust || areas.scripts,
           run: "bash scripts/ci-cancel-aware.sh node scripts/ci/check-module-boundaries.mjs",
@@ -368,13 +374,6 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
         {
           name: "test-modules",
           when: core,
-          env: ex63
-            ? {
-                TINYCONNECTORS_TARGET_DIR: `${scratch}/target/tinyconnectors`,
-                ...rustEnv,
-                ...sccache,
-              }
-            : {},
           run: `bash scripts/ci/self-hosted/install-test-modules.sh "${modulesDir}" ${modulesEnvFile}`,
         },
         {

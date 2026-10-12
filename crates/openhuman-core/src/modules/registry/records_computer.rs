@@ -1,6 +1,6 @@
 //! Native computer-use module (desktop and browser control). Published digests are added only from its release manifest.
 
-use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset};
+use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec};
 use tinycomputer_bus::names;
 
 pub(crate) const TINYCOMPUTER: ModuleRecord = ModuleRecord {
@@ -96,4 +96,11 @@ pub(crate) const TINYCOMPUTER: ModuleRecord = ModuleRecord {
         },
     ],
     load: LoadPolicy::Lazy,
+    source: SourceSpec {
+        submodule: "tinycomputer",
+        manifest: "crates/tinycomputer/Cargo.toml",
+        package: "tinycomputer",
+        lib_name: "tinycomputer",
+        features: &[],
+    },
 };

@@ -267,13 +267,16 @@ pub async fn compact_tool_output(call: ToolOutputCompaction<'_>) -> CompactedToo
         },
     };
     #[cfg(test)]
-    let config = if std::env::var_os("TINYJUICE_TEST_MODULE").is_some() {
-        // The released-module regression must not inherit an operator's
-        // persisted compression thresholds or disabled router flags.
-        std::sync::Arc::new(crate::config::Config::default())
-    } else {
-        config
-    };
+    // Only the config loaded from disk is replaced: a caller-supplied one is
+    // what the test is asking about.
+    let config =
+        if runtime_config.is_none() && crate::modules::local_artifact("tinyjuice").is_some() {
+            // The released-module regression must not inherit an operator's
+            // persisted compression thresholds or disabled router flags.
+            std::sync::Arc::new(crate::config::Config::default())
+        } else {
+            config
+        };
     if let Err(error) = install_from_config(&config).await {
         log::debug!("[tokenjuice] module configuration failed, passing through: {error}");
         return CompactedToolOutput::passthrough(content, wants_summary);

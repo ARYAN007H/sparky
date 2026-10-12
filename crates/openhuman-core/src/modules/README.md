@@ -110,9 +110,9 @@ The resolution itself (`ops::resolve`) tries the cheapest source first:
   already serving on the broker?          (search path at boot, earlier load)
         | no
         v
-  local override?                         [[modules.overrides]] id = "..."
-        | no                              or TINYSEARCH_TEST_MODULE /
-        v                                 TINYCONNECTORS_TEST_MODULE
+  configured source?                      [modules] source, per-module override
+        | release (default)               or OPENHUMAN_MODULE_SOURCE[_<ID>];
+        v                                 `path` override -> local file
   module search path?                     OPENHUMAN_MODULE_PATH, then
         | no                              platform data dirs (tinybus)
         v
@@ -125,6 +125,83 @@ The resolution itself (`ops::resolve`) tries the cheapest source first:
         v
   prune_stale_versions() removes older cached versions of this module
 ```
+
+#### Module source
+
+`[modules] source` (`release` | `linked` | `source`, default `release`) decides
+where a module comes from; `[[modules.overrides]]` entries take exactly one of
+`path` (a local library, as before) or `source` (a mode for that id), and a
+per-module entry beats the global mode. `OPENHUMAN_MODULE_SOURCE` sets the
+global mode and `OPENHUMAN_MODULE_SOURCE_<ID>` (id upper-cased) one module.
+
+| Source | What serves the module | Used by |
+| --- | --- | --- |
+| `release` (default) | The pinned, digest-checked GitHub release | CI, shipped builds, everyone by default |
+| `linked` | A factory registered by `crates/openhuman-modules-linked` (non-product `linked-modules` feature of `openhuman-cli`) | Local development and local tests only |
+| `source` | A library built from the vendored gitlink by `scripts/modules/build.mjs` | Local development and local tests only |
+
+Resolution order for one id: a per-module `path` override or
+`OPENHUMAN_MODULE_SOURCE_<ID>` first, then the global `[modules] source` /
+`OPENHUMAN_MODULE_SOURCE`, then `release`. **CI and shipped builds are
+`release` only**: `check-ci-module-source.mjs` enforces it, and the product
+feature list never contains `linked-modules`.
+
+- `release`: the chain below, pinned and digest-checked. The only mode CI and
+  shipped builds use; `scripts/ci/check-ci-module-source.mjs` (CI Lite) fails
+  if a workflow or CI script sets any other.
+- `linked`: the module linked into the running executable. The core exposes
+  only the seam (`modules::linked::register_linked(id, factory)`, re-exported as
+  `openhuman_rpc::embed::modules::register_linked`); the crate
+  `crates/openhuman-modules-linked` is the only place module implementation
+  crates are linked, and `install()` registers one factory per enabled module
+  feature. `ops::resolve` attaches the factory's `LinkedModule` through
+  `ModuleHost::attach_linked_with_config` with the same `module_config` a
+  released module gets (the executable's digest is the attestation). Only
+  `openhuman-cli` can reach the crate, as an optional dependency behind the
+  non-product `linked-modules` feature (`cargo run -p openhuman-cli --features
+  linked-modules`, then `OPENHUMAN_MODULE_SOURCE=linked`). tinybus never unloads
+  a module, so a process serves an id from one source only. See the crate docs
+  for which modules can be linked at the current vendor pins.
+- Pin status: `node scripts/modules/pin-status.mjs` compares each gitlink with
+  its registry `version` (in sync, ahead, behind/diverged, exempt). With
+  `OPENHUMAN_MODULE_PIN_AHEAD` set (`--print-env` prints it), a debug build logs
+  one warning per id when it serves a `linked` or `source` module whose gitlink
+  is ahead of its pin. `scripts/modules/release-and-repin.mjs <id>` publishes
+  the release and re-pins from its `checksum.toml`; the strict
+  `check-module-pins.mjs` is unchanged.
+- `source`: a library built from the module's vendored gitlink by
+  `node scripts/modules/build.mjs <id|all>` (the recipe is the record's
+  `SourceSpec`: submodule, manifest, package, `lib_name`, features). The build
+  stages `<out>/<id>/<library>` plus a `modules.toml` holding the file's sha256
+  as operator trust, and prints `OPENHUMAN_MODULE_SOURCE_DIR=<out>` and one
+  `OPENHUMAN_MODULE_SOURCE_<ID>=source` line per module. `ops::resolve` loads
+  `<OPENHUMAN_MODULE_SOURCE_DIR>/<id>/<library>` through the same local-file
+  path as an explicit `path` override, so no new loader exists. The digest is
+  never written to `records_*.rs`: registry pins come from published releases
+  only. Builds are cached by (submodule tree, rustc, target, profile, features).
+
+Local-dev recipe (never in CI):
+
+```bash
+# 1. Edit the module in vendor/<submodule> on its branch.
+# 2a. source: build it and point the core at the artifact.
+eval "$(node scripts/modules/build.mjs tinydocs --print-env)"
+OPENHUMAN_MODULE_SOURCE=source ./target/debug/openhuman-core serve
+# 2b. linked: link it into the CLI.
+OPENHUMAN_MODULE_SOURCE=linked cargo run -p openhuman-cli --features linked-modules -- serve
+# 3. Check the pin before pushing; a debug core warns once per id when the
+#    gitlink is ahead of the registry pin.
+eval "$(node scripts/modules/pin-status.mjs --print-env)"
+# 4. Release and re-pin (asks before publishing).
+node scripts/modules/release-and-repin.mjs tinydocs --bump patch
+```
+
+For local development and local tests only. When `linked` or `source` cannot be
+honoured (no factory registered, no built artifact), the module is served from
+`release`, one `warn` line names the id and both modes, and
+`ModuleStatus.detail` carries the reason. `modules.list` reports the serving
+source in `source` (`release`, `linked`, `source`, `local_file`); it never
+carries a path. No per-module artifact environment variable is read any more.
 
 Inside the release cache, tinybus looks for the archive in the bundled
 directory first, then in `install_dir/<id>/<version>/<host_key>`, and
@@ -386,8 +463,8 @@ loadable:
 
 Tests sit beside each file as `<file>_tests.rs`. Run them with
 `cargo test -p openhuman modules::` or `pnpm debug rust modules`. Tests that
-need a real module load a local build through `TINYSEARCH_TEST_MODULE`,
-`TINYCONNECTORS_TEST_MODULE`, or `[[modules.overrides]]`;
+need a real module load a local build through `[[modules.overrides]]` or
+`OPENHUMAN_MODULE_SOURCE`;
 `scripts/test-rust-with-mock.sh` and CI build the pinned submodules.
 
 See also `gitbooks/developing/performance.md` for how on-demand modules keep a
