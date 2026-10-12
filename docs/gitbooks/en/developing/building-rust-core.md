@@ -163,7 +163,7 @@ node scripts/modules/release-and-repin.mjs tinydocs --bump patch
 `OPENHUMAN_MODULE_SOURCE_<ID>` overrides one module. If a `linked` or `source`
 module is unavailable the core falls back to the release and logs a warning;
 `modules.list` shows which source each module is served from. Details:
-[Loadable modules](architecture/loadable-modules.md).
+[Loadable modules](loadable-modules.md).
 
 ## 4. macOS prerequisites
 
