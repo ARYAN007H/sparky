@@ -152,12 +152,16 @@ test("quoted database opener examples do not count as host persistence", () => {
   );
 });
 
-
 test("duplicate original core identities cannot inflate the retained baseline", () => {
   const core = { ...row, path: "crates/openhuman-core/src/state.rs" };
-  assert.match(validateCoverageDebt([core], [core, core], [], {
-    baseline: [core], extension: [], findings: [core],
-  }).join("\n"), /Duplicate core baseline record/);
+  assert.match(
+    validateCoverageDebt([core], [core, core], [], {
+      baseline: [core],
+      extension: [],
+      findings: [core],
+    }).join("\n"),
+    /Duplicate core baseline record/,
+  );
 });
 
 test("real checkouts refuse missing curated vendor source instead of shrinking debt", async () => {

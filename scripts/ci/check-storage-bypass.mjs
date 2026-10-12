@@ -222,7 +222,8 @@ async function rustFiles(dir, required = false) {
       await readFile(dir);
       return [dir];
     } catch (error) {
-      if (required) throw new Error("Missing curated source: " + dir, { cause: error });
+      if (required)
+        throw new Error("Missing curated source: " + dir, { cause: error });
       return [];
     }
   }
@@ -230,7 +231,8 @@ async function rustFiles(dir, required = false) {
   try {
     entries = await readdir(dir, { withFileTypes: true });
   } catch (error) {
-    if (required) throw new Error("Missing curated source: " + dir, { cause: error });
+    if (required)
+      throw new Error("Missing curated source: " + dir, { cause: error });
     return out;
   }
   for (const entry of entries) {
@@ -249,10 +251,18 @@ export async function collectFindings(root, { includeAllowed = false } = {}) {
     .map((e) => resolve(scanRoot, e.name, "src"));
   let realCheckout = false;
   try {
-    realCheckout = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim() === resolve(root);
+    realCheckout =
+      execFileSync("git", ["rev-parse", "--show-toplevel"], {
+        cwd: root,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      }).trim() === resolve(root);
   } catch {}
-  const files = (await Promise.all(roots.map((path) => rustFiles(path)))).flat();
-  for (const path of CURATED_VENDOR_ROOTS) files.push(...await rustFiles(resolve(root, path), realCheckout));
+  const files = (
+    await Promise.all(roots.map((path) => rustFiles(path)))
+  ).flat();
+  for (const path of CURATED_VENDOR_ROOTS)
+    files.push(...(await rustFiles(resolve(root, path), realCheckout)));
   for (const path of files) {
     const rel = relative(root, path).split(sep).join("/");
     if (isTestFile(rel)) continue;

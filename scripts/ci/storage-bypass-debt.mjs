@@ -17,7 +17,8 @@ export function validateCoverageDebt(findings, baseline, extension, history) {
   const coreSeen = new Set();
   for (const record of baseline) {
     const id = key(record);
-    if (coreSeen.has(id)) errors.push("Duplicate core baseline record: " + record.path);
+    if (coreSeen.has(id))
+      errors.push("Duplicate core baseline record: " + record.path);
     coreSeen.add(id);
     if (!original(record))
       errors.push(
