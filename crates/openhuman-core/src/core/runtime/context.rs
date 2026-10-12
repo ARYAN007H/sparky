@@ -161,8 +161,8 @@ impl CoreContext {
     pub async fn init_with_config(
         host_kind: HostKind,
         token: &TokenSource,
-        domains: crate::core::runtime::DomainSet,
-        tool_groups: crate::tools::toolpacks::ToolGroups,
+        mut domains: crate::core::runtime::DomainSet,
+        mut tool_groups: crate::tools::toolpacks::ToolGroups,
         preloaded_config: Option<crate::config::Config>,
         backend_transport: Option<Arc<dyn crate::backend::transport::BackendTransport>>,
     ) -> anyhow::Result<(Arc<CoreContext>, bool, Option<crate::config::Config>)> {
@@ -244,6 +244,14 @@ impl CoreContext {
             }
             None => crate::config::Config::load_or_init().await,
         };
+        // `[components]` can only narrow what the host chose.
+        let components = match &loaded {
+            Ok(cfg) => crate::core::runtime::ComponentSet::from_config(&cfg.components),
+            Err(_) => crate::core::runtime::ComponentSet::all(),
+        };
+        domains = components.narrow_domains(domains);
+        tool_groups = components.narrow_tool_groups(tool_groups);
+        log::debug!("[core-context] init: components={components:?} effective domains={domains:?}");
         let config = match loaded {
             Ok(cfg) => {
                 init_stores(&cfg, domains).await;
@@ -304,6 +312,11 @@ impl CoreContext {
     /// Which domain families are live for this context (#4796). The controller
     /// registry consults this (via [`CoreContext::current`]) to filter its
     /// schema/dispatch/tool surface. `full()` for desktop/CLI.
+    /// The `[components]` switches this context booted with.
+    pub fn components(&self) -> crate::core::runtime::ComponentSet {
+        self.components
+    }
+
     /// Per-group tool disclosure for this context.
     pub fn tool_groups(&self) -> crate::tools::toolpacks::ToolGroups {
         self.tool_groups.clone()
