@@ -585,6 +585,29 @@ async fn deferred_agent_purge_waits_for_module_close_and_keeps_the_id_reserved()
     assert!(McpConfiguredClient::for_config(&config).is_ok());
 }
 
+#[test]
+fn closed_client_cleanup_finishes_without_a_tokio_runtime() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    let agent_dir = workspace.path().join("agents").join("closed");
+    std::fs::create_dir_all(&agent_dir).unwrap();
+    let mut config = Config::default();
+    config.workspace_dir = agent_dir.clone();
+    config.modules.enabled = true;
+    McpConfiguredClient::install_test_port(&config, Box::new(FakePort::default()))
+        .expect("install closed client");
+
+    McpConfiguredClient::schedule_agent_close_and_cleanup(
+        &agent_dir,
+        Arc::new({
+            let agent_dir = agent_dir.clone();
+            move || std::fs::remove_dir_all(&agent_dir).is_ok() || !agent_dir.exists()
+        }),
+    );
+
+    assert!(!agent_dir.exists());
+    assert!(!McpConfiguredClient::agent_close_pending(&agent_dir));
+}
+
 #[tokio::test]
 async fn a_removed_agent_context_cannot_reopen_its_evicted_client() {
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
@@ -756,12 +779,9 @@ async fn failed_cleanup_actions_retain_and_retry_cached_and_orphaned_paths() {
     });
     let reservation = McpConfiguredClient::reservation_with_action(&agent_dir, action);
     let captured = McpConfiguredClient::retire_cached_client(&agent_dir).unwrap();
-    assert!(!McpConfiguredClient::close_retired_client(
-        agent_dir.clone(),
-        captured,
-        reservation,
-    )
-    .await);
+    assert!(
+        !McpConfiguredClient::close_retired_client(agent_dir.clone(), captured, reservation,).await
+    );
     assert!(agent_dir.join("state.json").exists());
     assert!(McpConfiguredClient::agent_close_pending(&agent_dir));
     assert!(matches!(
