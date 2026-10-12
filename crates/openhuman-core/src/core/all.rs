@@ -86,6 +86,28 @@ fn group_allowed(group: DomainGroup) -> bool {
     active_domain_set().map_or(group != DomainGroup::Operator, |s| s.allows(group))
 }
 
+/// The `[components]` switch that removed `g`'s family in the ambient scope.
+///
+/// A family a switch removed answers `COMPONENT_DISABLED:<name>` so the UI and
+/// CLI can explain it; a family the host merely left out stays
+/// indistinguishable from an unregistered method.
+fn component_blocking(g: &GroupedController) -> Option<&'static str> {
+    let name = crate::core::runtime::ComponentSet::component_for_group(g.group)?;
+    let ctx = crate::core::runtime::context::CoreContext::current()?;
+    (!ctx.components().enabled(name)).then_some(name)
+}
+
+/// `Some(component)` when `method` exists but its component is switched off in
+/// the ambient scope. Dispatch asks this before reporting an unknown method.
+pub fn disabled_component_for_method(method: &str) -> Option<&'static str> {
+    let view = registry_view();
+    let grouped = view
+        .iter()
+        .chain(internal_registry().iter())
+        .find(|g| g.controller.rpc_method_name() == method)?;
+    component_blocking(grouped)
+}
+
 /// Whether `g` is live in the ambient scope: its family is enabled and, for a
 /// SaaS user, the method is on the user surface (`profiles::surface`).
 fn visible(g: &GroupedController) -> bool {
@@ -1158,17 +1180,11 @@ pub async fn try_invoke_registered_rpc(
     // are indistinguishable from absent. Enforced HERE (dispatch), not in
     // schema/validation lookups, to avoid a validate/dispatch split.
     if !visible(grouped) {
-        // A family a `[components]` switch removed answers with the typed
-        // error so the UI and CLI can explain it; a family the host left
-        // out stays indistinguishable from an unregistered method.
-        if let Some(name) = crate::core::runtime::ComponentSet::component_for_group(grouped.group) {
-            let off = crate::core::runtime::context::CoreContext::current()
-                .map(|c| !c.components().enabled(name))
-                .unwrap_or(false);
-            if off {
-                log::debug!("[rpc][component-gate] method '{method}' refused — component '{name}' disabled");
-                return Some(Err(crate::core::runtime::components::component_disabled(name).encode()));
-            }
+        if let Some(name) = component_blocking(grouped) {
+            log::debug!("[rpc][component-gate] method '{method}' refused, component '{name}' disabled");
+            return Some(Err(
+                crate::core::runtime::components::component_disabled(name).encode()
+            ));
         }
         log::debug!(
             "[rpc][domain-gate] method '{method}' suppressed — group {:?} disabled or method \
