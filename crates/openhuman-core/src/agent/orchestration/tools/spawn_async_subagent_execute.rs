@@ -21,15 +21,8 @@ impl SpawnAsyncSubagentTool {
             force_fresh,
         } = decode_async_spawn_args(&args);
 
-        if agent_id.is_empty() {
-            return Ok(ToolResult::error(
-                "spawn_async_subagent: `agent_id` is required",
-            ));
-        }
-        if prompt.is_empty() {
-            return Ok(ToolResult::error(
-                "spawn_async_subagent: `prompt` is required",
-            ));
+        if let Some(refusal) = refuse_empty_spawn_args(&agent_id, &prompt) {
+            return Ok(refusal);
         }
         let Some(detached_parent) = detached_parent else {
             return Ok(ToolResult::error(

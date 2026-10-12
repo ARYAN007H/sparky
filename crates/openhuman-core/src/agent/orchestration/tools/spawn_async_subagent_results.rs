@@ -83,3 +83,17 @@ fn accepted_spawn_result(
         fleet,
     ))
 }
+
+fn refuse_empty_spawn_args(agent_id: &str, prompt: &str) -> Option<ToolResult> {
+    if agent_id.is_empty() {
+        return Some(ToolResult::error(
+            "spawn_async_subagent: `agent_id` is required",
+        ));
+    }
+    if prompt.is_empty() {
+        return Some(ToolResult::error(
+            "spawn_async_subagent: `prompt` is required",
+        ));
+    }
+    None
+}
