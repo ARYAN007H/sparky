@@ -4,6 +4,7 @@ use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
 use crate::tools::toolpacks::ToolGroups;
 use std::sync::Arc;
 
+/// Give both profiles one isolated configuration and one fake service identity.
 fn config(dir: &std::path::Path) -> Config {
     let mut config = Config {
         workspace_dir: dir.join("workspace"),
@@ -20,11 +21,13 @@ fn config(dir: &std::path::Path) -> Config {
     config
 }
 
+/// Derive a real profile context while keeping the shared configuration intact.
 fn profile(config: &Config, id: &str) -> Arc<CoreContext> {
     CoreContext::for_test_with_config(DomainSet::kernel(), config.clone()).derive_with(
         ContextOverlay::new(config.clone(), DomainSet::kernel(), ToolGroups::none()).profile(id),
     )
 }
+/// Install a known snapshot under the supplied context's production cache key.
 fn seed(config: &Config, ctx: Arc<CoreContext>, toolkit: &str) -> String {
     CoreContext::sync_scope(ctx, || {
         let key = cache_key(config);
@@ -47,6 +50,7 @@ fn seed(config: &Config, ctx: Arc<CoreContext>, toolkit: &str) -> String {
     })
 }
 
+/// Matching credentials must not let one profile read another's snapshot.
 #[test]
 fn profiles_with_identical_credentials_cannot_read_each_others_integrations() {
     let _guard = composio_cache_test_lock();
@@ -77,6 +81,7 @@ fn profiles_with_identical_credentials_cannot_read_each_others_integrations() {
     guard.remove(&bob_key);
 }
 
+/// Reconcile only the caller's entries against its connection response.
 #[test]
 fn reconciliation_for_one_profile_preserves_another_profiles_connections() {
     let _guard = composio_cache_test_lock();
@@ -102,6 +107,7 @@ fn reconciliation_for_one_profile_preserves_another_profiles_connections() {
     assert!(!guard.contains_key(&bob_key));
     guard.remove(&alice_key);
 }
+/// Invalidation must leave another profile's cached snapshot readable.
 #[test]
 fn profile_invalidation_preserves_another_profiles_snapshot() {
     let _guard = composio_cache_test_lock();
@@ -126,6 +132,7 @@ fn profile_invalidation_preserves_another_profiles_snapshot() {
     INTEGRATIONS_CACHE.write().unwrap().remove(&alice_key);
 }
 
+/// Fence the caller's pending warm while admitting another profile's result.
 #[test]
 fn profile_invalidation_does_not_cancel_another_profiles_in_flight_warm() {
     let _guard = composio_cache_test_lock();
@@ -163,6 +170,7 @@ fn profile_invalidation_does_not_cancel_another_profiles_in_flight_warm() {
     assert!(!guard.contains_key(&bob_key));
 }
 
+/// Missing SaaS authority must refuse cache reads, fetches and mutations.
 #[test]
 fn no_saas_profile_cannot_invalidate_or_reconcile_any_snapshot() {
     const CHILD: &str = "OPENHUMAN_TEST_UNSCOPED_CACHE_MUTATION_CHILD";
@@ -223,6 +231,7 @@ fn no_saas_profile_cannot_invalidate_or_reconcile_any_snapshot() {
     assert_eq!(epoch.load(Ordering::SeqCst), generation);
 }
 
+/// Desktop agents share their operator catalog and its invalidation epoch.
 #[test]
 fn desktop_agents_share_catalog_and_default_context_invalidates_their_warms() {
     let _guard = composio_cache_test_lock();

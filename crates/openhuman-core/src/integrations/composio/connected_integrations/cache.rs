@@ -47,6 +47,7 @@ pub(crate) fn cache_generation(key: &str) -> Arc<AtomicU64> {
         .clone()
 }
 
+/// Resolve the catalog's profile/operator identity, refusing missing SaaS scope.
 fn current_cache_scope_prefix() -> Option<String> {
     let tenant = crate::core::runtime::current_tenant().ok()?;
     // Connected accounts belong to the profile/operator, shared by its agents.
@@ -128,6 +129,7 @@ pub(crate) fn cache_key(config: &Config) -> String {
     checked_cache_key(config).expect("integration cache test requires a valid scope")
 }
 
+/// Digest the configuration, endpoint and resolved credential identities.
 fn cache_key_with_backend_url(config: &Config, backend_url: &str) -> String {
     let mut digest = Sha256::new();
     digest.update(b"openhuman-integrations-cache-v3\0");
@@ -223,6 +225,7 @@ pub fn cached_active_integrations(config: &Config) -> Option<Vec<ConnectedIntegr
     read_cached_integrations(config)
 }
 
+/// Read the caller's snapshot from the process cache without fetching.
 fn read_cached_integrations(config: &Config) -> Option<Vec<ConnectedIntegration>> {
     read_cached_integrations_from(&INTEGRATIONS_CACHE, config)
 }
