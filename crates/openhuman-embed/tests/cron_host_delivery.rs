@@ -42,6 +42,11 @@ fn add_job(name: &str, prompt: &str) -> serde_json::Value {
 
 #[test]
 fn a_library_agents_scheduled_reply_is_handed_to_the_host() {
+    let _ = env_logger::builder().is_test(true).try_init();
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_test_writer()
+        .try_init();
     runtime().block_on(async {
         tokio::spawn(async {
             let backend = stub_backend().await;
