@@ -211,8 +211,11 @@ impl AgentInner {
 
 impl Drop for AgentInner {
     fn drop(&mut self) {
-        let mut agents = self.registry.lock().unwrap_or_else(|e| e.into_inner());
         self.teardown("agent_dropped");
+        // Keep the weak registry slot as the id reservation while teardown
+        // drops user-owned state. Its destructors may block or re-enter the
+        // runtime, so do not hold the registry mutex across teardown.
+        let mut agents = self.registry.lock().unwrap_or_else(|e| e.into_inner());
         if agents
             .get(&self.id)
             .is_some_and(|current| std::ptr::eq(current.as_ptr(), self))
