@@ -154,7 +154,6 @@ if [ ! -f "$hosts_dir/libtinyhosts.$module_ext" ]; then
   fi
   tar --no-same-owner -xzf "$hosts_archive" -C "$hosts_dir"
 fi
-export OPENHUMAN_MODULE_PATH="$hosts_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
 fi
 
 # TinyBox command analysis is required by shell-backed storage and capability
@@ -205,10 +204,13 @@ fi
 stage_source_modules "${local_source_ids[@]}"
 connectors_dir="$REPO_ROOT/target/module-sources/tinyconnectors"
 for source_id in "${local_source_ids[@]}"; do
-  if [ "$source_id" != tinyconnectors ]; then
+  if [ "$source_id" != tinyconnectors ] && [ "$source_id" != tinyhosts ]; then
     export OPENHUMAN_MODULE_PATH="$REPO_ROOT/target/module-sources/$source_id${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
   fi
 done
+if local_module_source_is_source; then
+  hosts_dir="$REPO_ROOT/target/module-sources/tinyhosts"
+fi
 connectors_module_path="$connectors_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
 
 cargo_test() {
@@ -331,7 +333,7 @@ run_full_suite() {
 
   # Loading a native module mutates process-global module state, so exercise
   # the published contract in a fresh libtest process with its pinned artifact.
-  OPENHUMAN_MODULE_PATH="$connectors_module_path" \
+  OPENHUMAN_MODULE_PATH="$hosts_dir:$connectors_module_path" \
     cargo_test --lib \
       hosting::test::released_artifact_serves_providers_and_confidential_local_preparation \
       -- --exact --ignored --test-threads=1
