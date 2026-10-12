@@ -66,40 +66,52 @@ fn an_already_released_reservation_does_not_purge_a_home() {
     assert!(home.exists());
 }
 
-#[tokio::test]
-async fn the_last_runtime_guard_keeps_admission_reserved_through_cleanup_completion() {
-    let runtime = crate::Runtime::builder()
-        .config(openhuman_core::config::Config::default())
-        .workspace(crate::Workspace::Ephemeral)
+#[test]
+fn the_last_runtime_guard_keeps_admission_reserved_through_cleanup_completion() {
+    let executor = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .worker_threads(1)
+        .thread_stack_size(openhuman_core::core::runtime::AGENT_WORKER_STACK_BYTES)
         .build()
+        .unwrap();
+    executor.block_on(async {
+        tokio::spawn(async {
+            let runtime = crate::Runtime::builder()
+                .config(openhuman_core::config::Config::default())
+                .workspace(crate::Workspace::Ephemeral)
+                .build()
+                .await
+                .expect("a real isolated runtime can be built");
+            let guard = runtime.guard();
+            let weak = Arc::downgrade(&guard);
+            drop(runtime);
+            let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+            let (release_tx, release_rx) = std::sync::mpsc::channel();
+            let worker = std::thread::spawn(move || {
+                let mut guard = Some(guard);
+                complete_with_guard(&mut guard, || {
+                    entered_tx.send(()).unwrap();
+                    release_rx.recv().unwrap();
+                });
+            });
+            entered_rx.recv().unwrap();
+            let guard_is_live = weak.upgrade().is_some();
+            let admission_is_reserved =
+                crate::runtime::RUNTIME_LIVE.load(std::sync::atomic::Ordering::Acquire);
+            release_tx.send(()).unwrap();
+            worker.join().unwrap();
+            assert!(
+                guard_is_live,
+                "completion must retain the last real workspace/runtime guard"
+            );
+            assert!(
+                admission_is_reserved,
+                "another runtime must remain excluded while cleanup completion is blocked"
+            );
+            assert!(weak.upgrade().is_none());
+            assert!(!crate::runtime::RUNTIME_LIVE.load(std::sync::atomic::Ordering::Acquire));
+        })
         .await
-        .expect("a real isolated runtime can be built");
-    let guard = runtime.guard();
-    let weak = Arc::downgrade(&guard);
-    drop(runtime);
-    let (entered_tx, entered_rx) = std::sync::mpsc::channel();
-    let (release_tx, release_rx) = std::sync::mpsc::channel();
-    let worker = std::thread::spawn(move || {
-        let mut guard = Some(guard);
-        complete_with_guard(&mut guard, || {
-            entered_tx.send(()).unwrap();
-            release_rx.recv().unwrap();
-        });
+        .unwrap();
     });
-    entered_rx.recv().unwrap();
-    let guard_is_live = weak.upgrade().is_some();
-    let admission_is_reserved =
-        crate::runtime::RUNTIME_LIVE.load(std::sync::atomic::Ordering::Acquire);
-    release_tx.send(()).unwrap();
-    worker.join().unwrap();
-    assert!(
-        guard_is_live,
-        "completion must retain the last real workspace/runtime guard"
-    );
-    assert!(
-        admission_is_reserved,
-        "another runtime must remain excluded while cleanup completion is blocked"
-    );
-    assert!(weak.upgrade().is_none());
-    assert!(!crate::runtime::RUNTIME_LIVE.load(std::sync::atomic::Ordering::Acquire));
 }
