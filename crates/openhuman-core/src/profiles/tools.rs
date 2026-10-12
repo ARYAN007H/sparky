@@ -189,7 +189,8 @@ pub fn admits(tool: &str, domain_ok: bool) -> bool {
 /// Whether `tool` is one of the [`OPERATOR_ADMITTABLE`] tools and `named`
 /// lists it.
 pub fn admitted_by_name(tool: &str, named: Option<&std::collections::HashSet<String>>) -> bool {
-    let admitted = OPERATOR_ADMITTABLE.contains(&tool) && named.is_some_and(|names| names.contains(tool));
+    let admitted =
+        OPERATOR_ADMITTABLE.contains(&tool) && named.is_some_and(|names| names.contains(tool));
     if admitted {
         log::debug!("[profiles][tools] admitting named `{tool}` outside its domain family");
     }
