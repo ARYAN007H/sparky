@@ -698,26 +698,24 @@ async fn every_call_is_audited_without_its_payload() {
 #[path = "storage_host_bus_tests.rs"]
 mod bus;
 
+async fn set_secret(rig: &Rig) -> Result<Value, HostError> {
+    let who = alpha();
+    rig.host
+        .handle(
+            Object::Secrets,
+            "Set",
+            json!({"name": "token.a", "value": [1]}),
+            Some(&who),
+            Admission::Confidential,
+        )
+        .await
+}
+
 #[tokio::test]
 async fn a_key_provider_failure_at_bind_is_retried_not_cached() {
     let rig = rig();
     rig.env.keys_ready.store(false, Ordering::SeqCst);
-    let set = json!({"name": "token.a", "value": [1]});
-    let attempt = |rig: &Rig, set: Value| {
-        let host = &rig.host;
-        async move {
-            let who = alpha();
-            host.handle(
-                Object::Secrets,
-                "Set",
-                set,
-                Some(&who),
-                Admission::Confidential,
-            )
-            .await
-        }
-    };
-    assert!(attempt(&rig, set.clone()).await.is_err());
+    assert!(set_secret(&rig).await.is_err());
     rig.env.keys_ready.store(true, Ordering::SeqCst);
-    attempt(&rig, set).await.unwrap();
+    set_secret(&rig).await.unwrap();
 }
