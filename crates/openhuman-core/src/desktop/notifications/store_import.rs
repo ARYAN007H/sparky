@@ -34,7 +34,13 @@ pub(crate) const TABLES: &[&str] = &[
 
 /// Reads every legacy row.
 pub(crate) fn read(config: &Config) -> Result<Vec<ImportDoc>> {
-    super::with_connection(config, |conn| read_rows(conn, LOCAL_WORKSPACE))
+    read_for(config, LOCAL_WORKSPACE)
+}
+
+/// [`read`] with core notifications filed under `workspace` instead of the
+/// fixed local key.
+pub(crate) fn read_for(config: &Config, workspace: &str) -> Result<Vec<ImportDoc>> {
+    super::with_connection(config, |conn| read_rows(conn, workspace))
 }
 
 fn read_rows(conn: &Connection, workspace: &str) -> Result<Vec<ImportDoc>> {

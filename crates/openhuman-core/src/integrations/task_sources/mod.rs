@@ -25,6 +25,7 @@ pub mod route;
 mod schemas;
 pub mod store;
 mod store_documents;
+pub(crate) use store_documents::import_source;
 pub mod tools;
 pub mod types;
 

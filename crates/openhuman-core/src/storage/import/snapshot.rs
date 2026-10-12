@@ -42,10 +42,10 @@ impl Snapshot {
         }
         std::fs::copy(source, &db).with_context(|| format!("copy {}", source.display()))?;
         for suffix in ["-wal", "-shm"] {
-            let companion = companion(source, suffix);
-            if companion.is_file() {
-                std::fs::copy(&companion, companion(&db, suffix))
-                    .with_context(|| format!("copy {}", companion.display()))?;
+            let extra = companion(source, suffix);
+            if extra.is_file() {
+                std::fs::copy(&extra, companion(&db, suffix))
+                    .with_context(|| format!("copy {}", extra.display()))?;
             }
         }
         Ok(Self { dir, db })
