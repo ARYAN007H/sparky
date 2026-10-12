@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::Value;
+use tinymcp::McpRemoteToolExt;
 
 use crate::config::Config;
 use crate::mcp::host;
