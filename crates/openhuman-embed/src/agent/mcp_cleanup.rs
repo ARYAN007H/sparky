@@ -143,3 +143,7 @@ impl AgentInner {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "mcp_cleanup_tests.rs"]
+mod tests;
