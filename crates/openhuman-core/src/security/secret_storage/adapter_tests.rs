@@ -154,6 +154,9 @@ fn recovery_does_not_quarantine_a_valid_file_replaced_after_the_probe() {
     })
     .unwrap();
 
-    assert_eq!(backend.get_with_key(&KEY, "u:a").unwrap().as_deref(), Some("1"));
+    assert_eq!(
+        backend.get_with_key(&KEY, "u:a").unwrap().as_deref(),
+        Some("1")
+    );
     assert!(quarantined(dir.path()).is_empty());
 }

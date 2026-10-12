@@ -84,14 +84,12 @@ pub fn lock_for_write(path: &Path) -> Result<WriteLock, SecretStorageError> {
         use std::os::unix::fs::OpenOptionsExt;
         options.mode(0o600).custom_flags(libc::O_NOFOLLOW);
     }
-    let file = options
-        .open(&lock_path)
-        .map_err(|e| {
-            SecretStorageError::Backend(format!(
-                "could not open the keyring lock at {}: {e}",
-                lock_path.display()
-            ))
-        })?;
+    let file = options.open(&lock_path).map_err(|e| {
+        SecretStorageError::Backend(format!(
+            "could not open the keyring lock at {}: {e}",
+            lock_path.display()
+        ))
+    })?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::{MetadataExt, PermissionsExt};

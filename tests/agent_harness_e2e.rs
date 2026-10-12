@@ -4150,7 +4150,10 @@ async fn orchestrator_calls_a_connected_mcp_tool_directly_inner() {
             "tool_search",
             json!({ "query": "echo message on my connected MCP server" }),
         ),
-        tool_call_completion(SCRIPT_DISCOVERED_MCP_TOOL, json!({ "message": MCP_ECHO_CANARY })),
+        tool_call_completion(
+            SCRIPT_DISCOVERED_MCP_TOOL,
+            json!({ "message": MCP_ECHO_CANARY }),
+        ),
         text_completion("The MCP tool answered."),
     ]);
     let mut events = spawn_sse_collector(format!(
