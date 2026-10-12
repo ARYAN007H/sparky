@@ -29,11 +29,19 @@ pub(super) struct SourcePlan {
 
 /// Whether this binary registered an in-process factory for `id`.
 ///
-/// The factory registry arrives with `openhuman-modules-linked` (E0.2); until
-/// then no binary has one, so a `linked` request always falls back.
+/// Only a binary whose host called [`super::linked::register_linked`] (the CLI
+/// built with `linked-modules`) has one; every other binary falls back.
 #[must_use]
-pub(super) fn linked_factory_available(_id: &str) -> bool {
-    false
+pub(super) fn linked_factory_available(id: &str) -> bool {
+    #[cfg(feature = "modules")]
+    {
+        super::linked::is_registered(id)
+    }
+    #[cfg(not(feature = "modules"))]
+    {
+        let _ = id;
+        false
+    }
 }
 
 /// The locally built artifact for `id`, if one exists.

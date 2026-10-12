@@ -35,6 +35,7 @@
 //!   and claims it for a browser about to start.
 //! - [`wallet`] — the host half of the `tinywallet` module, which builds and
 //!   assembles transactions while the signing key stays in this process.
+//! - [`linked`] — the registry of modules linked into the executable (local development).
 //! - [`host`] — the module broker, connection and loader.
 //! - [`ops`] — resolving, loading, and reporting status.
 //! - [`schemas`] — the `modules` RPC surface.
@@ -73,6 +74,8 @@ pub mod documents;
 mod failure;
 #[cfg(feature = "modules")]
 pub mod host;
+#[cfg(feature = "modules")]
+pub mod linked;
 #[cfg(feature = "modules")]
 pub mod ops;
 pub mod registry;
