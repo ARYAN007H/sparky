@@ -2,7 +2,6 @@
 
 use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec};
 
-
 pub(crate) const TINYJUICE: ModuleRecord = ModuleRecord {
     id: "tinyjuice",
     description: "Content-aware tool-output compression and recoverable caching",

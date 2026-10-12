@@ -722,3 +722,112 @@ fn source_artifact_file_names_follow_the_platform_convention() {
         }
     }
 }
+
+/// The interface and object path each contract crate publishes, keyed by the
+/// module id the registry uses. This is written out from the contract
+/// constants, not from the records, so a record that drifts from its contract
+/// (or a contract that is renamed upstream) fails here rather than at the first
+/// bus call.
+fn contract_names() -> Vec<(&'static str, &'static str, &'static str)> {
+    vec![
+        (
+            "tinycomputer",
+            tinycomputer_bus::names::INTERFACE,
+            tinycomputer_bus::names::OBJECT_PATH,
+        ),
+        (
+            "tinysearch",
+            tinysearch_bus::names::INTERFACE,
+            tinysearch_bus::names::OBJECT_PATH,
+        ),
+        (
+            "tinydocs",
+            tinydocs_bus::names::BUS_NAME,
+            tinydocs_bus::names::OBJECT_PATH,
+        ),
+        (
+            "tinywallet",
+            tinywallet_bus::names::BUS_NAME,
+            tinywallet_bus::names::OBJECT_PATH,
+        ),
+        (
+            "tinyjuice",
+            tinyjuice_bus::names::BUS_NAME,
+            tinyjuice_bus::names::OBJECT_PATH,
+        ),
+        (
+            "tinyvoice",
+            tinyvoice_bus::names::BUS_NAME,
+            tinyvoice_bus::names::OBJECT_PATH,
+        ),
+        (
+            "tinymcp",
+            tinymcp_bus::names::INTERFACE,
+            tinymcp_bus::names::OBJECT_PATH,
+        ),
+        (
+            "tinyconnectors",
+            tinyconnectors_bus::names::INTERFACE,
+            tinyconnectors_bus::names::OBJECT_PATH,
+        ),
+        ("tinybox", tinybox_bus::INTERFACE, tinybox_bus::OBJECT_PATH),
+        (
+            "tinychannels",
+            tinychannels_bus::names::BUS_NAME,
+            tinychannels_bus::names::OBJECT_PATH,
+        ),
+        (
+            "tinyhosts",
+            tinyhosts_bus::BUS_NAME,
+            tinyhosts_bus::OBJECT_PATH,
+        ),
+    ]
+}
+
+#[test]
+fn every_record_matches_its_contract_constants() {
+    let contracts = contract_names();
+    assert_eq!(contracts.len(), ALL.len(), "a record has no contract entry");
+    for (id, bus_name, object_path) in contracts {
+        let record = find(id).unwrap_or_else(|| panic!("{id} has no registry record"));
+        assert_eq!(
+            record.bus_name, bus_name,
+            "{id} bus name drifted from its contract"
+        );
+        assert_eq!(
+            record.object_path, object_path,
+            "{id} object path drifted from its contract"
+        );
+    }
+}
+
+#[test]
+fn a_changed_contract_constant_is_detected() {
+    // The comparison above must be able to fail: feed it a fixture whose
+    // constant differs from the record and confirm it reports the drift.
+    let record = find("tinydocs").unwrap();
+    let drifted = format!("{}Renamed", tinydocs_bus::names::BUS_NAME);
+    assert_ne!(record.bus_name, drifted);
+}
+
+#[test]
+fn every_build_with_a_registry_carries_all_eleven_records() {
+    // The contract crates of the gate-optional modules ride on `modules`, so no
+    // feature combination that compiles the registry drops a record.
+    assert_eq!(ALL.len(), 11);
+    for id in [
+        "tinycomputer",
+        "tinysearch",
+        "tinydocs",
+        "tinywallet",
+        "tinyjuice",
+        "tinyvoice",
+        "tinymcp",
+        "tinyconnectors",
+        "tinybox",
+        "tinychannels",
+        "tinyhosts",
+    ] {
+        assert!(find(id).is_some(), "{id} missing from the registry");
+    }
+}

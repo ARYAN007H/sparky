@@ -2,7 +2,6 @@
 
 use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec};
 
-
 /// The `tinymcp` module: the Model Context Protocol client.
 ///
 /// Owns both transports (Streamable HTTP and a subprocess over stdio), the

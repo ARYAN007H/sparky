@@ -2,7 +2,6 @@
 
 use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec};
 
-
 /// The `tinyvoice` module: the host-agnostic half of the voice pipeline.
 ///
 /// Wake-word gating, fast-path command routing, STT hallucination detection,

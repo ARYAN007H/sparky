@@ -2,7 +2,6 @@
 
 use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec};
 
-
 /// The `tinydocs` module: document synthesis, bounded extraction, image facts,
 /// and PDF rendering.
 ///
