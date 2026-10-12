@@ -33,6 +33,13 @@ fn test_bundled_record() -> &'static crate::modules::types::ModuleRecord {
         release_url: "https://github.com/tinyhumansai/tinydocs/releases/tag/v0.1.16",
         assets,
         load: LoadPolicy::Lazy,
+        source: crate::modules::types::SourceSpec {
+            submodule: "tinydocs",
+            manifest: "Cargo.toml",
+            package: "test-bundled-module",
+            lib_name: "test_bundled_module",
+            features: &[],
+        },
     }))
 }
 

@@ -70,6 +70,25 @@ pub(super) fn artifact_in(root: &Path, id: &str) -> Option<PathBuf> {
     path.is_file().then_some(path)
 }
 
+/// A real module library for `id` on this machine, for tests that need one.
+///
+/// Looks first under [`SOURCE_DIR_ENV`] (a `scripts/modules/build.mjs` build),
+/// then in every `OPENHUMAN_MODULE_PATH` directory (the released modules the
+/// CI installer stages). `None` means the test should skip, not fail: no module
+/// was provided. Never used by the loader, which goes through [`plan`].
+#[doc(hidden)]
+#[must_use]
+pub fn local_artifact(id: &str) -> Option<PathBuf> {
+    if let Some(path) = source_artifact(id) {
+        return Some(path);
+    }
+    let name = super::registry::find(id)?.source.artifact_filename();
+    let dirs = std::env::var_os("OPENHUMAN_MODULE_PATH")?;
+    std::env::split_paths(&dirs)
+        .map(|dir| dir.join(&name))
+        .find(|path| path.is_file())
+}
+
 /// Choose the source for `id` under `config`.
 pub(super) fn plan(config: &Config, id: &str) -> SourcePlan {
     plan_with(
