@@ -405,28 +405,28 @@ impl Tool for McpCallTool {
         };
         let server = match client.normalize_identifier(&server).await {
             Ok(server) => server,
-            Err(_) => {
+            Err(error) => {
                 let outcome = tinymcp_bus::McpCallOutcome::failed(
                     &server,
                     &tool,
-                    tinymcp_bus::McpCallError::new(tinymcp_bus::errors::INVALID_ARGUMENTS),
+                    tinymcp_bus::McpCallError::new(input_module_error_code(error)),
                 );
                 return Ok(with_outcome(
-                    ToolResult::error("MCP server or tool identifier is invalid"),
+                    ToolResult::error("MCP server identifier normalization failed"),
                     &outcome,
                 ));
             }
         };
         let tool = match client.normalize_identifier(&tool).await {
             Ok(tool) => tool,
-            Err(_) => {
+            Err(error) => {
                 let outcome = tinymcp_bus::McpCallOutcome::failed(
                     &server,
                     &tool,
-                    tinymcp_bus::McpCallError::new(tinymcp_bus::errors::INVALID_ARGUMENTS),
+                    tinymcp_bus::McpCallError::new(input_module_error_code(error)),
                 );
                 return Ok(with_outcome(
-                    ToolResult::error("MCP server or tool identifier is invalid"),
+                    ToolResult::error("MCP tool identifier normalization failed"),
                     &outcome,
                 ));
             }
@@ -434,14 +434,14 @@ impl Tool for McpCallTool {
         let client_config = host::client_config(&self.config);
         let arguments = match client.normalize_tool_arguments(arguments).await {
             Ok(arguments) => Value::Object(arguments),
-            Err(_) => {
+            Err(error) => {
                 let outcome = tinymcp_bus::McpCallOutcome::failed(
                     &server,
                     &tool,
-                    tinymcp_bus::McpCallError::new(tinymcp_bus::errors::INVALID_ARGUMENTS),
+                    tinymcp_bus::McpCallError::new(input_module_error_code(error)),
                 );
                 return Ok(with_outcome(
-                    ToolResult::error("`arguments`: invalid MCP tool arguments"),
+                    ToolResult::error("MCP tool argument normalization failed"),
                     &outcome,
                 ));
             }
@@ -545,6 +545,17 @@ fn unavailable_outcome(server: &str, tool: &str) -> tinymcp_bus::McpCallOutcome 
         tool,
         tinymcp_bus::McpCallError::new(tinymcp_bus::errors::BUS),
     )
+}
+
+fn input_module_error_code(error: crate::modules::client::ModuleCallError) -> &'static str {
+    use crate::modules::client::ModuleCallError;
+    match error {
+        ModuleCallError::Unavailable | ModuleCallError::IncompatibleContract => {
+            tinymcp_bus::errors::BUS
+        }
+        ModuleCallError::TransportFailed => tinymcp_bus::errors::TRANSPORT,
+        ModuleCallError::ModuleFault => tinymcp_bus::errors::INVALID_ARGUMENTS,
+    }
 }
 
 fn with_outcome(mut result: ToolResult, outcome: &tinymcp_bus::McpCallOutcome) -> ToolResult {
