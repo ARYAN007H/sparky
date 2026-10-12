@@ -84,6 +84,7 @@ fi
 # Everything after `--` is forwarded to cargo test as test-binary args.
 SUITES=()
 EXTRA_ARGS=()
+HAS_EXTRA_ARGS=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --suite)
@@ -100,10 +101,14 @@ while [ $# -gt 0 ]; do
     --)
       shift
       EXTRA_ARGS+=("$@")
+      if [ "$#" -gt 0 ]; then
+        HAS_EXTRA_ARGS=1
+      fi
       break
       ;;
     *)
       EXTRA_ARGS+=("$1")
+      HAS_EXTRA_ARGS=1
       shift
       ;;
   esac
@@ -249,7 +254,7 @@ run_json_rpc_e2e_suite() {
     bash "$SCRIPT_DIR/ci-cancel-aware.sh" "$CARGO_BIN" test \
       --manifest-path Cargo.toml --features "$PRODUCT_FEATURES" \
       --test json_rpc_e2e "$test_name" -- \
-      --exact --test-threads=1 "${EXTRA_ARGS[@]}"
+      --exact --test-threads=1 ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
   done <<<"$test_names"
 }
 
@@ -290,7 +295,7 @@ for suite in "${SUITES[@]}"; do
     continue
   fi
 
-  if [ "${#EXTRA_ARGS[@]}" -gt 0 ]; then
+  if [ "$HAS_EXTRA_ARGS" -eq 1 ]; then
     echo "[rust-e2e]   $CARGO_BIN test --manifest-path Cargo.toml --test $suite -- ${EXTRA_ARGS[*]}"
     bash "$SCRIPT_DIR/ci-cancel-aware.sh" "$CARGO_BIN" test \
       --manifest-path Cargo.toml --features "$PRODUCT_FEATURES" \
