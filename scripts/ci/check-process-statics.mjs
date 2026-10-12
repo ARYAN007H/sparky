@@ -28,6 +28,8 @@ export function declarations(text, file) {
     for (; end < code.length; end++) {
       const char = code[end];
       if (!stack.length && (char === "=" || char === ";")) break;
+      // Operators inside a braced const expression are not type brackets.
+      if ((char === "<" || char === ">") && stack.includes("{")) continue;
       if ("<([{".includes(char)) stack.push(char);
       else if (">)]}".includes(char) && stack.length) {
         // An arrow inside a function type is not a generic closing bracket.
