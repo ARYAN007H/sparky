@@ -198,7 +198,7 @@ impl McpModulePort for TinyMcpPort {
         arguments: Option<Value>,
     ) -> Result<Map<String, Value>, ModuleCallError> {
         self.root
-            .call(
+            .call_confidential(
                 MODULE,
                 names::methods::NORMALIZE_TOOL_ARGUMENTS,
                 (arguments,),
