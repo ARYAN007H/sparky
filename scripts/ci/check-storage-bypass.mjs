@@ -32,12 +32,22 @@ const repoRoot =
   rootFlag === -1
     ? resolve(dirname(fileURLToPath(import.meta.url)), "../..")
     : resolve(process.argv[rootFlag + 1]);
-const scanRoot = resolve(repoRoot, "crates/openhuman-core/src");
+const scanRoot = resolve(repoRoot, "crates");
 const baselinePath = resolve(
   repoRoot,
   "scripts/ci/storage-bypass-baseline.json",
 );
 const writeBaseline = process.argv.includes("--write-baseline");
+
+export const CURATED_VENDOR_ROOTS = [
+  "vendor/tinyagents/crates/tinyagents-session/src/run_ledger",
+  "vendor/tinyagents/crates/tinyagents-session/src/threads/store",
+  "vendor/tinyagents/crates/tinyagents-session/src/transcript",
+  "vendor/tinyagents/crates/tinyagents-session/src/turn_state/store.rs",
+  "vendor/tinymcp/crates/tinymcp/src/registry/store",
+  "vendor/tinymcp/crates/tinymcp/src/audit/store",
+  "vendor/tinymcp/crates/tinymcp/src/tinybus_module/service.rs",
+];
 
 export const RULES = [
   {
@@ -50,6 +60,21 @@ export const RULES = [
     pattern:
       /\b(?:fs::write|File::create|OpenOptions::new|NamedTempFile::new_in)\s*\(/,
     hint: "persist through the storage port, or allowlist it with a reason in ALLOW",
+  },
+  {
+    rule: "file-mutation",
+    pattern: /\b(?:fs::(?:rename|copy|hard_link)|tempfile::Builder::new|serde_json::to_writer(?:_pretty)?)\s*\(/,
+    hint: "review the filesystem publication or serializer destination through the owning storage port",
+  },
+  {
+    rule: "writer-helper",
+    pattern: /\bfn\s+(?:write_private|create_private|write_atomic)\s*\(/,
+    hint: "review this helper definition; private permissions do not supply shared storage",
+  },
+  {
+    rule: "vendored-open",
+    pattern: /\b(?:[A-Za-z_][\w]*::)*(?:[A-Za-z_][\w]*Store|[A-Za-z_][\w]*Ledger)::open(?:_file)?\s*\([^;]*"[^"\n]*\.(?:db|jsonl)"/,
+    hint: "a persistent path passed to an owning store opener needs captured native routing",
   },
 ];
 
@@ -230,7 +255,9 @@ export function scan(rel, source) {
   return found;
 }
 
-const identity = ({ rule, path, text, occurrence }) =>
+export const originalCore = f => f.path.startsWith(SRC) && ["sqlite-open", "json-write"].includes(f.rule);
+
+export const identity = ({ rule, path, text, occurrence }) =>
   `${rule}\0${path}\0${text}\0${occurrence}`;
 
 /** `added` must fail; `stale` must be removed from the baseline. */
@@ -245,6 +272,9 @@ export function compare(findings, baseline) {
 
 async function rustFiles(dir) {
   const out = [];
+  if (dir.endsWith(".rs")) {
+    try { await readFile(dir); return [dir]; } catch { return []; }
+  }
   let entries;
   try {
     entries = await readdir(dir, { withFileTypes: true });
@@ -261,7 +291,9 @@ async function rustFiles(dir) {
 
 async function main() {
   const findings = [];
-  for (const path of await rustFiles(scanRoot)) {
+  const roots = (await readdir(scanRoot, { withFileTypes: true })).filter(e => e.isDirectory()).map(e => resolve(scanRoot, e.name, "src"));
+  roots.push(...CURATED_VENDOR_ROOTS.map(p => resolve(repoRoot, p)));
+  for (const path of (await Promise.all(roots.map(rustFiles))).flat()) {
     const rel = relative(repoRoot, path).split(sep).join("/");
     if (isTestFile(rel)) continue;
     const found = scan(rel, await readFile(path, "utf8"));
@@ -269,8 +301,14 @@ async function main() {
   }
 
   if (writeBaseline) {
+    let previous;
+    try { previous = JSON.parse(await readFile(baselinePath, "utf8")); } catch { previous = null; }
+    if (previous && compare(findings.filter(f => originalCore(f)), previous).added.length) {
+      console.error("Refusing baseline growth: fix new writers instead.");
+      return 1;
+    }
     await mkdir(dirname(baselinePath), { recursive: true });
-    await writeFile(baselinePath, `${JSON.stringify(findings, null, 2)}\n`);
+    await writeFile(baselinePath, `${JSON.stringify(findings.filter(f => originalCore(f)), null, 2)}\n`);
     console.log(
       `Wrote ${findings.length} baselined storage-bypass sites to ${relative(repoRoot, baselinePath)}.`,
     );
