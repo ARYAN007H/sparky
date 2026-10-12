@@ -413,7 +413,7 @@ async fn a_blocked_close_has_an_overall_cleanup_deadline_and_keeps_the_owner_for
 fn orphaned_shutdown_cleanup_keeps_a_host_directory_reservation_until_confirmed() {
     let scratch = tempfile::tempdir().unwrap();
     let directory = scratch.path().join("agents/purge-pending");
-    let token = agent_cleanup::reserve_agent_directory(scratch.path(), "purge-pending");
+    let token = crate::mcp::host::reserve_agent_directory(scratch.path(), "purge-pending");
     McpConfiguredClient::retry_orphaned_cleanups();
     assert!(McpConfiguredClient::agent_close_pending(&directory));
     let reservation = McpConfiguredClient::reservation_for(&directory);

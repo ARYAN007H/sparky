@@ -26,6 +26,8 @@ use tinymcp_bus::{
     ValidateServerArgumentsRequest,
 };
 
+use super::host_cleanup::{CleanupAction, CleanupReservation, CLEANUP_RESERVATIONS};
+
 use crate::{
     config::Config,
     modules::{client::ModuleCallError, client::ModuleClient},
@@ -35,16 +37,6 @@ const MODULE: &str = "tinymcp";
 const TRANSITION_TIMEOUT: Duration = Duration::from_secs(30);
 const TRANSITION_POLL_INTERVAL: Duration = Duration::from_millis(20);
 static CLIENTS: OnceLock<Mutex<HashMap<PathBuf, Arc<McpConfiguredClient>>>> = OnceLock::new();
-type CleanupAction = Arc<dyn Fn() -> bool + Send + Sync>;
-
-#[derive(Default)]
-struct CleanupReservation {
-    after_close: Mutex<Option<CleanupAction>>,
-    host_completion_pending: AtomicBool,
-}
-
-static CLEANUP_RESERVATIONS: OnceLock<Mutex<HashMap<PathBuf, Arc<CleanupReservation>>>> =
-    OnceLock::new();
 static SHUTDOWN_REGISTERED: AtomicBool = AtomicBool::new(false);
 static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
 

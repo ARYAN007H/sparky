@@ -127,6 +127,7 @@ where
             match result {
                 Ok(()) => {
                     owner.confirmed = true;
+                    drop(owner);
                     return;
                 }
                 Err(error) => {
