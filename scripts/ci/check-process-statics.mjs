@@ -7,14 +7,14 @@ import { stripRustComments } from './check-crate-chain.mjs';
 
 const CORE = 'crates/openhuman-core/src/';
 const MANIFEST = 'scripts/ci/process-statics.json';
-const production = (file) => file.startsWith(CORE) && file.endsWith('.rs') && !file.endsWith('_tests.rs');
+const production = (file) => typeof file === 'string' && file.startsWith(CORE) && file.endsWith('.rs') && !file.endsWith('_tests.rs');
 const signature = (entry) => JSON.stringify([entry.file, entry.name, entry.type]);
 
 /** Source declarations only: includes aliases and lazy_static!, not macro expansion. */
 export function declarations(text, file) {
   const code = stripRustComments(text);
   const found = [];
-  const pattern = /\bstatic\s+(?:(mut|ref)\s+)?([A-Za-z_][A-Za-z_0-9]*)\s*:/g;
+  const pattern = /(?<!')\bstatic\s+(?:(mut|ref)\s+)?([A-Za-z_][A-Za-z_0-9]*)\s*:(?!:)/g;
   for (const match of code.matchAll(pattern)) {
     let end = match.index + match[0].length;
     const start = end;

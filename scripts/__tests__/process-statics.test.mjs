@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { declarations, reviewChanges } from '../ci/check-process-statics.mjs';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { declarations, reviewChanges, checkRepository } from '../ci/check-process-statics.mjs';
 
 const file = 'crates/openhuman-core/src/example/ops.rs';
 const source = 'static CACHE: OnceLock<Mutex<Map>> = OnceLock::new();';
@@ -44,4 +48,28 @@ test('classification, reason and verification are mandatory', () => {
 });
 test('duplicate approval records fail', () => {
   assert.equal(reviewChanges([], scan(source), [entry,entry]).length > 0, true);
+});
+test('lifetimes and associated types are not declarations', () => {
+  assert.deepEqual(scan("fn value() -> &'static tinyagents_harness::Value { todo!() }"), []);
+});
+test('const generic equality and function arrows do not terminate a type', () => {
+  assert.equal(scan('static X: Wrapper<{1 == 1}, fn() -> usize> = x;')[0].type, 'Wrapper<{1==1},fn()->usize>');
+});
+test('repository scan reads the merge base, enforces records, and fails without history', () => {
+  const root = mkdtempSync(join(tmpdir(), 'process-statics-'));
+  const git = (...args) => execFileSync('git', args, {cwd:root, stdio:'pipe', env:{...process.env, GIT_CONFIG_COUNT:'0'}}).toString().trim();
+  try {
+    mkdirSync(join(root, 'crates/openhuman-core/src/example'), {recursive:true});
+    mkdirSync(join(root, 'scripts/ci'), {recursive:true});
+    writeFileSync(join(root,file), 'pub fn example() {}');
+    writeFileSync(join(root,'scripts/ci/process-statics.json'), '[]');
+    git('init'); git('add','.');
+    git('-c','user.name=Test','-c','user.email=test@example.invalid','-c','core.hooksPath=/dev/null','commit','-m','base');
+    const base = git('rev-parse','HEAD');
+    writeFileSync(join(root,file), source);
+    assert.equal(checkRepository(root,base).errors.length, 1);
+    writeFileSync(join(root,'scripts/ci/process-statics.json'), JSON.stringify([entry]));
+    assert.deepEqual(checkRepository(root,base).errors, []);
+    assert.throws(() => checkRepository(root,'missing-base'), /fetch the base/);
+  } finally { rmSync(root,{recursive:true,force:true}); }
 });
