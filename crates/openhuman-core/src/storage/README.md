@@ -64,6 +64,25 @@ on.
   declares its collections and runs each call; `compare_and_swap` is the
   guarded-`UPDATE` loop.
 
+## Storage for loadable modules
+
+A loaded module does not hold storage handles. It calls the bus interface
+`ai.tinyhumans.tinystorage.Storage` (`modules::storage_host`), which answers
+from the installed backend:
+
+- the scope is derived by the host from the broker-authenticated caller (module
+  id) and the host's current scope, never taken from the request (the wire types
+  reject unknown fields, so a forged `scope` is a decode failure);
+- the module's grant (`modules::storage_grants::StorageGrant`: collections with
+  their schema, stream, blob and secret-name prefixes, read-only or writable)
+  is enforced on every call, and only the host runs `ensure_collection`;
+- the backend is the fenced one (`open` wraps it), and a profile's module scope
+  sits under the profile's session-key prefix so its lease fence covers it;
+- each call produces one audit line without a payload.
+
+No module declares a grant yet, so none has storage. Bus streams for large
+blobs and watch signals are not served yet.
+
 ## Leases
 
 `storage::lease` gives one node exclusive, expiring ownership of a key; the

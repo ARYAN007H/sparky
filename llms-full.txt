@@ -2779,6 +2779,7 @@ This matrix comes from the default-feature compiled capability-report example. R
 | `skills` | Yes |
 | `storage-file` | No |
 | `storage-mongodb` | No |
+| `storage-s3` | No |
 | `storage-sqlite` | Yes |
 | `tinymemes` | Yes |
 | `voice` | No |
@@ -3046,6 +3047,7 @@ The compiled capability report describes this build:
     "skills": true,
     "storage-file": false,
     "storage-mongodb": false,
+    "storage-s3": false,
     "storage-sqlite": true,
     "tinymemes": true,
     "voice": false,

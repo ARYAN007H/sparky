@@ -151,6 +151,10 @@ tinyagents-session = { path = "../../vendor/tinyagents/crates/tinyagents-session
 # The storage ports and the URL-to-backend facade (`storage` domain). No driver
 # by default: the `storage-*` features below add them.
 tinystoragedrivers = { path = "../../vendor/tinyagents/vendor/tinystoragedrivers/crates/tinystoragedrivers", default-features = false, features = ["blocking", "secrets", "file"] }
+# The storage bus: the wire contract and the reference host server that the
+# `modules::storage_host` interface answers loaded modules with. Modules only.
+tinystoragedrivers-bus = { path = "../../vendor/tinyagents/vendor/tinystoragedrivers/crates/tinystoragedrivers-bus", optional = true }
+tinystoragedrivers-client = { path = "../../vendor/tinyagents/vendor/tinystoragedrivers/crates/tinystoragedrivers-client", optional = true }
 tinyagents-runtime = { path = "../../vendor/tinyagents/crates/tinyagents-runtime" }
 tinyagents-orchestration = { path = "../../vendor/tinyagents/crates/tinyagents-orchestration" }
 tinyagents-tasks = { path = "../../vendor/tinyagents/crates/tinyagents-tasks" }
@@ -548,6 +552,9 @@ langfuse = ["tinyagents-harness/langfuse"]
 # not the core or its storage-driver feature set.
 storage-sqlite = ["tinystoragedrivers/sqlite"]
 storage-mongodb = ["tinystoragedrivers/mongodb"]
+# `s3://` blob URLs and composite storage. In neither the contributor set nor
+# the product: an object-store client is only for a deployment that wants one.
+storage-s3 = ["tinystoragedrivers/s3"]
 # Always on (the dependency enables `file`); kept so existing feature lists
 # and the forwarding chain keep resolving.
 storage-file = []
@@ -658,7 +665,7 @@ tinymemes = ["dep:tinymemes"]
 # A loaded module is trusted in-process code with this process's privileges, and
 # tinybus never unloads one. See `crates/openhuman-core/src/modules/` before adding an entry
 # to the registry.
-modules = ["tinybus/modules", "dep:tinybox-bus"]
+modules = ["tinybus/modules", "dep:tinybox-bus", "dep:tinystoragedrivers-bus", "dep:tinystoragedrivers-client"]
 # Voice domain: STT/TTS providers, the standalone dictation
 # server, and always-on listening.
 # The desktop product enables voice explicitly; contributor defaults leave it

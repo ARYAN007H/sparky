@@ -206,6 +206,7 @@ The compiled capability report describes this build:
     "skills": true,
     "storage-file": false,
     "storage-mongodb": false,
+    "storage-s3": false,
     "storage-sqlite": true,
     "tinymemes": true,
     "voice": false,
