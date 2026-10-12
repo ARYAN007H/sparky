@@ -3,15 +3,15 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use super::channel::RelayChannel;
 use super::params::RelayInboundParams;
 use super::store::{self, Recorded};
 use crate::channels::context::MAX_CHANNEL_HISTORY;
 use crate::channels::runtime::{
-    build_channel_turn_parts, prepare_runtime_limits, process_channel_runtime_message,
-    runtime_context, PromptToolDescs,
+    PromptToolDescs, build_channel_turn_parts, prepare_runtime_limits,
+    process_channel_runtime_message, runtime_context,
 };
 use crate::config::Config;
 use crate::core::Outcome;
@@ -161,12 +161,14 @@ pub(crate) async fn run_relay_turn(
 
     let mut channels_by_name: HashMap<String, Arc<dyn crate::channels::Channel>> = HashMap::new();
     channels_by_name.insert(params.channel.clone(), channel.clone());
-    let ctx = Arc::new(runtime_context(
+    let mut runtime = runtime_context(
         &config,
         parts,
         Arc::new(channels_by_name),
         message_timeout_secs,
-    ));
+    );
+    runtime.relay_thread = Some(thread_id.clone());
+    let ctx = Arc::new(runtime);
 
     // The thread is the conversation's memory: seed the pipeline's per-chat
     // history from it, since this runtime context lives for one message.
@@ -220,11 +222,16 @@ pub(crate) async fn run_relay_turn(
     );
     let mut runtime_message = crate::channels::runtime::RuntimeChannelMessage::from(message);
     runtime_message.prepared_inbound = Some(prepared);
-    super::with_thread(
-        thread_id.clone(),
-        process_channel_runtime_message(ctx, runtime_message),
-    )
-    .await;
+    let turn = process_channel_runtime_message(ctx, runtime_message);
+    if let Some(context) = crate::core::runtime::CoreContext::scoped() {
+        crate::core::runtime::CoreContext::scope(
+            context.derive_channel_turn(Some(thread_id.clone()), None),
+            Box::pin(turn),
+        )
+        .await;
+    } else {
+        turn.await;
+    }
 
     let replies = channel.sent();
     record(&workspace_dir, &params, &thread_id, &replies).await;

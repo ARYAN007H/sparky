@@ -235,6 +235,7 @@ pub(crate) fn runtime_context(
     message_timeout_secs: u64,
 ) -> ChannelRuntimeContext {
     ChannelRuntimeContext {
+        relay_thread: None,
         channels_by_name,
         turn_model_source: None,
         default_provider: Arc::new(parts.provider_name),
