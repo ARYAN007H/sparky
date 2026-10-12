@@ -83,7 +83,7 @@ fn a_library_agents_scheduled_reply_is_handed_to_the_host() {
                         .definition(
                             AgentDefinitionSpec::new()
                                 .system_prompt("TEENY")
-                                .tools(ToolScopeSpec::Named(vec!["cron".into()])),
+                                .tools(ToolScopeSpec::Named(vec!["cron".into(), "tool_search".into()])),
                         )
                         .tools(|_| HostTurnTools::advertised(Vec::new())),
                 )
