@@ -63,7 +63,7 @@ failed against the original scanner (0 passed, 6 failed), then passed unchanged.
 A separate missing-baseline regeneration case also genuinely failed before its
 fix. Current focused scanner/debt/lane controls cover exact identity moves and
 copies, initial branch writes, later manifest growth, surviving unrecorded writes,
-missing history, absent/empty curated source, duplicate core records, comments/fixtures, original core debt, and both CI profiles. The review controls reproduced duplicate-baseline and missing-source failures (0 passed, 2 failed), empty-source failure (0 passed, 1 failed), and missing scripts path-filter coverage (0 passed, 1 failed) before their fixes. The final focused suite has 60 passing controls. Checker, debt helper, and policy-only JSON/Markdown changes arm the scripts self-test lane.
+missing history, absent/empty curated source, duplicate core records, comments/fixtures, original core debt, and both CI profiles. The review controls reproduced duplicate-baseline and missing-source failures (0 passed, 2 failed), empty-source failure (0 passed, 1 failed), and missing scripts path-filter coverage (0 passed, 1 failed) before their fixes. The initial focused suite had 60 passing controls. A subsequent review reproduced two real symlink-root bypasses (0 passed, 2 failed): missing curated source was ignored, and `--root` skipped required canonical history. Shared canonical-path checkout detection fixes both; the expanded suite has 62 passing controls. Checker, debt helper, and policy-only JSON/Markdown changes arm the scripts self-test lane.
 
 Run:
 
