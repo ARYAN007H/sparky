@@ -12,6 +12,7 @@ struct FakePort {
     transform_requests: Arc<Mutex<Vec<tinymcp_bus::TransformTextRequest>>>,
     open_started: Arc<Notify>,
     close_started: Arc<Notify>,
+    release_close: Arc<Notify>,
     call_started: Arc<Notify>,
     release_call: Arc<Notify>,
     block_first_open: Arc<std::sync::atomic::AtomicBool>,
@@ -67,7 +68,7 @@ impl McpModulePort for FakePort {
                 .block_first_close
                 .swap(false, std::sync::atomic::Ordering::SeqCst)
         {
-            std::future::pending::<()>().await;
+            self.release_close.notified().await;
         }
         Ok(Some("close-1".to_owned()))
     }
@@ -476,6 +477,59 @@ async fn failed_agent_close_stays_retired_and_can_be_retried() {
     assert!(!McpConfiguredClient::agent_close_pending(workspace.path()));
     assert_eq!(closed.lock().unwrap().len(), 2);
     assert!(McpConfiguredClient::for_config(&config).is_ok());
+}
+
+#[tokio::test]
+async fn agent_id_stays_unavailable_until_its_cached_module_close_is_acknowledged() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    let alpha_dir = workspace.path().join("agents").join("alpha");
+    let beta_dir = workspace.path().join("agents").join("beta");
+    let mut alpha_config = Config::default();
+    alpha_config.workspace_dir = alpha_dir;
+    alpha_config.modules.enabled = true;
+    let mut beta_config = Config::default();
+    beta_config.workspace_dir = beta_dir;
+    beta_config.modules.enabled = true;
+
+    let alpha_port = FakePort::default();
+    alpha_port
+        .block_first_close
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let alpha = McpConfiguredClient::install_test_port(&alpha_config, Box::new(alpha_port.clone()))
+        .expect("install alpha client");
+    alpha
+        .call::<bool>(&configured("alpha"), "ConnectedOverview", ())
+        .await
+        .unwrap();
+    let beta = McpConfiguredClient::install_test_port(&beta_config, Box::new(FakePort::default()))
+        .expect("install beta client");
+    beta.call::<bool>(&configured("beta"), "ConnectedOverview", ())
+        .await
+        .unwrap();
+
+    let closing = tokio::spawn(crate::mcp::host::close_agent(workspace.path(), "alpha"));
+    alpha_port.close_started.notified().await;
+    assert!(crate::mcp::host::agent_close_pending(
+        workspace.path(),
+        "alpha"
+    ));
+    assert!(!crate::mcp::host::agent_close_pending(
+        workspace.path(),
+        "beta"
+    ));
+    assert!(matches!(
+        McpConfiguredClient::for_config(&alpha_config),
+        Err(ModuleCallError::Unavailable)
+    ));
+    assert!(McpConfiguredClient::for_config(&beta_config).is_ok());
+
+    alpha_port.release_close.notify_one();
+    assert!(closing.await.unwrap());
+    assert!(!crate::mcp::host::agent_close_pending(
+        workspace.path(),
+        "alpha"
+    ));
+    assert!(McpConfiguredClient::for_config(&alpha_config).is_ok());
 }
 
 #[tokio::test]
