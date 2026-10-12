@@ -36,6 +36,8 @@ The switches only narrow. The core resolves them into a component set and comput
 
 A method whose component is off answers `COMPONENT_DISABLED:<name>` (JSON-RPC `error.message`, with `error.data = {"kind": "component_disabled", "component": "<name>"}`) instead of `unknown method`, so the UI and CLI can explain why. A method that the host simply left out still looks unregistered.
 
+Loadable modules follow the same switches. A module whose component is off is never downloaded, mapped or registered: `modules.list` reports its state as `disabled`, boot skips it (including a matching artifact on the module search path), and loading it returns `COMPONENT_DISABLED:<name>`. `about_app` marks capabilities backed by a disabled component with status `disabled`.
+
 A flag change takes effect on the next core start. There is no hot toggling.
 
 Each component's domain wires itself to its switch (tools, services and RPC) in its own change; until then a switch removes only the families, services and tool groups listed in the core's component set.
