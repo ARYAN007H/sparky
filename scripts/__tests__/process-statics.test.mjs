@@ -127,6 +127,9 @@ test("comparisons and shifts inside const blocks are not generic brackets", () =
     "Wrapper<{1<<2},{1<2}>",
   );
 });
+test("array length expressions do not treat shifts as generic brackets", () => {
+  assert.equal(scan("static X: [Option<u8>; 1 << 2] = x;")[0].type, "[Option<u8>;1<<2]");
+});
 test("repository scan reads the merge base, enforces records, and fails without history", () => {
   const root = mkdtempSync(join(tmpdir(), "process-statics-"));
   const git = (...args) =>
