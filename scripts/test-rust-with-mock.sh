@@ -135,25 +135,11 @@ if [ ! -f "$docs_dir/libtinydocs_module.$module_ext" ]; then
 fi
 export OPENHUMAN_MODULE_PATH="$docs_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
 
-if ! local_module_source_is_source; then
 # The released TinyHosts contract test runs in its own process, outside the
-# generic unit suite. Keep the recipient pinned to the registry digest just
-# like the other native module fixtures.
-hosts_asset="$(node scripts/ci/self-hosted/test-module-assets.mjs "$wallet_platform" tinyhosts)"
-IFS=$'\t' read -r _hosts_id hosts_url hosts_filename hosts_sha256 <<< "$hosts_asset"
-hosts_dir="$REPO_ROOT/target/test-modules/tinyhosts/$hosts_sha256"
-hosts_archive="$hosts_dir/$hosts_filename"
-if [ ! -f "$hosts_dir/libtinyhosts.$module_ext" ]; then
-  echo "Downloading the checksum-pinned TinyHosts test module ..."
-  mkdir -p "$hosts_dir"
-  curl --fail --location --silent --show-error "$hosts_url" --output "$hosts_archive"
-  if command -v shasum >/dev/null 2>&1; then
-    echo "${hosts_sha256}  $hosts_archive" | shasum -a 256 -c
-  else
-    echo "${hosts_sha256}  $hosts_archive" | sha256sum --check
-  fi
-  tar --no-same-owner -xzf "$hosts_archive" -C "$hosts_dir"
-fi
+# generic unit suite, so its directory goes only on that process (below).
+# The recipient stays pinned to the registry digest like the other fixtures.
+if ! local_module_source_is_source; then
+  hosts_dir="$(stage_release_module tinyhosts "$wallet_platform" "$module_ext")"
 fi
 
 # TinyBox command analysis is required by shell-backed storage and capability
@@ -176,26 +162,12 @@ if [ ! -f "$tinybox_dir/libtinybox.$module_ext" ]; then
 fi
 export OPENHUMAN_MODULE_PATH="$tinybox_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
 
-if ! local_module_source_is_source; then
 # The MCP registry E2E targets exercise real TinyMCP lifecycle calls through
-# the host's module adapter. Load the released, checksum-pinned module just as
-# the self-hosted CI installer does.
-tinymcp_asset="$(node scripts/ci/self-hosted/test-module-assets.mjs "$wallet_platform" tinymcp)"
-IFS=$'\t' read -r _tinymcp_id tinymcp_url tinymcp_filename tinymcp_sha256 <<< "$tinymcp_asset"
-tinymcp_dir="$REPO_ROOT/target/test-modules/tinymcp/$tinymcp_sha256"
-tinymcp_archive="$tinymcp_dir/$tinymcp_filename"
-if [ ! -f "$tinymcp_dir/libtinymcp_module.$module_ext" ]; then
-  echo "Downloading the checksum-pinned TinyMCP test module ..."
-  mkdir -p "$tinymcp_dir"
-  curl --fail --location --silent --show-error "$tinymcp_url" --output "$tinymcp_archive"
-  if command -v shasum >/dev/null 2>&1; then
-    echo "${tinymcp_sha256}  $tinymcp_archive" | shasum -a 256 -c
-  else
-    echo "${tinymcp_sha256}  $tinymcp_archive" | sha256sum --check
-  fi
-  tar --no-same-owner -xzf "$tinymcp_archive" -C "$tinymcp_dir"
-fi
-export OPENHUMAN_MODULE_PATH="$tinymcp_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
+# the host's module adapter, so they load the released, checksum-pinned module
+# just as the self-hosted CI installer does (source mode builds it instead).
+if ! local_module_source_is_source; then
+  tinymcp_dir="$(stage_release_module tinymcp "$wallet_platform" "$module_ext")"
+  export OPENHUMAN_MODULE_PATH="$tinymcp_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
 fi
 
 # Build the source modules in one call. The connector directory goes only on
