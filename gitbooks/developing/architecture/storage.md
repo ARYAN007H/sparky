@@ -62,6 +62,12 @@ In SaaS mode a call with no profile is refused instead of falling into a bucket 
 
 A backend decides how it enforces the scope. SQLite and the file driver keep each scope's data apart, and `local` is the scope a single-user install uses. MongoDB injects a scope key into every filter and every index prefix.
 
+### Process state
+
+The [process-state inventory](process-state.md) classifies the named shared-core
+singleton candidates and records their tenant, durability and routing boundaries.
+It also identifies pending regressions and implementation work.
+
 ### Background work
 
 Background work runs under the process default context, which names no agent, and on its own would only see `local`. `storage::agents` closes the gap. Agents are known when they are live (`AgentContextRegistry`) or when an earlier process recorded their id in the `local` scope (`storage_agents`). `for_each_scope` runs a step once for `local` and once under each known agent. The cron scheduler's agent pass (`cron::scheduler::tick_live_agents`, driven in tests through the public `cron::scheduler::run_live_agent_pass`) runs each live agent's due jobs under that agent's own context, so their results are recorded in the agent's own scope. A recorded agent that is not live waits until it is live again, because its jobs need its host tools and prompt.
