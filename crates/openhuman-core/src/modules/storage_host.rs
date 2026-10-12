@@ -353,16 +353,17 @@ impl StorageHost {
         }
         let mut server = StorageServer::new(storage.clone());
         if !grant.secret_prefixes.is_empty() {
-            match self.environment.keys() {
-                Ok(keys) => {
-                    server = server.with_secrets(Arc::new(DocumentSecrets::new(&storage, keys)));
-                }
-                Err(_) => tracing::warn!(
+            // A key-provider failure is retryable, so refuse the bind rather
+            // than cache a server that silently lacks secrets.
+            let keys = self.environment.keys().map_err(|_| {
+                tracing::warn!(
                     target: "openhuman::storage_host",
                     module,
-                    "[storage_host] no master key; module secrets stay unavailable"
-                ),
-            }
+                    "[storage_host] no master key; refusing to bind a grant with secrets"
+                );
+                BindError::Backend(StorageKind::Backend)
+            })?;
+            server = server.with_secrets(Arc::new(DocumentSecrets::new(&storage, keys)));
         }
         let binding = Arc::new(Binding {
             backend,
