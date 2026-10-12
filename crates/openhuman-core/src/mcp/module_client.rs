@@ -35,6 +35,15 @@ const MODULE: &str = "tinymcp";
 const TRANSITION_TIMEOUT: Duration = Duration::from_secs(30);
 const TRANSITION_POLL_INTERVAL: Duration = Duration::from_millis(20);
 static CLIENTS: OnceLock<Mutex<HashMap<PathBuf, Arc<McpConfiguredClient>>>> = OnceLock::new();
+type CleanupAction = Arc<dyn Fn() -> bool + Send + Sync>;
+
+#[derive(Default)]
+struct CleanupReservation {
+    after_close: Mutex<Option<CleanupAction>>,
+}
+
+static CLEANUP_RESERVATIONS: OnceLock<Mutex<HashMap<PathBuf, Arc<CleanupReservation>>>> =
+    OnceLock::new();
 static SHUTDOWN_REGISTERED: AtomicBool = AtomicBool::new(false);
 static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
 
@@ -251,10 +260,18 @@ impl McpConfiguredClient {
         }
 
         let data_dir = crate::core::runtime::agent_scope_dir(config);
+        if Self::cleanup_pending(&data_dir) {
+            return Err(ModuleCallError::Unavailable);
+        }
         let clients = CLIENTS.get_or_init(|| Mutex::new(HashMap::new()));
         let mut clients = clients
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
+        // The cleanup reservation can be installed after the first check but
+        // before this cache lock is acquired. Recheck before creating a client.
+        if Self::cleanup_pending(&data_dir) {
+            return Err(ModuleCallError::Unavailable);
+        }
         if let Some(client) = clients.get(&data_dir) {
             if client.retiring.load(Ordering::Acquire) {
                 return Err(ModuleCallError::Unavailable);
@@ -333,7 +350,9 @@ impl McpConfiguredClient {
                 .unwrap_or_default();
             for client in clients {
                 if client.retiring.load(Ordering::Acquire) {
-                    Self::close_retired_client(PathBuf::from(&client.data_dir), client).await;
+                    let data_dir = PathBuf::from(&client.data_dir);
+                    let reservation = Self::reservation_for(&data_dir);
+                    Self::close_retired_client(data_dir, client, reservation).await;
                 } else if let Err(error) = client.close().await {
                     tracing::warn!(?error, "[mcp] workspace cleanup is still pending");
                 }
@@ -393,10 +412,11 @@ impl McpConfiguredClient {
     /// a later cleanup attempt can retry the module's retained transition.
     pub(crate) async fn close_agent_data_dir(data_dir: &std::path::Path) -> bool {
         let key = data_dir.to_path_buf();
+        let reservation = Self::reservation_for(&key);
         let Some(client) = Self::retire_cached_client(&key) else {
-            return true;
+            return Self::finish_cleanup(&key, None, reservation);
         };
-        Self::close_retired_client(key, client).await
+        Self::close_retired_client(key, client, reservation).await
     }
 
     /// Marks the exact cached client unavailable before scheduling cleanup.
@@ -404,21 +424,49 @@ impl McpConfiguredClient {
     /// registered shutdown hook to close later.
     pub(crate) fn schedule_agent_close_data_dir(data_dir: &std::path::Path) {
         let key = data_dir.to_path_buf();
+        let reservation = Self::reservation_for(&key);
         let Some(client) = Self::retire_cached_client(&key) else {
+            Self::finish_cleanup(&key, None, reservation);
             return;
         };
         let Ok(runtime) = tokio::runtime::Handle::try_current() else {
             return;
         };
         runtime.spawn(async move {
-            if !Self::close_retired_client(key, client).await {
+            if !Self::close_retired_client(key, client, reservation).await {
                 tracing::warn!("[mcp] agent client close remains pending for retry");
             }
         });
     }
 
+    /// Retires the exact scoped client and runs `after_close` only after the
+    /// module acknowledges its close. The path remains unavailable until the
+    /// callback succeeds, so a replacement cannot reuse files being purged.
+    pub(crate) fn schedule_agent_close_and_cleanup(
+        data_dir: &std::path::Path,
+        after_close: CleanupAction,
+    ) {
+        let key = data_dir.to_path_buf();
+        let reservation = Self::reservation_with_action(&key, after_close);
+        let Some(client) = Self::retire_cached_client(&key) else {
+            if !Self::finish_cleanup(&key, None, reservation) {
+                tracing::warn!("[mcp] agent cleanup remains pending for retry");
+            }
+            return;
+        };
+        let Ok(runtime) = tokio::runtime::Handle::try_current() else {
+            return;
+        };
+        runtime.spawn(async move {
+            if !Self::close_retired_client(key, client, reservation).await {
+                tracing::warn!("[mcp] agent close and cleanup remain pending for retry");
+            }
+        });
+    }
+
     pub(crate) fn agent_close_pending(data_dir: &std::path::Path) -> bool {
-        CLIENTS
+        Self::cleanup_pending(data_dir)
+            || CLIENTS
             .get()
             .and_then(|clients| {
                 clients
@@ -428,6 +476,58 @@ impl McpConfiguredClient {
                     .map(|client| client.retiring.load(Ordering::Acquire))
             })
             .unwrap_or(false)
+    }
+
+    fn cleanup_pending(data_dir: &std::path::Path) -> bool {
+        CLEANUP_RESERVATIONS
+            .get()
+            .is_some_and(|reservations| {
+                reservations
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .contains_key(data_dir)
+            })
+    }
+
+    fn reservation_for(data_dir: &std::path::Path) -> Arc<CleanupReservation> {
+        let reservations = CLEANUP_RESERVATIONS.get_or_init(|| Mutex::new(HashMap::new()));
+        let mut reservations = reservations
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        Arc::clone(
+            reservations
+                .entry(data_dir.to_path_buf())
+                .or_insert_with(|| Arc::new(CleanupReservation::default())),
+        )
+    }
+
+    fn reservation_with_action(
+        data_dir: &std::path::Path,
+        action: CleanupAction,
+    ) -> Arc<CleanupReservation> {
+        loop {
+            let reservation = Self::reservation_for(data_dir);
+            let mut after_close = reservation
+                .after_close
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let current = CLEANUP_RESERVATIONS
+                .get()
+                .and_then(|reservations| {
+                    reservations
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                        .get(data_dir)
+                        .is_some_and(|stored| Arc::ptr_eq(stored, &reservation))
+                        .then_some(())
+                })
+                .is_some();
+            if !current {
+                continue;
+            }
+            after_close.get_or_insert(action);
+            return Arc::clone(&reservation);
+        }
     }
 
     fn retire_cached_client(data_dir: &std::path::Path) -> Option<Arc<Self>> {
@@ -441,26 +541,67 @@ impl McpConfiguredClient {
         Some(Arc::clone(client))
     }
 
-    async fn close_retired_client(data_dir: PathBuf, client: Arc<Self>) -> bool {
+    async fn close_retired_client(
+        data_dir: PathBuf,
+        client: Arc<Self>,
+        reservation: Arc<CleanupReservation>,
+    ) -> bool {
         match client.close().await {
-            Ok(()) => {
-                if let Some(clients) = CLIENTS.get() {
-                    let mut clients = clients
-                        .lock()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner);
-                    if clients
-                        .get(&data_dir)
-                        .is_some_and(|current| Arc::ptr_eq(current, &client))
-                    {
-                        clients.remove(&data_dir);
-                    }
-                }
-                true
-            }
+            Ok(()) => Self::finish_cleanup(&data_dir, Some(client), reservation),
             Err(error) => {
                 tracing::warn!(?error, "[mcp] agent client close remains pending");
                 false
             }
+        }
+    }
+
+    fn finish_cleanup(
+        data_dir: &std::path::Path,
+        client: Option<Arc<Self>>,
+        reservation: Arc<CleanupReservation>,
+    ) -> bool {
+        let mut after_close = reservation
+            .after_close
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let reservations = CLEANUP_RESERVATIONS.get_or_init(|| Mutex::new(HashMap::new()));
+        let is_current = reservations
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(data_dir)
+            .is_some_and(|stored| Arc::ptr_eq(stored, &reservation));
+        if !is_current {
+            return false;
+        }
+        if after_close.as_ref().is_some_and(|action| !action()) {
+            return false;
+        }
+        if let Some(client) = client {
+            if let Some(clients) = CLIENTS.get() {
+                let mut clients = clients
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                if clients
+                    .get(data_dir)
+                    .is_some_and(|current| Arc::ptr_eq(current, &client))
+                {
+                    clients.remove(data_dir);
+                } else {
+                    return false;
+                }
+            }
+        }
+        let mut reservations = reservations
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if reservations
+            .get(data_dir)
+            .is_some_and(|stored| Arc::ptr_eq(stored, &reservation))
+        {
+            reservations.remove(data_dir);
+            true
+        } else {
+            false
         }
     }
 

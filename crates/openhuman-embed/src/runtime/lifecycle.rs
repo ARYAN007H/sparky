@@ -41,27 +41,36 @@ impl RemovalSlot<'_> {
 
 impl Drop for RemovalSlot<'_> {
     fn drop(&mut self) {
-        self.inner.teardown("agent_removed");
-        if self.purge && !self.mcp_cleanup_confirmed {
-            self.mcp_cleanup_confirmed = !openhuman_core::mcp::host::agent_close_pending(
-                &self.inner.config.workspace_dir,
-                &self.inner.id,
-            );
-            if !self.mcp_cleanup_confirmed {
-                self.purge = false;
-                log::warn!(
-                    "[embed][runtime] retaining agent home until MCP cleanup is acknowledged"
-                );
-            }
-        }
-        if let Err(error) = self.purge_home() {
-            log::warn!("[embed][runtime] cancelled removal purge failed: {error}");
-        }
         let mut agents = self
             .runtime
             .agents
             .lock()
             .unwrap_or_else(|e| e.into_inner());
+        if self.purge && !self.mcp_cleanup_confirmed {
+            self.inner.teardown_without_mcp_cleanup("agent_removed");
+            let home = self.inner.layout.home.clone();
+            let cleanup = Arc::new(move || match std::fs::remove_dir_all(&home) {
+                Ok(()) => true,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => true,
+                Err(error) => {
+                    log::warn!("[embed][runtime] deferred agent purge failed: {error}");
+                    false
+                }
+            });
+            openhuman_core::mcp::host::schedule_agent_close_with_cleanup(
+                &self.inner.config.workspace_dir,
+                &self.inner.id,
+                cleanup,
+            );
+            // Ownership of the requested purge moved to the deferred cleanup
+            // reservation, which also fences this agent id until it completes.
+            self.purge = false;
+        } else {
+            self.inner.teardown("agent_removed");
+            if let Err(error) = self.purge_home() {
+                log::warn!("[embed][runtime] cancelled removal purge failed: {error}");
+            }
+        }
         if agents
             .get(&self.inner.id)
             .and_then(std::sync::Weak::upgrade)
@@ -153,7 +162,6 @@ impl Runtime {
         removal.mcp_cleanup_confirmed =
             openhuman_core::mcp::host::close_agent(&inner.config.workspace_dir, &inner.id).await;
         if !removal.mcp_cleanup_confirmed {
-            removal.purge = false;
             return Err(AgentError::CleanupPending);
         }
         inner.teardown("agent_removed");

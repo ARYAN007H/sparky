@@ -147,6 +147,17 @@ impl AgentInner {
     /// denied with `resolution`, its state slots are cleared, cached MCP
     /// cleanup is scheduled, and its context leaves the registry. Runs once.
     pub(crate) fn teardown(&self, resolution: &str) {
+        self.teardown_with_cleanup(resolution, true);
+    }
+
+    /// Tears down host state without scheduling a separate close task. The
+    /// removal owner uses this when it transfers cleanup to a deferred
+    /// close-and-purge callback.
+    pub(crate) fn teardown_without_mcp_cleanup(&self, resolution: &str) {
+        self.teardown_with_cleanup(resolution, false);
+    }
+
+    fn teardown_with_cleanup(&self, resolution: &str, schedule_mcp_cleanup: bool) {
         if !self.lifecycle.begin_teardown() {
             return;
         }
@@ -158,7 +169,9 @@ impl AgentInner {
         );
         self.deny_approvals(resolution);
         self.ctx.agent_state().clear();
-        openhuman_core::mcp::host::schedule_agent_close(&self.config.workspace_dir, &self.id);
+        if schedule_mcp_cleanup {
+            openhuman_core::mcp::host::schedule_agent_close(&self.config.workspace_dir, &self.id);
+        }
         openhuman_core::core::runtime::AgentContextRegistry::deregister(&self.id, &self.ctx);
         log::debug!("[embed][agent] teardown complete id={}", self.id);
     }
@@ -186,8 +199,8 @@ impl AgentInner {
 
 impl Drop for AgentInner {
     fn drop(&mut self) {
-        self.teardown("agent_dropped");
         let mut agents = self.registry.lock().unwrap_or_else(|e| e.into_inner());
+        self.teardown("agent_dropped");
         if agents
             .get(&self.id)
             .is_some_and(|current| std::ptr::eq(current.as_ptr(), self))
