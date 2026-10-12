@@ -222,13 +222,43 @@ test("array length expressions do not treat shifts as generic brackets", () => {
   );
 });
 test("swapping same-named static types between modules requires ownership review", () => {
-  const before = scan("mod user { static CACHE: UserCache = x; } mod infra { static CACHE: InfraCache = x; }");
-  const after = scan("mod user { static CACHE: InfraCache = x; } mod infra { static CACHE: UserCache = x; }");
+  const before = scan(
+    "mod user { static CACHE: UserCache = x; } mod infra { static CACHE: InfraCache = x; }",
+  );
+  const after = scan(
+    "mod user { static CACHE: InfraCache = x; } mod infra { static CACHE: UserCache = x; }",
+  );
   assert.equal(reviewChanges(before, after, []).length, 2);
 });
+test("module ownership records survive line and module-order changes but cannot cover another module", () => {
+  const before = scan(`mod outer { mod user { ${source} } }`);
+  const approval = { ...entry, scope: "outer::user" };
+  assert.deepEqual(reviewChanges([], before, [approval]), []);
+  assert.deepEqual(
+    reviewChanges(
+      before,
+      scan(`mod other {}\n\nmod outer { mod user { ${source} } }`),
+      [approval],
+    ),
+    [],
+  );
+  assert.equal(
+    reviewChanges(before, scan(`mod outer { mod infra { ${source} } }`), [
+      approval,
+    ]).length > 0,
+    true,
+  );
+});
 test("type macros preserve comparison tokens in parentheses and square token trees", () => {
-  for (const type of ["ty!(1 < 2)", "ty![1 > 2]", "Wrapper<ty!(1 << 2), Option<u8>>"]) {
-    assert.equal(scan(`static X: ${type} = x;`)[0].type, type.replaceAll(" ", ""));
+  for (const type of [
+    "ty!(1 < 2)",
+    "ty![1 > 2]",
+    "Wrapper<ty!(1 << 2), Option<u8>>",
+  ]) {
+    assert.equal(
+      scan(`static X: ${type} = x;`)[0].type,
+      type.replaceAll(" ", ""),
+    );
   }
 });
 test("repository scan reads the merge base, enforces records, and fails without history", () => {

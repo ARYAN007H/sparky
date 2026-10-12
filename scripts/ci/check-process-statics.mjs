@@ -19,7 +19,9 @@ const signature = (entry) =>
 // blocks and macro expansion are outside this source-level identity model.
 function moduleScopes(code) {
   const openings = new Map();
-  for (const match of code.matchAll(/\bmod\s+((?:r#)?[_\p{ID_Start}][_\p{ID_Continue}]*)\s*\{/gu))
+  for (const match of code.matchAll(
+    /\bmod\s+((?:r#)?[_\p{ID_Start}][_\p{ID_Continue}]*)\s*\{/gu,
+  ))
     openings.set(match.index + match[0].lastIndexOf("{"), match[1]);
   const stack = [];
   const scopes = [];
@@ -60,11 +62,13 @@ export function declarations(text, file) {
       )
         continue;
       if ("<([{".includes(char)) {
-        if ("([{".includes(char) && code.slice(start, end).trimEnd().endsWith("!"))
+        if (
+          "([{".includes(char) &&
+          code.slice(start, end).trimEnd().endsWith("!")
+        )
           macroTrees.add(stack.length + 1);
         stack.push(char);
-      }
-      else if (">)]}".includes(char) && stack.length) {
+      } else if (">)]}".includes(char) && stack.length) {
         // An arrow inside a function type is not a generic closing bracket.
         if (char === ">" && code[end - 1] === "-") continue;
         const expected = { ">": "<", ")": "(", "]": "[", "}": "{" }[char];

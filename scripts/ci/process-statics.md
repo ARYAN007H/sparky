@@ -21,6 +21,7 @@ Each record has these fields:
 ```json
 {
   "file": "crates/openhuman-core/src/example/store.rs",
+  "scope": "",
   "name": "CACHE",
   "type": "OnceLock<Mutex<Cache>>",
   "count": 1,
@@ -33,7 +34,9 @@ Each record has these fields:
 Use the type printed by the failure message, with whitespace outside literals
 removed (except the `mut ` or `ref ` prefix). ABI and other literal contents,
 including their whitespace, remain significant. `count` is the exact number of matching
-file/name/type declarations, including declarations in nested modules.
+file/module-scope/name/type declarations. `scope` is the inline module path,
+such as `outer::user`; an empty or omitted scope denotes the file root.
+Swapping types between inline modules requires separate ownership review.
 Duplicate records, missing fields, and records that no longer match the
 source fail. Update or remove the record when its declaration changes.
 Records present in the base manifest remain mandatory while their corresponding
@@ -58,6 +61,9 @@ This is a source declaration guard, not a Rust macro expander. It recognizes
 ordinary `static`, `static mut`, and `lazy_static!`'s `static ref`, multiline
 and qualified types, and ignores comments and string fixtures. Statics
 generated without a literal declaration by another macro need manual review.
+Type-position macro token trees are preserved without expanding them. Named
+inline modules contribute declaration identity; anonymous blocks and function
+scopes within one module still share its declaration counts.
 Sibling `*_tests.rs` files are excluded; declarations behind `cfg(test)` in
 production source files are conservatively included. Initializer and alias-definition
 edits to existing declarations are subject to ordinary code review. Other crates and
