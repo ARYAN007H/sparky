@@ -131,6 +131,14 @@ summary is `.validation/detached-review-focused-final-progress.log`.
 The 79 results do not establish full-workspace, default/all-feature, MSRV,
 coverage or hosted acceptance.
 
+The response/refusal helpers were mechanically extracted into a sibling file,
+bringing the execution fragment from 807 to 749 lines. Its now-stale legacy
+layout exception was removed. The final layout scan still exits 1 for five
+unchanged canonical over-limit files (`security_gate.rs`, its tests,
+`mcp/module_client.rs`, its tests and the policy paths/risk tests).
+The output is preserved in `.validation/detached-review-layout-final.log`;
+this follow-up does not claim a whole-repository layout pass.
+
 ## Remaining limits
 
 These results cover the supported feature graph above. They do not assert a
