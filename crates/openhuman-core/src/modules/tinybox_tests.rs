@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinybus::broker::Broker;
 use tinybus::service::Interface;
 use tinybus::transport::memory::MemoryBus;
@@ -557,8 +557,8 @@ async fn no_workspace_docker_refusal_is_not_retried_as_an_ordinary_call() {
 }
 
 #[tokio::test]
-async fn docker_controls_use_typed_calls_with_validated_contract_capability(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn docker_controls_use_typed_calls_with_validated_contract_capability()
+-> Result<(), Box<dyn std::error::Error>> {
     let (_service, client, calls) = mock_client().await;
     let status = call_docker_status_with_client(
         &client,
