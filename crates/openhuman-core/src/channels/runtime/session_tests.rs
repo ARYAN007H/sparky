@@ -139,6 +139,14 @@ async fn channel_sign_in_resumes_listener_service_after_logout() {
         "old runtime cleanup must finish before restart"
     );
     assert_eq!(starts.load(Ordering::SeqCst), 2);
+    assert_eq!(
+        tokio::time::timeout(std::time::Duration::from_secs(1), cleaned_rx.recv())
+            .await
+            .expect("first generation cleanup notification")
+            .expect("cleanup notification")
+            .0,
+        1
+    );
 
     controller.invalidate();
     assert_eq!(
