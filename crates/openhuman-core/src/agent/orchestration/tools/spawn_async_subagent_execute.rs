@@ -73,12 +73,6 @@ impl SpawnAsyncSubagentTool {
             }
         };
 
-        // The follow-up vocabulary offered back to the parent is limited to
-        // the fleet tools visible on *this turn* (see `fleet_tools`), not
-        // just the parent definition's static scope: a hide or named
-        // restriction can narrow the turn's real tool surface below what the
-        // definition alone would suggest, and offering a control the parent
-        // cannot currently call invites a denied tool call.
         let fleet = if parent.visible_tool_names.is_empty() {
             FleetToolSet::for_parent(&parent.agent_definition_id)
         } else {
@@ -105,17 +99,6 @@ impl SpawnAsyncSubagentTool {
             .or(run_context.thread_id.as_deref())
             .map(str::to_owned);
 
-        // Async delivery is thread-addressed: the finished result is inserted back into the
-        // parent chat thread as a follow-up turn (`background_delivery`). Outside a chat turn
-        // (flow `agent` nodes, CLI and cron runs intentionally have no parent thread to deliver
-        // into, so `background_delivery::deliver_batch` logs "dropping headless batch" and the
-        // (possibly real, completed) work is silently discarded — the caller sees "Accepted" and
-        // never learns the result never arrived. Fail loudly instead: the caller has a
-        // synchronous alternative (`spawn_subagent` with `blocking: true`, or a `delegate_*`
-        // tool). Both of those self-heal to blocking dispatch in this situation rather than
-        // reaching this guard — see the `has_delivery_thread` checks in `spawn_subagent.rs` and
-        // `dispatch.rs::dispatch_subagent`. Only a *direct* `spawn_async_subagent` call lands
-        // here.
         if let Some(refusal) = refuse_missing_delivery_thread(
             parent_thread_id.as_deref(),
             &parent.agent_definition_id,
