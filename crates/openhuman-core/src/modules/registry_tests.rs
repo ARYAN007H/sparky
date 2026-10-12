@@ -763,6 +763,8 @@ fn contract_names() -> Vec<(&'static str, &'static str, &'static str)> {
             tinychannels_bus::names::OBJECT_PATH,
         ),
     ];
+    #[cfg(feature = "modules")]
+    names.push(("tinybox", tinybox_bus::INTERFACE, tinybox_bus::OBJECT_PATH));
     #[cfg(feature = "documents")]
     names.push((
         "tinydocs",
