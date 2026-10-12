@@ -25,7 +25,10 @@ fn a_named_scope_admits_the_clock_and_scheduler_but_never_the_shell() {
                 .workspace(Workspace::Stateless)
                 .session_store(Arc::new(InMemorySessionStores::new()))
                 .backend_url(backend.uri())
-                .domains(DomainSet::harness())
+                .domains(DomainSet {
+                    inference: true,
+                    ..DomainSet::harness()
+                })
                 .tool_groups(ToolGroups::advertised())
                 .build()
                 .await
