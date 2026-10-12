@@ -23,6 +23,9 @@
 //   node scripts/ci/check-storage-bypass.mjs --write-baseline
 //   node scripts/ci/check-storage-bypass.mjs --root <dir>   (tests)
 
+import { execFileSync } from "node:child_process";
+import { stripRustComments } from "./check-crate-chain.mjs";
+import { validateCoverageDebt, historicalFindings } from "./storage-bypass-debt.mjs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -208,7 +211,7 @@ export function withoutAllowed(rel, found) {
   return found.filter((f) => !allowed(rel, f));
 }
 
-function isTestFile(rel) {
+export function isTestFile(rel) {
   return (
     rel.startsWith("crates/openhuman-core/src/storage/") ||
     rel.includes("/tests/") ||
@@ -236,6 +239,7 @@ export function scan(rel, source) {
   const found = [];
   const occurrences = new Map();
   const lines = source.split(/\r?\n/);
+  const masked = stripRustComments(source).split(/\r?\n/);
   for (const [index, raw] of lines.entries()) {
     const code = codeOf(raw);
     if (!code.trim()) continue;
@@ -243,8 +247,10 @@ export function scan(rel, source) {
     // count a match only when it starts on this line.
     const searchable = `${code}\n${codeOf(lines[index + 1] ?? "")}`;
     for (const { rule, pattern } of RULES) {
-      const hit = pattern.exec(searchable);
+      const input = ["sqlite-open", "json-write", "vendored-open"].includes(rule) ? searchable : `${masked[index]}\n${masked[index + 1] ?? ""}`;
+      const hit = pattern.exec(input);
       if (!hit || hit.index >= code.length) continue;
+      if (rule === "vendored-open" && !masked[index].slice(hit.index).match(/\b\w+::/)) continue;
       const text = raw.trim();
       const key = `${rule}\0${text}`;
       const occurrence = (occurrences.get(key) ?? 0) + 1;
@@ -289,17 +295,23 @@ async function rustFiles(dir) {
   return out.sort();
 }
 
-async function main() {
+export async function collectFindings(root) {
   const findings = [];
+  const scanRoot = resolve(root, "crates");
   const roots = (await readdir(scanRoot, { withFileTypes: true })).filter(e => e.isDirectory()).map(e => resolve(scanRoot, e.name, "src"));
-  roots.push(...CURATED_VENDOR_ROOTS.map(p => resolve(repoRoot, p)));
+  roots.push(...CURATED_VENDOR_ROOTS.map(p => resolve(root, p)));
   for (const path of (await Promise.all(roots.map(rustFiles))).flat()) {
-    const rel = relative(repoRoot, path).split(sep).join("/");
+    const rel = relative(root, path).split(sep).join("/");
     if (isTestFile(rel)) continue;
     const found = scan(rel, await readFile(path, "utf8"));
     findings.push(...withoutAllowed(rel, found));
   }
 
+  return findings;
+}
+
+async function main() {
+  const findings = await collectFindings(repoRoot);
   if (writeBaseline) {
     let previous;
     try { previous = JSON.parse(await readFile(baselinePath, "utf8")); } catch { previous = null; }
@@ -325,7 +337,21 @@ async function main() {
     return 1;
   }
 
-  const { added, stale } = compare(findings, baseline);
+  let extension = [];
+  try { extension = JSON.parse(await readFile(resolve(repoRoot, "scripts/ci/storage-bypass-extension.json"), "utf8")); }
+  catch (error) { if (error.code !== "ENOENT") throw error; }
+  let debtErrors = validateCoverageDebt(findings, baseline, extension);
+  // Fixture roots without Git history exercise source scanning; CI always checks
+  // the real checkout against its canonical merge base and retained records.
+  if (rootFlag === -1) {
+    const history = historicalFindings(repoRoot, { scan, withoutAllowed, isTestFile, CURATED_VENDOR_ROOTS });
+    debtErrors = validateCoverageDebt(findings, baseline, extension, history);
+  }
+  if (debtErrors.length) {
+    console.error(debtErrors.join("\n"));
+    return 1;
+  }
+  const { added, stale } = compare(findings, [...baseline, ...extension]);
   if (added.length === 0 && stale.length === 0) {
     console.log(
       `Storage-bypass ratchet holds (${findings.length} baselined sites; it only goes down).`,
