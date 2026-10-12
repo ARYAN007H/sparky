@@ -50,13 +50,15 @@ scope, storage selector or allegedly verified research output. The module must
 read the captured native catalog and preserve complete records, history and
 duplicate order while applying the existing owning reducer.
 
-Seventeen actual compiled content cases are staged, covering Memory/SQLite
+Seventeen actual compiled content cases cover Memory/SQLite
 preservation, cold reopen, native CAS races, corruption, exhaustion, fencing,
-native acknowledgement uncertainty and exact-instance admission. At this
-checkpoint the implementation is a deliberate unavailable stub; no successful
-content persistence result is claimed. The new graph removes TinyMemes' old
-replacement shim and uses public #28 plus canonical TinyBus, pending fresh
-behavioral baseline execution.
+native acknowledgement uncertainty and exact-instance admission. On the new
+public #28/canonical TinyBus graph, all 18 existing marker controls pass. The
+content baseline executes all 17 cases: two admission controls pass and 15
+behavior cases fail against the deliberate unavailable stub, with no setup or
+compiler failures. The owning CAS candidate is now under review; no successful
+content persistence result is claimed here. The new graph removes TinyMemes'
+old replacement shim.
 
 ### Native conversation append
 
