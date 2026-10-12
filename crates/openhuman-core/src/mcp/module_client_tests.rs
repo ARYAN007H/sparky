@@ -450,6 +450,7 @@ async fn agent_cleanup_closes_only_the_cached_agent_and_keeps_siblings_open() {
 #[tokio::test]
 async fn failed_agent_close_stays_retired_and_can_be_retried() {
     let workspace = tempfile::tempdir().expect("workspace");
+    let scoped_dir = workspace.path().join("agents").join("agent");
     let mut config = Config::default();
     config.workspace_dir = workspace.path().to_path_buf();
     config.modules.enabled = true;
@@ -655,7 +656,7 @@ async fn a_removed_context_waiting_for_the_client_cache_cannot_reopen_it() {
         request.await.unwrap(),
         Err(ModuleCallError::Unavailable)
     ));
-    assert!(!clients.lock().unwrap().contains_key(workspace.path()));
+    assert!(!clients.lock().unwrap().contains_key(&scoped_dir));
 }
 
 #[tokio::test]
