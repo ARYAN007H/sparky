@@ -1,6 +1,5 @@
 use super::*;
 
-#[cfg(feature = "modules")]
 #[tokio::test]
 async fn provider_credentials_never_reach_an_unattested_bus() {
     use std::sync::{
