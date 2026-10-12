@@ -110,9 +110,9 @@ The resolution itself (`ops::resolve`) tries the cheapest source first:
   already serving on the broker?          (search path at boot, earlier load)
         | no
         v
-  local override?                         [[modules.overrides]] id = "..."
-        | no                              or TINYSEARCH_TEST_MODULE /
-        v                                 TINYCONNECTORS_TEST_MODULE
+  configured source?                      [modules] source, per-module override
+        | release (default)               or OPENHUMAN_MODULE_SOURCE[_<ID>];
+        v                                 `path` override -> local file
   module search path?                     OPENHUMAN_MODULE_PATH, then
         | no                              platform data dirs (tinybus)
         v
@@ -125,6 +125,28 @@ The resolution itself (`ops::resolve`) tries the cheapest source first:
         v
   prune_stale_versions() removes older cached versions of this module
 ```
+
+#### Module source
+
+`[modules] source` (`release` | `linked` | `source`, default `release`) decides
+where a module comes from; `[[modules.overrides]]` entries take exactly one of
+`path` (a local library, as before) or `source` (a mode for that id), and a
+per-module entry beats the global mode. `OPENHUMAN_MODULE_SOURCE` sets the
+global mode and `OPENHUMAN_MODULE_SOURCE_<ID>` (id upper-cased) one module.
+
+- `release`: the chain below, pinned and digest-checked. The only mode CI and
+  shipped builds use; `scripts/ci/check-ci-module-source.mjs` (CI Lite) fails
+  if a workflow or CI script sets any other.
+- `linked`: the in-process factory registered by `openhuman-modules-linked`.
+- `source`: a locally built artifact.
+
+For local development and local tests only. When `linked` or `source` cannot be
+honoured (no factory registered, no built artifact), the module is served from
+`release`, one `warn` line names the id and both modes, and
+`ModuleStatus.detail` carries the reason. `modules.list` reports the serving
+source in `source` (`release`, `linked`, `source`, `local_file`); it never
+carries a path. The former `TINYSEARCH_TEST_MODULE` / `TINYJUICE_TEST_MODULE` /
+`TINYCONNECTORS_TEST_MODULE` variables are no longer read by the loader.
 
 Inside the release cache, tinybus looks for the archive in the bundled
 directory first, then in `install_dir/<id>/<version>/<host_key>`, and
@@ -386,8 +408,8 @@ loadable:
 
 Tests sit beside each file as `<file>_tests.rs`. Run them with
 `cargo test -p openhuman modules::` or `pnpm debug rust modules`. Tests that
-need a real module load a local build through `TINYSEARCH_TEST_MODULE`,
-`TINYCONNECTORS_TEST_MODULE`, or `[[modules.overrides]]`;
+need a real module load a local build through `[[modules.overrides]]` or
+`OPENHUMAN_MODULE_SOURCE`;
 `scripts/test-rust-with-mock.sh` and CI build the pinned submodules.
 
 See also `gitbooks/developing/performance.md` for how on-demand modules keep a
