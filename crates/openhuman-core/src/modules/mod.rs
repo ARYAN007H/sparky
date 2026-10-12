@@ -76,6 +76,7 @@ pub mod host;
 #[cfg(feature = "modules")]
 pub mod ops;
 pub mod registry;
+mod source;
 #[cfg(feature = "modules")]
 pub mod schemas;
 #[cfg(feature = "modules")]
