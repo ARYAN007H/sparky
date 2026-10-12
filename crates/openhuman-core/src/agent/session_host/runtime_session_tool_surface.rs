@@ -23,12 +23,7 @@ impl OpenHumanTurnPrelude {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .recorded_tool_snapshot_adopted;
-        // A named scope delegates only when it names a spawn tool (the build
-        // time rule), so the definition's roster never widens an explicit
-        // allowlist here either.
-        let delegates = !definition.subagents.is_empty()
-            && super::builder::should_synthesize_delegation_tools(&definition);
-        if !delegates && !has_recorded_tool_snapshot {
+        if definition.subagents.is_empty() && !has_recorded_tool_snapshot {
             return Ok(());
         }
         let (integrations, integrations_are_authoritative, recorded_tool_snapshot_adopted) = {
@@ -48,11 +43,7 @@ impl OpenHumanTurnPrelude {
             .tool_surface
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let mut collected = if delegates {
-            collect_orchestrator_tools(&definition, &registry, &integrations)
-        } else {
-            Vec::new()
-        };
+        let mut collected = collect_orchestrator_tools(&definition, &registry, &integrations);
         #[cfg(feature = "mcp")]
         collected.extend(mcp_tools);
         let rebuilt = self.rebuilt_recorded_tools(
