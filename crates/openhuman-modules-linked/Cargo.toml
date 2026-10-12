@@ -16,7 +16,9 @@
 # `module_export_optional_static!` export) can be linked. These WAIT for the
 # upstream static-link work (E0.3) and a re-pin; they have no feature here yet:
 #   tinycomputer, tinyjuice, tinysearch, tinywallet (module crate lacks
-#   `static-link`), tinyhosts (no module crate yet).
+#   `static-link`), tinymcp (has `static-link` but does not export
+#   `linked_module` yet, only the three ABI items), tinyhosts (no module crate
+#   yet).
 [package]
 name = "openhuman-modules-linked"
 description = "Local-development registration of in-process linked modules (never part of a product build)"
@@ -28,12 +30,11 @@ publish = false
 
 [features]
 default = []
-all = ["tinybox", "tinychannels", "tinyconnectors", "tinydocs", "tinymcp", "tinyvoice"]
+all = ["tinybox", "tinychannels", "tinyconnectors", "tinydocs", "tinyvoice"]
 tinybox = ["dep:tinybox-module"]
 tinychannels = ["dep:tinychannels-module"]
 tinyconnectors = ["dep:tinyconnectors"]
 tinydocs = ["dep:tinydocs-module"]
-tinymcp = ["dep:tinymcp"]
 tinyvoice = ["dep:tinyvoice-module"]
 
 [dependencies]
@@ -46,7 +47,6 @@ tinybox-module = { path = "../../vendor/tinybox/crates/tinybox-module", features
 tinychannels-module = { path = "../../vendor/tinychannels/crates/tinychannels-module", features = ["static-link"], optional = true }
 tinyconnectors = { path = "../../vendor/tinyconnectors/crates/tinyconnectors", default-features = false, features = ["static-link"], optional = true }
 tinydocs-module = { path = "../../vendor/tinydocs/crates/tinydocs-module", features = ["static-link"], optional = true }
-tinymcp = { path = "../../vendor/tinymcp/crates/tinymcp", features = ["static-link"], optional = true }
 tinyvoice-module = { path = "../../vendor/tinyvoice/crates/tinyvoice-module", default-features = false, features = ["static-link"], optional = true }
 
 [lints.rust]

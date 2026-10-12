@@ -10,7 +10,9 @@ pub use openhuman_core::modules::ops::set_bundled_releases_dir;
 /// executable. Local-development builds only: `openhuman-modules-linked` calls
 /// this for each module it links; no shipped host does.
 #[cfg(feature = "modules")]
-pub use openhuman_core::modules::linked::{register_linked, LinkedFactory};
+pub use openhuman_core::modules::linked::{
+    is_registered as is_linked_registered, register_linked, LinkedFactory,
+};
 
 /// The browser-control module.
 #[cfg(feature = "modules")]
