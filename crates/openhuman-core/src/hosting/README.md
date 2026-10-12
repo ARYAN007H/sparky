@@ -36,10 +36,10 @@ test exercises the pinned artifact through OpenHuman's configured module loader
 and real private TinyBus. It queries `Providers`, then sends a confidential
 `PrepareBundle` for a temporary local HTML file and checks the returned typed
 snapshot. This operation is local and does not contact a hosting provider. Run
-it with the released library at hand:
+it with a library built from the pinned submodule:
 
 ```bash
-OPENHUMAN_TINYHOSTS_TEST_MODULE=/path/to/libtinyhosts.so \
+eval "$(node scripts/modules/build.mjs tinyhosts --print-env)"
   scripts/ci-cancel-aware.sh cargo +stable test --locked \
     --manifest-path Cargo.toml -p openhuman --no-default-features \
     --features 'hosting,crash-reporting' \

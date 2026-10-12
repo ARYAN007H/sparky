@@ -267,7 +267,7 @@ pub async fn compact_tool_output(call: ToolOutputCompaction<'_>) -> CompactedToo
         },
     };
     #[cfg(test)]
-    let config = if std::env::var_os("TINYJUICE_TEST_MODULE").is_some() {
+    let config = if crate::modules::local_artifact("tinyjuice").is_some() {
         // The released-module regression must not inherit an operator's
         // persisted compression thresholds or disabled router flags.
         std::sync::Arc::new(crate::config::Config::default())
