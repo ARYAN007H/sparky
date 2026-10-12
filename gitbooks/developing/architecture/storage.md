@@ -65,7 +65,8 @@ A backend decides how it enforces the scope. SQLite and the file driver keep eac
 ### Process caches
 
 The connected-integration catalog belongs to the calling profile, or to the
-operator in single-user mode. Agents of one operator share it. Its cache key
+operator in single-user mode. Agents using that operator's same configuration
+and credentials share it. Its cache key
 also binds the configuration, backend endpoint and credential identity, using
 digests rather than storing those secrets in the key. Identical service
 credentials do not make two profiles share a snapshot.
