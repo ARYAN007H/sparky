@@ -384,6 +384,7 @@ impl DomainSet {
     pub fn saas() -> Self {
         Self {
             operator: true,
+            agent: true,
             threads: true,
             channels: true,
             memory: true,

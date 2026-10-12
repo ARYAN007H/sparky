@@ -65,6 +65,23 @@ fn caller_profile() -> Result<Option<String>, WaitError> {
     Ok(profile)
 }
 
+/// A refused detached spawn cannot be reported as accepted work.
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum RegistrationError {
+    #[error("missing or mismatched tenant scope")]
+    Scope,
+    #[error("detached task registration failed: {0}")]
+    Registry(#[source] tinyagents_tasks::DetachedTaskRegistryError),
+}
+
+/// Check the actual caller before any reusable-session or worker-thread write.
+pub(crate) fn admit_spawn(
+    workspace: &std::path::Path,
+) -> Result<Option<String>, RegistrationError> {
+    admit_workspace(workspace).map_err(|_| RegistrationError::Scope)?;
+    caller_profile().map_err(|_| RegistrationError::Scope)
+}
+
 /// Host ownership adapter over TinyAgents' opaque owner string.
 pub(super) fn owner_key(parent_session: &str) -> Result<String, WaitError> {
     let profile = caller_profile()?;
@@ -155,11 +172,14 @@ pub(crate) fn register(
     run_queue: Arc<RunQueue<crate::agent::queued_turn::QueuedTurn>>,
     abort: AbortHandle,
     status: watch::Receiver<DetachedSubagentStatus>,
-) {
-    let Ok(profile) = caller_profile() else {
-        abort.abort();
-        log::warn!("[running_subagents] refusing registration without a SaaS profile");
-        return;
+) -> Result<(), RegistrationError> {
+    let profile = match admit_spawn(&workspace_dir) {
+        Ok(profile) => profile,
+        Err(error) => {
+            abort.abort();
+            log::warn!("[running_subagents] refusing registration without a SaaS profile");
+            return Err(error);
+        }
     };
     let owner = crate::core::runtime::tenant::tenant_key(
         &crate::core::runtime::tenant::Tenant {
@@ -189,9 +209,32 @@ pub(crate) fn register(
         crate::agent::orchestration::background_delivery::recover_on_boot(&workspace_dir);
     }
 
-    // Typed lifecycle ledger: record the spawn and mirror the child's terminal
-    // status into the store via a lightweight watcher (issue #4249). Done before
-    // the entry is moved into the map so the metadata is still in scope.
+    let metadata = RunningSubagentMetadata {
+        profile,
+        parent_session: parent_session.clone(),
+        agent_id: agent_id.clone(),
+        subagent_session_id: subagent_session_id.clone(),
+        workspace_dir: workspace_dir.clone(),
+        parent_thread_id: parent_thread_id.clone(),
+        run_queue,
+    };
+    registry()
+        .register(
+            TaskId::new(task_id.clone()),
+            owner,
+            metadata,
+            status.clone(),
+            // Cooperative cancellation is flipped before the registry invokes
+            // the hard abort. The child executor can adopt this token without
+            // changing the registry/control API.
+            CancellationToken::new(),
+            abort.clone(),
+        )
+        .map_err(|error| {
+            abort.abort();
+            RegistrationError::Registry(error)
+        })?;
+    // Failed admission must not leave a Running lifecycle record or watcher.
     record_spawned(
         &task_id,
         &agent_id,
@@ -204,31 +247,8 @@ pub(crate) fn register(
     spawn_status_watcher(
         task_store_for_workspace(&workspace_dir),
         task_id.clone(),
-        status.clone(),
+        status,
     );
-
-    let metadata = RunningSubagentMetadata {
-        profile,
-        parent_session,
-        agent_id,
-        subagent_session_id,
-        workspace_dir,
-        parent_thread_id,
-        run_queue,
-    };
-    registry()
-        .register(
-            TaskId::new(task_id.clone()),
-            owner,
-            metadata,
-            status,
-            // Cooperative cancellation is flipped before the registry invokes
-            // the hard abort. The child executor can adopt this token without
-            // changing the registry/control API.
-            CancellationToken::new(),
-            abort,
-        )
-        .expect("duplicate detached sub-agent task id");
     log::debug!(
         "[running_subagents] registered task_id={} live_entries={}",
         task_id,
@@ -236,4 +256,5 @@ pub(crate) fn register(
             .len()
             .expect("detached task registry lock poisoned")
     );
+    Ok(())
 }

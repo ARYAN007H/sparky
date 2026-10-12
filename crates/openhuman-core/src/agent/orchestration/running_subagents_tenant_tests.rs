@@ -70,7 +70,8 @@ impl Worker {
             queue.clone(),
             abort.clone(),
             rx,
-        );
+        )
+        .expect("fixture registration admitted");
         Self {
             task,
             session,

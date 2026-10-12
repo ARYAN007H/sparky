@@ -46,6 +46,14 @@ impl SpawnAsyncSubagentTool {
             }
         };
 
+        // Preserve the actual caller's authority before any filesystem/session
+        // effects. A scoped refusal cannot become an accepted/running reference.
+        if let Err(error) = running_subagents::admit_spawn(&parent.workspace_dir) {
+            return Ok(ToolResult::error(format!(
+                "spawn_async_subagent: registration refused: {error}"
+            )));
+        }
+
         let registry = match AgentDefinitionRegistry::current() {
             Some(registry) => registry,
             None => {
@@ -742,7 +750,7 @@ impl SpawnAsyncSubagentTool {
 
         // Register *after* spawn so the AbortHandle is available. The task owns
         // `status_tx`; this side holds `status_rx` for `wait_subagent`.
-        running_subagents::register(
+        let registration = running_subagents::register(
             task_id.clone(),
             definition.id.clone(),
             parent_session.clone(),
@@ -754,6 +762,14 @@ impl SpawnAsyncSubagentTool {
             join.abort_handle(),
             status_rx,
         );
+        if let Err(error) = finish_spawn_registration(
+            registration,
+            &store,
+            &durable_session.subagent_session_id,
+            &task_id,
+        ) {
+            return Ok(ToolResult::error(error));
+        }
 
         let payload = async_subagent_ref_payload(
             &task_id,
