@@ -38,12 +38,12 @@ source fail. Update or remove the record when its declaration changes.
 
 Choose the ownership category and explain why it applies:
 
-| Category | Ownership |
-| --- | --- |
-| A | Process configuration or infrastructure; carries no tenant data |
-| B | Tenant data explicitly partitioned by authenticated scope |
-| C | Durable authoritative state reached through a storage driver |
-| D | A routing handle whose target enforces the ownership boundary |
+| Category | Ownership                                                       |
+| -------- | --------------------------------------------------------------- |
+| A        | Process configuration or infrastructure; carries no tenant data |
+| B        | Tenant data explicitly partitioned by authenticated scope       |
+| C        | Durable authoritative state reached through a storage driver    |
+| D        | A routing handle whose target enforces the ownership boundary   |
 
 Reviewers must inspect the reason and verification reference. The gate
 checks their presence and the source declaration; it does not execute the
