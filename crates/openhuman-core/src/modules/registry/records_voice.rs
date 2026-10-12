@@ -2,6 +2,7 @@
 
 use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec};
 
+
 /// The `tinyvoice` module: the host-agnostic half of the voice pipeline.
 ///
 /// Wake-word gating, fast-path command routing, STT hallucination detection,
@@ -17,8 +18,8 @@ use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec}
 pub(crate) const TINYVOICE: ModuleRecord = ModuleRecord {
     id: "tinyvoice",
     description: "Wake-word gating, command routing, hallucination detection, capture audio",
-    bus_name: "ai.tinyhumans.tinyvoice.Voice",
-    object_path: "/ai/tinyhumans/tinyvoice/Voice",
+    bus_name: tinyvoice_bus::names::BUS_NAME,
+    object_path: tinyvoice_bus::names::OBJECT_PATH,
     version: "0.1.16",
     release_url: "https://github.com/tinyhumansai/tinyvoice/releases/tag/v0.1.16",
     assets: &[

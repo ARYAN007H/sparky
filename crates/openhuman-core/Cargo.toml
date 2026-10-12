@@ -658,7 +658,19 @@ tinymemes = ["dep:tinymemes"]
 # A loaded module is trusted in-process code with this process's privileges, and
 # tinybus never unloads one. See `crates/openhuman-core/src/modules/` before adding an entry
 # to the registry.
-modules = ["tinybus/modules", "dep:tinybox-bus"]
+# The registry names every module's bus interface and object path from its
+# contract crate (`registry/records_*.rs`), so the contract crates of the
+# gate-optional modules ride on `modules` too: every build that has a registry
+# carries all eleven records, and a renamed interface fails a test instead of
+# the first call. They are wire vocabulary only (no I/O, no runtime).
+modules = [
+    "tinybus/modules",
+    "dep:tinybox-bus",
+    "dep:tinydocs-bus",
+    "dep:tinyhosts-bus",
+    "dep:tinyvoice-bus",
+    "dep:tinywallet-bus",
+]
 # Voice domain: STT/TTS providers, the standalone dictation
 # server, and always-on listening.
 # The desktop product enables voice explicitly; contributor defaults leave it

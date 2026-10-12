@@ -2,12 +2,13 @@
 
 use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec};
 
+
 /// The `tinybox` module, loaded on demand.
 pub(crate) const TINYBOX: ModuleRecord = ModuleRecord {
     id: "tinybox",
     description: "Sandbox execution and lifecycle operations through TinyBox",
-    bus_name: "ai.tinyhumans.tinybox.Box",
-    object_path: "/ai/tinyhumans/tinybox/Box",
+    bus_name: tinybox_bus::INTERFACE,
+    object_path: tinybox_bus::OBJECT_PATH,
     version: "0.1.24",
     release_url: "https://github.com/tinyhumansai/tinybox/releases/tag/v0.1.24",
     assets: &[
@@ -111,8 +112,8 @@ pub(crate) const TINYBOX: ModuleRecord = ModuleRecord {
 pub(crate) const TINYCHANNELS: ModuleRecord = ModuleRecord {
     id: "tinychannels",
     description: "Channel provider lifecycle and message transport",
-    bus_name: "ai.tinyhumans.tinychannels.Channels",
-    object_path: "/ai/tinyhumans/tinychannels/Channels",
+    bus_name: tinychannels_bus::names::BUS_NAME,
+    object_path: tinychannels_bus::names::OBJECT_PATH,
     version: "0.1.26",
     release_url: "https://github.com/tinyhumansai/tinychannels/releases/tag/v0.1.26",
     assets: &[
@@ -186,8 +187,8 @@ pub(crate) const TINYCHANNELS: ModuleRecord = ModuleRecord {
 pub(crate) const TINYHOSTS: ModuleRecord = ModuleRecord {
     id: "tinyhosts",
     description: "Hosting provider operations",
-    bus_name: "ai.tinyhumans.tinyhosts.Hosting",
-    object_path: "/ai/tinyhumans/tinyhosts/Hosting",
+    bus_name: tinyhosts_bus::BUS_NAME,
+    object_path: tinyhosts_bus::OBJECT_PATH,
     version: "0.3.0",
     release_url: "https://github.com/tinyhumansai/tinyhosts/releases/tag/v0.3.0",
     assets: &[

@@ -2,11 +2,12 @@
 
 use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec};
 
+
 pub(crate) const TINYJUICE: ModuleRecord = ModuleRecord {
     id: "tinyjuice",
     description: "Content-aware tool-output compression and recoverable caching",
-    bus_name: "ai.tinyhumans.tinyjuice.Compression",
-    object_path: "/ai/tinyhumans/tinyjuice/Compression",
+    bus_name: tinyjuice_bus::names::BUS_NAME,
+    object_path: tinyjuice_bus::names::OBJECT_PATH,
     version: "0.7.1",
     release_url: "https://github.com/tinyhumansai/tinyjuice/releases/tag/v0.7.1",
     assets: &[
