@@ -47,7 +47,7 @@ pub mod agent_scope;
 pub mod boot_guard;
 mod bootstrap;
 pub mod builder;
-mod components;
+pub mod components;
 pub use components::{ComponentSet, COMPONENT_NAMES};
 pub mod context;
 pub mod domain_set;

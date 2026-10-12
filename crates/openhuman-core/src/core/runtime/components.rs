@@ -72,23 +72,27 @@ impl ComponentSet {
     /// Whether the component named `name` is on. Unknown names are on: this is
     /// a narrowing set, and a name it does not know cannot have been switched off.
     pub fn enabled(&self, name: &str) -> bool {
-        let mut c = ComponentsConfig::default();
-        c.flows = self.flows;
-        c.memes = self.memes;
-        c.documents = self.documents;
-        c.search = self.search;
-        c.mcp = self.mcp;
-        c.connectors = self.connectors;
-        c.hosting = self.hosting;
-        c.juice = self.juice;
-        c.memory = self.memory;
-        c.wallet = self.wallet;
-        c.computer = self.computer;
-        c.sandbox = self.sandbox;
-        c.channels = self.channels;
-        c.skills = self.skills;
-        c.voice = self.voice;
-        c.get(name).unwrap_or(true)
+        self.to_config().get(name).unwrap_or(true)
+    }
+
+    fn to_config(self) -> ComponentsConfig {
+        ComponentsConfig {
+            flows: self.flows,
+            memes: self.memes,
+            documents: self.documents,
+            search: self.search,
+            mcp: self.mcp,
+            connectors: self.connectors,
+            hosting: self.hosting,
+            juice: self.juice,
+            memory: self.memory,
+            wallet: self.wallet,
+            computer: self.computer,
+            sandbox: self.sandbox,
+            channels: self.channels,
+            skills: self.skills,
+            voice: self.voice,
+        }
     }
 
     /// `Ok` when `name` is on, otherwise the typed `COMPONENT_DISABLED:<name>` error.

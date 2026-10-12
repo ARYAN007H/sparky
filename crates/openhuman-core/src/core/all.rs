@@ -1158,6 +1158,18 @@ pub async fn try_invoke_registered_rpc(
     // are indistinguishable from absent. Enforced HERE (dispatch), not in
     // schema/validation lookups, to avoid a validate/dispatch split.
     if !visible(grouped) {
+        // A family a `[components]` switch removed answers with the typed
+        // error so the UI and CLI can explain it; a family the host left
+        // out stays indistinguishable from an unregistered method.
+        if let Some(name) = crate::core::runtime::ComponentSet::component_for_group(grouped.group) {
+            let off = crate::core::runtime::context::CoreContext::current()
+                .map(|c| !c.components().enabled(name))
+                .unwrap_or(false);
+            if off {
+                log::debug!("[rpc][component-gate] method '{method}' refused — component '{name}' disabled");
+                return Some(Err(crate::core::runtime::components::component_disabled(name).encode()));
+            }
+        }
         log::debug!(
             "[rpc][domain-gate] method '{method}' suppressed — group {:?} disabled or method \
              outside the user surface in the active scope",
