@@ -97,12 +97,9 @@ export function rewriteRecord(src, id, newVersion, checksums) {
 /** Archive names in `checksums` that no asset of the record uses. */
 export function unusedChecksums(src, id, checksums) {
   const used = new Set();
-  for (const [, head, body] of src.matchAll(
-    /(const [A-Z0-9_]+: ModuleRecord = ModuleRecord \{)([\s\S]*?)\n\};/g,
-  ).map((m) => [m[0], m[1], m[2]])) {
-    void head;
-    if (!new RegExp(`^\\s*id: "${id}",`, "m").test(body)) continue;
-    for (const a of body.matchAll(ASSET_RE)) used.add(a[4]);
+  for (const record of src.matchAll(RECORD_RE)) {
+    if (!new RegExp(`^\\s*id: "${id}",`, "m").test(record[2])) continue;
+    for (const a of record[2].matchAll(ASSET_RE)) used.add(a[4]);
   }
   return [...checksums.keys()].filter((name) => !used.has(name));
 }
