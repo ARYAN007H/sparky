@@ -137,7 +137,19 @@ global mode and `OPENHUMAN_MODULE_SOURCE_<ID>` (id upper-cased) one module.
 - `release`: the chain below, pinned and digest-checked. The only mode CI and
   shipped builds use; `scripts/ci/check-ci-module-source.mjs` (CI Lite) fails
   if a workflow or CI script sets any other.
-- `linked`: the in-process factory registered by `openhuman-modules-linked`.
+- `linked`: the module linked into the running executable. The core exposes
+  only the seam (`modules::linked::register_linked(id, factory)`, re-exported as
+  `openhuman_rpc::embed::modules::register_linked`); the crate
+  `crates/openhuman-modules-linked` is the only place module implementation
+  crates are linked, and `install()` registers one factory per enabled module
+  feature. `ops::resolve` attaches the factory's `LinkedModule` through
+  `ModuleHost::attach_linked_with_config` with the same `module_config` a
+  released module gets (the executable's digest is the attestation). Only
+  `openhuman-cli` can reach the crate, as an optional dependency behind the
+  non-product `linked-modules` feature (`cargo run -p openhuman-cli --features
+  linked-modules`, then `OPENHUMAN_MODULE_SOURCE=linked`). tinybus never unloads
+  a module, so a process serves an id from one source only. See the crate docs
+  for which modules can be linked at the current vendor pins.
 - `source`: a locally built artifact.
 
 For local development and local tests only. When `linked` or `source` cannot be
