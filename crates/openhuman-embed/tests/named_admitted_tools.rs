@@ -1,6 +1,7 @@
 //! An embedded agent on the harness domains gets the scheduler and clock tools
 //! it names, although their domain family is off, and nothing else from that
-//! family: not the shell or file tools, even when it names them too.
+//! family: not the shell or file tools, even when it names them too. `cron` is
+//! deferred (found with `tool_search`), so it is called rather than listed.
 //!
 //! One runtime per process, so one test in this binary.
 
@@ -8,7 +9,9 @@ mod common;
 
 use std::sync::Arc;
 
-use common::{chat_requests, offline_config, provider, runtime, stub_backend, tool_names};
+use common::{
+    chat_requests, offline_config, runtime, stub_backend, tool_call_completion, tool_names,
+};
 use openhuman_embed::{
     AgentDefinitionSpec, AgentSpec, DomainSet, HostTurnTools, InMemorySessionStores, Runtime,
     ToolGroups, ToolScopeSpec, Workspace,
@@ -19,7 +22,13 @@ fn a_named_scope_admits_the_clock_and_scheduler_but_never_the_shell() {
     runtime().block_on(async {
         tokio::spawn(async {
             let backend = stub_backend().await;
-            let model = provider("ok").await;
+            // The turn calls `cron` (a deferred tool, so not listed up front)
+            // and then answers.
+            let model = common::scripted_provider(
+                vec![tool_call_completion("cron", r#"{"action":"list"}"#)],
+                "ok",
+            )
+            .await;
             let runtime = Runtime::builder()
                 .config(offline_config())
                 .workspace(Workspace::Stateless)
@@ -48,7 +57,7 @@ fn a_named_scope_admits_the_clock_and_scheduler_but_never_the_shell() {
 
             let requests = chat_requests(&model).await;
             let offered = tool_names(&requests[0]);
-            for admitted in ["cron", "current_time", "resolve_time"] {
+            for admitted in ["current_time", "resolve_time", "tool_search"] {
                 assert!(
                     offered.iter().any(|name| name == admitted),
                     "{admitted} missing: {offered:?}"
@@ -60,6 +69,11 @@ fn a_named_scope_admits_the_clock_and_scheduler_but_never_the_shell() {
                     "{refused} offered: {offered:?}"
                 );
             }
+            let result = common::tool_results(&requests[1]);
+            assert!(
+                !result.to_lowercase().contains("unknown") && !result.contains("not available"),
+                "cron did not run: {result}"
+            );
             drop(agent);
             drop(runtime);
         })
