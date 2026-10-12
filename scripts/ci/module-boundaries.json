@@ -100,13 +100,7 @@
     }
   ],
   "pendingContracts": [],
-  "exceptions": [
-    {
-      "scope": "hosts",
-      "package": "tinymcp",
-      "reason": "Protocol servers and supervisor operations still call the implementation."
-    }
-  ],
+  "exceptions": [],
   "excludedSubsystems": [
     {
       "owner": "tinyruntime",

@@ -215,13 +215,24 @@ fn registry_tools_present_the_exact_identity_they_always_had() {
 
 #[tokio::test]
 async fn tool_call_refuses_arguments_that_are_not_an_object() {
-    let err = McpRegistryToolCallTool::new(cfg())
+    let dir = tempfile::tempdir().expect("temp workspace");
+    let config = workspace_config(dir.path());
+    crate::mcp::module_client::McpConfiguredClient::install_test_port(
+        &config,
+        Box::new(ToolCallPort::default()),
+    )
+    .expect("test module port");
+    let err = McpRegistryToolCallTool::new(config)
         .execute(json!({ "server_id": "srv", "tool_name": "t", "arguments": 5 }))
         .await
         .expect_err("a number is not arguments");
     let message = err.to_string();
     assert!(message.contains("mcp_registry_tool_call"), "{message}");
-    assert!(message.contains("a number"), "{message}");
+    assert!(message.contains("invalid tool arguments"), "{message}");
+    assert!(
+        !message.contains('5'),
+        "module failure must not echo arguments: {message}"
+    );
 }
 
 /// A workspace of its own, so the host this opens is not shared.
@@ -325,6 +336,37 @@ impl crate::mcp::module_client::McpModulePort for ToolCallPort {
             }
             _ => Err(crate::modules::client::ModuleCallError::IncompatibleContract),
         }
+    }
+
+    async fn validate_server_arguments(
+        &self,
+        _request: tinymcp_bus::ValidateServerArgumentsRequest,
+    ) -> Result<tinymcp_bus::ServerArgumentsValidation, crate::modules::client::ModuleCallError>
+    {
+        Err(crate::modules::client::ModuleCallError::IncompatibleContract)
+    }
+
+    async fn normalize_tool_arguments(
+        &self,
+        arguments: Option<Value>,
+    ) -> Result<serde_json::Map<String, Value>, crate::modules::client::ModuleCallError> {
+        match arguments.unwrap_or(Value::Null) {
+            Value::Null => Ok(serde_json::Map::new()),
+            Value::Object(arguments) => Ok(arguments),
+            Value::String(encoded) => serde_json::from_str::<Value>(&encoded)
+                .ok()
+                .and_then(|value| value.as_object().cloned())
+                .ok_or(crate::modules::client::ModuleCallError::ModuleFault),
+            _ => Err(crate::modules::client::ModuleCallError::ModuleFault),
+        }
+    }
+
+    async fn prepare_agent_tools(
+        &self,
+        _request: tinymcp_bus::PrepareAgentToolsRequest,
+    ) -> Result<Vec<tinymcp_bus::McpToolPresentation>, crate::modules::client::ModuleCallError>
+    {
+        Ok(Vec::new())
     }
 }
 

@@ -15,7 +15,7 @@ copying its implementation into a host, or accepting weaker isolation.
 | --- | --- | --- | --- | --- |
 | tinyjuice | none (module loaded through TinyBus) | tinyjuice-bus | core tools, compression, CCR REPL | Complete: PR #59 provides module-owned compression, CCR queries, HTML extraction, schemas and declarations; the host retains turn-bound model callbacks and artifact authorization |
 | tinyconnectors | none | tinyconnectors-bus | core integrations, credentials and triggers | Module-backed argument preparation, action execution and trigger archives; host credential reconciliation and frozen tool restoration remain in OpenHuman |
-| tinymcp | tinymcp | tinymcp-bus | core MCP registry, supervisor, CLI stdio/HTTP server | Supervisor notifications, server protocol operations and callbacks for approved host tools/resources/prompts |
+| tinymcp | none in normal/build host dependencies | tinymcp-bus | core MCP registry, supervisor, CLI stdio/HTTP server | Host adapters use contract 1.20 for registry, supervisor, server protocol and approved host callbacks. Compatible release artifacts and final native host tests remain under validation; frozen recorded tool declarations are restored independently of the current catalog |
 | tinychannels | tinychannels, tinychannels-runtime, tinychannels-module (test-only) | tinychannels-bus | core channels, TinyHumans host, CLI REPL | Contract is pure; scoped providers, inbound/identity/outbound preparation, remote commands, runtime limits, typing and progressive delivery execute through confidential module calls. Host-owned policy, credentials, persistence and callbacks remain in OpenHuman. Both host implementation exceptions are removed; final focused build validation is pending |
 | tinyhosts | none | tinyhosts-bus | core hosting tools | Released Execute/Providers contract consumed through the module; workspace authorization, credentials and approval policy remain in OpenHuman |
 | tinywallet | none in normal/build host dependencies | tinywallet-bus | core wallet/web3/x402 | Complete: v0.19.0 contract 1.13 owns mnemonic validation/derivation, native transactions, Web3 quotes/execution, ERC-20 encoding, and x402 payment parsing/budgets/ledger. OpenHuman retains encrypted-key custody, authenticated transport, explicit approval, and lifecycle orchestration |
@@ -426,8 +426,23 @@ operation and signing E2E. The module-boundary audit reports zero violations
 and no remaining Wallet implementation exceptions. TinyRuntime remains excluded
 from this migration.
 
-## Combined Wallet and Channels integration
+## Current delivery scope
 
-This branch integrates merged Wallet host PR [#7489](https://github.com/tinyhumansai/openhuman/pull/7489). The fresh dependency audit reports zero violations, zero stale exceptions, one remaining MCP implementation exception, and no pending contracts. Channel implementation crates remain test-only fixtures. Final Channels host tests and builds are still pending; these dependency results alone do not establish completion.
+The active host cutovers are MCP and Channels. Wallet host PR [#7489](https://github.com/tinyhumansai/openhuman/pull/7489) is merged, as is TinyBox host PR [#7469](https://github.com/tinyhumansai/openhuman/pull/7469). This branch integrates the merged Wallet cutover and both active MCP and Channels cutovers. The dependency exception list is empty; final host tests and builds remain pending. Channels will land as its own host PR before MCP.
 
-TinyRuntime is excluded as requested. Broader bus error reporting and Sentry coverage are deferred to separate work.
+TinyRuntime is excluded as requested. Broader bus error reporting and Sentry coverage are deferred to separate work; the existing reporting path remains in place.
+
+## TinyMCP compatible release pin
+
+TinyMCP v0.14.2 is pinned at canonical merge source
+`e18f289407fac1a9e5695ed75bb4ab5800c79f7b`, contract 1.20. All 17 downloaded
+platform archives match the checksum manifest, GitHub asset digests and sizes.
+The Ubuntu artifact loads through OpenHuman's TinyBus revision and exposes
+all 62 expected contract methods. Registry metadata includes the additional
+Arch ARM archive and the renamed Arch archive basenames.
+
+The native host E2Es and full-crate focused tests are queued for final acceptance;
+release verification does not substitute for those host checks. Actual-source
+HTTP/session regressions pass 11 tests and cover host credential-header removal,
+terminal callback draining, lost-reply retry and rejected DELETE preservation.
+
