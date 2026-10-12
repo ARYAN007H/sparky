@@ -56,6 +56,6 @@ ordinary `static`, `static mut`, and `lazy_static!`'s `static ref`, multiline
 and qualified types, and ignores comments and string fixtures. Statics
 generated without a literal declaration by another macro need manual review.
 Sibling `*_tests.rs` files are excluded; declarations behind `cfg(test)` in
-production source files are conservatively included. Initializer edits to an
-existing declaration are subject to ordinary code review. Other crates and
+production source files are conservatively included. Initializer and alias-definition
+edits to existing declarations are subject to ordinary code review. Other crates and
 vendored repositories are outside this core-only gate.
