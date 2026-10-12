@@ -357,6 +357,28 @@ impl McpConfiguredClient {
                     tracing::warn!(?error, "[mcp] workspace cleanup is still pending");
                 }
             }
+            let reservations = CLEANUP_RESERVATIONS
+                .get()
+                .map(|reservations| {
+                    reservations
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                        .iter()
+                        .map(|(path, reservation)| (path.clone(), Arc::clone(reservation)))
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            for (data_dir, reservation) in reservations {
+                let has_client = CLIENTS.get().is_some_and(|clients| {
+                    clients
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                        .contains_key(&data_dir)
+                });
+                if !has_client {
+                    Self::finish_cleanup(&data_dir, None, reservation);
+                }
+            }
             SHUTDOWN_REGISTERED.store(false, Ordering::Release);
         });
     }
@@ -571,23 +593,28 @@ impl McpConfiguredClient {
         if !is_current {
             return false;
         }
+        let mut clients = if let Some(client) = client.as_ref() {
+            let Some(clients) = CLIENTS.get() else {
+                return false;
+            };
+            let clients = clients
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if !clients
+                .get(data_dir)
+                .is_some_and(|current| Arc::ptr_eq(current, client))
+            {
+                return false;
+            }
+            Some(clients)
+        } else {
+            None
+        };
         if after_close.as_ref().is_some_and(|action| !action()) {
             return false;
         }
-        if let Some(client) = client {
-            if let Some(clients) = CLIENTS.get() {
-                let mut clients = clients
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
-                if clients
-                    .get(data_dir)
-                    .is_some_and(|current| Arc::ptr_eq(current, &client))
-                {
-                    clients.remove(data_dir);
-                } else {
-                    return false;
-                }
-            }
+        if let Some(clients) = clients.as_mut() {
+            clients.remove(data_dir);
         }
         let mut reservations = reservations
             .lock()
