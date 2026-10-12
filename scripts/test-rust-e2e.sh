@@ -178,6 +178,15 @@ PRODUCT_FEATURES="$(bash "$REPO_ROOT/scripts/ci/product-features.sh")"
 # digest before the subprocesses start.
 module_target="$(bash "$SCRIPT_DIR/ci/native-test-module-platform.sh")"
 IFS=$'\t' read -r module_ext module_platform <<< "$module_target"
+# shellcheck source=modules/stage-local-modules.sh
+REPO_ROOT="$REPO_ROOT" source "$SCRIPT_DIR/modules/stage-local-modules.sh"
+# With OPENHUMAN_MODULE_SOURCE=source the modules below are built from the pinned
+# submodules (scripts/modules/build.mjs); otherwise TinyBox and TinyMCP are the
+# registry-pinned releases, as in CI.
+e2e_source_ids=(tinyconnectors tinysearch)
+if local_module_source_is_source; then
+  e2e_source_ids+=(tinybox tinymcp)
+else
 tinybox_asset="$(node scripts/ci/self-hosted/test-module-assets.mjs "$module_platform" tinybox)"
 IFS=$'\t' read -r _tinybox_id tinybox_url tinybox_filename tinybox_sha256 <<< "$tinybox_asset"
 tinybox_dir="$REPO_ROOT/target/test-modules/tinybox/$tinybox_sha256"
@@ -212,34 +221,20 @@ if [ ! -f "$tinymcp_dir/libtinymcp_module.$module_ext" ]; then
   tar --no-same-owner -xzf "$tinymcp_archive" -C "$tinymcp_dir"
 fi
 export OPENHUMAN_MODULE_PATH="$tinymcp_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
-export OPENHUMAN_TINYMCP_TEST_MODULE="$tinymcp_dir/libtinymcp_module.$module_ext"
+fi
 
 # Module-backed Composio coverage must use the pinned local artifact as well.
-# Without this override the core resolves TinyConnectors through release
-# metadata, turning an otherwise hermetic mock-backend suite into a network
-# dependency and permanently faulting that process when the lookup fails.
-if [ -z "${TINYCONNECTORS_TEST_MODULE:-}" ]; then
-  connectors_manifest="vendor/tinyconnectors/crates/tinyconnectors/Cargo.toml"
-  connectors_target_dir="$REPO_ROOT/target/native-test-modules/tinyconnectors"
-  connectors_module="$connectors_target_dir/release/libtinyconnectors.$module_ext"
-  echo "[rust-e2e] Building pinned TinyConnectors test module ..."
-  "$CARGO_BIN" build --release --manifest-path "$connectors_manifest" --target-dir "$connectors_target_dir"
-  connectors_module="$(node scripts/ci/stage-connector-test-module.mjs \
-    "$connectors_module" "$REPO_ROOT/target/test-modules/tinyconnectors")"
-  export TINYCONNECTORS_TEST_MODULE="$connectors_module"
-fi
-
-# The isolated module-admission suite requires a real native search module.
-# Build the pinned source, as the product unit runner does, before discovering
-# and executing the E2E targets; never fall back to release downloads in a test.
-if [ -z "${TINYSEARCH_TEST_MODULE:-}" ]; then
-  search_manifest="vendor/tinysearch/crates/tinysearch/Cargo.toml"
-  search_target_dir="$REPO_ROOT/target/native-test-modules/tinysearch"
-  search_module="$search_target_dir/release/libtinysearch.$module_ext"
-  echo "[rust-e2e] Building pinned TinySearch test module ..."
-  "$CARGO_BIN" build --release --manifest-path "$search_manifest" --target-dir "$search_target_dir"
-  export TINYSEARCH_TEST_MODULE="$search_module"
-fi
+# Without it the core resolves TinyConnectors through release metadata, turning
+# an otherwise hermetic mock-backend suite into a network dependency and
+# permanently faulting that process when the lookup fails. The isolated
+# module-admission suite likewise needs a real native search module; never fall
+# back to release downloads in a test. build.mjs stages each library with a
+# modules.toml carrying the operator-trust digest.
+echo "[rust-e2e] Building pinned local test modules: ${e2e_source_ids[*]} ..."
+stage_source_modules "${e2e_source_ids[@]}"
+for source_id in "${e2e_source_ids[@]}"; do
+  export OPENHUMAN_MODULE_PATH="$REPO_ROOT/target/module-sources/$source_id${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
+done
 
 echo "[rust-e2e] Running ${#SUITES[@]} suite(s) serially."
 
