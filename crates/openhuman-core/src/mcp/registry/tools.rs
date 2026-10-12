@@ -260,13 +260,8 @@ impl Tool for McpRegistryToolCallTool {
         // cannot hold one is refused here, naming what arrived.
         let client = crate::mcp::module_client::McpConfiguredClient::for_config(&self.config)
             .map_err(|_| anyhow::anyhow!("mcp_registry_tool_call: MCP module is unavailable"))?;
-        let client_config = crate::mcp::host::client_config(&self.config);
         let normalized: serde_json::Map<String, Value> = client
-            .call(
-                &client_config,
-                tinymcp_bus::names::methods::NORMALIZE_TOOL_ARGUMENTS,
-                (args.get("arguments").cloned(),),
-            )
+            .normalize_tool_arguments(args.get("arguments").cloned())
             .await
             .map_err(|_| anyhow::anyhow!("mcp_registry_tool_call: invalid tool arguments"))?;
         emit!(
