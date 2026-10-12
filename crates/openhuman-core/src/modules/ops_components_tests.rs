@@ -44,3 +44,15 @@ fn disabled_lib_stems_cover_only_disabled_modules() {
     assert!(!stems.contains(&mcp.to_string()));
     assert!(disabled_lib_stems(&Config::default()).is_empty());
 }
+
+#[cfg(feature = "web3")]
+#[tokio::test]
+async fn a_disabled_wallet_never_loads_the_tinywallet_module() {
+    let config = config_without("wallet");
+    let err = ensure_loaded_within(&config, "tinywallet", None)
+        .await
+        .unwrap_err();
+    assert_eq!(err, LoadError::Disabled("wallet"));
+    assert_eq!(err.into_message(), "COMPONENT_DISABLED:wallet");
+    assert_eq!(state_of("tinywallet"), ModuleState::Available);
+}

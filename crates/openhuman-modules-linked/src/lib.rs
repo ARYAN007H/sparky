@@ -28,7 +28,7 @@
 //! | `tinycomputer`   | waits: no `static-link` |
 //! | `tinyjuice`      | waits: no `static-link` |
 //! | `tinysearch`     | waits: no `static-link` |
-//! | `tinywallet`     | waits: no `static-link`; also see the attestation note below |
+//! | `tinywallet`     | waits: v0.20.0 has `static-link` + `linked_module`, but its nested `vendor/tinybus` (cbb2eea) collides with the workspace `tinybus` (9062dd8) in Cargo.lock; also see the attestation note below |
 //! | `tinyhosts`      | waits: no module crate yet |
 //!
 //! The waiting modules need the upstream static-link / tinybus alignment work (E0.3) and a re-pin;
