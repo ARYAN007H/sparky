@@ -402,6 +402,81 @@ async fn disabling_modules_rejects_a_cached_client_but_keeps_shutdown_cleanup() 
 }
 
 #[tokio::test]
+async fn agent_cleanup_closes_only_the_cached_agent_and_keeps_siblings_open() {
+    let target_workspace = tempfile::tempdir().expect("target workspace");
+    let sibling_workspace = tempfile::tempdir().expect("sibling workspace");
+    let mut target_config = Config::default();
+    target_config.workspace_dir = target_workspace.path().to_path_buf();
+    target_config.modules.enabled = true;
+    let mut sibling_config = Config::default();
+    sibling_config.workspace_dir = sibling_workspace.path().to_path_buf();
+    sibling_config.modules.enabled = true;
+
+    let target_port = FakePort::default();
+    let target_closed = Arc::clone(&target_port.closed);
+    let target = McpConfiguredClient::install_test_port(&target_config, Box::new(target_port))
+        .expect("install target client");
+    let sibling_port = FakePort::default();
+    let sibling_closed = Arc::clone(&sibling_port.closed);
+    let sibling = McpConfiguredClient::install_test_port(&sibling_config, Box::new(sibling_port))
+        .expect("install sibling client");
+
+    target
+        .call::<bool>(&configured("target"), "ConnectedOverview", ())
+        .await
+        .unwrap();
+    sibling
+        .call::<bool>(&configured("sibling"), "ConnectedOverview", ())
+        .await
+        .unwrap();
+
+    assert!(McpConfiguredClient::close_agent_data_dir(target_workspace.path()).await);
+    assert_eq!(
+        target_closed.lock().unwrap().as_slice(),
+        [target_workspace.path().to_str().unwrap()]
+    );
+    assert!(sibling_closed.lock().unwrap().is_empty());
+    assert!(McpConfiguredClient::for_config(&sibling_config).is_ok());
+    assert_eq!(
+        target
+            .call::<bool>(&configured("target"), "ConnectedOverview", ())
+            .await,
+        Err(ModuleCallError::Unavailable),
+        "an old client cannot reopen after acknowledged retirement"
+    );
+}
+
+#[tokio::test]
+async fn failed_agent_close_stays_retired_and_can_be_retried() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    let mut config = Config::default();
+    config.workspace_dir = workspace.path().to_path_buf();
+    config.modules.enabled = true;
+
+    let port = FakePort::default();
+    port.fail_first_close
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let closed = Arc::clone(&port.closed);
+    let client = McpConfiguredClient::install_test_port(&config, Box::new(port))
+        .expect("install client");
+    client
+        .call::<bool>(&configured("server"), "ConnectedOverview", ())
+        .await
+        .unwrap();
+
+    assert!(!McpConfiguredClient::close_agent_data_dir(workspace.path()).await);
+    assert!(matches!(
+        McpConfiguredClient::for_config(&config),
+        Err(ModuleCallError::Unavailable)
+    ));
+    assert_eq!(closed.lock().unwrap().len(), 1);
+
+    assert!(McpConfiguredClient::close_agent_data_dir(workspace.path()).await);
+    assert_eq!(closed.lock().unwrap().len(), 2);
+    assert!(McpConfiguredClient::for_config(&config).is_ok());
+}
+
+#[tokio::test]
 async fn configuration_switches_replace_the_object_before_dispatch() {
     let port = FakePort::default();
     let opened = Arc::clone(&port.opened);
