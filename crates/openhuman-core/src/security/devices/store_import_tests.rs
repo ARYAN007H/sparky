@@ -1,7 +1,7 @@
-use crate::storage::rusqlite;
 use super::*;
 use crate::security::devices::store as live;
 use crate::storage::local::{forget, table_names};
+use crate::storage::rusqlite;
 use tempfile::TempDir;
 
 fn workspace() -> (TempDir, Config, Config) {
