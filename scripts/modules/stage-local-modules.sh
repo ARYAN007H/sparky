@@ -6,7 +6,7 @@
 # the registry-pinned archive, verifies its sha256 and puts it on
 # OPENHUMAN_MODULE_PATH. Source-built modules: with OPENHUMAN_MODULE_SOURCE=source,
 # `stage_source_modules <id>...` builds them from the vendored submodules with
-# scripts/modules/build.mjs. tinyconnectors has no test release, so it is always built.
+# scripts/modules/build.mjs.
 #
 # Needs REPO_ROOT, module_ext and wallet_platform (or module_platform) set by the caller.
 
