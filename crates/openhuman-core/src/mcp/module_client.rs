@@ -269,7 +269,8 @@ impl McpConfiguredClient {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         // The cleanup reservation can be installed after the first check but
         // before this cache lock is acquired. Recheck before creating a client.
-        if Self::cleanup_pending(&data_dir) {
+        if current_agent_context_is_removed() || Self::cleanup_pending(&data_dir) {
+            ModuleClient::report_unavailable(MODULE);
             return Err(ModuleCallError::Unavailable);
         }
         if let Some(client) = clients.get(&data_dir) {
@@ -357,28 +358,7 @@ impl McpConfiguredClient {
                     tracing::warn!(?error, "[mcp] workspace cleanup is still pending");
                 }
             }
-            let reservations = CLEANUP_RESERVATIONS
-                .get()
-                .map(|reservations| {
-                    reservations
-                        .lock()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner)
-                        .iter()
-                        .map(|(path, reservation)| (path.clone(), Arc::clone(reservation)))
-                        .collect::<Vec<_>>()
-                })
-                .unwrap_or_default();
-            for (data_dir, reservation) in reservations {
-                let has_client = CLIENTS.get().is_some_and(|clients| {
-                    clients
-                        .lock()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner)
-                        .contains_key(&data_dir)
-                });
-                if !has_client {
-                    Self::finish_cleanup(&data_dir, None, reservation);
-                }
-            }
+            Self::retry_orphaned_cleanups();
             SHUTDOWN_REGISTERED.store(false, Ordering::Release);
         });
     }
@@ -486,6 +466,31 @@ impl McpConfiguredClient {
         });
     }
 
+    fn retry_orphaned_cleanups() {
+        let reservations = CLEANUP_RESERVATIONS
+            .get()
+            .map(|reservations| {
+                reservations
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .iter()
+                    .map(|(path, reservation)| (path.clone(), Arc::clone(reservation)))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        for (data_dir, reservation) in reservations {
+            let has_client = CLIENTS.get().is_some_and(|clients| {
+                clients
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .contains_key(&data_dir)
+            });
+            if !has_client {
+                Self::finish_cleanup(&data_dir, None, reservation);
+            }
+        }
+    }
+
     pub(crate) fn agent_close_pending(data_dir: &std::path::Path) -> bool {
         Self::cleanup_pending(data_dir)
             || CLIENTS
@@ -580,7 +585,7 @@ impl McpConfiguredClient {
         client: Option<Arc<Self>>,
         reservation: Arc<CleanupReservation>,
     ) -> bool {
-        let mut after_close = reservation
+        let after_close = reservation
             .after_close
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);

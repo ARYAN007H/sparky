@@ -52,7 +52,9 @@ pub fn schedule_agent_close(workspace_dir: &std::path::Path, agent_id: &str) {
 
 /// Schedules module close followed by host-owned cleanup for this agent's
 /// scoped data directory. The directory remains reserved until both the
-/// module acknowledgment and callback succeed.
+/// module acknowledgment and callback succeed. The callback runs synchronously
+/// while MCP cleanup locks are held, so it must be short and must not reenter
+/// MCP client lookup, close, or scheduling APIs.
 #[cfg(feature = "mcp")]
 pub fn schedule_agent_close_with_cleanup(
     workspace_dir: &std::path::Path,

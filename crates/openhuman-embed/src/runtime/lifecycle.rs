@@ -118,8 +118,9 @@ impl Runtime {
     /// state slots are cleared and its configured MCP client is closed before
     /// its context is deregistered, so its cron jobs stay dormant. The id is
     /// free for reuse once cleanup ends.
-    /// Cancelling an already-started removal still tears down the old instance
-    /// and performs a requested purge before releasing its id.
+    /// Cancelling an already-started removal still tears down the old instance.
+    /// A requested purge transfers to the cleanup task, which keeps the id
+    /// reserved until module close and home deletion both finish.
     ///
     /// Cancellation is cooperative: a tool already executing when the agent
     /// is removed, or a sub-agent it detached, may finish after this returns.
