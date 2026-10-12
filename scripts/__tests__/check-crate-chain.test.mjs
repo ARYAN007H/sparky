@@ -94,7 +94,7 @@ openhuman-rpc = { path = "crates/openhuman-rpc", default-features = false }
 
 test('each layer may name only the layer directly below it', () => {
   assert.deepEqual(CHAIN['openhuman-embed'], ['openhuman']);
-  assert.deepEqual(CHAIN['openhuman-cli'], ['openhuman-rpc']);
+  assert.deepEqual(CHAIN['openhuman-cli'], ['openhuman-rpc', 'openhuman-modules-linked']);
   assert.deepEqual(
     checkManifestEdges({
       crate: 'openhuman-tui',
