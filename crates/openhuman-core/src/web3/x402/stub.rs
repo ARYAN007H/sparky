@@ -1,16 +1,9 @@
 //! Disabled-x402 facade.
 //!
-//! Compiled only when the `web3` Cargo feature is OFF (see the gate in
-//! [`super`]). Only three entry points have always-on callers: `init_ledger`
-//! (`core/runtime/bootstrap.rs` boot, itself runtime-gated on `DomainGroup::Web3`) and
-//! the controller-registration pair (`core/all.rs`). The `X402RequestTool`
-//! registration and the http_request 402-retry path are `#[cfg(feature =
-//! "web3")]` at their call sites, so no other x402 surface is referenced when
-//! off.
-//!
-//! Signatures MUST match the real ones exactly; the disabled build
-//! (`cargo check --no-default-features`) is
-//! the only thing that catches drift.
+//! Compiled only when the `web3` Cargo feature is off. The controller
+//! registration pair remains callable and returns an empty surface. Ledger
+//! initialization is the always-on compatibility no-op in the parent module;
+//! the real ledger opens lazily through the TinyWallet module.
 
 use crate::core::all::RegisteredController;
 use crate::core::ControllerSchema;

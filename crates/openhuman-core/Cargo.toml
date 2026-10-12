@@ -245,14 +245,6 @@ tinymcp-bus = { path = "../../vendor/tinymcp/crates/tinymcp-bus", features = ["s
 # types, so this vocabulary is always-on kernel surface. It costs serde/schemars and nothing
 # this build did not already have.
 tinychannels-bus = { version = "0.1", path = "../../vendor/tinychannels/crates/tinychannels-bus" }
-# Remaining channel runtime helpers and provider traits (temporary migration dependency).
-tinychannels-runtime = { version = "0.1", path = "../../vendor/tinychannels/crates/tinychannels-runtime" }
-# The provider stack that IMPLEMENTS that vocabulary — Telegram, Discord,
-# Slack, IMAP, WhatsApp, the relay transport loop. Optional: it owns the
-# `reqwest` / `rusqlite` / `rustls` / `tokio-tungstenite` cohort, which a
-# workflow-only build has no use for. Enabled by `channels`; the loaded
-# TinyChannels module handles provider execution.
-tinychannels = { version = "0.1", features = ["relay-websocket"], optional = true }
 # tinybus — the message bus. Owns what `crates/openhuman-core/src/core/event_bus/` used to: the typed
 # pub/sub surface (`EventBus`, `EventHandler`, `SubscriptionHandle`), the
 # in-process zero-serialization request registry (`NativeRegistry`), and peer
@@ -349,8 +341,7 @@ zeroize = "1"
 x25519-dalek = { version = "2", features = ["static_secrets"] }
 hkdf = "0.12"
 hex = "0.4"
-# The SaaS gateway signature. 0.13 on sha2 0.11, the versions tinychannels-bus
-# already brings, so it adds no package to the graph.
+# The host-owned SaaS gateway signature uses HMAC with SHA-256.
 hmac = "0.13"
 sha2_011 = { package = "sha2", version = "0.11" }
 tokio-util = { version = "0.7", features = ["rt", "io"] }
@@ -399,9 +390,7 @@ fs2 = "0.4"
 # behind the `scheduler-gate` feature. CPU sampling uses `sysinfo` above.
 starship-battery = { version = "0.12", optional = true }
 
-# The WhatsApp Web provider (and its `whatsapp-rust` / `wacore` / `serde-big-array`
-# stack) now lives in the tinychannels crate; the `whatsapp-web` feature forwards
-# to `tinychannels/whatsapp-web`.
+# WhatsApp Web provider execution is supplied by the TinyChannels module.
 # TinyDocs — the document wire contract, and nothing else.
 #
 # `tinydocs-bus` is the whole dependency: the spec types, their size limits,
@@ -523,6 +512,11 @@ windows-sys = { version = "0.61", features = [
 tokio-tungstenite = { version = "0.29", default-features = false, features = ["connect", "handshake", "rustls-tls-webpki-roots"] }
 
 [dev-dependencies]
+# Legacy TinyChannels provider/runtime fixtures remain available to tests only;
+# production channel execution uses the TinyBus module contract above.
+tinychannels = { path = "../../vendor/tinychannels", features = ["relay-websocket", "email", "lark", "whatsapp-web"] }
+tinychannels-runtime = { path = "../../vendor/tinychannels/crates/tinychannels-runtime" }
+tinychannels-module = { path = "../../vendor/tinychannels/crates/tinychannels-module", features = ["static-link"] }
 tinybox-core = { path = "../../vendor/tinybox/crates/tinybox-core" }
 # The TinyMemory reference engine (an in-memory `MemoryEngine`) and the
 # behavioural suite every engine must pass. Memory unit tests bind it as the
@@ -834,14 +828,13 @@ crash-reporting = ["dep:sentry"]
 # `DomainSet::Channels` flag (#4796): this feature narrows the compile-time
 # surface, `DomainSet` gates it at runtime.
 #
-# Provider runtime remains an audited implementation exception until its bus
-# cutover. Channels-backed operations require the process-wide module loader;
+# Provider runtime executes inside the compiled TinyChannels module.
+# Channels-backed operations require the process-wide module loader;
 # serialized configuration/messages come from the always-on bus contract.
-channels = ["modules", "dep:tinychannels", "tinychannels/email", "tinychannels/lark"]
-# The WhatsApp Web provider now lives in tinychannels; forward to its feature.
-# It is a refinement INSIDE the `channels` gate — enabling it pulls in the whole
-# channels domain (the provider re-exports live under `channels/providers/`).
-whatsapp-web = ["channels", "tinychannels/whatsapp-web"]
+channels = ["modules"]
+# Retained only to gate legacy provider test fixtures; production channel
+# execution is delivered by the TinyChannels module artifact.
+whatsapp-web = ["channels"]
 # Exposes the destructive `openhuman.test_reset` RPC. Off by default; the E2E
 # build (app/scripts/e2e-build.sh) flips it on. Shipped binaries never have
 # this feature so the wipe RPC isn't even registered, let alone reachable.

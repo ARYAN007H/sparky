@@ -44,7 +44,7 @@ async fn dispatch_preserves_supplied_tinychannels_inbound_envelope() {
         message_id: "m1".into(),
         conversation: tinychannels::channel::ConversationRef {
             kind: tinychannels::channel::ConversationKind::Channel,
-            id: "general".into(),
+            id: "reply".into(),
             scope_id: Some("T123".into()),
             parent_id: None,
             thread_id: Some("thread-1".into()),
@@ -71,6 +71,7 @@ async fn dispatch_preserves_supplied_tinychannels_inbound_envelope() {
     let envelope = observation
         .received_event_envelope
         .expect("dispatch should publish supplied inbound envelope");
+    assert_eq!(envelope.conversation.id, "reply");
     assert_eq!(envelope.channel.account_id.as_deref(), Some("bot-a"));
     assert_eq!(envelope.conversation.scope_id.as_deref(), Some("T123"));
     assert_eq!(envelope.conversation.thread_id.as_deref(), Some("thread-1"));
