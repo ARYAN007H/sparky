@@ -15,6 +15,19 @@ fn a_runtime_identifies_as_a_library_host_by_default() {
 }
 
 #[test]
+fn a_retiring_agent_id_is_not_reused_until_cleanup_is_acknowledged() {
+    assert!(matches!(
+        agent_admission_error("agent", false, true),
+        Some(AgentError::CleanupPending)
+    ));
+    assert_eq!(agent_admission_error("agent", false, false), None);
+    assert!(matches!(
+        agent_admission_error("agent", true, true),
+        Some(AgentError::DuplicateId(id)) if id == "agent"
+    ));
+}
+
+#[test]
 fn inherited_workspace_without_a_host_credential_keeps_installed_session_policy() {
     assert_eq!(
         effective_host_kind(HostKind::Library, true, false),

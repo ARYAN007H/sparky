@@ -362,8 +362,21 @@ impl Runtime {
         // id as free and both instantiate, with the second `insert`
         // silently overwriting the first agent's registry entry.
         let mut agents = self.agents.lock().unwrap_or_else(|e| e.into_inner());
-        if agents.contains_key(&id) {
-            return Err(AgentError::DuplicateId(id));
+        let cleanup_pending = {
+            #[cfg(feature = "mcp")]
+            {
+                openhuman_core::mcp::host::agent_close_pending(
+                    &self.base_config.workspace_dir,
+                    &id,
+                )
+            }
+            #[cfg(not(feature = "mcp"))]
+            {
+                false
+            }
+        };
+        if let Some(error) = agent_admission_error(&id, agents.contains_key(&id), cleanup_pending) {
+            return Err(error);
         }
         if agents.len() >= self.max_agents {
             log::warn!(
@@ -625,6 +638,20 @@ impl Runtime {
             storage_info,
             storage_backend,
         }
+    }
+}
+
+fn agent_admission_error(
+    id: &str,
+    already_registered: bool,
+    cleanup_pending: bool,
+) -> Option<AgentError> {
+    if already_registered {
+        Some(AgentError::DuplicateId(id.to_owned()))
+    } else if cleanup_pending {
+        Some(AgentError::CleanupPending)
+    } else {
+        None
     }
 }
 
