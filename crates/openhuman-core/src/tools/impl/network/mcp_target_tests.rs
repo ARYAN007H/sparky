@@ -68,7 +68,7 @@ impl McpModulePort for PreparePort {
                         name: format!("owner:{}:{}", source.server_id, tool.name),
                         legacy_name: format!("legacy:{}:{}", source.server_id, tool.name),
                         server_id: source.server_id.clone(),
-                        remote_name: tool.name,
+                        remote_name: tool.name.clone(),
                         family: source.family.clone(),
                         description: String::new(),
                         parameters: Value::Null,
