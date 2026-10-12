@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -13,6 +13,7 @@ import {
   compare,
   scan,
   CURATED_VENDOR_ROOTS,
+  collectFindings,
 } from "../ci/check-storage-bypass.mjs";
 const row = {
   rule: "json-write",
@@ -149,4 +150,23 @@ test("quoted database opener examples do not count as host persistence", () => {
     ),
     [],
   );
+});
+
+
+test("duplicate original core identities cannot inflate the retained baseline", () => {
+  const core = { ...row, path: "crates/openhuman-core/src/state.rs" };
+  assert.match(validateCoverageDebt([core], [core, core], [], {
+    baseline: [core], extension: [], findings: [core],
+  }).join("\n"), /Duplicate core baseline record/);
+});
+
+test("real checkouts refuse missing curated vendor source instead of shrinking debt", async () => {
+  const root = mkdtempSync(join(tmpdir(), "storage-curated-source-"));
+  try {
+    execFileSync("git", ["init"], { cwd: root, stdio: "ignore" });
+    mkdirSync(join(root, "crates"));
+    await assert.rejects(collectFindings(root), /Missing curated source/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
