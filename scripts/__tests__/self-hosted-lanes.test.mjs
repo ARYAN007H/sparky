@@ -695,3 +695,11 @@ test("module boundary policy and checker changes arm their own scripts lane", ()
     );
   }
 });
+
+test("process-static policy and checker changes arm their own scripts lane", () => {
+  const filters = fs.readFileSync(path.join(repoRoot, ".github/ci-paths-filter.yml"), "utf8");
+  const scripts = filters.split(/^scripts:\s*$/m)[1].split(/^\S[^\n]*:/m)[0];
+  for (const file of ["scripts/ci/check-process-statics.mjs", "scripts/ci/process-statics.json"]) {
+    assert.ok(scripts.includes(`'${file}'`), `${file} must arm the scripts area`);
+  }
+});
