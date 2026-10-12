@@ -229,6 +229,7 @@ pub(crate) struct McpConfiguredClient {
     data_dir: String,
     port: Box<dyn McpModulePort>,
     state: tokio::sync::Mutex<State>,
+    retiring: AtomicBool,
 }
 
 impl McpConfiguredClient {
@@ -251,6 +252,9 @@ impl McpConfiguredClient {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         if let Some(client) = clients.get(&data_dir) {
+            if client.retiring.load(Ordering::Acquire) {
+                return Err(ModuleCallError::Unavailable);
+            }
             return Ok(Arc::clone(client));
         }
         let client = Arc::new(Self::new(&data_dir, config)?);
@@ -374,6 +378,72 @@ impl McpConfiguredClient {
             data_dir,
             port,
             state: tokio::sync::Mutex::new(State::Closed),
+            retiring: AtomicBool::new(false),
+        }
+    }
+
+    /// Close an already-open agent-scoped client without creating one. A
+    /// failed close remains in the cache, marked unavailable, so shutdown or
+    /// a later cleanup attempt can retry the module's retained transition.
+    pub(crate) async fn close_agent_data_dir(data_dir: &std::path::Path) -> bool {
+        let key = data_dir.to_path_buf();
+        let Some(client) = Self::retire_cached_client(&key) else {
+            return true;
+        };
+        Self::close_retired_client(key, client).await
+    }
+
+    /// Marks the exact cached client unavailable before scheduling cleanup.
+    /// If no Tokio runtime is active, the retired client remains cached for the
+    /// registered shutdown hook to close later.
+    pub(crate) fn schedule_agent_close_data_dir(data_dir: &std::path::Path) {
+        let key = data_dir.to_path_buf();
+        let Some(client) = Self::retire_cached_client(&key) else {
+            return;
+        };
+        let Ok(runtime) = tokio::runtime::Handle::try_current() else {
+            return;
+        };
+        runtime.spawn(async move {
+            if !Self::close_retired_client(key, client).await {
+                tracing::warn!("[mcp] agent client close remains pending for retry");
+            }
+        });
+    }
+
+    fn retire_cached_client(data_dir: &std::path::Path) -> Option<Arc<Self>> {
+        let mut clients = CLIENTS
+            .get()
+            .map(|clients| {
+                clients
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+            })?;
+        let client = clients.get(data_dir)?;
+        client.retiring.store(true, Ordering::Release);
+        Some(Arc::clone(client))
+    }
+
+    async fn close_retired_client(data_dir: PathBuf, client: Arc<Self>) -> bool {
+        match client.close().await {
+            Ok(()) => {
+                if let Some(clients) = CLIENTS.get() {
+                    let mut clients = clients
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner);
+                    if clients
+                        .get(&data_dir)
+                        .is_some_and(|current| Arc::ptr_eq(current, &client))
+                    {
+                        clients.remove(&data_dir);
+                    }
+                }
+                true
+            }
+            Err(error) => {
+                tracing::warn!(?error, "[mcp] agent client close remains pending");
+                false
+            }
         }
     }
 
@@ -407,6 +477,9 @@ impl McpConfiguredClient {
         if SHUTTING_DOWN.load(Ordering::Acquire) {
             return Err(ModuleCallError::Unavailable);
         }
+        if self.retiring.load(Ordering::Acquire) {
+            return Err(ModuleCallError::Unavailable);
+        }
         self.port.prepare_agent_tools(request).await
     }
 
@@ -436,6 +509,9 @@ impl McpConfiguredClient {
         if SHUTTING_DOWN.load(Ordering::Acquire) {
             return Err(ModuleCallError::Unavailable);
         }
+        if self.retiring.load(Ordering::Acquire) {
+            return Err(ModuleCallError::Unavailable);
+        }
         self.port.validate_server_arguments(request).await
     }
 
@@ -448,6 +524,9 @@ impl McpConfiguredClient {
         if SHUTTING_DOWN.load(Ordering::Acquire) {
             return Err(ModuleCallError::Unavailable);
         }
+        if self.retiring.load(Ordering::Acquire) {
+            return Err(ModuleCallError::Unavailable);
+        }
         self.port.normalize_tool_arguments(arguments).await
     }
 
@@ -457,6 +536,9 @@ impl McpConfiguredClient {
         value: &str,
     ) -> Result<String, ModuleCallError> {
         if SHUTTING_DOWN.load(Ordering::Acquire) {
+            return Err(ModuleCallError::Unavailable);
+        }
+        if self.retiring.load(Ordering::Acquire) {
             return Err(ModuleCallError::Unavailable);
         }
         self.port
@@ -557,7 +639,7 @@ impl McpConfiguredClient {
     ) -> Result<R, ModuleCallError> {
         let args = serde_json::to_value(args).map_err(|_| ModuleCallError::ModuleFault)?;
         let mut state = self.state.lock().await;
-        if SHUTTING_DOWN.load(Ordering::Acquire) {
+        if SHUTTING_DOWN.load(Ordering::Acquire) || self.retiring.load(Ordering::Acquire) {
             return Err(ModuleCallError::Unavailable);
         }
         let object = self.ensure_open(&mut state, config).await?;
