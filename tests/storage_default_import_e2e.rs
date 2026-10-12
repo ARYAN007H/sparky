@@ -4,6 +4,7 @@
 //! tables once and keeps them as `_legacy_<name>`. Through the real binary
 //! and its JSON-RPC surface.
 
+use openhuman_core::storage::rusqlite;
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};

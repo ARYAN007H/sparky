@@ -2,6 +2,7 @@
 //! dispatched twice, single-flight skips are recorded, per-job retry budgets
 //! are honoured and a system job's handler result is what gets recorded.
 
+use crate::storage::rusqlite;
 use super::*;
 use crate::cron::policy::{set_policy, JobPolicy};
 use crate::cron::system_job_handlers::{register, SystemJobContext};

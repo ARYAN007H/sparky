@@ -1,6 +1,7 @@
 //! Approval rows by the embedded agent that parked them, and whether the
 //! store exists to hold any.
 
+use crate::storage::rusqlite;
 use anyhow::{Context, Result};
 use rusqlite::params;
 

@@ -8,6 +8,7 @@
 //! workspace directory, execute DDL on each open (idempotent), then run
 //! the requested query and return.
 
+use crate::storage::rusqlite;
 use anyhow::{Context, Result};
 use chrono::Utc;
 use rusqlite::{params, Connection};

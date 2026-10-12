@@ -6,6 +6,7 @@
 //! Uses a synchronous `rusqlite::Connection` opened per call, following the
 //! same `with_connection` pattern as the cron domain.
 
+use crate::storage::rusqlite;
 use anyhow::{Context, Result};
 use chrono::Utc;
 use rusqlite::{params, Connection};
