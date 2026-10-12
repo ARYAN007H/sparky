@@ -39,7 +39,21 @@ The fresh run after restoring that path builds successfully in 3m47s and passes
 all six controls: zero failures and zero ignored. The isolated SaaS child also
 passes its one selected test; it is included in the six parent cases, not an
 additional distinct case. The full log is
-`.validation/cache-scope-green-restored.log`. Broader acceptance remains pending.
+`.validation/cache-scope-green-restored.log`.
+
+Broader acceptance runs the complete Composio module test filter: 361 passes,
+zero failures and zero ignored. This includes credential rotation, mocked fetch
+flows, existing reconciliation controls and all six new scope cases. The five
+scoped-spawn controls also pass. Their logs are
+`.validation/cache-composio-acceptance.log` and
+`.validation/cache-spawn-acceptance.log`.
+
+All three successful commands use `cargo test --locked -j1 -p openhuman
+--no-default-features --features storage-sqlite,mcp,modules,channels --lib`, with
+the corresponding module filter and `-- --test-threads=1`, through
+`scripts/ci-cancel-aware.sh`. These process-cache tests do not prove MongoDB,
+multi-core routing or complete cloud operation. Changed-line coverage remains
+for CI to measure.
 
 Independent source review found no Critical or Important issues. It checked
 cache/epoch lock ordering, scope admission and the refresh context capture.
