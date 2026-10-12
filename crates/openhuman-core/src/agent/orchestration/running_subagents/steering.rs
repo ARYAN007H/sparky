@@ -9,7 +9,7 @@ use tinyagents_tasks::DetachedTaskRegistryError;
 use tinyinference_llm::message::Message as TaMessage;
 
 use super::cancel::now_ms;
-use super::registry::registry;
+use super::registry::{control_admits, owner_key, registry};
 
 /// Why a steer could not be delivered.
 #[derive(Debug, PartialEq, Eq)]
@@ -84,15 +84,16 @@ pub async fn steer(
         return Err(SteerError::UnsupportedLane);
     }
     let task_id_key = TaskId::new(task_id);
+    let owner = owner_key(parent_session).map_err(|_| SteerError::NotOwned)?;
     let snapshot = registry()
-        .snapshot(&task_id_key, parent_session)
+        .snapshot(&task_id_key, &owner)
         .map_err(steer_error_from_registry)?;
     if snapshot.status.is_terminal() {
         return Err(SteerError::AlreadyDone);
     }
 
     let steered_via_registry = registry()
-        .steering_handle(&task_id_key, parent_session)
+        .steering_handle(&task_id_key, &owner)
         .map(|handle| send_registered_steering(&handle, text.clone(), lane))
         .unwrap_or(false);
     if steered_via_registry {
@@ -152,12 +153,13 @@ pub(crate) async fn steer_control(
     let snapshot = registry()
         .snapshot_trusted(&task_id_key)
         .map_err(steer_error_from_registry)?;
+    if !control_admits(&snapshot.metadata) { return Err(SteerError::NotOwned); }
     if snapshot.status.is_terminal() {
         return Err(SteerError::AlreadyDone);
     }
 
     let steered_via_registry = registry()
-        .steering_handle_trusted(&task_id_key)
+        .steering_handle(&task_id_key, &snapshot.owner_id)
         .map(|handle| send_registered_steering(&handle, text.clone(), lane))
         .unwrap_or(false);
     if steered_via_registry {

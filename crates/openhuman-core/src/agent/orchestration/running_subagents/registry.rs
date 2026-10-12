@@ -34,11 +34,15 @@ use tinyagents_tasks::DetachedTaskRegistry;
 
 use super::task_ledger::{record_spawned, task_store_for_workspace};
 use tinyagents_orchestration::subagent::{
-    spawn_status_watcher, DetachedSubagentStatus, SubagentIdentity,
+    spawn_status_watcher, DetachedSubagentStatus, SubagentIdentity, WaitError,
 };
 
 #[derive(Clone)]
 pub(crate) struct RunningSubagentMetadata {
+    /// Original profile authority, independent of caller-chosen session IDs.
+    pub(crate) profile: Option<String>,
+    /// Public/durable session ID; the registry owner uses an encoded key.
+    pub(crate) parent_session: String,
     pub(crate) agent_id: String,
     pub(crate) subagent_session_id: Option<String>,
     pub(crate) workspace_dir: PathBuf,
@@ -47,6 +51,46 @@ pub(crate) struct RunningSubagentMetadata {
     /// sub-agent when its parent thread is deleted (see [`super::cancel::cancel_for_thread`]).
     pub(crate) parent_thread_id: Option<String>,
     pub(crate) run_queue: Arc<RunQueue<crate::agent::queued_turn::QueuedTurn>>,
+}
+
+/// Resolve the caller's profile without falling back to the operator in SaaS.
+fn caller_profile() -> Result<Option<String>, WaitError> {
+    let profile = crate::core::runtime::tenant::current_tenant()
+        .map_err(|_| WaitError::NotOwned)?
+        .profile;
+    if crate::core::runtime::is_saas() && profile.is_none() {
+        return Err(WaitError::NotOwned);
+    }
+    Ok(profile)
+}
+
+/// Host ownership adapter over TinyAgents' opaque owner string.
+pub(super) fn owner_key(parent_session: &str) -> Result<String, WaitError> {
+    let profile = caller_profile()?;
+    Ok(crate::core::runtime::tenant::tenant_key(
+        &crate::core::runtime::tenant::Tenant { profile, agent: None },
+        parent_session,
+    ))
+}
+
+/// Public user controls may reach any of their profile's parents; desktop
+/// controls retain the process user's existing authority over all workers.
+pub(super) fn control_admits(metadata: &RunningSubagentMetadata) -> bool {
+    !crate::core::runtime::is_saas()
+        || caller_profile().is_ok_and(|profile| profile == metadata.profile)
+}
+
+/// Durable fallback paths must stay in the caller's captured workspace.
+pub(super) fn admit_workspace(workspace: &std::path::Path) -> Result<(), WaitError> {
+    if !crate::core::runtime::is_saas() {
+        return Ok(());
+    }
+    caller_profile()?;
+    let context = crate::core::runtime::CoreContext::scoped().ok_or(WaitError::NotOwned)?;
+    if context.workspace_dir().map_err(|_| WaitError::NotOwned)? != workspace {
+        return Err(WaitError::NotOwned);
+    }
+    Ok(())
 }
 
 impl SubagentIdentity for RunningSubagentMetadata {
@@ -108,6 +152,15 @@ pub(crate) fn register(
     abort: AbortHandle,
     status: watch::Receiver<DetachedSubagentStatus>,
 ) {
+    let Ok(profile) = caller_profile() else {
+        abort.abort();
+        log::warn!("[running_subagents] refusing registration without a SaaS profile");
+        return;
+    };
+    let owner = crate::core::runtime::tenant::tenant_key(
+        &crate::core::runtime::tenant::Tenant { profile: profile.clone(), agent: None },
+        &parent_session,
+    );
     if let Some(thread_id) = parent_thread_id.as_deref() {
         if crate::agent::orchestration::background_completions::mark_stopped_task_if_thread_stopped(
             &workspace_dir,
@@ -148,6 +201,8 @@ pub(crate) fn register(
     );
 
     let metadata = RunningSubagentMetadata {
+        profile,
+        parent_session,
         agent_id,
         subagent_session_id,
         workspace_dir,
@@ -157,7 +212,7 @@ pub(crate) fn register(
     registry()
         .register(
             TaskId::new(task_id.clone()),
-            parent_session,
+            owner,
             metadata,
             status,
             // Cooperative cancellation is flipped before the registry invokes
