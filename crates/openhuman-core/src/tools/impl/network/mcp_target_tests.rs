@@ -25,31 +25,41 @@ impl McpModulePort for PreparePort {
         _: &str,
         _: &tinymcp_bus::McpClientConfig,
     ) -> Result<OpenConfiguredResponse, crate::modules::client::ModuleCallError> {
-        unreachable!("target preparation is a root operation")
+        Ok(OpenConfiguredResponse {
+            object_path: "/test/mcp".to_owned(),
+            transition_id: "open-test".to_owned(),
+        })
     }
 
     async fn close(
         &self,
         _: &str,
     ) -> Result<Option<String>, crate::modules::client::ModuleCallError> {
-        unreachable!("target preparation does not open a workspace")
+        Ok(None)
     }
 
     async fn transition_status(
         &self,
         _: &str,
     ) -> Result<TransitionStatus, crate::modules::client::ModuleCallError> {
-        unreachable!("target preparation does not open a workspace")
+        Ok(TransitionStatus::Complete)
     }
 
     async fn call_object(
         &self,
         _: &str,
-        _: &str,
-        _: Value,
+        member: &str,
+        args: Value,
         _: bool,
     ) -> Result<Value, crate::modules::client::ModuleCallError> {
-        unreachable!("target preparation is a root operation")
+        if member != tinymcp_bus::names::methods::NORMALIZE_TOOL_ARGUMENTS {
+            return Err(crate::modules::client::ModuleCallError::IncompatibleContract);
+        }
+        let Some(Value::Object(arguments)) = args.get(0).cloned() else {
+            return Err(crate::modules::client::ModuleCallError::ModuleFault);
+        };
+        serde_json::to_value(arguments)
+            .map_err(|_| crate::modules::client::ModuleCallError::ModuleFault)
     }
 
     async fn prepare_agent_tools(

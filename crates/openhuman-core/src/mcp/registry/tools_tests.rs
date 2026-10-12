@@ -215,13 +215,21 @@ fn registry_tools_present_the_exact_identity_they_always_had() {
 
 #[tokio::test]
 async fn tool_call_refuses_arguments_that_are_not_an_object() {
-    let err = McpRegistryToolCallTool::new(cfg())
+    let dir = tempfile::tempdir().expect("temp workspace");
+    let config = workspace_config(dir.path());
+    crate::mcp::module_client::McpConfiguredClient::install_test_port(
+        &config,
+        Box::new(ToolCallPort::default()),
+    )
+    .expect("test module port");
+    let err = McpRegistryToolCallTool::new(config)
         .execute(json!({ "server_id": "srv", "tool_name": "t", "arguments": 5 }))
         .await
         .expect_err("a number is not arguments");
     let message = err.to_string();
     assert!(message.contains("mcp_registry_tool_call"), "{message}");
-    assert!(message.contains("a number"), "{message}");
+    assert!(message.contains("invalid tool arguments"), "{message}");
+    assert!(!message.contains('5'), "module failure must not echo arguments: {message}");
 }
 
 /// A workspace of its own, so the host this opens is not shared.
@@ -308,6 +316,23 @@ impl crate::mcp::module_client::McpModulePort for ToolCallPort {
                         tools: vec![tinymcp_bus::McpTool::new("forecast")],
                     });
                 serde_json::to_value(overview.into_iter().collect::<Vec<_>>())
+                    .map_err(|_| crate::modules::client::ModuleCallError::ModuleFault)
+            }
+            tinymcp_bus::names::methods::NORMALIZE_TOOL_ARGUMENTS => {
+                let value = args
+                    .get(0)
+                    .cloned()
+                    .ok_or(crate::modules::client::ModuleCallError::ModuleFault)?;
+                let map = match value {
+                    Value::Null => serde_json::Map::new(),
+                    Value::Object(map) => map,
+                    Value::String(text) => serde_json::from_str::<Value>(&text)
+                        .ok()
+                        .and_then(|value| value.as_object().cloned())
+                        .ok_or(crate::modules::client::ModuleCallError::ModuleFault)?,
+                    _ => return Err(crate::modules::client::ModuleCallError::ModuleFault),
+                };
+                serde_json::to_value(map)
                     .map_err(|_| crate::modules::client::ModuleCallError::ModuleFault)
             }
             tinymcp_bus::names::methods::TOOL_CALL => {
