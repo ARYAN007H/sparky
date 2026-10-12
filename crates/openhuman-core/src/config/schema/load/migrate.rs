@@ -274,3 +274,63 @@ pub(crate) fn migrate_legacy_memory_backend(config: &mut Config, raw: &str) {
         "[config] legacy memory backend is unsupported; select an explicit v2 memory engine"
     );
 }
+
+/// One-shot migration of the legacy per-dependency switches into
+/// `[components]` (`hosting.enabled`, `search.enabled`, `mcp_client.enabled`,
+/// `memory.engine = "none"`, `OPENHUMAN_TINYMEMES`). `composio.enabled` was
+/// never read and is simply dropped with its field.
+///
+/// A legacy switch is read from the raw TOML (so an unset key keeps its
+/// default) and only moves a component that `[components]` does not already
+/// name, which makes the migration idempotent: once saved, the explicit
+/// `components.*` key wins and the legacy key is never consulted again.
+pub(crate) fn migrate_components(config: &mut Config, raw: &str) {
+    let tinymemes = std::env::var(crate::tinymemes::FLAG_ENV).ok();
+    migrate_components_with(config, raw, tinymemes.as_deref());
+}
+
+pub(crate) fn migrate_components_with(config: &mut Config, raw: &str, tinymemes: Option<&str>) {
+    let value = toml::from_str::<toml::Value>(raw).ok();
+    let explicit = |name: &str| {
+        value
+            .as_ref()
+            .and_then(|v| v.get("components"))
+            .and_then(|c| c.get(name))
+            .is_some()
+    };
+    let legacy_bool = |table: &str| {
+        value
+            .as_ref()
+            .and_then(|v| v.get(table))
+            .and_then(|t| t.get("enabled"))
+            .and_then(toml::Value::as_bool)
+    };
+    let mut moved: Vec<&str> = Vec::new();
+    let mut disable = |config: &mut Config, name: &'static str, legacy_on: Option<bool>| {
+        if legacy_on == Some(false) && !explicit(name) && config.components.get(name) == Some(true)
+        {
+            config.components.set(name, false);
+            moved.push(name);
+        }
+    };
+    disable(config, "hosting", legacy_bool("hosting"));
+    disable(config, "search", legacy_bool("search"));
+    disable(config, "mcp", legacy_bool("mcp_client"));
+    let engine_none = value
+        .as_ref()
+        .and_then(|v| v.get("memory"))
+        .and_then(|m| m.get("engine"))
+        .and_then(toml::Value::as_str)
+        .is_some_and(|e| e.trim().eq_ignore_ascii_case("none"));
+    disable(config, "memory", engine_none.then_some(false));
+    let memes_off = tinymemes
+        .filter(|v| !v.trim().is_empty())
+        .map(|v| !matches!(crate::tinymemes::mode_from_flag(Some(v)), true));
+    disable(config, "memes", memes_off.map(|off| !off));
+    if !moved.is_empty() {
+        tracing::info!(
+            "[config][migrate] legacy switches moved to [components]: {}",
+            moved.join(",")
+        );
+    }
+}
