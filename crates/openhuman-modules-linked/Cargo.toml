@@ -1,0 +1,53 @@
+# Local-development bridge that links module implementation crates into a host
+# executable and registers them with the core's `register_linked` seam
+# (`openhuman_rpc::embed::modules`), so `[modules] source = "linked"` serves a
+# module from the running binary instead of a downloaded release.
+#
+# This is the ONLY crate allowed to depend on module implementation crates
+# (`scripts/ci/module-boundaries.json`), and the only crate allowed to depend on
+# it is `openhuman-cli`, as an optional dependency behind the non-product
+# `linked-modules` feature (`scripts/ci/check-crate-chain.mjs`). The desktop
+# app, the TUI and the core never reach it, and `linked-modules` is in no
+# product feature set (`scripts/ci/check-feature-forwarding.mjs`). CI and
+# shipped builds load pinned, digest-checked releases.
+#
+# One feature per module, named for its registry id, plus `all`. At the current
+# vendor pins only modules whose crate exposes `static-link` (the
+# `module_export_optional_static!` export) can be linked. These WAIT for the
+# upstream static-link work (E0.3) and a re-pin; they have no feature here yet:
+#   tinycomputer, tinyjuice, tinysearch, tinywallet (module crate lacks
+#   `static-link`), tinyhosts (no module crate yet).
+[package]
+name = "openhuman-modules-linked"
+description = "Local-development registration of in-process linked modules (never part of a product build)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[features]
+default = []
+all = ["tinybox", "tinychannels", "tinyconnectors", "tinydocs", "tinymcp", "tinyvoice"]
+tinybox = ["dep:tinybox-module"]
+tinychannels = ["dep:tinychannels-module"]
+tinyconnectors = ["dep:tinyconnectors"]
+tinydocs = ["dep:tinydocs-module"]
+tinymcp = ["dep:tinymcp"]
+tinyvoice = ["dep:tinyvoice-module"]
+
+[dependencies]
+# The host reaches the core only through the rpc facade (crate chain).
+openhuman-rpc = { path = "../openhuman-rpc", default-features = false, features = ["modules"] }
+log = "0.4"
+tinybus = { path = "../../vendor/tinybus/crates/tinybus", default-features = false, features = ["modules"] }
+
+tinybox-module = { path = "../../vendor/tinybox/crates/tinybox-module", features = ["static-link"], optional = true }
+tinychannels-module = { path = "../../vendor/tinychannels/crates/tinychannels-module", features = ["static-link"], optional = true }
+tinyconnectors = { path = "../../vendor/tinyconnectors/crates/tinyconnectors", default-features = false, features = ["static-link"], optional = true }
+tinydocs-module = { path = "../../vendor/tinydocs/crates/tinydocs-module", features = ["static-link"], optional = true }
+tinymcp = { path = "../../vendor/tinymcp/crates/tinymcp", features = ["static-link"], optional = true }
+tinyvoice-module = { path = "../../vendor/tinyvoice/crates/tinyvoice-module", default-features = false, features = ["static-link"], optional = true }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage)'] }
