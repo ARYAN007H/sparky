@@ -1,5 +1,6 @@
 //! Registry records for the `tinydocs` and `tinywallet` modules.
 
+#[cfg(any(feature = "documents", feature = "web3"))]
 use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec};
 
 #[cfg(feature = "documents")]

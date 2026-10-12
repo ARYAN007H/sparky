@@ -1,5 +1,6 @@
 //! Registry record for the `tinyvoice` module.
 
+#[cfg(feature = "voice")]
 use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec};
 
 #[cfg(feature = "voice")]
