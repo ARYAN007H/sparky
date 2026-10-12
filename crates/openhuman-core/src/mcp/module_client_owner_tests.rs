@@ -10,12 +10,19 @@ struct LifecycleFixture {
     close_poll_started: Arc<tokio::sync::Notify>,
     release_close_poll: Arc<tokio::sync::Notify>,
     fail_close: Arc<AtomicBool>,
+    block_close: Arc<AtomicBool>,
+    close_started: Arc<tokio::sync::Notify>,
+    release_close: Arc<tokio::sync::Notify>,
 }
 
 #[tinybus::interface(name = "ai.tinyhumans.tinymcp.Mcp")]
 impl LifecycleFixture {
     async fn close(&self, _data_dir: String) -> tinybus::Result<Option<String>> {
         self.closes.fetch_add(1, Ordering::SeqCst);
+        if self.block_close.swap(false, Ordering::SeqCst) {
+            self.close_started.notify_one();
+            self.release_close.notified().await;
+        }
         if self.fail_close.load(Ordering::SeqCst) {
             return Err(tinybus::Error::failed("fixture cleanup unavailable"));
         }
@@ -315,4 +322,90 @@ async fn cleanup_receipts_stay_with_the_original_module_after_alias_replacement(
     );
     assert_eq!(replacement_fixture.closes.load(Ordering::SeqCst), 0);
     assert_eq!(replacement_fixture.polls.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_blocked_close_has_an_overall_cleanup_deadline_and_keeps_the_owner_for_retry() {
+    let scratch = tempfile::tempdir().unwrap();
+    let directory = scratch.path().join("agents/blocked-close");
+    let bus = MemoryBus::new();
+    Broker::new().spawn(bus.clone());
+    let service = Connection::connect(bus.connect().await.unwrap())
+        .await
+        .unwrap();
+    let caller = Connection::connect(bus.connect().await.unwrap())
+        .await
+        .unwrap();
+    let fixture = LifecycleFixture::default();
+    service
+        .serve_at(
+            ObjectPath::new(names::OBJECT_PATH).unwrap(),
+            fixture.clone(),
+        )
+        .await
+        .unwrap();
+    service.request_name(names::INTERFACE).await.unwrap();
+    let port = TinyMcpPort::new(
+        ModuleClient::fixture(
+            caller
+                .proxy(names::INTERFACE, names::OBJECT_PATH, names::INTERFACE)
+                .unwrap(),
+        )
+        .with_timeout(Duration::from_secs(120)),
+    );
+    port.transition_status("original-open").await.unwrap();
+    let client = Arc::new(McpConfiguredClient::with_port(
+        directory.to_str().unwrap().into(),
+        Box::new(port),
+    ));
+    // The acknowledged object isolates lifecycle routing from module admission.
+    *client.state.lock().await = State::Open(OpenObject {
+        config: McpClientConfig::default(),
+        object_path: "/test/original-child".into(),
+    });
+    CLIENTS
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .unwrap()
+        .insert(directory.clone(), Arc::clone(&client));
+    let cleanup = agent_cleanup::take_agent_cleanup(scratch.path(), "blocked-close").unwrap();
+    fixture.block_close.store(true, Ordering::SeqCst);
+    let attempt = cleanup.clone();
+    let mut task = tokio::spawn(async move { attempt.finish().await });
+    fixture.close_started.notified().await;
+    let outcome = tokio::time::timeout(Duration::from_secs(31), &mut task).await;
+    if outcome.is_err() {
+        task.abort();
+        let _ = task.await;
+        fixture.release_close.notify_one();
+        CLIENTS.get().unwrap().lock().unwrap().remove(&directory);
+    }
+    let result = outcome.expect("cleanup must return within 30 seconds even when Close has a 120-second operation timeout")
+        .expect("cleanup task must complete normally");
+    assert_eq!(result, Err(ModuleCallError::TransportFailed));
+    assert!(matches!(
+        &*client.state.lock().await,
+        State::StartingClose(_)
+    ));
+    assert!(Arc::ptr_eq(
+        CLIENTS
+            .get()
+            .unwrap()
+            .lock()
+            .unwrap()
+            .get(&directory)
+            .unwrap(),
+        &client
+    ));
+    assert!(client.retired.load(Ordering::Acquire));
+    // Retry the captured owner; timing out must not evict its close intent.
+    fixture.release_close.notify_one();
+    cleanup.finish().await.unwrap();
+    assert_eq!(fixture.closes.load(Ordering::SeqCst), 2);
+    assert!(!CLIENTS
+        .get()
+        .unwrap()
+        .lock()
+        .unwrap()
+        .contains_key(&directory));
 }
