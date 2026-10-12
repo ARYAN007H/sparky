@@ -30,8 +30,10 @@ publish = false
 
 [features]
 default = []
-all = ["tinychannels"]
+all = ["tinychannels", "tinydocs", "tinyvoice"]
 tinychannels = ["dep:tinychannels-module"]
+tinydocs = ["dep:tinydocs-module"]
+tinyvoice = ["dep:tinyvoice-module"]
 
 [dependencies]
 # The host reaches the core only through the rpc facade (crate chain).
@@ -39,6 +41,8 @@ openhuman-rpc = { path = "../openhuman-rpc", default-features = false, features 
 log = "0.4"
 tinybus = { path = "../../vendor/tinybus/crates/tinybus", default-features = false, features = ["modules"] }
 
+tinydocs-module = { path = "../../vendor/tinydocs/crates/tinydocs-module", features = ["static-link"], optional = true }
+tinyvoice-module = { path = "../../vendor/tinyvoice/crates/tinyvoice-module", default-features = false, features = ["static-link"], optional = true }
 tinychannels-module = { path = "../../vendor/tinychannels/crates/tinychannels-module", features = ["static-link"], optional = true }
 
 [lints.rust]
