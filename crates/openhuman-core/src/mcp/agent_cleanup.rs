@@ -70,7 +70,8 @@ impl AgentMcpCleanup {
     }
 }
 
-/// Run captured cleanup independently of the caller's Tokio runtime.
+/// Run captured cleanup on the process module executor when modules are enabled.
+/// Without modules, the caller must keep its current Tokio runtime alive.
 /// This creates no configured client and loads no MCP artifact.
 pub fn spawn_agent_cleanup<F>(
     future: F,
