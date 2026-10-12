@@ -200,6 +200,7 @@ if [ ! -f "$tinymcp_dir/libtinymcp_module.$module_ext" ]; then
   tar --no-same-owner -xzf "$tinymcp_archive" -C "$tinymcp_dir"
 fi
 export OPENHUMAN_MODULE_PATH="$tinymcp_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
+export OPENHUMAN_TINYMCP_TEST_MODULE="$tinymcp_dir/libtinymcp_module.$module_ext"
 
 if [ -z "${TINYCONNECTORS_TEST_MODULE:-}" ]; then
   connectors_manifest="vendor/tinyconnectors/crates/tinyconnectors/Cargo.toml"
@@ -322,7 +323,7 @@ run_full_suite() {
       # The TinyMCP module owns process-level directory transitions; this
       # binary exercises several workspaces against that shared module object.
       TINYCONNECTORS_TEST_MODULE="${TINYCONNECTORS_TEST_MODULE:-$connectors_module}" \
-        cargo_test --test "$target" -- --test-threads=1 "$@"
+        cargo_test --test "$target" -- --ignored --test-threads=1 "$@"
     else
       TINYCONNECTORS_TEST_MODULE="${TINYCONNECTORS_TEST_MODULE:-$connectors_module}" \
         cargo_test --test "$target" -- "$@"
@@ -366,7 +367,7 @@ elif [ "$#" -ge 2 ] && [ "$1" = "--test" ] && [ "$2" = "mcp_registry_e2e" ]; the
     shift
   fi
   TINYCONNECTORS_TEST_MODULE="${TINYCONNECTORS_TEST_MODULE:-$connectors_module}" \
-    cargo_test --test mcp_registry_e2e -- --test-threads=1 "$@"
+    cargo_test --test mcp_registry_e2e -- --ignored --test-threads=1 "$@"
 else
   cargo_test "$@"
 fi

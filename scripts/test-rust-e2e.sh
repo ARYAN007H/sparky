@@ -195,6 +195,25 @@ if [ ! -f "$tinybox_dir/libtinybox.$module_ext" ]; then
 fi
 export OPENHUMAN_MODULE_PATH="$tinybox_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
 
+# Run the ignored MCP registry cases with the registry-pinned native artifact.
+tinymcp_asset="$(node scripts/ci/self-hosted/test-module-assets.mjs "$module_platform" tinymcp)"
+IFS=$'\t' read -r _tinymcp_id tinymcp_url tinymcp_filename tinymcp_sha256 <<< "$tinymcp_asset"
+tinymcp_dir="$REPO_ROOT/target/test-modules/tinymcp/$tinymcp_sha256"
+tinymcp_archive="$tinymcp_dir/$tinymcp_filename"
+if [ ! -f "$tinymcp_dir/libtinymcp_module.$module_ext" ]; then
+  echo "Downloading the checksum-pinned TinyMCP test module ..."
+  mkdir -p "$tinymcp_dir"
+  curl --fail --location --silent --show-error "$tinymcp_url" --output "$tinymcp_archive"
+  if command -v shasum >/dev/null 2>&1; then
+    echo "${tinymcp_sha256}  $tinymcp_archive" | shasum -a 256 -c
+  else
+    echo "${tinymcp_sha256}  $tinymcp_archive" | sha256sum --check
+  fi
+  tar --no-same-owner -xzf "$tinymcp_archive" -C "$tinymcp_dir"
+fi
+export OPENHUMAN_MODULE_PATH="$tinymcp_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
+export OPENHUMAN_TINYMCP_TEST_MODULE="$tinymcp_dir/libtinymcp_module.$module_ext"
+
 # Module-backed Composio coverage must use the pinned local artifact as well.
 # Without this override the core resolves TinyConnectors through release
 # metadata, turning an otherwise hermetic mock-backend suite into a network
@@ -291,7 +310,7 @@ for suite in "${SUITES[@]}"; do
     echo "[rust-e2e]   $CARGO_BIN test --manifest-path Cargo.toml --test $suite (serial)"
     bash "$SCRIPT_DIR/ci-cancel-aware.sh" "$CARGO_BIN" test \
       --manifest-path Cargo.toml --features "$PRODUCT_FEATURES" \
-      --test "$suite" -- --test-threads=1 ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
+      --test "$suite" -- --ignored --test-threads=1 ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
     continue
   fi
 
