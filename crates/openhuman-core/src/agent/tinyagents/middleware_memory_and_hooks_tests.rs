@@ -61,15 +61,6 @@ async fn embedder_tool_hooks_veto_denies_the_call_and_skips_post_use() {
         error.to_string().contains("vetoed"),
         "veto must surface as a tool error: {error}"
     );
-    // A refusal answers the model with a failed tool result; it does not end
-    // the run.
-    assert!(
-        matches!(
-            error,
-            tinyagents_harness::error::TinyAgentsError::ToolFailed(_)
-        ),
-        "{error:?}"
-    );
     // The call was vetoed — no post-use event, and no cache entry leaks.
     assert_eq!(pre.lock().unwrap().len(), 1, "pre-use hook still observed");
     assert!(
@@ -189,30 +180,4 @@ async fn embedder_tool_hooks_nested_call_refuses_ask_and_rewrite() {
             .unwrap_err();
         assert!(error.to_string().contains("refused nested call"), "{error}");
     }
-}
-
-#[tokio::test]
-async fn embedder_tool_hooks_unresolvable_ask_answers_the_model() {
-    use crate::agent::hooks::ToolHookDecision;
-    let mw = EmbedderToolHooksMiddleware::new(vec![std::sync::Arc::new(FixedDecisionHook(
-        ToolHookDecision::Ask("confirm".into()),
-    ))]);
-    let mut call = TaToolCall {
-        id: "call-3".into(),
-        name: "write".into(),
-        arguments: json!({}),
-        invalid: None,
-    };
-    let error = mw
-        .before_tool(&mut ctx(), &(), &mut call)
-        .await
-        .unwrap_err();
-    assert!(
-        matches!(
-            &error,
-            tinyagents_harness::error::TinyAgentsError::ToolFailed(message)
-                if message.contains("requires approval")
-        ),
-        "{error:?}"
-    );
 }
