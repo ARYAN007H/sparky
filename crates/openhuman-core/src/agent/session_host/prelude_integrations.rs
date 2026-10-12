@@ -77,7 +77,7 @@ impl OpenHumanTurnPrelude {
         // knew under the pre-readable hashed name keeps resolving.
         #[cfg(feature = "mcp")]
         {
-            let recorded_mcp_specs = recorded
+            let recorded_mcp_specs: Vec<tinytools::ToolSpec> = recorded
                 .specs()
                 .iter()
                 .filter(|spec| spec.name.starts_with("mcp_"))
