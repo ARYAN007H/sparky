@@ -149,7 +149,9 @@ export function classifyPin({ id, version, submodulePath, actual, exemption }) {
       `"${id}" registry pin and submodule pin describe different releases.\n` +
       `    registry.rs version : ${version}  (would download the v${version} artifact)\n` +
       `    ${submodulePath} is at : ${actual}  (what this build compiles the contract against)\n` +
-      `    Fix by moving whichever pin is stale, or — if the two are meant to differ —\n` +
+      `    Fix by moving whichever pin is stale (\`node scripts/modules/release-and-repin.mjs ${id}\`\n` +
+      `    releases the module and re-pins both from its checksum.toml; add \`--version X.Y.Z\` to\n` +
+      `    re-pin to a release that already exists), or — if the two are meant to differ —\n` +
       `    declare it in scripts/ci/module-pin-exemptions.json with a reason.`,
   };
 }

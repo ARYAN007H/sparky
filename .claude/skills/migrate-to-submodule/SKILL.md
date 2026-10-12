@@ -109,6 +109,14 @@ gitlinks outward.
 Only for **loadable modules** (a `cdylib` with a registry record). Pure Cargo
 libraries just need the merged commit.
 
+**Helper:** `node scripts/modules/release-and-repin.mjs <name> [--bump patch|minor|major]`
+automates this step and Step 4 (dispatch, watch, `checksum.toml`, record rewrite,
+gitlink checkout, pin gates). It asks before dispatching, because publishing is
+hard to undo. `--version X.Y.Z` re-pins to a release that already exists, and
+`--dry-run` prints the plan. `node scripts/modules/pin-status.mjs` shows whether a
+gitlink is in sync with, ahead of, or behind its registry pin. The manual steps
+below remain the reference for what the helper does.
+
 1. Trigger the submodule's `Release` workflow (`workflow_dispatch` on `main`,
    input `bump`: patch/minor/major/current), e.g.
    `gh workflow run release.yml -R tinyhumansai/<name> -f bump=patch`.
@@ -124,6 +132,9 @@ libraries just need the merged commit.
 
 Modules are pinned **twice**, and both must describe the same release
 (`scripts/ci/check-module-pins.mjs`):
+
+`scripts/modules/release-and-repin.mjs` does items 1-3 and runs the checks in 5;
+the details below are what it writes.
 
 1. **Submodule gitlink**: `git -C vendor/<name> fetch --tags && git -C vendor/<name> checkout vX.Y.Z`,
    then stage the gitlink in the superproject.
