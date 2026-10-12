@@ -44,25 +44,37 @@ mod records_voice;
 
 use crate::modules::types::ModuleRecord;
 use records_computer::TINYCOMPUTER;
-use records_docs_wallet::{TINYDOCS, TINYWALLET};
-use records_extra::{TINYBOX, TINYCHANNELS, TINYHOSTS};
+#[cfg(feature = "documents")]
+use records_docs_wallet::TINYDOCS;
+#[cfg(feature = "web3")]
+use records_docs_wallet::TINYWALLET;
+use records_extra::{TINYBOX, TINYCHANNELS};
+#[cfg(feature = "hosting")]
+use records_extra::TINYHOSTS;
 use records_mcp_connectors::{TINYCONNECTORS, TINYMCP};
 use records_memory_juice::TINYJUICE;
 use records_search::TINYSEARCH;
+#[cfg(feature = "voice")]
 use records_voice::TINYVOICE;
 
-/// Every module this build can load.
+/// Every module this build can load. The records whose contract crate is an
+/// optional dependency (`documents`, `web3`, `voice`, `hosting`) exist only when
+/// that gate is on; a product-feature build carries all eleven.
 pub const ALL: &[ModuleRecord] = &[
     TINYCOMPUTER,
     TINYSEARCH,
+    #[cfg(feature = "documents")]
     TINYDOCS,
+    #[cfg(feature = "web3")]
     TINYWALLET,
     TINYJUICE,
+    #[cfg(feature = "voice")]
     TINYVOICE,
     TINYMCP,
     TINYCONNECTORS,
     TINYBOX,
     TINYCHANNELS,
+    #[cfg(feature = "hosting")]
     TINYHOSTS,
 ];
 
