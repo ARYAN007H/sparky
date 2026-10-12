@@ -165,7 +165,11 @@ impl ModuleClient {
             let proxy = self
                 .timeout
                 .map_or(proxy.clone(), |timeout| proxy.with_timeout(timeout));
-            return Ok(ModuleObjectClient { record, proxy });
+            return Ok(ModuleObjectClient {
+                record,
+                proxy,
+                timeout: self.timeout,
+            });
         }
         super::ops::ensure_loaded(&self.config, module)
             .await
@@ -181,7 +185,11 @@ impl ModuleClient {
         let proxy = self
             .timeout
             .map_or(proxy.clone(), |timeout| proxy.with_timeout(timeout));
-        Ok(ModuleObjectClient { record, proxy })
+        Ok(ModuleObjectClient {
+            record,
+            proxy,
+            timeout: self.timeout,
+        })
     }
 
     /// Report a structurally invalid reply from a known module invocation.
@@ -266,6 +274,7 @@ impl ModuleClient {
 pub(crate) struct ModuleObjectClient {
     record: &'static super::types::ModuleRecord,
     proxy: tinybus::Proxy,
+    timeout: Option<Duration>,
 }
 
 #[cfg(feature = "modules")]
@@ -273,19 +282,51 @@ impl ModuleObjectClient {
     /// Capture the current unique peer before starting an owned lifecycle.
     /// Later alias replacement cannot redirect operations on this client.
     pub(crate) async fn pin_owner(&self) -> Result<Self, ModuleCallError> {
-        let owner = self.proxy.connection().name_owner(self.proxy.destination()).await
+        let owner = self
+            .proxy
+            .connection()
+            .name_owner(self.proxy.destination())
+            .await
             .map_err(|error| report_proxy_failure(self.record, &error))?
             .ok_or(ModuleCallError::Unavailable)?;
-        let proxy = self.proxy.connection().proxy(owner.as_str(), self.proxy.path().as_str(), self.proxy.interface().as_str())
+        let proxy = self
+            .proxy
+            .connection()
+            .proxy(
+                owner.as_str(),
+                self.proxy.path().as_str(),
+                self.proxy.interface().as_str(),
+            )
             .map_err(|error| report_proxy_failure(self.record, &error))?;
-        Ok(Self { record: self.record, proxy })
+        let proxy = self
+            .timeout
+            .map_or(proxy.clone(), |timeout| proxy.with_timeout(timeout));
+        Ok(Self {
+            record: self.record,
+            proxy,
+            timeout: self.timeout,
+        })
     }
 
     /// Derive a private child on the already captured module peer.
     pub(crate) fn object_at(&self, path: &str) -> Result<Self, ModuleCallError> {
-        let proxy = self.proxy.connection().proxy(self.proxy.destination().as_str(), path, self.proxy.interface().as_str())
+        let proxy = self
+            .proxy
+            .connection()
+            .proxy(
+                self.proxy.destination().as_str(),
+                path,
+                self.proxy.interface().as_str(),
+            )
             .map_err(|error| report_proxy_failure(self.record, &error))?;
-        Ok(Self { record: self.record, proxy })
+        let proxy = self
+            .timeout
+            .map_or(proxy.clone(), |timeout| proxy.with_timeout(timeout));
+        Ok(Self {
+            record: self.record,
+            proxy,
+            timeout: self.timeout,
+        })
     }
 
     pub(crate) async fn call<R: DeserializeOwned>(

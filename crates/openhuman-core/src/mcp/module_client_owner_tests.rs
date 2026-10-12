@@ -54,10 +54,10 @@ async fn cancelled_close_retries_its_receipt_on_the_original_owner() {
     }
     original.request_name(names::INTERFACE).await.unwrap();
     let port = TinyMcpPort::new(ModuleClient::fixture(
-            caller
-                .proxy(names::INTERFACE, names::OBJECT_PATH, names::INTERFACE)
-                .unwrap(),
-        ));
+        caller
+            .proxy(names::INTERFACE, names::OBJECT_PATH, names::INTERFACE)
+            .unwrap(),
+    ));
     assert_eq!(
         port.transition_status("original-open").await,
         Ok(TransitionStatus::Complete)
