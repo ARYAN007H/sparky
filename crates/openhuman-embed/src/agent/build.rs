@@ -270,6 +270,9 @@ pub(crate) fn instantiate(runtime: &Runtime, spec: AgentSpec) -> Result<AgentInn
     overrides.model = provider.custom_model();
     overrides.role_models = provider.role_models().clone();
     overrides.session_store = parts.session_store;
+    if let openhuman_core::agent::harness::definition::ToolScope::Named(names) = &definition.tools {
+        overrides.named_tools = Some(std::sync::Arc::new(names.iter().cloned().collect()));
+    }
     let overrides = std::sync::Arc::new(overrides);
     for hook in parts.post_turn_hooks {
         overrides.post_turn_hook(hook.name(), Some(hook.clone()));
