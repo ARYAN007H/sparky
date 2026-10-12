@@ -24,7 +24,7 @@
 //   node scripts/ci/check-storage-bypass.mjs --root <dir>   (tests)
 
 import { stripRustComments } from "./check-crate-chain.mjs";
-import { validateCoverageDebt, historicalFindings } from "./storage-bypass-debt.mjs";
+import { validateCoverageDebt, validateAllowances, historicalFindings } from "./storage-bypass-debt.mjs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -87,7 +87,7 @@ const SRC = "crates/openhuman-core/src/";
  * still a finding, and removing the allowed line does not free a quota for
  * another.
  */
-const auditedReasons = JSON.parse(await readFile(new URL("./storage-bypass-allow-reasons.json", import.meta.url), "utf8"));
+export const auditedReasons = JSON.parse(await readFile(new URL("./storage-bypass-allow-reasons.json", import.meta.url), "utf8"));
 export const ALLOW = new Map();
 for (const { path, ...entry } of auditedReasons) {
   if (!entry.reason?.trim() || !/^https:\/\/github\.com\/tinyhumansai\/openhuman\/issues\/\d+$/.test(entry.issue ?? "")) {
@@ -195,7 +195,7 @@ async function rustFiles(dir) {
   return out.sort();
 }
 
-export async function collectFindings(root) {
+export async function collectFindings(root, { includeAllowed = false } = {}) {
   const findings = [];
   const scanRoot = resolve(root, "crates");
   const roots = (await readdir(scanRoot, { withFileTypes: true })).filter(e => e.isDirectory()).map(e => resolve(scanRoot, e.name, "src"));
@@ -204,7 +204,7 @@ export async function collectFindings(root) {
     const rel = relative(root, path).split(sep).join("/");
     if (isTestFile(rel)) continue;
     const found = scan(rel, await readFile(path, "utf8"));
-    findings.push(...withoutAllowed(rel, found));
+    findings.push(...(includeAllowed ? found : withoutAllowed(rel, found)));
   }
 
   return findings;
@@ -212,21 +212,6 @@ export async function collectFindings(root) {
 
 async function main() {
   const findings = await collectFindings(repoRoot);
-  if (writeBaseline) {
-    let previous;
-    try { previous = JSON.parse(await readFile(baselinePath, "utf8")); } catch { previous = null; }
-    if (previous && compare(findings.filter(f => originalCore(f)), previous).added.length) {
-      console.error("Refusing baseline growth: fix new writers instead.");
-      return 1;
-    }
-    await mkdir(dirname(baselinePath), { recursive: true });
-    await writeFile(baselinePath, `${JSON.stringify(findings.filter(f => originalCore(f)), null, 2)}\n`);
-    console.log(
-      `Wrote ${findings.length} baselined storage-bypass sites to ${relative(repoRoot, baselinePath)}.`,
-    );
-    return 0;
-  }
-
   let baseline;
   try {
     baseline = JSON.parse(await readFile(baselinePath, "utf8"));
@@ -240,18 +225,31 @@ async function main() {
   let extension = [];
   try { extension = JSON.parse(await readFile(resolve(repoRoot, "scripts/ci/storage-bypass-extension.json"), "utf8")); }
   catch (error) { if (error.code !== "ENOENT") throw error; }
+  const raw = await collectFindings(repoRoot, { includeAllowed: true });
   let debtErrors = validateCoverageDebt(findings, baseline, extension);
+  if (rootFlag === -1) debtErrors.push(...validateAllowances(raw, auditedReasons));
   // Fixture roots without Git history exercise source scanning; CI always checks
   // the real checkout against its canonical merge base and retained records.
   if (rootFlag === -1) {
     const history = historicalFindings(repoRoot, { scan, withoutAllowed, isTestFile, CURATED_VENDOR_ROOTS });
     debtErrors = validateCoverageDebt(findings, baseline, extension, history);
+    debtErrors.push(...validateAllowances(raw, auditedReasons, history));
   }
   if (debtErrors.length) {
     console.error(debtErrors.join("\n"));
     return 1;
   }
   const { added, stale } = compare(findings, [...baseline, ...extension]);
+  if (writeBaseline) {
+    if (added.length) {
+      console.error("Refusing baseline growth: fix new writers instead.");
+      return 1;
+    }
+    const retained = findings.filter(originalCore);
+    await writeFile(baselinePath, `${JSON.stringify(retained, null, 2)}\n`);
+    console.log(`Tightened core debt baseline to ${retained.length} sites.`);
+    return 0;
+  }
   if (added.length === 0 && stale.length === 0) {
     console.log(
       `Storage-bypass ratchet holds (${findings.length} baselined sites; it only goes down).`,
