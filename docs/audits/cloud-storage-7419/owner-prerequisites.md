@@ -56,9 +56,11 @@ native acknowledgement uncertainty and exact-instance admission. On the new
 public #28/canonical TinyBus graph, all 18 existing marker controls pass. The
 content baseline executes all 17 cases: two admission controls pass and 15
 behavior cases fail against the deliberate unavailable stub, with no setup or
-compiler failures. The owning CAS candidate is now under review; no successful
-content persistence result is claimed here. The new graph removes TinyMemes'
-old replacement shim.
+compiler failures. The owning CAS candidate `592b6db` subsequently passes all
+35 actual compiled cases (17 content and 18 marker controls), with the baseline
+assertions unchanged. Independent source and proof review finds no issues;
+broader gates and coverage remain pending. This is not host migration acceptance.
+The new graph removes TinyMemes' old replacement shim.
 
 ### Native conversation append
 
