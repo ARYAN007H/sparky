@@ -65,7 +65,9 @@ fn disabled_component_answers_component_disabled_over_json_rpc() {
                     let server = tokio::spawn(async move { axum::serve(listener, app).await });
 
                     let off = rpc(&base, "openhuman.mcp_clients_status").await;
-                    let err = off.get("error").unwrap_or_else(|| panic!("want error: {off}"));
+                    let err = off
+                        .get("error")
+                        .unwrap_or_else(|| panic!("want error: {off}"));
                     assert_eq!(
                         err.get("message").and_then(Value::as_str),
                         Some("COMPONENT_DISABLED:mcp"),
@@ -76,7 +78,10 @@ fn disabled_component_answers_component_disabled_over_json_rpc() {
                         Some("component_disabled"),
                         "{off}"
                     );
-                    assert_eq!(err.pointer("/data/component").and_then(Value::as_str), Some("mcp"));
+                    assert_eq!(
+                        err.pointer("/data/component").and_then(Value::as_str),
+                        Some("mcp")
+                    );
 
                     // A component left on is untouched.
                     let on = rpc(&base, "openhuman.config_get").await;

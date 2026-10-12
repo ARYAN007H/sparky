@@ -10,8 +10,14 @@ fn off(name: &str) -> ComponentSet {
 fn all_on_changes_nothing() {
     let all = ComponentSet::all();
     assert_eq!(all.narrow_domains(DomainSet::full()), DomainSet::full());
-    assert_eq!(all.narrow_services(ServiceSet::desktop()), ServiceSet::desktop());
-    assert_eq!(all.narrow_tool_groups(ToolGroups::advertised()), ToolGroups::advertised());
+    assert_eq!(
+        all.narrow_services(ServiceSet::desktop()),
+        ServiceSet::desktop()
+    );
+    assert_eq!(
+        all.narrow_tool_groups(ToolGroups::advertised()),
+        ToolGroups::advertised()
+    );
 }
 
 #[test]
@@ -63,8 +69,17 @@ fn each_flag_turns_its_tool_groups_off() {
 #[test]
 fn config_cannot_widen_a_host_preset() {
     let all = ComponentSet::all();
-    for preset in [DomainSet::harness(), DomainSet::kernel(), DomainSet::none(), DomainSet::embedded()] {
-        assert_eq!(all.narrow_domains(preset), preset, "all-on must be identity");
+    for preset in [
+        DomainSet::harness(),
+        DomainSet::kernel(),
+        DomainSet::none(),
+        DomainSet::embedded(),
+    ] {
+        assert_eq!(
+            all.narrow_domains(preset),
+            preset,
+            "all-on must be identity"
+        );
         assert_eq!(all.narrow_domains(preset).intersect(&preset), preset);
     }
     // kernel has no flows/mcp/...; components being on must not add them.
@@ -75,7 +90,10 @@ fn config_cannot_widen_a_host_preset() {
     assert_eq!(g.mode("workflows"), GroupMode::Off);
     // And headless services stay off.
     assert_eq!(all.narrow_services(ServiceSet::none()), ServiceSet::none());
-    assert_eq!(all.narrow_services(ServiceSet::headless_api()), ServiceSet::headless_api());
+    assert_eq!(
+        all.narrow_services(ServiceSet::headless_api()),
+        ServiceSet::headless_api()
+    );
 }
 
 #[test]
