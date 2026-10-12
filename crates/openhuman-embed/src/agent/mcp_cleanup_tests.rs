@@ -173,3 +173,53 @@ fn exhausted_cleanup_releases_runtime_admission_but_preserves_the_ephemeral_work
         .unwrap();
     });
 }
+
+fn workspace_cleanup_control(cancel: bool) {
+    let executor = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .worker_threads(1)
+        .thread_stack_size(openhuman_core::core::runtime::AGENT_WORKER_STACK_BYTES)
+        .build()
+        .unwrap();
+    executor.block_on(async {
+        tokio::spawn(async move {
+            let runtime = crate::Runtime::builder()
+                .config(openhuman_core::config::Config::default())
+                .workspace(crate::Workspace::Ephemeral)
+                .build()
+                .await
+                .unwrap();
+            let root = runtime.workspace_dir().to_path_buf();
+            let guard = runtime.guard();
+            let weak = Arc::downgrade(&guard);
+            drop(runtime);
+            let cleanup = retry_cleanup(guard, || async { Ok(()) }, || Ok(()));
+            if cancel {
+                // Executor rejection or an unpolled task must preserve its home.
+                drop(cleanup);
+            } else {
+                cleanup.await;
+            }
+            let workspace_exists = root.exists();
+            let _ = std::fs::remove_dir_all(&root);
+            assert!(weak.upgrade().is_none());
+            assert!(!crate::runtime::RUNTIME_LIVE.load(Ordering::Acquire));
+            assert_eq!(
+                workspace_exists, cancel,
+                "only confirmed cleanup may remove the ephemeral workspace"
+            );
+        })
+        .await
+        .unwrap();
+    });
+}
+
+#[test]
+fn confirmed_cleanup_still_removes_the_last_owners_ephemeral_workspace() {
+    workspace_cleanup_control(false);
+}
+
+#[test]
+fn cancelling_an_unpolled_cleanup_preserves_its_ephemeral_workspace() {
+    workspace_cleanup_control(true);
+}
