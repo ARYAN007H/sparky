@@ -37,8 +37,10 @@ fn fresh_workspace_config() -> (tempfile::TempDir, Config) {
 }
 
 async fn install_server(config: &Config, name: &str, server: Value) -> String {
+    let mut servers = Map::new();
+    servers.insert(name.to_owned(), server);
     let document = json!({
-        "mcpServers": Map::from([(name.to_owned(), server)])
+        "mcpServers": servers
     });
     openhuman_core::mcp::registry::config_ops::mcp_clients_config_set(config, document)
         .await
