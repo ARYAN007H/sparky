@@ -31,8 +31,9 @@ Each record has these fields:
 }
 ```
 
-Use the type printed by the failure message, with whitespace outside literals
-removed (except the `mut ` or `ref ` prefix). ABI and other literal contents,
+Use the type printed by the failure message, with redundant whitespace outside literals
+removed. Separators that distinguish identifiers, literal prefixes/suffixes,
+raw identifiers, or joined punctuation remain (as do the `mut ` and `ref ` prefixes). ABI and other literal contents,
 including their whitespace, remain significant. `count` is the exact number of matching
 file/module-scope/name/type declarations. `scope` is the inline module path,
 such as `outer::user`; an empty or omitted scope denotes the file root.
@@ -61,6 +62,10 @@ This is a source declaration guard, not a Rust macro expander. It recognizes
 ordinary `static`, `static mut`, and `lazy_static!`'s `static ref`, multiline
 and qualified types, and ignores comments and string fixtures. Statics
 generated without a literal declaration by another macro need manual review.
+Literal declarations inside `macro_rules!` templates are conservatively checked
+even when the template is not invoked. Excluding these bodies would allow a new
+macro-defined global to bypass ownership review; the gate does not claim that
+every source declaration is instantiated at runtime.
 Type-position macro token trees are preserved without expanding them. Named
 inline modules contribute declaration identity; anonymous blocks and function
 scopes within one module still share its declaration counts.
