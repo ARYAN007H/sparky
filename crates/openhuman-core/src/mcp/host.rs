@@ -60,36 +60,6 @@ pub async fn close_agent(_workspace_dir: &std::path::Path, _agent_id: &str) -> b
 #[cfg(not(feature = "mcp"))]
 pub fn schedule_agent_close(_workspace_dir: &std::path::Path, _agent_id: &str) {}
 
-/// Closes an already-cached agent-scoped MCP client and returns only after the
-/// module acknowledges cleanup. A failed close remains unavailable in the
-/// cache so a later retry or runtime shutdown can finish it.
-#[cfg(feature = "mcp")]
-pub async fn close_agent(workspace_dir: &std::path::Path, agent_id: &str) -> bool {
-    crate::mcp::module_client::McpConfiguredClient::close_agent_data_dir(
-        &workspace_dir.join("agents").join(agent_id),
-    )
-    .await
-}
-
-/// Schedules cleanup for a dropped agent without opening a client. The exact
-/// cached client is marked retired before the cleanup task is spawned.
-#[cfg(feature = "mcp")]
-pub fn schedule_agent_close(workspace_dir: &std::path::Path, agent_id: &str) {
-    crate::mcp::module_client::McpConfiguredClient::schedule_agent_close_data_dir(
-        &workspace_dir.join("agents").join(agent_id),
-    );
-}
-
-/// The MCP feature is disabled, so there is no configured client to close.
-#[cfg(not(feature = "mcp"))]
-pub async fn close_agent(_workspace_dir: &std::path::Path, _agent_id: &str) -> bool {
-    true
-}
-
-/// The MCP feature is disabled, so there is no configured client to close.
-#[cfg(not(feature = "mcp"))]
-pub fn schedule_agent_close(_workspace_dir: &std::path::Path, _agent_id: &str) {}
-
 /// Converts the MCP section of product configuration to the module contract.
 pub fn client_config(config: &Config) -> tinymcp_bus::McpClientConfig {
     let mut client = tinymcp_bus::McpClientConfig {

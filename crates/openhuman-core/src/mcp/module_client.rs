@@ -245,6 +245,10 @@ impl McpConfiguredClient {
             ModuleClient::report_unavailable(MODULE);
             return Err(ModuleCallError::Unavailable);
         }
+        if current_agent_context_is_removed() {
+            ModuleClient::report_unavailable(MODULE);
+            return Err(ModuleCallError::Unavailable);
+        }
 
         let data_dir = crate::core::runtime::agent_scope_dir(config);
         let clients = CLIENTS.get_or_init(|| Mutex::new(HashMap::new()));
@@ -411,6 +415,19 @@ impl McpConfiguredClient {
                 tracing::warn!("[mcp] agent client close remains pending for retry");
             }
         });
+    }
+
+    pub(crate) fn agent_close_pending(data_dir: &std::path::Path) -> bool {
+        CLIENTS
+            .get()
+            .and_then(|clients| {
+                clients
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .get(data_dir)
+                    .map(|client| client.retiring.load(Ordering::Acquire))
+            })
+            .unwrap_or(false)
     }
 
     fn retire_cached_client(data_dir: &std::path::Path) -> Option<Arc<Self>> {
@@ -822,6 +839,17 @@ impl McpConfiguredClient {
         .await
         .map_err(|_| ModuleCallError::TransportFailed)?
     }
+}
+
+fn current_agent_context_is_removed() -> bool {
+    let Some(context) = crate::core::runtime::CoreContext::current() else {
+        return false;
+    };
+    context.session_agent().is_some()
+        && context
+            .host_overrides()
+            .and_then(|overrides| overrides.approval_scope())
+            .is_some_and(|scope| scope.is_closed())
 }
 
 #[cfg(test)]
