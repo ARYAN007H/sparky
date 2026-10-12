@@ -30,12 +30,8 @@ publish = false
 
 [features]
 default = []
-all = ["tinybox", "tinychannels", "tinyconnectors", "tinydocs", "tinyvoice"]
-tinybox = ["dep:tinybox-module"]
+all = ["tinychannels"]
 tinychannels = ["dep:tinychannels-module"]
-tinyconnectors = ["dep:tinyconnectors"]
-tinydocs = ["dep:tinydocs-module"]
-tinyvoice = ["dep:tinyvoice-module"]
 
 [dependencies]
 # The host reaches the core only through the rpc facade (crate chain).
@@ -43,11 +39,7 @@ openhuman-rpc = { path = "../openhuman-rpc", default-features = false, features 
 log = "0.4"
 tinybus = { path = "../../vendor/tinybus/crates/tinybus", default-features = false, features = ["modules"] }
 
-tinybox-module = { path = "../../vendor/tinybox/crates/tinybox-module", features = ["static-link"], optional = true }
 tinychannels-module = { path = "../../vendor/tinychannels/crates/tinychannels-module", features = ["static-link"], optional = true }
-tinyconnectors = { path = "../../vendor/tinyconnectors/crates/tinyconnectors", default-features = false, features = ["static-link"], optional = true }
-tinydocs-module = { path = "../../vendor/tinydocs/crates/tinydocs-module", features = ["static-link"], optional = true }
-tinyvoice-module = { path = "../../vendor/tinyvoice/crates/tinyvoice-module", default-features = false, features = ["static-link"], optional = true }
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage)'] }
