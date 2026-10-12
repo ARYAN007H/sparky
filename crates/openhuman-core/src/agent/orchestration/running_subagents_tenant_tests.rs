@@ -195,6 +195,18 @@ async fn saas_dispatch_exposes_only_the_callers_detached_worker_controls() {
             Some(true)
         );
         assert!(crate::core::all::schema_for_rpc_method("openhuman.config_get_config").is_none());
+        let unreviewed = crate::agent::orchestration::command_center::all_registered_controllers()
+            .into_iter()
+            .find(|controller| controller.schema.function == "list")
+            .expect("existing Agent controller")
+            .schema;
+        let method = crate::core::all::rpc_method_name(&unreviewed);
+        assert!(crate::core::all::schema_for_rpc_method(&method).is_none());
+        assert!(crate::core::invoke::invoke_method(
+            crate::core::invoke::default_state(),
+            &method,
+            serde_json::json!({}),
+        ).await.is_err(), "unreviewed Agent methods remain absent");
     })
     .await;
     CoreContext::scope(pair.alice.clone(), async {
@@ -266,7 +278,9 @@ async fn unscoped_async_spawn_refuses_before_persisting_a_running_session() {
     assert!(result.is_error, "unscoped spawn must not report accepted: {}", result.output());
     assert!(result.output().contains("scope"), "typed refusal must explain missing scope");
     assert!(sessions.is_empty(), "refused spawn must not create durable sessions: {sessions:?}");
-    assert!(roster(PARENT).is_empty());
+    assert!(snapshot_for_parent(PARENT).is_empty());
+    assert!(std::fs::read_dir(workspace.path()).unwrap().next().is_none(),
+        "scope refusal must precede session and worker-thread writes");
 }
 
 #[tokio::test]
