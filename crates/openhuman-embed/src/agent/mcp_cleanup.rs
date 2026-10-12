@@ -57,28 +57,20 @@ pub(crate) fn defer_pending(
     let running = Arc::clone(&pending.retry_running);
     let executor_failed = Arc::clone(&running);
     let future = async move {
-        let mut guard = Some(guard);
-        for attempt in 0..3 {
-            let result = match &pending.cleanup {
-                Some(cleanup) => cleanup.finish().await.map_err(AgentError::McpCleanup),
-                None => Ok(()),
-            };
-            let result = result.and_then(|()| {
-                complete_with_guard(&mut guard, || finish_removal(&registry, &id, &pending))
-            });
-            match result {
-                Ok(()) => {
-                    running.store(false, Ordering::Release);
-                    return;
+        retry_cleanup(
+            guard,
+            || {
+                let cleanup = pending.cleanup.clone();
+                async move {
+                    match cleanup {
+                        Some(cleanup) => cleanup.finish().await.map_err(AgentError::McpCleanup),
+                        None => Ok(()),
+                    }
                 }
-                Err(error) => {
-                    log::warn!("[embed][agent] captured cleanup remains pending: {error}")
-                }
-            }
-            if attempt < 2 {
-                tokio::time::sleep(std::time::Duration::from_millis(250 * (1 << attempt))).await;
-            }
-        }
+            },
+            || finish_removal(&registry, &id, &pending),
+        )
+        .await;
         // The original receipt, id reservation and purge intent stay in the
         // registry. A later remove_agent call retries them explicitly.
         running.store(false, Ordering::Release);
@@ -86,6 +78,30 @@ pub(crate) fn defer_pending(
     if let Err(error) = openhuman_core::mcp::host::spawn_agent_cleanup(future) {
         executor_failed.store(false, Ordering::Release);
         log::warn!("[embed][agent] cleanup executor unavailable: {error}");
+    }
+}
+
+async fn retry_cleanup<F, Fut, C>(
+    guard: Arc<crate::runtime::CoreGuard>,
+    mut close: F,
+    mut complete: C,
+) where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<(), AgentError>>,
+    C: FnMut() -> Result<(), AgentError>,
+{
+    let mut guard = Some(guard);
+    for attempt in 0..3 {
+        let result = close()
+            .await
+            .and_then(|()| complete_with_guard(&mut guard, &mut complete));
+        match result {
+            Ok(()) => return,
+            Err(error) => log::warn!("[embed][agent] captured cleanup remains pending: {error}"),
+        }
+        if attempt < 2 {
+            tokio::time::sleep(std::time::Duration::from_millis(250 * (1 << attempt))).await;
+        }
     }
 }
 

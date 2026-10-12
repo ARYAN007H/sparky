@@ -118,3 +118,58 @@ fn the_last_runtime_guard_keeps_admission_reserved_through_cleanup_completion() 
         .unwrap();
     });
 }
+
+#[test]
+fn exhausted_cleanup_releases_runtime_admission_but_preserves_the_ephemeral_workspace() {
+    let executor = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .worker_threads(1)
+        .thread_stack_size(openhuman_core::core::runtime::AGENT_WORKER_STACK_BYTES)
+        .build()
+        .unwrap();
+    executor.block_on(async {
+        tokio::spawn(async {
+            let runtime = crate::Runtime::builder()
+                .config(openhuman_core::config::Config::default())
+                .workspace(crate::Workspace::Ephemeral)
+                .build()
+                .await
+                .unwrap();
+            let root = runtime.workspace_dir().to_path_buf();
+            let home = root.join("agents/unresolved");
+            std::fs::create_dir_all(&home).unwrap();
+            std::fs::write(home.join("module-state"), "must survive unconfirmed close").unwrap();
+            let guard = runtime.guard();
+            let weak = Arc::downgrade(&guard);
+            drop(runtime);
+            let attempts = std::sync::atomic::AtomicUsize::new(0);
+            retry_cleanup(
+                guard,
+                || {
+                    attempts.fetch_add(1, Ordering::SeqCst);
+                    async {
+                        Err(AgentError::McpCleanup(
+                            openhuman_core::modules::client::ModuleCallError::ModuleFault,
+                        ))
+                    }
+                },
+                || panic!("unconfirmed close must never purge"),
+            )
+            .await;
+            let home_was_preserved = home.join("module-state").exists();
+            let _ = std::fs::remove_dir_all(&root);
+            assert_eq!(attempts.load(Ordering::SeqCst), 3);
+            assert!(
+                weak.upgrade().is_none(),
+                "exhaustion must release the process guard"
+            );
+            assert!(!crate::runtime::RUNTIME_LIVE.load(Ordering::Acquire));
+            assert!(
+                home_was_preserved,
+                "failed cleanup must preserve the ephemeral workspace after the last guard drops"
+            );
+        })
+        .await
+        .unwrap();
+    });
+}
