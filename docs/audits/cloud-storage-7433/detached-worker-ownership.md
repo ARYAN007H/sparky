@@ -121,8 +121,15 @@ These outputs are retained outside disposable targets in
 `.validation/detached-review-green-retry.log`,
 `.validation/detached-review-orchestration-green.log` and the individual
 `.validation/detached-review-{running,control,spawn,surface,saas}.log` files.
-The final narrow rerun is pending; the preceding results do not establish
-full-workspace, default/all-feature, MSRV, coverage or hosted acceptance.
+The final narrow rerun `78777` finished with exit 0 at tested source
+`f64060e800`: **79 distinct top-level tests passed, 0 failed, 0 ignored**
+(running-worker 31, controller 5, spawn 20, profile-surface 8, SaaS preset 15).
+Compilation finished in 2m17s. Nested subprocess repetitions are excluded
+from that total. The preset failure is separately preserved in
+`.validation/detached-review-saas-preset-red.log`, and the final runner
+summary is `.validation/detached-review-focused-final-progress.log`.
+The 79 results do not establish full-workspace, default/all-feature, MSRV,
+coverage or hosted acceptance.
 
 ## Remaining limits
 
