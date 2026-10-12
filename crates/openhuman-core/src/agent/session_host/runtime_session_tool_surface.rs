@@ -27,7 +27,7 @@ impl OpenHumanTurnPrelude {
         // time rule), so the definition's roster never widens an explicit
         // allowlist here either.
         let delegates = !definition.subagents.is_empty()
-            && super::builder::should_synthesize_delegation_tools(&definition);
+            && super::super::builder::should_synthesize_delegation_tools(&definition);
         if !delegates && !has_recorded_tool_snapshot {
             return Ok(());
         }
