@@ -24,6 +24,17 @@ use crate::storage::DocumentStoreExt;
 pub(super) const DEVICES: &str = "paired_devices";
 const DOMAIN: &str = "devices::store";
 
+/// The legacy `devices.db`, as the storage importer reads it.
+pub(crate) fn import_source() -> crate::storage::import::Source {
+    crate::storage::import::Source {
+        domain: "devices",
+        db: "devices/devices.db",
+        collections,
+        read_legacy: |scratch, _real| super::store::import::read(scratch),
+        rekey: |record, _config| record,
+    }
+}
+
 fn collections() -> Vec<CollectionSpec> {
     vec![CollectionSpec::new(DEVICES).index(IndexSpec::new("by_active", ["revoked", "created_at"]))]
 }

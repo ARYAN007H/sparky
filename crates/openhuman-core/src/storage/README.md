@@ -33,6 +33,15 @@ A URL for a driver the build lacks fails at `open`, naming the feature.
 always compiled in; `storage-mongodb` is in neither, a cloud build turns it
 on.
 
+## Legacy import
+
+`import/` copies the four small stores' legacy SQLite files into an installed
+backend once, read-only (see the module doc and the architecture page). The
+core calls `import::run` from `bootstrap_core_runtime` before any domain store
+opens; `run_with` takes an explicit backend for tests. Sessions, cron jobs and
+the flow catalog are not imported here: their formats belong to TinyAgents and
+TinyFlows.
+
 ## Entry points
 
 - `configured_url(&Config)` / `url_from(env, &Config)`: the URL in effect.
@@ -63,6 +72,25 @@ on.
   stores build on. A `Repo` holds one domain's scoped document handle,
   declares its collections and runs each call; `compare_and_swap` is the
   guarded-`UPDATE` loop.
+
+## Storage for loadable modules
+
+A loaded module does not hold storage handles. It calls the bus interface
+`ai.tinyhumans.tinystorage.Storage` (`modules::storage_host`), which answers
+from the installed backend:
+
+- the scope is derived by the host from the broker-authenticated caller (module
+  id) and the host's current scope, never taken from the request (the wire types
+  reject unknown fields, so a forged `scope` is a decode failure);
+- the module's grant (`modules::storage_grants::StorageGrant`: collections with
+  their schema, stream, blob and secret-name prefixes, read-only or writable)
+  is enforced on every call, and only the host runs `ensure_collection`;
+- the backend is the fenced one (`open` wraps it), and a profile's module scope
+  sits under the profile's session-key prefix so its lease fence covers it;
+- each call produces one audit line without a payload.
+
+No module declares a grant yet, so none has storage. Bus streams for large
+blobs and watch signals are not served yet.
 
 ## Leases
 

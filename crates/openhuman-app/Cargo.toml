@@ -302,6 +302,12 @@ tinyinference-llm = { path = "../../vendor/tinyagents/vendor/tinyinference/crate
 tinyinference-local = { path = "../../vendor/tinyagents/vendor/tinyinference/crates/tinyinference-local" }
 tinyinference-voice = { path = "../../vendor/tinyagents/vendor/tinyinference/crates/tinyinference-voice" }
 
+[patch."https://github.com/tinyhumansai/tinybus"]
+# tinystoragedrivers-bus names tinybus by git rev. Redirect it to the in-tree
+# copy so the graph holds exactly one `tinybus` (one `Interface`, one
+# `Connection`) instead of a second one compiled only for the storage wire types.
+tinybus = { path = "../../vendor/tinybus/crates/tinybus" }
+
 [patch."https://github.com/tinyhumansai/tinystoragedrivers"]
 # tinyflows names the storage crates by git tag; redirect them to the copy
 # tinyagents vendors so this world links one `DocumentStore` trait and one

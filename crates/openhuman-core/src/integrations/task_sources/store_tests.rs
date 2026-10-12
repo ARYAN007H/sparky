@@ -1,5 +1,6 @@
 use super::*;
 use crate::config::Config;
+use crate::storage::rusqlite;
 use serde_json::json;
 use tempfile::TempDir;
 

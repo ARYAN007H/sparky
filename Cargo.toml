@@ -54,6 +54,12 @@ tinytools = { path = "vendor/tinyagents/vendor/tinytools/crates/tinytools" }
 tinytools-std = { path = "vendor/tinyagents/vendor/tinytools/crates/tinytools-std" }
 tinytools-agent = { path = "vendor/tinyagents/vendor/tinytools/crates/tinytools-agent" }
 
+[patch."https://github.com/tinyhumansai/tinybus"]
+# tinystoragedrivers-bus names tinybus by git rev. Redirect it to the in-tree
+# copy so the graph holds exactly one `tinybus` (one `Interface`, one
+# `Connection`) instead of a second one compiled only for the storage wire types.
+tinybus = { path = "vendor/tinybus/crates/tinybus" }
+
 [patch."https://github.com/tinyhumansai/tinystoragedrivers"]
 # tinyflows names the storage crates by git tag so it can build on its own.
 # Redirect them to the copy tinyagents vendors — the one the session store and

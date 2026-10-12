@@ -57,6 +57,38 @@ const DOMAIN: &str = "notifications::store";
 /// How long identical content counts as a duplicate.
 const DEDUP_WINDOW_SECS: i64 = 60;
 
+/// The legacy `notifications.db`, as the storage importer reads it.
+///
+/// Core notifications are keyed by workspace. The legacy table and the old
+/// per-file default both used the fixed [`LOCAL_WORKSPACE`] key; an installed
+/// backend may serve several workspaces, so they are re-filed under the real
+/// workspace's key, exactly as [`current`] does for new records.
+pub(crate) fn import_source() -> crate::storage::import::Source {
+    crate::storage::import::Source {
+        domain: "notifications",
+        db: "notifications/notifications.db",
+        collections,
+        read_legacy: |scratch, real| {
+            super::store::import::read_for(scratch, &workspace_key(&real.workspace_dir))
+        },
+        rekey: |mut record, config| {
+            if record.collection != CORE {
+                return record;
+            }
+            let prefix = core_id(LOCAL_WORKSPACE, "");
+            let Some(event_id) = record.id.strip_prefix(&prefix) else {
+                return record;
+            };
+            let workspace = workspace_key(&config.workspace_dir);
+            record.id = core_id(&workspace, event_id);
+            if let Some(doc) = record.doc.as_object_mut() {
+                doc.insert("workspace".into(), serde_json::json!(workspace));
+            }
+            record
+        },
+    }
+}
+
 fn collections() -> Vec<CollectionSpec> {
     vec![
         CollectionSpec::new(NOTIFICATIONS)

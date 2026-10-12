@@ -1,5 +1,6 @@
 //! Row conversion for the SQLite notification store.
 
+use crate::storage::rusqlite;
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 
