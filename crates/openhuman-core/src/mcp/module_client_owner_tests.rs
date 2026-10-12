@@ -9,12 +9,16 @@ struct LifecycleFixture {
     block_close_poll: Arc<AtomicBool>,
     close_poll_started: Arc<tokio::sync::Notify>,
     release_close_poll: Arc<tokio::sync::Notify>,
+    fail_close: Arc<AtomicBool>,
 }
 
 #[tinybus::interface(name = "ai.tinyhumans.tinymcp.Mcp")]
 impl LifecycleFixture {
     async fn close(&self, _data_dir: String) -> tinybus::Result<Option<String>> {
         self.closes.fetch_add(1, Ordering::SeqCst);
+        if self.fail_close.load(Ordering::SeqCst) {
+            return Err(tinybus::Error::failed("fixture cleanup unavailable"));
+        }
         Ok(Some("original-close".into()))
     }
 
@@ -26,6 +30,109 @@ impl LifecycleFixture {
         }
         Ok(TransitionStatus::Complete)
     }
+}
+
+#[tokio::test]
+async fn failed_agent_cleanup_retains_the_retired_owner_and_can_retry() {
+    let scratch = tempfile::tempdir().unwrap();
+    let directory = scratch.path().join("agents/worker");
+    let bus = MemoryBus::new();
+    Broker::new().spawn(bus.clone());
+    let service = Connection::connect(bus.connect().await.unwrap())
+        .await
+        .unwrap();
+    let caller = Connection::connect(bus.connect().await.unwrap())
+        .await
+        .unwrap();
+    let fixture = LifecycleFixture::default();
+    service
+        .serve_at(
+            ObjectPath::new(names::OBJECT_PATH).unwrap(),
+            fixture.clone(),
+        )
+        .await
+        .unwrap();
+    service.request_name(names::INTERFACE).await.unwrap();
+    let port = TinyMcpPort::new(ModuleClient::fixture(
+        caller
+            .proxy(names::INTERFACE, names::OBJECT_PATH, names::INTERFACE)
+            .unwrap(),
+    ));
+    port.transition_status("original-open").await.unwrap();
+    let client = Arc::new(McpConfiguredClient::with_port(
+        directory.to_str().unwrap().into(),
+        Box::new(port),
+    ));
+    *client.state.lock().await = State::Open(OpenObject {
+        config: McpClientConfig::default(),
+        object_path: "/test/original-child".into(),
+    });
+    CLIENTS
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .unwrap()
+        .insert(directory.clone(), Arc::clone(&client));
+    let cleanup = agent_cleanup::take_agent_cleanup(scratch.path(), "worker").unwrap();
+    fixture.fail_close.store(true, Ordering::SeqCst);
+    assert_eq!(cleanup.finish().await, Err(ModuleCallError::ModuleFault));
+    assert!(Arc::ptr_eq(
+        CLIENTS
+            .get()
+            .unwrap()
+            .lock()
+            .unwrap()
+            .get(&directory)
+            .unwrap(),
+        &client
+    ));
+    assert!(matches!(
+        &*client.state.lock().await,
+        State::StartingClose(_)
+    ));
+    assert_eq!(
+        client
+            .call::<Value>(&McpClientConfig::default(), "NeverReopen", ())
+            .await,
+        Err(ModuleCallError::Unavailable)
+    );
+    fixture.fail_close.store(false, Ordering::SeqCst);
+    cleanup.finish().await.unwrap();
+    assert!(!CLIENTS
+        .get()
+        .unwrap()
+        .lock()
+        .unwrap()
+        .contains_key(&directory));
+    // Retrying the old completed handle cannot evict a later owner.
+    let successor = Arc::new(McpConfiguredClient::new(&directory, &Config::default()).unwrap());
+    CLIENTS
+        .get()
+        .unwrap()
+        .lock()
+        .unwrap()
+        .insert(directory.clone(), Arc::clone(&successor));
+    assert!(cleanup.finish_if_idle());
+    assert!(Arc::ptr_eq(
+        CLIENTS
+            .get()
+            .unwrap()
+            .lock()
+            .unwrap()
+            .get(&directory)
+            .unwrap(),
+        &successor
+    ));
+    CLIENTS.get().unwrap().lock().unwrap().remove(&directory);
+}
+
+#[test]
+fn an_absent_agent_cleanup_does_not_create_a_configured_client() {
+    let scratch = tempfile::tempdir().unwrap();
+    assert!(agent_cleanup::take_agent_cleanup(scratch.path(), "never-opened").is_none());
+    assert!(CLIENTS.get().is_none_or(|clients| !clients
+        .lock()
+        .unwrap()
+        .contains_key(&scratch.path().join("agents/never-opened"))));
 }
 
 #[tokio::test]
