@@ -713,3 +713,14 @@ test("storage-bypass runs under cancellation supervision in both profiles", () =
     );
   }
 });
+
+test("storage checker and debt policy changes arm their own scripts lane", () => {
+  const filters = fs.readFileSync(path.join(repoRoot, ".github/ci-paths-filter.yml"), "utf8");
+  const scripts = filters.split(/^scripts:\s*$/m)[1].split(/^\S[^\n]*:/m)[0];
+  for (const pattern of [
+    "scripts/ci/check-storage-bypass.mjs",
+    "scripts/ci/storage-bypass-debt.mjs",
+    "scripts/ci/storage-bypass*.json",
+    "scripts/ci/storage-bypass*.md",
+  ]) assert.ok(scripts.includes(`'${pattern}'`), `${pattern} must arm the scripts area`);
+});
