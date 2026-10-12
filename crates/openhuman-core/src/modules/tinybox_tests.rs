@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinybus::broker::Broker;
 use tinybus::service::Interface;
 use tinybus::transport::memory::MemoryBus;
@@ -349,7 +349,10 @@ async fn pinned_loader_serves_resolve_local_grants_from_tinybox_v0124() {
     let archive = std::env::var_os("TINYBOX_RELEASE_ARTIFACT")
         .map(std::path::PathBuf::from)
         .expect("set TINYBOX_RELEASE_ARTIFACT to the verified v0.1.24 archive");
-    assert!(archive.is_file(), "missing verified release archive: {archive:?}");
+    assert!(
+        archive.is_file(),
+        "missing verified release archive: {archive:?}"
+    );
 
     let record = crate::modules::registry::find(MODULE_ID).expect("TinyBox registry record");
     assert_eq!(record.version, "0.1.24");
@@ -358,7 +361,10 @@ async fn pinned_loader_serves_resolve_local_grants_from_tinybox_v0124() {
         .iter()
         .find_map(|host_key| record.asset_for(host_key))
         .expect("the pinned release supports this host");
-    assert_eq!(archive.file_name().and_then(std::ffi::OsStr::to_str), Some(asset.archive));
+    assert_eq!(
+        archive.file_name().and_then(std::ffi::OsStr::to_str),
+        Some(asset.archive)
+    );
 
     let bundled = tempfile::tempdir().expect("temporary installer bundle root");
     let bundle_asset_dir = bundled
@@ -380,7 +386,10 @@ async fn pinned_loader_serves_resolve_local_grants_from_tinybox_v0124() {
             .extract(&bundle_asset_dir)
             .expect("extract verified release archive");
     } else {
-        panic!("unsupported pinned release archive format: {}", asset.archive);
+        panic!(
+            "unsupported pinned release archive format: {}",
+            asset.archive
+        );
     }
     std::fs::copy(&archive, bundle_asset_dir.join(asset.archive))
         .expect("stage verified release archive in TinyBus bundle layout");
@@ -422,7 +431,10 @@ async fn pinned_loader_serves_resolve_local_grants_from_tinybox_v0124() {
         .call(MODULE_ID, contract::METHODS[31], (request,))
         .await
         .expect("the published artifact serves ResolveLocalGrants");
-    assert_eq!(grants.read_only, vec![allowed.canonicalize().unwrap().display().to_string()]);
+    assert_eq!(
+        grants.read_only,
+        vec![allowed.canonicalize().unwrap().display().to_string()]
+    );
     assert!(grants.read_write.is_empty());
 }
 
@@ -545,8 +557,8 @@ async fn no_workspace_docker_refusal_is_not_retried_as_an_ordinary_call() {
 }
 
 #[tokio::test]
-async fn docker_controls_use_typed_calls_with_validated_contract_capability(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn docker_controls_use_typed_calls_with_validated_contract_capability()
+-> Result<(), Box<dyn std::error::Error>> {
     let (_service, client, calls) = mock_client().await;
     let status = call_docker_status_with_client(
         &client,
