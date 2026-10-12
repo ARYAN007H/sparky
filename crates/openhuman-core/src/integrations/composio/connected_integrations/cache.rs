@@ -41,6 +41,10 @@ pub(crate) fn cache_generation(key: &str) -> Arc<AtomicU64> {
     let mut guard = CACHE_GENERATIONS
         .write()
         .unwrap_or_else(|error| error.into_inner());
+    // A map-only epoch has no fetch left to fence. Under this exclusive lock
+    // no caller can acquire another lease before removal. Keep every externally
+    // held Arc so a warm spanning profile churn retains its invalidation fence.
+    guard.retain(|_, epoch| Arc::strong_count(epoch) > 1);
     guard
         .entry(scope.to_owned())
         .or_insert_with(|| Arc::new(AtomicU64::new(0)))
@@ -48,17 +52,31 @@ pub(crate) fn cache_generation(key: &str) -> Arc<AtomicU64> {
 }
 
 /// Resolve the catalog's profile/operator identity, refusing missing SaaS scope.
-fn current_cache_scope_prefix() -> Option<String> {
-    let tenant = crate::core::runtime::current_tenant().ok()?;
+fn current_cache_scope_prefix(operation: &'static str) -> Option<String> {
+    let tenant = match crate::core::runtime::current_tenant() {
+        Ok(tenant) => tenant,
+        Err(error) => {
+            // NoTenant is a fixed, content-free error; do not attach identities.
+            tracing::warn!(operation, reason = %error,
+                "[composio][integrations] scope_resolution_refused");
+            return None;
+        }
+    };
     // Connected accounts belong to the profile/operator, shared by its agents.
     // scope_from keeps the storage profile encoding and refuses missing SaaS
     // profiles, while no-profile SingleUser work keeps its local identity.
-    let scope = crate::storage::scope_from(
+    let scope = match crate::storage::scope_from(
         tenant.profile.as_deref(),
         None,
         crate::core::runtime::is_saas(),
-    )
-    .ok()?;
+    ) {
+        Ok(scope) => scope,
+        Err(error) => {
+            tracing::warn!(operation, error_kind = ?error.kind(),
+                "[composio][integrations] scope_resolution_refused");
+            return None;
+        }
+    };
     let mut digest = Sha256::new();
     digest.update(b"openhuman-integrations-cache-scope-v1\0");
     digest.update(scope.as_str().as_bytes());
@@ -112,7 +130,7 @@ static COMPOSIO_CACHE_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::co
 /// Bind a snapshot to the calling profile/operator's scope and its
 /// credentials. SaaS work without a profile cannot read or populate the cache.
 pub(crate) fn checked_cache_key(config: &Config) -> Option<String> {
-    let prefix = current_cache_scope_prefix()?;
+    let prefix = current_cache_scope_prefix("cache_key")?;
     let backend_url = crate::backend::base_url(&config.api_url)
         .map(|url| crate::util::url::normalize_backend_api_base_url(&url))
         .unwrap_or_default();
@@ -192,7 +210,7 @@ fn cache_key_with_backend_url(config: &Config, backend_url: &str) -> String {
 /// callers resolve the authoritative calling scope. Other profiles are untouched;
 /// absent SaaS scope is a no-op.
 pub fn invalidate_connected_integrations_cache() {
-    let Some(prefix) = current_cache_scope_prefix() else {
+    let Some(prefix) = current_cache_scope_prefix("invalidate") else {
         return;
     };
     if let Ok(mut guard) = INTEGRATIONS_CACHE.write() {
@@ -338,7 +356,7 @@ fn connected_toolkit_set(integrations: &[ConnectedIntegration]) -> HashSet<Strin
 pub(crate) fn sync_cache_with_connections(
     connections: &[crate::integrations::composio::types::ComposioConnection],
 ) -> bool {
-    let Some(prefix) = current_cache_scope_prefix() else {
+    let Some(prefix) = current_cache_scope_prefix("reconcile") else {
         return false;
     };
     let live_active: HashSet<String> = connections

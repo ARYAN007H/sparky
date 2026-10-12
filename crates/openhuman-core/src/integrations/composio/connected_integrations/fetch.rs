@@ -67,7 +67,9 @@ pub async fn fetch_connected_integrations_status(
 ) -> FetchConnectedIntegrationsStatus {
     // A task that lost its SaaS profile must neither reuse another profile's
     // snapshot nor request and cache connections under operator credentials.
-    if crate::storage::current_scope().is_err() {
+    if let Err(error) = crate::storage::current_scope() {
+        tracing::warn!(operation = "fetch", error_kind = ?error.kind(),
+            "[composio][integrations] scope_resolution_refused");
         return FetchConnectedIntegrationsStatus::Unavailable;
     }
     // Composio switched off: nothing to ask. An authoritative empty set also
