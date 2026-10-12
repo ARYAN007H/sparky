@@ -71,13 +71,10 @@ jobs:
           # forwarding anonymous requests; keep checking all other links until
           # its provider-side redirect is restored.
           # GitHub intermittently returns 503 when the docs check fans out.
-          # Limit the burst and retry transient responses; permanent failures
-          # still fail the check after the bounded attempts.
+          # Limit the request burst; unsuccessful responses still fail the check.
           args: >-
             --no-progress
             --max-concurrency 4
-            --max-retries 3
-            --retry-wait-time 2
             --include-fragments
             --exclude '^http://localhost'
             --exclude '^https?://127\.0\.0\.1'
