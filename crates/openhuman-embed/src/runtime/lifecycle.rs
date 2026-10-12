@@ -93,6 +93,17 @@ impl Runtime {
     /// including after the last agent handle was dropped. Runtime drop does
     /// not execute the process signal's shutdown hooks.
     ///
+    /// Each MCP attempt has a 30-second deadline; three detached attempts add
+    /// at most 750 ms of backoff. Filesystem purge and executor scheduling are
+    /// outside that wait bound. Failed or cancelled cleanup preserves an
+    /// ephemeral workspace when the runtime drops and logs its retained path.
+    /// That preservation is conservative for the rest of this runtime.
+    ///
+    /// The directory fence survives in this process if the original runtime's
+    /// retry record is lost. A new runtime cannot recover that record through
+    /// this method; there is no automatic durable retry or file reclamation.
+    /// Retained state then needs explicit host cleanup.
+    ///
     /// Cancellation is cooperative: a tool already executing when the agent
     /// is removed, or a sub-agent it detached, may finish after this returns.
     pub fn remove_agent(&self, id: &str) -> RemoveAgent<'_> {

@@ -289,3 +289,102 @@ fn a_failed_purge_fences_the_same_directory_after_its_original_runtime_is_gone()
         .unwrap();
     });
 }
+
+#[test]
+fn repairing_and_retrying_purge_on_the_original_runtime_releases_the_directory() {
+    let executor = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .worker_threads(1)
+        .thread_stack_size(openhuman_core::core::runtime::AGENT_WORKER_STACK_BYTES)
+        .build()
+        .unwrap();
+    executor.block_on(async {
+        tokio::spawn(async {
+            let scratch = tempfile::tempdir().unwrap();
+            let runtime = crate::Runtime::builder()
+                .config(openhuman_core::config::Config::default())
+                .workspace(crate::Workspace::Dir(scratch.path().into()))
+                .access(crate::Access::full())
+                .build()
+                .await
+                .unwrap();
+            let spec = || {
+                crate::AgentSpec::new("worker")
+                    .provider(
+                        crate::Provider::openai_compatible("http://127.0.0.1:1", "fixture")
+                            .model("fixture"),
+                    )
+                    .access(crate::Access::full())
+            };
+            let agent = runtime.agent(spec()).unwrap();
+            let home = scratch.path().join("agents/worker");
+            std::fs::remove_dir_all(&home).unwrap();
+            std::fs::write(&home, "force purge failure").unwrap();
+            assert!(matches!(
+                runtime.remove_agent("worker").purge().await,
+                Err(AgentError::Workspace { .. })
+            ));
+            drop(agent);
+            assert!(openhuman_core::mcp::host::agent_close_pending(
+                scratch.path(),
+                "worker"
+            ));
+            std::fs::remove_file(&home).unwrap();
+            std::fs::create_dir_all(&home).unwrap();
+            std::fs::write(home.join("old-state"), "to purge").unwrap();
+            runtime.remove_agent("worker").purge().await.unwrap();
+            assert!(!home.exists());
+            assert!(!openhuman_core::mcp::host::agent_close_pending(
+                scratch.path(),
+                "worker"
+            ));
+            let successor = runtime
+                .agent(spec())
+                .expect("confirmed purge releases the public id");
+            drop(successor);
+            drop(runtime);
+        })
+        .await
+        .unwrap();
+    });
+}
+
+#[test]
+fn dropping_an_agent_without_an_mcp_entry_keeps_normal_ephemeral_cleanup() {
+    let executor = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .worker_threads(1)
+        .thread_stack_size(openhuman_core::core::runtime::AGENT_WORKER_STACK_BYTES)
+        .build()
+        .unwrap();
+    executor.block_on(async {
+        tokio::spawn(async {
+            let runtime = crate::Runtime::builder()
+                .config(openhuman_core::config::Config::default())
+                .workspace(crate::Workspace::Ephemeral)
+                .access(crate::Access::full())
+                .build()
+                .await
+                .unwrap();
+            let root = runtime.workspace_dir().to_path_buf();
+            let agent = runtime
+                .agent(
+                    crate::AgentSpec::new("unused")
+                        .provider(
+                            crate::Provider::openai_compatible("http://127.0.0.1:1", "fixture")
+                                .model("fixture"),
+                        )
+                        .access(crate::Access::full()),
+                )
+                .unwrap();
+            drop(agent);
+            drop(runtime);
+            assert!(!root.exists());
+            assert!(!openhuman_core::mcp::host::agent_close_pending(
+                &root, "unused"
+            ));
+        })
+        .await
+        .unwrap();
+    });
+}

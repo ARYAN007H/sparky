@@ -18,7 +18,9 @@ use crate::agent::AgentInner;
 pub(crate) type AgentMap = Mutex<AgentRegistry>;
 
 /// Failed cleanup retains its captured owner and purge intent, without keeping
-/// an agent or the runtime guard alive. `remove_agent` can retry this record.
+/// an agent or the runtime guard alive. The original live runtime's
+/// `remove_agent` can retry this record. Its process-local directory fence
+/// survives a lost record, without automatic durable retry or reclamation.
 #[derive(Clone)]
 pub(crate) struct PendingCleanup {
     pub(crate) cleanup: Option<openhuman_core::mcp::host::AgentMcpCleanup>,

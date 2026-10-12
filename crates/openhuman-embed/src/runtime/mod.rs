@@ -179,7 +179,7 @@ pub enum RuntimeError {
 /// [`crate::Workspace::Ephemeral`], the workspace it lives in.
 ///
 /// Held as `Arc<CoreGuard>` by both `Runtime` and `AgentInner` so its `Drop`
-/// — releasing [`RUNTIME_LIVE`] and removing an ephemeral workspace — runs
+/// — releasing [`RUNTIME_LIVE`] and normally removing an ephemeral workspace — runs
 /// only once the *last* of them goes away. `Agent`s are owned rather than
 /// borrowed from `Runtime`, so a caller can drop the `Runtime` handle while
 /// an `Agent` (or a `Turn` in flight) is still alive; if `Runtime` tore this
@@ -211,6 +211,9 @@ pub(crate) struct CoreGuard {
 }
 
 impl CoreGuard {
+    /// Keep the scratch path after an unconfirmed cleanup, while still
+    /// releasing the process slot. Sticky to avoid clearing another failed
+    /// agent's preservation request when an independent retry succeeds.
     pub(crate) fn preserve_ephemeral_workspace(&self) {
         self.preserve_ephemeral_workspace
             .store(true, std::sync::atomic::Ordering::Release);
