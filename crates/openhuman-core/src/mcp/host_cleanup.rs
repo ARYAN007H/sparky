@@ -20,6 +20,7 @@ pub(super) struct CleanupReservation {
 pub(super) static CLEANUP_RESERVATIONS: OnceLock<Mutex<HashMap<PathBuf, Arc<CleanupReservation>>>> =
     OnceLock::new();
 
+#[cfg(not(feature = "mcp"))]
 pub(super) fn directory_pending(workspace: &std::path::Path, agent_id: &str) -> bool {
     CLEANUP_RESERVATIONS.get().is_some_and(|reservations| {
         reservations
