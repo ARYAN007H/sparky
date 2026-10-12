@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { auditGraph, graph, isImplementation, validatePolicy, CONTRACT_REGISTRY } from '../ci/check-module-boundaries.mjs';
+import { auditGraph, bridgeReach, graph, isImplementation, validatePolicy, CONTRACT_REGISTRY } from '../ci/check-module-boundaries.mjs';
 
 const policy = JSON.parse(readFileSync(new URL('../ci/module-boundaries.json', import.meta.url), 'utf8'));
 const strict = { ...policy, exceptions: [] };
@@ -181,4 +181,21 @@ test('without a linkedHost policy the bridge subtree is audited like any other d
 test('linkedHost policy validation rejects an empty parent list and an implementation package', () => {
   assert.throws(() => validatePolicy({ ...policy, linkedHost: { package: 'x', allowedParents: [] } }), /linkedHost/);
   assert.throws(() => validatePolicy({ ...policy, linkedHost: { package: 'tinydocs-module', allowedParents: ['openhuman-cli'] } }), /implementation/);
+});
+
+test('without linked-modules no host reaches the bridge; with it, the CLI does', () => {
+  const without = metadata({ 'openhuman-cli': [['openhuman-rpc']], 'openhuman-tui': [['openhuman-rpc']], openhuman: [] });
+  assert.deepEqual(bridgeReach(without, ['openhuman-cli', 'openhuman-tui', 'openhuman'], policy), []);
+  const withIt = metadata({
+    'openhuman-cli': [['openhuman-rpc'], ['openhuman-modules-linked']],
+    'openhuman-tui': [['openhuman-rpc']],
+    openhuman: [],
+  });
+  assert.deepEqual(
+    bridgeReach(withIt, ['openhuman-cli', 'openhuman-tui', 'openhuman'], policy).map(v => v.path),
+    [['openhuman-cli', 'openhuman-modules-linked']]
+  );
+  // A dev edge is not a shipped edge.
+  const dev = metadata({ 'openhuman-cli': [['openhuman-modules-linked', 'dev']], 'openhuman-modules-linked': [] });
+  assert.deepEqual(bridgeReach(dev, ['openhuman-cli'], policy), []);
 });

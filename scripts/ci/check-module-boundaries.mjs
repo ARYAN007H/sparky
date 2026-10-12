@@ -99,6 +99,37 @@ export function auditGraph(metadata, roots, policy, contract = null) {
   return { violations, exceptions };
 }
 
+/**
+ * Roots that reach the linked-modules bridge through normal or build edges.
+ * Used on a metadata resolve WITHOUT `--all-features`: neither the CLI built
+ * without `linked-modules`, nor the TUI, nor the core may reach it. Returns
+ * violation findings shaped like {@link auditGraph}'s.
+ */
+export function bridgeReach(metadata, roots, policy) {
+  const target = policy.linkedHost?.package;
+  if (!target) return [];
+  const { packages, edges } = graph(metadata);
+  const found = [];
+  for (const root of roots) {
+    const candidates = [...packages.values()].filter(pkg => pkg.name === root);
+    if (candidates.length !== 1) throw new Error(`expected exactly one root package ${root}`);
+    const queue = [[candidates[0].id]];
+    const seen = new Set();
+    for (let at = 0; at < queue.length; at++) {
+      const path = queue[at];
+      const id = path.at(-1);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      if (packages.get(id).name === target) {
+        found.push({ scope: 'hosts', package: target, path: path.map(item => packages.get(item).name) });
+        continue;
+      }
+      for (const next of edges(id)) queue.push([...path, next]);
+    }
+  }
+  return found;
+}
+
 export function validatePolicy(policy) {
   for (const key of ['implementationPackages', 'implementationPrefixes', 'contracts', 'pendingContracts', 'exceptions']) {
     if (!Array.isArray(policy[key])) throw new Error(`policy.${key} must be an array`);
@@ -178,6 +209,12 @@ export function run(root, strict = false) {
     const metadata = cargo(root, ['--manifest-path', join(root, manifest), '--locked', '--all-features']);
     results.push(auditGraph(metadata, roots, policy));
   }
+  // Without `linked-modules` (default features) no host reaches the bridge.
+  results.push({
+    violations: bridgeReach(cargo(root, ['--manifest-path', join(root, 'Cargo.toml'), '--locked']),
+      ['openhuman-cli', 'openhuman-tui', 'openhuman'], policy),
+    exceptions: [],
+  });
   for (const contract of policy.contracts) {
     for (const all of [false, true]) {
       results.push(auditGraph(contractMetadata(root, contract, all), [contract.name], policy, contract.name));
