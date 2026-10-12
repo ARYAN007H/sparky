@@ -31,6 +31,36 @@ pub fn ambient_config() -> Option<Config> {
 }
 
 /// Closes an already-cached agent-scoped MCP client and returns only after the
+/// module acknowledges cleanup. Failed closes stay cached and unavailable so
+/// shutdown or a later cleanup attempt can retry them.
+#[cfg(feature = "mcp")]
+pub async fn close_agent(workspace_dir: &std::path::Path, agent_id: &str) -> bool {
+    crate::mcp::module_client::McpConfiguredClient::close_agent_data_dir(
+        &workspace_dir.join("agents").join(agent_id),
+    )
+    .await
+}
+
+/// Schedules cleanup for a dropped agent without opening a client. The exact
+/// cached client is retired before the cleanup task is spawned.
+#[cfg(feature = "mcp")]
+pub fn schedule_agent_close(workspace_dir: &std::path::Path, agent_id: &str) {
+    crate::mcp::module_client::McpConfiguredClient::schedule_agent_close_data_dir(
+        &workspace_dir.join("agents").join(agent_id),
+    );
+}
+
+/// There is no MCP client to close when the feature is disabled.
+#[cfg(not(feature = "mcp"))]
+pub async fn close_agent(_workspace_dir: &std::path::Path, _agent_id: &str) -> bool {
+    true
+}
+
+/// There is no MCP client to close when the feature is disabled.
+#[cfg(not(feature = "mcp"))]
+pub fn schedule_agent_close(_workspace_dir: &std::path::Path, _agent_id: &str) {}
+
+/// Closes an already-cached agent-scoped MCP client and returns only after the
 /// module acknowledges cleanup. A failed close remains unavailable in the
 /// cache so a later retry or runtime shutdown can finish it.
 #[cfg(feature = "mcp")]
