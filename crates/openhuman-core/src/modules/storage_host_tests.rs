@@ -47,7 +47,7 @@ impl Environment for Env {
 
     fn keys(&self) -> Result<Arc<dyn KeyProvider>, StorageError> {
         if !self.keys_ready.load(Ordering::SeqCst) {
-            return Err(StorageError::Backend("key provider unavailable".into()));
+            return Err(StorageError::unavailable("key provider unavailable"));
         }
         Ok(Arc::new(DerivedKeys::new(Zeroizing::new([7u8; 32]))))
     }
@@ -703,16 +703,20 @@ async fn a_key_provider_failure_at_bind_is_retried_not_cached() {
     let rig = rig();
     rig.env.keys_ready.store(false, Ordering::SeqCst);
     let set = json!({"name": "token.a", "value": [1]});
-    let call_set = || {
-        rig.host.handle(
-            Object::Secrets,
-            "Set",
-            set.clone(),
-            Some(&alpha()),
-            Admission::Confidential,
-        )
+    let attempt = |rig: &Rig, set: Value| {
+        let host = &rig.host;
+        async move {
+            host.handle(
+                Object::Secrets,
+                "Set",
+                set,
+                Some(&alpha()),
+                Admission::Confidential,
+            )
+            .await
+        }
     };
-    assert!(call_set().await.is_err());
+    assert!(attempt(&rig, set.clone()).await.is_err());
     rig.env.keys_ready.store(true, Ordering::SeqCst);
-    call_set().await.unwrap();
+    attempt(&rig, set).await.unwrap();
 }
