@@ -138,11 +138,14 @@ pub(crate) async fn refresh_configured_tool_cache(config: &crate::config::Config
             )
             .await;
         match outcome {
-            Ok(tools) => tracing::debug!(
-                server = %server,
-                tools = tools.len(),
-                "[mcp] refreshed configured tool cache"
-            ),
+            Ok(tools) => {
+                tracing::debug!(
+                    server = %server,
+                    tools = tools.len(),
+                    "[mcp] refreshed configured tool cache"
+                );
+                ui::discovery::log_configured_server(&server, &tools);
+            }
             Err(error) => tracing::debug!(
                 server = %server,
                 ?error,

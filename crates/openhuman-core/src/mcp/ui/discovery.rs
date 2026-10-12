@@ -8,7 +8,6 @@ use std::sync::Arc;
 
 use serde_json::Value;
 
-use crate::mcp::config_servers::McpServerRegistry;
 use crate::mcp::host::{self, McpHost};
 
 use super::resolve::is_ui_uri;
@@ -100,27 +99,12 @@ pub async fn log_all_installed(host: Arc<McpHost>) {
     }
 }
 
-/// Logs a configured server's declared UI, from the registry's last listing.
-pub async fn log_configured_server(
-    registry: &McpServerRegistry,
-    store: &tinymcp::registry::Store,
-    server: &str,
-) {
-    let tools = registry.cached_tools(server, store).unwrap_or_default();
+/// Logs a configured server's declared UI, from the tools it just listed.
+pub fn log_configured_server(server: &str, tools: &[tinymcp_bus::McpRemoteTool]) {
     tracing::info!(server = %server, tools = tools.len(), "[mcp-ui] configured server listed");
-    for tool in &tools {
-        if let Some(meta) = registry.tool_meta(server, &tool.name) {
-            log_tool(server, &tool.name, &meta);
-        }
-    }
-    match registry.list_resources(server).await {
-        Ok(resources) => {
-            for resource in resources {
-                log_resource(server, &resource.uri, resource.mime_type.as_deref());
-            }
-        }
-        Err(error) => {
-            tracing::info!(server = %server, %error, "[mcp-ui] resources/list unavailable")
+    for tool in tools {
+        if let Some(meta) = tool.meta.as_ref() {
+            log_tool(server, &tool.name, meta);
         }
     }
 }
