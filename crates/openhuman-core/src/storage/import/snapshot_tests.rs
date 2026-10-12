@@ -15,6 +15,8 @@ fn snapshot_sees_uncheckpointed_wal_writes_and_leaves_source_intact() {
     let v: String = copy.query_row("SELECT v FROM t", [], |r| r.get(0)).unwrap();
     assert_eq!(v, "in-wal");
     // The live source still answers and was not modified by the snapshot.
-    let n: i64 = conn.query_row("SELECT COUNT(*) FROM t", [], |r| r.get(0)).unwrap();
+    let n: i64 = conn
+        .query_row("SELECT COUNT(*) FROM t", [], |r| r.get(0))
+        .unwrap();
     assert_eq!(n, 1);
 }
