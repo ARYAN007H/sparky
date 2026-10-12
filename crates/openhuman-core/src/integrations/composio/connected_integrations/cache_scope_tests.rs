@@ -198,6 +198,29 @@ fn no_saas_profile_cannot_invalidate_or_reconcile_any_snapshot() {
         generation,
         "absent profile must not fence another tenant's warm"
     );
+
+    assert!(cached_active_integrations(&config).is_none());
+    let mut disabled = config.clone();
+    disabled.composio.mode = crate::config::schema::COMPOSIO_MODE_DISABLED.into();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        runtime.block_on(super::super::fetch::fetch_connected_integrations_status(
+            &disabled
+        )),
+        super::super::fetch::FetchConnectedIntegrationsStatus::Unavailable
+    ));
+    let unprofiled = CoreContext::for_test_with_config(DomainSet::kernel(), config.clone());
+    CoreContext::sync_scope(unprofiled, || {
+        assert!(checked_cache_key(&config).is_none());
+        assert!(cached_active_integrations(&config).is_none());
+        invalidate_connected_integrations_cache();
+        assert!(!sync_cache_with_connections(&[]));
+    });
+    assert!(INTEGRATIONS_CACHE.read().unwrap().contains_key(&key));
+    assert_eq!(epoch.load(Ordering::SeqCst), generation);
 }
 
 #[test]
