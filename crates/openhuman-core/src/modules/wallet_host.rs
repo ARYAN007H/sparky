@@ -17,9 +17,13 @@ use tinywallet_bus::wire::{
     WalletAccountInfo, WalletAccountsResponse, WalletBackendRequest, WalletBackendResponse,
 };
 
-#[path = "wallet_host/transport.rs"]
+#[path = "wallet_host_transport.rs"]
 mod transport;
-use transport::{classify_transport_error, validate_module_endpoint_url, TransportFailure};
+
+use transport::{
+    classify_transport_error, endpoint_key, join_endpoint, validate_module_endpoint_url,
+    TransportFailure,
+};
 
 const HOST_ERROR_NAME: &str = "ai.tinyhumans.tinywallet.Host.Error.CallbackFailed";
 
@@ -414,10 +418,7 @@ fn native_intent_matches_quote(
         },
         NativeWalletExecutionIntent::SolanaMessage { message_hex } => {
             quote.chain == WalletChain::Solana
-                && matches!(
-                    quote.kind,
-                    PreparedKind::NativeTransfer | PreparedKind::TokenTransfer
-                )
+                && quote.kind == PreparedKind::TokenTransfer
                 && valid_hex(message_hex)
         }
     }
@@ -688,31 +689,6 @@ impl WalletHost {
                 .then(|| "x402 payment was not explicitly approved for this chat".into()),
         }))
     }
-}
-
-fn endpoint_key(
-    chain: tinywallet_bus::Chain,
-    evm_chain_id: Option<u64>,
-) -> Option<tinywallet_bus::wire::RpcEndpointKey> {
-    use tinywallet_bus::wire::{EvmNetwork, RpcEndpointKey};
-    match chain {
-        tinywallet_bus::Chain::Evm => EvmNetwork::ALL
-            .into_iter()
-            .find(|network| Some(network.chain_id()) == evm_chain_id)
-            .map(|network| RpcEndpointKey::Evm { network }),
-        tinywallet_bus::Chain::Btc => Some(RpcEndpointKey::Btc),
-        tinywallet_bus::Chain::Solana => Some(RpcEndpointKey::Solana),
-        tinywallet_bus::Chain::Tron => Some(RpcEndpointKey::Tron),
-        _ => None,
-    }
-}
-
-fn join_endpoint(base: &str, path: &str) -> String {
-    format!(
-        "{}/{}",
-        base.trim_end_matches('/'),
-        path.trim_start_matches('/')
-    )
 }
 
 fn callback_error(error: impl std::fmt::Display) -> tinybus::Error {

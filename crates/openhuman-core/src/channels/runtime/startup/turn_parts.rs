@@ -9,7 +9,7 @@
 use super::chat_workload::{resolve_chat_workload, ChatWorkloadResolution};
 use super::prompt::format_access_context;
 use crate::agent::host_runtime;
-use crate::channels::context::{effective_channel_message_timeout_secs, ChannelRuntimeContext};
+use crate::channels::context::ChannelRuntimeContext;
 use crate::channels::system_prompt::{ChannelPromptInputs, ChannelSystemPrompt};
 use crate::config::Config;
 use crate::inference::provider;
@@ -232,8 +232,10 @@ pub(crate) fn runtime_context(
     config: &Config,
     parts: ChannelTurnParts,
     channels_by_name: Arc<HashMap<String, Arc<dyn crate::channels::Channel>>>,
+    message_timeout_secs: u64,
 ) -> ChannelRuntimeContext {
     ChannelRuntimeContext {
+        relay_thread: None,
         channels_by_name,
         turn_model_source: None,
         default_provider: Arc::new(parts.provider_name),
@@ -250,9 +252,7 @@ pub(crate) fn runtime_context(
         reliability: Arc::new(config.reliability.clone()),
         provider_runtime_options: parts.provider_runtime_options,
         workspace_dir: Arc::new(config.workspace_dir.clone()),
-        message_timeout_secs: effective_channel_message_timeout_secs(
-            config.channels_config.message_timeout_secs,
-        ),
+        message_timeout_secs,
         multimodal: config.multimodal.clone(),
         multimodal_files: config.multimodal_files.clone(),
         // Crate-native turn models for the channel turn (Phase 3 P3-B).

@@ -26,11 +26,13 @@ test("transient 503 recovers after more than one retry and preserves fragments",
     { status: 0, report: "" },
   ]);
   const waits = [];
+  const logs = [];
   assert.equal(
     await retryServiceUnavailable({
       initialReport: unavailable,
       check,
       wait: async (ms) => waits.push(ms),
+      log: (message) => logs.push(message),
     }),
     0,
   );
@@ -39,6 +41,10 @@ test("transient 503 recovers after more than one retry and preserves fragments",
     ["https://example.test/docs#anchor"],
   ]);
   assert.deepEqual(waits, [5000, 10000]);
+  assert.ok(logs.some((line) => /attempt=1 backoff_ms=5000 urls=1/.test(line)));
+  assert.ok(logs.some((line) => /attempt=1 status=2/.test(line)));
+  assert.ok(logs.some((line) => /attempt=2 status=0/.test(line)));
+  assert.ok(logs.some((line) => /reason=recovered/.test(line)));
 });
 
 test("persistent 503 remains a failure after bounded retries", async () => {

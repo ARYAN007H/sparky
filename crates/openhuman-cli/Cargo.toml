@@ -347,7 +347,6 @@ tinychannels = { version = "0.1", features = ["relay-websocket"] }
 tinyinference-core = { path = "../../vendor/tinyagents/vendor/tinyinference/crates/tinyinference-core" }
 tinyinference-local = { path = "../../vendor/tinyagents/vendor/tinyinference/crates/tinyinference-local" }
 tinyinference-voice = { path = "../../vendor/tinyagents/vendor/tinyinference/crates/tinyinference-voice" }
-tinymcp = { path = "../../vendor/tinymcp/crates/tinymcp", default-features = false, features = ["rustls-tls"] }
 tinymcp-bus = { path = "../../vendor/tinymcp/crates/tinymcp-bus", features = ["schemars"] }
 tinytools-agent = { path = "../../vendor/tinyagents/vendor/tinytools/crates/tinytools-agent" }
 tokio = { version = "1", features = ["full", "test-util"] }
