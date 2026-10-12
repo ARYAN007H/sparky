@@ -296,6 +296,7 @@ for (const runner of ["test-rust-with-mock.sh", "test-rust-e2e.sh"]) {
             "unset OPENHUMAN_MODULE_PATH",
             setup,
             'connectors_module_path="/connectors:${OPENHUMAN_MODULE_PATH:-}"',
+            'hosts_dir=/hosts',
             cargoStub,
             invocation,
           ].join("\n"),
