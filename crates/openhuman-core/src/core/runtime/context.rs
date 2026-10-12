@@ -85,6 +85,11 @@ pub struct CoreContext {
     /// the model. Defaults to every group withheld, which is what the
     /// compiled-in pack table meant before the type existed.
     tool_groups: crate::tools::toolpacks::ToolGroups,
+    /// Which tiny dependencies the config switched off (`[components]`). Only
+    /// narrows: `domains` and `tool_groups` are already clamped by it, and this
+    /// is kept so dispatch can answer `COMPONENT_DISABLED:<name>` for a method
+    /// that a disabled component removed.
+    components: crate::core::runtime::ComponentSet,
     /// Whether skill discovery under this context scans the operator's
     /// user-scope roots (`~/.openhuman/skills`, `~/.agents/skills`).
     ///
@@ -268,6 +273,7 @@ impl CoreContext {
             }))),
             domains,
             tool_groups,
+            components,
             embedder_config,
             user_skill_roots: true,
             backend_transport,
@@ -387,6 +393,7 @@ impl CoreContext {
             workspace_binding: RwLock::new(shared_binding),
             domains,
             tool_groups: overlay.tool_groups,
+            components: self.components,
             embedder_config: Some(overlay.config),
             user_skill_roots: overlay.user_skill_roots,
             backend_transport: self.backend_transport.clone(),
@@ -542,6 +549,7 @@ impl CoreContext {
             }))),
             domains,
             tool_groups: Default::default(),
+            components: Default::default(),
             embedder_config: None,
             user_skill_roots: true,
             backend_transport: None,
@@ -575,6 +583,7 @@ impl CoreContext {
             }))),
             domains,
             tool_groups: Default::default(),
+            components: Default::default(),
             embedder_config: Some(config),
             user_skill_roots: true,
             backend_transport: None,
