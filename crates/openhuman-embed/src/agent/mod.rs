@@ -144,9 +144,9 @@ pub(crate) struct AgentInner {
 }
 
 impl AgentInner {
-    /// Releases what the core keeps for this agent: parked approvals are
-    /// denied with `resolution`, its state slots and MCP host are dropped,
-    /// and its context leaves the registry. Runs once.
+    /// Denies parked approvals, clears state slots and deregisters the context.
+    /// Captures the original MCP owner's cleanup without creating a client;
+    /// explicit removal awaits it and final drop schedules it. Runs once.
     pub(crate) fn teardown(&self, resolution: &str) {
         if !self.lifecycle.begin_teardown() {
             return;
@@ -199,7 +199,7 @@ impl Drop for AgentInner {
 /// A handle to one agent on a runtime.
 ///
 /// Cheap to clone; every clone drives the same agent. The id is released for
-/// reuse once the last clone is dropped. Dropping an agent does **not** remove
+/// reuse after the last clone's MCP cleanup completes. Dropping an agent does **not** remove
 /// its directories — its transcripts and memory persist with the runtime's
 /// workspace.
 #[derive(Clone)]

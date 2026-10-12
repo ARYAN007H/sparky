@@ -83,10 +83,15 @@ impl Runtime {
     /// [`CoreError::AgentRemoved`](crate::CoreError::AgentRemoved); its parked
     /// approvals are denied with resolution `agent_removed`; turns in
     /// flight end with the same error, waited on for up to ten seconds; its
-    /// state slots and MCP host are dropped and its context deregistered, so
+    /// state slots are cleared, its original MCP object is closed, and its context deregistered, so
     /// its cron jobs stay dormant. The id is free for reuse once cleanup ends.
     /// Cancelling an already-started removal still tears down the old instance
     /// and performs a requested purge before releasing its id.
+    /// A failed close returns [`AgentError::McpCleanup`] and leaves the id and
+    /// purge intent reserved. Detached cleanup makes at most three attempts on
+    /// the process executor. Call this method again to retry the captured owner,
+    /// including after the last agent handle was dropped. Runtime drop does
+    /// not execute the process signal's shutdown hooks.
     ///
     /// Cancellation is cooperative: a tool already executing when the agent
     /// is removed, or a sub-agent it detached, may finish after this returns.
