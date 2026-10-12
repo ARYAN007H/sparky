@@ -10,6 +10,7 @@
 //   - OPENHUMAN_MODULE_SOURCE or OPENHUMAN_MODULE_SOURCE_<ID>
 //   - a `linked` / `source` override (`source = "linked"`, `"source": "source"`)
 //   - the `linked-modules` feature
+//   - scripts/modules/build.mjs, the local source build (E0.4)
 //
 // Comment lines are ignored, so a workflow may explain the rule. Pure text
 // scan, no network.
@@ -31,6 +32,11 @@ export const RULES = [
     name: "non-release-override",
     re: /\bsource["']?\s*[=:]\s*["'](?:linked|source)["']/,
     why: "selects a linked/source module override",
+  },
+  {
+    name: "module-build-script",
+    re: /\bmodules\/build\.mjs\b/,
+    why: "runs the local module build script (CI uses the pinned releases)",
   },
   {
     name: "linked-modules-feature",
