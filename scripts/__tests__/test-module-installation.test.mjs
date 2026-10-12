@@ -39,11 +39,13 @@ const localRustRunner = fileURLToPath(
   new URL("../test-rust-with-mock.sh", import.meta.url),
 );
 
-test("locally built native Rust test modules use the checkout target tree", () => {
+test("locally built native Rust test modules come from build.mjs, not ad hoc cargo builds", () => {
   const source = readFileSync(localRustRunner, "utf8");
-  assert.match(source, /target\/native-test-modules\/tinyjuice/);
-  assert.match(source, /target\/native-test-modules\/tinysearch/);
-  assert.match(source, /target\/native-test-modules\/tinyconnectors/);
+  assert.match(source, /scripts\/modules\/stage-local-modules\.sh/);
+  assert.match(source, /stage_source_modules "\$\{local_source_ids\[@\]\}"/);
+  assert.match(source, /target\/module-sources\/tinyconnectors/);
+  assert.doesNotMatch(source, /cargo build/, "no hand-rolled module build");
+  assert.doesNotMatch(source, /--target-dir|native-test-modules/);
   assert.doesNotMatch(
     source,
     /vendor\/tiny(?:juice|search|connectors)\/target/,
@@ -52,8 +54,7 @@ test("locally built native Rust test modules use the checkout target tree", () =
 
 test("local MCP registry E2E tests load the pinned TinyMCP module", () => {
   const source = readFileSync(localRustRunner, "utf8");
-  assert.match(source, /test-module-assets\.mjs .*tinymcp/);
-  assert.match(source, /target\/test-modules\/tinymcp/);
+  assert.match(source, /stage_release_module tinymcp/);
   assert.match(source, /OPENHUMAN_MODULE_PATH="\$tinymcp_dir/);
 });
 
@@ -139,8 +140,7 @@ for (const id of [
 }
 
 for (const [runner, archiveVariable, directoryVariable] of [
-  ["test-rust-e2e.sh", "tinybox_archive", "tinybox_dir"],
-  ["test-rust-with-mock.sh", "hosts_archive", "hosts_dir"],
+  ["modules/stage-local-modules.sh", "archive", "dir"],
   ["test-rust-with-mock.sh", "tinybox_archive", "tinybox_dir"],
 ]) {
   test(`${runner} extracts ${archiveVariable} with the current user's ownership`, () => {
