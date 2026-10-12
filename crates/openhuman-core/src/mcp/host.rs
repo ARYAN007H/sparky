@@ -9,6 +9,10 @@ use std::sync::OnceLock;
 
 use crate::config::Config;
 
+pub use super::module_client::agent_cleanup::{
+    spawn_agent_cleanup, take_agent_cleanup, AgentMcpCleanup,
+};
+
 const PROXY_SERVICE_KEY: &str = "tool.mcp_client";
 const DEFAULT_CORE_PORT: u16 = 7788;
 static DEFAULT_CONFIG: OnceLock<Config> = OnceLock::new();
