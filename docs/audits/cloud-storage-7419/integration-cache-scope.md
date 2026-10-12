@@ -23,7 +23,7 @@ The first minimal-feature attempt fails before execution because three existing
 fixtures require the MCP, modules and channels gates. That compilation failure
 is not counted as RED.
 
-## Candidate and pending acceptance
+## Candidate and acceptance
 
 The candidate binds cache entries to the profile/operator storage identity,
 preserves the existing credential digest, and uses per-scope epochs for fetch
@@ -35,7 +35,17 @@ The original three assertions remain unchanged. Additional controls cover
 in-flight fetch admission, missing SaaS profiles and desktop agent sharing.
 The first GREEN attempt catches an obsolete helper import from the retained
 branch; the canonical `contract::toolkit_description` path has been restored.
-GREEN execution and broader acceptance remain pending.
+The fresh run after restoring that path builds successfully in 3m47s and passes
+all six controls: zero failures and zero ignored. The isolated SaaS child also
+passes its one selected test; it is included in the six parent cases, not an
+additional distinct case. The full log is
+`.validation/cache-scope-green-restored.log`. Broader acceptance remains pending.
+
+Independent source review found no Critical or Important issues. It checked
+cache/epoch lock ordering, scope admission and the refresh context capture.
+The inherited reconciliation read-to-write gap can still evict a newer snapshot
+within the same scope, causing a safe cache miss. Epoch-map eviction is also
+future hardening; neither behavior is claimed as fixed here.
 
 Feature forwarding passes. Storage-bypass and Rust layout checks fail on files
 unchanged from the canonical base: the browser-profile lock probe is reported as
