@@ -193,9 +193,9 @@ pub use openhuman_core::cron::host_delivery::{CronDelivery, CronReply};
 pub use openhuman_core::cron::JobOrigin;
 #[cfg(feature = "profiles")]
 pub use profiles::{
-    ChatReply, CronSweepReport, DirectProfileProvider,
-    OpenError, ProfileError, ProfileEvents, ProfileHandle, ProfileId, ProfileIdMode,
-    ProfileRuntime, ProfileRuntimeBuilder, ProfileSummary, Provisioned, SaasConfig,
+    ChatReply, CronSweepReport, DirectProfileProvider, OpenError, ProfileError, ProfileEvents,
+    ProfileHandle, ProfileId, ProfileIdMode, ProfileRuntime, ProfileRuntimeBuilder, ProfileSummary,
+    Provisioned, SaasConfig,
 };
 #[cfg(all(feature = "profiles", feature = "channels"))]
 pub use profiles::{RelayAccepted, RelayMessage};

@@ -14,8 +14,8 @@ use std::time::Duration;
 
 use common::{offline_config, runtime, scripted_provider, stub_backend, tool_call_completion};
 use openhuman_embed::{
-    AgentDefinitionSpec, AgentSpec, CronDelivery, CronReply, HostTurnTools, InMemorySessionStores,
-    JobOrigin, Runtime, ServiceSet, ToolScopeSpec, Workspace,
+    AgentDefinitionSpec, AgentSpec, AgentTurnOrigin, CronDelivery, CronReply, HostTurnTools,
+    InMemorySessionStores, JobOrigin, Runtime, ServiceSet, ToolScopeSpec, Workspace,
 };
 
 #[derive(Default)]
@@ -92,6 +92,12 @@ fn a_library_agents_scheduled_reply_is_handed_to_the_host() {
             agent
                 .turn("remind me to stretch")
                 .session("t-stretch")
+                // The host's conversation: what a job made in it returns to.
+                .origin(AgentTurnOrigin::WebChat {
+                    thread_id: "t-stretch".into(),
+                    client_id: "teeny-host".into(),
+                    request_id: None,
+                })
                 .send()
                 .await
                 .expect("the stretch turn runs");
