@@ -5,7 +5,6 @@
 //! redirect URL from the core's actual bound port. TinyMCP owns its service,
 //! stores, transports, registries, and supervisor.
 
-use std::path::PathBuf;
 use std::sync::OnceLock;
 
 use crate::config::Config;

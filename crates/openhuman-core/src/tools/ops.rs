@@ -1,5 +1,5 @@
 #[cfg(feature = "mcp")]
-use super::r#impl::network::{McpListServersTool, McpListToolsTool};
+use super::implementations::network::{McpListServersTool, McpListToolsTool};
 use super::*;
 use crate::agent::host_runtime::{NativeRuntime, RuntimeAdapter};
 use crate::agent::tools::DelegateTool;
@@ -349,10 +349,12 @@ pub fn all_tools_with_runtime(
             GitbooksSearchTool::new(
                 root_config.gitbooks.endpoint.clone(),
                 root_config.gitbooks.timeout_secs,
+                root_config.clone(),
             ),
             GitbooksGetPageTool::new(
                 root_config.gitbooks.endpoint.clone(),
                 root_config.gitbooks.timeout_secs,
+                root_config.clone(),
             ),
         ) {
             (Ok(search), Ok(get_page)) => {

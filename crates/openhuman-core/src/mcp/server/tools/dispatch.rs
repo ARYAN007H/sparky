@@ -360,7 +360,7 @@ async fn run_subagent_tool(params: &Map<String, Value>) -> Result<Value, ToolCal
         // Leave sender unset; the gate's per-channel TTL-deny still
         // gates any external_effect tool the agent tries to run.
         sender: None,
-        reply_target: agent_id.clone(),
+        reply_target: agent_id.to_string(),
         message_id: uuid::Uuid::new_v4().to_string(),
         history_key: None,
     };
