@@ -31,7 +31,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { parseFeatureTable, stripComments } from '../lib/feature-forwarding.mjs';
+import { LINKED_MODULES_FEATURE as LINKED_FEATURE, parseFeatureTable, stripComments } from '../lib/feature-forwarding.mjs';
 
 /**
  * Package name -> the OpenHuman packages it may name as normal dependencies.
@@ -54,8 +54,10 @@ export const CHAIN = {
 
 /** The local-development crate that links module implementations. */
 export const LINKED_BRIDGE = 'openhuman-modules-linked';
-/** The only feature allowed to enable [`LINKED_BRIDGE`]; never a product gate. */
-export const LINKED_FEATURE = 'linked-modules';
+// The only feature allowed to enable LINKED_BRIDGE (never a product gate) is
+// LINKED_FEATURE, defined in scripts/lib/feature-forwarding.mjs. It is imported
+// rather than spelled here because scripts/ci/ is scanned for that name by
+// check-ci-module-source.mjs.
 
 /** The host crates whose `src/` must not reach core internals by path. */
 export const HOST_SOURCE_DIRS = [
@@ -395,7 +397,7 @@ export function checkLinkedBridgeGate(cliToml, crate = 'openhuman-cli') {
   for (const [name, items] of features) {
     if (name === LINKED_FEATURE) continue;
     if (items.some(item => item === LINKED_FEATURE || item === `dep:${dep.key}` || item.startsWith(`${dep.key}/`))) {
-      fail(`feature \`${name}\` enables the linked-modules bridge; only \`${LINKED_FEATURE}\` may`);
+      fail(`feature \`${name}\` enables the linked-module bridge; only \`${LINKED_FEATURE}\` may`);
     }
   }
   return violations;

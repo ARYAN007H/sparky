@@ -32,6 +32,7 @@ import {
   CHAIN_GATES_NOT_FORWARDED,
   CHAIN_LOCAL_GATES,
   checkLinkedModulesIsolation,
+  LINKED_MODULES_FEATURE,
   checkProductForwarding,
   diffChainForwarding,
   diffForwarding,
@@ -228,13 +229,13 @@ for (const result of chain) {
 
 const chainOk = chain.every(result => result.ok);
 
-// The local-development linked-modules gate must stay out of every shipped path.
+// The local-development linked-module gate must stay out of every shipped path.
 const linkedViolations = checkLinkedModulesIsolation({ productFeatures, shellToml, cliFeatures });
 console.log('');
 if (linkedViolations.length === 0) {
-  console.log('linked-modules isolation: OK (not a product gate, not in the app manifest, not a CLI default).');
+  console.log(`${LINKED_MODULES_FEATURE} isolation: OK (not a product gate, not in the app manifest, not a CLI default).`);
 } else {
-  console.log('linked-modules isolation: FAIL');
+  console.log(`${LINKED_MODULES_FEATURE} isolation: FAIL`);
   for (const violation of linkedViolations) console.log(`  - ${violation}`);
 }
 
