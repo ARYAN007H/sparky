@@ -367,11 +367,21 @@ async fn pinned_loader_serves_resolve_local_grants_from_tinybox_v0124() {
         .join(record.version)
         .join(asset.host_key);
     std::fs::create_dir_all(&bundle_asset_dir).expect("create TinyBus bundle layout");
-    let archive_file = std::fs::File::open(&archive).expect("open verified release archive");
-    let decoder = flate2::read::GzDecoder::new(archive_file);
-    tar::Archive::new(decoder)
-        .unpack(&bundle_asset_dir)
-        .expect("extract verified release archive");
+    if asset.archive.ends_with(".tar.gz") {
+        let archive_file = std::fs::File::open(&archive).expect("open verified release archive");
+        let decoder = flate2::read::GzDecoder::new(archive_file);
+        tar::Archive::new(decoder)
+            .unpack(&bundle_asset_dir)
+            .expect("extract verified release archive");
+    } else if asset.archive.ends_with(".zip") {
+        let archive_file = std::fs::File::open(&archive).expect("open verified release archive");
+        zip::ZipArchive::new(archive_file)
+            .expect("read verified release archive")
+            .extract(&bundle_asset_dir)
+            .expect("extract verified release archive");
+    } else {
+        panic!("unsupported pinned release archive format: {}", asset.archive);
+    }
     std::fs::copy(&archive, bundle_asset_dir.join(asset.archive))
         .expect("stage verified release archive in TinyBus bundle layout");
     std::fs::write(
