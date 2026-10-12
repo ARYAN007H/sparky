@@ -443,12 +443,12 @@ impl McpConfiguredClient {
     /// implementation operation.
     pub(crate) async fn normalize_tool_arguments(
         &self,
-        arguments: Value,
+        arguments: Option<Value>,
     ) -> Result<Map<String, Value>, ModuleCallError> {
         if SHUTTING_DOWN.load(Ordering::Acquire) {
             return Err(ModuleCallError::Unavailable);
         }
-        self.port.normalize_tool_arguments(Some(arguments)).await
+        self.port.normalize_tool_arguments(arguments).await
     }
 
     /// Normalizes a model-supplied MCP identifier in TinyMCP.

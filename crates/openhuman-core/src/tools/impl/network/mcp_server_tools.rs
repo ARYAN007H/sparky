@@ -148,7 +148,7 @@ impl Tool for ModuleConfiguredMcpServerTool {
             anyhow::bail!("MCP tool is no longer available or safe");
         }
         let arguments = client
-            .normalize_tool_arguments(args)
+            .normalize_tool_arguments(Some(args))
             .await
             .map_err(|error| anyhow::anyhow!(super::mcp::input_module_error_message(error)))?;
         let call: tinymcp_bus::ClassifiedStaticToolCall = client
