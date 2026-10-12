@@ -261,8 +261,12 @@ export async function collectFindings(root, { includeAllowed = false } = {}) {
   const files = (
     await Promise.all(roots.map((path) => rustFiles(path)))
   ).flat();
-  for (const path of CURATED_VENDOR_ROOTS)
-    files.push(...(await rustFiles(resolve(root, path), realCheckout)));
+  for (const path of CURATED_VENDOR_ROOTS) {
+    const sources = await rustFiles(resolve(root, path), realCheckout);
+    if (realCheckout && sources.length === 0)
+      throw new Error("Empty curated source: " + path);
+    files.push(...sources);
+  }
   for (const path of files) {
     const rel = relative(root, path).split(sep).join("/");
     if (isTestFile(rel)) continue;

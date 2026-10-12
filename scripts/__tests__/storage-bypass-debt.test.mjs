@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -180,8 +180,12 @@ test("present but empty curated vendor directories cannot appear as debt shrinka
   try {
     execFileSync("git", ["init"], { cwd: root, stdio: "ignore" });
     mkdirSync(join(root, "crates"));
-    // Only the first curated root is reached: it exists but has no Rust source.
-    mkdirSync(join(root, CURATED_VENDOR_ROOTS[0]), { recursive: true });
+    for (const path of CURATED_VENDOR_ROOTS) {
+      if (path.endsWith(".rs")) {
+        mkdirSync(join(root, path, ".."), { recursive: true });
+        writeFileSync(join(root, path), "// no writer\n");
+      } else mkdirSync(join(root, path), { recursive: true });
+    }
     await assert.rejects(collectFindings(root), /Empty curated source/);
   } finally {
     rmSync(root, { recursive: true, force: true });
