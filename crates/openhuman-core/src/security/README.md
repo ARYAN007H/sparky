@@ -216,9 +216,9 @@ decision. See [approval/README.md](approval/README.md).
   master key lives in keychain-backed storage.
 - The [`egress`](./egress) re-exports at the crate root: `enforce_egress`,
   `emit_external_transfer`, `local_only_blocks`, `local_only_tool_block`,
-  `EgressDescriptor`. Local PII detection is consumed directly from
-  `tinymemory_api::safety::{scan, PiiScanResult, PiiCategory, RiskLevel}`;
-  this security module does not re-export it.
+  `EgressDescriptor`. OpenHuman's agent stop-summary code directly consumes
+  `tinymemory_api::safety::redact_identifiers`; this security module does not
+  re-export the safety API.
 
 ## RPC surface
 
