@@ -30,11 +30,14 @@ Each record has these fields:
 }
 ```
 
-Use the type printed by the failure message, with whitespace removed (except
-the `mut ` or `ref ` prefix). `count` is the exact number of matching
+Use the type printed by the failure message, with whitespace outside literals
+removed (except the `mut ` or `ref ` prefix). ABI and other literal contents,
+including their whitespace, remain significant. `count` is the exact number of matching
 file/name/type declarations, including declarations in nested modules.
 Duplicate records, missing fields, and records that no longer match the
 source fail. Update or remove the record when its declaration changes.
+Records present in the base manifest remain mandatory while their corresponding
+declaration survives; deleting only an ownership record fails.
 
 Choose the ownership category and explain why it applies:
 
