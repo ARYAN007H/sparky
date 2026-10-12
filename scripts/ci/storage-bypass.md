@@ -54,7 +54,7 @@ known indirect host opens. New rules mask Rust comments and quoted fixtures;
 original core rule identities retain their existing lexical behavior.
 
 Real CI uses the canonical merge base and fails if the base, original baseline,
-or recorded vendor source is unavailable. `--root` also checks history when it names a real Git checkout; it supports isolated source
+or recorded vendor source is unavailable. Current curated vendor files must also be readable, and curated directories must contain Rust source; absent or empty checkouts cannot count as debt removal. `--root` also checks history when it names a real Git checkout; it supports isolated source
 fixtures without Git; those tests independently exercise the manifest comparison policy.
 Do not use a synthetic fixture result as proof of actual host storage isolation.
 
@@ -63,7 +63,7 @@ failed against the original scanner (0 passed, 6 failed), then passed unchanged.
 A separate missing-baseline regeneration case also genuinely failed before its
 fix. Current focused scanner/debt/lane controls cover exact identity moves and
 copies, initial branch writes, later manifest growth, surviving unrecorded writes,
-missing history, comments/fixtures, original core debt, and both CI profiles.
+missing history, absent/empty curated source, duplicate core records, comments/fixtures, original core debt, and both CI profiles. The review controls reproduced duplicate-baseline and missing-source failures (0 passed, 2 failed), empty-source failure (0 passed, 1 failed), and missing scripts path-filter coverage (0 passed, 1 failed) before their fixes. The final focused suite has 60 passing controls. Checker, debt helper, and policy-only JSON/Markdown changes arm the scripts self-test lane.
 
 Run:
 
