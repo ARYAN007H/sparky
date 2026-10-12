@@ -727,9 +727,11 @@ fn source_artifact_file_names_follow_the_platform_convention() {
 /// module id the registry uses. This is written out from the contract
 /// constants, not from the records, so a record that drifts from its contract
 /// (or a contract that is renamed upstream) fails here rather than at the first
-/// bus call.
+/// bus call. Records behind an optional contract crate are listed under the
+/// same gate as the crate.
 fn contract_names() -> Vec<(&'static str, &'static str, &'static str)> {
-    vec![
+    #[allow(unused_mut)]
+    let mut names = vec![
         (
             "tinycomputer",
             tinycomputer_bus::names::INTERFACE,
@@ -741,24 +743,9 @@ fn contract_names() -> Vec<(&'static str, &'static str, &'static str)> {
             tinysearch_bus::names::OBJECT_PATH,
         ),
         (
-            "tinydocs",
-            tinydocs_bus::names::BUS_NAME,
-            tinydocs_bus::names::OBJECT_PATH,
-        ),
-        (
-            "tinywallet",
-            tinywallet_bus::names::BUS_NAME,
-            tinywallet_bus::names::OBJECT_PATH,
-        ),
-        (
             "tinyjuice",
             tinyjuice_bus::names::BUS_NAME,
             tinyjuice_bus::names::OBJECT_PATH,
-        ),
-        (
-            "tinyvoice",
-            tinyvoice_bus::names::BUS_NAME,
-            tinyvoice_bus::names::OBJECT_PATH,
         ),
         (
             "tinymcp",
@@ -776,12 +763,32 @@ fn contract_names() -> Vec<(&'static str, &'static str, &'static str)> {
             tinychannels_bus::names::BUS_NAME,
             tinychannels_bus::names::OBJECT_PATH,
         ),
-        (
-            "tinyhosts",
-            tinyhosts_bus::BUS_NAME,
-            tinyhosts_bus::OBJECT_PATH,
-        ),
-    ]
+    ];
+    #[cfg(feature = "documents")]
+    names.push((
+        "tinydocs",
+        tinydocs_bus::names::BUS_NAME,
+        tinydocs_bus::names::OBJECT_PATH,
+    ));
+    #[cfg(feature = "web3")]
+    names.push((
+        "tinywallet",
+        tinywallet_bus::names::BUS_NAME,
+        tinywallet_bus::names::OBJECT_PATH,
+    ));
+    #[cfg(feature = "voice")]
+    names.push((
+        "tinyvoice",
+        tinyvoice_bus::names::BUS_NAME,
+        tinyvoice_bus::names::OBJECT_PATH,
+    ));
+    #[cfg(feature = "hosting")]
+    names.push((
+        "tinyhosts",
+        tinyhosts_bus::BUS_NAME,
+        tinyhosts_bus::OBJECT_PATH,
+    ));
+    names
 }
 
 #[test]
@@ -802,18 +809,22 @@ fn every_record_matches_its_contract_constants() {
 }
 
 #[test]
-fn a_changed_contract_constant_is_detected() {
-    // The comparison above must be able to fail: feed it a fixture whose
-    // constant differs from the record and confirm it reports the drift.
-    let record = find("tinydocs").unwrap();
-    let drifted = format!("{}Renamed", tinydocs_bus::names::BUS_NAME);
+fn a_drifted_contract_constant_is_reported_as_a_mismatch() {
+    // The comparison must be able to fail: a fixture whose constant differs
+    // from the record (as a renamed upstream interface would) is not equal.
+    let record = find("tinymcp").unwrap();
+    let drifted = format!("{}Renamed", tinymcp_bus::names::INTERFACE);
     assert_ne!(record.bus_name, drifted);
 }
 
+#[cfg(all(
+    feature = "documents",
+    feature = "web3",
+    feature = "voice",
+    feature = "hosting"
+))]
 #[test]
-fn every_build_with_a_registry_carries_all_eleven_records() {
-    // The contract crates of the gate-optional modules ride on `modules`, so no
-    // feature combination that compiles the registry drops a record.
+fn a_product_feature_build_carries_all_eleven_records() {
     assert_eq!(ALL.len(), 11);
     for id in [
         "tinycomputer",
