@@ -16,6 +16,7 @@
 //! [`super::repeat_loop_stop`]), and takes the relabel back when the rest of
 //! the batch shows progress.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
 use tinyagents_harness::steering::{SteeringCommand, SteeringHandle};
@@ -38,6 +39,10 @@ pub(super) struct StopLatch {
     /// The classified note a repeat-loop relabel replaced. A success later in
     /// the batch shows progress and puts it back.
     relabelled_from: Mutex<Option<String>>,
+    /// Whether a call in the current model response's tool batch succeeded.
+    /// A batch that produced anything new is never relabelled as a repeat
+    /// loop, whatever order its results fold back in.
+    batch_progress: AtomicBool,
 }
 
 impl StopLatch {
@@ -50,6 +55,7 @@ impl StopLatch {
             witness: RepeatLoopWitness::default(),
             candidate: Mutex::default(),
             relabelled_from: Mutex::default(),
+            batch_progress: AtomicBool::new(false),
         }
     }
 
@@ -135,6 +141,7 @@ impl StopLatch {
     /// explained as a repeat loop: a pending relabel is dropped and a relabel
     /// already made is taken back.
     pub(super) fn record_success(&self) {
+        self.batch_progress.store(true, Ordering::SeqCst);
         self.witness.record_success();
         if let Ok(mut candidate) = self.candidate.lock() {
             *candidate = None;
@@ -146,6 +153,12 @@ impl StopLatch {
             );
             self.replace_own_note(original);
         }
+    }
+
+    /// A model response asked for a new tool batch: nothing in it has
+    /// succeeded yet.
+    pub(super) fn start_batch(&self) {
+        self.batch_progress.store(false, Ordering::SeqCst);
     }
 
     /// End of a run: forget its latch state.
@@ -163,6 +176,12 @@ impl StopLatch {
     /// Replace this breaker's latched note with the repeat-loop `summary`,
     /// keeping the classified note so progress can restore it.
     fn relabel(&self, summary: String) {
+        if self.batch_progress.load(Ordering::SeqCst) {
+            tracing::debug!(
+                "[tinyagents::mw] the stop's batch made progress; keeping the classified stop note"
+            );
+            return;
+        }
         if let Some(original) = self.replace_own_note(summary) {
             tracing::debug!(
                 "[tinyagents::mw] classified stop came from a repeat loop; relabelled its stop note"

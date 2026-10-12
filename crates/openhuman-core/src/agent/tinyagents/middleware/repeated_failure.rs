@@ -330,6 +330,17 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         true
     }
 
+    /// A new model response starts a new tool batch for the stop latch.
+    async fn after_model(
+        &self,
+        _ctx: &mut RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+        _state: &(),
+        _response: &mut tinyinference_llm::model::ModelResponse,
+    ) -> TaResult<()> {
+        self.stop.start_batch();
+        Ok(())
+    }
+
     /// Forget the run's stop-latch state (see [`StopLatch::finish_run`]).
     async fn after_agent(
         &self,

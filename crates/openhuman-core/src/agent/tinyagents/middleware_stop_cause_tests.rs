@@ -144,6 +144,10 @@ async fn re_read_until_stopped(batch: &[(&str, &str)], rounds: usize) -> (StopRe
             .after_model(&mut ctx, &(), &mut response_with(&calls))
             .await
             .unwrap();
+        breaker
+            .after_model(&mut ctx, &(), &mut response_with(&calls))
+            .await
+            .unwrap();
         let mut results = Vec::new();
         for call in &mut calls {
             let result = match guard.before_tool(&mut ctx, &(), call).await {
@@ -480,6 +484,36 @@ async fn a_success_after_a_relabelled_stop_restores_the_classified_note() {
         "{relabelled}"
     );
     fold(&breaker, &mut ctx, "g1", "grep", "src", true).await;
+    let note = slot.lock().unwrap().clone().unwrap();
+    assert_eq!(
+        StopReasonKind::from_stop_note(&note),
+        StopReasonKind::NotFound,
+        "{note}"
+    );
+}
+
+/// A success that folds back before the refusal and the stop in the same
+/// batch still counts: the batch produced something new, so the stop is not
+/// relabelled as a repeat loop.
+#[tokio::test]
+async fn a_success_earlier_in_the_batch_keeps_the_stop_as_is() {
+    let handle = SteeringHandle::allow_all();
+    let slot = std::sync::Arc::new(std::sync::Mutex::new(None));
+    let breaker = RepeatedToolFailureMiddleware::new(handle.clone(), 3, slot.clone());
+    let mut ctx = ctx();
+    fold(&breaker, &mut ctx, "a1", "file_read", "src/lbi.rs", false).await;
+    let calls = [TaToolCall::new(
+        "next",
+        "file_read",
+        json!({ "path": "src/lbi.rs" }),
+    )];
+    breaker
+        .after_model(&mut ctx, &(), &mut response_with(&calls))
+        .await
+        .unwrap();
+    fold(&breaker, &mut ctx, "g1", "grep", "src", true).await;
+    fold_refusal(&breaker, &mut ctx).await;
+    fold(&breaker, &mut ctx, "a2", "file_read", "src/lbi.rs", false).await;
     let note = slot.lock().unwrap().clone().unwrap();
     assert_eq!(
         StopReasonKind::from_stop_note(&note),
