@@ -465,6 +465,7 @@ async fn failed_agent_close_stays_retired_and_can_be_retried() {
         .unwrap();
 
     assert!(!McpConfiguredClient::close_agent_data_dir(workspace.path()).await);
+    assert!(McpConfiguredClient::agent_close_pending(workspace.path()));
     assert!(matches!(
         McpConfiguredClient::for_config(&config),
         Err(ModuleCallError::Unavailable)
@@ -472,8 +473,40 @@ async fn failed_agent_close_stays_retired_and_can_be_retried() {
     assert_eq!(closed.lock().unwrap().len(), 1);
 
     assert!(McpConfiguredClient::close_agent_data_dir(workspace.path()).await);
+    assert!(!McpConfiguredClient::agent_close_pending(workspace.path()));
     assert_eq!(closed.lock().unwrap().len(), 2);
     assert!(McpConfiguredClient::for_config(&config).is_ok());
+}
+
+#[tokio::test]
+async fn a_removed_agent_context_cannot_reopen_its_evicted_client() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+    use crate::tools::toolpacks::ToolGroups;
+
+    let workspace = tempfile::tempdir().expect("workspace");
+    let mut config = Config::default();
+    config.workspace_dir = workspace.path().to_path_buf();
+    config.modules.enabled = true;
+    let scope = Arc::new(crate::security::approval::ApprovalScope::default());
+    let overrides = Arc::new(crate::agent::host_overrides::HostOverrides {
+        approval_scope: Some(Arc::clone(&scope)),
+        ..Default::default()
+    });
+    let context = CoreContext::for_test(DomainSet::full(), Some(workspace.path().to_path_buf()))
+        .derive_with(
+            ContextOverlay::new(config.clone(), DomainSet::kernel(), ToolGroups::none())
+                .session_agent("agent")
+                .host_overrides(overrides),
+        );
+    scope.close("agent_removed");
+
+    CoreContext::scope(context, async {
+        assert!(matches!(
+            McpConfiguredClient::for_config(&config),
+            Err(ModuleCallError::Unavailable)
+        ));
+    })
+    .await;
 }
 
 #[tokio::test]
