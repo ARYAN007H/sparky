@@ -136,6 +136,54 @@ fn an_absent_agent_cleanup_does_not_create_a_configured_client() {
 }
 
 #[tokio::test]
+async fn an_old_closed_context_cannot_create_the_reused_agents_first_client() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+    use crate::tools::toolpacks::ToolGroups;
+    let scratch = tempfile::tempdir().unwrap();
+    let mut config = Config::default();
+    config.workspace_dir = scratch.path().into();
+    let parent = CoreContext::for_test(DomainSet::full(), Some(config.workspace_dir.clone()));
+    let old_scope = Arc::new(crate::security::approval::ApprovalScope::default());
+    let old_overrides = Arc::new(crate::agent::host_overrides::HostOverrides {
+        approval_scope: Some(Arc::clone(&old_scope)),
+        ..Default::default()
+    });
+    let mut overlay = ContextOverlay::new(config.clone(), DomainSet::full(), ToolGroups::none())
+        .session_agent("worker");
+    overlay.host_overrides = Some(old_overrides);
+    let old_context = parent.derive_with(overlay);
+    old_scope.close("agent_removed");
+    CoreContext::scope(old_context, async {
+        assert!(matches!(
+            McpConfiguredClient::for_config(&config),
+            Err(ModuleCallError::Unavailable)
+        ));
+    })
+    .await;
+    let directory = config.workspace_dir.join("agents/worker");
+    assert!(CLIENTS
+        .get()
+        .is_none_or(|clients| !clients.lock().unwrap().contains_key(&directory)));
+    let mut new_overlay =
+        ContextOverlay::new(config.clone(), DomainSet::full(), ToolGroups::none())
+            .session_agent("worker");
+    new_overlay.host_overrides = Some(Arc::new(crate::agent::host_overrides::HostOverrides {
+        approval_scope: Some(Arc::new(crate::security::approval::ApprovalScope::default())),
+        ..Default::default()
+    }));
+    CoreContext::scope(parent.derive_with(new_overlay), async {
+        McpConfiguredClient::for_config(&config)
+            .expect("the new instance has an open lifecycle scope");
+    })
+    .await;
+    assert!(
+        agent_cleanup::take_agent_cleanup(&config.workspace_dir, "worker")
+            .unwrap()
+            .finish_if_idle()
+    );
+}
+
+#[tokio::test]
 async fn cancelled_close_retries_its_receipt_on_the_original_owner() {
     let bus = MemoryBus::new();
     Broker::new().spawn(bus.clone());
