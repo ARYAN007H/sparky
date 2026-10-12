@@ -16,6 +16,7 @@ use tinymcp_bus::{
 #[derive(Clone, Default)]
 struct PreparePort {
     requests: Arc<Mutex<Vec<PrepareAgentToolsRequest>>>,
+    transform_error: Option<crate::modules::client::ModuleCallError>,
 }
 
 #[async_trait]
@@ -111,8 +112,43 @@ impl McpModulePort for PreparePort {
         &self,
         request: tinymcp_bus::TransformTextRequest,
     ) -> Result<String, crate::modules::client::ModuleCallError> {
-        Ok(request.text)
+        match self.transform_error {
+            Some(error) => Err(error),
+            None => Ok(request.text),
+        }
     }
+}
+
+#[tokio::test]
+async fn valid_mcp_identifier_reports_module_unavailable_without_invalid_input_label() {
+    let workspace = tempfile::tempdir().unwrap();
+    let mut config = Config::default();
+    config.workspace_dir = workspace.path().to_path_buf();
+    config.modules.enabled = true;
+    McpConfiguredClient::install_test_port(
+        &config,
+        Box::new(PreparePort {
+            transform_error: Some(crate::modules::client::ModuleCallError::Unavailable),
+            ..PreparePort::default()
+        }),
+    )
+    .unwrap();
+    let tool = mcp_call_tool(Arc::new(config), Arc::new(SecurityPolicy::default()));
+
+    let result = tool
+        .execute_with_options(
+            json!({"server": "docs", "tool": "search", "arguments": {}}),
+            ToolCallOptions::default(),
+        )
+        .await
+        .unwrap();
+
+    assert!(result.is_error);
+    assert!(result.output().contains("TinyMCP module is unavailable"));
+    assert!(!result.output().contains("invalid"));
+    let outcome = tinymcp_bus::McpCallOutcome::from_metadata(result.metadata.as_ref().unwrap())
+        .expect("sanitized outcome remains available");
+    assert_eq!(outcome.error.unwrap().code, tinymcp_bus::errors::BUS);
 }
 
 #[tokio::test]

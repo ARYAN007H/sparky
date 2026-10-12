@@ -37,6 +37,22 @@ fn module_failures_keep_transport_and_unavailability_categories() {
         input_module_error_code(ModuleCallError::ModuleFault),
         tinymcp_bus::errors::BUS
     );
+    assert_eq!(
+        input_module_error_message(ModuleCallError::Unavailable),
+        "TinyMCP module is unavailable"
+    );
+    assert_eq!(
+        input_module_error_message(ModuleCallError::IncompatibleContract),
+        "TinyMCP contract is incompatible"
+    );
+    assert_eq!(
+        input_module_error_message(ModuleCallError::TransportFailed),
+        "TinyMCP transport failed"
+    );
+    assert_eq!(
+        input_module_error_message(ModuleCallError::ModuleFault),
+        "TinyMCP execution failed"
+    );
 }
 
 #[test]
