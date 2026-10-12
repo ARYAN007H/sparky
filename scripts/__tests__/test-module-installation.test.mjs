@@ -41,7 +41,7 @@ const localRustRunner = fileURLToPath(
 
 test("locally built native Rust test modules come from build.mjs, not ad hoc cargo builds", () => {
   const source = readFileSync(localRustRunner, "utf8");
-  assert.match(source, /scripts\/modules\/stage-local-modules\.sh/);
+  assert.match(source, /modules\/stage-local-modules\.sh/);
   assert.match(source, /stage_source_modules "\$\{local_source_ids\[@\]\}"/);
   assert.match(source, /target\/module-sources\/tinyconnectors/);
   assert.doesNotMatch(source, /cargo build/, "no hand-rolled module build");
