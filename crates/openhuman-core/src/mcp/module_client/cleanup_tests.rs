@@ -416,3 +416,30 @@ async fn failed_cleanup_actions_retain_and_retry_cached_and_orphaned_paths() {
     assert!(!McpConfiguredClient::agent_close_pending(&orphan_dir));
     assert!(!orphan_dir.exists());
 }
+
+#[test]
+fn cleanup_callback_can_access_the_client_cache() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    let mut config = Config::default();
+    config.workspace_dir = workspace.path().to_path_buf();
+    config.modules.enabled = true;
+    McpConfiguredClient::install_test_port(&config, Box::new(FakePort::default()))
+        .expect("install closed client");
+    let cache_available = Arc::new(AtomicBool::new(false));
+    let callback_flag = Arc::clone(&cache_available);
+    McpConfiguredClient::schedule_agent_close_and_cleanup(
+        workspace.path(),
+        Arc::new(move || {
+            callback_flag.store(
+                CLIENTS.get().unwrap().try_lock().is_ok(),
+                Ordering::SeqCst,
+            );
+            true
+        }),
+    );
+    assert!(
+        cache_available.load(Ordering::SeqCst),
+        "cleanup callbacks must not hold the global client cache lock"
+    );
+    assert!(!McpConfiguredClient::agent_close_pending(workspace.path()));
+}
