@@ -215,25 +215,27 @@ export function compare(findings, baseline) {
   };
 }
 
-async function rustFiles(dir) {
+async function rustFiles(dir, required = false) {
   const out = [];
   if (dir.endsWith(".rs")) {
     try {
       await readFile(dir);
       return [dir];
-    } catch {
+    } catch (error) {
+      if (required) throw new Error("Missing curated source: " + dir, { cause: error });
       return [];
     }
   }
   let entries;
   try {
     entries = await readdir(dir, { withFileTypes: true });
-  } catch {
+  } catch (error) {
+    if (required) throw new Error("Missing curated source: " + dir, { cause: error });
     return out;
   }
   for (const entry of entries) {
     const path = resolve(dir, entry.name);
-    if (entry.isDirectory()) out.push(...(await rustFiles(path)));
+    if (entry.isDirectory()) out.push(...(await rustFiles(path, required)));
     else if (entry.name.endsWith(".rs")) out.push(path);
   }
   return out.sort();
@@ -245,8 +247,13 @@ export async function collectFindings(root, { includeAllowed = false } = {}) {
   const roots = (await readdir(scanRoot, { withFileTypes: true }))
     .filter((e) => e.isDirectory())
     .map((e) => resolve(scanRoot, e.name, "src"));
-  roots.push(...CURATED_VENDOR_ROOTS.map((p) => resolve(root, p)));
-  for (const path of (await Promise.all(roots.map(rustFiles))).flat()) {
+  let realCheckout = false;
+  try {
+    realCheckout = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim() === resolve(root);
+  } catch {}
+  const files = (await Promise.all(roots.map((path) => rustFiles(path)))).flat();
+  for (const path of CURATED_VENDOR_ROOTS) files.push(...await rustFiles(resolve(root, path), realCheckout));
+  for (const path of files) {
     const rel = relative(root, path).split(sep).join("/");
     if (isTestFile(rel)) continue;
     const found = scan(rel, await readFile(path, "utf8"));

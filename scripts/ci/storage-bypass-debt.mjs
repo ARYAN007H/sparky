@@ -14,11 +14,16 @@ export function validateCoverageDebt(findings, baseline, extension, history) {
   const errors = [];
   const actual = new Set(findings.map(key));
   const seen = new Set();
-  for (const record of baseline)
+  const coreSeen = new Set();
+  for (const record of baseline) {
+    const id = key(record);
+    if (coreSeen.has(id)) errors.push("Duplicate core baseline record: " + record.path);
+    coreSeen.add(id);
     if (!original(record))
       errors.push(
         `Core baseline cannot accept extended coverage: ${record.path}`,
       );
+  }
   for (const record of extension) {
     const id = key(record);
     if (seen.has(id)) errors.push(`Duplicate extension record: ${record.path}`);

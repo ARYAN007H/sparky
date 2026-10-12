@@ -535,9 +535,9 @@
     "line": 277,
     "text": "fs::rename(&tmp_path, &self.path).context(\"rename auth profile tmp -> store\")",
     "occurrence": 1,
-    "classification": "machine",
-    "reason": "Desktop profile directory archive/rollback lifecycle operation; backend purge and ownership/drain authority are separate.",
-    "issue": "https://github.com/tinyhumansai/openhuman/issues/7432"
+    "classification": "classic",
+    "reason": "Classic encrypted credential profile fallback persists AuthProfilesData and token fields; native SecretStore routing requires trusted machine key and source admission, not directory rollback authority.",
+    "issue": "https://github.com/tinyhumansai/openhuman/issues/7421"
   },
   {
     "rule": "file-mutation",
