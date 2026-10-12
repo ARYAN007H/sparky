@@ -44,7 +44,7 @@ async fn dispatch_preserves_supplied_tinychannels_inbound_envelope() {
         message_id: "m1".into(),
         conversation: tinychannels::channel::ConversationRef {
             kind: tinychannels::channel::ConversationKind::Channel,
-            id: "general".into(),
+            id: "reply".into(),
             scope_id: Some("T123".into()),
             parent_id: None,
             thread_id: Some("thread-1".into()),
