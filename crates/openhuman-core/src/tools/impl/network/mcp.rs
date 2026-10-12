@@ -176,6 +176,10 @@ impl Tool for McpListToolsTool {
                 ))
             }
         };
+        let server = client
+            .normalize_identifier(&server)
+            .await
+            .map_err(|_| anyhow::anyhow!("invalid MCP server identifier"))?;
         let client_config = host::client_config(&self.config);
         let remote: Vec<tinymcp_bus::McpRemoteTool> = match client
             .call(
@@ -326,6 +330,14 @@ impl Tool for McpCallTool {
             .map_err(|_| anyhow::anyhow!("missing MCP tool identifier"))?;
         let client = McpConfiguredClient::for_config(&self.config)
             .map_err(|_| anyhow::anyhow!("TinyMCP module is unavailable"))?;
+        let server = client
+            .normalize_identifier(&server)
+            .await
+            .map_err(|_| anyhow::anyhow!("invalid MCP server identifier"))?;
+        let tool = client
+            .normalize_identifier(&tool)
+            .await
+            .map_err(|_| anyhow::anyhow!("invalid MCP tool identifier"))?;
         let client_config = host::client_config(&self.config);
         let prepared = client
             .prepare_agent_tools(tinymcp_bus::PrepareAgentToolsRequest {
@@ -512,26 +524,15 @@ fn with_outcome(mut result: ToolResult, outcome: &tinymcp_bus::McpCallOutcome) -
     result
 }
 
-/// A required identifier argument, trimmed and with surrounding markdown
-/// delimiters and trailing sentence punctuation removed.
+/// Reads a required identifier without applying MCP-owned normalization.
 fn required_string_arg(args: &Value, key: &str) -> anyhow::Result<String> {
     let missing = || anyhow::anyhow!("missing required `{key}`");
-    let value = args
-        .get(key)
+    args.get(key)
         .and_then(Value::as_str)
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .ok_or_else(missing)?;
-    // Strip model-introduced markdown wrappers before trailing sentence
-    // punctuation so `**search!**` is read as `search`, not `search!`.
-    let cleaned = value
-        .trim_matches(['`', '*'])
-        .trim_end_matches(['.', ',', ';', ':', '!'])
-        .trim_matches(['`', '*']);
-    if cleaned.is_empty() {
-        return Err(missing());
-    }
-    Ok(cleaned.to_owned())
+        .map(str::to_owned)
+        .ok_or_else(missing)
 }
 
 #[cfg(test)]
