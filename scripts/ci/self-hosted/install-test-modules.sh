@@ -21,7 +21,7 @@ log() { echo "[ci][test-modules] $*"; }
 
 dest="${1:?usage: install-test-modules.sh <dest-dir> <env-file>}"
 env_file="${2:?usage: install-test-modules.sh <dest-dir> <env-file>}"
-host_key="${OH_TEST_MODULE_HOST_KEY:-ubuntu-22.04-x86_64}"
+host_key="${OH_MODULE_HOST_KEY:-ubuntu-22.04-x86_64}"
 blobs="${CI_CACHE_DIR:+${CI_CACHE_DIR}/blobs}"
 blobs="${blobs:-${dest}/.blobs}"
 mkdir -p "${blobs}" "${dest}"
