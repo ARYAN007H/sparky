@@ -142,6 +142,19 @@ test("a new database open fails the check", () => {
   );
 });
 
+test("an embed Tokio file writer cannot bypass the host storage scan", () => {
+  const { status, out } = run(
+    {
+      "crates/openhuman-embed/src/preferences.rs":
+        "async fn save() { tokio::fs::write(path, bytes).await; }\n",
+    },
+    [],
+  );
+  assert.equal(status, 1);
+  assert.match(out, /New storage-bypass sites/);
+  assert.match(out, /json-write: crates\/openhuman-embed\/src\/preferences\.rs:1/);
+});
+
 test("the storage module, tests and allowlisted fallbacks are not flagged", () => {
   const { status } = run(
     {
