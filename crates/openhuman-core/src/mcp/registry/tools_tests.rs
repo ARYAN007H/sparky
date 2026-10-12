@@ -433,5 +433,8 @@ async fn tool_call_preserves_missing_arguments_as_distinct_from_json_null() {
         &[None, Some(Value::Null)],
         "the host must preserve the bus distinction between omitted arguments and JSON null"
     );
-    assert_eq!(arguments.lock().unwrap().as_slice(), &[json!({}), json!({})]);
+    assert_eq!(
+        arguments.lock().unwrap().as_slice(),
+        &[json!({}), json!({})]
+    );
 }
