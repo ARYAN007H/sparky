@@ -106,6 +106,13 @@ impl McpModulePort for PreparePort {
             _ => Err(crate::modules::client::ModuleCallError::ModuleFault),
         }
     }
+
+    async fn transform_text(
+        &self,
+        request: tinymcp_bus::TransformTextRequest,
+    ) -> Result<String, crate::modules::client::ModuleCallError> {
+        Ok(request.text)
+    }
 }
 
 #[tokio::test]

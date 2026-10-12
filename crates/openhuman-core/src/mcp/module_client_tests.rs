@@ -9,6 +9,7 @@ struct FakePort {
     calls: Arc<Mutex<Vec<(String, String, Value, bool)>>>,
     prepared_requests: Arc<Mutex<Vec<PrepareAgentToolsRequest>>>,
     validation_requests: Arc<Mutex<Vec<ValidateServerArgumentsRequest>>>,
+    transform_requests: Arc<Mutex<Vec<tinymcp_bus::TransformTextRequest>>>,
     open_started: Arc<Notify>,
     close_started: Arc<Notify>,
     call_started: Arc<Notify>,
@@ -159,6 +160,32 @@ impl McpModulePort for FakePort {
         self.validation_requests.lock().unwrap().push(request);
         Ok(ServerArgumentsValidation::Valid(arguments))
     }
+
+    async fn transform_text(
+        &self,
+        request: tinymcp_bus::TransformTextRequest,
+    ) -> Result<String, ModuleCallError> {
+        self.transform_requests.lock().unwrap().push(request.clone());
+        Ok(request.text)
+    }
+}
+
+#[tokio::test]
+async fn identifier_normalization_uses_tinymcp_root_transform_operation() {
+    let port = FakePort::default();
+    let requests = Arc::clone(&port.transform_requests);
+    let client = client(port);
+
+    let normalized = client.normalize_identifier("**search!**").await.unwrap();
+
+    assert_eq!(normalized, "**search!**");
+    let requests = requests.lock().unwrap();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(
+        requests[0].operation,
+        tinymcp_bus::TextTransform::NormalizeIdentifier
+    );
+    assert_eq!(requests[0].text, "**search!**");
 }
 
 #[tokio::test]

@@ -2,16 +2,16 @@ use super::*;
 use serde_json::json;
 
 #[test]
-fn required_mcp_identifier_trims_model_punctuation() {
+fn required_mcp_identifier_preserves_text_for_module_normalization() {
     let args = json!({ "server": " `docs`,", "tool": "**search!**" });
 
-    assert_eq!(required_string_arg(&args, "server").unwrap(), "docs");
-    assert_eq!(required_string_arg(&args, "tool").unwrap(), "search");
+    assert_eq!(required_string_arg(&args, "server").unwrap(), "`docs`,");
+    assert_eq!(required_string_arg(&args, "tool").unwrap(), "**search!**");
 }
 
 #[test]
 fn required_mcp_identifier_rejects_empty_values() {
-    for value in ["", "   ", "```"] {
+    for value in ["", "   "] {
         let args = json!({ "server": value });
         assert!(required_string_arg(&args, "server").is_err());
     }
