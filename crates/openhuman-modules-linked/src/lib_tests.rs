@@ -4,11 +4,8 @@ use super::*;
 fn every_enabled_feature_registers_exactly_its_own_id() {
     let ids: Vec<&str> = linked_modules().iter().map(|(id, _)| *id).collect();
     let expected: Vec<&str> = [
-        cfg!(feature = "tinybox").then_some("tinybox"),
         cfg!(feature = "tinychannels").then_some("tinychannels"),
-        cfg!(feature = "tinyconnectors").then_some("tinyconnectors"),
         cfg!(feature = "tinydocs").then_some("tinydocs"),
-        cfg!(feature = "tinyvoice").then_some("tinyvoice"),
     ]
     .into_iter()
     .flatten()

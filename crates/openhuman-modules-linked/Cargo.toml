@@ -12,13 +12,13 @@
 # shipped builds load pinned, digest-checked releases.
 #
 # One feature per module, named for its registry id, plus `all`. At the current
-# vendor pins only modules whose crate exposes `static-link` (the
-# `module_export_optional_static!` export) can be linked. These WAIT for the
-# upstream static-link work (E0.3) and a re-pin; they have no feature here yet:
-#   tinycomputer, tinyjuice, tinysearch, tinywallet (module crate lacks
-#   `static-link`), tinymcp (has `static-link` but does not export
-#   `linked_module` yet, only the three ABI items), tinyhosts (no module crate
-#   yet).
+# vendor pins a module can be linked only when its crate exposes `static-link`
+# with an exported `linked_module` AND resolves against the workspace `tinybus`
+# (0.1.3). These WAIT for the upstream E0.3 work and a re-pin; they have no
+# feature here yet (reasons in `src/lib.rs`):
+#   tinybox, tinyconnectors, tinyvoice, tinymcp, tinycomputer, tinyjuice,
+#   tinysearch, tinywallet, tinyhosts.
+
 [package]
 name = "openhuman-modules-linked"
 description = "Local-development registration of in-process linked modules (never part of a product build)"
@@ -30,19 +30,16 @@ publish = false
 
 [features]
 default = []
-all = ["tinychannels", "tinydocs", "tinyvoice"]
+all = ["tinychannels", "tinydocs"]
 tinychannels = ["dep:tinychannels-module"]
 tinydocs = ["dep:tinydocs-module"]
-tinyvoice = ["dep:tinyvoice-module"]
 
 [dependencies]
 # The host reaches the core only through the rpc facade (crate chain).
 openhuman-rpc = { path = "../openhuman-rpc", default-features = false, features = ["modules"] }
 log = "0.4"
-tinybus = { path = "../../vendor/tinybus/crates/tinybus", default-features = false, features = ["modules"] }
 
 tinydocs-module = { path = "../../vendor/tinydocs/crates/tinydocs-module", features = ["static-link"], optional = true }
-tinyvoice-module = { path = "../../vendor/tinyvoice/crates/tinyvoice-module", default-features = false, features = ["static-link"], optional = true }
 tinychannels-module = { path = "../../vendor/tinychannels/crates/tinychannels-module", features = ["static-link"], optional = true }
 
 [lints.rust]

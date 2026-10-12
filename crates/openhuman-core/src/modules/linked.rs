@@ -35,7 +35,9 @@ static FACTORIES: Mutex<BTreeMap<&'static str, LinkedFactory>> = Mutex::new(BTre
 fn factories() -> MutexGuard<'static, BTreeMap<&'static str, LinkedFactory>> {
     // A poisoned lock only means a panic elsewhere while holding it; the map
     // itself is never left half-updated by `insert`/`get`.
-    FACTORIES.lock().unwrap_or_else(|poison| poison.into_inner())
+    FACTORIES
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
 }
 
 /// Register the in-process factory for the module registered as `id`.

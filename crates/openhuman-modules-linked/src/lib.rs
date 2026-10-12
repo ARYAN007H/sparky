@@ -17,13 +17,13 @@
 //! One cargo feature per module, named for its registry id, plus `all`. The
 //! table is what the current vendor pins support:
 //!
-//! | feature          | status |
-//! | ---------------- | ------ |
-//! | `tinybox`        | linked |
+//! | feature          | status at the current vendor pins |
+//! | ---------------- | --------------------------------- |
 //! | `tinychannels`   | linked |
-//! | `tinyconnectors` | linked |
-//! | `tinydocs`       | linked |
-//! | `tinyvoice`      | linked |
+//! | `tinydocs`       | linked (needs tinydocs v0.2.2, whose module crate pins the workspace `tinybus` 0.1.3) |
+//! | `tinybox`        | waits: its module crate pins `tinybus =0.1.2`, which cannot unify with the workspace `tinybus` path |
+//! | `tinyconnectors` | waits: its workspace pins a `tinybus` the host does not carry (0.1.2 at the pin, 0.1.4 upstream) |
+//! | `tinyvoice`      | waits: upstream main needs nested `tinyagents` submodules that collide with the host's in Cargo.lock |
 //! | `tinymcp`        | waits: `static-link` exists but `linked_module` is not exported |
 //! | `tinycomputer`   | waits: no `static-link` |
 //! | `tinyjuice`      | waits: no `static-link` |
@@ -31,8 +31,8 @@
 //! | `tinywallet`     | waits: no `static-link`; also see the attestation note below |
 //! | `tinyhosts`      | waits: no module crate yet |
 //!
-//! The waiting modules need the upstream static-link work (E0.3) and a re-pin;
-//! each gets its feature here, and a line in [`install`], when that lands.
+//! The waiting modules need the upstream static-link / tinybus alignment work (E0.3) and a re-pin;
+//! each gets its feature here, and a line in [`linked_modules`], when that lands.
 //!
 //! # Attestation
 //!
@@ -50,16 +50,10 @@ use openhuman_rpc::embed::modules::{register_linked, LinkedFactory};
 pub fn linked_modules() -> Vec<(&'static str, LinkedFactory)> {
     #[allow(unused_mut)]
     let mut modules: Vec<(&'static str, LinkedFactory)> = Vec::new();
-    #[cfg(feature = "tinybox")]
-    modules.push(("tinybox", tinybox_module::linked_module));
     #[cfg(feature = "tinychannels")]
     modules.push(("tinychannels", tinychannels_module::linked_module));
-    #[cfg(feature = "tinyconnectors")]
-    modules.push(("tinyconnectors", tinyconnectors::linked_module));
     #[cfg(feature = "tinydocs")]
     modules.push(("tinydocs", tinydocs_module::linked_module));
-    #[cfg(feature = "tinyvoice")]
-    modules.push(("tinyvoice", tinyvoice_module::linked_module));
     modules
 }
 
