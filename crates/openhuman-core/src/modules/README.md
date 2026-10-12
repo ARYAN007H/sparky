@@ -134,6 +134,18 @@ where a module comes from; `[[modules.overrides]]` entries take exactly one of
 per-module entry beats the global mode. `OPENHUMAN_MODULE_SOURCE` sets the
 global mode and `OPENHUMAN_MODULE_SOURCE_<ID>` (id upper-cased) one module.
 
+| Source | What serves the module | Used by |
+| --- | --- | --- |
+| `release` (default) | The pinned, digest-checked GitHub release | CI, shipped builds, everyone by default |
+| `linked` | A factory registered by `crates/openhuman-modules-linked` (non-product `linked-modules` feature of `openhuman-cli`) | Local development and local tests only |
+| `source` | A library built from the vendored gitlink by `scripts/modules/build.mjs` | Local development and local tests only |
+
+Resolution order for one id: a per-module `path` override or
+`OPENHUMAN_MODULE_SOURCE_<ID>` first, then the global `[modules] source` /
+`OPENHUMAN_MODULE_SOURCE`, then `release`. **CI and shipped builds are
+`release` only**: `check-ci-module-source.mjs` enforces it, and the product
+feature list never contains `linked-modules`.
+
 - `release`: the chain below, pinned and digest-checked. The only mode CI and
   shipped builds use; `scripts/ci/check-ci-module-source.mjs` (CI Lite) fails
   if a workflow or CI script sets any other.
@@ -167,6 +179,22 @@ global mode and `OPENHUMAN_MODULE_SOURCE_<ID>` (id upper-cased) one module.
   path as an explicit `path` override, so no new loader exists. The digest is
   never written to `records_*.rs`: registry pins come from published releases
   only. Builds are cached by (submodule tree, rustc, target, profile, features).
+
+Local-dev recipe (never in CI):
+
+```bash
+# 1. Edit the module in vendor/<submodule> on its branch.
+# 2a. source: build it and point the core at the artifact.
+eval "$(node scripts/modules/build.mjs tinydocs --print-env)"
+OPENHUMAN_MODULE_SOURCE=source ./target/debug/openhuman-core serve
+# 2b. linked: link it into the CLI.
+OPENHUMAN_MODULE_SOURCE=linked cargo run -p openhuman-cli --features linked-modules -- serve
+# 3. Check the pin before pushing; a debug core warns once per id when the
+#    gitlink is ahead of the registry pin.
+eval "$(node scripts/modules/pin-status.mjs --print-env)"
+# 4. Release and re-pin (asks before publishing).
+node scripts/modules/release-and-repin.mjs tinydocs --bump patch
+```
 
 For local development and local tests only. When `linked` or `source` cannot be
 honoured (no factory registered, no built artifact), the module is served from

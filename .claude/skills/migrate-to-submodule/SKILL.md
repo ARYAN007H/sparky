@@ -104,6 +104,18 @@ If the change spans nested submodules (`tinyagents/vendor/tinytools`,
 `tinymemory/vendor/tinycortex`, ...), release/merge the innermost first and bump
 gitlinks outward.
 
+### Iterate locally before releasing
+
+Between Steps 2 and 3, run the host against your unreleased module with
+`OPENHUMAN_MODULE_SOURCE=linked` (build `openhuman-cli` with
+`--features linked-modules`) or `OPENHUMAN_MODULE_SOURCE=source` (after
+`node scripts/modules/build.mjs <name> --print-env`). These modes are for local
+development and local tests only; CI and shipped builds use the pinned release.
+Before pushing, run `node scripts/modules/pin-status.mjs` to see whether the
+gitlink is ahead of the registry pin. Then release and re-pin with
+`scripts/modules/release-and-repin.mjs` (Steps 3-4). See the modules README
+(`crates/openhuman-core/src/modules/README.md`).
+
 ## Step 3: Release the submodule
 
 Only for **loadable modules** (a `cdylib` with a registry record). Pure Cargo
