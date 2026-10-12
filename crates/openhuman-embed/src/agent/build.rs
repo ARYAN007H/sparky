@@ -184,6 +184,13 @@ pub(crate) fn instantiate(runtime: &Runtime, spec: AgentSpec) -> Result<AgentInn
         // moved `config_path` would silently point this agent at another.
         config.config_path = base.config_path.clone();
     }
+    // Runtime::agent holds the agent-map lock across instantiate. Check the
+    // final workspace (after the config escape hatch) before creating any
+    // directories, so a new agent cannot reuse an id whose old MCP service
+    // still awaits close acknowledgment.
+    if openhuman_core::mcp::host::agent_close_pending(&config.workspace_dir, &id) {
+        return Err(AgentError::CleanupPending);
+    }
     if host_only {
         // After the escape hatch, so it cannot loosen either.
         Access::readonly().apply(&mut config);
