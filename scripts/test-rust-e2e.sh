@@ -180,15 +180,15 @@ source "$SCRIPT_DIR/modules/stage-local-modules.sh"
 # With OPENHUMAN_MODULE_SOURCE=source the modules below are built from the pinned
 # submodules (scripts/modules/build.mjs); otherwise TinyBox and TinyMCP are the
 # registry-pinned releases, as in CI.
-e2e_source_ids=(tinyconnectors tinysearch)
+e2e_source_ids=()
 if local_module_source_is_source; then
-  e2e_source_ids+=(tinybox tinymcp)
+  e2e_source_ids+=(tinyconnectors tinysearch tinybox tinymcp)
 else
   # Shell command analysis and the storage URL E2E suites load TinyBox through
   # the native module path; the ignored MCP registry cases need TinyMCP. Both
   # come from the registry-pinned release, digest-verified before any
   # subprocess starts.
-  for released_id in tinybox tinymcp; do
+  for released_id in tinyconnectors tinysearch tinybox tinymcp; do
     released_dir="$(stage_release_module "$released_id" "$module_platform" "$module_ext")"
     export OPENHUMAN_MODULE_PATH="$released_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
   done

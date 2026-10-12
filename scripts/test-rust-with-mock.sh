@@ -81,14 +81,14 @@ IFS=$'\t' read -r module_ext wallet_platform <<< "$native_module_target"
 # shellcheck source=modules/stage-local-modules.sh
 source "$SCRIPT_DIR/modules/stage-local-modules.sh"
 
-# Tokenjuice, search, hosts and MCP: the registry-pinned release, as in CI. With
+# Connectors, tokenjuice, search, hosts and MCP: the registry-pinned release,
+# as in CI (#7618: no module is compiled from source there). With
 # OPENHUMAN_MODULE_SOURCE=source they are built from the pinned submodules
 # instead (scripts/modules/build.mjs), which is how a module change is tried
-# against the core locally. TinyConnectors has no test release, so it is always
-# built from its submodule; its modules.toml carries the operator-trust digest.
-local_source_ids=(tinyconnectors)
+# against the core locally.
+local_source_ids=()
 if local_module_source_is_source; then
-  local_source_ids+=(tinyjuice tinysearch tinyhosts tinymcp)
+  local_source_ids+=(tinyconnectors tinyjuice tinysearch tinyhosts tinymcp)
 else
   for released_id in tinyjuice tinysearch; do
     released_dir="$(stage_release_module "$released_id" "$wallet_platform" "$module_ext")"
@@ -170,12 +170,18 @@ if ! local_module_source_is_source; then
   export OPENHUMAN_MODULE_PATH="$tinymcp_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
 fi
 
-# Build the source modules in one call. The connector directory goes only on
-# the processes that exercise it: most Composio raw-coverage groups explicitly
-# test the absent-module path.
-stage_source_modules "${local_source_ids[@]}"
-connectors_dir="$REPO_ROOT/target/module-sources/tinyconnectors"
-for source_id in "${local_source_ids[@]}"; do
+# Build the source modules in one call (local source mode only). The connector
+# directory goes only on the processes that exercise it: most Composio
+# raw-coverage groups explicitly test the absent-module path.
+if [ "${#local_source_ids[@]}" -gt 0 ]; then
+  stage_source_modules "${local_source_ids[@]}"
+fi
+if local_module_source_is_source; then
+  connectors_dir="$REPO_ROOT/target/module-sources/tinyconnectors"
+else
+  connectors_dir="$(stage_release_module tinyconnectors "$wallet_platform" "$module_ext")"
+fi
+for source_id in ${local_source_ids[@]+"${local_source_ids[@]}"}; do
   if [ "$source_id" != tinyconnectors ] && [ "$source_id" != tinyhosts ]; then
     export OPENHUMAN_MODULE_PATH="$REPO_ROOT/target/module-sources/$source_id${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
   fi
