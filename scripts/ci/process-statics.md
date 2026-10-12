@@ -33,7 +33,7 @@ Each record has these fields:
 
 Use the type printed by the failure message, with redundant whitespace outside literals
 removed. Separators that distinguish identifiers, literal prefixes/suffixes,
-raw identifiers, or joined punctuation remain (as do the `mut ` and `ref ` prefixes). ABI and other literal contents,
+raw identifiers, numeric tokens, or joined punctuation remain (as do the `mut ` and `ref ` prefixes). ABI and other literal contents,
 including their whitespace, remain significant. `count` is the exact number of matching
 file/module-scope/name/type declarations. `scope` is the inline module path,
 such as `outer::user`; an empty or omitted scope denotes the file root.
@@ -66,7 +66,9 @@ Literal declarations inside `macro_rules!` templates are conservatively checked
 even when the template is not invoked. Excluding these bodies would allow a new
 macro-defined global to bypass ownership review; the gate does not claim that
 every source declaration is instantiated at runtime.
-Type-position macro token trees are preserved without expanding them. Named
+Type-position macro token trees are preserved without expanding them.
+Separated punctuation is conservatively significant: harmless formatting can
+require a renewed ownership record even when the effective Rust type is unchanged. Named
 inline modules contribute declaration identity; anonymous blocks and function
 scopes within one module still share its declaration counts.
 Sibling `*_tests.rs` files are excluded; declarations behind `cfg(test)` in

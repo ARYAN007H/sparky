@@ -138,7 +138,7 @@ export function stripRustComments(text, { preserveLiterals = false, compact = fa
   const word = char => /[\p{ID_Continue}]/u.test(char);
   // Rust punctuation spacing can distinguish macro arms, including a third
   // character completing an operator. Retain all separated punctuation pairs.
-  const punctuation = new Set("=<>!~+-*/%^&|@.,;:#$?'" );
+  const punctuation = new Set("=<>!~+-*/%^&|@.,;:#$?'");
   const append = chunk => {
     if (!chunk) return;
     if (compact && preserveTokenBoundaries && pendingBoundary && out) {
@@ -149,9 +149,10 @@ export function stripRustComments(text, { preserveLiterals = false, compact = fa
           (word(left) && ['"', "'", '#'].includes(right)) ||
           (['"', "'", '#'].includes(left) && word(right)) ||
           (left === '#' && right === '"') ||
-          (left === '.' && /[0-9]/.test(right)) ||
+          (left === '.' && word(right)) ||
           (/[0-9]/.test(left) && right === '.') ||
           (/[eE]/.test(left) && ['+', '-'].includes(right)) ||
+          (['+', '-'].includes(left) && /[0-9]/.test(right)) ||
           (punctuation.has(left) && punctuation.has(right))) out += ' ';
     }
     out += chunk;
