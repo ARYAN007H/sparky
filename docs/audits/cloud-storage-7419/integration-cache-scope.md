@@ -58,8 +58,7 @@ for CI to measure.
 Independent source review found no Critical or Important issues. It checked
 cache/epoch lock ordering, scope admission and the refresh context capture.
 The inherited reconciliation read-to-write gap can still evict a newer snapshot
-within the same scope, causing a safe cache miss. Epoch-map eviction is also
-future hardening; neither behavior is claimed as fixed here.
+within the same scope, causing a safe cache miss; that gap is not fixed here.
 
 Review follow-up also exercises enabled direct-mode fetch without a SaaS
 profile, before the existing disabled-mode assertion. Identical fake credentials
@@ -67,6 +66,28 @@ use loopback-only endpoints, and the seeded profiled snapshot uses the same
 enabled configuration. A fresh supported-graph run passes all six controls,
 with zero failures and zero ignored; the isolated child is a repeated case.
 The full log is `.validation/cache-review-enabled-green.log` (build 2m59s).
+
+The next review identifies missing scope diagnostics and retained idle epochs.
+Before either correction, the supported graph builds in 2m18s and reports six
+passes and two genuine failures: 128 dormant epochs remain after sequential
+scope churn, and absent-scope fetch/mutation emits no refusal diagnostics.
+The isolated child repeats the diagnostic failure; it is not a third case.
+The log is `.validation/cache-review-epoch-log-red.log`.
+
+Epoch acquisition now reclaims only map-owned Arcs under the epoch-map write
+lock. Every in-flight fetch keeps its external Arc across the backend await and
+cache admission, so reclamation cannot reset its invalidation fence. Epoch
+history is bounded by live holders plus the latest idle entry; snapshot cache
+residency is a separate concern. The refusal paths log fixed operation names,
+error kinds or the content-free NoTenant error, without tenant identities,
+credentials or paths.
+
+With the same assertions, the fresh focused run builds in 2m19s and passes all
+eight cases, with zero failures and zero ignored. A fresh complete Composio run
+passes 363 cases, also with zero failures and zero ignored. The child repeats
+one case. Logs are `.validation/cache-review-epoch-log-green.log` and
+`.validation/cache-review-composio-green.log`. Independent source review finds
+no issues in epoch reclamation, lock ordering or sanitized diagnostics.
 
 Feature forwarding passes. Storage-bypass and Rust layout checks fail on files
 unchanged from the canonical base: the browser-profile lock probe is reported as
