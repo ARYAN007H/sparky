@@ -58,14 +58,6 @@ pub fn agent_close_pending(workspace_dir: &std::path::Path, agent_id: &str) -> b
     )
 }
 
-/// Whether a prior agent-scoped module close is still pending acknowledgment.
-#[cfg(feature = "mcp")]
-pub fn agent_close_pending(workspace_dir: &std::path::Path, agent_id: &str) -> bool {
-    crate::mcp::module_client::McpConfiguredClient::agent_close_pending(
-        &workspace_dir.join("agents").join(agent_id),
-    )
-}
-
 /// There is no MCP client to close when the feature is disabled.
 #[cfg(not(feature = "mcp"))]
 pub async fn close_agent(_workspace_dir: &std::path::Path, _agent_id: &str) -> bool {
@@ -77,12 +69,6 @@ pub async fn close_agent(_workspace_dir: &std::path::Path, _agent_id: &str) -> b
 pub fn schedule_agent_close(_workspace_dir: &std::path::Path, _agent_id: &str) {}
 
 /// No agent-scoped module cleanup is pending when MCP is disabled.
-#[cfg(not(feature = "mcp"))]
-pub fn agent_close_pending(_workspace_dir: &std::path::Path, _agent_id: &str) -> bool {
-    false
-}
-
-/// No agent-scoped module close is pending when MCP is disabled.
 #[cfg(not(feature = "mcp"))]
 pub fn agent_close_pending(_workspace_dir: &std::path::Path, _agent_id: &str) -> bool {
     false
