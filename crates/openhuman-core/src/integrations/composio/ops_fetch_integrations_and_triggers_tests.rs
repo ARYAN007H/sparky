@@ -185,7 +185,10 @@ fn sync_cache_invalidates_when_connection_becomes_active() {
     // not connected. This is exactly the state the chat runtime
     // gets stuck in on Windows when the user completes OAuth
     // after the event-bus 60 s readiness poll times out.
-    let key = "windows-regression-1";
+    let tmp = tempfile::tempdir().unwrap();
+    let config = test_config(&tmp);
+    let key_string = cache_key(&config);
+    let key = key_string.as_str();
     clear_cache_key(key);
     seed_cache(
         key,
@@ -215,7 +218,10 @@ fn sync_cache_invalidates_when_connection_is_removed() {
     // Cache remembers gmail as connected. The user just
     // disconnected it from Settings; the next UI poll returns an
     // empty list. Chat must forget gmail within one poll.
-    let key = "windows-regression-2";
+    let tmp = tempfile::tempdir().unwrap();
+    let config = test_config(&tmp);
+    let key_string = cache_key(&config);
+    let key = key_string.as_str();
     clear_cache_key(key);
     seed_cache(key, vec![integration("gmail", true)]);
 
@@ -234,7 +240,10 @@ fn sync_cache_noop_when_backend_matches_cached_state() {
     // Steady state: UI polls confirm cache is accurate. No
     // invalidation — we must not thrash the chat runtime's tool
     // registry on every 5 s UI poll.
-    let key = "windows-regression-3";
+    let tmp = tempfile::tempdir().unwrap();
+    let config = test_config(&tmp);
+    let key_string = cache_key(&config);
+    let key = key_string.as_str();
     clear_cache_key(key);
     seed_cache(
         key,
@@ -261,7 +270,10 @@ fn sync_cache_ignores_non_active_connection_rows() {
     // while the OAuth handshake is in flight, which is wasteful
     // and would also clear `tools` vecs for real active
     // integrations already on disk.
-    let key = "windows-regression-4";
+    let tmp = tempfile::tempdir().unwrap();
+    let config = test_config(&tmp);
+    let key_string = cache_key(&config);
+    let key = key_string.as_str();
     clear_cache_key(key);
     seed_cache(key, vec![integration("gmail", true)]);
 
@@ -286,7 +298,10 @@ fn sync_cache_treats_connected_status_equivalent_to_active() {
     // `fetch_connected_integrations_uncached` filter). Make sure
     // the new diff path matches that convention so it doesn't
     // produce a false-positive invalidation.
-    let key = "windows-regression-5";
+    let tmp = tempfile::tempdir().unwrap();
+    let config = test_config(&tmp);
+    let key_string = cache_key(&config);
+    let key = key_string.as_str();
     clear_cache_key(key);
     seed_cache(key, vec![integration("gmail", true)]);
 

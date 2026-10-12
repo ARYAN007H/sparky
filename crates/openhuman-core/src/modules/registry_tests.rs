@@ -20,6 +20,7 @@ fn tinycomputer_registry_matches_bus_contract_and_published_release() {
 }
 
 #[test]
+#[cfg(feature = "web3")]
 fn tinywallet_registry_matches_the_verified_v019_release_manifest() {
     let wallet = find("tinywallet").expect("compiled TinyWallet module");
     assert_eq!(wallet.version, "0.19.0");

@@ -94,7 +94,7 @@ async fn mock_module_client(
 
 #[cfg(feature = "modules")]
 #[tokio::test]
-async fn gitbooks_tools_use_confidential_one_shot_module_calls() {
+async fn gitbooks_tools_fail_closed_when_the_module_is_not_attested() {
     let state = MockProviderState::default();
     let (client, _service, module_calls) = mock_module_client(state).await;
     let endpoint = "https://docs.example.test/path?token=secret".to_owned();
@@ -110,20 +110,21 @@ async fn gitbooks_tools_use_confidential_one_shot_module_calls() {
         .await
         .expect("page fetch executes");
 
-    assert!(!search_result.is_error, "{}", search_result.output());
-    assert!(search_result.output().contains("search fixture result"));
-    assert!(!page_result.is_error, "{}", page_result.output());
-    assert!(page_result.output().contains("page fixture markdown"));
-    assert_eq!(
+    assert!(search_result.is_error, "{}", search_result.output());
+    assert!(search_result
+        .output()
+        .contains("MODULE_CALL_REPORTED: module transport failed"));
+    assert!(page_result.is_error, "{}", page_result.output());
+    assert!(page_result
+        .output()
+        .contains("MODULE_CALL_REPORTED: module transport failed"));
+    assert!(
         module_calls
             .calls
             .lock()
             .expect("provider request log")
-            .as_slice(),
-        [
-            serde_json::json!({"tool": "searchDocumentation", "server": "openhuman-gitbooks", "endpoint": endpoint, "timeout_secs": 5, "arguments": {"query": "module migration"}}),
-            serde_json::json!({"tool": "getPage", "server": "openhuman-gitbooks", "endpoint": endpoint, "timeout_secs": 5, "arguments": {"url": "https://docs.example.test/guide"}}),
-        ]
+            .is_empty(),
+        "an unattested in-memory service must never receive confidential module calls"
     );
 }
 

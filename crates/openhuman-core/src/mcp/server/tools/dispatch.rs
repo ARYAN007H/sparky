@@ -338,7 +338,7 @@ async fn run_subagent_tool(params: &Map<String, Value>) -> Result<Value, ToolCal
 
     let config = load_config_and_init_registry().await?;
     let mut agent =
-        OpenHumanSessionHost::from_config_for_agent(&config, &agent_id).map_err(|err| {
+        OpenHumanSessionHost::from_config_for_agent(&config, agent_id).map_err(|err| {
             ToolCallError::InvalidParams(format!("failed to build agent `{agent_id}`: {err}"))
         })?;
     agent.set_event_context(
@@ -370,7 +370,7 @@ async fn run_subagent_tool(params: &Map<String, Value>) -> Result<Value, ToolCal
     // `handle_json_value` dispatch above it) keeps a small stack frame.
     let response = Box::pin(subagent_depth::scope(
         child_depth,
-        crate::agent::turn_origin::with_origin(origin, agent.run_single(&prompt)),
+        crate::agent::turn_origin::with_origin(origin, agent.run_single(prompt)),
     ))
     .await
     .map_err(|err| ToolCallError::Internal(format!("subagent `{agent_id}` failed: {err}")))?;

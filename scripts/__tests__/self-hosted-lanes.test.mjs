@@ -45,6 +45,12 @@ const ALL = Object.fromEntries(Object.keys(AREA_ENV).map((k) => [k, true]));
 const NONE = Object.fromEntries(Object.keys(AREA_ENV).map((k) => [k, false]));
 const EX63_ENV = { CI_SCRATCH_DIR: "/scratch" };
 
+test("EX63 installs script dependencies only after changed areas are detected", () => {
+  const detect = ciLanes.indexOf("- name: Detect changed areas");
+  const install = ciLanes.indexOf("- name: Install jq for release-script tests");
+  assert.ok(detect >= 0 && install > detect, "filter outputs must exist before they gate jq installation");
+});
+
 const plans = () => [
   buildPlan({ profile: "ex63", areas: ALL, env: EX63_ENV }),
   buildPlan({ profile: "hosted", areas: ALL }),
@@ -236,6 +242,7 @@ test("untouched areas leave only the always-on gates", () => {
     "static:orch-ip-gate",
     "static:feature-forwarding",
     "static:crate-chain",
+    "static:process-statics",
     "static:storage-bypass",
     "static:module-pins",
     "static:submodule-monotonic",
@@ -273,6 +280,7 @@ test("the storage area arms only the storage-drivers lane, with the sqlite and f
         "static:orch-ip-gate",
         "static:feature-forwarding",
         "static:crate-chain",
+        "static:process-statics",
         "static:storage-bypass",
         "static:module-pins",
         "static:submodule-monotonic",
@@ -692,6 +700,41 @@ test("module boundary policy and checker changes arm their own scripts lane", ()
     assert.ok(
       scripts.includes(`'${file}'`),
       `${file} must arm the scripts area`,
+    );
+  }
+});
+
+test("process-static policy and checker changes arm their own scripts lane", () => {
+  const filters = fs.readFileSync(
+    path.join(repoRoot, ".github/ci-paths-filter.yml"),
+    "utf8",
+  );
+  const scripts = filters.split(/^scripts:\s*$/m)[1].split(/^\S[^\n]*:/m)[0];
+  for (const file of [
+    "scripts/ci/check-process-statics.mjs",
+    "scripts/ci/check-crate-chain.mjs",
+    "scripts/ci/process-statics.json",
+  ]) {
+    assert.ok(
+      scripts.includes(`'${file}'`),
+      `${file} must arm the scripts area`,
+    );
+  }
+});
+
+test("process-static scan uses cancellation supervision in both profiles", () => {
+  for (const profile of ["hosted", "ex63"]) {
+    const plan = buildPlan({
+      profile,
+      areas: NONE,
+      env: profile === "ex63" ? EX63_ENV : {},
+    });
+    const check = plan.lanes
+      .flatMap((lane) => lane.checks)
+      .find((check) => check.name === "process-statics");
+    assert.equal(
+      check.run,
+      "bash scripts/ci-cancel-aware.sh node scripts/ci/check-process-statics.mjs",
     );
   }
 });

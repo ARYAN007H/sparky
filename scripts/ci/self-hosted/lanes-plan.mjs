@@ -233,6 +233,11 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           run: "node scripts/ci/check-crate-chain.mjs",
         },
         {
+          name: "process-statics",
+          when: true,
+          run: "bash scripts/ci-cancel-aware.sh node scripts/ci/check-process-statics.mjs",
+        },
+        {
           name: "module-boundaries",
           when: rust || areas.scripts,
           run: "bash scripts/ci-cancel-aware.sh node scripts/ci/check-module-boundaries.mjs",
