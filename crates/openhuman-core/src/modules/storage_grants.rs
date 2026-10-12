@@ -237,7 +237,7 @@ fn writes(grant: &StorageGrant) -> Result<(), Denied> {
 
 fn documents(grant: &StorageGrant, selector: &str, request: &Value) -> Result<Plan, Denied> {
     match selector {
-        "Get" | "Query" | "Count" | "Search" | "WatchOpen" => {
+        "Get" | "Query" | "Count" | "Search" => {
             let collection = text(request, "collection")?;
             grant.collection(collection)?;
             Ok(forward(collection))
@@ -281,7 +281,11 @@ fn documents(grant: &StorageGrant, selector: &str, request: &Value) -> Result<Pl
                 filter: ReplyFilter::GrantedCollections,
             })
         }
-        "WatchClose" | "Capabilities" => Ok(forward("")),
+        // Watches are projected to bus signals, which this host does not
+        // route per module yet; opening one would leave a native watch task
+        // with nobody to tell, so it is refused instead of half-served.
+        "WatchOpen" | "WatchClose" => Err(Denied::Unsupported),
+        "Capabilities" => Ok(forward("")),
         _ => Err(Denied::Malformed),
     }
 }
