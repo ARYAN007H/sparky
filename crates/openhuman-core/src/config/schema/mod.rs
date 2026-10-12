@@ -97,7 +97,7 @@ pub use memory::{
     MemoryEngineSettings, MemoryLayoutMode, MemoryRecallConfig, MemorySourceConfig,
     MemorySourceKind, MEMORY_CORTEXDB_KEY_NAME,
 };
-pub use modules::{ModuleOverride, ModulesConfig};
+pub use modules::{ModuleOverride, ModuleSourceMode, ModulesConfig};
 pub use observability::{AgentTracingBackend, AgentTracingConfig, ObservabilityConfig};
 pub use privacy::{PrivacyConfig, PrivacyMode};
 pub use proxy::{

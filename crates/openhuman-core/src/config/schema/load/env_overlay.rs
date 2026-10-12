@@ -4,6 +4,7 @@
 //! config section's overrides live in a submodule below.
 
 mod dictation_context;
+mod modules;
 mod embeddings;
 mod observability;
 mod proxy;
@@ -248,6 +249,7 @@ impl Config {
         self.apply_observability_env(env);
         self.apply_embedding_env(env);
         self.apply_update_env(env);
+        self.apply_modules_env(env);
         self.apply_dictation_env(env);
         self.apply_context_env(env);
 
