@@ -743,3 +743,7 @@ impl McpConfiguredClient {
 #[cfg(test)]
 #[path = "module_client_tests.rs"]
 mod tests;
+
+#[cfg(all(test, feature = "modules"))]
+#[path = "module_client_owner_tests.rs"]
+mod owner_tests;
