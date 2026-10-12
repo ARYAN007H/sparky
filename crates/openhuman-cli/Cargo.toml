@@ -75,6 +75,13 @@ required-features = ["http-server", "bin-tools"]
 # otherwise gate-free target — required-features is the blunt instrument, and
 # it costs the whole target when the gate is off.
 [[test]]
+# Loads the tinydocs module from the linked executable and calls GenerateDocx
+# end to end. Local only: needs `--features linked-modules,documents`.
+name = "tinydocs_linked_e2e"
+path = "../../tests/tinydocs_linked_e2e.rs"
+required-features = ["linked-modules", "documents"]
+
+[[test]]
 name = "tinysearch_module_e2e"
 path = "../../tests/tinysearch_module_e2e.rs"
 required-features = ["modules"]
@@ -291,6 +298,10 @@ path = "../../tests/skills_mcp_registry_live.rs"
 # The only openhuman crate the binary depends on. Every gate below forwards to
 # it, and it forwards down the chain to the core.
 openhuman-rpc = { workspace = true, features = ["server"] }
+# Local-development bridge that links module implementation crates into this
+# executable. Optional and behind the non-product `linked-modules` feature only:
+# no product feature set or other host may name it (`pnpm rust:layout`).
+openhuman-modules-linked = { path = "../openhuman-modules-linked", features = ["all"], optional = true }
 anyhow = "1.0"
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio", "query", "ws", "macros"] }
 clap = { version = "4.5", features = ["derive"], optional = true }
@@ -341,6 +352,7 @@ tar = "0.4"
 tinyagents-graph = { path = "../../vendor/tinyagents/crates/tinyagents-graph", features = ["sqlite", "storage-drivers"] }
 tinyagents-harness = { path = "../../vendor/tinyagents/crates/tinyagents-harness", features = ["sqlite", "multimodal"] }
 tinyagents-session = { path = "../../vendor/tinyagents/crates/tinyagents-session" }
+tinydocs-bus = { path = "../../vendor/tinydocs/crates/tinydocs-bus" }
 tinysearch-bus = { path = "../../vendor/tinysearch/crates/tinysearch-bus" }
 tinybus = { path = "../../vendor/tinybus/crates/tinybus", default-features = false, features = ["macros", "uds"] }
 tinychannels = { version = "0.1", features = ["relay-websocket"] }
@@ -411,6 +423,12 @@ scheduler-gate = ["openhuman-rpc/scheduler-gate"]
 crash-reporting = ["openhuman-rpc/crash-reporting"]
 # CLI argument parsing + logger init for `openhuman-fleet`.
 bin-tools = ["dep:clap"]
+# LOCAL DEVELOPMENT ONLY, never a product gate. Links the module implementation
+# crates (`openhuman-modules-linked`) into this binary and its tests and
+# registers them at boot, so `OPENHUMAN_MODULE_SOURCE=linked` serves modules from
+# the executable. Absent from `scripts/ci/product-features.txt` and from the
+# app manifest; CI never enables it.
+linked-modules = ["modules", "dep:openhuman-modules-linked"]
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage)'] }
