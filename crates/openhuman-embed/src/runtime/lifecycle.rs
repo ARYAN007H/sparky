@@ -43,10 +43,16 @@ impl Drop for RemovalSlot<'_> {
     fn drop(&mut self) {
         self.inner.teardown("agent_removed");
         if self.purge && !self.mcp_cleanup_confirmed {
-            self.purge = false;
-            log::warn!(
-                "[embed][runtime] retaining agent home until MCP cleanup is acknowledged"
+            self.mcp_cleanup_confirmed = !openhuman_core::mcp::host::agent_close_pending(
+                &self.inner.config.workspace_dir,
+                &self.inner.id,
             );
+            if !self.mcp_cleanup_confirmed {
+                self.purge = false;
+                log::warn!(
+                    "[embed][runtime] retaining agent home until MCP cleanup is acknowledged"
+                );
+            }
         }
         if let Err(error) = self.purge_home() {
             log::warn!("[embed][runtime] cancelled removal purge failed: {error}");
@@ -146,7 +152,7 @@ impl Runtime {
         }
         removal.mcp_cleanup_confirmed =
             openhuman_core::mcp::host::close_agent(&inner.config.workspace_dir, &inner.id).await;
-        if !removal.mcp_cleanup_confirmed && removal.purge {
+        if !removal.mcp_cleanup_confirmed {
             removal.purge = false;
             return Err(AgentError::CleanupPending);
         }

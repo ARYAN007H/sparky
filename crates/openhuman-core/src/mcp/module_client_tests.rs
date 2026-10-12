@@ -477,6 +477,54 @@ async fn failed_agent_close_stays_retired_and_can_be_retried() {
 }
 
 #[tokio::test]
+async fn delayed_agent_close_cannot_evict_a_replacement_cache_entry() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    let mut config = Config::default();
+    config.workspace_dir = workspace.path().to_path_buf();
+    config.modules.enabled = true;
+
+    let old_port = FakePort::default();
+    let old_closed = Arc::clone(&old_port.closed);
+    let old = McpConfiguredClient::install_test_port(&config, Box::new(old_port))
+        .expect("install old client");
+    old.call::<bool>(&configured("server"), "ConnectedOverview", ())
+        .await
+        .unwrap();
+    let captured = McpConfiguredClient::retire_cached_client(workspace.path())
+        .expect("retirement captures the exact old client");
+
+    let replacement_port = FakePort::default();
+    let replacement_closed = Arc::clone(&replacement_port.closed);
+    let replacement = Arc::new(McpConfiguredClient::with_port(
+        workspace.path().to_string_lossy().into_owned(),
+        Box::new(replacement_port),
+    ));
+    CLIENTS
+        .get()
+        .expect("old client initialized the cache")
+        .lock()
+        .unwrap()
+        .insert(workspace.path().to_path_buf(), Arc::clone(&replacement));
+
+    assert!(McpConfiguredClient::close_retired_client(
+        workspace.path().to_path_buf(),
+        captured,
+    )
+    .await);
+    assert_eq!(old_closed.lock().unwrap().len(), 1);
+    assert!(replacement_closed.lock().unwrap().is_empty());
+    let current = CLIENTS
+        .get()
+        .unwrap()
+        .lock()
+        .unwrap()
+        .get(workspace.path())
+        .cloned()
+        .expect("replacement remains cached");
+    assert!(Arc::ptr_eq(&current, &replacement));
+}
+
+#[tokio::test]
 async fn configuration_switches_replace_the_object_before_dispatch() {
     let port = FakePort::default();
     let opened = Arc::clone(&port.opened);
