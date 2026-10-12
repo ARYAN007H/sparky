@@ -125,3 +125,125 @@ fn profile_invalidation_preserves_another_profiles_snapshot() {
     });
     INTEGRATIONS_CACHE.write().unwrap().remove(&alice_key);
 }
+
+#[test]
+fn profile_invalidation_does_not_cancel_another_profiles_in_flight_warm() {
+    let _guard = composio_cache_test_lock();
+    let dir = tempfile::tempdir().unwrap();
+    let config = config(dir.path());
+    let alice = profile(&config, "warm-alice");
+    let bob = profile(&config, "warm-bob");
+    let alice_key = CoreContext::sync_scope(alice, || cache_key(&config));
+    let bob_key = CoreContext::sync_scope(bob.clone(), || cache_key(&config));
+    let alice_epoch = cache_generation(&alice_key);
+    let bob_epoch = cache_generation(&bob_key);
+    let alice_generation = alice_epoch.load(Ordering::SeqCst);
+    let bob_generation = bob_epoch.load(Ordering::SeqCst);
+    CoreContext::sync_scope(bob, invalidate_connected_integrations_cache);
+    assert_eq!(
+        alice_epoch.load(Ordering::SeqCst),
+        alice_generation,
+        "Alice's in-flight fetch must remain admissible"
+    );
+    assert_ne!(
+        bob_epoch.load(Ordering::SeqCst),
+        bob_generation,
+        "Bob's own in-flight fetch must be fenced even with no cached entries"
+    );
+    assert!(
+        store_fetched_integrations(alice_key.clone(), &alice_epoch, alice_generation, vec![]),
+        "Alice's completed warm must still be admitted through the production insertion path"
+    );
+    assert!(
+        !store_fetched_integrations(bob_key.clone(), &bob_epoch, bob_generation, vec![]),
+        "Bob's invalidated warm must never repopulate the cache"
+    );
+    let mut guard = INTEGRATIONS_CACHE.write().unwrap();
+    assert!(guard.remove(&alice_key).is_some());
+    assert!(!guard.contains_key(&bob_key));
+}
+
+#[test]
+fn no_saas_profile_cannot_invalidate_or_reconcile_any_snapshot() {
+    const CHILD: &str = "OPENHUMAN_TEST_UNSCOPED_CACHE_MUTATION_CHILD";
+    if std::env::var_os(CHILD).is_none() {
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "integrations::composio::connected_integrations::cache::scope_tests::no_saas_profile_cannot_invalidate_or_reconcile_any_snapshot", "--nocapture"])
+            .env(CHILD, "1").status().unwrap();
+        assert!(
+            status.success(),
+            "isolated SaaS cache mutation regression failed"
+        );
+        return;
+    }
+    crate::core::runtime::mode::lock_mode(crate::core::runtime::Mode::Saas).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let config = config(dir.path());
+    let alice = profile(&config, "unscoped-mutation-alice");
+    let key = seed(&config, alice, "gmail");
+    let epoch = cache_generation(&key);
+    let generation = epoch.load(Ordering::SeqCst);
+    invalidate_connected_integrations_cache();
+    assert!(
+        INTEGRATIONS_CACHE.read().unwrap().contains_key(&key),
+        "absent profile must not clear any cache"
+    );
+    assert!(
+        !sync_cache_with_connections(&[]),
+        "absent profile must not reconcile any cache"
+    );
+    assert!(INTEGRATIONS_CACHE.read().unwrap().contains_key(&key));
+    assert_eq!(
+        epoch.load(Ordering::SeqCst),
+        generation,
+        "absent profile must not fence another tenant's warm"
+    );
+}
+
+#[test]
+fn desktop_agents_share_catalog_and_default_context_invalidates_their_warms() {
+    let _guard = composio_cache_test_lock();
+    let dir = tempfile::tempdir().unwrap();
+    let config = config(dir.path());
+    let root = CoreContext::for_test_with_config(DomainSet::kernel(), config.clone());
+    let agent = |id: &str| {
+        let mut overlay =
+            ContextOverlay::new(config.clone(), DomainSet::kernel(), ToolGroups::none());
+        overlay.session_agent = Some(id.into());
+        root.derive_with(overlay)
+    };
+    let first = agent("desktop-first");
+    let second = agent("desktop-second");
+    let key = seed(&config, first, "gmail");
+    let other_profile = profile(&config, "desktop-other-profile");
+    let other_key = seed(&config, other_profile, "slack");
+    let epoch = cache_generation(&key);
+    let generation = epoch.load(Ordering::SeqCst);
+    CoreContext::sync_scope(second, || {
+        assert_eq!(
+            cache_key(&config),
+            key,
+            "the connected-account catalog belongs to the operator, shared by their agents"
+        );
+        assert_eq!(
+            cached_active_integrations(&config).unwrap()[0].toolkit,
+            "gmail"
+        );
+    });
+    CoreContext::sync_scope(root, invalidate_connected_integrations_cache);
+    assert!(
+        !INTEGRATIONS_CACHE.read().unwrap().contains_key(&key),
+        "the desktop settings/default context must invalidate its agents' catalog"
+    );
+    assert_ne!(
+        epoch.load(Ordering::SeqCst),
+        generation,
+        "the desktop settings/default context must fence its agents' in-flight warms"
+    );
+    assert!(!store_fetched_integrations(key, &epoch, generation, vec![]));
+    let mut guard = INTEGRATIONS_CACHE.write().unwrap();
+    assert!(
+        guard.remove(&other_key).is_some(),
+        "desktop invalidation must preserve explicit profiles"
+    );
+}
