@@ -48,18 +48,11 @@ impl McpModulePort for PreparePort {
     async fn call_object(
         &self,
         _: &str,
-        member: &str,
-        args: Value,
+        _: &str,
+        _: Value,
         _: bool,
     ) -> Result<Value, crate::modules::client::ModuleCallError> {
-        if member != tinymcp_bus::names::methods::NORMALIZE_TOOL_ARGUMENTS {
-            return Err(crate::modules::client::ModuleCallError::IncompatibleContract);
-        }
-        let Some(Value::Object(arguments)) = args.get(0).cloned() else {
-            return Err(crate::modules::client::ModuleCallError::ModuleFault);
-        };
-        serde_json::to_value(arguments)
-            .map_err(|_| crate::modules::client::ModuleCallError::ModuleFault)
+        Err(crate::modules::client::ModuleCallError::IncompatibleContract)
     }
 
     async fn prepare_agent_tools(
