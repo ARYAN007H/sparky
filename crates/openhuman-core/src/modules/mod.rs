@@ -79,11 +79,11 @@ pub mod linked;
 #[cfg(feature = "modules")]
 pub mod ops;
 pub mod registry;
-mod source;
 #[cfg(feature = "modules")]
 pub mod schemas;
 #[cfg(feature = "modules")]
 pub mod search;
+mod source;
 #[cfg(feature = "modules")]
 pub mod tinybox;
 #[cfg(feature = "modules")]
