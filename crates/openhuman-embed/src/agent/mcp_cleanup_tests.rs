@@ -223,3 +223,65 @@ fn confirmed_cleanup_still_removes_the_last_owners_ephemeral_workspace() {
 fn cancelling_an_unpolled_cleanup_preserves_its_ephemeral_workspace() {
     workspace_cleanup_control(true);
 }
+
+#[test]
+fn a_failed_purge_fences_the_same_directory_after_its_original_runtime_is_gone() {
+    let executor = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .worker_threads(1)
+        .thread_stack_size(openhuman_core::core::runtime::AGENT_WORKER_STACK_BYTES)
+        .build()
+        .unwrap();
+    executor.block_on(async {
+        tokio::spawn(async {
+            let scratch = tempfile::tempdir().unwrap();
+            let make_runtime = || {
+                crate::Runtime::builder()
+                    .config(openhuman_core::config::Config::default())
+                    .workspace(crate::Workspace::Dir(scratch.path().into()))
+                    .access(crate::Access::full())
+            };
+            let spec = || {
+                crate::AgentSpec::new("worker")
+                    .provider(
+                        crate::Provider::openai_compatible("http://127.0.0.1:1", "fixture")
+                            .model("fixture"),
+                    )
+                    .access(crate::Access::full())
+            };
+            let runtime = make_runtime().build().await.unwrap();
+            let agent = runtime.agent(spec()).unwrap();
+            let home = scratch.path().join("agents/worker");
+            std::fs::remove_dir_all(&home).unwrap();
+            std::fs::write(&home, "force purge failure").unwrap();
+            // No MCP entry means close is already confirmed. This pins the
+            // independent host purge fence; bus receipts have their own tests.
+            assert!(matches!(
+                runtime.remove_agent("worker").purge().await,
+                Err(AgentError::Workspace { .. })
+            ));
+            drop(agent);
+            drop(runtime);
+            assert!(!crate::runtime::RUNTIME_LIVE.load(Ordering::Acquire));
+            // Repair the filesystem fault without completing the old purge.
+            std::fs::remove_file(&home).unwrap();
+            std::fs::create_dir_all(&home).unwrap();
+            std::fs::write(home.join("old-state"), "must remain reserved").unwrap();
+            let successor_runtime = make_runtime().build().await.unwrap();
+            let successor = successor_runtime.agent(spec());
+            let rejected = matches!(successor, Err(AgentError::CleanupPending));
+            drop(successor);
+            drop(successor_runtime);
+            assert!(
+                rejected,
+                "failed purge must reserve this directory across runtime replacement"
+            );
+            assert_eq!(
+                std::fs::read_to_string(home.join("old-state")).unwrap(),
+                "must remain reserved"
+            );
+        })
+        .await
+        .unwrap();
+    });
+}
