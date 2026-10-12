@@ -221,8 +221,9 @@ fn structured_focus_refusal_is_preserved_for_host_presentation() {
 #[tokio::test]
 #[ignore = "requires a TinyComputer library: node scripts/modules/build.mjs tinycomputer, then OPENHUMAN_MODULE_SOURCE_DIR"]
 async fn released_module_serves_permissions_and_confidential_target_validation() {
-    let artifact = crate::modules::local_artifact("tinycomputer")
-        .expect("build tinycomputer with scripts/modules/build.mjs and set OPENHUMAN_MODULE_SOURCE_DIR");
+    let artifact = crate::modules::local_artifact("tinycomputer").expect(
+        "build tinycomputer with scripts/modules/build.mjs and set OPENHUMAN_MODULE_SOURCE_DIR",
+    );
     let mut config = Config::default();
     config.modules.allow_download = false;
     config

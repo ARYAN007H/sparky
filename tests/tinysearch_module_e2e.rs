@@ -4,8 +4,9 @@ use tinysearch_bus::{names, ExecuteToolRequest, ExecuteToolResponse, ListToolsRe
 #[tokio::test]
 async fn pinned_search_module_serves_host_contract_and_rejects_disabled_execution() {
     use tinybus::{broker::Broker, module::ModuleHost, transport::memory::MemoryBus};
-    let file = openhuman_core::modules::local_artifact("tinysearch")
-        .expect("build tinysearch with scripts/modules/build.mjs and set OPENHUMAN_MODULE_SOURCE_DIR");
+    let file = openhuman_core::modules::local_artifact("tinysearch").expect(
+        "build tinysearch with scripts/modules/build.mjs and set OPENHUMAN_MODULE_SOURCE_DIR",
+    );
     let bus = MemoryBus::new();
     let broker = Broker::new();
     let broker_task = broker.spawn(bus.clone());
