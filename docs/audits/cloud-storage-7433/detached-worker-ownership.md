@@ -78,6 +78,52 @@ Complete outputs were read and retained outside disposable build output in
 `.validation/detached-control-compat.log`. Independent source review found no
 Critical or Important findings in the bounded ownership correction.
 
+## Review follow-up: actual dispatch and spawn refusal
+
+The follow-up normally merged canonical `d1efa8bd58` without rewriting
+the earlier checkpoints. Test-only source then exercised the actual registered
+SaaS dispatch gate and the live `SpawnAsyncSubagentDispatch`, rather than
+calling only the controller handlers. Session `8074` compiled successfully
+in 2m07s and finished with **7 passed, 2 failed, 0 ignored**:
+the SaaS steer method was hidden, and a missing-profile spawn returned
+an accepted reference after persisting a Running reusable session.
+
+Both original assertions were retained. The fix admits the Agent domain in
+the SaaS/profile presets, while the exact user method allowlist admits only
+the reviewed cancel/steer controls. The dispatch regression also proves an
+unreviewed, registered Agent method remains denied. Spawn checks the actual
+profile/workspace before durable session or worker-thread writes.
+Registration now returns a typed refusal, aborts the unowned worker, and
+creates its Running task ledger/watcher only after successful registration.
+A late refusal settles an already persisted reusable session as Failed before
+any accepted response is constructed.
+
+The first postfix attempt `7255` failed compilation because the host adapter
+used the lower registry's error type instead of the actual runtime API's
+`TinyAgentsError`. That source type was corrected; no behavioral result is
+claimed for the compiler failure. Retry `22704` compiled in 2m02s and passed
+all nine tenant tests. Its two unused Result warnings in existing fixtures
+were subsequently repaired by asserting admitted registration.
+
+An overbroad orchestration run `1071` selected 339 tests and was explicitly
+cancelled through the cancel-aware wrapper (exit 143) during an unrelated
+team-worker retry test. Its incomplete output is preserved and excluded from
+acceptance. The narrower runner `37427` passed running-worker 31, controller
+5, spawn 20 and profile-surface 8 tests, including the actual late-refusal
+abort/Failed-state control. Its existing SaaS preset equality test still
+expected Agent to be disabled, producing 14 passes and one failure. The
+expected preset was updated only for the deliberately admitted Agent domain;
+the actual unrelated-Agent dispatch refusal remains enforced.
+
+These outputs are retained outside disposable targets in
+`.validation/detached-review-red.log`,
+`.validation/detached-review-green.log`,
+`.validation/detached-review-green-retry.log`,
+`.validation/detached-review-orchestration-green.log` and the individual
+`.validation/detached-review-{running,control,spawn,surface,saas}.log` files.
+The final narrow rerun is pending; the preceding results do not establish
+full-workspace, default/all-feature, MSRV, coverage or hosted acceptance.
+
 ## Remaining limits
 
 These results cover the supported feature graph above. They do not assert a
