@@ -71,7 +71,7 @@ pub(crate) enum RegistrationError {
     #[error("missing or mismatched tenant scope")]
     Scope,
     #[error("detached task registration failed: {0}")]
-    Registry(#[source] tinyagents_tasks::DetachedTaskRegistryError),
+    Registry(#[source] tinyagents_harness::error::TinyAgentsError),
 }
 
 /// Check the actual caller before any reusable-session or worker-thread write.
