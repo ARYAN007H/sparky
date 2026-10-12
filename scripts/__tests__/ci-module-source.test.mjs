@@ -39,6 +39,15 @@ test("enabling the linked-modules feature is flagged", () => {
   );
 });
 
+test("running the local module build script from CI is flagged", () => {
+  const found = scan("run: node scripts/modules/build.mjs all", "w.yml");
+  assert.deepEqual(
+    found.map((v) => v.rule),
+    ["module-build-script"],
+  );
+  assert.equal(scan("# node scripts/modules/build.mjs all", "w.yml").length, 0);
+});
+
 test("comments may explain the rule", () => {
   assert.deepEqual(
     scan("# never set OPENHUMAN_MODULE_SOURCE in CI", "w.yml"),
