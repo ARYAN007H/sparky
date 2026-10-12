@@ -138,6 +138,15 @@ async fn scenario() {
         })
         .collect();
     delivered.sort_by(|x, y| x.0.cmp(&y.0));
+    assert!(
+        recorder
+            .0
+            .lock()
+            .unwrap()
+            .iter()
+            .all(|r| r.agent_id.is_none()),
+        "a profile's default agent is not named"
+    );
     let web = |user: &str| {
         Some(JobOrigin::Web {
             thread_id: format!("t-{user}"),
@@ -148,13 +157,13 @@ async fn scenario() {
         delivered,
         [
             (
-                "alice".into(),
+                Some("alice".into()),
                 Some("t-alice".into()),
                 "ran: alice".into(),
                 web("alice")
             ),
             (
-                "bob".into(),
+                Some("bob".into()),
                 Some("t-bob".into()),
                 "ran: bob".into(),
                 web("bob")
