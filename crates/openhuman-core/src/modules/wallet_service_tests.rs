@@ -3,7 +3,7 @@ use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
     Arc,
 };
-use tinywallet_bus::wire::{NativeWalletServiceHandle, WalletAccountInfo};
+use tinywallet_bus::wire::{NativeWalletServiceHandle, SolanaCluster, WalletAccountInfo};
 
 fn service() -> NativeWalletService {
     NativeWalletService {
