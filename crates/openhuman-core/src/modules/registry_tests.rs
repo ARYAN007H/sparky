@@ -398,8 +398,15 @@ fn every_asset_name_carries_its_host_key_and_a_known_extension() {
     // loads the wrong platform's library.
     for record in ALL {
         for asset in record.assets {
+            // The rolling Arch Linux host key tracks the release archive's
+            // canonical `archlinux` stem.
+            let archive_host_key = asset
+                .host_key
+                .strip_prefix("archlinux-rolling-")
+                .map(|suffix| format!("archlinux-{suffix}"))
+                .unwrap_or_else(|| asset.host_key.to_owned());
             assert!(
-                asset.archive.contains(asset.host_key),
+                asset.archive.contains(&archive_host_key),
                 "{} asset {} does not name its host key {}",
                 record.id,
                 asset.archive,
