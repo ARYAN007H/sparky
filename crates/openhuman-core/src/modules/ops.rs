@@ -295,6 +295,15 @@ async fn resolve(config: &Config, record: &'static ModuleRecord) -> Result<(), S
         plan.requested.as_str(),
         plan.served
     );
+    // `resolve` runs once per id per process, so this is one line per id.
+    if let Some(line) = source::pin_ahead_warning(
+        record.id,
+        plan.served,
+        std::env::var(source::PIN_AHEAD_ENV).ok().as_deref(),
+        cfg!(debug_assertions),
+    ) {
+        log::warn!("{line}");
+    }
     match plan.served {
         ModuleSource::LocalFile | ModuleSource::Source => {
             if let Some(path) = plan.artifact {

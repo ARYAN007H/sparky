@@ -89,6 +89,37 @@ pub fn local_artifact(id: &str) -> Option<PathBuf> {
         .find(|path| path.is_file())
 }
 
+/// Environment variable listing module ids whose gitlink is ahead of the
+/// registry pin, comma separated. `scripts/modules/pin-status.mjs --print-env`
+/// prints it; a developer exports it next to `OPENHUMAN_MODULE_SOURCE`.
+pub(crate) const PIN_AHEAD_ENV: &str = "OPENHUMAN_MODULE_PIN_AHEAD";
+
+/// The warning for serving `id` from a local build whose gitlink is ahead of
+/// its released pin, or `None` when there is nothing to say.
+///
+/// Pure: `ahead_ids` is the raw [`PIN_AHEAD_ENV`] value and `debug` is whether
+/// this is a debug build. Only `Linked` and `Source` serve a local build, and
+/// release builds stay silent.
+#[must_use]
+pub(super) fn pin_ahead_warning(
+    id: &str,
+    served: ModuleSource,
+    ahead_ids: Option<&str>,
+    debug: bool,
+) -> Option<String> {
+    if !debug || !matches!(served, ModuleSource::Linked | ModuleSource::Source) {
+        return None;
+    }
+    let ahead = ahead_ids?
+        .split(',')
+        .any(|candidate| candidate.trim() == id);
+    ahead.then(|| {
+        format!(
+            "[modules] id={id} served={served:?}: gitlink ahead of released pin; you are running a locally compiled module, publish a release and re-pin (scripts/modules/release-and-repin.mjs) before CI will pass"
+        )
+    })
+}
+
 /// Choose the source for `id` under `config`.
 pub(super) fn plan(config: &Config, id: &str) -> SourcePlan {
     plan_with(
