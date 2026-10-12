@@ -554,7 +554,7 @@ fn input_module_error_code(error: crate::modules::client::ModuleCallError) -> &'
             tinymcp_bus::errors::BUS
         }
         ModuleCallError::TransportFailed => tinymcp_bus::errors::TRANSPORT,
-        ModuleCallError::ModuleFault => tinymcp_bus::errors::INVALID_ARGUMENTS,
+        ModuleCallError::ModuleFault => tinymcp_bus::errors::BUS,
     }
 }
 

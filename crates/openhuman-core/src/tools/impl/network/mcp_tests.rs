@@ -35,7 +35,7 @@ fn module_failures_keep_transport_and_unavailability_categories() {
     );
     assert_eq!(
         input_module_error_code(ModuleCallError::ModuleFault),
-        tinymcp_bus::errors::INVALID_ARGUMENTS
+        tinymcp_bus::errors::BUS
     );
 }
 
