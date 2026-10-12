@@ -3,9 +3,9 @@
 use crate::core::Outcome;
 
 use super::types::{Capability, CapabilityCategory, CapabilityStatus};
+use super::{all_capabilities, capabilities_by_category, lookup, search};
 use crate::core::runtime::context::CoreContext;
 use crate::core::runtime::ComponentSet;
-use super::{all_capabilities, capabilities_by_category, lookup, search};
 
 /// The `[components]` name backing a capability domain, if one does.
 pub fn component_for_domain(domain: &str) -> Option<&'static str> {

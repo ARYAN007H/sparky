@@ -7,8 +7,7 @@ use super::dirs::{
 use super::env::{EnvLookup, ProcessEnv, ProcessEnvWithoutWorkspace};
 use super::migrate::{
     migrate_cloud_provider_slugs, migrate_components, migrate_legacy_inference_url,
-    migrate_legacy_memory_backend,
-    migrate_search_settings,
+    migrate_legacy_memory_backend, migrate_search_settings,
 };
 use super::secrets::{
     decrypt_config_secrets, decrypt_config_secrets_strict, encrypt_config_secrets,

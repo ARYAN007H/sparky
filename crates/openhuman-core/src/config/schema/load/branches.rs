@@ -10,8 +10,7 @@ use super::env::EnvLookup;
 use super::impl_load::migration_source;
 use super::migrate::{
     migrate_cloud_provider_slugs, migrate_components, migrate_legacy_inference_url,
-    migrate_legacy_memory_backend,
-    migrate_legacy_memory_sources, migrate_search_settings,
+    migrate_legacy_memory_backend, migrate_legacy_memory_sources, migrate_search_settings,
 };
 use super::secrets::decrypt_config_secrets;
 use anyhow::Result;

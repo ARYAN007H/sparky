@@ -135,7 +135,8 @@ fn every_record_maps_to_a_real_component() {
     }
     for (id, _) in COMPONENT_OF {
         assert!(
-            ALL.iter().any(|r| r.id == *id) || !cfg!(feature = "modules")
+            ALL.iter().any(|r| r.id == *id)
+                || !cfg!(feature = "modules")
                 || matches!(*id, "tinydocs" | "tinywallet" | "tinyvoice" | "tinyhosts"),
             "mapping for unknown module '{id}'"
         );
