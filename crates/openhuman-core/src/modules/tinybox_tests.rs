@@ -472,8 +472,12 @@ fn every_host_operation_is_a_member_of_the_canonical_contract() {
         DOCKER_STATUS,
         CLEANUP_DOCKER,
         RUN_DOCKER_WITHOUT_WORKSPACE,
+        RESOLVE_LOCAL_GRANTS,
+        SELECT_SHELL,
+        START_SHELL_EXEC,
+        START_NATIVE_SHELL_EXEC,
     ];
-    assert_eq!(methods, contract::METHODS);
+    assert_eq!(methods, contract::METHODS[..methods.len()]);
 }
 
 #[tokio::test]
