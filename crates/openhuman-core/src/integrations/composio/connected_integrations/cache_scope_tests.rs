@@ -186,7 +186,13 @@ fn no_saas_profile_cannot_invalidate_or_reconcile_any_snapshot() {
     }
     crate::core::runtime::mode::lock_mode(crate::core::runtime::Mode::Saas).unwrap();
     let dir = tempfile::tempdir().unwrap();
-    let config = config(dir.path());
+    let mut config = config(dir.path());
+    config.composio.mode = crate::config::schema::COMPOSIO_MODE_DIRECT.into();
+    config.composio.pin_host_credential(
+        ComposioHostCredential::direct("ck_shared_scope_fixture")
+            .entity_id("shared-service-entity")
+            .base_urls("http://127.0.0.1:1/v2", "http://127.0.0.1:1/v3"),
+    );
     let alice = profile(&config, "unscoped-mutation-alice");
     let key = seed(&config, alice, "gmail");
     let epoch = cache_generation(&key);
@@ -214,6 +220,14 @@ fn no_saas_profile_cannot_invalidate_or_reconcile_any_snapshot() {
         .enable_all()
         .build()
         .unwrap();
+    // Use the exact enabled configuration Alice's seeded snapshot uses. Even
+    // a broken scope check must not send this fixture to a third-party service.
+    assert!(matches!(
+        runtime.block_on(super::super::fetch::fetch_connected_integrations_status(
+            &config
+        )),
+        super::super::fetch::FetchConnectedIntegrationsStatus::Unavailable
+    ));
     assert!(matches!(
         runtime.block_on(super::super::fetch::fetch_connected_integrations_status(
             &disabled
