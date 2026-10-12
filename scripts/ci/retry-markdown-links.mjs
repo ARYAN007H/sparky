@@ -17,18 +17,34 @@ export async function retryServiceUnavailable({
   initialReport,
   check,
   wait = delay,
+  log = console.info,
 }) {
   let urls = serviceUnavailableUrls(initialReport);
-  if (!urls) return 1;
+  if (!urls) {
+    log("[link-retry] reason=ineligible-report status=1");
+    return 1;
+  }
   let status = 1;
   for (let attempt = 0; attempt < 3; attempt++) {
-    await wait(5000 * 2 ** attempt);
+    const backoff = 5000 * 2 ** attempt;
+    log(
+      `[link-retry] attempt=${attempt + 1} backoff_ms=${backoff} urls=${urls.length}`,
+    );
+    await wait(backoff);
     const result = await check(urls);
     status = result.status;
-    if (status === 0) return 0;
+    log(`[link-retry] attempt=${attempt + 1} status=${status}`);
+    if (status === 0) {
+      log("[link-retry] reason=recovered status=0");
+      return 0;
+    }
     urls = serviceUnavailableUrls(result.report);
-    if (!urls) return status;
+    if (!urls) {
+      log(`[link-retry] reason=non-transient-failure status=${status}`);
+      return status;
+    }
   }
+  log(`[link-retry] reason=retries-exhausted status=${status}`);
   return status;
 }
 

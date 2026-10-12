@@ -100,8 +100,10 @@ jobs:
           fail: true
       - name: Recheck transient service failures
         if: steps.link-check.outcome == 'failure'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: >-
-          node scripts/ci/retry-markdown-links.mjs
+          bash scripts/ci-cancel-aware.sh node scripts/ci/retry-markdown-links.mjs
           target/link-check/report.md
           "$RUNNER_TEMP/lychee/bin/lychee"
   appimage-rpath-guard:
