@@ -282,6 +282,13 @@ async fn resolve(config: &Config, record: &'static ModuleRecord) -> Result<(), S
     // before the pinned release so a module can be iterated on against a live
     // core. `release` (the default) falls straight through to the chain below.
     let plan = source::plan(config, record.id);
+    if let Some(reason) = plan.fallback {
+        log::warn!(
+            "[modules] id={} requested={} served=release: {reason}",
+            record.id,
+            plan.requested.as_str()
+        );
+    }
     log::debug!(
         "[modules] id={} requested={} served={:?}",
         record.id,

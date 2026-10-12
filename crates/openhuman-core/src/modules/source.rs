@@ -85,10 +85,6 @@ pub(super) fn plan_with(
     }
 
     let released = |fallback: &'static str| {
-        log::warn!(
-            "[modules] id={id} requested={} served=release: {fallback}",
-            mode.as_str()
-        );
         SourcePlan {
             requested: mode,
             served: ModuleSource::Release,
