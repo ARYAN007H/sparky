@@ -219,15 +219,14 @@ test("a fixed site left in the baseline fails until removed", () => {
   assert.match(out, /Fixed sites still in the baseline/);
 });
 
-test("--write-baseline records the current sites", () => {
+test("--write-baseline refuses a missing debt baseline", () => {
   const { status, after } = run(
     { [`${SRC}/foo/store.rs`]: "fn f() { std::fs::write(p, b); }\n" },
     null,
     ["--write-baseline"],
   );
-  assert.equal(status, 0);
-  assert.equal(after.length, 1);
-  assert.equal(after[0].rule, "json-write");
+  assert.equal(status, 1);
+  assert.equal(after, null);
 });
 
 test("an allowlisted file may hold only its pinned site", () => {
