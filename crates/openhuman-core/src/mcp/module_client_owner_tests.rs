@@ -8,6 +8,7 @@ struct LifecycleFixture {
     polls: Arc<AtomicUsize>,
     block_close_poll: Arc<AtomicBool>,
     close_poll_started: Arc<tokio::sync::Notify>,
+    release_close_poll: Arc<tokio::sync::Notify>,
 }
 
 #[tinybus::interface(name = "ai.tinyhumans.tinymcp.Mcp")]
@@ -21,7 +22,7 @@ impl LifecycleFixture {
         self.polls.fetch_add(1, Ordering::SeqCst);
         if receipt == "original-close" && self.block_close_poll.swap(false, Ordering::SeqCst) {
             self.close_poll_started.notify_one();
-            std::future::pending::<()>().await;
+            self.release_close_poll.notified().await;
         }
         Ok(TransitionStatus::Complete)
     }
@@ -78,9 +79,15 @@ async fn cancelled_close_retries_its_receipt_on_the_original_owner() {
         let client = Arc::clone(&client);
         async move { client.close().await }
     });
-    original_fixture.close_poll_started.notified().await;
+    tokio::time::timeout(
+        Duration::from_secs(10),
+        original_fixture.close_poll_started.notified(),
+    )
+    .await
+    .expect("close receipt reaches the original module");
     closing.abort();
     assert!(closing.await.unwrap_err().is_cancelled());
+    original_fixture.release_close_poll.notify_one();
     assert!(
         matches!(&*client.state.lock().await, State::Closing { transition_id, .. } if transition_id == "original-close")
     );
