@@ -76,3 +76,59 @@ fn mode_names_round_trip() {
     assert_eq!(ModuleSourceMode::parse(" LINKED "), Some(ModuleSourceMode::Linked));
     assert_eq!(ModuleSourceMode::parse("nope"), None);
 }
+
+struct MapEnv(std::collections::HashMap<&'static str, &'static str>);
+
+impl crate::config::schema::load::env::EnvLookup for MapEnv {
+    fn get(&self, key: &str) -> Option<String> {
+        self.0.get(key).map(|v| (*v).to_string())
+    }
+}
+
+fn overlay(pairs: &[(&'static str, &'static str)]) -> crate::config::Config {
+    let mut config = crate::config::Config::default();
+    config.apply_modules_env_for_test(&MapEnv(pairs.iter().copied().collect()));
+    config
+}
+
+#[test]
+fn global_env_sets_the_source_mode() {
+    let config = overlay(&[("OPENHUMAN_MODULE_SOURCE", "linked")]);
+    assert_eq!(config.modules.source, ModuleSourceMode::Linked);
+}
+
+#[test]
+fn invalid_global_env_is_ignored() {
+    let config = overlay(&[("OPENHUMAN_MODULE_SOURCE", "bogus")]);
+    assert_eq!(config.modules.source, ModuleSourceMode::Release);
+}
+
+#[test]
+fn per_module_env_adds_a_source_override_replacing_a_path_entry() {
+    let mut config = crate::config::Config::default();
+    config
+        .modules
+        .overrides
+        .push(ModuleOverride::with_path("tinyjuice", "/dev/libtinyjuice.so"));
+    config.apply_modules_env_for_test(&MapEnv(
+        [("OPENHUMAN_MODULE_SOURCE_TINYJUICE", "source")]
+            .into_iter()
+            .collect(),
+    ));
+    assert_eq!(config.modules.overrides.len(), 1);
+    assert_eq!(config.modules.overrides[0].path, None);
+    assert_eq!(
+        config.modules.overrides[0].source,
+        Some(ModuleSourceMode::Source)
+    );
+}
+
+#[test]
+fn per_module_env_names_upper_case_the_id() {
+    use crate::config::schema::load::env_overlay_modules::module_source_env_for;
+    assert_eq!(
+        module_source_env_for("tinyjuice"),
+        "OPENHUMAN_MODULE_SOURCE_TINYJUICE"
+    );
+    assert_eq!(module_source_env_for("a-b"), "OPENHUMAN_MODULE_SOURCE_A_B");
+}
