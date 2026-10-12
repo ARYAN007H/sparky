@@ -545,7 +545,7 @@ fn a_profiles_module_scope_sits_under_its_lease_fence() {
             "tinymcp",
         )
         .unwrap();
-        let covered = crate::profiles::fence::scopes_of(&crate::profiles::ProfileId::new(profile).unwrap());
+        let covered = crate::profiles::fence::scopes_of(&crate::profiles::ProfileId::parse(profile).unwrap());
         assert!(
             covered.iter().any(|matcher| match matcher {
                 crate::storage::fence::ScopeMatch::Prefix(prefix) => scope.as_str().starts_with(prefix.as_str()),
@@ -589,7 +589,7 @@ async fn a_module_write_under_a_stale_lease_is_fenced_by_the_host() {
         grant_a.epoch,
         grant_a.expires_at_ms,
         5_000,
-        crate::profiles::fence::scopes_of(&crate::profiles::ProfileId::new("acme").unwrap()),
+        crate::profiles::fence::scopes_of(&crate::profiles::ProfileId::parse("acme").unwrap()),
     )));
     let fenced: Arc<dyn StorageBackend> = Arc::new(FencedBackend::new(shared, fences));
 
