@@ -27,7 +27,9 @@ export async function retryServiceUnavailable({
   let status = 1;
   for (let attempt = 0; attempt < 3; attempt++) {
     const backoff = 5000 * 2 ** attempt;
-    log(`[link-retry] attempt=${attempt + 1} backoff_ms=${backoff} urls=${urls.length}`);
+    log(
+      `[link-retry] attempt=${attempt + 1} backoff_ms=${backoff} urls=${urls.length}`,
+    );
     await wait(backoff);
     const result = await check(urls);
     status = result.status;
