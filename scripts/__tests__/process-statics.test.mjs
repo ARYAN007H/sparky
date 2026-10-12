@@ -221,6 +221,16 @@ test("array length expressions do not treat shifts as generic brackets", () => {
     "[Option<u8>;1<<2]",
   );
 });
+test("swapping same-named static types between modules requires ownership review", () => {
+  const before = scan("mod user { static CACHE: UserCache = x; } mod infra { static CACHE: InfraCache = x; }");
+  const after = scan("mod user { static CACHE: InfraCache = x; } mod infra { static CACHE: UserCache = x; }");
+  assert.equal(reviewChanges(before, after, []).length, 2);
+});
+test("type macros preserve comparison tokens in parentheses and square token trees", () => {
+  for (const type of ["ty!(1 < 2)", "ty![1 > 2]", "Wrapper<ty!(1 << 2), Option<u8>>"]) {
+    assert.equal(scan(`static X: ${type} = x;`)[0].type, type.replaceAll(" ", ""));
+  }
+});
 test("repository scan reads the merge base, enforces records, and fails without history", () => {
   const root = mkdtempSync(join(tmpdir(), "process-statics-"));
   const git = (...args) =>
