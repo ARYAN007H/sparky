@@ -116,7 +116,13 @@ for (const [description, resolverExit] of [
   });
 }
 
-for (const id of ["tinybox", "tinywallet", "tinychannels", "tinymcp", "tinyhosts"]) {
+for (const id of [
+  "tinybox",
+  "tinywallet",
+  "tinychannels",
+  "tinymcp",
+  "tinyhosts",
+]) {
   test(`native ${id} regressions receive their pinned release fixture`, () => {
     const assets = resolveTestModuleAssets(
       readRegistrySource(),
@@ -142,9 +148,13 @@ for (const [runner, archiveVariable, directoryVariable] of [
       fileURLToPath(new URL(`../${runner}`, import.meta.url)),
       "utf8",
     );
-    const extraction = source.split("\n").find(
-      (line) => line.trimStart().startsWith("tar ") && line.includes(`"$${archiveVariable}"`),
-    );
+    const extraction = source
+      .split("\n")
+      .find(
+        (line) =>
+          line.trimStart().startsWith("tar ") &&
+          line.includes(`"$${archiveVariable}"`),
+      );
     assert.ok(extraction, "runner must extract the pinned archive");
     const root = mkdtempSync(join(tmpdir(), "module-ownership-"));
     try {
@@ -154,28 +164,51 @@ for (const [runner, archiveVariable, directoryVariable] of [
       mkdirSync(destination);
       writeFileSync(join(payload, "module.so"), "native module fixture");
       const archive = join(root, "module.tar.gz");
-      const packed = spawnSync("python3", ["-c", [
-        "import sys, tarfile",
-        "with tarfile.open(sys.argv[1], 'w:gz') as archive:",
-        "    info = archive.gettarinfo(sys.argv[2], arcname='module.so')",
-        "    info.uid = info.gid = 12345",
-        "    info.uname = info.gname = ''",
-        "    with open(sys.argv[2], 'rb') as payload:",
-        "        archive.addfile(info, payload)",
-      ].join("\n"), archive, join(payload, "module.so")], { encoding: "utf8" });
+      const packed = spawnSync(
+        "python3",
+        [
+          "-c",
+          [
+            "import sys, tarfile",
+            "with tarfile.open(sys.argv[1], 'w:gz') as archive:",
+            "    info = archive.gettarinfo(sys.argv[2], arcname='module.so')",
+            "    info.uid = info.gid = 12345",
+            "    info.uname = info.gname = ''",
+            "    with open(sys.argv[2], 'rb') as payload:",
+            "        archive.addfile(info, payload)",
+          ].join("\n"),
+          archive,
+          join(payload, "module.so"),
+        ],
+        { encoding: "utf8" },
+      );
       assert.equal(packed.status, 0, packed.stderr);
       // Force the superuser default even on unprivileged developer machines.
       // The runner's --no-same-owner must override it on the real tar command.
-      const result = spawnSync("bash", ["-c", [
-        'tar() { command tar --same-owner "$@"; }',
-        extraction,
-      ].join("\n")], {
-        encoding: "utf8",
-        env: { ...process.env, [archiveVariable]: archive, [directoryVariable]: destination },
-      });
+      const result = spawnSync(
+        "bash",
+        [
+          "-c",
+          ['tar() { command tar --same-owner "$@"; }', extraction].join("\n"),
+        ],
+        {
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            [archiveVariable]: archive,
+            [directoryVariable]: destination,
+          },
+        },
+      );
       assert.equal(result.status, 0, result.stdout + result.stderr);
-      assert.equal(statSync(join(destination, "module.so")).uid, statSync(destination).uid);
-      assert.equal(statSync(join(destination, "module.so")).gid, statSync(destination).gid);
+      assert.equal(
+        statSync(join(destination, "module.so")).uid,
+        statSync(destination).uid,
+      );
+      assert.equal(
+        statSync(join(destination, "module.so")).gid,
+        statSync(destination).gid,
+      );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
