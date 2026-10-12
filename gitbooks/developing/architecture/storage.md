@@ -62,6 +62,12 @@ In SaaS mode a call with no profile is refused instead of falling into a bucket 
 
 A backend decides how it enforces the scope. SQLite and the file driver keep each scope's data apart, and `local` is the scope a single-user install uses. MongoDB injects a scope key into every filter and every index prefix.
 
+### Process state
+
+The [process-state inventory](process-state.md) classifies the named shared-core
+singleton candidates and records their tenant, durability and routing boundaries.
+It also identifies pending regressions and implementation work.
+
 ### Process caches
 
 The connected-integration catalog belongs to the calling profile, or to the
