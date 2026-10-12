@@ -1,6 +1,6 @@
 //! TinySearch web-search module. Published digests are added only from its
 //! release manifest.
-use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset};
+use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec};
 
 pub(crate) const TINYSEARCH: ModuleRecord = ModuleRecord {
     id: "tinysearch",
@@ -70,4 +70,11 @@ pub(crate) const TINYSEARCH: ModuleRecord = ModuleRecord {
         },
     ],
     load: LoadPolicy::Lazy,
+    source: SourceSpec {
+        submodule: "tinysearch",
+        manifest: "crates/tinysearch/Cargo.toml",
+        package: "tinysearch",
+        lib_name: "tinysearch",
+        features: &[],
+    },
 };

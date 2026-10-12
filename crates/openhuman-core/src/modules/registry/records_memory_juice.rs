@@ -1,6 +1,6 @@
 //! Registry record for the `tinyjuice` module.
 
-use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset};
+use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec};
 
 pub(crate) const TINYJUICE: ModuleRecord = ModuleRecord {
     id: "tinyjuice",
@@ -67,4 +67,11 @@ pub(crate) const TINYJUICE: ModuleRecord = ModuleRecord {
         },
     ],
     load: LoadPolicy::Lazy,
+    source: SourceSpec {
+        submodule: "tinyjuice",
+        manifest: "crates/tinyjuice-module/Cargo.toml",
+        package: "tinyjuice-module",
+        lib_name: "tinyjuice_module",
+        features: &[],
+    },
 };

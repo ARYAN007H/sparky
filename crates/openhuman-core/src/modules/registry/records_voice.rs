@@ -1,6 +1,6 @@
 //! Registry record for the `tinyvoice` module.
 
-use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset};
+use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec};
 
 /// The `tinyvoice` module: the host-agnostic half of the voice pipeline.
 ///
@@ -79,4 +79,11 @@ pub(crate) const TINYVOICE: ModuleRecord = ModuleRecord {
         },
     ],
     load: LoadPolicy::Lazy,
+    source: SourceSpec {
+        submodule: "tinyvoice",
+        manifest: "crates/tinyvoice-module/Cargo.toml",
+        package: "tinyvoice-module",
+        lib_name: "tinyvoice_module",
+        features: &[],
+    },
 };

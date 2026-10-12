@@ -1,6 +1,6 @@
 //! Registry records for the `tinymcp` and `tinyconnectors` modules.
 
-use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset};
+use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec};
 
 /// The `tinymcp` module: the Model Context Protocol client.
 ///
@@ -117,6 +117,13 @@ pub(crate) const TINYMCP: ModuleRecord = ModuleRecord {
         },
     ],
     load: LoadPolicy::Lazy,
+    source: SourceSpec {
+        submodule: "tinymcp",
+        manifest: "crates/tinymcp/Cargo.toml",
+        package: "tinymcp",
+        lib_name: "tinymcp",
+        features: &[],
+    },
 };
 
 pub(crate) const TINYCONNECTORS: ModuleRecord = ModuleRecord {
@@ -187,4 +194,11 @@ pub(crate) const TINYCONNECTORS: ModuleRecord = ModuleRecord {
     // most sessions never touch a connector. Safe even signed out — the module
     // loads without configuration and still answers the capability members.
     load: LoadPolicy::Lazy,
+    source: SourceSpec {
+        submodule: "tinyconnectors",
+        manifest: "crates/tinyconnectors/Cargo.toml",
+        package: "tinyconnectors",
+        lib_name: "tinyconnectors",
+        features: &[],
+    },
 };

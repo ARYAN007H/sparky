@@ -1,6 +1,6 @@
 //! Registry records for the `tinydocs` and `tinywallet` modules.
 
-use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset};
+use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec};
 
 /// The `tinydocs` module: document synthesis, bounded extraction, image facts,
 /// and PDF rendering.
@@ -72,6 +72,13 @@ pub(crate) const TINYDOCS: ModuleRecord = ModuleRecord {
         },
     ],
     load: LoadPolicy::Lazy,
+    source: SourceSpec {
+        submodule: "tinydocs",
+        manifest: "crates/tinydocs-module/Cargo.toml",
+        package: "tinydocs-module",
+        lib_name: "tinydocs_module",
+        features: &[],
+    },
 };
 
 /// The `tinywallet` module: native wallet, Web3 quote, and x402 operations.
@@ -194,4 +201,11 @@ pub(crate) const TINYWALLET: ModuleRecord = ModuleRecord {
         },
     ],
     load: LoadPolicy::Lazy,
+    source: SourceSpec {
+        submodule: "tinywallet",
+        manifest: "crates/tinywallet-module/Cargo.toml",
+        package: "tinywallet-module",
+        lib_name: "tinywallet_module",
+        features: &[],
+    },
 };
