@@ -74,7 +74,7 @@ export const RULES = [
   },
   {
     rule: "vendored-open",
-    pattern: /\b(?:[A-Za-z_][\w]*::)*(?:[A-Za-z_][\w]*Store|[A-Za-z_][\w]*Ledger)::open(?:_file)?\s*\([^;]*"[^"\n]*\.(?:db|jsonl)"/,
+    pattern: /\b(?:[A-Za-z_][\w]*::)*(?:[A-Za-z_][\w]*Store|[A-Za-z_][\w]*Ledger)::open(?:_file)?\s*\(/,
     hint: "a persistent path passed to an owning store opener needs captured native routing",
   },
 ];
@@ -147,10 +147,10 @@ export function scan(rel, source) {
     // count a match only when it starts on this line.
     const searchable = `${code}\n${codeOf(lines[index + 1] ?? "")}`;
     for (const { rule, pattern } of RULES) {
-      const input = ["sqlite-open", "json-write", "vendored-open"].includes(rule) ? searchable : `${masked[index]}\n${masked[index + 1] ?? ""}`;
+      const input = originalCore({ path: rel, rule }) ? searchable : `${masked[index]}\n${masked[index + 1] ?? ""}`;
       const hit = pattern.exec(input);
       if (!hit || hit.index >= code.length) continue;
-      if (rule === "vendored-open" && !masked[index].slice(hit.index).match(/\b\w+::/)) continue;
+      if (rule === "vendored-open" && !/"[^"\n]*\.(?:db|jsonl)"/.test(searchable.slice(hit.index))) continue;
       const text = raw.trim();
       const key = `${rule}\0${text}`;
       const occurrence = (occurrences.get(key) ?? 0) + 1;
