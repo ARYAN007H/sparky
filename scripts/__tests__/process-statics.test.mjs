@@ -23,6 +23,45 @@ const entry = {
 };
 const scan = (text) => declarations(text, file);
 
+function withRepository(initialSource, approvals, callback) {
+  const root = mkdtempSync(join(tmpdir(), "process-statics-review-"));
+  const git = (...args) => execFileSync("git", args, { cwd: root, stdio: "pipe" }).toString().trim();
+  try {
+    mkdirSync(join(root, "crates/openhuman-core/src/example"), { recursive: true });
+    mkdirSync(join(root, "scripts/ci"), { recursive: true });
+    writeFileSync(join(root, file), initialSource);
+    writeFileSync(join(root, "scripts/ci/process-statics.json"), JSON.stringify(approvals));
+    git("init"); git("add", ".");
+    git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "-c", "core.hooksPath=/dev/null", "commit", "-m", "base");
+    return callback(root, git, git("rev-parse", "HEAD"));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+test("previous ownership records cannot be removed while the declaration survives", () => {
+  withRepository(source, [entry], (root, _git, base) => {
+    writeFileSync(join(root, "scripts/ci/process-statics.json"), "[]");
+    assert.equal(checkRepository(root, base).errors.length > 0, true);
+  });
+});
+
+test("non-ASCII and newline filenames cannot bypass the tracked source scan", () => {
+  withRepository("pub fn example() {}", [], (root, git, base) => {
+    for (const name of ["缓存.rs", "line\nbreak.rs"]) {
+      const path = "crates/openhuman-core/src/" + name;
+      writeFileSync(join(root, path), source);
+      git("add", path);
+    }
+    assert.equal(checkRepository(root, base).errors.length, 2);
+  });
+});
+
+test("ABI literals remain part of the declared type signature", () => {
+  const before = scan('static CALLBACK: extern "C" fn() = x;');
+  const after = scan('static CALLBACK: extern "C-unwind" fn() = x;');
+  assert.notEqual(before[0].type, after[0].type);
+  assert.equal(reviewChanges(before, after, []).length, 1);
+});
+
 test("finds multiline, qualified, mutable and lazy_static declarations", () => {
   assert.deepEqual(
     scan(
