@@ -201,7 +201,9 @@ async fn saas_dispatch_exposes_only_the_callers_detached_worker_controls() {
             Some(true)
         );
         assert!(crate::core::all::schema_for_rpc_method("openhuman.config_get_config").is_none());
-        let unreviewed = crate::agent::orchestration::command_center::all_registered_controllers()
+        let unreviewed =
+            crate::agent::orchestration::command_center::all_command_center_registered_controllers(
+            )
             .into_iter()
             .find(|controller| controller.schema.function == "list")
             .expect("existing Agent controller")
