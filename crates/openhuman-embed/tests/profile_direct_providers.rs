@@ -87,7 +87,7 @@ fn profile_uses_operator_direct_chat_and_search_with_no_managed_traffic() {
 }
 
 async fn scenario() {
-    let module = std::env::var_os("TINYSEARCH_TEST_MODULE").is_some();
+    let module = openhuman_core::modules::local_artifact("tinysearch").is_some();
     let (managed, chat, exa, gemini) = (
         MockServer::start().await,
         MockServer::start().await,

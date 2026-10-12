@@ -113,10 +113,11 @@ fn files_under(dir: &Path) -> Vec<std::path::PathBuf> {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn each_agent_searches_with_its_own_in_memory_key() {
-    if std::env::var_os("TINYSEARCH_TEST_MODULE").is_none() {
+    if openhuman_core::modules::local_artifact("tinysearch").is_none() {
         eprintln!(
-            "SKIPPED (not run, not asserted): TINYSEARCH_TEST_MODULE is not set. Build vendor/tinysearch \
-             and export TINYSEARCH_TEST_MODULE=<path to libtinysearch>, or use scripts/test-rust-with-mock.sh"
+            "SKIPPED (not run, not asserted): no tinysearch library. Run \
+             `node scripts/modules/build.mjs tinysearch` and set OPENHUMAN_MODULE_SOURCE_DIR, \
+             or use scripts/test-rust-with-mock.sh"
         );
         return;
     }

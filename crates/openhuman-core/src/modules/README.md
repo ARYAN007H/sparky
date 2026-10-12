@@ -157,8 +157,7 @@ honoured (no factory registered, no built artifact), the module is served from
 `release`, one `warn` line names the id and both modes, and
 `ModuleStatus.detail` carries the reason. `modules.list` reports the serving
 source in `source` (`release`, `linked`, `source`, `local_file`); it never
-carries a path. The former `TINYSEARCH_TEST_MODULE` / `TINYJUICE_TEST_MODULE` /
-`TINYCONNECTORS_TEST_MODULE` variables are no longer read by the loader.
+carries a path. No per-module artifact environment variable is read any more.
 
 Inside the release cache, tinybus looks for the archive in the bundled
 directory first, then in `install_dir/<id>/<version>/<host_key>`, and
