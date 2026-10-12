@@ -4,6 +4,53 @@ use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
 use crate::tools::toolpacks::ToolGroups;
 use std::sync::Arc;
 
+#[derive(Clone)]
+struct CapturedScopeLogs(Arc<std::sync::Mutex<Vec<u8>>>);
+
+impl std::io::Write for CapturedScopeLogs {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.0.lock().unwrap().extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[test]
+fn dormant_scope_epochs_do_not_accumulate_with_profile_churn() {
+    let _guard = composio_cache_test_lock();
+    for index in 0..128 {
+        drop(cache_generation(&format!(
+            "review-dormant-{index}/snapshot"
+        )));
+    }
+    let count = CACHE_GENERATIONS
+        .read()
+        .unwrap()
+        .keys()
+        .filter(|key| key.starts_with("review-dormant-"))
+        .count();
+    assert!(
+        count <= 1,
+        "dormant epochs must not grow with historical profiles: {count}"
+    );
+}
+
+#[test]
+fn epoch_reclamation_preserves_the_lease_fencing_an_in_flight_fetch() {
+    let _guard = composio_cache_test_lock();
+    let original = cache_generation("review-live/snapshot");
+    original.fetch_add(1, Ordering::SeqCst);
+    for index in 0..128 {
+        drop(cache_generation(&format!("review-churn-{index}/snapshot")));
+    }
+    let resumed = cache_generation("review-live/snapshot");
+    assert!(Arc::ptr_eq(&original, &resumed));
+    assert_eq!(resumed.load(Ordering::SeqCst), 1);
+}
+
 /// Give both profiles one isolated configuration and one fake service identity.
 fn config(dir: &std::path::Path) -> Config {
     let mut config = Config {
@@ -185,6 +232,15 @@ fn no_saas_profile_cannot_invalidate_or_reconcile_any_snapshot() {
         return;
     }
     crate::core::runtime::mode::lock_mode(crate::core::runtime::Mode::Saas).unwrap();
+    let captured = CapturedScopeLogs(Arc::new(std::sync::Mutex::new(Vec::new())));
+    let writer = captured.clone();
+    let subscriber = tracing_subscriber::fmt()
+        .without_time()
+        .with_ansi(false)
+        .with_max_level(tracing::Level::WARN)
+        .with_writer(move || writer.clone())
+        .finish();
+    let _subscriber_guard = tracing::subscriber::set_default(subscriber);
     let dir = tempfile::tempdir().unwrap();
     let mut config = config(dir.path());
     config.composio.mode = crate::config::schema::COMPOSIO_MODE_DIRECT.into();
@@ -243,6 +299,13 @@ fn no_saas_profile_cannot_invalidate_or_reconcile_any_snapshot() {
     });
     assert!(INTEGRATIONS_CACHE.read().unwrap().contains_key(&key));
     assert_eq!(epoch.load(Ordering::SeqCst), generation);
+    let logs = String::from_utf8(captured.0.lock().unwrap().clone()).unwrap();
+    assert!(
+        logs.matches("scope_resolution_refused").count() >= 3,
+        "scope failures must be observable for fetch and cache mutation: {logs}"
+    );
+    assert!(!logs.contains("ck_shared_scope_fixture"));
+    assert!(!logs.contains("unscoped-mutation-alice"));
 }
 
 /// Desktop agents share their operator catalog and its invalidation epoch.
