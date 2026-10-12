@@ -145,6 +145,8 @@ export function stripRustComments(text, { preserveLiterals = false, compact = fa
         ((word(left) && word(right)) ||
          (word(left) && ['"', "'", '#'].includes(right)) ||
          (['"', "'", '#'].includes(left) && word(right)) ||
+         (left === '.' && /[0-9]/.test(right)) ||
+         (/[0-9]/.test(left) && right === '.') ||
          joins.has(left + right))) out += ' ';
     out += chunk;
     pendingBoundary = false;
@@ -194,9 +196,10 @@ export function stripRustComments(text, { preserveLiterals = false, compact = fa
       append(preserveLiterals ? text.slice(i, j + 1) : blank(text.slice(i, j + 1)));
       i = j + 1;
     } else {
-      if (compact && /\s/.test(text[i])) pendingBoundary = true;
-      else append(text[i]);
-      i++;
+      const char = String.fromCodePoint(text.codePointAt(i));
+      if (compact && /\s/.test(char)) pendingBoundary = true;
+      else append(char);
+      i += char.length;
     }
   }
   return out;
