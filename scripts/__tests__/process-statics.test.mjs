@@ -326,3 +326,12 @@ test("literal static declarations in macro templates require source ownership re
   assert.equal(after.length, 1);
   assert.equal(reviewChanges(before, after, []).length, 1);
 });
+
+test("numeric and supplementary Unicode macro token boundaries remain distinct", () => {
+  for (const [left, right] of [["1 . 0", "1.0"], ["𐐀 𐐁", "𐐀𐐁"]]) {
+    const before = scan(`static X: ty!(${left}) = x;`);
+    const after = scan(`static X: ty!(${right}) = x;`);
+    assert.notEqual(before[0].type, after[0].type, left);
+    assert.equal(reviewChanges(before, after, []).length, 1);
+  }
+});
