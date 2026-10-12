@@ -7,7 +7,7 @@
 //! must authenticate with that agent's key and no other, and the key must stay
 //! out of the environment, every file and every log line.
 //!
-//! Needs the real module: CI and `scripts/test-rust-with-mock.sh` build the
+//! Needs the real module: `scripts/test-rust-with-mock.sh` stages the
 //! pinned `vendor/tinysearch` (`node scripts/modules/build.mjs tinysearch`). The
 //! provider is a loopback stand-in, so nothing leaves the machine.
 

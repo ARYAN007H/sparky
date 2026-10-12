@@ -1,7 +1,7 @@
 //! A profile answers from the operator's direct chat provider and searches
 //! through direct Exa and Gemini endpoints, with no managed-backend traffic.
 //! One runtime and one test: SaaS operating mode is process-wide. The search
-//! half needs the real module (`TINYSEARCH_TEST_MODULE`), as in
+//! half needs the real module (`node scripts/modules/build.mjs tinysearch`), as in
 //! `tests/search_pinned_keys_e2e.rs`; without it only chat is asserted.
 
 mod common;
