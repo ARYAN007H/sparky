@@ -179,7 +179,7 @@ PRODUCT_FEATURES="$(bash "$REPO_ROOT/scripts/ci/product-features.sh")"
 module_target="$(bash "$SCRIPT_DIR/ci/native-test-module-platform.sh")"
 IFS=$'\t' read -r module_ext module_platform <<< "$module_target"
 # shellcheck source=modules/stage-local-modules.sh
-REPO_ROOT="$REPO_ROOT" source "$SCRIPT_DIR/modules/stage-local-modules.sh"
+source "$SCRIPT_DIR/modules/stage-local-modules.sh"
 # With OPENHUMAN_MODULE_SOURCE=source the modules below are built from the pinned
 # submodules (scripts/modules/build.mjs); otherwise TinyBox and TinyMCP are the
 # registry-pinned releases, as in CI.
