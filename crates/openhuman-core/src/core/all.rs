@@ -4,7 +4,11 @@
 //! controllers (e.g., memory, skills, config) and providing a unified
 //! interface for both the CLI and RPC layers to invoke them.
 
-use std::{future::Future, pin::Pin, sync::{Arc, OnceLock, RwLock}};
+use std::{
+    future::Future,
+    pin::Pin,
+    sync::{Arc, OnceLock, RwLock},
+};
 
 use serde_json::{Map, Value};
 
