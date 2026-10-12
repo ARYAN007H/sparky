@@ -162,7 +162,7 @@ async fn saas_dispatch_exposes_only_the_callers_detached_worker_controls() {
     }
     let mut pair = Pair::new();
     let admitted = |name: &str, workspace: &std::path::Path| {
-        CoreContext::for_test(DomainSet::full(), None).derive_with(
+        CoreContext::for_test(DomainSet::saas(), None).derive_with(
             ContextOverlay::new(
                 crate::config::Config {
                     workspace_dir: workspace.to_path_buf(),
