@@ -24,6 +24,7 @@
 //   node scripts/ci/check-storage-bypass.mjs --root <dir>   (tests)
 
 import { execFileSync } from "node:child_process";
+import { realpathSync } from "node:fs";
 import { stripRustComments } from "./check-crate-chain.mjs";
 import {
   validateCoverageDebt,
@@ -44,21 +45,20 @@ const baselinePath = resolve(
   "scripts/ci/storage-bypass-baseline.json",
 );
 const writeBaseline = process.argv.includes("--write-baseline");
-const enforceHistory =
-  rootFlag === -1 ||
-  (() => {
-    try {
-      return (
-        execFileSync("git", ["rev-parse", "--show-toplevel"], {
-          cwd: repoRoot,
-          encoding: "utf8",
-          stdio: ["ignore", "pipe", "pipe"],
-        }).trim() === repoRoot
-      );
-    } catch {
-      return false;
-    }
-  })();
+/** Identify the actual checkout across symlinks and platform path spelling. */
+function sameCheckout(root) {
+  try {
+    const top = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+    return realpathSync(top) === realpathSync(root);
+  } catch {
+    return false;
+  }
+}
+const enforceHistory = rootFlag === -1 || sameCheckout(repoRoot);
 
 export const CURATED_VENDOR_ROOTS = [
   "vendor/tinyagents/crates/tinyagents-session/src/run_ledger",
@@ -249,15 +249,7 @@ export async function collectFindings(root, { includeAllowed = false } = {}) {
   const roots = (await readdir(scanRoot, { withFileTypes: true }))
     .filter((e) => e.isDirectory())
     .map((e) => resolve(scanRoot, e.name, "src"));
-  let realCheckout = false;
-  try {
-    realCheckout =
-      execFileSync("git", ["rev-parse", "--show-toplevel"], {
-        cwd: root,
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "pipe"],
-      }).trim() === resolve(root);
-  } catch {}
+  const realCheckout = sameCheckout(root);
   const files = (
     await Promise.all(roots.map((path) => rustFiles(path)))
   ).flat();
