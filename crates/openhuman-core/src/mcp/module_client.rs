@@ -263,6 +263,9 @@ impl McpConfiguredClient {
             return Err(ModuleCallError::Unavailable);
         }
         let data_dir = crate::core::runtime::agent_scope_dir(config);
+        if Self::cleanup_pending(&data_dir) {
+            return Err(ModuleCallError::Unavailable);
+        }
         #[cfg(test)]
         {
             let mut hook = AFTER_CONTEXT_CHECK
@@ -277,9 +280,6 @@ impl McpConfiguredClient {
                     let _ = sender.send(());
                 }
             }
-        }
-        if current_agent_context_is_removed() || Self::cleanup_pending(&data_dir) {
-            return Err(ModuleCallError::Unavailable);
         }
         let clients = CLIENTS.get_or_init(|| Mutex::new(HashMap::new()));
         let mut clients = clients
