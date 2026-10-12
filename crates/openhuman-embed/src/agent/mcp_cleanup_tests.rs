@@ -93,13 +93,15 @@ fn the_last_runtime_guard_keeps_admission_reserved_through_cleanup_completion() 
                     entered_tx.send(()).unwrap();
                     release_rx.recv().unwrap();
                 });
+                guard.is_some()
             });
             entered_rx.recv().unwrap();
             let guard_is_live = weak.upgrade().is_some();
             let admission_is_reserved =
                 crate::runtime::RUNTIME_LIVE.load(std::sync::atomic::Ordering::Acquire);
             release_tx.send(()).unwrap();
-            worker.join().unwrap();
+            let retry_guard_is_retained = worker.join().unwrap();
+            assert!(retry_guard_is_retained, "a failed completion may retry and must retain runtime admission until the task ends");
             assert!(
                 guard_is_live,
                 "completion must retain the last real workspace/runtime guard"
