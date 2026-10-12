@@ -48,7 +48,7 @@ use openhuman_rpc::embed::modules::{register_linked, LinkedFactory};
 /// Empty when no module feature is enabled.
 #[must_use]
 pub fn linked_modules() -> Vec<(&'static str, LinkedFactory)> {
-    #[allow(unused_mut)]
+    #[allow(unused_mut, clippy::vec_init_then_push)]
     let mut modules: Vec<(&'static str, LinkedFactory)> = Vec::new();
     #[cfg(feature = "tinychannels")]
     modules.push(("tinychannels", tinychannels_module::linked_module));
