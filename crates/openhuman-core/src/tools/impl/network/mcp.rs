@@ -360,7 +360,7 @@ impl Tool for McpCallTool {
             .cloned()
             .ok_or_else(|| anyhow::anyhow!("missing MCP tool arguments"))?;
         let arguments = client
-            .normalize_tool_arguments(&client_config, arguments)
+            .normalize_tool_arguments(arguments)
             .await
             .map_err(|_| anyhow::anyhow!("invalid MCP tool arguments"))?;
         Ok(Some(call.with_arguments(Value::Object(arguments))))
@@ -393,7 +393,7 @@ impl Tool for McpCallTool {
         };
         let client_config = host::client_config(&self.config);
         let arguments = match client
-            .normalize_tool_arguments(&client_config, arguments)
+            .normalize_tool_arguments(arguments)
             .await
         {
             Ok(arguments) => Value::Object(arguments),

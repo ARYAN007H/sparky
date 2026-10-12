@@ -96,6 +96,14 @@ pub(crate) trait McpModulePort: Send + Sync {
         &self,
         request: ValidateServerArgumentsRequest,
     ) -> Result<ServerArgumentsValidation, ModuleCallError>;
+
+    /// Normalizes model-supplied arguments through TinyMCP's root operation.
+    async fn normalize_tool_arguments(
+        &self,
+        _arguments: Option<Value>,
+    ) -> Result<Map<String, Value>, ModuleCallError> {
+        Err(ModuleCallError::IncompatibleContract)
+    }
 }
 
 struct TinyMcpPort {
@@ -182,6 +190,15 @@ impl McpModulePort for TinyMcpPort {
                 names::methods::VALIDATE_SERVER_ARGUMENTS,
                 (request,),
             )
+            .await
+    }
+
+    async fn normalize_tool_arguments(
+        &self,
+        arguments: Option<Value>,
+    ) -> Result<Map<String, Value>, ModuleCallError> {
+        self.root
+            .call(MODULE, names::methods::NORMALIZE_TOOL_ARGUMENTS, (arguments,))
             .await
     }
 }
@@ -405,15 +422,12 @@ impl McpConfiguredClient {
     /// implementation operation.
     pub(crate) async fn normalize_tool_arguments(
         &self,
-        config: &McpClientConfig,
         arguments: Value,
     ) -> Result<Map<String, Value>, ModuleCallError> {
-        self.call_confidential(
-            config,
-            names::methods::NORMALIZE_TOOL_ARGUMENTS,
-            (Some(arguments),),
-        )
-        .await
+        if SHUTTING_DOWN.load(Ordering::Acquire) {
+            return Err(ModuleCallError::Unavailable);
+        }
+        self.port.normalize_tool_arguments(Some(arguments)).await
     }
 
     /// Loads and prepares configured-server tools from TinyMCP's persistent
