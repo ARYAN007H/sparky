@@ -151,3 +151,7 @@ impl UiServerPort for HostUiPort {
             .map_err(|error| error.to_string())
     }
 }
+
+#[cfg(test)]
+#[path = "port_tests.rs"]
+mod tests;
