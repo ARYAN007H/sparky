@@ -16,14 +16,20 @@ fn capability_of_a_disabled_component_shows_disabled() {
     assert_eq!(marked.id, cap.id);
     // Another component being off leaves it alone.
     assert_eq!(apply_components(cap, &off("wallet")).status, cap.status);
-    assert_eq!(apply_components(cap, &ComponentSet::all()).status, cap.status);
+    assert_eq!(
+        apply_components(cap, &ComponentSet::all()).status,
+        cap.status
+    );
 }
 
 #[test]
 fn domain_mapping_names_real_components() {
     for cap in super::super::all_capabilities() {
         if let Some(name) = component_for_domain(cap.domain) {
-            assert!(crate::core::runtime::COMPONENT_NAMES.contains(&name), "{name}");
+            assert!(
+                crate::core::runtime::COMPONENT_NAMES.contains(&name),
+                "{name}"
+            );
         }
     }
 }

@@ -26,7 +26,10 @@ pub fn load_enabled(host: &ModuleHost, skip: &[String]) -> Vec<Result<ModuleInfo
         return host.load_search_paths();
     }
     let mut outcomes = Vec::new();
-    for dir in ModuleHost::search_paths().into_iter().filter(|p| p.is_dir()) {
+    for dir in ModuleHost::search_paths()
+        .into_iter()
+        .filter(|p| p.is_dir())
+    {
         let mut files: Vec<_> = match std::fs::read_dir(&dir) {
             Ok(entries) => entries.filter_map(|e| e.ok().map(|e| e.path())).collect(),
             Err(_) => Vec::new(),
@@ -45,7 +48,10 @@ pub fn load_enabled(host: &ModuleHost, skip: &[String]) -> Vec<Result<ModuleInfo
                 log::debug!("[modules] search-path artifact skipped: component disabled");
                 continue;
             }
-            if file.extension().is_some_and(|e| matches!(e.to_str(), Some("so" | "dylib" | "dll"))) {
+            if file
+                .extension()
+                .is_some_and(|e| matches!(e.to_str(), Some("so" | "dylib" | "dll")))
+            {
                 outcomes.push(host.load_file(&file));
             }
         }
