@@ -374,13 +374,6 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
         {
           name: "test-modules",
           when: core,
-          env: ex63
-            ? {
-                TINYCONNECTORS_TARGET_DIR: `${scratch}/target/tinyconnectors`,
-                ...rustEnv,
-                ...sccache,
-              }
-            : {},
           run: `bash scripts/ci/self-hosted/install-test-modules.sh "${modulesDir}" ${modulesEnvFile}`,
         },
         {
