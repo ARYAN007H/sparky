@@ -181,9 +181,12 @@ impl StorageGrant {
 /// that does adds its row here (a declaration is a reviewable build-time
 /// decision, like the registry's digests) and then calls
 /// `ai.tinyhumans.tinystorage.Storage`; until then it has no storage at all.
+/// One module's declaration: its registry id and the grant it holds.
+type Declaration = (&'static str, fn() -> StorageGrant);
+
 #[must_use]
 pub fn declared(module_id: &str) -> Option<StorageGrant> {
-    let table: &[(&str, fn() -> StorageGrant)] = &[];
+    let table: &[Declaration] = &[];
     table
         .iter()
         .find(|(id, _)| *id == module_id)
