@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { validateCoverageDebt, validateAllowances } from "../ci/storage-bypass-debt.mjs";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { execFileSync } from "node:child_process";
+import { validateCoverageDebt, validateAllowances, historicalFindings } from "../ci/storage-bypass-debt.mjs";
 import { compare, scan, CURATED_VENDOR_ROOTS } from "../ci/check-storage-bypass.mjs";
 const row = {
   rule: "json-write", path: "crates/openhuman-embed/src/state.rs", text: "tokio::fs::write(path, bytes);", occurrence: 1,
@@ -56,4 +60,15 @@ test("curated vendor coverage excludes native drivers but not host adapter write
 });
 test("new serializer and helper rules ignore quoted and commented fixture text", () => {
   assert.deepEqual(scan("x.rs", 'let fixture = "serde_json::to_writer(file, value);";\n/* fn write_atomic(path) {} */'), []);
+});
+
+test("missing canonical base history fails closed", () => {
+  const root = mkdtempSync(join(tmpdir(), "storage-history-"));
+  try {
+    execFileSync("git", ["init"], { cwd: root, stdio: "ignore" });
+    assert.throws(() => historicalFindings(root, { scan, withoutAllowed: (_, x) => x, isTestFile: () => false, CURATED_VENDOR_ROOTS: [] }));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+test("quoted database opener examples do not count as host persistence", () => {
+  assert.deepEqual(scan("crates/openhuman-embed/src/example.rs", 'let example = r#"OtherStore::open(root.join("cache.db"))"#;'), []);
 });

@@ -231,6 +231,7 @@ test("untouched areas leave only the always-on gates", () => {
     "static:orch-ip-gate",
     "static:feature-forwarding",
     "static:crate-chain",
+    "static:storage-bypass",
     "static:module-pins",
     "static:submodule-monotonic",
   ]);
@@ -267,6 +268,7 @@ test("the storage area arms only the storage-drivers lane, with the sqlite and f
         "static:orch-ip-gate",
         "static:feature-forwarding",
         "static:crate-chain",
+    "static:storage-bypass",
         "static:module-pins",
         "static:submodule-monotonic",
       ],
@@ -673,5 +675,15 @@ test("module boundary policy and checker changes arm their own scripts lane", ()
   const scripts = filters.split(/^scripts:\s*$/m)[1].split(/^\S[^\n]*:/m)[0];
   for (const file of ["scripts/ci/check-module-boundaries.mjs", "scripts/ci/module-boundaries.json"]) {
     assert.ok(scripts.includes(`'${file}'`), `${file} must arm the scripts area`);
+  }
+});
+
+
+test("storage-bypass runs under cancellation supervision in both profiles", () => {
+  for (const profile of ["hosted", "ex63"]) {
+    const plan = buildPlan({ profile, areas: NONE, env: profile === "ex63" ? EX63_ENV : {} });
+    const check = plan.lanes.flatMap(lane => lane.checks).find(check => check.name === "storage-bypass");
+    assert.equal(check.when, true);
+    assert.equal(check.run, "bash scripts/ci-cancel-aware.sh node scripts/ci/check-storage-bypass.mjs");
   }
 });
