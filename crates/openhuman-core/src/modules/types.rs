@@ -64,17 +64,22 @@ pub enum LoadPolicy {
     Eager,
 }
 
-/// Where a module's artifact should come from.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+/// Which source actually serves (or would serve) a module.
+///
+/// Reported in `modules.list`. It can differ from the mode requested: a
+/// `linked` request in a binary with no linked factory is served by `release`.
+/// Never carries a path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ModuleSource {
-    /// The registry-pinned GitHub release for this build.
-    Pinned,
-    /// A local artifact, for developing a module against a live core.
-    LocalFile {
-        /// Absolute path to the platform library.
-        path: String,
-    },
+    /// The registry-pinned, digest-checked GitHub release.
+    Release,
+    /// The in-process factory from `openhuman-modules-linked`.
+    Linked,
+    /// A locally built artifact selected through the `source` mode.
+    Source,
+    /// A local artifact named by a `[[modules.overrides]]` `path`.
+    LocalFile,
 }
 
 /// Lifecycle of a module as this host sees it.
@@ -113,6 +118,9 @@ pub struct ModuleStatus {
     pub bus_name: String,
     /// Current lifecycle state.
     pub state: ModuleState,
+    /// Source that serves this module under the current configuration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<ModuleSource>,
     /// Why the module is in [`ModuleState::Failed`] or
     /// [`ModuleState::Unsupported`], if it is.
     ///

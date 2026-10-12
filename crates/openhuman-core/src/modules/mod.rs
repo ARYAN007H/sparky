@@ -104,4 +104,4 @@ pub(crate) mod x402_service;
 pub use ops::{ensure_loaded, ensure_loaded_within, state_of, LoadError};
 #[cfg(feature = "modules")]
 pub use schemas::{all_controller_schemas, all_registered_controllers};
-pub use types::{LoadPolicy, ModuleRecord, ModuleState, ModuleStatus, PlatformAsset};
+pub use types::{LoadPolicy, ModuleRecord, ModuleSource, ModuleState, ModuleStatus, PlatformAsset};
