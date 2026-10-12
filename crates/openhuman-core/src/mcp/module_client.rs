@@ -35,8 +35,21 @@ const MODULE: &str = "tinymcp";
 const TRANSITION_TIMEOUT: Duration = Duration::from_secs(30);
 const TRANSITION_POLL_INTERVAL: Duration = Duration::from_millis(20);
 static CLIENTS: OnceLock<Mutex<HashMap<PathBuf, Arc<McpConfiguredClient>>>> = OnceLock::new();
+type CleanupAction = Arc<dyn Fn() -> bool + Send + Sync>;
+
+#[derive(Default)]
+struct CleanupReservation {
+    after_close: Mutex<Option<CleanupAction>>,
+}
+
+static CLEANUP_RESERVATIONS: OnceLock<Mutex<HashMap<PathBuf, Arc<CleanupReservation>>>> =
+    OnceLock::new();
 static SHUTDOWN_REGISTERED: AtomicBool = AtomicBool::new(false);
 static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
+
+#[cfg(test)]
+static AFTER_CONTEXT_CHECK: OnceLock<Mutex<Option<(PathBuf, tokio::sync::oneshot::Sender<()>)>>> =
+    OnceLock::new();
 
 #[derive(Clone)]
 struct OpenObject {
@@ -229,154 +242,12 @@ pub(crate) struct McpConfiguredClient {
     data_dir: String,
     port: Box<dyn McpModulePort>,
     state: tokio::sync::Mutex<State>,
+    retiring: AtomicBool,
 }
 
+mod lifecycle;
+
 impl McpConfiguredClient {
-    /// The process-owned configured object for this workspace. Entries remain
-    /// reachable until `close` confirms cleanup; workspace/config switching is
-    /// serialized by the client itself.
-    pub(crate) fn for_config(config: &Config) -> Result<Arc<Self>, ModuleCallError> {
-        if SHUTTING_DOWN.load(Ordering::Acquire) {
-            ModuleClient::report_unavailable(MODULE);
-            return Err(ModuleCallError::Unavailable);
-        }
-        if !config.modules.enabled {
-            ModuleClient::report_unavailable(MODULE);
-            return Err(ModuleCallError::Unavailable);
-        }
-
-        let data_dir = crate::core::runtime::agent_scope_dir(config);
-        let clients = CLIENTS.get_or_init(|| Mutex::new(HashMap::new()));
-        let mut clients = clients
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        if let Some(client) = clients.get(&data_dir) {
-            return Ok(Arc::clone(client));
-        }
-        let client = Arc::new(Self::new(&data_dir, config)?);
-        clients.insert(data_dir, Arc::clone(&client));
-        Ok(client)
-    }
-
-    /// A snapshot of configured workspaces currently retained by the host.
-    /// The supervisor only drains open objects; it never creates a workspace.
-    pub(crate) fn open_clients() -> Vec<(PathBuf, Arc<Self>)> {
-        CLIENTS
-            .get()
-            .map(|clients| {
-                clients
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .iter()
-                    .map(|(workspace, client)| (workspace.clone(), Arc::clone(client)))
-                    .collect()
-            })
-            .unwrap_or_default()
-    }
-
-    /// Drain observations from the module-owned supervisor for an open child.
-    /// An object that is opening or closing is skipped and will be revisited
-    /// on the next host poll.
-    pub(crate) async fn drain_supervisor_events(
-        &self,
-        limit: usize,
-    ) -> Result<Option<SupervisorBatch>, ModuleCallError> {
-        let state = self.state.lock().await;
-        if SHUTTING_DOWN.load(Ordering::Acquire) {
-            return Err(ModuleCallError::Unavailable);
-        }
-        let State::Open(object) = &*state else {
-            return Ok(None);
-        };
-        let args = serde_json::to_value((limit,)).map_err(|_| ModuleCallError::ModuleFault)?;
-        let reply = self
-            .port
-            .call_object(
-                &object.object_path,
-                names::methods::DRAIN_SUPERVISOR_EVENTS,
-                args,
-                false,
-            )
-            .await?;
-        serde_json::from_value(reply)
-            .map(Some)
-            .map_err(|_| ModuleCallError::ModuleFault)
-    }
-
-    /// Register this runtime's cleanup. The flag is reset by the drained hook,
-    /// so a later embedded-runtime start can register a fresh one.
-    pub(crate) fn register_shutdown_hook() {
-        if SHUTDOWN_REGISTERED.swap(true, Ordering::AcqRel) {
-            return;
-        }
-        SHUTTING_DOWN.store(false, Ordering::Release);
-        crate::core::shutdown::register(|| async {
-            SHUTTING_DOWN.store(true, Ordering::Release);
-            let clients = CLIENTS
-                .get()
-                .map(|clients| {
-                    clients
-                        .lock()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner)
-                        .values()
-                        .cloned()
-                        .collect::<Vec<_>>()
-                })
-                .unwrap_or_default();
-            for client in clients {
-                if let Err(error) = client.close().await {
-                    tracing::warn!(?error, "[mcp] workspace cleanup is still pending");
-                }
-            }
-            SHUTDOWN_REGISTERED.store(false, Ordering::Release);
-        });
-    }
-
-    pub(crate) fn new(
-        data_dir: &std::path::Path,
-        config: &Config,
-    ) -> Result<Self, ModuleCallError> {
-        let data_dir = data_dir
-            .to_str()
-            .ok_or(ModuleCallError::IncompatibleContract)?
-            .to_owned();
-        Ok(Self::with_port(
-            data_dir,
-            Box::new(TinyMcpPort {
-                root: ModuleClient::new(config.clone()),
-            }),
-        ))
-    }
-
-    #[cfg(test)]
-    pub(crate) fn install_test_port(
-        config: &Config,
-        port: Box<dyn McpModulePort>,
-    ) -> Result<Arc<Self>, ModuleCallError> {
-        let data_dir = crate::core::runtime::agent_scope_dir(config);
-        let client = Arc::new(Self::with_port(
-            data_dir
-                .to_str()
-                .ok_or(ModuleCallError::IncompatibleContract)?
-                .to_owned(),
-            port,
-        ));
-        let clients = CLIENTS.get_or_init(|| Mutex::new(HashMap::new()));
-        clients
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .insert(data_dir, Arc::clone(&client));
-        Ok(client)
-    }
-
-    fn with_port(data_dir: String, port: Box<dyn McpModulePort>) -> Self {
-        Self {
-            data_dir,
-            port,
-            state: tokio::sync::Mutex::new(State::Closed),
-        }
-    }
-
     /// Calls one member on this workspace's private configured object.
     pub(crate) async fn call<R: DeserializeOwned>(
         &self,
@@ -405,6 +276,9 @@ impl McpConfiguredClient {
         request: PrepareAgentToolsRequest,
     ) -> Result<Vec<McpToolPresentation>, ModuleCallError> {
         if SHUTTING_DOWN.load(Ordering::Acquire) {
+            return Err(ModuleCallError::Unavailable);
+        }
+        if self.retiring.load(Ordering::Acquire) {
             return Err(ModuleCallError::Unavailable);
         }
         self.port.prepare_agent_tools(request).await
@@ -436,6 +310,9 @@ impl McpConfiguredClient {
         if SHUTTING_DOWN.load(Ordering::Acquire) {
             return Err(ModuleCallError::Unavailable);
         }
+        if self.retiring.load(Ordering::Acquire) {
+            return Err(ModuleCallError::Unavailable);
+        }
         self.port.validate_server_arguments(request).await
     }
 
@@ -448,6 +325,9 @@ impl McpConfiguredClient {
         if SHUTTING_DOWN.load(Ordering::Acquire) {
             return Err(ModuleCallError::Unavailable);
         }
+        if self.retiring.load(Ordering::Acquire) {
+            return Err(ModuleCallError::Unavailable);
+        }
         self.port.normalize_tool_arguments(arguments).await
     }
 
@@ -457,6 +337,9 @@ impl McpConfiguredClient {
         value: &str,
     ) -> Result<String, ModuleCallError> {
         if SHUTTING_DOWN.load(Ordering::Acquire) {
+            return Err(ModuleCallError::Unavailable);
+        }
+        if self.retiring.load(Ordering::Acquire) {
             return Err(ModuleCallError::Unavailable);
         }
         self.port
@@ -557,7 +440,7 @@ impl McpConfiguredClient {
     ) -> Result<R, ModuleCallError> {
         let args = serde_json::to_value(args).map_err(|_| ModuleCallError::ModuleFault)?;
         let mut state = self.state.lock().await;
-        if SHUTTING_DOWN.load(Ordering::Acquire) {
+        if SHUTTING_DOWN.load(Ordering::Acquire) || self.retiring.load(Ordering::Acquire) {
             return Err(ModuleCallError::Unavailable);
         }
         let object = self.ensure_open(&mut state, config).await?;
@@ -738,6 +621,17 @@ impl McpConfiguredClient {
         .await
         .map_err(|_| ModuleCallError::TransportFailed)?
     }
+}
+
+fn current_agent_context_is_removed() -> bool {
+    let Some(context) = crate::core::runtime::CoreContext::current() else {
+        return false;
+    };
+    context.session_agent().is_some()
+        && context
+            .host_overrides()
+            .and_then(|overrides| overrides.approval_scope())
+            .is_some_and(|scope| scope.is_closed())
 }
 
 #[cfg(test)]

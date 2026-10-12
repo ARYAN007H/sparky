@@ -45,7 +45,17 @@ fn saas_cli_does_not_expose_host_files_without_a_host_adapter() {
     assert_eq!(status, 200, "{body}");
     assert!(body.get("result").is_some(), "{body}");
 
+    wait_until(
+        "host-files inference request",
+        &node,
+        Duration::from_secs(60),
+        || llm.recorded().iter().any(|request| request.is_inference()),
+    );
     let requests = llm.recorded();
+    assert!(
+        requests.iter().any(|request| request.is_inference()),
+        "the tool exposure assertion requires an inference request"
+    );
     let offered: Vec<_> = requests
         .iter()
         .filter(|request| request.is_inference())

@@ -157,7 +157,7 @@ if [ ! -f "$hosts_dir/libtinyhosts.$module_ext" ]; then
   else
     echo "${hosts_sha256}  $hosts_archive" | sha256sum --check
   fi
-  tar -xzf "$hosts_archive" -C "$hosts_dir"
+  tar --no-same-owner -xzf "$hosts_archive" -C "$hosts_dir"
 fi
 export OPENHUMAN_TINYHOSTS_TEST_MODULE="$hosts_dir/libtinyhosts.$module_ext"
 
@@ -177,7 +177,7 @@ if [ ! -f "$tinybox_dir/libtinybox.$module_ext" ]; then
   else
     echo "${tinybox_sha256}  $tinybox_archive" | sha256sum --check
   fi
-  tar -xzf "$tinybox_archive" -C "$tinybox_dir"
+  tar --no-same-owner -xzf "$tinybox_archive" -C "$tinybox_dir"
 fi
 export OPENHUMAN_MODULE_PATH="$tinybox_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
 
@@ -333,7 +333,7 @@ run_full_suite() {
   # the published contract in a fresh libtest process with its pinned artifact.
   TINYCONNECTORS_TEST_MODULE="${TINYCONNECTORS_TEST_MODULE:-$connectors_module}" \
     cargo_test --lib \
-      hosting::hosting_tests::released_artifact_serves_providers_and_confidential_local_preparation \
+      hosting::test::released_artifact_serves_providers_and_confidential_local_preparation \
       -- --exact --ignored --test-threads=1
 }
 
