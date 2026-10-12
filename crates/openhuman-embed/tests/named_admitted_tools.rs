@@ -2,6 +2,8 @@
 //! it names, although their domain family is off, and nothing else from that
 //! family: not the shell or file tools, even when it names them too. `cron` is
 //! deferred (found with `tool_search`), so it is called rather than listed.
+//! The default definition's sub-agents stay out too: the scope names no
+//! spawn tool.
 //!
 //! One runtime per process, so one test in this binary.
 
@@ -13,8 +15,8 @@ use common::{
     chat_requests, offline_config, runtime, stub_backend, tool_call_completion, tool_names,
 };
 use openhuman_embed::{
-    AgentDefinitionSpec, AgentSpec, DomainSet, HostTurnTools, InMemorySessionStores, Runtime,
-    ToolGroups, ToolScopeSpec, Workspace,
+    AgentDefinitionSpec, AgentSpec, DomainSet, GroupMode, HostTurnTools, InMemorySessionStores,
+    Runtime, ToolGroups, ToolScopeSpec, Workspace,
 };
 
 #[test]
@@ -38,7 +40,8 @@ fn a_named_scope_admits_the_clock_and_scheduler_but_never_the_shell() {
                     inference: true,
                     ..DomainSet::harness()
                 })
-                .tool_groups(ToolGroups::advertised())
+                // Packs off except scheduling, so `cron` is not packed away.
+                .tool_groups(ToolGroups::none().with("scheduling", GroupMode::Advertised))
                 .build()
                 .await
                 .expect("runtime builds");
@@ -63,7 +66,17 @@ fn a_named_scope_admits_the_clock_and_scheduler_but_never_the_shell() {
                     "{admitted} missing: {offered:?}"
                 );
             }
-            for refused in ["shell", "file_read"] {
+            // Neither the shell and files, nor the default definition's
+            // sub-agents: a named scope that names no spawn tool delegates
+            // nothing, on the first turn or any later one.
+            for refused in [
+                "shell",
+                "file_read",
+                "manage_tasks",
+                "analyze_image",
+                "create_image",
+                "create_video",
+            ] {
                 assert!(
                     !offered.iter().any(|name| name == refused),
                     "{refused} offered: {offered:?}"
