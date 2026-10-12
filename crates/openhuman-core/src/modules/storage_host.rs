@@ -46,9 +46,7 @@ use tinystoragedrivers::secrets::{DocumentSecrets, KeyProvider};
 use tinystoragedrivers_bus::{StorageFailure, StorageKind, STORAGE_INTERFACE};
 use tinystoragedrivers_client::{Admission, StorageServer};
 
-use super::storage_grants::{
-    authorize, declared, filter_reply, Object, Plan, StorageGrant,
-};
+use super::storage_grants::{authorize, declared, filter_reply, Object, Plan, StorageGrant};
 use crate::storage::{Scope, StorageBackend, StorageError};
 
 /// Where the four objects are served: `<root>/<Object>`.
@@ -507,7 +505,8 @@ impl Environment for Live {
         // A module call arrives on the module bus, outside any turn, so with no
         // tenant the host's default scope applies (refused in SaaS mode).
         let tenant = crate::core::runtime::current_tenant().unwrap_or_default();
-        let base = crate::storage::scope_from(tenant.profile.as_deref(), tenant.agent.as_deref(), saas)?;
+        let base =
+            crate::storage::scope_from(tenant.profile.as_deref(), tenant.agent.as_deref(), saas)?;
         module_scope(tenant.profile.as_deref(), &base, module_id)
     }
 
@@ -530,11 +529,7 @@ pub(super) async fn install(connection: &tinybus::Connection) -> tinybus::Result
     let live = Arc::new(Live {
         connection: connection.clone(),
     });
-    let host = Arc::new(StorageHost::new(
-        live.clone(),
-        live,
-        Arc::new(LogAudit),
-    ));
+    let host = Arc::new(StorageHost::new(live.clone(), live, Arc::new(LogAudit)));
     for object in [
         Object::Documents,
         Object::Streams,

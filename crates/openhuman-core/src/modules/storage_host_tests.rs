@@ -119,6 +119,28 @@ fn rig() -> Rig {
     }
 }
 
+/// A rig where only `module` (bus name `:1.1`) declares `grant`.
+fn rig_with(module: &'static str, grant: StorageGrant) -> Rig {
+    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::new());
+    let env = Arc::new(Env {
+        backend: Mutex::new(Some(Arc::clone(&backend))),
+        profile: Mutex::new(None),
+        grants: HashMap::from([(module, grant)]),
+        fences: Mutex::new(None),
+    });
+    let trail = Arc::new(Trail::default());
+    Rig {
+        host: StorageHost::new(
+            Arc::new(Directory(HashMap::from([(":1.1".into(), module.into())]))),
+            Arc::clone(&env) as Arc<dyn Environment>,
+            Arc::clone(&trail) as Arc<dyn AuditSink>,
+        ),
+        env,
+        trail,
+        backend,
+    }
+}
+
 fn put(collection: &str, id: &str, doc: Value) -> Value {
     json!({
         "collection": collection,
@@ -151,9 +173,15 @@ fn denied(label: &'static str) -> Result<Value, HostError> {
 #[tokio::test]
 async fn a_module_stores_and_reads_its_own_documents() {
     let rig = rig();
-    call(&rig, &alpha(), Object::Documents, "Put", put("notes", "a", json!({"v": 1})))
-        .await
-        .unwrap();
+    call(
+        &rig,
+        &alpha(),
+        Object::Documents,
+        "Put",
+        put("notes", "a", json!({"v": 1})),
+    )
+    .await
+    .unwrap();
     let found = call(&rig, &alpha(), Object::Documents, "Get", get("notes", "a"))
         .await
         .unwrap();
@@ -180,7 +208,14 @@ async fn a_call_with_no_authenticated_sender_is_refused() {
 #[tokio::test]
 async fn a_peer_that_is_not_a_registry_module_is_refused() {
     let rig = rig();
-    let result = call(&rig, &stranger(), Object::Documents, "Get", get("notes", "a")).await;
+    let result = call(
+        &rig,
+        &stranger(),
+        Object::Documents,
+        "Get",
+        get("notes", "a"),
+    )
+    .await;
     assert_eq!(result, denied("unknown-caller"));
 }
 
@@ -208,9 +243,15 @@ async fn a_module_without_a_declared_grant_has_no_storage() {
 #[tokio::test]
 async fn a_module_cannot_name_another_modules_collection() {
     let rig = rig();
-    call(&rig, &alpha(), Object::Documents, "Put", put("notes", "a", json!({"v": 1})))
-        .await
-        .unwrap();
+    call(
+        &rig,
+        &alpha(),
+        Object::Documents,
+        "Put",
+        put("notes", "a", json!({"v": 1})),
+    )
+    .await
+    .unwrap();
     // beta is granted "other", not "notes".
     for selector in ["Get", "Put", "Delete"] {
         let request = if selector == "Put" {
@@ -252,8 +293,14 @@ async fn two_modules_granted_the_same_collection_name_do_not_share_documents() {
     let ask = |who: BusName, selector: &'static str, request: Value| {
         let host = &host;
         async move {
-            host.handle(Object::Documents, selector, request, Some(&who), Admission::Private)
-                .await
+            host.handle(
+                Object::Documents,
+                selector,
+                request,
+                Some(&who),
+                Admission::Private,
+            )
+            .await
         }
     };
     ask(alpha(), "Put", put("notes", "a", json!({"owner": "alpha"})))
@@ -268,15 +315,24 @@ async fn two_modules_granted_the_same_collection_name_do_not_share_documents() {
         .await
         .unwrap();
     let alphas = ask(alpha(), "Get", get("notes", "a")).await.unwrap();
-    assert_eq!(alphas["document_json"], json!({"owner": "alpha"}).to_string());
+    assert_eq!(
+        alphas["document_json"],
+        json!({"owner": "alpha"}).to_string()
+    );
 }
 
 #[tokio::test]
 async fn a_module_in_another_scope_does_not_see_the_data() {
     let rig = rig();
-    call(&rig, &alpha(), Object::Documents, "Put", put("notes", "a", json!({"v": 1})))
-        .await
-        .unwrap();
+    call(
+        &rig,
+        &alpha(),
+        Object::Documents,
+        "Put",
+        put("notes", "a", json!({"v": 1})),
+    )
+    .await
+    .unwrap();
     // The same module, acting for a different tenant, is a different scope.
     *rig.env.profile.lock().unwrap() = Some("acme".into());
     let other = call(&rig, &alpha(), Object::Documents, "Get", get("notes", "a"))
@@ -309,26 +365,70 @@ async fn a_request_cannot_carry_a_scope_a_database_or_a_grant() {
 
 #[tokio::test]
 async fn the_host_ensures_declared_schema_and_the_module_cannot_change_it() {
-    let rig = rig();
-    // Binding ran ensure_collection for the declared spec.
-    call(&rig, &alpha(), Object::Documents, "Get", get("notes", "a"))
-        .await
-        .unwrap();
-    let scope = module_scope(None, &Scope::local(), "alpha").unwrap();
-    let storage = rig.backend.for_scope(&scope).unwrap();
-    assert_eq!(
-        storage.documents().collections("").await.unwrap(),
-        vec!["notes".to_string()]
+    // The grant declares a unique index; only the host's ensure_collection can
+    // have created it, so a duplicate being refused proves the host ran it.
+    let spec = CollectionSpec::new("notes")
+        .index(tinystoragedrivers::IndexSpec::new("by_key", ["key"]).unique());
+    let mut declared = grant("notes");
+    declared.collections = vec![spec.clone()];
+    let rig = rig_with("alpha", declared);
+    call(
+        &rig,
+        &alpha(),
+        Object::Documents,
+        "Put",
+        put("notes", "a", json!({"key": "same"})),
+    )
+    .await
+    .unwrap();
+    let duplicate = call(
+        &rig,
+        &alpha(),
+        Object::Documents,
+        "Put",
+        put("notes", "b", json!({"key": "same"})),
+    )
+    .await;
+    assert!(
+        matches!(duplicate, Err(HostError::Storage(_))),
+        "the declared unique index must hold: {duplicate:?}"
     );
 
-    let same = serde_json::to_value(CollectionSpec::new("notes")).unwrap();
+    // Repeating the declared spec is answered; changing it is the host's call.
+    let same = serde_json::to_value(&spec).unwrap();
     assert_eq!(
-        call(&rig, &alpha(), Object::Documents, "EnsureCollection", json!({"spec": same})).await,
+        call(
+            &rig,
+            &alpha(),
+            Object::Documents,
+            "EnsureCollection",
+            json!({"spec": same})
+        )
+        .await,
         Ok(Value::Null)
     );
-    let wider = serde_json::to_value(CollectionSpec::new("notes").ttl("t")).unwrap();
+    let wider = serde_json::to_value(spec.clone().ttl("t")).unwrap();
     assert_eq!(
-        call(&rig, &alpha(), Object::Documents, "EnsureCollection", json!({"spec": wider})).await,
+        call(
+            &rig,
+            &alpha(),
+            Object::Documents,
+            "EnsureCollection",
+            json!({"spec": wider})
+        )
+        .await,
+        denied("schema-is-host-only")
+    );
+    let weaker = serde_json::to_value(CollectionSpec::new("notes")).unwrap();
+    assert_eq!(
+        call(
+            &rig,
+            &alpha(),
+            Object::Documents,
+            "EnsureCollection",
+            json!({"spec": weaker})
+        )
+        .await,
         denied("schema-is-host-only")
     );
     assert_eq!(
@@ -347,21 +447,40 @@ async fn the_host_ensures_declared_schema_and_the_module_cannot_change_it() {
 #[tokio::test]
 async fn a_collection_listing_shows_only_the_modules_own_names() {
     let rig = rig();
-    // Something else lives in the module's scope.
-    call(&rig, &alpha(), Object::Documents, "Get", get("notes", "a"))
-        .await
-        .unwrap();
+    call(
+        &rig,
+        &alpha(),
+        Object::Documents,
+        "Put",
+        put("notes", "a", json!({})),
+    )
+    .await
+    .unwrap();
+    // The host keeps something else in the module's scope.
     let scope = module_scope(None, &Scope::local(), "alpha").unwrap();
-    rig.backend
-        .for_scope(&scope)
-        .unwrap()
+    let storage = rig.backend.for_scope(&scope).unwrap();
+    storage
         .documents()
-        .ensure_collection(&CollectionSpec::new("host-private"))
+        .put(
+            "host-private",
+            "x",
+            json!({}),
+            crate::storage::Precondition::None,
+        )
         .await
         .unwrap();
-    let listed = call(&rig, &alpha(), Object::Documents, "Collections", json!({"prefix": ""}))
-        .await
-        .unwrap();
+    let all = storage.documents().collections("").await.unwrap();
+    assert!(all.contains(&"host-private".to_string()), "{all:?}");
+
+    let listed = call(
+        &rig,
+        &alpha(),
+        Object::Documents,
+        "Collections",
+        json!({"prefix": ""}),
+    )
+    .await
+    .unwrap();
     assert_eq!(listed, json!(["notes"]));
 }
 
@@ -389,11 +508,25 @@ async fn streams_and_blobs_stay_inside_their_prefixes() {
         denied("target-not-granted")
     );
     assert_eq!(
-        call(&rig, &alpha(), Object::Blobs, "Head", json!({"key": "elsewhere/x"})).await,
+        call(
+            &rig,
+            &alpha(),
+            Object::Blobs,
+            "Head",
+            json!({"key": "elsewhere/x"})
+        )
+        .await,
         denied("target-not-granted")
     );
     assert_eq!(
-        call(&rig, &alpha(), Object::Blobs, "PutStream", json!({"key": "files/x", "len": 1})).await,
+        call(
+            &rig,
+            &alpha(),
+            Object::Blobs,
+            "PutStream",
+            json!({"key": "files/x", "len": 1})
+        )
+        .await,
         denied("unsupported-selector")
     );
 }
@@ -413,8 +546,14 @@ async fn secrets_need_a_confidential_caller_and_a_granted_prefix() {
     let confidential = |request: Value, selector: &'static str, who: BusName| {
         let host = &rig.host;
         async move {
-            host.handle(Object::Secrets, selector, request, Some(&who), Admission::Confidential)
-                .await
+            host.handle(
+                Object::Secrets,
+                selector,
+                request,
+                Some(&who),
+                Admission::Confidential,
+            )
+            .await
         }
     };
     confidential(set, "Set", alpha()).await.unwrap();
@@ -428,7 +567,9 @@ async fn secrets_need_a_confidential_caller_and_a_granted_prefix() {
     );
     // beta's secrets are a different scope even under the same name.
     assert_eq!(
-        confidential(json!({"name": "token.a"}), "Get", beta()).await.unwrap(),
+        confidential(json!({"name": "token.a"}), "Get", beta())
+            .await
+            .unwrap(),
         Value::Null
     );
 }
@@ -515,7 +656,14 @@ async fn every_call_is_audited_without_its_payload() {
     .await
     .unwrap();
     let _ = call(&rig, &beta(), Object::Documents, "Get", get("notes", "a")).await;
-    let _ = call(&rig, &alpha(), Object::Documents, "DropCollection", json!({"collection": "notes"})).await;
+    let _ = call(
+        &rig,
+        &alpha(),
+        Object::Documents,
+        "DropCollection",
+        json!({"collection": "notes"}),
+    )
+    .await;
 
     let trail = rig.trail.0.lock().unwrap().clone();
     assert_eq!(trail.len(), 3);
@@ -544,25 +692,37 @@ fn module_scopes_are_distinct_per_module_and_per_tenant() {
     let b = module_scope(None, &local, "beta").unwrap();
     assert_ne!(a, b);
     assert_eq!(a.as_str(), "module:alpha@local");
-    let acme = module_scope(Some("acme"), &crate::storage::scope_for_profile("acme"), "alpha").unwrap();
+    let acme = module_scope(
+        Some("acme"),
+        &crate::storage::scope_for_profile("acme"),
+        "alpha",
+    )
+    .unwrap();
     assert_ne!(a, acme);
-    let other = module_scope(Some("globex"), &crate::storage::scope_for_profile("globex"), "alpha").unwrap();
+    let other = module_scope(
+        Some("globex"),
+        &crate::storage::scope_for_profile("globex"),
+        "alpha",
+    )
+    .unwrap();
     assert_ne!(acme, other);
 }
 
 #[test]
 fn a_profiles_module_scope_sits_under_its_lease_fence() {
-    for profile in ["acme", "a~b", "100%"] {
+    for profile in ["acme", "user-1_x", "h-0123456789abcdef0123456789abcdef"] {
         let scope = module_scope(
             Some(profile),
             &crate::storage::scope_for_profile(profile),
             "tinymcp",
         )
         .unwrap();
-        let covered = crate::profiles::fence::scopes_of(&crate::profiles::ProfileId::parse(profile).unwrap());
+        let covered =
+            crate::profiles::fence::scopes_of(&crate::profiles::ProfileId::parse(profile).unwrap());
         assert!(
             covered.iter().any(|matcher| match matcher {
-                crate::storage::fence::ScopeMatch::Prefix(prefix) => scope.as_str().starts_with(prefix.as_str()),
+                crate::storage::fence::ScopeMatch::Prefix(prefix) =>
+                    scope.as_str().starts_with(prefix.as_str()),
                 crate::storage::fence::ScopeMatch::Exact(exact) => scope.as_str() == exact,
             }),
             "{profile}: {scope:?}"
@@ -577,12 +737,17 @@ fn an_ambiguous_module_id_falls_back_to_a_hashed_scope() {
     assert!(hashed.as_str().starts_with("module-sha256:"));
     assert_ne!(hashed, module_scope(None, &local, "a@c").unwrap());
     // For a profile there is no hash fallback: it would leave the fence.
-    assert!(module_scope(Some("acme"), &crate::storage::scope_for_profile("acme"), "a@b").is_err());
+    assert!(module_scope(
+        Some("acme"),
+        &crate::storage::scope_for_profile("acme"),
+        "a@b"
+    )
+    .is_err());
 }
 
 #[tokio::test]
 async fn a_module_write_under_a_stale_lease_is_fenced_by_the_host() {
-    use crate::storage::fence::{FenceRegistry, LeaseFence, ScopeMatch};
+    use crate::storage::fence::{FenceRegistry, LeaseFence};
     use crate::storage::fenced_backend::FencedBackend;
     use crate::storage::lease::{DocumentLeases, LeaseStore};
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -605,24 +770,151 @@ async fn a_module_write_under_a_stale_lease_is_fenced_by_the_host() {
         5_000,
         crate::profiles::fence::scopes_of(&crate::profiles::ProfileId::parse("acme").unwrap()),
     )));
-    let fenced: Arc<dyn StorageBackend> = Arc::new(FencedBackend::new(shared, fences));
+    let fenced: Arc<dyn StorageBackend> = Arc::new(FencedBackend::new(shared, Arc::clone(&fences)));
 
     let rig = rig();
     *rig.env.backend.lock().unwrap() = Some(fenced);
+    *rig.env.fences.lock().unwrap() = Some(fences);
     *rig.env.profile.lock().unwrap() = Some("acme".into());
 
-    call(&rig, &alpha(), Object::Documents, "Put", put("notes", "a", json!({"v": 1})))
-        .await
-        .unwrap();
+    call(
+        &rig,
+        &alpha(),
+        Object::Documents,
+        "Put",
+        put("notes", "a", json!({"v": 1})),
+    )
+    .await
+    .unwrap();
 
-    // The lease runs out; the module's next write is refused by the host's fence.
+    // The lease runs out; the module's next write is refused by the host's fence,
+    // and a read is not.
     clock.store(10 * 60 * 1000, Ordering::SeqCst);
-    let result = call(&rig, &alpha(), Object::Documents, "Put", put("notes", "a", json!({"v": 2}))).await;
+    let result = call(
+        &rig,
+        &alpha(),
+        Object::Documents,
+        "Put",
+        put("notes", "a", json!({"v": 2})),
+    )
+    .await;
     assert_eq!(
         result,
         Err(HostError::Storage(StorageFailure {
             kind: StorageKind::Fenced
         }))
     );
-    let _ = ScopeMatch::Exact(String::new());
+    let fenced_audit = rig.trail.0.lock().unwrap().last().cloned().unwrap();
+    assert_eq!(fenced_audit.outcome, "fenced");
+    assert!(
+        call(&rig, &alpha(), Object::Documents, "Get", get("notes", "a"))
+            .await
+            .is_ok()
+    );
+}
+
+#[tokio::test]
+async fn the_bus_hands_the_host_the_brokers_sender_and_nothing_else() {
+    use tinybus::broker::Broker;
+    use tinybus::transport::memory::MemoryBus;
+    use tinybus::Connection;
+
+    let bus = MemoryBus::new();
+    Broker::new().spawn(bus.clone());
+    let service = Connection::connect(bus.connect().await.unwrap())
+        .await
+        .unwrap();
+    let module = Connection::connect(bus.connect().await.unwrap())
+        .await
+        .unwrap();
+    let outsider = Connection::connect(bus.connect().await.unwrap())
+        .await
+        .unwrap();
+
+    let rig = rig();
+    let directory = Directory(HashMap::from([(
+        module.unique_name().unwrap().as_str().to_string(),
+        "alpha".to_string(),
+    )]));
+    let host = Arc::new(StorageHost::new(
+        Arc::new(directory),
+        Arc::clone(&rig.env) as Arc<dyn Environment>,
+        Arc::clone(&rig.trail) as Arc<dyn AuditSink>,
+    ));
+    for object in [Object::Documents, Object::Secrets] {
+        let path = ObjectPath::new(format!("{OBJECT_ROOT}/{}", object.as_str())).unwrap();
+        service
+            .serve_at(
+                path,
+                ObjectService {
+                    object,
+                    host: Arc::clone(&host),
+                },
+            )
+            .await
+            .unwrap();
+    }
+    service.request_name(STORAGE_INTERFACE).await.unwrap();
+
+    let documents = |from: &Connection| {
+        from.proxy(
+            STORAGE_INTERFACE,
+            format!("{OBJECT_ROOT}/Documents"),
+            STORAGE_INTERFACE,
+        )
+        .unwrap()
+    };
+
+    // The registered module is served...
+    let stored: Value = documents(&module)
+        .call("Put", put("notes", "a", json!({"v": 1})))
+        .await
+        .unwrap();
+    assert_eq!(stored, json!(1));
+    let found: Value = documents(&module)
+        .call("Get", get("notes", "a"))
+        .await
+        .unwrap();
+    assert_eq!(found["document_id"], "a");
+
+    // ...a peer that is not a module is refused with the denial name, not data.
+    let refused = documents(&outsider)
+        .call::<Value>("Get", get("notes", "a"))
+        .await
+        .unwrap_err();
+    match refused {
+        tinybus::Error::MethodFailed { name, message } => {
+            assert_eq!(name, ERROR_DENIED);
+            assert_eq!(message, "unknown-caller");
+        }
+        other => panic!("unexpected error: {other:?}"),
+    }
+
+    // A forged scope is a refused request, not a different scope.
+    let mut forged = get("notes", "a");
+    forged["scope"] = json!("local");
+    assert!(documents(&module)
+        .call::<Value>("Get", forged)
+        .await
+        .is_err());
+
+    // Secrets are on a confidential route: an ordinary call never reaches the host.
+    let secrets = module
+        .proxy(
+            STORAGE_INTERFACE,
+            format!("{OBJECT_ROOT}/Secrets"),
+            STORAGE_INTERFACE,
+        )
+        .unwrap();
+    assert!(secrets
+        .call::<Value>("Get", json!({"name": "token.a"}))
+        .await
+        .is_err());
+    assert!(rig
+        .trail
+        .0
+        .lock()
+        .unwrap()
+        .iter()
+        .all(|record| record.object != "Secrets"));
 }

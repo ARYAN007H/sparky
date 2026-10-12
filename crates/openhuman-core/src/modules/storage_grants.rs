@@ -382,18 +382,15 @@ fn blobs(grant: &StorageGrant, selector: &str, request: &Value) -> Result<Plan, 
 fn secrets(grant: &StorageGrant, selector: &str, request: &Value) -> Result<Plan, Denied> {
     match selector {
         "Get" => {
-            let granted =
-                StorageGrant::prefixed(&grant.secret_prefixes, text(request, "name")?)?;
+            let granted = StorageGrant::prefixed(&grant.secret_prefixes, text(request, "name")?)?;
             Ok(forward(granted))
         }
         "Set" | "Delete" => {
-            let granted =
-                StorageGrant::prefixed(&grant.secret_prefixes, text(request, "name")?)?;
+            let granted = StorageGrant::prefixed(&grant.secret_prefixes, text(request, "name")?)?;
             Ok(forward(granted))
         }
         "List" => {
-            let granted =
-                StorageGrant::prefixed(&grant.secret_prefixes, text(request, "prefix")?)?;
+            let granted = StorageGrant::prefixed(&grant.secret_prefixes, text(request, "prefix")?)?;
             Ok(forward(granted))
         }
         _ => Err(Denied::Malformed),
@@ -406,10 +403,7 @@ pub(crate) fn filter_reply(grant: &StorageGrant, filter: ReplyFilter, reply: Val
         (ReplyFilter::GrantedCollections, Value::Array(names)) => Value::Array(
             names
                 .into_iter()
-                .filter(|name| {
-                    name.as_str()
-                        .is_some_and(|name| grant.spec(name).is_some())
-                })
+                .filter(|name| name.as_str().is_some_and(|name| grant.spec(name).is_some()))
                 .collect(),
         ),
         (_, reply) => reply,

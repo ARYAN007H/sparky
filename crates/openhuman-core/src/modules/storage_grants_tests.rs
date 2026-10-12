@@ -34,7 +34,16 @@ fn a_granted_collection_is_forwarded_with_its_name_as_the_audit_target() {
 
 #[test]
 fn another_collection_is_refused_for_every_document_selector_that_names_one() {
-    for selector in ["Get", "Query", "Count", "Search", "Put", "Delete", "DeleteWhere", "Claim"] {
+    for selector in [
+        "Get",
+        "Query",
+        "Count",
+        "Search",
+        "Put",
+        "Delete",
+        "DeleteWhere",
+        "Claim",
+    ] {
         let request = json!({"collection": "someone-elses"});
         assert_eq!(
             authorize(&grant(), Object::Documents, selector, &request),
@@ -63,7 +72,12 @@ fn a_batch_is_refused_when_any_op_or_check_leaves_the_grant() {
         "ops": [],
     });
     assert_eq!(
-        authorize(&grant(), Object::Documents, "AtomicBatchChecked", &bad_check),
+        authorize(
+            &grant(),
+            Object::Documents,
+            "AtomicBatchChecked",
+            &bad_check
+        ),
         Err(Denied::Target)
     );
 
@@ -121,11 +135,19 @@ fn a_read_only_grant_refuses_every_write_and_allows_the_reads() {
     let writes = [
         (Object::Documents, "Put", json!({"collection": "notes"})),
         (Object::Documents, "Delete", json!({"collection": "notes"})),
-        (Object::Documents, "DeleteWhere", json!({"collection": "notes"})),
+        (
+            Object::Documents,
+            "DeleteWhere",
+            json!({"collection": "notes"}),
+        ),
         (Object::Documents, "Claim", json!({"collection": "notes"})),
         (Object::Documents, "AtomicBatch", json!({"ops": []})),
         (Object::Streams, "Append", json!({"stream": "log/a"})),
-        (Object::Streams, "TruncateBefore", json!({"stream": "log/a"})),
+        (
+            Object::Streams,
+            "TruncateBefore",
+            json!({"stream": "log/a"}),
+        ),
         (Object::Streams, "DeleteStream", json!({"stream": "log/a"})),
         (Object::Blobs, "Put", json!({"key": "files/a"})),
         (Object::Blobs, "Delete", json!({"key": "files/a"})),
@@ -146,7 +168,10 @@ fn a_read_only_grant_refuses_every_write_and_allows_the_reads() {
         (Object::Blobs, "Get", json!({"key": "files/a"})),
         (Object::Secrets, "Get", json!({"name": "token.a"})),
     ] {
-        assert!(authorize(&g, object, selector, &request).is_ok(), "{selector}");
+        assert!(
+            authorize(&g, object, selector, &request).is_ok(),
+            "{selector}"
+        );
     }
 }
 
@@ -154,7 +179,12 @@ fn a_read_only_grant_refuses_every_write_and_allows_the_reads() {
 fn streams_blobs_and_secrets_are_confined_to_their_prefixes() {
     let g = grant();
     assert_eq!(
-        forwarded(authorize(&g, Object::Streams, "Append", &json!({"stream": "log/a"}))),
+        forwarded(authorize(
+            &g,
+            Object::Streams,
+            "Append",
+            &json!({"stream": "log/a"})
+        )),
         "log/a"
     );
     assert_eq!(
@@ -175,7 +205,11 @@ fn streams_blobs_and_secrets_are_confined_to_their_prefixes() {
         (Object::Blobs, json!({"prefix": ""})),
         (Object::Secrets, json!({"prefix": ""})),
     ] {
-        let selector = if object == Object::Streams { "Streams" } else { "List" };
+        let selector = if object == Object::Streams {
+            "Streams"
+        } else {
+            "List"
+        };
         assert_eq!(
             authorize(&g, object, selector, &request),
             Err(Denied::Target)
@@ -189,21 +223,41 @@ fn schema_is_the_hosts_to_change() {
     let g = grant();
     let declared = serde_json::to_value(CollectionSpec::new("notes")).unwrap();
     assert_eq!(
-        authorize(&g, Object::Documents, "EnsureCollection", &json!({"spec": declared})),
+        authorize(
+            &g,
+            Object::Documents,
+            "EnsureCollection",
+            &json!({"spec": declared})
+        ),
         Ok(Plan::Answer(Value::Null))
     );
     let widened = serde_json::to_value(CollectionSpec::new("notes").ttl("expires")).unwrap();
     assert_eq!(
-        authorize(&g, Object::Documents, "EnsureCollection", &json!({"spec": widened})),
+        authorize(
+            &g,
+            Object::Documents,
+            "EnsureCollection",
+            &json!({"spec": widened})
+        ),
         Err(Denied::Schema)
     );
     let unknown = serde_json::to_value(CollectionSpec::new("brand-new")).unwrap();
     assert_eq!(
-        authorize(&g, Object::Documents, "EnsureCollection", &json!({"spec": unknown})),
+        authorize(
+            &g,
+            Object::Documents,
+            "EnsureCollection",
+            &json!({"spec": unknown})
+        ),
         Err(Denied::Schema)
     );
     assert_eq!(
-        authorize(&g, Object::Documents, "DropCollection", &json!({"collection": "notes"})),
+        authorize(
+            &g,
+            Object::Documents,
+            "DropCollection",
+            &json!({"collection": "notes"})
+        ),
         Err(Denied::Schema)
     );
 }
@@ -220,7 +274,12 @@ fn streamed_blobs_and_watches_are_refused_as_unsupported() {
         Err(Denied::Unsupported)
     );
     assert_eq!(
-        authorize(&g, Object::Documents, "WatchOpen", &json!({"collection": "notes"})),
+        authorize(
+            &g,
+            Object::Documents,
+            "WatchOpen",
+            &json!({"collection": "notes"})
+        ),
         Err(Denied::Unsupported)
     );
 }
@@ -230,7 +289,10 @@ fn a_collections_listing_is_trimmed_to_the_grant() {
     let reply = json!(["notes", "index", "secrets", "belongs-to-someone-else"]);
     let trimmed = filter_reply(&grant(), ReplyFilter::GrantedCollections, reply.clone());
     assert_eq!(trimmed, json!(["notes", "index"]));
-    assert_eq!(filter_reply(&grant(), ReplyFilter::None, reply.clone()), reply);
+    assert_eq!(
+        filter_reply(&grant(), ReplyFilter::None, reply.clone()),
+        reply
+    );
 }
 
 #[test]
@@ -276,17 +338,46 @@ fn no_module_declares_storage_yet() {
 #[test]
 fn only_mutating_selectors_ask_for_the_write_fence() {
     let g = grant();
-    let write_flag = |object, selector: &str, request: Value| match authorize(&g, object, selector, &request) {
-        Ok(Plan::Forward { write, .. }) => write,
-        other => panic!("{selector}: {other:?}"),
-    };
-    assert!(write_flag(Object::Documents, "Put", json!({"collection": "notes"})));
-    assert!(write_flag(Object::Documents, "AtomicBatch", json!({"ops": []})));
-    assert!(write_flag(Object::Streams, "Append", json!({"stream": "log/a"})));
+    let write_flag =
+        |object, selector: &str, request: Value| match authorize(&g, object, selector, &request) {
+            Ok(Plan::Forward { write, .. }) => write,
+            other => panic!("{selector}: {other:?}"),
+        };
+    assert!(write_flag(
+        Object::Documents,
+        "Put",
+        json!({"collection": "notes"})
+    ));
+    assert!(write_flag(
+        Object::Documents,
+        "AtomicBatch",
+        json!({"ops": []})
+    ));
+    assert!(write_flag(
+        Object::Streams,
+        "Append",
+        json!({"stream": "log/a"})
+    ));
     assert!(write_flag(Object::Blobs, "Put", json!({"key": "files/a"})));
-    assert!(write_flag(Object::Secrets, "Set", json!({"name": "token.a"})));
-    assert!(!write_flag(Object::Documents, "Get", json!({"collection": "notes"})));
-    assert!(!write_flag(Object::Documents, "Query", json!({"collection": "notes"})));
-    assert!(!write_flag(Object::Streams, "ReadWindow", json!({"stream": "log/a"})));
+    assert!(write_flag(
+        Object::Secrets,
+        "Set",
+        json!({"name": "token.a"})
+    ));
+    assert!(!write_flag(
+        Object::Documents,
+        "Get",
+        json!({"collection": "notes"})
+    ));
+    assert!(!write_flag(
+        Object::Documents,
+        "Query",
+        json!({"collection": "notes"})
+    ));
+    assert!(!write_flag(
+        Object::Streams,
+        "ReadWindow",
+        json!({"stream": "log/a"})
+    ));
     assert!(!write_flag(Object::Blobs, "Get", json!({"key": "files/a"})));
 }
