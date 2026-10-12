@@ -229,7 +229,10 @@ async fn tool_call_refuses_arguments_that_are_not_an_object() {
     let message = err.to_string();
     assert!(message.contains("mcp_registry_tool_call"), "{message}");
     assert!(message.contains("invalid tool arguments"), "{message}");
-    assert!(!message.contains('5'), "module failure must not echo arguments: {message}");
+    assert!(
+        !message.contains('5'),
+        "module failure must not echo arguments: {message}"
+    );
 }
 
 /// A workspace of its own, so the host this opens is not shared.

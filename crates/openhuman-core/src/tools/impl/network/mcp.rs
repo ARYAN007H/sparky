@@ -525,13 +525,12 @@ fn required_string_arg(args: &Value, key: &str) -> anyhow::Result<String> {
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .ok_or_else(missing)?;
-    let unpunctuated = value.trim_end_matches(['.', ',', ';', ':', '!']);
-    let fenced = if unpunctuated.ends_with(['`', '*']) {
-        unpunctuated
-    } else {
-        value
-    };
-    let cleaned = fenced.trim_matches(['`', '*']);
+    // Strip model-introduced markdown wrappers before trailing sentence
+    // punctuation so `**search!**` is read as `search`, not `search!`.
+    let cleaned = value
+        .trim_matches(['`', '*'])
+        .trim_end_matches(['.', ',', ';', ':', '!'])
+        .trim_matches(['`', '*']);
     if cleaned.is_empty() {
         return Err(missing());
     }
