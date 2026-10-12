@@ -381,3 +381,46 @@ fn only_mutating_selectors_ask_for_the_write_fence() {
     ));
     assert!(!write_flag(Object::Blobs, "Get", json!({"key": "files/a"})));
 }
+
+#[test]
+fn the_write_selectors_track_the_contract_selector_sets() {
+    use tinystoragedrivers_bus as wire;
+    let all: [(Object, &[&str]); 4] = [
+        (Object::Documents, &wire::DOCUMENTS_SELECTORS),
+        (Object::Streams, &wire::STREAMS_SELECTORS),
+        (Object::Blobs, &wire::BLOBS_SELECTORS),
+        (Object::Secrets, &wire::SECRETS_SELECTORS),
+    ];
+    let mut writes: Vec<String> = Vec::new();
+    for (object, selectors) in all {
+        for selector in selectors {
+            if is_write(object, selector) {
+                writes.push(format!("{object:?}.{selector}"));
+            }
+        }
+    }
+    writes.sort();
+    // A contract rename or addition changes this list, so authorization cannot
+    // drift from the exposed interface unnoticed.
+    assert_eq!(
+        writes,
+        [
+            "Blobs.Delete",
+            "Blobs.PresignPut",
+            "Blobs.Put",
+            "Documents.AtomicBatch",
+            "Documents.AtomicBatchChecked",
+            "Documents.Claim",
+            "Documents.Delete",
+            "Documents.DeleteWhere",
+            "Documents.Put",
+            "Secrets.Delete",
+            "Secrets.Set",
+            "Streams.Append",
+            "Streams.AppendBatch",
+            "Streams.AppendBatchIfOffset",
+            "Streams.DeleteStream",
+            "Streams.TruncateBefore",
+        ]
+    );
+}
