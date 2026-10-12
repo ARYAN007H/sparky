@@ -631,7 +631,10 @@ async fn a_failing_linked_factory_is_reported_without_its_error_detail() {
     let runtime = crate::modules::host::runtime().await.expect("module host");
     let error = ops::load_linked(runtime, "linked-failing-test", serde_json::json!({}))
         .expect_err("the factory fails");
-    assert!(error.contains("linked factory could not be started"), "{error}");
+    assert!(
+        error.contains("linked factory could not be started"),
+        "{error}"
+    );
     assert!(!error.contains("secret-token"), "{error}");
     assert!(!error.contains("/home"), "{error}");
 }

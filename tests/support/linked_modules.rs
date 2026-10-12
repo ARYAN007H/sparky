@@ -18,7 +18,9 @@ pub fn install() {
 /// should follow the environment like the binary does.
 #[cfg(feature = "linked-modules")]
 pub fn install_if_requested() {
-    if std::env::var("OPENHUMAN_MODULE_SOURCE").is_ok_and(|value| value.eq_ignore_ascii_case("linked")) {
+    if std::env::var("OPENHUMAN_MODULE_SOURCE")
+        .is_ok_and(|value| value.eq_ignore_ascii_case("linked"))
+    {
         install();
     }
 }

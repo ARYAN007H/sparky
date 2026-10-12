@@ -28,7 +28,10 @@ pub(crate) async fn client() -> ModuleClient {
     let proxy = host::runtime()
         .await
         .expect("the module host should be running")
-        .proxy(tinychannels_module::BUS_NAME, tinychannels_module::OBJECT_PATH)
+        .proxy(
+            tinychannels_module::BUS_NAME,
+            tinychannels_module::OBJECT_PATH,
+        )
         .expect("the linked TinyChannels proxy should be valid");
     ModuleClient::fixture(proxy)
 }
