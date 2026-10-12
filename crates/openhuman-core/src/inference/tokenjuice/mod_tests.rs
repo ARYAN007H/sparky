@@ -135,12 +135,11 @@ async fn an_off_profile_still_discloses_a_registered_summary() {
 }
 
 /// A module disabled in configuration cannot install, even when the process
-/// also carries a `TINYJUICE_TEST_MODULE` fixture: the config check runs
+/// also carries a tinyjuice library: the config check runs
 /// first. Exercises the config-driven passthrough independent of whatever
 /// module happens to be installed for other tests in this binary.
 #[tokio::test]
 async fn a_module_disabled_in_configuration_discloses_a_wanted_summary() {
-    let _lock = crate::config::TEST_ENV_LOCK.lock().await;
     let mut config = crate::config::Config::default();
     config.modules.enabled = false;
     let fixture_aware_call = client(&config)
@@ -150,21 +149,6 @@ async fn a_module_disabled_in_configuration_discloses_a_wanted_summary() {
         fixture_aware_call.is_err(),
         "a test module artifact must not override modules.enabled=false"
     );
-
-    let previous = std::env::var_os("TINYJUICE_TEST_MODULE");
-    // SAFETY: serialized by TEST_ENV_LOCK; restored below for every exit path.
-    unsafe { std::env::remove_var("TINYJUICE_TEST_MODULE") };
-    struct RestoreEnv(Option<std::ffi::OsString>);
-    impl Drop for RestoreEnv {
-        fn drop(&mut self) {
-            // SAFETY: still under TEST_ENV_LOCK for the guarded test's scope.
-            match self.0.take() {
-                Some(value) => unsafe { std::env::set_var("TINYJUICE_TEST_MODULE", value) },
-                None => unsafe { std::env::remove_var("TINYJUICE_TEST_MODULE") },
-            }
-        }
-    }
-    let _restore = RestoreEnv(previous);
 
     let config = std::sync::Arc::new(config);
 
