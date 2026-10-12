@@ -63,10 +63,7 @@ pub(crate) fn defer_pending(
                 None => Ok(()),
             };
             let result = result.and_then(|()| {
-                // Confirmed module cleanup no longer needs the process/workspace
-                // owner. Filesystem purge must not extend its retention lifetime.
-                drop(guard.take());
-                finish_removal(&registry, &id, &pending)
+                complete_with_guard(&mut guard, || finish_removal(&registry, &id, &pending))
             });
             match result {
                 Ok(()) => {
@@ -89,6 +86,14 @@ pub(crate) fn defer_pending(
         executor_failed.store(false, Ordering::Release);
         log::warn!("[embed][agent] cleanup executor unavailable: {error}");
     }
+}
+
+fn complete_with_guard<T>(
+    guard: &mut Option<Arc<crate::runtime::CoreGuard>>,
+    complete: impl FnOnce() -> T,
+) -> T {
+    drop(guard.take());
+    complete()
 }
 
 impl AgentInner {
