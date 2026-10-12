@@ -8,7 +8,7 @@
 //! out of the environment, every file and every log line.
 //!
 //! Needs the real module: CI and `scripts/test-rust-with-mock.sh` build the
-//! pinned `vendor/tinysearch` and export `TINYSEARCH_TEST_MODULE`. The
+//! pinned `vendor/tinysearch` (`node scripts/modules/build.mjs tinysearch`). The
 //! provider is a loopback stand-in, so nothing leaves the machine.
 
 use std::io::Write;
