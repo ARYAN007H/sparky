@@ -321,23 +321,6 @@ impl crate::mcp::module_client::McpModulePort for ToolCallPort {
                 serde_json::to_value(overview.into_iter().collect::<Vec<_>>())
                     .map_err(|_| crate::modules::client::ModuleCallError::ModuleFault)
             }
-            tinymcp_bus::names::methods::NORMALIZE_TOOL_ARGUMENTS => {
-                let value = args
-                    .get(0)
-                    .cloned()
-                    .ok_or(crate::modules::client::ModuleCallError::ModuleFault)?;
-                let map = match value {
-                    Value::Null => serde_json::Map::new(),
-                    Value::Object(map) => map,
-                    Value::String(text) => serde_json::from_str::<Value>(&text)
-                        .ok()
-                        .and_then(|value| value.as_object().cloned())
-                        .ok_or(crate::modules::client::ModuleCallError::ModuleFault)?,
-                    _ => return Err(crate::modules::client::ModuleCallError::ModuleFault),
-                };
-                serde_json::to_value(map)
-                    .map_err(|_| crate::modules::client::ModuleCallError::ModuleFault)
-            }
             tinymcp_bus::names::methods::TOOL_CALL => {
                 let arguments = args
                     .get(2)
@@ -361,6 +344,21 @@ impl crate::mcp::module_client::McpModulePort for ToolCallPort {
     ) -> Result<tinymcp_bus::ServerArgumentsValidation, crate::modules::client::ModuleCallError>
     {
         Err(crate::modules::client::ModuleCallError::IncompatibleContract)
+    }
+
+    async fn normalize_tool_arguments(
+        &self,
+        arguments: Option<Value>,
+    ) -> Result<serde_json::Map<String, Value>, crate::modules::client::ModuleCallError> {
+        match arguments.unwrap_or(Value::Null) {
+            Value::Null => Ok(serde_json::Map::new()),
+            Value::Object(arguments) => Ok(arguments),
+            Value::String(encoded) => serde_json::from_str::<Value>(&encoded)
+                .ok()
+                .and_then(|value| value.as_object().cloned())
+                .ok_or(crate::modules::client::ModuleCallError::ModuleFault),
+            _ => Err(crate::modules::client::ModuleCallError::ModuleFault),
+        }
     }
 
     async fn prepare_agent_tools(

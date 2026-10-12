@@ -102,6 +102,17 @@ impl McpModulePort for PreparePort {
         ))
         .await
     }
+
+    async fn normalize_tool_arguments(
+        &self,
+        arguments: Option<Value>,
+    ) -> Result<serde_json::Map<String, Value>, crate::modules::client::ModuleCallError> {
+        match arguments.unwrap_or(Value::Null) {
+            Value::Null => Ok(serde_json::Map::new()),
+            Value::Object(arguments) => Ok(arguments),
+            _ => Err(crate::modules::client::ModuleCallError::ModuleFault),
+        }
+    }
 }
 
 #[tokio::test]
