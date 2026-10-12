@@ -284,3 +284,10 @@ for (const [name, source] of [
     }
   });
 }
+
+
+test("host calls to the JSONL task opener cannot hide their persistent path", () => {
+  const findings = scan("crates/openhuman-core/src/tasks.rs", "let store = tinyagents::open_jsonl_task_store_or_memory(path, None);");
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].rule, "task-store-open");
+});
