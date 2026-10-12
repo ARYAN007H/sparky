@@ -190,6 +190,8 @@ pub enum RuntimeError {
 pub(crate) struct CoreGuard {
     pub(crate) events: Arc<crate::events::EventHub>,
     core: Option<Core>,
+    /// Terminal or cancelled agent cleanup must not erase unconfirmed state.
+    preserve_ephemeral_workspace: AtomicBool,
     /// Held for its `Drop`: an ephemeral workspace lives exactly as long as
     /// the last owner of this guard.
     workspace: ResolvedWorkspace,
@@ -206,6 +208,13 @@ pub(crate) struct CoreGuard {
     /// Process-global seams this runtime installed; dropping restores the
     /// restorable ones (see [`seams`]).
     seams: Mutex<Option<seams::InstalledSeams>>,
+}
+
+impl CoreGuard {
+    pub(crate) fn preserve_ephemeral_workspace(&self) {
+        self.preserve_ephemeral_workspace
+            .store(true, std::sync::atomic::Ordering::Release);
+    }
 }
 
 impl Drop for CoreGuard {
@@ -241,21 +250,31 @@ impl Drop for CoreGuard {
         // writes settle before giving up.
         if let Some(temp) = self.workspace._temp.take() {
             let root = temp.keep();
-            let mut quiet_passes = 0;
-            for _ in 0..20 {
-                match std::fs::remove_dir_all(&root) {
-                    Ok(()) => quiet_passes += 1,
-                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                        quiet_passes += 1;
+            if self
+                .preserve_ephemeral_workspace
+                .load(std::sync::atomic::Ordering::Acquire)
+            {
+                log::warn!(
+                    "[embed][runtime] unresolved cleanup; preserved ephemeral workspace at {}",
+                    root.display()
+                );
+            } else {
+                let mut quiet_passes = 0;
+                for _ in 0..20 {
+                    match std::fs::remove_dir_all(&root) {
+                        Ok(()) => quiet_passes += 1,
+                        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                            quiet_passes += 1;
+                        }
+                        Err(_) => quiet_passes = 0,
                     }
-                    Err(_) => quiet_passes = 0,
+                    if quiet_passes >= 5 {
+                        break;
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(50));
                 }
-                if quiet_passes >= 5 {
-                    break;
-                }
-                std::thread::sleep(std::time::Duration::from_millis(50));
+                let _ = std::fs::remove_dir_all(&root);
             }
-            let _ = std::fs::remove_dir_all(&root);
         }
         RUNTIME_LIVE.store(false, std::sync::atomic::Ordering::Release);
         log::debug!("[embed][runtime] released");
@@ -606,6 +625,7 @@ impl Runtime {
             guard: Arc::new(CoreGuard {
                 events: crate::events::EventHub::new(256),
                 core: Some(core),
+                preserve_ephemeral_workspace: AtomicBool::new(false),
                 workspace,
                 session_store,
                 previous_session_store,

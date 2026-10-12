@@ -47,6 +47,7 @@ pub(crate) fn defer_pending(
         .is_none_or(|cleanup| cleanup.finish_if_idle())
     {
         if let Err(error) = finish_removal(&registry, &id, &pending) {
+            guard.preserve_ephemeral_workspace();
             log::warn!("[embed][agent] removed home cleanup remains pending: {error}");
         }
         return;
@@ -56,23 +57,30 @@ pub(crate) fn defer_pending(
     }
     let running = Arc::clone(&pending.retry_running);
     let executor_failed = Arc::clone(&running);
-    let future = async move {
-        retry_cleanup(
-            guard,
-            || {
-                let cleanup = pending.cleanup.clone();
-                async move {
-                    match cleanup {
-                        Some(cleanup) => cleanup.finish().await.map_err(AgentError::McpCleanup),
-                        None => Ok(()),
-                    }
+    let pending_for_completion = pending.clone();
+    // Construct the RAII owner before scheduling, so rejection or cancellation
+    // of an unpolled future cannot delete the unconfirmed workspace.
+    let cleanup = retry_cleanup(
+        guard,
+        move || {
+            let cleanup = pending.cleanup.clone();
+            async move {
+                match cleanup {
+                    Some(cleanup) => cleanup.finish().await.map_err(AgentError::McpCleanup),
+                    None => Ok(()),
                 }
-            },
-            || finish_removal(&registry, &id, &pending),
-        )
-        .await;
-        // The original receipt, id reservation and purge intent stay in the
-        // registry. A later remove_agent call retries them explicitly.
+            }
+        },
+        {
+            let registry = Arc::clone(&registry);
+            let pending = pending_for_completion;
+            move || finish_removal(&registry, &id, &pending)
+        },
+    );
+    let future = async move {
+        cleanup.await;
+        // Retained metadata has no runtime guard. A live Runtime can explicitly
+        // retry; after it is gone, retained files require manual reclamation.
         running.store(false, Ordering::Release);
     };
     if let Err(error) = openhuman_core::mcp::host::spawn_agent_cleanup(future) {
@@ -81,26 +89,52 @@ pub(crate) fn defer_pending(
     }
 }
 
-async fn retry_cleanup<F, Fut, C>(
+struct CleanupWorkspaceOwner {
+    guard: Option<Arc<crate::runtime::CoreGuard>>,
+    confirmed: bool,
+}
+
+impl Drop for CleanupWorkspaceOwner {
+    fn drop(&mut self) {
+        if !self.confirmed {
+            if let Some(guard) = &self.guard {
+                guard.preserve_ephemeral_workspace();
+            }
+        }
+    }
+}
+
+fn retry_cleanup<F, Fut, C>(
     guard: Arc<crate::runtime::CoreGuard>,
     mut close: F,
     mut complete: C,
-) where
+) -> impl std::future::Future<Output = ()>
+where
     F: FnMut() -> Fut,
     Fut: std::future::Future<Output = Result<(), AgentError>>,
     C: FnMut() -> Result<(), AgentError>,
 {
-    let mut guard = Some(guard);
-    for attempt in 0..3 {
-        let result = close()
-            .await
-            .and_then(|()| complete_with_guard(&mut guard, &mut complete));
-        match result {
-            Ok(()) => return,
-            Err(error) => log::warn!("[embed][agent] captured cleanup remains pending: {error}"),
-        }
-        if attempt < 2 {
-            tokio::time::sleep(std::time::Duration::from_millis(250 * (1 << attempt))).await;
+    let mut owner = CleanupWorkspaceOwner {
+        guard: Some(guard),
+        confirmed: false,
+    };
+    async move {
+        for attempt in 0..3 {
+            let result = close()
+                .await
+                .and_then(|()| complete_with_guard(&mut owner.guard, &mut complete));
+            match result {
+                Ok(()) => {
+                    owner.confirmed = true;
+                    return;
+                }
+                Err(error) => {
+                    log::warn!("[embed][agent] captured cleanup remains pending: {error}")
+                }
+            }
+            if attempt < 2 {
+                tokio::time::sleep(std::time::Duration::from_millis(250 * (1 << attempt))).await;
+            }
         }
     }
 }
