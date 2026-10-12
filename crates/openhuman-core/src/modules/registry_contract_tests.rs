@@ -122,3 +122,22 @@ fn a_product_feature_build_carries_all_eleven_records() {
         assert!(find(id).is_some(), "{id} missing from the registry");
     }
 }
+
+#[test]
+fn every_record_maps_to_a_real_component() {
+    for record in ALL {
+        let component = component_for(record.id)
+            .unwrap_or_else(|| panic!("module '{}' has no component mapping", record.id));
+        assert!(
+            crate::core::runtime::COMPONENT_NAMES.contains(&component),
+            "'{component}' is not a [components] name"
+        );
+    }
+    for (id, _) in COMPONENT_OF {
+        assert!(
+            ALL.iter().any(|r| r.id == *id) || !cfg!(feature = "modules")
+                || matches!(*id, "tinydocs" | "tinywallet" | "tinyvoice" | "tinyhosts"),
+            "mapping for unknown module '{id}'"
+        );
+    }
+}

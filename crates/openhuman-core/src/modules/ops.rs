@@ -632,3 +632,7 @@ fn status_of(config: &Config, record: &ModuleRecord) -> ModuleStatus {
 #[cfg(test)]
 #[path = "ops_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "ops_components_tests.rs"]
+mod components_tests;
