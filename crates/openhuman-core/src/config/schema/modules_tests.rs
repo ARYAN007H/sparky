@@ -79,7 +79,7 @@ fn mode_names_round_trip() {
 
 struct MapEnv(std::collections::HashMap<&'static str, &'static str>);
 
-impl crate::config::schema::load::env::EnvLookup for MapEnv {
+impl load::env::EnvLookup for MapEnv {
     fn get(&self, key: &str) -> Option<String> {
         self.0.get(key).map(|v| (*v).to_string())
     }
@@ -87,7 +87,7 @@ impl crate::config::schema::load::env::EnvLookup for MapEnv {
 
 fn overlay(pairs: &[(&'static str, &'static str)]) -> crate::config::Config {
     let mut config = crate::config::Config::default();
-    config.apply_modules_env_for_test(&MapEnv(pairs.iter().copied().collect()));
+    config.apply_env_overlay_with(&MapEnv(pairs.iter().copied().collect()));
     config
 }
 
@@ -110,7 +110,7 @@ fn per_module_env_adds_a_source_override_replacing_a_path_entry() {
         .modules
         .overrides
         .push(ModuleOverride::with_path("tinyjuice", "/dev/libtinyjuice.so"));
-    config.apply_modules_env_for_test(&MapEnv(
+    config.apply_env_overlay_with(&MapEnv(
         [("OPENHUMAN_MODULE_SOURCE_TINYJUICE", "source")]
             .into_iter()
             .collect(),
@@ -125,7 +125,6 @@ fn per_module_env_adds_a_source_override_replacing_a_path_entry() {
 
 #[test]
 fn per_module_env_names_upper_case_the_id() {
-    use crate::config::schema::load::env_overlay_modules::module_source_env_for;
     assert_eq!(
         module_source_env_for("tinyjuice"),
         "OPENHUMAN_MODULE_SOURCE_TINYJUICE"

@@ -5,26 +5,9 @@
 //! global mode and a `[[modules.overrides]]` entry for that id.
 
 use crate::config::schema::load::env::EnvLookup;
-use crate::config::schema::{Config, ModuleOverride, ModuleSourceMode};
-
-/// Name of the global module-source variable.
-pub const MODULE_SOURCE_ENV: &str = "OPENHUMAN_MODULE_SOURCE";
-
-/// Name of the per-module variable for `id`.
-#[must_use]
-pub fn module_source_env_for(id: &str) -> String {
-    let suffix: String = id
-        .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() {
-                c.to_ascii_uppercase()
-            } else {
-                '_'
-            }
-        })
-        .collect();
-    format!("{MODULE_SOURCE_ENV}_{suffix}")
-}
+use crate::config::schema::{
+    module_source_env_for, Config, ModuleOverride, ModuleSourceMode, MODULE_SOURCE_ENV,
+};
 
 impl Config {
     pub(super) fn apply_modules_env<E: EnvLookup + ?Sized>(&mut self, env: &E) {

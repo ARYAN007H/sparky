@@ -66,6 +66,26 @@ impl Default for ModulesConfig {
     }
 }
 
+/// Name of the global module-source environment variable.
+pub const MODULE_SOURCE_ENV: &str = "OPENHUMAN_MODULE_SOURCE";
+
+/// Name of the per-module source variable for `id`: the id upper-cased, with
+/// non-alphanumerics as `_`.
+#[must_use]
+pub fn module_source_env_for(id: &str) -> String {
+    let suffix: String = id
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() {
+                c.to_ascii_uppercase()
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    format!("{MODULE_SOURCE_ENV}_{suffix}")
+}
+
 /// Where a module is resolved from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
