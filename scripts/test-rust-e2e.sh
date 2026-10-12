@@ -187,40 +187,14 @@ e2e_source_ids=(tinyconnectors tinysearch)
 if local_module_source_is_source; then
   e2e_source_ids+=(tinybox tinymcp)
 else
-tinybox_asset="$(node scripts/ci/self-hosted/test-module-assets.mjs "$module_platform" tinybox)"
-IFS=$'\t' read -r _tinybox_id tinybox_url tinybox_filename tinybox_sha256 <<< "$tinybox_asset"
-tinybox_dir="$REPO_ROOT/target/test-modules/tinybox/$tinybox_sha256"
-tinybox_archive="$tinybox_dir/$tinybox_filename"
-if [ ! -f "$tinybox_dir/libtinybox.$module_ext" ]; then
-  echo "[rust-e2e] Downloading the checksum-pinned TinyBox test module ..."
-  mkdir -p "$tinybox_dir"
-  curl --fail --location --silent --show-error "$tinybox_url" --output "$tinybox_archive"
-  if command -v shasum >/dev/null 2>&1; then
-    echo "${tinybox_sha256}  $tinybox_archive" | shasum -a 256 -c
-  else
-    echo "${tinybox_sha256}  $tinybox_archive" | sha256sum --check
-  fi
-  tar --no-same-owner -xzf "$tinybox_archive" -C "$tinybox_dir"
-fi
-export OPENHUMAN_MODULE_PATH="$tinybox_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
-
-# Run the ignored MCP registry cases with the registry-pinned native artifact.
-tinymcp_asset="$(node scripts/ci/self-hosted/test-module-assets.mjs "$module_platform" tinymcp)"
-IFS=$'\t' read -r _tinymcp_id tinymcp_url tinymcp_filename tinymcp_sha256 <<< "$tinymcp_asset"
-tinymcp_dir="$REPO_ROOT/target/test-modules/tinymcp/$tinymcp_sha256"
-tinymcp_archive="$tinymcp_dir/$tinymcp_filename"
-if [ ! -f "$tinymcp_dir/libtinymcp_module.$module_ext" ]; then
-  echo "Downloading the checksum-pinned TinyMCP test module ..."
-  mkdir -p "$tinymcp_dir"
-  curl --fail --location --silent --show-error "$tinymcp_url" --output "$tinymcp_archive"
-  if command -v shasum >/dev/null 2>&1; then
-    echo "${tinymcp_sha256}  $tinymcp_archive" | shasum -a 256 -c
-  else
-    echo "${tinymcp_sha256}  $tinymcp_archive" | sha256sum --check
-  fi
-  tar --no-same-owner -xzf "$tinymcp_archive" -C "$tinymcp_dir"
-fi
-export OPENHUMAN_MODULE_PATH="$tinymcp_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
+  # Shell command analysis and the storage URL E2E suites load TinyBox through
+  # the native module path; the ignored MCP registry cases need TinyMCP. Both
+  # come from the registry-pinned release, digest-verified before any
+  # subprocess starts.
+  for released_id in tinybox tinymcp; do
+    released_dir="$(stage_release_module "$released_id" "$module_platform" "$module_ext")"
+    export OPENHUMAN_MODULE_PATH="$released_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
+  done
 fi
 
 # Module-backed Composio coverage must use the pinned local artifact as well.
