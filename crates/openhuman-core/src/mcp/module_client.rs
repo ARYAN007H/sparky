@@ -286,7 +286,7 @@ impl McpConfiguredClient {
         limit: usize,
     ) -> Result<Option<SupervisorBatch>, ModuleCallError> {
         let state = self.state.lock().await;
-        if SHUTTING_DOWN.load(Ordering::Acquire) {
+        if SHUTTING_DOWN.load(Ordering::Acquire) || self.retiring.load(Ordering::Acquire) {
             return Err(ModuleCallError::Unavailable);
         }
         let State::Open(object) = &*state else {
@@ -328,7 +328,9 @@ impl McpConfiguredClient {
                 })
                 .unwrap_or_default();
             for client in clients {
-                if let Err(error) = client.close().await {
+                if client.retiring.load(Ordering::Acquire) {
+                    Self::close_retired_client(PathBuf::from(&client.data_dir), client).await;
+                } else if let Err(error) = client.close().await {
                     tracing::warn!(?error, "[mcp] workspace cleanup is still pending");
                 }
             }

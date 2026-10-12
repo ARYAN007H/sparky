@@ -76,6 +76,11 @@ pub enum AgentError {
         source: std::io::Error,
     },
 
+    /// A module-owned agent resource did not acknowledge cleanup, so its
+    /// workspace could not be purged safely.
+    #[error("agent cleanup is still pending; its workspace was retained")]
+    CleanupPending,
+
     /// A spec input could not be honoured.
     #[error("{0}")]
     Invalid(String),
@@ -139,8 +144,8 @@ pub(crate) struct AgentInner {
 
 impl AgentInner {
     /// Releases what the core keeps for this agent: parked approvals are
-    /// denied with `resolution`, its state slots and MCP host are dropped,
-    /// and its context leaves the registry. Runs once.
+    /// denied with `resolution`, its state slots are cleared, cached MCP
+    /// cleanup is scheduled, and its context leaves the registry. Runs once.
     pub(crate) fn teardown(&self, resolution: &str) {
         if !self.lifecycle.begin_teardown() {
             return;
@@ -153,14 +158,7 @@ impl AgentInner {
         );
         self.deny_approvals(resolution);
         self.ctx.agent_state().clear();
-        if openhuman_core::mcp::host::take_agent_host(&self.config.workspace_dir, &self.id)
-            .is_some()
-        {
-            log::debug!(
-                "[embed][agent] teardown id={} evicted its MCP host",
-                self.id
-            );
-        }
+        openhuman_core::mcp::host::schedule_agent_close(&self.config.workspace_dir, &self.id);
         openhuman_core::core::runtime::AgentContextRegistry::deregister(&self.id, &self.ctx);
         log::debug!("[embed][agent] teardown complete id={}", self.id);
     }

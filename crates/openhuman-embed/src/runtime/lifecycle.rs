@@ -17,12 +17,16 @@ struct RemovalSlot<'a> {
     runtime: &'a Runtime,
     inner: Arc<crate::agent::AgentInner>,
     purge: bool,
+    mcp_cleanup_confirmed: bool,
 }
 
 impl RemovalSlot<'_> {
     fn purge_home(&mut self) -> Result<(), AgentError> {
         if !std::mem::take(&mut self.purge) {
             return Ok(());
+        }
+        if !self.mcp_cleanup_confirmed {
+            return Err(AgentError::CleanupPending);
         }
         let home = &self.inner.layout.home;
         if home.exists() {
@@ -38,6 +42,12 @@ impl RemovalSlot<'_> {
 impl Drop for RemovalSlot<'_> {
     fn drop(&mut self) {
         self.inner.teardown("agent_removed");
+        if self.purge && !self.mcp_cleanup_confirmed {
+            self.purge = false;
+            log::warn!(
+                "[embed][runtime] retaining agent home until MCP cleanup is acknowledged"
+            );
+        }
         if let Err(error) = self.purge_home() {
             log::warn!("[embed][runtime] cancelled removal purge failed: {error}");
         }
@@ -90,8 +100,9 @@ impl Runtime {
     /// [`CoreError::AgentRemoved`](crate::CoreError::AgentRemoved); its parked
     /// approvals are denied with resolution `agent_removed`; turns in
     /// flight end with the same error, waited on for up to ten seconds; its
-    /// state slots and MCP host are dropped and its context deregistered, so
-    /// its cron jobs stay dormant. The id is free for reuse once cleanup ends.
+    /// state slots are cleared and its configured MCP client is closed before
+    /// its context is deregistered, so its cron jobs stay dormant. The id is
+    /// free for reuse once cleanup ends.
     /// Cancelling an already-started removal still tears down the old instance
     /// and performs a requested purge before releasing its id.
     ///
@@ -123,6 +134,7 @@ impl Runtime {
             runtime: self,
             inner,
             purge,
+            mcp_cleanup_confirmed: false,
         };
         let inner = &removal.inner;
         log::debug!("[embed][runtime] removing agent id={id} purge={purge}");
@@ -131,6 +143,12 @@ impl Runtime {
                 "[embed][runtime] agent id={id} still had turns unwinding after {}s",
                 REMOVE_IDLE_WAIT.as_secs()
             );
+        }
+        removal.mcp_cleanup_confirmed =
+            openhuman_core::mcp::host::close_agent(&inner.config.workspace_dir, &inner.id).await;
+        if !removal.mcp_cleanup_confirmed && removal.purge {
+            removal.purge = false;
+            return Err(AgentError::CleanupPending);
         }
         inner.teardown("agent_removed");
         removal.purge_home()?;
