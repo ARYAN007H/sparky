@@ -152,19 +152,25 @@ pub(crate) async fn deliver_to_origin(
     };
     let text = output.trim();
 
-    // A hosted profile's host routes the reply itself.
-    if let (Some(sink), Some(profile_id)) = (
-        crate::cron::host_delivery::installed(),
-        crate::core::runtime::current_tenant()
-            .ok()
-            .and_then(|tenant| tenant.profile),
-    ) {
+    // A hosted profile's or an embedded agent's host routes the reply itself.
+    let owner = crate::core::runtime::current_tenant()
+        .ok()
+        .filter(|tenant| tenant.profile.is_some() || tenant.agent.is_some());
+    if let (Some(sink), Some(owner)) = (crate::cron::host_delivery::installed(), owner) {
         let thread_id = match origin {
             JobOrigin::Web { thread_id, .. } => Some(thread_id.clone()),
             JobOrigin::Channel { thread_id, .. } => thread_id.clone(),
         };
+        tracing::debug!(
+            job_id = %job.id,
+            run_id = %run_id,
+            profile = owner.profile.is_some(),
+            agent = owner.agent.is_some(),
+            "[cron] origin delivery handed to the host"
+        );
         sink.deliver(crate::cron::host_delivery::CronReply {
-            profile_id,
+            profile_id: owner.profile,
+            agent_id: owner.agent,
             job_id: job.id.clone(),
             run_id: run_id.to_string(),
             thread_id,
