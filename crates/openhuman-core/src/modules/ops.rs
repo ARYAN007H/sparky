@@ -304,10 +304,8 @@ async fn resolve(config: &Config, record: &'static ModuleRecord) -> Result<(), S
             }
         }
         ModuleSource::Linked => {
-            return Err(mark_terminal(format!(
-                "module '{}' is unavailable: its linked factory could not be started",
-                record.id
-            )));
+            let module_config = module_config(config, record.id);
+            return blocking(move || load_linked(runtime, record.id, module_config)).await;
         }
         ModuleSource::Release => {}
     }
@@ -447,6 +445,39 @@ pub(super) fn load_local(
         Err(err) => Err(format!(
             "module '{id}' could not be loaded from its local artifact: {err}. This is terminal \
              for the running process; restart the app to try again"
+        )),
+    }
+}
+
+/// Attach the module linked into this executable for `id`.
+///
+/// Runs the same descriptor, manifest, dependency and init checks as a
+/// released module, with the same private configuration; the executable's
+/// digest is the attestation. Errors carry static text only.
+pub(super) fn load_linked(
+    runtime: &host::ModuleRuntime,
+    id: &str,
+    module_config: serde_json::Value,
+) -> Result<(), String> {
+    let Some(factory) = super::linked::factory_for(id) else {
+        return Err(format!(
+            "module '{id}' is unavailable: no linked factory is registered in this binary"
+        ));
+    };
+    let module = factory().map_err(|err| {
+        log::warn!("[modules] linked factory for '{id}' failed: {err}");
+        format!("module '{id}' is unavailable: its linked factory could not be started")
+    })?;
+    match runtime
+        .host()
+        .attach_linked_with_config(module, module_config)
+    {
+        Ok(_) => {
+            log::info!("[modules] loaded '{id}' from the linked executable");
+            Ok(())
+        }
+        Err(err) => Err(format!(
+            "module '{id}' could not be attached from the linked executable: {err}"
         )),
     }
 }
