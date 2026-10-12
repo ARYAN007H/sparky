@@ -139,6 +139,11 @@ name = "storage_delegation_e2e"
 path = "../../tests/storage_delegation_e2e.rs"
 
 [[test]]
+# Its own binary: it boots a core with `[components]` switches off.
+name = "components_e2e"
+path = "../../tests/components_e2e.rs"
+
+[[test]]
 name = "embedded_server_shutdown_e2e"
 path = "../../tests/embedded_server_shutdown_e2e.rs"
 
