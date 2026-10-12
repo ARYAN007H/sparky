@@ -129,6 +129,7 @@ export const HOST_RPC_INTERNAL_PATTERNS = [
  * mistaken for code. Handles nested block comments, escapes and raw strings.
  * Optional literal preservation and code-whitespace compaction support type
  * signatures; default masking is unchanged. Compaction leaves literal contents intact.
+ * preserveTokenBoundaries retains separators that prevent lexical token merging.
  */
 export function stripRustComments(text, { preserveLiterals = false, compact = false, preserveTokenBoundaries = false } = {}) {
   let out = '';
