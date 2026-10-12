@@ -396,7 +396,7 @@ async fn a_blocked_close_has_an_overall_cleanup_deadline_and_keeps_the_owner_for
             .unwrap(),
         &client
     ));
-    assert!(client.retired.load(Ordering::Acquire));
+    assert!(client.retiring.load(Ordering::Acquire));
     // Retry the captured owner; timing out must not evict its close intent.
     fixture.release_close.notify_one();
     cleanup.finish().await.unwrap();

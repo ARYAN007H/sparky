@@ -18,18 +18,8 @@ pub fn take_agent_cleanup(workspace: &std::path::Path, agent_id: &str) -> Option
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     let client = Arc::clone(clients.get(&directory)?);
-    client.retired.store(true, Ordering::Release);
+    client.retiring.store(true, Ordering::Release);
     Some(AgentMcpCleanup { directory, client })
-}
-
-pub(super) fn agent_is_removed() -> bool {
-    crate::core::runtime::CoreContext::current().is_some_and(|ctx| {
-        ctx.session_agent().is_some()
-            && ctx
-                .host_overrides()
-                .and_then(|overrides| overrides.approval_scope())
-                .is_some_and(|scope| scope.is_closed())
-    })
 }
 
 impl AgentMcpCleanup {

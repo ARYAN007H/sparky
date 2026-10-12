@@ -35,8 +35,21 @@ const MODULE: &str = "tinymcp";
 const TRANSITION_TIMEOUT: Duration = Duration::from_secs(30);
 const TRANSITION_POLL_INTERVAL: Duration = Duration::from_millis(20);
 static CLIENTS: OnceLock<Mutex<HashMap<PathBuf, Arc<McpConfiguredClient>>>> = OnceLock::new();
+type CleanupAction = Arc<dyn Fn() -> bool + Send + Sync>;
+
+#[derive(Default)]
+struct CleanupReservation {
+    after_close: Mutex<Option<CleanupAction>>,
+}
+
+static CLEANUP_RESERVATIONS: OnceLock<Mutex<HashMap<PathBuf, Arc<CleanupReservation>>>> =
+    OnceLock::new();
 static SHUTDOWN_REGISTERED: AtomicBool = AtomicBool::new(false);
 static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
+
+#[cfg(test)]
+static AFTER_CONTEXT_CHECK: OnceLock<Mutex<Option<(PathBuf, tokio::sync::oneshot::Sender<()>)>>> =
+    OnceLock::new();
 
 #[derive(Clone)]
 struct OpenObject {
@@ -118,6 +131,9 @@ pub(crate) trait McpModulePort: Send + Sync {
 mod module_port;
 use module_port::TinyMcpPort;
 
+#[path = "cached_cleanup.rs"]
+mod cached_cleanup;
+
 #[path = "agent_cleanup.rs"]
 pub(crate) mod agent_cleanup;
 
@@ -126,7 +142,7 @@ pub(crate) struct McpConfiguredClient {
     data_dir: String,
     port: Box<dyn McpModulePort>,
     state: tokio::sync::Mutex<State>,
-    retired: AtomicBool,
+    retiring: AtomicBool,
 }
 
 impl McpConfiguredClient {
@@ -142,19 +158,41 @@ impl McpConfiguredClient {
             ModuleClient::report_unavailable(MODULE);
             return Err(ModuleCallError::Unavailable);
         }
-
+        if current_agent_context_is_removed() {
+            ModuleClient::report_unavailable(MODULE);
+            return Err(ModuleCallError::Unavailable);
+        }
         let data_dir = crate::core::runtime::agent_scope_dir(config);
+        if Self::cleanup_pending(&data_dir) {
+            return Err(ModuleCallError::Unavailable);
+        }
+        #[cfg(test)]
+        {
+            let mut hook = AFTER_CONTEXT_CHECK
+                .get_or_init(|| Mutex::new(None))
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if hook
+                .as_ref()
+                .is_some_and(|(expected, _)| expected == &data_dir)
+            {
+                if let Some((_, sender)) = hook.take() {
+                    let _ = sender.send(());
+                }
+            }
+        }
         let clients = CLIENTS.get_or_init(|| Mutex::new(HashMap::new()));
         let mut clients = clients
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        // Check while holding the same lock cleanup uses. A previously
-        // admitted turn must not create a first client after removal.
-        if agent_cleanup::agent_is_removed() {
+        // The cleanup reservation can be installed after the first check but
+        // before this cache lock is acquired. Recheck before creating a client.
+        if current_agent_context_is_removed() || Self::cleanup_pending(&data_dir) {
+            ModuleClient::report_unavailable(MODULE);
             return Err(ModuleCallError::Unavailable);
         }
         if let Some(client) = clients.get(&data_dir) {
-            if client.retired.load(Ordering::Acquire) {
+            if client.retiring.load(Ordering::Acquire) {
                 return Err(ModuleCallError::Unavailable);
             }
             return Ok(Arc::clone(client));
@@ -188,7 +226,7 @@ impl McpConfiguredClient {
         limit: usize,
     ) -> Result<Option<SupervisorBatch>, ModuleCallError> {
         let state = self.state.lock().await;
-        if SHUTTING_DOWN.load(Ordering::Acquire) || self.retired.load(Ordering::Acquire) {
+        if SHUTTING_DOWN.load(Ordering::Acquire) || self.retiring.load(Ordering::Acquire) {
             return Err(ModuleCallError::Unavailable);
         }
         let State::Open(object) = &*state else {
@@ -230,10 +268,15 @@ impl McpConfiguredClient {
                 })
                 .unwrap_or_default();
             for client in clients {
-                if let Err(error) = client.close().await {
+                if client.retiring.load(Ordering::Acquire) {
+                    let data_dir = PathBuf::from(&client.data_dir);
+                    let reservation = Self::reservation_for(&data_dir);
+                    Self::close_retired_client(data_dir, client, reservation).await;
+                } else if let Err(error) = client.close().await {
                     tracing::warn!(?error, "[mcp] workspace cleanup is still pending");
                 }
             }
+            Self::retry_orphaned_cleanups();
             SHUTDOWN_REGISTERED.store(false, Ordering::Release);
         });
     }
@@ -278,7 +321,7 @@ impl McpConfiguredClient {
             data_dir,
             port,
             state: tokio::sync::Mutex::new(State::Closed),
-            retired: AtomicBool::new(false),
+            retiring: AtomicBool::new(false),
         }
     }
 
@@ -310,7 +353,7 @@ impl McpConfiguredClient {
         request: PrepareAgentToolsRequest,
     ) -> Result<Vec<McpToolPresentation>, ModuleCallError> {
         let _accepted = self.state.lock().await;
-        if SHUTTING_DOWN.load(Ordering::Acquire) || self.retired.load(Ordering::Acquire) {
+        if SHUTTING_DOWN.load(Ordering::Acquire) || self.retiring.load(Ordering::Acquire) {
             return Err(ModuleCallError::Unavailable);
         }
         self.port.prepare_agent_tools(request).await
@@ -340,7 +383,7 @@ impl McpConfiguredClient {
         request: ValidateServerArgumentsRequest,
     ) -> Result<ServerArgumentsValidation, ModuleCallError> {
         let _accepted = self.state.lock().await;
-        if SHUTTING_DOWN.load(Ordering::Acquire) || self.retired.load(Ordering::Acquire) {
+        if SHUTTING_DOWN.load(Ordering::Acquire) || self.retiring.load(Ordering::Acquire) {
             return Err(ModuleCallError::Unavailable);
         }
         self.port.validate_server_arguments(request).await
@@ -353,7 +396,7 @@ impl McpConfiguredClient {
         arguments: Option<Value>,
     ) -> Result<Map<String, Value>, ModuleCallError> {
         let _accepted = self.state.lock().await;
-        if SHUTTING_DOWN.load(Ordering::Acquire) || self.retired.load(Ordering::Acquire) {
+        if SHUTTING_DOWN.load(Ordering::Acquire) || self.retiring.load(Ordering::Acquire) {
             return Err(ModuleCallError::Unavailable);
         }
         self.port.normalize_tool_arguments(arguments).await
@@ -365,7 +408,7 @@ impl McpConfiguredClient {
         value: &str,
     ) -> Result<String, ModuleCallError> {
         let _accepted = self.state.lock().await;
-        if SHUTTING_DOWN.load(Ordering::Acquire) || self.retired.load(Ordering::Acquire) {
+        if SHUTTING_DOWN.load(Ordering::Acquire) || self.retiring.load(Ordering::Acquire) {
             return Err(ModuleCallError::Unavailable);
         }
         self.port
@@ -466,7 +509,7 @@ impl McpConfiguredClient {
     ) -> Result<R, ModuleCallError> {
         let args = serde_json::to_value(args).map_err(|_| ModuleCallError::ModuleFault)?;
         let mut state = self.state.lock().await;
-        if SHUTTING_DOWN.load(Ordering::Acquire) || self.retired.load(Ordering::Acquire) {
+        if SHUTTING_DOWN.load(Ordering::Acquire) || self.retiring.load(Ordering::Acquire) {
             return Err(ModuleCallError::Unavailable);
         }
         let object = self.ensure_open(&mut state, config).await?;
@@ -647,6 +690,17 @@ impl McpConfiguredClient {
         .await
         .map_err(|_| ModuleCallError::TransportFailed)?
     }
+}
+
+fn current_agent_context_is_removed() -> bool {
+    let Some(context) = crate::core::runtime::CoreContext::current() else {
+        return false;
+    };
+    context.session_agent().is_some()
+        && context
+            .host_overrides()
+            .and_then(|overrides| overrides.approval_scope())
+            .is_some_and(|scope| scope.is_closed())
 }
 
 #[cfg(test)]
