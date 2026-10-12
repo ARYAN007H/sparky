@@ -106,6 +106,9 @@ pub enum LoadError {
     /// The module is still being downloaded, verified, or initialised, and the
     /// caller's bound passed first. Asking again later can succeed.
     StillLoading,
+    /// The module's `[components]` switch is off. Nothing was downloaded,
+    /// mapped or registered. Carries the component name.
+    Disabled(&'static str),
 }
 
 impl LoadError {
@@ -115,6 +118,9 @@ impl LoadError {
         match self {
             Self::Failed(message) => message,
             Self::StillLoading => "the module is still loading; try again shortly".to_string(),
+            Self::Disabled(component) => {
+                format!("COMPONENT_DISABLED:{component}")
+            }
         }
     }
 }
@@ -160,6 +166,10 @@ pub async fn ensure_loaded_within(
     }
     let record =
         registry::find(id).ok_or_else(|| LoadError::Failed(format!("unknown module '{id}'")))?;
+    if let Some(component) = disabled_component(config, id) {
+        log::debug!("[modules] '{id}' refused: component '{component}' is disabled");
+        return Err(LoadError::Disabled(component));
+    }
 
     let receiver = match resolution::global().claim(id) {
         Claim::Done(Resolution::Ready) => return Ok(()),
@@ -184,6 +194,28 @@ pub async fn ensure_loaded_within(
         }
         Waited::StillLoading => Err(LoadError::StillLoading),
     }
+}
+
+/// The disabled `[components]` switch that owns module `id`, if any.
+#[must_use]
+pub fn disabled_component(config: &Config, id: &str) -> Option<&'static str> {
+    let component = registry::component_for(id)?;
+    let set = crate::core::runtime::ComponentSet::from_config(&config.components);
+    (!set.enabled(component)).then_some(component)
+}
+
+/// Library file stems of every module whose component is off, for skipping
+/// their search-path artifacts. Both `name` and `libname` spellings.
+#[must_use]
+pub fn disabled_lib_stems(config: &Config) -> Vec<String> {
+    registry::ALL
+        .iter()
+        .filter(|record| disabled_component(config, record.id).is_some())
+        .flat_map(|record| {
+            let stem = record.source.lib_name.to_string();
+            [format!("lib{stem}"), stem]
+        })
+        .collect()
 }
 
 /// The state of `id` as the resolution table reports it, without touching it.
@@ -324,10 +356,9 @@ async fn resolve(config: &Config, record: &'static ModuleRecord) -> Result<(), S
     // nothing, and tinybus reports each refusal with a sanitised reason — so the
     // errors are dropped here and only a match on the bus name counts.
     let bus_name = record.bus_name;
+    let skip = disabled_lib_stems(config);
     let found_on_search_path = tokio::task::spawn_blocking(move || {
-        runtime
-            .host()
-            .load_search_paths()
+        super::search_path::load_enabled(runtime.host(), &skip)
             .into_iter()
             .flatten()
             .any(|info| info.manifest.bus_name.as_str() == bus_name)
@@ -553,6 +584,14 @@ fn status_of(config: &Config, record: &ModuleRecord) -> ModuleStatus {
     // may remain loaded in this process after a prior request, but callers
     // whose configuration disables modules must still be told it is unusable.
     let (state, detail) = match () {
+        _ if disabled_component(config, record.id).is_some() => (
+            ModuleState::Disabled,
+            Some(format!(
+                "COMPONENT_DISABLED:{} (set [components] {} = true to enable)",
+                disabled_component(config, record.id).unwrap_or_default(),
+                disabled_component(config, record.id).unwrap_or_default()
+            )),
+        ),
         _ if !config.modules.enabled => (
             ModuleState::Unsupported,
             Some("modules are disabled in configuration".to_string()),
@@ -577,7 +616,7 @@ fn status_of(config: &Config, record: &ModuleRecord) -> ModuleStatus {
         },
     };
     let plan = source::plan(config, record.id);
-    let source = (state != ModuleState::Unsupported).then_some(plan.served);
+    let source = (!matches!(state, ModuleState::Unsupported | ModuleState::Disabled)).then_some(plan.served);
     let detail = detail.or_else(|| plan.fallback.map(str::to_string));
     ModuleStatus {
         id: record.id.to_string(),

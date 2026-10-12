@@ -90,3 +90,30 @@ pub const ALL: &[ModuleRecord] = &[
 pub fn find(id: &str) -> Option<&'static ModuleRecord> {
     ALL.iter().find(|record| record.id == id)
 }
+
+/// Which `[components]` switch owns each module id.
+///
+/// Every record in [`ALL`] has an entry (`registry_tests` enforces it), so a
+/// module is never exempt from a disabled component by omission.
+pub const COMPONENT_OF: &[(&str, &str)] = &[
+    ("tinycomputer", "computer"),
+    ("tinysearch", "search"),
+    ("tinydocs", "documents"),
+    ("tinywallet", "wallet"),
+    ("tinyjuice", "juice"),
+    ("tinyvoice", "voice"),
+    ("tinymcp", "mcp"),
+    ("tinyconnectors", "connectors"),
+    ("tinybox", "sandbox"),
+    ("tinychannels", "channels"),
+    ("tinyhosts", "hosting"),
+];
+
+/// The `[components]` name that owns module `id`, if the table knows it.
+#[must_use]
+pub fn component_for(id: &str) -> Option<&'static str> {
+    COMPONENT_OF
+        .iter()
+        .find(|(module, _)| *module == id)
+        .map(|(_, component)| *component)
+}

@@ -140,6 +140,8 @@ pub enum ModuleState {
     Failed,
     /// No artifact is published for this host.
     Unsupported,
+    /// Switched off by `[components]`: never downloaded, loaded or registered.
+    Disabled,
 }
 
 /// A module's status as reported over RPC.
