@@ -89,11 +89,12 @@ fn the_last_runtime_guard_keeps_admission_reserved_through_cleanup_completion() 
             let (release_tx, release_rx) = std::sync::mpsc::channel();
             let worker = std::thread::spawn(move || {
                 let mut guard = Some(guard);
-                complete_with_guard(&mut guard, || {
+                let result = complete_with_guard(&mut guard, || {
                     entered_tx.send(()).unwrap();
                     release_rx.recv().unwrap();
+                    Err::<(), ()>(())
                 });
-                guard.is_some()
+                result.is_err() && guard.is_some()
             });
             entered_rx.recv().unwrap();
             let guard_is_live = weak.upgrade().is_some();
