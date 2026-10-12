@@ -116,7 +116,12 @@ impl OpenHumanSessionHost {
             );
             return;
         };
-        if def.subagents.is_empty() {
+        // The same rule as at build time: a named scope delegates only when it
+        // names a spawn tool, so the definition's roster never widens an
+        // explicit allowlist on a later turn.
+        if def.subagents.is_empty()
+            || !super::super::builder::should_synthesize_delegation_tools(&def)
+        {
             return;
         }
 
