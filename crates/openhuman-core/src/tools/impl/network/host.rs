@@ -161,7 +161,7 @@ mod x402 {
         log::debug!("[tool.http_request] x402 payment declined: component 'wallet' disabled");
         Err(format!(
             "{}:wallet",
-            crate::core::runtime::COMPONENT_DISABLED
+            crate::core::runtime::components::COMPONENT_DISABLED
         ))
     }
 
