@@ -13,19 +13,42 @@ const production = (file) =>
   file.endsWith(".rs") &&
   !file.endsWith("_tests.rs");
 const signature = (entry) =>
-  JSON.stringify([entry.file, entry.name, entry.type]);
+  JSON.stringify([entry.file, entry.scope ?? "", entry.name, entry.type]);
+
+// Track explicit inline modules through every balanced source brace. Anonymous
+// blocks and macro expansion are outside this source-level identity model.
+function moduleScopes(code) {
+  const openings = new Map();
+  for (const match of code.matchAll(/\bmod\s+((?:r#)?[_\p{ID_Start}][_\p{ID_Continue}]*)\s*\{/gu))
+    openings.set(match.index + match[0].lastIndexOf("{"), match[1]);
+  const stack = [];
+  const scopes = [];
+  for (let index = 0; index < code.length; index++) {
+    if (code[index] === "{") stack.push(openings.get(index) ?? null);
+    else if (code[index] === "}") stack.pop();
+    if (openings.has(index) || code[index] === "}")
+      scopes.push([index, stack.filter(Boolean).join("::")]);
+  }
+  return scopes;
+}
 
 /** Source declarations only: includes aliases and lazy_static!, not macro expansion. */
 export function declarations(text, file) {
   const code = stripRustComments(text);
   const found = [];
+  const scopes = moduleScopes(code);
+  let scopeIndex = 0;
+  let scope = "";
   const pattern =
     /(?<!')\bstatic\s+(?:(mut|ref)\s+)?((?:r#)?[_\p{ID_Start}][_\p{ID_Continue}]*)\s*:(?!:)/gu;
   for (const match of code.matchAll(pattern)) {
+    while (scopeIndex < scopes.length && scopes[scopeIndex][0] < match.index)
+      scope = scopes[scopeIndex++][1];
     let end = match.index + match[0].length;
     const start = end;
     const stack = [];
     const arrayLengths = new Set();
+    const macroTrees = new Set();
     for (; end < code.length; end++) {
       const char = code[end];
       if (!stack.length && (char === "=" || char === ";")) break;
@@ -33,16 +56,21 @@ export function declarations(text, file) {
       // Operators in const blocks and array lengths are not type brackets.
       if (
         (char === "<" || char === ">") &&
-        (stack.includes("{") || arrayLengths.size)
+        (stack.includes("{") || arrayLengths.size || macroTrees.size)
       )
         continue;
-      if ("<([{".includes(char)) stack.push(char);
+      if ("<([{".includes(char)) {
+        if ("([{".includes(char) && code.slice(start, end).trimEnd().endsWith("!"))
+          macroTrees.add(stack.length + 1);
+        stack.push(char);
+      }
       else if (">)]}".includes(char) && stack.length) {
         // An arrow inside a function type is not a generic closing bracket.
         if (char === ">" && code[end - 1] === "-") continue;
         const expected = { ">": "<", ")": "(", "]": "[", "}": "{" }[char];
         if (stack.at(-1) === expected) {
           arrayLengths.delete(stack.length);
+          macroTrees.delete(stack.length);
           stack.pop();
         }
       }
@@ -56,6 +84,7 @@ export function declarations(text, file) {
     if (!type) throw new Error(`${file}: static ${match[2]} has no type`);
     found.push({
       file,
+      scope,
       name: match[2],
       type: (match[1] ? match[1] + " " : "") + type,
       line: code.slice(0, match.index).split("\n").length,
@@ -96,6 +125,7 @@ export function reviewChanges(
     reviewed.set(key, entry);
     if (
       !production(entry.file ?? "") ||
+      (entry.scope !== undefined && typeof entry.scope !== "string") ||
       typeof entry.name !== "string" ||
       !entry.name ||
       typeof entry.type !== "string" ||
