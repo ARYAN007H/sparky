@@ -4,8 +4,10 @@
 //! ([`host::user_domains`](super::host::user_domains)): memory and thread
 //! tools, nothing that reaches the host. Shell and file tools sit in the
 //! `Platform` family, which a user context never enables. The operator opts
-//! users into them per deployment with `tool_allowlist`, one
-//! [`SaasToolGroup`] at a time:
+//! into tools supplied by an embedding host with `tool_allowlist`, one
+//! [`SaasToolGroup`] at a time. The allowlist grants admission, not registration:
+//! the standalone SaaS CLI has no host-tool adapter and exposes neither group.
+//! When an embedding host supplies the corresponding tools:
 //!
 //! - `host_files`: the file tools. They run in-process, confined by the
 //!   user's policy (`layout::profile_config`: autonomy on, workspace-only,
