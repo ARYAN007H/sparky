@@ -150,7 +150,7 @@ impl Tool for ModuleConfiguredMcpServerTool {
         let arguments = client
             .normalize_tool_arguments(args)
             .await
-            .map_err(|_| anyhow::anyhow!("invalid MCP tool arguments"))?;
+            .map_err(|error| anyhow::anyhow!(super::mcp::input_module_error_message(error)))?;
         let call: tinymcp_bus::ClassifiedStaticToolCall = client
             .call_confidential(
                 &client_config,
