@@ -107,6 +107,11 @@ test("lifetimes and associated types are not declarations", () => {
     [],
   );
 });
+test("raw and Unicode identifiers cannot bypass ownership review", () => {
+  const current = scan("static r#type: Alias = x; static 缓存: Alias = x;");
+  assert.deepEqual(current.map(({ name }) => name), ["r#type", "缓存"]);
+  assert.equal(reviewChanges([], current, []).length, 2);
+});
 test("const generic equality and function arrows do not terminate a type", () => {
   assert.equal(
     scan("static X: Wrapper<{1 == 1}, fn() -> usize> = x;")[0].type,
