@@ -759,7 +759,7 @@ skills = ["tinyskills/registry"]
 # parent compiled. `sanitize` left the family entirely for `util::sanitize` —
 # the orchestrator prompt sanitises *skill* descriptions through it. The gate
 # follows the real dependency graph, not the directory name.
-mcp = []
+mcp = ["modules"]
 # Sentry crash/error reporting: the `sentry::init` guard + secret-scrubbing
 # `before_send` hook (src/main.rs), the sentry-tracing bridge layer
 # (core::logging), the ~24 `before_send` Event classifiers + the two
