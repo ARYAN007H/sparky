@@ -430,7 +430,19 @@ fn cleanup_callback_can_access_the_client_cache() {
     McpConfiguredClient::schedule_agent_close_and_cleanup(
         workspace.path(),
         Arc::new(move || {
-            callback_flag.store(CLIENTS.get().unwrap().try_lock().is_ok(), Ordering::SeqCst);
+            // Permit transient contention from other parallel tests, while
+            // detecting a cache lock held by the cleanup call itself.
+            let deadline = std::time::Instant::now() + Duration::from_secs(10);
+            let available = loop {
+                if CLIENTS.get().unwrap().try_lock().is_ok() {
+                    break true;
+                }
+                if std::time::Instant::now() >= deadline {
+                    break false;
+                }
+                std::thread::yield_now();
+            };
+            callback_flag.store(available, Ordering::SeqCst);
             true
         }),
     );

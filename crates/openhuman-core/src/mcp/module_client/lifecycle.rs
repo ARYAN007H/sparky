@@ -398,7 +398,7 @@ impl McpConfiguredClient {
         if !is_current {
             return false;
         }
-        let mut clients = if let Some(client) = client.as_ref() {
+        if let Some(client) = client.as_ref() {
             let Some(clients) = CLIENTS.get() else {
                 return false;
             };
@@ -411,14 +411,25 @@ impl McpConfiguredClient {
             {
                 return false;
             }
-            Some(clients)
-        } else {
-            None
-        };
+        }
+        // The reservation still blocks admission for this directory while
+        // the callback runs without the global client cache lock.
         if after_close.as_ref().is_some_and(|action| !action()) {
             return false;
         }
-        if let Some(clients) = clients.as_mut() {
+        if let Some(client) = client.as_ref() {
+            let Some(clients) = CLIENTS.get() else {
+                return false;
+            };
+            let mut clients = clients
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if !clients
+                .get(data_dir)
+                .is_some_and(|current| Arc::ptr_eq(current, client))
+            {
+                return false;
+            }
             clients.remove(data_dir);
         }
         let mut reservations = reservations
