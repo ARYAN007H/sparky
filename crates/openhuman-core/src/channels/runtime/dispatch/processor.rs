@@ -11,8 +11,8 @@
 //!   the native bus. A channel bound to a host agent runs through
 //!   [`super::host_agent`] instead.
 //! * [`run_message_dispatch_loop`] — feeds messages into
-//!   [`process_channel_runtime_message`] through the bounded-concurrency
-//!   `tinychannels::runtime::run_dispatch_loop`.
+//!   [`process_channel_runtime_message`] with a bounded set of host workers
+//!   and joins them when the inbound queue closes.
 
 mod approval;
 mod bus_turn;
