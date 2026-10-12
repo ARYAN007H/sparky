@@ -1,18 +1,19 @@
 //! The server operations widget RPCs need, behind a seam.
 //!
-//! [`HostUiPort`] answers them from this workspace's MCP host: installed
-//! servers through the live connection map, configured servers through the
-//! static set. Tests substitute their own.
+//! [`HostUiPort`] answers them through this workspace's TinyMCP module:
+//! installed servers by their connection, configured servers by the static
+//! set. The module contract has no `resources/read`, so a widget document is
+//! only available when the tool result embedded it. Tests substitute their
+//! own port.
 
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::Value;
-use tinymcp::McpRemoteToolExt;
 
 use crate::config::Config;
 use crate::mcp::host;
-use crate::mcp::registry::connections;
+use crate::mcp::module_client::McpConfiguredClient;
 
 use super::types::UiToolDescriptor;
 
@@ -38,7 +39,7 @@ pub trait UiServerPort: Send + Sync {
     ) -> Result<Value, String>;
 }
 
-/// [`UiServerPort`] over `config`'s MCP host.
+/// [`UiServerPort`] over `config`'s TinyMCP module.
 pub struct HostUiPort {
     config: Arc<Config>,
 }
@@ -49,84 +50,113 @@ impl HostUiPort {
         Self { config }
     }
 
-    fn is_static(&self, server_id: &str) -> bool {
-        host::static_registry(&self.config).get(server_id).is_some()
+    fn client(&self) -> Option<Arc<McpConfiguredClient>> {
+        McpConfiguredClient::for_config(&self.config).ok()
+    }
+
+    async fn is_static(&self, server_id: &str) -> bool {
+        let Some(client) = self.client() else {
+            return false;
+        };
+        let listed: Result<Vec<String>, _> = client
+            .call(
+                &host::client_config(&self.config),
+                tinymcp_bus::names::methods::STATIC_LIST,
+                (),
+            )
+            .await;
+        listed.is_ok_and(|servers| servers.iter().any(|name| name == server_id))
+    }
+
+    async fn is_installed_connected(&self, server_id: &str) -> bool {
+        let Some(client) = self.client() else {
+            return false;
+        };
+        let statuses: Result<Vec<tinymcp_bus::ConnStatus>, _> = client
+            .call(
+                &host::client_config(&self.config),
+                tinymcp_bus::names::methods::STATUS,
+                (),
+            )
+            .await;
+        statuses.is_ok_and(|statuses| {
+            statuses.iter().any(|status| {
+                status.server_id == server_id
+                    && status.status == tinymcp_bus::ServerStatus::Connected
+            })
+        })
     }
 }
 
 #[async_trait]
 impl UiServerPort for HostUiPort {
     async fn is_available(&self, server_id: &str) -> bool {
-        connections::is_connected_for_config(&self.config, server_id).await
-            || self.is_static(server_id)
+        self.is_installed_connected(server_id).await || self.is_static(server_id).await
     }
 
     async fn tool_descriptor(&self, server_id: &str, tool: &str) -> Option<UiToolDescriptor> {
-        if let Some(live) = connections::server_tools_for_config(&self.config, server_id).await {
+        let client = self.client()?;
+        let client_config = host::client_config(&self.config);
+        if self.is_installed_connected(server_id).await {
+            let live: Vec<tinymcp_bus::McpTool> = client
+                .call(
+                    &client_config,
+                    tinymcp_bus::names::methods::LIST_TOOLS,
+                    (server_id,),
+                )
+                .await
+                .ok()?;
             let safe = crate::mcp::registry::tools_safe_for_agent(server_id, live);
             safe.iter().find(|candidate| candidate.name == tool)?;
-            let service = host::for_config(&self.config).ok()?;
-            let meta = service
-                .dynamic()
-                .connections()
-                .tool_meta(server_id, tool)
-                .await;
             return Some(UiToolDescriptor {
-                meta,
+                meta: None,
                 annotations: None,
             });
         }
-        let registry = host::static_registry(&self.config);
-        registry.get(server_id)?;
-        let listed = registry
-            .list_tools(server_id)
+        let listed: Vec<tinymcp_bus::McpRemoteTool> = client
+            .call(
+                &client_config,
+                tinymcp_bus::names::methods::STATIC_LIST_TOOLS,
+                (server_id,),
+            )
             .await
             .map_err(|error| {
-                tracing::debug!(server_id, %error, "[mcp_ui] could not list tools");
+                tracing::debug!(server_id, ?error, "[mcp_ui] could not list tools");
             })
             .ok()?;
+        let listed = client
+            .scrub_static_tools(&client_config, server_id, listed)
+            .await
+            .ok()?;
+        let meta = listed
+            .iter()
+            .find(|remote| remote.name == tool)
+            .and_then(|remote| remote.meta.clone());
         let safe = crate::mcp::registry::tools_safe_for_agent(
             server_id,
             listed
                 .into_iter()
-                .map(|remote| {
-                    let description = remote.display_description();
-                    tinymcp_bus::McpTool {
-                        name: remote.name,
-                        description,
-                        input_schema: remote.input_schema,
-                    }
+                .map(|remote| tinymcp_bus::McpTool {
+                    description: remote.description.or(remote.title),
+                    name: remote.name,
+                    input_schema: remote.input_schema,
                 })
                 .collect(),
         );
         safe.iter().find(|candidate| candidate.name == tool)?;
         Some(UiToolDescriptor {
-            meta: registry.tool_meta(server_id, tool),
+            meta,
             annotations: None,
         })
     }
 
     async fn read_resource(&self, server_id: &str, uri: &str) -> Result<Vec<Value>, String> {
-        let contents = if connections::is_connected_for_config(&self.config, server_id).await {
-            host::for_config(&self.config)
-                .map_err(|error| error.to_string())?
-                .dynamic()
-                .connections()
-                .read_resource(server_id, uri)
-                .await
-        } else {
-            host::static_registry(&self.config)
-                .read_resource(server_id, uri)
-                .await
-        }
-        .map_err(|error| {
-            tracing::debug!(server_id, %error, "[mcp_ui] resources/read failed");
-            error.to_string()
-        })?;
-        contents
-            .iter()
-            .map(|entry| serde_json::to_value(entry).map_err(|error| error.to_string()))
-            .collect()
+        tracing::debug!(
+            server_id,
+            uri,
+            "[mcp_ui] resources/read is not part of the TinyMCP module contract"
+        );
+        Err("this server's widget document is not embedded in its tool result".to_string())
     }
 
     async fn call_tool(
@@ -135,20 +165,21 @@ impl UiServerPort for HostUiPort {
         tool: &str,
         arguments: Value,
     ) -> Result<Value, String> {
-        if connections::is_connected_for_config(&self.config, server_id).await {
-            let service = host::for_config(&self.config).map_err(|error| error.to_string())?;
-            return service
-                .dynamic()
-                .tool_call(server_id, tool, arguments)
-                .await
-                .map(|outcome| outcome.result)
-                .map_err(|error| error.to_string());
-        }
-        host::static_registry(&self.config)
-            .call_tool(server_id, tool, arguments)
+        let client = self.client().ok_or("MCP module is unavailable")?;
+        let client_config = host::client_config(&self.config);
+        let member = if self.is_installed_connected(server_id).await {
+            tinymcp_bus::names::methods::TOOL_CALL
+        } else {
+            tinymcp_bus::names::methods::STATIC_CALL_TOOL
+        };
+        let outcome: tinymcp_bus::ToolCallOutcome = client
+            .call_confidential(&client_config, member, (server_id, tool, arguments))
             .await
-            .map(|result| result.raw_result)
-            .map_err(|error| error.to_string())
+            .map_err(|error| {
+                tracing::debug!(server_id, tool, ?error, "[mcp_ui] widget tool call failed");
+                "MCP tool call failed".to_string()
+            })?;
+        Ok(outcome.result)
     }
 }
 

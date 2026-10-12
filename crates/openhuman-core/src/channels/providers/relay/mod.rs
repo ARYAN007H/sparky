@@ -6,8 +6,9 @@
 //! For each message it calls `channel_relay_inbound` under that user's scope.
 //! The core:
 //!
-//! 1. validates the message ([`params`]) and derives its thread,
-//!    `channel:<channel>/<sender>/<chat>` (`tinychannels::channel::derive_inbound_thread_id`);
+//! 1. validates the message ([`params`]) and asks TinyChannels' confidential
+//!    `PrepareChannelIdentity` operation for its canonical thread id,
+//!    `channel:<channel>/<sender>/<chat>`;
 //! 2. records the message on that thread in the caller's workspace
 //!    ([`store`]), refusing a duplicate `message_id`;
 //! 3. runs the turn through the channel dispatch pipeline
@@ -25,10 +26,10 @@ mod params;
 mod schemas;
 mod store;
 
-pub use channel::{RelayChannel, CHANNEL_OUTBOUND_EVENT};
+pub use channel::{CHANNEL_OUTBOUND_EVENT, RelayChannel};
 pub use ops::channel_relay_inbound;
 pub use params::{
-    validate_channel, validate_id, RelayInboundParams, DEFAULT_RELAY_CLIENT_ID, MAX_CHANNEL_LEN,
-    MAX_ID_LEN, MAX_SENDER_NAME_CHARS, MAX_TEXT_BYTES, RESERVED_CHANNELS,
+    DEFAULT_RELAY_CLIENT_ID, MAX_CHANNEL_LEN, MAX_ID_LEN, MAX_SENDER_NAME_CHARS, MAX_TEXT_BYTES,
+    RESERVED_CHANNELS, RelayInboundParams, validate_channel, validate_id,
 };
 pub use schemas::{all_relay_controller_schemas, all_relay_registered_controllers};

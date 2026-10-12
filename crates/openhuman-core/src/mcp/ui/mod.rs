@@ -35,16 +35,16 @@ pub fn show_ui_tool(config: &crate::config::Config) -> Box<dyn tinytools::Tool> 
     Box::new(ShowUiTool::for_config(config))
 }
 
-/// `mcp_call_tool` over a configured-server registry, presenting the UI of
-/// the remote tool it calls.
+/// `mcp_call_tool` over the configured servers, presenting the UI of the
+/// remote tool it calls.
 #[must_use]
 pub fn ui_aware_call(
     call: Box<dyn tinytools::Tool>,
-    registry: &std::sync::Arc<crate::mcp::config_servers::McpServerRegistry>,
+    config: &std::sync::Arc<crate::config::Config>,
 ) -> Box<dyn tinytools::Tool> {
     Box::new(UiAwareTool::new(
         call,
-        decorate::MetaLookup::Configured(std::sync::Arc::clone(registry)),
+        decorate::MetaLookup::Configured(std::sync::Arc::clone(config)),
         decorate::ToolInput::Nested("arguments"),
     ))
 }

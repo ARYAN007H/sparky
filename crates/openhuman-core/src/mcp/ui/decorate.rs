@@ -17,8 +17,8 @@ use tinytools::{
 };
 
 use crate::config::Config;
-use crate::mcp::config_servers::McpServerRegistry;
 use crate::mcp::host;
+use crate::mcp::module_client::McpConfiguredClient;
 
 use super::resolve::{presentation_from_view, view_from_envelope};
 use super::types::MCP_RESULT_KIND;
@@ -50,39 +50,40 @@ pub fn decorate_result(tool_meta: Option<&Value>, tool_input: &Value, result: &m
     result.metadata = presentation_from_view(&view).map(|presentation| presentation.to_metadata());
 }
 
-/// Rewrites every string in `value` through `scrub`.
-pub fn scrub_strings(value: &mut Value, scrub: &dyn Fn(&str) -> String) {
-    match value {
-        Value::String(text) => *text = scrub(text),
-        Value::Array(items) => items.iter_mut().for_each(|item| scrub_strings(item, scrub)),
-        Value::Object(map) => map.values_mut().for_each(|item| scrub_strings(item, scrub)),
-        _ => {}
-    }
-}
-
 /// Where a wrapped tool's descriptor `_meta` comes from, keyed by the server
 /// and tool the envelope names.
 pub enum MetaLookup {
-    /// Installed servers: the live connection's listing.
-    Installed(Arc<Config>),
-    /// Configured servers: the registry's last listing.
-    Configured(Arc<McpServerRegistry>),
+    /// No descriptor `_meta` is available; only the result's own metadata is
+    /// read.
+    Absent,
+    /// Configured servers: the module's live listing.
+    Configured(Arc<Config>),
 }
 
 impl MetaLookup {
     async fn tool_meta(&self, server: &str, tool: &str) -> Option<Value> {
         match self {
-            Self::Installed(config) => {
-                let service = host::for_config(config).ok()?;
-                service
-                    .dynamic()
-                    .connections()
-                    .tool_meta(server, tool)
-                    .await
-            }
-            Self::Configured(registry) => registry.tool_meta(server, tool),
+            Self::Absent => None,
+            Self::Configured(config) => configured_tool_meta(config, server, tool).await,
         }
     }
+}
+
+async fn configured_tool_meta(config: &Config, server: &str, tool: &str) -> Option<Value> {
+    let client = McpConfiguredClient::for_config(config).ok()?;
+    let client_config = host::client_config(config);
+    let listed: Vec<tinymcp_bus::McpRemoteTool> = client
+        .call(
+            &client_config,
+            tinymcp_bus::names::methods::STATIC_LIST_TOOLS,
+            (server,),
+        )
+        .await
+        .ok()?;
+    listed
+        .into_iter()
+        .find(|remote| remote.name == tool)
+        .and_then(|remote| remote.meta)
 }
 
 /// Which part of a call's arguments the remote tool received.

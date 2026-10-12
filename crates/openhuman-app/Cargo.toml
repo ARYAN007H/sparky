@@ -332,7 +332,6 @@ tinyinference-voice = { path = "../../vendor/tinyagents/vendor/tinyinference/cra
 # TinyFlows and TinyChannels are vendored beside TinyAgents so integration
 # work can test crate changes against OpenHuman before publishing.
 tinyflows = { path = "../../vendor/tinyflows/crates/tinyflows" }
-tinychannels = { path = "../../vendor/tinychannels" }
 
 
 [dev-dependencies]

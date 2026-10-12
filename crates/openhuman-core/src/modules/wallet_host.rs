@@ -17,6 +17,14 @@ use tinywallet_bus::wire::{
     WalletAccountInfo, WalletAccountsResponse, WalletBackendRequest, WalletBackendResponse,
 };
 
+#[path = "wallet_host_transport.rs"]
+mod transport;
+
+use transport::{
+    classify_transport_error, endpoint_key, join_endpoint, validate_module_endpoint_url,
+    TransportFailure,
+};
+
 const HOST_ERROR_NAME: &str = "ai.tinyhumans.tinywallet.Host.Error.CallbackFailed";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -681,60 +689,6 @@ impl WalletHost {
                 .then(|| "x402 payment was not explicitly approved for this chat".into()),
         }))
     }
-}
-
-enum TransportFailure {
-    Unreachable(String),
-    Rpc(String),
-}
-
-fn classify_transport_error(message: String) -> TransportFailure {
-    if ["transport failed", "read body failed"]
-        .iter()
-        .any(|marker| message.contains(marker))
-    {
-        TransportFailure::Unreachable(message)
-    } else {
-        TransportFailure::Rpc(message)
-    }
-}
-
-fn validate_module_endpoint_url(raw: &str) -> Result<String, String> {
-    let url = reqwest::Url::parse(raw)
-        .map_err(|_| "wallet module selected an invalid RPC endpoint URL".to_string())?;
-    if !matches!(url.scheme(), "http" | "https")
-        || url.host_str().is_none()
-        || !url.username().is_empty()
-        || url.password().is_some()
-    {
-        return Err("wallet module selected an unsafe RPC endpoint URL".into());
-    }
-    Ok(raw.to_owned())
-}
-
-fn endpoint_key(
-    chain: tinywallet_bus::Chain,
-    evm_chain_id: Option<u64>,
-) -> Option<tinywallet_bus::wire::RpcEndpointKey> {
-    use tinywallet_bus::wire::{EvmNetwork, RpcEndpointKey};
-    match chain {
-        tinywallet_bus::Chain::Evm => EvmNetwork::ALL
-            .into_iter()
-            .find(|network| Some(network.chain_id()) == evm_chain_id)
-            .map(|network| RpcEndpointKey::Evm { network }),
-        tinywallet_bus::Chain::Btc => Some(RpcEndpointKey::Btc),
-        tinywallet_bus::Chain::Solana => Some(RpcEndpointKey::Solana),
-        tinywallet_bus::Chain::Tron => Some(RpcEndpointKey::Tron),
-        _ => None,
-    }
-}
-
-fn join_endpoint(base: &str, path: &str) -> String {
-    format!(
-        "{}/{}",
-        base.trim_end_matches('/'),
-        path.trim_start_matches('/')
-    )
 }
 
 fn callback_error(error: impl std::fmt::Display) -> tinybus::Error {

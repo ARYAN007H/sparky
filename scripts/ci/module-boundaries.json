@@ -100,23 +100,7 @@
     }
   ],
   "pendingContracts": [],
-  "exceptions": [
-    {
-      "scope": "hosts",
-      "package": "tinymcp",
-      "reason": "Protocol servers and supervisor operations still call the implementation."
-    },
-    {
-      "scope": "hosts",
-      "package": "tinychannels",
-      "reason": "Providers, relay, pairing and delivery lifecycles still call the implementation."
-    },
-    {
-      "scope": "hosts",
-      "package": "tinychannels-runtime",
-      "reason": "Providers, relay, pairing and delivery lifecycles still call the implementation."
-    }
-  ],
+  "exceptions": [],
   "excludedSubsystems": [
     {
       "owner": "tinyruntime",

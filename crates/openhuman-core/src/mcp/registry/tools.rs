@@ -27,7 +27,6 @@ use async_trait::async_trait;
 use serde_json::Value;
 
 use crate::config::Config;
-use tinymcp::normalize_tool_arguments;
 use tinymcp_bus::agent_tools::{AgentToolEffect, AgentToolSpec, RegistryTool};
 use tinytools::{PermissionLevel, Tool, ToolExposure, ToolResult};
 
@@ -259,9 +258,13 @@ impl Tool for McpRegistryToolCallTool {
         // Tolerant at execution, unchanged in the schema: an object that
         // arrived JSON-encoded in a string is decoded, and anything that
         // cannot hold one is refused here, naming what arrived.
-        let arguments = normalize_tool_arguments(args.get("arguments").cloned())
-            .map(Value::Object)
-            .map_err(|error| anyhow::anyhow!("mcp_registry_tool_call: {error}"))?;
+        let client = crate::mcp::module_client::McpConfiguredClient::for_config(&self.config)
+            .map_err(|_| anyhow::anyhow!("mcp_registry_tool_call: MCP module is unavailable"))?;
+        let normalized: serde_json::Map<String, Value> = client
+            .normalize_tool_arguments(args.get("arguments").cloned().unwrap_or(Value::Null))
+            .await
+            .map_err(|_| anyhow::anyhow!("mcp_registry_tool_call: invalid tool arguments"))?;
+        let arguments = Value::Object(normalized);
         let outcome = ops::mcp_clients_tool_call(
             &self.config,
             sid.clone(),
@@ -271,20 +274,9 @@ impl Tool for McpRegistryToolCallTool {
         .await
         .map_err(|e| anyhow::anyhow!("mcp_registry_tool_call: {e}"))?;
         let mut result = ToolResult::success(serde_json::to_string(&outcome.value)?);
-        let raw = outcome.value.get("result").filter(|raw| raw.is_object());
-        if let Some(raw) = raw {
-            let tool_meta = match crate::mcp::host::for_config(&self.config) {
-                Ok(service) => {
-                    service
-                        .dynamic()
-                        .connections()
-                        .tool_meta(&sid, &tool_name)
-                        .await
-                }
-                Err(_) => None,
-            };
+        if let Some(raw) = outcome.value.get("result").filter(|raw| raw.is_object()) {
             let view = crate::mcp::ui::resolve::view_from_raw_result(
-                &sid, &tool_name, tool_meta, arguments, raw,
+                &sid, &tool_name, None, arguments, raw,
             );
             result.metadata = crate::mcp::ui::resolve::presentation_from_view(&view)
                 .map(|presentation| presentation.to_metadata());

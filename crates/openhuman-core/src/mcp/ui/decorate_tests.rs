@@ -23,7 +23,7 @@ impl Tool for Fixed {
 }
 
 fn no_lookup() -> MetaLookup {
-    MetaLookup::Configured(Arc::new(McpServerRegistry::default()))
+    MetaLookup::Absent
 }
 
 fn envelope(extra: Value) -> Value {
@@ -111,16 +111,6 @@ fn malformed_envelope_is_removed() {
     assert!(result.metadata.is_none());
 }
 
-#[test]
-fn scrub_strings_rewrites_nested_values() {
-    let mut value = json!({"a": ["tok-SECRET"], "b": {"c": "SECRET"}, "n": 1});
-    scrub_strings(&mut value, &|text| text.replace("SECRET", "[redacted]"));
-    assert_eq!(
-        value,
-        json!({"a": ["tok-[redacted]"], "b": {"c": "[redacted]"}, "n": 1})
-    );
-}
-
 #[tokio::test]
 async fn wrapper_forwards_every_inner_tool_property() {
     let tool = UiAwareTool::new(
@@ -197,10 +187,10 @@ async fn option_and_context_entry_points_present_the_widget() {
 }
 
 #[tokio::test]
-async fn installed_lookup_without_a_host_has_no_meta() {
+async fn configured_lookup_without_a_module_has_no_meta() {
     let workspace = tempfile::tempdir().unwrap();
     let mut config = Config::default();
     config.workspace_dir = workspace.path().to_path_buf();
-    let lookup = MetaLookup::Installed(Arc::new(config));
+    let lookup = MetaLookup::Configured(Arc::new(config));
     assert!(lookup.tool_meta("shop", "order").await.is_none());
 }

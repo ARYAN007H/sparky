@@ -20,14 +20,12 @@ fn meta_keys_of_a_non_object_are_empty() {
 }
 
 #[test]
-fn logging_a_tool_and_resources_does_not_expose_values() {
+fn logging_a_tool_does_not_expose_values() {
     log_tool(
         "shop",
         "order",
         &json!({"ui": {"resourceUri": "ui://shop/cart"}}),
     );
-    log_resource("shop", "ui://shop/cart", Some("text/html"));
-    log_resource("shop", "file:///secret", None);
 }
 
 #[test]
@@ -41,19 +39,4 @@ fn configured_server_logs_every_tool_with_meta() {
         remote_tool(json!({"name": "plain", "inputSchema": {"type": "object"}})),
     ];
     log_configured_server("shop", &tools);
-}
-
-#[tokio::test]
-async fn installed_server_with_no_connection_logs_nothing_to_list() {
-    let workspace = tempfile::tempdir().unwrap();
-    let mut config = crate::config::Config::default();
-    config.workspace_dir = workspace.path().to_path_buf();
-    let host = host::for_config(&config).expect("host");
-    log_installed_server(&host, "missing").await;
-    log_all_installed(Arc::clone(&host)).await;
-}
-
-#[tokio::test]
-async fn spawning_a_log_without_a_runtime_host_is_a_no_op() {
-    spawn_log_installed("missing".to_string());
 }

@@ -18,10 +18,12 @@ use std::{
 
 use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
-use serde_json::Value;
+use serde_json::{Map, Value};
 use tinymcp_bus::{
+    agent_tools::{McpToolPresentation, PrepareAgentToolsRequest},
     config::{McpClientConfig, OpenConfiguredRequest, OpenConfiguredResponse, TransitionStatus},
-    names,
+    names, McpRemoteTool, ScrubStaticToolsRequest, ServerArgumentsValidation, SupervisorBatch,
+    ValidateServerArgumentsRequest,
 };
 
 use crate::{
@@ -34,6 +36,7 @@ const TRANSITION_TIMEOUT: Duration = Duration::from_secs(30);
 const TRANSITION_POLL_INTERVAL: Duration = Duration::from_millis(20);
 static CLIENTS: OnceLock<Mutex<HashMap<PathBuf, Arc<McpConfiguredClient>>>> = OnceLock::new();
 static SHUTDOWN_REGISTERED: AtomicBool = AtomicBool::new(false);
+static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
 
 #[derive(Clone)]
 struct OpenObject {
@@ -83,6 +86,32 @@ pub(crate) trait McpModulePort: Send + Sync {
         args: Value,
         confidential: bool,
     ) -> Result<Value, ModuleCallError>;
+
+    async fn prepare_agent_tools(
+        &self,
+        request: PrepareAgentToolsRequest,
+    ) -> Result<Vec<McpToolPresentation>, ModuleCallError>;
+
+    async fn validate_server_arguments(
+        &self,
+        request: ValidateServerArgumentsRequest,
+    ) -> Result<ServerArgumentsValidation, ModuleCallError>;
+
+    /// Normalizes model-supplied arguments through TinyMCP's root operation.
+    async fn normalize_tool_arguments(
+        &self,
+        _arguments: Option<Value>,
+    ) -> Result<Map<String, Value>, ModuleCallError> {
+        Err(ModuleCallError::IncompatibleContract)
+    }
+
+    /// Applies a TinyMCP-owned text transformation through the root operation.
+    async fn transform_text(
+        &self,
+        _request: tinymcp_bus::TransformTextRequest,
+    ) -> Result<String, ModuleCallError> {
+        Err(ModuleCallError::IncompatibleContract)
+    }
 }
 
 struct TinyMcpPort {
@@ -149,6 +178,50 @@ impl McpModulePort for TinyMcpPort {
             Err(ModuleCallError::Unavailable)
         }
     }
+
+    async fn prepare_agent_tools(
+        &self,
+        request: PrepareAgentToolsRequest,
+    ) -> Result<Vec<McpToolPresentation>, ModuleCallError> {
+        self.root
+            .call(MODULE, names::methods::PREPARE_AGENT_TOOLS, (request,))
+            .await
+    }
+
+    async fn validate_server_arguments(
+        &self,
+        request: ValidateServerArgumentsRequest,
+    ) -> Result<ServerArgumentsValidation, ModuleCallError> {
+        self.root
+            .call_confidential(
+                MODULE,
+                names::methods::VALIDATE_SERVER_ARGUMENTS,
+                (request,),
+            )
+            .await
+    }
+
+    async fn normalize_tool_arguments(
+        &self,
+        arguments: Option<Value>,
+    ) -> Result<Map<String, Value>, ModuleCallError> {
+        self.root
+            .call_confidential(
+                MODULE,
+                names::methods::NORMALIZE_TOOL_ARGUMENTS,
+                (arguments,),
+            )
+            .await
+    }
+
+    async fn transform_text(
+        &self,
+        request: tinymcp_bus::TransformTextRequest,
+    ) -> Result<String, ModuleCallError> {
+        self.root
+            .call_confidential(MODULE, names::methods::TRANSFORM_TEXT, (request,))
+            .await
+    }
 }
 
 /// One workspace's serialized TinyMCP lifecycle and private object proxy.
@@ -163,6 +236,10 @@ impl McpConfiguredClient {
     /// reachable until `close` confirms cleanup; workspace/config switching is
     /// serialized by the client itself.
     pub(crate) fn for_config(config: &Config) -> Result<Arc<Self>, ModuleCallError> {
+        if SHUTTING_DOWN.load(Ordering::Acquire) {
+            ModuleClient::report_unavailable(MODULE);
+            return Err(ModuleCallError::Unavailable);
+        }
         if !config.modules.enabled {
             ModuleClient::report_unavailable(MODULE);
             return Err(ModuleCallError::Unavailable);
@@ -181,13 +258,60 @@ impl McpConfiguredClient {
         Ok(client)
     }
 
+    /// A snapshot of configured workspaces currently retained by the host.
+    /// The supervisor only drains open objects; it never creates a workspace.
+    pub(crate) fn open_clients() -> Vec<(PathBuf, Arc<Self>)> {
+        CLIENTS
+            .get()
+            .map(|clients| {
+                clients
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .iter()
+                    .map(|(workspace, client)| (workspace.clone(), Arc::clone(client)))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Drain observations from the module-owned supervisor for an open child.
+    /// An object that is opening or closing is skipped and will be revisited
+    /// on the next host poll.
+    pub(crate) async fn drain_supervisor_events(
+        &self,
+        limit: usize,
+    ) -> Result<Option<SupervisorBatch>, ModuleCallError> {
+        let state = self.state.lock().await;
+        if SHUTTING_DOWN.load(Ordering::Acquire) {
+            return Err(ModuleCallError::Unavailable);
+        }
+        let State::Open(object) = &*state else {
+            return Ok(None);
+        };
+        let args = serde_json::to_value((limit,)).map_err(|_| ModuleCallError::ModuleFault)?;
+        let reply = self
+            .port
+            .call_object(
+                &object.object_path,
+                names::methods::DRAIN_SUPERVISOR_EVENTS,
+                args,
+                false,
+            )
+            .await?;
+        serde_json::from_value(reply)
+            .map(Some)
+            .map_err(|_| ModuleCallError::ModuleFault)
+    }
+
     /// Register this runtime's cleanup. The flag is reset by the drained hook,
     /// so a later embedded-runtime start can register a fresh one.
     pub(crate) fn register_shutdown_hook() {
         if SHUTDOWN_REGISTERED.swap(true, Ordering::AcqRel) {
             return;
         }
+        SHUTTING_DOWN.store(false, Ordering::Release);
         crate::core::shutdown::register(|| async {
+            SHUTTING_DOWN.store(true, Ordering::Release);
             let clients = CLIENTS
                 .get()
                 .map(|clients| {
@@ -273,6 +397,157 @@ impl McpConfiguredClient {
         self.call_inner(config, member, args, true).await
     }
 
+    /// Asks the module to prepare owner-derived names and rule facts for
+    /// host-screened tools. This root operation needs no configured server
+    /// object or credentials.
+    pub(crate) async fn prepare_agent_tools(
+        &self,
+        request: PrepareAgentToolsRequest,
+    ) -> Result<Vec<McpToolPresentation>, ModuleCallError> {
+        if SHUTTING_DOWN.load(Ordering::Acquire) {
+            return Err(ModuleCallError::Unavailable);
+        }
+        self.port.prepare_agent_tools(request).await
+    }
+
+    /// Scrubs configured credentials from static remote tool metadata inside
+    /// TinyMCP before the host screens or presents that metadata.
+    pub(crate) async fn scrub_static_tools(
+        &self,
+        config: &McpClientConfig,
+        server: &str,
+        tools: Vec<McpRemoteTool>,
+    ) -> Result<Vec<McpRemoteTool>, ModuleCallError> {
+        self.call_confidential(
+            config,
+            names::methods::STATIC_SCRUB_TOOLS,
+            (ScrubStaticToolsRequest {
+                server: server.to_owned(),
+                tools,
+            },),
+        )
+        .await
+    }
+
+    pub(crate) async fn validate_server_arguments(
+        &self,
+        request: ValidateServerArgumentsRequest,
+    ) -> Result<ServerArgumentsValidation, ModuleCallError> {
+        if SHUTTING_DOWN.load(Ordering::Acquire) {
+            return Err(ModuleCallError::Unavailable);
+        }
+        self.port.validate_server_arguments(request).await
+    }
+
+    /// Normalizes host-supplied MCP arguments through TinyMCP's bounded
+    /// implementation operation.
+    pub(crate) async fn normalize_tool_arguments(
+        &self,
+        arguments: Value,
+    ) -> Result<Map<String, Value>, ModuleCallError> {
+        if SHUTTING_DOWN.load(Ordering::Acquire) {
+            return Err(ModuleCallError::Unavailable);
+        }
+        self.port.normalize_tool_arguments(Some(arguments)).await
+    }
+
+    /// Normalizes a model-supplied MCP identifier in TinyMCP.
+    pub(crate) async fn normalize_identifier(
+        &self,
+        value: &str,
+    ) -> Result<String, ModuleCallError> {
+        if SHUTTING_DOWN.load(Ordering::Acquire) {
+            return Err(ModuleCallError::Unavailable);
+        }
+        self.port
+            .transform_text(tinymcp_bus::TransformTextRequest {
+                operation: tinymcp_bus::TextTransform::NormalizeIdentifier,
+                text: value.to_owned(),
+                max_bytes: tinymcp_bus::MAX_PROCESSING_BYTES,
+            })
+            .await
+    }
+
+    /// Loads and prepares configured-server tools from TinyMCP's persistent
+    /// cache, listing a server only when no cached catalog exists. The host
+    /// applies its prompt-injection filter before TinyMCP creates the stable
+    /// model-facing declarations.
+    pub(crate) async fn configured_tool_presentations(
+        config: &Config,
+    ) -> Result<Vec<McpToolPresentation>, ModuleCallError> {
+        if !config.mcp_client.enabled {
+            return Ok(Vec::new());
+        }
+        let client = Self::for_config(config)?;
+        let client_config = crate::mcp::host::client_config(config);
+        let mut sources = Vec::new();
+        for declared in &config.mcp_client.servers {
+            let server = &declared.server;
+            if !server.enabled {
+                continue;
+            }
+            let cached: Option<Vec<tinymcp_bus::McpTool>> = client
+                .call(
+                    &client_config,
+                    names::methods::STATIC_CACHED_LIST_TOOLS,
+                    (server.name.as_str(),),
+                )
+                .await?;
+            let tools: Vec<McpRemoteTool> = match cached {
+                Some(tools) => tools
+                    .into_iter()
+                    .map(|tool| McpRemoteTool {
+                        name: tool.name,
+                        title: None,
+                        description: tool.description,
+                        input_schema: tool.input_schema,
+                        meta: None,
+                    })
+                    .collect(),
+                None => {
+                    client
+                        .call(
+                            &client_config,
+                            names::methods::STATIC_LIST_TOOLS,
+                            (server.name.as_str(),),
+                        )
+                        .await?
+                }
+            };
+            let tools: Vec<McpRemoteTool> = client
+                .scrub_static_tools(&client_config, &server.name, tools)
+                .await?;
+            let tools = crate::mcp::registry::tools_safe_for_agent(
+                &server.name,
+                tools
+                    .into_iter()
+                    .map(|tool| tinymcp_bus::McpTool {
+                        name: tool.name,
+                        description: tool.description.or(tool.title),
+                        input_schema: tool.input_schema,
+                    })
+                    .collect(),
+            );
+            sources.push(tinymcp_bus::McpToolSourceSpec {
+                server_id: server.name.clone(),
+                label: server.name.clone(),
+                family: server.name.clone(),
+                display_name: server.name.clone(),
+                tools,
+                default_exposure: match declared.expose {
+                    crate::config::McpToolExposure::Direct => tinymcp_bus::McpToolExposure::Direct,
+                    crate::config::McpToolExposure::Deferred => {
+                        tinymcp_bus::McpToolExposure::Deferred
+                    }
+                },
+                direct_tools: declared.direct_tools.clone(),
+            });
+        }
+        client
+            .prepare_agent_tools(PrepareAgentToolsRequest { sources })
+            .await
+    }
+
     async fn call_inner<R: DeserializeOwned>(
         &self,
         config: &McpClientConfig,
@@ -282,6 +557,9 @@ impl McpConfiguredClient {
     ) -> Result<R, ModuleCallError> {
         let args = serde_json::to_value(args).map_err(|_| ModuleCallError::ModuleFault)?;
         let mut state = self.state.lock().await;
+        if SHUTTING_DOWN.load(Ordering::Acquire) {
+            return Err(ModuleCallError::Unavailable);
+        }
         let object = self.ensure_open(&mut state, config).await?;
         let reply = self
             .port
