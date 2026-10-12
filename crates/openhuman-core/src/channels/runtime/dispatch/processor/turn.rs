@@ -77,6 +77,8 @@ pub(crate) async fn process_channel_runtime_message(
             {
                 Ok(prepared) => prepared,
                 Err(error) => {
+                    #[cfg(test)]
+                    eprintln!("channel inbound preparation failed: {error:?}");
                     tracing::warn!("[dispatch] channel preparation failed: {error}");
                     return;
                 }
