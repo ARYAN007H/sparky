@@ -80,8 +80,10 @@ impl From<ImportDoc> for Record {
 /// The collection that records finished imports.
 pub const MARKER_COLLECTION: &str = "storage_import";
 
-/// Marker document version; bumped when an importer's output changes in a
-/// way that a finished import should be redone.
+/// Marker document schema version, recorded for diagnostics. An existing
+/// marker of any version counts as a finished import; redoing one after an
+/// importer change needs an explicit re-import policy (the marker is written
+/// with `Precondition::Absent`), which a future bump must introduce.
 const MARKER_VERSION: u32 = 1;
 
 /// One legacy store the importer knows how to read.
