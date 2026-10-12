@@ -170,7 +170,19 @@ impl AgentInner {
         self.deny_approvals(resolution);
         self.ctx.agent_state().clear();
         if schedule_mcp_cleanup {
-            openhuman_core::mcp::host::schedule_agent_close(&self.config.workspace_dir, &self.id);
+            // Keep an ephemeral runtime workspace alive until an outstanding
+            // module close is acknowledged. The cleanup callback is retained
+            // by the path reservation if close needs a later retry.
+            let runtime_guard = Arc::clone(&self._runtime_guard);
+            let keep_workspace = Arc::new(move || {
+                let _ = &runtime_guard;
+                true
+            });
+            openhuman_core::mcp::host::schedule_agent_close_with_cleanup(
+                &self.config.workspace_dir,
+                &self.id,
+                keep_workspace,
+            );
         }
         openhuman_core::core::runtime::AgentContextRegistry::deregister(&self.id, &self.ctx);
         log::debug!("[embed][agent] teardown complete id={}", self.id);

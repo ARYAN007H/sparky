@@ -614,6 +614,50 @@ async fn a_removed_agent_context_cannot_reopen_its_evicted_client() {
     .await;
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_removed_context_waiting_for_the_client_cache_cannot_reopen_it() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+    use crate::tools::toolpacks::ToolGroups;
+
+    let workspace = tempfile::tempdir().expect("workspace");
+    let mut config = Config::default();
+    config.workspace_dir = workspace.path().to_path_buf();
+    config.modules.enabled = true;
+    let scope = Arc::new(crate::security::approval::ApprovalScope::default());
+    let mut overrides = crate::agent::host_overrides::HostOverrides::default();
+    overrides.approval_scope = Some(Arc::clone(&scope));
+    let context = CoreContext::for_test(DomainSet::full(), Some(workspace.path().to_path_buf()))
+        .derive_with(
+            ContextOverlay::new(config.clone(), DomainSet::kernel(), ToolGroups::none())
+                .session_agent("agent")
+                .host_overrides(Arc::new(overrides)),
+        );
+
+    let clients = CLIENTS.get_or_init(|| Mutex::new(HashMap::new()));
+    let clients_lock = clients.lock().unwrap();
+    let (checked, checked_rx) = tokio::sync::oneshot::channel();
+    *AFTER_CONTEXT_CHECK
+        .get_or_init(|| Mutex::new(None))
+        .lock()
+        .unwrap() = Some(checked);
+    let request = tokio::spawn(CoreContext::scope(context, async move {
+        McpConfiguredClient::for_config(&config)
+    }));
+
+    tokio::time::timeout(Duration::from_secs(1), checked_rx)
+        .await
+        .expect("request passed the initial context check")
+        .unwrap();
+    scope.close("agent_removed");
+    drop(clients_lock);
+
+    assert!(matches!(
+        request.await.unwrap(),
+        Err(ModuleCallError::Unavailable)
+    ));
+    assert!(!clients.lock().unwrap().contains_key(workspace.path()));
+}
+
 #[tokio::test]
 async fn delayed_agent_close_cannot_evict_a_replacement_cache_entry() {
     let workspace = tempfile::tempdir().expect("workspace");
@@ -628,6 +672,15 @@ async fn delayed_agent_close_cannot_evict_a_replacement_cache_entry() {
     old.call::<bool>(&configured("server"), "ConnectedOverview", ())
         .await
         .unwrap();
+    let cleanup_ran = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let callback_flag = Arc::clone(&cleanup_ran);
+    let reservation = McpConfiguredClient::reservation_with_action(
+        workspace.path(),
+        Arc::new(move || {
+            callback_flag.store(true, std::sync::atomic::Ordering::SeqCst);
+            true
+        }),
+    );
     let captured = McpConfiguredClient::retire_cached_client(workspace.path())
         .expect("retirement captures the exact old client");
 
@@ -645,8 +698,15 @@ async fn delayed_agent_close_cannot_evict_a_replacement_cache_entry() {
         .insert(workspace.path().to_path_buf(), Arc::clone(&replacement));
 
     assert!(
-        McpConfiguredClient::close_retired_client(workspace.path().to_path_buf(), captured,).await
+        !McpConfiguredClient::close_retired_client(
+            workspace.path().to_path_buf(),
+            captured,
+            Arc::clone(&reservation),
+        )
+        .await,
+        "a stale close completion cannot claim the replacement entry"
     );
+    assert!(!cleanup_ran.load(std::sync::atomic::Ordering::SeqCst));
     assert_eq!(old_closed.lock().unwrap().len(), 1);
     assert!(replacement_closed.lock().unwrap().is_empty());
     let current = CLIENTS
@@ -658,6 +718,83 @@ async fn delayed_agent_close_cannot_evict_a_replacement_cache_entry() {
         .cloned()
         .expect("replacement remains cached");
     assert!(Arc::ptr_eq(&current, &replacement));
+    CLEANUP_RESERVATIONS
+        .get()
+        .unwrap()
+        .lock()
+        .unwrap()
+        .remove(workspace.path());
+}
+
+#[tokio::test]
+async fn failed_cleanup_actions_retain_and_retry_cached_and_orphaned_paths() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let workspace = tempfile::tempdir().expect("workspace");
+    let agent_dir = workspace.path().join("agents").join("alpha");
+    std::fs::create_dir_all(&agent_dir).unwrap();
+    std::fs::write(agent_dir.join("state.json"), "retained until cleanup").unwrap();
+    let mut config = Config::default();
+    config.workspace_dir = agent_dir.clone();
+    config.modules.enabled = true;
+    let client = McpConfiguredClient::install_test_port(&config, Box::new(FakePort::default()))
+        .expect("install client");
+    client
+        .call::<bool>(&configured("alpha"), "ConnectedOverview", ())
+        .await
+        .unwrap();
+
+    let attempts = Arc::new(AtomicUsize::new(0));
+    let callback_attempts = Arc::clone(&attempts);
+    let home = agent_dir.clone();
+    let action: CleanupAction = Arc::new(move || {
+        if callback_attempts.fetch_add(1, Ordering::SeqCst) == 0 {
+            return false;
+        }
+        std::fs::remove_dir_all(&home).is_ok() || !home.exists()
+    });
+    let reservation = McpConfiguredClient::reservation_with_action(&agent_dir, action);
+    let captured = McpConfiguredClient::retire_cached_client(&agent_dir).unwrap();
+    assert!(!McpConfiguredClient::close_retired_client(
+        agent_dir.clone(),
+        captured,
+        reservation,
+    )
+    .await);
+    assert!(agent_dir.join("state.json").exists());
+    assert!(McpConfiguredClient::agent_close_pending(&agent_dir));
+    assert!(matches!(
+        McpConfiguredClient::for_config(&config),
+        Err(ModuleCallError::Unavailable)
+    ));
+    assert!(McpConfiguredClient::close_agent_data_dir(&agent_dir).await);
+    assert!(!agent_dir.exists());
+    assert!(McpConfiguredClient::for_config(&config).is_ok());
+
+    let orphan_dir = workspace.path().join("agents").join("orphan");
+    std::fs::create_dir_all(&orphan_dir).unwrap();
+    let orphan_attempts = Arc::new(AtomicUsize::new(0));
+    let callback_attempts = Arc::clone(&orphan_attempts);
+    let orphan_home = orphan_dir.clone();
+    let reservation = McpConfiguredClient::reservation_with_action(
+        &orphan_dir,
+        Arc::new(move || {
+            if callback_attempts.fetch_add(1, Ordering::SeqCst) == 0 {
+                return false;
+            }
+            std::fs::remove_dir_all(&orphan_home).is_ok() || !orphan_home.exists()
+        }),
+    );
+    assert!(!McpConfiguredClient::finish_cleanup(
+        &orphan_dir,
+        None,
+        reservation,
+    ));
+    assert!(McpConfiguredClient::agent_close_pending(&orphan_dir));
+    assert!(orphan_dir.exists());
+    McpConfiguredClient::retry_orphaned_cleanups();
+    assert!(!McpConfiguredClient::agent_close_pending(&orphan_dir));
+    assert!(!orphan_dir.exists());
 }
 
 #[tokio::test]
