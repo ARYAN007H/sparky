@@ -174,3 +174,16 @@ test("real checkouts refuse missing curated vendor source instead of shrinking d
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("present but empty curated vendor directories cannot appear as debt shrinkage", async () => {
+  const root = mkdtempSync(join(tmpdir(), "storage-empty-curated-"));
+  try {
+    execFileSync("git", ["init"], { cwd: root, stdio: "ignore" });
+    mkdirSync(join(root, "crates"));
+    // Only the first curated root is reached: it exists but has no Rust source.
+    mkdirSync(join(root, CURATED_VENDOR_ROOTS[0]), { recursive: true });
+    await assert.rejects(collectFindings(root), /Empty curated source/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
