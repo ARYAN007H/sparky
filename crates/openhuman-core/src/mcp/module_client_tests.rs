@@ -165,7 +165,10 @@ impl McpModulePort for FakePort {
         &self,
         request: tinymcp_bus::TransformTextRequest,
     ) -> Result<String, ModuleCallError> {
-        self.transform_requests.lock().unwrap().push(request.clone());
+        self.transform_requests
+            .lock()
+            .unwrap()
+            .push(request.clone());
         Ok(request.text)
     }
 }
