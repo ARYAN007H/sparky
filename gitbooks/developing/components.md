@@ -60,3 +60,7 @@ The first load of an older config moves these once into `[components]`, and the 
 | `[composio] enabled` | dropped; it was never read |
 
 A `components.*` key already present in the file always wins over its legacy flag, so the migration is idempotent and turning a component back on sticks.
+
+## Wallet
+
+`wallet = false` removes the `web3` domain family and tool group, so `wallet.*`, `web3.*` and `x402.*` answer `COMPONENT_DISABLED:wallet`. The x402 payment hook behind `http_request` declines before any quote or signing (the 402 response comes back unpaid), and `tinywallet` is never downloaded, attested or loaded. Keychain material, spending limits (`OPENHUMAN_X402_*_MAX`) and RPC endpoints (`OPENHUMAN_WALLET_RPC_*`) are left as they are, so setting `wallet = true` again restores the wallet on the next core start.
