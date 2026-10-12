@@ -169,11 +169,7 @@ test("native E2E installation attests the connector module before launching the 
     assert.equal(
       readFileSync(envFile, "utf8").trim(),
       [
-        `TINYJUICE_TEST_MODULE=${join(root, "modules/fixture-1/tinyjuice/libtinyjuice_module.so")}`,
-        `TINYSEARCH_TEST_MODULE=${join(root, "modules/fixture-1/tinysearch/libtinysearch.so")}`,
-        `OPENHUMAN_TINYHOSTS_TEST_MODULE=${join(root, "modules/fixture-1/tinyhosts/libtinyhosts.so")}`,
-        `OPENHUMAN_MODULE_PATH=${["tinybox", "tinydocs", "tinywallet", "tinychannels", "tinymcp"].map((id) => join(root, "modules/fixture-1", id)).join(":")}`,
-        `TINYCONNECTORS_TEST_MODULE=${destination}/libtinyconnectors.so`,
+        `OPENHUMAN_MODULE_PATH=${["tinybox", "tinydocs", "tinywallet", "tinychannels", "tinymcp", "tinyjuice", "tinysearch", "tinyhosts", "tinyconnectors"].map((id) => join(root, "modules/fixture-1", id)).join(":")}`,
       ].join("\n"),
     );
     assert.equal(

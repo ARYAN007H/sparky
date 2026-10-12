@@ -82,11 +82,12 @@ cp "${conn_cached}" "${dest}/tinyconnectors/libtinyconnectors.so"
 node scripts/ci/stage-connector-test-module.mjs \
   "${dest}/tinyconnectors/libtinyconnectors.so" "${dest}/tinyconnectors" > /dev/null
 
-{
-  echo "TINYJUICE_TEST_MODULE=${dest}/tinyjuice/libtinyjuice_module.so"
-  echo "TINYSEARCH_TEST_MODULE=${dest}/tinysearch/libtinysearch.so"
-  echo "OPENHUMAN_TINYHOSTS_TEST_MODULE=${dest}/tinyhosts/libtinyhosts.so"
-  echo "OPENHUMAN_MODULE_PATH=${dest}/tinybox:${dest}/tinydocs:${dest}/tinywallet:${dest}/tinychannels:${dest}/tinymcp${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
-  echo "TINYCONNECTORS_TEST_MODULE=${dest}/tinyconnectors/libtinyconnectors.so"
-} > "${env_file}"
+# Every staged directory goes on the search path the loader already honours
+# (release mode); each holds the library and, for tinyconnectors, the
+# operator-trust modules.toml beside it.
+module_dirs=""
+for id in tinybox tinydocs tinywallet tinychannels tinymcp tinyjuice tinysearch tinyhosts tinyconnectors; do
+  module_dirs="${module_dirs:+${module_dirs}:}${dest}/${id}"
+done
+echo "OPENHUMAN_MODULE_PATH=${module_dirs}${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}" > "${env_file}"
 log "wrote ${env_file}"
