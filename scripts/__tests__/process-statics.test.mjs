@@ -121,6 +121,9 @@ test("const generic equality and function arrows do not terminate a type", () =>
     "Wrapper<{1==1},fn()->usize>",
   );
 });
+test("comparisons and shifts inside const blocks are not generic brackets", () => {
+  assert.equal(scan("static X: Wrapper<{1 << 2}, {1 < 2}> = x;")[0].type, "Wrapper<{1<<2},{1<2}>");
+});
 test("repository scan reads the merge base, enforces records, and fails without history", () => {
   const root = mkdtempSync(join(tmpdir(), "process-statics-"));
   const git = (...args) =>
