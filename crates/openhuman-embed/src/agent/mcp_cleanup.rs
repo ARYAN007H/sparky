@@ -32,8 +32,9 @@ pub(crate) fn finish_removal(
 
 /// Run at most three retries on the process module executor. The future owns
 /// the workspace guard through at most 90 seconds of polled MCP cleanup and
-/// 750 ms of backoff. It releases the guard before filesystem purge; retained
-/// records contain no guard. Executor scheduling can delay these timed waits.
+/// 750 ms of backoff, plus synchronous filesystem purge. Purge and executor
+/// scheduling are outside the MCP wait bound. Retained records contain no
+/// guard; the last guard keeps runtime admission reserved through completion.
 pub(crate) fn defer_pending(
     registry: Arc<crate::runtime::AgentMap>,
     id: String,
@@ -92,7 +93,9 @@ fn complete_with_guard<T>(
     guard: &mut Option<Arc<crate::runtime::CoreGuard>>,
     complete: impl FnOnce() -> T,
 ) -> T {
-    drop(guard.take());
+    // Releasing the last guard permits a new runtime with another agent map
+    // to reopen this workspace. Keep admission reserved through the callback.
+    let _guard = guard.take();
     complete()
 }
 
