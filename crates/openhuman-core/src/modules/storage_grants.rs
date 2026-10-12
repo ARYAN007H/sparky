@@ -269,13 +269,9 @@ fn documents(grant: &StorageGrant, selector: &str, request: &Value) -> Result<Pl
         "DropCollection" => Err(Denied::Schema),
         "Collections" => {
             // Listing is filtered, not refused: a module sees its own names.
-            text(request, "prefix").map(|_| ()).or_else(|_| {
-                request
-                    .as_object()
-                    .filter(|fields| fields.is_empty())
-                    .map(|_| ())
-                    .ok_or(Denied::Malformed)
-            })?;
+            if !request.is_object() {
+                return Err(Denied::Malformed);
+            }
             Ok(Plan::Forward {
                 target: String::new(),
                 filter: ReplyFilter::GrantedCollections,
