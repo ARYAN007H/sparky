@@ -28,11 +28,6 @@
       "reason": "The pinned TinyConnectors workspace package is 0.14.0, matching the registry artifact; the repository tag still reflects its older 0.10.3 release."
     },
     {
-      "id": "tinychannels",
-      "expect": "v0.1.4-402-g2a29969f",
-      "reason": "The pinned TinyChannels workspace package is 0.1.18, matching the registry artifact; the repository tag still reflects its older 0.1.4 release."
-    },
-    {
       "id": "tinyhosts",
       "expect": "v0.1.9-46-g6ad6e8b2",
       "reason": "The pinned TinyHosts package is 0.3.0, matching the registry artifact; the repository tag still reflects its older 0.1.9 release."
