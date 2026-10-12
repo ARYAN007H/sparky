@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use serde_json::json;
 
 use crate::channels::traits::{Channel, ChannelMessage, SendMessage};
-use crate::web_chat::{WebChannelEvent, publish_web_channel_event};
+use crate::web_chat::{publish_web_channel_event, WebChannelEvent};
 
 /// The event name a relayed reply is published under.
 pub const CHANNEL_OUTBOUND_EVENT: &str = "channel_outbound";

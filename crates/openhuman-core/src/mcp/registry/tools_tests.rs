@@ -413,6 +413,7 @@ async fn tool_call_preserves_missing_arguments_as_distinct_from_json_null() {
         connected: true,
         ..ToolCallPort::default()
     };
+    let arguments = SharedArc::clone(&port.arguments);
     let normalized_arguments = SharedArc::clone(&port.normalized_arguments);
     crate::mcp::module_client::McpConfiguredClient::install_test_port(&config, Box::new(port))
         .expect("test module port");
@@ -431,5 +432,9 @@ async fn tool_call_preserves_missing_arguments_as_distinct_from_json_null() {
         normalized_arguments.lock().unwrap().as_slice(),
         &[None, Some(Value::Null)],
         "the host must preserve the bus distinction between omitted arguments and JSON null"
+    );
+    assert_eq!(
+        arguments.lock().unwrap().as_slice(),
+        &[json!({}), json!({})]
     );
 }

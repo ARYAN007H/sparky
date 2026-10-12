@@ -297,9 +297,7 @@ pub fn spawn_channels_service() -> Option<tokio::task::JoinHandle<()>> {
                 |channel_session| async move {
                     let config = match crate::config::Config::load_or_init().await {
                         Ok(c) => c,
-                        Err(e) => {
-                            return Err(e.into());
-                        }
+                        Err(e) => return Err(e),
                     };
                     if !crate::channels::has_listener_configuration(&config) {
                         log::debug!(

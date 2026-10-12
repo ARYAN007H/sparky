@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -72,16 +73,24 @@ test("native E2E installation attests the connector module before launching the 
     const assets = [];
     for (const id of [
       "tinyjuice",
+      "tinybox",
       "tinysearch",
       "tinydocs",
       "tinywallet",
       "tinychannels",
       "tinymcp",
+      "tinyhosts",
     ]) {
       const archive = `${id}.tar.gz`;
       const contents = join(root, `archive-${id}`);
       mkdirSync(contents);
-      writeFileSync(join(contents, "module-fixture.so"), `released ${id}`);
+      const moduleFile =
+        id === "tinyhosts"
+          ? "libtinyhosts.so"
+          : id === "tinybox"
+            ? "libtinybox.so"
+            : "module-fixture.so";
+      writeFileSync(join(contents, moduleFile), `released ${id}`);
       const packed = spawnSync("tar", [
         "-czf",
         join(root, archive),
@@ -162,9 +171,20 @@ test("native E2E installation attests the connector module before launching the 
       [
         `TINYJUICE_TEST_MODULE=${join(root, "modules/fixture-1/tinyjuice/libtinyjuice_module.so")}`,
         `TINYSEARCH_TEST_MODULE=${join(root, "modules/fixture-1/tinysearch/libtinysearch.so")}`,
-        `OPENHUMAN_MODULE_PATH=${["tinydocs", "tinywallet", "tinychannels", "tinymcp"].map((id) => join(root, "modules/fixture-1", id)).join(":")}`,
+        `OPENHUMAN_TINYHOSTS_TEST_MODULE=${join(root, "modules/fixture-1/tinyhosts/libtinyhosts.so")}`,
+        `OPENHUMAN_MODULE_PATH=${["tinybox", "tinydocs", "tinywallet", "tinychannels", "tinymcp"].map((id) => join(root, "modules/fixture-1", id)).join(":")}`,
         `TINYCONNECTORS_TEST_MODULE=${destination}/libtinyconnectors.so`,
       ].join("\n"),
+    );
+    assert.equal(
+      existsSync(join(root, "modules/fixture-1/tinyhosts/libtinyhosts.so")),
+      true,
+      "the released module fixture is staged for its isolated core test",
+    );
+    assert.equal(
+      existsSync(join(root, "modules/fixture-1/tinybox/libtinybox.so")),
+      true,
+      "the released TinyBox module fixture is available to Rust E2E tests",
     );
   } finally {
     rmSync(root, { recursive: true, force: true });

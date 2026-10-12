@@ -45,6 +45,12 @@ const ALL = Object.fromEntries(Object.keys(AREA_ENV).map((k) => [k, true]));
 const NONE = Object.fromEntries(Object.keys(AREA_ENV).map((k) => [k, false]));
 const EX63_ENV = { CI_SCRATCH_DIR: "/scratch" };
 
+test("EX63 installs script dependencies only after changed areas are detected", () => {
+  const detect = ciLanes.indexOf("- name: Detect changed areas");
+  const install = ciLanes.indexOf("- name: Install jq for release-script tests");
+  assert.ok(detect >= 0 && install > detect, "filter outputs must exist before they gate jq installation");
+});
+
 const plans = () => [
   buildPlan({ profile: "ex63", areas: ALL, env: EX63_ENV }),
   buildPlan({ profile: "hosted", areas: ALL }),

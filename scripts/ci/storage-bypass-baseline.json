@@ -380,8 +380,8 @@
   {
     "rule": "json-write",
     "path": "crates/openhuman-core/src/security/secret_storage/file_store.rs",
-    "line": 79,
-    "text": "let file = OpenOptions::new()",
+    "line": 80,
+    "text": "let mut options = OpenOptions::new();",
     "occurrence": 1
   },
   {

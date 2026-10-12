@@ -68,7 +68,7 @@ conn_cached="${blobs}/tinyconnectors-${conn_rev}-${rustc_rev}.so"
 if [ -f "${conn_cached}" ]; then
   log "tinyconnectors: cache hit ${conn_rev:0:12}"
 else
-  conn_target="${TINYCONNECTORS_TARGET_DIR:-vendor/tinyconnectors/target}"
+  conn_target="${TINYCONNECTORS_TARGET_DIR:-target/native-test-modules/tinyconnectors}"
   log "tinyconnectors: building ${conn_rev:0:12} into ${conn_target}"
   bash scripts/ci-cancel-aware.sh cargo build --release \
     --manifest-path vendor/tinyconnectors/crates/tinyconnectors/Cargo.toml \
@@ -85,7 +85,8 @@ node scripts/ci/stage-connector-test-module.mjs \
 {
   echo "TINYJUICE_TEST_MODULE=${dest}/tinyjuice/libtinyjuice_module.so"
   echo "TINYSEARCH_TEST_MODULE=${dest}/tinysearch/libtinysearch.so"
-  echo "OPENHUMAN_MODULE_PATH=${dest}/tinydocs:${dest}/tinywallet:${dest}/tinychannels:${dest}/tinymcp${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
+  echo "OPENHUMAN_TINYHOSTS_TEST_MODULE=${dest}/tinyhosts/libtinyhosts.so"
+  echo "OPENHUMAN_MODULE_PATH=${dest}/tinybox:${dest}/tinydocs:${dest}/tinywallet:${dest}/tinychannels:${dest}/tinymcp${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
   echo "TINYCONNECTORS_TEST_MODULE=${dest}/tinyconnectors/libtinyconnectors.so"
 } > "${env_file}"
 log "wrote ${env_file}"

@@ -269,8 +269,10 @@ A profile holds one thread per conversation, whatever interface it came in on:
   direct `load_or_init` calls, environment writes and `home_dir()` lookups.
   Detached work uses `spawn_scoped` so it keeps its profile.
 - **Host tools are opt-in and confined.** A user's context has no `Platform`
-  family, so shell and file tools are absent unless the operator lists their
-  group in `tool_allowlist`:
+  family. The standalone SaaS CLI has no host-tool adapter and exposes no
+  shell or file tools, even when their group is in `tool_allowlist`. An
+  embedding host must supply profile tool adapters and a permission callback;
+  the allowlist limits which host groups those adapters may expose:
   - `host_files` (`file_read`, `file_write`, `edit`, `apply_patch`, `grep`,
     `glob`, `list`, `csv_export`, `read_workspace_state`) runs in-process,
     confined by the forced policy to the profile's `sandbox/`. In SaaS the
