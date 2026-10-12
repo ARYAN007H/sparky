@@ -62,7 +62,11 @@ fn tree(root: &Path) -> BTreeMap<String, String> {
 }
 
 /// All documents of `collection` in the backend's local scope, by id.
-fn dump(backend: &Arc<dyn StorageBackend>, source: &Source, collection: &str) -> BTreeMap<String, serde_json::Value> {
+fn dump(
+    backend: &Arc<dyn StorageBackend>,
+    source: &Source,
+    collection: &str,
+) -> BTreeMap<String, serde_json::Value> {
     let docs = Arc::clone(backend.for_scope(&Scope::local()).unwrap().documents());
     let specs = (source.collections)();
     let collection = collection.to_string();
@@ -167,7 +171,8 @@ fn a_finished_import_does_not_run_again_or_resurrect_deleted_records() {
     // The user removes a record; the untouched legacy file still has it.
     let docs = Arc::clone(backend.for_scope(&Scope::local()).unwrap().documents());
     crate::storage::block_on(async move {
-        docs.delete("approvals", "denied-1", Precondition::None).await
+        docs.delete("approvals", "denied-1", Precondition::None)
+            .await
     })
     .unwrap();
 
@@ -187,7 +192,8 @@ fn an_existing_record_is_never_overwritten() {
     // A record the new code already wrote (a resumed import).
     let docs = Arc::clone(backend.for_scope(&Scope::local()).unwrap().documents());
     crate::storage::block_on(async move {
-        docs.ensure_collection(&(source.collections)().remove(0)).await?;
+        docs.ensure_collection(&(source.collections)().remove(0))
+            .await?;
         docs.put(
             "approvals",
             "pending-1",
@@ -366,7 +372,8 @@ fn records_the_previous_default_wrote_as_documents_are_imported_and_rekeyed() {
 
     let (found, written) = imported(run_with(&backend, &plain, &[source]));
 
-    assert_eq!((found, written), (2, 2));
+    // The notification, its content-dedup entry and the core event.
+    assert_eq!((found, written), (3, 3));
     assert!(dump(&backend, &source, "integration_notifications").contains_key("n-doc"));
     let key = format!(
         "path:{}",
