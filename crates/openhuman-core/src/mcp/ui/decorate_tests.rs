@@ -120,3 +120,87 @@ fn scrub_strings_rewrites_nested_values() {
         json!({"a": ["tok-[redacted]"], "b": {"c": "[redacted]"}, "n": 1})
     );
 }
+
+#[tokio::test]
+async fn wrapper_forwards_every_inner_tool_property() {
+    let tool = UiAwareTool::new(
+        Box::new(Fixed(ToolResult::success("plain"))),
+        no_lookup(),
+        ToolInput::Direct,
+    );
+    let args = json!({});
+    assert_eq!(tool.name(), "mcp_shop_order");
+    assert_eq!(tool.description(), "order");
+    assert_eq!(tool.parameters_schema(), json!({"type": "object"}));
+    let inner = Fixed(ToolResult::success("plain"));
+    assert_eq!(tool.permission_level(), inner.permission_level());
+    assert_eq!(
+        tool.permission_level_with_args(&args),
+        inner.permission_level_with_args(&args)
+    );
+    assert_eq!(tool.scope(), inner.scope());
+    assert_eq!(tool.category(), inner.category());
+    assert_eq!(tool.family(), inner.family());
+    assert_eq!(tool.policy(), inner.policy());
+    assert_eq!(
+        tool.injected_arguments().len(),
+        inner.injected_arguments().len()
+    );
+    assert_eq!(tool.supports_markdown(), inner.supports_markdown());
+    assert_eq!(
+        tool.is_concurrency_safe(&args),
+        inner.is_concurrency_safe(&args)
+    );
+    assert_eq!(tool.external_effect(), inner.external_effect());
+    assert_eq!(
+        tool.external_effect_with_args(&args),
+        inner.external_effect_with_args(&args)
+    );
+    assert_eq!(tool.max_result_size_chars(), inner.max_result_size_chars());
+    assert_eq!(tool.timeout_policy(&args), inner.timeout_policy(&args));
+    assert_eq!(
+        tool.host_extension().is_some(),
+        inner.host_extension().is_some()
+    );
+    assert_eq!(
+        tool.host_call_extension(&args).is_some(),
+        inner.host_call_extension(&args).is_some()
+    );
+    assert_eq!(tool.spec().name, inner.spec().name);
+    assert_eq!(tool.display_label(&args), inner.display_label(&args));
+    assert_eq!(tool.display_detail(&args), inner.display_detail(&args));
+    assert_eq!(tool.return_direct(), inner.return_direct());
+}
+
+#[tokio::test]
+async fn option_and_context_entry_points_present_the_widget() {
+    let build = || {
+        UiAwareTool::new(
+            Box::new(Fixed(result_with(
+                envelope(json!({"meta": {"ui": {"resourceUri": "ui://shop/cart"}}})),
+                "Order placed",
+            ))),
+            no_lookup(),
+            ToolInput::Direct,
+        )
+    };
+    let with_options = build()
+        .execute_with_options(json!({}), ToolCallOptions::default())
+        .await
+        .unwrap();
+    assert_eq!(with_options.metadata.unwrap()["kind"], "mcp_ui");
+    let with_context = build()
+        .execute_with_context(json!({}), ToolCallOptions::default(), None)
+        .await
+        .unwrap();
+    assert_eq!(with_context.metadata.unwrap()["kind"], "mcp_ui");
+}
+
+#[tokio::test]
+async fn installed_lookup_without_a_host_has_no_meta() {
+    let workspace = tempfile::tempdir().unwrap();
+    let mut config = Config::default();
+    config.workspace_dir = workspace.path().to_path_buf();
+    let lookup = MetaLookup::Installed(Arc::new(config));
+    assert!(lookup.tool_meta("shop", "order").await.is_none());
+}
