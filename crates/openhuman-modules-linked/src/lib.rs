@@ -28,7 +28,7 @@
 //! | `tinycomputer`   | waits: no `static-link` |
 //! | `tinyjuice`      | waits: no `static-link` |
 //! | `tinysearch`     | waits: no `static-link` |
-//! | `tinywallet`     | linked (v0.20.0 `static-link`); see the attestation note below |
+//! | `tinywallet`     | waits: no `static-link`; also see the attestation note below |
 //! | `tinyhosts`      | waits: no module crate yet |
 //!
 //! The waiting modules need the upstream static-link / tinybus alignment work (E0.3) and a re-pin;
@@ -54,8 +54,6 @@ pub fn linked_modules() -> Vec<(&'static str, LinkedFactory)> {
     modules.push(("tinychannels", tinychannels_module::linked_module));
     #[cfg(feature = "tinydocs")]
     modules.push(("tinydocs", tinydocs_module::linked_module));
-    #[cfg(feature = "tinywallet")]
-    modules.push(("tinywallet", tinywallet_module::linked_module));
     modules
 }
 
