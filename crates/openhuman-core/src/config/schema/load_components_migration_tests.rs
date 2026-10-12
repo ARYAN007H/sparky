@@ -8,7 +8,7 @@ fn parse(raw: &str) -> Config {
 
 fn migrated(raw: &str, tinymemes: Option<&str>) -> Config {
     let mut c = parse(raw);
-    super::migrate::migrate_components_with(&mut c, raw, tinymemes);
+    crate::config::schema::load::migrate::migrate_components_with(&mut c, raw, tinymemes);
     c
 }
 
@@ -45,10 +45,19 @@ fn hosting_enabled_false_alone_maps_to_components_hosting() {
 
 #[test]
 fn enabled_or_absent_legacy_flags_change_nothing() {
-    let c = migrated("[hosting]\nenabled = true\n[mcp_client]\nenabled = true\n", Some("on"));
-    assert_eq!(c.components, crate::config::schema::ComponentsConfig::default());
+    let c = migrated(
+        "[hosting]\nenabled = true\n[mcp_client]\nenabled = true\n",
+        Some("on"),
+    );
+    assert_eq!(
+        c.components,
+        crate::config::schema::ComponentsConfig::default()
+    );
     let c = migrated("", None);
-    assert_eq!(c.components, crate::config::schema::ComponentsConfig::default());
+    assert_eq!(
+        c.components,
+        crate::config::schema::ComponentsConfig::default()
+    );
 }
 
 #[test]

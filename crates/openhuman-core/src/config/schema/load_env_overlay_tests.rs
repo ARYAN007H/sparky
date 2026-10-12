@@ -556,8 +556,14 @@ fn env_overlay_component_switches_apply_and_ignore_garbage() {
     cfg.apply_env_overlay_with(&env);
     assert!(!cfg.components.flows);
     assert!(!cfg.components.voice);
-    assert!(cfg.components.mcp, "invalid value must leave the switch alone");
-    assert!(!cfg.components.hosting, "unset env must not touch the config");
+    assert!(
+        cfg.components.mcp,
+        "invalid value must leave the switch alone"
+    );
+    assert!(
+        !cfg.components.hosting,
+        "unset env must not touch the config"
+    );
 
     let env = HashMapEnv::new().with("OPENHUMAN_COMPONENT_HOSTING", "1");
     cfg.apply_env_overlay_with(&env);
