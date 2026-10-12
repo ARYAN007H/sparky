@@ -16,6 +16,7 @@ struct FakePort {
     release_call: Arc<Notify>,
     block_first_open: Arc<std::sync::atomic::AtomicBool>,
     block_first_close: Arc<std::sync::atomic::AtomicBool>,
+    fail_first_close: Arc<std::sync::atomic::AtomicBool>,
     block_calls: Arc<std::sync::atomic::AtomicBool>,
 }
 
@@ -55,6 +56,12 @@ impl McpModulePort for FakePort {
             closed.len()
         };
         self.close_started.notify_one();
+        if self
+            .fail_first_close
+            .swap(false, std::sync::atomic::Ordering::SeqCst)
+        {
+            return Err(ModuleCallError::TransportFailed);
+        }
         if index == 1
             && self
                 .block_first_close
