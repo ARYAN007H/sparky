@@ -78,6 +78,12 @@ remain explicit when the original attempt cannot be identified; no hidden UUID
 retry or whole-operation exactly-once guarantee follows. This is a reviewed
 implementation plan, not an executed append capability or a turn-claim proof.
 
+The owning local implementation branch now has an authentic baseline: two
+prepared ExistingSchema Memory/SQLite cases compile successfully and both fail
+at the first append with the expected typed Unsupported result. Later assertions
+for replay, reopen and statistics are not reached by that baseline. The owning
+append implementation and its GREEN evidence remain pending.
+
 ## Remaining host and migration work
 
 OpenHuman still directly imports the TinyMemes implementation and persists local
