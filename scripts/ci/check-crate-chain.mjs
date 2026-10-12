@@ -127,12 +127,13 @@ export const HOST_RPC_INTERNAL_PATTERNS = [
  * Blank out Rust comments and string literals (contents only), keeping line
  * structure, so a banned path quoted in a doc, log message or fixture is not
  * mistaken for code. Handles nested block comments, escapes and raw strings.
- * Optional literal preservation supports type signatures; default masking is unchanged.
+ * Optional literal preservation and code-whitespace compaction support type
+ * signatures; default masking is unchanged. Compaction leaves literal contents intact.
  */
-export function stripRustComments(text, { preserveLiterals = false } = {}) {
+export function stripRustComments(text, { preserveLiterals = false, compact = false } = {}) {
   let out = '';
   let i = 0;
-  const blank = chunk => chunk.replace(/[^\n]/g, ' ');
+  const blank = chunk => compact ? '' : chunk.replace(/[^\n]/g, ' ');
   while (i < text.length) {
     const rest = text.slice(i);
     let m;
@@ -171,7 +172,7 @@ export function stripRustComments(text, { preserveLiterals = false } = {}) {
       out += preserveLiterals ? text.slice(i, j + 1) : blank(text.slice(i, j + 1));
       i = j + 1;
     } else {
-      out += text[i];
+      if (!compact || !/\s/.test(text[i])) out += text[i];
       i++;
     }
   }

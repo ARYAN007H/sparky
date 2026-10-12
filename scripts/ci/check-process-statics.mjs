@@ -18,7 +18,6 @@ const signature = (entry) =>
 /** Source declarations only: includes aliases and lazy_static!, not macro expansion. */
 export function declarations(text, file) {
   const code = stripRustComments(text);
-  const signatureCode = stripRustComments(text, { preserveLiterals: true });
   const found = [];
   const pattern =
     /(?<!')\bstatic\s+(?:(mut|ref)\s+)?((?:r#)?[_\p{ID_Start}][_\p{ID_Continue}]*)\s*:(?!:)/gu;
@@ -50,7 +49,10 @@ export function declarations(text, file) {
     }
     if (end === code.length)
       throw new Error(`${file}: cannot parse static ${match[2]}`);
-    const type = signatureCode.slice(start, end).replace(/\s+/g, "");
+    const type = stripRustComments(text.slice(start, end), {
+      preserveLiterals: true,
+      compact: true,
+    });
     if (!type) throw new Error(`${file}: static ${match[2]} has no type`);
     found.push({
       file,
