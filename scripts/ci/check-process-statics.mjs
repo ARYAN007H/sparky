@@ -20,7 +20,7 @@ export function declarations(text, file) {
   const code = stripRustComments(text);
   const found = [];
   const pattern =
-    /(?<!')\bstatic\s+(?:(mut|ref)\s+)?([A-Za-z_][A-Za-z_0-9]*)\s*:(?!:)/g;
+    /(?<!')\bstatic\s+(?:(mut|ref)\s+)?((?:r#)?[_\p{ID_Start}][_\p{ID_Continue}]*)\s*:(?!:)/gu;
   for (const match of code.matchAll(pattern)) {
     let end = match.index + match[0].length;
     const start = end;
