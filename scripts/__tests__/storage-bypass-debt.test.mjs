@@ -255,26 +255,37 @@ test("symlinked --root checkouts cannot bypass required canonical history", () =
   }
 });
 
-
 test("new-based file stores are findings without matching memory stores", () => {
-  const findings = scan("crates/openhuman-core/src/catalog.rs", [
-    "let cache = FileCatalogStore::new(dir);",
-    "let cache = tinyskills::FileCatalogStore::new(dir);",
-    "let memory = MemoryCatalogStore::new();",
-  ].join("\n"));
-  assert.deepEqual(findings.map(f => f.rule), ["file-store-new", "file-store-new"]);
+  const findings = scan(
+    "crates/openhuman-core/src/catalog.rs",
+    [
+      "let cache = FileCatalogStore::new(dir);",
+      "let cache = tinyskills::FileCatalogStore::new(dir);",
+      "let memory = MemoryCatalogStore::new();",
+    ].join("\n"),
+  );
+  assert.deepEqual(
+    findings.map((f) => f.rule),
+    ["file-store-new", "file-store-new"],
+  );
 });
 
 for (const [name, source] of [
   ["task stores", "vendor/tinyagents/crates/tinyagents-tasks/src/store.rs"],
-  ["catalog store", "vendor/tinyskills/crates/tinyskills/src/registry/store.rs"],
+  [
+    "catalog store",
+    "vendor/tinyskills/crates/tinyskills/src/registry/store.rs",
+  ],
 ]) {
   test(`${name} owning writers are included in curated coverage`, async () => {
     const root = mkdtempSync(join(tmpdir(), "storage-owner-coverage-"));
     try {
       mkdirSync(join(root, "crates"));
       mkdirSync(join(root, source, ".."), { recursive: true });
-      writeFileSync(join(root, source), "pub fn persist() { std::fs::write(path, bytes); }\n");
+      writeFileSync(
+        join(root, source),
+        "pub fn persist() { std::fs::write(path, bytes); }\n",
+      );
       const findings = await collectFindings(root);
       assert.equal(findings.length, 1);
       assert.equal(findings[0].path, source);
@@ -285,9 +296,11 @@ for (const [name, source] of [
   });
 }
 
-
 test("host calls to the JSONL task opener cannot hide their persistent path", () => {
-  const findings = scan("crates/openhuman-core/src/tasks.rs", "let store = tinyagents::open_jsonl_task_store_or_memory(path, None);");
+  const findings = scan(
+    "crates/openhuman-core/src/tasks.rs",
+    "let store = tinyagents::open_jsonl_task_store_or_memory(path, None);",
+  );
   assert.equal(findings.length, 1);
   assert.equal(findings[0].rule, "task-store-open");
 });

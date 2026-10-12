@@ -47,8 +47,13 @@ const EX63_ENV = { CI_SCRATCH_DIR: "/scratch" };
 
 test("EX63 installs script dependencies only after changed areas are detected", () => {
   const detect = ciLanes.indexOf("- name: Detect changed areas");
-  const install = ciLanes.indexOf("- name: Install jq for release-script tests");
-  assert.ok(detect >= 0 && install > detect, "filter outputs must exist before they gate jq installation");
+  const install = ciLanes.indexOf(
+    "- name: Install jq for release-script tests",
+  );
+  assert.ok(
+    detect >= 0 && install > detect,
+    "filter outputs must exist before they gate jq installation",
+  );
 });
 
 const plans = () => [
