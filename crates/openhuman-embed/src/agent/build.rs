@@ -338,6 +338,7 @@ pub(crate) fn instantiate(runtime: &Runtime, spec: AgentSpec) -> Result<AgentInn
         host_tools: parts.host_tools,
         hooks: parts.hooks,
         lifecycle,
+        mcp_cleanup: Default::default(),
         host_only,
     })
 }

@@ -72,6 +72,7 @@ pub(crate) mod builder;
 mod defaults;
 mod host_agents;
 pub(crate) use host_agents::AgentMap;
+pub(crate) use host_agents::PendingCleanup;
 mod info;
 mod lifecycle;
 mod live_hooks;
@@ -596,7 +597,7 @@ impl Runtime {
         storage_info: StorageInfo,
         storage_backend: Option<Arc<dyn openhuman_core::storage::StorageBackend>>,
     ) -> Self {
-        let agents: Arc<host_agents::AgentMap> = Arc::new(Mutex::new(HashMap::new()));
+        let agents: Arc<host_agents::AgentMap> = Arc::new(Mutex::new(Default::default()));
         let resolver: Arc<dyn openhuman_core::agent::host_agents::HostAgentResolver> =
             Arc::new(host_agents::RuntimeAgents(Arc::clone(&agents)));
         openhuman_core::agent::host_agents::install(Arc::clone(&resolver));

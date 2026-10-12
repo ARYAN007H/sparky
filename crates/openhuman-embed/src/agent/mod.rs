@@ -19,6 +19,7 @@ mod approvals;
 pub use approval_handler::{ApprovalHandler, ApprovalSubscription};
 mod attachments;
 pub(crate) mod lifecycle;
+pub(crate) mod mcp_cleanup;
 pub use approvals::{ApprovalDecision, Approvals, ApprovalsError, PendingApproval};
 pub use attachments::ToolAttachmentError;
 pub(crate) mod build;
@@ -102,6 +103,10 @@ pub enum AgentError {
     /// A named built-in definition does not exist.
     #[error("unknown built-in agent definition {0:?}")]
     UnknownDefinition(String),
+    /// The agent is removed, but its original MCP owner still needs cleanup.
+    /// Its id and home remain reserved while detached cleanup retries.
+    #[error("agent MCP cleanup is still pending: {0}")]
+    McpCleanup(#[source] openhuman_core::modules::client::ModuleCallError),
 }
 
 /// The assembled state behind an [`Agent`], shared by every clone of it and
@@ -132,6 +137,7 @@ pub(crate) struct AgentInner {
     pub(crate) host_tools: Option<openhuman_core::agent::HostTools>,
     pub(crate) hooks: openhuman_core::agent::hooks::HookScope,
     pub(crate) lifecycle: lifecycle::Lifecycle,
+    pub(crate) mcp_cleanup: std::sync::Mutex<Option<openhuman_core::mcp::host::AgentMcpCleanup>>,
     /// Built from [`ToolScopeSpec::HostOnly`]: every turn's session is built
     /// from the host tools alone.
     pub(crate) host_only: bool,
@@ -153,14 +159,8 @@ impl AgentInner {
         );
         self.deny_approvals(resolution);
         self.ctx.agent_state().clear();
-        if openhuman_core::mcp::host::take_agent_host(&self.config.workspace_dir, &self.id)
-            .is_some()
-        {
-            log::debug!(
-                "[embed][agent] teardown id={} evicted its MCP host",
-                self.id
-            );
-        }
+        *self.mcp_cleanup.lock().unwrap_or_else(std::sync::PoisonError::into_inner) =
+            openhuman_core::mcp::host::take_agent_cleanup(&self.config.workspace_dir, &self.id);
         openhuman_core::core::runtime::AgentContextRegistry::deregister(&self.id, &self.ctx);
         log::debug!("[embed][agent] teardown complete id={}", self.id);
     }
@@ -189,13 +189,7 @@ impl AgentInner {
 impl Drop for AgentInner {
     fn drop(&mut self) {
         self.teardown("agent_dropped");
-        let mut agents = self.registry.lock().unwrap_or_else(|e| e.into_inner());
-        if agents
-            .get(&self.id)
-            .is_some_and(|current| std::ptr::eq(current.as_ptr(), self))
-        {
-            agents.remove(&self.id);
-        }
+        self.defer_cleanup(false);
     }
 }
 
