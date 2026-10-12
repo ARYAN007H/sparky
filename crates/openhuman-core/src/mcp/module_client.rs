@@ -287,7 +287,7 @@ impl McpConfiguredClient {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         // The cleanup reservation can be installed after the first check but
         // before this cache lock is acquired. Recheck before creating a client.
-        if Self::cleanup_pending(&data_dir) {
+        if current_agent_context_is_removed() || Self::cleanup_pending(&data_dir) {
             ModuleClient::report_unavailable(MODULE);
             return Err(ModuleCallError::Unavailable);
         }
