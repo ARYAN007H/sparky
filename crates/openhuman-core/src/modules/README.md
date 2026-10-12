@@ -150,6 +150,13 @@ global mode and `OPENHUMAN_MODULE_SOURCE_<ID>` (id upper-cased) one module.
   linked-modules`, then `OPENHUMAN_MODULE_SOURCE=linked`). tinybus never unloads
   a module, so a process serves an id from one source only. See the crate docs
   for which modules can be linked at the current vendor pins.
+- Pin status: `node scripts/modules/pin-status.mjs` compares each gitlink with
+  its registry `version` (in sync, ahead, behind/diverged, exempt). With
+  `OPENHUMAN_MODULE_PIN_AHEAD` set (`--print-env` prints it), a debug build logs
+  one warning per id when it serves a `linked` or `source` module whose gitlink
+  is ahead of its pin. `scripts/modules/release-and-repin.mjs <id>` publishes
+  the release and re-pins from its `checksum.toml`; the strict
+  `check-module-pins.mjs` is unchanged.
 - `source`: a library built from the module's vendored gitlink by
   `node scripts/modules/build.mjs <id|all>` (the recipe is the record's
   `SourceSpec`: submodule, manifest, package, `lib_name`, features). The build
