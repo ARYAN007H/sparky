@@ -392,10 +392,7 @@ impl Tool for McpCallTool {
             }
         };
         let client_config = host::client_config(&self.config);
-        let arguments = match client
-            .normalize_tool_arguments(arguments)
-            .await
-        {
+        let arguments = match client.normalize_tool_arguments(arguments).await {
             Ok(arguments) => Value::Object(arguments),
             Err(_) => {
                 let outcome = tinymcp_bus::McpCallOutcome::failed(
