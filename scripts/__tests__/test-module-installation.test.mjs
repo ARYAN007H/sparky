@@ -221,20 +221,30 @@ for (const runner of ["test-rust-with-mock.sh", "test-rust-e2e.sh"]) {
       new URL(`../${runner}`, import.meta.url),
       "utf8",
     );
-    const setupStart = source.indexOf('tinymcp_asset="');
+    const setupStart = source.indexOf(
+      runner === "test-rust-with-mock.sh"
+        ? "# The MCP registry E2E targets"
+        : "e2e_source_ids=(",
+    );
     assert.ok(setupStart >= 0, "runner prepares the pinned TinyMCP fixture");
-    const setupEnd = source.indexOf("\n\n", setupStart);
+    const setupEnd = source.indexOf("\nfi\n", setupStart) + 4;
     const setup = source.slice(setupStart, setupEnd);
+    const stageLib = fileURLToPath(
+      new URL("../modules/stage-local-modules.sh", import.meta.url),
+    );
     const root = mkdtempSync(join(tmpdir(), "mcp-runner-"));
     try {
       const moduleDir = join(root, "target/test-modules/tinymcp/test-digest");
       mkdirSync(moduleDir, { recursive: true });
       writeFileSync(join(moduleDir, "libtinymcp_module.so"), "fixture");
+      const boxDir = join(root, "target/test-modules/tinybox/test-digest");
+      mkdirSync(boxDir, { recursive: true });
+      writeFileSync(join(boxDir, "libtinybox.so"), "fixture");
       // Evaluate the real runner branches with only external commands stubbed.
       // A cached fixture avoids downloads while exercising the path export.
       const cargoStub = `cargo_test() {
         if [[ " $* " == *" --test mcp_registry_e2e "* ]]; then
-          printf 'ARTIFACT=%s\\n' "\${OPENHUMAN_TINYMCP_TEST_MODULE:-missing}"
+          printf 'ARTIFACT=%s\\n' "\${OPENHUMAN_MODULE_PATH:-missing}"
           printf 'ARG=%s\\n' "$@"
         fi
       }`;
@@ -281,9 +291,11 @@ for (const runner of ["test-rust-with-mock.sh", "test-rust-e2e.sh"]) {
             "module_platform=ubuntu-22.04-x86_64",
             "module_ext=so",
             "PRODUCT_FEATURES=mcp",
-            "connectors_module=unused",
-            "node() { printf 'tinymcp\\tunused\\tmodule.tar.gz\\ttest-digest\\n'; }",
+            `source ${JSON.stringify(stageLib)}`,
+            "node() { printf '%s\\tunused\\tmodule.tar.gz\\ttest-digest\\n' \"${@: -1}\"; }",
+            "unset OPENHUMAN_MODULE_PATH",
             setup,
+            'connectors_module_path="/connectors:${OPENHUMAN_MODULE_PATH:-}"',
             cargoStub,
             invocation,
           ].join("\n"),
@@ -293,7 +305,7 @@ for (const runner of ["test-rust-with-mock.sh", "test-rust-e2e.sh"]) {
           env: {
             ...process.env,
             TEST_ROOT: root,
-            OPENHUMAN_TINYMCP_TEST_MODULE: "",
+            OPENHUMAN_MODULE_SOURCE: "",
           },
         },
       );
@@ -301,9 +313,9 @@ for (const runner of ["test-rust-with-mock.sh", "test-rust-e2e.sh"]) {
       const runs = result.stdout.split("ARTIFACT=").slice(1);
       assert.equal(runs.length, runner === "test-rust-with-mock.sh" ? 2 : 1);
       for (const run of runs) {
-        assert.equal(
-          run.split("\n")[0],
-          join(moduleDir, "libtinymcp_module.so"),
+        assert.ok(
+          run.split("\n")[0].split(":").includes(moduleDir),
+          "the pinned TinyMCP release directory is on the module search path",
         );
         assert.match(
           run,
