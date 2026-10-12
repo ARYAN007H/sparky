@@ -21,7 +21,8 @@
 //!
 //! TinyAgents owns the process-local watch/cancel/abort/steering mechanics.
 //! OpenHuman retains product metadata, durable task-store projection, and the
-//! legacy `RunQueue` steering fallback. Ownership is enforced by parent session;
+//! legacy `RunQueue` steering fallback. Ownership is enforced by captured profile
+//! and parent session; user controls retain the profile without requiring a parent ID.
 //! terminal entries are pruned on `wait` and swept at the registry soft cap.
 //!
 //! ## Typed lifecycle ledger (issue #4249)

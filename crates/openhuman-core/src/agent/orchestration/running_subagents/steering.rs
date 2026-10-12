@@ -130,12 +130,12 @@ pub async fn steer(
     Ok(())
 }
 
-/// Trusted-control variant used by JSON-RPC sub-agent controls.
+/// User-control variant used by JSON-RPC sub-agent controls.
 ///
 /// This intentionally does not require the caller to provide `parent_session`:
-/// the RPC layer is already bearer-protected and mirrors the existing
-/// `subagent_cancel` control surface, which can abort a task by id. The function
-/// still refuses unknown or terminal tasks and never logs the steered text.
+/// the captured profile is checked against the caller in SaaS. Desktop controls
+/// retain authority over the process user's workers. Unknown, foreign or
+/// terminal tasks are refused, and steered text is never logged.
 pub(crate) async fn steer_control(
     task_id: &str,
     text: String,
@@ -153,7 +153,9 @@ pub(crate) async fn steer_control(
     let snapshot = registry()
         .snapshot_trusted(&task_id_key)
         .map_err(steer_error_from_registry)?;
-    if !control_admits(&snapshot.metadata) { return Err(SteerError::NotOwned); }
+    if !control_admits(&snapshot.metadata) {
+        return Err(SteerError::NotOwned);
+    }
     if snapshot.status.is_terminal() {
         return Err(SteerError::AlreadyDone);
     }

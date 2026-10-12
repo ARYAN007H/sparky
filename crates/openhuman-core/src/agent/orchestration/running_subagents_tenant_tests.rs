@@ -289,6 +289,23 @@ async fn missing_saas_scope_cannot_observe_or_control_workers() {
     CoreContext::sync_scope(pair.alice.clone(), || {
         assert!(resume_ref_for_task(&pair.a.task, PARENT).is_ok())
     });
+    // A scoped kernel context without an admitted profile is not authority.
+    CoreContext::scope(CoreContext::for_test(DomainSet::full(), None), async {
+        assert!(snapshot_for_parent(PARENT).is_empty());
+        assert!(matches!(
+            resume_ref_for_task(&pair.a.task, PARENT),
+            Err(WaitError::NotOwned)
+        ));
+        assert_eq!(
+            field(&control("steer", &pair.a.task).await, "steered"),
+            Some(false)
+        );
+        assert_eq!(
+            field(&control("cancel", &pair.a.task).await, "cancelled"),
+            Some(false)
+        );
+    })
+    .await;
 }
 
 #[tokio::test]

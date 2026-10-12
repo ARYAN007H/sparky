@@ -17,7 +17,8 @@
 //!
 //! TinyAgents owns the process-local watch/cancel/abort/steering mechanics.
 //! OpenHuman retains product metadata, durable task-store projection, and the
-//! legacy `RunQueue` steering fallback. Ownership is enforced by parent session;
+//! legacy `RunQueue` steering fallback. Ownership is enforced by captured profile
+//! and parent session;
 //! terminal entries are pruned on `wait` and swept at the registry soft cap.
 
 use std::path::PathBuf;
@@ -68,7 +69,10 @@ fn caller_profile() -> Result<Option<String>, WaitError> {
 pub(super) fn owner_key(parent_session: &str) -> Result<String, WaitError> {
     let profile = caller_profile()?;
     Ok(crate::core::runtime::tenant::tenant_key(
-        &crate::core::runtime::tenant::Tenant { profile, agent: None },
+        &crate::core::runtime::tenant::Tenant {
+            profile,
+            agent: None,
+        },
         parent_session,
     ))
 }
@@ -158,7 +162,10 @@ pub(crate) fn register(
         return;
     };
     let owner = crate::core::runtime::tenant::tenant_key(
-        &crate::core::runtime::tenant::Tenant { profile: profile.clone(), agent: None },
+        &crate::core::runtime::tenant::Tenant {
+            profile: profile.clone(),
+            agent: None,
+        },
         &parent_session,
     );
     if let Some(thread_id) = parent_thread_id.as_deref() {

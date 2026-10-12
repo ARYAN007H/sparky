@@ -39,7 +39,9 @@ pub(crate) struct CancelledSubagent {
 pub(crate) fn cancel_by_task(task_id: &str) -> Option<CancelledSubagent> {
     let id = TaskId::new(task_id);
     let snapshot = registry().snapshot_trusted(&id).ok()?;
-    if !control_admits(&snapshot.metadata) { return None; }
+    if !control_admits(&snapshot.metadata) {
+        return None;
+    }
     let cancelled = registry().cancel(&id, &snapshot.owner_id).ok()?;
     // `AwaitingUser` is paused, not finished: cancelling it is a real cancel.
     let already_finished = cancelled.status.finished_outcome();
