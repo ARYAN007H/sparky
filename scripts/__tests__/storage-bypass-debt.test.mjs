@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
   validateCoverageDebt,
   validateAllowances,
@@ -190,4 +191,44 @@ test("present but empty curated vendor directories cannot appear as debt shrinka
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+
+test("symlinked real checkouts still refuse missing curated source", async () => {
+  const fixture = mkdtempSync(join(tmpdir(), "storage-symlink-source-"));
+  const root = join(fixture, "checkout");
+  const linked = join(fixture, "linked");
+  try {
+    mkdirSync(root);
+    execFileSync("git", ["init"], { cwd: root, stdio: "ignore" });
+    mkdirSync(join(root, "crates"));
+    symlinkSync(root, linked, "junction");
+    await assert.rejects(collectFindings(linked), /Missing curated source/);
+  } finally { rmSync(fixture, { recursive: true, force: true }); }
+});
+
+test("symlinked --root checkouts cannot bypass required canonical history", () => {
+  const fixture = mkdtempSync(join(tmpdir(), "storage-symlink-history-"));
+  const root = join(fixture, "checkout");
+  const linked = join(fixture, "linked");
+  try {
+    mkdirSync(root);
+    execFileSync("git", ["init"], { cwd: root, stdio: "ignore" });
+    mkdirSync(join(root, "crates"));
+    for (const path of CURATED_VENDOR_ROOTS) {
+      if (path.endsWith(".rs")) {
+        mkdirSync(join(root, path, ".."), { recursive: true });
+        writeFileSync(join(root, path), "// no writer\n");
+      } else {
+        mkdirSync(join(root, path), { recursive: true });
+        writeFileSync(join(root, path, "store.rs"), "// no writer\n");
+      }
+    }
+    mkdirSync(join(root, "scripts", "ci"), { recursive: true });
+    writeFileSync(join(root, "scripts", "ci", "storage-bypass-baseline.json"), "[]\n");
+    symlinkSync(root, linked, "junction");
+    const result = spawnSync(process.execPath, [fileURLToPath(new URL("../ci/check-storage-bypass.mjs", import.meta.url)), "--root", linked], { encoding: "utf8" });
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stderr, /merge-base|origin\/main|upstream\/main/);
+  } finally { rmSync(fixture, { recursive: true, force: true }); }
 });
