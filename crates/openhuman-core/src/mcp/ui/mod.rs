@@ -48,9 +48,3 @@ pub fn ui_aware_call(
         decorate::ToolInput::Nested("arguments"),
     ))
 }
-
-/// The `initialize` capabilities this host advertises: MCP Apps support.
-#[must_use]
-pub fn client_capabilities() -> serde_json::Value {
-    tinymcp::ui::client_capabilities()
-}
