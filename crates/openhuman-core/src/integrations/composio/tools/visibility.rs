@@ -180,7 +180,7 @@ pub(super) async fn filter_list_tools_response(
             ToolDecision::Allow | ToolDecision::PassthroughCheckScope { .. }
         ));
     }
-    let drained: Vec<_> = resp.tools.drain(..).collect();
+    let drained = std::mem::take(&mut resp.tools);
     resp.tools = drained
         .into_iter()
         .zip(keep)
