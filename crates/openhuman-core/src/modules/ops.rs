@@ -537,8 +537,7 @@ fn status_of(config: &Config, record: &ModuleRecord) -> ModuleStatus {
         },
     };
     let plan = source::plan(config, record.id);
-    let source = (state == ModuleState::Ready || state == ModuleState::Available)
-        .then_some(plan.served);
+    let source = (state != ModuleState::Unsupported).then_some(plan.served);
     let detail = detail.or_else(|| plan.fallback.map(str::to_string));
     ModuleStatus {
         id: record.id.to_string(),
