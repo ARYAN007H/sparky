@@ -41,11 +41,6 @@ impl RemovalSlot<'_> {
 
 impl Drop for RemovalSlot<'_> {
     fn drop(&mut self) {
-        let mut agents = self
-            .runtime
-            .agents
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
         if self.purge && !self.mcp_cleanup_confirmed {
             self.inner.teardown_without_mcp_cleanup("agent_removed");
             let home = self.inner.layout.home.clone();
@@ -79,6 +74,15 @@ impl Drop for RemovalSlot<'_> {
                 log::warn!("[embed][runtime] cancelled removal purge failed: {error}");
             }
         }
+        // Teardown may drop user-owned state whose destructor blocks or
+        // re-enters Runtime. Keep the old Arc in the weak map as the ID
+        // reservation while teardown runs, but never hold the map lock across
+        // user destructors or cleanup scheduling.
+        let mut agents = self
+            .runtime
+            .agents
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         if agents
             .get(&self.inner.id)
             .and_then(std::sync::Weak::upgrade)
