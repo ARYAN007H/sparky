@@ -173,9 +173,6 @@ fi
 # execute. Keep this list in the same canonical source as `pnpm test:rust`.
 PRODUCT_FEATURES="$(bash "$REPO_ROOT/scripts/ci/product-features.sh")"
 
-# Shell command analysis and the storage URL E2E suites load TinyBox through
-# the native module path. Download the registry-pinned release and verify its
-# digest before the subprocesses start.
 module_target="$(bash "$SCRIPT_DIR/ci/native-test-module-platform.sh")"
 IFS=$'\t' read -r module_ext module_platform <<< "$module_target"
 # shellcheck source=modules/stage-local-modules.sh
