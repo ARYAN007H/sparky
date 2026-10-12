@@ -544,10 +544,9 @@ async fn a_removed_agent_context_cannot_reopen_its_evicted_client() {
     config.workspace_dir = workspace.path().to_path_buf();
     config.modules.enabled = true;
     let scope = Arc::new(crate::security::approval::ApprovalScope::default());
-    let overrides = Arc::new(crate::agent::host_overrides::HostOverrides {
-        approval_scope: Some(Arc::clone(&scope)),
-        ..Default::default()
-    });
+    let mut overrides = crate::agent::host_overrides::HostOverrides::default();
+    overrides.approval_scope = Some(Arc::clone(&scope));
+    let overrides = Arc::new(overrides);
     let context = CoreContext::for_test(DomainSet::full(), Some(workspace.path().to_path_buf()))
         .derive_with(
             ContextOverlay::new(config.clone(), DomainSet::kernel(), ToolGroups::none())
