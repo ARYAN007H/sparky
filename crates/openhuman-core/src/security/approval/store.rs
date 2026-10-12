@@ -30,10 +30,9 @@
 //! mode without one). With no backend — the desktop default — nothing
 //! changes and `approval/approval.db` is used as before.
 
-use crate::storage::rusqlite;
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
-use rusqlite::{params, types::Type, Connection};
+use crate::storage::rusqlite::{self, params, types::Type, Connection};
 
 use super::store_documents::Docs;
 use crate::config::Config;
