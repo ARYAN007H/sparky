@@ -185,9 +185,7 @@ mod x402 {
             let config = crate::config::rpc::load_config_with_timeout()
                 .await
                 .map_err(|error| format!("x402 payment failed: {error}"))?;
-            if let Err(refused) = declined_when_wallet_off(&config) {
-                return Err(refused);
-            }
+            declined_when_wallet_off(&config)?;
             let owner = crate::security::approval::APPROVAL_CHAT_CONTEXT
                 .try_with(|context| tinywallet_bus::wire::QuoteOwner {
                     thread_id: context.thread_id.clone(),
