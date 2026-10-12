@@ -1,15 +1,25 @@
 use super::*;
+use crate::config::ComposioHostCredential;
 use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
 use crate::tools::toolpacks::ToolGroups;
 use std::sync::Arc;
 
 fn config(dir: &std::path::Path) -> Config {
-    Config {
+    let mut config = Config {
         workspace_dir: dir.join("workspace"),
+        action_dir: dir.join("workspace"),
         config_path: dir.join("config.toml"),
         ..Config::default()
-    }
+    };
+    // A fixed fake host credential makes the shared service identity explicit.
+    // These tests seed cached data and never call the backend.
+    config.composio.pin_host_credential(
+        ComposioHostCredential::direct("ck_shared_scope_fixture")
+            .entity_id("shared-service-entity"),
+    );
+    config
 }
+
 fn profile(config: &Config, id: &str) -> Arc<CoreContext> {
     CoreContext::for_test_with_config(DomainSet::kernel(), config.clone()).derive_with(
         ContextOverlay::new(config.clone(), DomainSet::kernel(), ToolGroups::none()).profile(id),
