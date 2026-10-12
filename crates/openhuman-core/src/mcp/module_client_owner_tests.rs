@@ -151,10 +151,9 @@ async fn an_old_closed_context_cannot_create_the_reused_agents_first_client() {
     config.workspace_dir = scratch.path().into();
     let parent = CoreContext::for_test(DomainSet::full(), Some(config.workspace_dir.clone()));
     let old_scope = Arc::new(crate::security::approval::ApprovalScope::default());
-    let old_overrides = Arc::new(crate::agent::host_overrides::HostOverrides {
-        approval_scope: Some(Arc::clone(&old_scope)),
-        ..Default::default()
-    });
+    let mut old_overrides = crate::agent::host_overrides::HostOverrides::default();
+    old_overrides.approval_scope = Some(Arc::clone(&old_scope));
+    let old_overrides = Arc::new(old_overrides);
     let mut overlay = ContextOverlay::new(config.clone(), DomainSet::full(), ToolGroups::none())
         .session_agent("worker");
     overlay.host_overrides = Some(old_overrides);
@@ -174,10 +173,10 @@ async fn an_old_closed_context_cannot_create_the_reused_agents_first_client() {
     let mut new_overlay =
         ContextOverlay::new(config.clone(), DomainSet::full(), ToolGroups::none())
             .session_agent("worker");
-    new_overlay.host_overrides = Some(Arc::new(crate::agent::host_overrides::HostOverrides {
-        approval_scope: Some(Arc::new(crate::security::approval::ApprovalScope::default())),
-        ..Default::default()
-    }));
+    let mut new_overrides = crate::agent::host_overrides::HostOverrides::default();
+    new_overrides.approval_scope =
+        Some(Arc::new(crate::security::approval::ApprovalScope::default()));
+    new_overlay.host_overrides = Some(Arc::new(new_overrides));
     CoreContext::scope(parent.derive_with(new_overlay), async {
         McpConfiguredClient::for_config(&config)
             .expect("the new instance has an open lifecycle scope");
