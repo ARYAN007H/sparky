@@ -365,9 +365,6 @@ impl Runtime {
         if agents.contains_key(&id) {
             return Err(AgentError::DuplicateId(id));
         }
-        if openhuman_core::mcp::host::agent_close_pending(&self.base_config.workspace_dir, &id) {
-            return Err(AgentError::CleanupPending);
-        }
         if agents.len() >= self.max_agents {
             log::warn!(
                 "[embed][runtime] agent refused id={id}: {} live agents is the limit",
