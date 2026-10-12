@@ -23,37 +23,16 @@ use std::collections::BTreeSet;
 use serde_json::Value;
 use tinystoragedrivers::CollectionSpec;
 
-/// The four objects of the storage interface.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(crate) enum Object {
-    Documents,
-    Streams,
-    Blobs,
-    Secrets,
-}
+pub(crate) use tinystoragedrivers_client::Object;
 
-impl Object {
-    /// The wire object name.
-    pub(crate) const fn as_str(self) -> &'static str {
-        match self {
-            Self::Documents => tinystoragedrivers_bus::DOCUMENTS_OBJECT,
-            Self::Streams => tinystoragedrivers_bus::STREAMS_OBJECT,
-            Self::Blobs => tinystoragedrivers_bus::BLOBS_OBJECT,
-            Self::Secrets => tinystoragedrivers_bus::SECRETS_OBJECT,
-        }
-    }
-
-    /// Every object, in wire order.
-    pub(crate) const ALL: [Self; 4] = [Self::Documents, Self::Streams, Self::Blobs, Self::Secrets];
-
-    /// The selectors the contract defines for this object.
-    pub(crate) fn selectors(self) -> &'static [&'static str] {
-        match self {
-            Self::Documents => &tinystoragedrivers_bus::DOCUMENTS_SELECTORS,
-            Self::Streams => &tinystoragedrivers_bus::STREAMS_SELECTORS,
-            Self::Blobs => &tinystoragedrivers_bus::BLOBS_SELECTORS,
-            Self::Secrets => &tinystoragedrivers_bus::SECRETS_SELECTORS,
-        }
+/// Whether the contract defines `selector` for `object`.
+pub(crate) fn is_selector(object: Object, selector: &str) -> bool {
+    use tinystoragedrivers_bus as wire;
+    match object {
+        Object::Documents => wire::is_documents_selector(selector),
+        Object::Streams => wire::is_streams_selector(selector),
+        Object::Blobs => wire::is_blobs_selector(selector),
+        Object::Secrets => wire::is_secrets_selector(selector),
     }
 }
 
@@ -234,7 +213,7 @@ pub(crate) fn authorize(
     selector: &str,
     request: &Value,
 ) -> Result<Plan, Denied> {
-    if !object.selectors().contains(&selector) {
+    if !is_selector(object, selector) {
         return Err(Denied::Malformed);
     }
     if !grant.has_object(object) {
