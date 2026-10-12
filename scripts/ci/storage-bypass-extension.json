@@ -206,7 +206,7 @@
     "text": "let store = FileStatusStore::new(open_session_stores(workspace).kv);",
     "occurrence": 1,
     "classification": "classic",
-    "reason": "Historical status reader wraps the concrete FileStore returned by the classic session opener; FileStatusStore::new is not a captured native KV adapter.",
+    "reason": "Classic status sweep reads and persists cancellation through the concrete FileStore returned by the classic session opener; FileStatusStore::new is not a captured native KV adapter.",
     "issue": "https://github.com/tinyhumansai/openhuman/issues/7423"
   },
   {
