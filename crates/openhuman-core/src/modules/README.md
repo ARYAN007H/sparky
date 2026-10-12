@@ -257,6 +257,15 @@ The host files for those three modules fingerprint the configuration and call
 a sign-out reaches a module that is already serving. Secrets travel only in
 that configuration, never in an ordinary method call or an RPC reply.
 
+### Disabled components
+
+`registry::COMPONENT_OF` maps every module id to its `[components]` switch
+(`registry_contract_tests` covers every record). `ops::ensure_loaded*` refuses
+a record whose component is off with `LoadError::Disabled` before any claim,
+download or `dlopen`; `modules.list` reports `ModuleState::Disabled`; boot skips
+the module and `search_path::load_enabled` leaves its search-path artifact
+unopened. See [components](../../../../gitbooks/developing/components.md).
+
 ### Boot
 
 `boot::load_declared_modules` runs as a background bootstrap job
@@ -472,6 +481,7 @@ minimal build small.
 
 ## Further reading
 
+- [Module sources and `[components]` (AGENTS.md)](../../../../AGENTS.md)
 - [Loadable modules](../../../../gitbooks/developing/loadable-modules.md)
 - [tinybus submodule](../../../../vendor/tinybus/README.md)
 - [Architecture overview](../../../../gitbooks/developing/architecture.md)
