@@ -14,8 +14,8 @@ use std::time::Duration;
 
 use common::{offline_config, runtime, scripted_provider, stub_backend, tool_call_completion};
 use openhuman_embed::{
-    AgentDefinitionSpec, AgentSpec, AgentTurnOrigin, CronDelivery, CronReply, HostTurnTools,
-    InMemorySessionStores, JobOrigin, Runtime, ServiceSet, ToolScopeSpec, Workspace,
+    Access, AgentDefinitionSpec, AgentSpec, AgentTurnOrigin, CronDelivery, CronReply,
+    HostTurnTools, InMemorySessionStores, JobOrigin, Runtime, ServiceSet, ToolScopeSpec, Workspace,
 };
 
 #[derive(Default)]
@@ -80,6 +80,9 @@ fn a_library_agents_scheduled_reply_is_handed_to_the_host() {
                 .agent(
                     AgentSpec::new("teeny")
                         .provider(common::route(&provider, "fixture"))
+                        // Scheduling is the one effect this agent may take
+                        // without a person approving it.
+                        .access(Access::supervised().auto_approve(["cron"]))
                         .definition(
                             AgentDefinitionSpec::new()
                                 .system_prompt("TEENY")
