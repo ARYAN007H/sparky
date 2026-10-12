@@ -304,7 +304,10 @@ async fn resumed_mcp_snapshot_survives_a_cold_catalog_and_keeps_its_frozen_spec(
         .iter()
         .find(|spec| spec.name == name)
         .expect("recorded MCP name survives the cold catalog");
-    assert_eq!(cold_spec, &recorded_spec);
+    assert_eq!(
+        serde_json::to_value(cold_spec).expect("serialize restored declaration"),
+        serde_json::to_value(&recorded_spec).expect("serialize frozen declaration")
+    );
 
     prelude
         .mutable
@@ -336,7 +339,10 @@ async fn resumed_mcp_snapshot_survives_a_cold_catalog_and_keeps_its_frozen_spec(
         .iter()
         .find(|spec| spec.name == name)
         .expect("recorded MCP name remains present");
-    assert_eq!(recovered_spec, &recorded_spec);
+    assert_eq!(
+        serde_json::to_value(recovered_spec).expect("serialize restored declaration"),
+        serde_json::to_value(&recorded_spec).expect("serialize frozen declaration")
+    );
 }
 
 #[cfg(feature = "modules")]

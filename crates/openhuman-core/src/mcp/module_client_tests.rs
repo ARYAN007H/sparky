@@ -82,7 +82,7 @@ impl McpModulePort for FakePort {
             self.calls.lock().unwrap().push((
                 object_path.to_owned(),
                 member.to_owned(),
-                args,
+                args: args.clone(),
                 confidential,
             ));
             self.call_started.notify_one();
