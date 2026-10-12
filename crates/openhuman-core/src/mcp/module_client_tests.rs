@@ -457,8 +457,8 @@ async fn failed_agent_close_stays_retired_and_can_be_retried() {
     port.fail_first_close
         .store(true, std::sync::atomic::Ordering::SeqCst);
     let closed = Arc::clone(&port.closed);
-    let client = McpConfiguredClient::install_test_port(&config, Box::new(port))
-        .expect("install client");
+    let client =
+        McpConfiguredClient::install_test_port(&config, Box::new(port)).expect("install client");
     client
         .call::<bool>(&configured("server"), "ConnectedOverview", ())
         .await
@@ -539,11 +539,9 @@ async fn delayed_agent_close_cannot_evict_a_replacement_cache_entry() {
         .unwrap()
         .insert(workspace.path().to_path_buf(), Arc::clone(&replacement));
 
-    assert!(McpConfiguredClient::close_retired_client(
-        workspace.path().to_path_buf(),
-        captured,
-    )
-    .await);
+    assert!(
+        McpConfiguredClient::close_retired_client(workspace.path().to_path_buf(), captured,).await
+    );
     assert_eq!(old_closed.lock().unwrap().len(), 1);
     assert!(replacement_closed.lock().unwrap().is_empty());
     let current = CLIENTS
