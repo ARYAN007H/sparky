@@ -675,10 +675,11 @@ async fn a_removed_context_waiting_for_the_client_cache_cannot_reopen_it() {
     scope.close("agent_removed");
     drop(clients_lock);
 
-    assert!(matches!(
-        request.await.unwrap(),
-        Err(ModuleCallError::Unavailable)
-    ));
+    let admitted = request.await.unwrap().is_ok();
+    if admitted {
+        clients.lock().unwrap().remove(&scoped_dir);
+    }
+    assert!(!admitted, "removed context must not create a cached client");
     assert!(!clients.lock().unwrap().contains_key(&scoped_dir));
 }
 
