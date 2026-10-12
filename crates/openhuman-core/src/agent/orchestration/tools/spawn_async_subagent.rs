@@ -290,6 +290,7 @@ impl SpawnAsyncSubagentTool {
 
 include!("spawn_async_subagent_execute.rs");
 include!("spawn_async_subagent_args.rs");
+include!("spawn_async_subagent_results.rs");
 
 /// Settle a late registration refusal before an accepted response is built.
 fn finish_spawn_registration(

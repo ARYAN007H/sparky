@@ -116,23 +116,12 @@ impl SpawnAsyncSubagentTool {
         // reaching this guard — see the `has_delivery_thread` checks in `spawn_subagent.rs` and
         // `dispatch.rs::dispatch_subagent`. Only a *direct* `spawn_async_subagent` call lands
         // here.
-        if parent_thread_id.is_none() {
-            log::warn!(
-                "[spawn_async_subagent] refusing fire-and-forget spawn with no delivery thread \
-                 parent={} requested={} — directing caller to synchronous delegation (flow node / \
-                 CLI / cron context, background result would be discarded)",
-                parent.agent_definition_id,
-                definition.id
-            );
-            return Ok(ToolResult::error(
-                "spawn_async_subagent: no parent chat thread available to deliver the result \
-                 into (this looks like a flow node, CLI, or cron run rather than an interactive \
-                 chat turn). Fire-and-forget delegation has nowhere to land its result here and \
-                 the sub-agent's work would be silently discarded. Use synchronous delegation \
-                 instead: a `delegate_*` tool with `blocking: true` runs the sub-agent inline \
-                 and hands you its output in this turn. For parallel work, model it as \
-                 parallel flow nodes rather than background sub-agents.",
-            ));
+        if let Some(refusal) = refuse_missing_delivery_thread(
+            parent_thread_id.as_deref(),
+            &parent.agent_definition_id,
+            &definition.id,
+        ) {
+            return Ok(refusal);
         }
         let store = SubagentSessionStore::new(parent.workspace_dir.clone());
         let workspace_descriptor = tool_context
@@ -771,37 +760,14 @@ impl SpawnAsyncSubagentTool {
             return Ok(ToolResult::error(error));
         }
 
-        let payload = async_subagent_ref_payload(
+        Ok(accepted_spawn_result(
             &task_id,
             &durable_session.subagent_session_id,
             &definition.id,
             worker_thread_id.as_deref(),
             reusable.is_some(),
             reuse_decision.as_str(),
-            "running",
             &fleet,
-        );
-        let payload_json = match serde_json::to_string(&payload) {
-            Ok(serialized) => {
-                log::debug!(
-                    "[spawn_async_subagent] serialized async reference payload bytes={}",
-                    serialized.len()
-                );
-                serialized
-            }
-            Err(error) => {
-                log::debug!(
-                    "[spawn_async_subagent] failed to serialize async reference payload: {}",
-                    error
-                );
-                "{}".to_string()
-            }
-        };
-        log::debug!("[spawn_async_subagent] formatting accepted response");
-        Ok(ToolResult::success(format_async_subagent_accepted(
-            payload["agent_id"].as_str().unwrap_or("subagent"),
-            &payload_json,
-            &fleet,
-        )))
+        ))
     }
 }

@@ -1,6 +1,6 @@
 use super::*;
 use crate::agent::harness::definition::AgentDefinitionRegistry;
-use crate::agent::harness::fork_context::{with_parent_context, ParentExecutionContext};
+use crate::agent::harness::fork_context::{ParentExecutionContext, with_parent_context};
 use crate::agent::prompts::ToolCallFormat;
 use crate::config::AgentConfig;
 use std::collections::HashSet;
@@ -107,7 +107,7 @@ async fn late_registration_refusal_aborts_the_worker_and_settles_its_durable_ses
         assert_eq!(persisted[0].status, DurableSubagentStatus::Failed);
         assert_eq!(persisted[0].latest_error.as_deref(), Some(error.as_str()));
         assert!(
-            running_subagents::task_records(&workspace.path().to_path_buf()).is_empty(),
+            running_subagents::task_records(Some("late-parent")).is_empty(),
             "refused registration must not create a Running task ledger row"
         );
     });
@@ -298,9 +298,10 @@ fn async_reference_matches_the_orchestrator_fleet_vocabulary() {
         .iter()
         .filter_map(|v| v.as_str())
         .collect();
-    assert!(next
-        .iter()
-        .any(|a| a.contains("delivered to you automatically")));
+    assert!(
+        next.iter()
+            .any(|a| a.contains("delivered to you automatically"))
+    );
 
     let message = format_async_subagent_accepted("task_manager_agent", &serialized, &fleet);
     let prose = message.split("[async_subagent_ref]").next().unwrap();
@@ -604,8 +605,10 @@ fn scoped_instance_advertises_exactly_the_allowlist() {
         schema["properties"]["agent_id"]["enum"],
         serde_json::json!(["agent_memory", "workflow_builder"])
     );
-    assert!(schema["properties"]["agent_id"]["description"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("only these are dispatchable"));
+    assert!(
+        schema["properties"]["agent_id"]["description"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("only these are dispatchable")
+    );
 }
