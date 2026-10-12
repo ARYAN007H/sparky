@@ -31,6 +31,7 @@ import { fileURLToPath } from 'node:url';
 import {
   CHAIN_GATES_NOT_FORWARDED,
   CHAIN_LOCAL_GATES,
+  checkLinkedModulesIsolation,
   checkProductForwarding,
   diffChainForwarding,
   diffForwarding,
@@ -227,4 +228,14 @@ for (const result of chain) {
 
 const chainOk = chain.every(result => result.ok);
 
-process.exit(product.ok && defaults.ok && chainOk ? 0 : 1);
+// The local-development linked-modules gate must stay out of every shipped path.
+const linkedViolations = checkLinkedModulesIsolation({ productFeatures, shellToml, cliFeatures });
+console.log('');
+if (linkedViolations.length === 0) {
+  console.log('linked-modules isolation: OK (not a product gate, not in the app manifest, not a CLI default).');
+} else {
+  console.log('linked-modules isolation: FAIL');
+  for (const violation of linkedViolations) console.log(`  - ${violation}`);
+}
+
+process.exit(product.ok && defaults.ok && chainOk && linkedViolations.length === 0 ? 0 : 1);
