@@ -8,15 +8,21 @@ pub(crate) fn finish_removal(
     id: &str,
     pending: &PendingCleanup,
 ) -> Result<(), AgentError> {
-    let mut agents = registry.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-    if !agents.get(id).is_some_and(|current| Weak::ptr_eq(current, &pending.instance)) {
+    let mut agents = registry
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if !agents
+        .get(id)
+        .is_some_and(|current| Weak::ptr_eq(current, &pending.instance))
+    {
         return Ok(());
     }
     let purge = pending.purge || agents.pending.get(id).is_some_and(|current| current.purge);
     // Keep the id reserved throughout purge; never touch a successor's home.
     if purge && pending.home.exists() {
         std::fs::remove_dir_all(&pending.home).map_err(|source| AgentError::Workspace {
-            what: "delete the removed agent's home", source,
+            what: "delete the removed agent's home",
+            source,
         })?;
     }
     agents.remove(id);
@@ -32,24 +38,37 @@ pub(crate) fn defer_pending(
     pending: PendingCleanup,
     guard: Arc<crate::runtime::CoreGuard>,
 ) {
-    if pending.cleanup.as_ref().is_none_or(|cleanup| cleanup.finish_if_idle()) {
+    if pending
+        .cleanup
+        .as_ref()
+        .is_none_or(|cleanup| cleanup.finish_if_idle())
+    {
         if let Err(error) = finish_removal(&registry, &id, &pending) {
             log::warn!("[embed][agent] removed home cleanup remains pending: {error}");
         }
         return;
     }
-    if pending.retry_running.swap(true, Ordering::AcqRel) { return; }
+    if pending.retry_running.swap(true, Ordering::AcqRel) {
+        return;
+    }
     let running = Arc::clone(&pending.retry_running);
+    let executor_failed = Arc::clone(&running);
     let future = async move {
         let _guard = guard;
         for attempt in 0..3 {
             let result = match &pending.cleanup {
                 Some(cleanup) => cleanup.finish().await.map_err(AgentError::McpCleanup),
                 None => Ok(()),
-            }.and_then(|()| finish_removal(&registry, &id, &pending));
+            }
+            .and_then(|()| finish_removal(&registry, &id, &pending));
             match result {
-                Ok(()) => { running.store(false, Ordering::Release); return; }
-                Err(error) => log::warn!("[embed][agent] captured cleanup remains pending: {error}"),
+                Ok(()) => {
+                    running.store(false, Ordering::Release);
+                    return;
+                }
+                Err(error) => {
+                    log::warn!("[embed][agent] captured cleanup remains pending: {error}")
+                }
             }
             if attempt < 2 {
                 tokio::time::sleep(std::time::Duration::from_millis(250 * (1 << attempt))).await;
@@ -60,26 +79,46 @@ pub(crate) fn defer_pending(
         running.store(false, Ordering::Release);
     };
     if let Err(error) = openhuman_core::mcp::host::spawn_agent_cleanup(future) {
-        pending_running_reset(&registry_placeholder());
+        executor_failed.store(false, Ordering::Release);
         log::warn!("[embed][agent] cleanup executor unavailable: {error}");
     }
 }
 
 impl AgentInner {
     pub(crate) fn reserve_cleanup(&self, purge: bool) -> Option<PendingCleanup> {
-        let cleanup = self.mcp_cleanup.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
-        let mut agents = self.registry.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-        let instance = agents.get(&self.id).filter(|weak| std::ptr::eq(weak.as_ptr(), self)).cloned()?;
-        let pending = agents.pending.entry(self.id.clone()).or_insert_with(|| PendingCleanup {
-            cleanup, instance, home: self.layout.home.clone(), purge,
-            retry_running: Default::default(),
-        });
+        let cleanup = self
+            .mcp_cleanup
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        let mut agents = self
+            .registry
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let instance = agents
+            .get(&self.id)
+            .filter(|weak| std::ptr::eq(weak.as_ptr(), self))
+            .cloned()?;
+        let pending = agents
+            .pending
+            .entry(self.id.clone())
+            .or_insert_with(|| PendingCleanup {
+                cleanup,
+                instance,
+                home: self.layout.home.clone(),
+                purge,
+                retry_running: Default::default(),
+            });
         pending.purge |= purge;
         Some(pending.clone())
     }
 
     pub(crate) async fn finish_mcp_cleanup(&self) -> Result<(), AgentError> {
-        let cleanup = self.mcp_cleanup.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
+        let cleanup = self
+            .mcp_cleanup
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
         if let Some(cleanup) = cleanup {
             cleanup.finish().await.map_err(AgentError::McpCleanup)?;
         }
@@ -95,7 +134,12 @@ impl AgentInner {
 
     pub(crate) fn defer_cleanup(&self, purge: bool) {
         if let Some(pending) = self.reserve_cleanup(purge) {
-            defer_pending(Arc::clone(&self.registry), self.id.clone(), pending, Arc::clone(&self._runtime_guard));
+            defer_pending(
+                Arc::clone(&self.registry),
+                self.id.clone(),
+                pending,
+                Arc::clone(&self._runtime_guard),
+            );
         }
     }
 }

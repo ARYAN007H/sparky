@@ -36,11 +36,15 @@ pub(crate) struct AgentRegistry {
 
 impl std::ops::Deref for AgentRegistry {
     type Target = HashMap<String, Weak<AgentInner>>;
-    fn deref(&self) -> &Self::Target { &self.live }
+    fn deref(&self) -> &Self::Target {
+        &self.live
+    }
 }
 
 impl std::ops::DerefMut for AgentRegistry {
-    fn deref_mut(&mut self) -> &mut Self::Target { &mut self.live }
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.live
+    }
 }
 
 pub(crate) struct RuntimeAgents(pub(crate) Arc<AgentMap>);

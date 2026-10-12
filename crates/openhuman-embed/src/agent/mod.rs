@@ -159,7 +159,10 @@ impl AgentInner {
         );
         self.deny_approvals(resolution);
         self.ctx.agent_state().clear();
-        *self.mcp_cleanup.lock().unwrap_or_else(std::sync::PoisonError::into_inner) =
+        *self
+            .mcp_cleanup
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
             openhuman_core::mcp::host::take_agent_cleanup(&self.config.workspace_dir, &self.id);
         openhuman_core::core::runtime::AgentContextRegistry::deregister(&self.id, &self.ctx);
         log::debug!("[embed][agent] teardown complete id={}", self.id);
