@@ -61,6 +61,13 @@ The inherited reconciliation read-to-write gap can still evict a newer snapshot
 within the same scope, causing a safe cache miss. Epoch-map eviction is also
 future hardening; neither behavior is claimed as fixed here.
 
+Review follow-up also exercises enabled direct-mode fetch without a SaaS
+profile, before the existing disabled-mode assertion. Identical fake credentials
+use loopback-only endpoints, and the seeded profiled snapshot uses the same
+enabled configuration. A fresh supported-graph run passes all six controls,
+with zero failures and zero ignored; the isolated child is a repeated case.
+The full log is `.validation/cache-review-enabled-green.log` (build 2m59s).
+
 Feature forwarding passes. Storage-bypass and Rust layout checks fail on files
 unchanged from the canonical base: the browser-profile lock probe is reported as
 a write, and three security files exceed the line limit. Exact base-to-candidate
