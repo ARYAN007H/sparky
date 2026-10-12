@@ -258,7 +258,7 @@ pub(super) fn summarizes_tool_output(agent_id: &str, config: &crate::config::Con
     crate::inference::tokenjuice::summarizes_tool_output(agent_id, config)
 }
 
-pub(crate) fn should_synthesize_delegation_tools(def: &AgentDefinition) -> bool {
+pub(super) fn should_synthesize_delegation_tools(def: &AgentDefinition) -> bool {
     match &def.tools {
         ToolScope::Wildcard => !def.subagents.is_empty(),
         ToolScope::Named(names) => names.iter().any(|name| {
