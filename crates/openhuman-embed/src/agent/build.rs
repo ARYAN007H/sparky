@@ -236,6 +236,22 @@ pub(crate) fn instantiate(runtime: &Runtime, spec: AgentSpec) -> Result<AgentInn
         opt_named_belt_into_discovery(&mut definition.tools);
     }
 
+    // A named scope is an explicit allowlist: unless it names a spawn tool it
+    // delegates only to the sub-agents its host declares, never to the
+    // inherited built-in roster (which would otherwise come back as
+    // `delegate_*` tools the scope never listed).
+    if matches!(
+        definition.tools,
+        openhuman_core::agent::harness::definition::ToolScope::Named(_)
+    ) && !definition.tools.names_a_spawn_tool()
+        && !definition.subagents.is_empty()
+    {
+        log::debug!(
+            "[embed][agent] id={id} named scope names no spawn tool; dropping {} inherited sub-agent(s)",
+            definition.subagents.len()
+        );
+        definition.subagents.clear();
+    }
     let definitions = own_catalogue(&catalogue, &id, &mut definition, parts.subagents)?;
 
     // ── narrowing ────────────────────────────────────────────────────────
