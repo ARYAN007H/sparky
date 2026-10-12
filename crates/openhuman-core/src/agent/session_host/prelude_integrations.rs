@@ -16,6 +16,7 @@ pub(super) struct McpToolCatalog {
     pub(super) connected: Vec<tinymcp_bus::McpToolPresentation>,
     pub(super) configured: Vec<tinymcp_bus::McpToolPresentation>,
     pub(super) recorded_names: std::collections::HashSet<String>,
+    pub(super) recorded_specs: Vec<tinytools::ToolSpec>,
 }
 
 impl OpenHumanTurnPrelude {
@@ -76,12 +77,17 @@ impl OpenHumanTurnPrelude {
         // knew under the pre-readable hashed name keeps resolving.
         #[cfg(feature = "mcp")]
         {
-            mutable.mcp_tools.recorded_names = recorded
+            let recorded_mcp_specs = recorded
                 .specs()
                 .iter()
                 .filter(|spec| spec.name.starts_with("mcp_"))
+                .cloned()
+                .collect();
+            mutable.mcp_tools.recorded_names = recorded_mcp_specs
+                .iter()
                 .map(|spec| spec.name.clone())
                 .collect();
+            mutable.mcp_tools.recorded_specs = recorded_mcp_specs;
         }
     }
 

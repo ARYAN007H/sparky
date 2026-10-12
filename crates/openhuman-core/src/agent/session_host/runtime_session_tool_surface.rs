@@ -147,6 +147,28 @@ impl OpenHumanTurnPrelude {
                 }
             }
         }
+        #[cfg(feature = "mcp")]
+        {
+            let recorded = self
+                .mutable
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .mcp_tools
+                .recorded_specs
+                .clone();
+            let recorded = recorded
+                .iter()
+                .map(|spec| (spec.name.as_str(), spec))
+                .collect::<std::collections::HashMap<_, _>>();
+            // A resumed thread keeps the exact MCP declaration it was shown,
+            // while the current module presentation still supplies its live
+            // executor. This mirrors the REPL snapshot restoration above.
+            for spec in &mut specs {
+                if let Some(frozen) = recorded.get(spec.name.as_str()) {
+                    *spec = Arc::new((*frozen).clone());
+                }
+            }
+        }
         let synthesized_tools = Arc::new(synthesized);
         crate::tools::toolpacks::bind_synthesized_pack_registry(&surface.tools, &synthesized_tools);
         let all_tools = surface
