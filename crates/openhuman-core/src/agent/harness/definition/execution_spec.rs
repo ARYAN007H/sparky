@@ -81,3 +81,7 @@ pub enum SandboxMode {
     /// Drop privileges, restrict filesystem (Landlock / Bubblewrap).
     Sandboxed,
 }
+
+#[cfg(test)]
+#[path = "execution_spec_tests.rs"]
+mod tests;
