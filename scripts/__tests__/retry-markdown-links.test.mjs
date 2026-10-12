@@ -94,3 +94,47 @@ test("retry inputs deduplicate repeated failures without dropping URL fragments"
     "https://example.test/docs#anchor",
   ]);
 });
+
+test("executable retries preserve report files and propagate final success or failure", async () => {
+  const { mkdtempSync, writeFileSync, readFileSync, rmSync } =
+    await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { recheckReport } = await import("../ci/retry-markdown-links.mjs");
+  for (const recover of [true, false]) {
+    const folder = mkdtempSync(join(tmpdir(), "lychee retry test "));
+    try {
+      const report = join(folder, "report.md");
+      const binary = join(folder, "fake checker.mjs");
+      const counter = join(folder, "calls.json");
+      writeFileSync(report, unavailable);
+      writeFileSync(
+        binary,
+        `#!/usr/bin/env node
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+const counter = ${JSON.stringify(counter)};
+const count = existsSync(counter) ? JSON.parse(readFileSync(counter, 'utf8')) + 1 : 1;
+writeFileSync(counter, JSON.stringify(count));
+const args = process.argv.slice(2);
+const input = readFileSync(args.at(-1), 'utf8');
+if (!input.includes('https://example.test/docs#anchor')) process.exit(3);
+const success = ${recover} && count === 2;
+writeFileSync(args[args.indexOf('--output') + 1], success ? '' : ${JSON.stringify(unavailable)});
+process.exit(success ? 0 : 2);
+`,
+        { mode: 0o755 },
+      );
+      assert.equal(
+        await recheckReport(report, binary, { wait: async () => {} }),
+        recover ? 0 : 2,
+      );
+      assert.equal(JSON.parse(readFileSync(counter, "utf8")), recover ? 2 : 3);
+      assert.equal(
+        readFileSync(join(folder, "retry-1.md"), "utf8"),
+        "- <https://example.test/docs#anchor>\n",
+      );
+    } finally {
+      rmSync(folder, { recursive: true, force: true });
+    }
+  }
+});

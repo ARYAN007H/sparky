@@ -32,11 +32,13 @@ export async function retryServiceUnavailable({
   return status;
 }
 
-async function main(reportPath, binary) {
+/** Recheck a Lychee Markdown report with the installed executable. */
+export async function recheckReport(reportPath, binary, { wait = delay } = {}) {
   const initialReport = readFileSync(reportPath, "utf8");
   let attempt = 0;
   const status = await retryServiceUnavailable({
     initialReport,
+    wait,
     check(urls) {
       const input = join(dirname(reportPath), `retry-${++attempt}.md`);
       writeFileSync(input, urls.map((url) => `- <${url}>`).join("\n") + "\n");
@@ -63,12 +65,12 @@ async function main(reportPath, binary) {
       };
     },
   });
-  process.exitCode = status;
+  return status;
 }
 
 if (
   process.argv[1] &&
   resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
-  await main(process.argv[2], process.argv[3]);
+  process.exitCode = await recheckReport(process.argv[2], process.argv[3]);
 }
