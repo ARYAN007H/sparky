@@ -139,6 +139,136 @@ fn field(value: &serde_json::Value, key: &str) -> Option<bool> {
         .and_then(serde_json::Value::as_bool)
 }
 
+async fn dispatched_control(function: &str, task: &str) -> Result<serde_json::Value, String> {
+    let mut params = serde_json::json!({ "taskId": task });
+    if function == "steer" {
+        params["message"] = serde_json::json!("scoped dispatch regression");
+    }
+    crate::core::invoke::invoke_method(
+        crate::core::invoke::default_state(),
+        &format!("openhuman.subagent_{function}"),
+        params,
+    )
+    .await
+}
+
+#[tokio::test]
+async fn saas_dispatch_exposes_only_the_callers_detached_worker_controls() {
+    if !child(
+        "saas_dispatch_exposes_only_the_callers_detached_worker_controls",
+        Mode::Saas,
+    ) {
+        return;
+    }
+    let mut pair = Pair::new();
+    let admitted = |name: &str, workspace: &std::path::Path| {
+        CoreContext::for_test(DomainSet::full(), None).derive_with(
+            ContextOverlay::new(
+                crate::config::Config {
+                    workspace_dir: workspace.to_path_buf(),
+                    ..crate::config::Config::default()
+                },
+                crate::profiles::host::user_domains(),
+                ToolGroups::none(),
+            )
+            .profile(name)
+            .session_agent("same-agent"),
+        )
+    };
+    pair.alice = admitted("detached-alice", pair._a_dir.path());
+    pair.bob = admitted("detached-bob", pair._b_dir.path());
+    CoreContext::scope(pair.bob.clone(), async {
+        for (function, field_name) in [("steer", "steered"), ("cancel", "cancelled")] {
+            let foreign = dispatched_control(function, &pair.a.task)
+                .await
+                .expect("reviewed user-plane control must dispatch");
+            assert_eq!(field(&foreign, field_name), Some(false));
+        }
+        assert_eq!(pair.a.queue.status().await.steers, 0);
+        assert_eq!(
+            field(&dispatched_control("steer", &pair.b.task).await.unwrap(), "steered"),
+            Some(true)
+        );
+        assert_eq!(pair.b.queue.status().await.steers, 1);
+        assert_eq!(
+            field(&dispatched_control("cancel", &pair.b.task).await.unwrap(), "cancelled"),
+            Some(true)
+        );
+        assert!(crate::core::all::schema_for_rpc_method("openhuman.config_get_config").is_none());
+    })
+    .await;
+    CoreContext::scope(pair.alice.clone(), async {
+        assert!(resume_ref_for_task(&pair.a.task, PARENT).is_ok());
+    })
+    .await;
+    for function in ["steer", "cancel"] {
+        assert!(dispatched_control(function, &pair.a.task).await.is_err());
+    }
+}
+
+#[tokio::test]
+async fn unscoped_async_spawn_refuses_before_persisting_a_running_session() {
+    if !child(
+        "unscoped_async_spawn_refuses_before_persisting_a_running_session",
+        Mode::Saas,
+    ) {
+        return;
+    }
+    use crate::agent::harness::fork_context::ParentExecutionContext;
+    use crate::agent::orchestration::subagent_sessions::SubagentSessionStore;
+    use crate::agent::orchestration::tools::{SpawnAsyncSubagentDispatch, SpawnAsyncSubagentTool};
+    use tinyagents_harness::tool::ToolDispatch;
+    let _ = crate::agent::harness::definition::AgentDefinitionRegistry::init_global_builtins();
+    let workspace = tempfile::tempdir().unwrap();
+    assert!(crate::storage::installed().is_none(), "exercise the real file fallback");
+    let parent = ParentExecutionContext {
+        workspace_descriptor: None,
+        agent_definition_id: "orchestrator".into(),
+        allowed_subagent_ids: std::collections::HashSet::from(["task_manager_agent".into()]),
+        turn_model_source: crate::agent::tinyagents::TurnModelSource::from_model(Arc::new(
+            tinyagents_harness::testkit::ScriptedModel::replies(vec!["done"]),
+        )),
+        all_tools: Arc::new(Vec::new()),
+        all_tool_specs: Arc::new(Vec::new()),
+        visible_tool_specs: Arc::new(Vec::new()),
+        visible_tool_names: Default::default(),
+        subagent_tool_ceiling_names: Default::default(),
+        model_name: "test-model".into(),
+        temperature: 0.0,
+        workspace_dir: workspace.path().to_path_buf(),
+        agent_config: crate::config::AgentConfig::default(),
+        workflows: Arc::new(Vec::new()),
+        memory_context: Arc::new(None),
+        session_id: PARENT.into(),
+        channel: "test".into(),
+        connected_integrations: Vec::new(),
+        tool_call_format: crate::agent::prompts::ToolCallFormat::Native,
+        session_key: "scope-refusal-parent".into(),
+        session_parent_prefix: None,
+        on_progress: None,
+        run_queue: None,
+    };
+    let run = crate::agent::tinyagents::host::OpenHumanRunContext::new()
+        .with_parent(parent)
+        .into_tinyagents(tinyagents_harness::context::RunConfig::new("scope-refusal")
+            .with_thread("scope-refusal-parent"));
+    let result = SpawnAsyncSubagentDispatch::new(Arc::new(SpawnAsyncSubagentTool::new()))
+        .execute(
+            &(),
+            tinyagents_harness::ids::CallId::new("scope-refusal-spawn"),
+            serde_json::json!({"agent_id": "task_manager_agent", "prompt": "deterministic fixture"}),
+            tinytools::ToolCallOptions::default(),
+            &run,
+        )
+        .await
+        .expect("tool dispatch reports a refusal as a tool outcome");
+    let sessions = SubagentSessionStore::new(workspace.path().to_path_buf()).load().unwrap();
+    assert!(result.is_error, "unscoped spawn must not report accepted: {}", result.output());
+    assert!(result.output().contains("scope"), "typed refusal must explain missing scope");
+    assert!(sessions.is_empty(), "refused spawn must not create durable sessions: {sessions:?}");
+    assert!(roster(PARENT).is_empty());
+}
+
 #[tokio::test]
 async fn same_parent_rosters_are_profile_isolated() {
     if !child("same_parent_rosters_are_profile_isolated", Mode::Saas) {
