@@ -431,6 +431,9 @@ impl McpConfiguredClient {
         let Some(client) = Self::retire_cached_client(&key) else {
             return Self::finish_cleanup(&key, None, reservation);
         };
+        if let Some(cleaned) = Self::finish_closed_client_synchronously(&key, &client, &reservation) {
+            return cleaned;
+        }
         Self::close_retired_client(key, client, reservation).await
     }
 
@@ -444,6 +447,9 @@ impl McpConfiguredClient {
             Self::finish_cleanup(&key, None, reservation);
             return;
         };
+        if Self::finish_closed_client_synchronously(&key, &client, &reservation).is_some() {
+            return;
+        }
         let Ok(runtime) = tokio::runtime::Handle::try_current() else {
             return;
         };
@@ -469,6 +475,9 @@ impl McpConfiguredClient {
             }
             return;
         };
+        if Self::finish_closed_client_synchronously(&key, &client, &reservation).is_some() {
+            return;
+        }
         let Ok(runtime) = tokio::runtime::Handle::try_current() else {
             return;
         };
@@ -577,6 +586,21 @@ impl McpConfiguredClient {
         let client = clients.get(data_dir)?;
         client.retiring.store(true, Ordering::Release);
         Some(Arc::clone(client))
+    }
+
+    fn finish_closed_client_synchronously(
+        data_dir: &std::path::Path,
+        client: &Arc<Self>,
+        reservation: &Arc<CleanupReservation>,
+    ) -> Option<bool> {
+        let Ok(state) = client.state.try_lock() else {
+            return None;
+        };
+        let is_closed = matches!(&*state, State::Closed);
+        drop(state);
+        is_closed.then(|| {
+            Self::finish_cleanup(data_dir, Some(Arc::clone(client)), Arc::clone(reservation))
+        })
     }
 
     async fn close_retired_client(
