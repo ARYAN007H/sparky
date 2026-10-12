@@ -210,10 +210,10 @@ async fn released_artifact_serves_providers_and_confidential_local_preparation()
     config
         .modules
         .overrides
-        .push(crate::config::schema::ModuleOverride {
-            id: "tinyhosts".to_owned(),
-            path: artifact.to_string_lossy().into_owned(),
-        });
+        .push(crate::config::schema::ModuleOverride::with_path(
+            "tinyhosts",
+            artifact.to_string_lossy().into_owned(),
+        ));
     let account = Account::connect_with_config("vercel", "fixture-api-key", None, config)
         .expect("account configuration");
     let workspace = workspace

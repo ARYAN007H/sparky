@@ -25,10 +25,10 @@ fn fresh_workspace_config() -> (tempfile::TempDir, Config) {
         modules: openhuman_core::config::schema::ModulesConfig {
             enabled: true,
             allow_download: false,
-            overrides: vec![ModuleOverride {
-                id: "tinymcp".into(),
-                path: artifact.to_string_lossy().into_owned(),
-            }],
+            overrides: vec![ModuleOverride::with_path(
+                "tinymcp",
+                artifact.to_string_lossy().into_owned(),
+            )],
             ..Default::default()
         },
         ..Config::default()

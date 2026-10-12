@@ -551,23 +551,43 @@ async fn disabled_modules_are_reported_then_demoted_at_product_boundaries() {
 }
 
 #[test]
-fn native_juice_fixture_is_resolved_without_a_unit_test_adapter() {
-    let fixture = std::path::PathBuf::from("fixture/libtinyjuice_module.so");
-    let _env = crate::config::test_env::EnvVarGuard::locked_set("TINYJUICE_TEST_MODULE", &fixture);
-    assert_eq!(
-        local_override(&Config::default(), "tinyjuice"),
-        Some(fixture)
-    );
-    let mut configured = Config::default();
-    configured
+fn status_reports_the_source_that_serves_a_module() {
+    use crate::config::schema::ModuleSourceMode;
+    use crate::modules::types::ModuleSource;
+
+    let mut config = Config::default();
+    let status = |config: &Config| {
+        list(config)
+            .into_iter()
+            .find(|m| m.id == "tinyjuice")
+            .expect("tinyjuice is registered")
+    };
+    if let Some(source) = status(&config).source {
+        assert_eq!(source, ModuleSource::Release);
+    }
+    assert_eq!(status(&config).detail, None);
+
+    // A linked request in a binary with no linked factory is served by the
+    // release, and the status says why without naming a path.
+    config.modules.source = ModuleSourceMode::Linked;
+    let fallback = status(&config);
+    assert_ne!(fallback.source, Some(ModuleSource::Linked));
+    let detail = fallback.detail.expect("fallback is visible in detail");
+    assert!(detail.contains("release"), "{detail}");
+    assert!(!detail.contains('/'), "{detail}");
+
+    // A path override is reported as a local file.
+    let mut config = Config::default();
+    config
         .modules
         .overrides
-        .push(crate::config::schema::ModuleOverride {
-            id: "tinyjuice".into(),
-            path: "explicit/libtinyjuice_module.so".into(),
-        });
-    assert_eq!(
-        local_override(&configured, "tinyjuice"),
-        Some("explicit/libtinyjuice_module.so".into())
-    );
+        .push(crate::config::schema::ModuleOverride::with_path(
+            "tinyjuice",
+            "/dev/libtinyjuice_module.so",
+        ));
+    let local = status(&config);
+    assert_ne!(local.source, Some(ModuleSource::Release));
+    if let Some(source) = local.source {
+        assert_eq!(source, ModuleSource::LocalFile);
+    }
 }

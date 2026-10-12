@@ -228,10 +228,10 @@ async fn released_module_serves_permissions_and_confidential_target_validation()
     config
         .modules
         .overrides
-        .push(crate::config::schema::ModuleOverride {
-            id: "tinycomputer".into(),
-            path: std::path::PathBuf::from(artifact).to_str().unwrap().into(),
-        });
+        .push(crate::config::schema::ModuleOverride::with_path(
+            "tinycomputer",
+            std::path::PathBuf::from(artifact).to_str().unwrap(),
+        ));
     let client = AccessibilityClient::new(&config);
     let permissions = client.permissions().await.expect("native permission query");
     assert_eq!(permissions.accessibility, PermissionState::Unsupported);
