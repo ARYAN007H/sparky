@@ -101,3 +101,7 @@ pub fn put_read(server_id: &str, uri: &str, resource: UiResource) {
         },
     );
 }
+
+#[cfg(test)]
+#[path = "cache_tests.rs"]
+mod tests;
