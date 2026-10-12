@@ -18,6 +18,7 @@ const signature = (entry) =>
 /** Source declarations only: includes aliases and lazy_static!, not macro expansion. */
 export function declarations(text, file) {
   const code = stripRustComments(text);
+  const signatureCode = stripRustComments(text, { preserveLiterals: true });
   const found = [];
   const pattern =
     /(?<!')\bstatic\s+(?:(mut|ref)\s+)?((?:r#)?[_\p{ID_Start}][_\p{ID_Continue}]*)\s*:(?!:)/gu;
@@ -49,7 +50,7 @@ export function declarations(text, file) {
     }
     if (end === code.length)
       throw new Error(`${file}: cannot parse static ${match[2]}`);
-    const type = code.slice(start, end).replace(/\s+/g, "");
+    const type = signatureCode.slice(start, end).replace(/\s+/g, "");
     if (!type) throw new Error(`${file}: static ${match[2]} has no type`);
     found.push({
       file,
@@ -71,7 +72,7 @@ function counts(entries) {
 }
 
 /** Require exact, non-stale ownership records for added or changed declaration types. */
-export function reviewChanges(before, after, approvals) {
+export function reviewChanges(before, after, approvals, previousApprovals = []) {
   if (!Array.isArray(approvals))
     throw new Error("process-statics.json must contain an array");
   const oldCounts = counts(before);
@@ -114,6 +115,12 @@ export function reviewChanges(before, after, approvals) {
       );
     }
   }
+  for (const entry of previousApprovals) {
+    const key = signature(entry);
+    if (newCounts.has(key) && !reviewed.has(key)) {
+      errors.push(`Prior ownership record must remain while its declaration survives: ${key}`);
+    }
+  }
   return errors;
 }
 
@@ -146,10 +153,10 @@ export function checkRepository(root, baseRef) {
     );
   }
   const previousFiles = git(["ls-tree", "-r", "--name-only", base, "--", CORE])
-    .split("\n")
+    .split("\0")
     .filter(production);
-  const currentFiles = git(["ls-files", "--", CORE])
-    .split("\n")
+  const currentFiles = git(["ls-files", "-z", "--", CORE])
+    .split("\0")
     .filter(production);
   if (!currentFiles.length)
     throw new Error(
@@ -162,10 +169,13 @@ export function checkRepository(root, baseRef) {
     declarations(readFileSync(resolve(root, file), "utf8"), file),
   );
   const approvals = JSON.parse(readFileSync(resolve(root, MANIFEST), "utf8"));
+  const hasPreviousManifest = git(["ls-tree", "--name-only", base, "--", MANIFEST]);
+  const previousApprovals = hasPreviousManifest ? JSON.parse(git(["show", `${base}:${MANIFEST}`])) : [];
+  if (!Array.isArray(previousApprovals)) throw new Error("Base ownership manifest must contain an array");
   return {
     base,
     files: currentFiles.length,
-    errors: reviewChanges(before, after, approvals),
+    errors: reviewChanges(before, after, approvals, previousApprovals),
   };
 }
 

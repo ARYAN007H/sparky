@@ -127,8 +127,9 @@ export const HOST_RPC_INTERNAL_PATTERNS = [
  * Blank out Rust comments and string literals (contents only), keeping line
  * structure, so a banned path quoted in a doc, log message or fixture is not
  * mistaken for code. Handles nested block comments, escapes and raw strings.
+ * Optional literal preservation supports type signatures; default masking is unchanged.
  */
-export function stripRustComments(text) {
+export function stripRustComments(text, { preserveLiterals = false } = {}) {
   let out = '';
   let i = 0;
   const blank = chunk => chunk.replace(/[^\n]/g, ' ');
@@ -159,15 +160,15 @@ export function stripRustComments(text) {
       const close = '"' + m[1];
       const end = text.indexOf(close, i + m[0].length);
       const stop = end === -1 ? text.length : end + close.length;
-      out += blank(text.slice(i, stop));
+      out += preserveLiterals ? text.slice(i, stop) : blank(text.slice(i, stop));
       i = stop;
     } else if ((m = /^b?'(?:\\(?:x[0-9a-fA-F]{2}|u\{[0-9a-fA-F]+\}|.)|[^\\'])'/.exec(rest))) {
-      out += blank(m[0]);
+      out += preserveLiterals ? m[0] : blank(m[0]);
       i += m[0].length;
     } else if (rest.startsWith('"') || rest.startsWith('b"')) {
       let j = i + (rest.startsWith('b') ? 2 : 1);
       while (j < text.length && text[j] !== '"') j += text[j] === '\\' ? 2 : 1;
-      out += blank(text.slice(i, j + 1));
+      out += preserveLiterals ? text.slice(i, j + 1) : blank(text.slice(i, j + 1));
       i = j + 1;
     } else {
       out += text[i];

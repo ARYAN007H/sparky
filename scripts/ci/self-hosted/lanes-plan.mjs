@@ -235,7 +235,7 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
         {
           name: "process-statics",
           when: true,
-          run: "node scripts/ci/check-process-statics.mjs",
+          run: "bash scripts/ci-cancel-aware.sh node scripts/ci/check-process-statics.mjs",
         },
         {
           name: "module-boundaries",
