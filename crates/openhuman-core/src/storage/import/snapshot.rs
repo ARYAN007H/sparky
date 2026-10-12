@@ -3,7 +3,7 @@
 //! Reading a SQLite file opens it for writing as far as the legacy readers
 //! are concerned (they create missing tables and migrate an old schema), and
 //! the storage driver declares its own tables on open. Neither may touch a
-//! user's real file, so the importer reads a byte copy in a scratch
+//! user's real file, so the importer reads a consistent snapshot in a scratch
 //! directory laid out like the workspace.
 
 use std::path::{Path, PathBuf};
@@ -13,9 +13,10 @@ use tempfile::TempDir;
 use tinystoragedrivers::CollectionSpec;
 
 use super::Record;
+use crate::storage::rusqlite;
 
-/// A copy of one legacy database (with its `-wal` / `-shm` files, so
-/// uncheckpointed writes are seen) inside a scratch workspace. Removed on
+/// A consistent snapshot of one legacy database (WAL contents included)
+/// inside a scratch workspace. Removed on
 /// drop.
 pub struct Snapshot {
     dir: TempDir,
@@ -40,14 +41,16 @@ impl Snapshot {
             std::fs::create_dir_all(parent)
                 .with_context(|| format!("create {}", parent.display()))?;
         }
-        std::fs::copy(source, &db).with_context(|| format!("copy {}", source.display()))?;
-        for suffix in ["-wal", "-shm"] {
-            let extra = companion(source, suffix);
-            if extra.is_file() {
-                std::fs::copy(&extra, companion(&db, suffix))
-                    .with_context(|| format!("copy {}", extra.display()))?;
-            }
-        }
+        // `VACUUM INTO` is a SQLite-consistent read: the main file and the
+        // WAL are seen as one committed state, which two separate file
+        // copies could not guarantee while a writer checkpoints.
+        let src = rusqlite::Connection::open_with_flags(
+            source,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )
+        .with_context(|| format!("open {} read-only", source.display()))?;
+        src.execute("VACUUM INTO ?1", [db.to_string_lossy().as_ref()])
+            .with_context(|| format!("snapshot {}", source.display()))?;
         Ok(Self { dir, db })
     }
 
