@@ -105,12 +105,22 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
                     call.arguments = arguments.clone();
                     context.arguments = arguments;
                 }
+                // A refusal is the model's answer, not a failure of the run:
+                // `ToolFailed` hands it back as a failed tool result and the
+                // turn carries on, as `ToolHookDecision::Deny` documents.
                 crate::agent::hooks::ToolHookDecision::Deny(reason) => {
-                    return Err(tinyagents_harness::error::TinyAgentsError::Tool(format!(
-                        "tool hook '{}' denied {}: {reason}",
-                        hook.name(),
-                        context.tool_name
-                    )));
+                    tracing::debug!(
+                        hook = hook.name(),
+                        tool = context.tool_name,
+                        "[tinyagents::mw] tool hook denied the call"
+                    );
+                    return Err(tinyagents_harness::error::TinyAgentsError::ToolFailed(
+                        format!(
+                            "tool hook '{}' denied {}: {reason}",
+                            hook.name(),
+                            context.tool_name
+                        ),
+                    ));
                 }
                 // There is no approval channel inside a middleware, and a hook
                 // that asks for a human is asking for something stricter than
@@ -124,11 +134,13 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
                         "[tinyagents::mw] tool hook requested approval; denying in a \
                          non-interactive middleware"
                     );
-                    return Err(tinyagents_harness::error::TinyAgentsError::Tool(format!(
-                        "tool hook '{}' requires approval for {}: {reason}",
-                        hook.name(),
-                        context.tool_name
-                    )));
+                    return Err(tinyagents_harness::error::TinyAgentsError::ToolFailed(
+                        format!(
+                            "tool hook '{}' requires approval for {}: {reason}",
+                            hook.name(),
+                            context.tool_name
+                        ),
+                    ));
                 }
             }
         }
