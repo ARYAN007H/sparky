@@ -1,4 +1,5 @@
 use super::*;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
 use serde_json::json;
@@ -22,6 +23,7 @@ struct Env {
     profile: Mutex<Option<String>>,
     grants: HashMap<&'static str, StorageGrant>,
     fences: Mutex<Option<Arc<crate::storage::fence::FenceRegistry>>>,
+    keys_ready: AtomicBool,
 }
 
 #[async_trait]
@@ -44,6 +46,9 @@ impl Environment for Env {
     }
 
     fn keys(&self) -> Result<Arc<dyn KeyProvider>, StorageError> {
+        if !self.keys_ready.load(Ordering::SeqCst) {
+            return Err(StorageError::Backend("key provider unavailable".into()));
+        }
         Ok(Arc::new(DerivedKeys::new(Zeroizing::new([7u8; 32]))))
     }
 
@@ -101,6 +106,7 @@ fn rig() -> Rig {
         profile: Mutex::new(None),
         grants: HashMap::from([("alpha", grant("notes")), ("beta", grant("other"))]),
         fences: Mutex::new(None),
+        keys_ready: AtomicBool::new(true),
     });
     let directory = Directory(HashMap::from([
         (":1.1".into(), "alpha".into()),
@@ -127,6 +133,7 @@ fn rig_with(module: &'static str, grant: StorageGrant) -> Rig {
         profile: Mutex::new(None),
         grants: HashMap::from([(module, grant)]),
         fences: Mutex::new(None),
+        keys_ready: AtomicBool::new(true),
     });
     let trail = Arc::new(Trail::default());
     Rig {
@@ -280,6 +287,7 @@ async fn two_modules_granted_the_same_collection_name_do_not_share_documents() {
         profile: Mutex::new(None),
         grants: HashMap::from([("alpha", grant("notes")), ("beta", grant("notes"))]),
         fences: Mutex::new(None),
+        keys_ready: AtomicBool::new(true),
     });
     let directory = Directory(HashMap::from([
         (":1.1".into(), "alpha".into()),
@@ -584,6 +592,7 @@ async fn a_read_only_grant_cannot_write() {
         profile: Mutex::new(None),
         grants: HashMap::from([("alpha", read_only)]),
         fences: Mutex::new(None),
+        keys_ready: AtomicBool::new(true),
     });
     let host = StorageHost::new(
         Arc::new(Directory(HashMap::from([(":1.1".into(), "alpha".into())]))),
@@ -612,6 +621,7 @@ async fn an_invalid_grant_is_never_bound() {
         profile: Mutex::new(None),
         grants: HashMap::from([("alpha", bad)]),
         fences: Mutex::new(None),
+        keys_ready: AtomicBool::new(true),
     });
     let host = StorageHost::new(
         Arc::new(Directory(HashMap::from([(":1.1".into(), "alpha".into())]))),
@@ -687,3 +697,22 @@ async fn every_call_is_audited_without_its_payload() {
 
 #[path = "storage_host_bus_tests.rs"]
 mod bus;
+
+#[tokio::test]
+async fn a_key_provider_failure_at_bind_is_retried_not_cached() {
+    let rig = rig();
+    rig.env.keys_ready.store(false, Ordering::SeqCst);
+    let set = json!({"name": "token.a", "value": [1]});
+    let call_set = || {
+        rig.host.handle(
+            Object::Secrets,
+            "Set",
+            set.clone(),
+            Some(&alpha()),
+            Admission::Confidential,
+        )
+    };
+    assert!(call_set().await.is_err());
+    rig.env.keys_ready.store(true, Ordering::SeqCst);
+    call_set().await.unwrap();
+}
