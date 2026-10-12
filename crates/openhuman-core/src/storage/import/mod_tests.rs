@@ -40,7 +40,9 @@ fn workspace() -> (TempDir, Config, Config) {
     (dir, classic, plain)
 }
 
-/// Every file under `root` with a digest of its bytes.
+/// Every file under `root` with a digest of its bytes. SQLite's `-shm`
+/// index and an empty `-wal` are connection bookkeeping a read-only open may
+/// create; they hold no data and are left out.
 fn tree(root: &Path) -> BTreeMap<String, String> {
     fn walk(dir: &Path, root: &Path, out: &mut BTreeMap<String, String>) {
         for entry in std::fs::read_dir(dir).unwrap() {
@@ -48,7 +50,12 @@ fn tree(root: &Path) -> BTreeMap<String, String> {
             if path.is_dir() {
                 walk(&path, root, out);
             } else {
-                let digest = sha2::Sha256::digest(std::fs::read(&path).unwrap());
+                let bytes = std::fs::read(&path).unwrap();
+                let name = path.to_string_lossy();
+                if name.ends_with("-shm") || (name.ends_with("-wal") && bytes.is_empty()) {
+                    continue;
+                }
+                let digest = sha2::Sha256::digest(bytes);
                 out.insert(
                     path.strip_prefix(root).unwrap().display().to_string(),
                     hex::encode(digest),
