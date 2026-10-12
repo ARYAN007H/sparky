@@ -323,10 +323,10 @@ pub(crate) fn migrate_components_with(config: &mut Config, raw: &str, tinymemes:
         .and_then(toml::Value::as_str)
         .is_some_and(|e| e.trim().eq_ignore_ascii_case("none"));
     disable(config, "memory", engine_none.then_some(false));
-    let memes_off = tinymemes
+    let memes_on = tinymemes
         .filter(|v| !v.trim().is_empty())
-        .map(|v| !matches!(crate::tinymemes::mode_from_flag(Some(v)), true));
-    disable(config, "memes", memes_off.map(|off| !off));
+        .map(crate::tinymemes::flag_enabled);
+    disable(config, "memes", memes_on);
     if !moved.is_empty() {
         tracing::info!(
             "[config][migrate] legacy switches moved to [components]: {}",
