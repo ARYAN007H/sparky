@@ -308,7 +308,7 @@ async fn pinned_loader_serves_the_published_tinybox_release() {
 
     crate::modules::ops::ensure_loaded(&config, MODULE_ID)
         .await
-        .expect("the OpenHuman release registry and TinyBus loader admit v0.1.20");
+        .expect("the OpenHuman release registry and TinyBus loader admit v0.1.24");
     let capabilities = super::capabilities(&config)
         .await
         .expect("the loaded release serves TinyBus capabilities");
