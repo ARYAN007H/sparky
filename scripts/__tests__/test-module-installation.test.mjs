@@ -44,6 +44,7 @@ test("locally built native Rust test modules come from build.mjs, not ad hoc car
   assert.match(source, /modules\/stage-local-modules\.sh/);
   assert.match(source, /stage_source_modules "\$\{local_source_ids\[@\]\}"/);
   assert.match(source, /target\/module-sources\/tinyconnectors/);
+  assert.match(source, /stage_release_module tinyconnectors/);
   assert.doesNotMatch(source, /cargo build/, "no hand-rolled module build");
   assert.doesNotMatch(source, /--target-dir|native-test-modules/);
   assert.doesNotMatch(
@@ -335,3 +336,17 @@ for (const runner of ["test-rust-with-mock.sh", "test-rust-e2e.sh"]) {
     }
   });
 }
+
+test("the CI installer builds nothing: every module, tinyconnectors included, is a registry release", () => {
+  const source = readFileSync(installer, "utf8");
+  assert.doesNotMatch(source, /cargo build|cargo-cancel|--target-dir/);
+  assert.doesNotMatch(source, /stage-connector-test-module|modules\.toml/);
+  const assets = resolveTestModuleAssets(
+    readRegistrySource(),
+    "ubuntu-22.04-x86_64",
+  );
+  const connectors = assets.find((asset) => asset.id === "tinyconnectors");
+  assert.ok(connectors, "the installer resolves tinyconnectors from the registry");
+  assert.match(connectors.sha256, /^[a-f0-9]{64}$/);
+  assert.match(connectors.url, /\/releases\/download\/v\d+\.\d+\.\d+\//);
+});
