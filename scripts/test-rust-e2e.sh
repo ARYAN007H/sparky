@@ -194,16 +194,18 @@ else
   done
 fi
 
-# Module-backed Composio coverage must use the pinned local artifact as well.
-# Without it the core resolves TinyConnectors through release metadata, turning
-# an otherwise hermetic mock-backend suite into a network dependency and
-# permanently faulting that process when the lookup fails. The isolated
-# module-admission suite likewise needs a real native search module; never fall
-# back to release downloads in a test. build.mjs stages each library with a
-# modules.toml carrying the operator-trust digest.
-echo "[rust-e2e] Building pinned local test modules: ${e2e_source_ids[*]} ..."
-stage_source_modules "${e2e_source_ids[@]}"
-for source_id in "${e2e_source_ids[@]}"; do
+# Module-backed Composio coverage must use a staged artifact as well. Without
+# it the core resolves TinyConnectors through release metadata at run time,
+# turning an otherwise hermetic mock-backend suite into a network dependency
+# and permanently faulting that process when the lookup fails. The isolated
+# module-admission suite likewise needs a real native search module. The
+# released archives are staged above (digest-verified); only the local
+# OPENHUMAN_MODULE_SOURCE=source mode builds anything, through build.mjs.
+if [ "${#e2e_source_ids[@]}" -gt 0 ]; then
+  echo "[rust-e2e] Building pinned local test modules: ${e2e_source_ids[*]} ..."
+  stage_source_modules "${e2e_source_ids[@]}"
+fi
+for source_id in ${e2e_source_ids[@]+"${e2e_source_ids[@]}"}; do
   export OPENHUMAN_MODULE_PATH="$REPO_ROOT/target/module-sources/$source_id${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
 done
 

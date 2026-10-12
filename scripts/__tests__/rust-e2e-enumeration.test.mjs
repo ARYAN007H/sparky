@@ -243,7 +243,7 @@ test("mcp_registry_e2e runs serially because its module state is process-global"
   );
 });
 
-test("the E2E runner builds its search and connector fixtures and puts them on the module path", () => {
+test("the E2E runner stages released search and connector fixtures, and builds only in local source mode", () => {
   const source = fs.readFileSync(runner, "utf8");
   const start = source.indexOf("# Module-backed Composio coverage");
   const end = source.indexOf('echo "[rust-e2e] Running', start);
