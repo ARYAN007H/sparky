@@ -333,7 +333,7 @@ run_full_suite() {
   # the published contract in a fresh libtest process with its pinned artifact.
   TINYCONNECTORS_TEST_MODULE="${TINYCONNECTORS_TEST_MODULE:-$connectors_module}" \
     cargo_test --lib \
-      hosting::hosting_tests::released_artifact_serves_providers_and_confidential_local_preparation \
+      hosting::test::released_artifact_serves_providers_and_confidential_local_preparation \
       -- --exact --ignored --test-threads=1
 }
 

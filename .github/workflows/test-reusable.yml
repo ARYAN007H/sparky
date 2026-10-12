@@ -288,7 +288,7 @@ jobs:
           # above.
           bash scripts/ci-cancel-aware.sh cargo test -p openhuman --lib \
             --features "${CORE_FEATURES}" \
-            hosting::hosting_tests::released_artifact_serves_providers_and_confidential_local_preparation \
+            hosting::test::released_artifact_serves_providers_and_confidential_local_preparation \
             -- --exact --ignored --test-threads=1
 
   rust-core-tests-windows:
