@@ -431,7 +431,8 @@ impl McpConfiguredClient {
         let Some(client) = Self::retire_cached_client(&key) else {
             return Self::finish_cleanup(&key, None, reservation);
         };
-        if let Some(cleaned) = Self::finish_closed_client_synchronously(&key, &client, &reservation) {
+        if let Some(cleaned) = Self::finish_closed_client_synchronously(&key, &client, &reservation)
+        {
             return cleaned;
         }
         Self::close_retired_client(key, client, reservation).await
