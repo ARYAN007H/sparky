@@ -95,7 +95,7 @@ fn complete_with_guard<T>(
 ) -> T {
     // Releasing the last guard permits a new runtime with another agent map
     // to reopen this workspace. Keep admission reserved through the callback.
-    let _guard = guard.take();
+    let _guard = guard.as_ref();
     complete()
 }
 
