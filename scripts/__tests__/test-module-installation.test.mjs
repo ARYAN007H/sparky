@@ -215,10 +215,12 @@ for (const [runner, archiveVariable, directoryVariable] of [
   });
 }
 
-
 for (const runner of ["test-rust-with-mock.sh", "test-rust-e2e.sh"]) {
   test(`${runner} supplies the TinyMCP artifact and executes ignored registry cases`, () => {
-    const source = readFileSync(new URL(`../${runner}`, import.meta.url), "utf8");
+    const source = readFileSync(
+      new URL(`../${runner}`, import.meta.url),
+      "utf8",
+    );
     const setupStart = source.indexOf('tinymcp_asset="');
     assert.ok(setupStart >= 0, "runner prepares the pinned TinyMCP fixture");
     const setupEnd = source.indexOf("\n\n", setupStart);
@@ -240,7 +242,9 @@ for (const runner of ["test-rust-with-mock.sh", "test-rust-e2e.sh"]) {
       if (runner === "test-rust-with-mock.sh") {
         const start = source.indexOf("run_full_suite() {");
         const end = source.indexOf("\n}\n", start);
-        const directStart = source.indexOf('elif [ "$#" -ge 2 ] && [ "$1" = "--test" ] && [ "$2" = "mcp_registry_e2e" ]');
+        const directStart = source.indexOf(
+          'elif [ "$#" -ge 2 ] && [ "$1" = "--test" ] && [ "$2" = "mcp_registry_e2e" ]',
+        );
         const directEnd = source.indexOf("\nelse\n", directStart);
         invocation = [
           "integration_test_targets() { echo mcp_registry_e2e; }",
@@ -256,41 +260,63 @@ for (const runner of ["test-rust-with-mock.sh", "test-rust-e2e.sh"]) {
         const start = source.indexOf('  if [ "$suite" = "mcp_registry_e2e" ]');
         const end = source.indexOf('  if [ "$HAS_EXTRA_ARGS"', start);
         invocation = [
-          'suite=mcp_registry_e2e',
-          'CARGO_BIN=cargo_test',
-          'EXTRA_ARGS=(--nocapture)',
+          "suite=mcp_registry_e2e",
+          "CARGO_BIN=cargo_test",
+          "EXTRA_ARGS=(--nocapture)",
           'bash() { shift; "$@"; }',
           "for once in 1; do",
           source.slice(start, end),
           "done",
         ].join("\n");
       }
-      const result = spawnSync("bash", ["-c", [
-        "set -euo pipefail",
-        'REPO_ROOT="$TEST_ROOT"',
-        'SCRIPT_DIR="$TEST_ROOT"',
-        'wallet_platform=ubuntu-22.04-x86_64',
-        'module_platform=ubuntu-22.04-x86_64',
-        'module_ext=so',
-        'PRODUCT_FEATURES=mcp',
-        'connectors_module=unused',
-        "node() { printf 'tinymcp\\tunused\\tmodule.tar.gz\\ttest-digest\\n'; }",
-        setup,
-        cargoStub,
-        invocation,
-      ].join("\n")], {
-        encoding: "utf8",
-        env: { ...process.env, TEST_ROOT: root, OPENHUMAN_TINYMCP_TEST_MODULE: "" },
-      });
+      const result = spawnSync(
+        "bash",
+        [
+          "-c",
+          [
+            "set -euo pipefail",
+            'REPO_ROOT="$TEST_ROOT"',
+            'SCRIPT_DIR="$TEST_ROOT"',
+            "wallet_platform=ubuntu-22.04-x86_64",
+            "module_platform=ubuntu-22.04-x86_64",
+            "module_ext=so",
+            "PRODUCT_FEATURES=mcp",
+            "connectors_module=unused",
+            "node() { printf 'tinymcp\\tunused\\tmodule.tar.gz\\ttest-digest\\n'; }",
+            setup,
+            cargoStub,
+            invocation,
+          ].join("\n"),
+        ],
+        {
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            TEST_ROOT: root,
+            OPENHUMAN_TINYMCP_TEST_MODULE: "",
+          },
+        },
+      );
       assert.equal(result.status, 0, result.stdout + result.stderr);
       const runs = result.stdout.split("ARTIFACT=").slice(1);
       assert.equal(runs.length, runner === "test-rust-with-mock.sh" ? 2 : 1);
       for (const run of runs) {
-        assert.equal(run.split("\n")[0], join(moduleDir, "libtinymcp_module.so"));
-        assert.match(run, /^ARG=--ignored$/m, "ignored cases must actually execute");
+        assert.equal(
+          run.split("\n")[0],
+          join(moduleDir, "libtinymcp_module.so"),
+        );
+        assert.match(
+          run,
+          /^ARG=--ignored$/m,
+          "ignored cases must actually execute",
+        );
         assert.match(run, /^ARG=--test-threads=1$/m);
       }
-      assert.match(runs.at(-1), /^ARG=--nocapture$/m, "caller arguments survive");
+      assert.match(
+        runs.at(-1),
+        /^ARG=--nocapture$/m,
+        "caller arguments survive",
+      );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
