@@ -25,17 +25,26 @@ export function declarations(text, file) {
     let end = match.index + match[0].length;
     const start = end;
     const stack = [];
+    const arrayLengths = new Set();
     for (; end < code.length; end++) {
       const char = code[end];
       if (!stack.length && (char === "=" || char === ";")) break;
-      // Operators inside a braced const expression are not type brackets.
-      if ((char === "<" || char === ">") && stack.includes("{")) continue;
+      if (char === ";" && stack.at(-1) === "[") arrayLengths.add(stack.length);
+      // Operators in const blocks and array lengths are not type brackets.
+      if (
+        (char === "<" || char === ">") &&
+        (stack.includes("{") || arrayLengths.size)
+      )
+        continue;
       if ("<([{".includes(char)) stack.push(char);
       else if (">)]}".includes(char) && stack.length) {
         // An arrow inside a function type is not a generic closing bracket.
         if (char === ">" && code[end - 1] === "-") continue;
         const expected = { ">": "<", ")": "(", "]": "[", "}": "{" }[char];
-        if (stack.at(-1) === expected) stack.pop();
+        if (stack.at(-1) === expected) {
+          arrayLengths.delete(stack.length);
+          stack.pop();
+        }
       }
     }
     if (end === code.length)
