@@ -34,6 +34,10 @@
 #[path = "registry_tests.rs"]
 mod tests;
 
+#[cfg(all(test, feature = "modules"))]
+#[path = "registry_contract_tests.rs"]
+mod contract_tests;
+
 mod records_computer;
 mod records_docs_wallet;
 mod records_extra;
