@@ -114,115 +114,9 @@ pub(crate) trait McpModulePort: Send + Sync {
     }
 }
 
-struct TinyMcpPort {
-    root: ModuleClient,
-}
-
-#[async_trait]
-impl McpModulePort for TinyMcpPort {
-    async fn open_configured(
-        &self,
-        data_dir: &str,
-        config: &McpClientConfig,
-    ) -> Result<OpenConfiguredResponse, ModuleCallError> {
-        self.root
-            .call_confidential(
-                MODULE,
-                names::methods::OPEN_CONFIGURED,
-                (OpenConfiguredRequest {
-                    data_dir: data_dir.to_owned(),
-                    client: config.clone(),
-                },),
-            )
-            .await
-    }
-
-    async fn close(&self, data_dir: &str) -> Result<Option<String>, ModuleCallError> {
-        self.root
-            .call(MODULE, names::methods::CLOSE, (data_dir.to_owned(),))
-            .await
-    }
-
-    async fn transition_status(
-        &self,
-        transition_id: &str,
-    ) -> Result<TransitionStatus, ModuleCallError> {
-        self.root
-            .call(
-                MODULE,
-                names::methods::TRANSITION_STATUS,
-                (transition_id.to_owned(),),
-            )
-            .await
-    }
-
-    async fn call_object(
-        &self,
-        object_path: &str,
-        member: &str,
-        args: Value,
-        confidential: bool,
-    ) -> Result<Value, ModuleCallError> {
-        #[cfg(feature = "modules")]
-        {
-            let object = self.root.object_client(MODULE, object_path).await?;
-            if confidential {
-                object.call_confidential(member, args).await
-            } else {
-                object.call(member, args).await
-            }
-        }
-        #[cfg(not(feature = "modules"))]
-        {
-            let _ = (object_path, member, args, confidential);
-            Err(ModuleCallError::Unavailable)
-        }
-    }
-
-    async fn prepare_agent_tools(
-        &self,
-        request: PrepareAgentToolsRequest,
-    ) -> Result<Vec<McpToolPresentation>, ModuleCallError> {
-        self.root
-            .call(MODULE, names::methods::PREPARE_AGENT_TOOLS, (request,))
-            .await
-    }
-
-    async fn validate_server_arguments(
-        &self,
-        request: ValidateServerArgumentsRequest,
-    ) -> Result<ServerArgumentsValidation, ModuleCallError> {
-        self.root
-            .call_confidential(
-                MODULE,
-                names::methods::VALIDATE_SERVER_ARGUMENTS,
-                (request,),
-            )
-            .await
-    }
-
-    async fn normalize_tool_arguments(
-        &self,
-        arguments: Option<Value>,
-    ) -> Result<Map<String, Value>, ModuleCallError> {
-        self.root
-            .call_confidential(
-                MODULE,
-                names::methods::NORMALIZE_TOOL_ARGUMENTS,
-                (arguments,),
-            )
-            .await
-    }
-
-    async fn transform_text(
-        &self,
-        request: tinymcp_bus::TransformTextRequest,
-    ) -> Result<String, ModuleCallError> {
-        self.root
-            .call_confidential(MODULE, names::methods::TRANSFORM_TEXT, (request,))
-            .await
-    }
-}
+#[path = "module_port.rs"]
+mod module_port;
+use module_port::TinyMcpPort;
 
 /// One workspace's serialized TinyMCP lifecycle and private object proxy.
 pub(crate) struct McpConfiguredClient {
@@ -342,9 +236,7 @@ impl McpConfiguredClient {
             .to_owned();
         Ok(Self::with_port(
             data_dir,
-            Box::new(TinyMcpPort {
-                root: ModuleClient::new(config.clone()),
-            }),
+            Box::new(TinyMcpPort::new(ModuleClient::new(config.clone()))),
         ))
     }
 

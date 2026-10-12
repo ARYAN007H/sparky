@@ -53,13 +53,11 @@ async fn cancelled_close_retries_its_receipt_on_the_original_owner() {
             .unwrap();
     }
     original.request_name(names::INTERFACE).await.unwrap();
-    let port = TinyMcpPort {
-        root: ModuleClient::fixture(
+    let port = TinyMcpPort::new(ModuleClient::fixture(
             caller
                 .proxy(names::INTERFACE, names::OBJECT_PATH, names::INTERFACE)
                 .unwrap(),
-        ),
-    };
+        ));
     assert_eq!(
         port.transition_status("original-open").await,
         Ok(TransitionStatus::Complete)
@@ -134,7 +132,7 @@ async fn cleanup_receipts_stay_with_the_original_module_after_alias_replacement(
             .proxy(names::INTERFACE, names::OBJECT_PATH, names::INTERFACE)
             .unwrap(),
     );
-    let port = TinyMcpPort { root };
+    let port = TinyMcpPort::new(root);
     // Resolve the original owner through a real bus call. No secret is sent
     // to these deliberately unattested lifecycle fixtures.
     assert_eq!(
