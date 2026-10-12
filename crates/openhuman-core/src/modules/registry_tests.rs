@@ -394,12 +394,22 @@ fn every_digest_is_a_lowercase_sha256() {
 #[test]
 fn every_asset_name_carries_its_host_key_and_a_known_extension() {
     // tinybus selects the asset by exact name and requires a `.tar.gz` or
-    // `.zip` archive, so a name that does not match its key is a module that
-    // loads the wrong platform's library.
+    // `.zip` archive. Most archive platform stems match their host keys;
+    // TinyMCP's release uses the canonical `archlinux` stem for the rolling
+    // Arch host keys.
     for record in ALL {
         for asset in record.assets {
+            let archive_host_key = if record.id == "tinymcp" {
+                asset
+                    .host_key
+                    .strip_prefix("archlinux-rolling-")
+                    .map(|suffix| format!("archlinux-{suffix}"))
+                    .unwrap_or_else(|| asset.host_key.to_owned())
+            } else {
+                asset.host_key.to_owned()
+            };
             assert!(
-                asset.archive.contains(asset.host_key),
+                asset.archive.contains(&archive_host_key),
                 "{} asset {} does not name its host key {}",
                 record.id,
                 asset.archive,
