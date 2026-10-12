@@ -2,6 +2,7 @@
 
 use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec};
 
+#[cfg(feature = "documents")]
 /// The `tinydocs` module: document synthesis, bounded extraction, image facts,
 /// and PDF rendering.
 ///
@@ -81,6 +82,7 @@ pub(crate) const TINYDOCS: ModuleRecord = ModuleRecord {
     },
 };
 
+#[cfg(feature = "web3")]
 /// The `tinywallet` module: native wallet, Web3 quote, and x402 operations.
 ///
 /// Lazy for the same reason as [`TINYDOCS`], and more so: most sessions never

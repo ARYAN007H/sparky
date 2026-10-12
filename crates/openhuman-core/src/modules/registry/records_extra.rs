@@ -182,6 +182,7 @@ pub(crate) const TINYCHANNELS: ModuleRecord = ModuleRecord {
     },
 };
 
+#[cfg(feature = "hosting")]
 /// The `tinyhosts` module, loaded on demand.
 pub(crate) const TINYHOSTS: ModuleRecord = ModuleRecord {
     id: "tinyhosts",
