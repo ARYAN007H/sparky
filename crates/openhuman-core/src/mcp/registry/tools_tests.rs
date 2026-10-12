@@ -399,3 +399,27 @@ async fn tool_call_with_string_arguments_reaches_the_module_as_an_object() {
         &[json!({ "city": "Paris" })]
     );
 }
+
+#[tokio::test]
+async fn tool_call_without_arguments_reaches_the_module_as_an_empty_object() {
+    let dir = tempfile::tempdir().expect("temp workspace");
+    let config = workspace_config(dir.path());
+    let port = ToolCallPort {
+        connected: true,
+        ..ToolCallPort::default()
+    };
+    let arguments = SharedArc::clone(&port.arguments);
+    crate::mcp::module_client::McpConfiguredClient::install_test_port(&config, Box::new(port))
+        .expect("test module port");
+
+    let result = McpRegistryToolCallTool::new(Arc::clone(&config))
+        .execute(json!({
+            "server_id": "srv-1",
+            "tool_name": "forecast"
+        }))
+        .await
+        .expect("call");
+    assert!(!result.is_error, "{}", result.text());
+
+    assert_eq!(arguments.lock().unwrap().as_slice(), &[json!({})]);
+}

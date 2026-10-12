@@ -280,6 +280,15 @@ for suite in "${SUITES[@]}"; do
     run_in_process_modules
     continue
   fi
+  if [ "$suite" = "mcp_registry_e2e" ]; then
+    # The registry tests open several process-global module clients across
+    # workspaces. Parallel libtest threads can race their module lifecycle.
+    echo "[rust-e2e]   $CARGO_BIN test --manifest-path Cargo.toml --test $suite (serial)"
+    bash "$SCRIPT_DIR/ci-cancel-aware.sh" "$CARGO_BIN" test \
+      --manifest-path Cargo.toml --features "$PRODUCT_FEATURES" \
+      --test "$suite" -- --test-threads=1 ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
+    continue
+  fi
 
   if [ "${#EXTRA_ARGS[@]}" -gt 0 ]; then
     echo "[rust-e2e]   $CARGO_BIN test --manifest-path Cargo.toml --test $suite -- ${EXTRA_ARGS[*]}"

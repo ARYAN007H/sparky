@@ -204,9 +204,56 @@ fn module_selected_rpc_endpoints_are_public_http_urls_without_credentials() {
 }
 
 #[test]
-fn native_solana_approval_accepts_the_module_signed_message_for_its_quote() {
+fn native_solana_approval_accepts_the_exact_typed_transfer_for_its_quote() {
     let quote = PreparedTransaction {
         quote_id: "solana-native-quote".into(),
+        kind: PreparedKind::NativeTransfer,
+        chain: WalletChain::Solana,
+        evm_network: None,
+        from_address: "sender".into(),
+        to_address: "recipient".into(),
+        asset_symbol: "SOL".into(),
+        amount_raw: "1000".into(),
+        amount_formatted: "0.000001".into(),
+        receive_symbol: None,
+        min_receive_raw: None,
+        calldata: None,
+        token_address: None,
+        estimated_fee_raw: "5000".into(),
+        status: PreparedStatus::AwaitingConfirmation,
+        created_at_ms: 1,
+        expires_at_ms: u64::MAX,
+        notes: vec![],
+    };
+    let permit = ApprovalPermit::new(
+        ApprovalKind::Native,
+        &quote.quote_id,
+        Some(quote.clone()),
+        None,
+    );
+    let request = AuthorizeNativeWalletExecutionRequest {
+        quote_id: quote.quote_id.clone(),
+        operation: "transfer".into(),
+        quote: quote.clone(),
+        intent: NativeWalletExecutionIntent::Transaction {
+            transaction: TransactionSpec::Solana {
+                from: quote.from_address.clone(),
+                to: quote.to_address.clone(),
+                lamports: 1000,
+                recent_blockhash: "recent-blockhash".into(),
+            },
+        },
+    };
+
+    assert!(native_approval_matches_request(&quote, &request));
+    assert!(!consume_approval(ApprovalKind::Native, &quote.quote_id));
+    drop(permit);
+}
+
+#[test]
+fn native_solana_approval_rejects_an_unverified_signed_message() {
+    let quote = PreparedTransaction {
+        quote_id: "solana-native-opaque-quote".into(),
         kind: PreparedKind::NativeTransfer,
         chain: WalletChain::Solana,
         evm_network: None,
@@ -240,7 +287,7 @@ fn native_solana_approval_accepts_the_module_signed_message_for_its_quote() {
         },
     };
 
-    assert!(native_approval_matches_request(&quote, &request));
+    assert!(!native_approval_matches_request(&quote, &request));
     assert!(!consume_approval(ApprovalKind::Native, &quote.quote_id));
     drop(permit);
 }

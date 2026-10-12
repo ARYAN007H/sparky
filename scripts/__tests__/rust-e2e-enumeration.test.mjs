@@ -218,6 +218,19 @@ test("a failing case still fails the suite, and nothing after it runs", () => {
   assert.deepEqual(res.runs, [runOf("scenario_a")]);
 });
 
+test("mcp_registry_e2e runs serially because its module state is process-global", () => {
+  const source = fs.readFileSync(runner, "utf8");
+  const start = source.indexOf('if [ "$suite" = "mcp_registry_e2e" ]');
+  assert.ok(start >= 0, "MCP registry target has an explicit runner branch");
+  const end = source.indexOf("  if [ \"${#EXTRA_ARGS[@]}\" -gt 0 ]", start);
+  assert.ok(end > start, "MCP registry branch ends before the generic suite runner");
+  assert.match(
+    source.slice(start, end),
+    /--test-threads=1/,
+    "per-config module clients must not race through process-global state",
+  );
+});
+
 test("the E2E runner builds and exports its pinned search module fixture", () => {
   const source = fs.readFileSync(runner, "utf8");
   const start = source.indexOf("# Module-backed Composio coverage");
