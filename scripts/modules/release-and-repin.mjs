@@ -200,10 +200,14 @@ export async function repin(opts, deps = {}) {
     }
   }
 
-  const checks = ["check-module-pins.mjs", "check-submodule-monotonic.mjs"];
+  // The monotonic gate takes a base ref (default origin/main), not a root.
+  const checks = [
+    ["check-module-pins.mjs", [root]],
+    ["check-submodule-monotonic.mjs", []],
+  ];
   const failed = [];
-  for (const script of checks) {
-    const res = run("node", [join("scripts/ci", script), root], { cwd: root });
+  for (const [script, args] of checks) {
+    const res = run("node", [join("scripts/ci", script), ...args], { cwd: root });
     log(`${script}: ${res.code === 0 ? "ok" : "FAILED"}`);
     if (res.code !== 0) {
       failed.push(script);
