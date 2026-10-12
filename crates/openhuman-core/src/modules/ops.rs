@@ -13,7 +13,8 @@
 //!
 //! # Where an artifact comes from, and where it stays
 //!
-//! Resolution order is cheapest-first: already loaded, a developer's override,
+//! Resolution order is cheapest-first: already loaded, the configured source
+//! (`[modules] source`, per-module overrides; see [`super::source`]),
 //! the module search path, then the release cache. The cache is a directory per
 //! module version under [`install_dir`], filled by the first load — downloaded,
 //! verified against the digest in [`registry`], extracted — and re-verified from
@@ -35,8 +36,8 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use std::time::Duration;
 
-use super::types::{ModuleRecord, ModuleState, ModuleStatus};
-use super::{host, registry};
+use super::types::{ModuleRecord, ModuleSource, ModuleState, ModuleStatus};
+use super::{host, registry, source};
 use crate::config::Config;
 use tinybus::module::platform::host_candidates;
 use tinybus::module::resolution::{self, Claim, Resolution, ResolutionState, Waited};
@@ -277,11 +278,45 @@ async fn resolve(config: &Config, record: &'static ModuleRecord) -> Result<(), S
         return Ok(());
     }
 
-    // An override points at a developer's own build. Checked before the pinned
-    // release so a module can be iterated on against a live core.
-    if let Some(path) = local_override(config, record.id) {
-        let module_config = module_config(config, record.id);
-        return blocking(move || load_local(runtime, &path, record.id, module_config)).await;
+    // The configured source decides first: a developer's own build is checked
+    // before the pinned release so a module can be iterated on against a live
+    // core. `release` (the default) falls straight through to the chain below.
+    let plan = source::plan(config, record.id);
+    if let Some(reason) = plan.fallback {
+        log::warn!(
+            "[modules] id={} requested={} served=release: {reason}",
+            record.id,
+            plan.requested.as_str()
+        );
+    }
+    log::debug!(
+        "[modules] id={} requested={} served={:?}",
+        record.id,
+        plan.requested.as_str(),
+        plan.served
+    );
+    // `resolve` runs once per id per process, so this is one line per id.
+    if let Some(line) = source::pin_ahead_warning(
+        record.id,
+        plan.served,
+        std::env::var(source::PIN_AHEAD_ENV).ok().as_deref(),
+        cfg!(debug_assertions),
+    ) {
+        log::warn!("{line}");
+    }
+    match plan.served {
+        ModuleSource::LocalFile | ModuleSource::Source => {
+            if let Some(path) = plan.artifact {
+                let module_config = module_config(config, record.id);
+                return blocking(move || load_local(runtime, &path, record.id, module_config))
+                    .await;
+            }
+        }
+        ModuleSource::Linked => {
+            let module_config = module_config(config, record.id);
+            return blocking(move || load_linked(runtime, record.id, module_config)).await;
+        }
+        ModuleSource::Release => {}
     }
 
     // The search path tinybus itself honours, including OPENHUMAN_MODULE_PATH.
@@ -423,6 +458,39 @@ pub(super) fn load_local(
     }
 }
 
+/// Attach the module linked into this executable for `id`.
+///
+/// Runs the same descriptor, manifest, dependency and init checks as a
+/// released module, with the same private configuration; the executable's
+/// digest is the attestation. Errors carry static text only.
+pub(super) fn load_linked(
+    runtime: &host::ModuleRuntime,
+    id: &str,
+    module_config: serde_json::Value,
+) -> Result<(), String> {
+    let Some(factory) = super::linked::factory_for(id) else {
+        return Err(format!(
+            "module '{id}' is unavailable: no linked factory is registered in this binary"
+        ));
+    };
+    let module = factory().map_err(|err| {
+        log::warn!("[modules] linked factory for '{id}' failed: {err}");
+        format!("module '{id}' is unavailable: its linked factory could not be started")
+    })?;
+    match runtime
+        .host()
+        .attach_linked_with_config(module, module_config)
+    {
+        Ok(_) => {
+            log::info!("[modules] loaded '{id}' from the linked executable");
+            Ok(())
+        }
+        Err(err) => Err(format!(
+            "module '{id}' could not be attached from the linked executable: {err}"
+        )),
+    }
+}
+
 /// Configuration crossing into a first-party compiled module.
 ///
 /// Credentials are intentionally absent. TinyMemory calls back into the host
@@ -450,44 +518,6 @@ fn module_config(config: &Config, id: &str) -> serde_json::Value {
         });
     }
     serde_json::json!({})
-}
-
-/// A configured local artifact for `id`, if one is set.
-///
-/// The test fixture uses the same explicit-override path as a developer build,
-/// so TinyMemory is initialized with the host's real module configuration.
-/// Loading it through `OPENHUMAN_MODULE_PATH` would initialize it during boot
-/// before that configuration and its host callbacks are installed.
-fn local_override(config: &Config, id: &str) -> Option<PathBuf> {
-    let configured = config
-        .modules
-        .overrides
-        .iter()
-        .find_map(|entry| (entry.id == id).then(|| PathBuf::from(entry.path.clone())));
-
-    configured
-        .or_else(|| {
-            (id == super::search::MODULE_ID)
-                .then(|| std::env::var_os("TINYSEARCH_TEST_MODULE"))
-                .flatten()
-                .map(PathBuf::from)
-        })
-        .or_else(|| {
-            // Integration tests compile the core as a dependency, without
-            // cfg(test), so fixture routing belongs in this shared loader.
-            (id == "tinyjuice")
-                .then(|| std::env::var_os("TINYJUICE_TEST_MODULE"))
-                .flatten()
-                .map(PathBuf::from)
-        })
-        .or_else(|| {
-            // TinyConnectors exposes its contract to the host, but has no
-            // host-side module namespace: it is resolved by its registry ID.
-            (id == "tinyconnectors")
-                .then(|| std::env::var_os("TINYCONNECTORS_TEST_MODULE"))
-                .flatten()
-                .map(PathBuf::from)
-        })
 }
 
 /// Where downloaded artifacts are kept.
@@ -546,12 +576,16 @@ fn status_of(config: &Config, record: &ModuleRecord) -> ModuleStatus {
             }
         },
     };
+    let plan = source::plan(config, record.id);
+    let source = (state != ModuleState::Unsupported).then_some(plan.served);
+    let detail = detail.or_else(|| plan.fallback.map(str::to_string));
     ModuleStatus {
         id: record.id.to_string(),
         description: record.description.to_string(),
         version: record.version.to_string(),
         bus_name: record.bus_name.to_string(),
         state,
+        source,
         detail,
     }
 }

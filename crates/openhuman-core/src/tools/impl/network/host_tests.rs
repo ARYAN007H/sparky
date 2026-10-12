@@ -87,8 +87,8 @@ fn zero_limits_fall_back_to_the_http_request_config_defaults() {
 
 #[tokio::test]
 async fn tinyjuice_detects_and_converts_html() {
-    if std::env::var_os("TINYJUICE_TEST_MODULE").is_none() {
-        eprintln!("SKIPPED: released module fixture is not configured");
+    if crate::modules::local_artifact("tinyjuice").is_none() {
+        eprintln!("SKIPPED: no tinyjuice library (node scripts/modules/build.mjs tinyjuice)");
         return;
     }
     let page = "<!DOCTYPE html><html><body><p>hi</p></body></html>";

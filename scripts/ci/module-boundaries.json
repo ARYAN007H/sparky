@@ -99,6 +99,10 @@
       "owner": "https://github.com/tinyhumansai/tinybox"
     }
   ],
+  "linkedHost": {
+    "package": "openhuman-modules-linked",
+    "allowedParents": ["openhuman-cli"]
+  },
   "pendingContracts": [],
   "exceptions": [],
   "excludedSubsystems": [

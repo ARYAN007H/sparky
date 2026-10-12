@@ -16,6 +16,7 @@ members = [
     "crates/openhuman-cli",
     "crates/openhuman-core",
     "crates/openhuman-embed",
+    "crates/openhuman-modules-linked",
     "crates/openhuman-rpc",
     "crates/openhuman-tinyhumans",
     "crates/openhuman-tui",

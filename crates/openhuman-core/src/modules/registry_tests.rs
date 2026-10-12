@@ -693,3 +693,32 @@ fn voice_capture_release_pins_summary_contract_and_every_platform_digest() {
         assert_eq!(asset.sha256, digest);
     }
 }
+
+#[test]
+fn every_record_names_a_source_manifest_that_exists_in_its_submodule() {
+    let vendor = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../vendor");
+    for record in ALL {
+        let spec = &record.source;
+        assert!(!spec.package.is_empty(), "{}: package", record.id);
+        assert!(!spec.lib_name.is_empty(), "{}: lib_name", record.id);
+        assert_eq!(spec.submodule, record.id, "{}: submodule dir", record.id);
+        let manifest = vendor.join(spec.submodule).join(spec.manifest);
+        assert!(
+            manifest.is_file(),
+            "{}: source manifest {} is missing (is the submodule initialised?)",
+            record.id,
+            spec.manifest
+        );
+    }
+}
+
+#[test]
+fn source_artifact_file_names_follow_the_platform_convention() {
+    for record in ALL {
+        let name = record.source.artifact_filename();
+        assert!(name.contains(record.source.lib_name), "{}", record.id);
+        if cfg!(target_os = "linux") {
+            assert!(name.starts_with("lib") && name.ends_with(".so"), "{name}");
+        }
+    }
+}

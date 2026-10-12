@@ -1,6 +1,6 @@
 //! Registry records for additional first-party TinyBus modules.
 
-use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset};
+use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec};
 
 /// The `tinybox` module, loaded on demand.
 pub(crate) const TINYBOX: ModuleRecord = ModuleRecord {
@@ -98,6 +98,13 @@ pub(crate) const TINYBOX: ModuleRecord = ModuleRecord {
         },
     ],
     load: LoadPolicy::Lazy,
+    source: SourceSpec {
+        submodule: "tinybox",
+        manifest: "crates/tinybox-module/Cargo.toml",
+        package: "tinybox-module",
+        lib_name: "tinybox",
+        features: &[],
+    },
 };
 
 /// The `tinychannels` module, loaded on demand.
@@ -166,6 +173,13 @@ pub(crate) const TINYCHANNELS: ModuleRecord = ModuleRecord {
         },
     ],
     load: LoadPolicy::Lazy,
+    source: SourceSpec {
+        submodule: "tinychannels",
+        manifest: "crates/tinychannels-module/Cargo.toml",
+        package: "tinychannels-module",
+        lib_name: "tinychannels_module",
+        features: &[],
+    },
 };
 
 /// The `tinyhosts` module, loaded on demand.
@@ -234,4 +248,11 @@ pub(crate) const TINYHOSTS: ModuleRecord = ModuleRecord {
         },
     ],
     load: LoadPolicy::Lazy,
+    source: SourceSpec {
+        submodule: "tinyhosts",
+        manifest: "Cargo.toml",
+        package: "tinyhosts",
+        lib_name: "tinyhosts",
+        features: &[],
+    },
 };

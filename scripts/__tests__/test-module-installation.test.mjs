@@ -39,11 +39,14 @@ const localRustRunner = fileURLToPath(
   new URL("../test-rust-with-mock.sh", import.meta.url),
 );
 
-test("locally built native Rust test modules use the checkout target tree", () => {
+test("locally built native Rust test modules come from build.mjs, not ad hoc cargo builds", () => {
   const source = readFileSync(localRustRunner, "utf8");
-  assert.match(source, /target\/native-test-modules\/tinyjuice/);
-  assert.match(source, /target\/native-test-modules\/tinysearch/);
-  assert.match(source, /target\/native-test-modules\/tinyconnectors/);
+  assert.match(source, /modules\/stage-local-modules\.sh/);
+  assert.match(source, /stage_source_modules "\$\{local_source_ids\[@\]\}"/);
+  assert.match(source, /target\/module-sources\/tinyconnectors/);
+  assert.match(source, /stage_release_module tinyconnectors/);
+  assert.doesNotMatch(source, /cargo build/, "no hand-rolled module build");
+  assert.doesNotMatch(source, /--target-dir|native-test-modules/);
   assert.doesNotMatch(
     source,
     /vendor\/tiny(?:juice|search|connectors)\/target/,
@@ -52,8 +55,7 @@ test("locally built native Rust test modules use the checkout target tree", () =
 
 test("local MCP registry E2E tests load the pinned TinyMCP module", () => {
   const source = readFileSync(localRustRunner, "utf8");
-  assert.match(source, /test-module-assets\.mjs .*tinymcp/);
-  assert.match(source, /target\/test-modules\/tinymcp/);
+  assert.match(source, /stage_release_module tinymcp/);
   assert.match(source, /OPENHUMAN_MODULE_PATH="\$tinymcp_dir/);
 });
 
@@ -139,8 +141,7 @@ for (const id of [
 }
 
 for (const [runner, archiveVariable, directoryVariable] of [
-  ["test-rust-e2e.sh", "tinybox_archive", "tinybox_dir"],
-  ["test-rust-with-mock.sh", "hosts_archive", "hosts_dir"],
+  ["modules/stage-local-modules.sh", "archive", "dir"],
   ["test-rust-with-mock.sh", "tinybox_archive", "tinybox_dir"],
 ]) {
   test(`${runner} extracts ${archiveVariable} with the current user's ownership`, () => {
@@ -221,20 +222,30 @@ for (const runner of ["test-rust-with-mock.sh", "test-rust-e2e.sh"]) {
       new URL(`../${runner}`, import.meta.url),
       "utf8",
     );
-    const setupStart = source.indexOf('tinymcp_asset="');
+    const setupStart = source.indexOf(
+      runner === "test-rust-with-mock.sh"
+        ? "# The MCP registry E2E targets"
+        : "e2e_source_ids=(",
+    );
     assert.ok(setupStart >= 0, "runner prepares the pinned TinyMCP fixture");
-    const setupEnd = source.indexOf("\n\n", setupStart);
+    const setupEnd = source.indexOf("\nfi\n", setupStart) + 4;
     const setup = source.slice(setupStart, setupEnd);
+    const stageLib = fileURLToPath(
+      new URL("../modules/stage-local-modules.sh", import.meta.url),
+    );
     const root = mkdtempSync(join(tmpdir(), "mcp-runner-"));
     try {
       const moduleDir = join(root, "target/test-modules/tinymcp/test-digest");
       mkdirSync(moduleDir, { recursive: true });
       writeFileSync(join(moduleDir, "libtinymcp_module.so"), "fixture");
+      const boxDir = join(root, "target/test-modules/tinybox/test-digest");
+      mkdirSync(boxDir, { recursive: true });
+      writeFileSync(join(boxDir, "libtinybox.so"), "fixture");
       // Evaluate the real runner branches with only external commands stubbed.
       // A cached fixture avoids downloads while exercising the path export.
       const cargoStub = `cargo_test() {
         if [[ " $* " == *" --test mcp_registry_e2e "* ]]; then
-          printf 'ARTIFACT=%s\\n' "\${OPENHUMAN_TINYMCP_TEST_MODULE:-missing}"
+          printf 'ARTIFACT=%s\\n' "\${OPENHUMAN_MODULE_PATH:-missing}"
           printf 'ARG=%s\\n' "$@"
         fi
       }`;
@@ -281,9 +292,12 @@ for (const runner of ["test-rust-with-mock.sh", "test-rust-e2e.sh"]) {
             "module_platform=ubuntu-22.04-x86_64",
             "module_ext=so",
             "PRODUCT_FEATURES=mcp",
-            "connectors_module=unused",
-            "node() { printf 'tinymcp\\tunused\\tmodule.tar.gz\\ttest-digest\\n'; }",
+            `source ${JSON.stringify(stageLib)}`,
+            "node() { printf '%s\\tunused\\tmodule.tar.gz\\ttest-digest\\n' \"${@: -1}\"; }",
+            "unset OPENHUMAN_MODULE_PATH",
             setup,
+            'connectors_module_path="/connectors:${OPENHUMAN_MODULE_PATH:-}"',
+            'hosts_dir=/hosts',
             cargoStub,
             invocation,
           ].join("\n"),
@@ -293,7 +307,7 @@ for (const runner of ["test-rust-with-mock.sh", "test-rust-e2e.sh"]) {
           env: {
             ...process.env,
             TEST_ROOT: root,
-            OPENHUMAN_TINYMCP_TEST_MODULE: "",
+            OPENHUMAN_MODULE_SOURCE: "",
           },
         },
       );
@@ -301,9 +315,9 @@ for (const runner of ["test-rust-with-mock.sh", "test-rust-e2e.sh"]) {
       const runs = result.stdout.split("ARTIFACT=").slice(1);
       assert.equal(runs.length, runner === "test-rust-with-mock.sh" ? 2 : 1);
       for (const run of runs) {
-        assert.equal(
-          run.split("\n")[0],
-          join(moduleDir, "libtinymcp_module.so"),
+        assert.ok(
+          run.split("\n")[0].split(":").includes(moduleDir),
+          "the pinned TinyMCP release directory is on the module search path",
         );
         assert.match(
           run,
@@ -322,3 +336,17 @@ for (const runner of ["test-rust-with-mock.sh", "test-rust-e2e.sh"]) {
     }
   });
 }
+
+test("the CI installer builds nothing: every module, tinyconnectors included, is a registry release", () => {
+  const source = readFileSync(installer, "utf8");
+  assert.doesNotMatch(source, /cargo build|cargo-cancel|--target-dir/);
+  assert.doesNotMatch(source, /stage-connector-test-module|modules\.toml/);
+  const assets = resolveTestModuleAssets(
+    readRegistrySource(),
+    "ubuntu-22.04-x86_64",
+  );
+  const connectors = assets.find((asset) => asset.id === "tinyconnectors");
+  assert.ok(connectors, "the installer resolves tinyconnectors from the registry");
+  assert.match(connectors.sha256, /^[a-f0-9]{64}$/);
+  assert.match(connectors.url, /\/releases\/download\/v\d+\.\d+\.\d+\//);
+});

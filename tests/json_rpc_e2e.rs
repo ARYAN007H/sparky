@@ -1317,6 +1317,48 @@ async fn json_rpc_config_update_browser_settings_persists_backend() {
 
 #[cfg(feature = "modules")]
 #[tokio::test]
+async fn json_rpc_modules_list_reports_the_serving_source() {
+    let _env_lock = json_rpc_e2e_env_lock_async().await;
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path();
+    let openhuman_home = home.join(".openhuman");
+
+    let _home_guard = EnvVarGuard::set_to_path("HOME", home);
+    let _workspace_guard = EnvVarGuard::unset("OPENHUMAN_WORKSPACE");
+    let _backend_url_guard = EnvVarGuard::unset("BACKEND_URL");
+    let _vite_backend_guard = EnvVarGuard::unset("VITE_BACKEND_URL");
+    let _source_guard = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE");
+
+    write_min_config(&openhuman_home, "http://127.0.0.1:9");
+
+    let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
+    let rpc_base = format!("http://{rpc_addr}");
+
+    let list = post_json_rpc(&rpc_base, 41_260, "openhuman.modules_list", json!({})).await;
+    let list = peel_logs_envelope(assert_no_jsonrpc_error(&list, "modules_list"));
+    let modules = list
+        .get("modules")
+        .and_then(Value::as_array)
+        .expect("modules array");
+    assert!(!modules.is_empty(), "{list}");
+    for module in modules {
+        // Default config: every supported module is served by the pinned
+        // release; an unsupported platform reports no source.
+        match module.get("source").and_then(Value::as_str) {
+            Some(source) => assert_eq!(source, "release", "{module}"),
+            None => assert_eq!(
+                module.get("state").and_then(Value::as_str),
+                Some("unsupported"),
+                "{module}"
+            ),
+        }
+    }
+
+    rpc_join.abort();
+}
+
+#[cfg(feature = "modules")]
+#[tokio::test]
 async fn json_rpc_modules_browser_forget_sites_removes_learned_sites() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let tmp = tempdir().expect("tempdir");

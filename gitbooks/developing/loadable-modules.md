@@ -57,7 +57,7 @@ Every asset carries a SHA-256 copied verbatim from the published release's own c
 Each step avoids the cost of the next:
 
 1. Already serving on the host's broker.
-2. An operator override: a path in `[modules].overrides`, or a `*_TEST_MODULE` environment variable.
+2. An operator override: a path in `[modules].overrides`, or a source mode (`[modules] source` / `OPENHUMAN_MODULE_SOURCE`, local development only; CI uses `release`). `linked` serves a module compiled into the running `openhuman-core` (build it with `--features linked-modules`, which links `crates/openhuman-modules-linked`; no product build or other host can reach that crate). `source` serves a library built from the module's vendored gitlink by `node scripts/modules/build.mjs <id|all>` (it writes `target/module-sources/<id>/` with an operator-trust `modules.toml`; set `OPENHUMAN_MODULE_SOURCE_DIR` to that directory). Local digests are never registry pins. `node scripts/modules/pin-status.mjs` reports whether each gitlink is in sync with, ahead of or behind its registry pin (ahead means you are running a locally compiled module that CI will refuse), and `node scripts/modules/release-and-repin.mjs <id>` publishes a release and re-pins from its `checksum.toml`. The strict `check-module-pins.mjs` is unchanged.
 3. The module search path: `OPENHUMAN_MODULE_PATH`, then the platform data directories.
 4. Bundled releases staged into the app at build time.
 5. The release cache, downloading only if `[modules].allow_download` is true.
