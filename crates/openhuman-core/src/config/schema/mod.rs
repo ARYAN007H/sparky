@@ -24,6 +24,8 @@ mod defaults;
 mod dictation;
 mod hooks;
 pub use hooks::HooksConfig;
+pub mod components;
+pub use components::ComponentsConfig;
 pub mod hosting;
 pub use hosting::HostingConfig;
 pub mod storage;

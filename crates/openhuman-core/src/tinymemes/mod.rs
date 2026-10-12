@@ -27,6 +27,12 @@ use crate::config::Config;
 use std::time::{Duration, Instant};
 
 pub(crate) use arm::Arm;
+pub(crate) use arm::FLAG_ENV;
+
+/// Whether an `OPENHUMAN_TINYMEMES` value turns remixing on in any form.
+pub(crate) fn flag_enabled(value: &str) -> bool {
+    arm::mode_from(Some(value)) != arm::Mode::Off
+}
 
 const TIMEOUT_ENV: &str = "OPENHUMAN_TINYMEMES_TIMEOUT_MS";
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(20);

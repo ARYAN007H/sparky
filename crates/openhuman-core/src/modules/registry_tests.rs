@@ -545,7 +545,7 @@ fn a_record_publishes_for_every_host_or_for_none() {
 
 #[test]
 fn find_resolves_known_ids_only() {
-    assert!(find("tinydocs").is_some());
+    assert!(find("tinymcp").is_some());
     assert!(find("not-a-module").is_none());
 }
 

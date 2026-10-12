@@ -139,7 +139,6 @@ fn all_tools_registers_integration_families_when_enabled_and_signed_in() {
     cfg.integrations.parallel.enabled = true;
     cfg.integrations.tinyfish.enabled = true;
     cfg.integrations.stock_prices.enabled = true;
-    cfg.composio.enabled = true;
     store_test_session_token(&cfg);
 
     let tools = all_tools(

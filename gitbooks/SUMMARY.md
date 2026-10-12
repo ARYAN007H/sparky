@@ -87,6 +87,7 @@
 - [Loadable modules](developing/loadable-modules.md)
 - [Performance and footprint](developing/performance.md)
 - [Pluggable engines](developing/engines.md)
+- [Components](developing/components.md)
 - [Jev](developing/jev.md)
 - [Embedding](developing/embed/README.md)
   - [Installation](developing/embed/installation.md)

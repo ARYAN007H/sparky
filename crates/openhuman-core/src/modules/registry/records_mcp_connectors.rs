@@ -25,8 +25,8 @@ use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec}
 pub(crate) const TINYMCP: ModuleRecord = ModuleRecord {
     id: "tinymcp",
     description: "Model Context Protocol client: transports, registry, and the write-audit log",
-    bus_name: "ai.tinyhumans.tinymcp.Mcp",
-    object_path: "/ai/tinyhumans/tinymcp/Mcp",
+    bus_name: tinymcp_bus::names::INTERFACE,
+    object_path: tinymcp_bus::names::OBJECT_PATH,
     version: "0.14.3",
     release_url: "https://github.com/tinyhumansai/tinymcp/releases/tag/v0.14.3",
     assets: &[
@@ -129,8 +129,8 @@ pub(crate) const TINYMCP: ModuleRecord = ModuleRecord {
 pub(crate) const TINYCONNECTORS: ModuleRecord = ModuleRecord {
     id: "tinyconnectors",
     description: "OAuth connector integrations: accounts, actions, and triggers",
-    bus_name: "ai.tinyhumans.connectors.Composio",
-    object_path: "/ai/tinyhumans/connectors/Composio",
+    bus_name: tinyconnectors_bus::names::INTERFACE,
+    object_path: tinyconnectors_bus::names::OBJECT_PATH,
     version: "0.14.0",
     release_url: "https://github.com/tinyhumansai/tinyconnectors/releases/tag/v0.14.0",
     assets: &[

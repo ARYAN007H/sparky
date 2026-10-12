@@ -115,7 +115,7 @@ fn the_default_config_enables_modules_and_downloads() {
 fn list_reports_every_registry_entry() {
     let statuses = list(&offline_config());
     assert_eq!(statuses.len(), registry::ALL.len());
-    assert!(statuses.iter().any(|status| status.id == "tinydocs"));
+    assert!(statuses.iter().any(|status| status.id == "tinymcp"));
     for status in &statuses {
         assert!(!status.version.is_empty());
         assert!(!status.bus_name.is_empty());
@@ -229,6 +229,7 @@ fn errors_never_leak_a_path_or_a_url() {
     }
 }
 
+#[cfg(feature = "documents")]
 #[tokio::test]
 async fn a_bounded_wait_with_nothing_cached_and_downloads_off_fails_rather_than_loading() {
     // An isolated install directory: this machine's real cache may hold the

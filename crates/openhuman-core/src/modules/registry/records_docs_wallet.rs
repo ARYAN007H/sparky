@@ -1,7 +1,9 @@
 //! Registry records for the `tinydocs` and `tinywallet` modules.
 
+#[cfg(any(feature = "documents", feature = "web3"))]
 use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec};
 
+#[cfg(feature = "documents")]
 /// The `tinydocs` module: document synthesis, bounded extraction, image facts,
 /// and PDF rendering.
 ///
@@ -10,8 +12,8 @@ use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec}
 pub(crate) const TINYDOCS: ModuleRecord = ModuleRecord {
     id: "tinydocs",
     description: "Document synthesis, Office/PDF extraction, image inspection, and PDF rendering",
-    bus_name: "ai.tinyhumans.tinydocs.Documents",
-    object_path: "/ai/tinyhumans/tinydocs/Documents",
+    bus_name: tinydocs_bus::names::BUS_NAME,
+    object_path: tinydocs_bus::names::OBJECT_PATH,
     version: "0.2.2",
     release_url: "https://github.com/tinyhumansai/tinydocs/releases/tag/v0.2.2",
     assets: &[
@@ -81,6 +83,7 @@ pub(crate) const TINYDOCS: ModuleRecord = ModuleRecord {
     },
 };
 
+#[cfg(feature = "web3")]
 /// The `tinywallet` module: native wallet, Web3 quote, and x402 operations.
 ///
 /// Lazy for the same reason as [`TINYDOCS`], and more so: most sessions never
@@ -109,8 +112,8 @@ pub(crate) const TINYDOCS: ModuleRecord = ModuleRecord {
 pub(crate) const TINYWALLET: ModuleRecord = ModuleRecord {
     id: "tinywallet",
     description: "Transaction building and assembly for Bitcoin, EVM, Solana and Tron",
-    bus_name: "ai.tinyhumans.tinywallet.Wallet",
-    object_path: "/ai/tinyhumans/tinywallet/Wallet",
+    bus_name: tinywallet_bus::names::BUS_NAME,
+    object_path: tinywallet_bus::names::OBJECT_PATH,
     version: "0.19.0",
     release_url: "https://github.com/tinyhumansai/tinywallet/releases/tag/v0.19.0",
     assets: &[

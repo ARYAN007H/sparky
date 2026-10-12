@@ -4,9 +4,11 @@
 //! controllers (e.g., memory, skills, config) and providing a unified
 //! interface for both the CLI and RPC layers to invoke them.
 
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::{Arc, OnceLock, RwLock};
+use std::{
+    future::Future,
+    pin::Pin,
+    sync::{Arc, OnceLock, RwLock},
+};
 
 use serde_json::{Map, Value};
 
@@ -47,6 +49,8 @@ impl RegisteredController {
 }
 
 pub use super::domain_group::DomainGroup;
+mod components_gate;
+pub use components_gate::disabled_component_for_method;
 
 /// A [`RegisteredController`] tagged with the [`DomainGroup`] it belongs to.
 ///
