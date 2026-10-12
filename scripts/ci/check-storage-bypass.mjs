@@ -23,7 +23,6 @@
 //   node scripts/ci/check-storage-bypass.mjs --write-baseline
 //   node scripts/ci/check-storage-bypass.mjs --root <dir>   (tests)
 
-import { execFileSync } from "node:child_process";
 import { stripRustComments } from "./check-crate-chain.mjs";
 import { validateCoverageDebt, historicalFindings } from "./storage-bypass-debt.mjs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
@@ -35,7 +34,6 @@ const repoRoot =
   rootFlag === -1
     ? resolve(dirname(fileURLToPath(import.meta.url)), "../..")
     : resolve(process.argv[rootFlag + 1]);
-const scanRoot = resolve(repoRoot, "crates");
 const baselinePath = resolve(
   repoRoot,
   "scripts/ci/storage-bypass-baseline.json",
@@ -82,8 +80,6 @@ export const RULES = [
 ];
 
 const SRC = "crates/openhuman-core/src/";
-const FALLBACK =
-  "legacy fallback of a store that already runs on the storage port";
 
 /**
  * path -> { rule, site, reason }: the one site (its trimmed source line) a rule
@@ -91,110 +87,14 @@ const FALLBACK =
  * still a finding, and removing the allowed line does not free a quota for
  * another.
  */
-export const ALLOW = new Map(
-  [
-    [
-      "security/approval/store.rs",
-      "sqlite-open",
-      "let conn = Connection::open(&db_path).with_context(|| {",
-      FALLBACK,
-    ],
-    [
-      "security/devices/store.rs",
-      "sqlite-open",
-      "let conn = Connection::open(&db_path)",
-      FALLBACK,
-    ],
-    [
-      "desktop/notifications/store.rs",
-      "sqlite-open",
-      "let conn = Connection::open(&db_path).with_context(|| {",
-      FALLBACK,
-    ],
-    [
-      "integrations/task_sources/store.rs",
-      "sqlite-open",
-      "let mut conn = Connection::open(&db_path)",
-      FALLBACK,
-    ],
-    [
-      "cron/policy.rs",
-      "sqlite-open",
-      "let conn = Connection::open(&path)",
-      FALLBACK,
-    ],
-    [
-      "config/workspace/state.rs",
-      "sqlite-open",
-      "let conn = Connection::open(db_path)?;",
-      "vault watcher state is absolute local paths and their mtimes: per-machine filesystem state that is meaningless on, and must not be shared through, another host's database",
-    ],
-    [
-      "platform/cost/tracker.rs",
-      "json-write",
-      "let mut file = OpenOptions::new()",
-      FALLBACK,
-    ],
-    [
-      "agent/orchestration/subagent_sessions/store.rs",
-      "json-write",
-      "fs::write(&tmp_path, raw)",
-      FALLBACK,
-    ],
-    [
-      "integrations/composio/file_store.rs",
-      "json-write",
-      "tokio::fs::write(&tmp, &bytes)",
-      FALLBACK,
-    ],
-    [
-      "desktop/control/ops.rs",
-      "json-write",
-      "let mut temporary = tempfile::NamedTempFile::new_in(parent)",
-      "this machine's own consent to drive its desktop: per-machine, and it must fail closed rather than follow a shared backend to another host",
-    ],
-    [
-      "desktop/app_state/ops/state_file.rs",
-      "json-write",
-      "let mut temp_file = NamedTempFile::new_in(parent)",
-      "holds the local encryption key and keyring consent, which are needed before any storage backend is open (bootstrap state is never read from storage)",
-    ],
-    [
-      "web3/wallet/ops/state.rs",
-      "json-write",
-      "let mut temp_file = NamedTempFile::new_in(parent)",
-      "paired with the OS keychain mnemonic (and holds it when there is no keychain): moves with the secrets work, not as a plain document",
-    ],
-    [
-      "inference/tokenjuice/savings.rs",
-      "json-write",
-      "if let Err(e) = std::fs::write(path, json) {",
-      "one process-global savings counter snapshot, cheap to lose; not per-user data a scope would mean anything for",
-    ],
-    [
-      "agent/artifacts/store.rs",
-      "json-write",
-      "tokio::fs::write(&tmp_path, json).await.map_err(|e| {",
-      FALLBACK,
-    ],
-    [
-      "agent/artifacts/store.rs",
-      "json-write",
-      "tokio::fs::write(&args_path, json)",
-      FALLBACK,
-    ],
-    [
-      "agent/artifacts/files.rs",
-      "json-write",
-      "match tokio::fs::OpenOptions::new()",
-      "reserves the artifact's content file in the user-visible files folder; the bytes stay a file on every backend (the port has no blob store), only the records moved",
-    ],
-  ].reduce((map, [path, rule, site, reason]) => {
-    const key = `${SRC}${path}`;
-    map.set(key, [...(map.get(key) ?? []), { rule, site, reason }]);
-    return map;
-  }, new Map()),
-);
+const auditedReasons = JSON.parse(await readFile(new URL("./storage-bypass-allow-reasons.json", import.meta.url), "utf8"));
+export const ALLOW = new Map();
+for (const { path, ...entry } of auditedReasons) {
+  if (!entry.reason?.trim() || !/^https:\/\/github\.com\/tinyhumansai\/openhuman\/issues\/\d+$/.test(entry.issue ?? "")) {
+    throw new Error(`Invalid storage allowance reason: ${path}`);
+  }
+  ALLOW.set(path, [...(ALLOW.get(path) ?? []), entry]);
+}
 
 /** Whether `finding` is the allowlisted site of its file (its first occurrence). */
 export function allowed(rel, finding) {
