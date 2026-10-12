@@ -430,10 +430,7 @@ fn cleanup_callback_can_access_the_client_cache() {
     McpConfiguredClient::schedule_agent_close_and_cleanup(
         workspace.path(),
         Arc::new(move || {
-            callback_flag.store(
-                CLIENTS.get().unwrap().try_lock().is_ok(),
-                Ordering::SeqCst,
-            );
+            callback_flag.store(CLIENTS.get().unwrap().try_lock().is_ok(), Ordering::SeqCst);
             true
         }),
     );
