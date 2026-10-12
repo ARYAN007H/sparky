@@ -24,7 +24,11 @@
 //   node scripts/ci/check-storage-bypass.mjs --root <dir>   (tests)
 
 import { stripRustComments } from "./check-crate-chain.mjs";
-import { validateCoverageDebt, validateAllowances, historicalFindings } from "./storage-bypass-debt.mjs";
+import {
+  validateCoverageDebt,
+  validateAllowances,
+  historicalFindings,
+} from "./storage-bypass-debt.mjs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -64,7 +68,8 @@ export const RULES = [
   },
   {
     rule: "file-mutation",
-    pattern: /\b(?:fs::(?:rename|copy|hard_link)|tempfile::Builder::new|serde_json::to_writer(?:_pretty)?)\s*\(/,
+    pattern:
+      /\b(?:fs::(?:rename|copy|hard_link)|tempfile::Builder::new|serde_json::to_writer(?:_pretty)?)\s*\(/,
     hint: "review the filesystem publication or serializer destination through the owning storage port",
   },
   {
@@ -74,7 +79,8 @@ export const RULES = [
   },
   {
     rule: "vendored-open",
-    pattern: /\b(?:[A-Za-z_][\w]*::)*(?:[A-Za-z_][\w]*Store|[A-Za-z_][\w]*Ledger)::open(?:_file)?\s*\(/,
+    pattern:
+      /\b(?:[A-Za-z_][\w]*::)*(?:[A-Za-z_][\w]*Store|[A-Za-z_][\w]*Ledger)::open(?:_file)?\s*\(/,
     hint: "a persistent path passed to an owning store opener needs captured native routing",
   },
 ];
@@ -87,10 +93,20 @@ const SRC = "crates/openhuman-core/src/";
  * still a finding, and removing the allowed line does not free a quota for
  * another.
  */
-export const auditedReasons = JSON.parse(await readFile(new URL("./storage-bypass-allow-reasons.json", import.meta.url), "utf8"));
+export const auditedReasons = JSON.parse(
+  await readFile(
+    new URL("./storage-bypass-allow-reasons.json", import.meta.url),
+    "utf8",
+  ),
+);
 export const ALLOW = new Map();
 for (const { path, ...entry } of auditedReasons) {
-  if (!entry.reason?.trim() || !/^https:\/\/github\.com\/tinyhumansai\/openhuman\/issues\/\d+$/.test(entry.issue ?? "")) {
+  if (
+    !entry.reason?.trim() ||
+    !/^https:\/\/github\.com\/tinyhumansai\/openhuman\/issues\/\d+$/.test(
+      entry.issue ?? "",
+    )
+  ) {
     throw new Error(`Invalid storage allowance reason: ${path}`);
   }
   ALLOW.set(path, [...(ALLOW.get(path) ?? []), entry]);
@@ -147,10 +163,16 @@ export function scan(rel, source) {
     // count a match only when it starts on this line.
     const searchable = `${code}\n${codeOf(lines[index + 1] ?? "")}`;
     for (const { rule, pattern } of RULES) {
-      const input = originalCore({ path: rel, rule }) ? searchable : `${masked[index]}\n${masked[index + 1] ?? ""}`;
+      const input = originalCore({ path: rel, rule })
+        ? searchable
+        : `${masked[index]}\n${masked[index + 1] ?? ""}`;
       const hit = pattern.exec(input);
       if (!hit || hit.index >= code.length) continue;
-      if (rule === "vendored-open" && !/"[^"\n]*\.(?:db|jsonl)"/.test(searchable.slice(hit.index))) continue;
+      if (
+        rule === "vendored-open" &&
+        !/"[^"\n]*\.(?:db|jsonl)"/.test(searchable.slice(hit.index))
+      )
+        continue;
       const text = raw.trim();
       const key = `${rule}\0${text}`;
       const occurrence = (occurrences.get(key) ?? 0) + 1;
@@ -161,7 +183,8 @@ export function scan(rel, source) {
   return found;
 }
 
-export const originalCore = f => f.path.startsWith(SRC) && ["sqlite-open", "json-write"].includes(f.rule);
+export const originalCore = (f) =>
+  f.path.startsWith(SRC) && ["sqlite-open", "json-write"].includes(f.rule);
 
 export const identity = ({ rule, path, text, occurrence }) =>
   `${rule}\0${path}\0${text}\0${occurrence}`;
@@ -179,7 +202,12 @@ export function compare(findings, baseline) {
 async function rustFiles(dir) {
   const out = [];
   if (dir.endsWith(".rs")) {
-    try { await readFile(dir); return [dir]; } catch { return []; }
+    try {
+      await readFile(dir);
+      return [dir];
+    } catch {
+      return [];
+    }
   }
   let entries;
   try {
@@ -198,8 +226,10 @@ async function rustFiles(dir) {
 export async function collectFindings(root, { includeAllowed = false } = {}) {
   const findings = [];
   const scanRoot = resolve(root, "crates");
-  const roots = (await readdir(scanRoot, { withFileTypes: true })).filter(e => e.isDirectory()).map(e => resolve(scanRoot, e.name, "src"));
-  roots.push(...CURATED_VENDOR_ROOTS.map(p => resolve(root, p)));
+  const roots = (await readdir(scanRoot, { withFileTypes: true }))
+    .filter((e) => e.isDirectory())
+    .map((e) => resolve(scanRoot, e.name, "src"));
+  roots.push(...CURATED_VENDOR_ROOTS.map((p) => resolve(root, p)));
   for (const path of (await Promise.all(roots.map(rustFiles))).flat()) {
     const rel = relative(root, path).split(sep).join("/");
     if (isTestFile(rel)) continue;
@@ -223,15 +253,29 @@ async function main() {
   }
 
   let extension = [];
-  try { extension = JSON.parse(await readFile(resolve(repoRoot, "scripts/ci/storage-bypass-extension.json"), "utf8")); }
-  catch (error) { if (error.code !== "ENOENT") throw error; }
+  try {
+    extension = JSON.parse(
+      await readFile(
+        resolve(repoRoot, "scripts/ci/storage-bypass-extension.json"),
+        "utf8",
+      ),
+    );
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
   const raw = await collectFindings(repoRoot, { includeAllowed: true });
   let debtErrors = validateCoverageDebt(findings, baseline, extension);
-  if (rootFlag === -1) debtErrors.push(...validateAllowances(raw, auditedReasons));
+  if (rootFlag === -1)
+    debtErrors.push(...validateAllowances(raw, auditedReasons));
   // Fixture roots without Git history exercise source scanning; CI always checks
   // the real checkout against its canonical merge base and retained records.
   if (rootFlag === -1) {
-    const history = historicalFindings(repoRoot, { scan, withoutAllowed, isTestFile, CURATED_VENDOR_ROOTS });
+    const history = historicalFindings(repoRoot, {
+      scan,
+      withoutAllowed,
+      isTestFile,
+      CURATED_VENDOR_ROOTS,
+    });
     debtErrors = validateCoverageDebt(findings, baseline, extension, history);
     debtErrors.push(...validateAllowances(raw, auditedReasons, history));
   }

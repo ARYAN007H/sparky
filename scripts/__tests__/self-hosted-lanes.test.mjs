@@ -164,9 +164,14 @@ test("core doctests remain outside PR coverage; embed doctests and tui tests run
     assert.equal(cov.env.OH_COV_TUI, "1");
     const runs = allRuns(plan).join("\n");
     assert.doesNotMatch(runs, /cargo test -p openhuman --doc/);
-    assert.doesNotMatch(runs, /cargo test -p openhuman-(embed|tinyhumans)\b(?! --doc)/);
+    assert.doesNotMatch(
+      runs,
+      /cargo test -p openhuman-(embed|tinyhumans)\b(?! --doc)/,
+    );
     assert.match(runs, /cargo test -p openhuman-embed --doc/);
-    const doc = plan.lanes.find(l => l.name === "rust-lint").checks.find(c => c.name === "embed-rustdoc");
+    const doc = plan.lanes
+      .find((l) => l.name === "rust-lint")
+      .checks.find((c) => c.name === "embed-rustdoc");
     assert.equal(doc.env.RUSTDOCFLAGS, "-D warnings");
     assert.match(doc.run, /cargo doc -p openhuman-embed --no-deps/);
     assert.match(runs, /node scripts\/run-embed-examples.mjs/);
@@ -268,7 +273,7 @@ test("the storage area arms only the storage-drivers lane, with the sqlite and f
         "static:orch-ip-gate",
         "static:feature-forwarding",
         "static:crate-chain",
-    "static:storage-bypass",
+        "static:storage-bypass",
         "static:module-pins",
         "static:submodule-monotonic",
       ],
@@ -662,28 +667,49 @@ test("module boundaries run for Rust and scripts changes in both profiles", () =
         areas: { ...NONE, [area]: true },
         env: profile === "ex63" ? EX63_ENV : {},
       });
-      const check = plan.lanes.flatMap(lane => lane.checks).find(check => check.name === "module-boundaries");
+      const check = plan.lanes
+        .flatMap((lane) => lane.checks)
+        .find((check) => check.name === "module-boundaries");
       assert.equal(check.when, true, `${profile}:${area}`);
-      assert.equal(check.run, "bash scripts/ci-cancel-aware.sh node scripts/ci/check-module-boundaries.mjs");
+      assert.equal(
+        check.run,
+        "bash scripts/ci-cancel-aware.sh node scripts/ci/check-module-boundaries.mjs",
+      );
     }
   }
 });
 
-
 test("module boundary policy and checker changes arm their own scripts lane", () => {
-  const filters = fs.readFileSync(path.join(repoRoot, ".github/ci-paths-filter.yml"), "utf8");
+  const filters = fs.readFileSync(
+    path.join(repoRoot, ".github/ci-paths-filter.yml"),
+    "utf8",
+  );
   const scripts = filters.split(/^scripts:\s*$/m)[1].split(/^\S[^\n]*:/m)[0];
-  for (const file of ["scripts/ci/check-module-boundaries.mjs", "scripts/ci/module-boundaries.json"]) {
-    assert.ok(scripts.includes(`'${file}'`), `${file} must arm the scripts area`);
+  for (const file of [
+    "scripts/ci/check-module-boundaries.mjs",
+    "scripts/ci/module-boundaries.json",
+  ]) {
+    assert.ok(
+      scripts.includes(`'${file}'`),
+      `${file} must arm the scripts area`,
+    );
   }
 });
 
-
 test("storage-bypass runs under cancellation supervision in both profiles", () => {
   for (const profile of ["hosted", "ex63"]) {
-    const plan = buildPlan({ profile, areas: NONE, env: profile === "ex63" ? EX63_ENV : {} });
-    const check = plan.lanes.flatMap(lane => lane.checks).find(check => check.name === "storage-bypass");
+    const plan = buildPlan({
+      profile,
+      areas: NONE,
+      env: profile === "ex63" ? EX63_ENV : {},
+    });
+    const check = plan.lanes
+      .flatMap((lane) => lane.checks)
+      .find((check) => check.name === "storage-bypass");
     assert.equal(check.when, true);
-    assert.equal(check.run, "bash scripts/ci-cancel-aware.sh node scripts/ci/check-storage-bypass.mjs");
+    assert.equal(
+      check.run,
+      "bash scripts/ci-cancel-aware.sh node scripts/ci/check-storage-bypass.mjs",
+    );
   }
 });
