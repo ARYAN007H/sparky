@@ -26,6 +26,8 @@ pub struct ModuleRecord {
     pub assets: &'static [PlatformAsset],
     /// When the module is loaded.
     pub load: LoadPolicy,
+    /// How to build the module from its vendored gitlink, for local use.
+    pub source: SourceSpec,
 }
 
 impl ModuleRecord {
@@ -33,6 +35,41 @@ impl ModuleRecord {
     #[must_use]
     pub fn asset_for(&self, host_key: &str) -> Option<&'static PlatformAsset> {
         self.assets.iter().find(|asset| asset.host_key == host_key)
+    }
+}
+
+/// How to build a module's native library from its gitlink under `vendor/`.
+///
+/// Used only by `scripts/modules/build.mjs` and the `source` mode, both for
+/// local development and local tests. It says nothing about legitimacy: the
+/// registry digests in [`PlatformAsset`] are the only pins, and a local build
+/// is trusted by the operator through a `modules.toml` the build step writes
+/// beside the artifact.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SourceSpec {
+    /// Directory name under `vendor/` holding the module's repository.
+    pub submodule: &'static str,
+    /// Path of the module crate's `Cargo.toml`, relative to the submodule.
+    pub manifest: &'static str,
+    /// Cargo package that produces the `cdylib`.
+    pub package: &'static str,
+    /// Library file stem Cargo emits, without the platform prefix or suffix.
+    pub lib_name: &'static str,
+    /// Cargo features to enable on top of the package defaults.
+    pub features: &'static [&'static str],
+}
+
+impl SourceSpec {
+    /// The file name Cargo gives the built library on this platform.
+    #[must_use]
+    pub fn artifact_filename(&self) -> String {
+        if cfg!(target_os = "windows") {
+            format!("{}.dll", self.lib_name)
+        } else if cfg!(target_os = "macos") {
+            format!("lib{}.dylib", self.lib_name)
+        } else {
+            format!("lib{}.so", self.lib_name)
+        }
     }
 }
 
