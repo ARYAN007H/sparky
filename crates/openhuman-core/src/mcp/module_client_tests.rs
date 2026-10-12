@@ -507,7 +507,9 @@ async fn agent_id_stays_unavailable_until_its_cached_module_close_is_acknowledge
         .await
         .unwrap();
 
-    let closing = tokio::spawn(crate::mcp::host::close_agent(workspace.path(), "alpha"));
+    let workspace_path = workspace.path().to_path_buf();
+    let closing =
+        tokio::spawn(async move { crate::mcp::host::close_agent(&workspace_path, "alpha").await });
     alpha_port.close_started.notified().await;
     assert!(crate::mcp::host::agent_close_pending(
         workspace.path(),

@@ -365,10 +365,7 @@ impl Runtime {
         let cleanup_pending = {
             #[cfg(feature = "mcp")]
             {
-                openhuman_core::mcp::host::agent_close_pending(
-                    &self.base_config.workspace_dir,
-                    &id,
-                )
+                openhuman_core::mcp::host::agent_close_pending(&self.base_config.workspace_dir, &id)
             }
             #[cfg(not(feature = "mcp"))]
             {

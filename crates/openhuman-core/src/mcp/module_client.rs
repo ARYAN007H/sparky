@@ -431,7 +431,7 @@ impl McpConfiguredClient {
     }
 
     fn retire_cached_client(data_dir: &std::path::Path) -> Option<Arc<Self>> {
-        let mut clients = CLIENTS.get().map(|clients| {
+        let clients = CLIENTS.get().map(|clients| {
             clients
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
