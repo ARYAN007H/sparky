@@ -175,7 +175,7 @@ test('deliberate violation: the bridge reached from the app, the TUI, the core o
 
 test('without a linkedHost policy the bridge subtree is audited like any other dependency', () => {
   const m = metadata({ 'openhuman-cli': [['openhuman-modules-linked']], 'openhuman-modules-linked': [['tinydocs-module']] });
-  assert.deepEqual(auditGraph(m, ['openhuman-cli'], strict).violations.map(v => v.package), ['tinydocs-module']);
+  assert.deepEqual(auditGraph(m, ['openhuman-cli'], { ...strict, linkedHost: undefined }).violations.map(v => v.package), ['tinydocs-module']);
 });
 
 test('linkedHost policy validation rejects an empty parent list and an implementation package', () => {
