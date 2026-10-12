@@ -330,7 +330,8 @@ impl crate::mcp::module_client::McpModulePort for ToolCallPort {
     async fn validate_server_arguments(
         &self,
         _request: tinymcp_bus::ValidateServerArgumentsRequest,
-    ) -> Result<tinymcp_bus::ServerArgumentsValidation, crate::modules::client::ModuleCallError> {
+    ) -> Result<tinymcp_bus::ServerArgumentsValidation, crate::modules::client::ModuleCallError>
+    {
         Err(crate::modules::client::ModuleCallError::IncompatibleContract)
     }
 
