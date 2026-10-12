@@ -150,7 +150,7 @@ tinyagents-registry = { path = "../../vendor/tinyagents/crates/tinyagents-regist
 tinyagents-session = { path = "../../vendor/tinyagents/crates/tinyagents-session", features = ["storage-drivers"] }
 # The storage ports and the URL-to-backend facade (`storage` domain). No driver
 # by default: the `storage-*` features below add them.
-tinystoragedrivers = { path = "../../vendor/tinyagents/vendor/tinystoragedrivers/crates/tinystoragedrivers", default-features = false, features = ["blocking", "secrets", "file"] }
+tinystoragedrivers = { path = "../../vendor/tinyagents/vendor/tinystoragedrivers/crates/tinystoragedrivers", default-features = false, features = ["blocking", "secrets", "file", "sqlite"] }
 # The storage bus: the wire contract and the reference host server that the
 # `modules::storage_host` interface answers loaded modules with. Modules only.
 tinystoragedrivers-bus = { path = "../../vendor/tinyagents/vendor/tinystoragedrivers/crates/tinystoragedrivers-bus", optional = true }
@@ -320,7 +320,6 @@ tokio-util = { version = "0.7", features = ["rt", "io"] }
 # (native-tls on Windows, rustls on macOS / Linux) matches the reqwest
 # backend selected at each TLS call site.
 futures = "0.3"
-rusqlite = { version = "=0.40.2", features = ["bundled"] }
 chrono = { version = "0.4", features = ["serde"] }
 iana-time-zone = "0.1"
 # Validates the user's IANA time zone setting (`Config::time_zone`).

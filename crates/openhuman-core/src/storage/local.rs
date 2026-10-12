@@ -35,6 +35,7 @@
 //! out ([`super::config::CLASSIC`]), in SaaS mode, or in a build without
 //! `storage-sqlite`: those keep the legacy tables.
 
+use crate::storage::rusqlite;
 use std::path::Path;
 use std::sync::Arc;
 #[cfg(feature = "storage-sqlite")]

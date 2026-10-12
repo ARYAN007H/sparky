@@ -33,6 +33,15 @@ A URL for a driver the build lacks fails at `open`, naming the feature.
 always compiled in; `storage-mongodb` is in neither, a cloud build turns it
 on.
 
+## Legacy import
+
+`import/` copies the four small stores' legacy SQLite files into an installed
+backend once, read-only (see the module doc and the architecture page). The
+core calls `import::run` from `bootstrap_core_runtime` before any domain store
+opens; `run_with` takes an explicit backend for tests. Sessions, cron jobs and
+the flow catalog are not imported here: their formats belong to TinyAgents and
+TinyFlows.
+
 ## Entry points
 
 - `configured_url(&Config)` / `url_from(env, &Config)`: the URL in effect.

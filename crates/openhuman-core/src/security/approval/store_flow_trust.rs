@@ -6,6 +6,7 @@
 //! this flow" grants used by `ApprovalGate::intercept_audited` to
 //! short-circuit parking for a trusted flow/tool pair.
 
+use crate::storage::rusqlite;
 use anyhow::{Context, Result};
 use chrono::Utc;
 use rusqlite::params;

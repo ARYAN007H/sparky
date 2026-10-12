@@ -5,6 +5,7 @@
 //! carried over. The driver ([`crate::storage::local`]) writes the documents
 //! and then renames the table to `_legacy_paired_devices`.
 
+use crate::storage::rusqlite;
 use anyhow::{Context, Result};
 use rusqlite::Connection;
 use serde_json::{json, Value};

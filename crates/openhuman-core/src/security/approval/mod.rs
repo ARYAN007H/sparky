@@ -22,6 +22,7 @@ pub mod rpc;
 pub mod schemas;
 pub mod store;
 mod store_documents;
+pub(crate) use store_documents::import_source;
 pub mod types;
 
 pub use gate::{

@@ -14,6 +14,7 @@
 //!   running is skipped silently. `true` additionally records each missed slot
 //!   as a `skipped` run and refuses a manual "Run now" while a run is in flight.
 
+use crate::storage::rusqlite;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};

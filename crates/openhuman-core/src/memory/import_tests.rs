@@ -1,6 +1,7 @@
 use super::*;
 use crate::memory::error::{INVALID_REQUEST, MEMORY_OFF};
 use crate::memory::test_fixtures::{bind_reference, config_in, stored};
+use crate::storage::rusqlite;
 use std::sync::Arc;
 
 use rusqlite::{params, Connection};

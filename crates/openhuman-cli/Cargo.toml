@@ -346,7 +346,6 @@ flate2 = "1"
 futures-util = "0.3"
 hex = "0.4"
 parking_lot = "0.12"
-rusqlite = { version = "=0.40.2", features = ["bundled"] }
 sha2 = "0.10"
 tar = "0.4"
 tinyagents-graph = { path = "../../vendor/tinyagents/crates/tinyagents-graph", features = ["sqlite", "storage-drivers"] }

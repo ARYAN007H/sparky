@@ -32,6 +32,20 @@ pub(crate) async fn bootstrap_core_runtime(
     };
     let workspace_dir = cfg.workspace_dir.clone();
 
+    // --- Legacy store import ---------------------------------------------
+    // With a storage backend installed, bring the workspace's per-domain
+    // SQLite files (approvals, devices, notifications, task sources) into it
+    // once, read-only, before anything below opens those stores. A no-op
+    // without a backend; failures are logged and retried at the next boot.
+    for report in crate::storage::import::run(&cfg).await {
+        if let Err(error) = report.outcome {
+            log::warn!(
+                "[runtime] legacy {} store import failed: {error:#}",
+                report.domain
+            );
+        }
+    }
+
     // --- Event bus bootstrap ---
     // Ensure the global event bus is initialized (no-op if already done by start_channels).
     crate::core::bus::init().await.expect("bus init");

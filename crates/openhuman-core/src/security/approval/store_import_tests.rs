@@ -4,6 +4,7 @@ use crate::security::approval::types::{
     ApprovalDecision, ApprovalSourceContext, ExecutionOutcome, PendingApproval,
 };
 use crate::storage::local::{forget, table_names};
+use crate::storage::rusqlite;
 use chrono::{Duration, Utc};
 use serde_json::json;
 use tempfile::TempDir;
