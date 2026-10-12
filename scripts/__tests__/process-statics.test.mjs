@@ -104,6 +104,13 @@ test("ABI literals remain part of the declared type signature", () => {
   assert.equal(reviewChanges(before, after, []).length, 1);
 });
 
+test("whitespace inside type literals remains significant", () => {
+  const before = scan('static X: [u8; "a b".len()] = x;');
+  const after = scan('static X: [u8; "ab".len()] = x;');
+  assert.notEqual(before[0].type, after[0].type);
+  assert.equal(reviewChanges(before, after, []).length, 1);
+});
+
 test("finds multiline, qualified, mutable and lazy_static declarations", () => {
   assert.deepEqual(
     scan(
