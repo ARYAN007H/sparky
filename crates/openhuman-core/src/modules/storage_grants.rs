@@ -86,6 +86,9 @@ pub(crate) enum Plan {
         target: String,
         /// How to trim the reply.
         filter: ReplyFilter,
+        /// Whether the call mutates storage, so the host fence is consulted
+        /// before it goes to the backend.
+        write: bool,
     },
     /// Answer without calling the backend (the host already ran it).
     Answer(Value),
@@ -198,6 +201,7 @@ fn forward(target: impl Into<String>) -> Plan {
     Plan::Forward {
         target: target.into(),
         filter: ReplyFilter::None,
+        write: false,
     }
 }
 
@@ -219,12 +223,39 @@ pub(crate) fn authorize(
     if !grant.has_object(object) {
         return Err(Denied::Object);
     }
-    match object {
+    let write = is_write(object, selector);
+    if write {
+        writes(grant)?;
+    }
+    let plan = match object {
         Object::Documents => documents(grant, selector, request),
         Object::Streams => streams(grant, selector, request),
         Object::Blobs => blobs(grant, selector, request),
         Object::Secrets => secrets(grant, selector, request),
-    }
+    }?;
+    Ok(match plan {
+        Plan::Forward { target, filter, .. } => Plan::Forward {
+            target,
+            filter,
+            write,
+        },
+        answered @ Plan::Answer(_) => answered,
+    })
+}
+
+/// Whether `selector` mutates storage.
+fn is_write(object: Object, selector: &str) -> bool {
+    matches!(
+        (object, selector),
+        (
+            Object::Documents,
+            "Put" | "Delete" | "DeleteWhere" | "Claim" | "AtomicBatch" | "AtomicBatchChecked"
+        ) | (
+            Object::Streams,
+            "Append" | "AppendBatch" | "AppendBatchIfOffset" | "TruncateBefore" | "DeleteStream"
+        ) | (Object::Blobs, "Put" | "Delete" | "PresignPut")
+            | (Object::Secrets, "Set" | "Delete")
+    )
 }
 
 fn writes(grant: &StorageGrant) -> Result<(), Denied> {
@@ -243,15 +274,11 @@ fn documents(grant: &StorageGrant, selector: &str, request: &Value) -> Result<Pl
             Ok(forward(collection))
         }
         "Put" | "Delete" | "DeleteWhere" | "Claim" => {
-            writes(grant)?;
             let collection = text(request, "collection")?;
             grant.collection(collection)?;
             Ok(forward(collection))
         }
-        "AtomicBatch" | "AtomicBatchChecked" => {
-            writes(grant)?;
-            batch(grant, request)
-        }
+        "AtomicBatch" | "AtomicBatchChecked" => batch(grant, request),
         "EnsureCollection" | "ValidateCollectionSpec" => {
             // The host ran `ensure_collection` from the declared spec when it
             // bound this module. Repeating it is harmless; changing it is not
@@ -275,6 +302,7 @@ fn documents(grant: &StorageGrant, selector: &str, request: &Value) -> Result<Pl
             Ok(Plan::Forward {
                 target: String::new(),
                 filter: ReplyFilter::GrantedCollections,
+                write: false,
             })
         }
         // Watches are projected to bus signals, which this host does not
@@ -312,7 +340,6 @@ fn streams(grant: &StorageGrant, selector: &str, request: &Value) -> Result<Plan
             Ok(forward(name))
         }
         "Append" | "AppendBatch" | "AppendBatchIfOffset" | "TruncateBefore" | "DeleteStream" => {
-            writes(grant)?;
             let name = text(request, "stream")?;
             StorageGrant::prefixed(&grant.stream_prefixes, name)?;
             Ok(forward(name))
@@ -338,7 +365,6 @@ fn blobs(grant: &StorageGrant, selector: &str, request: &Value) -> Result<Plan, 
             Ok(forward(granted))
         }
         "Put" | "Delete" | "PresignPut" => {
-            writes(grant)?;
             let key = text(request, "key")?;
             let granted = StorageGrant::prefixed(&grant.blob_prefixes, key)?;
             Ok(forward(granted))
@@ -361,7 +387,6 @@ fn secrets(grant: &StorageGrant, selector: &str, request: &Value) -> Result<Plan
             Ok(forward(granted))
         }
         "Set" | "Delete" => {
-            writes(grant)?;
             let granted =
                 StorageGrant::prefixed(&grant.secret_prefixes, text(request, "name")?)?;
             Ok(forward(granted))

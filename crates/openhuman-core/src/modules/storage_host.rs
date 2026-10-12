@@ -64,6 +64,7 @@ pub(crate) trait CallerDirectory: Send + Sync {
 }
 
 /// What the host decides from, separated so tests can supply their own.
+#[async_trait]
 pub(crate) trait Environment: Send + Sync {
     /// The installed backend, if the host configured one.
     fn backend(&self) -> Option<Arc<dyn StorageBackend>>;
@@ -74,6 +75,10 @@ pub(crate) trait Environment: Send + Sync {
     fn grant(&self, module_id: &str) -> Option<StorageGrant>;
     /// The key provider for module secrets.
     fn keys(&self) -> Result<Arc<dyn KeyProvider>, StorageError>;
+    /// Consults the host's write fence for `scope` before a write is forwarded
+    /// (the backend checks it again). A refusal means the lease behind the
+    /// scope is gone.
+    async fn admit_write(&self, scope: &Scope) -> Result<(), StorageError>;
 }
 
 /// One line of the audit trail. Carries no payload by construction.
@@ -263,6 +268,7 @@ impl StorageHost {
                 return Err(HostError::Denied("no-scope"));
             }
         };
+        let binding_scope = scope.clone();
         let binding = match self.bind(&module, scope).await {
             Ok(binding) => binding,
             Err(error) => {
@@ -282,7 +288,22 @@ impl StorageHost {
                 audit("", "answered-by-host");
                 Ok(reply)
             }
-            Plan::Forward { target, filter } => {
+            Plan::Forward {
+                target,
+                filter,
+                write,
+            } => {
+                if write {
+                    if let Err(refused) = self.environment.admit_write(&binding_scope).await {
+                        let kind = if crate::storage::fence::fence_error(&refused).is_some() {
+                            StorageKind::Fenced
+                        } else {
+                            StorageKind::Backend
+                        };
+                        audit(&target, "fenced");
+                        return Err(failure(kind));
+                    }
+                }
                 match binding
                     .server
                     .handle(admission, object.as_str(), selector, request)
@@ -475,6 +496,7 @@ impl CallerDirectory for Live {
     }
 }
 
+#[async_trait]
 impl Environment for Live {
     fn backend(&self) -> Option<Arc<dyn StorageBackend>> {
         crate::storage::installed()
@@ -495,6 +517,12 @@ impl Environment for Live {
 
     fn keys(&self) -> Result<Arc<dyn KeyProvider>, StorageError> {
         crate::storage::secrets::keys()
+    }
+
+    async fn admit_write(&self, scope: &Scope) -> Result<(), StorageError> {
+        crate::storage::fence::registry()
+            .guard(scope.as_str(), "module-write")
+            .await
     }
 }
 

@@ -155,7 +155,7 @@ fn streams_blobs_and_secrets_are_confined_to_their_prefixes() {
     let g = grant();
     assert_eq!(
         forwarded(authorize(&g, Object::Streams, "Append", &json!({"stream": "log/a"}))),
-        "log/"
+        "log/a"
     );
     assert_eq!(
         authorize(&g, Object::Streams, "Append", &json!({"stream": "audit/a"})),
@@ -271,4 +271,22 @@ fn no_module_declares_storage_yet() {
     for record in crate::modules::registry::ALL {
         assert!(declared(record.id).is_none(), "{}", record.id);
     }
+}
+
+#[test]
+fn only_mutating_selectors_ask_for_the_write_fence() {
+    let g = grant();
+    let write_flag = |object, selector: &str, request: Value| match authorize(&g, object, selector, &request) {
+        Ok(Plan::Forward { write, .. }) => write,
+        other => panic!("{selector}: {other:?}"),
+    };
+    assert!(write_flag(Object::Documents, "Put", json!({"collection": "notes"})));
+    assert!(write_flag(Object::Documents, "AtomicBatch", json!({"ops": []})));
+    assert!(write_flag(Object::Streams, "Append", json!({"stream": "log/a"})));
+    assert!(write_flag(Object::Blobs, "Put", json!({"key": "files/a"})));
+    assert!(write_flag(Object::Secrets, "Set", json!({"name": "token.a"})));
+    assert!(!write_flag(Object::Documents, "Get", json!({"collection": "notes"})));
+    assert!(!write_flag(Object::Documents, "Query", json!({"collection": "notes"})));
+    assert!(!write_flag(Object::Streams, "ReadWindow", json!({"stream": "log/a"})));
+    assert!(!write_flag(Object::Blobs, "Get", json!({"key": "files/a"})));
 }
