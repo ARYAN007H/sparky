@@ -307,3 +307,22 @@ test("repository scan reads the merge base, enforces records, and fails without 
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+ test("type macro token boundaries cannot reuse an earlier ownership signature", () => {
+  for (const [beforeTokens, afterTokens] of [
+    ["a b", "ab"], ["a/**/b", "ab"], ["1 u8", "1u8"],
+    ['b "x"', 'b"x"'], ["> >", ">>"], ["r #ident", "r#ident"],
+  ]) {
+    const before = scan(`static X: ty!(${beforeTokens}) = x;`);
+    const after = scan(`static X: ty!(${afterTokens}) = x;`);
+    assert.notEqual(before[0].type, after[0].type, beforeTokens);
+    assert.equal(reviewChanges(before, after, []).length, 1);
+  }
+});
+
+test("literal static declarations in macro templates require source ownership review", () => {
+  const before = scan("pub fn example() {}");
+  const after = scan("macro_rules! make_cache { () => { static CACHE: OnceLock<Map> = x; }; }");
+  assert.equal(after.length, 1);
+  assert.equal(reviewChanges(before, after, []).length, 1);
+});
