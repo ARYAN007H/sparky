@@ -145,8 +145,6 @@ async fn boot_skips_disabled_servers_and_records_errors() {
 
 #[tokio::test]
 async fn set_enabled_false_disconnects_running_server() {
-    use openhuman_core::mcp::registry::ops;
-
     let (_tmp, cfg) = fresh_workspace_config();
     let h = host(&cfg);
     let server = make_installed_server();
@@ -156,10 +154,10 @@ async fn set_enabled_false_disconnects_running_server() {
         .await
         .expect("connect");
 
-    let outcome = ops::mcp_clients_set_enabled(&cfg, server.server_id.clone(), false)
+    h.dynamic()
+        .set_enabled(&server.server_id, false)
         .await
-        .expect("set_enabled ok");
-    assert_eq!(outcome.value["enabled"], serde_json::json!(false));
+        .expect("set_enabled");
 
     let loaded = h.dynamic().store().get_server(&server.server_id).unwrap();
     assert!(!loaded.enabled);
@@ -348,7 +346,6 @@ fn make_http_remote_server(url: &str) -> InstalledServer {
 #[tokio::test]
 async fn per_config_failure_lookups_surface_the_reason() {
     use openhuman_core::mcp::host;
-    use openhuman_core::mcp::registry::connections;
     use wiremock::matchers::any;
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -361,7 +358,7 @@ async fn per_config_failure_lookups_surface_the_reason() {
 
     let (_tmp_a, cfg_a) = fresh_workspace_config();
     let (_tmp_b, cfg_b) = fresh_workspace_config();
-    let _host_b = host(&cfg_b);
+    let host_b = host(&cfg_b);
 
     let h = host(&cfg_a);
     let server = make_http_remote_server(&upstream.uri());
@@ -370,7 +367,7 @@ async fn per_config_failure_lookups_surface_the_reason() {
         .insert_server(&server)
         .expect("insert installed server");
 
-    let outcome = connections::connect(&cfg_a, &server).await;
+    let outcome = h.dynamic().connect(&server.server_id).await;
     assert!(
         outcome.is_err(),
         "a 401 from the endpoint must fail the connect, not report success"
@@ -382,36 +379,40 @@ async fn per_config_failure_lookups_surface_the_reason() {
          which is what makes the per-config forms the only correct ones here"
     );
 
-    let hint = connections::auth_hint_for_config(&cfg_a, &server.server_id).await;
+    let statuses = h.dynamic().status().await.expect("workspace A status");
+    let status = statuses
+        .iter()
+        .find(|status| status.server_id == server.server_id)
+        .expect("server status is retained after a failed connect");
     assert_eq!(
-        hint,
+        status.auth_hint.map(|hint| hint.as_code()),
         Some("credential_required"),
         "the workspace that attempted the connect must see why its 401 happened"
     );
-
-    let last_error = connections::last_error_for_config(&cfg_a, &server.server_id).await;
-    // Non-empty after trimming, not merely `Some`: the contract this pins is a
-    // *readable* reason, and `Some(String::new())` satisfies `is_some()` while
-    // telling a caller polling status precisely nothing.
     assert!(
-        last_error
-            .as_deref()
-            .is_some_and(|error| !error.trim().is_empty()),
-        "a failed attempt must leave a readable reason behind — `connect`'s own contract \
-         is that a caller polling status sees it without re-attempting; got {last_error:?}"
+        status.last_error.is_none(),
+        "unauthorized response bodies are not exposed as last_error"
     );
 
     // A failure belongs to the workspace that hit it, not to every workspace.
     assert!(
-        connections::auth_hint_for_config(&cfg_b, &server.server_id)
+        host_b
+            .dynamic()
+            .status()
             .await
-            .is_none(),
+            .expect("workspace B status")
+            .iter()
+            .all(|status| status.server_id != server.server_id),
         "an auth hint must not leak across workspaces"
     );
     assert!(
-        connections::last_error_for_config(&cfg_b, &server.server_id)
+        host_b
+            .dynamic()
+            .status()
             .await
-            .is_none(),
+            .expect("workspace B status")
+            .iter()
+            .all(|status| status.server_id != server.server_id),
         "a failure must not leak across workspaces"
     );
 }

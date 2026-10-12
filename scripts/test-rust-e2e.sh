@@ -168,17 +168,40 @@ fi
 # execute. Keep this list in the same canonical source as `pnpm test:rust`.
 PRODUCT_FEATURES="$(bash "$REPO_ROOT/scripts/ci/product-features.sh")"
 
+# Shell command analysis and the storage URL E2E suites load TinyBox through
+# the native module path. Download the registry-pinned release and verify its
+# digest before the subprocesses start.
+module_target="$(bash "$SCRIPT_DIR/ci/native-test-module-platform.sh")"
+IFS=$'\t' read -r module_ext module_platform <<< "$module_target"
+tinybox_asset="$(node scripts/ci/self-hosted/test-module-assets.mjs "$module_platform" tinybox)"
+IFS=$'\t' read -r _tinybox_id tinybox_url tinybox_filename tinybox_sha256 <<< "$tinybox_asset"
+tinybox_dir="$REPO_ROOT/target/test-modules/tinybox/$tinybox_sha256"
+tinybox_archive="$tinybox_dir/$tinybox_filename"
+if [ ! -f "$tinybox_dir/libtinybox.$module_ext" ]; then
+  echo "[rust-e2e] Downloading the checksum-pinned TinyBox test module ..."
+  mkdir -p "$tinybox_dir"
+  curl --fail --location --silent --show-error "$tinybox_url" --output "$tinybox_archive"
+  if command -v shasum >/dev/null 2>&1; then
+    echo "${tinybox_sha256}  $tinybox_archive" | shasum -a 256 -c
+  else
+    echo "${tinybox_sha256}  $tinybox_archive" | sha256sum --check
+  fi
+  tar -xzf "$tinybox_archive" -C "$tinybox_dir"
+fi
+export OPENHUMAN_MODULE_PATH="$tinybox_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
+
 # Module-backed Composio coverage must use the pinned local artifact as well.
 # Without this override the core resolves TinyConnectors through release
 # metadata, turning an otherwise hermetic mock-backend suite into a network
 # dependency and permanently faulting that process when the lookup fails.
 if [ -z "${TINYCONNECTORS_TEST_MODULE:-}" ]; then
   connectors_manifest="vendor/tinyconnectors/crates/tinyconnectors/Cargo.toml"
-  connectors_module="vendor/tinyconnectors/target/release/libtinyconnectors.so"
+  connectors_target_dir="$REPO_ROOT/target/native-test-modules/tinyconnectors"
+  connectors_module="$connectors_target_dir/release/libtinyconnectors.$module_ext"
   echo "[rust-e2e] Building pinned TinyConnectors test module ..."
-  "$CARGO_BIN" build --release --manifest-path "$connectors_manifest"
+  "$CARGO_BIN" build --release --manifest-path "$connectors_manifest" --target-dir "$connectors_target_dir"
   connectors_module="$(node scripts/ci/stage-connector-test-module.mjs \
-    "$REPO_ROOT/$connectors_module" "$REPO_ROOT/target/test-modules/tinyconnectors")"
+    "$connectors_module" "$REPO_ROOT/target/test-modules/tinyconnectors")"
   export TINYCONNECTORS_TEST_MODULE="$connectors_module"
 fi
 
@@ -187,10 +210,11 @@ fi
 # and executing the E2E targets; never fall back to release downloads in a test.
 if [ -z "${TINYSEARCH_TEST_MODULE:-}" ]; then
   search_manifest="vendor/tinysearch/crates/tinysearch/Cargo.toml"
-  search_module="vendor/tinysearch/target/release/libtinysearch.so"
+  search_target_dir="$REPO_ROOT/target/native-test-modules/tinysearch"
+  search_module="$search_target_dir/release/libtinysearch.$module_ext"
   echo "[rust-e2e] Building pinned TinySearch test module ..."
-  "$CARGO_BIN" build --release --manifest-path "$search_manifest"
-  export TINYSEARCH_TEST_MODULE="$REPO_ROOT/$search_module"
+  "$CARGO_BIN" build --release --manifest-path "$search_manifest" --target-dir "$search_target_dir"
+  export TINYSEARCH_TEST_MODULE="$search_module"
 fi
 
 echo "[rust-e2e] Running ${#SUITES[@]} suite(s) serially."

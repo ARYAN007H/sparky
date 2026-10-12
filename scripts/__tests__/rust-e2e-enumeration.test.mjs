@@ -224,7 +224,10 @@ test("the E2E runner builds and exports its pinned search module fixture", () =>
   const end = source.indexOf('echo "[rust-e2e] Running', start);
   assert.ok(start >= 0 && end > start, "module preparation block exists");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rust-e2e-modules-"));
-  const connectorDir = path.join(dir, "vendor/tinyconnectors/target/release");
+  const connectorDir = path.join(
+    dir,
+    "target/native-test-modules/tinyconnectors/release",
+  );
   fs.mkdirSync(connectorDir, { recursive: true });
   fs.writeFileSync(
     path.join(connectorDir, "libtinyconnectors.so"),
@@ -246,6 +249,7 @@ test("the E2E runner builds and exports its pinned search module fixture", () =>
           "set -euo pipefail",
           'REPO_ROOT="$STUB_DIR"',
           'CARGO_BIN="$STUB_DIR/cargo"',
+          "module_ext=so",
           "unset TINYCONNECTORS_TEST_MODULE TINYSEARCH_TEST_MODULE",
           source.slice(start, end),
           "printf 'search=%s\\n' \"${TINYSEARCH_TEST_MODULE:-}\"",
@@ -258,7 +262,7 @@ test("the E2E runner builds and exports its pinned search module fixture", () =>
     );
     assert.ok(
       output.includes(
-        `search=${dir}/vendor/tinysearch/target/release/libtinysearch.so`,
+        `search=${dir}/target/native-test-modules/tinysearch/release/libtinysearch.so`,
       ),
       output,
     );
@@ -273,7 +277,8 @@ test("the E2E runner builds and exports its pinned search module fixture", () =>
       fs
         .readFileSync(runLog, "utf8")
         .includes(
-          "build --release --manifest-path vendor/tinysearch/crates/tinysearch/Cargo.toml",
+          "build --release --manifest-path vendor/tinysearch/crates/tinysearch/Cargo.toml --target-dir " +
+            path.join(dir, "target/native-test-modules/tinysearch"),
         ),
     );
   } finally {

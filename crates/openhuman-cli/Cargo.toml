@@ -225,10 +225,6 @@ name = "composio_list_tools_stack_overflow_regression"
 path = "../../tests/composio_list_tools_stack_overflow_regression.rs"
 
 [[test]]
-name = "cwd_jail_e2e"
-path = "../../tests/cwd_jail_e2e.rs"
-
-[[test]]
 name = "windows_sandbox_env_e2e"
 path = "../../tests/windows_sandbox_env_e2e.rs"
 

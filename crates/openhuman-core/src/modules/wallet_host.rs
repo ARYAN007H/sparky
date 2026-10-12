@@ -17,6 +17,10 @@ use tinywallet_bus::wire::{
     WalletAccountInfo, WalletAccountsResponse, WalletBackendRequest, WalletBackendResponse,
 };
 
+#[path = "wallet_host/transport.rs"]
+mod transport;
+use transport::{classify_transport_error, validate_module_endpoint_url, TransportFailure};
+
 const HOST_ERROR_NAME: &str = "ai.tinyhumans.tinywallet.Host.Error.CallbackFailed";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -410,7 +414,10 @@ fn native_intent_matches_quote(
         },
         NativeWalletExecutionIntent::SolanaMessage { message_hex } => {
             quote.chain == WalletChain::Solana
-                && quote.kind == PreparedKind::TokenTransfer
+                && matches!(
+                    quote.kind,
+                    PreparedKind::NativeTransfer | PreparedKind::TokenTransfer
+                )
                 && valid_hex(message_hex)
         }
     }
@@ -681,35 +688,6 @@ impl WalletHost {
                 .then(|| "x402 payment was not explicitly approved for this chat".into()),
         }))
     }
-}
-
-enum TransportFailure {
-    Unreachable(String),
-    Rpc(String),
-}
-
-fn classify_transport_error(message: String) -> TransportFailure {
-    if ["transport failed", "read body failed"]
-        .iter()
-        .any(|marker| message.contains(marker))
-    {
-        TransportFailure::Unreachable(message)
-    } else {
-        TransportFailure::Rpc(message)
-    }
-}
-
-fn validate_module_endpoint_url(raw: &str) -> Result<String, String> {
-    let url = reqwest::Url::parse(raw)
-        .map_err(|_| "wallet module selected an invalid RPC endpoint URL".to_string())?;
-    if !matches!(url.scheme(), "http" | "https")
-        || url.host_str().is_none()
-        || !url.username().is_empty()
-        || url.password().is_some()
-    {
-        return Err("wallet module selected an unsafe RPC endpoint URL".into());
-    }
-    Ok(raw.to_owned())
 }
 
 fn endpoint_key(

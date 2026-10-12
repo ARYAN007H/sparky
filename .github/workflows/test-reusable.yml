@@ -282,6 +282,15 @@ jobs:
             fi
           done < <(integration_test_targets)
 
+          # This contract test loads the released TinyHosts module into a
+          # fresh process. Keep it out of the shared unit process, but include
+          # it in the product gate with the checksum-verified fixture installed
+          # above.
+          bash scripts/ci-cancel-aware.sh cargo test -p openhuman --lib \
+            --features "${CORE_FEATURES}" \
+            hosting::hosting_tests::released_artifact_serves_providers_and_confidential_local_preparation \
+            -- --exact --ignored --test-threads=1
+
   rust-core-tests-windows:
     if: inputs.run_rust_core
     name: Rust Core Tests (Windows — secrets ACL)

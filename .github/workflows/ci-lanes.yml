@@ -71,6 +71,12 @@ jobs:
       - name: Check out submodules
         run: bash scripts/ci/checkout-submodules.sh
 
+      - name: Install jq for release-script tests
+        if: steps.filter.outputs.scripts == 'true'
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends jq python3-tomli
+
       - name: Detect changed areas
         id: filter
         uses: dorny/paths-filter@v4
@@ -263,6 +269,12 @@ jobs:
         # The checkout is owned by the runner uid; the container runs as root.
         if: matrix.container != ''
         run: git config --global --add safe.directory '*'
+
+      - name: Install jq for release-script tests
+        if: matrix.container != '' && needs.plan.outputs.scripts == 'true'
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends jq python3-tomli
 
       - name: Check out submodules
         run: bash scripts/ci/checkout-submodules.sh

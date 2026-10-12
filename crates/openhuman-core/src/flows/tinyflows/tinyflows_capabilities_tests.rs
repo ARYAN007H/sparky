@@ -88,8 +88,10 @@ async fn engine_run_drives_trigger_to_http_request_through_the_real_seam() {
 // ── Code adapter ──────────────────────────────────────────────────────────
 
 /// Requires `node` on `PATH` (the code node runs the host's Node under the
-/// sandbox). Runs by default; on a host without Node it prints a `SKIPPED`
-/// line instead of failing.
+/// sandbox). TinyBox's native backend only provides the required isolation on
+/// Linux; macOS Seatbelt and other fallback backends deliberately do not meet
+/// the untrusted-code floor.
+#[cfg(target_os = "linux")]
 #[tokio::test]
 async fn code_adapter_javascript_passthrough_round_trips_json() {
     if std::process::Command::new("node")

@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import {
   mkdtempSync,
   mkdirSync,
+  readFileSync,
   writeFileSync,
   existsSync,
   rmSync,
@@ -33,6 +34,36 @@ test("native document regressions receive a checksum-pinned module fixture", () 
 const installer = fileURLToPath(
   new URL("../ci/self-hosted/install-test-modules.sh", import.meta.url),
 );
+const localRustRunner = fileURLToPath(
+  new URL("../test-rust-with-mock.sh", import.meta.url),
+);
+
+test("locally built native Rust test modules use the checkout target tree", () => {
+  const source = readFileSync(localRustRunner, "utf8");
+  assert.match(source, /target\/native-test-modules\/tinyjuice/);
+  assert.match(source, /target\/native-test-modules\/tinysearch/);
+  assert.match(source, /target\/native-test-modules\/tinyconnectors/);
+  assert.doesNotMatch(
+    source,
+    /vendor\/tiny(?:juice|search|connectors)\/target/,
+  );
+});
+
+test("local MCP registry E2E tests load the pinned TinyMCP module", () => {
+  const source = readFileSync(localRustRunner, "utf8");
+  assert.match(source, /test-module-assets\.mjs .*tinymcp/);
+  assert.match(source, /target\/test-modules\/tinymcp/);
+  assert.match(source, /OPENHUMAN_MODULE_PATH="\$tinymcp_dir/);
+});
+
+test("MCP registry Rust integration tests run serially", () => {
+  const source = readFileSync(localRustRunner, "utf8");
+  assert.match(
+    source,
+    /mcp_registry_e2e[\s\S]*?--test-threads=1/,
+    "the TinyMCP process state is shared across test cases",
+  );
+});
 
 for (const [description, resolverExit] of [
   ["failed", 7],
@@ -84,7 +115,7 @@ for (const [description, resolverExit] of [
   });
 }
 
-for (const id of ["tinywallet", "tinychannels", "tinymcp"]) {
+for (const id of ["tinybox", "tinywallet", "tinychannels", "tinymcp", "tinyhosts"]) {
   test(`native ${id} regressions receive their pinned release fixture`, () => {
     const assets = resolveTestModuleAssets(
       readRegistrySource(),
