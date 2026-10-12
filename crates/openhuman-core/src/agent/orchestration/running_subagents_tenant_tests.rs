@@ -186,12 +186,18 @@ async fn saas_dispatch_exposes_only_the_callers_detached_worker_controls() {
         }
         assert_eq!(pair.a.queue.status().await.steers, 0);
         assert_eq!(
-            field(&dispatched_control("steer", &pair.b.task).await.unwrap(), "steered"),
+            field(
+                &dispatched_control("steer", &pair.b.task).await.unwrap(),
+                "steered"
+            ),
             Some(true)
         );
         assert_eq!(pair.b.queue.status().await.steers, 1);
         assert_eq!(
-            field(&dispatched_control("cancel", &pair.b.task).await.unwrap(), "cancelled"),
+            field(
+                &dispatched_control("cancel", &pair.b.task).await.unwrap(),
+                "cancelled"
+            ),
             Some(true)
         );
         assert!(crate::core::all::schema_for_rpc_method("openhuman.config_get_config").is_none());
@@ -202,11 +208,16 @@ async fn saas_dispatch_exposes_only_the_callers_detached_worker_controls() {
             .schema;
         let method = crate::core::all::rpc_method_name(&unreviewed);
         assert!(crate::core::all::schema_for_rpc_method(&method).is_none());
-        assert!(crate::core::invoke::invoke_method(
-            crate::core::invoke::default_state(),
-            &method,
-            serde_json::json!({}),
-        ).await.is_err(), "unreviewed Agent methods remain absent");
+        assert!(
+            crate::core::invoke::invoke_method(
+                crate::core::invoke::default_state(),
+                &method,
+                serde_json::json!({}),
+            )
+            .await
+            .is_err(),
+            "unreviewed Agent methods remain absent"
+        );
     })
     .await;
     CoreContext::scope(pair.alice.clone(), async {
@@ -232,7 +243,10 @@ async fn unscoped_async_spawn_refuses_before_persisting_a_running_session() {
     use tinyagents_harness::tool::ToolDispatch;
     let _ = crate::agent::harness::definition::AgentDefinitionRegistry::init_global_builtins();
     let workspace = tempfile::tempdir().unwrap();
-    assert!(crate::storage::installed().is_none(), "exercise the real file fallback");
+    assert!(
+        crate::storage::installed().is_none(),
+        "exercise the real file fallback"
+    );
     let parent = ParentExecutionContext {
         workspace_descriptor: None,
         agent_definition_id: "orchestrator".into(),
@@ -262,8 +276,10 @@ async fn unscoped_async_spawn_refuses_before_persisting_a_running_session() {
     };
     let run = crate::agent::tinyagents::host::OpenHumanRunContext::new()
         .with_parent(parent)
-        .into_tinyagents(tinyagents_harness::context::RunConfig::new("scope-refusal")
-            .with_thread("scope-refusal-parent"));
+        .into_tinyagents(
+            tinyagents_harness::context::RunConfig::new("scope-refusal")
+                .with_thread("scope-refusal-parent"),
+        );
     let result = SpawnAsyncSubagentDispatch::new(Arc::new(SpawnAsyncSubagentTool::new()))
         .execute(
             &(),
@@ -274,13 +290,30 @@ async fn unscoped_async_spawn_refuses_before_persisting_a_running_session() {
         )
         .await
         .expect("tool dispatch reports a refusal as a tool outcome");
-    let sessions = SubagentSessionStore::new(workspace.path().to_path_buf()).load().unwrap();
-    assert!(result.is_error, "unscoped spawn must not report accepted: {}", result.output());
-    assert!(result.output().contains("scope"), "typed refusal must explain missing scope");
-    assert!(sessions.is_empty(), "refused spawn must not create durable sessions: {sessions:?}");
+    let sessions = SubagentSessionStore::new(workspace.path().to_path_buf())
+        .load()
+        .unwrap();
+    assert!(
+        result.is_error,
+        "unscoped spawn must not report accepted: {}",
+        result.output()
+    );
+    assert!(
+        result.output().contains("scope"),
+        "typed refusal must explain missing scope"
+    );
+    assert!(
+        sessions.is_empty(),
+        "refused spawn must not create durable sessions: {sessions:?}"
+    );
     assert!(snapshot_for_parent(PARENT).is_empty());
-    assert!(std::fs::read_dir(workspace.path()).unwrap().next().is_none(),
-        "scope refusal must precede session and worker-thread writes");
+    assert!(
+        std::fs::read_dir(workspace.path())
+            .unwrap()
+            .next()
+            .is_none(),
+        "scope refusal must precede session and worker-thread writes"
+    );
 }
 
 #[tokio::test]
