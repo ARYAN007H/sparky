@@ -4,8 +4,8 @@
 //! config section's overrides live in a submodule below.
 
 mod dictation_context;
-mod modules;
 mod embeddings;
+mod modules;
 mod observability;
 mod proxy;
 mod runtime;
