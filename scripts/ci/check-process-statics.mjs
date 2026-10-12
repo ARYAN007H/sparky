@@ -84,6 +84,7 @@ export function declarations(text, file) {
     const type = stripRustComments(text.slice(start, end), {
       preserveLiterals: true,
       compact: true,
+      preserveTokenBoundaries: true,
     });
     if (!type) throw new Error(`${file}: static ${match[2]} has no type`);
     found.push({
