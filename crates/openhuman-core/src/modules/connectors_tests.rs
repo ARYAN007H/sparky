@@ -67,8 +67,7 @@ fn every_member_this_host_names_is_one_the_module_serves() {
 
 /// A config with no backend session and no stored key.
 fn bare_config() -> Config {
-    let mut config = Config::default();
-    config
+    Config::default()
 }
 
 #[test]
