@@ -335,3 +335,12 @@ test("numeric and supplementary Unicode macro token boundaries remain distinct",
     assert.equal(reviewChanges(before, after, []).length, 1);
   }
 });
+
+test("macro punctuation jointness cannot change without ownership review", () => {
+  for (const [left, right] of [["a.. =b", "a..=b"], [".. =", "..="], ["# $", "#$"], ["1e +2", "1e+2"]]) {
+    const before = scan(`static X: ty!(${left}) = x;`);
+    const after = scan(`static X: ty!(${right}) = x;`);
+    assert.notEqual(before[0].type, after[0].type, left);
+    assert.equal(reviewChanges(before, after, []).length, 1);
+  }
+});
