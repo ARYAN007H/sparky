@@ -371,10 +371,10 @@ async fn removal_reserves_ids_until_cleanup_finishes(runtime: Arc<Runtime>, scra
             runtime.agent_ids().iter().any(|reserved| reserved == id),
             "removal must retain the id reservation until cleanup finishes"
         );
-            assert!(
-                openhuman_core::agent::host_agents::resolve(id).is_none(),
-                "removed agents must not admit new sessions through core drivers"
-            );
+        assert!(
+            openhuman_core::agent::host_agents::resolve(id).is_none(),
+            "removed agents must not admit new sessions through core drivers"
+        );
         assert!(
             matches!(runtime.remove_agent(id).await, Err(AgentError::UnknownId(ref removed)) if removed == id),
             "a second removal cannot claim the same cleanup reservation"

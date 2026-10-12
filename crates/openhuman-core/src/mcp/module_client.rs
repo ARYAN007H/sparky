@@ -467,26 +467,24 @@ impl McpConfiguredClient {
     pub(crate) fn agent_close_pending(data_dir: &std::path::Path) -> bool {
         Self::cleanup_pending(data_dir)
             || CLIENTS
-            .get()
-            .and_then(|clients| {
-                clients
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .get(data_dir)
-                    .map(|client| client.retiring.load(Ordering::Acquire))
-            })
-            .unwrap_or(false)
+                .get()
+                .and_then(|clients| {
+                    clients
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                        .get(data_dir)
+                        .map(|client| client.retiring.load(Ordering::Acquire))
+                })
+                .unwrap_or(false)
     }
 
     fn cleanup_pending(data_dir: &std::path::Path) -> bool {
-        CLEANUP_RESERVATIONS
-            .get()
-            .is_some_and(|reservations| {
-                reservations
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .contains_key(data_dir)
-            })
+        CLEANUP_RESERVATIONS.get().is_some_and(|reservations| {
+            reservations
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .contains_key(data_dir)
+        })
     }
 
     fn reservation_for(data_dir: &std::path::Path) -> Arc<CleanupReservation> {
