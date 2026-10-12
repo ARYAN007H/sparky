@@ -201,8 +201,22 @@ async fn a_session_opens_in_a_fresh_profile_while_another_chrome_holds_it() {
         user_data_dir: Some(held.clone()),
         ..SessionOptions::default()
     };
-    fresh_if_held(&mut options, std::time::Duration::from_millis(50)).await;
+    let wait = std::time::Duration::from_millis(50);
+    assert_eq!(
+        claim_profile(&mut options, wait).await,
+        Some(profile.clone())
+    );
     assert_eq!(options.user_data_dir.as_deref(), Some(held.as_str()));
+
+    // A second session while the first's browser is still starting.
+    let mut second = SessionOptions {
+        user_data_dir: Some(held.clone()),
+        ..SessionOptions::default()
+    };
+    assert_eq!(claim_profile(&mut second, wait).await, None);
+    assert!(second.user_data_dir.is_none());
+    super::super::browser_profile::release(&profile);
+
     #[cfg(not(windows))]
     {
         let here = sysinfo::System::host_name().unwrap_or_default();
@@ -211,7 +225,7 @@ async fn a_session_opens_in_a_fresh_profile_while_another_chrome_holds_it() {
             profile.join("SingletonLock"),
         )
         .unwrap();
-        fresh_if_held(&mut options, std::time::Duration::from_millis(50)).await;
+        assert_eq!(claim_profile(&mut options, wait).await, None);
         assert!(options.user_data_dir.is_none());
     }
     let _ = std::fs::remove_dir_all(&profile);

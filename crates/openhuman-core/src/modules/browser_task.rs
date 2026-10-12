@@ -10,6 +10,7 @@
 
 use std::collections::BTreeMap;
 use std::future::Future;
+use std::path::PathBuf;
 use std::pin::Pin;
 use std::time::{Duration, Instant};
 
@@ -118,7 +119,7 @@ pub(crate) async fn begin<'a>(
         return Err("a browser task needs at least one allowed origin".to_owned());
     }
     let mut request = start_request(config, task);
-    free_profile(&mut request, super::browser_profile::PROFILE_WAIT).await;
+    let claimed = claim_profile(&mut request, super::browser_profile::PROFILE_WAIT).await;
     let mut following = super::browser_sites::apply(config, task, &mut request).await;
     tracing::debug!(
         origins = task.origins.len(),
@@ -127,18 +128,28 @@ pub(crate) async fn begin<'a>(
         learning = following.is_some(),
         "[browser-task] starting"
     );
-    let view = match send(request.clone()).await {
+    let sent = match send(request.clone()).await {
         Err(error) if refused_flow(&error) => match following.as_mut() {
             Some(reusing) if reusing.reuses_plan() => {
                 // The error's text is the module's, and can quote the plan.
                 tracing::warn!("[browser-task] the module refused a saved plan; planning afresh");
                 super::browser_sites::refused(config, reusing).await;
                 request.flow = None;
-                send(request).await?
+                send(request).await
             }
-            _ => return Err(error),
+            _ => Err(error),
         },
-        sent => sent?,
+        sent => sent,
+    };
+    let view = match sent {
+        Ok(view) => view,
+        Err(error) => {
+            // A task that did not start starts no browser on the profile.
+            if let Some(profile) = claimed {
+                super::browser_profile::release(&profile);
+            }
+            return Err(error);
+        }
     };
     super::browser_sites::follow(config, &view.id, following);
     Ok(view)
@@ -286,21 +297,22 @@ fn refused_flow(error: &str) -> bool {
     ))
 }
 
-/// Leaves `request` its persistent profile only when no other Chrome holds
-/// it within `wait`. Chrome lets one browser at a time use a profile folder,
-/// so a task waits a moment for one closing on it (the browser of the task
-/// before it, which closes as it ends), and otherwise runs in a fresh profile
-/// rather than fail to start its browser.
-async fn free_profile(request: &mut StartTaskRequest, wait: Duration) {
-    let Some(profile) = request.constraints.browser_profile.clone() else {
-        return;
-    };
-    if !super::browser_profile::free_within(std::path::Path::new(&profile), wait).await {
-        tracing::warn!(
-            "[browser-task] another Chrome holds the persistent profile; this task runs in a fresh profile"
-        );
-        request.constraints.browser_profile = None;
+/// Claims `request`'s persistent profile for the task's browser, or leaves it
+/// a fresh profile when another browser still holds the folder after `wait`;
+/// the folder it claimed. Chrome lets one browser at a time use a profile
+/// folder, so a task waits a moment for one closing on it (the browser of the
+/// task before it, which closes as it ends), and otherwise runs in a fresh
+/// profile rather than fail to start its browser.
+async fn claim_profile(request: &mut StartTaskRequest, wait: Duration) -> Option<PathBuf> {
+    let profile = PathBuf::from(request.constraints.browser_profile.as_ref()?);
+    if super::browser_profile::claim_within(&profile, wait).await {
+        return Some(profile);
     }
+    tracing::warn!(
+        "[browser-task] another browser holds the persistent profile; this task runs in a fresh profile"
+    );
+    request.constraints.browser_profile = None;
+    None
 }
 
 /// A module reply as its data, or as the error the tool reports: its code,

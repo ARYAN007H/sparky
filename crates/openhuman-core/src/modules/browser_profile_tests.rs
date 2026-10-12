@@ -64,7 +64,7 @@ async fn waiting_ends_as_soon_as_the_folder_is_let_go() {
     let path = folder("closing");
     let lock = path.join("SingletonLock");
     std::os::unix::fs::symlink(format!("{here}-{}", std::process::id()), &lock).unwrap();
-    assert!(!free_within(&path, Duration::from_millis(300)).await);
+    assert!(!claim_within(&path, Duration::from_millis(300)).await);
     let letting_go = {
         let lock = lock.clone();
         tokio::spawn(async move {
@@ -72,7 +72,52 @@ async fn waiting_ends_as_soon_as_the_folder_is_let_go() {
             std::fs::remove_file(lock).unwrap();
         })
     };
-    assert!(free_within(&path, PROFILE_WAIT).await);
+    assert!(claim_within(&path, PROFILE_WAIT).await);
     letting_go.await.unwrap();
+    release(&path);
+    let _ = std::fs::remove_dir_all(&path);
+}
+
+#[tokio::test]
+async fn a_folder_claimed_for_a_starting_browser_is_held_until_released() {
+    let path = folder("claimed");
+    assert!(claim_within(&path, Duration::ZERO).await);
+    assert!(
+        !claim_within(&path, Duration::from_millis(50)).await,
+        "a browser still starting on it holds it"
+    );
+    release(&path);
+    assert!(claim_within(&path, Duration::ZERO).await);
+    release(&path);
+    let _ = std::fs::remove_dir_all(&path);
+}
+
+#[tokio::test]
+async fn of_two_browsers_starting_together_one_claims_the_folder() {
+    // Both look before either Chrome has locked the folder.
+    let path = folder("together");
+    let (first, second) = tokio::join!(
+        claim_within(&path, Duration::from_millis(50)),
+        claim_within(&path, Duration::from_millis(50)),
+    );
+    assert!(first ^ second, "first {first}, second {second}");
+    release(&path);
+    let _ = std::fs::remove_dir_all(&path);
+}
+
+#[cfg(not(windows))]
+#[tokio::test]
+async fn a_claim_ends_when_its_chrome_holds_the_folder() {
+    let here = sysinfo::System::host_name().unwrap_or_default();
+    let path = folder("taken-up");
+    assert!(claim_within(&path, Duration::ZERO).await);
+    // Its Chrome has started and locked the folder.
+    let lock = path.join("SingletonLock");
+    std::os::unix::fs::symlink(format!("{here}-{}", std::process::id()), &lock).unwrap();
+    assert!(!claim_within(&path, Duration::ZERO).await);
+    // That Chrome has closed: nothing of the claim is left to hold the folder.
+    std::fs::remove_file(&lock).unwrap();
+    assert!(claim_within(&path, Duration::ZERO).await);
+    release(&path);
     let _ = std::fs::remove_dir_all(&path);
 }

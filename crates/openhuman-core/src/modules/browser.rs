@@ -204,12 +204,19 @@ impl BrowserClient {
         } else {
             None
         };
-        fresh_if_held(&mut options, super::browser_profile::SESSION_PROFILE_WAIT).await;
+        let claimed =
+            claim_profile(&mut options, super::browser_profile::SESSION_PROFILE_WAIT).await;
         options.download_dir = browser.download_dir.clone();
         options.default_timeout_ms = browser.task_timeout_secs.saturating_mul(1000);
         options.allowed_origins =
             origin.map_or_else(|| self.browser_origins(), |origin| vec![origin]);
-        self.call(names::methods::OPEN_SESSION, options).await
+        let opened = self.call(names::methods::OPEN_SESSION, options).await;
+        // An open session's Chrome holds the profile itself; one that did
+        // not open holds nothing.
+        if let Some(profile) = claimed {
+            super::browser_profile::release(&profile);
+        }
+        opened
     }
 
     /// Open a session bound to the host tree of an explicit destination.
@@ -481,21 +488,25 @@ fn parsed_browser_url(raw: &str) -> Result<url::Url, BrowserCallError> {
         .map_err(|_| BrowserCallError::Policy("invalid URL".into()))
 }
 
-/// Leaves `options` its persistent profile only when no other Chrome holds
-/// it within `wait`. Chrome lets one browser at a time use a profile folder:
-/// a second one hands its window to the first and exits, and a session in
-/// one conversation found the profile held by another conversation's
-/// browser, or a task's. Such a session uses a fresh profile instead.
-async fn fresh_if_held(options: &mut SessionOptions, wait: std::time::Duration) {
-    let Some(profile) = options.user_data_dir.clone() else {
-        return;
-    };
-    if !super::browser_profile::free_within(std::path::Path::new(&profile), wait).await {
-        tracing::warn!(
-            "[browser] another Chrome holds the persistent profile; this session uses a fresh profile"
-        );
-        options.user_data_dir = None;
+/// Claims `options`' persistent profile for the session's browser, or leaves
+/// it a fresh profile when another browser still holds the folder after
+/// `wait`; the folder it claimed. Chrome lets one browser at a time use a
+/// profile folder: a second one hands its window to the first and exits, and
+/// a session in one conversation found the profile held by another
+/// conversation's browser, or a task's.
+async fn claim_profile(
+    options: &mut SessionOptions,
+    wait: std::time::Duration,
+) -> Option<std::path::PathBuf> {
+    let profile = std::path::PathBuf::from(options.user_data_dir.as_ref()?);
+    if super::browser_profile::claim_within(&profile, wait).await {
+        return Some(profile);
     }
+    tracing::warn!(
+        "[browser] another browser holds the persistent profile; this session uses a fresh profile"
+    );
+    options.user_data_dir = None;
+    None
 }
 
 fn browser_allow_all() -> bool {

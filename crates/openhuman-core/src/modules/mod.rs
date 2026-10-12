@@ -31,7 +31,8 @@
 //! - [`browser`] and [`browser_task`] — TinyComputer browser members and tasks
 //!   without linking the browser engine into the core; [`browser_sites`] keeps
 //!   what finished tasks learned about each site for the next task there, and
-//!   [`browser_profile`] tells whether a Chrome holds the persistent profile.
+//!   [`browser_profile`] tells whether a Chrome holds the persistent profile
+//!   and claims it for a browser about to start.
 //! - [`wallet`] — the host half of the `tinywallet` module, which builds and
 //!   assembles transactions while the signing key stays in this process.
 //! - [`host`] — the module broker, connection and loader.
