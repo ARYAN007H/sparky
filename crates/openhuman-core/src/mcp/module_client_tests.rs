@@ -535,6 +535,56 @@ async fn agent_id_stays_unavailable_until_its_cached_module_close_is_acknowledge
 }
 
 #[tokio::test]
+async fn deferred_agent_purge_waits_for_module_close_and_keeps_the_id_reserved() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    let agent_dir = workspace.path().join("agents").join("alpha");
+    std::fs::create_dir_all(&agent_dir).expect("agent home");
+    std::fs::write(agent_dir.join("transcript.jsonl"), "kept until close").unwrap();
+    let mut config = Config::default();
+    config.workspace_dir = agent_dir.clone();
+    config.modules.enabled = true;
+
+    let port = FakePort::default();
+    port.block_first_close
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let close_started = Arc::clone(&port.close_started);
+    let release_close = Arc::clone(&port.release_close);
+    let client = McpConfiguredClient::install_test_port(&config, Box::new(port))
+        .expect("install module client");
+    client
+        .call::<bool>(&configured("agent"), "ConnectedOverview", ())
+        .await
+        .unwrap();
+
+    McpConfiguredClient::schedule_agent_close_and_cleanup(
+        &agent_dir,
+        Arc::new({
+            let agent_dir = agent_dir.clone();
+            move || std::fs::remove_dir_all(&agent_dir).is_ok() || !agent_dir.exists()
+        }),
+    );
+    close_started.notified().await;
+
+    assert!(agent_dir.join("transcript.jsonl").exists());
+    assert!(McpConfiguredClient::agent_close_pending(&agent_dir));
+    assert!(matches!(
+        McpConfiguredClient::for_config(&config),
+        Err(ModuleCallError::Unavailable)
+    ));
+
+    release_close.notify_one();
+    tokio::time::timeout(Duration::from_secs(1), async {
+        while McpConfiguredClient::agent_close_pending(&agent_dir) {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("close and deferred cleanup finish");
+    assert!(!agent_dir.exists());
+    assert!(McpConfiguredClient::for_config(&config).is_ok());
+}
+
+#[tokio::test]
 async fn a_removed_agent_context_cannot_reopen_its_evicted_client() {
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
     use crate::tools::toolpacks::ToolGroups;
