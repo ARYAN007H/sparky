@@ -4,14 +4,14 @@
     "rule": "sqlite-open",
     "site": "let conn = Connection::open(&db_path).with_context(|| {",
     "reason": "legacy fallback of a store that already runs on the storage port",
-    "issue": "https://github.com/tinyhumansai/openhuman/issues/7427"
+    "issue": "https://github.com/tinyhumansai/openhuman/issues/7431"
   },
   {
     "path": "crates/openhuman-core/src/security/devices/store.rs",
     "rule": "sqlite-open",
     "site": "let conn = Connection::open(&db_path)",
     "reason": "legacy fallback of a store that already runs on the storage port",
-    "issue": "https://github.com/tinyhumansai/openhuman/issues/7427"
+    "issue": "https://github.com/tinyhumansai/openhuman/issues/7431"
   },
   {
     "path": "crates/openhuman-core/src/desktop/notifications/store.rs",
@@ -32,7 +32,7 @@
     "rule": "sqlite-open",
     "site": "let conn = Connection::open(&path)",
     "reason": "legacy fallback of a store that already runs on the storage port",
-    "issue": "https://github.com/tinyhumansai/openhuman/issues/7430"
+    "issue": "https://github.com/tinyhumansai/openhuman/issues/7431"
   },
   {
     "path": "crates/openhuman-core/src/config/workspace/state.rs",
@@ -53,7 +53,7 @@
     "rule": "json-write",
     "site": "fs::write(&tmp_path, raw)",
     "reason": "legacy fallback of a store that already runs on the storage port",
-    "issue": "https://github.com/tinyhumansai/openhuman/issues/7424"
+    "issue": "https://github.com/tinyhumansai/openhuman/issues/7426"
   },
   {
     "path": "crates/openhuman-core/src/integrations/composio/file_store.rs",
@@ -81,7 +81,7 @@
     "rule": "json-write",
     "site": "let mut temp_file = NamedTempFile::new_in(parent)",
     "reason": "paired with the OS keychain mnemonic (and holds it when there is no keychain): moves with the secrets work, not as a plain document",
-    "issue": "https://github.com/tinyhumansai/openhuman/issues/7427"
+    "issue": "https://github.com/tinyhumansai/openhuman/issues/7430"
   },
   {
     "path": "crates/openhuman-core/src/inference/tokenjuice/savings.rs",
@@ -95,21 +95,21 @@
     "rule": "json-write",
     "site": "tokio::fs::write(&tmp_path, json).await.map_err(|e| {",
     "reason": "legacy fallback of a store that already runs on the storage port",
-    "issue": "https://github.com/tinyhumansai/openhuman/issues/7426"
+    "issue": "https://github.com/tinyhumansai/openhuman/issues/7425"
   },
   {
     "path": "crates/openhuman-core/src/agent/artifacts/store.rs",
     "rule": "json-write",
     "site": "tokio::fs::write(&args_path, json)",
     "reason": "legacy fallback of a store that already runs on the storage port",
-    "issue": "https://github.com/tinyhumansai/openhuman/issues/7426"
+    "issue": "https://github.com/tinyhumansai/openhuman/issues/7425"
   },
   {
     "path": "crates/openhuman-core/src/agent/artifacts/files.rs",
     "rule": "json-write",
     "site": "match tokio::fs::OpenOptions::new()",
     "reason": "Historical local artifact content reservation; a native BlobStore now exists, so this is migration debt, not a missing blob capability.",
-    "issue": "https://github.com/tinyhumansai/openhuman/issues/7426"
+    "issue": "https://github.com/tinyhumansai/openhuman/issues/7425"
   },
   {
     "path": "crates/openhuman-core/src/modules/browser_profile.rs",
