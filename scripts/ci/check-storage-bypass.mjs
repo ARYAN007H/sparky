@@ -61,6 +61,8 @@ function sameCheckout(root) {
 const enforceHistory = rootFlag === -1 || sameCheckout(repoRoot);
 
 export const CURATED_VENDOR_ROOTS = [
+  "vendor/tinyagents/crates/tinyagents-tasks/src",
+  "vendor/tinyskills/crates/tinyskills/src/registry/store.rs",
   "vendor/tinyagents/crates/tinyagents-session/src/run_ledger",
   "vendor/tinyagents/crates/tinyagents-session/src/threads/store",
   "vendor/tinyagents/crates/tinyagents-session/src/transcript",
@@ -71,6 +73,16 @@ export const CURATED_VENDOR_ROOTS = [
 ];
 
 export const RULES = [
+  {
+    rule: "file-store-new",
+    pattern: /\b(?:[A-Za-z_][\w]*::)*File[A-Za-z_]*(?:Store|Ledger)::new\s*\(/,
+    hint: "a file-backed constructor needs captured native routing or an audited cache classification",
+  },
+  {
+    rule: "task-store-open",
+    pattern: /\bopen_jsonl_task_store_or_memory\s*\(/,
+    hint: "the JSONL task opener needs captured native routing; a fallback does not make its file portable",
+  },
   {
     rule: "sqlite-open",
     pattern: /\bConnection::open(?:_with_flags)?\s*\(/,
