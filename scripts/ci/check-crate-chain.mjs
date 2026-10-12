@@ -139,15 +139,18 @@ export function stripRustComments(text, { preserveLiterals = false, compact = fa
     '<<', '>>', '+=', '-=', '*=', '/=', '%=', '&=', '|=', '^=', '..', '/*', '//']);
   const append = chunk => {
     if (!chunk) return;
-    const left = [...out].at(-1) ?? '';
-    const right = [...chunk][0];
-    if (compact && preserveTokenBoundaries && pendingBoundary && left &&
-        ((word(left) && word(right)) ||
-         (word(left) && ['"', "'", '#'].includes(right)) ||
-         (['"', "'", '#'].includes(left) && word(right)) ||
-         (left === '.' && /[0-9]/.test(right)) ||
-         (/[0-9]/.test(left) && right === '.') ||
-         joins.has(left + right))) out += ' ';
+    if (compact && preserveTokenBoundaries && pendingBoundary && out) {
+      const tail = out.slice(-2);
+      const left = [...tail].at(-1);
+      const right = String.fromCodePoint(chunk.codePointAt(0));
+      if ((word(left) && word(right)) ||
+          (word(left) && ['"', "'", '#'].includes(right)) ||
+          (['"', "'", '#'].includes(left) && word(right)) ||
+          (left === '#' && right === '"') ||
+          (left === '.' && /[0-9]/.test(right)) ||
+          (/[0-9]/.test(left) && right === '.') ||
+          joins.has(left + right)) out += ' ';
+    }
     out += chunk;
     pendingBoundary = false;
   };
