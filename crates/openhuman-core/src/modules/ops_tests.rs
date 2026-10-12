@@ -590,3 +590,48 @@ fn status_reports_the_source_that_serves_a_module() {
         assert_eq!(source, ModuleSource::LocalFile);
     }
 }
+
+#[tokio::test]
+async fn a_registered_linked_factory_serves_the_module_and_status_says_so() {
+    use crate::config::schema::ModuleSourceMode;
+    use crate::modules::linked::register_linked;
+    use crate::modules::types::ModuleSource;
+
+    register_linked("tinychannels", tinychannels_module::linked_module);
+    let mut config = Config::default();
+    config.modules.source = ModuleSourceMode::Linked;
+    ops::ensure_loaded(&config, "tinychannels")
+        .await
+        .expect("the linked module is admitted through the seam");
+
+    let status = list(&config)
+        .into_iter()
+        .find(|m| m.id == "tinychannels")
+        .expect("tinychannels is registered");
+    assert_eq!(status.state, ModuleState::Ready);
+    assert_eq!(status.source, Some(ModuleSource::Linked));
+    assert_eq!(status.detail, None);
+}
+
+#[tokio::test]
+async fn attaching_a_linked_module_without_a_factory_fails_with_a_static_reason() {
+    let runtime = crate::modules::host::runtime().await.expect("module host");
+    let error = ops::load_linked(runtime, "tinyhosts-no-factory", serde_json::json!({}))
+        .expect_err("no factory is registered for this id");
+    assert!(error.contains("no linked factory"), "{error}");
+    assert!(!error.contains('/'), "{error}");
+}
+
+#[tokio::test]
+async fn a_failing_linked_factory_is_reported_without_its_error_detail() {
+    fn failing() -> tinybus::Result<tinybus::module::LinkedModule> {
+        Err(tinybus::Error::failed("secret-token /home/user/path"))
+    }
+    crate::modules::linked::register_linked("linked-failing-test", failing);
+    let runtime = crate::modules::host::runtime().await.expect("module host");
+    let error = ops::load_linked(runtime, "linked-failing-test", serde_json::json!({}))
+        .expect_err("the factory fails");
+    assert!(error.contains("linked factory could not be started"), "{error}");
+    assert!(!error.contains("secret-token"), "{error}");
+    assert!(!error.contains("/home"), "{error}");
+}
