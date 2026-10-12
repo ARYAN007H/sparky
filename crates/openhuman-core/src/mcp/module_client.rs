@@ -118,11 +118,15 @@ pub(crate) trait McpModulePort: Send + Sync {
 mod module_port;
 use module_port::TinyMcpPort;
 
+#[path = "agent_cleanup.rs"]
+pub(crate) mod agent_cleanup;
+
 /// One workspace's serialized TinyMCP lifecycle and private object proxy.
 pub(crate) struct McpConfiguredClient {
     data_dir: String,
     port: Box<dyn McpModulePort>,
     state: tokio::sync::Mutex<State>,
+    retired: AtomicBool,
 }
 
 impl McpConfiguredClient {
@@ -144,7 +148,15 @@ impl McpConfiguredClient {
         let mut clients = clients
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
+        // Check while holding the same lock cleanup uses. A previously
+        // admitted turn must not create a first client after removal.
+        if agent_cleanup::agent_is_removed() {
+            return Err(ModuleCallError::Unavailable);
+        }
         if let Some(client) = clients.get(&data_dir) {
+            if client.retired.load(Ordering::Acquire) {
+                return Err(ModuleCallError::Unavailable);
+            }
             return Ok(Arc::clone(client));
         }
         let client = Arc::new(Self::new(&data_dir, config)?);
@@ -176,7 +188,7 @@ impl McpConfiguredClient {
         limit: usize,
     ) -> Result<Option<SupervisorBatch>, ModuleCallError> {
         let state = self.state.lock().await;
-        if SHUTTING_DOWN.load(Ordering::Acquire) {
+        if SHUTTING_DOWN.load(Ordering::Acquire) || self.retired.load(Ordering::Acquire) {
             return Err(ModuleCallError::Unavailable);
         }
         let State::Open(object) = &*state else {
@@ -266,6 +278,7 @@ impl McpConfiguredClient {
             data_dir,
             port,
             state: tokio::sync::Mutex::new(State::Closed),
+            retired: AtomicBool::new(false),
         }
     }
 
@@ -296,7 +309,8 @@ impl McpConfiguredClient {
         &self,
         request: PrepareAgentToolsRequest,
     ) -> Result<Vec<McpToolPresentation>, ModuleCallError> {
-        if SHUTTING_DOWN.load(Ordering::Acquire) {
+        let _accepted = self.state.lock().await;
+        if SHUTTING_DOWN.load(Ordering::Acquire) || self.retired.load(Ordering::Acquire) {
             return Err(ModuleCallError::Unavailable);
         }
         self.port.prepare_agent_tools(request).await
@@ -325,7 +339,8 @@ impl McpConfiguredClient {
         &self,
         request: ValidateServerArgumentsRequest,
     ) -> Result<ServerArgumentsValidation, ModuleCallError> {
-        if SHUTTING_DOWN.load(Ordering::Acquire) {
+        let _accepted = self.state.lock().await;
+        if SHUTTING_DOWN.load(Ordering::Acquire) || self.retired.load(Ordering::Acquire) {
             return Err(ModuleCallError::Unavailable);
         }
         self.port.validate_server_arguments(request).await
@@ -337,7 +352,8 @@ impl McpConfiguredClient {
         &self,
         arguments: Option<Value>,
     ) -> Result<Map<String, Value>, ModuleCallError> {
-        if SHUTTING_DOWN.load(Ordering::Acquire) {
+        let _accepted = self.state.lock().await;
+        if SHUTTING_DOWN.load(Ordering::Acquire) || self.retired.load(Ordering::Acquire) {
             return Err(ModuleCallError::Unavailable);
         }
         self.port.normalize_tool_arguments(arguments).await
@@ -348,7 +364,8 @@ impl McpConfiguredClient {
         &self,
         value: &str,
     ) -> Result<String, ModuleCallError> {
-        if SHUTTING_DOWN.load(Ordering::Acquire) {
+        let _accepted = self.state.lock().await;
+        if SHUTTING_DOWN.load(Ordering::Acquire) || self.retired.load(Ordering::Acquire) {
             return Err(ModuleCallError::Unavailable);
         }
         self.port
@@ -449,7 +466,7 @@ impl McpConfiguredClient {
     ) -> Result<R, ModuleCallError> {
         let args = serde_json::to_value(args).map_err(|_| ModuleCallError::ModuleFault)?;
         let mut state = self.state.lock().await;
-        if SHUTTING_DOWN.load(Ordering::Acquire) {
+        if SHUTTING_DOWN.load(Ordering::Acquire) || self.retired.load(Ordering::Acquire) {
             return Err(ModuleCallError::Unavailable);
         }
         let object = self.ensure_open(&mut state, config).await?;
