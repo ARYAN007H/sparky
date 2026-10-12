@@ -6,7 +6,7 @@
 //! default everywhere and the only mode CI and shipped builds use; `linked` and
 //! `source` exist for local development and local tests.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use super::types::ModuleSource;
 use crate::config::schema::ModuleSourceMode;
@@ -44,13 +44,30 @@ pub(super) fn linked_factory_available(id: &str) -> bool {
     }
 }
 
+/// Environment variable naming the directory `scripts/modules/build.mjs`
+/// wrote its artifacts under (`<dir>/<id>/<library>` plus a `modules.toml`
+/// carrying the operator-trust digest). The build step prints it.
+pub(crate) const SOURCE_DIR_ENV: &str = "OPENHUMAN_MODULE_SOURCE_DIR";
+
 /// The locally built artifact for `id`, if one exists.
 ///
-/// Produced by the source-build step (E0.4); until it lands there is none, so a
-/// `source` request without an explicit path falls back to `release`.
+/// Looks under [`SOURCE_DIR_ENV`]; with the variable unset, or no built file
+/// there, a `source` request without an explicit path falls back to `release`.
 #[must_use]
-pub(super) fn source_artifact(_id: &str) -> Option<PathBuf> {
-    None
+pub(super) fn source_artifact(id: &str) -> Option<PathBuf> {
+    let root = std::env::var_os(SOURCE_DIR_ENV)?;
+    artifact_in(Path::new(&root), id)
+}
+
+/// The built library for `id` under `root`, if the file exists.
+///
+/// The file name comes from the registry's `SourceSpec`, so the caller never
+/// supplies one and an unknown id has no artifact.
+#[must_use]
+pub(super) fn artifact_in(root: &Path, id: &str) -> Option<PathBuf> {
+    let record = super::registry::find(id)?;
+    let path = root.join(record.id).join(record.source.artifact_filename());
+    path.is_file().then_some(path)
 }
 
 /// Choose the source for `id` under `config`.

@@ -97,3 +97,22 @@ fn an_override_with_both_path_and_source_is_ignored() {
     assert_eq!(plan.served, ModuleSource::Release);
     assert_eq!(plan.artifact, None);
 }
+
+#[test]
+fn artifact_in_finds_the_built_library_by_registry_file_name() {
+    let dir = tempfile::tempdir().unwrap();
+    let record = crate::modules::registry::find("tinydocs").unwrap();
+    assert_eq!(artifact_in(dir.path(), "tinydocs"), None);
+    let module_dir = dir.path().join("tinydocs");
+    std::fs::create_dir_all(&module_dir).unwrap();
+    let file = module_dir.join(record.source.artifact_filename());
+    std::fs::write(&file, b"x").unwrap();
+    assert_eq!(artifact_in(dir.path(), "tinydocs"), Some(file));
+}
+
+#[test]
+fn artifact_in_has_nothing_for_an_unknown_id() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("nope")).unwrap();
+    assert_eq!(artifact_in(dir.path(), "nope"), None);
+}
