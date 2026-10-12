@@ -356,3 +356,7 @@ pub(crate) fn sync_cache_with_connections(
     }
     false
 }
+
+#[cfg(test)]
+#[path = "cache_scope_tests.rs"]
+mod scope_tests;
