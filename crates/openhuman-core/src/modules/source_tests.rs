@@ -59,10 +59,10 @@ fn a_fallback_reason_never_carries_a_path() {
 #[test]
 fn a_per_module_override_beats_the_global_mode() {
     let mut config = config(ModuleSourceMode::Linked);
-    config
-        .modules
-        .overrides
-        .push(ModuleOverride::with_source("tinydocs", ModuleSourceMode::Release));
+    config.modules.overrides.push(ModuleOverride::with_source(
+        "tinydocs",
+        ModuleSourceMode::Release,
+    ));
     let plan = plan_with(&config, "tinydocs", true, None);
     assert_eq!(plan.served, ModuleSource::Release);
     assert_eq!(plan.fallback, None);

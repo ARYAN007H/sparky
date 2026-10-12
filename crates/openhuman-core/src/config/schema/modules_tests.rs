@@ -16,7 +16,10 @@ fn legacy_path_overrides_still_parse() {
     )
     .expect("legacy {id, path} entry");
     assert_eq!(config.source, ModuleSourceMode::Release);
-    assert_eq!(config.overrides[0].path.as_deref(), Some("/dev/libtinydocs.so"));
+    assert_eq!(
+        config.overrides[0].path.as_deref(),
+        Some("/dev/libtinydocs.so")
+    );
     assert_eq!(config.overrides[0].source, None);
     assert!(config.overrides[0].validate().is_ok());
 }
@@ -73,13 +76,16 @@ fn mode_names_round_trip() {
     ] {
         assert_eq!(ModuleSourceMode::parse(mode.as_str()), Some(mode));
     }
-    assert_eq!(ModuleSourceMode::parse(" LINKED "), Some(ModuleSourceMode::Linked));
+    assert_eq!(
+        ModuleSourceMode::parse(" LINKED "),
+        Some(ModuleSourceMode::Linked)
+    );
     assert_eq!(ModuleSourceMode::parse("nope"), None);
 }
 
 struct MapEnv(std::collections::HashMap<&'static str, &'static str>);
 
-impl load::env::EnvLookup for MapEnv {
+impl crate::config::schema::load::env::EnvLookup for MapEnv {
     fn get(&self, key: &str) -> Option<String> {
         self.0.get(key).map(|v| (*v).to_string())
     }
@@ -106,10 +112,10 @@ fn invalid_global_env_is_ignored() {
 #[test]
 fn per_module_env_adds_a_source_override_replacing_a_path_entry() {
     let mut config = crate::config::Config::default();
-    config
-        .modules
-        .overrides
-        .push(ModuleOverride::with_path("tinyjuice", "/dev/libtinyjuice.so"));
+    config.modules.overrides.push(ModuleOverride::with_path(
+        "tinyjuice",
+        "/dev/libtinyjuice.so",
+    ));
     config.apply_env_overlay_with(&MapEnv(
         [("OPENHUMAN_MODULE_SOURCE_TINYJUICE", "source")]
             .into_iter()

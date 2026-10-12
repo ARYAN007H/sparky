@@ -5,7 +5,6 @@
 //! reachable without touching the network, which is what keeps them in the unit
 //! suite instead of behind an ignore.
 
-use super::*;
 use crate::config::Config;
 use crate::modules::ops::{self, install_dir, list};
 use crate::modules::registry;

@@ -23,9 +23,7 @@ impl Config {
             let key = module_source_env_for(record.id);
             let Some(raw) = env.get(&key) else { continue };
             let Some(mode) = ModuleSourceMode::parse(&raw) else {
-                tracing::warn!(
-                    "[modules] ignoring invalid {key} (valid: release, linked, source)"
-                );
+                tracing::warn!("[modules] ignoring invalid {key} (valid: release, linked, source)");
                 continue;
             };
             self.modules.overrides.retain(|entry| entry.id != record.id);

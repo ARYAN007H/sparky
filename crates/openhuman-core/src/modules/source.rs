@@ -84,13 +84,11 @@ pub(super) fn plan_with(
         }
     }
 
-    let released = |fallback: &'static str| {
-        SourcePlan {
-            requested: mode,
-            served: ModuleSource::Release,
-            artifact: None,
-            fallback: Some(fallback),
-        }
+    let released = |fallback: &'static str| SourcePlan {
+        requested: mode,
+        served: ModuleSource::Release,
+        artifact: None,
+        fallback: Some(fallback),
     };
     match mode {
         ModuleSourceMode::Release => SourcePlan {
