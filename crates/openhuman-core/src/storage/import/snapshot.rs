@@ -67,7 +67,6 @@ impl Snapshot {
     /// # Errors
     ///
     /// When the copy cannot be opened with the SQLite driver or read.
-    #[cfg(feature = "storage-sqlite")]
     pub fn driver_docs(&self, collections: fn() -> Vec<CollectionSpec>) -> Result<Vec<Record>> {
         use tinystoragedrivers::{DocumentStoreExt, Query, Scope, StorageBackend};
 
@@ -93,12 +92,6 @@ impl Snapshot {
             Ok(out)
         })?;
         Ok(found)
-    }
-
-    /// Without the SQLite driver there is no way to read driver tables.
-    #[cfg(not(feature = "storage-sqlite"))]
-    pub fn driver_docs(&self, _collections: fn() -> Vec<CollectionSpec>) -> Result<Vec<Record>> {
-        Ok(Vec::new())
     }
 }
 
