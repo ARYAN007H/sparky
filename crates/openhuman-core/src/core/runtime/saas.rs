@@ -47,8 +47,10 @@ pub struct SaasConfig {
     /// `<root>/service.token`.
     #[serde(default)]
     pub service_token_file: Option<PathBuf>,
-    /// Host tool groups the operator opts users into
+    /// Host tool groups the operator permits an embedding host to supply
     /// (`profiles::tools::SaasToolGroup`: `host_files`, `host_shell`).
+    /// This allowlist does not register tools. The standalone SaaS CLI has no
+    /// host-tool adapter, so these groups expose no file or shell tools there.
     /// Empty by default: users get no tool that reaches the host.
     #[serde(default)]
     pub tool_allowlist: Vec<String>,

@@ -97,7 +97,7 @@ pub async fn composio_list_connections(
         // connection-created subscriber's readiness window. Re-warm here so
         // the next chat turn does not perform the three discovery requests.
         let config = config.clone();
-        tokio::spawn(async move {
+        crate::core::runtime::spawn_scoped(async move {
             let _ = fetch_connected_integrations_status(&config).await;
         });
     }

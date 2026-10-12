@@ -171,7 +171,7 @@ impl ChannelDeliveryStore {
             "delivery fingerprint is invalid"
         );
         anyhow::ensure!(
-            serde_json::to_vec(&result).map_or(false, |bytes| bytes.len() <= DELIVERY_RECORD_BYTES),
+            serde_json::to_vec(&result).is_ok_and(|bytes| bytes.len() <= DELIVERY_RECORD_BYTES),
             "delivery result exceeds its record limit"
         );
         let (_guard, mut state) = self.locked_state().await?;
@@ -240,7 +240,7 @@ fn validate_entry(entry: &DeliveryQueueEntry) -> anyhow::Result<()> {
         "delivery id does not match intent key"
     );
     anyhow::ensure!(
-        serde_json::to_vec(entry).map_or(false, |bytes| bytes.len() <= DELIVERY_RECORD_BYTES),
+        serde_json::to_vec(entry).is_ok_and(|bytes| bytes.len() <= DELIVERY_RECORD_BYTES),
         "delivery record exceeds its limit"
     );
     Ok(())
