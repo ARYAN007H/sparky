@@ -715,8 +715,17 @@ test("process-static policy and checker changes arm their own scripts lane", () 
 
 test("process-static scan uses cancellation supervision in both profiles", () => {
   for (const profile of ["hosted", "ex63"]) {
-    const plan = buildPlan({ profile, areas: NONE, env: profile === "ex63" ? EX63_ENV : {} });
-    const check = plan.lanes.flatMap(lane => lane.checks).find(check => check.name === "process-statics");
-    assert.equal(check.run, "bash scripts/ci-cancel-aware.sh node scripts/ci/check-process-statics.mjs");
+    const plan = buildPlan({
+      profile,
+      areas: NONE,
+      env: profile === "ex63" ? EX63_ENV : {},
+    });
+    const check = plan.lanes
+      .flatMap((lane) => lane.checks)
+      .find((check) => check.name === "process-statics");
+    assert.equal(
+      check.run,
+      "bash scripts/ci-cancel-aware.sh node scripts/ci/check-process-statics.mjs",
+    );
   }
 });

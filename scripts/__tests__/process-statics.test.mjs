@@ -25,16 +25,35 @@ const scan = (text) => declarations(text, file);
 
 function withRepository(initialSource, approvals, callback) {
   const root = mkdtempSync(join(tmpdir(), "process-statics-review-"));
-  const git = (...args) => execFileSync("git", args, { cwd: root, stdio: "pipe" }).toString().trim();
+  const git = (...args) =>
+    execFileSync("git", args, { cwd: root, stdio: "pipe" }).toString().trim();
   try {
-    mkdirSync(join(root, "crates/openhuman-core/src/example"), { recursive: true });
+    mkdirSync(join(root, "crates/openhuman-core/src/example"), {
+      recursive: true,
+    });
     mkdirSync(join(root, "scripts/ci"), { recursive: true });
     writeFileSync(join(root, file), initialSource);
-    writeFileSync(join(root, "scripts/ci/process-statics.json"), JSON.stringify(approvals));
-    git("init"); git("add", ".");
-    git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "-c", "core.hooksPath=/dev/null", "commit", "-m", "base");
+    writeFileSync(
+      join(root, "scripts/ci/process-statics.json"),
+      JSON.stringify(approvals),
+    );
+    git("init");
+    git("add", ".");
+    git(
+      "-c",
+      "user.name=Test",
+      "-c",
+      "user.email=test@example.invalid",
+      "-c",
+      "core.hooksPath=/dev/null",
+      "commit",
+      "-m",
+      "base",
+    );
     return callback(root, git, git("rev-parse", "HEAD"));
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 }
 
 test("previous ownership records cannot be removed while the declaration survives", () => {
@@ -52,6 +71,29 @@ test("non-ASCII and newline filenames cannot bypass the tracked source scan", ()
       git("add", path);
     }
     assert.equal(checkRepository(root, base).errors.length, 2);
+    git(
+      "-c",
+      "user.name=Test",
+      "-c",
+      "user.email=test@example.invalid",
+      "-c",
+      "core.hooksPath=/dev/null",
+      "commit",
+      "-m",
+      "legacy paths",
+    );
+    assert.deepEqual(
+      checkRepository(root, git("rev-parse", "HEAD")).errors,
+      [],
+    );
+  });
+});
+
+test("prior ownership records can be removed when their declaration disappears", () => {
+  withRepository(source, [entry], (root, _git, base) => {
+    writeFileSync(join(root, file), "pub fn example() {}");
+    writeFileSync(join(root, "scripts/ci/process-statics.json"), "[]");
+    assert.deepEqual(checkRepository(root, base).errors, []);
   });
 });
 

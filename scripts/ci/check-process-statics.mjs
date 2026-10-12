@@ -72,7 +72,12 @@ function counts(entries) {
 }
 
 /** Require exact, non-stale ownership records for added or changed declaration types. */
-export function reviewChanges(before, after, approvals, previousApprovals = []) {
+export function reviewChanges(
+  before,
+  after,
+  approvals,
+  previousApprovals = [],
+) {
   if (!Array.isArray(approvals))
     throw new Error("process-statics.json must contain an array");
   const oldCounts = counts(before);
@@ -118,7 +123,9 @@ export function reviewChanges(before, after, approvals, previousApprovals = []) 
   for (const entry of previousApprovals) {
     const key = signature(entry);
     if (newCounts.has(key) && !reviewed.has(key)) {
-      errors.push(`Prior ownership record must remain while its declaration survives: ${key}`);
+      errors.push(
+        `Prior ownership record must remain while its declaration survives: ${key}`,
+      );
     }
   }
   return errors;
@@ -152,7 +159,15 @@ export function checkRepository(root, baseRef) {
       `Cannot resolve merge base ${baseRef}; fetch the base with full history before running this gate.`,
     );
   }
-  const previousFiles = git(["ls-tree", "-r", "--name-only", base, "--", CORE])
+  const previousFiles = git([
+    "ls-tree",
+    "-r",
+    "-z",
+    "--name-only",
+    base,
+    "--",
+    CORE,
+  ])
     .split("\0")
     .filter(production);
   const currentFiles = git(["ls-files", "-z", "--", CORE])
@@ -169,9 +184,18 @@ export function checkRepository(root, baseRef) {
     declarations(readFileSync(resolve(root, file), "utf8"), file),
   );
   const approvals = JSON.parse(readFileSync(resolve(root, MANIFEST), "utf8"));
-  const hasPreviousManifest = git(["ls-tree", "--name-only", base, "--", MANIFEST]);
-  const previousApprovals = hasPreviousManifest ? JSON.parse(git(["show", `${base}:${MANIFEST}`])) : [];
-  if (!Array.isArray(previousApprovals)) throw new Error("Base ownership manifest must contain an array");
+  const hasPreviousManifest = git([
+    "ls-tree",
+    "--name-only",
+    base,
+    "--",
+    MANIFEST,
+  ]);
+  const previousApprovals = hasPreviousManifest
+    ? JSON.parse(git(["show", `${base}:${MANIFEST}`]))
+    : [];
+  if (!Array.isArray(previousApprovals))
+    throw new Error("Base ownership manifest must contain an array");
   return {
     base,
     files: currentFiles.length,
