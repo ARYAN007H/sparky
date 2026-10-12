@@ -219,10 +219,10 @@ fn structured_focus_refusal_is_preserved_for_host_presentation() {
 
 #[cfg(all(feature = "modules", target_os = "linux"))]
 #[tokio::test]
-#[ignore = "requires the released v0.11.0 artifact in OPENHUMAN_TINYCOMPUTER_TEST_MODULE"]
+#[ignore = "requires a TinyComputer library: node scripts/modules/build.mjs tinycomputer, then OPENHUMAN_MODULE_SOURCE_DIR"]
 async fn released_module_serves_permissions_and_confidential_target_validation() {
-    let artifact = std::env::var_os("OPENHUMAN_TINYCOMPUTER_TEST_MODULE")
-        .expect("set OPENHUMAN_TINYCOMPUTER_TEST_MODULE to the released native library");
+    let artifact = crate::modules::local_artifact("tinycomputer")
+        .expect("build tinycomputer with scripts/modules/build.mjs and set OPENHUMAN_MODULE_SOURCE_DIR");
     let mut config = Config::default();
     config.modules.allow_download = false;
     config
