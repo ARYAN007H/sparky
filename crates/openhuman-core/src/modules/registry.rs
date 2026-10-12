@@ -48,7 +48,9 @@ use records_computer::TINYCOMPUTER;
 use records_docs_wallet::TINYDOCS;
 #[cfg(feature = "web3")]
 use records_docs_wallet::TINYWALLET;
-use records_extra::{TINYBOX, TINYCHANNELS};
+use records_extra::TINYCHANNELS;
+#[cfg(feature = "modules")]
+use records_extra::TINYBOX;
 #[cfg(feature = "hosting")]
 use records_extra::TINYHOSTS;
 use records_mcp_connectors::{TINYCONNECTORS, TINYMCP};
@@ -72,6 +74,7 @@ pub const ALL: &[ModuleRecord] = &[
     TINYVOICE,
     TINYMCP,
     TINYCONNECTORS,
+    #[cfg(feature = "modules")]
     TINYBOX,
     TINYCHANNELS,
     #[cfg(feature = "hosting")]

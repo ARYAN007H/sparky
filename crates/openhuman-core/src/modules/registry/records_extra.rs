@@ -3,6 +3,7 @@
 use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec};
 
 /// The `tinybox` module, loaded on demand.
+#[cfg(feature = "modules")]
 pub(crate) const TINYBOX: ModuleRecord = ModuleRecord {
     id: "tinybox",
     description: "Sandbox execution and lifecycle operations through TinyBox",

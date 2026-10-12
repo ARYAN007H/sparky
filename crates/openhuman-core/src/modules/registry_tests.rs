@@ -545,7 +545,7 @@ fn a_record_publishes_for_every_host_or_for_none() {
 
 #[test]
 fn find_resolves_known_ids_only() {
-    assert!(find("tinydocs").is_some());
+    assert!(find("tinymcp").is_some());
     assert!(find("not-a-module").is_none());
 }
 
@@ -757,7 +757,6 @@ fn contract_names() -> Vec<(&'static str, &'static str, &'static str)> {
             tinyconnectors_bus::names::INTERFACE,
             tinyconnectors_bus::names::OBJECT_PATH,
         ),
-        ("tinybox", tinybox_bus::INTERFACE, tinybox_bus::OBJECT_PATH),
         (
             "tinychannels",
             tinychannels_bus::names::BUS_NAME,
