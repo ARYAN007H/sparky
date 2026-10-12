@@ -704,6 +704,7 @@ test("process-static policy and checker changes arm their own scripts lane", () 
   const scripts = filters.split(/^scripts:\s*$/m)[1].split(/^\S[^\n]*:/m)[0];
   for (const file of [
     "scripts/ci/check-process-statics.mjs",
+    "scripts/ci/check-crate-chain.mjs",
     "scripts/ci/process-statics.json",
   ]) {
     assert.ok(
