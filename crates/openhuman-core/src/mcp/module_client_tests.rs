@@ -450,7 +450,6 @@ async fn agent_cleanup_closes_only_the_cached_agent_and_keeps_siblings_open() {
 #[tokio::test]
 async fn failed_agent_close_stays_retired_and_can_be_retried() {
     let workspace = tempfile::tempdir().expect("workspace");
-    let scoped_dir = workspace.path().join("agents").join("agent");
     let mut config = Config::default();
     config.workspace_dir = workspace.path().to_path_buf();
     config.modules.enabled = true;
@@ -644,6 +643,7 @@ async fn a_removed_context_waiting_for_the_client_cache_cannot_reopen_it() {
     use crate::tools::toolpacks::ToolGroups;
 
     let workspace = tempfile::tempdir().expect("workspace");
+    let scoped_dir = workspace.path().join("agents").join("agent");
     let mut config = Config::default();
     config.workspace_dir = workspace.path().to_path_buf();
     config.modules.enabled = true;
@@ -663,12 +663,12 @@ async fn a_removed_context_waiting_for_the_client_cache_cannot_reopen_it() {
     *AFTER_CONTEXT_CHECK
         .get_or_init(|| Mutex::new(None))
         .lock()
-        .unwrap() = Some(checked);
+        .unwrap() = Some((scoped_dir.clone(), checked));
     let request = tokio::spawn(CoreContext::scope(context, async move {
         McpConfiguredClient::for_config(&config)
     }));
 
-    tokio::time::timeout(Duration::from_secs(1), checked_rx)
+    tokio::time::timeout(Duration::from_secs(10), checked_rx)
         .await
         .expect("request passed the initial context check")
         .unwrap();

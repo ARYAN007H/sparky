@@ -48,8 +48,8 @@ static SHUTDOWN_REGISTERED: AtomicBool = AtomicBool::new(false);
 static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
 
 #[cfg(test)]
-static AFTER_CONTEXT_CHECK: OnceLock<Mutex<Option<tokio::sync::oneshot::Sender<()>>>> =
-    OnceLock::new();
+static AFTER_CONTEXT_CHECK:
+    OnceLock<Mutex<Option<(PathBuf, tokio::sync::oneshot::Sender<()>)>>> = OnceLock::new();
 
 #[derive(Clone)]
 struct OpenObject {
@@ -262,17 +262,22 @@ impl McpConfiguredClient {
             ModuleClient::report_unavailable(MODULE);
             return Err(ModuleCallError::Unavailable);
         }
-        #[cfg(test)]
-        if let Some(sender) = AFTER_CONTEXT_CHECK
-            .get_or_init(|| Mutex::new(None))
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .take()
-        {
-            let _ = sender.send(());
-        }
-
         let data_dir = crate::core::runtime::agent_scope_dir(config);
+        #[cfg(test)]
+        {
+            let mut hook = AFTER_CONTEXT_CHECK
+                .get_or_init(|| Mutex::new(None))
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if hook
+                .as_ref()
+                .is_some_and(|(expected, _)| expected == &data_dir)
+            {
+                if let Some((_, sender)) = hook.take() {
+                    let _ = sender.send(());
+                }
+            }
+        }
         if current_agent_context_is_removed() || Self::cleanup_pending(&data_dir) {
             return Err(ModuleCallError::Unavailable);
         }
