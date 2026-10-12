@@ -6,6 +6,8 @@ use tinybus::{broker::Broker, transport::memory::MemoryBus, Connection, ObjectPa
 struct LifecycleFixture {
     closes: Arc<AtomicUsize>,
     polls: Arc<AtomicUsize>,
+    block_close_poll: Arc<AtomicBool>,
+    close_poll_started: Arc<tokio::sync::Notify>,
 }
 
 #[tinybus::interface(name = "ai.tinyhumans.tinymcp.Mcp")]
@@ -15,10 +17,84 @@ impl LifecycleFixture {
         Ok(Some("original-close".into()))
     }
 
-    async fn transition_status(&self, _receipt: String) -> tinybus::Result<TransitionStatus> {
+    async fn transition_status(&self, receipt: String) -> tinybus::Result<TransitionStatus> {
         self.polls.fetch_add(1, Ordering::SeqCst);
+        if receipt == "original-close" && self.block_close_poll.swap(false, Ordering::SeqCst) {
+            self.close_poll_started.notify_one();
+            std::future::pending::<()>().await;
+        }
         Ok(TransitionStatus::Complete)
     }
+}
+
+#[tokio::test]
+async fn cancelled_close_retries_its_receipt_on_the_original_owner() {
+    let bus = MemoryBus::new();
+    Broker::new().spawn(bus.clone());
+    let original = Connection::connect(bus.connect().await.unwrap())
+        .await
+        .unwrap();
+    let replacement = Connection::connect(bus.connect().await.unwrap())
+        .await
+        .unwrap();
+    let caller = Connection::connect(bus.connect().await.unwrap())
+        .await
+        .unwrap();
+    let original_fixture = LifecycleFixture::default();
+    let replacement_fixture = LifecycleFixture::default();
+    for (connection, fixture) in [
+        (&original, original_fixture.clone()),
+        (&replacement, replacement_fixture.clone()),
+    ] {
+        connection
+            .serve_at(ObjectPath::new(names::OBJECT_PATH).unwrap(), fixture)
+            .await
+            .unwrap();
+    }
+    original.request_name(names::INTERFACE).await.unwrap();
+    let port = TinyMcpPort {
+        root: ModuleClient::fixture(
+            caller
+                .proxy(names::INTERFACE, names::OBJECT_PATH, names::INTERFACE)
+                .unwrap(),
+        ),
+    };
+    assert_eq!(
+        port.transition_status("original-open").await,
+        Ok(TransitionStatus::Complete)
+    );
+    let client = Arc::new(McpConfiguredClient::with_port(
+        "/test/agent".into(),
+        Box::new(port),
+    ));
+    *client.state.lock().await = State::Open(OpenObject {
+        config: McpClientConfig::default(),
+        object_path: "/test/original-child".into(),
+    });
+    original_fixture
+        .block_close_poll
+        .store(true, Ordering::SeqCst);
+    let closing = tokio::spawn({
+        let client = Arc::clone(&client);
+        async move { client.close().await }
+    });
+    original_fixture.close_poll_started.notified().await;
+    closing.abort();
+    assert!(closing.await.unwrap_err().is_cancelled());
+    assert!(
+        matches!(&*client.state.lock().await, State::Closing { transition_id, .. } if transition_id == "original-close")
+    );
+    original.release_name(names::INTERFACE).await.unwrap();
+    replacement.request_name(names::INTERFACE).await.unwrap();
+    client.close().await.unwrap();
+    assert_eq!(original_fixture.closes.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        original_fixture.polls.load(Ordering::SeqCst),
+        3,
+        "retry must poll the retained receipt on the original owner"
+    );
+    assert_eq!(replacement_fixture.closes.load(Ordering::SeqCst), 0);
+    assert_eq!(replacement_fixture.polls.load(Ordering::SeqCst), 0);
 }
 
 #[tokio::test]
