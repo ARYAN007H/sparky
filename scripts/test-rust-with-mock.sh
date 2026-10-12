@@ -202,17 +202,12 @@ fi
 # Build the source modules in one call. The connector directory goes only on
 # the processes that exercise it: most Composio raw-coverage groups explicitly
 # test the absent-module path.
-path_before_sources="${OPENHUMAN_MODULE_PATH:-}"
 stage_source_modules "${local_source_ids[@]}"
 connectors_dir="$REPO_ROOT/target/module-sources/tinyconnectors"
-if [ -n "$path_before_sources" ]; then
-  export OPENHUMAN_MODULE_PATH="$path_before_sources"
-else
-  unset OPENHUMAN_MODULE_PATH
-fi
 for source_id in "${local_source_ids[@]}"; do
-  [ "$source_id" = tinyconnectors ] && continue
-  export OPENHUMAN_MODULE_PATH="$REPO_ROOT/target/module-sources/$source_id${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
+  if [ "$source_id" != tinyconnectors ]; then
+    export OPENHUMAN_MODULE_PATH="$REPO_ROOT/target/module-sources/$source_id${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
+  fi
 done
 connectors_module_path="$connectors_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
 

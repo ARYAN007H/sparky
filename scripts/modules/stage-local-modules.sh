@@ -6,8 +6,7 @@
 # the registry-pinned archive, verifies its sha256 and puts it on
 # OPENHUMAN_MODULE_PATH. Source-built modules: with OPENHUMAN_MODULE_SOURCE=source,
 # `stage_source_modules <id>...` builds them from the vendored submodules with
-# scripts/modules/build.mjs and exports OPENHUMAN_MODULE_SOURCE_DIR plus the
-# search path. tinyconnectors has no test release, so it is always built.
+# scripts/modules/build.mjs. tinyconnectors has no test release, so it is always built.
 #
 # Needs REPO_ROOT, module_ext and wallet_platform (or module_platform) set by the caller.
 
@@ -37,10 +36,12 @@ stage_release_module() {
   printf '%s\n' "$dir"
 }
 
-# stage_source_modules <id>... : build from the pinned submodules and eval the
-# exports. OPENHUMAN_MODULE_PATH then carries every built directory.
+# stage_source_modules <id>... : build from the pinned submodules into the
+# default out dir (target/module-sources/<id>/). The runners put the directories
+# they want on OPENHUMAN_MODULE_PATH themselves, so a module is visible only to
+# the processes meant to see it. build.mjs prints its exports; they are dropped
+# here on purpose (OPENHUMAN_MODULE_SOURCE_<ID> would switch a module on for
+# every suite).
 stage_source_modules() {
-  local exports
-  exports="$(node "$REPO_ROOT/scripts/modules/build.mjs" "$@" --print-env)" || return 1
-  eval "$exports"
+  node "$REPO_ROOT/scripts/modules/build.mjs" "$@" >/dev/null
 }
