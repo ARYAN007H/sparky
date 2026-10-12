@@ -706,11 +706,12 @@ async fn a_key_provider_failure_at_bind_is_retried_not_cached() {
     let attempt = |rig: &Rig, set: Value| {
         let host = &rig.host;
         async move {
+            let who = alpha();
             host.handle(
                 Object::Secrets,
                 "Set",
                 set,
-                Some(&alpha()),
+                Some(&who),
                 Admission::Confidential,
             )
             .await
