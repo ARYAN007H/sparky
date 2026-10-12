@@ -150,6 +150,16 @@
     "issue": "https://github.com/tinyhumansai/openhuman/issues/7425"
   },
   {
+    "rule": "task-store-open",
+    "path": "crates/openhuman-core/src/agent/orchestration/running_subagents/task_ledger.rs",
+    "line": 65,
+    "text": "open_jsonl_task_store_or_memory(&task_store_path(workspace_dir))",
+    "occurrence": 1,
+    "classification": "classic",
+    "reason": "Classic detached-task or completion JSONL opener, append, torn-tail repair, or compaction publication; native task routing does not remove the owning library local fallback.",
+    "issue": "https://github.com/tinyhumansai/openhuman/issues/7426"
+  },
+  {
     "rule": "file-mutation",
     "path": "crates/openhuman-core/src/agent/orchestration/subagent_sessions/store.rs",
     "line": 51,
@@ -188,6 +198,36 @@
     "classification": "classic",
     "reason": "Historical subagent lifecycle/checkpoint file publication; scoped native orchestration stores must be selected separately.",
     "issue": "https://github.com/tinyhumansai/openhuman/issues/7426"
+  },
+  {
+    "rule": "file-store-new",
+    "path": "crates/openhuman-core/src/agent/tinyagents/reaper.rs",
+    "line": 47,
+    "text": "let store = FileStatusStore::new(open_session_stores(workspace).kv);",
+    "occurrence": 1,
+    "classification": "classic",
+    "reason": "Historical status reader wraps the concrete FileStore returned by the classic session opener; FileStatusStore::new is not a captured native KV adapter.",
+    "issue": "https://github.com/tinyhumansai/openhuman/issues/7423"
+  },
+  {
+    "rule": "file-store-new",
+    "path": "crates/openhuman-core/src/agent/tinyagents/replay/ops.rs",
+    "line": 34,
+    "text": "let store = FileStatusStore::new(open_session_stores(workspace).kv);",
+    "occurrence": 1,
+    "classification": "classic",
+    "reason": "Historical status reader wraps the concrete FileStore returned by the classic session opener; FileStatusStore::new is not a captured native KV adapter.",
+    "issue": "https://github.com/tinyhumansai/openhuman/issues/7423"
+  },
+  {
+    "rule": "file-store-new",
+    "path": "crates/openhuman-core/src/agent/tinyagents/replay/ops.rs",
+    "line": 46,
+    "text": "let store = FileStatusStore::new(open_session_stores(workspace).kv);",
+    "occurrence": 2,
+    "classification": "classic",
+    "reason": "Historical status reader wraps the concrete FileStore returned by the classic session opener; FileStatusStore::new is not a captured native KV adapter.",
+    "issue": "https://github.com/tinyhumansai/openhuman/issues/7423"
   },
   {
     "rule": "file-mutation",
@@ -590,6 +630,16 @@
     "issue": "https://github.com/tinyhumansai/openhuman/issues/7421"
   },
   {
+    "rule": "file-store-new",
+    "path": "crates/openhuman-core/src/skills/catalog/registry.rs",
+    "line": 118,
+    "text": "builder.store(FileCatalogStore::new(dir.clone())).build()",
+    "occurrence": 1,
+    "classification": "scratch",
+    "reason": "Refetchable skill catalog metadata cache uses FileCatalogStore and capability-directory temporary-file publication; SaaS cache routing and desktop cache selection remain separate work.",
+    "issue": "https://github.com/tinyhumansai/openhuman/issues/7429"
+  },
+  {
     "rule": "file-mutation",
     "path": "crates/openhuman-core/src/threads/welcome_migration.rs",
     "line": 306,
@@ -800,6 +850,16 @@
     "issue": "https://github.com/tinyhumansai/openhuman/issues/7426"
   },
   {
+    "rule": "file-store-new",
+    "path": "vendor/tinyagents/crates/tinyagents-session/src/transcript/import/ops.rs",
+    "line": 111,
+    "text": "kv: FileStore::new(root.join(KV_SUBDIR)),",
+    "occurrence": 1,
+    "classification": "classic",
+    "reason": "Legacy transcript importer and live dual-write explicitly construct the file KV destination under tinyagents_store; source-preserving import is distinct from native session routing.",
+    "issue": "https://github.com/tinyhumansai/openhuman/issues/7424"
+  },
+  {
     "rule": "sqlite-open",
     "path": "vendor/tinyagents/crates/tinyagents-session/src/transcript/import/ops.rs",
     "line": 512,
@@ -901,6 +961,76 @@
   },
   {
     "rule": "json-write",
+    "path": "vendor/tinyagents/crates/tinyagents-tasks/src/completions/store.rs",
+    "line": 153,
+    "text": "std::fs::OpenOptions::new()",
+    "occurrence": 1,
+    "classification": "classic",
+    "reason": "Classic detached-task or completion JSONL opener, append, torn-tail repair, or compaction publication; native task routing does not remove the owning library local fallback.",
+    "issue": "https://github.com/tinyhumansai/openhuman/issues/7426"
+  },
+  {
+    "rule": "json-write",
+    "path": "vendor/tinyagents/crates/tinyagents-tasks/src/completions/store.rs",
+    "line": 206,
+    "text": "let file = std::fs::OpenOptions::new()",
+    "occurrence": 1,
+    "classification": "classic",
+    "reason": "Classic detached-task or completion JSONL opener, append, torn-tail repair, or compaction publication; native task routing does not remove the owning library local fallback.",
+    "issue": "https://github.com/tinyhumansai/openhuman/issues/7426"
+  },
+  {
+    "rule": "json-write",
+    "path": "vendor/tinyagents/crates/tinyagents-tasks/src/completions/store.rs",
+    "line": 275,
+    "text": "let mut out = std::fs::OpenOptions::new()",
+    "occurrence": 1,
+    "classification": "classic",
+    "reason": "Classic detached-task or completion JSONL opener, append, torn-tail repair, or compaction publication; native task routing does not remove the owning library local fallback.",
+    "issue": "https://github.com/tinyhumansai/openhuman/issues/7426"
+  },
+  {
+    "rule": "file-mutation",
+    "path": "vendor/tinyagents/crates/tinyagents-tasks/src/completions/store.rs",
+    "line": 291,
+    "text": "std::fs::rename(&tmp, &self.path).map_err(|e| store_err(\"swap compacted log\", e))?;",
+    "occurrence": 1,
+    "classification": "classic",
+    "reason": "Classic detached-task or completion JSONL opener, append, torn-tail repair, or compaction publication; native task routing does not remove the owning library local fallback.",
+    "issue": "https://github.com/tinyhumansai/openhuman/issues/7426"
+  },
+  {
+    "rule": "json-write",
+    "path": "vendor/tinyagents/crates/tinyagents-tasks/src/store.rs",
+    "line": 373,
+    "text": "let file = std::fs::OpenOptions::new()",
+    "occurrence": 1,
+    "classification": "classic",
+    "reason": "Classic detached-task or completion JSONL opener, append, torn-tail repair, or compaction publication; native task routing does not remove the owning library local fallback.",
+    "issue": "https://github.com/tinyhumansai/openhuman/issues/7426"
+  },
+  {
+    "rule": "task-store-open",
+    "path": "vendor/tinyagents/crates/tinyagents-tasks/src/store_registry.rs",
+    "line": 157,
+    "text": "pub fn open_jsonl_task_store_or_memory(path: &Path) -> Arc<dyn TaskStore> {",
+    "occurrence": 1,
+    "classification": "classic",
+    "reason": "Classic detached-task or completion JSONL opener, append, torn-tail repair, or compaction publication; native task routing does not remove the owning library local fallback.",
+    "issue": "https://github.com/tinyhumansai/openhuman/issues/7426"
+  },
+  {
+    "rule": "sqlite-open",
+    "path": "vendor/tinymcp/crates/tinymcp/src/audit/store/types.rs",
+    "line": 52,
+    "text": "let connection = Connection::open(path).map_err(|source| {",
+    "occurrence": 1,
+    "classification": "classic",
+    "reason": "Owning MCP local registry/audit store implementation used by the module local opener; native captured callback storage is distinct and does not remove this local mode.",
+    "issue": "https://github.com/tinyhumansai/openhuman/issues/7430"
+  },
+  {
+    "rule": "json-write",
     "path": "vendor/tinymcp/crates/tinymcp/src/registry/store/types.rs",
     "line": 39,
     "text": "let mut options = std::fs::OpenOptions::new();",
@@ -940,13 +1070,23 @@
     "issue": "https://github.com/tinyhumansai/openhuman/issues/7430"
   },
   {
-    "rule": "sqlite-open",
-    "path": "vendor/tinymcp/crates/tinymcp/src/audit/store/types.rs",
-    "line": 52,
-    "text": "let connection = Connection::open(path).map_err(|source| {",
+    "rule": "json-write",
+    "path": "vendor/tinyskills/crates/tinyskills/src/registry/store.rs",
+    "line": 261,
+    "text": "let mut options = OpenOptions::new();",
     "occurrence": 1,
-    "classification": "classic",
-    "reason": "Owning MCP local registry/audit store implementation used by the module local opener; native captured callback storage is distinct and does not remove this local mode.",
-    "issue": "https://github.com/tinyhumansai/openhuman/issues/7430"
+    "classification": "read-only",
+    "reason": "Catalog reader opens an existing capability-directory file with read(true) and no write/create flag; this exact occurrence is not the catalog publisher.",
+    "issue": "https://github.com/tinyhumansai/openhuman/issues/7429"
+  },
+  {
+    "rule": "json-write",
+    "path": "vendor/tinyskills/crates/tinyskills/src/registry/store.rs",
+    "line": 339,
+    "text": "let mut options = OpenOptions::new();",
+    "occurrence": 2,
+    "classification": "scratch",
+    "reason": "Refetchable skill catalog metadata cache uses FileCatalogStore and capability-directory temporary-file publication; SaaS cache routing and desktop cache selection remain separate work.",
+    "issue": "https://github.com/tinyhumansai/openhuman/issues/7429"
   }
 ]

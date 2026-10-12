@@ -3,14 +3,14 @@
 The cancellation-supervised checks lane scans every immediate `crates/*/src`
 host directory. The original core document/storage implementation exclusion and
 sibling test exclusions remain. It also scans explicitly curated classic
-TinyAgents session stores and the TinyMCP registry/audit stores actually opened
+TinyAgents session/task/completion stores, TinySkills catalog storage, and the TinyMCP registry/audit stores actually opened
 by host composition. Native storage driver implementations are not bypasses;
 their host adapters remain scanned.
 
 Rules cover database opens, filesystem writes/creation, rename/copy/hard-link
 publication, tempfile builders, JSON writer destinations, the known filesystem
 helper definitions `write_private`, `create_private`, and `write_atomic`, and
-store open calls with a nearby `.db` or `.jsonl` literal argument. Tokio calls
+store open calls with a nearby `.db` or `.jsonl` literal argument, file-backed `File*Store::new` / `File*Ledger::new` constructors, and the JSONL task opener. Tokio calls
 are included: the original `fs::write` pattern already recognized their `fs::`
 suffix. The missing embed detection was a directory coverage bug.
 
@@ -21,10 +21,10 @@ This change does not increase or replace that baseline. Regeneration requires an
 existing baseline and refuses new findings; it can only remove fixed sites.
 The merge-base check also prevents editing the manifest to accept new debt.
 
-`storage-bypass-extension.json` contains **95** reviewed identities for coverage
+`storage-bypass-extension.json` contains **109** reviewed identities for coverage
 that this change introduces. Each identifies its exact rule, path, source line,
 and occurrence, with a destination classification, reason, and owning issue.
-These are sites, not 95 independent stores. The initial extension must match
+These are sites, not 109 independent stores. The initial extension must match
 source already present at the canonical merge base, including its recorded
 vendor gitlinks. A branch-added or moved writer cannot enter this inventory.
 Once the extension exists in the base, its identities can only shrink. Removing
@@ -75,3 +75,5 @@ bash scripts/ci-cancel-aware.sh node scripts/ci/check-storage-bypass.mjs
 This guard does not implement backend migration, desktop import authority, or
 Memory/SQLite/MongoDB runtime composition. Those belong to the linked owner
 issues and their authentic native integration proofs.
+
+The latest review added task/completion and catalog owner coverage. Three curated/constructor regressions and one host task-opener regression failed before their fixes. The expanded focused suite passed 70 controls. The additional 14 canonical sites include a read-only catalog opener, refetchable catalog cache publication, classic task/completion logs, and classic file-backed status/import stores. No site is classified as migrated solely because another native implementation exists. Changes to the shared Rust comment masker also arm the scripts lane.
