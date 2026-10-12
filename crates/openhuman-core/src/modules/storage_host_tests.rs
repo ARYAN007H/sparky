@@ -21,8 +21,10 @@ struct Env {
     backend: Mutex<Option<Arc<dyn StorageBackend>>>,
     profile: Mutex<Option<String>>,
     grants: HashMap<&'static str, StorageGrant>,
+    fences: Mutex<Option<Arc<crate::storage::fence::FenceRegistry>>>,
 }
 
+#[async_trait]
 impl Environment for Env {
     fn backend(&self) -> Option<Arc<dyn StorageBackend>> {
         self.backend.lock().unwrap().clone()
@@ -43,6 +45,14 @@ impl Environment for Env {
 
     fn keys(&self) -> Result<Arc<dyn KeyProvider>, StorageError> {
         Ok(Arc::new(DerivedKeys::new(Zeroizing::new([7u8; 32]))))
+    }
+
+    async fn admit_write(&self, scope: &Scope) -> Result<(), StorageError> {
+        let fences = self.fences.lock().unwrap().clone();
+        match fences {
+            Some(fences) => fences.guard(scope.as_str(), "test-write").await,
+            None => Ok(()),
+        }
     }
 }
 
@@ -90,6 +100,7 @@ fn rig() -> Rig {
         backend: Mutex::new(Some(Arc::clone(&backend))),
         profile: Mutex::new(None),
         grants: HashMap::from([("alpha", grant("notes")), ("beta", grant("other"))]),
+        fences: Mutex::new(None),
     });
     let directory = Directory(HashMap::from([
         (":1.1".into(), "alpha".into()),
@@ -227,6 +238,7 @@ async fn two_modules_granted_the_same_collection_name_do_not_share_documents() {
         backend: Mutex::new(Some(backend)),
         profile: Mutex::new(None),
         grants: HashMap::from([("alpha", grant("notes")), ("beta", grant("notes"))]),
+        fences: Mutex::new(None),
     });
     let directory = Directory(HashMap::from([
         (":1.1".into(), "alpha".into()),
@@ -430,6 +442,7 @@ async fn a_read_only_grant_cannot_write() {
         backend: Mutex::new(Some(Arc::clone(&rig.backend))),
         profile: Mutex::new(None),
         grants: HashMap::from([("alpha", read_only)]),
+        fences: Mutex::new(None),
     });
     let host = StorageHost::new(
         Arc::new(Directory(HashMap::from([(":1.1".into(), "alpha".into())]))),
@@ -457,6 +470,7 @@ async fn an_invalid_grant_is_never_bound() {
         backend: Mutex::new(Some(Arc::clone(&rig.backend))),
         profile: Mutex::new(None),
         grants: HashMap::from([("alpha", bad)]),
+        fences: Mutex::new(None),
     });
     let host = StorageHost::new(
         Arc::new(Directory(HashMap::from([(":1.1".into(), "alpha".into())]))),
