@@ -1,8 +1,8 @@
 //! TinyChannels backend implementation for OpenHuman controller operations.
 
-use serde_json::Value;
 #[cfg(test)]
 use serde_json::json;
+use serde_json::Value;
 
 use crate::config::{ChannelsConfig, Config};
 use crate::core::Outcome;
