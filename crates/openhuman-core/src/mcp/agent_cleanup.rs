@@ -34,9 +34,13 @@ pub(super) fn agent_is_removed() -> bool {
 
 impl AgentMcpCleanup {
     /// Close the original object and evict it only after confirmed cleanup.
-    /// Cancellation or error retains the same client and transition receipt.
+    /// The whole attempt, including lock acquisition and bus calls, has a
+    /// 30-second deadline. Timeout returns `TransportFailed`; cancellation or
+    /// error retains the same client and transition receipt for explicit retry.
     pub async fn finish(&self) -> Result<(), ModuleCallError> {
-        self.client.close().await?;
+        tokio::time::timeout(TRANSITION_TIMEOUT, self.client.close())
+            .await
+            .map_err(|_| ModuleCallError::TransportFailed)??;
         self.evict();
         Ok(())
     }

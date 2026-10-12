@@ -31,7 +31,9 @@ pub(crate) fn finish_removal(
 }
 
 /// Run at most three retries on the process module executor. The future owns
-/// the workspace guard only while running; retained records contain no guard.
+/// the workspace guard through at most 90 seconds of polled MCP cleanup and
+/// 750 ms of backoff. It releases the guard before filesystem purge; retained
+/// records contain no guard. Executor scheduling can delay these timed waits.
 pub(crate) fn defer_pending(
     registry: Arc<crate::runtime::AgentMap>,
     id: String,
@@ -54,13 +56,18 @@ pub(crate) fn defer_pending(
     let running = Arc::clone(&pending.retry_running);
     let executor_failed = Arc::clone(&running);
     let future = async move {
-        let _guard = guard;
+        let mut guard = Some(guard);
         for attempt in 0..3 {
             let result = match &pending.cleanup {
                 Some(cleanup) => cleanup.finish().await.map_err(AgentError::McpCleanup),
                 None => Ok(()),
-            }
-            .and_then(|()| finish_removal(&registry, &id, &pending));
+            };
+            let result = result.and_then(|()| {
+                // Confirmed module cleanup no longer needs the process/workspace
+                // owner. Filesystem purge must not extend its retention lifetime.
+                drop(guard.take());
+                finish_removal(&registry, &id, &pending)
+            });
             match result {
                 Ok(()) => {
                     running.store(false, Ordering::Release);
