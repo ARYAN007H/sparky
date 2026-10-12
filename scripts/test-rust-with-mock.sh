@@ -78,28 +78,22 @@ PRODUCT_FEATURES="$(bash "$REPO_ROOT/scripts/ci/product-features.sh")"
 native_module_target="$(bash "$SCRIPT_DIR/ci/native-test-module-platform.sh")"
 IFS=$'\t' read -r module_ext wallet_platform <<< "$native_module_target"
 
-# Tokenjuice JSON-RPC coverage loads the production native module. Keep the
-# test run hermetic by building the pinned submodule instead of falling back
-# to GitHub release metadata.
-if [ -z "${TINYJUICE_TEST_MODULE:-}" ]; then
-  juice_manifest="vendor/tinyjuice/crates/tinyjuice-module/Cargo.toml"
-  juice_target_dir="$REPO_ROOT/target/native-test-modules/tinyjuice"
-  juice_module="$juice_target_dir/release/libtinyjuice_module.$module_ext"
-  echo "Building TinyJuice test module from the pinned submodule ..."
-  cargo build --release --manifest-path "$juice_manifest" --target-dir "$juice_target_dir"
-  export TINYJUICE_TEST_MODULE="$juice_module"
-fi
+# shellcheck source=modules/stage-local-modules.sh
+source "$SCRIPT_DIR/modules/stage-local-modules.sh"
 
-# Search JSON-RPC/agent coverage calls the TinySearch module against the mock
-# backend's managed Exa/Gemini routes. Build the pinned submodule so the suite
-# never depends on a published release.
-if [ -z "${TINYSEARCH_TEST_MODULE:-}" ]; then
-  search_manifest="vendor/tinysearch/crates/tinysearch/Cargo.toml"
-  search_target_dir="$REPO_ROOT/target/native-test-modules/tinysearch"
-  search_module="$search_target_dir/release/libtinysearch.$module_ext"
-  echo "Building TinySearch test module from the pinned submodule ..."
-  cargo build --release --manifest-path "$search_manifest" --target-dir "$search_target_dir"
-  export TINYSEARCH_TEST_MODULE="$search_module"
+# Tokenjuice, search, hosts and MCP: the registry-pinned release, as in CI. With
+# OPENHUMAN_MODULE_SOURCE=source they are built from the pinned submodules
+# instead (scripts/modules/build.mjs), which is how a module change is tried
+# against the core locally. TinyConnectors has no test release, so it is always
+# built from its submodule; its modules.toml carries the operator-trust digest.
+local_source_ids=(tinyconnectors)
+if local_module_source_is_source; then
+  local_source_ids+=(tinyjuice tinysearch tinyhosts tinymcp)
+else
+  for released_id in tinyjuice tinysearch; do
+    released_dir="$(stage_release_module "$released_id" "$wallet_platform" "$module_ext")"
+    export OPENHUMAN_MODULE_PATH="$released_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
+  done
 fi
 
 # Wallet JSON-RPC E2E sends a recovery phrase only to an attested module. Build
@@ -141,6 +135,7 @@ if [ ! -f "$docs_dir/libtinydocs_module.$module_ext" ]; then
 fi
 export OPENHUMAN_MODULE_PATH="$docs_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
 
+if ! local_module_source_is_source; then
 # The released TinyHosts contract test runs in its own process, outside the
 # generic unit suite. Keep the recipient pinned to the registry digest just
 # like the other native module fixtures.
@@ -159,7 +154,8 @@ if [ ! -f "$hosts_dir/libtinyhosts.$module_ext" ]; then
   fi
   tar --no-same-owner -xzf "$hosts_archive" -C "$hosts_dir"
 fi
-export OPENHUMAN_TINYHOSTS_TEST_MODULE="$hosts_dir/libtinyhosts.$module_ext"
+export OPENHUMAN_MODULE_PATH="$hosts_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
+fi
 
 # TinyBox command analysis is required by shell-backed storage and capability
 # tests. Load the published, checksum-pinned module rather than relying on the
@@ -181,6 +177,7 @@ if [ ! -f "$tinybox_dir/libtinybox.$module_ext" ]; then
 fi
 export OPENHUMAN_MODULE_PATH="$tinybox_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
 
+if ! local_module_source_is_source; then
 # The MCP registry E2E targets exercise real TinyMCP lifecycle calls through
 # the host's module adapter. Load the released, checksum-pinned module just as
 # the self-hosted CI installer does.
@@ -200,17 +197,24 @@ if [ ! -f "$tinymcp_dir/libtinymcp_module.$module_ext" ]; then
   tar --no-same-owner -xzf "$tinymcp_archive" -C "$tinymcp_dir"
 fi
 export OPENHUMAN_MODULE_PATH="$tinymcp_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
-export OPENHUMAN_TINYMCP_TEST_MODULE="$tinymcp_dir/libtinymcp_module.$module_ext"
-
-if [ -z "${TINYCONNECTORS_TEST_MODULE:-}" ]; then
-  connectors_manifest="vendor/tinyconnectors/crates/tinyconnectors/Cargo.toml"
-  connectors_target_dir="${TINYCONNECTORS_TARGET_DIR:-$REPO_ROOT/target/native-test-modules/tinyconnectors}"
-  connectors_module="$connectors_target_dir/release/libtinyconnectors.$module_ext"
-  echo "Building TinyConnectors test module from the pinned submodule ..."
-  cargo build --release --manifest-path "$connectors_manifest" --target-dir "$connectors_target_dir"
-  connectors_module="$(node scripts/ci/stage-connector-test-module.mjs \
-    "$connectors_module" "$REPO_ROOT/target/test-modules/tinyconnectors")"
 fi
+
+# Build the source modules in one call. The connector directory goes only on
+# the processes that exercise it: most Composio raw-coverage groups explicitly
+# test the absent-module path.
+path_before_sources="${OPENHUMAN_MODULE_PATH:-}"
+stage_source_modules "${local_source_ids[@]}"
+connectors_dir="$REPO_ROOT/target/module-sources/tinyconnectors"
+if [ -n "$path_before_sources" ]; then
+  export OPENHUMAN_MODULE_PATH="$path_before_sources"
+else
+  unset OPENHUMAN_MODULE_PATH
+fi
+for source_id in "${local_source_ids[@]}"; do
+  [ "$source_id" = tinyconnectors ] && continue
+  export OPENHUMAN_MODULE_PATH="$REPO_ROOT/target/module-sources/$source_id${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
+done
+connectors_module_path="$connectors_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
 
 cargo_test() {
   cargo test --manifest-path Cargo.toml --workspace \
@@ -239,8 +243,8 @@ run_raw_coverage_modules() {
     if { [ "$module" = "composio_credentials_state_raw_coverage_e2e" ] ||
          [ "$module" = "composio_tools_direct_raw_coverage_e2e" ] ||
          [ "$module" = "tools_composio_large_round25_raw_coverage_e2e" ]; } &&
-       [ -z "${TINYCONNECTORS_TEST_MODULE:-}" ]; then
-      TINYCONNECTORS_TEST_MODULE="$connectors_module" \
+       true; then
+      OPENHUMAN_MODULE_PATH="$connectors_module_path" \
         cargo_test --test raw_coverage_all -- "${module}::" --test-threads=1 "$@"
     else
       cargo_test --test raw_coverage_all -- "${module}::" --test-threads=1 "$@"
@@ -261,7 +265,7 @@ run_in_process_modules() {
   while IFS= read -r module; do
     [ -n "$module" ] || continue
     echo "[test-rust-with-mock] in-process module: ${module}"
-    TINYCONNECTORS_TEST_MODULE="${TINYCONNECTORS_TEST_MODULE:-$connectors_module}" \
+    OPENHUMAN_MODULE_PATH="$connectors_module_path" \
       cargo_test --test in_process_all -- "${module}::" "$@"
   done < <(in_process_modules)
 }
@@ -299,7 +303,7 @@ run_full_suite() {
   # Several unit fixtures mutate process-wide state (provider overrides and
   # temporary executable paths). Keep this aggregate invocation deterministic;
   # integration targets below retain their own, narrower isolation strategies.
-  TINYCONNECTORS_TEST_MODULE="${TINYCONNECTORS_TEST_MODULE:-$connectors_module}" \
+  OPENHUMAN_MODULE_PATH="$connectors_module_path" \
     cargo_test --lib -- --test-threads=1 \
     --skip a_build_only_runtime_is_swept_before_it_can_be_invoked "$@"
   # The core binary and the developer bins live in `crates/openhuman-cli`;
@@ -322,17 +326,17 @@ run_full_suite() {
     elif [ "$target" = "mcp_registry_e2e" ]; then
       # The TinyMCP module owns process-level directory transitions; this
       # binary exercises several workspaces against that shared module object.
-      TINYCONNECTORS_TEST_MODULE="${TINYCONNECTORS_TEST_MODULE:-$connectors_module}" \
+      OPENHUMAN_MODULE_PATH="$connectors_module_path" \
         cargo_test --test "$target" -- --ignored --test-threads=1 "$@"
     else
-      TINYCONNECTORS_TEST_MODULE="${TINYCONNECTORS_TEST_MODULE:-$connectors_module}" \
+      OPENHUMAN_MODULE_PATH="$connectors_module_path" \
         cargo_test --test "$target" -- "$@"
     fi
   done < <(integration_test_targets)
 
   # Loading a native module mutates process-global module state, so exercise
   # the published contract in a fresh libtest process with its pinned artifact.
-  TINYCONNECTORS_TEST_MODULE="${TINYCONNECTORS_TEST_MODULE:-$connectors_module}" \
+  OPENHUMAN_MODULE_PATH="$connectors_module_path" \
     cargo_test --lib \
       hosting::test::released_artifact_serves_providers_and_confidential_local_preparation \
       -- --exact --ignored --test-threads=1
@@ -366,7 +370,7 @@ elif [ "$#" -ge 2 ] && [ "$1" = "--test" ] && [ "$2" = "mcp_registry_e2e" ]; the
   if [ "${1:-}" = "--" ]; then
     shift
   fi
-  TINYCONNECTORS_TEST_MODULE="${TINYCONNECTORS_TEST_MODULE:-$connectors_module}" \
+  OPENHUMAN_MODULE_PATH="$connectors_module_path" \
     cargo_test --test mcp_registry_e2e -- --ignored --test-threads=1 "$@"
 else
   cargo_test "$@"

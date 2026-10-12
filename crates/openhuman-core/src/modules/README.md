@@ -150,7 +150,16 @@ global mode and `OPENHUMAN_MODULE_SOURCE_<ID>` (id upper-cased) one module.
   linked-modules`, then `OPENHUMAN_MODULE_SOURCE=linked`). tinybus never unloads
   a module, so a process serves an id from one source only. See the crate docs
   for which modules can be linked at the current vendor pins.
-- `source`: a locally built artifact.
+- `source`: a library built from the module's vendored gitlink by
+  `node scripts/modules/build.mjs <id|all>` (the recipe is the record's
+  `SourceSpec`: submodule, manifest, package, `lib_name`, features). The build
+  stages `<out>/<id>/<library>` plus a `modules.toml` holding the file's sha256
+  as operator trust, and prints `OPENHUMAN_MODULE_SOURCE_DIR=<out>` and one
+  `OPENHUMAN_MODULE_SOURCE_<ID>=source` line per module. `ops::resolve` loads
+  `<OPENHUMAN_MODULE_SOURCE_DIR>/<id>/<library>` through the same local-file
+  path as an explicit `path` override, so no new loader exists. The digest is
+  never written to `records_*.rs`: registry pins come from published releases
+  only. Builds are cached by (submodule tree, rustc, target, profile, features).
 
 For local development and local tests only. When `linked` or `source` cannot be
 honoured (no factory registered, no built artifact), the module is served from
