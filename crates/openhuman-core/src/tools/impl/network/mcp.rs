@@ -403,6 +403,34 @@ impl Tool for McpCallTool {
                 ));
             }
         };
+        let server = match client.normalize_identifier(&server).await {
+            Ok(server) => server,
+            Err(_) => {
+                let outcome = tinymcp_bus::McpCallOutcome::failed(
+                    &server,
+                    &tool,
+                    tinymcp_bus::McpCallError::new(tinymcp_bus::errors::INVALID_ARGUMENTS),
+                );
+                return Ok(with_outcome(
+                    ToolResult::error("MCP server or tool identifier is invalid"),
+                    &outcome,
+                ));
+            }
+        };
+        let tool = match client.normalize_identifier(&tool).await {
+            Ok(tool) => tool,
+            Err(_) => {
+                let outcome = tinymcp_bus::McpCallOutcome::failed(
+                    &server,
+                    &tool,
+                    tinymcp_bus::McpCallError::new(tinymcp_bus::errors::INVALID_ARGUMENTS),
+                );
+                return Ok(with_outcome(
+                    ToolResult::error("MCP server or tool identifier is invalid"),
+                    &outcome,
+                ));
+            }
+        };
         let client_config = host::client_config(&self.config);
         let arguments = match client.normalize_tool_arguments(arguments).await {
             Ok(arguments) => Value::Object(arguments),
