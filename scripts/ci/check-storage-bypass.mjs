@@ -312,7 +312,7 @@ async function main() {
   }
   if (added.length === 0 && stale.length === 0) {
     console.log(
-      `Storage-bypass ratchet holds (${findings.length} baselined sites; it only goes down).`,
+      `Storage-bypass ratchet holds (${baseline.length} original core sites; ${extension.length} reviewed extension sites; both only shrink).`,
     );
     return 0;
   }
