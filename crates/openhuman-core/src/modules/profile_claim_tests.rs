@@ -31,7 +31,10 @@ fn a_claimed_folder_is_kept_and_a_held_one_means_a_fresh_profile() {
         settle("/p", &answer(ProfileClaim::Claimed, None)),
         Claim::Claimed("/p".into())
     );
-    assert_eq!(settle("/p", &answer(ProfileClaim::Busy, None)), Claim::Fresh);
+    assert_eq!(
+        settle("/p", &answer(ProfileClaim::Busy, None)),
+        Claim::Fresh
+    );
     assert_eq!(
         settle("/p", &answer(ProfileClaim::FellBackToFresh, Some("/tmp/x"))),
         Claim::Fresh

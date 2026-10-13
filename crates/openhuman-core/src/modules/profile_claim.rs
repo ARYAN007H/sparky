@@ -55,7 +55,12 @@ pub(crate) fn settle(requested: &str, response: &ClaimProfileResponse) -> Claim 
 /// A module that cannot be asked leaves the folder unclaimed and the browser
 /// on a fresh profile, as a held folder does.
 pub(crate) async fn claim(config: &Config, path: &str, wait_ms: u64) -> Claim {
-    let reply = call(config, methods::CLAIM_PROFILE, &claim_request(path, wait_ms)).await;
+    let reply = call(
+        config,
+        methods::CLAIM_PROFILE,
+        &claim_request(path, wait_ms),
+    )
+    .await;
     let Some(data) = reply else {
         tracing::warn!("[profile-claim] the module could not claim the profile; using a fresh one");
         return Claim::Fresh;
@@ -81,7 +86,11 @@ pub(crate) async fn release(config: &Config, path: &str) {
     let _ = call(config, methods::RELEASE_PROFILE, &request).await;
 }
 
-async fn call<A: serde::Serialize + Sync>(config: &Config, member: &str, request: &A) -> Option<Value> {
+async fn call<A: serde::Serialize + Sync>(
+    config: &Config,
+    member: &str,
+    request: &A,
+) -> Option<Value> {
     let proxy = super::desktop::proxy(config).await.ok()?;
     let response: DesktopResponse = proxy.call(member, (request,)).await.ok()?;
     if !response.ok {
