@@ -38,8 +38,10 @@ backend, execute.
        +--------------+------------------+
        v              v                  v
   None           Local                 Docker
-  host shell     TinyBox StartJailedExec TinyBox RunDocker
-  (env cleared)  with explicit jail     action_dir mounted at /workspace
+  TinyBox        TinyBox               TinyBox RunDocker
+  StartNative-   StartNativeShellExec  action_dir mounted at /workspace
+  ShellExec      with explicit jail
+  (no jail)
 ```
 
 ### Resolving a policy
@@ -80,13 +82,13 @@ the `modules` feature the run is refused.
 
 `native_jail.rs` asks the pinned TinyBox module for `JailStatus`, creates a
 module-owned `passthrough` resource rooted at `policy.workspace_root`, and
-starts the shell through `StartJailedExec`. The request carries only the
+starts the shell through `StartNativeShellExec` with a jail. The request carries only the
 resolved read-only/read-write grants, network policy, and a required enforced
 isolation floor. TinyBox owns the jail provider, child process, pipe capture,
 and kill/reap acknowledgement; OpenHuman reads bounded output batches and
-closes the resource after terminal cleanup. A per-call scratch directory under
-the core state dir is granted read-write and used for `TMPDIR`, `TEMP`, and
-`TMP` unless the caller supplied one. No host-local jail or unconfined fallback
+closes the resource after terminal cleanup. TinyBox owns the per-call scratch
+directory under the core state dir: it grants it read-write and points `TMPDIR`,
+`TEMP`, and `TMP` at it unless the caller supplied one. No host-local jail or unconfined fallback
 runs if the module, artifact, or requested enforcement is unavailable.
 
 A real jail (Landlock, Seatbelt) denies everything it is not told about, so

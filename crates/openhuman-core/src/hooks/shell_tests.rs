@@ -67,11 +67,26 @@ fn a_selection_must_embed_the_command_exactly_once() {
     assert!(!embeds_placeholder_once(&twice));
 }
 
+/// The selection is process-global, so tests that install or clear it share this.
+static SELECTION: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[test]
 fn an_unresolved_selection_fails_the_spawn_instead_of_picking_a_shell() {
-    // A fresh slot is process-global state; this test only reads the factory's
-    // behavior when nothing was installed or after clearing it.
+    let _serial = SELECTION
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     *slot().write().unwrap() = None;
     let process = command("echo hi");
     assert_eq!(process.as_std().get_program(), UNAVAILABLE);
+}
+
+#[test]
+fn an_installed_selection_builds_the_hook_process() {
+    let _serial = SELECTION
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    install(posix());
+    let process = command("echo hi");
+    assert_eq!(process.as_std().get_program(), "/bin/bash");
+    *slot().write().unwrap() = None;
 }

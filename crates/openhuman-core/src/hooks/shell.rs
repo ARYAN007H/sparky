@@ -48,6 +48,8 @@ pub(super) async fn resolve() {
             Err(error) => log::warn!("[hooks] TinyBox shell selection failed: {error}"),
         }
     }
+    #[cfg(not(feature = "modules"))]
+    log::warn!("[hooks] built without `modules`; hook commands cannot select a shell");
 }
 
 fn install(selection: ShellInvocation) {
