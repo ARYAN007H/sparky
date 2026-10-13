@@ -183,6 +183,7 @@ fn a_server_added_through_the_released_module_survives_a_restart_in_the_storage_
         assert!(listed.contains(SERVER), "added server is listed: {listed}");
     }
 
+    eprintln!("FILES {:#?}", files(tmp.path()));
     // Second process on the same workspace and URL.
     {
         let (_server, base) = start(tmp.path(), &workspace, &url, &modules);
