@@ -301,11 +301,16 @@ impl SessionStoreProvider for WorkspaceSessionStores {
         Self::current().conversations_for_agent(agent_id)
     }
 
+    /// Nothing to sweep at install time: the workspaces are the profiles', and
+    /// a profile's turns are recovered when its lease is taken over
+    /// (`profiles::recovery`), not when its stores open. Resolving "the
+    /// current workspace" here would also open the default workspace's
+    /// database before any profile exists.
     fn recover(&self) -> anyhow::Result<()> {
-        Self::current().recover()
+        Ok(())
     }
 
     fn destination_key(&self) -> Option<String> {
-        Self::current().destination_key()
+        Some("workspace-default".to_string())
     }
 }
