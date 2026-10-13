@@ -313,12 +313,7 @@ pub(crate) fn force_next_run_for_test(
     at: DateTime<Utc>,
 ) -> Result<()> {
     use tinystoragedrivers::Precondition;
-    let opened = crate::storage::local::open_standing(
-        &db_path(config),
-        "cron::store",
-        config,
-        &|backend, scope, config| legacy_import(backend, scope, config),
-    )?;
+    let opened = crate::storage::local::open("cron::store", &config.workspace_dir)?;
     let docs = std::sync::Arc::clone(opened.scoped()?.documents());
     let job_id = job_id.to_string();
     run(async move {
