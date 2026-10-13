@@ -218,7 +218,8 @@ async fn secrets_served_from_a_plain_connection_are_refused_not_attested() {
     };
     let refused = bus.set_secret("mcp_client_env/x", b"v").await;
     assert!(
-        matches!(refused, Err(tinybus::Error::NotAttested { .. })),
+        matches!(&refused, Err(tinybus::Error::MethodFailed { name, .. })
+            if name == tinybus::Error::NOT_ATTESTED),
         "{refused:?}"
     );
 }
