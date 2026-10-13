@@ -16,11 +16,11 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use tinyconnectors_bus::names::methods;
 use tinyconnectors_bus::vocabulary::{
-    CuratedCatalogRequest, CuratedTool as BusCuratedTool, ToolScope as BusScope, VocabularyRequest,
-    VocabularyResponse,
+    CuratedCatalogRequest, CuratedTool, ToolScope, VocabularyRequest, VocabularyResponse,
 };
 
-use super::scopes::{CuratedTool, ToolScope};
+use super::slug::{classify_unknown, find_curated, toolkit_from_slug};
+use super::UserScopePref;
 
 const LOG: &str = "[composio][curated]";
 
@@ -53,6 +53,8 @@ struct Snapshot {
     native: HashSet<String>,
     /// Canonical toolkits with a catalog, in the module's order.
     toolkits: Vec<String>,
+    /// The module's agent-ready toolkit list, sorted.
+    agent_ready: Vec<String>,
 }
 
 fn store() -> &'static RwLock<Option<Arc<Snapshot>>> {
@@ -84,7 +86,7 @@ fn test_fixture() -> Arc<Snapshot> {
             #[derive(serde::Deserialize)]
             struct Row {
                 slug: String,
-                scope: BusScope,
+                scope: ToolScope,
             }
             let actions: HashMap<String, Vec<Row>> =
                 serde_json::from_str(include_str!("curated_fixtures/catalog-actions.json"))
@@ -111,7 +113,13 @@ fn test_fixture() -> Arc<Snapshot> {
                 .collect();
             let vocabulary = VocabularyResponse {
                 toolkits,
-                agent_ready_toolkits: Vec::new(),
+                agent_ready_toolkits: vec![
+                    "github".to_owned(),
+                    "gmail".to_owned(),
+                    "linear".to_owned(),
+                    "notion".to_owned(),
+                    "slack".to_owned(),
+                ],
             };
             Arc::new(build("fixture", &[], &vocabulary))
         })
@@ -134,14 +142,6 @@ fn intern(text: &str) -> &'static str {
     leaked
 }
 
-fn scope(bus: BusScope) -> ToolScope {
-    match bus {
-        BusScope::Read => ToolScope::Read,
-        BusScope::Write => ToolScope::Write,
-        BusScope::Admin => ToolScope::Admin,
-    }
-}
-
 fn key(toolkit: &str) -> String {
     toolkit.trim().to_ascii_lowercase()
 }
@@ -150,7 +150,7 @@ fn key(toolkit: &str) -> String {
 /// without a loaded module.
 fn build(
     module_version: &str,
-    listed: &[BusCuratedTool],
+    listed: &[CuratedTool],
     vocabulary: &VocabularyResponse,
 ) -> Snapshot {
     let mut snapshot = Snapshot {
@@ -174,13 +174,17 @@ fn build(
             let catalog: Arc<[CuratedTool]> = actions
                 .iter()
                 .map(|action| CuratedTool {
-                    slug: intern(&action.slug),
-                    scope: scope(action.scope),
+                    toolkit: entry.toolkit.clone(),
+                    slug: action.slug.clone(),
+                    scope: action.scope,
                 })
                 .collect();
             snapshot.catalogs.insert(name, catalog);
         }
     }
+    snapshot.agent_ready = vocabulary.agent_ready_toolkits.clone();
+    snapshot.agent_ready.sort_unstable();
+    snapshot.agent_ready.dedup();
     snapshot
 }
 
@@ -197,7 +201,7 @@ pub async fn prime(config: &crate::config::Config) -> Result<(), String> {
     if current().is_some_and(|snapshot| snapshot.module_version == version) {
         return Ok(());
     }
-    let listed: Vec<BusCuratedTool> = crate::modules::connectors::call_stateless(
+    let listed: Vec<CuratedTool> = crate::modules::connectors::call_stateless(
         config,
         methods::LIST_CURATED_CATALOG,
         CuratedCatalogRequest { toolkit: None },
@@ -238,7 +242,7 @@ pub fn invalidate() {
 /// Replace the snapshot directly. Test seam for callers that exercise the
 /// host adapters without a loaded module.
 #[cfg(test)]
-pub(crate) fn install_for_test(listed: &[BusCuratedTool], vocabulary: &VocabularyResponse) {
+pub(crate) fn install_for_test(listed: &[CuratedTool], vocabulary: &VocabularyResponse) {
     *store()
         .write()
         .unwrap_or_else(std::sync::PoisonError::into_inner) =
@@ -249,6 +253,12 @@ pub(crate) fn install_for_test(listed: &[BusCuratedTool], vocabulary: &Vocabular
 #[must_use]
 pub fn catalog_for_toolkit(toolkit: &str) -> Option<Arc<[CuratedTool]>> {
     current()?.catalogs.get(&key(toolkit)).cloned()
+}
+
+/// Toolkits the module marks agent-ready, sorted. Empty until [`prime`] runs.
+#[must_use]
+pub fn agent_ready_toolkits() -> Vec<String> {
+    current().map(|s| s.agent_ready.clone()).unwrap_or_default()
 }
 
 /// Canonical toolkits that have a curated catalog.
@@ -275,8 +285,7 @@ pub fn toolkit_description(toolkit: &str) -> &'static str {
 /// already-loaded user scope preference? See `ListTools`: the module applies
 /// the same rule when it lists tools.
 #[must_use]
-pub fn is_action_visible_with_pref(slug: &str, pref: &super::scopes::UserScopePref) -> bool {
-    use super::scopes::{classify_unknown, find_curated, toolkit_from_slug};
+pub fn is_action_visible_with_pref(slug: &str, pref: &UserScopePref) -> bool {
     let Some(toolkit) = toolkit_from_slug(slug) else {
         return true;
     };
@@ -289,7 +298,6 @@ pub fn is_action_visible_with_pref(slug: &str, pref: &super::scopes::UserScopePr
 /// The curated scope `slug` requires, if it appears in a catalog.
 #[must_use]
 pub fn curated_scope_for(slug: &str) -> Option<ToolScope> {
-    use super::scopes::{find_curated, toolkit_from_slug};
     let catalog = catalog_for_toolkit(&toolkit_from_slug(slug)?)?;
     find_curated(&catalog, slug).map(|c| c.scope)
 }

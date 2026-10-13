@@ -1,12 +1,6 @@
-//! Tests for the action-scope classification and the per-toolkit preference.
-//!
-//! The storage half — reading and writing a [`super::UserScopePref`] through
-//! the key/value seam — is tested in the engine crate next to the code that
-//! performs it. What is pinned here is everything two separately compiled
-//! processes have to agree on: the verb precedence in
-//! [`super::classify_unknown`], the multi-segment toolkit prefixes, the
-//! persisted preference shape, and the default that decides what a brand-new
-//! connection is allowed to do.
+//! Pins the text-only slug helpers: verb precedence in
+//! [`super::classify_unknown`], the multi-segment toolkit prefixes and the
+//! alias rewrite.
 
 #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 
