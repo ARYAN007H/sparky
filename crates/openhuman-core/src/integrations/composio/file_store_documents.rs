@@ -119,6 +119,22 @@ impl Docs {
         })
     }
 
+    /// Stores `value` under `name` only when no value is stored there yet
+    /// (the one-time import of a pre-documents state file). Returns whether it
+    /// wrote.
+    pub(super) fn import_if_absent(&self, name: &str, value: serde_json::Value) -> Result<bool> {
+        let id = name.to_string();
+        let doc = json!({ "value": value });
+        log::debug!("[composio:store] document import id={id}");
+        self.0.run(|docs| async move {
+            match docs.put(STATE, &id, doc, Precondition::Absent).await {
+                Ok(_) => Ok(true),
+                Err(error) if error.kind() == tinystoragedrivers::ErrorKind::Conflict => Ok(false),
+                Err(error) => Err(error),
+            }
+        })
+    }
+
     #[cfg(test)]
     pub(super) fn save<T: Serialize>(&self, name: &str, value: &T) -> Result<()> {
         let id = name.to_string();
