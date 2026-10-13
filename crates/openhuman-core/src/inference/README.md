@@ -57,7 +57,7 @@ The provider-string grammar is documented at the top of `provider/factory.rs`:
 ```
 
 The optional `@<temp>` suffix pins a temperature for that workload. It is stripped
-(`routing::split_model_and_temperature`) before the model id goes upstream. Unknown slugs and
+(`tinyinference_providers::route::split_model_and_temperature`) before the model id goes upstream. Unknown slugs and
 missing credentials produce actionable errors instead of a silent fallback.
 
 Background roles (`vision`, `embeddings`, `memory`, `agentic`, `burst`) fall back to the primary

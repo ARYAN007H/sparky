@@ -90,7 +90,7 @@ use local_runtime::{
 pub(crate) use managed_backend::make_openhuman_backend_model_for_thread;
 use managed_backend::{resolve_managed_backend, resolve_managed_backend_with_model_override};
 use primary_cloud::{legacy_inference_slug, resolve_primary_cloud_provider_string};
-use routing::split_model_and_temperature;
+use tinyinference_providers::route::split_model_and_temperature;
 use subprocess_providers::{
     prepare_claude_agent_sdk_chat_model, try_create_claude_agent_sdk_chat_model,
     try_create_claude_agent_sdk_chat_model_from_string, try_create_claude_code_chat_model,
