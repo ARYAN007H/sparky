@@ -48,7 +48,7 @@ async fn threads_purge_inner(
     // snapshot files (which `list()` would warn-and-skip) are also
     // removed — a destructive cleanup must not leave behind anything
     // it failed to deserialize. Failures surface as RPC errors.
-    turn_state::store::clear_all(dir.clone())
+    crate::agent::session_store::turn_states_for(&dir).clear_all()
         .map_err(|err| format!("threads purged but turn-snapshot cleanup failed: {err}"))?;
     Ok(envelope(
         PurgeConversationThreadsResponse {

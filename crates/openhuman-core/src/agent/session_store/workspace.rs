@@ -17,7 +17,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
-use tinyagents_session::port::{AgentStores, SessionStoreProvider};
+use tinyagents_session::port::{AgentStores, SessionStoreProvider, TurnStates};
 use tinyagents_session::run_ledger::{LedgerError, LedgerResult, RunLedgerStore};
 use tinyagents_session::DriverSessionStores;
 use tinystoragedrivers::{DocumentStore, MemoryStorage, StorageBackend};
@@ -134,6 +134,24 @@ pub fn stores_or_ephemeral(workspace_dir: &Path) -> AgentStores {
         log::warn!("[session_store] no tenant; using throwaway in-memory stores");
         tinyagents_session::port::InMemorySessionStores::new().for_agent("ephemeral")
     })
+}
+
+/// The calling tenant's turn-state snapshots for `workspace_dir`: the
+/// `TurnStates` port of its session stores. A call with no tenant gets a
+/// throwaway in-memory store.
+#[must_use]
+pub fn turn_states_for(workspace_dir: &Path) -> Arc<dyn TurnStates> {
+    stores_or_ephemeral(workspace_dir).turn_states
+}
+
+/// The operator's ([`DEFAULT_AGENT`](super::DEFAULT_AGENT)) turn-state
+/// snapshots for `workspace_dir`, independent of the calling task's tenant —
+/// for boot-time recovery sweeps that run before any tenant is in scope.
+#[must_use]
+pub fn default_turn_states_for(workspace_dir: &Path) -> Arc<dyn TurnStates> {
+    provider_for_workspace(workspace_dir)
+        .for_agent(super::DEFAULT_AGENT)
+        .turn_states
 }
 
 /// The calling tenant's run ledger for `workspace_dir`.
