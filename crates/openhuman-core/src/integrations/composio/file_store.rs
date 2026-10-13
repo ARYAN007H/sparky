@@ -41,12 +41,13 @@ async fn import_legacy(
     let value: serde_json::Value = serde_json::from_slice(&bytes)
         .map_err(|error| format!("[composio:store] parsing legacy {name} failed: {error}"))?;
     let docs = docs.clone();
-    let wrote = crate::core::runtime::spawn_blocking_scoped(move || {
-        docs.import_if_absent(name, value)
-    })
-    .await
-    .map_err(|error| format!("[composio:store] importing legacy {name} failed: {error}"))?
-    .map_err(|error| format!("[composio:store] importing legacy {name} failed: {error:#}"))?;
+    let wrote =
+        crate::core::runtime::spawn_blocking_scoped(move || docs.import_if_absent(name, value))
+            .await
+            .map_err(|error| format!("[composio:store] importing legacy {name} failed: {error}"))?
+            .map_err(|error| {
+                format!("[composio:store] importing legacy {name} failed: {error:#}")
+            })?;
     log::debug!("[composio:store] legacy import name={name} wrote={wrote}");
     let migrated = path.with_file_name(format!("{name}.migrated"));
     if let Err(error) = tokio::fs::rename(&path, &migrated).await {

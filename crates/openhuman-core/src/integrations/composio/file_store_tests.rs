@@ -61,10 +61,14 @@ async fn a_legacy_state_file_is_imported_once_and_retired() {
         .exists());
 
     // A later edit is not clobbered by a re-import.
-    update(&config, USER_SCOPES_FILE, |v: &mut BTreeMap<String, u32>| {
-        v.insert("gmail".into(), 9);
-        ((), true)
-    })
+    update(
+        &config,
+        USER_SCOPES_FILE,
+        |v: &mut BTreeMap<String, u32>| {
+            v.insert("gmail".into(), 9);
+            ((), true)
+        },
+    )
     .await
     .unwrap();
     let again: BTreeMap<String, u32> = load(&config, USER_SCOPES_FILE).await.unwrap();
