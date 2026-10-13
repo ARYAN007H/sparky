@@ -35,7 +35,8 @@ use super::*;
 /// listing them would request grants that are never checked.
 pub async fn compute_approval_manifest(config: &Config, graph: &WorkflowGraph) -> Vec<Value> {
     use crate::flows::tinyflows::caps::classify_composio_action_for_tier;
-    use crate::security::{CommandClass, GateDecision, SecurityPolicy};
+    use crate::security::{GateDecision, SecurityPolicy};
+    use tinybox_bus::CommandClass;
 
     let security =
         SecurityPolicy::from_config(&config.autonomy, &config.workspace_dir, &config.action_dir);
