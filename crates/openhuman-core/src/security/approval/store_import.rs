@@ -8,7 +8,7 @@
 //! expiry key, optional columns left out when NULL. The legacy file is only
 //! ever opened here, by the storage importer, on a scratch copy of it.
 
-use crate::storage::rusqlite::{self, params, Connection};
+use crate::storage::rusqlite::{params, Connection};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use serde_json::{json, Map, Value};

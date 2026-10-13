@@ -10,7 +10,7 @@
 //! The `task_sources/sources.db` older installs wrote is read once,
 //! read-only, by the storage importer (`store_import.rs`).
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use chrono::{DateTime, Utc};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;

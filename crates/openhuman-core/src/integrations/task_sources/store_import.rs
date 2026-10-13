@@ -14,7 +14,7 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use chrono::DateTime;
-use rusqlite::{params, Connection};
+use rusqlite::Connection;
 use serde_json::{json, Map, Value};
 
 use super::store_documents::{ingested_id, to_doc, INGESTED, SOURCES};
