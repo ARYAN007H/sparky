@@ -112,6 +112,10 @@ fn probe(_: Map<String, Value>) -> ControllerFuture {
 
 fn pending(_: Map<String, Value>) -> ControllerFuture {
     Box::pin(async {
+        let config = crate::config::rpc::load_config_with_timeout()
+            .await
+            .map_err(|error| format!("config unavailable: {error}"))?;
+        crate::core::runtime::components::require_config(&config, "computer")?;
         serde_json::to_value(super::confirmation::pending()).map_err(|error| error.to_string())
     })
 }
