@@ -58,6 +58,15 @@ impl ShowUiTool {
 ///
 /// When the path is malformed, outside every root, or not an HTML file.
 pub fn confine_path(roots: &[PathBuf], path: &str) -> Result<PathBuf, String> {
+    confine_path_in(roots, path).map(|(_, resolved)| resolved)
+}
+
+/// [`confine_path`], also returning the canonical root that contains the file.
+///
+/// # Errors
+///
+/// As [`confine_path`].
+pub fn confine_path_in(roots: &[PathBuf], path: &str) -> Result<(PathBuf, PathBuf), String> {
     let requested = Path::new(path.trim());
     if path.trim().is_empty() || path.contains('\0') {
         return Err("path must not be empty".to_string());
@@ -88,10 +97,46 @@ pub fn confine_path(roots: &[PathBuf], path: &str) -> Result<PathBuf, String> {
             continue;
         };
         if resolved.starts_with(&canonical_root) && resolved.is_file() {
-            return Ok(resolved);
+            return Ok((canonical_root, resolved));
         }
     }
     Err("the file is not inside the workspace or a skill bundle".to_string())
+}
+
+/// Reads `resolved` through one handle opened without following links below
+/// `root`, bounded by [`MAX_RESOURCE_BYTES`].
+///
+/// # Errors
+///
+/// When the open is refused, the file is not regular, or it is too large.
+pub async fn read_confined(root: PathBuf, resolved: PathBuf) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || {
+        use std::io::Read;
+        let file = crate::agent::attachments::provider::open::secure_open(&resolved, &root)
+            .map_err(|error| {
+                tracing::debug!(?error, "[mcp_ui] show_ui refused the file open");
+                "the file is not inside the workspace or a skill bundle".to_string()
+            })?;
+        let metadata = file
+            .metadata()
+            .map_err(|_| "could not read the file".to_string())?;
+        if !metadata.is_file() {
+            return Err("only regular files can be shown".to_string());
+        }
+        if metadata.len() > MAX_RESOURCE_BYTES as u64 {
+            return Err("the file is too large to show".to_string());
+        }
+        let mut html = String::new();
+        file.take(MAX_RESOURCE_BYTES as u64 + 1)
+            .read_to_string(&mut html)
+            .map_err(|_| "could not read the file".to_string())?;
+        if html.len() > MAX_RESOURCE_BYTES {
+            return Err("the file is too large to show".to_string());
+        }
+        Ok(html)
+    })
+    .await
+    .map_err(|_| "could not read the file".to_string())?
 }
 
 fn clean_title(raw: Option<&str>) -> Option<String> {
@@ -140,15 +185,14 @@ impl Tool for ShowUiTool {
         let html = match (html_arg, path_arg) {
             (Some(html), None) => html.to_string(),
             (None, Some(path)) => {
-                let resolved = match confine_path(&self.roots, path) {
-                    Ok(resolved) => resolved,
+                let (root, resolved) = match confine_path_in(&self.roots, path) {
+                    Ok(found) => found,
                     Err(error) => return Ok(ToolResult::error(format!("show_ui: {error}"))),
                 };
-                let size = tokio::fs::metadata(&resolved).await?.len();
-                if size > MAX_RESOURCE_BYTES as u64 {
-                    return Ok(ToolResult::error("show_ui: the file is too large to show"));
+                match read_confined(root, resolved).await {
+                    Ok(html) => html,
+                    Err(error) => return Ok(ToolResult::error(format!("show_ui: {error}"))),
                 }
-                tokio::fs::read_to_string(&resolved).await?
             }
             _ => {
                 return Ok(ToolResult::error(
