@@ -737,7 +737,7 @@ impl OpenHumanSessionHost {
 
         // `[components] juice = false`: truncation only, no compaction/summary.
         let juice_on =
-            (self.runtime_config.as_ref()).is_none_or(crate::inference::tokenjuice::enabled);
+            (self.runtime_config.as_ref()).is_none_or(|c| crate::inference::tokenjuice::enabled(c));
         let context_mw = TurnContextMiddleware {
             tool_result_budget_bytes,
             payload_summarizer: self.payload_summarizer.clone().filter(|_| juice_on),
