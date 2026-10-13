@@ -7,7 +7,6 @@ use super::types::{
     SandboxPolicy, SandboxStatus, ELEVATED_TOOLS,
 };
 use crate::agent::harness::definition::SandboxMode;
-use crate::agent::platform_shell;
 use crate::config::{RuntimeConfig, SandboxBackend, SandboxConfig};
 use std::collections::HashMap;
 use std::ffi::OsString;
@@ -341,7 +340,15 @@ pub async fn execute_in_sandbox(
     match policy.backend {
         SandboxBackendKind::None => {
             crate::config::ensure_usable_cwd(working_dir)?;
-            execute_unsandboxed(command, working_dir, &extra_env, timeout).await
+            let config = match module_config {
+                Some(config) => config,
+                None => crate::config::ops::load_config_with_timeout()
+                    .await
+                    .map_err(|error| {
+                        anyhow::anyhow!("Cannot read module configuration: {error}")
+                    })?,
+            };
+            execute_unsandboxed(&config, policy, command, working_dir, &extra_env, timeout).await
         }
         SandboxBackendKind::Local => {
             crate::config::ensure_usable_cwd(working_dir)?;
@@ -434,94 +441,38 @@ pub(crate) async fn apply_requested_backend(
 }
 
 /// Passthrough execution with no sandbox (for `SandboxBackendKind::None`).
+///
+/// TinyBox's `StartNativeShellExec` selects the shell (so Windows gets
+/// `cmd.exe`, #4705), clears the environment down to its safe snapshot (the
+/// [`SANDBOX_ENV_PASSTHROUGH`] names plus the Windows process-bootstrap
+/// variables), applies the caller's overrides and owns the scratch directory.
 async fn execute_unsandboxed(
+    config: &crate::config::Config,
+    policy: &SandboxPolicy,
     command: &str,
     working_dir: &Path,
     extra_env: &HashMap<OsString, OsString>,
     timeout: Duration,
 ) -> anyhow::Result<SandboxExecResult> {
-    // Shell selection routed through `platform_shell` so this path picks
-    // `cmd.exe /C` on Windows instead of the non-existent `sh` binary
-    // (#4705 — Windows Shell tool spawn-failed at ~30ms).
-    let mut cmd = platform_shell::build_tokio_command(command);
-    cmd.current_dir(working_dir);
-    cmd.env_clear();
-    for var in SANDBOX_ENV_PASSTHROUGH {
-        if let Ok(val) = std::env::var(var) {
-            if val.is_empty() {
-                anyhow::bail!("sandbox passthrough environment variable {var} is empty");
-            }
-            cmd.env(var, val);
-        }
+    let mut env = std::collections::BTreeMap::new();
+    for (name, value) in extra_env {
+        let (Some(name), Some(value)) = (name.to_str(), value.to_str()) else {
+            anyhow::bail!("sandbox environment is not UTF-8");
+        };
+        env.insert(name.to_owned(), value.to_owned());
     }
-    platform_shell::forward_windows_bootstrap_env(&mut cmd)?;
-    for (k, v) in extra_env {
-        cmd.env(k, v);
-    }
-
-    let result = crate::tools::timeout::output_or_kill(&mut cmd, timeout).await;
-    match result {
-        Ok(Ok(output)) => Ok(SandboxExecResult {
-            exit_code: output.status.code().unwrap_or(-1),
-            stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-            timed_out: false,
-        }),
-        Ok(Err(e)) => anyhow::bail!("Failed to execute command: {e}"),
-        Err(_) => Ok(SandboxExecResult {
-            exit_code: -1,
-            stdout: String::new(),
-            stderr: format!("Command timed out after {}s", timeout.as_secs()),
-            timed_out: true,
-        }),
-    }
-}
-
-/// Where module-owned native jailed executions create a per-call writable scratch area.
-#[cfg(feature = "modules")]
-pub fn sandbox_scratch_root(state_dir: &Path) -> PathBuf {
-    state_dir.join("artifacts").join("sandbox-scratch")
-}
-
-/// A fresh per-call scratch directory, removed after the module acknowledges execution cleanup.
-#[cfg(feature = "modules")]
-pub(super) struct CallDir {
-    pub(super) path: PathBuf,
-    kind: &'static str,
-}
-
-#[cfg(feature = "modules")]
-impl CallDir {
-    pub(super) fn create(root: PathBuf, kind: &'static str) -> anyhow::Result<Self> {
-        let path = root.join(uuid::Uuid::new_v4().to_string());
-        std::fs::create_dir_all(&path).map_err(|error| {
-            anyhow::anyhow!(
-                "Failed to create sandbox {kind} dir {}: {error}",
-                path.display()
-            )
-        })?;
-        tracing::debug!(dir = %path.display(), kind, "[sandbox:local] created per-call dir");
-        Ok(Self { path, kind })
-    }
-}
-
-#[cfg(feature = "modules")]
-impl Drop for CallDir {
-    fn drop(&mut self) {
-        match std::fs::remove_dir_all(&self.path) {
-            Ok(()) => tracing::debug!(
-                dir = %self.path.display(),
-                kind = self.kind,
-                "[sandbox:local] removed per-call dir"
-            ),
-            Err(error) => tracing::warn!(
-                dir = %self.path.display(),
-                kind = self.kind,
-                error = %error,
-                "[sandbox:local] failed to remove per-call dir"
-            ),
-        }
-    }
+    std::fs::create_dir_all(&policy.state_dir)
+        .map_err(|error| anyhow::anyhow!("Cannot prepare sandbox state directory: {error}"))?;
+    super::shell_exec::run_host(
+        config,
+        command,
+        working_dir,
+        &policy.state_dir,
+        env,
+        timeout,
+        false,
+    )
+    .await
 }
 
 /// Check whether a tool operation is an elevated op that must run on the
