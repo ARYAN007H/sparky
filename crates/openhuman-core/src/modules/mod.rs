@@ -157,10 +157,42 @@ pub async fn import_legacy_mcp(data_dir: &std::path::Path) {
     let _ = data_dir;
 }
 
-/// The (importer, directory) pairs this process already imported, so a hot
-/// call path pays for the marker lookup once rather than on every call.
+/// What an importer's outcome says about whether it may be skipped next time.
 #[cfg(feature = "modules")]
-type ImportedSet = std::sync::Mutex<std::collections::HashSet<(&'static str, std::path::PathBuf)>>;
+trait Settled {
+    /// True once the import finished or its marker was found; false while the
+    /// outcome (no backend, no source, unsupported backend) can still change.
+    fn settled(&self) -> bool;
+}
+
+#[cfg(feature = "modules")]
+macro_rules! settled_outcome {
+    ($($module:ident),*) => {$(
+        impl Settled for $module::Outcome {
+            fn settled(&self) -> bool {
+                matches!(self, Self::AlreadyDone | Self::Imported { .. })
+            }
+        }
+    )*};
+}
+
+#[cfg(feature = "modules")]
+settled_outcome!(
+    storage_import_tinyconnectors,
+    storage_import_tinybox,
+    storage_import_tinyjuice
+);
+#[cfg(all(feature = "modules", feature = "web3"))]
+settled_outcome!(storage_import_tinywallet);
+
+/// The (importer, module scope, directory) triples this process already
+/// imported, so a hot call path pays for the marker lookup once rather than
+/// on every call. The async lock is held across an import, so a concurrent
+/// first caller waits for the migration instead of racing it.
+#[cfg(feature = "modules")]
+type ImportedSet = tokio::sync::Mutex<
+    std::collections::HashSet<(&'static str, String, std::path::PathBuf)>,
+>;
 
 #[cfg(feature = "modules")]
 fn imported_once() -> &'static ImportedSet {
@@ -168,30 +200,37 @@ fn imported_once() -> &'static ImportedSet {
     DONE.get_or_init(Default::default)
 }
 
-/// Runs one legacy import at most once per process and directory, and again
-/// after a failure (which is logged, never returned).
+/// Runs one legacy import at most once per process, module scope and
+/// directory, and again after a failure or an unsettled outcome (which is
+/// logged, never returned). The key is recorded only after the import
+/// finishes, so a cancelled caller leaves nothing behind.
 #[cfg(feature = "modules")]
-async fn import_once<F, T>(kind: &'static str, dir: &std::path::Path, run: F)
+async fn import_once<F, T>(kind: &'static str, module_id: &str, dir: &std::path::Path, run: F)
 where
     F: std::future::Future<Output = anyhow::Result<T>>,
-    T: std::fmt::Debug,
+    T: std::fmt::Debug + Settled,
 {
-    let key = (kind, dir.to_path_buf());
-    let first = imported_once()
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .insert(key.clone());
-    if !first {
+    let scope = match storage_host::current_module_scope(module_id) {
+        Ok(scope) => format!("{scope:?}"),
+        Err(error) => {
+            log::warn!("[{kind}] legacy storage import skipped: {:?}", error.kind());
+            return;
+        }
+    };
+    let key = (kind, scope, dir.to_path_buf());
+    let mut done = imported_once().lock().await;
+    if done.contains(&key) {
         return;
     }
     match run.await {
-        Ok(outcome) => log::debug!("[{kind}] legacy storage import: {outcome:?}"),
+        Ok(outcome) => {
+            log::debug!("[{kind}] legacy storage import: {outcome:?}");
+            if outcome.settled() {
+                done.insert(key);
+            }
+        }
         Err(error) => {
             log::warn!("[{kind}] legacy storage import failed, will retry: {error:#}");
-            imported_once()
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .remove(&key);
         }
     }
 }
@@ -203,6 +242,7 @@ pub async fn import_legacy_connectors(state_dir: &std::path::Path) {
     #[cfg(feature = "modules")]
     import_once(
         "connectors",
+        storage_grant_tinyconnectors::MODULE_ID,
         state_dir,
         storage_import_tinyconnectors::import_legacy(state_dir),
     )
@@ -218,6 +258,7 @@ pub async fn import_legacy_x402(workspace_dir: &std::path::Path) {
     #[cfg(all(feature = "modules", feature = "web3"))]
     import_once(
         "x402",
+        storage_grant_tinywallet::MODULE_ID,
         workspace_dir,
         storage_import_tinywallet::import_legacy(workspace_dir),
     )
@@ -233,6 +274,7 @@ pub async fn import_legacy_tinybox(workspace_dir: &std::path::Path) {
     #[cfg(feature = "modules")]
     import_once(
         "tinybox",
+        storage_grant_tinybox::MODULE_ID,
         workspace_dir,
         storage_import_tinybox::import_legacy(workspace_dir),
     )
@@ -249,6 +291,7 @@ pub async fn import_legacy_tinyjuice(root: &std::path::Path, ttl: Option<std::ti
     #[cfg(feature = "modules")]
     import_once(
         "tinyjuice",
+        storage_grant_tinyjuice::MODULE_ID,
         root,
         storage_import_tinyjuice::import_legacy(root, ttl),
     )

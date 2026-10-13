@@ -165,12 +165,15 @@ fn read_originals(root: &Path, now: SystemTime) -> Result<(Vec<LegacyOriginal>, 
             continue;
         };
         let path = entry.path();
-        if !path.is_file() {
+        // Never follow a link: it could point outside the CCR directory.
+        let meta = std::fs::symlink_metadata(&path)
+            .with_context(|| format!("stat {}", path.display()))?;
+        if !meta.file_type().is_file() {
             skipped += 1;
             continue;
         }
-        let modified = std::fs::metadata(&path)
-            .and_then(|meta| meta.modified())
+        let modified = meta
+            .modified()
             .with_context(|| format!("stat {}", path.display()))?;
         let bytes = std::fs::read(&path).with_context(|| format!("read {}", path.display()))?;
         let Ok(text) = String::from_utf8(bytes) else {
