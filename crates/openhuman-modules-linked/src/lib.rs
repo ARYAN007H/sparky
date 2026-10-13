@@ -49,10 +49,48 @@ use openhuman_rpc::embed::modules::{register_linked, LinkedFactory};
 #[must_use]
 pub fn linked_modules() -> Vec<(&'static str, LinkedFactory)> {
     let modules: Vec<(&'static str, LinkedFactory)> = vec![
+        #[cfg(feature = "tinybox")]
+        ("tinybox", tinybox_module::linked_module),
+        #[cfg(feature = "tinychannels")]
+        ("tinychannels", tinychannels_module::linked_module),
+        #[cfg(feature = "tinycomputer")]
+        ("tinycomputer", tinycomputer::linked_module),
+        #[cfg(feature = "tinyconnectors")]
+        ("tinyconnectors", tinyconnectors::linked_module),
         #[cfg(feature = "tinydocs")]
         ("tinydocs", tinydocs_module::linked_module),
+        #[cfg(feature = "tinyhosts")]
+        ("tinyhosts", tinyhosts::linked_module),
+        #[cfg(feature = "tinyjuice")]
+        ("tinyjuice", tinyjuice_module::linked_module),
+        #[cfg(feature = "tinymcp")]
+        ("tinymcp", tinymcp_linked_module),
+        #[cfg(feature = "tinysearch")]
+        ("tinysearch", tinysearch::linked_module),
+        #[cfg(feature = "tinyvoice")]
+        ("tinyvoice", tinyvoice_module::linked_module),
+        #[cfg(feature = "tinywallet")]
+        ("tinywallet", tinywallet_module::linked_module),
     ];
     modules
+}
+
+/// tinymcp exports the three ABI entry points under `static-link` but no
+/// `linked_module()` wrapper, so the factory is assembled from them here.
+#[cfg(feature = "tinymcp")]
+fn tinymcp_linked_module() -> tinybus::Result<tinybus::module::LinkedModule> {
+    use tinymcp::tinybus_module::{
+        tinybus_module_init_v1, tinybus_module_manifest_v1, TINYBUS_MODULE_ABI_V1,
+    };
+    // SAFETY: these are the module's own generated exports, which is exactly
+    // what `module_export!`'s `linked_module()` passes.
+    unsafe {
+        tinybus::module::LinkedModule::from_exports(
+            &TINYBUS_MODULE_ABI_V1,
+            tinybus_module_manifest_v1,
+            tinybus_module_init_v1,
+        )
+    }
 }
 
 /// Register every enabled module with the core's linked-module seam.
