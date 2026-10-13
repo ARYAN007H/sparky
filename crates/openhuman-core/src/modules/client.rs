@@ -320,7 +320,7 @@ pub(super) fn report_proxy_failure(
     record: &'static super::types::ModuleRecord,
     error: &tinybus::Error,
 ) -> ModuleCallError {
-    let (outcome, reason) = classify(error);
+    eprintln!("DBGERR {error:?}"); let (outcome, reason) = classify(error);
     if reason == failure::Reason::ModuleUnavailable {
         failure::report(record, reason);
     } else {
