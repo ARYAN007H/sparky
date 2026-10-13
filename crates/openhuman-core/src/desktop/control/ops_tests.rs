@@ -341,7 +341,10 @@ fn component_off_overrides_local_consent() {
     save(&config, true).unwrap();
     assert!(enabled(&config));
     config.components.computer = false;
-    assert!(!enabled(&config), "component off must disable despite consent");
+    assert!(
+        !enabled(&config),
+        "component off must disable despite consent"
+    );
 }
 
 #[test]

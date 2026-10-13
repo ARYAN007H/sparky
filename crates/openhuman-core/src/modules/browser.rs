@@ -204,8 +204,12 @@ impl BrowserClient {
         } else {
             None
         };
-        let claimed =
-            claim_profile(&self.config, &mut options, super::profile_claim::SESSION_WAIT_MS).await;
+        let claimed = claim_profile(
+            &self.config,
+            &mut options,
+            super::profile_claim::SESSION_WAIT_MS,
+        )
+        .await;
         options.download_dir = browser.download_dir.clone();
         options.default_timeout_ms = browser.task_timeout_secs.saturating_mul(1000);
         options.allowed_origins =

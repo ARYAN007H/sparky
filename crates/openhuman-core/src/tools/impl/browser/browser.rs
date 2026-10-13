@@ -587,7 +587,6 @@ impl Tool for BrowserTool {
 #[path = "browser_computer_tests.rs"]
 mod tests;
 
-
 #[cfg(test)]
 #[path = "browser_task_outcome_tests.rs"]
 mod task_outcome_tests;

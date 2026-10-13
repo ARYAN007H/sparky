@@ -47,8 +47,6 @@ pub mod boot;
 #[cfg(feature = "modules")]
 pub mod browser;
 #[cfg(feature = "modules")]
-pub(crate) mod profile_claim;
-#[cfg(feature = "modules")]
 pub(crate) mod browser_sites;
 #[cfg(feature = "modules")]
 pub mod browser_task;
@@ -78,6 +76,8 @@ pub mod host;
 pub mod linked;
 #[cfg(feature = "modules")]
 pub mod ops;
+#[cfg(feature = "modules")]
+pub(crate) mod profile_claim;
 pub mod registry;
 #[cfg(feature = "modules")]
 pub mod schemas;
@@ -85,13 +85,13 @@ pub mod schemas;
 pub mod search;
 #[cfg(feature = "modules")]
 mod search_path;
+#[cfg(feature = "modules")]
+mod site_memory_host;
 mod source;
 #[cfg(feature = "modules")]
 mod storage_grant_tinymcp;
 #[cfg(feature = "modules")]
 pub mod storage_grants;
-#[cfg(feature = "modules")]
-mod site_memory_host;
 #[cfg(feature = "modules")]
 mod storage_host;
 #[cfg(feature = "modules")]
