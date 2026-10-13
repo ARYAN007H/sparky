@@ -1,7 +1,9 @@
 use super::*;
 
 // The refusal code is `tinyflows::compat`'s, re-exported at `ops::` scope
-// because this module's tests assert on it by name.
+// because this module's tests assert on it by name — which is the point of a
+// stable code, and what keeps a rename upstream a compile error here rather
+// than a silently-passing `contains`.
 #[cfg(test)]
 pub(crate) use tinyflows::compat::UNSUPPORTED_NESTED_CONDITIONAL_FAN_IN;
 
@@ -21,13 +23,6 @@ pub(super) fn ensure_config_aware_engine_compatible(
         None => Ok(()),
     }
 }
-
-/// Runs a raw graph JSON value through migration + deserialization **without**
-/// the structural `validate` step, attributing a deserialization failure to the
-/// member that caused it (`nodes[1]: missing field ...`). The implementation is
-/// `tinyflows::migrate::deserialize_graph`; this alias keeps the host's
-/// call sites (and the authoring tools' error text) unchanged.
-pub(crate) use tinyflows::migrate::deserialize_graph as tinyflows::migrate::deserialize_graph;
 
 /// Checks literal `workflow_id` children reachable from an authoring candidate.
 ///
@@ -107,7 +102,10 @@ pub fn flows_validate(graph_json: Value) -> Outcome<tinyflows_catalog::FlowValid
 
     let structural = tinyflows::validate::validate_all(&graph);
     if !structural.is_empty() {
-        let error_details: Vec<_> = structural.iter().map(tinyflows_catalog::validation::to_flow_validation_error).collect();
+        let error_details: Vec<_> = structural
+            .iter()
+            .map(tinyflows_catalog::validation::to_flow_validation_error)
+            .collect();
         let errors: Vec<String> = error_details.iter().map(|e| e.message.clone()).collect();
         tracing::debug!(
             target: "flows",
