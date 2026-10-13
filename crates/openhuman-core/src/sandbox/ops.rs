@@ -15,19 +15,12 @@ use std::time::Duration;
 
 /// Safe environment variables forwarded into sandboxed execution.
 ///
-/// This list is the *entire* environment a sandboxed child gets: both
-/// [`execute_unsandboxed`] and the TinyBox native jail adapter call `env_clear()` and
-/// re-forward only what is named here. Windows process-bootstrap variables are
-/// added only in the host spawn paths below; keeping them out of this policy
-/// prevents Windows paths from being passed into Linux Docker containers.
-///
-/// They were missing when this defect was found, and it survived the first
-/// round of fixes because the tool launchers now share the shell and flows code-runner paths rather than
-/// carrying separate copies of the allow-list and
-/// had already been patched: the built-in `orchestrator` runs with
-/// `sandbox_mode = "sandboxed"`, and all four tools divert to
-/// [`crate::sandbox`] *before* reaching those lists, so the host spawn paths
-/// below are the ones that must add the Windows-only bootstrap set.
+/// This is the Docker container's host-environment allowlist and the set the
+/// TinyBox module's own safe snapshot starts from for every native shell child
+/// ([`execute_unsandboxed`] and the native jail adapter): the module reads these
+/// names from the parent and adds the Windows process-bootstrap variables
+/// itself. Keeping the bootstrap names out of this policy prevents Windows paths
+/// from being passed into Linux Docker containers.
 pub const SANDBOX_ENV_PASSTHROUGH: &[&str] = &[
     "PATH", "HOME", "TERM", "LANG", "LC_ALL", "LC_CTYPE", "USER", "SHELL", "TMPDIR",
 ];
