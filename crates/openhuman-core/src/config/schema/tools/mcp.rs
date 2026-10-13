@@ -152,3 +152,7 @@ impl Default for McpClientConfig {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "mcp_tests.rs"]
+mod tests;
