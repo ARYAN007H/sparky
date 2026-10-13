@@ -3,7 +3,7 @@ use super::super::runtime::test_support::{run_dispatch_harness, DispatchHarnessO
 use super::super::runtime::{
     process_channel_message, run_message_dispatch_loop, RuntimeChannelMessage,
 };
-use super::super::{traits, Channel};
+use super::super::Channel;
 use super::common::{use_real_agent_handler, RecordingChannel, SlowModel};
 use crate::agent::bus::{mock_agent_run_turn, AgentTurnRequest, AgentTurnResponse};
 use crate::core::events::DomainEvent;
@@ -12,6 +12,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use tinychannels_bus as traits;
 use tokio::sync::Barrier;
 
 #[tokio::test]

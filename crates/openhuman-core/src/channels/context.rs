@@ -76,7 +76,7 @@ pub(crate) async fn module_client(
 }
 
 #[cfg(test)]
-pub(crate) fn conversation_history_key(msg: &super::traits::ChannelMessage) -> String {
+pub(crate) fn conversation_history_key(msg: &tinychannels_bus::ChannelMessage) -> String {
     tinychannels::context::conversation_history_key(msg)
 }
 
