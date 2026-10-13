@@ -41,6 +41,14 @@ the acting workspace's `/workspace` sandbox mount. Originals have no transient
 image-stash expiry and remain available to terminal tools and child agents that
 share that workspace.
 
+Hosts that already hold a file's bytes skip markers entirely: an embed
+`Turn::attach(HostAttachment)` rides `AgentChatTarget::Definition::attachments`,
+and `host::stage_host` saves each one through the same `save`, under the same
+`[multimodal]` / `[multimodal_files]` count and size limits, sniffing blank or
+generic MIME types. Their references lead the message. No local path is read,
+so host attachments are accepted for every turn origin, including external
+channels whose text markers are refused.
+
 `message_convert` lifts these references into typed image, audio, video, or
 document input blocks while preserving source order and captions. The document
 carrier also handles arbitrary binaries. Durable transcript parts retain paths
