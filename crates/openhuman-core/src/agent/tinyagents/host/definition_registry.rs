@@ -286,13 +286,10 @@ impl OpenHumanDefinitionRegistry {
             // The definition's validated tier is the host assertion the model
             // resolver consumes for workload routing.
             role: Some(def.agent_tier.to_string()),
-            agent_tier: match def.agent_tier {
-                AgentTier::Chat => tinyagents_definition::AgentTier::Chat,
-                AgentTier::Reasoning => tinyagents_definition::AgentTier::Reasoning,
-                AgentTier::Worker => tinyagents_definition::AgentTier::Worker,
-            },
-            model: model_for(&def.model),
-            subagents: declared_subagent_ids(def)
+            agent_tier: def.agent_tier,
+            model: def.model.clone(),
+            subagents: def
+                .allowed_subagent_ids()
                 .into_iter()
                 .map(tinyagents_definition::SubagentEntry::AgentId)
                 .collect(),
@@ -415,7 +412,7 @@ impl OpenHumanDefinitionRegistry {
         }
 
         let mut out = Vec::new();
-        for id in declared_subagent_ids(def) {
+        for id in def.allowed_subagent_ids() {
             let Some(child) = self.host_definition(&id) else {
                 // Unknown child: `validate_tier_hierarchy` `continue`s past it
                 // rather than failing, and the trait explicitly allows an
@@ -423,7 +420,7 @@ impl OpenHumanDefinitionRegistry {
                 out.push(id);
                 continue;
             };
-            match tinyagents_definition::validate_tier_transition(
+            match tinyagents_definition::tinyagents_definition::validate_tier_transition(
                 def.agent_tier,
                 child.agent_tier,
             ) {
@@ -447,31 +444,6 @@ impl OpenHumanDefinitionRegistry {
 }
 
 // ── Free helpers ──────────────────────────────────────────────────────────────
-
-/// Declared subagent **agent ids** only.
-///
-/// [`SubagentEntry::Skills`] entries are skipped: they are a wildcard that
-/// expands to searchable integration actions, not an agent the parent may
-/// address by id.
-fn declared_subagent_ids(def: &HostAgentDefinition) -> Vec<String> {
-    def.subagents
-        .iter()
-        .filter_map(|entry| match entry {
-            SubagentEntry::AgentId(id) => Some(id.clone()),
-            SubagentEntry::Skills(_) => None,
-        })
-        .collect()
-}
-
-/// Preserves inherited routing, concrete model pins and routing hints in the
-/// provider-neutral definition vocabulary.
-fn model_for(spec: &ModelSpec) -> tinyagents_definition::ModelSpec {
-    match spec {
-        ModelSpec::Inherit => tinyagents_definition::ModelSpec::Inherit,
-        ModelSpec::Exact(name) => tinyagents_definition::ModelSpec::Exact(name.clone()),
-        ModelSpec::Hint(hint) => tinyagents_definition::ModelSpec::Hint(hint.clone()),
-    }
-}
 
 /// Drops repeated names while keeping first-occurrence order.
 ///
