@@ -222,11 +222,10 @@ export function generateEmbedDocs({ root = ROOT, check = false, capabilities } =
   desired.set(resolve(root, 'llms.txt'), index);
   desired.set(resolve(root, 'llms-full.txt'), index + '\n' + [...desired].filter(([path]) => path.endsWith('.md')).map(([path, source]) => `<!-- Source: ${relative(root, path)} -->\n${source}`).join('\n'));
   desired.set(resolve(root, 'EMBED.md'), index + '\nSee the generated [API index](docs/gitbooks/en/developing/embed/api-index.md) for build capabilities.\n');
-  const publishedDirectory = directory;
   for (const [path, source] of desired) {
     if (path.endsWith('.md')) checkLocalLinks(source, path, root, link => desired.get(link) ?? readFileSync(link, 'utf8'));
   }
-  const obsolete = markdownFiles(publishedDirectory, new Set(['.md', '.json'])).filter(path => !desired.has(path));
+  const obsolete = markdownFiles(directory, new Set(['.md', '.json'])).filter(path => !desired.has(path));
   const stale = [...desired].filter(([path, source]) => !existsSync(path) || readFileSync(path, 'utf8') !== source);
   if (check && (stale.length || obsolete.length)) throw new Error(`Embed documentation drift: ${[...stale.map(([path]) => path), ...obsolete].map(path => relative(root, path)).join(', ')}. Run pnpm docs:generate.`);
   if (!check) for (const [path, source] of stale) {
