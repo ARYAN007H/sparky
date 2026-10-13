@@ -5,9 +5,9 @@ process, then put any number of independently configured agents on it with
 `Runtime::agent`. This folder owns the builder that boots the embedded core,
 the `Runtime` handle, and the guard that tears the core down when the last
 handle goes away. See
-[`gitbooks/developing/embedding.md`](../../../../gitbooks/developing/embedding.md)
+[`docs/gitbooks/en/developing/embedding.md`](../../../../docs/gitbooks/en/developing/embedding.md)
 for the walkthrough and
-[`gitbooks/developing/performance.md`](../../../../gitbooks/developing/performance.md)
+[`docs/gitbooks/en/developing/performance.md`](../../../../docs/gitbooks/en/developing/performance.md)
 for what many agents on one runtime cost in memory.
 
 ## How it works
@@ -112,7 +112,7 @@ crate README's "Still process-owned" list names what agents share, and its
 - No backend transport is installed here. `openhuman-tinyhumans`'s
   `RuntimeBuilder` ([`crates/openhuman-tinyhumans/src/runtime.rs`](../../../openhuman-tinyhumans/src/runtime.rs)) wraps this
   builder and installs the SDK transport on `build()`; see
-  [`gitbooks/developing/tinyhumans-api-key.md`](../../../../gitbooks/developing/tinyhumans-api-key.md).
+  [`docs/gitbooks/en/developing/tinyhumans-api-key.md`](../../../../docs/gitbooks/en/developing/tinyhumans-api-key.md).
 - The session store port (`SessionStoreProvider`) is defined by
   [`vendor/tinyagents`](../../../../vendor/tinyagents/) and the core's `agent::session_store`; the classic
   on-disk provider lives in `openhuman-rpc`'s `session_store`.
@@ -145,6 +145,6 @@ cargo test -p openhuman-embed --features inference,mcp,skills runtime::
 
 ## Further reading
 
-- [`gitbooks/developing/embedding.md`](../../../../gitbooks/developing/embedding.md): embedding the core in another product.
-- [`gitbooks/developing/tinyhumans-api-key.md`](../../../../gitbooks/developing/tinyhumans-api-key.md): running on a TinyHumans API key.
+- [`docs/gitbooks/en/developing/embedding.md`](../../../../docs/gitbooks/en/developing/embedding.md): embedding the core in another product.
+- [`docs/gitbooks/en/developing/tinyhumans-api-key.md`](../../../../docs/gitbooks/en/developing/tinyhumans-api-key.md): running on a TinyHumans API key.
 - [`crates/openhuman-embed/README.md`](../../README.md): the openhuman-embed crate README.
