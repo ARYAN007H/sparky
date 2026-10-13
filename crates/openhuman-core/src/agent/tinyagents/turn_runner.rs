@@ -463,7 +463,7 @@ pub(super) async fn run_turn_via_tinyagents_body(
         }
     }
     let sink = EventSink::with_stream_id(journal_run_id.as_str());
-    super::turn_observer::install(&mut harness, &sink, hosted_root.is_some());
+    tinyagents_harness::observability::turn_observer::install(&mut harness, &sink, hosted_root.is_some());
     let events = Some(sink);
     // Attach the event bridge for EVERY turn — including an unobserved
     // (`on_progress = None`) background/cron turn (#4467, item 3). The bridge's

@@ -9,7 +9,6 @@
 //! tinyagents path — and feeds per-call usage into the global cost tracker.
 
 mod cap_pauser;
-mod compaction_log;
 mod event_bridge;
 mod event_projection;
 mod graph_tracing;

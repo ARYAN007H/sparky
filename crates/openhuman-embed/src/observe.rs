@@ -1,8 +1,8 @@
 //! Host turn callbacks with explicit payload consent. Callbacks should enqueue
 //! telemetry work; transport and retention belong to the embedding application.
 use crate::{CoreError, LastTurnUsage, TurnOutcome};
-use openhuman_core::agent::tinyagents::turn_observer::{self, Observer, ObserverScope};
-pub use openhuman_core::agent::tinyagents::turn_observer::{
+use tinyagents_harness::observability::turn_observer::{self, Observer, ObserverScope};
+pub use tinyagents_harness::observability::turn_observer::{
     ObservedUsage, TraceContent, TurnObservation,
 };
 use std::sync::Arc;
@@ -113,5 +113,5 @@ where
 /// Enable the `langfuse` feature. Export requires explicit host credentials.
 #[cfg(feature = "langfuse")]
 pub mod langfuse {
-    pub use openhuman_core::agent::tinyagents::turn_observer::langfuse::*;
+    pub use tinyagents_harness::observability::turn_observer::langfuse::*;
 }

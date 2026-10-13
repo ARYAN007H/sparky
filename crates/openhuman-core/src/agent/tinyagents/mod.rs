@@ -64,7 +64,6 @@ pub mod todos;
 pub(crate) mod tools;
 mod topology;
 mod turn_models;
-pub mod turn_observer;
 mod turn_outcome;
 mod turn_policy;
 mod turn_run_error;
