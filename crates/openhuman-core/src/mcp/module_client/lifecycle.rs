@@ -134,7 +134,7 @@ impl McpConfiguredClient {
                 .to_owned(),
             port,
         ));
-        table().insert(data_dir, Arc::clone(&client));
+        table().insert(client_key(&data_dir), Arc::clone(&client));
         Ok(client)
     }
 
