@@ -10,7 +10,7 @@ use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, Wake, Waker};
-use tinyagents_session::transcript::TranscriptMessage;
+use tinychannels_bus::context::ChatMessage;
 use tinybus::EventHandler;
 use tinychannels::routes::resolve_provider_alias;
 use tinychannels_bus::ChannelMessage;
@@ -345,7 +345,7 @@ async fn handle_runtime_command_set_model_clears_sender_history_and_persists_rou
     let key = "telegram_alice_room";
     ctx.conversation_histories.lock().unwrap().insert(
         key.to_string(),
-        vec![TranscriptMessage::user("old history")],
+        vec![ChatMessage::user("old history")],
     );
     let channel_impl = Arc::new(RecordingChannel::default());
     let channel: Arc<dyn Channel> = channel_impl.clone();
@@ -522,7 +522,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
 
     ctx.conversation_histories.lock().unwrap().insert(
         sender_key.to_string(),
-        vec![TranscriptMessage::user("old history")],
+        vec![ChatMessage::user("old history")],
     );
 
     let new_msg = ChannelMessage {
@@ -553,7 +553,7 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
 
     ctx.conversation_histories.lock().unwrap().insert(
         sender_key.to_string(),
-        vec![TranscriptMessage::user("after new")],
+        vec![ChatMessage::user("after new")],
     );
     set_route_selection(
         &ctx,

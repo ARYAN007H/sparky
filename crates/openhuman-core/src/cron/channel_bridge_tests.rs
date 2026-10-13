@@ -35,8 +35,8 @@ async fn bridge_reads_appends_trims_and_sends() {
     histories.lock().unwrap().insert(
         "k".into(),
         vec![
-            TranscriptMessage::user("remind me"),
-            TranscriptMessage::assistant("ok"),
+            ChatMessage::user("remind me"),
+            ChatMessage::assistant("ok"),
         ],
     );
     let sends = Arc::new(AtomicUsize::new(0));

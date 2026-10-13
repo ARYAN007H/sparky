@@ -530,7 +530,7 @@ pub(crate) async fn process_channel_runtime_message(
                 .await
                 .unwrap_or(false)
             {
-                let compacted = compact_sender_history(ctx.as_ref(), &history_key);
+                let compacted = compact_sender_history(&ctx.conversation_histories, &history_key);
                 let error_text = if compacted {
                     "⚠️ Context window exceeded for this conversation. I compacted recent history and kept the latest context. Please resend your last message."
                 } else {
