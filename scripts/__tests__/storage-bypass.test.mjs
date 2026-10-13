@@ -197,13 +197,7 @@ test("an allowlisted file may hold only its pinned site", () => {
     ],
   );
   // The pinned line moving elsewhere in the file is still allowed; a new write is not.
-  assert.equal(
-    withoutAllowed(
-      file,
-      scan(file, `x();\n${pinned}\n`),
-    ).length,
-    0,
-  );
+  assert.equal(withoutAllowed(file, scan(file, `x();\n${pinned}\n`)).length, 0);
 });
 
 test("a call split across lines is still found", () => {
