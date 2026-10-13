@@ -64,7 +64,11 @@ impl std::fmt::Debug for HostAttachment {
 fn mime_of(attachment: &HostAttachment) -> String {
     let declared = attachment.mime_type.trim();
     let name = attachment.name.as_deref().map(Path::new);
-    let header = (!declared.is_empty()).then_some(declared);
+    // The detector trusts any header it knows, octet-stream included, so a
+    // generic one is withheld for the name and bytes to decide.
+    let header = (!declared.is_empty()
+        && !declared.eq_ignore_ascii_case("application/octet-stream"))
+    .then_some(declared);
     detect_file_mime(name, &attachment.bytes, header)
         .or_else(|| header.map(str::to_ascii_lowercase))
         .unwrap_or_else(|| "application/octet-stream".into())
