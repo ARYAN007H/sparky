@@ -7580,14 +7580,14 @@ dependencies = [
 
 [[package]]
 name = "tinybox-bus"
-version = "0.1.24"
+version = "0.1.26"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "tinybox-core"
-version = "0.1.24"
+version = "0.1.26"
 dependencies = [
  "async-trait",
  "serde",
@@ -8072,7 +8072,7 @@ dependencies = [
 
 [[package]]
 name = "tinymcp-bus"
-version = "0.15.0"
+version = "0.16.1"
 dependencies = [
  "schemars",
  "serde",

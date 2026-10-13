@@ -23,7 +23,13 @@ pub fn component_for_domain(domain: &str) -> Option<&'static str> {
 /// `capability`, marked [`CapabilityStatus::Disabled`] when its component is
 /// off in `components`.
 pub fn apply_components(capability: Capability, components: &ComponentSet) -> Capability {
-    match component_for_domain(capability.domain) {
+    // The sandbox capability lives in the shared `security` domain, so it is
+    // matched by id.
+    let component = match capability.id {
+        "security.sandbox_backends" => Some("sandbox"),
+        _ => component_for_domain(capability.domain),
+    };
+    match component {
         Some(name) if !components.enabled(name) => Capability {
             status: CapabilityStatus::Disabled,
             ..capability
