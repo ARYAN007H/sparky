@@ -2,8 +2,6 @@
 
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 #[cfg(test)]
-use crate::agent::orchestration::spawn_parallel::with_ownership_boundary;
-#[cfg(test)]
 use crate::agent::orchestration::spawn_parallel::ParallelAgentLineage;
 #[cfg(test)]
 use crate::agent::orchestration::spawn_parallel::ParallelAgentResult;
