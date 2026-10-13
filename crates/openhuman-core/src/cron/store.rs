@@ -93,7 +93,7 @@ pub fn add_job(config: &Config, expression: &str, command: &str) -> Result<CronJ
     limits::check_new(config, &JobType::Shell, &schedule, None)?;
     let docs = documents(config)?;
     let (expression, command) = (expression.to_string(), command.to_string());
-    return run(async move { docs.add_job(&expression, &command).await })
+    run(async move { docs.add_job(&expression, &command).await })
 }
 
 pub fn add_shell_job(
@@ -105,7 +105,7 @@ pub fn add_shell_job(
     limits::check_new(config, &JobType::Shell, &schedule, None)?;
     let docs = documents(config)?;
     let command = command.to_string();
-    return run(async move { docs.add_shell_job(name, schedule, &command).await })
+    run(async move { docs.add_shell_job(name, schedule, &command).await })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -122,7 +122,7 @@ pub fn add_agent_job(
     limits::check_new(config, &JobType::Agent, &schedule, delivery.as_ref())?;
     let docs = documents(config)?;
     let prompt = prompt.to_string();
-    return run(async move {
+    run(async move {
         docs.add_agent_job(
             name,
             schedule,
@@ -154,7 +154,7 @@ pub fn add_agent_job_with_definition(
     limits::check_new(config, &JobType::Agent, &schedule, delivery.as_ref())?;
     let docs = documents(config)?;
     let prompt = prompt.to_string();
-    return run(async move {
+    run(async move {
         docs.add_agent_job_with_definition(
             name,
             schedule,
@@ -179,7 +179,7 @@ pub fn add_agent_job_from_spec(config: &Config, spec: AgentJobSpec) -> Result<Cr
         spec.delivery.as_ref(),
     )?;
     let docs = documents(config)?;
-    return run(async move { docs.add_agent_job_from_spec(spec).await })
+    run(async move { docs.add_agent_job_from_spec(spec).await })
 }
 
 /// Registers (idempotently) the cron job that fires a flow's `schedule`
@@ -192,24 +192,24 @@ pub fn add_flow_schedule_job(
     limits::check_new(config, &JobType::Flow, &schedule, None)?;
     let docs = documents(config)?;
     let flow_id = flow_id.to_string();
-    return run(async move { docs.add_flow_schedule_job(&flow_id, schedule).await })
+    run(async move { docs.add_flow_schedule_job(&flow_id, schedule).await })
 }
 
 pub fn find_flow_schedule_job(config: &Config, flow_id: &str) -> Result<Option<CronJob>> {
     let docs = documents(config)?;
     let flow_id = flow_id.to_string();
-    return run(async move { docs.find_flow_schedule_job(&flow_id).await })
+    run(async move { docs.find_flow_schedule_job(&flow_id).await })
 }
 
 pub fn list_jobs(config: &Config) -> Result<Vec<CronJob>> {
     let docs = documents(config)?;
-    return run(async move { docs.list_jobs().await })
+    run(async move { docs.list_jobs().await })
 }
 
 pub fn get_job(config: &Config, job_id: &str) -> Result<CronJob> {
     let docs = documents(config)?;
     let job_id = job_id.to_string();
-    return run(async move { docs.get_job(&job_id).await })
+    run(async move { docs.get_job(&job_id).await })
 }
 
 pub fn remove_job(config: &Config, id: &str) -> Result<()> {
@@ -220,7 +220,7 @@ pub fn remove_job(config: &Config, id: &str) -> Result<()> {
         tracing::warn!(job_id = id, %error, "[cron:store] removing job policy failed");
     }
     println!("✅ Removed cron job {id}");
-    return Ok(())
+    Ok(())
 }
 
 /// Deletes every cron job in the workspace (E2E `openhuman.test_reset`).
@@ -239,19 +239,19 @@ pub fn clear_all_jobs(config: &Config) -> Result<usize> {
 /// Removes duplicate jobs sharing a `name`, keeping the one with most history.
 pub fn dedup_named_jobs(config: &Config) -> Result<usize> {
     let docs = documents(config)?;
-    return run(async move { docs.dedup_named_jobs().await })
+    run(async move { docs.dedup_named_jobs().await })
 }
 
 pub fn due_jobs(config: &Config, now: DateTime<Utc>) -> Result<Vec<CronJob>> {
     let docs = documents(config)?;
-    return run(async move { docs.due_jobs(now).await })
+    run(async move { docs.due_jobs(now).await })
 }
 
 pub fn update_job(config: &Config, job_id: &str, patch: CronJobPatch) -> Result<CronJob> {
     limits::check_patch(config, &patch)?;
     let docs = documents(config)?;
     let job_id = job_id.to_string();
-    return run(async move { docs.update_job(&job_id, patch).await })
+    run(async move { docs.update_job(&job_id, patch).await })
 }
 
 pub fn record_last_run(
@@ -263,7 +263,7 @@ pub fn record_last_run(
 ) -> Result<()> {
     let docs = documents(config)?;
     let (job_id, output) = (job_id.to_string(), output.to_string());
-    return run(async move {
+    run(async move {
         docs.record_last_run(&job_id, finished_at, success, &output)
             .await
     })
@@ -277,7 +277,7 @@ pub fn reschedule_after_run(
 ) -> Result<()> {
     let docs = documents(config)?;
     let (job, output) = (job.clone(), output.to_string());
-    return run(async move { docs.reschedule_after_run(&job, success, &output).await })
+    run(async move { docs.reschedule_after_run(&job, success, &output).await })
 }
 
 pub fn record_run(
@@ -295,7 +295,7 @@ pub fn record_run(
         status.to_string(),
         output.map(str::to_string),
     );
-    return run(async move {
+    run(async move {
         docs.record_run(
             &job_id,
             started_at,
@@ -326,7 +326,7 @@ pub fn record_run_with_delivery(
         status.to_string(),
         output.map(str::to_string),
     );
-    return run(async move {
+    run(async move {
         docs.record_run_with_delivery(
             &job_id,
             started_at,
@@ -344,13 +344,13 @@ pub fn record_run_with_delivery(
 pub fn delete_queued_runs(config: &Config, job_id: &str) -> Result<usize> {
     let docs = documents(config)?;
     let job_id = job_id.to_string();
-    return run(async move { docs.delete_queued_runs(&job_id).await })
+    run(async move { docs.delete_queued_runs(&job_id).await })
 }
 
 pub fn list_runs(config: &Config, job_id: &str, limit: usize) -> Result<Vec<CronRun>> {
     let docs = documents(config)?;
     let job_id = job_id.to_string();
-    return run(async move { docs.list_runs(&job_id, limit).await })
+    run(async move { docs.list_runs(&job_id, limit).await })
 }
 
 #[cfg(test)]
