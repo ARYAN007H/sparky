@@ -284,7 +284,7 @@ pub struct OpenHumanRunContext {
     /// only by the session turn entry point from the web backstop
     /// (`agent::turn_deadline`). The harness winds the run down and clamps
     /// its wall clock against it. `None` for turns without a backstop.
-    pub turn_deadline: Option<crate::agent::turn_deadline::TurnDeadline>,
+    pub turn_deadline: Option<tinyagents_harness::turn_deadline::TurnDeadline>,
     /// Parent runtime snapshot used by canonical recursive tool dispatch.
     pub parent: Option<ParentExecutionContext>,
     /// Context-preparation sources already consumed in this turn.
