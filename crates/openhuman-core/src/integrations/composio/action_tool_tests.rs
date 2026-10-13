@@ -496,7 +496,7 @@ fn deferred_instance_returns_live_config_for_redaction() {
 
         // Boxed exactly like `Tool::execute` does.
         let (live_config, outcome) =
-            Box::pin(t.execute_unredacted(serde_json::json!({}), None, None)).await;
+            Box::pin(t.execute_unredacted(serde_json::json!({}), None)).await;
         let first = outcome.expect("contract-gate surface is Ok(error result)");
         assert!(
             first.is_error && error_text(&first).contains("Input JSON schema"),
