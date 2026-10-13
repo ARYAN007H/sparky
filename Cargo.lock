@@ -4615,6 +4615,7 @@ dependencies = [
  "tinymemory-api",
  "tinymemory-integrations",
  "tinymemory-tools",
+ "tinyredact",
  "tinysearch-bus",
  "tinyskills",
  "tinystoragedrivers",
