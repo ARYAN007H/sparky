@@ -8,7 +8,7 @@ use super::helpers::{
     create_stt_provider_by_slug, create_tts_provider_by_slug, split_slug_model, LOG_PREFIX,
 };
 use super::stt_providers::CloudSttProvider;
-use tinychannels_bus::{SttProvider, TtsProvider};
+use super::traits::{SttProvider, TtsProvider};
 use super::tts_providers::{CloudTtsProvider, PiperTtsProvider};
 use crate::config::Config;
 
