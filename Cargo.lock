@@ -7811,8 +7811,17 @@ dependencies = [
 name = "tinyflows-copilot"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
  "serde",
  "serde_json",
+ "sha2 0.11.0",
+ "tinyflows",
+ "tinyflows-catalog",
+ "tinytools",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
