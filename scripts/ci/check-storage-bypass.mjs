@@ -104,24 +104,6 @@ export const ALLOW = new Map(
       "vault watcher state is absolute local paths and their mtimes: per-machine filesystem state that is meaningless on, and must not be shared through, another host's database",
     ],
     [
-      "platform/cost/tracker.rs",
-      "json-write",
-      "let mut file = OpenOptions::new()",
-      FALLBACK,
-    ],
-    [
-      "agent/orchestration/subagent_sessions/store.rs",
-      "json-write",
-      "fs::write(&tmp_path, raw)",
-      FALLBACK,
-    ],
-    [
-      "integrations/composio/file_store.rs",
-      "json-write",
-      "tokio::fs::write(&tmp, &bytes)",
-      FALLBACK,
-    ],
-    [
       "desktop/control/ops.rs",
       "json-write",
       "let mut temporary = tempfile::NamedTempFile::new_in(parent)",
@@ -144,18 +126,6 @@ export const ALLOW = new Map(
       "json-write",
       "if let Err(e) = std::fs::write(path, json) {",
       "one process-global savings counter snapshot, cheap to lose; not per-user data a scope would mean anything for",
-    ],
-    [
-      "agent/artifacts/store.rs",
-      "json-write",
-      "tokio::fs::write(&tmp_path, json).await.map_err(|e| {",
-      FALLBACK,
-    ],
-    [
-      "agent/artifacts/store.rs",
-      "json-write",
-      "tokio::fs::write(&args_path, json)",
-      FALLBACK,
     ],
     [
       "agent/artifacts/files.rs",
