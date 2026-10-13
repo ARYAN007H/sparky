@@ -389,6 +389,35 @@ impl std::fmt::Debug for FencedBlobs {
 
 #[async_trait]
 impl BlobStore for FencedBlobs {
+    fn max_key_len(&self) -> usize {
+        self.inner.max_key_len()
+    }
+
+    /// The driver's abilities, minus presigned URLs: a presigned PUT is a write
+    /// the fence never sees, so the view does not offer them (the trait
+    /// default for `presign_get`/`presign_put` is `Unsupported`).
+    fn capabilities(&self) -> Capabilities {
+        self.inner.capabilities().without(Capability::PresignedUrls)
+    }
+
+    async fn put_expiring(
+        &self,
+        key: &str,
+        bytes: Vec<u8>,
+        content_type: Option<&str>,
+        ttl: Duration,
+    ) -> Result<BlobMeta> {
+        fenced_write!(
+            self,
+            "blobs.put_expiring",
+            blobs.put_expiring(key, bytes, content_type, ttl)
+        )
+    }
+
+    async fn get_stream(&self, key: &str) -> Result<Option<BlobStream>> {
+        self.inner.get_stream(key).await
+    }
+
     async fn put(&self, key: &str, bytes: Vec<u8>, content_type: Option<&str>) -> Result<BlobMeta> {
         fenced_write!(self, "blobs.put", blobs.put(key, bytes, content_type))
     }
