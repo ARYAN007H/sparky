@@ -205,3 +205,19 @@ fn tinyfish_takes_its_own_key() {
     assert_eq!(tinyfish["route"], "direct");
     assert!(!view.to_string().contains("tf-key"));
 }
+
+#[test]
+fn settings_report_the_search_component_as_disabled() {
+    let mut config = Config::default();
+    let on = search_settings_json_with(&config, true);
+    assert_eq!(on["component_disabled"], false);
+    config.components.search = false;
+    let off = search_settings_json_with(&config, true);
+    assert_eq!(off["enabled"], false);
+    assert_eq!(off["component_disabled"], true);
+    assert!(off["component_disabled_reason"]
+        .as_str()
+        .unwrap()
+        .starts_with("COMPONENT_DISABLED:search"));
+    assert!(off["effective_roles"]["search"].as_array().unwrap().is_empty());
+}

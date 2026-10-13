@@ -297,3 +297,12 @@ async fn a_rejected_api_key_does_not_sign_the_user_out() {
         "search.test_marker_api_key_search"
     ));
 }
+
+#[test]
+fn components_search_off_registers_no_search_tools() {
+    let mut config = signed_out_byok_config();
+    assert!(!build_search_tools(&config).is_empty());
+    config.components.search = false;
+    assert!(build_search_tools(&config).is_empty());
+    assert!(crate::modules::search::configured_tool_specs(&config).is_empty());
+}
