@@ -64,8 +64,8 @@ use replay::{json_content_text, turn_outcome_for_failure, user_message_text, Rep
 
 #[path = "journal_replay.rs"]
 mod replay;
-use tinytools::status::classify;
 use tinyagents_harness::observability::trace_export::{TraceContext, TraceSpan};
+use tinytools::status::classify;
 
 /// Mutable state threaded across a single run's observations while replaying.
 #[derive(Default)]
