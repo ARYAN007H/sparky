@@ -23,7 +23,7 @@ inference = ["openhuman-core/inference"]
 documents = ["openhuman-core/documents"]
 hosting = ["openhuman-core/hosting"]
 tinymemes = ["openhuman-core/tinymemes"]
-modules = ["openhuman-core/modules"]
+modules = ["openhuman-core/modules", "tinybus/modules"]
 voice = ["openhuman-core/voice"]
 web3 = ["openhuman-core/web3"]
 # Storage drivers for `[storage] url` (see the core `storage` domain).
