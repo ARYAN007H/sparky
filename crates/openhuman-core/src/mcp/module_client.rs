@@ -447,7 +447,7 @@ impl McpConfiguredClient {
                     // call; retrying the same configuration recovers the
                     // module's idempotent receipt after a cancelled caller.
                     let reply = self.port.open_configured(&self.data_dir, &config).await;
-                    state.open_replied(reply.as_ref().map(|ok| ok.clone()).map_err(|_| ()));
+                    state.open_replied(reply.clone().map_err(|_| ()));
                     reply?;
                 }
                 Step::PollOpen(id) => {
@@ -456,7 +456,7 @@ impl McpConfiguredClient {
                 }
                 Step::CallClose => {
                     let reply = self.port.close(&self.data_dir).await;
-                    state.close_replied(reply.as_ref().map(|ok| ok.clone()).map_err(|_| ()));
+                    state.close_replied(reply.clone().map_err(|_| ()));
                     reply?;
                 }
                 Step::PollClose(id) => {
