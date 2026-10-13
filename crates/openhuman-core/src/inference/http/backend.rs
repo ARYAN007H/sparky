@@ -74,7 +74,7 @@ impl ChatBackend for HostChatBackend {
             );
         }
         Ok(ResolvedChat {
-            chat_model: Box::new(chat_model),
+            chat_model,
             model_id,
             temperature: raw,
         })
