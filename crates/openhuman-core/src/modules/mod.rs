@@ -95,6 +95,8 @@ pub mod storage_grants;
 #[cfg(feature = "modules")]
 pub(crate) mod storage_host;
 #[cfg(feature = "modules")]
+mod storage_host_linked;
+#[cfg(feature = "modules")]
 pub mod tinybox;
 #[cfg(feature = "modules")]
 mod tokenjuice_host;

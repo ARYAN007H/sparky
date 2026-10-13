@@ -195,7 +195,7 @@ async fn build_runtime() -> tinybus::Result<ModuleRuntime> {
         tracing::debug!("[modules] juice component off; MlHost not served");
     }
     super::site_memory_host::install(&connection).await?;
-    super::storage_host::install(&connection).await?;
+    super::storage_host::install(&connection, &host).await?;
     #[cfg(feature = "tinymemes")]
     {
         let memes_on = crate::core::runtime::context::CoreContext::current()
