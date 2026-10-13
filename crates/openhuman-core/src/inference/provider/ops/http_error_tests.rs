@@ -13,7 +13,7 @@ fn response(status: StatusCode, body: &str) -> reqwest::Response {
 
 /// Drain the shared bus until `pick` matches an event or the queue is empty.
 fn drain_until<T>(
-    rx: &mut tinybus::Receiver<DomainEvent>,
+    rx: &mut tinybus::EventReceiver<DomainEvent>,
     mut pick: impl FnMut(DomainEvent) -> Option<T>,
 ) -> Option<T> {
     loop {
@@ -68,7 +68,10 @@ async fn api_error_replaces_no_model_loaded_body_with_guidance() {
         ),
     )
     .await;
-    assert!(err.to_string().to_ascii_lowercase().contains("load a model"));
+    assert!(err
+        .to_string()
+        .to_ascii_lowercase()
+        .contains("load a model"));
 }
 
 #[tokio::test]
@@ -140,5 +143,8 @@ async fn backend_provider_does_not_get_byo_key_rejection() {
         }
         _ => None,
     });
-    assert!(rejected.is_none(), "backend 401 is session expiry, not a BYO key");
+    assert!(
+        rejected.is_none(),
+        "backend 401 is session expiry, not a BYO key"
+    );
 }

@@ -12,10 +12,11 @@ mod provider_factory;
 
 // ── public surface (preserves the original `pub use ops::*` contract) ──
 
+#[cfg(test)]
+pub(crate) use http_error::config_rejection_demoted;
 pub use http_error::{
-    api_error, is_backend_auth_failure, is_backend_error_code_owned,
-    log_byo_provider_auth_failure, publish_backend_session_expired,
-    should_report_provider_http_failure,
+    api_error, is_backend_auth_failure, is_backend_error_code_owned, log_byo_provider_auth_failure,
+    publish_backend_session_expired, should_report_provider_http_failure,
 };
 
 pub use models::{

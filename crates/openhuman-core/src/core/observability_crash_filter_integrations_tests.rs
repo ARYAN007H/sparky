@@ -631,7 +631,7 @@ fn ollama_cloud_internal_500_reraise_routes_through_expected_path() {
     // `domain=agent` half of the flood is suppressed too.
     let reraise = tinyinference_llm::failure::ollama_cloud_internal_500_user_message(
         Some("minimax-m3:cloud"),
-        reqwest::StatusCode::INTERNAL_SERVER_ERROR,
+        500,
     );
     assert_eq!(
         expected_error_kind(&reraise),
@@ -653,7 +653,7 @@ fn ollama_cloud_internal_500_before_send_matches_raw_and_reraised_shapes() {
 
     let reraise = tinyinference_llm::failure::ollama_cloud_internal_500_user_message(
         None,
-        reqwest::StatusCode::INTERNAL_SERVER_ERROR,
+        500,
     );
     assert!(is_ollama_cloud_internal_500_event(&event_with_message(
         &reraise

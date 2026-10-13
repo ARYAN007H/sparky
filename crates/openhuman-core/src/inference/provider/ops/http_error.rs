@@ -11,7 +11,7 @@ mod tests;
 use crate::inference::provider::openhuman_backend_model;
 use tinyinference_core::sanitize::sanitize_api_error;
 use tinyinference_llm::failure::http::{
-    classify_and_report_http_failure, ErrorReporter, ProviderHttpFailure,
+    classify_and_report_http_failure, ErrorReporter, ProviderHttpFailure, ProviderHttpFailureFacts,
 };
 use tinyinference_llm::failure::{
     local_provider_no_model_loaded_user_message, ollama_cloud_internal_500_user_message,
@@ -35,6 +35,14 @@ pub fn is_backend_error_code_owned(provider: &str, body: &str) -> bool {
         && crate::inference::provider::backend_error_code_skips_sentry(body)
 }
 
+/// Config-rejection demotion policy: the managed backend's unknown-model body
+/// is user-state on every provider; the remaining rejection phrases stay
+/// third-party scoped so a backend regression still reaches Sentry.
+pub(crate) fn config_rejection_demoted(facts: &ProviderHttpFailureFacts, provider: &str) -> bool {
+    facts.configuration_rejected
+        && (facts.unknown_model || provider != openhuman_backend_model::PROVIDER_LABEL)
+}
+
 fn log_user_state(
     level_warn: bool,
     kind: &str,
@@ -46,14 +54,26 @@ fn log_user_state(
 ) {
     if level_warn {
         tracing::warn!(
-            domain = "llm_provider", operation, provider, model = model.unwrap_or(""),
-            status, failure = "non_2xx", kind, reason,
+            domain = "llm_provider",
+            operation,
+            provider,
+            model = model.unwrap_or(""),
+            status,
+            failure = "non_2xx",
+            kind,
+            reason,
             "[llm_provider] {operation} {reason} ({status}) — not reporting to Sentry"
         );
     } else {
         tracing::info!(
-            domain = "llm_provider", operation, provider, model = model.unwrap_or(""),
-            status, failure = "non_2xx", kind, reason,
+            domain = "llm_provider",
+            operation,
+            provider,
+            model = model.unwrap_or(""),
+            status,
+            failure = "non_2xx",
+            kind,
+            reason,
             "[llm_provider] {operation} {reason} ({status}) — not reporting to Sentry"
         );
     }
@@ -131,23 +151,36 @@ impl ErrorReporter for HostErrorReporter<'_> {
         let demote = |kind: &str, reason: &str, warn: bool| {
             log_user_state(warn, kind, reason, operation, provider, model, status);
         };
-        // The managed backend's unknown-model body is user-state on every
-        // provider; the remaining config-rejection phrases stay third-party
-        // scoped so a backend regression still reaches Sentry.
-        let config_rejected = facts.configuration_rejected && (facts.unknown_model || !is_backend);
+        let config_rejected = config_rejection_demoted(&facts, provider);
 
         if matches!(status, 401 | 403) && is_backend {
             publish_backend_session_expired(operation, provider, status_code, self.message);
         } else if facts.budget_exhausted {
             demote("budget", "budget-exhausted 400", false);
         } else if facts.no_model_loaded {
-            demote("provider_user_state", "local_provider_no_model_loaded", false);
+            demote(
+                "provider_user_state",
+                "local_provider_no_model_loaded",
+                false,
+            );
         } else if facts.custom_upstream_bad_request {
-            demote("provider_user_state", "custom_openai_upstream_bad_request", false);
+            demote(
+                "provider_user_state",
+                "custom_openai_upstream_bad_request",
+                false,
+            );
         } else if facts.access_policy_denied {
-            demote("provider_access_policy", "provider access-policy 403", false);
+            demote(
+                "provider_access_policy",
+                "provider access-policy 403",
+                false,
+            );
         } else if config_rejected {
-            demote("provider_config_rejection", "provider config-rejection", false);
+            demote(
+                "provider_config_rejection",
+                "provider config-rejection",
+                false,
+            );
         } else if facts.context_window_exceeded {
             demote("context_window_exceeded", "context-window exceeded", true);
         } else if facts.quota_exhausted {
@@ -159,11 +192,23 @@ impl ErrorReporter for HostErrorReporter<'_> {
         } else if facts.oauth_session_expired && !is_backend {
             demote("provider_user_state", "openai_oauth_session_expired", false);
         } else if facts.insufficient_credits {
-            demote("insufficient_credits", "provider insufficient-credits 402", false);
+            demote(
+                "insufficient_credits",
+                "provider insufficient-credits 402",
+                false,
+            );
         } else if facts.ollama_cloud_internal_error {
-            demote("ollama_cloud_internal_500", "Ollama Cloud hosted-inference 500", false);
+            demote(
+                "ollama_cloud_internal_500",
+                "Ollama Cloud hosted-inference 500",
+                false,
+            );
         } else if facts.moderation_rejected {
-            demote("external_moderation_rejection", "external content-moderation rejection", false);
+            demote(
+                "external_moderation_rejection",
+                "external content-moderation rejection",
+                false,
+            );
         } else if should_report_provider_http_status(status) {
             let status_str = status.to_string();
             crate::core::observability::report_error(
