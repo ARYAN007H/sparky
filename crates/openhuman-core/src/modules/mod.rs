@@ -87,9 +87,17 @@ mod search_path;
 pub(crate) mod site_memory_host;
 mod source;
 #[cfg(feature = "modules")]
+mod storage_grant_tinybox;
+#[cfg(feature = "modules")]
 mod storage_grant_tinychannels;
 #[cfg(feature = "modules")]
+mod storage_grant_tinyconnectors;
+#[cfg(feature = "modules")]
+mod storage_grant_tinyjuice;
+#[cfg(feature = "modules")]
 mod storage_grant_tinymcp;
+#[cfg(feature = "modules")]
+mod storage_grant_tinywallet;
 #[cfg(feature = "modules")]
 pub mod storage_grants;
 #[cfg(feature = "modules")]
@@ -97,7 +105,17 @@ pub(crate) mod storage_host;
 #[cfg(feature = "modules")]
 mod storage_host_linked;
 #[cfg(feature = "modules")]
+mod storage_import_support;
+#[cfg(feature = "modules")]
+mod storage_import_tinybox;
+#[cfg(feature = "modules")]
+mod storage_import_tinyconnectors;
+#[cfg(feature = "modules")]
+mod storage_import_tinyjuice;
+#[cfg(feature = "modules")]
 mod storage_import_tinymcp;
+#[cfg(all(feature = "modules", feature = "web3"))]
+mod storage_import_tinywallet;
 #[cfg(feature = "modules")]
 pub mod tinybox;
 #[cfg(feature = "modules")]
@@ -137,4 +155,59 @@ pub async fn import_legacy_mcp(data_dir: &std::path::Path) {
     }
     #[cfg(not(feature = "modules"))]
     let _ = data_dir;
+}
+
+/// Imports the connector module's legacy preference and trigger-archive files
+/// under `state_dir` into its storage, once per directory. Never fails the
+/// caller: an error is logged and the import is retried at the next open.
+pub async fn import_legacy_connectors(state_dir: &std::path::Path) {
+    #[cfg(feature = "modules")]
+    match storage_import_tinyconnectors::import_legacy(state_dir).await {
+        Ok(outcome) => log::debug!("[connectors] legacy storage import: {outcome:?}"),
+        Err(error) => {
+            log::warn!("[connectors] legacy storage import failed, will retry: {error:#}");
+        }
+    }
+    #[cfg(not(feature = "modules"))]
+    let _ = state_dir;
+}
+
+/// Imports the x402 ledger's legacy `payments.jsonl` under `workspace_dir`
+/// into the wallet module's storage, once per workspace. Never fails the
+/// caller: an error is logged and the import is retried at the next open.
+pub async fn import_legacy_x402(workspace_dir: &std::path::Path) {
+    #[cfg(all(feature = "modules", feature = "web3"))]
+    match storage_import_tinywallet::import_legacy(workspace_dir).await {
+        Ok(outcome) => log::debug!("[x402] legacy storage import: {outcome:?}"),
+        Err(error) => log::warn!("[x402] legacy storage import failed, will retry: {error:#}"),
+    }
+    #[cfg(not(all(feature = "modules", feature = "web3")))]
+    let _ = workspace_dir;
+}
+
+/// Imports the legacy jail registry index under `<workspace_dir>/jails` into
+/// the tinybox module's storage, once. Never fails the caller: an error is
+/// logged and the import is retried at the next call.
+pub async fn import_legacy_tinybox(workspace_dir: &std::path::Path) {
+    #[cfg(feature = "modules")]
+    match storage_import_tinybox::import_legacy(workspace_dir).await {
+        Ok(outcome) => log::debug!("[tinybox] legacy storage import: {outcome:?}"),
+        Err(error) => log::warn!("[tinybox] legacy storage import failed, will retry: {error:#}"),
+    }
+    #[cfg(not(feature = "modules"))]
+    let _ = workspace_dir;
+}
+
+/// Imports the legacy on-disk CCR tier under `root` into the tinyjuice
+/// module's blob storage, once per directory. `ttl` is the configured original
+/// lifetime. Never fails the caller: an error is logged and the import is
+/// retried at the next install.
+pub async fn import_legacy_tinyjuice(root: &std::path::Path, ttl: Option<std::time::Duration>) {
+    #[cfg(feature = "modules")]
+    match storage_import_tinyjuice::import_legacy(root, ttl).await {
+        Ok(outcome) => log::debug!("[tinyjuice] legacy storage import: {outcome:?}"),
+        Err(error) => log::warn!("[tinyjuice] legacy storage import failed, will retry: {error:#}"),
+    }
+    #[cfg(not(feature = "modules"))]
+    let _ = (root, ttl);
 }

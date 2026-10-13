@@ -138,6 +138,9 @@ async fn ensure_service(
     }
 
     if active.is_none() {
+        // The module's ledger opens on its storage: bring the payments file of
+        // an earlier install across first (once per workspace, best effort).
+        super::import_legacy_x402(&workspace).await;
         let service_config = X402ConfigResponse {
             workspace_dir: workspace.display().to_string(),
             session_id: format!("x402-{}", uuid::Uuid::new_v4()),
