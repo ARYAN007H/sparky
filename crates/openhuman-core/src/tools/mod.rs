@@ -8,7 +8,6 @@ pub mod registry;
 pub mod rules;
 pub(crate) mod schema_cache;
 mod schemas;
-pub mod status;
 pub mod timeout;
 pub mod toolpacks;
 pub(crate) mod user_filter;
