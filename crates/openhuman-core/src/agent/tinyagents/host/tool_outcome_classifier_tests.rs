@@ -1,5 +1,5 @@
 use super::*;
-use crate::security::{POLICY_BLOCKED_MARKER, POLICY_DENIED_MARKER};
+use tinytools::status::{POLICY_BLOCKED_MARKER, POLICY_DENIED_MARKER};
 
 fn result(error: Option<&str>, content: &str) -> ToolResult {
     match error {
