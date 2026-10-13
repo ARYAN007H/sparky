@@ -23,7 +23,13 @@ pub(crate) fn recover_workspace(id: &ProfileId, workspace_dir: &std::path::Path)
         Ok(turns) => log::info!("[profiles] profile={id} recovered {turns} interrupted turn(s)"),
         Err(error) => log::warn!("[profiles] profile={id} turn recovery failed: {error}"),
     }
-    match tinyagents_session::run_ledger::interrupt_orphaned_agent_runs(workspace_dir) {
+    if crate::storage::installed_is_shared() {
+        // Another replica may still be driving a run in a shared backend.
+        return;
+    }
+    match crate::agent::session_store::with_ledger(workspace_dir, |ledger| async move {
+        ledger.interrupt_orphaned_agent_runs().await
+    }) {
         Ok(0) => {}
         Ok(runs) => log::info!("[profiles] profile={id} settled {runs} orphaned run(s)"),
         Err(error) => log::warn!("[profiles] profile={id} run recovery failed: {error:#}"),

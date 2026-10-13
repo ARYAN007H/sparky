@@ -126,9 +126,10 @@ pub(crate) async fn bootstrap_core_runtime(
     // the finalizer never settled it. Stamp such rows `interrupted` so they stop
     // rendering as perpetual "running" timeline entries on thread reopen.
     if agent_enabled {
-        if host_store.is_none() {
-            match tinyagents_session::run_ledger::interrupt_orphaned_agent_runs(&cfg.workspace_dir)
-            {
+        if !crate::storage::installed_is_shared() {
+            match crate::agent::session_store::with_ledger(&cfg.workspace_dir, |ledger| async move {
+                ledger.interrupt_orphaned_agent_runs().await
+            }) {
                 Ok(0) => {}
                 Ok(count) => {
                     log::info!("[runtime] settled {count} orphaned agent run(s) on startup")
