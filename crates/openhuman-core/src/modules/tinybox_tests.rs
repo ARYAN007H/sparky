@@ -570,7 +570,10 @@ async fn native_shell_start_calls_the_native_member_not_the_two_argument_shell_m
         jail: None,
         hide_window: true,
     };
-    let _: () = call_with_client(&client, START_NATIVE_SHELL_EXEC, (request.clone(),), true)
+    // The fixture bus cannot attest a recipient, so the confidential variant
+    // production uses is exercised unconfidentially here; the member name and
+    // positional argument are what this pins.
+    let _: () = call_with_client(&client, START_NATIVE_SHELL_EXEC, (request.clone(),), false)
         .await
         .expect("native shell start call");
     let log = calls.lock().expect("call log lock");
