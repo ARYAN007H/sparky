@@ -379,7 +379,7 @@ impl ToolMiddleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
                 ToolPolicyDecision::Deny { .. } => "denied",
                 ToolPolicyDecision::Allow => "allowed",
             };
-            crate::tools::registry::denials::record(
+            tinytools::registry::denials::record(
                 call.name.as_str(),
                 policy_name,
                 blocked_action,
