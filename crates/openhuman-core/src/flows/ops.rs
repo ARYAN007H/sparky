@@ -81,7 +81,7 @@ const FLOW_RUN_TIMEOUT_SECS: u64 = 600;
 /// forever. The two are distinct mechanisms (flow runs execute as
 /// `TrustedAutomation { Workflow }`, which the tool-call gate lets through), so
 /// this is a dedicated flows-side TTL, not a reuse of the approval store's.
-const FLOW_PARKED_TTL_SECS: i64 = 600;
+const FLOW_PARKED_TTL_SECS: i64 = tinyflows_catalog::run_management::PARKED_RUN_TTL_SECS;
 
 /// T-M1 fail-closed refusal: the graph hash pinned when this run parked no
 /// longer matches the flow's current graph (`save_workflow` rewrote it while
