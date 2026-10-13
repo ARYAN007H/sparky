@@ -56,9 +56,7 @@ impl OpenHumanSessionHost {
             workflows: &self.workflows,
             dispatcher_instructions: &instructions,
             visible_tool_names: &prompt_visible_tool_names,
-            tool_call_format: tool_call_format_from_dialect(
-                self.tool_dispatcher.tool_call_format(),
-            ),
+            tool_call_format: self.tool_dispatcher.tool_call_format(),
             connected_integrations: &self.connected_integrations,
             connected_identities_md: crate::agent::prompts::render_connected_identities(),
             user_identity: crate::security::credentials::identity::peek_credential_user_identity(),

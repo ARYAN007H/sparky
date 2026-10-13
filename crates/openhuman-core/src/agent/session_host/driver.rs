@@ -184,10 +184,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
         // composed for: a text dialect strips schemas off the wire and needs
         // the positional registry to recover P-Format / code-style calls.
         let run_context = request.run_context.data.clone().with_tool_dialect(
-            (
-                self.dispatcher.tool_call_format(),
-            )
-            .harness_dispatcher(),
+            tinyagents_harness::dialect::dispatcher_for_format(self.dispatcher.tool_call_format()),
         );
         let cancellation = request.run_context.cancellation.clone();
         // Boxed: the graph future is very large, and holding it inline in the

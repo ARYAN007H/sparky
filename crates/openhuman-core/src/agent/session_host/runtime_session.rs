@@ -330,9 +330,7 @@ impl OpenHumanTurnPrelude {
             workflows: &mutable.workflows,
             dispatcher_instructions: &instructions,
             visible_tool_names: &visible_tool_names,
-            tool_call_format: tool_call_format_from_dialect(
-                self.tool_dispatcher.tool_call_format(),
-            ),
+            tool_call_format: self.tool_dispatcher.tool_call_format(),
             connected_integrations: &mutable.connected_integrations,
             connected_identities_md: crate::agent::prompts::render_connected_identities(),
             user_identity: crate::security::credentials::identity::peek_credential_user_identity(),
@@ -505,10 +503,7 @@ impl OpenHumanTurnPrelude {
         // the prompt was composed for, so a text dialect keeps its schemas off
         // the wire and renders the catalogue itself (`ToolsSection` no longer
         // does), and a code call is recovered against the positional registry.
-        run_context.tool_dialect = (
-            self.tool_dispatcher.tool_call_format(),
-        )
-        .harness_dispatcher();
+        run_context.tool_dialect = tinyagents_harness::dialect::dispatcher_for_format(self.tool_dispatcher.tool_call_format());
         format!("{}\n\n{enriched}", turn.preamble())
     }
 
