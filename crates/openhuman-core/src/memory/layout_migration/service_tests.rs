@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tinymemory_api::MemoryEngine;
 
 use super::*;
-use crate::memory::layout_migration::state;
+use crate::memory::layout_migration::{state, Phase};
 use crate::memory::layout_migration::test_host::{count, fact, FakeHost};
 
 fn never() -> Arc<dyn Fn() -> bool + Send + Sync> {
