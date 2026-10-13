@@ -78,17 +78,14 @@ pub(super) fn command(command: &str) -> tokio::process::Command {
         .read()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .clone();
-    let mut process = match selection {
+    let process = match selection {
         Some(selection) => from_selection(&selection, command),
         None => {
             log::warn!("[hooks] no TinyBox shell selection; the hook command will not start");
             std::process::Command::new(UNAVAILABLE)
         }
     };
-    let mut process = tokio::process::Command::from(std::mem::replace(
-        &mut process,
-        std::process::Command::new(UNAVAILABLE),
-    ));
+    let mut process = tokio::process::Command::from(process);
     // A hook leads its own process group and dies with the handle that owns it,
     // so a deadline cannot leave its pipeline running.
     process.kill_on_drop(true);
