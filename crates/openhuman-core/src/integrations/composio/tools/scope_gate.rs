@@ -82,6 +82,9 @@ pub(super) async fn evaluate_tool_visibility(config: &Config, slug: &str) -> Too
         // Unparseable slug — let the backend return its own error.
         return ToolDecision::Allow;
     };
+    // Rows still in the legacy workspace file must be in the module before it
+    // is asked, or its default (`write` on) would outrank a stored `write=false`.
+    super::super::ops::ensure_user_scopes_migrated(config).await;
     let request = VisibleToolsRequest {
         toolkit: toolkit.clone(),
         preference: None,
