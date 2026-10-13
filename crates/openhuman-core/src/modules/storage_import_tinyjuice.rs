@@ -154,7 +154,7 @@ fn is_token(name: &str) -> bool {
 /// directory or anything else; the file is never reached through a symlink.
 fn read_regular(path: &Path) -> Result<Option<(SystemTime, Vec<u8>)>> {
     use std::io::Read;
-    let mut options = std::fs::OpenOptions::new();
+    let mut options = std::fs::File::options();
     options.read(true);
     #[cfg(unix)]
     {
