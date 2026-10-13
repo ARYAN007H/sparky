@@ -17,7 +17,7 @@ use tinyinference_llm::model::CapabilitySet;
 use tokio::sync::mpsc::Sender;
 
 use crate::agent::progress::AgentProgress;
-use crate::agent::tinyagents::harness_context_ladder::install_context_ladder;
+use crate::agent::tinyagents::context_wiring::install_context_ladder;
 use crate::agent::tinyagents::harness_tool_registration::register_turn_tools_and_agents;
 use crate::agent::tinyagents::host::steering;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
@@ -508,7 +508,7 @@ pub(super) fn assemble_turn_harness(
     )));
     // The context ladder (compression, microcompact, final-call wrap-up,
     // artifact contents list, trim), registered here so each step keeps its
-    // place in the middleware order. See `harness_context_ladder.rs`.
+    // place in the middleware order. See `context_wiring.rs`.
     let (compression_mw, wrap_up_fired) = install_context_ladder(
         &mut harness,
         model,

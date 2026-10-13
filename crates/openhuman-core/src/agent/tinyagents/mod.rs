@@ -25,7 +25,7 @@ mod deadline_wind_down;
 pub mod discovery;
 mod embeddings;
 mod harness_assembly;
-mod harness_context_ladder;
+mod context_wiring;
 pub(crate) mod harness_tool_registration;
 pub mod host;
 pub(crate) mod hosted_error;
