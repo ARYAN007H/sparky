@@ -179,7 +179,7 @@ when they stop a turn for repeated tool failures.
 
 ### The OpenAI-compatible endpoint
 
-`http/server.rs` serves `/v1/chat/completions` (with SSE streaming) and `/v1/models`.
+The handlers for `/v1/chat/completions` (with SSE streaming) and `/v1/models` live in `tinyinference_llm::providers::openai::server_http`; `http/backend.rs` is the host `ChatBackend` that resolves models against `Config`.
 `openhuman-rpc` mounts it with `.nest("/v1", openhuman_core::inference::http::router())`, so it sits
 behind the same bearer middleware as `/rpc`. The bearer may be either the per-launch core token or
 a stable user-managed key stored under the `EXTERNAL_OPENAI_COMPAT_PROVIDER` auth profile, which
@@ -208,7 +208,7 @@ picks the provider the same way a provider string does.
 | `host_runtime/` | Product policy, RPC and speech bindings over `tinyinference_local`. See [`host_runtime/README.md`](host_runtime/README.md). |
 | `embedding_host/` | Embedding provider selection (managed, Voyage, OpenAI, Cohere, Ollama, custom, noop) and the `embeddings.*` RPC. See [`embedding_host/README.md`](embedding_host/README.md). |
 | `tokenjuice/` | Host adapter for the TinyJuice tool-output compression module, the `juice_retrieve` recovery tool, and the `tokenjuice.*` RPC. See [`tokenjuice/README.md`](tokenjuice/README.md). |
-| `http/` | OpenAI-compatible `/v1` endpoint. `server.rs` (router and handlers) is behind the `http-server` feature; `types.rs` and `EXTERNAL_OPENAI_COMPAT_PROVIDER` stay ungated because `core::auth` reads them. |
+| `http/` | OpenAI-compatible `/v1` endpoint. `backend.rs` (host `ChatBackend` and `router()`) is behind the `http-server` feature; `EXTERNAL_OPENAI_COMPAT_PROVIDER` stays ungated because `core::auth` reads it. |
 
 ## Key types and entry points
 
