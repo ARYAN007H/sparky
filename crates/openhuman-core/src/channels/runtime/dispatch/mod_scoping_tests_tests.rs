@@ -50,9 +50,6 @@ fn def_with_scope(scope: ToolScope) -> AgentDefinition {
         when_to_use: "test".into(),
         display_name: None,
         system_prompt: PromptSource::Inline(String::new()),
-        omit_identity: true,
-        omit_memory_context: true,
-        omit_safety_preamble: true,
         model: ModelSpec::Inherit,
         temperature: 0.4,
         tools: scope,
@@ -68,12 +65,19 @@ fn def_with_scope(scope: ToolScope) -> AgentDefinition {
         timeout_secs: None,
         sandbox_mode: SandboxMode::None,
         background: false,
-        tokenjuice_compression: tinyjuice_bus::types::AgentTokenjuiceCompression::Auto,
         subagents: vec![],
         delegate_name: None,
         agent_tier: tinyagents_definition::AgentTier::Worker,
-        searches_connected_mcp: false,
         source: DefinitionSource::Builtin,
+        extensions: crate::agent::harness::host_definition::AgentExt {
+            omit_identity: true,
+            omit_memory_context: true,
+            omit_safety_preamble: true,
+            tokenjuice_compression: tinyjuice_bus::types::AgentTokenjuiceCompression::Auto,
+            searches_connected_mcp: false,
+            ..Default::default()
+        },
+        role: None,
     }
 }
 
