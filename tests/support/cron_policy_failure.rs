@@ -12,7 +12,8 @@ use tinystoragedrivers_core::{
 use tinytools::Tool;
 
 type StoreResult<T> = Result<T, StorageError>;
-const POLICIES: &str = "cron_job_policies";
+/// A job's policy is a field of its job document.
+const JOBS: &str = "cron_jobs";
 const BACKEND_DETAIL: &str = "mongodb://policy-user:secret@backend/private-payload";
 
 #[derive(Debug, Default)]
@@ -79,7 +80,7 @@ impl DocumentStore for Documents {
         collection: &str,
         id: &str,
     ) -> StoreResult<Option<Versioned<serde_json::Value>>> {
-        if collection == POLICIES {
+        if collection == JOBS {
             self.faults
                 .calls
                 .lock()
@@ -101,7 +102,7 @@ impl DocumentStore for Documents {
         if self.faults.read.load(Ordering::SeqCst) {
             self.faults.writes.fetch_add(1, Ordering::SeqCst);
         }
-        if collection == POLICIES && self.faults.write.load(Ordering::SeqCst) {
+        if collection == JOBS && self.faults.write.load(Ordering::SeqCst) {
             return Err(StorageError::backend(BACKEND_DETAIL));
         }
         self.inner.put(collection, id, doc, precondition).await
@@ -115,7 +116,7 @@ impl DocumentStore for Documents {
         if self.faults.read.load(Ordering::SeqCst) {
             self.faults.writes.fetch_add(1, Ordering::SeqCst);
         }
-        if collection == POLICIES && self.faults.delete.load(Ordering::SeqCst) {
+        if collection == JOBS && self.faults.delete.load(Ordering::SeqCst) {
             return Err(StorageError::backend(BACKEND_DETAIL));
         }
         self.inner.delete(collection, id, precondition).await
@@ -147,11 +148,33 @@ impl DocumentStore for Documents {
     }
 }
 
-/// Size and mtime of the SQLite job store, if it exists: unchanged means
-/// nothing fell back to it.
+/// Size and mtime of the workspace's own job store, if it exists: unchanged
+/// (absent) means nothing fell back to it.
 fn sqlite_stamp(config: &Config) -> Option<(u64, std::time::SystemTime)> {
-    let meta = std::fs::metadata(config.workspace_dir.join("cron/jobs.db")).ok()?;
+    let meta = std::fs::metadata(config.workspace_dir.join("cron/schedule.db")).ok()?;
     Some((meta.len(), meta.modified().ok()?))
+}
+
+/// The next run of `job_id`, read through a listing (a point read is what the
+/// fault injection refuses).
+fn next_run_of(config: &Config, job_id: &str) -> chrono::DateTime<chrono::Utc> {
+    cron::list_jobs(config)
+        .unwrap()
+        .into_iter()
+        .find(|job| job.id == job_id)
+        .unwrap()
+        .next_run
+}
+
+/// Writes `policy` as the raw `policy` field of `job_id`'s document, bypassing
+/// the store's own validation.
+async fn put_raw_policy(docs: &ScopedStorage, job_id: &str, policy: serde_json::Value) {
+    let mut stored = docs.documents().get(JOBS, job_id).await.unwrap().unwrap();
+    stored.doc["policy"] = policy;
+    docs.documents()
+        .put(JOBS, job_id, stored.doc, Precondition::None)
+        .await
+        .unwrap();
 }
 
 pub(super) async fn policy_reads_refuse_execution_without_consuming_a_slot(case: Case) {
@@ -228,10 +251,8 @@ pub(super) async fn policy_reads_refuse_execution_without_consuming_a_slot(case:
             }
         )
         .is_err());
-        faults.write.store(false, Ordering::SeqCst);
-        faults.delete.store(true, Ordering::SeqCst);
         assert!(policy::clear_policy(&config, &job.id).is_err());
-        faults.delete.store(false, Ordering::SeqCst);
+        faults.write.store(false, Ordering::SeqCst);
         assert_eq!(policy::get_policy(&config, &job.id).unwrap(), restricted);
     })
     .await;
@@ -262,13 +283,13 @@ pub(super) async fn policy_reads_refuse_execution_without_consuming_a_slot(case:
     })
     .await;
     let before = CoreContext::scope(Arc::clone(&alpha), async {
-        cron::get_job(&config, &job.id).unwrap().next_run
+        next_run_of(&config, &job.id)
     })
     .await;
     faults.read.store(true, Ordering::SeqCst);
     cron::scheduler::run_live_agent_pass(1).await;
     let after = CoreContext::scope(Arc::clone(&alpha), async {
-        cron::get_job(&config, &job.id).unwrap().next_run
+        next_run_of(&config, &job.id)
     })
     .await;
     let scheduled_calls = calls.load(Ordering::SeqCst);
@@ -438,10 +459,7 @@ pub(super) async fn malformed_policy_rows_refuse_execution(case: Case) {
         json!({"retries": 0, "single_flight": "private-payload"}),
         json!({"retries": 0}),
     ] {
-        docs.documents()
-            .put(POLICIES, &job.id, doc, Precondition::None)
-            .await
-            .unwrap();
+        put_raw_policy(&docs, &job.id, doc).await;
         assert!(
             policy::get_policy(&config, &job.id).is_err(),
             "a malformed existing row became a usable policy"
@@ -472,10 +490,7 @@ pub(super) async fn malformed_policy_rows_refuse_execution(case: Case) {
             },
         ),
     ] {
-        docs.documents()
-            .put(POLICIES, &job.id, doc, Precondition::None)
-            .await
-            .unwrap();
+        put_raw_policy(&docs, &job.id, doc).await;
         assert_eq!(policy::get_policy(&config, &job.id).unwrap(), wanted);
     }
     policy::clear_policy(&config, &job.id).unwrap();
