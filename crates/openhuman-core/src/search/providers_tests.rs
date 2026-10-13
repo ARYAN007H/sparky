@@ -1,6 +1,6 @@
 use super::*;
-use tinysearch_bus::{parse_role, role_key, ROLES};
 use crate::config::{SearchProviderSettings, SEARCH_ROLES};
+use tinysearch_bus::{parse_role, role_key, ROLES};
 
 fn config_with(providers: &[(&str, SearchProviderSettings)]) -> Config {
     let mut config = Config::default();

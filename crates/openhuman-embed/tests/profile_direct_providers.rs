@@ -10,7 +10,7 @@ use common::{
     chat_completion, chat_requests, runtime_without_master_key, tool_names, PointedTransport,
 };
 use openhuman_embed::config::{
-    SearchConfig, SearchEngineCredentials, PresentationMode, SearchProviderSettings, SearchRole,
+    PresentationMode, SearchConfig, SearchEngineCredentials, SearchProviderSettings, SearchRole,
 };
 use openhuman_embed::seams::ToolHookDecision;
 use openhuman_embed::{

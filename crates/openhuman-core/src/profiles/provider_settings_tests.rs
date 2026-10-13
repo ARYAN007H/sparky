@@ -1,5 +1,5 @@
 use super::*;
-use crate::config::{SearchEngineCredentials, PresentationMode, SearchProviderSettings};
+use crate::config::{PresentationMode, SearchEngineCredentials, SearchProviderSettings};
 use tinysearch_bus::Role;
 
 fn deployment(exa: Option<&str>, gemini: Option<&str>) -> crate::core::runtime::SaasConfig {

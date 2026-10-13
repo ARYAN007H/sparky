@@ -219,5 +219,8 @@ fn settings_report_the_search_component_as_disabled() {
         .as_str()
         .unwrap()
         .starts_with("COMPONENT_DISABLED:search"));
-    assert!(off["effective_roles"]["search"].as_array().unwrap().is_empty());
+    assert!(off["effective_roles"]["search"]
+        .as_array()
+        .unwrap()
+        .is_empty());
 }

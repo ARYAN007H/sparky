@@ -4,7 +4,7 @@
 use crate::config::schema::load::env::parse_env_bool;
 use crate::config::schema::load::env::EnvLookup;
 use crate::config::schema::{
-    Config, PresentationMode, SearchProviderSettings, ProviderRoute, MANAGED_SEARCH_PROVIDERS,
+    Config, PresentationMode, ProviderRoute, SearchProviderSettings, MANAGED_SEARCH_PROVIDERS,
     SEARCH_PROVIDERS, SEARCH_ROLES,
 };
 
@@ -97,9 +97,10 @@ impl Config {
             let mut providers = std::collections::BTreeMap::new();
             for entry in names.split(',').map(str::trim).filter(|e| !e.is_empty()) {
                 let (name, route) = match entry.split_once(':') {
-                    Some((name, route)) => {
-                        (name.trim().to_ascii_lowercase(), ProviderRoute::parse(route))
-                    }
+                    Some((name, route)) => (
+                        name.trim().to_ascii_lowercase(),
+                        ProviderRoute::parse(route),
+                    ),
                     None => (entry.to_ascii_lowercase(), None),
                 };
                 if name == "managed" {

@@ -11,8 +11,8 @@
 use std::collections::BTreeMap;
 
 use tinysearch_bus::{
-    BackendAuthMode, BackendConfig, PresentationConfig, ProviderConfig,
-    ProviderRoute, SearchConfig as ModuleSearchConfig,
+    BackendAuthMode, BackendConfig, PresentationConfig, ProviderConfig, ProviderRoute,
+    SearchConfig as ModuleSearchConfig,
 };
 
 use crate::config::Config;

@@ -6,7 +6,7 @@
 //! router that can point at arbitrary native capabilities.
 
 use crate::config::{
-    Config, SearchConfig, PresentationMode, SearchProviderSettings, ProviderRoute,
+    Config, PresentationMode, ProviderRoute, SearchConfig, SearchProviderSettings,
 };
 use crate::core::runtime::direct_profile_provider::{validate_endpoint, DirectProfileProvider};
 use crate::core::runtime::SaasConfig;
@@ -185,12 +185,10 @@ impl ProfileProviderSettings {
     /// An advertised role maps exactly once to its canonical module operation.
     /// Renamed canonical operations and provider-native names never resolve.
     pub fn canonical_role_name(&self, advertised: &str) -> Option<&'static str> {
-        tinysearch_bus::ROLES
-            .into_iter()
-            .find_map(|role| {
-                (self.advertised_role_name(role) == advertised)
-                    .then(|| tinysearch_bus::names::role_tool_name(role))
-            })
+        tinysearch_bus::ROLES.into_iter().find_map(|role| {
+            (self.advertised_role_name(role) == advertised)
+                .then(|| tinysearch_bus::names::role_tool_name(role))
+        })
     }
 
     /// The operator-selected name for a role, or the ordinary canonical name.

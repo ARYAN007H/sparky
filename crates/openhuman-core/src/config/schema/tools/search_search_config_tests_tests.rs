@@ -317,8 +317,14 @@ fn enabled_provider_names_skip_disabled_entries() {
 
 #[test]
 fn route_and_presentation_parse_accept_legacy_spellings() {
-    assert_eq!(ProviderRoute::parse("backend"), Some(ProviderRoute::Backend));
-    assert_eq!(ProviderRoute::parse(" Direct "), Some(ProviderRoute::Direct));
+    assert_eq!(
+        ProviderRoute::parse("backend"),
+        Some(ProviderRoute::Backend)
+    );
+    assert_eq!(
+        ProviderRoute::parse(" Direct "),
+        Some(ProviderRoute::Direct)
+    );
     assert_eq!(ProviderRoute::parse("other"), None);
     assert_eq!(
         PresentationMode::parse("all_tools"),

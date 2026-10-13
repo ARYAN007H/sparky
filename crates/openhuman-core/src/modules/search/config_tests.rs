@@ -1,6 +1,6 @@
 use super::*;
-use tinysearch_bus::PresentationMode;
 use crate::config::SearchProviderSettings;
+use tinysearch_bus::PresentationMode;
 
 fn config_in(dir: &std::path::Path) -> Config {
     let mut config = Config::default();

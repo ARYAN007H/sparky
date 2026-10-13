@@ -1,5 +1,5 @@
 use super::*;
-use crate::config::{SearchProviderSettings, ProviderRoute};
+use crate::config::{ProviderRoute, SearchProviderSettings};
 
 fn signed_out_byok_config() -> Config {
     let mut config = Config::default();

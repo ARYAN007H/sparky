@@ -5,7 +5,7 @@
 use std::collections::BTreeMap;
 
 use super::{
-    LegacySearchInputs, SearchConfig, SearchProviderSettings, ProviderRoute, SEARCH_ENGINE_BRAVE,
+    LegacySearchInputs, ProviderRoute, SearchConfig, SearchProviderSettings, SEARCH_ENGINE_BRAVE,
     SEARCH_ENGINE_DISABLED, SEARCH_ENGINE_EXA, SEARCH_ENGINE_MANAGED, SEARCH_ENGINE_PARALLEL,
     SEARCH_ENGINE_QUERIT, SEARCH_ENGINE_TAVILY, SEARCH_PROVIDERS, SEARCH_ROLE_SEARCH,
     SEARCH_SCHEMA_PROVIDERS, SEARCH_SCHEMA_VERSION,
@@ -96,7 +96,10 @@ impl SearchConfig {
             .unwrap_or(ProviderRoute::Backend);
         let mut providers = BTreeMap::new();
         let parallel_key = self.parallel.has_key();
-        let managed_parallel = self.parallel_route.as_deref().and_then(ProviderRoute::parse)
+        let managed_parallel = self
+            .parallel_route
+            .as_deref()
+            .and_then(ProviderRoute::parse)
             == Some(ProviderRoute::Backend);
         let mut dropped_parallel = false;
 

@@ -112,7 +112,10 @@ enabled = true
 route = "direct"
 "#;
     let search: SearchConfig = toml::from_str(existing).unwrap();
-    assert_eq!(search.presentation, crate::config::PresentationMode::OneProvider);
+    assert_eq!(
+        search.presentation,
+        crate::config::PresentationMode::OneProvider
+    );
     assert_eq!(search.route("exa"), ProviderRoute::Backend);
     assert_eq!(search.route("brave"), ProviderRoute::Direct);
 
@@ -120,5 +123,8 @@ route = "direct"
     let written = toml::to_string(&search).unwrap();
     assert!(written.contains("route = \"managed\""), "{written}");
     assert!(!written.contains("backend"), "{written}");
-    assert!(written.contains("presentation = \"one_provider\""), "{written}");
+    assert!(
+        written.contains("presentation = \"one_provider\""),
+        "{written}"
+    );
 }
