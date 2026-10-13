@@ -33,7 +33,7 @@ survive that boundary on its own.
 ## Where next
 
 - `crate::agent::harness::host_definition` for `AgentDefinition` (and `tinyagents_definition` for `AgentTier`,
-  `SandboxMode`, and the other archetype shapes this module resolves against.
+  `SandboxMode`), and the other archetype shapes this module resolves against.
 - `crate::agent::orchestration` for `spawn_subagent` and the other
   user-facing tools that call into this runner.
 - `crate::agent::session_host` for the parent turn that sets up the
