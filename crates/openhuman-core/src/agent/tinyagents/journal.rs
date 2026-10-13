@@ -39,7 +39,7 @@
 //!
 //! - Full sub-agent / graph run lineage (`parent_run_id` / `root_run_id`
 //!   threading) — wired in 05.2/05.3. This slice threads `thread_id` (from the
-//!   sub-agent task scope) so `FileStatusStore::list_by_thread` answers.
+//!   sub-agent task scope) so `DriverStatusStore::list_by_thread` answers.
 //!
 //! [`EventSink::with_stream_id`]: tinyagents_harness::events::EventSink::with_stream_id
 
@@ -50,12 +50,11 @@ use std::sync::{Arc, Mutex};
 use tinyagents_harness::events::{EventSink, HarnessRunStatus};
 use tinyagents_harness::ids::{ComponentId, HarnessPhase, RunId, ThreadId};
 use tinyagents_harness::observability::{
-    process_env_secrets, AgentObservation, FanOutSink, FileStatusStore, HarnessEventJournal,
+    process_env_secrets, AgentObservation, DriverStatusStore, FanOutSink, HarnessEventJournal,
     HarnessStatusStore, JournalSink, RedactingSink, StoreEventJournal,
 };
 
 use tinyagents_harness::store::{AppendStore, Store};
-use tinyagents_session::transcript::import::ops::open_session_stores;
 
 /// Best-effort live request → durable tinyagents journal stream map. The web
 /// progress bridge uses this at turn end to shadow-project spans from the
@@ -125,7 +124,7 @@ async fn journal_stores() -> anyhow::Result<(Arc<dyn AppendStore>, Arc<dyn Store
 /// non-fatal.
 pub(crate) struct TurnJournal {
     run_id: RunId,
-    status_store: Arc<FileStatusStore>,
+    status_store: Arc<DriverStatusStore>,
     event_sink: Arc<JournalSink>,
     /// The in-flight status snapshot, mutated in place to `completed`/`failed`.
     status: Mutex<HarnessRunStatus>,
@@ -179,7 +178,7 @@ impl TurnJournal {
 /// `tinyagents_harness::observability::mint_run_id`). That shared id is what makes the persisted `event_id`s the
 /// restart-stable `{run_id}-evt-{offset}` a late-attach replay reconstructs the
 /// timeline from. `thread_id` (when known — e.g. the sub-agent task scope)
-/// records the run under a thread so `FileStatusStore::list_by_thread` answers.
+/// records the run under a thread so `DriverStatusStore::list_by_thread` answers.
 ///
 /// Returns a [`TurnJournal`] handle the caller uses to stamp the terminal
 /// status after the run, or `None` when the store could not be opened (the run
@@ -219,7 +218,7 @@ pub(crate) async fn attach_turn_journal(
 
     // Status store: durable, Store-backed. Seed an initial `running` snapshot,
     // recording the thread (when known) so list_by_thread answers at run start.
-    let status_store = Arc::new(FileStatusStore::over(kv));
+    let status_store = Arc::new(status_store);
     let mut status = HarnessRunStatus::new(run_id.clone(), ComponentId::new(model.to_string()));
     if let Some(thread_id) = thread_id {
         status = status.with_thread(thread_id);

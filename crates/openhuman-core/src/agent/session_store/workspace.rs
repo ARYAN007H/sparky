@@ -186,6 +186,21 @@ pub fn current_documents_for(workspace_dir: &Path) -> Option<Arc<dyn DocumentSto
     }
 }
 
+/// The calling tenant's durable run-status store for `workspace_dir`: the
+/// `harness_run_status` documents of its agent scope, beside its session
+/// stores. A call with no tenant gets a throwaway in-memory store.
+#[must_use]
+pub fn status_store_for(workspace_dir: &Path) -> tinyagents_harness::observability::DriverStatusStore {
+    let docs = current_documents_for(workspace_dir).unwrap_or_else(|| {
+        log::warn!("[session_store] no tenant; using a throwaway run-status store");
+        let scoped = MemoryStorage::new()
+            .for_scope(&tinystoragedrivers::Scope::local())
+            .expect("the memory backend binds the local scope");
+        Arc::clone(scoped.documents())
+    });
+    tinyagents_harness::observability::DriverStatusStore::new(docs)
+}
+
 /// Runs a run-ledger call from synchronous code on the shared storage bridge.
 ///
 /// # Errors
