@@ -84,8 +84,14 @@ pub(crate) fn rebind_with(
         workspace = %config.workspace_dir.display(),
         "[storage] the workspace moved; reopening the storage backend"
     );
-    std::fs::create_dir_all(config.workspace_dir.join(super::config::DEFAULT_DIR))
-        .with_context(|| format!("create the storage directory under {}", config.workspace_dir.display()))?;
+    std::fs::create_dir_all(config.workspace_dir.join(super::config::DEFAULT_DIR)).with_context(
+        || {
+            format!(
+                "create the storage directory under {}",
+                config.workspace_dir.display()
+            )
+        },
+    )?;
     let url = next.clone();
     let backend = super::block_on_anyhow(async move { Ok(super::open(&url).await?) })
         .with_context(|| format!("open the storage backend {redacted_to}"))?;

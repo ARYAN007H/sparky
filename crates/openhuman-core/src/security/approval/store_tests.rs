@@ -63,12 +63,8 @@ fn fetch_decision_state(
     config: &Config,
     request_id: &str,
 ) -> Option<(Option<String>, Option<String>)> {
-    raw_doc(config, request_id).map(|doc| {
-        (
-            text_field(&doc, "decided_at"),
-            text_field(&doc, "decision"),
-        )
-    })
+    raw_doc(config, request_id)
+        .map(|doc| (text_field(&doc, "decided_at"), text_field(&doc, "decision")))
 }
 
 // ── record_execution tests (#2135) ──────────

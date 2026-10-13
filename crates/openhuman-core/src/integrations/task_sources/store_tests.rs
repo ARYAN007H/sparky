@@ -294,4 +294,3 @@ fn clear_all_removes_every_source() {
     assert_eq!(removed, 1);
     assert!(list_sources(&config).unwrap().is_empty());
 }
-

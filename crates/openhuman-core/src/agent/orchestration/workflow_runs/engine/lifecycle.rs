@@ -165,8 +165,7 @@ pub async fn stop_workflow_run(config: &Config, id: &str) -> Result<Option<Workf
 /// definition no longer exists.
 pub async fn resume_workflow_run(config: &Config, id: &str) -> Result<WorkflowRun> {
     log::debug!(target: LOG_TARGET, "[workflow_run_engine] resume.entry run={id}");
-    let run = get_workflow_run(config, id)?
-        .ok_or_else(|| anyhow!("unknown workflow run: {id}"))?;
+    let run = get_workflow_run(config, id)?.ok_or_else(|| anyhow!("unknown workflow run: {id}"))?;
 
     if matches!(run.status, WorkflowRunStatus::Completed) {
         return Err(anyhow!("workflow run {id} is already completed"));

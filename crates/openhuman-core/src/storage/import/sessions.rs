@@ -131,11 +131,12 @@ fn import(backend: &Arc<dyn StorageBackend>, config: &Config) -> Result<Outcome>
 /// The agent definitions a stem may belong to, by the component their ids
 /// encode to in a stem.
 fn known_agents() -> HashMap<String, String> {
-    let mut ids: Vec<String> = crate::agent::harness::definition::AgentDefinitionRegistry::builtins_only()
-        .list()
-        .iter()
-        .map(|def| def.id.clone())
-        .collect();
+    let mut ids: Vec<String> =
+        crate::agent::harness::definition::AgentDefinitionRegistry::builtins_only()
+            .list()
+            .iter()
+            .map(|def| def.id.clone())
+            .collect();
     if let Some(current) = crate::agent::harness::definition::AgentDefinitionRegistry::current() {
         ids.extend(current.list().iter().map(|def| def.id.clone()));
     }

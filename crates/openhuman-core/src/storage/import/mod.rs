@@ -53,10 +53,10 @@ use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition};
 
 use super::documents::Repo;
 use super::rusqlite;
-use rusqlite::Connection;
-use serde_json::Value;
 use super::{block_on, Scope, StorageBackend};
 use crate::config::Config;
+use rusqlite::Connection;
+use serde_json::Value;
 
 pub use snapshot::Snapshot;
 
@@ -187,10 +187,7 @@ pub async fn run(config: &Config) -> Vec<Report> {
         return Vec::new();
     }
     let config = config.clone();
-    let joined = tokio::task::spawn_blocking(move || {
-        run_all(&backend, &config)
-    })
-    .await;
+    let joined = tokio::task::spawn_blocking(move || run_all(&backend, &config)).await;
     match joined {
         Ok(reports) => reports,
         Err(error) => {

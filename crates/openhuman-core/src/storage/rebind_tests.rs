@@ -1,6 +1,6 @@
 use super::*;
-use crate::storage::{CollectionSpec, Precondition, Scope};
 use crate::storage::import::Outcome;
+use crate::storage::{CollectionSpec, Precondition, Scope};
 use std::sync::Mutex;
 use tempfile::TempDir;
 
@@ -24,7 +24,12 @@ impl Installed {
     }
 
     fn urls(&self) -> Vec<String> {
-        self.0.lock().unwrap().iter().map(|(url, _)| url.clone()).collect()
+        self.0
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(url, _)| url.clone())
+            .collect()
     }
 }
 
@@ -65,9 +70,15 @@ fn the_new_workspace_is_a_different_database() {
     let scoped = backend.for_scope(&Scope::local()).unwrap();
     let docs = Arc::clone(scoped.documents());
     crate::storage::block_on(async move {
-        docs.ensure_collection(&CollectionSpec::new("probe")).await?;
-        docs.put("probe", "k", serde_json::json!({"v": 1}), Precondition::None)
-            .await
+        docs.ensure_collection(&CollectionSpec::new("probe"))
+            .await?;
+        docs.put(
+            "probe",
+            "k",
+            serde_json::json!({"v": 1}),
+            Precondition::None,
+        )
+        .await
     })
     .unwrap();
 
@@ -78,7 +89,8 @@ fn the_new_workspace_is_a_different_database() {
     .unwrap();
     let docs = Arc::clone(other.for_scope(&Scope::local()).unwrap().documents());
     let found = crate::storage::block_on(async move {
-        docs.ensure_collection(&CollectionSpec::new("probe")).await?;
+        docs.ensure_collection(&CollectionSpec::new("probe"))
+            .await?;
         docs.get("probe", "k").await
     })
     .unwrap();
@@ -118,7 +130,10 @@ fn the_legacy_files_of_the_new_workspace_are_imported() {
         .expect("the devices importer ran");
     assert!(matches!(
         devices.outcome,
-        Ok(Outcome::Imported { found: 1, written: 1 })
+        Ok(Outcome::Imported {
+            found: 1,
+            written: 1
+        })
     ));
 }
 

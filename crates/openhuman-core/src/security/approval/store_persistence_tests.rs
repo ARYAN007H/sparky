@@ -490,4 +490,3 @@ fn agent_id_round_trips_and_older_rows_read_as_the_process() {
     decide(&config, "owned", ApprovalDecision::Deny).unwrap();
     assert_eq!(pending_agent(&config, "owned").unwrap(), None);
 }
-

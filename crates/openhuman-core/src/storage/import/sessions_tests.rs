@@ -80,7 +80,12 @@ fn legacy_workspace(config: &Config) {
     .unwrap();
 
     TurnStateStore::new(config.workspace_dir.clone())
-        .put(&TurnState::started("thread-1", "req-1", 4, "2026-01-01T00:00:00Z"))
+        .put(&TurnState::started(
+            "thread-1",
+            "req-1",
+            4,
+            "2026-01-01T00:00:00Z",
+        ))
         .unwrap();
 
     let db = config.workspace_dir.join(SESSIONS_DB);
@@ -119,7 +124,10 @@ fn a_classic_workspace_moves_into_the_backend_and_its_files_are_untouched() {
     // resumes it.
     let orchestrator = provider.try_for_agent("orchestrator").unwrap();
     assert!(
-        orchestrator.transcripts.root_for_thread("thread-1").is_some(),
+        orchestrator
+            .transcripts
+            .root_for_thread("thread-1")
+            .is_some(),
         "the transcript is in the agent its stem names"
     );
     // The in-flight turn snapshot is the default agent's.

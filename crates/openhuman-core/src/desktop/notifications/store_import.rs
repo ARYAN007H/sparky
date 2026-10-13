@@ -23,9 +23,7 @@ use serde_json::json;
 mod store_rows;
 use store_rows::rows_to_notifications;
 
-use super::store_documents::{
-    core_id, to_doc, CORE, LOCAL_WORKSPACE, NOTIFICATIONS, SETTINGS,
-};
+use super::store_documents::{core_id, to_doc, CORE, LOCAL_WORKSPACE, NOTIFICATIONS, SETTINGS};
 use crate::config::Config;
 use crate::storage::import::{table_exists, ImportDoc};
 
@@ -122,7 +120,6 @@ pub(crate) fn with_connection<T>(
     tracing::trace!("[notifications::store] schema migration applied, running operation");
     f(&conn)
 }
-
 
 /// Reads every legacy row.
 pub(crate) fn read(config: &Config) -> Result<Vec<ImportDoc>> {

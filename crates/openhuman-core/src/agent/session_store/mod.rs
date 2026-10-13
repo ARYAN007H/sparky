@@ -27,7 +27,8 @@ mod workspace;
 pub use rebound::{rebind_all, ReboundSessionStores};
 pub use workspace::{
     current_documents_for, ledger_for, provider_for_workspace, release_workspace_defaults,
-    require_ledger, status_store_for, stores_for, stores_or_ephemeral, with_ledger, with_ledger_async, WorkspaceSessionStores,
+    require_ledger, status_store_for, stores_for, stores_or_ephemeral, with_ledger,
+    with_ledger_async, WorkspaceSessionStores,
 };
 
 static PROVIDER: LazyLock<RwLock<Option<Arc<dyn SessionStoreProvider>>>> =

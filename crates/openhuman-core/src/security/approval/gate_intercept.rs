@@ -295,7 +295,9 @@ impl ApprovalGate {
         // Any park raised inside a sub-agent run — detached or inline — gets
         // the shorter `SUBAGENT_APPROVAL_TTL` window.
         let subagent_park = !forced
-            && (detached || tinyagents_harness::context::current_run_depth().is_some_and(|facts| facts.depth > 0));
+            && (detached
+                || tinyagents_harness::context::current_run_depth()
+                    .is_some_and(|facts| facts.depth > 0));
         let chat_thread_id = chat_ctx
             .as_ref()
             .map(|c| c.thread_id.clone())

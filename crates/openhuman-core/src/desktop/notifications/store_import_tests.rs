@@ -25,7 +25,12 @@ fn import(config: &Config) -> Outcome {
 }
 
 /// Writes a notification row the way the retired store did.
-fn seed_note(config: &Config, n: &IntegrationNotification, score: Option<(f64, &str)>, status: &str) {
+fn seed_note(
+    config: &Config,
+    n: &IntegrationNotification,
+    score: Option<(f64, &str)>,
+    status: &str,
+) {
     with_connection(config, |conn| {
         conn.execute(
             "INSERT INTO integration_notifications
@@ -105,7 +110,12 @@ fn event(id: &str, ts: u64) -> CoreNotificationEvent {
 fn legacy_notifications_are_imported_once_and_the_file_is_left_alone() {
     let (_dir, config) = workspace();
     seed_note(&config, &note("n-old", "slack", 60), None, "unread");
-    seed_note(&config, &note("n-new", "gmail", 0), Some((0.8, "react")), "unread");
+    seed_note(
+        &config,
+        &note("n-new", "gmail", 0),
+        Some((0.8, "react")),
+        "unread",
+    );
     seed_note(&config, &note("n-read", "gmail", 30), None, "read");
     with_connection(&config, |conn| {
         conn.execute(
@@ -122,7 +132,13 @@ fn legacy_notifications_are_imported_once_and_the_file_is_left_alone() {
     let db = db_path(&config);
     let before = std::fs::read(&db).unwrap();
 
-    assert!(matches!(import(&config), Outcome::Imported { found: 6, written: 6 }));
+    assert!(matches!(
+        import(&config),
+        Outcome::Imported {
+            found: 6,
+            written: 6
+        }
+    ));
 
     let listed = live::list(&config, 10, 0, None, None).unwrap();
     let ids: Vec<_> = listed.iter().map(|n| n.id.as_str()).collect();
@@ -142,7 +158,11 @@ fn legacy_notifications_are_imported_once_and_the_file_is_left_alone() {
     let core_ids: Vec<_> = core.iter().map(|e| e.id.as_str()).collect();
     assert_eq!(core_ids, ["e2", "e1"]);
     assert_eq!(live::unread_core_notification_count(&config).unwrap(), 1);
-    assert_eq!(std::fs::read(&db).unwrap(), before, "notifications.db untouched");
+    assert_eq!(
+        std::fs::read(&db).unwrap(),
+        before,
+        "notifications.db untouched"
+    );
 
     // A second run does not import again.
     live::mark_dismissed(&config, "n-old").unwrap();

@@ -17,7 +17,8 @@ pub(crate) async fn read_run_events_page(
     offset: u64,
     limit: u64,
 ) -> anyhow::Result<RunEventsPage> {
-    let journal = StoreEventJournal::new(crate::agent::session_store::stores_or_ephemeral(workspace).journal);
+    let journal =
+        StoreEventJournal::new(crate::agent::session_store::stores_or_ephemeral(workspace).journal);
     replay::read_run_events_page(&journal, run_id, offset, limit)
         .await
         .map_err(|e| {

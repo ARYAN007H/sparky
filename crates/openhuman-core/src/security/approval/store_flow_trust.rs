@@ -30,16 +30,16 @@ pub fn record_flow_preauthorization(
     session_id: &str,
 ) -> Result<()> {
     super::super::store_documents::current(config)?.insert_decided(
-            tool_name,
-            PREAUTHORIZATION_SUMMARY,
-            session_id,
-            &ApprovalSourceContext::Flow {
-                flow_id: flow_id.to_string(),
-                run_id: String::new(),
-                node_id: None,
-            },
-            ApprovalDecision::ApproveAlwaysForFlow,
-        )
+        tool_name,
+        PREAUTHORIZATION_SUMMARY,
+        session_id,
+        &ApprovalSourceContext::Flow {
+            flow_id: flow_id.to_string(),
+            run_id: String::new(),
+            node_id: None,
+        },
+        ApprovalDecision::ApproveAlwaysForFlow,
+    )
 }
 
 /// Grant "approve always for this flow" trust to a `(flow_id, tool_name)`

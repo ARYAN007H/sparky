@@ -90,7 +90,10 @@ fn legacy_rows_are_imported_once_and_the_file_is_left_alone() {
 
     assert!(matches!(
         import(&config),
-        Outcome::Imported { found: 6, written: 6 }
+        Outcome::Imported {
+            found: 6,
+            written: 6
+        }
     ));
 
     let pending = live::list_pending(&config).unwrap();
@@ -173,7 +176,10 @@ fn an_old_schema_is_brought_forward_and_its_session_ids_scrubbed() {
     let pending = live::list_pending(&config).unwrap();
     assert_eq!(pending.len(), 1);
     assert_eq!(pending[0].request_id, "old");
-    assert!(pending[0].agent_id.is_none(), "an old row is the process's own");
+    assert!(
+        pending[0].agent_id.is_none(),
+        "an old row is the process's own"
+    );
     // The credential-shaped session id was scrubbed before it was read.
     let docs = crate::storage::local::open("test", &config.workspace_dir)
         .unwrap()

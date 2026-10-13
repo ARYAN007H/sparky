@@ -105,7 +105,8 @@ pub async fn start_member_run(
         "[agent_team_runtime] start.entry team={team_id} member={member_id} task={task_id:?}"
     );
 
-    let member = run_ledger::get_agent_team_member(&config.workspace_dir, member_id).await?
+    let member = run_ledger::get_agent_team_member(&config.workspace_dir, member_id)
+        .await?
         .filter(|m| m.team_id == team_id)
         .ok_or_else(|| {
             anyhow!(TeamError::UnknownMember {
@@ -150,7 +151,9 @@ pub async fn start_member_run(
         &target.id,
         member_id,
         &run_id,
-    ).await? {
+    )
+    .await?
+    {
         ClaimOutcome::Claimed(task) => *task,
         ClaimOutcome::AlreadyClaimed => return Ok(StartMemberOutcome::AlreadyClaimed),
         ClaimOutcome::Blocked { unmet } => return Ok(StartMemberOutcome::Blocked { unmet }),
@@ -166,7 +169,8 @@ pub async fn start_member_run(
         &claimed.id,
         &run_id,
         &run_id,
-    ).await?;
+    )
+    .await?;
 
     let agent_id = member
         .agent_id
@@ -250,7 +254,8 @@ async fn run_member_loop(
             task.id
         );
         let _ = run_ledger::release_agent_team_task(&config.workspace_dir, team_id, &task.id).await;
-        let _ = run_ledger::mark_agent_team_member_idle(&config.workspace_dir, team_id, member_id).await;
+        let _ = run_ledger::mark_agent_team_member_idle(&config.workspace_dir, team_id, member_id)
+            .await;
         record_failure_event(config, team_id, member_id, &task.id, &err.to_string()).await;
     }
 }
@@ -384,7 +389,8 @@ async fn drive_member(
                     &member_id,
                     &evidence,
                     false,
-                ).await?;
+                )
+                .await?;
                 log::debug!(
                     target: LOG_TARGET,
                     "[agent_team_runtime] drive.completed team={team_id} member={member_id} task={task_id} outcome={outcome:?}"
@@ -393,7 +399,8 @@ async fn drive_member(
                     &config.workspace_dir,
                     &team_id,
                     &member_id,
-                ).await?;
+                )
+                .await?;
                 Ok(())
             }
         }
@@ -417,12 +424,14 @@ async fn drive_member(
                     target: LOG_TARGET,
                     "[agent_team_runtime] drive.worker_failed team={team_id} member={member_id} task={task_id} reason={reason}"
                 );
-                run_ledger::release_agent_team_task(&config.workspace_dir, &team_id, &task_id).await?;
+                run_ledger::release_agent_team_task(&config.workspace_dir, &team_id, &task_id)
+                    .await?;
                 run_ledger::mark_agent_team_member_idle(
                     &config.workspace_dir,
                     &team_id,
                     &member_id,
-                ).await?;
+                )
+                .await?;
                 record_failure_event(&config, &team_id, &member_id, &task_id, &reason).await;
                 Ok(())
             }
@@ -458,7 +467,8 @@ async fn record_failure_event(
                 "reason": truncate_chars(reason, EVIDENCE_MAX_CHARS),
             }),
         },
-    ).await;
+    )
+    .await;
 }
 
 /// The team ledger operations this runtime performs, on the calling tenant's

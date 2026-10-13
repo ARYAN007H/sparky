@@ -44,7 +44,13 @@ fn task(external_id: &str, title: &str) -> NormalizedTask {
 }
 
 /// Writes a `task_sources` row the way the retired store did.
-fn seed_source(config: &Config, id: &str, name: Option<&str>, conn_id: Option<&str>, interval: i64) {
+fn seed_source(
+    config: &Config,
+    id: &str,
+    name: Option<&str>,
+    conn_id: Option<&str>,
+    interval: i64,
+) {
     with_connection(config, |conn| {
         conn.execute(
             "INSERT INTO task_sources
@@ -100,7 +106,10 @@ fn legacy_sources_and_ledger_are_imported_once_and_the_file_is_left_alone() {
 
     assert!(matches!(
         import(&config).unwrap(),
-        Outcome::Imported { found: 5, written: 5 }
+        Outcome::Imported {
+            found: 5,
+            written: 5
+        }
     ));
 
     let sources = live::list_sources(&config).unwrap();
@@ -154,7 +163,10 @@ fn an_undecodable_source_row_fails_the_import_and_it_is_retried() {
     .unwrap();
 
     let error = import(&config).unwrap_err();
-    assert!(format!("{error:#}").contains("decode a task_sources row"), "{error:#}");
+    assert!(
+        format!("{error:#}").contains("decode a task_sources row"),
+        "{error:#}"
+    );
     // No marker was written, so nothing is imported and the next boot retries.
     assert!(live::list_sources(&config).unwrap().is_empty());
 }

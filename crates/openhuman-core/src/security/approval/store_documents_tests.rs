@@ -346,12 +346,9 @@ fn a_captured_store_decides_without_the_task_scope() {
 #[test]
 fn an_unresolved_scope_fails_the_captured_decide_instead_of_using_another_scope() {
     let captured = Err("no acting agent".to_string());
-    let error = crate::security::approval::store::decide_captured(
-        &captured,
-        "r",
-        ApprovalDecision::Deny,
-    )
-    .unwrap_err();
+    let error =
+        crate::security::approval::store::decide_captured(&captured, "r", ApprovalDecision::Deny)
+            .unwrap_err();
     assert!(error.to_string().contains("unresolved"), "{error}");
 }
 

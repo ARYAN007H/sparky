@@ -173,7 +173,10 @@ pub(crate) fn db_path(config: &Config) -> std::path::PathBuf {
 
 /// Open (and migrate) the approval DB, then call `f` with a live
 /// connection. Mirrors `notifications/store.rs::with_connection`.
-pub(crate) fn with_connection<T>(config: &Config, f: impl FnOnce(&Connection) -> Result<T>) -> Result<T> {
+pub(crate) fn with_connection<T>(
+    config: &Config,
+    f: impl FnOnce(&Connection) -> Result<T>,
+) -> Result<T> {
     let db_path = db_path(config);
 
     tracing::trace!(

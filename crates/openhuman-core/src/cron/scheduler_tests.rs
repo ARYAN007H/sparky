@@ -335,4 +335,3 @@ async fn a_pipeline_reports_its_last_stage_rather_than_pipefail() {
          a failure and re-status every existing job with a pipeline in it: {output}"
     );
 }
-

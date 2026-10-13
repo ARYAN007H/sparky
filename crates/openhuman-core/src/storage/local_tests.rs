@@ -58,5 +58,9 @@ fn forgetting_a_workspace_reopens_the_same_data() {
     forget(dir.path());
     let second = open("things", dir.path()).unwrap();
     assert!(!Arc::ptr_eq(&first.backend, &second.backend));
-    assert_eq!(get_thing(&second, "kept"), Some(3), "a restart keeps the data");
+    assert_eq!(
+        get_thing(&second, "kept"),
+        Some(3),
+        "a restart keeps the data"
+    );
 }

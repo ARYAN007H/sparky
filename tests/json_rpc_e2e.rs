@@ -4111,10 +4111,12 @@ async fn json_rpc_agent_team_coordination_roundtrip() {
     );
 
     // Mark A done directly via the run ledger, then B claims fine.
-    let task_a =
-        openhuman_core::agent::session_store::ledger_sync::get_agent_team_task(&config.workspace_dir, &task_a_id)
-            .expect("get task A")
-            .expect("task A present");
+    let task_a = openhuman_core::agent::session_store::ledger_sync::get_agent_team_task(
+        &config.workspace_dir,
+        &task_a_id,
+    )
+    .expect("get task A")
+    .expect("task A present");
     openhuman_core::agent::session_store::ledger_sync::upsert_agent_team_task(
         &config.workspace_dir,
         tinyagents_session::run_ledger::AgentTeamTaskUpsert {

@@ -204,9 +204,10 @@ fn retriever_for(config: &Config) -> Result<Arc<dyn ToolRanker>, RankError> {
         provider.name(),
         provider.model_id()
     );
-    Ok(Arc::new(
-        embedding_tool_ranker_in(provider, &config.workspace_dir),
-    ))
+    Ok(Arc::new(embedding_tool_ranker_in(
+        provider,
+        &config.workspace_dir,
+    )))
 }
 
 fn fingerprint(secret: &str, base_url: &str) -> u64 {

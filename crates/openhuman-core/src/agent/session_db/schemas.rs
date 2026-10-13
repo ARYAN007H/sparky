@@ -110,9 +110,10 @@ fn handle_run_ledger_list(params: Map<String, Value>) -> ControllerFuture {
                 s
             })?
         };
-        let response = crate::agent::session_store::with_ledger_async(&config.workspace_dir, |ledger| async move {
-            ledger.list_agent_runs(&request).await
-        })
+        let response = crate::agent::session_store::with_ledger_async(
+            &config.workspace_dir,
+            |ledger| async move { ledger.list_agent_runs(&request).await },
+        )
         .await
         .map_err(|e| {
             let s = e.to_string();
@@ -160,9 +161,10 @@ fn handle_run_ledger_events(params: Map<String, Value>) -> ControllerFuture {
                 log::warn!(target: "run_ledger_rpc", "[run_ledger_rpc][{cid}] events.bad_params err={s}");
                 s
             })?;
-        let response = crate::agent::session_store::with_ledger_async(&config.workspace_dir, |ledger| async move {
-            ledger.list_recent_run_events(&request).await
-        })
+        let response = crate::agent::session_store::with_ledger_async(
+            &config.workspace_dir,
+            |ledger| async move { ledger.list_recent_run_events(&request).await },
+        )
         .await
         .map_err(|e| {
             let s = e.to_string();

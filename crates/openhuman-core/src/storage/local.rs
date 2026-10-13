@@ -67,8 +67,12 @@ pub fn backend_for(workspace_dir: &Path) -> Result<Arc<dyn StorageBackend>> {
         return Ok(Arc::clone(backend));
     }
     let url = super::config::default_url(workspace_dir);
-    std::fs::create_dir_all(workspace_dir.join(super::config::DEFAULT_DIR))
-        .with_context(|| format!("create the storage directory under {}", workspace_dir.display()))?;
+    std::fs::create_dir_all(workspace_dir.join(super::config::DEFAULT_DIR)).with_context(|| {
+        format!(
+            "create the storage directory under {}",
+            workspace_dir.display()
+        )
+    })?;
     tracing::debug!(
         target: "openhuman::storage",
         workspace = %workspace_dir.display(),
@@ -93,8 +97,7 @@ pub fn backend_for(workspace_dir: &Path) -> Result<Arc<dyn StorageBackend>> {
 pub fn open(domain: &'static str, workspace_dir: &Path) -> Result<Opened> {
     let backend = backend_for(workspace_dir)
         .with_context(|| format!("[{domain}] open the storage backend"))?;
-    let scope =
-        current_scope().with_context(|| format!("[{domain}] resolve the storage scope"))?;
+    let scope = current_scope().with_context(|| format!("[{domain}] resolve the storage scope"))?;
     Ok(Opened { backend, scope })
 }
 

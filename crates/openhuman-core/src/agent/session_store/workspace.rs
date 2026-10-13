@@ -190,7 +190,9 @@ pub fn current_documents_for(workspace_dir: &Path) -> Option<Arc<dyn DocumentSto
 /// `harness_run_status` documents of its agent scope, beside its session
 /// stores. A call with no tenant gets a throwaway in-memory store.
 #[must_use]
-pub fn status_store_for(workspace_dir: &Path) -> tinyagents_harness::observability::DriverStatusStore {
+pub fn status_store_for(
+    workspace_dir: &Path,
+) -> tinyagents_harness::observability::DriverStatusStore {
     let docs = current_documents_for(workspace_dir).unwrap_or_else(|| {
         log::warn!("[session_store] no tenant; using a throwaway run-status store");
         let scoped = MemoryStorage::new()

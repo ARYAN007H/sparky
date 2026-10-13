@@ -127,9 +127,10 @@ pub(crate) async fn bootstrap_core_runtime(
     // rendering as perpetual "running" timeline entries on thread reopen.
     if agent_enabled {
         if !crate::storage::installed_is_shared() {
-            match crate::agent::session_store::with_ledger(&cfg.workspace_dir, |ledger| async move {
-                ledger.interrupt_orphaned_agent_runs().await
-            }) {
+            match crate::agent::session_store::with_ledger(
+                &cfg.workspace_dir,
+                |ledger| async move { ledger.interrupt_orphaned_agent_runs().await },
+            ) {
                 Ok(0) => {}
                 Ok(count) => {
                     log::info!("[runtime] settled {count} orphaned agent run(s) on startup")

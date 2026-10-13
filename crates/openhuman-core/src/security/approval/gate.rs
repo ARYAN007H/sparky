@@ -358,11 +358,7 @@ impl Drop for WaiterGuard<'_> {
             self.gate
                 .clear_thread_route_if_owned(thread_key, &self.request_id);
         }
-        let decided = store::decide_captured(
-            &self.docs,
-            &self.request_id,
-            ApprovalDecision::Deny,
-        );
+        let decided = store::decide_captured(&self.docs, &self.request_id, ApprovalDecision::Deny);
         if let Ok(Some(row)) = decided {
             let route = self.gate.take_request_route(&self.request_id);
             BUS.publish(DomainEvent::ApprovalDecided {

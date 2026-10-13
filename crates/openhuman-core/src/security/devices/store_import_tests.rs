@@ -46,7 +46,10 @@ fn legacy_devices_are_imported_once_and_the_file_is_left_alone() {
     let reports = run_with(&backend, &config, &[super::super::import_source()]);
     assert!(matches!(
         reports[0].outcome,
-        Ok(Outcome::Imported { found: 3, written: 3 })
+        Ok(Outcome::Imported {
+            found: 3,
+            written: 3
+        })
     ));
 
     let listed = live::list_devices(&config).unwrap();

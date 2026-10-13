@@ -117,7 +117,9 @@ fn handle_session_import_run(params: Map<String, Value>) -> ControllerFuture {
         let imports: Vec<Value> = reports
             .iter()
             .map(|report| match &report.outcome {
-                Ok(outcome) => json!({ "domain": report.domain, "outcome": format!("{outcome:?}") }),
+                Ok(outcome) => {
+                    json!({ "domain": report.domain, "outcome": format!("{outcome:?}") })
+                }
                 Err(error) => json!({ "domain": report.domain, "error": format!("{error:#}") }),
             })
             .collect();
