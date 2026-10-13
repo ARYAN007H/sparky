@@ -2,9 +2,8 @@
 //!
 //! [`HostUiPort`] answers them through this workspace's TinyMCP module:
 //! installed servers by their connection, configured servers by the static
-//! set. The module contract has no `resources/read`, so a widget document is
-//! only available when the tool result embedded it. Tests substitute their
-//! own port.
+//! set. Widget documents are read through the module's resource members.
+//! Tests substitute their own port.
 
 use std::sync::Arc;
 
@@ -42,16 +41,31 @@ pub trait UiServerPort: Send + Sync {
 /// [`UiServerPort`] over `config`'s TinyMCP module.
 pub struct HostUiPort {
     config: Arc<Config>,
+    client: Option<Arc<McpConfiguredClient>>,
 }
 
 impl HostUiPort {
     #[must_use]
     pub fn new(config: Arc<Config>) -> Self {
-        Self { config }
+        Self {
+            config,
+            client: None,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_client(config: Arc<Config>, client: Arc<McpConfiguredClient>) -> Self {
+        Self {
+            config,
+            client: Some(client),
+        }
     }
 
     fn client(&self) -> Option<Arc<McpConfiguredClient>> {
-        McpConfiguredClient::for_config(&self.config).ok()
+        match &self.client {
+            Some(client) => Some(Arc::clone(client)),
+            None => McpConfiguredClient::for_config(&self.config).ok(),
+        }
     }
 
     async fn is_static(&self, server_id: &str) -> bool {
@@ -107,9 +121,9 @@ impl UiServerPort for HostUiPort {
                 .await
                 .ok()?;
             let safe = crate::mcp::registry::tools_safe_for_agent(server_id, live);
-            safe.iter().find(|candidate| candidate.name == tool)?;
+            let candidate = safe.into_iter().find(|candidate| candidate.name == tool)?;
             return Some(UiToolDescriptor {
-                meta: None,
+                meta: candidate.meta,
                 annotations: None,
             });
         }
@@ -140,6 +154,7 @@ impl UiServerPort for HostUiPort {
                     description: remote.description.or(remote.title),
                     name: remote.name,
                     input_schema: remote.input_schema,
+                    meta: None,
                 })
                 .collect(),
         );
@@ -151,12 +166,28 @@ impl UiServerPort for HostUiPort {
     }
 
     async fn read_resource(&self, server_id: &str, uri: &str) -> Result<Vec<Value>, String> {
-        tracing::debug!(
-            server_id,
-            uri,
-            "[mcp_ui] resources/read is not part of the TinyMCP module contract"
-        );
-        Err("this server's widget document is not embedded in its tool result".to_string())
+        let client = self.client().ok_or("MCP module is unavailable")?;
+        let member = if self.is_installed_connected(server_id).await {
+            tinymcp_bus::names::methods::READ_RESOURCE
+        } else {
+            tinymcp_bus::names::methods::STATIC_READ_RESOURCE
+        };
+        let contents: Vec<tinymcp_bus::McpResourceContents> = client
+            .call(&host::client_config(&self.config), member, (server_id, uri))
+            .await
+            .map_err(|error| {
+                tracing::debug!(
+                    server_id,
+                    uri,
+                    ?error,
+                    "[mcp_ui] widget resource read failed"
+                );
+                "MCP resource read failed".to_string()
+            })?;
+        contents
+            .iter()
+            .map(|content| serde_json::to_value(content).map_err(|error| error.to_string()))
+            .collect()
     }
 
     async fn call_tool(

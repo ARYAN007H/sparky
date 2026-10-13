@@ -146,6 +146,11 @@ impl McpConfiguredClient {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) fn with_test_port(data_dir: String, port: Box<dyn McpModulePort>) -> Self {
+        Self::with_port(data_dir, port)
+    }
+
     /// Close an already-open agent-scoped client without creating one. A
     /// failed close remains in the cache, marked unavailable, so shutdown or
     /// a later cleanup attempt can retry the module's retained transition.
