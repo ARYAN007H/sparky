@@ -83,7 +83,7 @@ fn no_provider_can_fetch_today() {
         ProviderSlug::Clickup,
     ] {
         assert!(
-            !provider.can_fetch(),
+            !provider_can_fetch(provider),
             "{} has no fetch path until the pipeline's fetch step is restored",
             provider.as_str()
         );
@@ -151,7 +151,7 @@ async fn a_tick_over_an_unfetchable_source_records_nothing() {
     assert!(stored.enabled, "precondition: the source is enabled");
     assert!(is_due(&stored), "precondition: the source is due");
     assert!(
-        !stored.provider.can_fetch(),
+        !provider_can_fetch(stored.provider),
         "precondition: its provider has no fetch path, so the gate must skip it"
     );
 
