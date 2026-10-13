@@ -54,7 +54,12 @@ fn the_payments_stream_and_the_budget_hold_document_are_reachable() {
 
 #[test]
 fn nothing_else_is_reachable() {
-    for other in ["x402_budget_extra", "tinywallet_host_import", "approvals", "_secrets"] {
+    for other in [
+        "x402_budget_extra",
+        "tinywallet_host_import",
+        "approvals",
+        "_secrets",
+    ] {
         assert_eq!(
             authorize(
                 &grant(),
@@ -67,7 +72,12 @@ fn nothing_else_is_reachable() {
         );
     }
     assert_eq!(
-        authorize(&grant(), Object::Streams, "Append", &json!({"stream": "mcp_audit"})),
+        authorize(
+            &grant(),
+            Object::Streams,
+            "Append",
+            &json!({"stream": "mcp_audit"})
+        ),
         Err(Denied::Target)
     );
     assert_eq!(

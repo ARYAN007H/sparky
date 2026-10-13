@@ -99,7 +99,10 @@ async fn a_stream_the_module_already_wrote_is_not_preceded_by_old_records() {
     let scoped = scoped();
     scoped
         .streams()
-        .append(PAYMENTS_STREAM, serde_json::from_str(&record("live", "settled")).unwrap())
+        .append(
+            PAYMENTS_STREAM,
+            serde_json::from_str(&record("live", "settled")).unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(

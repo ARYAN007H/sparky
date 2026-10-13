@@ -34,17 +34,32 @@ fn only_its_own_collection_and_trigger_streams_are_reachable() {
         json!({"collection": "composio-user-scopes", "id": "gmail"})
     ));
     for day in ["triggers/2026-10-13", "triggers/x"] {
-        assert!(allowed(Object::Streams, "Append", json!({"stream": day})), "{day}");
-        assert!(allowed(Object::Streams, "Len", json!({"stream": day})), "{day}");
+        assert!(
+            allowed(Object::Streams, "Append", json!({"stream": day})),
+            "{day}"
+        );
+        assert!(
+            allowed(Object::Streams, "Len", json!({"stream": day})),
+            "{day}"
+        );
     }
     for other in ["trigger", "mcp_audit", "x402.payments", "_secrets"] {
         assert_eq!(
-            authorize(&grant(), Object::Streams, "Append", &json!({"stream": other})),
+            authorize(
+                &grant(),
+                Object::Streams,
+                "Append",
+                &json!({"stream": other})
+            ),
             Err(Denied::Target),
             "{other}"
         );
     }
-    for other in ["composio-user-scopes-x", "tinyconnectors_host_import", "approvals"] {
+    for other in [
+        "composio-user-scopes-x",
+        "tinyconnectors_host_import",
+        "approvals",
+    ] {
         assert_eq!(
             authorize(
                 &grant(),

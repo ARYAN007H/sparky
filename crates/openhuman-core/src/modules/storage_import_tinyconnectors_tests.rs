@@ -234,7 +234,14 @@ async fn an_unreadable_preference_file_is_retried_instead_of_marked_done() {
 #[test]
 fn only_calendar_days_name_an_archive_stream() {
     assert!(is_day("2026-10-13"));
-    for name in ["2026-1-13", "20261013", "2026-10-1x", "README", "2026-10-130", ""] {
+    for name in [
+        "2026-1-13",
+        "20261013",
+        "2026-10-1x",
+        "README",
+        "2026-10-130",
+        "",
+    ] {
         assert!(!is_day(name), "{name}");
     }
 }

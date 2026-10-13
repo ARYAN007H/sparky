@@ -26,9 +26,7 @@ use anyhow::{anyhow, Context, Result};
 use serde_json::{json, Value};
 use tinystoragedrivers::{CollectionSpec, ScopedStorage};
 
-use super::storage_grant_tinyconnectors::{
-    MODULE_ID, PREFS_COLLECTION, TRIGGER_STREAM_PREFIX,
-};
+use super::storage_grant_tinyconnectors::{MODULE_ID, PREFS_COLLECTION, TRIGGER_STREAM_PREFIX};
 use super::storage_import_support as support;
 
 const LOG_PREFIX: &str = "[connectors-import]";
@@ -140,7 +138,9 @@ fn files_with_extension(dir: &Path, extension: &str) -> Result<Vec<std::path::Pa
     };
     let mut files = Vec::new();
     for entry in entries {
-        let path = entry.with_context(|| format!("list {}", dir.display()))?.path();
+        let path = entry
+            .with_context(|| format!("list {}", dir.display()))?
+            .path();
         if path.is_file() && path.extension().is_some_and(|found| found == extension) {
             files.push(path);
         }
@@ -157,8 +157,8 @@ fn read_legacy(prefs_dir: &Path, triggers_dir: &Path) -> Result<Legacy> {
             skipped += 1;
             continue;
         };
-        let text = std::fs::read_to_string(&path)
-            .with_context(|| format!("read {}", path.display()))?;
+        let text =
+            std::fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
         match serde_json::from_str::<Value>(&text) {
             Ok(value) => prefs.push(LegacyPref {
                 key: key.to_owned(),
@@ -180,8 +180,8 @@ fn read_legacy(prefs_dir: &Path, triggers_dir: &Path) -> Result<Legacy> {
             skipped += 1;
             continue;
         };
-        let text = std::fs::read_to_string(&path)
-            .with_context(|| format!("read {}", path.display()))?;
+        let text =
+            std::fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
         let (records, bad) = support::parse_jsonl(&text);
         skipped += bad;
         days.push(LegacyDay {
@@ -200,13 +200,10 @@ fn read_legacy(prefs_dir: &Path, triggers_dir: &Path) -> Result<Legacy> {
 fn is_day(name: &str) -> bool {
     let bytes = name.as_bytes();
     bytes.len() == 10
-        && bytes
-            .iter()
-            .enumerate()
-            .all(|(index, byte)| match index {
-                4 | 7 => *byte == b'-',
-                _ => byte.is_ascii_digit(),
-            })
+        && bytes.iter().enumerate().all(|(index, byte)| match index {
+            4 | 7 => *byte == b'-',
+            _ => byte.is_ascii_digit(),
+        })
 }
 
 #[cfg(test)]

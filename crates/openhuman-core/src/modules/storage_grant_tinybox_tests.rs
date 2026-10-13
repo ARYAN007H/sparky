@@ -38,7 +38,12 @@ fn box_records_and_the_jail_index_are_reachable() {
         );
     }
     assert_eq!(grant().collections.len(), 2);
-    for other in ["tinybox_host_import", "tinybox_boxes_x", "approvals", "_secrets"] {
+    for other in [
+        "tinybox_host_import",
+        "tinybox_boxes_x",
+        "approvals",
+        "_secrets",
+    ] {
         assert_eq!(
             authorize(
                 &grant(),

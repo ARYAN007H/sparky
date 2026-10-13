@@ -170,7 +170,12 @@ async fn a_missing_directory_writes_no_marker() {
 #[test]
 fn only_hex_tokens_of_the_hash_length_are_ccr_names() {
     assert!(is_token(FRESH));
-    for name in ["", "abc", "zz112233445566778899aabbccddeeff", "../etc/passwd"] {
+    for name in [
+        "",
+        "abc",
+        "zz112233445566778899aabbccddeeff",
+        "../etc/passwd",
+    ] {
         assert!(!is_token(name), "{name}");
     }
 }

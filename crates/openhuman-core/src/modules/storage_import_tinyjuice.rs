@@ -120,7 +120,11 @@ async fn import_into(
         }
         let bytes = original.text.into_bytes();
         match remaining {
-            Some(left) => blobs.put_expiring(&key, bytes, Some(CONTENT_TYPE), left).await,
+            Some(left) => {
+                blobs
+                    .put_expiring(&key, bytes, Some(CONTENT_TYPE), left)
+                    .await
+            }
             None => blobs.put(&key, bytes, Some(CONTENT_TYPE)).await,
         }
         .map_err(|error| anyhow!("write a blob: {:?}", error.kind()))?;

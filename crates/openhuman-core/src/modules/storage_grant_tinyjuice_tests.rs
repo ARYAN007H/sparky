@@ -37,7 +37,12 @@ fn only_ccr_blobs_are_reachable() {
             "{selector}"
         );
     }
-    for other in ["tinyjuice_ccr", "tinyjuice_ccr_x/a", "ccr/a", "../tinyjuice_ccr/a"] {
+    for other in [
+        "tinyjuice_ccr",
+        "tinyjuice_ccr_x/a",
+        "ccr/a",
+        "../tinyjuice_ccr/a",
+    ] {
         assert_eq!(
             authorize(&grant(), Object::Blobs, "Get", &json!({"key": other})),
             Err(Denied::Target),
@@ -56,7 +61,7 @@ fn documents_streams_and_secrets_are_not_granted() {
             "Get",
             &json!({"collection": "tinyjuice_host_import", "id": "x"})
         ),
-        Err(Denied::Target)
+        Err(Denied::Object)
     );
     assert_eq!(
         authorize(&grant(), Object::Streams, "Append", &json!({"stream": "s"})),
