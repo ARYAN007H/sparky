@@ -187,6 +187,16 @@ fn a_stateless_runtime_keeps_every_conversation_in_its_session_store() {
                 "a stateless workspace must remain empty, found: {written:?}"
             );
 
+            // Dropping a handle only schedules its MCP close, and the deferred
+            // close keeps the scratch workspace until it is acknowledged, so
+            // remove both agents (which awaits the close) before the runtime
+            // goes.
+            for agent in ["asha", "ravi"] {
+                runtime
+                    .remove_agent(agent)
+                    .await
+                    .expect("agent is removed and its cleanup acknowledged");
+            }
             drop((asha, ravi));
             drop(runtime);
             assert!(
