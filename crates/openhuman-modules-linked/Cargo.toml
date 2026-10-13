@@ -74,5 +74,9 @@ tinysearch = { path = "../../vendor/tinysearch/crates/tinysearch", features = ["
 tinyvoice-module = { path = "../../vendor/tinyvoice/crates/tinyvoice-module", features = ["static-link"], optional = true }
 tinywallet-module = { path = "../../vendor/tinywallet/crates/tinywallet-module", features = ["static-link"], optional = true }
 
+[dev-dependencies]
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
+
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage)'] }
