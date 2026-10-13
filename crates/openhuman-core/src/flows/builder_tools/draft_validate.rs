@@ -145,7 +145,7 @@ impl Tool for ValidateWorkflowTool {
         // "gates passed" previously reported `ok: true` while silently
         // skipping every hard gate.
         let (gate_errors, gate_check_failed) = if validation.valid {
-            match ops::migrate_and_deserialize_graph(graph_json) {
+            match tinyflows::migrate::deserialize_graph(graph_json) {
                 Ok(graph) => (ops::run_builder_gates(&self.config, &graph).await, false),
                 Err(e) => {
                     tracing::warn!(

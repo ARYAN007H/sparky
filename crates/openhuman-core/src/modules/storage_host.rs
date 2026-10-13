@@ -475,6 +475,24 @@ impl tinybus::Interface for ObjectService {
     }
 }
 
+/// The scope the host serves `module_id` under right now: what a bus call from
+/// that module would be bound to. The host's own one-time legacy imports use it
+/// to write a module's records where the module will read them.
+///
+/// # Errors
+///
+/// When the acting scope cannot be resolved (SaaS mode with no profile) or the
+/// module id is not a plain name under a profile.
+pub(crate) fn current_module_scope(module_id: &str) -> Result<Scope, StorageError> {
+    let saas = crate::core::runtime::mode::is_saas();
+    // A module call arrives on the module bus, outside any turn, so with no
+    // tenant the host's default scope applies (refused in SaaS mode).
+    let tenant = crate::core::runtime::current_tenant().unwrap_or_default();
+    let base =
+        crate::storage::scope_from(tenant.profile.as_deref(), tenant.agent.as_deref(), saas)?;
+    module_scope(tenant.profile.as_deref(), &base, module_id)
+}
+
 /// Production wiring: the broker's name owners, the installed backend, the
 /// host's scope rule and the compiled grants.
 struct Live {
@@ -502,13 +520,7 @@ impl Environment for Live {
     }
 
     fn module_scope(&self, module_id: &str) -> Result<Scope, StorageError> {
-        let saas = crate::core::runtime::mode::is_saas();
-        // A module call arrives on the module bus, outside any turn, so with no
-        // tenant the host's default scope applies (refused in SaaS mode).
-        let tenant = crate::core::runtime::current_tenant().unwrap_or_default();
-        let base =
-            crate::storage::scope_from(tenant.profile.as_deref(), tenant.agent.as_deref(), saas)?;
-        module_scope(tenant.profile.as_deref(), &base, module_id)
+        current_module_scope(module_id)
     }
 
     fn grant(&self, module_id: &str) -> Option<StorageGrant> {

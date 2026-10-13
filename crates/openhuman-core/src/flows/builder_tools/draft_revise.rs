@@ -8,7 +8,7 @@ use serde_json::Value;
 
 use crate::config::Config;
 use crate::flows::ops;
-use crate::flows::ops::validate_and_migrate_graph;
+use tinyflows::authoring::validate_and_migrate_graph;
 use tinytools::{PermissionLevel, Tool, ToolResult};
 
 // ─────────────────────────────────────────────────────────────────────────────

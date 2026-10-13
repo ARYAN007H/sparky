@@ -267,7 +267,7 @@ the trigger → run bridge: it subscribes to the normalized domain events a save
 flow's single trigger node can bind to and calls `flows::ops::flows_run` for each
 match:
 
-- `DomainEvent::FlowScheduleTick`: a `flow`-type cron job fired; the one
+- The schedule runtime's `TriggerSink`: a `flow`-type cron job fired; the one
   named flow is loaded, re-checked for a still-live `schedule` trigger, and
   dispatched with an empty trigger payload.
 - `DomainEvent::ComposioTriggerReceived`: every enabled flow with an
