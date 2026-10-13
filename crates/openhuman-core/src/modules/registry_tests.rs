@@ -556,7 +556,7 @@ fn tinychannels_registry_matches_scoped_runtime_release() {
     assert_eq!(tinychannels_bus::CONTRACT_VERSION, 20);
     assert_eq!(
         tinychannels_bus::module_relay::MODULE_OPERATION_VERSION,
-        (1, 17)
+        (1, 20)
     );
     let expected = [
         (
