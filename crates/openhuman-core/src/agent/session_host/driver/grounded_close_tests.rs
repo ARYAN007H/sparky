@@ -249,44 +249,32 @@ fn a_capped_truncated_turn_gets_the_cap_checkpoint() {
     assert!(out.contains("<tool_records>"), "{out}");
 }
 
-/// The production failure (#7716): the close model never answered, and the
-/// backstop dropped the turn with no summary. Within its budget the close
-/// gives up and ships the deterministic summary instead.
+/// #7716: a close that never answers ships the fallback once the budget runs
+/// out; one that finishes in time, or runs without a deadline, ships its reply.
 #[tokio::test]
-async fn stalled_close_model_ships_the_fallback_within_the_budget() {
-    let instruction = final_answer_instruction(None, false, RECORDS);
-    let ask = |_prompt: String| std::future::pending::<(String, Option<BilledUsage>)>();
-    let verify = |_candidate: String| async { (None, None) };
+async fn close_budget_bounds_the_close_and_falls_back_on_expiry() {
+    use std::time::Duration;
     let fallback = || FALLBACK.to_string();
-
-    let started = std::time::Instant::now();
-    let (output, usage) = within_close_budget(
-        Some(std::time::Duration::from_millis(20)),
-        "test-model",
-        close_with_one_repair("test-model", instruction, None, ask, verify, &fallback),
-        &fallback,
-    )
-    .await;
-
-    assert_eq!(output, FALLBACK);
-    assert_eq!(usage.model_calls, 0);
-    assert!(
-        started.elapsed() < std::time::Duration::from_secs(5),
-        "the budget, not the stalled call, ended the close"
-    );
-}
-
-#[tokio::test]
-async fn close_that_finishes_in_budget_or_without_one_ships_its_reply() {
-    let closed = || async {
+    let reply = || async {
         (
             CLEAN_REPLY.to_string(),
             RepairUsage::for_model("test-model"),
         )
     };
-    for budget in [Some(std::time::Duration::from_secs(60)), None] {
-        let (output, _) =
-            within_close_budget(budget, "test-model", closed(), || FALLBACK.to_string()).await;
+
+    let stalled = std::future::pending::<(String, RepairUsage)>();
+    let (output, usage) = within_close_budget(
+        Some(Duration::from_millis(20)),
+        "test-model",
+        stalled,
+        fallback,
+    )
+    .await;
+    assert_eq!(output, FALLBACK);
+    assert_eq!(usage.model_calls, 0);
+
+    for budget in [Some(Duration::from_secs(60)), None] {
+        let (output, _) = within_close_budget(budget, "test-model", reply(), fallback).await;
         assert_eq!(output, CLEAN_REPLY, "budget {budget:?}");
     }
 }

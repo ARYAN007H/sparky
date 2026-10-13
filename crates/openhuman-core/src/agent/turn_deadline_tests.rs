@@ -117,6 +117,7 @@ fn close_budget_is_backstop_remainder_minus_reserve() {
     let at = |elapsed: u64| TurnDeadline::new(now - Duration::from_secs(elapsed), backstop);
     // The wind-down point of a default turn leaves 120s, 110s of it for the close.
     assert_eq!(at(780).close_budget(now), Duration::from_secs(110));
+    assert_eq!(at(889).close_budget(now), Duration::from_secs(1));
     assert_eq!(at(890).close_budget(now), Duration::ZERO);
     assert_eq!(at(950).close_budget(now), Duration::ZERO);
 }

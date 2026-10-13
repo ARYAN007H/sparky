@@ -114,10 +114,8 @@ impl TurnDeadline {
         self.elapsed_at(now) >= self.wind_down_after()
     }
 
-    /// How long the post-loop grounded close may run as of `now`: what is left
-    /// of the backstop minus [`CLOSE_RESERVE`], zero once that has passed. The
-    /// close otherwise makes up to four model calls with no deadline, and a
-    /// slow one let the backstop drop the turn with no summary (#7716).
+    /// How long the post-loop grounded close may run as of `now`: the backstop
+    /// remainder minus [`CLOSE_RESERVE`], zero once that has passed (#7716).
     pub fn close_budget(&self, now: Instant) -> Duration {
         self.backstop
             .saturating_sub(self.elapsed_at(now))

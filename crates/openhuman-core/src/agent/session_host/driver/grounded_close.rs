@@ -272,13 +272,10 @@ pub(super) async fn close_if_needed(
     Some(GroundedClose { output, usage })
 }
 
-/// Run `close` within `budget` (the turn deadline's
-/// [`close_budget`](crate::agent::turn_deadline::TurnDeadline::close_budget)),
-/// or ship `fallback` when it runs out. `None` (no deadline) waits for `close`.
-///
-/// The fallback is the same deterministic summary a rejected close ships, so a
-/// slow or stalled provider costs the user the model's wording, not the answer.
-/// Usage of calls that finished before the timeout is not recorded.
+/// Run `close` within `budget`, else ship `fallback` (the deterministic summary
+/// a rejected close ships). `None` (no turn deadline) waits for `close`.
+/// ponytail: usage of calls finished before a timeout is dropped; thread a
+/// shared `RepairUsage` through if that spend must be billed.
 async fn within_close_budget(
     budget: Option<std::time::Duration>,
     model: &str,
