@@ -68,10 +68,19 @@ fn request(
     original_tokens: u64,
     compacted_tokens: u64,
 ) -> Option<RecordSavingsRequest> {
+    request_for(attribution_model(), compressor, original_tokens, compacted_tokens)
+}
+
+/// [`request`] for an explicit attribution `model`.
+fn request_for(
+    model: String,
+    compressor: CompressorKind,
+    original_tokens: u64,
+    compacted_tokens: u64,
+) -> Option<RecordSavingsRequest> {
     if original_tokens <= compacted_tokens {
         return None;
     }
-    let model = attribution_model();
     Some(RecordSavingsRequest {
         input_per_mtok_usd: input_per_mtok_usd(&model),
         model,

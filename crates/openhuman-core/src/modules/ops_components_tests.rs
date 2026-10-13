@@ -75,8 +75,13 @@ async fn juice_off_refuses_tinyjuice_before_download_or_load() {
         .await
         .unwrap_err();
     assert_eq!(err, LoadError::Disabled("juice"));
-    assert_eq!(state_of("tinyjuice"), ModuleState::Available);
+    // The resolution slot is process-global, and other tests legitimately
+    // load tinyjuice into it while this one runs, so `state_of("tinyjuice")`
+    // cannot be asserted here. The refusal itself is the proof: a claim on
+    // the slot would have answered with a download or load outcome, never
+    // `Disabled`, and the listing below reports `Disabled` with no source.
     let statuses = list(&config);
     let status = statuses.iter().find(|s| s.id == "tinyjuice").unwrap();
     assert_eq!(status.state, ModuleState::Disabled);
+    assert!(status.source.is_none());
 }

@@ -96,3 +96,31 @@ fn composio_enabled_is_accepted_and_dropped() {
     let v: toml::Value = toml::from_str(&out).unwrap();
     assert!(v["composio"].get("enabled").is_none());
 }
+
+#[test]
+fn legacy_tokenjuice_router_off_maps_to_components_juice() {
+    let c = migrated("[tokenjuice]\nrouter_enabled = false\n", None);
+    assert!(!c.components.juice);
+    assert!(c.components.search && c.components.mcp && c.components.memory);
+}
+
+#[test]
+fn tokenjuice_router_on_or_absent_keeps_juice_on() {
+    assert!(migrated("[tokenjuice]\nrouter_enabled = true\n", None).components.juice);
+    assert!(migrated("[tokenjuice]\nccr_enabled = false\n", None).components.juice);
+}
+
+#[test]
+fn explicit_components_juice_beats_legacy_router_flag() {
+    let raw = "[components]\njuice = true\n[tokenjuice]\nrouter_enabled = false\n";
+    assert!(migrated(raw, None).components.juice);
+}
+
+#[test]
+fn juice_migration_round_trip_is_idempotent() {
+    let first = migrated("[tokenjuice]\nrouter_enabled = false\n", None);
+    let saved = toml::to_string(&first).unwrap();
+    let second = migrated(&saved, None);
+    assert!(!second.components.juice);
+    assert_eq!(saved, toml::to_string(&second).unwrap());
+}
