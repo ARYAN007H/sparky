@@ -54,7 +54,7 @@ pub fn provider_for_workspace(workspace_dir: &Path) -> Arc<dyn SessionStoreProvi
 }
 
 /// The provider over `workspace_dir`'s default backend, installed or not.
-fn fallback_provider(workspace_dir: &Path) -> Arc<dyn SessionStoreProvider> {
+pub(super) fn fallback_provider(workspace_dir: &Path) -> Arc<dyn SessionStoreProvider> {
     let backend = match crate::storage::local::backend_for(workspace_dir) {
         Ok(backend) => backend,
         Err(error) => {
@@ -252,4 +252,58 @@ where
 {
     let ledger = require_ledger(workspace_dir)?;
     op(ledger).await
+}
+
+/// A session store that resolves the workspace of the calling context on every
+/// use and keeps that workspace's sessions in its own default backend
+/// ([`crate::storage::local::backend_for`]).
+///
+/// For the one host with no single backend to install: a SaaS core with no
+/// storage URL, where every profile has a workspace of its own and so a
+/// database of its own. Every other host installs
+/// [`ReboundSessionStores`](super::ReboundSessionStores) over its backend.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct WorkspaceSessionStores;
+
+impl WorkspaceSessionStores {
+    fn current() -> Arc<dyn SessionStoreProvider> {
+        fallback_provider(&super::context_workspace_dir())
+    }
+}
+
+impl SessionStoreProvider for WorkspaceSessionStores {
+    fn for_agent(&self, agent_id: &str) -> AgentStores {
+        Self::current().for_agent(agent_id)
+    }
+
+    fn try_for_agent(
+        &self,
+        agent_id: &str,
+    ) -> Result<AgentStores, tinystoragedrivers::StorageError> {
+        Self::current().try_for_agent(agent_id)
+    }
+
+    fn run_ledger_for_agent(
+        &self,
+        agent_id: &str,
+    ) -> LedgerResult<Option<Arc<dyn RunLedgerStore>>> {
+        Self::current().run_ledger_for_agent(agent_id)
+    }
+
+    fn conversations_for_agent(
+        &self,
+        agent_id: &str,
+    ) -> tinyagents_session::threads::ConversationResult<
+        Option<Arc<dyn tinyagents_session::threads::ConversationPersistence>>,
+    > {
+        Self::current().conversations_for_agent(agent_id)
+    }
+
+    fn recover(&self) -> anyhow::Result<()> {
+        Self::current().recover()
+    }
+
+    fn destination_key(&self) -> Option<String> {
+        Self::current().destination_key()
+    }
 }

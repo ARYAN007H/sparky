@@ -9,9 +9,8 @@
 //! process. A different workspace is a different database, which is also what
 //! isolates tests that use a temp directory each.
 //!
-//! A SaaS process never gets this fallback: it has no workspace-local state,
-//! and its hosts refuse to start without an explicit backend, so an
-//! uninstalled call there is an error, not a bucket other tenants could share.
+//! A SaaS core with no storage URL lands here too: each profile's workspace is
+//! its own database, so nothing is shared between tenants.
 //!
 //! The fallback imports nothing. The legacy per-domain files are read by
 //! [`super::import`] when a backend is installed at boot (and again when the
@@ -62,11 +61,6 @@ static WORKSPACES: LazyLock<Mutex<HashMap<PathBuf, Arc<dyn StorageBackend>>>> =
 pub fn backend_for(workspace_dir: &Path) -> Result<Arc<dyn StorageBackend>> {
     if let Some(backend) = installed() {
         return Ok(backend);
-    }
-    if crate::core::runtime::mode::is_saas() {
-        return Err(anyhow!(
-            "SaaS mode needs an explicit storage backend (OPENHUMAN_STORAGE_URL)"
-        ));
     }
     let mut opened = WORKSPACES.lock().unwrap_or_else(PoisonError::into_inner);
     if let Some(backend) = opened.get(workspace_dir) {
