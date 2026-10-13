@@ -146,8 +146,22 @@ pub(crate) async fn search_catalog(
         .map(|t| t.to_ascii_lowercase())
         .collect();
 
+    // The host's offered-toolkit policy also bounds an explicit search: a denied
+    // toolkit's actions are not shown to the agent by naming it.
+    let offered = tinyconnectors_bus::vocabulary::OfferedToolkits {
+        allow: config.composio.offered_toolkits_allow.clone(),
+        deny: config.composio.offered_toolkits_deny.clone(),
+    };
     let toolkits: Vec<String> = match toolkit_filter {
-        Some(tk) if !tk.trim().is_empty() => vec![tk.trim().to_ascii_lowercase()],
+        Some(tk) if !tk.trim().is_empty() => {
+            let toolkit = tk.trim().to_ascii_lowercase();
+            if offered.permits(&toolkit) {
+                vec![toolkit]
+            } else {
+                tracing::debug!(%toolkit, "[flows] catalog search skipped: toolkit not offered");
+                Vec::new()
+            }
+        }
         _ => agent_ready_toolkits(),
     };
 
