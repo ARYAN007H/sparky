@@ -627,62 +627,62 @@ fn tinychannels_registry_matches_scoped_runtime_release() {
 #[test]
 fn voice_capture_release_pins_summary_contract_and_every_platform_digest() {
     let record = find("tinyvoice").unwrap();
-    assert_eq!(record.version, "0.1.16");
+    assert_eq!(record.version, "0.2.0");
     assert_eq!(tinyvoice_bus::CONTRACT_VERSION, (1, 5));
     let expected = [
         (
             "macos-15-arm64",
-            "tinyvoice-module-0.1.16-macos-15-arm64.tar.gz",
+            "tinyvoice-module-0.2.0-macos-15-arm64.tar.gz",
             "72c75b371e72c22da9a149b0962395d74131b41910e2ed735d127667f9f38c1d",
         ),
         (
             "macos-15-x86_64",
-            "tinyvoice-module-0.1.16-macos-15-x86_64.tar.gz",
+            "tinyvoice-module-0.2.0-macos-15-x86_64.tar.gz",
             "a293f24b14570ac551be300d1aac28eddb0339066ab4ec0a231b6831fade4734",
         ),
         (
             "macos-26-arm64",
-            "tinyvoice-module-0.1.16-macos-26-arm64.tar.gz",
+            "tinyvoice-module-0.2.0-macos-26-arm64.tar.gz",
             "8003a988fdc2eb4a6be724caf6d1ba16a97d3bbf7372921630bb180f02dfeb28",
         ),
         (
             "macos-26-x86_64",
-            "tinyvoice-module-0.1.16-macos-26-x86_64.tar.gz",
+            "tinyvoice-module-0.2.0-macos-26-x86_64.tar.gz",
             "20142bb6bb285b863b626d2d49c4879331de1f34cfc2847755d038adf5664abe",
         ),
         (
             "ubuntu-22.04-arm64",
-            "tinyvoice-module-0.1.16-ubuntu-22.04-arm64.tar.gz",
+            "tinyvoice-module-0.2.0-ubuntu-22.04-arm64.tar.gz",
             "be42ffdf401d10bdaac083b05c42ebbeeca4f25649286cd0ada608fa02045c23",
         ),
         (
             "ubuntu-22.04-x86_64",
-            "tinyvoice-module-0.1.16-ubuntu-22.04-x86_64.tar.gz",
+            "tinyvoice-module-0.2.0-ubuntu-22.04-x86_64.tar.gz",
             "9a43aedb59617d6322537c411f91710ffe31c9595066592e0abc6086aca13a1a",
         ),
         (
             "ubuntu-24.04-arm64",
-            "tinyvoice-module-0.1.16-ubuntu-24.04-arm64.tar.gz",
+            "tinyvoice-module-0.2.0-ubuntu-24.04-arm64.tar.gz",
             "620167d61a331ad1260f3f432552cca57af4a0696b51b3e7d8d62ad1f0337a06",
         ),
         (
             "ubuntu-24.04-x86_64",
-            "tinyvoice-module-0.1.16-ubuntu-24.04-x86_64.tar.gz",
+            "tinyvoice-module-0.2.0-ubuntu-24.04-x86_64.tar.gz",
             "90de2c9dce82e9d8e3864e9e0f827f1110599a3b5148d905a2841492145a1015",
         ),
         (
             "windows-11-arm64",
-            "tinyvoice-module-0.1.16-windows-11-arm64.zip",
+            "tinyvoice-module-0.2.0-windows-11-arm64.zip",
             "8272daea789109e6034ee3af5ad9a46e5559b511f9cf6c965c14225e1c59c69e",
         ),
         (
             "windows-2022-x86_64",
-            "tinyvoice-module-0.1.16-windows-2022-x86_64.zip",
+            "tinyvoice-module-0.2.0-windows-2022-x86_64.zip",
             "89fc25bdddbcb77393f8618aa4f7f00f9cd9abd27dd1e35ad184aafb4fe4fb9d",
         ),
         (
             "windows-2025-x86_64",
-            "tinyvoice-module-0.1.16-windows-2025-x86_64.zip",
+            "tinyvoice-module-0.2.0-windows-2025-x86_64.zip",
             "271ba8c8476c22535f9fba0086b0aa0a253f9d228cd6f6a73e91cbe24dfa8a2a",
         ),
     ];
