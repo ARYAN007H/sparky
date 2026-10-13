@@ -439,3 +439,13 @@ The UI flow is `app/test/playwright/specs/memory-v2.spec.ts`.
 - [Memory architecture](../../../../gitbooks/developing/architecture/memory.md)
 - [Memory tools](../../../../gitbooks/features/native-tools/memory-tools.md)
 - [tinymemory submodule](../../../../vendor/tinymemory/README.md)
+
+## `[components] memory`
+
+`components.memory = false` (also `OPENHUMAN_COMPONENT_MEMORY=0`, and the
+one-shot migration of `memory.engine = "none"`) turns the whole domain off at
+the next core start: `DomainSet::memory` is narrowed away, the `memory_queue`
+and `memory_sync` services do not start, the `memory` tool is not registered,
+`memory.*` RPC answers `COMPONENT_DISABLED:memory`, and `engine::resolve` /
+`bind_with_root` never bind an engine (`engine::switched_off`). The finer
+`memory.engine`, recall and conversation settings stay beneath the flag.
