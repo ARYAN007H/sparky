@@ -110,7 +110,7 @@ pub fn confine_path_in(roots: &[PathBuf], path: &str) -> Result<(PathBuf, PathBu
 ///
 /// When the open is refused, the file is not regular, or it is too large.
 pub async fn read_confined(root: PathBuf, resolved: PathBuf) -> Result<String, String> {
-    tokio::task::spawn_blocking(move || {
+    crate::core::runtime::spawn_blocking_scoped(move || {
         use std::io::Read;
         let file = crate::agent::attachments::provider::open::secure_open(&resolved, &root)
             .map_err(|error| {
