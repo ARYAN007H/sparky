@@ -277,8 +277,9 @@ pub(crate) fn migrate_legacy_memory_backend(config: &mut Config, raw: &str) {
 
 /// One-shot migration of the legacy per-dependency switches into
 /// `[components]` (`hosting.enabled`, `search.enabled`, `mcp_client.enabled`,
-/// `memory.engine = "none"`, `OPENHUMAN_TINYMEMES`). `composio.enabled` was
-/// never read and is simply dropped with its field.
+/// `memory.engine = "none"`, `OPENHUMAN_TINYMEMES`, `composio.mode =
+/// "disabled"`). `composio.enabled` was never read and is simply dropped with
+/// its field; `composio.mode` stays as the route selector.
 ///
 /// A legacy switch is read from the raw TOML (so an unset key keeps its
 /// default) and only moves a component that `[components]` does not already
@@ -319,6 +320,13 @@ pub(crate) fn migrate_components_with(config: &mut Config, raw: &str, tinymemes:
     disable(config, "hosting", legacy_bool("hosting"));
     disable(config, "search", legacy_bool("search"));
     disable(config, "mcp", legacy_bool("mcp_client"));
+    let composio_off = value
+        .as_ref()
+        .and_then(|v| v.get("composio"))
+        .and_then(|t| t.get("mode"))
+        .and_then(toml::Value::as_str)
+        .is_some_and(|m| m.trim().eq_ignore_ascii_case("disabled"));
+    disable(config, "connectors", composio_off.then_some(false));
     let engine_none = value
         .as_ref()
         .and_then(|v| v.get("memory"))
