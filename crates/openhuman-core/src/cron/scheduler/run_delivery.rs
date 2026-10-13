@@ -87,7 +87,13 @@ impl TriggerSink for HostTriggers {
         self.binding
             .within(async {
                 if let Some(name) = crate::cron::system_jobs::system_command_name(flow_id) {
-                    return Ok(run_system_job(flow_id, name, run_id).await);
+                    let config = self.binding.config();
+                    let job_id = match crate::cron::store::documents(&config) {
+                        Ok(docs) => docs.find_flow_schedule_job(flow_id).await.ok().flatten(),
+                        Err(_) => None,
+                    }
+                    .map_or_else(|| flow_id.to_string(), |job| job.id);
+                    return Ok(run_system_job(&job_id, name, run_id).await);
                 }
                 tracing::info!(
                     target: "flows",
@@ -112,13 +118,13 @@ impl TriggerSink for HostTriggers {
 /// A host-owned system job (`system:<name>`): announced on the bus, then its
 /// registered handler is awaited and its result is the run's result. Without a
 /// handler the job is announce-only and `ok` on dispatch.
-async fn run_system_job(command: &str, name: &str, run_id: &str) -> Attempt {
-    tracing::info!(%command, job = %name, %run_id, "[cron] system job due — publishing CronSystemJobDue");
+async fn run_system_job(job_id: &str, name: &str, run_id: &str) -> Attempt {
+    tracing::info!(%job_id, job = %name, %run_id, "[cron] system job due — publishing CronSystemJobDue");
     BUS.publish(DomainEvent::CronSystemJobDue {
         job: name.to_string(),
     });
     let ctx = crate::cron::system_job_handlers::SystemJobContext {
-        job_id: run_id.to_string(),
+        job_id: job_id.to_string(),
         name: name.to_string(),
     };
     let (success, output) = match crate::cron::system_job_handlers::dispatch(ctx).await {
