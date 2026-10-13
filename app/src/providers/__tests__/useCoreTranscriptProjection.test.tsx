@@ -137,31 +137,121 @@ describe('history refresh stability', () => {
     await act(async () => rerender({ revision: 'try-now' }));
     expect(result.current).toBe(previous);
   });
+});
 
-  it('does not erase older cards while paging a next-turn refresh', async () => {
-    let resolveOlder!: (value: DerivedTranscriptPage) => void;
-    const older = new Promise<DerivedTranscriptPage>(resolve => {
-      resolveOlder = resolve;
-    });
+/**
+ * #7731: a refresh fetches only the newest page and merges it with the held
+ * older items, unless the history shrank or the page leaves a gap.
+ */
+describe('useCoreTranscriptProjection incremental refresh', () => {
+  const load = async () => {
     vi.mocked(threadApi.getDerivedTranscript)
       .mockReset()
       .mockResolvedValueOnce(
-        page({ items: [...turn('new', 'new-call'), ...turn('old', 'old-call')] })
+        page({ items: turn('b', 'b-call'), total: 6, hasMore: true, nextCursor: 'c1' })
       )
-      .mockResolvedValueOnce(
-        page({ items: turn('new', 'new-call'), hasMore: true, nextCursor: 'older' })
-      )
-      .mockReturnValueOnce(older);
-    const { result, rerender } = renderHook(
+      .mockResolvedValueOnce(page({ items: turn('a', 'a-call'), total: 6 }));
+    const hook = renderHook(
       ({ revision }) => useCoreTranscriptProjection(THREAD, revision, undefined),
-      { initialProps: { revision: 'before' } }
+      { initialProps: { revision: 'rev-1' } }
     );
-    await waitFor(() => expect(result.current.timelines.old).toHaveLength(1));
-    const old = result.current.timelines.old;
-    await act(async () => rerender({ revision: 'try-now' }));
-    await waitFor(() => expect(threadApi.getDerivedTranscript).toHaveBeenCalledTimes(3));
-    expect(result.current.timelines.old).toBe(old);
-    await act(async () => resolveOlder(page({ items: turn('old', 'old-call') })));
-    expect(result.current.timelines.old).toBe(old);
+    await waitFor(() => expect(Object.keys(hook.result.current.timelines)).toHaveLength(2));
+    return hook;
+  };
+
+  it.each([
+    {
+      name: 'unchanged history fetches only the newest page',
+      pages: [page({ items: turn('b', 'b-call'), total: 6, hasMore: true, nextCursor: 'c1' })],
+      turns: ['a', 'b'],
+    },
+    {
+      name: 'an appended turn is merged with the held older items',
+      pages: [page({ items: turn('c', 'c-call'), total: 9, hasMore: true, nextCursor: 'c2' })],
+      turns: ['a', 'b', 'c'],
+    },
+    {
+      name: 'a gap past the held items walks the full history',
+      pages: [
+        page({ items: turn('d', 'd-call'), total: 12, hasMore: true, nextCursor: 'c3' }),
+        page({ items: turn('c', 'c-call'), total: 12 }),
+      ],
+      turns: ['c', 'd'],
+    },
+    {
+      name: 'a shrunk history walks in full and keeps no stale items',
+      pages: [page({ items: turn('b2', 'b2-call'), total: 3 })],
+      turns: ['b2'],
+    },
+  ])('$name', async ({ pages, turns }) => {
+    const { result, rerender } = await load();
+    const held = result.current.timelines.a;
+    for (const next of pages) vi.mocked(threadApi.getDerivedTranscript).mockResolvedValueOnce(next);
+
+    rerender({ revision: 'rev-2' });
+
+    await waitFor(() => expect(Object.keys(result.current.timelines).sort()).toEqual(turns));
+    expect(threadApi.getDerivedTranscript).toHaveBeenCalledTimes(2 + pages.length);
+    if (turns.includes('a')) expect(result.current.timelines.a).toBe(held);
+  });
+
+  it('coalesces a burst of revisions into one in-flight fetch', async () => {
+    const { result, rerender } = await load();
+    let active = 0;
+    let maxActive = 0;
+    const release: Array<() => void> = [];
+    vi.mocked(threadApi.getDerivedTranscript).mockImplementation(() => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      return new Promise(resolve =>
+        release.push(() => {
+          active -= 1;
+          resolve(page({ items: turn('c', 'c-call'), total: 9, hasMore: true, nextCursor: 'c2' }));
+        })
+      );
+    });
+
+    rerender({ revision: 'rev-2' });
+    rerender({ revision: 'rev-3' });
+    rerender({ revision: 'rev-4' });
+    expect(release).toHaveLength(1);
+    await act(async () => release[0]());
+    await waitFor(() => expect(release).toHaveLength(2));
+    await act(async () => release[1]());
+
+    await waitFor(() =>
+      expect(Object.keys(result.current.timelines).sort()).toEqual(['a', 'b', 'c'])
+    );
+    expect(threadApi.getDerivedTranscript).toHaveBeenCalledTimes(4);
+    expect(maxActive).toBe(1);
+  });
+
+  it('loads the full history of a thread it switches to', async () => {
+    vi.mocked(threadApi.getDerivedTranscript)
+      .mockReset()
+      .mockResolvedValueOnce(page({ items: turn('a', 'a-call'), total: 3 }))
+      .mockResolvedValueOnce(
+        page({
+          threadId: 'other',
+          items: turn('y', 'y-call'),
+          total: 6,
+          hasMore: true,
+          nextCursor: 'c1',
+        })
+      )
+      .mockResolvedValueOnce(page({ threadId: 'other', items: turn('x', 'x-call'), total: 6 }));
+    const { result, rerender } = renderHook(
+      ({ thread }) => useCoreTranscriptProjection(thread, 'rev-1', undefined),
+      { initialProps: { thread: THREAD as string } }
+    );
+    await waitFor(() => expect(Object.keys(result.current.timelines)).toEqual(['a']));
+
+    rerender({ thread: 'other' });
+
+    await waitFor(() => expect(Object.keys(result.current.timelines).sort()).toEqual(['x', 'y']));
+    expect(threadApi.getDerivedTranscript).toHaveBeenLastCalledWith('other', {
+      limit: 500,
+      cursor: 'c1',
+    });
   });
 });

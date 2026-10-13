@@ -7,7 +7,7 @@ import type {
   ThreadSuggestion,
 } from '@assistant-ui/react';
 import debug from 'debug';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { toast } from '../components/ui/Toast';
 import { useOpenHumanQueueAdapter } from '../features/conversations/aui/queueAdapter';
@@ -147,6 +147,18 @@ export function useCoreTranscriptProjection(
   liveRequestId: string | undefined
 ): CoreTranscriptProjection {
   const [projection, setProjection] = useState<CoreTranscriptProjection>(EMPTY_CORE_TRANSCRIPT);
+  // Read by the fetch loop after each await: the thread may have changed.
+  const latest = useRef({ threadId, liveRequestId });
+  latest.current = { threadId, liveRequestId };
+  // Newest-first items already fetched for one thread, and the thread's
+  // `total` when they were. Cursors are chronological, so items older than the
+  // newest page never move and a refresh only needs that page (#7731).
+  const held = useRef<{ threadId: string; total: number; items: DerivedDisplayItem[] } | null>(
+    null
+  );
+  // One fetch loop at a time; a change while it runs asks for one more pass.
+  const inFlight = useRef<string | null>(null);
+  const rerun = useRef(false);
 
   useEffect(() => {
     if (!threadId) {
@@ -159,10 +171,14 @@ export function useCoreTranscriptProjection(
       setProjection({ threadId, timelines: EMPTY_TURN_MAP, transcripts: EMPTY_TURN_MAP });
       return;
     }
-    let cancelled = false;
-    const skipRequestIds = liveRequestId ? new Set([liveRequestId]) : undefined;
+    if (inFlight.current === threadId) {
+      rerun.current = true;
+      return;
+    }
+    const stale = () => latest.current.threadId !== threadId;
     const project = (items: DerivedDisplayItem[], partial = false) => {
-      const mapped = mapDisplayItems(items, { skipRequestIds });
+      const live = latest.current.liveRequestId;
+      const mapped = mapDisplayItems(items, { skipRequestIds: live ? new Set([live]) : undefined });
       setProjection(previous => {
         if (partial && previous.threadId === threadId && Object.keys(previous.timelines).length > 0)
           return previous;
@@ -177,23 +193,31 @@ export function useCoreTranscriptProjection(
         return { threadId, timelines, transcripts };
       });
     };
-    void (async () => {
-      try {
-        const first = await threadApi.getDerivedTranscript(threadId, {
-          limit: DERIVED_TRANSCRIPT_PAGE_LIMIT,
-        });
-        if (cancelled) return;
-        if (!first.hasTranscript) {
-          setProjection({ threadId, timelines: EMPTY_TURN_MAP, transcripts: EMPTY_TURN_MAP });
-          return;
-        }
+    const refresh = async () => {
+      const first = await threadApi.getDerivedTranscript(threadId, {
+        limit: DERIVED_TRANSCRIPT_PAGE_LIMIT,
+      });
+      if (stale()) return;
+      if (!first.hasTranscript) {
+        held.current = null;
+        setProjection({ threadId, timelines: EMPTY_TURN_MAP, transcripts: EMPTY_TURN_MAP });
+        return;
+      }
+      const prev = held.current?.threadId === threadId ? held.current : null;
+      // Chronological index of the page's oldest item.
+      const lower = Math.max(0, first.total - first.items.length);
+      let items = first.items;
+      if (prev && first.total >= prev.total && lower <= prev.total) {
+        // The newest page reaches into what is held: keep the held items older
+        // than it. A shrunk total (edit, regenerate) or a gap walks in full.
+        // ponytail: assumes items older than the newest page never change; if
+        // the core starts rewriting old items, refetch the overlap instead.
+        items = [...items, ...prev.items.slice(prev.total - lower)];
+      } else {
         // Paint the newest page immediately, then walk the older pages and
-        // re-project once with the whole history. A single page silently
-        // dropped everything older than 500 items on a long thread, and a
-        // page that begins mid-turn hides that turn's leading tool calls until
-        // its boundary is in view — both only resolve with the full list.
-        let items = first.items;
-        project(items, first.hasMore);
+        // re-project once with the whole history. A page that begins mid-turn
+        // hides that turn's leading tool calls until its boundary is in view.
+        if (first.hasMore) project(items, true);
         let cursor = first.hasMore ? first.nextCursor : undefined;
         let pages = 1;
         while (cursor && pages < DERIVED_TRANSCRIPT_MAX_PAGES) {
@@ -201,24 +225,32 @@ export function useCoreTranscriptProjection(
             limit: DERIVED_TRANSCRIPT_PAGE_LIMIT,
             cursor,
           });
-          if (cancelled) return;
+          if (stale()) return;
           // Pages are newest-first and each next page is older, so appending
           // keeps the newest-first order `mapDisplayItems` expects.
           items = [...items, ...page.items];
           pages += 1;
           cursor = page.hasMore ? page.nextCursor : undefined;
         }
-        if (pages > 1) project(items);
+      }
+      held.current = { threadId, total: first.total, items };
+      project(items);
+    };
+    inFlight.current = threadId;
+    void (async () => {
+      try {
+        do {
+          rerun.current = false;
+          await refresh();
+        } while (rerun.current && !stale());
       } catch {
         // A missing/older core has no settled process trail; message text and
         // the live socket projection remain usable. Navigation must not fail.
         // A transient refresh failure must not erase the last complete trail.
-        // The return below already masks projections belonging to another thread.
+      } finally {
+        if (inFlight.current === threadId) inFlight.current = null;
       }
     })();
-    return () => {
-      cancelled = true;
-    };
   }, [liveRequestId, revision, threadId]);
 
   return projection.threadId === threadId ? projection : EMPTY_CORE_TRANSCRIPT;
