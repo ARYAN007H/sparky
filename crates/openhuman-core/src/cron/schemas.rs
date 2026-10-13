@@ -373,11 +373,13 @@ fn handle_add(params: Map<String, Value>) -> ControllerFuture {
                         .is_none()
                         .then(tinyflows_schedule::types::DeliveryConfig::default)
                         .or_else(|| {
-                            Some(crate::cron::job_builder::default_delivery(origin.as_ref()))
+                            Some(tinyflows_schedule::validation::default_delivery(
+                                origin.as_ref(),
+                            ))
                         })
                 });
                 let delivery_cfg = delivery.clone().unwrap_or_default();
-                crate::cron::job_builder::check_origin_requirements(
+                tinyflows_schedule::validation::check_origin_requirements(
                     &session_target,
                     &delivery_cfg,
                     origin.as_ref(),
