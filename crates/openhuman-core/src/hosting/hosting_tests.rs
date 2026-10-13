@@ -584,3 +584,12 @@ fn only_the_tools_that_change_the_world_carry_an_external_effect() {
         );
     }
 }
+
+#[test]
+fn a_disabled_hosting_component_registers_no_tools_despite_a_credential() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    let config = config_with(workspace.path(), false, "token");
+    assert!(Account::from_config(&config).unwrap().is_none());
+    let config = config_with(workspace.path(), true, "token");
+    assert!(Account::from_config(&config).unwrap().is_some());
+}

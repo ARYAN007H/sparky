@@ -36,9 +36,8 @@ fn a_configured_key_and_team_are_reported() {
 #[test]
 fn the_section_round_trips_through_toml() {
     let config: HostingConfig =
-        toml::from_str("enabled = true\napi_key = \"token\"\n").expect("parses");
+        toml::from_str("api_key = \"token\"\n").expect("parses");
 
-    assert!(config.enabled);
     assert_eq!(config.provider, "vercel");
     assert_eq!(config.api_key, "token");
 }
@@ -46,7 +45,7 @@ fn the_section_round_trips_through_toml() {
 #[test]
 fn the_team_scope_round_trips_through_toml() {
     let config: HostingConfig =
-        toml::from_str("enabled = true\nteam = \"team_abc\"\n").expect("parses");
+        toml::from_str("team = \"team_abc\"\n").expect("parses");
 
     assert_eq!(config.team(), Some("team_abc"));
 }
