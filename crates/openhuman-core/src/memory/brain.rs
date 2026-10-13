@@ -48,7 +48,12 @@ pub fn brain_node(
     source: &BrainSource,
     item: &StoreItem,
 ) -> MemoryResult<Namespace> {
-    brain_node_with(config.memory.split_github_by_repo, layout, source, item)
+    Ok(brain_node_with(
+        config.memory.split_github_by_repo,
+        layout,
+        source,
+        item,
+    )?)
 }
 
 /// The layout the brain RPCs act on: the in-scope identity's.
