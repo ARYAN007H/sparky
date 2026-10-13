@@ -1,6 +1,6 @@
 //! OpenHuman observer adapter for TinyChannels listener supervision.
 
-use super::super::traits;
+use tinychannels_bus as traits;
 use super::super::Channel;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
