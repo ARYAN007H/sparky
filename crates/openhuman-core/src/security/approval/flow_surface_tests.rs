@@ -1,7 +1,6 @@
 use super::*;
 use std::cell::Cell;
 use std::future::Future;
-use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
 
 #[test]
