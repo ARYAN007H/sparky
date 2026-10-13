@@ -282,8 +282,12 @@ once_cell = "1.19"
 parking_lot = "0.12"
 log = "0.4"
 # Final-reply slang + meme remix (runtime flag OPENHUMAN_TINYMEMES, off by
-# default). Vendored submodule: vendor/tinymemes.
-tinymemes = { path = "../../vendor/tinymemes", optional = true }
+# default). The engine runs in the `tinymemes` module; the host links only its
+# `*-bus` contract (vendored submodule: vendor/tinymemes).
+tinymemes-bus = { path = "../../vendor/tinymemes/crates/tinymemes-bus", optional = true }
+# The Jev client the host serves to the module's `Evaluate` callback (managed
+# Jev over the backend's System One proxy). Not a module implementation.
+tinyinference-decisions = { path = "../../vendor/tinyagents/vendor/tinyinference/crates/tinyinference-decisions", optional = true }
 libc = "0.2"
 nu-ansi-term = "0.50"
 base64 = "0.22"
@@ -647,7 +651,7 @@ hosting = ["modules", "dep:tinyhosts-bus"]
 # is still off until `OPENHUMAN_TINYMEMES` (or a build-time
 # `OPENHUMAN_TINYMEMES_DEFAULT`) turns it on. Off in the minimal kernel
 # profiles, so they stay free of its dependencies.
-tinymemes = ["dep:tinymemes"]
+tinymemes = ["modules", "dep:tinymemes-bus", "dep:tinyinference-decisions"]
 # The dynamic module host (`openhuman::modules`): the loader that admits a
 # compiled `cdylib` through tinybus's ABI descriptor, manifest, dependency and
 # SHA-256 gates, plus the `modules` RPC namespace and the registry of modules
