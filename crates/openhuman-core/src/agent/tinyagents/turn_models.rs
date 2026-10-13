@@ -42,7 +42,7 @@ pub(crate) struct TurnModels {
     /// its provider errors don't touch the turn's `error_slot`).
     pub(crate) summarizer: TurnChatModel,
     /// Recovers the primary's original (downcastable) provider error on failure.
-    pub(crate) error_slot: crate::agent::tinyagents::model::ModelErrorSlot,
+    pub(crate) error_slot: tinyinference_llm::model::ModelErrorSlot,
     /// Provider telemetry id (`{provider_id}.{model}` in Langfuse), captured from
     /// the source `Provider` at build time. Carried here (issue #4249, Phase 3 /
     /// Motion A) so the harness turn path no longer reads it off a raw

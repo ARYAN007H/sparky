@@ -471,13 +471,16 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           // module host while keeping web3 disabled, so its wallet callback
           // gate is exercised rather than silently selecting zero tests.
           // MCP resources do not touch test_support; introspection stays
-          // scoped to avoid tests that require the complete product.
+          // scoped to avoid tests that require the complete product. The
+          // wallet grant's ungated tests sit beside a web3-gated one, so they
+          // run here with web3 off (check-gated-test-allowlist.sh).
           name: "gate-contract-tests-features",
           when: gateSmoke,
           run:
             "cargo test --manifest-path Cargo.toml -p openhuman --no-default-features" +
             " --features modules,mcp,e2e-test-support --lib --" +
-            " modules::host:: modules::registry:: mcp::server::resources:: test_support::introspect::",
+            " modules::host:: modules::registry:: modules::storage_grant_tinywallet::" +
+            " mcp::server::resources:: test_support::introspect::",
         },
         {
           name: "kernel-floor",
