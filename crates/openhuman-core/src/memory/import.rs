@@ -120,7 +120,9 @@ fn importer(
         Arc::new(TokioPacer),
         Arc::new(move || consent),
     )
-    .with_describe(Arc::new(|error| MemoryError::from(error.clone()).to_string()));
+    .with_describe(Arc::new(|error| {
+        MemoryError::from(error.clone()).to_string()
+    }));
     if let Some(paused) = paused {
         importer = importer.with_pause(paused);
     }
@@ -342,7 +344,11 @@ async fn launch(
         }
     };
     let state = begun.state.clone();
-    tracing::info!(total = state.total, retry = mode != Mode::Import, "[memory:import] run started");
+    tracing::info!(
+        total = state.total,
+        retry = mode != Mode::Import,
+        "[memory:import] run started"
+    );
     let config = config.clone();
     crate::core::runtime::spawn_scoped(async move {
         if mode == Mode::Import {
