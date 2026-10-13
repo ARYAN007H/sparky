@@ -134,7 +134,7 @@ fn a_host_only_session_runs_a_definition_that_cannot_delegate_or_act() {
     assert!(def.subagents.is_empty(), "no delegation surface");
     assert!(def.deferred_tools.is_empty());
     assert_eq!(def.sandbox_mode, SandboxMode::ReadOnly);
-    assert!(def.omit_memory_context);
+    assert!(def.extensions.omit_memory_context);
 }
 
 #[tokio::test]

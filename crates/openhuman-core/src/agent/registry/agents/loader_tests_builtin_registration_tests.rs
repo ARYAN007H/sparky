@@ -59,7 +59,7 @@ fn trigger_reactor_has_agentic_hint_and_narrow_tools() {
     assert_eq!(def.sandbox_mode, SandboxMode::None);
     assert_eq!(def.max_iterations, 6);
     assert!(
-        !def.omit_memory_context,
+        !def.extensions.omit_memory_context,
         "trigger_reactor needs global memory/context"
     );
 }
@@ -96,11 +96,11 @@ fn trigger_triage_has_no_tools_and_pulls_memory_context() {
         ToolScope::Wildcard => panic!("trigger_triage must have a Named empty tool scope"),
     }
     assert!(
-        !def.omit_memory_context,
+        !def.extensions.omit_memory_context,
         "trigger_triage needs global memory/context to reason about triggers"
     );
-    assert!(def.omit_identity);
-    assert!(def.omit_safety_preamble);
+    assert!(def.extensions.omit_identity);
+    assert!(def.extensions.omit_safety_preamble);
     assert_eq!(def.sandbox_mode, SandboxMode::ReadOnly);
     assert_eq!(def.max_iterations, 2);
 }
@@ -349,7 +349,7 @@ fn master_agent_has_coding_hint_and_named_tools() {
     // #6958: coding turns routinely need substantially more than fifty model calls.
     assert_eq!(def.max_iterations, 200);
     assert!(
-        !def.omit_memory_context,
+        !def.extensions.omit_memory_context,
         "the user-facing agent opens new sessions with the memory context"
     );
 }
@@ -411,7 +411,7 @@ fn broad_agent_surfaces_expose_storage_transfer_not_lifecycle_tools() {
 fn critic_is_read_only() {
     let def = find("critic");
     assert_eq!(def.sandbox_mode, SandboxMode::ReadOnly);
-    assert!(def.omit_safety_preamble);
+    assert!(def.extensions.omit_safety_preamble);
 }
 
 /// Planner runs `composio_execute` so it can ground plans in real
