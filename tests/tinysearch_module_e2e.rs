@@ -17,7 +17,7 @@ async fn pinned_search_module_serves_host_contract_and_rejects_disabled_executio
     };
     let info = host
         .load_file_with_config(
-            std::path::PathBuf::from(file),
+            file,
             serde_json::to_value(config).unwrap(),
         )
         .expect("published artifact is admitted by the host loader");

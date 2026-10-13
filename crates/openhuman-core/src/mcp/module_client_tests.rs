@@ -2,11 +2,13 @@ use super::*;
 use std::sync::{Arc, Mutex};
 use tokio::sync::Notify;
 
+type CallRecord = (String, String, Value, bool);
+
 #[derive(Clone, Default)]
 struct FakePort {
     opened: Arc<Mutex<Vec<(String, McpClientConfig)>>>,
     closed: Arc<Mutex<Vec<String>>>,
-    calls: Arc<Mutex<Vec<(String, String, Value, bool)>>>,
+    calls: Arc<Mutex<Vec<CallRecord>>>,
     prepared_requests: Arc<Mutex<Vec<PrepareAgentToolsRequest>>>,
     validation_requests: Arc<Mutex<Vec<ValidateServerArgumentsRequest>>>,
     transform_requests: Arc<Mutex<Vec<tinymcp_bus::TransformTextRequest>>>,
