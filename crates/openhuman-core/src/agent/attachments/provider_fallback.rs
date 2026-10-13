@@ -76,7 +76,9 @@ impl AttachmentModel {
                     _ => None,
                 };
                 if format.is_some() && !self.config.components.documents {
-                    log::debug!("[attachments] document extraction skipped: component 'documents' disabled");
+                    log::debug!(
+                        "[attachments] document extraction skipped: component 'documents' disabled"
+                    );
                     cacheable = false;
                     text.push_str(
                         "\nDocument extraction is disabled ([components] documents = false); original remains available.",
