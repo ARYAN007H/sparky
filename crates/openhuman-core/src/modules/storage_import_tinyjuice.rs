@@ -159,7 +159,8 @@ fn read_regular(path: &Path) -> Result<Option<(SystemTime, Vec<u8>)>> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt;
-        options.custom_flags(libc::O_NOFOLLOW);
+        // O_NONBLOCK keeps a FIFO planted in the directory from hanging the open.
+        options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
     }
     let mut file = match options.open(path) {
         Ok(file) => file,

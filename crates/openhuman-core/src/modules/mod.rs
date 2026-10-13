@@ -190,9 +190,8 @@ settled_outcome!(storage_import_tinywallet);
 /// on every call. The async lock is held across an import, so a concurrent
 /// first caller waits for the migration instead of racing it.
 #[cfg(feature = "modules")]
-type ImportedSet = tokio::sync::Mutex<
-    std::collections::HashSet<(&'static str, String, std::path::PathBuf)>,
->;
+type ImportedSet =
+    tokio::sync::Mutex<std::collections::HashSet<(&'static str, String, std::path::PathBuf)>>;
 
 #[cfg(feature = "modules")]
 fn imported_once() -> &'static ImportedSet {
