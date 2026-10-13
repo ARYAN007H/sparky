@@ -215,7 +215,7 @@ pub(crate) async fn handle_runtime_command_if_needed(
         );
     }
     if clear_history {
-        clear_sender_history(ctx, sender_key);
+        clear_sender_history(&ctx.conversation_histories, sender_key);
     }
     let Some(reply) = reply else {
         return false;
