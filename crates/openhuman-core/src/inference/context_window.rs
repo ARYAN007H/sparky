@@ -28,7 +28,7 @@ use std::collections::HashSet;
 use std::sync::{Mutex, OnceLock};
 
 use tinyinference_llm::model::context_window::{ContextWindowInput, ContextWindowResolver};
-pub(crate) use tinyinference_llm::model::context_window::{ResolvedWindow, WindowSource};
+use tinyinference_llm::model::context_window::{ResolvedWindow, WindowSource};
 use tinyinference_llm::model::discover::{
     model_limits_cache, DiscoveryRequest, ModelLimitsCache, ModelListingFetcher,
 };

@@ -110,6 +110,14 @@ fn a_stateless_runtime_keeps_every_conversation_in_its_session_store() {
                 .send()
                 .await
                 .expect("second turn");
+            // Reusing an id waits for the old instance's cleanup: dropping a
+            // handle only schedules its MCP close, and the id stays reserved
+            // until that close is acknowledged (`CleanupPending`). Removing
+            // awaits the close, so the reopen below is deterministic.
+            runtime
+                .remove_agent("asha")
+                .await
+                .expect("asha is removed and its cleanup acknowledged");
             drop(asha);
 
             // ── reopened, asha resumes from the store ─────────────────────
