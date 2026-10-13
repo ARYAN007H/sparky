@@ -202,10 +202,15 @@ fn imported_once() -> &'static ImportedSet {
 
 /// Runs one legacy import at most once per process, module scope and
 /// directory, and again after a failure or an unsettled outcome (which is
-/// logged, never returned). The key is recorded only after the import
+/// logged, never returned). Returns false only when the import failed. The key is recorded only after the import
 /// finishes, so a cancelled caller leaves nothing behind.
 #[cfg(feature = "modules")]
-async fn import_once<F, T>(kind: &'static str, module_id: &str, dir: &std::path::Path, run: F)
+async fn import_once<F, T>(
+    kind: &'static str,
+    module_id: &str,
+    dir: &std::path::Path,
+    run: F,
+) -> bool
 where
     F: std::future::Future<Output = anyhow::Result<T>>,
     T: std::fmt::Debug + Settled,
@@ -214,13 +219,13 @@ where
         Ok(scope) => format!("{scope:?}"),
         Err(error) => {
             log::warn!("[{kind}] legacy storage import skipped: {:?}", error.kind());
-            return;
+            return true;
         }
     };
     let key = (kind, scope, dir.to_path_buf());
     let mut done = imported_once().lock().await;
     if done.contains(&key) {
-        return;
+        return true;
     }
     match run.await {
         Ok(outcome) => {
@@ -228,9 +233,11 @@ where
             if outcome.settled() {
                 done.insert(key);
             }
+            true
         }
         Err(error) => {
             log::warn!("[{kind}] legacy storage import failed, will retry: {error:#}");
+            false
         }
     }
 }
