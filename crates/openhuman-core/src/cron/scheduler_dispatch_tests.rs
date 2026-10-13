@@ -370,8 +370,11 @@ async fn an_upgraded_job_with_a_side_table_policy_keeps_firing_with_it() {
         .unwrap();
     }
 
-    // Reading first runs the legacy import, which the direct write below skips.
-    cron::get_job(&config, shell_id).unwrap();
+    // The storage importer brings the legacy rows (and their side-table policy) over.
+    let backend = crate::storage::local::backend_for(&config.workspace_dir).unwrap();
+    for report in crate::storage::import::tinyflows::run_with(&backend, &config) {
+        report.outcome.unwrap();
+    }
     force_due(&config, shell_id);
     let job = cron::get_job(&config, shell_id).unwrap();
     assert_eq!(job.policy.retries, Some(0));
