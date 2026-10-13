@@ -545,7 +545,7 @@ fn module_config(config: &Config, id: &str) -> serde_json::Value {
                 error = %error,
                 "[connectors] no route configured; loading with the capability surface only"
             );
-            serde_json::json!({})
+            serde_json::json!({ "offered_toolkits": super::connectors::offered_toolkits(config) })
         });
     }
     serde_json::json!({})
