@@ -18,8 +18,6 @@ pub mod job_builder;
 pub mod limits;
 pub mod ops;
 pub mod origin;
-/// Per-job run policy (retry budget, single-flight) kept beside the job store.
-pub mod policy;
 mod schemas;
 pub mod seed;
 pub(crate) mod store;

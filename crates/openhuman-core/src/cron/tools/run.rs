@@ -88,9 +88,6 @@ impl Tool for CronRunTool {
             }
         };
 
-        if let Err(e) = cron::policy::get_policy(&self.config, &job.id) {
-            return Ok(ToolResult::error(e.to_string()));
-        }
         if let Err(e) = cron::limits::check_run(&self.config, &job) {
             return Ok(ToolResult::error(e.to_string()));
         }

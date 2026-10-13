@@ -503,12 +503,15 @@ fn single_flight_system_job(config: &Config, name: &str) -> CronJob {
         },
     )
     .unwrap();
-    crate::cron::policy::set_policy(
+    crate::cron::update_job(
         config,
         &job.id,
-        crate::cron::policy::JobPolicy {
-            retries: Some(0),
-            single_flight: true,
+        CronJobPatch {
+            policy: Some(tinyflows_schedule::JobPolicy {
+                retries: Some(0),
+                single_flight: true,
+            }),
+            ..CronJobPatch::default()
         },
     )
     .unwrap();
