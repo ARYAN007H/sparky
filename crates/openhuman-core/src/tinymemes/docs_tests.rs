@@ -84,3 +84,36 @@ fn a_stored_document_wins_over_a_legacy_file() {
     );
     assert!(legacy_path(&config.workspace_dir, IndexKind::Memes).exists());
 }
+
+#[cfg(unix)]
+#[test]
+fn an_unreadable_legacy_file_is_an_error_not_an_empty_start() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().unwrap();
+    let config = config_in(dir.path());
+    write_legacy(&config, IndexKind::Remixed, "[\"keep\"]");
+    let path = legacy_path(&config.workspace_dir, IndexKind::Remixed);
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o000)).unwrap();
+    if std::fs::read_to_string(&path).is_ok() {
+        // Running as a user who can read anything (root): nothing to assert.
+        return;
+    }
+    assert!(load(&config, IndexKind::Remixed).is_err());
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    assert_eq!(
+        load(&config, IndexKind::Remixed).unwrap().as_deref(),
+        Some("[\"keep\"]"),
+        "the state is still there once the file can be read"
+    );
+}
+
+#[test]
+fn an_invalid_utf8_legacy_file_is_an_error() {
+    let dir = tempfile::tempdir().unwrap();
+    let config = config_in(dir.path());
+    let path = legacy_path(&config.workspace_dir, IndexKind::Slang);
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(&path, [0xff, 0xfe, 0x00]).unwrap();
+    assert!(load(&config, IndexKind::Slang).is_err());
+    assert!(path.exists(), "an unreadable file is left where it is");
+}

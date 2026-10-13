@@ -63,8 +63,13 @@ pub(super) fn load(config: &Config, kind: IndexKind) -> Result<Option<String>> {
         return Ok(text(&stored.doc, FIELD).map(str::to_owned));
     }
     let path = legacy_path(&config.workspace_dir, kind);
-    let Ok(legacy) = std::fs::read_to_string(&path) else {
-        return Ok(None);
+    // Only an absent file means "nothing to adopt". Any other failure
+    // (permissions, bad UTF-8) is an error: answering `None` would let the
+    // module start empty and save over state the old file still holds.
+    let legacy = match std::fs::read_to_string(&path) {
+        Ok(legacy) => legacy,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(anyhow!("read {}: {e}", path.display())),
     };
     // `Absent`: a concurrent save wins over the old file's content.
     let adopted = legacy.clone();
@@ -91,10 +96,14 @@ pub(super) fn load(config: &Config, kind: IndexKind) -> Result<Option<String>> {
             }
             Ok(Some(legacy))
         }
-        // Somebody stored a document in between; theirs is the truth.
-        Err(_) => {
+        // Somebody stored a document in between; theirs is the truth. When no
+        // document exists the put failed for a real reason, which is reported.
+        Err(error) => {
             let stored = repo.run(move |docs| async move { docs.get(COLLECTION, id).await })?;
-            Ok(stored.and_then(|s| text(&s.doc, FIELD).map(str::to_owned)))
+            match stored {
+                Some(stored) => Ok(text(&stored.doc, FIELD).map(str::to_owned)),
+                None => Err(error),
+            }
         }
     }
 }
