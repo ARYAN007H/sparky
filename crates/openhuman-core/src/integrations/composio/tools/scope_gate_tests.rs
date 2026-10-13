@@ -144,3 +144,37 @@ fn the_slack_channel_invite_stays_admin_scoped() {
     assert_eq!(invite.scope, ToolScope::Admin);
     assert!(!UserScopePref::default().allows(invite.scope));
 }
+
+#[tokio::test]
+async fn a_preference_still_in_the_legacy_file_gates_execution() {
+    // The execute gate asks the module (`ListVisibleTools`), which only knows
+    // rows already migrated out of the legacy workspace file.
+    use crate::integrations::composio::module_client::module_guard;
+    let _serialised = module_guard().await;
+    let tmp = tempfile::tempdir().unwrap();
+    let mut config = Config::default();
+    config.workspace_dir = tmp.path().join("workspace");
+    config.config_path = tmp.path().join("config.toml");
+    let legacy = crate::integrations::composio::file_store::path(
+        &config,
+        crate::integrations::composio::file_store::USER_SCOPES_FILE,
+    );
+    std::fs::create_dir_all(legacy.parent().unwrap()).unwrap();
+    std::fs::write(
+        &legacy,
+        serde_json::json!({"gmail": {"read": true, "write": false, "admin": false}}).to_string(),
+    )
+    .unwrap();
+
+    let decision = evaluate_tool_visibility(&config, "GMAIL_SEND_EMAIL").await;
+    let restored =
+        super::super::ops::save_user_scope_pref(&config, "gmail", Default::default()).await;
+    restored.unwrap();
+
+    assert!(matches!(
+        decision,
+        ToolDecision::BlockedByScope {
+            scope: ToolScope::Write
+        }
+    ));
+}

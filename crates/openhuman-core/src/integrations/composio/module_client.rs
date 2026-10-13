@@ -111,10 +111,12 @@ async fn prime_curated_catalogs(config: &crate::config::Config) {
 /// without a module loader has no catalogs to read and answers `Ok`.
 #[cfg(feature = "modules")]
 pub async fn ensure_catalogs(config: &crate::config::Config) -> Result<(), String> {
-    super::contract::curated::prime(config).await.map_err(|error| {
-        tracing::debug!("[composio][curated] prime failed: {error}");
-        error
-    })
+    super::contract::curated::prime(config)
+        .await
+        .map_err(|error| {
+            tracing::debug!("[composio][curated] prime failed: {error}");
+            error
+        })
 }
 
 /// Without the module loader there is no catalog to read.
