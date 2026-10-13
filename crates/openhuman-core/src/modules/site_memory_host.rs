@@ -293,47 +293,61 @@ async fn sweep(dir: &Path) {
     }
 }
 
+/// `Load`, under `config`.
+async fn load_site(
+    config: &crate::config::Config,
+    request: LoadSiteRequest,
+) -> std::io::Result<LoadSiteResponse> {
+    let epoch = guard().lock().await;
+    let dir = sites_dir(&config.workspace_dir);
+    sweep(&dir).await;
+    let memory = SiteStore::new(dir).load(&request.site).await?;
+    Ok(LoadSiteResponse {
+        memory,
+        epoch: *epoch,
+    })
+}
+
+/// `Save`, under `config`: refused when learning is off or the site was
+/// forgotten since it was loaded.
+async fn save_site(
+    config: &crate::config::Config,
+    request: SaveSiteRequest,
+) -> std::io::Result<SaveSiteResponse> {
+    let epoch = guard().lock().await;
+    if request.epoch != *epoch || !learning(config) {
+        tracing::debug!(
+            stale = request.epoch != *epoch,
+            "[site-memory-host] save refused"
+        );
+        return Ok(SaveSiteResponse { saved: false });
+    }
+    let saved = SiteStore::new(sites_dir(&config.workspace_dir))
+        .save(&request.site, &request.memory)
+        .await?;
+    Ok(SaveSiteResponse { saved })
+}
+
 #[tinybus::interface(name = "ai.tinyhumans.tinycomputer.SiteMemoryHost")]
 impl SiteMemoryHost {
     /// One site's memory; empty for a site with nothing kept.
     async fn load(&self, request: LoadSiteRequest) -> tinybus::Result<LoadSiteResponse> {
-        let config = config().await?;
-        let epoch = guard().lock().await;
-        let dir = sites_dir(&config.workspace_dir);
-        sweep(&dir).await;
-        let memory = SiteStore::new(dir)
-            .load(&request.site)
+        load_site(&config().await?, request)
             .await
-            .map_err(method_error)?;
-        Ok(LoadSiteResponse {
-            memory,
-            epoch: *epoch,
-        })
+            .map_err(method_error)
     }
 
     /// Replaces one site's memory, unless learning is off or the site was
     /// forgotten since it was loaded.
     async fn save(&self, request: SaveSiteRequest) -> tinybus::Result<SaveSiteResponse> {
-        let config = config().await?;
-        let epoch = guard().lock().await;
-        if request.epoch != *epoch || !learning(&config) {
-            tracing::debug!(
-                stale = request.epoch != *epoch,
-                "[site-memory-host] save refused"
-            );
-            return Ok(SaveSiteResponse { saved: false });
-        }
-        let saved = SiteStore::new(sites_dir(&config.workspace_dir))
-            .save(&request.site, &request.memory)
+        save_site(&config().await?, request)
             .await
-            .map_err(method_error)?;
-        Ok(SaveSiteResponse { saved })
+            .map_err(method_error)
     }
 
     /// Forgets one site, or every site.
     async fn forget(&self, request: ForgetSiteRequest) -> tinybus::Result<ForgetSiteResponse> {
-        let config = config().await?;
-        let forgotten = forget(&config, request.site.as_deref())
+        let forgotten = forget(&config().await?, request.site.as_deref())
             .await
             .map_err(method_error)?;
         Ok(ForgetSiteResponse {
