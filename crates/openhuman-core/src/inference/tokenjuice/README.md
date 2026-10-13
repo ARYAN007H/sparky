@@ -97,5 +97,7 @@ callback is not served, `juice_*` / `retrieve_tool_output` tools are not
 registered, the tool-output middleware runs with compaction and the summary
 stage off (per-tool cap and byte-budget truncation only), `install_from_config`
 is a no-op, and every `tokenjuice.*` RPC answers `COMPONENT_DISABLED`.
-`[tokenjuice] router_enabled` stays a sub-setting of the on state. There is no
-legacy flag for this component, so there is nothing to migrate.
+`[tokenjuice] router_enabled` stays a sub-setting of the on state. A legacy
+config with `[tokenjuice] router_enabled = false` and no `[components] juice`
+key is migrated on load to `[components] juice = false` (an explicit
+`[components]` key always wins).
