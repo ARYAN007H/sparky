@@ -85,12 +85,16 @@ fn disabled_component_answers_component_disabled_over_json_rpc() {
                     );
 
                     // The voice namespace answers the same typed error.
-                    let voice = rpc(&base, "openhuman.voice_status").await;
-                    assert_eq!(
-                        voice.pointer("/error/message").and_then(Value::as_str),
-                        Some("COMPONENT_DISABLED:voice"),
-                        "{voice}"
-                    );
+                    // (The `voice` family is only registered with the Cargo `voice` gate.)
+                    #[cfg(feature = "voice")]
+                    {
+                        let voice = rpc(&base, "openhuman.voice_status").await;
+                        assert_eq!(
+                            voice.pointer("/error/message").and_then(Value::as_str),
+                            Some("COMPONENT_DISABLED:voice"),
+                            "{voice}"
+                        );
+                    }
 
                     // `modules.list` reports the same module as Disabled, and only it.
                     let listed = rpc(&base, "openhuman.modules_list").await;
