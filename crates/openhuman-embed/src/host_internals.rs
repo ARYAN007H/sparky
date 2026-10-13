@@ -147,7 +147,7 @@ pub mod agent {
     pub mod tinyagents {
         pub mod discovery {
             pub use openhuman_core::agent::tinyagents::discovery::{
-                embedding_provider_is_usable, embedding_tool_ranker, install_tool_ranker,
+                embedding_provider_is_usable, embedding_tool_ranker, embedding_tool_ranker_in, install_tool_ranker,
                 installed_tool_ranker,
             };
         }
