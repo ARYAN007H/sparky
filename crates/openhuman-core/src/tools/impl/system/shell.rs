@@ -1,8 +1,5 @@
 use super::shell_description::{command_param_description, shell_description};
-use super::shell_support::{
-    command_failure, exec_result, python_utf8_env, tool_timeout_message, COMMAND_TIMEOUT_EXIT_CODE,
-    COMMAND_TIMEOUT_NOTE, PYTHON_UTF8_DEFAULTS,
-};
+use super::shell_support::{command_failure, exec_result, python_utf8_env, tool_timeout_message};
 #[cfg(feature = "modules")]
 use super::shell_support::container_environment;
 use crate::agent::host_runtime::RuntimeAdapter;
