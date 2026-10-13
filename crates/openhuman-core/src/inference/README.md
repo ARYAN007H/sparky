@@ -156,9 +156,8 @@ A failed provider call passes through several layers, each with one job:
   HTTP / transport error
      |
      v
-  provider/ops/http_error/dispatch.rs   api_error(): run every classifier
-     |  quota_and_credits, local_provider, policy_rejection,
-     |  context_window, auth_failure
+  provider/ops/http_error.rs   api_error(): tinyinference_llm::failure::http
+     |  classifies; HostErrorReporter applies backend guards, demotion, Sentry
      |
      +--> auth_failure.rs: 401 from managed backend -> SessionExpired event
      |                     401/403 on a BYO key -> auth_error_registry::record
