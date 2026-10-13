@@ -162,3 +162,23 @@ fn explicit_components_voice_wins_over_legacy_voice_switches() {
     );
     assert!(c.components.voice);
 }
+
+#[test]
+fn sandbox_enabled_false_maps_to_components_sandbox() {
+    for raw in ["[sandbox]\nenabled = false\n", "[security.sandbox]\nenabled = false\n"] {
+        let c = migrated(raw, None);
+        assert!(!c.components.sandbox, "{raw}");
+        assert_eq!(c.sandbox.enabled.or(c.security.sandbox.enabled), Some(false), "old key kept");
+    }
+}
+
+#[test]
+fn sandbox_auto_or_on_or_explicit_component_keeps_the_component_on() {
+    for raw in [
+        "[sandbox]\nenabled = true\n",
+        "[sandbox]\nbackend = \"auto\"\n",
+        "[sandbox]\nenabled = false\n[components]\nsandbox = true\n",
+    ] {
+        assert!(migrated(raw, None).components.sandbox, "{raw}");
+    }
+}
