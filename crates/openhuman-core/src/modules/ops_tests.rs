@@ -600,6 +600,7 @@ fn status_reports_the_source_that_serves_a_module() {
 }
 
 #[tokio::test]
+#[ignore = "blocked on tinybus 0.1.4 (tinybus epic): tinychannels-module cannot be a dev-dependency"]
 async fn a_registered_linked_factory_serves_the_module_and_status_says_so() {
     use crate::config::schema::ModuleSourceMode;
     use crate::modules::linked::register_linked;

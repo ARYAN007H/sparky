@@ -1,5 +1,6 @@
 use super::super::runtime::spawn_supervised_listener;
-use super::super::{traits, Channel};
+use super::super::Channel;
+use tinychannels_bus as traits;
 use super::common::AlwaysFailChannel;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;

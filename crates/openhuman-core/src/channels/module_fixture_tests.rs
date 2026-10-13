@@ -8,14 +8,10 @@
 //! on a process-lifetime runtime, so it outlives the short Tokio runtimes of
 //! individual tests.
 
-use crate::config::schema::ModuleSourceMode;
-use crate::config::Config;
 use crate::modules::client::ModuleClient;
-use crate::modules::linked::register_linked;
-use crate::modules::{host, ops};
 use tinychannels_bus::methods;
 
-const MODULE_ID: &str = "tinychannels";
+
 
 /// Return a client for the compiled, linked TinyChannels module fixture.
 ///
@@ -24,7 +20,6 @@ const MODULE_ID: &str = "tinychannels";
 /// and the fixture cannot be linked. Tests that need it fail with this message
 /// until the dependency is restored.
 pub(crate) async fn client() -> ModuleClient {
-    let _ = (MODULE_ID, register_linked::<fn()>, &host::runtime, &ops::ensure_loaded);
     panic!("tinychannels-module fixture unavailable: blocked on tinybus 0.1.4 (tinybus epic)")
 }
 

@@ -3,7 +3,8 @@ use super::super::runtime::test_support::{run_dispatch_harness, DispatchHarnessO
 use super::super::runtime::{
     process_channel_message, run_message_dispatch_loop, RuntimeChannelMessage,
 };
-use super::super::{traits, Channel};
+use super::super::Channel;
+use tinychannels_bus as traits;
 use super::common::{use_real_agent_handler, RecordingChannel, SlowModel};
 use crate::agent::bus::{mock_agent_run_turn, AgentTurnRequest, AgentTurnResponse};
 use crate::core::events::DomainEvent;

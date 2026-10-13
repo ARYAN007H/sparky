@@ -3,7 +3,8 @@ use super::super::context::{
     CHANNEL_MESSAGE_TIMEOUT_SECS,
 };
 use super::super::runtime::process_channel_message;
-use super::super::{traits, Channel};
+use super::super::Channel;
+use tinychannels_bus as traits;
 use super::common::{
     IterativeToolModel, MockPriceTool, ModelCaptureModel, RecordingChannel,
     TelegramRecordingChannel, ToolCallingModel,
