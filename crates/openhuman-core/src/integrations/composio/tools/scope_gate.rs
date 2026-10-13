@@ -75,12 +75,14 @@ pub(super) async fn evaluate_tool_visibility(config: &Config, slug: &str) -> Too
         return ToolDecision::Allow;
     };
     let pref = load_user_scope_pref(config, &toolkit).await;
-    // The catalog covers every catalogued toolkit directly now — the
-    // engine's `get_provider(toolkit).curated_tools()` hop this used to
-    // prefer was pure indirection, verified identical to `catalog_for_toolkit`
-    // for every toolkit that had a native provider.
-    let catalog = catalog_for_toolkit(&toolkit);
-    match catalog {
+    decide_visibility(&toolkit, slug, pref)
+}
+
+/// The pure half of [`evaluate_tool_visibility`], given the toolkit's stored
+/// preference. The catalog is the connector module's, read from the host's
+/// curated snapshot.
+fn decide_visibility(toolkit: &str, slug: &str, pref: UserScopePref) -> ToolDecision {
+    match catalog_for_toolkit(toolkit) {
         Some(catalog) => match find_curated(&catalog, slug) {
             Some(curated) if pref.allows(curated.scope) => ToolDecision::Allow,
             Some(curated) => ToolDecision::BlockedByScope {
@@ -111,9 +113,26 @@ pub(super) async fn filter_list_tools_response(
     // can't fold this into a single sync `retain` closure). Then zip
     // each tool with its decision and collect the survivors — clearer
     // than juggling a parallel index alongside `Vec::retain`.
+    // One preference read per toolkit, not per tool: each read is a bus call.
+    let mut prefs: std::collections::HashMap<String, UserScopePref> =
+        std::collections::HashMap::new();
     let mut keep: Vec<bool> = Vec::with_capacity(before);
     for t in &resp.tools {
-        let decision = evaluate_tool_visibility(config, &t.function.name).await;
+        let slug = &t.function.name;
+        let decision = match toolkit_from_slug(slug) {
+            None => ToolDecision::Allow,
+            Some(toolkit) => {
+                let pref = match prefs.get(&toolkit) {
+                    Some(pref) => *pref,
+                    None => {
+                        let pref = load_user_scope_pref(config, &toolkit).await;
+                        prefs.insert(toolkit.clone(), pref);
+                        pref
+                    }
+                };
+                decide_visibility(&toolkit, slug, pref)
+            }
+        };
         keep.push(matches!(
             decision,
             ToolDecision::Allow | ToolDecision::PassthroughCheckScope { .. }
@@ -157,3 +176,7 @@ pub(super) fn scope_error_message(slug: &str, scope: ToolScope, pref: UserScopeP
         pref.read, pref.write, pref.admin,
     )
 }
+
+#[cfg(test)]
+#[path = "scope_gate_tests.rs"]
+mod tests;
