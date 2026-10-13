@@ -86,7 +86,7 @@ pub(super) async fn evaluate_tool_visibility(config: &Config, slug: &str) -> Too
         toolkit: toolkit.clone(),
         preference: None,
     };
-    match connectors::call_stateless::<_, VisibleToolsResponse>(
+    match connectors::call::<_, VisibleToolsResponse>(
         config,
         methods::LIST_VISIBLE_TOOLS,
         request,
