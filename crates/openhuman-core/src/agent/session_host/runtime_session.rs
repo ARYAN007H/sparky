@@ -735,12 +735,9 @@ impl OpenHumanSessionHost {
             &self.event_session_id,
         );
 
-        // `[components] juice = false`: tool output is truncated only, never
-        // compacted or summarized, and the module is never called for it.
-        let juice_on = self
-            .runtime_config
-            .as_ref()
-            .map_or(true, |config| crate::inference::tokenjuice::enabled(config));
+        // `[components] juice = false`: truncation only, no compaction/summary.
+        let juice_on = (self.runtime_config.as_ref())
+            .map_or(true, |c| crate::inference::tokenjuice::enabled(c));
         let tokenjuice_compaction_enabled = tokenjuice_compaction_enabled && juice_on;
         let context_mw = TurnContextMiddleware {
             tool_result_budget_bytes,
