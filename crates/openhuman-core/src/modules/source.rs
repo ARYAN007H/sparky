@@ -82,11 +82,30 @@ pub fn local_artifact(id: &str) -> Option<PathBuf> {
     if let Some(path) = source_artifact(id) {
         return Some(path);
     }
-    let name = super::registry::find(id)?.source.artifact_filename();
+    super::registry::find(id)?;
     let dirs = std::env::var_os("OPENHUMAN_MODULE_PATH")?;
-    std::env::split_paths(&dirs)
-        .map(|dir| dir.join(&name))
-        .find(|path| path.is_file())
+    std::env::split_paths(&dirs).find_map(|dir| module_artifact_in(&dir, id))
+}
+
+/// Find either a locally built library or a released TinyBus module in one
+/// directory. Source builds use the crate library name; release archives use
+/// the module ABI name, which adds the `_module` suffix.
+fn module_artifact_in(dir: &Path, id: &str) -> Option<PathBuf> {
+    let record = super::registry::find(id)?;
+    let source = dir.join(record.source.artifact_filename());
+    if source.is_file() {
+        return Some(source);
+    }
+
+    let released_name = if cfg!(target_os = "windows") {
+        format!("{id}_module.dll")
+    } else if cfg!(target_os = "macos") {
+        format!("lib{id}_module.dylib")
+    } else {
+        format!("lib{id}_module.so")
+    };
+    let released = dir.join(released_name);
+    released.is_file().then_some(released)
 }
 
 /// Environment variable listing module ids whose gitlink is ahead of the

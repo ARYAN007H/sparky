@@ -378,102 +378,96 @@ async fn attested_proxy(config: &Config) -> Result<tinybus::Proxy, WalletCallErr
 }
 
 // Embedded library checksums verified from all 17 archives in the
-// registry-pinned TinyWallet v0.19.0 release. Each library is trusted only
+// registry-pinned TinyWallet v0.20.0 release. Each library is trusted only
 // while its archive checksum remains pinned in the supplied ModuleRecord.
 const PINNED_WALLET_LIBRARIES: &[(&str, &str)] = &[
     // archlinux-arm64
     (
-        "59863d52205fabe486a16dfbf573a007d19c3237236cee3a8ff236281cdf6ba9",
-        "33929ad0096de1ea9e7a2cb03eeecba27ff35e44f8d10bc74941c65481c03683",
+        "04641e9a3e69a28d7b29b7055cd6b6f1e710f117e37392426a22eb1867e1a0c8",
+        "b73228d792e651c053350822980294933a96bf87e63affa419247547be18c113",
     ),
     // archlinux-x86_64
     (
-        "645679737effe617f566af7349dc7153f29dac21fa7a377a610ccf72054e7454",
-        "7770801d0ddc7c659391b3d1f06b3aa757cc086094c9bd9b40306de77e8b28c2",
+        "50dbe4f6b296941971712eacc831a9ff5947dfaca3be664687e6a1ae120f9b9d",
+        "96b1cf45803d0e3d9acf1a7727cbcf75a6c484aa6e57d0597f5dec27181d2706",
     ),
     // fedora-43-arm64
     (
-        "c05ff2da4101246b7a50a37a44632a8502a5747f5e7cc416258fb728782d91b6",
-        "3d23139debe5d9d0d69c9feefcbe2372449cda547f81eae590dfb82f7842e2e3",
+        "3802fd3681bfeac1ce90e34c98600258993cc832fa89285895aabea22f0d2b81",
+        "3dc1feaf275f6c4063d1175310dea449eb618f5ee163b5ca715b763a695e6a91",
     ),
     // fedora-43-x86_64
     (
-        "c4399bbb1c9d3c42545fb78474f548337cfc4a96ebb49ce50912ca4c85dd3aa4",
-        "2ddd77bf0645ad8dce6b8e4ab6554ac913d5f0e9ee21ab6b234c8d572d0d763e",
+        "9767aa07631a03adaed05430c03726f4e19e16b3561f1fc149264eb52332dbc5",
+        "fb7e0a03af9d91220bc1a6a676b34ae68f15ba7028f83bf144b6a97232f55c2",
     ),
     // fedora-44-arm64
     (
-        "d17075dd175d0bd3bebe31350a3bcc58320c698f4c54f69691f85dd54297fdb9",
-        "d00d9630dff068c0980e9b81c6184eba0af11fd3168ea2bcdc57ebad713eb91a",
+        "3974790d265b775f968e5dcaa7e4206d08da52187cad09e438cc278aba9eb540",
+        "76e46c8a57fa20545adfdb599d0474d8f5f05883045073cf6cae3d808f8cb976",
     ),
     // fedora-44-x86_64
     (
-        "ef64e56e536a2661ae0ddcd799632819c02f391a5e7f98431adc184f7df45adb",
-        "71df95081c6b0da69e52bb4ae461c841763436332eae5e19b269730a5bf1688e",
+        "83ff87f0d71985e63ac73c95944e534286fde1a04b0a7daa499753e1fe943269",
+        "76310f1a88ec48f27bfe491a53d0f6badf3d541f7026081653d00974de2163a6",
     ),
     // macos-15-arm64
     (
-        "15397175e39dffbfe372bb40a4dccd6e03440ed5925043d41df058a335e1427d",
-        "e1e95043354060e98a604ef7a2c4ec0407bf22c906f4240b1438e303c4283bbd",
+        "496e61f6ce4a431ee77bf730a713c3d1c8d76b6666f99d15972f7f62623e632f",
+        "65d58cb4e4e4269c9fe0c1a068d5c067c6d059c59665206432c6fd6cffe4cd68",
     ),
     // macos-15-x86_64
     (
-        "389e68114a4d1243afe04e8143e7f6ebd321c1cc24b54be2d768c7ee8643c7b1",
-        "deb320a1e0214105e1621f83fbb43c3e884ed7923d5303ae56b113b4f31eef2e",
+        "427b9882eb1ef52be3ba28ed9e292790c60a1f769148b3bbafe4ef5389e1144a",
+        "6213ea0b0a19f6b4c6e221e7a15ce71a1e89cf36f26a4942f9b9aea55c2174b7",
     ),
     // macos-26-arm64
     (
-        "bff93e7c33fcf663c0b69117add0e249c461233a58eb5ba2f1b753a9a8944350",
-        "4aaaec17daa9c3aca68c02342761138aa100a10886a3845a1e3068c755665091",
+        "65955f1a0c921da47e1a2cecc7ba4f19cd775c536f7039878dd6c60c3804b017",
+        "b1bf6b500deabba653b84d7bfe4df192f0758ae77afffd8b03320a0360b1d8ad",
     ),
     // macos-26-x86_64
     (
-        "72e1ef5c1047c0ac848abb9cd1cf69e6639ac4e8527496979406922852a4d2d3",
-        "3655a3efb340c1959704b71e67056499e47b0dde719b9139e8d3a4d5608c7d57",
+        "5fa92699fed3cb00c57f29c04fa101d94b24f85aedae91f1b6776d57f7162604",
+        "76e7be391960c98aaf9a788bf3d0f82a29838174269014b047d949dc45cccabb",
     ),
     // ubuntu-22.04-arm64
     (
-        "d981e334615d4a4d2ea003a4c3d59ee8f631d6f52532cfa70dc97143e97a6fe8",
-        "6a30e85422cfeb919efcf70ece5e503ba9fd6145eac1e6229caff326d7c438e7",
+        "cce338941314005f54584e567dc5d6c2f9a8a4189c4b47908ead8ceed19ae328",
+        "6f0729144fbbfb3fa686fc911860852910a38e556d29cd8c9bb5a87adce3fa57",
     ),
     // ubuntu-22.04-x86_64
     (
-        "4511bf4a03f9163f5493472c1b294eccd8087e44efbde6b7e50c2ee4867b707c",
-        "04ed808e5c32234b9879a1468da6034c8bdc214beaf6da4f6303b1a9efb83f9b",
+        "8712d00897266d0e2b0889ac76fe4da12d1917ffb8e2b3fcc8eb95c1c6f8570e",
+        "6de34e9b4adf1a210550af88e43528a9501ab6edd089e151c5573acf56d825d6",
     ),
     // ubuntu-24.04-arm64
     (
-        "aa79e84f60892f2ff624f42619f928b2699bdbea613f7bc2a0595f769c7f1d68",
-        "27ec59b039fff01ebf01ba065a061fa84c67552f3486e1e9757a1210a52304fd",
+        "1ca76d32b4d66c68b31963f4aa9cfdc6585276fff660d4ab29726dbb29e04499",
+        "b9373c23b416246c0004d1037b921311c55e6d828e173deb9d7e7ff4b35f59d9",
     ),
     // ubuntu-24.04-x86_64
     (
-        "55c27a4c85631aee0509e9c74ae1eceb5f3fb3aa43540294bdd4991eac5500af",
-        "5d0a3ae5881f91966249858cd155e5b9c244bd419d06698d808f972a8d23afc9",
+        "6c092e41f8053851c5d4919e3c8ff6445cac4a9f8526889aa40a500a77ae40ba",
+        "06ebfd294c3e815e4fca25df608e2b37f9bfb493b74687562f93b9bd34d52760",
     ),
     // windows-11-arm64
     (
-        "f91ef12a88c324a4c890be0ff8114239d835770541ce8cfd6059f015d3720764",
-        "0b702e879f7514f0204bc867c3c6e01e429fcba993ef1817be65110097c6b0bd",
+        "171172d90020470dfbe83d3be480b0d6127b123694fdbf600218acc7cba6f929",
+        "24fbd39ddae1be87ca601d1b6437292ba94acc52fb1f8d814c35e453b71493d8",
     ),
     // windows-2022-x86_64
     (
-        "398bce97e33fa44faa3e92eb20cdd448089882233858a952b7710ad4d1806546",
-        "83aaed32e29ead292066e123efb91f1ebd21545ea0d8a3b3ca20fdd7cd99e644",
+        "80d5ae3272ae0d32fcc1fcb727573554dffcc34f793d35c9b2603d0a4f8cdb28",
+        "89a9f9e8e6d245c32b5932e81011af183e6bbb275990df0e41ab51d68b759e67",
     ),
     // windows-2025-x86_64
     (
-        "17856ed57fb14840c3a4c5cde9167a68d9a8d578ee63728852b894d3d1e8fec1",
-        "34d33e8534cb36acaf771cfd8a73a2dc6149ecdd4d143cc1af76088457795d8b",
+        "c56914add49d2529dc4620e1c1a4846961d16da9b4d8fb9005c3d6d23989d51f",
+        "707e994999531da9e61659bab98c3c40f0c28eadbaa5978e456400b86db09c13",
     ),
 ];
 
-/// Whether the attested archive or library belongs to a currently pinned release.
-///
-/// The release loader attests the verified archive; local discovery attests the
-/// library from modules.toml. Library checksums therefore require their paired
-/// archive to remain in this record, so retiring a release also retires its
-/// libraries. Check every platform because the attestation carries no host key.
 fn digest_is_pinned(record: &super::ModuleRecord, sha256: &str) -> bool {
     record.assets.iter().any(|asset| {
         asset.sha256.eq_ignore_ascii_case(sha256)
