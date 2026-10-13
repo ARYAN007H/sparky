@@ -17,10 +17,11 @@ use super::super::module_client::{self as connectors};
 use super::super::types::{
     ComposioConnectionsResponse, ComposioListToolsRequest, ComposioToolsResponse,
 };
-use super::visibility::{
-    empty_uncurated_toolkits_message, filter_list_tools_response, normalized_scope_toolkits,
-    render_tools_markdown, retain_connected_tools,
+use super::render::{
+    empty_uncurated_toolkits_message, normalized_scope_toolkits, render_tools_markdown,
+    retain_connected_tools,
 };
+use super::scope_gate::filter_list_tools_response;
 use tinyconnectors_bus::names::methods;
 
 pub struct ComposioListToolsTool {

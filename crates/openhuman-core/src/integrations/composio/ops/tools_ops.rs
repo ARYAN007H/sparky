@@ -23,17 +23,10 @@ use tinyconnectors_bus::names::methods;
 /// one component deciding both is the only arrangement that cannot disagree
 /// with itself.
 ///
-/// It cannot yet, because the preference is not stored where the module can
-/// see it. The rows live in the bound memory driver's KV tier
-/// (`super::user_scopes`), and the module reads its own state directory. Asking
-/// it to filter today would filter against *its* defaults — `read+write`, no
-/// `admin` — rather than against what the user actually chose, and the two
-/// would disagree the moment anyone touched the toggle.
-///
-/// So enforcement stays whole on this side for now: `super::super::tools`
-/// applies the preference to what the agent sees, which is the path that leads
-/// to an action being run. Phase 4 moves the store, and this flag flips with
-/// it.
+/// The preference now lives in the module (`GetUserScopes`), so the two
+/// would agree; the flag stays `false` because the host's scope gate still
+/// applies the preference to what the agent sees (and refuses the execution),
+/// and filtering twice would only hide the host's "blocked by scope" message.
 pub async fn composio_list_tools(
     config: &Config,
     toolkits: Option<Vec<String>>,

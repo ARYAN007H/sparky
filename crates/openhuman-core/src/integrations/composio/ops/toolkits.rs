@@ -79,10 +79,7 @@ pub async fn composio_list_capabilities(
 pub async fn composio_list_agent_ready_toolkits(
 ) -> OpResult<Outcome<super::super::types::ComposioAgentReadyToolkitsResponse>> {
     tracing::debug!("[composio] rpc list_agent_ready_toolkits");
-    let toolkits: Vec<String> = agent_ready_toolkits()
-        .into_iter()
-        .map(|s| s.to_string())
-        .collect();
+    let toolkits: Vec<String> = agent_ready_toolkits();
     let count = toolkits.len();
     let resp = super::super::types::ComposioAgentReadyToolkitsResponse { toolkits };
     Ok(Outcome::new(
