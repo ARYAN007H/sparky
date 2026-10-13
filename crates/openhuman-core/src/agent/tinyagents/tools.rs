@@ -173,10 +173,8 @@ impl Tool for CanonicalSharedToolAdapter {
         self.resolved_tool().and_then(Tool::family)
     }
 
-    /// Forwarded so the harness bounds each call by the wrapped tool's own
-    /// policy. Without it the trait default reported `Inherit` for every
-    /// registered tool, so `shell` (Unbounded unless `timeout_secs`) and the
-    /// tools sized to a human wait were all killed at the inherited 120s.
+    /// Forwarded so each call gets the wrapped tool's own deadline; the trait
+    /// default capped every tool, `shell` included, at the inherited 120s.
     fn timeout_policy(&self, arguments: &serde_json::Value) -> tinytools::ToolTimeout {
         self.resolved_tool()
             .map_or(tinytools::ToolTimeout::Inherit, |tool| {
