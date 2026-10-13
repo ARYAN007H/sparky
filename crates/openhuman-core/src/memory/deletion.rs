@@ -124,7 +124,9 @@ impl DeletionExecutor for Executor<'_> {
 
     async fn run(&self, deletion: &PendingDeletion) -> Result<usize, String> {
         let result = match deletion {
-            PendingDeletion::Thread { thread_id } => forget_thread_now(self.config, thread_id).await,
+            PendingDeletion::Thread { thread_id } => {
+                forget_thread_now(self.config, thread_id).await
+            }
             PendingDeletion::Source { source_id } => {
                 super::sources::forget_items(self.config, source_id).await
             }

@@ -185,7 +185,7 @@ pub(super) fn enqueue(
                     "learning namespace is outside the trusted reach",
                 ));
             }
-            Operation::Learn {
+            WriteOperation::Learn {
                 item: super::guard::scrub(item),
             }
         }
@@ -203,11 +203,11 @@ pub(super) fn enqueue(
             if ids.is_empty() {
                 return Err(MemoryError::invalid("forget needs at least one id"));
             }
-            Operation::Forget { ids, reach }
+            WriteOperation::Forget { ids, reach }
         }
         _ => return Err(MemoryError::invalid("expected a memory write")),
     };
-        let _guard = LOCK
+    let _guard = LOCK
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     if !file.exists() && partitions(config)?.len() >= MAX_PENDING {
@@ -217,7 +217,7 @@ pub(super) fn enqueue(
     }
     let owner = owner_state(config);
     let ack = queue(&file)
-        .enqueue(operation, acknowledgement_scope, binding(config), &owner.gate)
+        .enqueue(operation, scope_root, binding(config), &owner.gate)
         .map_err(map_pending)?;
     Ok(match ack {
         Ack::Learned { id } => serde_json::json!({"id":id, "status":QUEUED}),
@@ -558,18 +558,13 @@ impl WriteExecutor for Executor<'_> {
         };
         match tokio::time::timeout(WRITE_TIMEOUT, work).await {
             Ok(Ok(())) => Ok(()),
-            Ok(Err(error)) => Err(MemoryError::code(&error).to_string()),
+            Ok(Err(error)) => Err(error.code().to_string()),
             Err(_) => Err("TIMEOUT".to_string()),
         }
     }
 }
 
-async fn drain_locked(
-    config: &Config,
-    file: &Path,
-    state: &OwnerState,
-    generation: u64,
-) -> usize {
+async fn drain_locked(config: &Config, file: &Path, state: &OwnerState, generation: u64) -> usize {
     if config.memory.engine == super::engine::DISABLED_ENGINE {
         return 0;
     }
