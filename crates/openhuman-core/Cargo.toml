@@ -158,6 +158,10 @@ tinystoragedrivers = { path = "../../vendor/tinyagents/vendor/tinystoragedrivers
 # `modules::storage_host` interface answers loaded modules with. Modules only.
 tinystoragedrivers-bus = { path = "../../vendor/tinyagents/vendor/tinystoragedrivers/crates/tinystoragedrivers-bus", optional = true }
 tinystoragedrivers-client = { path = "../../vendor/tinyagents/vendor/tinystoragedrivers/crates/tinystoragedrivers-client", optional = true }
+# The module-side export macro, used only to wrap the host's own storage server
+# as a *linked* module (`modules/storage_host_linked.rs`): a linked module is the
+# one in-process recipient the bus attests, so it is how `Secrets` can be served.
+tinybus-module = { path = "../../vendor/tinybus/crates/tinybus-module", optional = true }
 tinyagents-runtime = { path = "../../vendor/tinyagents/crates/tinyagents-runtime" }
 tinyagents-orchestration = { path = "../../vendor/tinyagents/crates/tinyagents-orchestration" }
 tinyagents-tasks = { path = "../../vendor/tinyagents/crates/tinyagents-tasks" }
@@ -679,6 +683,7 @@ modules = [
     "dep:tinywallet-bus",
     "dep:tinystoragedrivers-bus",
     "dep:tinystoragedrivers-client",
+    "dep:tinybus-module",
 ]
 # Voice domain: STT/TTS providers, the standalone dictation
 # server, and always-on listening.
