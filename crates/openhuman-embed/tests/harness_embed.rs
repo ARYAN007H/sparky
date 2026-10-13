@@ -257,7 +257,7 @@ fn a_harness_runs_a_turn_against_the_provider_it_was_given() {
             // removing the agent awaits the close first.
             harness
                 .runtime()
-                .remove_agent(openhuman_embed::HARNESS_AGENT_ID)
+                .remove_agent("harness")
                 .await
                 .expect("the harness agent is removed and its cleanup acknowledged");
             drop(harness);
