@@ -135,34 +135,34 @@ pub(crate) const TINYCONNECTORS: ModuleRecord = ModuleRecord {
     release_url: "https://github.com/tinyhumansai/tinyconnectors/releases/tag/v0.18.0",
     assets: &[
         PlatformAsset {
-            host_key: "ubuntu-24.04-x86_64",
-            archive: "tinyconnectors-0.18.0-ubuntu-24.04-x86_64.tar.gz",
-            sha256: "88a3298c62fd20418ce5e563e7261d322a8b2a55b3b9e6f85952c70c77c4d038",
+            host_key: "archlinux-arm64",
+            archive: "tinyconnectors-0.18.0-archlinux-arm64.tar.gz",
+            sha256: "1f88b89aab79f443a89e894d3b767d46a75e60aae44270b8a70fb64a940b15f9",
         },
         PlatformAsset {
-            host_key: "ubuntu-24.04-arm64",
-            archive: "tinyconnectors-0.18.0-ubuntu-24.04-arm64.tar.gz",
-            sha256: "1699dec831e5876d9aad878dce155a4c30c3f872c58f50b14188973e16dde4e8",
+            host_key: "archlinux-x86_64",
+            archive: "tinyconnectors-0.18.0-archlinux-x86_64.tar.gz",
+            sha256: "9eb635f95d4d483dbfe77605c73cf2762b141aeb7643b648b28810424b01c0e2",
         },
         PlatformAsset {
-            host_key: "ubuntu-22.04-x86_64",
-            archive: "tinyconnectors-0.18.0-ubuntu-22.04-x86_64.tar.gz",
-            sha256: "541e749cac08df822ffe95b604ad9a95d9640a6a1290fda1b6218196baf0a571",
+            host_key: "fedora-43-arm64",
+            archive: "tinyconnectors-0.18.0-fedora-43-arm64.tar.gz",
+            sha256: "b70cf6b82106bfd3de16d126a32ec9bda5c1562fd30910ec3c41b5feedd44f40",
         },
         PlatformAsset {
-            host_key: "ubuntu-22.04-arm64",
-            archive: "tinyconnectors-0.18.0-ubuntu-22.04-arm64.tar.gz",
-            sha256: "4828242bbdc8026566eff76f8748bf30c5bc65cd668967a2b649c93dc4968a6c",
+            host_key: "fedora-43-x86_64",
+            archive: "tinyconnectors-0.18.0-fedora-43-x86_64.tar.gz",
+            sha256: "b85bdba6e3a323f57a8f15e111256a3c4ba0e3964f53d3ed5f487c50a4fc3de5",
         },
         PlatformAsset {
-            host_key: "macos-26-arm64",
-            archive: "tinyconnectors-0.18.0-macos-26-arm64.tar.gz",
-            sha256: "a477e127a4aaa3143dee1bb6edf267af9d25fa60e3aa2c24793ad6e2a2d92ef3",
+            host_key: "fedora-44-arm64",
+            archive: "tinyconnectors-0.18.0-fedora-44-arm64.tar.gz",
+            sha256: "773af57110b4a398b7d7c23491893dc9233fe52f517ba308435cf8235fd56c3d",
         },
         PlatformAsset {
-            host_key: "macos-26-x86_64",
-            archive: "tinyconnectors-0.18.0-macos-26-x86_64.tar.gz",
-            sha256: "7ef87939be10f1e7b002d509442043378ed8ee53eebf0a34e95813dc79bab157",
+            host_key: "fedora-44-x86_64",
+            archive: "tinyconnectors-0.18.0-fedora-44-x86_64.tar.gz",
+            sha256: "8b1647e1a7207ad96044bb741e704dc8f56ec578ce30c862eb13d3af4b7c9bd3",
         },
         PlatformAsset {
             host_key: "macos-15-arm64",
@@ -175,9 +175,39 @@ pub(crate) const TINYCONNECTORS: ModuleRecord = ModuleRecord {
             sha256: "7df3d800fd42d99c873d0ad915e14382f1cade7bb3c3e0f6fa6f9363f645adc3",
         },
         PlatformAsset {
-            host_key: "windows-2025-x86_64",
-            archive: "tinyconnectors-0.18.0-windows-2025-x86_64.zip",
-            sha256: "2d33cffaded0125f7d3cbe2bea84eb9680c965229b0d6dea28277b0e71e9a35f",
+            host_key: "macos-26-arm64",
+            archive: "tinyconnectors-0.18.0-macos-26-arm64.tar.gz",
+            sha256: "a477e127a4aaa3143dee1bb6edf267af9d25fa60e3aa2c24793ad6e2a2d92ef3",
+        },
+        PlatformAsset {
+            host_key: "macos-26-x86_64",
+            archive: "tinyconnectors-0.18.0-macos-26-x86_64.tar.gz",
+            sha256: "7ef87939be10f1e7b002d509442043378ed8ee53eebf0a34e95813dc79bab157",
+        },
+        PlatformAsset {
+            host_key: "ubuntu-22.04-arm64",
+            archive: "tinyconnectors-0.18.0-ubuntu-22.04-arm64.tar.gz",
+            sha256: "4828242bbdc8026566eff76f8748bf30c5bc65cd668967a2b649c93dc4968a6c",
+        },
+        PlatformAsset {
+            host_key: "ubuntu-22.04-x86_64",
+            archive: "tinyconnectors-0.18.0-ubuntu-22.04-x86_64.tar.gz",
+            sha256: "541e749cac08df822ffe95b604ad9a95d9640a6a1290fda1b6218196baf0a571",
+        },
+        PlatformAsset {
+            host_key: "ubuntu-24.04-arm64",
+            archive: "tinyconnectors-0.18.0-ubuntu-24.04-arm64.tar.gz",
+            sha256: "1699dec831e5876d9aad878dce155a4c30c3f872c58f50b14188973e16dde4e8",
+        },
+        PlatformAsset {
+            host_key: "ubuntu-24.04-x86_64",
+            archive: "tinyconnectors-0.18.0-ubuntu-24.04-x86_64.tar.gz",
+            sha256: "88a3298c62fd20418ce5e563e7261d322a8b2a55b3b9e6f85952c70c77c4d038",
+        },
+        PlatformAsset {
+            host_key: "windows-11-arm64",
+            archive: "tinyconnectors-0.18.0-windows-11-arm64.zip",
+            sha256: "c6a70997bb42f72b24009006d3b00d85d674ef619447dea58c5d17a9ab6b6c11",
         },
         PlatformAsset {
             host_key: "windows-2022-x86_64",
@@ -185,9 +215,9 @@ pub(crate) const TINYCONNECTORS: ModuleRecord = ModuleRecord {
             sha256: "5a35fd8f5e8733e26089ad5ee7cb10294a4c8125ebfa9f823f072a18cf92be89",
         },
         PlatformAsset {
-            host_key: "windows-11-arm64",
-            archive: "tinyconnectors-0.18.0-windows-11-arm64.zip",
-            sha256: "c6a70997bb42f72b24009006d3b00d85d674ef619447dea58c5d17a9ab6b6c11",
+            host_key: "windows-2025-x86_64",
+            archive: "tinyconnectors-0.18.0-windows-2025-x86_64.zip",
+            sha256: "2d33cffaded0125f7d3cbe2bea84eb9680c965229b0d6dea28277b0e71e9a35f",
         },
     ],
     // Lazy: a user with no connected accounts should not pay to load it, and
