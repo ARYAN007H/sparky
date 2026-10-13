@@ -171,10 +171,8 @@ async fn retryable_shell_failure_consumes_the_whole_retry_budget() {
 
     let counter = tmp.path().join("retryable-attempts.log");
     let job = test_job(&counting_failure_command(&counter));
-    let security =
-        SecurityPolicy::from_config(&config.autonomy, &config.workspace_dir, &config.action_dir);
 
-    let (success, output) = execute_job_with_retry(&config, &security, &job).await;
+    let (success, output) = execute_job_now(&config, &job, "test-run").await;
 
     assert!(
         !success,
@@ -232,7 +230,7 @@ async fn security_policy_block_halts_without_spending_the_retry_budget() {
     );
 
     let started = std::time::Instant::now();
-    let (success, output) = execute_job_with_retry(&config, &security, &job).await;
+    let (success, output) = execute_job_now(&config, &job, "test-run").await;
     let elapsed = started.elapsed();
 
     assert!(!success, "a blocked job cannot succeed; got {output}");
