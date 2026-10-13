@@ -174,7 +174,10 @@ pub(crate) fn module_config_with_proxy(
                 .as_deref()
                 .unwrap_or("https://backend.composio.dev/api/v3");
             if let Some(transport) =
-                crate::integrations::composio::client::module_transport_with_proxy(destination, proxy)
+                crate::integrations::composio::client::module_transport_with_proxy(
+                    destination,
+                    proxy,
+                )
             {
                 payload["transport"] = serde_json::json!(transport);
             }

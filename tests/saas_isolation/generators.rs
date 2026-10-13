@@ -213,9 +213,10 @@ pub const GENERATORS: &[(&str, Generator)] = &[
     // Sub-agent ids are minted by live turns the mock model cannot spawn, so
     // these aim at ids no profile owns: another profile's or an unknown task
     // must answer the same "nothing running" and never touch a worker.
-    ("openhuman.subagent_cancel", |w, a| {
-        json!({ "taskId": format!("sub-{}", w.next_id()), "reason": w.canary(a) })
-    }),
+    (
+        "openhuman.subagent_cancel",
+        |w, a| json!({ "taskId": format!("sub-{}", w.next_id()), "reason": w.canary(a) }),
+    ),
     ("openhuman.subagent_steer", |w, a| {
         let mode = ["steer", "collect"][w.rng.below(2)];
         json!({
