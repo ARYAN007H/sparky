@@ -1,7 +1,6 @@
 use super::*;
 use crate::storage::rusqlite;
 use crate::storage::{MemoryStorage, Scope};
-use sha2::Digest as _;
 use std::collections::BTreeMap;
 use tempfile::TempDir;
 use tinystoragedrivers::{DocumentStoreExt, Query};

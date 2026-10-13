@@ -1,7 +1,7 @@
 use super::*;
 use crate::integrations::composio::contract::NormalizedTask;
 use crate::integrations::task_sources::store as live;
-use crate::integrations::task_sources::types::{FilterSpec, ProviderSlug, SourceTarget};
+use crate::integrations::task_sources::types::{FilterSpec, SourceTarget};
 use crate::storage::import::{run_with, Outcome};
 use crate::storage::rusqlite::params;
 use serde_json::json;

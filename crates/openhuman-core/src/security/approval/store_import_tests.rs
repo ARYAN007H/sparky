@@ -2,7 +2,6 @@ use super::*;
 use crate::security::approval::store as live;
 use crate::security::approval::types::{ApprovalDecision, ApprovalSourceContext};
 use crate::storage::import::{run_with, Outcome};
-use crate::storage::DocumentStore;
 use crate::storage::rusqlite;
 use chrono::{Duration, Utc};
 use tempfile::TempDir;

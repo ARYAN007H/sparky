@@ -1,8 +1,7 @@
 use super::*;
 use crate::desktop::notifications::store as live;
 use crate::desktop::notifications::types::{
-    CoreNotificationCategory, CoreNotificationEvent, IntegrationNotification, NotificationSettings,
-    NotificationStatus,
+    CoreNotificationCategory, CoreNotificationEvent, IntegrationNotification, NotificationStatus,
 };
 use crate::storage::import::{run_with, Outcome};
 use chrono::{Duration, Utc};
