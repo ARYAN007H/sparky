@@ -245,3 +245,19 @@ fn direct_auth_refusals_preserve_the_provider_status_and_prevent_duplicate_repor
         &message
     ));
 }
+
+#[test]
+fn a_host_pinned_credential_outranks_the_mode_and_the_store() {
+    let mut config = bare_config();
+    config.composio.mode = COMPOSIO_MODE_BACKEND.into();
+    config.composio.pin_host_credential(
+        crate::config::ComposioHostCredential::direct("ck_pinned")
+            .entity_id("tenant-7")
+            .base_urls("http://127.0.0.1:1/v2", "http://127.0.0.1:1/v3"),
+    );
+    let route = module_config(&config).expect("pinned credential names a route");
+    assert_eq!(route["route"], "direct");
+    assert_eq!(route["api_key"], "ck_pinned");
+    assert_eq!(route["entity_id"], "tenant-7");
+    assert_eq!(route["base_url"], "http://127.0.0.1:1/v3");
+}

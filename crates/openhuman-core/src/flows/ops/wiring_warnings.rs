@@ -137,7 +137,7 @@ pub(super) async fn graph_output_field_warnings(
             // exact slug overrides the schema-derived `output_fields` — most
             // relevant for an action whose live listing publishes no output
             // schema at all (e.g. every GitHub action, verified live).
-            let contract = crate::flows::tinyflows::caps::apply_probe_override(contract.clone());
+            let contract = contract.clone();
             // Nothing real to check `field_path` against — schema unknown AND
             // no probed output fields either.
             if contract.output_schema.is_none() && contract.output_fields.is_empty() {
@@ -217,7 +217,7 @@ pub(super) async fn graph_output_field_warnings(
 ///    this already bakes in the `data.` segment Composio's execute-response
 ///    wrapper adds, so `expected` below comes out `"json.data.<…>"` with no
 ///    extra handling needed here — and, via
-///    [`crate::flows::tinyflows::caps::apply_probe_override`], a real
+///    the module's probe overlay, a real
 ///    `get_tool_output_sample` probe for this slug overrides a schema that
 ///    never named an array at all): if the configured `config.path` doesn't match the
 ///    `json.<primary_array_path>` convention, suggest the real path.
@@ -239,7 +239,7 @@ pub(super) async fn graph_output_field_warnings(
 /// `primary_array_path` NOR an `output_schema` is known (truly nothing to
 /// check against).
 async fn graph_split_out_path_warnings(config: &Config, graph: &WorkflowGraph) -> Vec<String> {
-    use crate::flows::tinyflows::caps::{apply_probe_override, fetch_live_toolkit_catalog};
+    use crate::flows::tinyflows::caps::fetch_live_toolkit_catalog;
     use crate::integrations::composio::contract::toolkit_from_slug;
 
     let mut warnings = Vec::new();
@@ -276,7 +276,7 @@ async fn graph_split_out_path_warnings(config: &Config, graph: &WorkflowGraph) -
             };
             // B12: a real-output probe overrides the schema-derived
             // `primary_array_path` for this exact slug when one is cached.
-            let contract = apply_probe_override(contract.clone());
+            let contract = contract.clone();
 
             match contract.primary_array_path.as_deref() {
                 Some(primary) => {

@@ -6,16 +6,16 @@ fn tinycomputer_registry_matches_bus_contract_and_published_release() {
     let desktop = find("tinycomputer").expect("compiled computer module");
     assert_eq!(desktop.bus_name, tinycomputer_bus::names::INTERFACE);
     assert_eq!(desktop.object_path, tinycomputer_bus::names::OBJECT_PATH);
-    assert_eq!(desktop.version, "0.11.0");
-    assert_eq!(desktop.assets.len(), 16);
-    assert_eq!(tinycomputer_bus::CONTRACT_VERSION, (2, 12));
+    assert_eq!(desktop.version, "0.12.0");
+    assert_eq!(desktop.assets.len(), 17);
+    assert_eq!(tinycomputer_bus::CONTRACT_VERSION, (2, 16));
     assert_eq!(
         desktop.asset_for("ubuntu-24.04-x86_64").unwrap().sha256,
-        "430426bdbc6f8ad8cc5ed17d6f3bd05f73b4d4fe747a8fc9b77f0b3f4fd3506b"
+        "ab6f0cdc859dc16bbe8683666a801d25458e262951f6cdd0d1d859ef7dafdd2a"
     );
     assert_eq!(
         desktop.asset_for("macos-26-arm64").unwrap().sha256,
-        "3a8e20a809262be2154c1b7339fed2a627c13c32b2a7b9de52e4d54ced94a994"
+        "a1353832da53723b2fa8692cea211e3cb6bada080ed57c4b3fe4cddb820832fe"
     );
 }
 
@@ -552,67 +552,67 @@ fn find_resolves_known_ids_only() {
 #[test]
 fn tinychannels_registry_matches_scoped_runtime_release() {
     let record = find("tinychannels").expect("compiled TinyChannels module");
-    assert_eq!(record.version, "0.1.29");
-    assert_eq!(tinychannels_bus::CONTRACT_VERSION, 20);
+    assert_eq!(record.version, "0.1.30");
+    assert_eq!(tinychannels_bus::CONTRACT_VERSION, 21);
     assert_eq!(
         tinychannels_bus::module_relay::MODULE_OPERATION_VERSION,
-        (1, 20)
+        (1, 21)
     );
     let expected = [
         (
             "macos-15-arm64",
-            "tinychannels-module-0.1.29-macos-15-arm64.tar.gz",
-            "a1dbca6cc5bb04baec1f5b82d43593d87eb135619f95be3d64441a96cc95127e",
+            "tinychannels-module-0.1.30-macos-15-arm64.tar.gz",
+            "c23e3c099f33121e14a520dfec994e7b5da6205da02ea001d71b28889e5f269b",
         ),
         (
             "macos-15-x86_64",
-            "tinychannels-module-0.1.29-macos-15-x86_64.tar.gz",
-            "464ceaca6acb3f6653c5e77c6e7d6d357a0cfbcc5e9691f55dc7eb4e1368a7a6",
+            "tinychannels-module-0.1.30-macos-15-x86_64.tar.gz",
+            "455e33ffb1d93b0a1023e8b4d528b49ccbc0ed95851b1fb2733649994efe9bfc",
         ),
         (
             "macos-26-arm64",
-            "tinychannels-module-0.1.29-macos-26-arm64.tar.gz",
-            "2943b3e8d6b2006a93ad1f880cfc7cd4fbcfb48540c0913bb6318470249edf9c",
+            "tinychannels-module-0.1.30-macos-26-arm64.tar.gz",
+            "b2bcc666b980eab9a3090312ed83482a34591f1f4ecc73346f8e1e2422f482eb",
         ),
         (
             "macos-26-x86_64",
-            "tinychannels-module-0.1.29-macos-26-x86_64.tar.gz",
-            "50e92f04b2ef30db6f5053742819a2fbfdfb6d6361f63124fac9f32079775970",
+            "tinychannels-module-0.1.30-macos-26-x86_64.tar.gz",
+            "d92cb8757f49ebaf3b5d7ecbd79af193a4d4bb002e9b78ce473091d649b08b31",
         ),
         (
             "ubuntu-22.04-arm64",
-            "tinychannels-module-0.1.29-ubuntu-22.04-arm64.tar.gz",
-            "ae621d0ff6cc908135073a2d990ac7d3bc9fd5cc9da99ddcd52e2c610359f7b0",
+            "tinychannels-module-0.1.30-ubuntu-22.04-arm64.tar.gz",
+            "5852f6888541332cacaed2401ed67815588ba076d60926fdb31daedb13185b12",
         ),
         (
             "ubuntu-22.04-x86_64",
-            "tinychannels-module-0.1.29-ubuntu-22.04-x86_64.tar.gz",
-            "e9b5d5d77f551fc17c715bcc23ce9d18d337570ccc5500438bdeff3d5d507dd6",
+            "tinychannels-module-0.1.30-ubuntu-22.04-x86_64.tar.gz",
+            "f63bb9034aa48a2335bea0a86ad0f1f920121281b88611c11a9e09fdac8cfe02",
         ),
         (
             "ubuntu-24.04-arm64",
-            "tinychannels-module-0.1.29-ubuntu-24.04-arm64.tar.gz",
-            "699dfb6ae0ab31deb1334fc287b58fc75e31606ce8f28c07a9dcec1c089c6d9c",
+            "tinychannels-module-0.1.30-ubuntu-24.04-arm64.tar.gz",
+            "810f68f723e9817d7343944137a00689ef997f57e4e241f496120350a1ba58f6",
         ),
         (
             "ubuntu-24.04-x86_64",
-            "tinychannels-module-0.1.29-ubuntu-24.04-x86_64.tar.gz",
-            "3b90fb51324a9068ad7ab5deb8162584d1bebac75ef4abfa05984b6d73fe2db0",
+            "tinychannels-module-0.1.30-ubuntu-24.04-x86_64.tar.gz",
+            "61e7a6f956b17ae53e83a2b0068f1009b0fde0b1266ca4f8f1a7feb8fb077104",
         ),
         (
             "windows-11-arm64",
-            "tinychannels-module-0.1.29-windows-11-arm64.zip",
-            "efd1b177c73832510434e97f3c3e7e4ee40f36e0d24f6938a5b3e0dfc9297f0c",
+            "tinychannels-module-0.1.30-windows-11-arm64.zip",
+            "122b253a859f769a6ae5e89ea9adc5edaefc5471bf26e6bf8d09e7e0bef3d236",
         ),
         (
             "windows-2022-x86_64",
-            "tinychannels-module-0.1.29-windows-2022-x86_64.zip",
-            "c8d8dac1e6529d552920ae2d77520971a9cd1241e164b0b4c588384ebaf297da",
+            "tinychannels-module-0.1.30-windows-2022-x86_64.zip",
+            "2a8905d6a72bdbc7c4839fa7afb38362deef54eb2296f918b6af016dd8d54090",
         ),
         (
             "windows-2025-x86_64",
-            "tinychannels-module-0.1.29-windows-2025-x86_64.zip",
-            "c347c824605aae4411b3b5e1385c689043da288445ce75fc58839f7d354aafb6",
+            "tinychannels-module-0.1.30-windows-2025-x86_64.zip",
+            "feeddcb7beaa48e4bfda78e40cf6ce999cb7e4abd0414a6595da44665546af88",
         ),
     ];
     assert_eq!(record.assets.len(), expected.len());
@@ -627,63 +627,63 @@ fn tinychannels_registry_matches_scoped_runtime_release() {
 #[test]
 fn voice_capture_release_pins_summary_contract_and_every_platform_digest() {
     let record = find("tinyvoice").unwrap();
-    assert_eq!(record.version, "0.2.0");
-    assert_eq!(tinyvoice_bus::CONTRACT_VERSION, (1, 9));
+    assert_eq!(record.version, "0.3.0");
+    assert_eq!(tinyvoice_bus::CONTRACT_VERSION, (1, 10));
     let expected = [
         (
             "macos-15-arm64",
-            "tinyvoice-module-0.2.0-macos-15-arm64.tar.gz",
-            "340e799db919f145382b372c45d237ef1edbf69afa2fa0ab976eccd850b62f03",
+            "tinyvoice-module-0.3.0-macos-15-arm64.tar.gz",
+            "91b231f6b6e48e3f78a9ae8b3fecab606c7d20f004fe300c030b883df845fd82",
         ),
         (
             "macos-15-x86_64",
-            "tinyvoice-module-0.2.0-macos-15-x86_64.tar.gz",
-            "f5bd0ab69258b5fda58074768c959df41f49ed1fda34a8c2d32027b7feb0348e",
+            "tinyvoice-module-0.3.0-macos-15-x86_64.tar.gz",
+            "f9f4ed3fa6e3615c7f747a619b8c32a2ee252d51541226e27142422273104dad",
         ),
         (
             "macos-26-arm64",
-            "tinyvoice-module-0.2.0-macos-26-arm64.tar.gz",
-            "7a7babe46af562e9833d59a594f66babe76bdc0a7b925754d04bde8579bb1299",
+            "tinyvoice-module-0.3.0-macos-26-arm64.tar.gz",
+            "4cdbab216808163d8fe33bf9c55eea1355fe1d84cd265167971dac2763f65807",
         ),
         (
             "macos-26-x86_64",
-            "tinyvoice-module-0.2.0-macos-26-x86_64.tar.gz",
-            "a29df2511d63eec3c1cb97bdee2a13a7da94f3c53f5f36cb217c271363e6c2fa",
+            "tinyvoice-module-0.3.0-macos-26-x86_64.tar.gz",
+            "8f12b00fa3474cd5ba2baef3e0e8f8dfb30a401f103bf70d339d8d997ce79597",
         ),
         (
             "ubuntu-22.04-arm64",
-            "tinyvoice-module-0.2.0-ubuntu-22.04-arm64.tar.gz",
-            "e59e98a6844e6e202da9df539d63dedc0cb2c7c733b8cd91ff6fc6b9a2baf9a0",
+            "tinyvoice-module-0.3.0-ubuntu-22.04-arm64.tar.gz",
+            "d20f000a9343167016fbfef7007ee6fdd8b84f022cdc15d96c203a0b43aab058",
         ),
         (
             "ubuntu-22.04-x86_64",
-            "tinyvoice-module-0.2.0-ubuntu-22.04-x86_64.tar.gz",
-            "57330db85525148a78352882181ab7008fd79c18528289ed43f11cdae4f01c31",
+            "tinyvoice-module-0.3.0-ubuntu-22.04-x86_64.tar.gz",
+            "5e1f4b18a6662244fc1488166db153f9df60c651828e44e8bcfd55dc46698087",
         ),
         (
             "ubuntu-24.04-arm64",
-            "tinyvoice-module-0.2.0-ubuntu-24.04-arm64.tar.gz",
-            "d9cfea6d2a910e98f6609dbca65d3bbdcc3950f40615545a0ce14d9117ce34cd",
+            "tinyvoice-module-0.3.0-ubuntu-24.04-arm64.tar.gz",
+            "fadbe5b4b9d47744a21096838c10e2ad03b3be43f690f8cef7deb1d2fc1bc427",
         ),
         (
             "ubuntu-24.04-x86_64",
-            "tinyvoice-module-0.2.0-ubuntu-24.04-x86_64.tar.gz",
-            "7993badf940bfbc988c078f9c1ba40af29a6e4177ead8680b78e7a98545cc5e4",
+            "tinyvoice-module-0.3.0-ubuntu-24.04-x86_64.tar.gz",
+            "945fdd762be37c779bdf16b96da03109ce82c7b43d5bb9865e0dfc32e239d883",
         ),
         (
             "windows-11-arm64",
-            "tinyvoice-module-0.2.0-windows-11-arm64.zip",
-            "d7be3ffd3e6bd2d3deb7f334d447250cb31228f49dfec86e3a24c4d3e4d93754",
+            "tinyvoice-module-0.3.0-windows-11-arm64.zip",
+            "7b7e247fb2b6f8be6948ffbe21ed9244e01dac6f367db12b5a78d014d13b8ae9",
         ),
         (
             "windows-2022-x86_64",
-            "tinyvoice-module-0.2.0-windows-2022-x86_64.zip",
-            "15190a7cd8a3d49d4b4c9b4e3e39247fa936ecea9a7d5f7becd2911e97a8636b",
+            "tinyvoice-module-0.3.0-windows-2022-x86_64.zip",
+            "b2485d846a3287c47da303237680e0cbe76a210e5ef2f25027220cde4ffb8ed4",
         ),
         (
             "windows-2025-x86_64",
-            "tinyvoice-module-0.2.0-windows-2025-x86_64.zip",
-            "57c802f2e1c07c66aae10de26013f3ddb6f02d5309fb6ea5f0580d048501bd86",
+            "tinyvoice-module-0.3.0-windows-2025-x86_64.zip",
+            "ff91872dee9ac3ab098bea1830fe1bebd6f16a8cc3267e02ee36a74d0bc48469",
         ),
     ];
     assert_eq!(record.assets.len(), expected.len());

@@ -143,10 +143,7 @@ pub(crate) async fn search_catalog(
 
     let toolkits: Vec<String> = match toolkit_filter {
         Some(tk) if !tk.trim().is_empty() => vec![tk.trim().to_ascii_lowercase()],
-        _ => agent_ready_toolkits()
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+        _ => agent_ready_toolkits(),
     };
 
     // Fetch every candidate toolkit's live catalog concurrently — a bare
