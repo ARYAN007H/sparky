@@ -78,7 +78,7 @@ consumers: the agent harness ([`agent/session_host/builder/factory.rs`](../../ag
 [`web_chat/web_errors/`](../../web_chat/web_errors/) (`classify.rs`, `budget.rs`, `retry.rs`, `timeout.rs`,
 `backend_error_code.rs`, `provider_detail.rs`, `response_predicates.rs`), `voice/factory/{helpers,mod}.rs`,
 [`inference/ops.rs`](../ops.rs) / [`inference/schemas/`](../schemas/) /
-[`inference/http/server.rs`](../http/server.rs),
+[`inference/http/backend.rs`](../http/server.rs),
 `flows/tinyflows/caps/{llm,prompt,agent}.rs`, [`cron/scheduler/failure_classification.rs`](../../cron/scheduler/failure_classification.rs)
 (`is_budget_exhausted_message`), and [`threads/ops/usage.rs`](../../threads/ops/usage.rs) (`UsageInfo`).
 
