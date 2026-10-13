@@ -1,5 +1,4 @@
 use super::*;
-use tokio::sync::Mutex;
 use crate::voice::server::types::{MAX_INITIAL_PROMPT_CHARS, MAX_RECENT_TRANSCRIPTS};
 
 #[test]
