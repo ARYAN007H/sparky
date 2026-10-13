@@ -372,8 +372,11 @@ pub(crate) fn migrate_components_with(config: &mut Config, raw: &str, tinymemes:
         }
         node.get("enabled").and_then(toml::Value::as_bool)
     };
-    let sandbox_off = [sandbox_flag(&["sandbox"]), sandbox_flag(&["security", "sandbox"])]
-        .contains(&Some(false));
+    let sandbox_off = [
+        sandbox_flag(&["sandbox"]),
+        sandbox_flag(&["security", "sandbox"]),
+    ]
+    .contains(&Some(false));
     disable(config, "sandbox", sandbox_off.then_some(false));
     if !moved.is_empty() {
         tracing::info!(
