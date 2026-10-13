@@ -28,7 +28,7 @@ use tinymcp_bus::{
 
 use crate::{
     config::Config,
-    modules::{client::ModuleCallError, client::ModuleClient},
+    ,
 };
 
 const MODULE: &str = "tinymcp";
@@ -413,7 +413,7 @@ impl McpConfiguredClient {
             .call_object(&object.object_path, member, args, confidential)
             .await?;
         serde_json::from_value(reply).map_err(|_| {
-            ModuleClient::report_malformed_reply(MODULE);
+            crate::modules::report::malformed_reply(MODULE);
             ModuleCallError::ModuleFault
         })
     }

@@ -63,7 +63,7 @@ pub async fn start_recording(config: &Config) -> Result<RecordingHandle, String>
 pub async fn list_input_devices(config: &Config) -> Result<Vec<String>, String> {
     use tinyvoice_bus::{capture::CaptureResult, names::methods};
     let result: CaptureResult<Vec<String>> =
-        crate::modules::client::ModuleClient::new(config.clone())
+        crate::modules::ops::client(config.clone())
             .call_confidential("tinyvoice", methods::LIST_INPUT_DEVICES, ())
             .await
             .map_err(|e| e.to_string())?;

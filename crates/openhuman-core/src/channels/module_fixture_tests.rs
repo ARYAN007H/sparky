@@ -8,7 +8,7 @@
 //! on a process-lifetime runtime, so it outlives the short Tokio runtimes of
 //! individual tests.
 
-use crate::modules::client::ModuleClient;
+use tinybus::module::ModuleClient;
 use tinychannels_bus::methods;
 
 /// Return a client for the compiled, linked TinyChannels module fixture.

@@ -178,7 +178,7 @@ pub(crate) async fn process_channel_runtime_message(
                     emoji,
                 )) => Some(emoji),
                 Ok(_) => {
-                    crate::modules::client::ModuleClient::report_malformed_reply("tinychannels");
+                    crate::modules::report::malformed_reply("tinychannels");
                     None
                 }
                 Err(_) => None,

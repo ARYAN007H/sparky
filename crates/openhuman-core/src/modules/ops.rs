@@ -173,7 +173,7 @@ pub fn resolver(config: &Config) -> Resolver {
 /// facade before the first call when artifacts ship with the host.
 #[must_use]
 pub fn client(config: Config) -> ModuleClient {
-    ModuleClient::new(resolver(&config))
+    crate::modules::ops::client(resolver(&config))
 }
 
 /// Log which source serves each module and warn about a local build whose

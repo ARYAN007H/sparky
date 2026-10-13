@@ -1,6 +1,6 @@
 //! Identity-scoped channel objects and cancellation-safe callback ownership.
 
-use super::client::{ModuleCallError, ModuleClient, ModuleObjectClient};
+use tinybus::module::{ModuleCallError, ModuleClient, ModuleObjectClient};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -225,7 +225,7 @@ fn validate_reservation(reservation: &ChannelRuntimeReservation) -> Result<(), M
         || reservation.host_object_path
             != format!("{HOST_OBJECT_PATH}/runtime_{}", reservation.handle)
     {
-        ModuleClient::report_malformed_reply("tinychannels");
+        crate::modules::report::malformed_reply("tinychannels");
         return Err(ModuleCallError::ModuleFault);
     }
     Ok(())

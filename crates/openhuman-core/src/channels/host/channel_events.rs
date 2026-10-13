@@ -1,7 +1,7 @@
 //! Host-owned approval routing and turn events over the channel module.
 use crate::channels::{Channel, ChannelSendExt, SendMessage};
 use crate::core::events::DomainEvent;
-use crate::modules::client::ModuleClient;
+use tinybus::module::ModuleClient;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -48,7 +48,7 @@ impl ChannelApprovalSurfaceSubscriber {
         if self.config.is_none() {
             return crate::channels::module_fixture::client().await;
         }
-        ModuleClient::new(self.config.as_deref().cloned().unwrap_or_default())
+        crate::modules::ops::client(self.config.as_deref().cloned().unwrap_or_default())
     }
 }
 #[async_trait]
@@ -165,7 +165,7 @@ impl EventHandler<DomainEvent> for ChannelApprovalSurfaceSubscriber {
                             .await;
                     }
                     Ok(_) => {
-                        ModuleClient::report_malformed_reply("tinychannels");
+                        crate::modules::report::malformed_reply("tinychannels");
                     }
                     Err(_) => {}
                 }
@@ -208,10 +208,10 @@ impl ChannelTurnStateSubscriber {
         let client = if self.config.is_none() {
             crate::channels::module_fixture::client().await
         } else {
-            ModuleClient::new(self.config.as_deref().cloned().unwrap_or_default())
+            crate::modules::ops::client(self.config.as_deref().cloned().unwrap_or_default())
         };
         #[cfg(not(test))]
-        let client = ModuleClient::new(self.config.as_deref().cloned().unwrap_or_default());
+        let client = crate::modules::ops::client(self.config.as_deref().cloned().unwrap_or_default());
         let result: Result<tinychannels_bus::module_remote::RemoteOperationResult, _> = client
             .call_confidential(
                 "tinychannels",

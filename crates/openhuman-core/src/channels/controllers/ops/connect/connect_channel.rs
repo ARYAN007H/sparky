@@ -3,7 +3,7 @@
 use super::shared::credential_provider;
 use crate::config::Config;
 use crate::core::Outcome;
-use crate::modules::client::{ModuleCallError, ModuleClient};
+use tinybus::module::{ModuleCallError, ModuleClient};
 use crate::security::credentials;
 use serde_json::Value;
 use tinychannels_bus::controllers::ChannelConnectionResult;
@@ -31,7 +31,7 @@ pub async fn connect_channel(
         HttpProxyPolicy::default()
     };
     let prepared = crate::modules::channel_controller::prepare_connection(
-        &ModuleClient::new(config.clone()),
+        &crate::modules::ops::client(config.clone()),
         ChannelControllerRequest::PrepareConnect {
             config: config.channels_config.clone(),
             channel: channel_id.to_owned(),
@@ -149,7 +149,7 @@ fn update_matches_scope(
 }
 
 fn malformed() -> String {
-    ModuleClient::report_malformed_reply("tinychannels");
+    crate::modules::report::malformed_reply("tinychannels");
     ModuleCallError::ModuleFault.to_string()
 }
 

@@ -1,7 +1,7 @@
 use super::*;
 
 #[cfg(feature = "modules")]
-use crate::modules::client::ModuleClient;
+use tinybus::module::ModuleClient;
 
 #[cfg(feature = "modules")]
 #[derive(Clone, Default)]

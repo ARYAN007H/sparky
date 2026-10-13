@@ -124,7 +124,7 @@ pub(super) struct CaptureLease {
 }
 impl CaptureLease {
     pub(super) async fn reserve(config: &Config, kind: Kind) -> Result<Self, String> {
-        let port: Arc<dyn Port> = Arc::new(BusPort(ModuleClient::new(config.clone())));
+        let port: Arc<dyn Port> = Arc::new(BusPort(crate::modules::ops::client(config.clone())));
         Self::reserve_with_port(port, kind).await
     }
     async fn reserve_with_port(port: Arc<dyn Port>, kind: Kind) -> Result<Self, String> {
@@ -319,8 +319,8 @@ impl Drop for CaptureLease {
     }
 }
 fn malformed() -> String {
-    ModuleClient::report_malformed_reply(MODULE);
-    crate::modules::client::ModuleCallError::ModuleFault.to_string()
+    crate::modules::report::malformed_reply(MODULE);
+    tinybus::module::ModuleCallError::ModuleFault.to_string()
 }
 fn capture_error(error: CaptureError) -> String {
     let reason = match error {

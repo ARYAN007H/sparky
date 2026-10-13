@@ -28,7 +28,7 @@ fn model_slot() -> &'static Mutex<String> {
 /// Install the attribution model (host policy) and point the module at the
 /// snapshot location; the module loads a prior snapshot once per path.
 pub async fn configure(
-    client: &crate::modules::client::ModuleClient,
+    client: &tinybus::module::ModuleClient,
     attribution_model: String,
     workspace_dir: &std::path::Path,
 ) -> Result<(), String> {
@@ -97,7 +97,7 @@ fn request_for(
 
 /// Record one compaction's savings through the module.
 pub async fn record(
-    client: &crate::modules::client::ModuleClient,
+    client: &tinybus::module::ModuleClient,
     compressor: CompressorKind,
     original_tokens: u64,
     compacted_tokens: u64,
@@ -115,7 +115,7 @@ pub async fn record(
 
 /// Snapshot the module's savings aggregate.
 pub async fn stats(
-    client: &crate::modules::client::ModuleClient,
+    client: &tinybus::module::ModuleClient,
 ) -> Result<SavingsAggregate, String> {
     client
         .call(MODULE, methods::SAVINGS_STATS, ())
@@ -124,7 +124,7 @@ pub async fn stats(
 }
 
 /// Clear all recorded savings (and the persisted snapshot).
-pub async fn reset(client: &crate::modules::client::ModuleClient) -> Result<(), String> {
+pub async fn reset(client: &tinybus::module::ModuleClient) -> Result<(), String> {
     client
         .call::<()>(MODULE, methods::RESET_SAVINGS, ())
         .await

@@ -149,7 +149,7 @@ impl ModuleProgressiveReply {
         session: tokio_util::sync::CancellationToken,
     ) -> anyhow::Result<Self> {
         let callback = ManagedTransport::capture(&config, channel.clone(), session)?;
-        let runtime = ChannelRuntimeLease::open(ModuleClient::new(config), callback).await?;
+        let runtime = ChannelRuntimeLease::open(crate::modules::ops::client(config), callback).await?;
         let result: ProgressiveResult = runtime
             .object()
             .call_confidential(
@@ -162,7 +162,7 @@ impl ModuleProgressiveReply {
                 Ok(Self { runtime, handle })
             }
             _ => {
-                ModuleClient::report_malformed_reply("tinychannels");
+                crate::modules::report::malformed_reply("tinychannels");
                 Err(ModuleCallError::ModuleFault.into())
             }
         }
@@ -181,7 +181,7 @@ impl ModuleProgressiveReply {
             )
             .await?;
         if result != ProgressiveResult::Updated {
-            ModuleClient::report_malformed_reply("tinychannels");
+            crate::modules::report::malformed_reply("tinychannels");
             return Err(ModuleCallError::ModuleFault);
         }
         Ok(())
@@ -200,7 +200,7 @@ impl ModuleProgressiveReply {
             )
             .await?;
         if result != ProgressiveResult::Closed {
-            ModuleClient::report_malformed_reply("tinychannels");
+            crate::modules::report::malformed_reply("tinychannels");
             return Err(ModuleCallError::ModuleFault);
         }
         self.runtime.close().await

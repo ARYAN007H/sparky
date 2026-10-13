@@ -22,7 +22,7 @@ pub mod browser {
 }
 
 /// Pre-core calls through the process-wide loader, with explicit runtime configuration.
-pub use openhuman_core::modules::client::{ModuleCallError, ModuleClient};
+pub use tinybus::module::{ModuleCallError, ModuleClient};
 
 #[cfg(all(test, not(feature = "modules"), not(feature = "default")))]
 #[path = "modules_tests.rs"]
