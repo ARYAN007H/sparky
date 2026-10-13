@@ -60,7 +60,9 @@ pub struct ClearTurnStateResponse {
 ///
 /// A free function rather than a `From` impl: both types are foreign to this
 /// crate (`tinytools` and `tinyagents_session`).
-pub(crate) fn persisted_tool_failure(f: &tinytools::status::ClassifiedFailure) -> PersistedToolFailure {
+pub(crate) fn persisted_tool_failure(
+    f: &tinytools::status::ClassifiedFailure,
+) -> PersistedToolFailure {
     {
         // Serialize the enums to their wire variant name so the persisted
         // `class`/`category` strings match exactly what the live socket emits
