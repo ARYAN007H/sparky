@@ -47,6 +47,8 @@ mod types;
 #[path = "presentation_tests.rs"]
 mod tests;
 
+use crate::tools::implementations::document::format::spec::SlideImage;
+
 use self::types::{
     validate_input, GeneratePresentationInput, GeneratePresentationOutput, SlideImageRequest,
     SlideImageSource, MAX_IMAGE_BYTES,
