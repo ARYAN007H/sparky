@@ -465,7 +465,10 @@ async fn search_catalog_does_not_show_a_toolkit_the_host_does_not_offer() {
     seed_live_catalog_cache("offeredpolicytest", vec![twt_lookup(), twt_replies()]);
     let mut config = Config::default();
     let offered = search_catalog(&config, "tweet", Some("offeredpolicytest"), 40).await;
-    assert!(!offered.results.is_empty(), "control: the toolkit is searchable");
+    assert!(
+        !offered.results.is_empty(),
+        "control: the toolkit is searchable"
+    );
 
     config.composio.offered_toolkits_deny = vec!["OfferedPolicyTest".into()];
     let denied = search_catalog(&config, "tweet", Some("offeredpolicytest"), 40).await;
