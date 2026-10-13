@@ -1,6 +1,4 @@
-use super::shell_platform::{
-    command_param_description, python_utf8_env, shell_child_env, shell_description,
-};
+use super::shell_description::{command_param_description, shell_description};
 use crate::agent::host_runtime::RuntimeAdapter;
 use crate::config::Config;
 use crate::security::{AuditLogger, CommandExecutionLog, SecurityPolicy};
@@ -497,17 +495,12 @@ impl ShellTool {
                 request.timeout_ms = timeout_ms;
             }
 
-            let mut env = std::collections::BTreeMap::new();
-            for (name, value) in shell_child_env(crate::tools::timeout::CommandEnvironment::var_os)
-            {
-                let Ok(value) = value.into_string() else {
-                    return (
-                        false,
-                        ToolResult::error("Docker environment contains a non-UTF-8 value."),
-                    );
-                };
-                env.insert(name.to_owned(), value);
-            }
+            let Some(mut env) = container_environment() else {
+                return (
+                    false,
+                    ToolResult::error("Docker environment contains a non-UTF-8 value."),
+                );
+            };
             for (name, value) in tinytools_std::filesystem::shell_git_env() {
                 let (Ok(name), Ok(value)) = (name.into_string(), value.into_string()) else {
                     return (
@@ -544,25 +537,27 @@ impl ShellTool {
             return (true, result);
         }
 
-        let mut cmd = match self.runtime.build_shell_command(command, &action_dir) {
-            Ok(cmd) => cmd,
-            Err(e) => {
-                return (
-                    true,
-                    ToolResult::error(format!("Failed to build shell command: {e}")),
-                );
-            }
-        };
-        cmd.env_clear();
-
-        for (var, val) in shell_child_env(crate::tools::timeout::CommandEnvironment::var_os) {
-            cmd.env(var, val);
+        // The module spawns the shell: it selects cmd or bash, starts from its
+        // own safe environment (no API keys or other secrets, CWE-200) and owns
+        // the per-call scratch directory. The host adds only what it approves.
+        if let Err(e) = crate::config::ensure_usable_cwd(&action_dir) {
+            return (
+                true,
+                ToolResult::error(format!("Failed to build shell command: {e}")),
+            );
         }
+        let mut env = std::collections::BTreeMap::new();
 
         // Keep command-valued repository Git settings from executing host
         // programs when a shell command happens to invoke git.
         for (key, value) in tinytools_std::filesystem::shell_git_env() {
-            cmd.env(key, value);
+            let (Ok(key), Ok(value)) = (key.into_string(), value.into_string()) else {
+                return (
+                    false,
+                    ToolResult::error("Shell environment contains a non-UTF-8 value."),
+                );
+            };
+            env.insert(key, value);
         }
 
         // Point the child's temp dir at the agent's granted scratch dir
@@ -570,72 +565,57 @@ impl ShellTool {
         // `from_config`) so `python3 tempfile` / `mktemp` / `$TMPDIR` writes land
         // in a sandboxed, readable location instead of the world-shared /tmp.
         let scratch_dir = crate::security::openhuman_scratch_dir();
-        if scratch_dir.is_dir() {
+        if let (true, Some(scratch)) = (scratch_dir.is_dir(), scratch_dir.to_str()) {
             tracing::debug!(
                 scratch_dir = %scratch_dir.display(),
                 "[shell] overriding TMPDIR/TMP/TEMP to the openhuman scratch dir"
             );
-            cmd.env("TMPDIR", scratch_dir.as_os_str());
-            cmd.env("TMP", scratch_dir.as_os_str());
-            cmd.env("TEMP", scratch_dir.as_os_str());
+            for name in ["TMPDIR", "TMP", "TEMP"] {
+                env.insert(name.to_owned(), scratch.to_owned());
+            }
         } else {
             tracing::debug!(
                 scratch_dir = %scratch_dir.display(),
-                "[shell] scratch dir missing — leaving TMPDIR/TMP/TEMP as inherited"
+                "[shell] scratch dir missing — leaving TMPDIR/TMP/TEMP to the module"
             );
         }
 
         // No default deadline — only a caller-supplied `timeout_secs` bounds the
-        // run. `None` ⇒ run to completion (issue #4023).
+        // run (issue #4023). TinyBox needs a finite budget, so an unbounded call
+        // gets the module's ceiling.
         let explicit_timeout = self.explicit_timeout(requested_timeout);
+        let effective = explicit_timeout.unwrap_or_else(|| {
+            Duration::from_secs(crate::tools::timeout::SANDBOX_UNBOUNDED_CAP_SECS)
+        });
         tracing::debug!(
-            timeout_secs = ?explicit_timeout.map(|d| d.as_secs()),
+            timeout_secs = effective.as_secs(),
             requested_timeout_secs = ?requested_timeout,
-            "[shell] starting command ({} timeout)",
-            if explicit_timeout.is_some() { "explicit" } else { "no" }
+            unbounded = explicit_timeout.is_none(),
+            "[shell] starting command through TinyBox"
         );
-        let result = match explicit_timeout {
-            Some(timeout) => crate::tools::timeout::output_or_kill(&mut cmd, timeout).await,
-            None => Ok(crate::tools::timeout::output_unbounded(&mut cmd).await),
+        let config = match self.analysis_config.as_deref() {
+            Some(config) => config.clone(),
+            None => match crate::config::ops::load_config_with_timeout().await {
+                Ok(config) => config,
+                Err(e) => {
+                    return (
+                        true,
+                        ToolResult::error(format!("Cannot read module configuration: {e}")),
+                    )
+                }
+            },
         };
-
-        let tool_result = match result {
-            Ok(Ok(output)) => {
-                let mut stdout = String::from_utf8_lossy(&output.stdout).to_string();
-                let mut stderr = String::from_utf8_lossy(&output.stderr).to_string();
-
-                // Truncate output to prevent OOM
-                if stdout.len() > MAX_OUTPUT_BYTES {
-                    stdout.truncate(crate::util::floor_char_boundary(&stdout, MAX_OUTPUT_BYTES));
-                    stdout.push_str("\n... [output truncated at 1MB]");
-                }
-                if stderr.len() > MAX_OUTPUT_BYTES {
-                    stderr.truncate(crate::util::floor_char_boundary(&stderr, MAX_OUTPUT_BYTES));
-                    stderr.push_str("\n... [stderr truncated at 1MB]");
-                }
-
-                if output.status.success() {
-                    if stderr.is_empty() {
-                        ToolResult::success(stdout)
-                    } else {
-                        // Successful exit but stderr present — attach stderr as output suffix
-                        ToolResult::success(format!("{stdout}\n[stderr]\n{stderr}"))
-                    }
-                } else {
-                    // Surface the exit code AND both streams so the agent can
-                    // diagnose the failure (e.g. 127 missing dependency, 126
-                    // sandbox/permission wall) instead of looping on it (#4095).
-                    command_failure(output.status.code(), &stdout, &stderr)
-                }
-            }
-            Ok(Err(e)) => ToolResult::error(format!("Failed to execute command: {e}")),
-            Err(_) => {
-                let secs = explicit_timeout.map(|d| d.as_secs()).unwrap_or(0);
-                tracing::debug!(timeout_secs = secs, "[shell] tool timeout_secs fired");
-                ToolResult::error(tool_timeout_message(secs))
-            }
-        };
-        (true, tool_result)
+        let mut run = crate::sandbox::shell_exec::NativeShellRun::new(
+            command,
+            &action_dir,
+            &self.security.workspace_dir,
+            effective,
+        );
+        run.env = env;
+        run.python_utf8 = true;
+        run.hide_window = self.runtime.hide_window();
+        let result = crate::sandbox::shell_exec::run(&config, run).await;
+        (true, exec_result(result, effective))
     }
 
     /// Execute a command through the sandbox backend. Called when the
@@ -696,37 +676,75 @@ impl ShellTool {
             "[shell] starting sandboxed command"
         );
 
-        match sandbox::execute_in_sandbox(&policy, command, action_dir, extra_env, effective).await
-        {
-            Ok(result) => {
-                let tool_result = if result.timed_out {
-                    ToolResult::error(tool_timeout_message(effective.as_secs()))
-                } else if result.success() {
-                    if result.stderr.is_empty() {
-                        ToolResult::success(result.stdout)
-                    } else {
-                        ToolResult::success(format!(
-                            "{}\n[stderr]\n{}",
-                            result.stdout, result.stderr
-                        ))
-                    }
-                } else {
-                    // Same exit-code + both-streams surfacing as the native path
-                    // (#4095); the sandbox `-1` sentinel renders as a signal.
-                    command_failure(
-                        tinytools::sandbox_exit_code(result.exit_code),
-                        &result.stdout,
-                        &result.stderr,
-                    )
-                };
-                (true, tool_result)
-            }
-            Err(e) => (
-                true,
-                ToolResult::error(format!("Sandbox execution failed: {e}")),
-            ),
-        }
+        let result =
+            sandbox::execute_in_sandbox(&policy, command, action_dir, extra_env, effective).await;
+        (true, exec_result(result, effective))
     }
+}
+
+/// Map a finished sandbox or module execution to the tool result.
+///
+/// The same exit-code and both-streams surfacing everywhere (#4095); the `-1`
+/// sentinel renders as a signal.
+fn exec_result(
+    result: anyhow::Result<crate::sandbox::SandboxExecResult>,
+    effective: Duration,
+) -> ToolResult {
+    match result {
+        Ok(result) if result.timed_out => ToolResult::error(tool_timeout_message(effective.as_secs())),
+        Ok(result) if result.success() => {
+            if result.stderr.is_empty() {
+                ToolResult::success(result.stdout)
+            } else {
+                ToolResult::success(format!("{}\n[stderr]\n{}", result.stdout, result.stderr))
+            }
+        }
+        Ok(result) => command_failure(
+            tinytools::sandbox_exit_code(result.exit_code),
+            &result.stdout,
+            &result.stderr,
+        ),
+        Err(e) => ToolResult::error(format!("Sandbox execution failed: {e}")),
+    }
+}
+
+/// Python's text-encoding defaults for a child, unless the parent sets its own.
+/// Under `cmd.exe` the console code page is a legacy one (cp1252, cp437), so a
+/// script printing anything outside it dies with `UnicodeEncodeError`. Both are
+/// no-ops for a non-Python command. Native runs get the same from TinyBox's
+/// `python_utf8` request flag; this serves the Docker and sandbox-policy paths,
+/// which forward their environment as plain variables.
+const PYTHON_UTF8_DEFAULTS: &[(&str, &str)] = &[("PYTHONUTF8", "1"), ("PYTHONIOENCODING", "utf-8")];
+
+fn python_utf8_env(
+    lookup: impl Fn(&str) -> Option<std::ffi::OsString>,
+) -> Vec<(&'static str, std::ffi::OsString)> {
+    PYTHON_UTF8_DEFAULTS
+        .iter()
+        .map(|(name, default)| {
+            let value = lookup(name).unwrap_or_else(|| (*default).into());
+            (*name, value)
+        })
+        .collect()
+}
+
+/// The host environment a Docker container receives: the sandbox allowlist from
+/// the parent plus the Python encoding defaults. `None` when a value is not UTF-8.
+#[cfg(feature = "modules")]
+fn container_environment() -> Option<std::collections::BTreeMap<String, String>> {
+    let mut env = std::collections::BTreeMap::new();
+    let inherited = crate::sandbox::ops::SANDBOX_ENV_PASSTHROUGH
+        .iter()
+        .filter_map(|name| {
+            crate::tools::timeout::CommandEnvironment::var_os(name).map(|value| (*name, value))
+        })
+        .chain(python_utf8_env(
+            crate::tools::timeout::CommandEnvironment::var_os,
+        ));
+    for (name, value) in inherited {
+        env.insert(name.to_owned(), value.into_string().ok()?);
+    }
+    Some(env)
 }
 
 #[cfg(test)]
