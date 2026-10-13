@@ -228,4 +228,3 @@ test("a verbatim copy of an allowlisted line is still a finding", () => {
     [[3, 2]],
   );
 });
-
