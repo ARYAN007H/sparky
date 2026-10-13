@@ -75,6 +75,7 @@ fn handle_session_import_run(params: Map<String, Value>) -> ControllerFuture {
         let payload: SessionImportRunParams = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("invalid params: {e}"))?;
 
+        let overridden = payload.workspace.is_some();
         let workspace = match payload.workspace {
             Some(dir) => std::path::PathBuf::from(dir),
             None => {
@@ -98,16 +99,26 @@ fn handle_session_import_run(params: Map<String, Value>) -> ControllerFuture {
             )
             .into_cli_compatible_json();
         }
+        let configured = crate::config::Config::load_or_init()
+            .await
+            .map_err(|e| format!("failed to load config: {e}"))?;
+        let configured_workspace = configured.workspace_dir.clone();
         let config = crate::config::Config {
             workspace_dir: workspace.clone(),
-            ..crate::config::Config::load_or_init()
-                .await
-                .map_err(|e| format!("failed to load config: {e}"))?
+            ..configured
         };
-        let backend = match crate::storage::installed() {
-            Some(backend) => backend,
-            None => crate::storage::local::backend_for(&workspace)
-                .map_err(|e| format!("open the storage backend: {e:#}"))?,
+        // A workspace override that differs from the configured one must not
+        // write into the installed backend (bound to the configured workspace).
+        let backend = if !overridden || workspace == configured_workspace {
+            match crate::storage::installed() {
+                Some(backend) => backend,
+                None => crate::storage::local::backend_for(&workspace)
+                    .map_err(|e| format!("open the storage backend: {e:#}"))?,
+            }
+        } else {
+            crate::storage::open(&crate::storage::config::default_url(&workspace))
+                .await
+                .map_err(|e| format!("open the storage backend: {e:#}"))?
         };
         let reports = tokio::task::spawn_blocking(move || {
             crate::storage::import::sessions::run_with(&backend, &config)
