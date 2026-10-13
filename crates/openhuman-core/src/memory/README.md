@@ -246,7 +246,11 @@ start without explicit consent and resumes after a restart:
   between, then cleans up the legacy copies. State is in
   `layout_migration.json`. A legacy tree other accounts may share (a
   self-hosted CortexDB) moves only with the user's consent, claimed through
-  a marker in the shared app directory (`claim.rs`).
+  a marker in the shared app directory (`claim.rs`). The engine itself is
+  `tinymemory_tools::layout_migration` (tinymemory); this directory is the
+  host adapter: `app_host.rs` (engine binding, placement, the switch, the
+  free period), `claim.rs`, `state.rs` (the file-backed state store) and
+  `service.rs` (the background run and its gate on the import).
 
 Automatic runs of the import and the migration start only when
 `billing::free_period_active` says the work costs the user nothing: always
@@ -291,7 +295,7 @@ The agent `memory` tool applies the same confinement and overwrites any
 | [`deletion.rs`](./deletion.rs) | Hard deletes and the pending-deletion queue with its drain. |
 | [`backfill.rs`](./backfill.rs) | Consent-gated, resumable storing of past chats. |
 | [`import.rs`](./import.rs), [`import_retry.rs`](./import_retry.rs) | Consent-gated, resumable v1 import, and retrying refused items. Skips what v1 synced from Composio connectors (`import_open.rs::open_legacy` turns on `LegacyWorkspace::skip_connector_syncs`); the connectors re-sync it. |
-| [`layout_migration/`](./layout_migration/) | Legacy tree to per-user tree migration: `job.rs` (end to end), `copy.rs`, `map.rs` (placement), `cleanup.rs`, `claim.rs`, `state.rs`, `service.rs` (RPC/tick entry points), `app_host.rs` (the real host). |
+| [`layout_migration/`](./layout_migration/) | Host adapter over `tinymemory_tools::layout_migration` (copy, placement, cleanup and the job live in tinymemory): `app_host.rs` (the real `LayoutHost`), `claim.rs`, `state.rs` (file-backed `MigrationStateStore`), `service.rs` (RPC/tick entry points). |
 | [`billing.rs`](./billing.rs) | Whether background rewrites are free for the user right now. |
 | [`files.rs`](./files.rs) | Owner-only (0600 / 0700 on unix) writes of the local state files. |
 | [`tools.rs`](./tools.rs) | The single `memory` agent tool and per-turn citations. |
