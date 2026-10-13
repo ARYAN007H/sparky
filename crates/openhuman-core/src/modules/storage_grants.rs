@@ -188,10 +188,16 @@ type Declaration = (&'static str, fn() -> StorageGrant);
 /// until the registry moves to a release that does.
 #[must_use]
 pub fn declared(module_id: &str) -> Option<StorageGrant> {
-    let table: &[Declaration] = &[(
-        super::storage_grant_tinymcp::MODULE_ID,
-        super::storage_grant_tinymcp::grant,
-    )];
+    let table: &[Declaration] = &[
+        (
+            super::storage_grant_tinychannels::MODULE_ID,
+            super::storage_grant_tinychannels::grant,
+        ),
+        (
+            super::storage_grant_tinymcp::MODULE_ID,
+            super::storage_grant_tinymcp::grant,
+        ),
+    ];
     table
         .iter()
         .find(|(id, _)| *id == module_id)
