@@ -293,7 +293,7 @@ The agent `memory` tool applies the same confinement and overwrites any
 | [`sources/`](./sources/) | The `[[memory.sources]]` registry (`mod.rs`), sync state (`state.rs`) and sync (`sync.rs`). |
 | [`channels.rs`](./channels.rs) | Channel to thread records, for forgetting a channel. |
 | [`deletion.rs`](./deletion.rs) | Hard deletes; the file store and executor for the pending-deletion queue (`tinymemory_tools::deletion`, with retry backoff on background ticks). |
-| [`backfill.rs`](./backfill.rs) | Consent-gated, resumable storing of past chats. |
+| [`backfill.rs`](./backfill.rs) | Consent-gated, resumable storing of past chats; turns are built by `tinymemory_tools::backfill`. |
 | [`import.rs`](./import.rs) | Host adapter for the consent-gated, resumable v1 import and the retry of refused items; the driver is the module's `Importer`, which skips what v1 synced from Composio connectors. |
 | [`layout_migration/`](./layout_migration/) | Host adapter over `tinymemory_tools::layout_migration` (copy, placement, cleanup and the job live in tinymemory): `app_host.rs` (the real `LayoutHost`), `claim.rs`, `state.rs` (file-backed `MigrationStateStore`), `service.rs` (RPC/tick entry points). |
 | [`billing.rs`](./billing.rs) | Whether background rewrites are free for the user right now. |
