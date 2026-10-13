@@ -15,7 +15,8 @@ fn a_rebind_moves_new_agents_to_the_new_backend() {
     put_marker(&stores, &first);
     let before = stores.destination_key();
 
-    assert_eq!(rebind_all(&second), 1);
+    // Other tests' live stores in this process are rebound too.
+    assert!(rebind_all(&second) >= 1);
 
     // The destination names the backend driver and a per-provider id; a
     // rebound store is a different provider underneath.
