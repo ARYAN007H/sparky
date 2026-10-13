@@ -53,6 +53,12 @@ fn account_fixture(
                     "database":null,"database_env_keys":[],"domains":[],
                     "deployment":{"id":"deploy-1","site":"demo","status":"building","url":"https://demo.example"}
                 }}),
+                Some("deployment") => serde_json::json!({"result":"deployment","value":{
+                    "id":"deploy-1","site":"demo","status":
+                        if request["id"] == "ready-1" { "ready" } else { "failed" }
+                }}),
+                Some("promote") => serde_json::json!({"result":"done"}),
+                Some("set_env") => serde_json::json!({"result":"done"}),
                 Some("list_sites") => serde_json::json!({"result":"sites","value":[]}),
                 _ => return Err(anyhow::anyhow!("unexpected fixture operation")),
             };
@@ -221,15 +227,22 @@ async fn released_artifact_serves_providers_and_confidential_local_preparation()
         .path()
         .canonicalize()
         .expect("canonical workspace");
-    let prepared = account
-        .execute(serde_json::json!({
-            "operation": "prepare_bundle",
-            "directory": { "workspace": workspace, "path": "site" }
-        }))
+    let operation: tinyhosts_bus::rpc::Operation =
+        tinyhosts_bus::rpc::Operation::PrepareBundle {
+            directory: tinyhosts_bus::preparation::AuthorizedDirectory {
+                workspace: workspace.to_string_lossy().into_owned(),
+                path: "site".to_owned(),
+                max_bytes: tinyhosts_bus::preparation::MAX_PREPARATION_BYTES,
+                max_files: tinyhosts_bus::preparation::MAX_PREPARATION_FILES,
+            },
+        };
+    let tinyhosts_bus::rpc::Outcome::PreparedBundle(prepared) = account
+        .execute(operation)
         .await
-        .expect("released module Providers and PrepareBundle calls");
-    let prepared: tinyhosts_bus::preparation::PreparedBundle =
-        serde_json::from_value(prepared).expect("typed prepared bundle");
+        .expect("released module Providers and PrepareBundle calls")
+    else {
+        panic!("typed prepared bundle");
+    };
 
     assert_eq!(prepared.contract_version, (1, 1));
     assert_eq!(prepared.file_count, 1);
@@ -294,6 +307,76 @@ async fn providers_and_launch_use_the_declared_bus_members_and_confidential_exec
         serde_json::from_str(calls[2].1[0].as_str().unwrap()).unwrap();
     assert_eq!(launched["operation"], "launch");
     assert_eq!(launched["plan"]["bundle"][0]["path"], "index.html");
+}
+
+#[tokio::test]
+async fn rollback_promotes_only_a_ready_deployment() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let account = account_fixture(workspace.path().to_path_buf(), Arc::clone(&calls));
+    let tools = account.tools();
+    let rollback = tools
+        .iter()
+        .find(|tool| tool.name() == "hosting_rollback")
+        .unwrap();
+    let refused = rollback
+        .execute(serde_json::json!({"site":"demo","deployment_id":"bad-1"}))
+        .await
+        .unwrap();
+    assert!(refused.is_error);
+    assert!(refused.content[0].render().contains("Failed"));
+    let done = rollback
+        .execute(serde_json::json!({"site":"demo","deployment_id":"ready-1"}))
+        .await
+        .unwrap();
+    assert!(!done.is_error);
+    let operations: Vec<String> = calls
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|call| call.0 == "Execute")
+        .map(|call| {
+            let request: serde_json::Value =
+                serde_json::from_str(call.1[0].as_str().unwrap()).unwrap();
+            request["operation"].as_str().unwrap().to_owned()
+        })
+        .collect();
+    assert_eq!(operations, ["deployment", "deployment", "promote"]);
+}
+
+#[tokio::test]
+async fn set_env_renders_the_module_summary_for_the_given_keys() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let account = account_fixture(workspace.path().to_path_buf(), calls);
+    let tools = account.tools();
+    let set_env = tools
+        .iter()
+        .find(|tool| tool.name() == "hosting_set_env")
+        .unwrap();
+    let result = set_env
+        .execute(serde_json::json!({"site":"demo","env":{"A":"1"}}))
+        .await
+        .unwrap();
+    assert!(!result.is_error);
+    assert!(result.content[0].render().contains("Set A on demo."));
+}
+
+#[tokio::test]
+async fn an_environment_credential_is_left_for_the_module_to_read() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let mut account = account_fixture(workspace.path().to_path_buf(), Arc::clone(&calls));
+    account.env_credential = true;
+    let tools = account.tools();
+    let list = tools
+        .iter()
+        .find(|tool| tool.name() == "hosting_list_sites")
+        .unwrap();
+    list.execute(serde_json::json!({})).await.unwrap();
+    let calls = calls.lock().unwrap();
+    let request: serde_json::Value = serde_json::from_str(calls[1].1[0].as_str().unwrap()).unwrap();
+    assert!(request.get("credentials").is_none());
 }
 
 #[tokio::test]
