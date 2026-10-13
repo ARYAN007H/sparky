@@ -16,7 +16,7 @@ use std::sync::Arc;
 use tinyagents_definition::{PromptSource, ToolScope};
 use tinytools::Tool;
 use tinytools_agent::dialect::{
-    CodeDialect, NativeDialect, PFormatDialect, ToolDialect, XmlDialect,
+    CodeDialect, NativeDialect, PFormatDialect, ToolCallFormat, ToolDialect, XmlDialect,
 };
 
 #[path = "factory_workflows.rs"]
@@ -640,7 +640,7 @@ impl OpenHumanSessionHost {
                 .map(|tool| (tool.name(), tool.parameters_schema())),
         );
         let dispatcher_kind =
-            tinytools_agent::dialect::ToolCallFormat::resolve(&dispatcher_choice, supports_native);
+            ToolCallFormat::resolve(&dispatcher_choice, supports_native);
         let tool_dispatcher: Box<dyn ToolDialect> = match dispatcher_kind {
             ToolCallFormat::Native => Box::new(NativeDialect),
             ToolCallFormat::Json => Box::new(XmlDialect),
