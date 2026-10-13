@@ -147,10 +147,12 @@ fn known_agents() -> HashMap<String, String> {
 }
 
 /// The text a stem carries for agent `id`: `session_stem` of a probe session,
-/// without its session key.
+/// without its session key. A stem is `<key>.<agent>[.g<n>]`, each component
+/// sanitized (a `.` inside one becomes `-`) and followed by a digest, so the
+/// agent's component is what follows the first `.`.
 fn agent_component(id: &str) -> Option<String> {
     let stem = session_stem(&SessionRef::scoped("probe", id));
-    stem.strip_prefix("probe.").map(str::to_owned)
+    stem.split_once('.').map(|(_, agent)| agent.to_owned())
 }
 
 /// The agent whose component `stem` carries, if it is one of `known`.
