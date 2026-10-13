@@ -34,10 +34,12 @@
 //!
 //! # What is not here
 //!
-//! Sessions and transcripts are imported by TinyAgents, which owns that
-//! format. The tinyflows stores (cron jobs, the flow catalog and checkpoints)
-//! are copied here with `tinyflows-import`; see [`tinyflows`].
+//! Sessions, transcripts, turn states and the run ledger are read by
+//! TinyAgents' importer, which owns those formats; see [`sessions`]. The
+//! tinyflows stores (cron jobs, the flow catalog and checkpoints) are copied
+//! with `tinyflows-import`; see [`tinyflows`].
 
+pub mod sessions;
 mod snapshot;
 pub mod tinyflows;
 
@@ -50,11 +52,37 @@ use sha2::Digest;
 use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition};
 
 use super::documents::Repo;
-use super::local::ImportDoc;
+use super::rusqlite;
 use super::{block_on, Scope, StorageBackend};
 use crate::config::Config;
+use rusqlite::Connection;
+use serde_json::Value;
 
 pub use snapshot::Snapshot;
+
+/// One legacy row as a document of the new layout.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImportDoc {
+    /// The collection the store keeps it in.
+    pub collection: &'static str,
+    /// The document id.
+    pub id: String,
+    /// The document body.
+    pub doc: Value,
+}
+
+/// Whether `table` exists on `conn`.
+///
+/// # Errors
+///
+/// When the catalog cannot be read.
+pub fn table_exists(conn: &Connection, table: &str) -> rusqlite::Result<bool> {
+    conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1)",
+        [table],
+        |row| row.get(0),
+    )
+}
 
 /// One record to write: a legacy row, or a driver document, in the shape the
 /// installed backend expects.
@@ -159,12 +187,7 @@ pub async fn run(config: &Config) -> Vec<Report> {
         return Vec::new();
     }
     let config = config.clone();
-    let joined = tokio::task::spawn_blocking(move || {
-        let mut reports = run_with(&backend, &config, &sources());
-        reports.extend(tinyflows::run_with(&backend, &config));
-        reports
-    })
-    .await;
+    let joined = tokio::task::spawn_blocking(move || run_all(&backend, &config)).await;
     match joined {
         Ok(reports) => reports,
         Err(error) => {
@@ -176,6 +199,15 @@ pub async fn run(config: &Config) -> Vec<Report> {
             Vec::new()
         }
     }
+}
+
+/// Every importer, in order, over `backend` for `config`'s workspace; from
+/// synchronous code.
+pub fn run_all(backend: &Arc<dyn StorageBackend>, config: &Config) -> Vec<Report> {
+    let mut reports = run_with(backend, config, &sources());
+    reports.extend(tinyflows::run_with(backend, config));
+    reports.extend(sessions::run_with(backend, config));
+    reports
 }
 
 /// [`run`] over an explicit backend and source list, from synchronous code.

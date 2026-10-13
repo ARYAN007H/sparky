@@ -52,7 +52,7 @@ pub fn legacy_jobs_db(scope_dir: &Path) -> PathBuf {
 /// otherwise `(found, written, skipped)`. A run that skipped records writes no
 /// marker, so the import is retried at the next boot once the operator has
 /// repaired them (records already written are counted, not duplicated).
-fn marked(
+pub(super) fn marked(
     backend: &Arc<dyn StorageBackend>,
     workspace: &Path,
     domain: &str,
@@ -272,8 +272,7 @@ pub fn run_with(_backend: &Arc<dyn StorageBackend>, config: &Config) -> Vec<Repo
     Vec::new()
 }
 
-#[cfg(feature = "flows")]
-fn finish(domain: &'static str, outcome: Result<Outcome>) -> Report {
+pub(super) fn finish(domain: &'static str, outcome: Result<Outcome>) -> Report {
     match &outcome {
         Ok(Outcome::Imported { found, written }) => tracing::info!(
             target: "openhuman::storage_import",

@@ -2,11 +2,10 @@
 //!
 //! The catalog is `tinyflows_drivers::catalog::FlowCatalogDocuments`: flows,
 //! revisions, runs, state, suggestions and drafts as documents on the storage
-//! ports, in the acting agent's scope of the installed backend
-//! ([`crate::storage`]) or, when the host configured none, in a SQLite
-//! document store of its own (`<workspace>/flows/catalog.db`). tinyflows no
+//! ports, in the acting agent's scope of the storage backend
+//! ([`crate::storage`]). tinyflows no
 //! longer has a SQLite store: the `flows.db`, `checkpoints.db` and
-//! `drafts/*.json` it wrote are imported once, read-only, on first use
+//! `drafts/*.json` it wrote are imported once, read-only, when the backend is installed
 //! ([`crate::storage::import`]).
 //!
 //! Every function below is that one substitution and nothing else. They are
@@ -25,12 +24,6 @@ use tinyflows_catalog::{
 
 use tinyflows_drivers::catalog::FlowCatalogDocuments;
 
-/// Where this host keeps the flow catalog's own database when no storage
-/// backend is installed: `<workspace_dir>/flows/catalog.db`.
-pub fn db_path(config: &Config) -> PathBuf {
-    dir(config).join("catalog.db")
-}
-
 /// Where tinyflows kept its flow files: `<workspace_dir>/flows`
 /// (`flows.db`, `checkpoints.db`, `drafts/`). Read once by the importer.
 pub fn dir(config: &Config) -> PathBuf {
@@ -38,27 +31,9 @@ pub fn dir(config: &Config) -> PathBuf {
 }
 
 /// The storage the flow catalog and its checkpoints use for this call: the
-/// installed backend in the acting scope, else the workspace's own database
-/// (see [`crate::storage::local::open_standing`]).
+/// storage backend in the acting scope ([`crate::storage::local::open`]).
 pub(crate) fn scoped(config: &Config) -> Result<crate::storage::ScopedStorage> {
-    let opened = crate::storage::local::open_standing(
-        &db_path(config),
-        "flows::store",
-        config,
-        &|backend, scope, config| legacy_import(backend, scope, config),
-    )?;
-    opened.scoped()
-}
-
-/// Brings the legacy flow files into a freshly opened workspace database (the
-/// default layout; with a backend installed the boot-time import did it).
-fn legacy_import(
-    backend: &std::sync::Arc<dyn crate::storage::StorageBackend>,
-    scope: &crate::storage::Scope,
-    config: &Config,
-) -> Result<()> {
-    crate::storage::import::tinyflows::import_flows(backend, scope, config)?;
-    Ok(())
+    crate::storage::local::open("flows::store", &config.workspace_dir)?.scoped()
 }
 
 /// The document catalog for this call.
