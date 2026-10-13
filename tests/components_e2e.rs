@@ -49,6 +49,7 @@ fn disabled_component_answers_component_disabled_over_json_rpc() {
                         ..Config::default()
                     };
                     config.components.mcp = false;
+                    config.components.voice = false;
                     tinyhumans_boot::boot();
                     let _runtime = CoreBuilder::new(HostKind::Library)
                         .config(config)
@@ -82,6 +83,18 @@ fn disabled_component_answers_component_disabled_over_json_rpc() {
                         err.pointer("/data/component").and_then(Value::as_str),
                         Some("mcp")
                     );
+
+                    // The voice namespace answers the same typed error.
+                    // (The `voice` family is only registered with the Cargo `voice` gate.)
+                    #[cfg(feature = "voice")]
+                    {
+                        let voice = rpc(&base, "openhuman.voice_status").await;
+                        assert_eq!(
+                            voice.pointer("/error/message").and_then(Value::as_str),
+                            Some("COMPONENT_DISABLED:voice"),
+                            "{voice}"
+                        );
+                    }
 
                     // `modules.list` reports the same module as Disabled, and only it.
                     let listed = rpc(&base, "openhuman.modules_list").await;
