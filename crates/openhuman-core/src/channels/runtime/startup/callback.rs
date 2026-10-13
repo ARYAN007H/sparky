@@ -6,7 +6,8 @@ use crate::config::Config;
 use std::sync::{Arc, OnceLock, Weak};
 use tinybus::{Error, Result};
 use tinychannels_bus::{
-    ChannelBackendRequest, ChannelBackendResult, HostEventPublication, HostTranscriptionRequest, HostTranscriptionResult,
+    ChannelBackendRequest, ChannelBackendResult, HostEventPublication, HostTranscriptionRequest,
+    HostTranscriptionResult,
 };
 use tokio::sync::mpsc;
 

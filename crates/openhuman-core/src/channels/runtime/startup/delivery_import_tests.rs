@@ -86,7 +86,9 @@ async fn the_import_runs_once_so_a_finished_delivery_is_not_resurrected() {
     let docs = docs();
     import_into(&docs, dir.path()).await.unwrap();
 
-    docs.delete(PENDING, "p1", Precondition::None).await.unwrap();
+    docs.delete(PENDING, "p1", Precondition::None)
+        .await
+        .unwrap();
     assert_eq!(
         import_into(&docs, dir.path()).await.unwrap(),
         Outcome::AlreadyDone

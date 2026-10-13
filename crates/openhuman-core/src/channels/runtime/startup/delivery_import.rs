@@ -139,7 +139,8 @@ async fn import_into(docs: &Arc<dyn DocumentStore>, workspace: &Path) -> anyhow:
     for (collection, id, doc) in records {
         match docs.put(collection, &id, doc, Precondition::Absent).await {
             Ok(_) => written += 1,
-            Err(error) if matches!(error.kind(), ErrorKind::Conflict | ErrorKind::AlreadyExists) => {}
+            Err(error)
+                if matches!(error.kind(), ErrorKind::Conflict | ErrorKind::AlreadyExists) => {}
             Err(error) => {
                 return Err(anyhow::anyhow!(
                     "write {collection} record: {:?}",

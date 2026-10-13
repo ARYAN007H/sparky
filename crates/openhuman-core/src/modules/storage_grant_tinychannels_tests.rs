@@ -55,7 +55,12 @@ fn delivery_remote_and_whatsapp_collections_are_all_granted() {
 
 #[test]
 fn other_collections_and_the_host_import_marker_are_refused() {
-    for other in ["approvals", "mcp_servers", "channels_host_import", "_secrets"] {
+    for other in [
+        "approvals",
+        "mcp_servers",
+        "channels_host_import",
+        "_secrets",
+    ] {
         assert_eq!(
             authorize(
                 &grant(),
