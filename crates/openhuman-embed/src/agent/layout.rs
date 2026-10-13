@@ -43,7 +43,7 @@ impl AgentLayout {
         Self {
             home: workspace_dir.join("agents").join(id),
             skills: workspace_dir.join("agents").join(id).join("skills"),
-            transcripts: openhuman_core::agent::session_store::agent_transcript_root(
+            transcripts: tinyagents_session::transcript::agent_transcript_root(
                 workspace_dir,
                 id,
             )
