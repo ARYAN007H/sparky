@@ -177,23 +177,23 @@ fn tinybox_registry_matches_the_published_v0126_release_manifest() {
         ),
         (
             "macos-15-arm64",
-            "tinychannels-module-0.1.29-macos-15-arm64.tar.gz",
-            "a1dbca6cc5bb04baec1f5b82d43593d87eb135619f95be3d64441a96cc95127e",
+            "tinybox-0.1.26-macos-15-arm64.tar.gz",
+            "806ef4507a1317c295f08356827d53212a627e329c47f0b41db2fbadd1b10f3e",
         ),
         (
             "macos-15-x86_64",
-            "tinychannels-module-0.1.29-macos-15-x86_64.tar.gz",
-            "464ceaca6acb3f6653c5e77c6e7d6d357a0cfbcc5e9691f55dc7eb4e1368a7a6",
+            "tinybox-0.1.26-macos-15-x86_64.tar.gz",
+            "3a80345165eda9a2ddd7a09e5447c8042eacee2109a2a7f2e7311efd24a45415",
         ),
         (
             "macos-26-arm64",
-            "tinychannels-module-0.1.29-macos-26-arm64.tar.gz",
-            "2943b3e8d6b2006a93ad1f880cfc7cd4fbcfb48540c0913bb6318470249edf9c",
+            "tinybox-0.1.26-macos-26-arm64.tar.gz",
+            "4c63c88eab009946a05e505c146a879ee8446e94103956721af8fa8ecff30c11",
         ),
         (
             "macos-26-x86_64",
-            "tinychannels-module-0.1.29-macos-26-x86_64.tar.gz",
-            "50e92f04b2ef30db6f5053742819a2fbfdfb6d6361f63124fac9f32079775970",
+            "tinybox-0.1.26-macos-26-x86_64.tar.gz",
+            "38ec8ee7bf72783e8c3dbe452664312e1b9f55123a5585132fc1e1e1f19a7f90",
         ),
         (
             "ubuntu-22.04-arm64",
@@ -561,23 +561,23 @@ fn tinychannels_registry_matches_scoped_runtime_release() {
     let expected = [
         (
             "macos-15-arm64",
-            "tinychannels-module-0.1.29-macos-15-arm64.tar.gz",
-            "a1dbca6cc5bb04baec1f5b82d43593d87eb135619f95be3d64441a96cc95127e",
+            "tinybox-0.1.26-macos-15-arm64.tar.gz",
+            "806ef4507a1317c295f08356827d53212a627e329c47f0b41db2fbadd1b10f3e",
         ),
         (
             "macos-15-x86_64",
-            "tinychannels-module-0.1.29-macos-15-x86_64.tar.gz",
-            "464ceaca6acb3f6653c5e77c6e7d6d357a0cfbcc5e9691f55dc7eb4e1368a7a6",
+            "tinybox-0.1.26-macos-15-x86_64.tar.gz",
+            "3a80345165eda9a2ddd7a09e5447c8042eacee2109a2a7f2e7311efd24a45415",
         ),
         (
             "macos-26-arm64",
-            "tinychannels-module-0.1.29-macos-26-arm64.tar.gz",
-            "2943b3e8d6b2006a93ad1f880cfc7cd4fbcfb48540c0913bb6318470249edf9c",
+            "tinybox-0.1.26-macos-26-arm64.tar.gz",
+            "4c63c88eab009946a05e505c146a879ee8446e94103956721af8fa8ecff30c11",
         ),
         (
             "macos-26-x86_64",
-            "tinychannels-module-0.1.29-macos-26-x86_64.tar.gz",
-            "50e92f04b2ef30db6f5053742819a2fbfdfb6d6361f63124fac9f32079775970",
+            "tinybox-0.1.26-macos-26-x86_64.tar.gz",
+            "38ec8ee7bf72783e8c3dbe452664312e1b9f55123a5585132fc1e1e1f19a7f90",
         ),
         (
             "ubuntu-22.04-arm64",
