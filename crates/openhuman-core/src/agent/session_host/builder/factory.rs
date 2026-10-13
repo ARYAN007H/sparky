@@ -4,8 +4,7 @@ use super::dispatcher::{resolve_dispatcher_kind, DispatcherKind};
 use super::host_tools::derive_turn_workspace_descriptor;
 use super::should_synthesize_delegation_tools;
 use crate::agent::harness::host_definition::{
-    dynamic_prompt_builder, effective_tokenjuice_compression, AgentDefinitionRegistry,
-    NO_TOOLS_SENTINEL,
+    dynamic_prompt_builder, AgentDefinitionRegistry, NO_TOOLS_SENTINEL,
 };
 use crate::agent::host_runtime;
 use crate::agent::prompts::SystemPromptBuilder;
@@ -671,7 +670,7 @@ impl OpenHumanSessionHost {
             .map(|def| def.extensions.omit_memory_context)
             .unwrap_or(false);
         let effective_tokenjuice_compression = target_def
-            .map(|def| effective_tokenjuice_compression(def))
+            .map(|def| def.extensions.effective_tokenjuice_compression(&def.model))
             .unwrap_or(tinyjuice_bus::types::AgentTokenjuiceCompression::Full);
 
         // Stamp the resolved agent definition id onto the OpenHumanSessionHost via the
