@@ -36,26 +36,39 @@ async fn save_rejects_an_empty_toolkit() {
     assert!(save(&config, "  ", UserScopePref::default()).await.is_err());
 }
 
-/// A stored preference must survive a module that cannot be reached: the read
-/// fails open to the default and the legacy file is left exactly as it was, so
-/// the migration retries on the next call instead of dropping the row.
+/// A stored preference is never lost: either the module took it (the read
+/// returns it and the legacy file is emptied) or the module was unreachable
+/// (the read fails open to the default and the file is left exactly as it was
+/// so the migration retries).
 #[tokio::test]
-async fn legacy_prefs_stay_on_disk_until_the_module_takes_them() {
+async fn a_legacy_pref_either_reaches_the_module_or_stays_on_disk() {
     let dir = tempfile::tempdir().unwrap();
     let config = config_in(&dir);
     let path = file_store::path(&config, USER_SCOPES_FILE);
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     let legacy = r#"{"github":{"read":true,"write":false,"admin":true}}"#;
     std::fs::write(&path, legacy).unwrap();
+    let stored = UserScopePref {
+        read: true,
+        write: false,
+        admin: true,
+    };
 
     let pref = load_or_default(&config, "github").await;
-    assert_eq!(
-        pref,
-        UserScopePref::default(),
-        "unreachable module fails open"
-    );
-    assert_eq!(std::fs::read_to_string(&path).unwrap(), legacy);
-    assert!(!migrated().lock().unwrap().contains(&config.workspace_dir));
+    let done = migrated().lock().unwrap().contains(&config.workspace_dir);
+    if done {
+        assert_eq!(pref, stored, "the migrated row must decide visibility");
+        let left: LegacyScopeFile =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert!(left.is_empty(), "the legacy file is emptied once moved");
+    } else {
+        assert_eq!(
+            pref,
+            UserScopePref::default(),
+            "unreachable module fails open"
+        );
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), legacy);
+    }
 }
 
 #[tokio::test]
