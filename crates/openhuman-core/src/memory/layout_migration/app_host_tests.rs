@@ -4,11 +4,11 @@ use tinymemory_api::conformance::ReferenceEngine;
 use tinymemory_api::MemoryEngine;
 
 use super::*;
-use crate::memory::layout_migration::claim;
 use crate::memory::engine::install_test_engine_for_root;
+use crate::memory::layout_migration::claim;
 use crate::memory::layout_migration::service::scan;
-use tinymemory_tools::layout_migration::{LayoutHost, Outcome, Trigger};
 use crate::memory::layout_migration::test_host::{count, fact};
+use tinymemory_tools::layout_migration::{LayoutHost, Outcome, Trigger};
 
 const ACCOUNT: &str = "0123456789abcdef01234567";
 
@@ -23,7 +23,10 @@ fn signed_in(tmp: &tempfile::TempDir) -> Config {
 async fn signed_out_there_is_nothing_to_move() {
     let tmp = tempfile::tempdir().unwrap();
     let config = crate::memory::test_fixtures::config_in(&tmp);
-    assert!(matches!(AppHost::new(config.clone()).engines(), Err(lm::Error::Off(_))));
+    assert!(matches!(
+        AppHost::new(config.clone()).engines(),
+        Err(lm::Error::Off(_))
+    ));
     assert!(!scan(&AppHost::new(config.clone())).await.unwrap().needed);
 }
 
@@ -144,16 +147,24 @@ async fn a_shared_tree_reaches_the_module_as_a_claim() {
     let host = AppHost::new(config.clone());
     let view = scan(&host).await.unwrap();
     assert!(view.needed && view.shared, "{view:?}");
-    let outcome = lm::run(&host, Trigger::Manual { takeover: false }, || async { false })
-        .await
-        .unwrap();
+    let outcome = lm::run(&host, Trigger::Manual { takeover: false }, || async {
+        false
+    })
+    .await
+    .unwrap();
     assert_eq!(outcome, Outcome::NeedsTakeover);
     assert_eq!(count(&*host.engines().unwrap().tree).await, 0);
 
     // Another account on the machine took the tree first.
     let key = claim_key(&config).unwrap().unwrap();
     let other = ClaimKey::new(
-        key.marker.parent().unwrap().parent().unwrap().parent().unwrap(),
+        key.marker
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap(),
         &key.endpoint,
         "user:fedcba9876543210fedcba98",
     );
@@ -175,10 +186,6 @@ fn errors_keep_their_wire_codes_across_the_module_boundary() {
     ] {
         let back = from_module(to_module(error.clone()));
         assert_eq!(back.code(), error.code(), "{error:?}");
-        assert_eq!(
-            back.is_account_wide(),
-            error.is_account_wide(),
-            "{error:?}"
-        );
+        assert_eq!(back.is_account_wide(), error.is_account_wide(), "{error:?}");
     }
 }
