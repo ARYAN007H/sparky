@@ -24,12 +24,12 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::agent::harness::host_definition::{AgentDefinition};
-use tinyagents_definition::{SandboxMode, ToolScope};
+use crate::agent::harness::host_definition::AgentDefinition;
 use crate::agent::tool_policy::{ToolPolicy, ToolPolicyDecision, ToolPolicyRequest};
 use crate::agent::OpenHumanSessionHost;
 use crate::config::Config;
 use anyhow::Result;
+use tinyagents_definition::{SandboxMode, ToolScope};
 
 /// Deny-by-default gate for a host-only session.
 ///

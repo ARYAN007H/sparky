@@ -7,11 +7,11 @@
 //! session runs under can neither delegate nor act.
 
 use super::*;
-use tinyagents_definition::{SandboxMode, ToolScope};
 use crate::agent::tool_policy::{
     ToolCallContext, ToolPolicy, ToolPolicyDecision, ToolPolicyRequest,
 };
 use std::sync::Arc;
+use tinyagents_definition::{SandboxMode, ToolScope};
 
 #[derive(Debug)]
 struct Marker(&'static str);

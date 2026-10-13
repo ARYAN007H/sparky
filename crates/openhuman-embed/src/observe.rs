@@ -1,12 +1,12 @@
 //! Host turn callbacks with explicit payload consent. Callbacks should enqueue
 //! telemetry work; transport and retention belong to the embedding application.
 use crate::{CoreError, LastTurnUsage, TurnOutcome};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tinyagents_harness::observability::turn_observer::{self, Observer, ObserverScope};
 pub use tinyagents_harness::observability::turn_observer::{
     ObservedUsage, TraceContent, TurnObservation,
 };
-use std::sync::Arc;
-use std::time::{Duration, Instant};
 
 /// Sanitized failure classification; no controller or provider error text.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -108,8 +108,7 @@
 #![cfg(not(coverage))]
 
 use async_trait::async_trait;
-use openhuman_core::agent::harness::host_definition::{AgentDefinitionRegistry};
-use tinyagents_definition::{ModelSpec};
+use openhuman_core::agent::harness::host_definition::AgentDefinitionRegistry;
 use openhuman_core::agent::harness::{with_parent_context, ParentExecutionContext};
 use openhuman_core::agent::prompts::ToolCallFormat;
 use openhuman_core::agent::subagent_host::{run_subagent, SubagentRunOptions};
@@ -118,6 +117,7 @@ use parking_lot::Mutex;
 use serde_json::json;
 use std::sync::Arc;
 use tempfile::tempdir;
+use tinyagents_definition::ModelSpec;
 use tinyinference_llm::message::AssistantMessage;
 use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
 use tinyinference_llm::tool::ToolCall;

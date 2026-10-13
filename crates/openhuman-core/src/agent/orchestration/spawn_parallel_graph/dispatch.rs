@@ -9,11 +9,11 @@ use tinyagents_harness::workspace::WorkspaceIsolation;
 use tinytools::WorkspaceDescriptor;
 use tokio::sync::mpsc::Sender;
 
-use crate::agent::harness::host_definition::{AgentDefinition};
-use tinyagents_definition::{SandboxMode};
 use crate::agent::harness::fork_context::ParentExecutionContext;
+use crate::agent::harness::host_definition::AgentDefinition;
 use crate::agent::orchestration::worktree;
 use crate::agent::progress::AgentProgress;
+use tinyagents_definition::SandboxMode;
 
 use super::staging::{
     prepare_spawn_parallel_tasks_from_defs, worktree_request_for_task, ParallelTaskRejectionKind,

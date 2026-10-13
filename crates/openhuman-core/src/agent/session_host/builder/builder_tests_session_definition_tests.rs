@@ -8,10 +8,10 @@
 //! These tests pin the route that closes that gap.
 
 use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
-use tinyagents_definition::{ToolScope};
 use crate::agent::tinyagents::host::OpenHumanDefinitionRegistry;
 use std::sync::Arc;
 use tinyagents_definition::DefinitionRegistry;
+use tinyagents_definition::ToolScope;
 
 /// An id no built-in definition uses, so a hit can only have come from the
 /// caller's own definition.

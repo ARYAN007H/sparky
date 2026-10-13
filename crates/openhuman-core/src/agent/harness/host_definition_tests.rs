@@ -72,8 +72,7 @@ fn an_extra_definition_is_not_builtins_only() {
 #[test]
 fn a_file_sourced_override_is_not_builtins_only() {
     let mut overridden = named("orchestrator", "from a workspace file");
-    overridden.source =
-        DefinitionSource::File("/ws/agents/orchestrator.toml".into());
+    overridden.source = DefinitionSource::File("/ws/agents/orchestrator.toml".into());
     let registry = AgentDefinitionRegistry::builtins_only().with_definitions([overridden]);
     assert!(!registry.holds_builtins_only());
 }
@@ -234,10 +233,9 @@ wildcard = {}
 
     // Load a baseline registry (no custom overrides) to get the
     // built-in count dynamically — avoids coupling to a hardcoded number.
-    let baseline = AgentDefinitionRegistry::load(
-        &tempfile::TempDir::new().unwrap().path().join("empty"),
-    )
-    .unwrap();
+    let baseline =
+        AgentDefinitionRegistry::load(&tempfile::TempDir::new().unwrap().path().join("empty"))
+            .unwrap();
     let expected_count = baseline.len();
 
     let reg = AgentDefinitionRegistry::load(ws.path()).unwrap();
@@ -248,8 +246,6 @@ wildcard = {}
     assert_eq!(def.when_to_use, "CUSTOM OVERRIDE");
     assert!(matches!(def.source, DefinitionSource::File(_)));
 }
-
-
 
 // ── Issue #4868 audit snapshot ──────────────────────────────────────────────
 //
@@ -408,7 +404,10 @@ fn builtin_dynamic_prompts_carry_their_builder_beside_an_inert_marker() {
             def.id
         );
         let json = serde_json::to_value(def).unwrap();
-        assert_eq!(json["system_prompt"], serde_json::json!({ "dynamic": null }));
+        assert_eq!(
+            json["system_prompt"],
+            serde_json::json!({ "dynamic": null })
+        );
         assert!(
             json.get("prompt_builder").is_none(),
             "the builder is runtime-only and never serialised"

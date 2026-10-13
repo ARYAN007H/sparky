@@ -195,11 +195,12 @@ async fn test_subagent_has_current_date_context() -> Result<()> {
         run_queue: None,
     };
 
-    let mut def = openhuman_core::agent::harness::host_definition::AgentDefinitionRegistry::global()
-        .unwrap()
-        .get("critic")
-        .unwrap()
-        .clone();
+    let mut def =
+        openhuman_core::agent::harness::host_definition::AgentDefinitionRegistry::global()
+            .unwrap()
+            .get("critic")
+            .unwrap()
+            .clone();
     // A Hint sub-agent builds a fresh provider via the workload factory
     // instead of inheriting `parent.provider` — which here would resolve to
     // the OpenHuman backend and fail with "No backend session" before the

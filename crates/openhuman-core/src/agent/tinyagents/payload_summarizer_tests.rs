@@ -1,8 +1,8 @@
 use super::*;
-use tinyagents_harness::context::RunConfig;
-use tinyagents_definition::{DefinitionSource, ModelSpec, PromptSource, SandboxMode, ToolScope};
 use async_trait::async_trait;
 use std::sync::atomic::{AtomicBool, Ordering};
+use tinyagents_definition::{DefinitionSource, ModelSpec, PromptSource, SandboxMode, ToolScope};
+use tinyagents_harness::context::RunConfig;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse, ModelStream};
 
 fn dummy_definition() -> AgentDefinition {

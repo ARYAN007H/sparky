@@ -9,9 +9,11 @@ use serde_json::{json, Value};
 
 use super::live_config::live_composio_config;
 use super::redact::redact_composio_outcome;
-use tinyagents_definition::SandboxMode;
-use crate::agent::tinyagents::host::run_context::{sandbox_mode_for_tool, task_recency_window_for_tool};
+use crate::agent::tinyagents::host::run_context::{
+    sandbox_mode_for_tool, task_recency_window_for_tool,
+};
 use crate::config::Config;
+use tinyagents_definition::SandboxMode;
 use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolCategory, ToolResult, ToolRunContext};
 
 use super::super::contract::{toolkit_from_slug, ToolScope};
@@ -108,13 +110,12 @@ impl Tool for ComposioExecuteTool {
         _options: ToolCallOptions,
         context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
-        let (config, outcome) =
-            Box::pin(self.execute_unredacted(
-                args,
-                sandbox_mode_for_tool(context),
-                task_recency_window_for_tool(context),
-            ))
-            .await;
+        let (config, outcome) = Box::pin(self.execute_unredacted(
+            args,
+            sandbox_mode_for_tool(context),
+            task_recency_window_for_tool(context),
+        ))
+        .await;
         redact_composio_outcome(&config, outcome)
     }
 }

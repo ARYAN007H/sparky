@@ -6,11 +6,11 @@
 //! anyone writing a test for it.
 
 use super::load_builtins;
-use crate::agent::harness::host_definition::{AgentDefinition};
-use tinyagents_definition::{PromptSource, SubagentEntry, ToolScope};
+use crate::agent::harness::host_definition::AgentDefinition;
 use crate::agent::prompts::{PromptContext, ToolCallFormat};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::sync::Arc;
+use tinyagents_definition::{PromptSource, SubagentEntry, ToolScope};
 
 /// Render `def`'s prompt through its own `PromptSource`, with no tools,
 /// connections or user: what is left is what the agent was written to say.
@@ -48,7 +48,8 @@ fn visible_tool_names(def: &AgentDefinition, definitions: &[AgentDefinition]) ->
 }
 
 fn render(def: &AgentDefinition, definitions: &[AgentDefinition]) -> String {
-    let (PromptSource::Dynamic(()), Some(build)) = (&def.system_prompt, def.extensions.prompt_builder)
+    let (PromptSource::Dynamic(()), Some(build)) =
+        (&def.system_prompt, def.extensions.prompt_builder)
     else {
         panic!("built-in `{}` must carry a dynamic prompt", def.id);
     };

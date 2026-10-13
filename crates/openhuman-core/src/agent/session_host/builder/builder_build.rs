@@ -357,7 +357,8 @@ impl SessionHostBuilder {
             }),
         );
         #[cfg(not(test))]
-        let definitions = crate::agent::harness::host_definition::AgentDefinitionRegistry::current();
+        let definitions =
+            crate::agent::harness::host_definition::AgentDefinitionRegistry::current();
         // A caller that brought its own definition is the authority for this
         // session, so it does not need a process registry to exist before it
         // may run a turn. The stand-in is deliberately *empty* rather than
@@ -369,9 +370,9 @@ impl SessionHostBuilder {
         // resolution changes.
         let session_definition = self.session_definition;
         let definitions = definitions.or_else(|| {
-            session_definition
-                .is_some()
-                .then(|| Arc::new(crate::agent::harness::host_definition::AgentDefinitionRegistry::default()))
+            session_definition.is_some().then(|| {
+                Arc::new(crate::agent::harness::host_definition::AgentDefinitionRegistry::default())
+            })
         });
         let hosted_base = definitions.map(|definitions| {
             Arc::new(crate::agent::tinyagents::host::OpenHumanHostBase {

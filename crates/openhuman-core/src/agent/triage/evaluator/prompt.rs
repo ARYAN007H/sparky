@@ -1,8 +1,8 @@
 //! Prompt assembly for the classifier turn: the system prompt from the
 //! built-in agent definition and the rendered user message.
 
-use crate::agent::harness::host_definition::{AgentDefinition};
-use tinyagents_definition::{PromptSource};
+use crate::agent::harness::host_definition::AgentDefinition;
+use tinyagents_definition::PromptSource;
 
 use super::super::decision::ParseError;
 use super::super::envelope::TriggerEnvelope;

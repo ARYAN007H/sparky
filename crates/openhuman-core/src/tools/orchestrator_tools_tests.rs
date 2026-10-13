@@ -1,5 +1,7 @@
 use super::*;
-use tinyagents_definition::{DefinitionSource, ModelSpec, PromptSource, SandboxMode, SkillsWildcard, ToolScope};
+use tinyagents_definition::{
+    DefinitionSource, ModelSpec, PromptSource, SandboxMode, SkillsWildcard, ToolScope,
+};
 
 fn def(id: &str, when_to_use: &str, delegate_name: Option<&str>) -> AgentDefinition {
     AgentDefinition {

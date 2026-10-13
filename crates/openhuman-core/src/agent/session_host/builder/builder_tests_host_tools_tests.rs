@@ -39,10 +39,8 @@ fn definition() -> crate::agent::harness::host_definition::AgentDefinition {
 #[test]
 fn host_scope_additions_respect_named_and_withheld_tools() {
     let mut definition = definition();
-    definition.tools = tinyagents_definition::ToolScope::Named(vec![
-        "base".into(),
-        "already_withheld".into(),
-    ]);
+    definition.tools =
+        tinyagents_definition::ToolScope::Named(vec!["base".into(), "already_withheld".into()]);
     definition.extra_tools = vec!["already_withheld".into(), "base".into()];
     let host_tools = super::super::host_tools::MergedHostTurnTools {
         policy: None,

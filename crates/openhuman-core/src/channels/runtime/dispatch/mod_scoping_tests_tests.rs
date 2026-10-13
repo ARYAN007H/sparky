@@ -11,9 +11,9 @@
 //! the test environment).
 
 use super::*;
-use crate::agent::harness::host_definition::{AgentDefinition};
-use tinyagents_definition::{DefinitionSource, ModelSpec, PromptSource, SandboxMode, ToolScope};
+use crate::agent::harness::host_definition::AgentDefinition;
 use async_trait::async_trait;
+use tinyagents_definition::{DefinitionSource, ModelSpec, PromptSource, SandboxMode, ToolScope};
 use tinytools::{PermissionLevel, Tool, ToolCategory, ToolResult};
 
 /// Minimal owned tool stub — just enough for `build_visible_tool_set`

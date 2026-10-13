@@ -3,7 +3,6 @@
 //! grep-friendly trace line for events with no UI surface), plus the
 //! prompt-cache layout diagnostic helper drained after a run.
 
-
 use tinyagents_harness::cache::CacheLayoutEvent;
 use tinyagents_harness::events::{AgentEvent, EventListener, EventRecord};
 
@@ -285,7 +284,9 @@ impl EventListener for OpenhumanEventBridge {
                     "[tinyagents] context compressed before model call"
                 );
             }
-            AgentEvent::Compacted { .. } => tinyagents_harness::events::log_compacted(&record.event),
+            AgentEvent::Compacted { .. } => {
+                tinyagents_harness::events::log_compacted(&record.event)
+            }
             AgentEvent::UnknownToolCall {
                 call_id,
                 requested_name,

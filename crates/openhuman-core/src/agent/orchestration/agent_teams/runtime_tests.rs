@@ -14,8 +14,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use super::*;
-use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::harness::fork_context::{with_parent_context, ParentExecutionContext};
+use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::prompts::ToolCallFormat;
 use crate::config::{AgentConfig, Config};
 use tinyagents_orchestration::teams::{SessionTeamLedger, TeamService};

@@ -597,7 +597,8 @@ pub struct SessionHostBuilder {
     /// `None` (the default) leaves every existing caller as it was.
     ///
     /// [`AgentDefinitionRegistry`]: crate::agent::harness::host_definition::AgentDefinitionRegistry
-    pub(super) session_definition: Option<Arc<crate::agent::harness::host_definition::AgentDefinition>>,
+    pub(super) session_definition:
+        Option<Arc<crate::agent::harness::host_definition::AgentDefinition>>,
     /// Directory chain of parent session keys for a sub-agent. `None`
     /// (default) means this is a root session — its transcript lands
     /// flat in `session_raw/DDMMYYYY/{session_key}.jsonl`. Populated

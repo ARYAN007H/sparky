@@ -1,6 +1,6 @@
 use super::*;
-use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::harness::fork_context::{with_parent_context, ParentExecutionContext};
+use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::prompts::ToolCallFormat;
 use crate::config::AgentConfig;
 use async_trait::async_trait;
