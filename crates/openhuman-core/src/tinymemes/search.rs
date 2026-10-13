@@ -18,7 +18,7 @@ pub(crate) struct OpenHumanSearch {
 impl OpenHumanSearch {
     /// A search backend, or `None` when OpenHuman cannot search right now.
     pub(crate) fn available(config: &Config) -> Option<Self> {
-        if !config.search.is_enabled() {
+        if !crate::search::is_active(config) {
             return None;
         }
         if crate::search::tools::local_only_search_block(TOOL).is_some() {

@@ -241,7 +241,7 @@ tinychannels-bus = { version = "0.1", path = "../../vendor/tinychannels/crates/t
 # --features flows` would carry `ureq` and the archive stack for a host that
 # never loads a module. The kernel-floor ratchet catches exactly that, and did.
 tinybus = { path = "../../vendor/tinybus/crates/tinybus", default-features = false, features = ["macros", "uds"] }
-tinysearch-bus = { path = "../../vendor/tinysearch/crates/tinysearch-bus" }
+tinysearch-bus = { path = "../../vendor/tinysearch/crates/tinysearch-bus", features = ["schemars"] }
 # Registry vocabulary is available even when the loader is disabled, so the
 # pre-core client can identify and report an unavailable module safely.
 tinycomputer-bus = { path = "../../vendor/tinycomputer/crates/tinycomputer-bus" }

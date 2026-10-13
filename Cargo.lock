@@ -8165,8 +8165,9 @@ dependencies = [
 
 [[package]]
 name = "tinysearch-bus"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
+ "schemars",
  "serde",
  "serde_json",
 ]

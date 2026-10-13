@@ -27,7 +27,7 @@
 //! | `tinymcp`        | waits: `static-link` exists but `linked_module` is not exported |
 //! | `tinycomputer`   | waits: no `static-link` |
 //! | `tinyjuice`      | waits: no `static-link` |
-//! | `tinysearch`     | waits: no `static-link` |
+//! | `tinysearch`     | waits: v0.5.0 has `static-link` + `linked_module`, but needs `tinybus ^0.1.4` while its nested `vendor/tinybus` is 0.1.2 and the workspace carries 0.1.3, so Cargo cannot resolve the graph |
 //! | `tinywallet`     | waits: v0.20.0 has `static-link` + `linked_module`, but its nested `vendor/tinybus` (cbb2eea) collides with the workspace `tinybus` (9062dd8) in Cargo.lock; also see the attestation note below |
 //! | `tinyhosts`      | waits: no module crate yet |
 //!
