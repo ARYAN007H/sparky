@@ -8,7 +8,7 @@
 //! live tool timeline, streaming text, and the cost/token footer on the
 //! tinyagents path — and feeds per-call usage into the global cost tracker.
 
-mod cap_pauser;
+mod bridge_types;
 mod event_bridge;
 mod event_projection;
 mod graph_tracing;
@@ -24,7 +24,7 @@ use tinyinference_llm::usage::Usage;
 #[cfg(test)]
 use crate::agent::progress::AgentProgress;
 
-pub(crate) use cap_pauser::{
+pub(crate) use bridge_types::{
     ProviderUsageCarry, SubagentScope, ToolFailureMap, ToolNameMap,
 };
 pub(crate) use event_bridge::OpenhumanEventBridge;

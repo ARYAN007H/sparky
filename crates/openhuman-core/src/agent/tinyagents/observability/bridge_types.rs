@@ -21,7 +21,6 @@ pub struct SubagentScope {
     pub journal_run_id: Option<Arc<Mutex<Option<String>>>>,
 }
 
-
 /// A shared `call_id → tool_name` map. The model adapter's `ThinkingForwarder`
 /// writes it when a tool call *starts* (the crate `ToolDelta` has no `tool_name`
 /// field, so the start-event/name half of the tool-arg contract can't ride the

@@ -13,7 +13,7 @@ use crate::agent::progress::AgentProgress;
 use crate::inference::provider::BilledUsage;
 use tinytools::humanize_tool_name;
 
-use super::cap_pauser::{ProviderUsageCarry, SubagentScope, ToolFailureMap, ToolNameMap};
+use super::bridge_types::{ProviderUsageCarry, SubagentScope, ToolFailureMap, ToolNameMap};
 use tinyagents_harness::events::{CallDedupe, IterationCursor, OrderedSender};
 
 #[derive(Default)]
