@@ -28,6 +28,7 @@
 pub mod bridge;
 pub mod host;
 pub mod ops;
+mod shell;
 pub mod prompt_eval;
 pub mod schemas;
 

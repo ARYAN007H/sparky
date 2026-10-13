@@ -548,6 +548,23 @@ impl ShellTool {
         }
         let mut env = std::collections::BTreeMap::new();
 
+        // A turn that owns its child environment (library agents) keeps it: the
+        // module starts from the process snapshot, so the turn's own values for
+        // the functional variables are passed as approved overrides.
+        if crate::tools::timeout::CommandEnvironment::is_active() {
+            for name in crate::sandbox::ops::SANDBOX_ENV_PASSTHROUGH {
+                if let Some(value) = crate::tools::timeout::CommandEnvironment::var_os(name) {
+                    let Ok(value) = value.into_string() else {
+                        return (
+                            false,
+                            ToolResult::error("Shell environment contains a non-UTF-8 value."),
+                        );
+                    };
+                    env.insert((*name).to_owned(), value);
+                }
+            }
+        }
+
         // Keep command-valued repository Git settings from executing host
         // programs when a shell command happens to invoke git.
         for (key, value) in tinytools_std::filesystem::shell_git_env() {
