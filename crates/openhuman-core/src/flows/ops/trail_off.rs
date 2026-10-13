@@ -6,7 +6,7 @@ use tinyflows_copilot::fallback::{self, ToolResult};
 // trail-off fallback construction live in `tinyflows-copilot`; what stays here
 // is the host adapter that correlates the harness `TranscriptEntry` history
 // into the module's `ToolResult` shape.
-pub(super) use tinyflows_copilot::combine_trail_off_fallback;
+pub(super) use tinyflows_copilot::fallback::combine_trail_off_fallback;
 pub(super) use tinyflows_copilot::text_looks_like_question;
 
 /// Correlates each `ToolResults` entry's `tool_call_id` back to the
