@@ -58,11 +58,11 @@ pub(crate) use loop_guards::is_repeat_call_exempt;
 pub(crate) use memory_pack::MemoryPackMiddleware;
 pub(crate) use packed_tool_route::PackedToolRouteMiddleware;
 pub(crate) use repeated_failure::RepeatedToolFailureMiddleware;
-pub(crate) use tool_output::ToolOutputMiddleware;
 pub(crate) use research_budget::ResearchBudgetMiddleware;
 pub(crate) use shell_turn_budget::install_time_notes;
 pub(crate) use tool_exposure::OpenHumanToolExposureShadowMiddleware;
 pub(crate) use tool_outcome_capture::ToolOutcomeCaptureMiddleware;
+pub(crate) use tool_output::ToolOutputMiddleware;
 pub(crate) use tool_policy::ToolPolicyMiddleware;
 pub(crate) use turn_context::{
     render_unanswered_steps, TranscriptSnapshot, TranscriptSnapshotSink, TurnContextMiddleware,
