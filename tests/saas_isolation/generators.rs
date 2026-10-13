@@ -105,6 +105,20 @@ pub const GENERATORS: &[(&str, Generator)] = &[
         "openhuman.threads_todos_get",
         |w, a| json!({ "thread_id": w.thread_for(a, false) }),
     ),
+    ("openhuman.subagent_cancel", |w, a| {
+        json!({
+            "taskId": format!("sub-{}", w.next_id()),
+            "reason": w.canary(a),
+        })
+    }),
+    ("openhuman.subagent_steer", |w, a| {
+        let mode = ["steer", "collect"][w.rng.below(2)];
+        json!({
+            "taskId": format!("sub-{}", w.next_id()),
+            "message": w.canary(a),
+            "mode": mode,
+        })
+    }),
     (
         "openhuman.threads_generate_title",
         |w, a| json!({ "thread_id": w.thread_for(a, true), "assistant_message": w.canary(a) }),

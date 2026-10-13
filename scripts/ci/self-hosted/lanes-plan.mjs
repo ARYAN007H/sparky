@@ -462,8 +462,8 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           run:
             "cargo test --manifest-path Cargo.toml -p openhuman --no-default-features --lib --" +
             " core::all:: core::cli:: core::invoke:: core::session_expiry:: core::legacy_aliases:: core::runtime::" +
-            " agent::registry::agents::loader:: commands::ops::tests:: memory::people::contacts_gate_tests::" +
-            " memory::layout_migration::" +
+            " agent::registry::agents::loader:: commands::ops::tests:: cron::store::" +
+            " memory::people::contacts_gate_tests:: memory::layout_migration::" +
             " openhuman::config:: openhuman::platform::socket::event_handlers:: tools::schemas:: tools::ops::tests::",
         },
         {
@@ -476,8 +476,10 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           when: gateSmoke,
           run:
             "cargo test --manifest-path Cargo.toml -p openhuman --no-default-features" +
-            " --features modules,mcp,e2e-test-support --lib --" +
-            " modules::host:: modules::registry:: mcp::server::resources:: test_support::introspect::",
+            " --features modules,mcp,e2e-test-support,flows,storage-sqlite,web3,hosting --lib --" +
+            " modules::host:: modules::registry:: modules::ops::components_tests::" +
+            " mcp::server::resources:: storage::import::tinyflows::" +
+            " tools::implementations::network::tests:: test_support::introspect::",
         },
         {
           name: "kernel-floor",

@@ -65,4 +65,7 @@ for id in tinybox tinydocs tinywallet tinychannels tinymcp tinyjuice tinysearch 
   module_dirs="${module_dirs:+${module_dirs}:}${dest}/${id}"
 done
 echo "OPENHUMAN_MODULE_PATH=${module_dirs}${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}" > "${env_file}"
+if [ -f "${dest}/tinymcp/libtinymcp_module.so" ]; then
+  echo "OPENHUMAN_TINYMCP_TEST_MODULE=${dest}/tinymcp/libtinymcp_module.so" >> "${env_file}"
+fi
 log "wrote ${env_file}"

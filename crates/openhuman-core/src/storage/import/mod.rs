@@ -159,7 +159,7 @@ pub async fn run(config: &Config) -> Vec<Report> {
         return Vec::new();
     }
     let config = config.clone();
-    let joined = tokio::task::spawn_blocking(move || {
+    let joined = crate::core::runtime::spawn_blocking_scoped(move || {
         let mut reports = run_with(&backend, &config, &sources());
         reports.extend(tinyflows::run_with(&backend, &config));
         reports

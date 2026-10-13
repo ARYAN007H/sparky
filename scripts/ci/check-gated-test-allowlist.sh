@@ -33,6 +33,7 @@ core/dispatch_tests.rs
 core/invoke_tests.rs
 core/legacy_aliases_tests.rs
 core/runtime/services.rs
+cron/store.rs
 core/runtime/subscribers.rs
 inference/provider/factory.rs
 memory/layout_migration/map_tests.rs
@@ -48,11 +49,14 @@ channels/mod.rs
 mcp/host.rs
 modules/registry_contract_tests.rs
 modules/registry.rs
+modules/ops_components_tests.rs
 security/credentials/ops/credential.rs
 skills/bundled/mod.rs
 skills/mod.rs
 skills/search.rs
 tools/impl/network/host.rs
+tools/impl/network/host_tests.rs
+storage/import/tinyflows.rs
 tools/ops.rs
 tools/ops_tests.rs
 tools/ops_tests_capability_gating_tests.rs

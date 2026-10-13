@@ -351,9 +351,9 @@ async fn persist_channel_turn(
     workspace_dir: &Path,
     descriptor: ChannelTurnDescriptor<'_>,
 ) -> Result<(), String> {
-    #[cfg(test)]
+    #[cfg(all(test, feature = "channels", feature = "modules"))]
     let client = crate::channels::module_fixture::client().await;
-    #[cfg(not(test))]
+    #[cfg(not(all(test, feature = "channels", feature = "modules")))]
     let client = {
         let config = crate::config::rpc::load_config_with_timeout().await?;
         if config.workspace_dir != workspace_dir {

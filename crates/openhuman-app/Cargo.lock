@@ -3824,7 +3824,6 @@ dependencies = [
  "rand 0.10.2",
  "regex",
  "reqwest 0.12.28",
- "reqwest 0.13.5",
  "rustls",
  "schemars 1.2.2",
  "sentry",
@@ -3894,7 +3893,6 @@ dependencies = [
  "urlencoding",
  "uuid",
  "walkdir",
- "webpki-roots 1.0.9",
  "windows-sys 0.61.2",
  "x25519-dalek",
  "zeroize",
@@ -4869,17 +4867,14 @@ dependencies = [
  "bytes",
  "futures-core",
  "futures-util",
- "h2",
  "http",
  "http-body",
  "http-body-util",
  "hyper",
  "hyper-rustls",
- "hyper-tls",
  "hyper-util",
  "js-sys",
  "log",
- "native-tls",
  "percent-encoding",
  "pin-project-lite",
  "rustls",
@@ -4889,7 +4884,6 @@ dependencies = [
  "serde_json",
  "sync_wrapper",
  "tokio",
- "tokio-native-tls",
  "tokio-rustls",
  "tokio-util",
  "tower",
@@ -7078,7 +7072,7 @@ dependencies = [
 
 [[package]]
 name = "tinyjuice-bus"
-version = "0.7.1"
+version = "0.9.0"
 dependencies = [
  "serde",
  "serde_json",

@@ -17,6 +17,7 @@ fn test_config(tmp: &TempDir) -> Config {
     config
 }
 
+#[cfg(feature = "storage-sqlite")]
 #[test]
 fn database_lives_at_workspace_cron_schedule_db() {
     let tmp = TempDir::new().unwrap();
@@ -65,6 +66,7 @@ fn agent_context(
     )
 }
 
+#[cfg(feature = "storage-sqlite")]
 #[tokio::test]
 async fn an_agents_jobs_live_in_its_own_database() {
     use crate::core::runtime::CoreContext;
@@ -131,6 +133,7 @@ fn legacy_fixture() -> std::path::PathBuf {
         .join("src/storage/import/fixtures/tinyflows/workspace/cron/jobs.db")
 }
 
+#[cfg(feature = "storage-sqlite")]
 #[test]
 fn a_legacy_jobs_db_is_imported_on_first_use_and_left_untouched() {
     let tmp = TempDir::new().unwrap();

@@ -78,7 +78,7 @@ impl ChannelDeliveryStore {
             "channel delivery store is oversized"
         );
         let path = self.path.clone();
-        tokio::task::spawn_blocking(move || {
+        crate::core::runtime::spawn_blocking_scoped(move || {
             crate::security::secret_storage::file_store::write_atomic(&path, &bytes)
                 .map_err(anyhow::Error::from)
         })

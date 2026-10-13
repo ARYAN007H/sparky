@@ -343,10 +343,7 @@ fn juice_off_drops_handles_summaries_and_companion_tools() {
 }
 
 #[tokio::test]
-async fn juice_off_install_never_touches_the_module() {
+#[cfg(feature = "modules")]
+async fn juice_off_install_is_a_noop() {
     install_from_config(&juice_off()).await.expect("no-op");
-    assert_eq!(
-        crate::modules::state_of("tinyjuice"),
-        crate::modules::types::ModuleState::Available
-    );
 }

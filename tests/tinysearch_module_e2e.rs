@@ -22,7 +22,7 @@ async fn pinned_search_module_serves_host_contract_and_rejects_disabled_executio
         )
         .expect("published artifact is admitted by the host loader");
     assert_eq!(info.name, "tinysearch");
-    assert_eq!(info.version, "0.4.2");
+    assert_eq!(info.version, "0.5.0");
     let client = tinybus::Connection::connect(bus.connect().await.unwrap())
         .await
         .unwrap();

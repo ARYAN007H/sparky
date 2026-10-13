@@ -17,7 +17,7 @@ use futures_util::stream;
 use serde_json::{Map, Value};
 use tinymcp_bus::{ServerHttpSessionMethod, ServerHttpSessionRequest, HEADER_SESSION_ID};
 
-use crate::{config::Config, modules::client::ModuleCallError};
+use crate::modules::client::ModuleCallError;
 
 use super::module::{headers_object, ServerError, ServerPort, ServerSession};
 
@@ -45,7 +45,9 @@ pub async fn run_http_reporting(
     config: HttpServerConfig,
     ready: Option<tokio::sync::oneshot::Sender<SocketAddr>>,
 ) -> anyhow::Result<()> {
-    let host_config = Config::load_or_init().await?;
+    let host_config = crate::config::rpc::load_config_with_timeout()
+        .await
+        .map_err(anyhow::Error::msg)?;
     let port = ServerSession::port_for_config(&host_config);
     let state = HttpState {
         port,

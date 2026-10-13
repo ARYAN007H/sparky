@@ -61,7 +61,7 @@ pub(crate) async fn execute(
         let working_dir = working_dir.to_path_buf();
         let extra_env = extra_env.clone();
         // The worker owns cancellation and resource cleanup if the caller drops its wait.
-        tokio::spawn(async move {
+        crate::core::runtime::spawn_scoped(async move {
             execute_owned(
                 &config,
                 &policy,
@@ -105,7 +105,7 @@ pub(crate) async fn execute_passthrough(
         let config = config.clone();
         let command = command.to_owned();
         let working_dir = working_dir.to_path_buf();
-        tokio::spawn(async move {
+        crate::core::runtime::spawn_scoped(async move {
             execute_passthrough_owned(&config, &command, &working_dir, timeout).await
         })
         .await
