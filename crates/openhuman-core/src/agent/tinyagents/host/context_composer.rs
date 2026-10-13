@@ -120,7 +120,7 @@ impl OpenHumanContextComposer {
         Self {
             config,
             model_name,
-            tool_call_format: ToolCallFormat::default(),
+            tool_call_format: ToolCallFormat::Json,
             connected_integrations: Vec::new(),
             builder: SystemPromptBuilder::with_defaults(),
         }
