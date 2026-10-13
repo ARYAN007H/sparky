@@ -5,6 +5,8 @@
 //! pinned on every CI host, not only on a Windows runner.
 
 use super::*;
+#[cfg(feature = "modules")]
+use super::super::shell_support::PYTHON_UTF8_DEFAULTS;
 use crate::agent::host_runtime::{host_shell_flavor, ShellFlavor};
 use std::collections::HashMap;
 use std::ffi::OsString;
