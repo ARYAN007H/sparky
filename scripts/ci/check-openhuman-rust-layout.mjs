@@ -22,19 +22,6 @@ const WARN_AT = 725;
 // spent again. No new exception can appear, and one file may be listed only
 // once (a Map keeps the last duplicate, which silently discards the other pin).
 const LEGACY_LIMIT_ENTRIES = [
-  // These orchestration files crossed the general limit in the already-merged
-  // runtime compatibility work. They are being split along semantic seams.
-  // `spawn_async_subagent_execute.rs`: 847 -> 821 when the argument prologue
-  // moved to `spawn_async_subagent_args.rs`, 821 -> 809 via
-  // `AbortReport::deliver`, 809 -> 795 via `CompletionTarget`, 795 -> 791 when
-  // the detached-usage comments were reflowed. Still exempt because the rest of that function's
-  // phases close over locals whose types are not nameable from this module
-  // (see that fragment's header); taking it under 750 needs a visibility
-  // change in `subagent_sessions`.
-  [
-    "crates/openhuman-core/src/agent/orchestration/tools/spawn_async_subagent_execute.rs",
-    791,
-  ],
   // `spawn_subagent_tool_impl.rs` had its entry DELETED, not lowered: the
   // parameter schema moved to `spawn_subagent_parameters.rs` and the file is
   // under the general 750 limit, so it needs no exception at all.

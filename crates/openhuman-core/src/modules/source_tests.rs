@@ -116,3 +116,19 @@ fn artifact_in_has_nothing_for_an_unknown_id() {
     std::fs::create_dir_all(dir.path().join("nope")).unwrap();
     assert_eq!(artifact_in(dir.path(), "nope"), None);
 }
+
+#[test]
+fn local_artifact_lookup_finds_the_published_module_filename() {
+    let dir = tempfile::tempdir().unwrap();
+    let released_name = if cfg!(target_os = "windows") {
+        "tinymcp_module.dll"
+    } else if cfg!(target_os = "macos") {
+        "libtinymcp_module.dylib"
+    } else {
+        "libtinymcp_module.so"
+    };
+    let released = dir.path().join(released_name);
+    std::fs::write(&released, b"module").unwrap();
+
+    assert_eq!(module_artifact_in(dir.path(), "tinymcp"), Some(released));
+}
