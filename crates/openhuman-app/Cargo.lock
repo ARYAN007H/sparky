@@ -6800,7 +6800,7 @@ dependencies = [
 
 [[package]]
 name = "tinydocs-bus"
-version = "0.2.3"
+version = "0.2.2"
 dependencies = [
  "serde",
  "thiserror 2.0.20",
