@@ -29,7 +29,8 @@ use openhuman_core::security::approval::{
     GateOutcome,
 };
 use openhuman_core::security::{live_policy, SecurityPolicy};
-use openhuman_core::tools::registry::{denials, registry_entries, registry_entries_for_config};
+use openhuman_core::tools::registry::{registry_entries, registry_entries_for_config};
+use tinytools::registry::denials;
 use openhuman_rpc::server::build_core_http_router;
 
 const TEST_RPC_TOKEN: &str = "tool-registry-approval-raw-e2e-token";
