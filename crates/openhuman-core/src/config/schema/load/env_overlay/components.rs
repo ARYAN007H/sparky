@@ -15,6 +15,18 @@ pub(crate) fn parse_flag(raw: &str) -> Option<bool> {
 
 impl Config {
     pub(super) fn apply_components_env<E: EnvLookup + ?Sized>(&mut self, env: &E) {
+        // Legacy listener kill switch, folded into `components.channels` for
+        // one release. An explicit `OPENHUMAN_COMPONENT_CHANNELS` below wins.
+        if env
+            .get("OPENHUMAN_DISABLE_CHANNEL_LISTENERS")
+            .and_then(|raw| parse_flag(&raw))
+            == Some(true)
+        {
+            tracing::debug!(
+                "[components] OPENHUMAN_DISABLE_CHANNEL_LISTENERS folds to channels=false"
+            );
+            self.components.set("channels", false);
+        }
         for name in COMPONENT_NAMES {
             let key = format!("OPENHUMAN_COMPONENT_{}", name.to_ascii_uppercase());
             let Some(raw) = env.get(&key) else { continue };
