@@ -574,11 +574,10 @@ impl CoreContext {
         })
     }
 
-    /// Test-only constructor with the given `[components]` switches.
+    /// Test-only: given `[components]` switches.
     #[cfg(test)]
     pub(crate) fn for_test_with_components(c: crate::core::runtime::ComponentSet) -> Arc<Self> {
-        let base = Self::for_test(crate::core::runtime::DomainSet::full(), None);
-        let mut ctx = Arc::try_unwrap(base).unwrap_or_else(|_| unreachable!());
+        let mut ctx = Arc::try_unwrap(Self::for_test(super::DomainSet::full(), None)).ok().unwrap();
         ctx.components = c;
         Arc::new(ctx)
     }

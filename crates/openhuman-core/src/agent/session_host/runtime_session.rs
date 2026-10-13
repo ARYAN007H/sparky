@@ -713,7 +713,7 @@ impl OpenHumanSessionHost {
         }
         let (
             tool_result_budget_bytes,
-            tokenjuice_compaction_enabled,
+            tokenjuice_compaction_enabled: tokenjuice_compaction_enabled && juice_on,
             microcompact_keep_recent,
             autocompact_enabled,
             compaction,
@@ -736,10 +736,8 @@ impl OpenHumanSessionHost {
         );
 
         // `[components] juice = false`: truncation only, no compaction/summary.
-        let juice_on = (self.runtime_config.as_ref())
-            .map_or(true, |c| crate::inference::tokenjuice::enabled(c));
-        let tokenjuice_compaction_enabled = tokenjuice_compaction_enabled && juice_on;
-        let context_mw = TurnContextMiddleware {
+        let juice_on = (self.runtime_config.as_ref()).map_or(true, |c| tokenjuice::enabled(c));
+                let context_mw = TurnContextMiddleware {
             tool_result_budget_bytes,
             payload_summarizer: self.payload_summarizer.clone().filter(|_| juice_on),
             // Rooted outside the project; see `artifact_wiring` (#6408, #6483).
