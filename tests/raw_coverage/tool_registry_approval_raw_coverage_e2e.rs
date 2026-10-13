@@ -499,10 +499,15 @@ async fn tool_registry_diagnostics_reports_config_and_audit_store_failures() {
         .expect_err("workspace file should prevent config load");
     assert!(err.contains("failed to load config for tool registry diagnostics"));
 
-    let broken_audit_config = Config {
+    // The write audit lives in the TinyMCP module (605ca6e841), which picks its
+    // storage provider once per process at load, so a broken workspace no
+    // longer reaches it. Fail it at the module seam instead; storage failures
+    // inside the audit are covered by tinymcp's `storage/failing.rs`.
+    let mut broken_audit_config = Config {
         workspace_dir: workspace_file,
         ..Config::default()
     };
+    broken_audit_config.modules.enabled = false;
     let diagnostics =
         openhuman_core::tools::registry::ops::diagnostics_for_config(&broken_audit_config).await;
     assert!(diagnostics.value.mcp_write_audit.enabled);
