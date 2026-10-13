@@ -354,3 +354,77 @@ named = []
     assert!(def.extensions.omit_identity);
     assert!(def.extensions.omit_safety_preamble);
 }
+
+#[test]
+fn host_fields_default_to_the_lean_prompt_when_the_toml_omits_them() {
+    let def: AgentDefinition = toml::from_str(
+        r#"
+id = "lean"
+when_to_use = "defaults"
+"#,
+    )
+    .unwrap();
+    assert!(def.extensions.omit_identity);
+    assert!(def.extensions.omit_memory_context);
+    assert!(def.extensions.omit_safety_preamble);
+    assert!(!def.extensions.searches_connected_mcp);
+    assert!(def.extensions.prompt_builder.is_none());
+}
+
+#[test]
+fn host_fields_parse_from_the_flattened_top_level_of_the_toml() {
+    let def: AgentDefinition = toml::from_str(
+        r#"
+id = "opted_in"
+when_to_use = "host flags"
+omit_identity = false
+searches_connected_mcp = true
+tokenjuice_compression = "light"
+"#,
+    )
+    .unwrap();
+    assert!(!def.extensions.omit_identity);
+    assert!(def.extensions.searches_connected_mcp);
+    assert_eq!(
+        def.extensions.tokenjuice_compression,
+        tinyjuice_bus::types::AgentTokenjuiceCompression::Light
+    );
+}
+
+#[test]
+fn builtin_dynamic_prompts_carry_their_builder_beside_an_inert_marker() {
+    let defs = crate::agent::registry::agents::load_builtins().unwrap();
+    assert!(!defs.is_empty());
+    for def in &defs {
+        assert!(
+            matches!(def.system_prompt, PromptSource::Dynamic(())),
+            "built-in `{}` uses a dynamic prompt",
+            def.id
+        );
+        assert!(
+            def.extensions.prompt_builder.is_some(),
+            "built-in `{}` must keep its executable prompt builder",
+            def.id
+        );
+        let json = serde_json::to_value(def).unwrap();
+        assert_eq!(json["system_prompt"], serde_json::json!({ "dynamic": null }));
+        assert!(
+            json.get("prompt_builder").is_none(),
+            "the builder is runtime-only and never serialised"
+        );
+    }
+}
+
+#[test]
+fn coding_hint_resolves_auto_tokenjuice_to_light() {
+    use tinyjuice_bus::types::AgentTokenjuiceCompression as Profile;
+    let ext = AgentExt::default();
+    assert_eq!(
+        ext.effective_tokenjuice_compression(&ModelSpec::Hint(" Coding ".into())),
+        Profile::Light
+    );
+    assert_eq!(
+        ext.effective_tokenjuice_compression(&ModelSpec::Inherit),
+        Profile::Full
+    );
+}
