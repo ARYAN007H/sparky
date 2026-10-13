@@ -21,13 +21,13 @@
 //! | ---------------- | --------------------------------- |
 //! | `tinychannels`   | linked |
 //! | `tinydocs`       | linked (needs tinydocs v0.2.2, whose module crate pins the workspace `tinybus` 0.1.3) |
+//! | `tinysearch`     | linked (needs tinysearch v0.5.0) |
 //! | `tinybox`        | waits: its module crate pins `tinybus =0.1.2`, which cannot unify with the workspace `tinybus` path |
 //! | `tinyconnectors` | waits: its workspace pins a `tinybus` the host does not carry (0.1.2 at the pin, 0.1.4 upstream) |
 //! | `tinyvoice`      | waits: upstream main needs nested `tinyagents` submodules that collide with the host's in Cargo.lock |
 //! | `tinymcp`        | waits: `static-link` exists but `linked_module` is not exported |
 //! | `tinycomputer`   | waits: no `static-link` |
 //! | `tinyjuice`      | waits: no `static-link` |
-//! | `tinysearch`     | waits: no `static-link` |
 //! | `tinywallet`     | waits: v0.20.0 has `static-link` + `linked_module`, but its nested `vendor/tinybus` (cbb2eea) collides with the workspace `tinybus` (9062dd8) in Cargo.lock; also see the attestation note below |
 //! | `tinyhosts`      | waits: no module crate yet |
 //!
@@ -54,6 +54,8 @@ pub fn linked_modules() -> Vec<(&'static str, LinkedFactory)> {
     modules.push(("tinychannels", tinychannels_module::linked_module));
     #[cfg(feature = "tinydocs")]
     modules.push(("tinydocs", tinydocs_module::linked_module));
+    #[cfg(feature = "tinysearch")]
+    modules.push(("tinysearch", tinysearch::linked_module));
     modules
 }
 
