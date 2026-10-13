@@ -57,6 +57,7 @@ on:
       - "tests/storage_*.rs"
       - "tests/cli_storage_url_e2e.rs"
       - "tests/storage_desktop_upgrade_e2e.rs"
+      - "tests/tinymcp_storage_smoke_e2e.rs"
       - "scripts/e2e-core.sh"
       - "scripts/test-rust-e2e.sh"
       - "tests/support/storage_drivers.rs"

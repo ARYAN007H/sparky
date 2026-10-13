@@ -43,7 +43,22 @@ case "$driver" in
       exit 2
     fi
     case "$base" in
-      mongodb://localhost*|mongodb://127.0.0.1*|mongodb://\[::1\]*) ;;
+      mongodb://*) ;;
+      *) echo "[e2e-core] ERROR: TSD_MONGO_URL must be a mongodb:// URL." >&2; exit 2 ;;
+    esac
+    # Judge the complete host (userinfo and port stripped), not a prefix:
+    # mongodb://localhost.example.com must not pass as loopback.
+    hostpart="${base#mongodb://}"
+    hostpart="${hostpart%%/*}"
+    hostpart="${hostpart%%\?*}"
+    hostpart="${hostpart##*@}"
+    hostpart="${hostpart%%,*}"
+    case "$hostpart" in
+      \[::1\]|\[::1\]:*) ;;
+      *) hostpart="${hostpart%%:*}" ;;
+    esac
+    case "$hostpart" in
+      localhost|127.0.0.1|\[::1\]|\[::1\]:*) ;;
       *) echo "[e2e-core] ERROR: TSD_MONGO_URL must name a local throwaway server." >&2; exit 2 ;;
     esac
     db="oh_e2e_core_$(date +%s)_$$"
