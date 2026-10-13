@@ -444,12 +444,9 @@ pub(super) async fn run_turn_via_tinyagents_body(
     let turn_completed_sink = (subagent_scope.is_none() && !defer_turn_completed_to_caller)
         .then(|| on_progress.clone())
         .flatten();
-    // A sink is needed to mirror progress (bridge), to observe model-call
-    // completions for the cap pauser, or to persist a durable event journal
-    // (issue #4249, 05.1). The journal must attach even for an unobserved
-    // (`on_progress = None`) turn so the run stays reconstructable, so the
-    // EventSink is now created unconditionally — cheap (an empty sink) and, if
-    // no consumer subscribes, inert.
+    // The EventSink is created unconditionally (bridge, cap pauser and the
+    // durable journal of issue #4249, 05.1 all subscribe; it is inert when
+    // nothing does), so an unobserved turn stays reconstructable.
     //
     // Mint the durable run id *before* the sink and seed the sink stream prefix
     // with it (`with_stream_id`), so every persisted observation's `event_id` is
