@@ -34,11 +34,12 @@ fn reads_are_keyed_by_server_and_uri() {
 #[test]
 fn eviction_drops_the_oldest_entries_at_capacity() {
     let mut map: HashMap<u32, Timed<u32>> = HashMap::new();
+    let base = Instant::now();
     for key in 0..MAX_ENTRIES as u32 {
         map.insert(
             key,
             Timed {
-                at: Instant::now(),
+                at: base + Duration::from_millis(u64::from(key)),
                 value: key,
             },
         );
