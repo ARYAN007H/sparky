@@ -62,9 +62,7 @@ impl SiteStore {
         let read = match tokio::fs::metadata(&path).await {
             Ok(m) if m.len() <= MAX_FILE_BYTES => tokio::fs::read(&path).await,
             Ok(_) => Err(std::io::Error::other("larger than a site file can be")),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                return Ok(SiteMemory::default())
-            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(SiteMemory::default()),
             Err(e) => Err(e),
         };
         match read.and_then(|b| serde_json::from_slice(&b).map_err(std::io::Error::other)) {
