@@ -6,6 +6,7 @@ fn every_enabled_feature_registers_exactly_its_own_id() {
     let expected: Vec<&str> = [
         cfg!(feature = "tinychannels").then_some("tinychannels"),
         cfg!(feature = "tinydocs").then_some("tinydocs"),
+        cfg!(feature = "tinyjuice").then_some("tinyjuice"),
     ]
     .into_iter()
     .flatten()
@@ -25,5 +26,14 @@ fn install_makes_the_factory_visible_to_the_core() {
     install();
     assert!(openhuman_rpc::embed::modules::is_linked_registered(
         "tinychannels"
+    ));
+}
+
+#[cfg(feature = "tinyjuice")]
+#[test]
+fn tinyjuice_factory_is_visible_to_the_core() {
+    install();
+    assert!(openhuman_rpc::embed::modules::is_linked_registered(
+        "tinyjuice"
     ));
 }
