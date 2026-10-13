@@ -157,30 +157,71 @@ pub async fn import_legacy_mcp(data_dir: &std::path::Path) {
     let _ = data_dir;
 }
 
-/// Imports the connector module's legacy preference and trigger-archive files
-/// under `state_dir` into its storage, once per directory. Never fails the
-/// caller: an error is logged and the import is retried at the next open.
-pub async fn import_legacy_connectors(state_dir: &std::path::Path) {
-    #[cfg(feature = "modules")]
-    match storage_import_tinyconnectors::import_legacy(state_dir).await {
-        Ok(outcome) => log::debug!("[connectors] legacy storage import: {outcome:?}"),
+/// The (importer, directory) pairs this process already imported, so a hot
+/// call path pays for the marker lookup once rather than on every call.
+#[cfg(feature = "modules")]
+fn imported_once() -> &'static std::sync::Mutex<std::collections::HashSet<(&'static str, std::path::PathBuf)>>
+{
+    static DONE: std::sync::OnceLock<
+        std::sync::Mutex<std::collections::HashSet<(&'static str, std::path::PathBuf)>>,
+    > = std::sync::OnceLock::new();
+    DONE.get_or_init(Default::default)
+}
+
+/// Runs one legacy import at most once per process and directory, and again
+/// after a failure (which is logged, never returned).
+#[cfg(feature = "modules")]
+async fn import_once<F, T>(kind: &'static str, dir: &std::path::Path, run: F)
+where
+    F: std::future::Future<Output = anyhow::Result<T>>,
+    T: std::fmt::Debug,
+{
+    let key = (kind, dir.to_path_buf());
+    let first = imported_once()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .insert(key.clone());
+    if !first {
+        return;
+    }
+    match run.await {
+        Ok(outcome) => log::debug!("[{kind}] legacy storage import: {outcome:?}"),
         Err(error) => {
-            log::warn!("[connectors] legacy storage import failed, will retry: {error:#}");
+            log::warn!("[{kind}] legacy storage import failed, will retry: {error:#}");
+            imported_once()
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .remove(&key);
         }
     }
+}
+
+/// Imports the connector module's legacy preference and trigger-archive files
+/// under `state_dir` into its storage, once per directory. Never fails the
+/// caller: an error is logged and the import is retried at the next call.
+pub async fn import_legacy_connectors(state_dir: &std::path::Path) {
+    #[cfg(feature = "modules")]
+    import_once(
+        "connectors",
+        state_dir,
+        storage_import_tinyconnectors::import_legacy(state_dir),
+    )
+    .await;
     #[cfg(not(feature = "modules"))]
     let _ = state_dir;
 }
 
 /// Imports the x402 ledger's legacy `payments.jsonl` under `workspace_dir`
 /// into the wallet module's storage, once per workspace. Never fails the
-/// caller: an error is logged and the import is retried at the next open.
+/// caller: an error is logged and the import is retried at the next call.
 pub async fn import_legacy_x402(workspace_dir: &std::path::Path) {
     #[cfg(all(feature = "modules", feature = "web3"))]
-    match storage_import_tinywallet::import_legacy(workspace_dir).await {
-        Ok(outcome) => log::debug!("[x402] legacy storage import: {outcome:?}"),
-        Err(error) => log::warn!("[x402] legacy storage import failed, will retry: {error:#}"),
-    }
+    import_once(
+        "x402",
+        workspace_dir,
+        storage_import_tinywallet::import_legacy(workspace_dir),
+    )
+    .await;
     #[cfg(not(all(feature = "modules", feature = "web3")))]
     let _ = workspace_dir;
 }
@@ -190,10 +231,12 @@ pub async fn import_legacy_x402(workspace_dir: &std::path::Path) {
 /// logged and the import is retried at the next call.
 pub async fn import_legacy_tinybox(workspace_dir: &std::path::Path) {
     #[cfg(feature = "modules")]
-    match storage_import_tinybox::import_legacy(workspace_dir).await {
-        Ok(outcome) => log::debug!("[tinybox] legacy storage import: {outcome:?}"),
-        Err(error) => log::warn!("[tinybox] legacy storage import failed, will retry: {error:#}"),
-    }
+    import_once(
+        "tinybox",
+        workspace_dir,
+        storage_import_tinybox::import_legacy(workspace_dir),
+    )
+    .await;
     #[cfg(not(feature = "modules"))]
     let _ = workspace_dir;
 }
@@ -204,10 +247,12 @@ pub async fn import_legacy_tinybox(workspace_dir: &std::path::Path) {
 /// retried at the next install.
 pub async fn import_legacy_tinyjuice(root: &std::path::Path, ttl: Option<std::time::Duration>) {
     #[cfg(feature = "modules")]
-    match storage_import_tinyjuice::import_legacy(root, ttl).await {
-        Ok(outcome) => log::debug!("[tinyjuice] legacy storage import: {outcome:?}"),
-        Err(error) => log::warn!("[tinyjuice] legacy storage import failed, will retry: {error:#}"),
-    }
+    import_once(
+        "tinyjuice",
+        root,
+        storage_import_tinyjuice::import_legacy(root, ttl),
+    )
+    .await;
     #[cfg(not(feature = "modules"))]
     let _ = (root, ttl);
 }
