@@ -129,7 +129,10 @@ async fn a_resumed_thread_keeps_recorded_juice_specs_and_executors_when_repl_is_
     let unavailable = {
         let (tools, synthesized_tools) = {
             let surface = prelude.tool_surface.lock().expect("tool surface");
-            (Arc::clone(&surface.tools), Arc::clone(&surface.synthesized_tools))
+            (
+                Arc::clone(&surface.tools),
+                Arc::clone(&surface.synthesized_tools),
+            )
         };
         let tool = tools
             .iter()

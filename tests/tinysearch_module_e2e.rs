@@ -16,10 +16,7 @@ async fn pinned_search_module_serves_host_contract_and_rejects_disabled_executio
         ..Default::default()
     };
     let info = host
-        .load_file_with_config(
-            file,
-            serde_json::to_value(config).unwrap(),
-        )
+        .load_file_with_config(file, serde_json::to_value(config).unwrap())
         .expect("published artifact is admitted by the host loader");
     assert_eq!(info.name, "tinysearch");
     assert_eq!(info.version, "0.4.2");
