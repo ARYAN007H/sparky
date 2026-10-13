@@ -30,7 +30,6 @@ use crate::security::credentials::HttpCredentialsStore;
 use crate::security::SecurityPolicy;
 #[cfg(test)]
 use crate::security::GateDecision;
-use tinytools::status::POLICY_BLOCKED_MARKER;
 use tinybox_bus::CommandClass;
 
 // The live Composio catalog and probe moved to `composio::catalog` -- the domain
