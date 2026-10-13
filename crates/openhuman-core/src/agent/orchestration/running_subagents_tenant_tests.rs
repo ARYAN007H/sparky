@@ -295,9 +295,16 @@ async fn unscoped_async_spawn_refuses_before_persisting_a_running_session() {
         .expect("tool dispatch reports a refusal as a tool outcome");
     // An unscoped SaaS call fails closed on the store itself, so nothing was
     // persisted either way.
-    let sessions = SubagentSessionStore::new(workspace.path().to_path_buf())
-        .load()
-        .unwrap_or_default();
+    let sessions = match SubagentSessionStore::new(workspace.path().to_path_buf()).load() {
+        Ok(sessions) => sessions,
+        Err(err) => {
+            assert!(
+                err.contains("no profile in SaaS mode; refusing a shared storage scope"),
+                "unexpected store error: {err}"
+            );
+            Vec::new()
+        }
+    };
     assert!(
         result.is_error,
         "unscoped spawn must not report accepted: {}",
