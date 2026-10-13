@@ -6,7 +6,7 @@ use std::{collections::HashMap, ffi::OsString, path::Path, time::Duration};
 use std::{collections::BTreeMap, ffi::OsStr};
 
 use super::types::{SandboxExecResult, SandboxPolicy, SandboxStatus};
-use crate::{agent::platform_shell, config::Config};
+use crate::config::Config;
 
 #[cfg(feature = "modules")]
 use crate::modules::tinybox::{self, contract};
@@ -148,18 +148,22 @@ async fn execute_passthrough_owned(
         .await
         .map_err(|_| anyhow::anyhow!("TinyBox could not create a command resource"))?;
 
-        let request = shell_request(&resource, command, working_dir, BTreeMap::new(), true)?;
         let process = tinybox::reserve(config, contract::ReserveRequest::Process(resource.clone()))
             .await
             .map_err(|_| anyhow::anyhow!("TinyBox could not reserve a command process"))?;
-        let process = tinybox::start_exec(
-            config,
-            contract::SpawnRequest {
-                process,
-                command: request,
-            },
-        )
-        .await
+        let request = shell_exec_request(
+            process,
+            &resource,
+            command,
+            working_dir,
+            BTreeMap::new(),
+            &config.workspace_dir,
+            timeout,
+            true,
+            None,
+        )?;
+        let process = tinybox::start_shell_exec(config, request)
+            .await
         .map_err(|_| anyhow::anyhow!("TinyBox could not start a command process"))?;
         collect_process(config, process, timeout).await
     }
@@ -219,20 +223,23 @@ async fn execute_owned(
             "scratch",
         )?;
         let (env, read_write) = execution_environment(policy, extra_env, &scratch.path)?;
-        let exec = shell_request(&resource, command, working_dir, env, false)?;
         let jail = jail_request(policy, read_write)?;
         let process = tinybox::reserve(config, contract::ReserveRequest::Process(resource.clone()))
             .await
             .map_err(|_| anyhow::anyhow!("TinyBox could not reserve a native jail process"))?;
-        let process = tinybox::start_jailed_exec(
-            config,
-            contract::SpawnRequest {
-                process,
-                command: exec,
-            },
-            jail,
-        )
-        .await
+        let exec = shell_exec_request(
+            process,
+            &resource,
+            command,
+            working_dir,
+            env,
+            &policy.state_dir,
+            timeout,
+            false,
+            Some(jail),
+        )?;
+        let process = tinybox::start_shell_exec(config, exec)
+            .await
         .map_err(|_| anyhow::anyhow!("TinyBox could not start the native jailed process"))?;
 
         collect_process(config, process, timeout).await
@@ -293,40 +300,41 @@ fn execution_environment(
     Ok((env, read_write))
 }
 
+/// Map a host-authorized command onto TinyBox's `StartShellExec` request.
+///
+/// TinyBox selects the shell (cmd or bash with pipefail), builds the safe child
+/// environment and owns the scratch directory; the host supplies only the
+/// command, working directory, approved environment overrides and policy.
 #[cfg(feature = "modules")]
-fn shell_request(
+#[allow(clippy::too_many_arguments)]
+fn shell_exec_request(
+    process: contract::ResourceId,
     resource: &contract::ResourceId,
     command: &str,
     working_dir: &Path,
-    env: BTreeMap<String, String>,
-    preserve_pipe_status: bool,
-) -> anyhow::Result<contract::ExecRequest> {
-    let shell = if preserve_pipe_status {
-        platform_shell::build_std_command_preserving_pipe_status(command)
-    } else {
-        platform_shell::build_std_command(command)
-    };
-    let program = shell
-        .get_program()
-        .to_str()
-        .ok_or_else(|| anyhow::anyhow!("platform shell name is not UTF-8"))?;
-    let mut argv = vec![program.to_owned()];
-    argv.extend(
-        shell
-            .get_args()
-            .map(|arg| {
-                arg.to_str()
-                    .map(str::to_owned)
-                    .ok_or_else(|| anyhow::anyhow!("platform shell argument is not UTF-8"))
-            })
-            .collect::<anyhow::Result<Vec<_>>>()?,
-    );
-    Ok(contract::ExecRequest {
+    extra_env: BTreeMap<String, String>,
+    state_dir: &Path,
+    timeout: Duration,
+    preserve_pipeline_status: bool,
+    jail: Option<contract::NativeJailConfig>,
+) -> anyhow::Result<contract::ShellExecRequest> {
+    Ok(contract::ShellExecRequest {
+        process,
         resource: resource.clone(),
-        argv,
+        shell: contract::SelectShellRequest {
+            command: command.to_owned(),
+            preserve_pipeline_status,
+            runtime_path: None,
+            python_utf8: false,
+        },
         cwd: Some(path_string(working_dir, "sandbox working directory")?),
-        env,
+        extra_env,
+        state_dir: path_string(state_dir, "sandbox state directory")?,
+        timeout_ms: u64::try_from(timeout.as_millis())
+            .unwrap_or(u64::MAX)
+            .max(1),
         stdin: None,
+        jail,
     })
 }
 

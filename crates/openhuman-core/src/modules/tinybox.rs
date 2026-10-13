@@ -52,6 +52,8 @@ const RUN_DOCKER: &str = contract::METHODS[27];
 const DOCKER_STATUS: &str = contract::METHODS[28];
 const CLEANUP_DOCKER: &str = contract::METHODS[29];
 const RUN_DOCKER_WITHOUT_WORKSPACE: &str = contract::METHODS[30];
+const SELECT_SHELL: &str = contract::names::SELECT_SHELL;
+const START_SHELL_EXEC: &str = contract::names::START_SHELL_EXEC;
 const DOCKER_CALL_GRACE: Duration = Duration::from_secs(5);
 
 #[cfg(test)]
@@ -163,6 +165,28 @@ pub async fn start_jailed_exec(
     jail: contract::NativeJailConfig,
 ) -> Result<contract::ProcessRef, String> {
     call(config, START_JAILED_EXEC, (request, jail), true).await
+}
+
+/// Ask TinyBox which shell it would spawn for a command on its machine.
+///
+/// The reply is discovery only: the host never spawns the plan itself, it
+/// executes through [`start_shell_exec`].
+pub async fn select_shell(
+    config: &Config,
+    request: contract::SelectShellRequest,
+) -> Result<contract::ShellInvocation, String> {
+    call(config, SELECT_SHELL, (request,), false).await
+}
+
+/// Start a local shell under module-owned supervision and output replay.
+///
+/// The caller has already authorized the command; the module owns shell
+/// selection, the safe child environment and cleanup.
+pub async fn start_shell_exec(
+    config: &Config,
+    request: contract::ShellExecRequest,
+) -> Result<contract::ProcessRef, String> {
+    call(config, START_SHELL_EXEC, (request,), true).await
 }
 
 /// Run one bounded Docker-isolated command through TinyBox.

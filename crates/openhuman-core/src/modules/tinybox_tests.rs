@@ -474,6 +474,25 @@ fn every_host_operation_is_a_member_of_the_canonical_contract() {
         RUN_DOCKER_WITHOUT_WORKSPACE,
     ];
     assert_eq!(methods, contract::METHODS[..methods.len()]);
+    assert!(contract::METHODS.contains(&SELECT_SHELL));
+    assert!(contract::METHODS.contains(&START_SHELL_EXEC));
+}
+
+#[tokio::test]
+async fn shell_selection_and_start_use_contract_members_with_typed_requests() {
+    let (_service, client, calls) = mock_client().await;
+    let request = contract::SelectShellRequest {
+        command: "echo hi".to_owned(),
+        preserve_pipeline_status: false,
+        runtime_path: Some("/opt/bin".to_owned()),
+        python_utf8: true,
+    };
+    let _: () = call_with_client(&client, SELECT_SHELL, (request.clone(),), false)
+        .await
+        .expect("select shell call");
+    let log = calls.lock().expect("call log lock");
+    assert_eq!(log[1].0, "SelectShell");
+    assert_eq!(log[1].1, json!([request]));
 }
 
 #[tokio::test]
