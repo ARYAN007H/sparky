@@ -67,24 +67,21 @@ tinyflows = { version = "0.8", features = ["mock"], optional = true }
 # time zones, active hours, cadence floor). Unconditional: the cron scheduler is
 # not behind the `flows` gate. Runtime, store and config stay in `cron::`.
 tinyflows-schedule = { path = "../../vendor/tinyflows/crates/tinyflows-schedule" }
-# The saved-flow catalog and its SQLite backend, split out of this crate's
-# `flows::` domain so a second host storing workflows does not have to reinvent
-# them. `tinyflows-catalog` is the model (flows, revisions, runs, drafts,
-# suggestions, the n8n importer, the save/run safety predicates);
-# `tinyflows-sqlite` is one storage backend for it plus the engine checkpointer.
+# The saved-flow catalog, split out of this crate's `flows::` domain so a second
+# host storing workflows does not have to reinvent it. `tinyflows-catalog` is
+# the model (flows, revisions, runs, drafts, suggestions, the n8n importer, the
+# save/run safety predicates). tinyflows has no storage backend of its own any
+# more: `tinyflows-drivers` below keeps it on the storage ports.
 #
-# Neither is published, so both are path dependencies into the same vendored
-# workspace `tinyflows` itself comes from — one checkout, one `tinyflows`
-# package, one `WorkflowGraph` type. Optional and exclusive to `flows` for the
-# same reason the engine is.
+# Not published, so a path dependency into the same vendored workspace
+# `tinyflows` itself comes from — one checkout, one `tinyflows` package, one
+# `WorkflowGraph` type. Optional and exclusive to `flows` for the same reason
+# the engine is.
 tinyflows-catalog = { path = "../../vendor/tinyflows/crates/tinyflows-catalog", optional = true }
-# The cron job/run store half (`schedule`) is unconditional, so `tinyflows-sqlite`
-# is too; only its `catalog` half (which needs the engine) rides the `flows` gate.
-tinyflows-sqlite = { path = "../../vendor/tinyflows/crates/tinyflows-sqlite", default-features = false, features = ["schedule"] }
-# tinyflows' stores on the storage ports, used instead of the SQLite files when
-# a storage backend is configured (`storage`). The cron half (`schedule`) is
-# unconditional like cron itself; the catalog, flow state and checkpointer
-# (`catalog`, which needs the engine) ride the `flows` gate.
+# tinyflows' stores on the storage ports: the only persistence for cron jobs,
+# the flow catalog, flow state and checkpoints (`storage`). The cron half
+# (`schedule`) is unconditional like cron itself; the catalog, flow state and
+# checkpointer (`catalog`, which needs the engine) ride the `flows` gate.
 tinyflows-drivers = { path = "../../vendor/tinyflows/crates/tinyflows-drivers", default-features = false, features = ["schedule"] }
 # The authoring copilot's words: the `workflow_builder` / `flow_discovery`
 # standing archetypes and the turn brief that opens a builder turn. Harness-free
@@ -92,6 +89,12 @@ tinyflows-drivers = { path = "../../vendor/tinyflows/crates/tinyflows-drivers", 
 # keeps only the wiring: the `Tool` impls, the agent registry entries, and the
 # prompt assembly that appends its own runtime sections.
 tinyflows-copilot = { path = "../../vendor/tinyflows/crates/tinyflows-copilot", optional = true }
+# Reads the stores tinyflows hosts used before storage moved onto the ports
+# (`flows.db`, `jobs.db`, `checkpoints.db`, drafts) and copies them into the
+# port-backed stores, read-only (`storage::import`). It needs the engine and the
+# catalog, so it rides the `flows` gate; a build without `flows` imports no
+# legacy cron jobs.
+tinyflows-import = { path = "../../vendor/tinyflows/crates/tinyflows-import", optional = true }
 # TinyAgents — Rust LLM orchestration framework (LangGraph/LangChain-style):
 # durable state graphs, agent-loop harness, model/tool registries, REPL +
 # `.rag` workflow language. openhuman's agent engine + orchestration run on this
@@ -492,12 +495,6 @@ tinybox-core = { path = "../../vendor/tinybox/crates/tinybox-core" }
 # behavioural suite every engine must pass. Memory unit tests bind it as the
 # engine instead of talking to CortexDB.
 tinymemory-api = { path = "../../vendor/tinymemory/crates/tinymemory-api", features = ["conformance"] }
-# Turns on `tinyflows-sqlite`'s `test-fixtures` gate for test builds only: the
-# flows test suite stages a terminal run flipped back to `running` and a
-# `graph_json` column that does not deserialize, neither of which any production
-# write path can produce. Declared here rather than in `[dependencies]` so the
-# shipped binary never carries those two writers.
-tinyflows-sqlite = { path = "../../vendor/tinyflows/crates/tinyflows-sqlite", features = ["test-fixtures"] }
 # The document catalog's `*_for_test` fixtures, which the flows store forwards
 # in test builds.
 tinyflows-drivers = { path = "../../vendor/tinyflows/crates/tinyflows-drivers", default-features = false, features = ["schedule", "test-fixtures"] }
@@ -737,7 +734,7 @@ media = ["tinyagents-harness/media"]
 # runtime `DomainSet::flows` flag (#4796): the feature narrows the compile-time
 # surface, `DomainSet` gates it at runtime.
 # NOTE: this gate does NOT drop `tinyagents` itself — 26+ domains consume it.
-flows = ["modules", "dep:tinyflows", "dep:tinyflows-catalog", "dep:tinyflows-copilot", "tinyflows-drivers/catalog", "tinyflows-sqlite/catalog"]
+flows = ["modules", "dep:tinyflows", "dep:tinyflows-catalog", "dep:tinyflows-copilot", "dep:tinyflows-import", "tinyflows-drivers/catalog"]
 # Skills domains: `openhuman::skills` (metadata/discovery/install),
 # `openhuman::skill_runtime` (SKILL.md execution + the skill_executor agent),
 # and `openhuman::skill_registry` (remote catalogs + the skill_setup agent).

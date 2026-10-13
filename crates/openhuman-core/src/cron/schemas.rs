@@ -382,7 +382,7 @@ fn handle_add(params: Map<String, Value>) -> ControllerFuture {
                     &delivery_cfg,
                     origin.as_ref(),
                 )?;
-                let mut spec = tinyflows_sqlite::schedule::AgentJobSpec::new(schedule, p);
+                let mut spec = tinyflows_schedule::AgentJobSpec::new(schedule, p);
                 spec.name = name;
                 spec.session_target = session_target;
                 spec.model = model;

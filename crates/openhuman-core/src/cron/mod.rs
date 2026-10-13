@@ -60,4 +60,4 @@ pub use tinyflows_schedule::types::{
     ActiveHours, CronJob, CronJobPatch, CronRun, DeliveryConfig, DeliveryStatus, JobOrigin,
     JobType, Schedule, SessionTarget,
 };
-pub use tinyflows_sqlite::schedule::AgentJobSpec;
+pub use tinyflows_schedule::AgentJobSpec;
