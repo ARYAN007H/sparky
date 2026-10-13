@@ -5621,6 +5621,7 @@ version = "0.64.15"
 dependencies = [
  "log",
  "openhuman-rpc",
+ "serde_json",
  "tinybox-module",
  "tinybus",
  "tinychannels-module",
@@ -5633,6 +5634,7 @@ dependencies = [
  "tinysearch",
  "tinyvoice-module",
  "tinywallet-module",
+ "tokio",
 ]
 
 [[package]]
