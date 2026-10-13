@@ -7,6 +7,7 @@
 //! developer points a host at a local build.
 
 use super::*;
+use service::MODULE_ID;
 use tinymemes_bus::IndexKind;
 
 fn config_in(dir: &std::path::Path, artifact: &std::path::Path) -> Config {
