@@ -495,7 +495,8 @@ pub(super) async fn run_turn_via_tinyagents_body(
     // pause is also recorded on the turn's dispatch guard (resolved here, on
     // the turn's task where the task-local is in scope) to stop a racing
     // sub-agent dispatch (#5804).
-    if let (Some(events), Some(handle)) = (&events, &handle) {
+    if pause_at_cap {
+        if let (Some(events), Some(handle)) = (&events, &handle) {
             // Only the top-level turn's cap pause is binding on dispatch; a
             // delegated child reaching its own cap is routine and must not
             // stop the parent's fan-out (it still gets its advisory `Pause`).
