@@ -19,8 +19,9 @@ use tinyconnectors_bus::vocabulary::{
     CuratedCatalogRequest, CuratedTool, ToolScope, VocabularyRequest, VocabularyResponse,
 };
 
-use super::slug::{classify_unknown, find_curated, toolkit_from_slug};
-use super::UserScopePref;
+use tinyconnectors_bus::vocabulary::{
+    classify_unknown, find_curated, toolkit_from_slug, UserScopePref,
+};
 
 const LOG: &str = "[composio][curated]";
 

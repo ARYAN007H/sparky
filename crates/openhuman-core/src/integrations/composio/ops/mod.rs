@@ -55,7 +55,8 @@ pub use triggers::{
 };
 // The `composio.{get,set}_user_scopes` handlers' storage half.
 pub(crate) use scope_prefs::{
-    load_or_default as load_user_scope_pref, save as save_user_scope_pref,
+    ensure_migrated as ensure_user_scopes_migrated, load_or_default as load_user_scope_pref,
+    save as save_user_scope_pref,
 };
 
 // ── Re-export connected_integrations public items ──────────────────────────

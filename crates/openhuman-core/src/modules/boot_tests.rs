@@ -38,3 +38,15 @@ async fn boot_skips_disabled_components() {
         );
     }
 }
+
+#[test]
+fn the_catalog_warm_up_runs_only_while_connectors_are_on() {
+    use super::should_warm_connector_catalogs;
+    let mut config = Config::default();
+    assert!(should_warm_connector_catalogs(&config));
+    config.composio.mode = crate::config::schema::COMPOSIO_MODE_DISABLED.into();
+    assert!(
+        !should_warm_connector_catalogs(&config),
+        "composio off must not load the connector module at boot"
+    );
+}

@@ -261,3 +261,50 @@ fn a_host_pinned_credential_outranks_the_mode_and_the_store() {
     assert_eq!(route["entity_id"], "tenant-7");
     assert_eq!(route["base_url"], "http://127.0.0.1:1/v3");
 }
+
+#[test]
+fn the_offered_toolkit_lists_reach_the_module_in_its_load_blob() {
+    let mut config = bare_config();
+    config.composio.mode = COMPOSIO_MODE_DIRECT.into();
+    config.composio.api_key = Some("ck_test".into());
+    config.composio.offered_toolkits_allow = vec!["gmail".into(), "slack".into()];
+    config.composio.offered_toolkits_deny = vec!["slack".into()];
+
+    let blob = module_config(&config).expect("direct mode with a key resolves");
+    assert_eq!(
+        blob["offered_toolkits"],
+        serde_json::json!({ "allow": ["gmail", "slack"], "deny": ["slack"] })
+    );
+    // And the module parses it as its policy: deny wins over allow.
+    let policy: tinyconnectors_bus::vocabulary::OfferedToolkits =
+        serde_json::from_value(blob["offered_toolkits"].clone()).expect("the module's own shape");
+    assert!(policy.permits("gmail"));
+    assert!(!policy.permits("slack"));
+}
+
+#[test]
+fn an_unconfigured_route_still_carries_the_offered_toolkit_policy() {
+    let mut config = bare_config();
+    config.composio.offered_toolkits_deny = vec!["twitter".into()];
+    // No session and no key: no route can be named, but the load blob the
+    // module falls back to must not drop the operator's policy.
+    assert!(module_config(&config).is_err());
+    let fallback = super::ops::module_config_for_test(&config, MODULE_ID);
+    assert_eq!(
+        fallback["offered_toolkits"]["deny"],
+        serde_json::json!(["twitter"])
+    );
+}
+
+#[test]
+fn offered_toolkits_default_to_unrestricted_and_parse_from_toml() {
+    let defaults = Config::default();
+    assert!(defaults.composio.offered_toolkits_allow.is_empty());
+    assert!(defaults.composio.offered_toolkits_deny.is_empty());
+    let parsed: Config = toml::from_str(
+        "[composio]\noffered_toolkits_allow = [\"gmail\"]\noffered_toolkits_deny = [\"slack\"]\n",
+    )
+    .expect("config parses");
+    assert_eq!(parsed.composio.offered_toolkits_allow, ["gmail"]);
+    assert_eq!(parsed.composio.offered_toolkits_deny, ["slack"]);
+}
