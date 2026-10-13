@@ -7108,7 +7108,7 @@ dependencies = [
 
 [[package]]
 name = "tinymcp-bus"
-version = "0.14.3"
+version = "0.15.0"
 dependencies = [
  "schemars 1.2.2",
  "serde",
