@@ -59,6 +59,7 @@ The first load of an older config moves these once into `[components]`, and the 
 | `OPENHUMAN_TINYMEMES` set to an off value | `components.memes = false` |
 | `OPENHUMAN_DISABLE_CHANNEL_LISTENERS=1` | `components.channels = false` at load (env override, kept for one release; `OPENHUMAN_COMPONENT_CHANNELS` wins) |
 | `[dictation] enabled`, `[voice_server] auto_start` and `always_on_enabled` all explicitly `false` | `components.voice = false` (any other mix keeps voice on) |
+| `[sandbox] enabled = false` (or `[security.sandbox] enabled = false`) | `components.sandbox = false` (`enabled = true` or unset keeps it on; the old key is kept) |
 | `[composio] enabled` | dropped; it was never read |
 
 A `components.*` key already present in the file always wins over its legacy flag, so the migration is idempotent and turning a component back on sticks.
@@ -74,3 +75,7 @@ A `components.*` key already present in the file always wins over its legacy fla
 ## Voice
 
 `voice = false` removes the `voice` domain family, so `voice.*` answers `COMPONENT_DISABLED:voice`. The embedded voice server, the dictation hotkey listener and always-on listening do not start whatever `[dictation] enabled`, `[voice_server] auto_start` and `always_on_enabled` say, and `tinyvoice` is never downloaded, attested or loaded. `about_app` and `modules.list` report voice as disabled. The Cargo `voice` feature is unchanged.
+
+## Sandbox
+
+`sandbox = false` means the TinyBox module is never downloaded, attested, loaded or initialised, and `sandbox.*` answers `COMPONENT_DISABLED:sandbox`. Sandboxed execution takes the documented fallback, the same as `[sandbox] enabled = false` or `OPENHUMAN_SANDBOX=off`: the command runs unjailed and the Rust path checks, the always-forbidden credential floor and the security policy still apply. TinyBox registers no tools and starts no background services. `modules.list` reports `tinybox` as `disabled`, `about_app` marks the sandbox capability as disabled, and the host `DomainSet` still wins. A SaaS core still requires the per-user container path, so with the module disabled it fails closed instead of running unsandboxed.
