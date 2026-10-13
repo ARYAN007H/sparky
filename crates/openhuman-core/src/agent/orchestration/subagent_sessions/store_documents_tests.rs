@@ -69,16 +69,18 @@ fn scopes_do_not_see_each_others_sessions() {
 }
 
 #[test]
-fn the_file_store_still_works_with_no_backend() {
+fn the_store_uses_the_workspace_default_with_no_backend_installed() {
     let dir = tempfile::tempdir().unwrap();
     let store = SubagentSessionStore::new(dir.path().to_path_buf());
     assert!(store.load().unwrap().is_empty());
     store.save(&[session("a")]).unwrap();
-    assert!(dir
+    assert_eq!(store.load().unwrap().len(), 1);
+    // No JSON file store: the records are in the workspace's own database.
+    assert!(!dir
         .path()
         .join(".openhuman/subagent_sessions.json")
         .exists());
-    assert_eq!(store.load().unwrap().len(), 1);
+    assert!(dir.path().join("storage").exists());
 }
 
 #[test]
