@@ -2,7 +2,6 @@ use super::*;
 
 use tinyflows_schedule::types::JobType;
 use tinyflows_schedule::types::Schedule;
-use tinyflows_schedule::types::SessionTarget;
 // TAURI-RUST-514 — a BYO provider insufficient-credits 402 ("requires more
 // credits") leaks from a cron-fired agent job through `last_agent_error`.
 // `is_insufficient_credits_failure` must consult the message classifier so the
