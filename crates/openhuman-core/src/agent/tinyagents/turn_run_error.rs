@@ -81,7 +81,7 @@ pub(super) async fn map_turn_run_error(
             model,
             "[tinyagents] re-surfacing typed provider error from error_slot as the run failure — #4457 defect B"
         );
-        return original;
+        return anyhow::Error::new(original);
     }
     anyhow::anyhow!("tinyagents harness run failed: {e}")
 }

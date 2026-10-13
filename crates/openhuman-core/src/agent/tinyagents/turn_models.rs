@@ -5,9 +5,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::agent::tinyagents::model::{
-    BuiltTurnModels, ErrorSlotModel, ProfileOverrideModel, TierRoutes, TurnChatModel,
-};
+use crate::agent::tinyagents::model::{BuiltTurnModels, TierRoutes, TurnChatModel};
+use tinyinference_llm::model::{ErrorSlotModel, ProfileOverrideModel};
 use crate::agent::tinyagents::routes;
 use tinyagents_harness::host::{ModelResolveRequest, ModelResolver};
 use tinyinference_llm::model::{ResolvedModelRoute, RouteRecordingModel};
