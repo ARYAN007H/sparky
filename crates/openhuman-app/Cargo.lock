@@ -606,7 +606,7 @@ dependencies = [
  "cap-primitives",
  "cap-std",
  "io-lifetimes 3.0.1",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -623,7 +623,7 @@ dependencies = [
  "maybe-owned",
  "rustix 1.1.5",
  "rustix-linux-procfs",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
  "winx",
 ]
 
@@ -1525,7 +1525,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2648,7 +2648,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20fd6de4ccfcc187e38bc21cfa543cb5a302cb86a8b114eb7f0bf0dc9f8ac00f"
 dependencies = [
  "io-lifetimes 3.0.1",
- "windows-sys 0.60.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3273,7 +3273,7 @@ dependencies = [
  "png 0.18.1",
  "serde",
  "thiserror 2.0.20",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3857,8 +3857,8 @@ dependencies = [
  "tinyflows-catalog",
  "tinyflows-copilot",
  "tinyflows-drivers",
+ "tinyflows-import",
  "tinyflows-schedule",
- "tinyflows-sqlite",
  "tinyhosts-bus",
  "tinyinference-core",
  "tinyinference-embeddings",
@@ -4600,7 +4600,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -5020,7 +5020,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -5088,7 +5088,7 @@ dependencies = [
  "security-framework 3.7.0",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -5700,7 +5700,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3d1e2c7f27f8d4cb10542a02c49005dbd6e93095799d6f3be745fae9f8fedd4"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6449,10 +6449,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix 1.1.5",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -6808,7 +6808,7 @@ dependencies = [
 
 [[package]]
 name = "tinyflows"
-version = "0.8.8"
+version = "0.8.14"
 dependencies = [
  "async-trait",
  "futures-timer",
@@ -6820,6 +6820,7 @@ dependencies = [
  "jaq-std",
  "serde",
  "serde_json",
+ "sha2 0.11.0",
  "thiserror 2.0.20",
  "tokio",
  "tracing",
@@ -6867,31 +6868,35 @@ dependencies = [
 ]
 
 [[package]]
-name = "tinyflows-schedule"
+name = "tinyflows-import"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
- "chrono-tz",
- "cron",
+ "hex",
  "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "tempfile",
+ "tinyflows",
+ "tinyflows-catalog",
+ "tinyflows-drivers",
+ "tinyflows-schedule",
+ "tinystoragedrivers-core",
+ "tinystoragedrivers-sqlite",
  "tracing",
 ]
 
 [[package]]
-name = "tinyflows-sqlite"
+name = "tinyflows-schedule"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "rusqlite",
+ "chrono-tz",
+ "cron",
  "serde",
- "serde_json",
- "tinyflows",
- "tinyflows-catalog",
- "tinyflows-schedule",
- "tinystoragedrivers-sqlite",
  "tokio",
  "tracing",
  "uuid",
@@ -7199,7 +7204,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "tinystoragedrivers-core",
  "tinystoragedrivers-file",
@@ -7209,7 +7214,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-bus"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -7218,7 +7223,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-client"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "async-trait",
  "serde",
@@ -7231,7 +7236,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-core"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "async-trait",
  "serde",
@@ -7242,7 +7247,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-file"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "async-trait",
  "libc",
@@ -7254,7 +7259,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-secrets"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "async-trait",
  "atomicwrites",
@@ -7277,7 +7282,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-sqlite"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "rusqlite",
  "serde_json",
@@ -7731,7 +7736,7 @@ dependencies = [
  "png 0.18.1",
  "serde",
  "thiserror 2.0.20",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7803,7 +7808,7 @@ checksum = "f2f6fb2847f6742cd76af783a2a2c49e9375d0a111c7bef6f71cd9e738c72d6e"
 dependencies = [
  "memoffset",
  "tempfile",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
