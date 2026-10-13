@@ -96,7 +96,7 @@ pub fn resolve(config: &Config) -> Vec<ResolvedProvider> {
 /// [`resolve`] with the credential check supplied, for tests and for callers
 /// that already resolved the credential.
 pub fn resolve_with(config: &Config, managed_available: bool) -> Vec<ResolvedProvider> {
-    let search_enabled = config.search.is_enabled();
+    let search_enabled = crate::search::is_active(config);
     SEARCH_PROVIDERS
         .iter()
         .map(|&id| {

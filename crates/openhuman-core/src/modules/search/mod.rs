@@ -135,7 +135,7 @@ pub fn module_config(config: &Config) -> ModuleSearchConfig {
         && !module_providers.contains_key("gemini_deep_research")
     {
         let mut deep = direct_settings(config, "gemini_deep_research");
-        deep.enabled = config.search.is_enabled() && deep.credential.is_some();
+        deep.enabled = crate::search::is_active(config) && deep.credential.is_some();
         module_providers.insert("gemini_deep_research".into(), deep);
     }
 
@@ -150,7 +150,7 @@ pub fn module_config(config: &Config) -> ModuleSearchConfig {
     };
 
     tracing::debug!(
-        enabled = config.search.is_enabled(),
+        enabled = crate::search::is_active(config),
         providers = ?module_providers
             .iter()
             .map(|(name, p)| format!("{name}:{:?}:{}", p.route, p.enabled))
@@ -160,7 +160,7 @@ pub fn module_config(config: &Config) -> ModuleSearchConfig {
     );
 
     ModuleSearchConfig {
-        enabled: config.search.is_enabled(),
+        enabled: crate::search::is_active(config),
         backend,
         providers: module_providers,
         presentation,

@@ -296,7 +296,7 @@ pub async fn apply_search_settings(
     #[cfg(feature = "modules")]
     crate::modules::search::refresh_loaded(config).await?;
     tracing::debug!(
-        enabled = config.search.is_enabled(),
+        enabled = crate::search::is_active(config),
         providers = ?config.search.enabled_provider_names(),
         "[config][search] settings saved"
     );
@@ -324,7 +324,7 @@ pub fn search_settings_json(config: &Config) -> Value {
 
 pub(crate) fn search_settings_json_with(config: &Config, managed_available: bool) -> Value {
     let resolved = providers::resolve_with(config, managed_available);
-    let search_enabled = config.search.is_enabled();
+    let search_enabled = crate::search::is_active(config);
     let gemini_key = config.search.gemini.has_key();
     let providers_json: Vec<Value> = LISTED_PROVIDERS
         .iter()

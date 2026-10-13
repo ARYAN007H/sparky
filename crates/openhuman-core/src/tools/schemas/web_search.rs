@@ -44,7 +44,7 @@ async fn run_role_tool_with(
     arguments: Value,
     method: &str,
 ) -> Result<Value, String> {
-    if !config.search.is_enabled() {
+    if !crate::search::is_active(config) {
         return Err("web search is disabled in settings".to_string());
     }
     // JSON-RPC, MCP, and agent callers share this dispatcher; enforce egress
