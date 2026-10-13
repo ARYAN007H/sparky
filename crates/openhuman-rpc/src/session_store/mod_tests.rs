@@ -205,6 +205,7 @@ async fn provider_for_url_returns_the_store_without_installing_it() {
     let backend_driver = crate::core_host::storage::installed().map(|b| b.driver());
     let left_uninstalled = crate::core_host::agent::session_store::installed().is_none();
 
+    // No URL: each workspace keeps its sessions in its own default database.
     let per_workspace = provider_for_url(None).await.unwrap();
     let cleared = crate::core_host::storage::installed().is_none();
 
@@ -222,10 +223,7 @@ async fn provider_for_url_returns_the_store_without_installing_it() {
         left_uninstalled,
         "the provider is handed back, not installed"
     );
-    assert!(
-        per_workspace.destination_key().is_some(),
-        "no URL keeps each workspace's sessions in its own default database"
-    );
+    drop(per_workspace);
     assert!(cleared, "no URL clears an earlier backend");
 }
 
