@@ -97,7 +97,7 @@ impl StorageInfo {
                 configured: true,
             },
             Some(super::StorageSource::Url(url)) => Self::url("explicit", url),
-            None => match openhuman_core::storage::configured_url(config) {
+            None => match openhuman_core::storage::explicit_url(config) {
                 Some(url) => Self::url("configuration", &url),
                 None => Self {
                     source: "workspace".into(),

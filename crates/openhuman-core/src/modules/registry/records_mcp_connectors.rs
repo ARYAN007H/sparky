@@ -1,6 +1,6 @@
 //! Registry records for the `tinymcp` and `tinyconnectors` modules.
 
-use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset};
+use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec};
 
 /// The `tinymcp` module: the Model Context Protocol client.
 ///
@@ -25,105 +25,112 @@ use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset};
 pub(crate) const TINYMCP: ModuleRecord = ModuleRecord {
     id: "tinymcp",
     description: "Model Context Protocol client: transports, registry, and the write-audit log",
-    bus_name: "ai.tinyhumans.tinymcp.Mcp",
-    object_path: "/ai/tinyhumans/tinymcp/Mcp",
-    version: "0.14.3",
-    release_url: "https://github.com/tinyhumansai/tinymcp/releases/tag/v0.14.3",
+    bus_name: tinymcp_bus::names::INTERFACE,
+    object_path: tinymcp_bus::names::OBJECT_PATH,
+    version: "0.15.0",
+    release_url: "https://github.com/tinyhumansai/tinymcp/releases/tag/v0.15.0",
     assets: &[
         PlatformAsset {
             host_key: "archlinux-rolling-arm64",
-            archive: "tinymcp-0.14.3-archlinux-arm64.tar.gz",
-            sha256: "ce3429b277e8d6ff18e5cb2eae508681e282c5a662b04be6e5a6b0baef889309",
+            archive: "tinymcp-0.15.0-archlinux-arm64.tar.gz",
+            sha256: "c77d02b8c03278ad24294dc63e0cd1ae490d4d17ee7b8543e71c2600176a7b60",
         },
         PlatformAsset {
             host_key: "archlinux-rolling-x86_64",
-            archive: "tinymcp-0.14.3-archlinux-x86_64.tar.gz",
-            sha256: "e58fa20f6d4f5041951eeb8799050a251a01b5fde1a6442409ebec4ab0387e28",
+            archive: "tinymcp-0.15.0-archlinux-x86_64.tar.gz",
+            sha256: "836259b5cb2a06da6df598593fe2b60670d36faf3151e875946f16ccb5456fff",
         },
         PlatformAsset {
             host_key: "fedora-43-arm64",
-            archive: "tinymcp-0.14.3-fedora-43-arm64.tar.gz",
-            sha256: "d792e3afd6b9bf715450a08b6dc0ea5640b4e31ec05824e73cabca742dc439d7",
+            archive: "tinymcp-0.15.0-fedora-43-arm64.tar.gz",
+            sha256: "0ba117c96137e13f958de0a557094a06c58797c7c03eee1b8fedfc25c7f17b6a",
         },
         PlatformAsset {
             host_key: "fedora-43-x86_64",
-            archive: "tinymcp-0.14.3-fedora-43-x86_64.tar.gz",
-            sha256: "7d9e36f65058518e58a4a366797786c8c7cd9954070f9a9c2a38f4a4078d6bca",
+            archive: "tinymcp-0.15.0-fedora-43-x86_64.tar.gz",
+            sha256: "da5154722f65019f7de2452662f1f46c8425bfba95d0aa6613dab1efff6fec7e",
         },
         PlatformAsset {
             host_key: "fedora-44-arm64",
-            archive: "tinymcp-0.14.3-fedora-44-arm64.tar.gz",
-            sha256: "ae150372d30a8d90dd82c39a139db36322d03142509a8fa0aaa837227944d315",
+            archive: "tinymcp-0.15.0-fedora-44-arm64.tar.gz",
+            sha256: "ada62a47ad9d88a4bd9f8e0defe67718a75db2f30e8e298e838b7d5d3f036f4f",
         },
         PlatformAsset {
             host_key: "fedora-44-x86_64",
-            archive: "tinymcp-0.14.3-fedora-44-x86_64.tar.gz",
-            sha256: "255559923bd7a2bcf8c7290cfe0d9eb39bde4cfeb99d35bb5ce3dd2c994b1819",
+            archive: "tinymcp-0.15.0-fedora-44-x86_64.tar.gz",
+            sha256: "2036d7a13f06bfb243fd7f54626cdcf7ed4653a534ac780503ee9980be1488ca",
         },
         PlatformAsset {
             host_key: "macos-15-arm64",
-            archive: "tinymcp-0.14.3-macos-15-arm64.tar.gz",
-            sha256: "5100539b489a0ea2e6b64334bd3857b6cf63af8d4c0f20d4efba3c675488d8a0",
+            archive: "tinymcp-0.15.0-macos-15-arm64.tar.gz",
+            sha256: "11aaa66c1dc42ec2b6f6a70c01d1c98e95bef22c7f626d32c6da9455b2cdf38f",
         },
         PlatformAsset {
             host_key: "macos-15-x86_64",
-            archive: "tinymcp-0.14.3-macos-15-x86_64.tar.gz",
-            sha256: "d485623e52b5ea1057ff1ad354c2338ee06666ba0ca4e941439e6b0a703e19da",
+            archive: "tinymcp-0.15.0-macos-15-x86_64.tar.gz",
+            sha256: "11ee1ecede7599f575d75fcc3e030ea0f18df9ffe91a8264dd20da4453825569",
         },
         PlatformAsset {
             host_key: "macos-26-arm64",
-            archive: "tinymcp-0.14.3-macos-26-arm64.tar.gz",
-            sha256: "f147c5fb4220a316e36ce9e68004166faa36b0f31d96f89cf154867b2d1cd13c",
+            archive: "tinymcp-0.15.0-macos-26-arm64.tar.gz",
+            sha256: "4062a4a7de2bda4d707960c715412ce61d66e8b5983f05b75ef5bca5931eb866",
         },
         PlatformAsset {
             host_key: "macos-26-x86_64",
-            archive: "tinymcp-0.14.3-macos-26-x86_64.tar.gz",
-            sha256: "fb07cecdcf1c78076de4e985c089c17a3c7a78e2d3c7f35882eec5b8612c2418",
+            archive: "tinymcp-0.15.0-macos-26-x86_64.tar.gz",
+            sha256: "8a144d5f19bb743186373ec18c118da9f1b772d592a14caed892f808a690c41f",
         },
         PlatformAsset {
             host_key: "ubuntu-22.04-arm64",
-            archive: "tinymcp-0.14.3-ubuntu-22.04-arm64.tar.gz",
-            sha256: "fc0b6c92683abf8b8d3c78983ce325d720482d23ecde60aaa606c5e6e0952e3b",
+            archive: "tinymcp-0.15.0-ubuntu-22.04-arm64.tar.gz",
+            sha256: "1d3de88aeaf2255d44f5895ae06d7c7b4e2869314fff0efe8661a1eea50d0863",
         },
         PlatformAsset {
             host_key: "ubuntu-22.04-x86_64",
-            archive: "tinymcp-0.14.3-ubuntu-22.04-x86_64.tar.gz",
-            sha256: "e7f2eccefbc645c66916c4885658a1dc286f1eb72ec7a7546bbc9f37e4228946",
+            archive: "tinymcp-0.15.0-ubuntu-22.04-x86_64.tar.gz",
+            sha256: "aacd2ea47433e8c61941be71b5ff95036afe4435da4c38f2ab1dfa0d31ddade1",
         },
         PlatformAsset {
             host_key: "ubuntu-24.04-arm64",
-            archive: "tinymcp-0.14.3-ubuntu-24.04-arm64.tar.gz",
-            sha256: "f1cd87ed2a3276a5e8bd483ca134ffb12c0638d94701be83dd54ddbab3f64c51",
+            archive: "tinymcp-0.15.0-ubuntu-24.04-arm64.tar.gz",
+            sha256: "c5dcc8c5f74d00f08d8a4dace062ebaaf347edcee7342d11ff0ba9da840e5807",
         },
         PlatformAsset {
             host_key: "ubuntu-24.04-x86_64",
-            archive: "tinymcp-0.14.3-ubuntu-24.04-x86_64.tar.gz",
-            sha256: "4858b6eb8d246ae3f18f0e3e5de02bf98f98c7cd9ca3489d2049200b09abf15e",
+            archive: "tinymcp-0.15.0-ubuntu-24.04-x86_64.tar.gz",
+            sha256: "fefa976a7e8ea19c3c63ce9dedb6652411258c478b0c16abceaa460c3afb95e7",
         },
         PlatformAsset {
             host_key: "windows-11-arm64",
-            archive: "tinymcp-0.14.3-windows-11-arm64.zip",
-            sha256: "0ab17f2ceb5134984b13746f2c8ac2e04fa632d66faa691d61019d08f1470adc",
+            archive: "tinymcp-0.15.0-windows-11-arm64.zip",
+            sha256: "055fc3a47d050ab5fa76c993ff85d8690dbcaaab31b4673ba40e88575951d9a8",
         },
         PlatformAsset {
             host_key: "windows-2022-x86_64",
-            archive: "tinymcp-0.14.3-windows-2022-x86_64.zip",
-            sha256: "891e9be9218e4e67a6c6ce64f2ca593bd98dc13fb2885a5d2c5d1c787b371fe7",
+            archive: "tinymcp-0.15.0-windows-2022-x86_64.zip",
+            sha256: "e9f06cc33a3e29f1de05935c26238c2f23c46936544ba55a74ac89e3c8c8f690",
         },
         PlatformAsset {
             host_key: "windows-2025-x86_64",
-            archive: "tinymcp-0.14.3-windows-2025-x86_64.zip",
-            sha256: "82e6e42cd586bf5a2dcec7b56fe88b158e5078f4e26e55dd4154ef70467e89d2",
+            archive: "tinymcp-0.15.0-windows-2025-x86_64.zip",
+            sha256: "943dea2ae0695c10a9f4376b5025c560f05668f5bd121e06e355bebfc819f970",
         },
     ],
     load: LoadPolicy::Lazy,
+    source: SourceSpec {
+        submodule: "tinymcp",
+        manifest: "crates/tinymcp/Cargo.toml",
+        package: "tinymcp",
+        lib_name: "tinymcp",
+        features: &[],
+    },
 };
 
 pub(crate) const TINYCONNECTORS: ModuleRecord = ModuleRecord {
     id: "tinyconnectors",
     description: "OAuth connector integrations: accounts, actions, and triggers",
-    bus_name: "ai.tinyhumans.connectors.Composio",
-    object_path: "/ai/tinyhumans/connectors/Composio",
+    bus_name: tinyconnectors_bus::names::INTERFACE,
+    object_path: tinyconnectors_bus::names::OBJECT_PATH,
     version: "0.14.0",
     release_url: "https://github.com/tinyhumansai/tinyconnectors/releases/tag/v0.14.0",
     assets: &[
@@ -187,4 +194,11 @@ pub(crate) const TINYCONNECTORS: ModuleRecord = ModuleRecord {
     // most sessions never touch a connector. Safe even signed out — the module
     // loads without configuration and still answers the capability members.
     load: LoadPolicy::Lazy,
+    source: SourceSpec {
+        submodule: "tinyconnectors",
+        manifest: "crates/tinyconnectors/Cargo.toml",
+        package: "tinyconnectors",
+        lib_name: "tinyconnectors",
+        features: &[],
+    },
 };

@@ -1,8 +1,9 @@
 //! Native-module integration tests for the MCP registry host adapter.
 //!
 //! These tests use TinyBus' normal loader with a locally supplied TinyMCP
-//! artifact. Set `OPENHUMAN_TINYMCP_TEST_MODULE` to the verified platform
-//! library to run them with `--ignored`; no implementation crate is linked
+//! artifact. Build one with `node scripts/modules/build.mjs tinymcp` and set
+//! `OPENHUMAN_MODULE_SOURCE_DIR` (or put the verified platform library on
+//! `OPENHUMAN_MODULE_PATH`) to run them with `--ignored`; no implementation crate is linked
 //! into this host test.
 
 #![cfg(feature = "mcp")]
@@ -10,13 +11,10 @@
 use openhuman_core::config::{schema::ModuleOverride, Config};
 use serde_json::{json, Map, Value};
 
-const MODULE_ARTIFACT_ENV: &str = "OPENHUMAN_TINYMCP_TEST_MODULE";
-
 fn fresh_workspace_config() -> (tempfile::TempDir, Config) {
     let tmp = tempfile::tempdir().expect("tempdir");
-    let artifact = std::env::var_os(MODULE_ARTIFACT_ENV)
-        .map(std::path::PathBuf::from)
-        .expect("set OPENHUMAN_TINYMCP_TEST_MODULE to the verified TinyMCP artifact");
+    let artifact = openhuman_core::modules::local_artifact("tinymcp")
+        .expect("build tinymcp with scripts/modules/build.mjs and set OPENHUMAN_MODULE_SOURCE_DIR");
     let artifact = artifact
         .canonicalize()
         .expect("TinyMCP artifact path must exist");
@@ -25,10 +23,10 @@ fn fresh_workspace_config() -> (tempfile::TempDir, Config) {
         modules: openhuman_core::config::schema::ModulesConfig {
             enabled: true,
             allow_download: false,
-            overrides: vec![ModuleOverride {
-                id: "tinymcp".into(),
-                path: artifact.to_string_lossy().into_owned(),
-            }],
+            overrides: vec![ModuleOverride::with_path(
+                "tinymcp",
+                artifact.to_string_lossy().into_owned(),
+            )],
             ..Default::default()
         },
         ..Config::default()
@@ -37,8 +35,10 @@ fn fresh_workspace_config() -> (tempfile::TempDir, Config) {
 }
 
 async fn install_server(config: &Config, name: &str, server: Value) -> String {
+    let mut servers = Map::new();
+    servers.insert(name.to_owned(), server);
     let document = json!({
-        "mcpServers": Map::from([(name.to_owned(), server)])
+        "mcpServers": servers
     });
     openhuman_core::mcp::registry::config_ops::mcp_clients_config_set(config, document)
         .await
@@ -67,7 +67,7 @@ fn http_server(url: &str) -> Value {
 }
 
 #[tokio::test]
-#[ignore = "requires verified TinyMCP artifact in OPENHUMAN_TINYMCP_TEST_MODULE"]
+#[ignore = "requires a TinyMCP library: node scripts/modules/build.mjs tinymcp"]
 async fn module_tool_call_reports_unknown_tool_as_error() {
     let (_tmp, config) = fresh_workspace_config();
     let server_id = install_server(&config, "@openhuman-test/echo", stdio_server()).await;
@@ -94,7 +94,7 @@ async fn module_tool_call_reports_unknown_tool_as_error() {
 }
 
 #[tokio::test]
-#[ignore = "requires verified TinyMCP artifact in OPENHUMAN_TINYMCP_TEST_MODULE"]
+#[ignore = "requires a TinyMCP library: node scripts/modules/build.mjs tinymcp"]
 async fn disabling_server_drops_its_live_module_connection() {
     let (_tmp, config) = fresh_workspace_config();
     let server_id = install_server(&config, "@openhuman-test/echo", stdio_server()).await;
@@ -120,7 +120,7 @@ async fn disabling_server_drops_its_live_module_connection() {
 }
 
 #[tokio::test]
-#[ignore = "requires verified TinyMCP artifact in OPENHUMAN_TINYMCP_TEST_MODULE"]
+#[ignore = "requires a TinyMCP library: node scripts/modules/build.mjs tinymcp"]
 async fn disabled_server_accepts_environment_update_without_reconnecting() {
     use std::collections::HashMap;
 
@@ -142,7 +142,7 @@ async fn disabled_server_accepts_environment_update_without_reconnecting() {
 }
 
 #[tokio::test]
-#[ignore = "requires verified TinyMCP artifact in OPENHUMAN_TINYMCP_TEST_MODULE"]
+#[ignore = "requires a TinyMCP library: node scripts/modules/build.mjs tinymcp"]
 async fn per_config_lookups_are_isolated_by_workspace() {
     use openhuman_core::mcp::registry::{connections, ops};
 
@@ -170,7 +170,7 @@ async fn per_config_lookups_are_isolated_by_workspace() {
 }
 
 #[tokio::test]
-#[ignore = "requires verified TinyMCP artifact in OPENHUMAN_TINYMCP_TEST_MODULE"]
+#[ignore = "requires a TinyMCP library: node scripts/modules/build.mjs tinymcp"]
 async fn disabled_install_is_not_dialed_during_startup() {
     use openhuman_core::mcp::registry::{connections, ops};
 
@@ -196,7 +196,7 @@ async fn disabled_install_is_not_dialed_during_startup() {
 }
 
 #[tokio::test]
-#[ignore = "requires verified TinyMCP artifact in OPENHUMAN_TINYMCP_TEST_MODULE"]
+#[ignore = "requires a TinyMCP library: node scripts/modules/build.mjs tinymcp"]
 async fn per_config_auth_failure_surfaces_401_reason_without_cross_workspace_leak() {
     use openhuman_core::mcp::registry::{connections, ops};
     use wiremock::matchers::any;
@@ -231,9 +231,11 @@ async fn per_config_auth_failure_surfaces_401_reason_without_cross_workspace_lea
         connections::auth_hint_for_config(&config_a, &server_id).await,
         Some("credential_required")
     );
-    assert!(connections::last_error_for_config(&config_a, &server_id)
-        .await
-        .is_some_and(|error| !error.trim().is_empty()));
+    assert_eq!(
+        connections::last_error_for_config(&config_a, &server_id).await,
+        None,
+        "401 response text stays hidden; the typed auth hint carries the user-facing reason"
+    );
     assert!(connections::auth_hint_for_config(&config_b, &server_id)
         .await
         .is_none());

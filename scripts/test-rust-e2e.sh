@@ -84,6 +84,7 @@ fi
 # Everything after `--` is forwarded to cargo test as test-binary args.
 SUITES=()
 EXTRA_ARGS=()
+HAS_EXTRA_ARGS=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --suite)
@@ -100,10 +101,14 @@ while [ $# -gt 0 ]; do
     --)
       shift
       EXTRA_ARGS+=("$@")
+      if [ "$#" -gt 0 ]; then
+        HAS_EXTRA_ARGS=1
+      fi
       break
       ;;
     *)
       EXTRA_ARGS+=("$1")
+      HAS_EXTRA_ARGS=1
       shift
       ;;
   esac
@@ -168,30 +173,41 @@ fi
 # execute. Keep this list in the same canonical source as `pnpm test:rust`.
 PRODUCT_FEATURES="$(bash "$REPO_ROOT/scripts/ci/product-features.sh")"
 
-# Module-backed Composio coverage must use the pinned local artifact as well.
-# Without this override the core resolves TinyConnectors through release
-# metadata, turning an otherwise hermetic mock-backend suite into a network
-# dependency and permanently faulting that process when the lookup fails.
-if [ -z "${TINYCONNECTORS_TEST_MODULE:-}" ]; then
-  connectors_manifest="vendor/tinyconnectors/crates/tinyconnectors/Cargo.toml"
-  connectors_module="vendor/tinyconnectors/target/release/libtinyconnectors.so"
-  echo "[rust-e2e] Building pinned TinyConnectors test module ..."
-  "$CARGO_BIN" build --release --manifest-path "$connectors_manifest"
-  connectors_module="$(node scripts/ci/stage-connector-test-module.mjs \
-    "$REPO_ROOT/$connectors_module" "$REPO_ROOT/target/test-modules/tinyconnectors")"
-  export TINYCONNECTORS_TEST_MODULE="$connectors_module"
+module_target="$(bash "$SCRIPT_DIR/ci/native-test-module-platform.sh")"
+IFS=$'\t' read -r module_ext module_platform <<< "$module_target"
+# shellcheck source=modules/stage-local-modules.sh
+source "$SCRIPT_DIR/modules/stage-local-modules.sh"
+# With OPENHUMAN_MODULE_SOURCE=source the modules below are built from the pinned
+# submodules (scripts/modules/build.mjs); otherwise TinyBox and TinyMCP are the
+# registry-pinned releases, as in CI.
+e2e_source_ids=()
+if local_module_source_is_source; then
+  e2e_source_ids+=(tinyconnectors tinysearch tinybox tinymcp)
+else
+  # Shell command analysis and the storage URL E2E suites load TinyBox through
+  # the native module path; the ignored MCP registry cases need TinyMCP. Both
+  # come from the registry-pinned release, digest-verified before any
+  # subprocess starts.
+  for released_id in tinyconnectors tinysearch tinybox tinymcp; do
+    released_dir="$(stage_release_module "$released_id" "$module_platform" "$module_ext")"
+    export OPENHUMAN_MODULE_PATH="$released_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
+  done
 fi
 
-# The isolated module-admission suite requires a real native search module.
-# Build the pinned source, as the product unit runner does, before discovering
-# and executing the E2E targets; never fall back to release downloads in a test.
-if [ -z "${TINYSEARCH_TEST_MODULE:-}" ]; then
-  search_manifest="vendor/tinysearch/crates/tinysearch/Cargo.toml"
-  search_module="vendor/tinysearch/target/release/libtinysearch.so"
-  echo "[rust-e2e] Building pinned TinySearch test module ..."
-  "$CARGO_BIN" build --release --manifest-path "$search_manifest"
-  export TINYSEARCH_TEST_MODULE="$REPO_ROOT/$search_module"
+# Module-backed Composio coverage must use a staged artifact as well. Without
+# it the core resolves TinyConnectors through release metadata at run time,
+# turning an otherwise hermetic mock-backend suite into a network dependency
+# and permanently faulting that process when the lookup fails. The isolated
+# module-admission suite likewise needs a real native search module. The
+# released archives are staged above (digest-verified); only the local
+# OPENHUMAN_MODULE_SOURCE=source mode builds anything, through build.mjs.
+if [ "${#e2e_source_ids[@]}" -gt 0 ]; then
+  echo "[rust-e2e] Building pinned local test modules: ${e2e_source_ids[*]} ..."
+  stage_source_modules "${e2e_source_ids[@]}"
 fi
+for source_id in ${e2e_source_ids[@]+"${e2e_source_ids[@]}"}; do
+  export OPENHUMAN_MODULE_PATH="$REPO_ROOT/target/module-sources/$source_id${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
+done
 
 echo "[rust-e2e] Running ${#SUITES[@]} suite(s) serially."
 
@@ -225,7 +241,7 @@ run_json_rpc_e2e_suite() {
     bash "$SCRIPT_DIR/ci-cancel-aware.sh" "$CARGO_BIN" test \
       --manifest-path Cargo.toml --features "$PRODUCT_FEATURES" \
       --test json_rpc_e2e "$test_name" -- \
-      --exact --test-threads=1 "${EXTRA_ARGS[@]}"
+      --exact --test-threads=1 ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
   done <<<"$test_names"
 }
 
@@ -256,8 +272,27 @@ for suite in "${SUITES[@]}"; do
     run_in_process_modules
     continue
   fi
+  if [ "$suite" = "mcp_registry_e2e" ]; then
+    # The registry tests open several process-global module clients across
+    # workspaces. Parallel libtest threads can race their module lifecycle.
+    echo "[rust-e2e]   $CARGO_BIN test --manifest-path Cargo.toml --test $suite (serial)"
+    bash "$SCRIPT_DIR/ci-cancel-aware.sh" "$CARGO_BIN" test \
+      --manifest-path Cargo.toml --features "$PRODUCT_FEATURES" \
+      --test "$suite" -- --ignored --test-threads=1 ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
+    continue
+  fi
+  if [ "$suite" = "tinydocs_linked_e2e" ]; then
+    # This local-only E2E target is outside the product feature set. Enable
+    # its required linked implementation explicitly instead of failing Cargo's
+    # required-features check.
+    echo "[rust-e2e]   $CARGO_BIN test --manifest-path Cargo.toml --test $suite (linked-modules)"
+    bash "$SCRIPT_DIR/ci-cancel-aware.sh" "$CARGO_BIN" test \
+      --manifest-path Cargo.toml --features "$PRODUCT_FEATURES,linked-modules" \
+      --test "$suite" -- ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
+    continue
+  fi
 
-  if [ "${#EXTRA_ARGS[@]}" -gt 0 ]; then
+  if [ "$HAS_EXTRA_ARGS" -eq 1 ]; then
     echo "[rust-e2e]   $CARGO_BIN test --manifest-path Cargo.toml --test $suite -- ${EXTRA_ARGS[*]}"
     bash "$SCRIPT_DIR/ci-cancel-aware.sh" "$CARGO_BIN" test \
       --manifest-path Cargo.toml --features "$PRODUCT_FEATURES" \

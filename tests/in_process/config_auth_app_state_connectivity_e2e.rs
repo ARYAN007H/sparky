@@ -1,10 +1,7 @@
 //! Focused JSON-RPC E2E coverage for config, auth/credentials, app_state,
 //! and connectivity controller surfaces.
 
-use crate::env_guard::{
-    env_lock_with_file_keyring as env_lock, env_lock_with_file_keyring_async as env_lock_async,
-    EnvVarGuard,
-};
+use crate::env_guard::{env_lock, env_lock_async, EnvVarGuard};
 use crate::rpc_auth::ensure_rpc_auth;
 use crate::rpc_harness::{ok, payload, rpc, schema};
 use std::net::SocketAddr;
@@ -464,6 +461,7 @@ fn config_schema_defaults_cover_dashboard_capability_memory_and_security_shapes(
 
     let mut search = openhuman_core::config::schema::SearchConfig {
         brave: openhuman_core::config::schema::SearchEngineCredentials {
+            base_url: None,
             api_key: Some(" brave-key ".into()),
         },
         ..Default::default()

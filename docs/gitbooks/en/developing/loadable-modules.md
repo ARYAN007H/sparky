@@ -39,7 +39,7 @@ Every asset carries a SHA-256 copied verbatim from the published release's own c
 Each step avoids the cost of the next:
 
 1. Already serving on the host's broker.
-2. An operator override: a path in `[modules].overrides`, or a `*_TEST_MODULE` environment variable.
+2. An operator override: a path in `[modules].overrides`, or a source mode (`[modules] source` / `OPENHUMAN_MODULE_SOURCE`, local development only; CI uses `release`). `linked` serves a module compiled into the running `openhuman-core` (build it with `--features linked-modules`, which links `crates/openhuman-modules-linked`; no product build or other host can reach that crate).
 3. The module search path: `OPENHUMAN_MODULE_PATH`, then the platform data directories.
 4. Bundled releases staged into the app at build time.
 5. The release cache, downloading only if `[modules].allow_download` is true.

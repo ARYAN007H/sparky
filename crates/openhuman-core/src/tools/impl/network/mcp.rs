@@ -338,7 +338,6 @@ impl Tool for McpCallTool {
             .normalize_identifier(&tool)
             .await
             .map_err(|error| anyhow::anyhow!(input_module_error_message(error)))?;
-        let client_config = host::client_config(&self.config);
         let prepared = client
             .prepare_agent_tools(tinymcp_bus::PrepareAgentToolsRequest {
                 sources: vec![tinymcp_bus::McpToolSourceSpec {
@@ -372,7 +371,7 @@ impl Tool for McpCallTool {
             .cloned()
             .ok_or_else(|| anyhow::anyhow!("missing MCP tool arguments"))?;
         let arguments = client
-            .normalize_tool_arguments(arguments)
+            .normalize_tool_arguments(Some(arguments))
             .await
             .map_err(|error| anyhow::anyhow!(input_module_error_message(error)))?;
         Ok(Some(call.with_arguments(Value::Object(arguments))))
@@ -432,7 +431,7 @@ impl Tool for McpCallTool {
             }
         };
         let client_config = host::client_config(&self.config);
-        let arguments = match client.normalize_tool_arguments(arguments).await {
+        let arguments = match client.normalize_tool_arguments(Some(arguments)).await {
             Ok(arguments) => Value::Object(arguments),
             Err(error) => {
                 let outcome = tinymcp_bus::McpCallOutcome::failed(

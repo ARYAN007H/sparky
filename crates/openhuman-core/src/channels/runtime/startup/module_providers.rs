@@ -3,7 +3,6 @@
 use super::callback::ChannelHostCallbacks;
 use super::credentials::hydrate_channel_credentials;
 use crate::channels::runtime::dispatch::RuntimeChannelMessage;
-use crate::channels::traits::{Channel, ChannelMessage, SendMessage};
 use crate::config::Config;
 use crate::modules::channel_runtime::ChannelRuntimeLease;
 use crate::modules::client::{ModuleCallError, ModuleClient, ModuleObjectClient};
@@ -15,6 +14,7 @@ use tinychannels_bus::module_runtime::{
     ChannelIngressKind, ChannelMessagePreparation, ConfiguredChannelInfo,
 };
 use tinychannels_bus::module_supervision::ChannelSupervisionPolicy;
+use tinychannels_bus::{Channel, ChannelMessage, SendMessage};
 use tinychannels_bus::{ChannelInteraction, ChannelInteractionResult};
 use tokio::sync::mpsc;
 
@@ -365,7 +365,7 @@ impl Channel for ModuleChannel {
     }
 
     fn capabilities(&self) -> tinychannels_bus::ChannelCapabilities {
-        self.interaction.capabilities.clone()
+        self.interaction.capabilities
     }
 
     fn supports_reactions(&self) -> bool {

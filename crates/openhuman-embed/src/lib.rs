@@ -187,11 +187,15 @@ pub use harness::{
 };
 #[cfg(feature = "mcp")]
 pub use harness::{HttpHeader, McpAuthConfig, McpServer};
+/// Host-routed delivery of scheduled replies, for [`RuntimeBuilder::cron_delivery`]
+/// and the profile runtime alike.
+pub use openhuman_core::cron::host_delivery::{CronDelivery, CronReply};
+pub use openhuman_core::cron::JobOrigin;
 #[cfg(feature = "profiles")]
 pub use profiles::{
-    ChatReply, CronDelivery, CronReply, CronSweepReport, DirectProfileProvider, JobOrigin,
-    OpenError, ProfileError, ProfileEvents, ProfileHandle, ProfileId, ProfileIdMode,
-    ProfileRuntime, ProfileRuntimeBuilder, ProfileSummary, Provisioned, SaasConfig,
+    ChatReply, CronSweepReport, DirectProfileProvider, OpenError, ProfileError, ProfileEvents,
+    ProfileHandle, ProfileId, ProfileIdMode, ProfileRuntime, ProfileRuntimeBuilder, ProfileSummary,
+    Provisioned, SaasConfig,
 };
 #[cfg(all(feature = "profiles", feature = "channels"))]
 pub use profiles::{RelayAccepted, RelayMessage};
@@ -245,7 +249,6 @@ pub mod session_store {
     pub use tinyagents_session::testkit::conformance::{
         session_store_conformance, session_store_isolation_conformance,
     };
-    pub use tinyagents_session::transcript::import::types::{JournalMessage, SessionDescriptor};
     /// The transcript seam a provider's [`AgentStores::transcripts`] implements.
     pub use tinyagents_session::transcript::{
         SessionRef, SessionTranscript, TranscriptHistory, TranscriptLocator, TranscriptMessage,

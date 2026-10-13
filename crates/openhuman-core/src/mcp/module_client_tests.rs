@@ -12,10 +12,12 @@ struct FakePort {
     transform_requests: Arc<Mutex<Vec<tinymcp_bus::TransformTextRequest>>>,
     open_started: Arc<Notify>,
     close_started: Arc<Notify>,
+    release_close: Arc<Notify>,
     call_started: Arc<Notify>,
     release_call: Arc<Notify>,
     block_first_open: Arc<std::sync::atomic::AtomicBool>,
     block_first_close: Arc<std::sync::atomic::AtomicBool>,
+    fail_first_close: Arc<std::sync::atomic::AtomicBool>,
     block_calls: Arc<std::sync::atomic::AtomicBool>,
 }
 
@@ -55,12 +57,18 @@ impl McpModulePort for FakePort {
             closed.len()
         };
         self.close_started.notify_one();
+        if self
+            .fail_first_close
+            .swap(false, std::sync::atomic::Ordering::SeqCst)
+        {
+            return Err(ModuleCallError::TransportFailed);
+        }
         if index == 1
             && self
                 .block_first_close
                 .swap(false, std::sync::atomic::Ordering::SeqCst)
         {
-            std::future::pending::<()>().await;
+            self.release_close.notified().await;
         }
         Ok(Some("close-1".to_owned()))
     }
@@ -518,3 +526,7 @@ async fn non_utf8_workspace_paths_are_rejected_before_opening() {
     let result = McpConfiguredClient::new(&path, &Config::default());
     assert!(matches!(result, Err(ModuleCallError::IncompatibleContract)));
 }
+
+#[cfg(test)]
+#[path = "module_client/cleanup_tests.rs"]
+mod cleanup_tests;

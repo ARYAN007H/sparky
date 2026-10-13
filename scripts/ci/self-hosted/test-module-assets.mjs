@@ -19,11 +19,14 @@ const REGISTRY_DIR = join(ROOT, "crates/openhuman-core/src/modules");
 /** Test modules the core suite loads, by registry record id. */
 export const TEST_MODULE_IDS = [
   "tinyjuice",
+  "tinybox",
   "tinysearch",
   "tinydocs",
   "tinywallet",
   "tinychannels",
   "tinymcp",
+  "tinyhosts",
+  "tinyconnectors",
 ];
 
 /** Concatenate registry.rs and its `registry/records_*.rs` fragments. */

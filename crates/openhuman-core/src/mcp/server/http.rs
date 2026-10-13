@@ -171,10 +171,7 @@ async fn http_session_request(
     } else {
         None
     };
-    let internal_session_id = match session.as_ref() {
-        Some(session) => Some(session.id().to_owned()),
-        None => None,
-    };
+    let internal_session_id = session.as_ref().map(|session| session.id().to_owned());
     let request = ServerHttpSessionRequest {
         method: method.clone(),
         requested_session_id: requested_session_id.clone(),

@@ -3,15 +3,15 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use super::channel::RelayChannel;
 use super::params::RelayInboundParams;
 use super::store::{self, Recorded};
 use crate::channels::context::MAX_CHANNEL_HISTORY;
 use crate::channels::runtime::{
-    PromptToolDescs, build_channel_turn_parts, prepare_runtime_limits,
-    process_channel_runtime_message, runtime_context,
+    build_channel_turn_parts, prepare_runtime_limits, process_channel_runtime_message,
+    runtime_context, PromptToolDescs,
 };
 use crate::config::Config;
 use crate::core::Outcome;
@@ -124,7 +124,7 @@ pub(crate) async fn run_relay_turn(
                 tracing::warn!("relayed channel runtime limits unavailable: {error}");
                 let reply =
                     "⚠️ This chat's assistant is not available right now. Please try again later.";
-                let _ = crate::channels::traits::Channel::send(
+                let _ = tinychannels_bus::Channel::send(
                     channel.as_ref(),
                     &crate::channels::SendMessage::new(reply, &params.chat_id),
                 )
@@ -149,7 +149,7 @@ pub(crate) async fn run_relay_turn(
             );
             let reply =
                 "⚠️ This chat's assistant is not available right now. Please try again later.";
-            let _ = crate::channels::traits::Channel::send(
+            let _ = tinychannels_bus::Channel::send(
                 channel.as_ref(),
                 &crate::channels::SendMessage::new(reply, &params.chat_id),
             )

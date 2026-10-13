@@ -184,7 +184,7 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
     {
       name: "static",
       checks: [
-        { name: "rust-fmt", when: rust, run: "cargo fmt --all -- --check" },
+        { name: "rust-fmt", when: rust, run: "cargo fmt --manifest-path Cargo.toml --package openhuman --package openhuman-cli --package openhuman-embed --package openhuman-modules-linked --package openhuman-rpc --package openhuman-tinyhumans --package openhuman-tui -- --check" },
         {
           name: "rust-layout",
           when: core,
@@ -231,6 +231,17 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           name: "crate-chain",
           when: true,
           run: "node scripts/ci/check-crate-chain.mjs",
+        },
+        {
+          name: "process-statics",
+          when: true,
+          run: "bash scripts/ci-cancel-aware.sh node scripts/ci/check-process-statics.mjs",
+        },
+        {
+          // CI runs the pinned release only; linked/source are local-dev modes.
+          name: "module-source",
+          when: true,
+          run: "node scripts/ci/check-ci-module-source.mjs",
         },
         {
           name: "module-boundaries",
@@ -285,11 +296,11 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           when: areas.frontend,
           needs: ["pnpm-install"],
           // ex63: ci-lite's `format:check` is prettier plus rust:format:check;
-          // the static lane's rust-fmt already checks the root workspace, so
+          // the static lane's rust-fmt already checks OpenHuman workspace packages, so
           // only the (non-member) Tauri crate's rustfmt check stays here.
           run: ex63
             ? `pnpm --filter openhuman-app format:check:prettier --cache --cache-strategy content --cache-location ${nodeCache}/prettier-cache` +
-              " && cargo fmt --manifest-path crates/openhuman-app/Cargo.toml --all --check"
+              " && cargo fmt --manifest-path crates/openhuman-app/Cargo.toml --package openhuman-app -- --check"
             : "pnpm --filter openhuman-app format:check",
         },
         {
@@ -363,13 +374,6 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
         {
           name: "test-modules",
           when: core,
-          env: ex63
-            ? {
-                TINYCONNECTORS_TARGET_DIR: `${scratch}/target/tinyconnectors`,
-                ...rustEnv,
-                ...sccache,
-              }
-            : {},
           run: `bash scripts/ci/self-hosted/install-test-modules.sh "${modulesDir}" ${modulesEnvFile}`,
         },
         {

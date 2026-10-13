@@ -121,14 +121,6 @@ pub fn all_tools_with_runtime(
     ));
     tools.append(&mut vec![
         Box::new(CurrentTimeTool::new()),
-        // Reversibility for native tool-output compaction (Stage 1a): when a
-        // large result is compacted with a `retrieve_tool_output("<hash>")`
-        // marker, this hands the original back from the CCR store on demand.
-        Box::new(retrieve_tool_output_tool()),
-        // TokenJuice 2.0 content-router retrieval: fetches the original (full or
-        // by byte/line range) for a `⟦tj:<hash>⟧` marker from the CCR cache.
-        // Supersedes `retrieve_tool_output`; both are kept live during migration.
-        Box::new(crate::inference::tokenjuice::TokenjuiceRetrieveTool::new()),
         // Deterministic time-expression → timestamp resolver. `current_time`
         // only returns *now*, leaving the model to do epoch arithmetic by hand
         // (a real incident had an agent compute "24h ago" ~10 months off, then
@@ -246,6 +238,19 @@ pub fn all_tools_with_runtime(
         tracing::debug!("[tools::ops] registered memory tool");
     } else {
         tracing::debug!("[tools::ops] memory off; memory tool not registered");
+    }
+
+    // Recovery tools for compacted output (`retrieve_tool_output` for the
+    // Stage 1a marker, `juice_retrieve` for `⟦tj:<hash>⟧`; both live during
+    // migration): only while `[components] juice` is on, since with it off
+    // nothing is compacted and nothing can hand out a marker.
+    if crate::inference::tokenjuice::enabled(root_config) {
+        tools.push(Box::new(retrieve_tool_output_tool()));
+        tools.push(Box::new(
+            crate::inference::tokenjuice::TokenjuiceRetrieveTool::new(),
+        ));
+    } else {
+        tracing::debug!("[tools::ops] juice component off; recovery tools not registered");
     }
 
     // `juice_find` / `juice_extract` / `juice_summarize`: only while a handle can name them.

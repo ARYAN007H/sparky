@@ -4540,6 +4540,7 @@ const messages: TranslationMap = {
   'computer.status.state.ready': 'Gotowy',
   'computer.status.state.failed': 'Błąd',
   'computer.status.state.unsupported': 'Nieobsługiwane na tym urządzeniu',
+  'computer.status.state.disabled': 'Wyłączony w konfiguracji',
   'desktop.permission.accessibility': 'Dostępność',
   'desktop.permission.screen_recording': 'Nagrywanie ekranu',
   'channels.status.configuring': 'Konfigurowanie',

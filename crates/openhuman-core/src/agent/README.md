@@ -144,8 +144,7 @@ In order:
 9. The runtime commits the turn. `OpenHumanTranscriptCodec`
    ([`session_host/codec.rs`](./session_host/codec.rs)) converts between durable `TranscriptMessage`
    rows and model `Message`s. After the durable commit, the host publishes
-   `ConversationTurnCommitted` for memory ingest, optionally dual-writes
-   the legacy session format (`session_import::live`), and accounts usage
+   `ConversationTurnCommitted` for memory ingest and accounts usage
    against any active goal.
 10. `run_single_with_origin` publishes `AgentTurnCompleted` (or
     `AgentError`) and returns the final text.
@@ -319,7 +318,7 @@ Persistence, setup and RPC:
 | --- | --- |
 | `artifacts/` | Agent-generated artifact storage and the `ai` RPC namespace ([README](artifacts/README.md)) |
 | `session_db/` | `run_ledger` RPC over `tinyagents_session::run_ledger` |
-| `session_import/` | One-time import of legacy session files and the optional live dual-write ([README](session_import/README.md)) |
+| `session_import/` | The `session_import.run` retry of the boot-time legacy-session import, and the agent's key-value store on each turn's `RunContext` ([README](session_import/README.md)) |
 | [`schemas.rs`](./schemas.rs) | The `agent` namespace controllers |
 
 ## Key types and entry points

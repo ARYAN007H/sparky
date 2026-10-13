@@ -1317,6 +1317,48 @@ async fn json_rpc_config_update_browser_settings_persists_backend() {
 
 #[cfg(feature = "modules")]
 #[tokio::test]
+async fn json_rpc_modules_list_reports_the_serving_source() {
+    let _env_lock = json_rpc_e2e_env_lock_async().await;
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path();
+    let openhuman_home = home.join(".openhuman");
+
+    let _home_guard = EnvVarGuard::set_to_path("HOME", home);
+    let _workspace_guard = EnvVarGuard::unset("OPENHUMAN_WORKSPACE");
+    let _backend_url_guard = EnvVarGuard::unset("BACKEND_URL");
+    let _vite_backend_guard = EnvVarGuard::unset("VITE_BACKEND_URL");
+    let _source_guard = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE");
+
+    write_min_config(&openhuman_home, "http://127.0.0.1:9");
+
+    let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
+    let rpc_base = format!("http://{rpc_addr}");
+
+    let list = post_json_rpc(&rpc_base, 41_260, "openhuman.modules_list", json!({})).await;
+    let list = peel_logs_envelope(assert_no_jsonrpc_error(&list, "modules_list"));
+    let modules = list
+        .get("modules")
+        .and_then(Value::as_array)
+        .expect("modules array");
+    assert!(!modules.is_empty(), "{list}");
+    for module in modules {
+        // Default config: every supported module is served by the pinned
+        // release; an unsupported platform reports no source.
+        match module.get("source").and_then(Value::as_str) {
+            Some(source) => assert_eq!(source, "release", "{module}"),
+            None => assert_eq!(
+                module.get("state").and_then(Value::as_str),
+                Some("unsupported"),
+                "{module}"
+            ),
+        }
+    }
+
+    rpc_join.abort();
+}
+
+#[cfg(feature = "modules")]
+#[tokio::test]
 async fn json_rpc_modules_browser_forget_sites_removes_learned_sites() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let tmp = tempdir().expect("tempdir");
@@ -3626,7 +3668,7 @@ async fn json_rpc_run_ledger_lifecycle() {
         .await
         .expect("load config");
 
-    tinyagents_session::run_ledger::upsert_agent_run(
+    openhuman_core::agent::session_store::ledger_sync::upsert_agent_run(
         &config.workspace_dir,
         tinyagents_session::run_ledger::AgentRunUpsert {
             id: "sub-run-1".to_string(),
@@ -3651,7 +3693,7 @@ async fn json_rpc_run_ledger_lifecycle() {
     )
     .expect("seed run");
 
-    tinyagents_session::run_ledger::append_run_event(
+    openhuman_core::agent::session_store::ledger_sync::append_run_event(
         &config.workspace_dir,
         tinyagents_session::run_ledger::RunEventAppend {
             run_id: "sub-run-1".to_string(),
@@ -3743,9 +3785,8 @@ async fn json_rpc_agent_work_list_groups_runs_by_bucket() {
         .await
         .expect("load config");
 
-    use tinyagents_session::run_ledger::{
-        upsert_agent_run, AgentRunKind, AgentRunStatus, AgentRunUpsert,
-    };
+    use openhuman_core::agent::session_store::ledger_sync::upsert_agent_run;
+    use tinyagents_session::run_ledger::{AgentRunKind, AgentRunStatus, AgentRunUpsert};
     let seed = |id: &str, status: AgentRunStatus| AgentRunUpsert {
         id: id.to_string(),
         kind: AgentRunKind::Subagent,
@@ -3872,7 +3913,7 @@ async fn json_rpc_workflow_run_definitions_and_runs_roundtrip() {
     );
 
     // Seed a durable workflow run, then list + get it.
-    tinyagents_session::run_ledger::upsert_workflow_run(
+    openhuman_core::agent::session_store::ledger_sync::upsert_workflow_run(
         &config.workspace_dir,
         tinyagents_session::run_ledger::WorkflowRunUpsert {
             id: "wf-run-1".to_string(),
@@ -4070,11 +4111,13 @@ async fn json_rpc_agent_team_coordination_roundtrip() {
     );
 
     // Mark A done directly via the run ledger, then B claims fine.
-    let task_a =
-        tinyagents_session::run_ledger::get_agent_team_task(&config.workspace_dir, &task_a_id)
-            .expect("get task A")
-            .expect("task A present");
-    tinyagents_session::run_ledger::upsert_agent_team_task(
+    let task_a = openhuman_core::agent::session_store::ledger_sync::get_agent_team_task(
+        &config.workspace_dir,
+        &task_a_id,
+    )
+    .expect("get task A")
+    .expect("task A present");
+    openhuman_core::agent::session_store::ledger_sync::upsert_agent_team_task(
         &config.workspace_dir,
         tinyagents_session::run_ledger::AgentTeamTaskUpsert {
             id: task_a.id.clone(),
@@ -9427,7 +9470,7 @@ async fn mcp_clients_config_round_trip_merges_credentials_and_removes_absent_ser
     assert_eq!(b5.get("removed"), Some(&json!(["echo-rt"])), "{b5}");
     assert_eq!(b5["mcpServers"], json!({}), "{b5}");
 
-    // ── 6. a refused document names the entry and the field ──────────────────
+    // ── 6. a refused document is redacted and leaves the store unchanged ────
     let refused = post_json_rpc(
         &rpc_base,
         9968,
@@ -9438,9 +9481,25 @@ async fn mcp_clients_config_round_trip_merges_credentials_and_removes_absent_ser
     let message = refused["error"]["message"]
         .as_str()
         .expect("a refusal is a JSON-RPC error");
-    assert!(
-        message.contains("`bad`") && message.contains("both"),
-        "refusal should name the entry and the problem: {message}"
+    assert_eq!(
+        message, "MODULE_CALL_REPORTED: module execution failed",
+        "the host reports sanitized module errors instead of exposing remote text"
+    );
+    let after_refusal = post_json_rpc(
+        &rpc_base,
+        9969,
+        "openhuman.mcp_clients_config_get",
+        json!({}),
+    )
+    .await;
+    let after_refusal = peel_logs_envelope(assert_no_jsonrpc_error(
+        &after_refusal,
+        "config_get (after refusal)",
+    ));
+    assert_eq!(
+        after_refusal["mcpServers"],
+        json!({}),
+        "a refused replacement leaves the install store unchanged"
     );
 
     mock_join.abort();

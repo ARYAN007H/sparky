@@ -213,13 +213,38 @@ fn test_mcp_server() -> InstalledServer {
     }
 }
 
-fn install_test_mcp_server(config: &Config, server: &InstalledServer) {
-    openhuman_core::mcp::host::for_config(config)
-        .expect("open test MCP host")
-        .dynamic()
-        .store()
-        .insert_server(server)
-        .expect("install test MCP server");
+async fn install_test_mcp_server(config: &Config, server: &InstalledServer) -> InstalledServer {
+    openhuman_core::mcp::registry::config_ops::mcp_clients_config_set(
+        config,
+        json!({
+            "mcpServers": {
+                server.qualified_name.clone(): {
+                    "command": server.command.clone(),
+                    "args": server.args.clone(),
+                    "enabled": false,
+                }
+            }
+        }),
+    )
+    .await
+    .expect("install test MCP server through the module-owned config document");
+    let status = openhuman_core::mcp::registry::ops::mcp_clients_status(config)
+        .await
+        .expect("read module-owned MCP server status");
+    let server_id = status.value["servers"]
+        .as_array()
+        .and_then(|servers| {
+            servers
+                .iter()
+                .find(|entry| entry["qualified_name"] == server.qualified_name)
+        })
+        .and_then(|entry| entry["server_id"].as_str())
+        .expect("the installed server has a module-owned id")
+        .to_owned();
+    let mut installed = server.clone();
+    installed.server_id = server_id;
+    installed.enabled = false;
+    installed
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -385,8 +410,14 @@ async fn tool_registry_entries_include_connected_mcp_client_tools() {
         workspace_dir: tmp.path().to_path_buf(),
         ..Config::default()
     };
-    let server = test_mcp_server();
-    install_test_mcp_server(&config, &server);
+    let server = install_test_mcp_server(&config, &test_mcp_server()).await;
+    openhuman_core::mcp::registry::ops::mcp_clients_set_enabled(
+        &config,
+        server.server_id.clone(),
+        true,
+    )
+    .await
+    .expect("enable test MCP server");
     let tools = connections::connect(&config, &server)
         .await
         .expect("connect test mcp server");
@@ -400,8 +431,14 @@ async fn tool_registry_entries_include_connected_mcp_client_tools() {
         workspace_dir: other_tmp.path().to_path_buf(),
         ..Config::default()
     };
-    let other_server = test_mcp_server();
-    install_test_mcp_server(&other_config, &other_server);
+    let other_server = install_test_mcp_server(&other_config, &test_mcp_server()).await;
+    openhuman_core::mcp::registry::ops::mcp_clients_set_enabled(
+        &other_config,
+        other_server.server_id.clone(),
+        true,
+    )
+    .await
+    .expect("enable second test MCP server");
     connections::connect(&other_config, &other_server)
         .await
         .expect("connect second test mcp server");
@@ -464,8 +501,10 @@ async fn tool_registry_diagnostics_reports_config_and_audit_store_failures() {
         workspace_dir: workspace_file,
         ..Config::default()
     };
-    let diagnostics =
-        openhuman_core::tools::registry::ops::diagnostics_for_config(&broken_audit_config);
+    let diagnostics = openhuman_core::tools::registry::ops::diagnostics_for_config(
+        &broken_audit_config,
+    )
+    .await;
     assert!(diagnostics.value.mcp_write_audit.enabled);
     assert_eq!(diagnostics.value.mcp_write_audit.recent_rows, None);
     assert!(diagnostics

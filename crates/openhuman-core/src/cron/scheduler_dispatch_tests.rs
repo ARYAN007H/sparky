@@ -47,13 +47,10 @@ fn due_system_job(config: &Config, name: &str) -> CronJob {
 }
 
 fn force_due(config: &Config, job_id: &str) {
-    let conn = rusqlite::Connection::open(crate::cron::policy::db_path(config)).unwrap();
-    conn.execute(
-        "UPDATE cron_jobs SET next_run = ?1 WHERE id = ?2",
-        rusqlite::params![
-            (Utc::now() - ChronoDuration::seconds(1)).to_rfc3339(),
-            job_id
-        ],
+    crate::cron::store::force_next_run_for_test(
+        config,
+        job_id,
+        Utc::now() - ChronoDuration::seconds(1),
     )
     .unwrap();
 }

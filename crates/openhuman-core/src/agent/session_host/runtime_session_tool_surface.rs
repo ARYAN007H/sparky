@@ -31,9 +31,9 @@ impl OpenHumanTurnPrelude {
             .is_empty();
         #[cfg(not(feature = "mcp"))]
         let has_configured_mcp_tools = false;
-        if !definition
+        if definition
             .as_ref()
-            .is_some_and(|definition| !definition.subagents.is_empty())
+            .is_none_or(|definition| definition.subagents.is_empty())
             && !has_recorded_tool_snapshot
             && !has_configured_mcp_tools
         {

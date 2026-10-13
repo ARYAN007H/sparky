@@ -48,7 +48,7 @@ fn a_policy_round_trips_including_zero_retries() {
 }
 
 #[test]
-fn setting_the_default_policy_removes_the_row() {
+fn setting_the_default_policy_reverts_the_job_to_the_default() {
     let tmp = TempDir::new().unwrap();
     let config = config(&tmp);
     let id = shell_job(&config, "back-to-default");
@@ -63,11 +63,14 @@ fn setting_the_default_policy_removes_the_row() {
     .unwrap();
     set_policy(&config, &id, JobPolicy::default()).unwrap();
     assert_eq!(get_policy(&config, &id).unwrap(), JobPolicy::default());
-    assert_eq!(count_rows(&config), 0);
+    assert_eq!(
+        crate::cron::get_job(&config, &id).unwrap().policy,
+        JobPolicy::default()
+    );
 }
 
 #[test]
-fn removing_a_job_removes_its_policy() {
+fn removing_a_job_takes_its_policy_with_it() {
     let tmp = TempDir::new().unwrap();
     let config = config(&tmp);
     let id = shell_job(&config, "removed");
@@ -81,7 +84,8 @@ fn removing_a_job_removes_its_policy() {
     )
     .unwrap();
     crate::cron::remove_job(&config, &id).unwrap();
-    assert_eq!(count_rows(&config), 0);
+    assert_eq!(get_policy(&config, &id).unwrap(), JobPolicy::default());
+    assert!(crate::cron::get_job(&config, &id).is_err());
 }
 
 #[test]
@@ -101,7 +105,7 @@ fn clearing_every_job_clears_every_policy() {
         .unwrap();
     }
     crate::cron::clear_all_jobs(&config).unwrap();
-    assert_eq!(count_rows(&config), 0);
+    assert!(crate::cron::list_jobs(&config).unwrap().is_empty());
 }
 
 #[test]
@@ -116,10 +120,46 @@ fn effective_retries_prefers_the_job_override() {
     assert_eq!(effective_retries(&config, &none), 0);
 }
 
-fn count_rows(config: &Config) -> i64 {
-    let conn = rusqlite::Connection::open(db_path(config)).unwrap();
-    conn.query_row("SELECT COUNT(*) FROM cron_job_policies", [], |row| {
-        row.get(0)
-    })
-    .unwrap()
+#[test]
+fn a_policy_stays_with_its_job_across_other_updates() {
+    let tmp = TempDir::new().unwrap();
+    let config = config(&tmp);
+    let id = shell_job(&config, "renamed");
+    let policy = JobPolicy {
+        retries: Some(3),
+        single_flight: true,
+    };
+    set_policy(&config, &id, policy).unwrap();
+    crate::cron::update_job(
+        &config,
+        &id,
+        crate::cron::CronJobPatch {
+            name: Some("renamed again".into()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(get_policy(&config, &id).unwrap(), policy);
+}
+
+#[test]
+fn clearing_the_policy_of_a_missing_job_is_not_an_error() {
+    let tmp = TempDir::new().unwrap();
+    let config = config(&tmp);
+    clear_policy(&config, "no-such-job").unwrap();
+}
+
+#[test]
+fn only_the_stores_own_missing_job_message_counts_as_missing() {
+    assert!(is_missing(
+        &anyhow::anyhow!("Cron job 'j1' not found"),
+        "j1"
+    ));
+    assert!(!is_missing(
+        &anyhow::anyhow!("Cron job 'j2' not found"),
+        "j1"
+    ));
+    // A backend failure that merely mentions "not found" must fail closed.
+    let backend = anyhow::anyhow!("collection not found").context("cron store: backend failed");
+    assert!(!is_missing(&backend, "j1"));
 }

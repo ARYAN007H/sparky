@@ -56,6 +56,8 @@ export const RULES = [
 const SRC = "crates/openhuman-core/src/";
 const FALLBACK =
   "legacy fallback of a store that already runs on the storage port";
+const LEGACY_READER =
+  "the storage importer's read-only reader of a legacy database, opened on a scratch copy of it (never the real file) to bring older installs' rows into the backend";
 
 /**
  * path -> { rule, site, reason }: the one site (its trimmed source line) a rule
@@ -66,34 +68,34 @@ const FALLBACK =
 export const ALLOW = new Map(
   [
     [
-      "security/approval/store.rs",
-      "sqlite-open",
-      "let conn = Connection::open(&db_path).with_context(|| {",
-      FALLBACK,
+      "modules/browser_profile.rs",
+      "json-write",
+      "lock.exists() && std::fs::OpenOptions::new().write(true).open(&lock).is_err()",
+      "probes Chrome's machine-local Windows profile lock for sharing violations; opens an existing file without creating, truncating or writing persisted state",
     ],
     [
-      "security/devices/store.rs",
+      "security/approval/store_import.rs",
+      "sqlite-open",
+      "let conn = Connection::open(&db_path).with_context(|| {",
+      LEGACY_READER,
+    ],
+    [
+      "security/devices/store_import.rs",
       "sqlite-open",
       "let conn = Connection::open(&db_path)",
-      FALLBACK,
+      LEGACY_READER,
     ],
     [
-      "desktop/notifications/store.rs",
+      "desktop/notifications/store_import.rs",
       "sqlite-open",
       "let conn = Connection::open(&db_path).with_context(|| {",
-      FALLBACK,
+      LEGACY_READER,
     ],
     [
-      "integrations/task_sources/store.rs",
+      "integrations/task_sources/store_import.rs",
       "sqlite-open",
       "let mut conn = Connection::open(&db_path)",
-      FALLBACK,
-    ],
-    [
-      "cron/policy.rs",
-      "sqlite-open",
-      "let conn = Connection::open(&path)",
-      FALLBACK,
+      LEGACY_READER,
     ],
     [
       "config/workspace/state.rs",
