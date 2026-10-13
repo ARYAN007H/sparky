@@ -39,9 +39,14 @@ impl ShowUiTool {
     #[must_use]
     pub fn for_config(config: &crate::config::Config) -> Self {
         let mut roots = vec![config.action_dir.clone(), config.workspace_dir.clone()];
-        if let Some(home) = crate::skills::ops_discover::discovery_home_dir() {
-            roots.push(home.join(".openhuman").join("skills"));
+        #[cfg(feature = "skills")]
+        {
+            if let Some(home) = crate::skills::ops_discover::discovery_home_dir() {
+                roots.push(home.join(".openhuman").join("skills"));
+            }
         }
+        #[cfg(not(feature = "skills"))]
+        let _ = &mut roots;
         Self::new(roots)
     }
 }
