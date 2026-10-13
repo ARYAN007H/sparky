@@ -1,19 +1,3 @@
-    .envs(
-        [
-            "SANDBOX",
-            "CONNECTORS",
-            "CHANNELS",
-            "HOSTING",
-            "MEMES",
-            "COMPUTER",
-            "SEARCH",
-            "DOCUMENTS",
-            "WALLET",
-            "JUICE",
-            "VOICE",
-        ]
-        .map(|name| (format!("OPENHUMAN_COMPONENT_{name}"), "0")),
-    )
 //! Smoke test of the released TinyMCP cdylib under the real host and its
 //! storage backend (#7737): add a server with a secret, restart the core, and
 //! list it again.
@@ -103,11 +87,22 @@ fn try_start(
     .env_remove("OPENHUMAN_MODE")
     // Only the module under test: the others would be fetched from the release
     // host, and this test never reaches the network.
-    .env("OPENHUMAN_COMPONENT_SANDBOX", "0")
-    .env("OPENHUMAN_COMPONENT_CONNECTORS", "0")
-    .env("OPENHUMAN_COMPONENT_CHANNELS", "0")
-    .env("OPENHUMAN_COMPONENT_HOSTING", "0")
-    .env("OPENHUMAN_COMPONENT_MEMES", "0")
+    .envs(
+        [
+            "SANDBOX",
+            "CONNECTORS",
+            "CHANNELS",
+            "HOSTING",
+            "MEMES",
+            "COMPUTER",
+            "SEARCH",
+            "DOCUMENTS",
+            "WALLET",
+            "JUICE",
+            "VOICE",
+        ]
+        .map(|name| (format!("OPENHUMAN_COMPONENT_{name}"), "0")),
+    )
     .stdout(Stdio::null())
     .stderr(Stdio::null());
     let mut server = Server(cmd.spawn().expect("spawn openhuman-core"));
