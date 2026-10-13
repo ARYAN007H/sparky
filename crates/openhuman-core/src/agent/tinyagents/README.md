@@ -65,7 +65,7 @@ that installed ranker together with `agent.tool_search`
 process-wide, like the backend transport, because the credential a
 decision-model ranker needs belongs to the process's signed-in user rather
 than to any one agent config. See
-[the Jev page](../../../../../gitbooks/developing/jev.md) for the ranking
+[the Jev page](../../../../../docs/gitbooks/en/developing/jev.md) for the ranking
 mechanism and its measured accuracy against plain BM25.
 
 ## Public surface
@@ -131,7 +131,7 @@ through the typed parent run.
 - The taint/scope/redaction/approval/budget guarantees the crate deliberately does not know about are enforced in `host/` and `middleware*.rs`. Widening a permission or dropping a scope filter to make an adapter signature fit would silently disable a guarantee the rest of the system assumes.
 - `journal.rs` is best-effort: store opening and every write swallow errors behind a `[journal]` log line rather than failing a turn. `reaper.rs` logs its sweep under `[agent] startup run sweep`.
 - `defer_turn_completed_to_caller` (a `run_turn_via_tinyagents_shared` parameter, issue #4457) exists because the chat/session path emits its own `TurnCompleted` after streaming a post-run checkpoint; callers without that step (channel/CLI) pass `false` and rely on this seam's emit.
-- [gitbooks/developing/architecture/agent-harness.md](../../../../../gitbooks/developing/architecture/agent-harness.md) is the narrative overview of the turn lifecycle and where this seam sits in it.
+- [docs/gitbooks/en/developing/architecture/agent-harness.md](../../../../../docs/gitbooks/en/developing/architecture/agent-harness.md) is the narrative overview of the turn lifecycle and where this seam sits in it.
 
 ## Further reading
 

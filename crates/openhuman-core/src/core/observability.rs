@@ -3090,12 +3090,10 @@ pub fn is_insufficient_credits_event(event: &sentry::protocol::Event<'_>) -> boo
 /// [`is_insufficient_credits_message`] it does NOT anchor on a 402 status,
 /// because the Kiro IDE proxy wraps its 402 inside a 500 envelope
 /// (TAURI-RUST-C9A). Delegates to the single-source quota-phrase set in
-/// [`crate::inference::provider::body_indicates_quota_exhausted`], so
+/// [`tinyinference_llm::failure::body_indicates_quota_exhausted`], so
 /// the emit-site guard and this `before_send` net can't drift. Shared with the
 /// event-level filter [`is_quota_exhausted_event`].
-pub fn is_quota_exhausted_message(text: &str) -> bool {
-    tinyinference_llm::failure::body_indicates_quota_exhausted(text)
-}
+pub use tinyinference_llm::failure::body_indicates_quota_exhausted as is_quota_exhausted_message;
 
 /// Defense-in-depth `before_send` filter for provider **monthly-quota
 /// exhausted** events (TAURI-RUST-C9A): the user's third-party plan has spent
