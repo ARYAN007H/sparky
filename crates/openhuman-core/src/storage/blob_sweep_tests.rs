@@ -60,3 +60,26 @@ async fn spawned_sweeper_waits_for_its_first_delay_then_keeps_ticking() {
     assert!(!handle.is_finished(), "the sweeper keeps running");
     handle.abort();
 }
+
+#[tokio::test]
+async fn sweeping_through_the_fenced_backend_reaches_the_driver() {
+    let (now, inner) = backend_with_clock();
+    let scope = Scope::local();
+    put_expiring(&inner, &scope, "gone", 10).await;
+    now.store(2_000, Ordering::SeqCst);
+    let fenced: Arc<dyn StorageBackend> = Arc::new(super::super::fenced_backend::FencedBackend::new(
+        inner,
+        Arc::new(crate::storage::fence::FenceRegistry::new(|| 0)),
+    ));
+    assert_eq!(sweep_scope(fenced.as_ref(), &scope).await, 1);
+}
+
+#[tokio::test]
+async fn module_blob_scopes_are_swept_alongside_the_acting_scope() {
+    let (now, backend) = backend_with_clock();
+    let module_scopes = crate::modules::expiring_blob_module_scopes();
+    assert!(!module_scopes.is_empty(), "TinyJuice owns expiring blobs");
+    put_expiring(&backend, &module_scopes[0], "tinyjuice_ccr/t", 10).await;
+    now.store(2_000, Ordering::SeqCst);
+    assert_eq!(sweep_all(backend).await, 1);
+}
