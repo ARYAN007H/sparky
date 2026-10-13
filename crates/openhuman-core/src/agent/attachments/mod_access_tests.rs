@@ -149,6 +149,10 @@ async fn thread_folder_upload_is_staged_where_the_turn_reads_it() {
     };
     thread_in(&config, "bound", Some(&folder)).await;
     thread_in(&config, "unbound", None).await;
+    let gone = temp.path().join("gone");
+    std::fs::create_dir_all(&gone).unwrap();
+    thread_in(&config, "gone", Some(&gone)).await;
+    std::fs::remove_dir(&gone).unwrap();
 
     let root = thread_action_dir(&config, &config.workspace_dir, Some("bound"))
         .await
@@ -162,6 +166,13 @@ async fn thread_folder_upload_is_staged_where_the_turn_reads_it() {
             config.action_dir
         );
     }
+    // A folder that disappeared is an error, as in `run_task`, not a silent
+    // fallback to the global dir.
+    assert!(
+        thread_action_dir(&config, &config.workspace_dir, Some("gone"))
+            .await
+            .is_err()
+    );
 
     // Stage the way `start_chat` does, then read the way the turn does: its
     // config acts in the thread folder and the request scope names no

@@ -424,6 +424,27 @@ pub(crate) async fn stage(
     Ok(out)
 }
 
+/// Config and scope for a delegated reference: the explicit workspace, else
+/// the thread's folder, which is where the turn staged its uploads (#7714).
+async fn acting_config(
+    workspace: Option<&tinytools::WorkspaceDescriptor>,
+    thread_id: Option<&str>,
+) -> anyhow::Result<(Config, AttachmentAccessScope)> {
+    let mut config = crate::config::rpc::load_config_with_timeout()
+        .await
+        .map_err(anyhow::Error::msg)?;
+    let action_dir = match workspace {
+        Some(workspace) => workspace.root.clone(),
+        None => thread_action_dir(&config, &config.workspace_dir, thread_id).await?,
+    };
+    config.action_dir = action_dir;
+    let scope = AttachmentAccessScope {
+        external_channel: false,
+        workspace: workspace.map(|workspace| workspace.root.clone()),
+    };
+    Ok((config, scope))
+}
+
 /// Explicit image forwarding for delegation. A filename mentioned in prose
 /// grants no read; only the typed argument or a legacy image marker does.
 pub(crate) async fn delegation_prompt(
@@ -455,21 +476,7 @@ pub(crate) async fn delegation_prompt(
     ) {
         anyhow::bail!("local attachment reads are disabled for external channel input");
     }
-    let mut config = crate::config::rpc::load_config_with_timeout()
-        .await
-        .map_err(anyhow::Error::msg)?;
-    if let Some(workspace) = workspace {
-        config.action_dir = workspace.root.clone();
-    } else {
-        // No explicit workspace: the turn acts in its thread's folder, so the
-        // copy must land (and be checked) there too (#7714).
-        let dir = thread_action_dir(&config, &config.workspace_dir, thread_id).await?;
-        config.action_dir = dir;
-    }
-    let scope = AttachmentAccessScope {
-        external_channel: false,
-        workspace: workspace.map(|workspace| workspace.root.clone()),
-    };
+    let (config, scope) = acting_config(workspace, thread_id).await?;
     stage(&prompt, "delegation", &config, &scope).await
 }
 
@@ -493,27 +500,13 @@ pub(crate) async fn has_resolvable_image(
     if paths.is_empty() {
         return Ok(false);
     }
-    let mut config = crate::config::rpc::load_config_with_timeout()
-        .await
-        .map_err(anyhow::Error::msg)?;
     if matches!(
         origin,
         Some(crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel { .. })
     ) {
         anyhow::bail!("local attachment reads are disabled for external channel input");
     }
-    if let Some(workspace) = workspace {
-        config.action_dir = workspace.root.clone();
-    } else {
-        // No explicit workspace: the turn acts in its thread's folder, so its
-        // uploads are resolved there too (#7714).
-        let dir = thread_action_dir(&config, &config.workspace_dir, thread_id).await?;
-        config.action_dir = dir;
-    }
-    let scope = AttachmentAccessScope {
-        external_channel: false,
-        workspace: workspace.map(|workspace| workspace.root.clone()),
-    };
+    let (config, scope) = acting_config(workspace, thread_id).await?;
     for path in paths {
         let path = legacy::migrate_path(&config, &path, &scope)
             .await?

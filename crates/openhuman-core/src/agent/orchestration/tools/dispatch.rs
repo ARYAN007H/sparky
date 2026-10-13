@@ -255,9 +255,7 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
             prompt,
             parent_workspace_descriptor.as_ref(),
             run_context.origin.as_ref(),
-            tool_context
-                .and_then(ToolRunContext::thread_id)
-                .or(run_context.thread_id.as_deref()),
+            run_context.thread_id.as_deref(),
         )
         .await
         {
