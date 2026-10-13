@@ -336,15 +336,11 @@ async fn session_import_plans_imports_then_skips_on_rerun() {
         imported.get("dry_run").and_then(Value::as_bool),
         Some(false)
     );
-    let outcome = sessions_outcome(&imported);
-    let written = outcome
-        .strip_prefix("Imported {")
-        .and_then(|rest| rest.split("written: ").nth(1))
-        .and_then(|rest| rest.trim_end_matches([' ', '}']).parse::<u64>().ok())
-        .unwrap_or_else(|| panic!("the real run must import: {imported}"));
-    assert!(
-        written > 0,
-        "the transcript's messages must be written: {imported}"
+    // `found`/`written` count transcripts: the one seeded file is written.
+    assert_eq!(
+        sessions_outcome(&imported),
+        "Imported { found: 1, written: 1 }",
+        "the seeded transcript must be imported: {imported}"
     );
 
     // ── re-run: idempotent, short-circuited by the per-workspace marker ──

@@ -151,11 +151,27 @@ fn headless_default_keyring_stores_provider_secrets_encrypted() {
         .output()
         .expect("run provider credential list command");
     let stdout = String::from_utf8_lossy(&listed.stdout);
+    let listing: serde_json::Value = serde_json::from_str(&stdout).unwrap_or_default();
+    // The profile must come back with its token, not just its metadata: a lost
+    // token still lists the profile with `hasToken: false`.
     assert!(
-        listed.status.success() && stdout.contains("openai"),
-        "stored credential not listed: stdout={stdout} stderr={}",
+        listed.status.success() && lists_openai_token(&listing),
+        "stored credential not read back with its token: stdout={stdout} stderr={}",
         String::from_utf8_lossy(&listed.stderr)
     );
+}
+
+/// Whether `value` holds the `openai` profile summary with its token present.
+fn lists_openai_token(value: &serde_json::Value) -> bool {
+    match value {
+        serde_json::Value::Object(map) => {
+            (map.get("provider").and_then(serde_json::Value::as_str) == Some("openai")
+                && map.get("hasToken").and_then(serde_json::Value::as_bool) == Some(true))
+                || map.values().any(lists_openai_token)
+        }
+        serde_json::Value::Array(items) => items.iter().any(lists_openai_token),
+        _ => false,
+    }
 }
 
 /// Every regular file under `root`, recursively.
