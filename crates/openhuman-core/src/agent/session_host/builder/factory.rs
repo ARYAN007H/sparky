@@ -3,7 +3,10 @@
 use super::dispatcher::{resolve_dispatcher_kind, DispatcherKind};
 use super::host_tools::derive_turn_workspace_descriptor;
 use super::should_synthesize_delegation_tools;
-use crate::agent::harness::host_definition::{AgentDefinitionRegistry, NO_TOOLS_SENTINEL};
+use crate::agent::harness::host_definition::{
+    dynamic_prompt_builder, effective_tokenjuice_compression, AgentDefinitionRegistry,
+    NO_TOOLS_SENTINEL,
+};
 use crate::agent::host_runtime;
 use crate::agent::prompts::SystemPromptBuilder;
 use crate::agent::session_host::types::OpenHumanSessionHost;

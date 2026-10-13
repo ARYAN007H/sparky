@@ -116,9 +116,12 @@ pub fn effective_tokenjuice_compression(def: &AgentDefinition) -> AgentTokenjuic
 
 /// The prompt builder behind a `PromptSource::Dynamic(())` marker.
 pub fn dynamic_prompt_builder(def: &AgentDefinition) -> Result<PromptBuilder> {
-    def.extensions
-        .prompt_builder
-        .ok_or_else(|| anyhow::anyhow!("agent `{}` declares a dynamic prompt but has no builder", def.id))
+    def.extensions.prompt_builder.ok_or_else(|| {
+        anyhow::anyhow!(
+            "agent `{}` declares a dynamic prompt but has no builder",
+            def.id
+        )
+    })
 }
 
 /// Re-check the spawn-hierarchy contract over a slice of definitions.
