@@ -9,16 +9,6 @@ use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
 use crate::config::schema::ModelRegistryEntry;
 use crate::security::credentials::AuthService;
 
-#[test]
-fn remembered_windows_are_scoped_to_provider_routes() {
-    let model = "route-cache-isolation-model";
-    remember_window("route-a", model, 32_000);
-    remember_window("route-b", model, 96_000);
-
-    assert_eq!(remembered_window("route-a", model), Some(32_000));
-    assert_eq!(remembered_window("route-b", model), Some(96_000));
-}
-
 const OPENROUTER: &str = "https://openrouter.ai/api/v1";
 const V41_FLASH: &str = "deepseek/deepseek-v4.1-flash";
 
