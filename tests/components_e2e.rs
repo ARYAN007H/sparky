@@ -31,38 +31,19 @@ async fn rpc(base: &str, method: &str) -> Value {
         .expect("json")
 }
 
+/// One core per process (the first context becomes the process default), so
+/// every disabled component is switched off in the same boot and asserted in
+/// turn: `(rpc method, component, module id)`.
+const DISABLED_CASES: &[(&str, &str, &str)] = &[
+    ("openhuman.mcp_clients_status", "mcp", "tinymcp"),
+    ("openhuman.channels_list", "channels", "tinychannels"),
+];
+
 #[test]
 fn disabled_component_answers_component_disabled_over_json_rpc() {
-    run_disabled_case(
-        |c| c.components.mcp = false,
-        "openhuman.mcp_clients_status",
-        "mcp",
-        "tinymcp",
-        "tinydocs",
-    );
-}
-
-#[test]
-fn disabled_channels_component_answers_component_disabled_over_json_rpc() {
-    run_disabled_case(
-        |c| c.components.channels = false,
-        "openhuman.channels_list",
-        "channels",
-        "tinychannels",
-        "tinydocs",
-    );
-}
-
-fn run_disabled_case(
-    disable: fn(&mut Config),
-    method: &'static str,
-    component: &'static str,
-    module_id: &'static str,
-    other_module_id: &'static str,
-) {
     std::thread::Builder::new()
         .stack_size(64 * 1024 * 1024)
-        .spawn(move || {
+        .spawn(|| {
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .thread_stack_size(16 * 1024 * 1024)
@@ -75,7 +56,8 @@ fn run_disabled_case(
                         config_path: dir.path().join("config.toml"),
                         ..Config::default()
                     };
-                    disable(&mut config);
+                    config.components.mcp = false;
+                    config.components.channels = false;
                     tinyhumans_boot::boot();
                     let _runtime = CoreBuilder::new(HostKind::Library)
                         .config(config)
@@ -91,26 +73,29 @@ fn run_disabled_case(
                     let app = build_core_http_router(false);
                     let server = tokio::spawn(async move { axum::serve(listener, app).await });
 
-                    let off = rpc(&base, method).await;
-                    let err = off
-                        .get("error")
-                        .unwrap_or_else(|| panic!("want error: {off}"));
-                    assert_eq!(
-                        err.get("message").and_then(Value::as_str),
-                        Some(format!("COMPONENT_DISABLED:{component}").as_str()),
-                        "{off}"
-                    );
-                    assert_eq!(
-                        err.pointer("/data/kind").and_then(Value::as_str),
-                        Some("component_disabled"),
-                        "{off}"
-                    );
-                    assert_eq!(
-                        err.pointer("/data/component").and_then(Value::as_str),
-                        Some(component)
-                    );
+                    for (method, component, _) in DISABLED_CASES {
+                        let off = rpc(&base, method).await;
+                        let err = off
+                            .get("error")
+                            .unwrap_or_else(|| panic!("want error for {method}: {off}"));
+                        let want = format!("COMPONENT_DISABLED:{component}");
+                        assert_eq!(
+                            err.get("message").and_then(Value::as_str),
+                            Some(want.as_str()),
+                            "{off}"
+                        );
+                        assert_eq!(
+                            err.pointer("/data/kind").and_then(Value::as_str),
+                            Some("component_disabled"),
+                            "{off}"
+                        );
+                        assert_eq!(
+                            err.pointer("/data/component").and_then(Value::as_str),
+                            Some(*component)
+                        );
+                    }
 
-                    // `modules.list` reports the same module as Disabled, and only it.
+                    // `modules.list` reports the same modules as Disabled, and only them.
                     let listed = rpc(&base, "openhuman.modules_list").await;
                     let modules = listed
                         .pointer("/result/modules")
@@ -124,9 +109,11 @@ fn run_disabled_case(
                             .and_then(|m| m.get("state").and_then(Value::as_str))
                             .map(str::to_owned)
                     };
-                    assert_eq!(state_of(module_id).as_deref(), Some("disabled"), "{listed}");
+                    for (_, _, module_id) in DISABLED_CASES {
+                        assert_eq!(state_of(module_id).as_deref(), Some("disabled"), "{listed}");
+                    }
                     assert_ne!(
-                        state_of(other_module_id).as_deref(),
+                        state_of("tinydocs").as_deref(),
                         Some("disabled"),
                         "{listed}"
                     );
