@@ -247,14 +247,14 @@ async fn composio_controller_registry_and_scope_handlers_cover_validation_edges(
     .await
     .expect_err("write must be bool");
     assert!(invalid_write.contains("invalid 'write'"));
-    // The storage half persists to `<workspace>/integrations/composio_user_scopes.json`
-    // (no memory driver involved) and reads back through `get_user_scopes`.
+    // The storage half persists in the storage backend (no memory driver
+    // involved) and reads back through `get_user_scopes`.
     let saved = composio_call(
         set_scopes,
         json!({ "toolkit": " GitHub ", "read": true, "write": false, "admin": true }),
     )
     .await
-    .expect("set_user_scopes persists to the workspace file store");
+    .expect("set_user_scopes persists to the storage backend");
     assert_eq!(saved.pointer("/admin"), Some(&json!(true)));
     assert_eq!(saved.pointer("/write"), Some(&json!(false)));
     let reread = composio_call(get_scopes, json!({ "toolkit": "github" }))
@@ -262,13 +262,6 @@ async fn composio_controller_registry_and_scope_handlers_cover_validation_edges(
         .expect("get_user_scopes reads the stored pref");
     assert_eq!(reread.pointer("/admin"), Some(&json!(true)));
     assert_eq!(reread.pointer("/write"), Some(&json!(false)));
-    assert!(
-        workspace_dir
-            .join("integrations")
-            .join("composio_user_scopes.json")
-            .exists(),
-        "the pref lands in the workspace file store"
-    );
 }
 
 struct WorkspaceEnvGuard(Option<std::ffi::OsString>);
