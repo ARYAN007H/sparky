@@ -144,7 +144,6 @@ async fn a_configured_backend_holds_cron_flows_and_flow_state(case: Case) {
     assert!(workspace.path().join("graph_checkpoints.db").exists());
 }
 
-driver_cases!(async a_configured_backend_holds_cron_flows_and_flow_state);
 
 /// The stores tinyflows used to write (`jobs.db`, `flows.db`, `checkpoints.db`,
 /// `drafts/`) are copied into a configured backend by the boot-time import,
@@ -200,4 +199,7 @@ fn copy_tree(from: &std::path::Path, to: &std::path::Path) {
     }
 }
 
-driver_cases!(async legacy_tinyflows_files_are_imported_into_a_configured_backend);
+driver_cases!(
+    async a_configured_backend_holds_cron_flows_and_flow_state,
+    legacy_tinyflows_files_are_imported_into_a_configured_backend
+);
