@@ -141,7 +141,12 @@ fn capabilities_are_answered_for_an_object_the_grant_does_not_hold() {
     assert!(authorize(&documents_only, Object::Blobs, "Capabilities", &json!(null)).is_ok());
     // Anything else on that object is still refused.
     assert_eq!(
-        authorize(&documents_only, Object::Blobs, "Head", &json!({"key": "files/a"})),
+        authorize(
+            &documents_only,
+            Object::Blobs,
+            "Head",
+            &json!({"key": "files/a"})
+        ),
         Err(Denied::Object)
     );
 }
