@@ -188,7 +188,7 @@ async fn build_runtime() -> tinybus::Result<ModuleRuntime> {
     // The summary callback exists for the module alone; with the component off
     // the module never loads, so nothing would call it.
     let juice_on = crate::core::runtime::context::CoreContext::current()
-        .map_or(true, |ctx| ctx.components().juice);
+        .is_none_or(|ctx| ctx.components().juice);
     if juice_on {
         super::tokenjuice_host::install(&connection).await?;
     } else {
