@@ -117,12 +117,18 @@ async fn an_unavailable_module_is_a_tool_error() {
     assert!(result.output().contains("module unavailable"));
 }
 
-#[test]
-fn handle_normalization_only_accepts_alphanumeric_tokens() {
-    assert_eq!(normalize_handle(" abc123 "), Some("abc123"));
-    assert_eq!(normalize_handle("⟦tj:abc123⟧"), Some("abc123"));
-    assert_eq!(normalize_handle("../x"), None);
-    assert_eq!(normalize_handle(&"f".repeat(MAX_HANDLE_LEN + 1)), None);
+#[tokio::test]
+async fn marker_and_bare_handles_reach_the_source_and_junk_does_not() {
+    let source = Arc::new(RecordingSource::default());
+    let tools = repl_tools_with(source.clone(), ReplLimits::default());
+    for ok in ["abc123", " abc123 ", "\u{27e6}tj:abc123\u{27e7}"] {
+        let r = tools[0].execute(json!({"handle": ok, "query":"x"})).await.unwrap();
+        assert!(!r.output().contains("not a juice handle"), "{ok}");
+    }
+    for bad in ["call_abc", "../x", &"f".repeat(65)] {
+        let r = tools[0].execute(json!({"handle": bad, "query":"x"})).await.unwrap();
+        assert!(r.is_error, "{bad}");
+    }
 }
 
 /// A workspace whose tool-results dir holds one persisted shell output, the
