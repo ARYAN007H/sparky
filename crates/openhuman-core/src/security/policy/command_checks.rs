@@ -2,7 +2,8 @@ use std::path::{Path, PathBuf};
 
 #[cfg(test)]
 use super::types::CommandRiskLevel;
-use super::types::{AutonomyLevel, GateDecision, SecurityPolicy, POLICY_BLOCKED_MARKER};
+use super::types::{AutonomyLevel, GateDecision, SecurityPolicy};
+use tinytools::status::POLICY_BLOCKED_MARKER;
 #[cfg(test)]
 use crate::util::floor_char_boundary;
 use tinybox_bus::CommandClass;
