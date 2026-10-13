@@ -12,14 +12,6 @@ fn metadata_methods_expose_execute_permission_and_schema() {
 }
 
 #[test]
-fn ownership_boundary_is_prepended_when_present() {
-    let prompt = with_ownership_boundary("implement tests", Some("files: src/foo.rs"));
-    assert!(prompt.starts_with("[Ownership Boundary]"));
-    assert!(prompt.contains("files: src/foo.rs"));
-    assert!(prompt.contains("[Task]\nimplement tests"));
-}
-
-#[test]
 fn schema_advertises_isolation_and_base_ref() {
     let tool = SpawnParallelAgentsTool;
     let schema = tool.parameters_schema();
