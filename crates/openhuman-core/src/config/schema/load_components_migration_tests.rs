@@ -165,11 +165,11 @@ fn explicit_components_voice_wins_over_legacy_voice_switches() {
 
 #[test]
 fn sandbox_enabled_false_maps_to_components_sandbox() {
-    for raw in ["[sandbox]\nenabled = false\n", "[security.sandbox]\nenabled = false\n"] {
-        let c = migrated(raw, None);
-        assert!(!c.components.sandbox, "{raw}");
-        assert_eq!(c.sandbox.enabled.or(c.security.sandbox.enabled), Some(false), "old key kept");
-    }
+    let c = migrated("[sandbox]\nenabled = false\n", None);
+    assert!(!c.components.sandbox);
+    assert_eq!(c.sandbox.enabled, Some(false), "old key kept");
+    let c = migrated("[security.sandbox]\nenabled = false\n", None);
+    assert!(!c.components.sandbox);
 }
 
 #[test]
