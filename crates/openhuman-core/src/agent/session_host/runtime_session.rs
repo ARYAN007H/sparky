@@ -133,7 +133,7 @@ struct OpenHumanTurnToolSurface {
     /// off so refresh cannot reopen withdrawn authority.
     auto_include_new_synthesized_tools: bool,
     synthesized_tool_names: std::collections::HashSet<String>,
-    tool_policy_session: crate::tools::agent_policy::ToolPolicySession,
+    tool_policy_session: tinytools::ToolPolicySession,
     event_session_id: String,
     event_channel: String,
     agent_definition_name: String,
@@ -187,7 +187,7 @@ impl OpenHumanTurnPrelude {
     ) -> (
         Arc<Vec<Box<dyn tinytools::Tool>>>,
         Arc<Vec<Box<dyn tinytools::Tool>>>,
-        crate::tools::agent_policy::ToolPolicySession,
+        tinytools::ToolPolicySession,
         String,
         String,
     ) {

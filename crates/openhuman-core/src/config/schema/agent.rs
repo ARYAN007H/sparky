@@ -206,7 +206,7 @@ pub struct AgentConfig {
     /// "write", "execute", "dangerous".
     ///
     /// Runtime semantics (see
-    /// [`crate::tools::agent_policy::engine::ToolPolicyEngine`]):
+    /// [`tinytools::engine::ToolPolicyEngine`]):
     ///
     /// * **Empty map** — the policy engine preserves the legacy
     ///   unrestricted surface and returns `PermissionLevel::Dangerous`

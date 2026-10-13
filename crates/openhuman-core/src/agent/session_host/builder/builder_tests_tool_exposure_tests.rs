@@ -162,7 +162,7 @@ fn wildcard_belt_defers_but_keeps_reachable() {
 fn named_belt_opts_into_discovery_by_naming_tool_search() {
     let visible: std::collections::HashSet<String> = [
         "plain",
-        crate::tools::implementations::meta::TOOL_SEARCH_NAME,
+        tinytools::TOOL_SEARCH_NAME,
     ]
     .into_iter()
     .map(String::from)

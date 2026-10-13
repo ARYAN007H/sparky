@@ -72,7 +72,7 @@ mod tool_spec_views_tests;
 
 // ── use_skill's advertised spec is scoped to the session ────────────────────
 
-use crate::tools::agent_policy::{
+use tinytools::{
     TaskProfile, TaskRiskLevel, ToolPolicyAction, ToolPolicyDecision, ToolPolicySession,
 };
 use tinytools::PermissionLevel;
@@ -190,7 +190,7 @@ fn visible_specs_drop_the_pack_tool_when_no_pack_is_reachable() {
 /// the only route to every withheld tool.
 #[test]
 fn a_realistic_withheld_session_keeps_its_packs_advertised() {
-    use crate::tools::agent_policy::ToolPolicyEngine;
+    use tinytools::ToolPolicyEngine;
     use crate::tools::toolpacks::{append_pack_tools, strip_packed_from_visible};
 
     struct Fake(&'static str);

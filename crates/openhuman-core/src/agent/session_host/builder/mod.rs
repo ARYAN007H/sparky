@@ -26,7 +26,7 @@ pub use host_tools::{HostTools, HostTurnTools, TurnContext};
 mod builder_tests;
 
 use crate::agent::harness::definition::{AgentDefinition, ToolScope};
-use crate::tools::agent_policy::ToolPolicySession;
+use tinytools::ToolPolicySession;
 use std::sync::Arc;
 use tinytools::{Tool, ToolSpec};
 

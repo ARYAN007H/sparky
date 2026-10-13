@@ -3,7 +3,7 @@
 use super::{dedup_visible_tool_specs, visible_tool_specs_for_policy};
 use crate::agent::context::ContextManager;
 use crate::agent::session_host::types::{OpenHumanSessionHost, SessionHostBuilder};
-use crate::tools::agent_policy::ToolPolicyEngine;
+use tinytools::ToolPolicyEngine;
 use anyhow::Result;
 use std::sync::Arc;
 use tinytools::{Tool, ToolSpec};
@@ -143,16 +143,16 @@ impl SessionHostBuilder {
         // swaps synthesised names, and `OpenHumanSessionHost::hide_tools` only seeds a set
         // that is still empty — see the matching strip there.
         let discovery_opted_in =
-            visible_names.remove(crate::tools::implementations::meta::TOOL_SEARCH_NAME);
+            visible_names.remove(tinytools::TOOL_SEARCH_NAME);
         let discovery_enabled = (belt_is_wildcard || discovery_opted_in)
             && !self
                 .withheld_tool_names
-                .contains(crate::tools::implementations::meta::TOOL_SEARCH_NAME);
+                .contains(tinytools::TOOL_SEARCH_NAME);
         // A wildcard belt was seeded from the whole registry, so its durable
         // `Hidden` members (collapsed `todo_*`) leave here too.
         // A named belt never listed them.
         let mut deferred_names = if belt_is_wildcard {
-            crate::tools::implementations::meta::strip_deferred_from_visible(
+            tinytools::strip_deferred_from_visible(
                 &mut visible_names,
                 tools.as_slice(),
             )
@@ -166,7 +166,7 @@ impl SessionHostBuilder {
             // are left alone on purpose — see the comment above.
             // Plus the tools this agent's definition defers for itself
             // (`deferred_tools`); see `meta::deferred_set`.
-            deferred_names.extend(crate::tools::implementations::meta::deferred_set(
+            deferred_names.extend(tinytools::deferred_set(
                 tools.as_slice(),
                 synthesized_tools.as_slice(),
                 &self.deferred_tools,

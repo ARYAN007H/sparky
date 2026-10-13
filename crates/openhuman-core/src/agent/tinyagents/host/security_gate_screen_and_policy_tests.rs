@@ -32,7 +32,7 @@ async fn ordinary_text_passes_screening_unchanged() {
 
 /// Builds a session whose channel policy yields `action` for `tool_name`.
 fn policy_session(tool_name: &str, action: ToolPolicyAction) -> Arc<ToolPolicySession> {
-    use crate::tools::agent_policy::{TaskProfile, TaskRiskLevel, ToolPolicyDecision};
+    use tinytools::{TaskProfile, TaskRiskLevel, ToolPolicyDecision};
     let profile = TaskProfile {
         agent_id: "lead".to_string(),
         channel: "telegram".to_string(),
