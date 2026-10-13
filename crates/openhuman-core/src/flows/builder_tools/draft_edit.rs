@@ -128,7 +128,7 @@ impl Tool for EditWorkflowTool {
             (Some(id), _, _) => match ops::flows_draft_get(&self.config, id) {
                 Ok(outcome) => {
                     let draft = outcome.value;
-                    match ops::migrate_and_deserialize_graph(draft.graph.clone()) {
+                    match tinyflows::migrate::deserialize_graph(draft.graph.clone()) {
                         Ok(graph) => {
                             write_back_draft = Some(draft.id.clone());
                             // A draft may already be linked to a saved flow —
@@ -198,7 +198,7 @@ impl Tool for EditWorkflowTool {
                 }
             },
             (None, None, Some(graph_json)) => {
-                match ops::migrate_and_deserialize_graph(graph_json.clone()) {
+                match tinyflows::migrate::deserialize_graph(graph_json.clone()) {
                     Ok(graph) => {
                         let name = graph.name.clone();
                         (graph, name)
