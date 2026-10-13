@@ -9,7 +9,6 @@ use tinyinference_llm::usage::{recover_usage, ProviderUsageReport};
 
 use crate::inference::provider::{BilledUsage, ChatResponse};
 
-pub(super) use tinyinference_llm::model::ModelErrorSlot;
 pub(super) type TurnChatModel = Arc<dyn ChatModel<()>>;
 pub(super) type TierRoutes = Vec<(String, TurnChatModel)>;
 pub(super) type BuiltTurnModels = (TurnChatModel, TierRoutes, TurnChatModel);

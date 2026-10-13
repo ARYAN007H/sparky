@@ -264,7 +264,7 @@ that configuration, never in an ordinary method call or an RPC reply.
 a record whose component is off with `LoadError::Disabled` before any claim,
 download or `dlopen`; `modules.list` reports `ModuleState::Disabled`; boot skips
 the module and `search_path::load_enabled` leaves its search-path artifact
-unopened. See [components](../../../../gitbooks/developing/components.md).
+unopened. See [components](../../../../docs/gitbooks/en/developing/components.md).
 
 ### Boot
 
@@ -477,15 +477,15 @@ need a real module load a local build through `[[modules.overrides]]` or
 `OPENHUMAN_MODULE_SOURCE`;
 `scripts/test-rust-with-mock.sh` and CI build the pinned submodules.
 
-See also `gitbooks/developing/performance.md` for how on-demand modules keep a
+See also `docs/gitbooks/en/developing/performance.md` for how on-demand modules keep a
 minimal build small.
 
 ## Further reading
 
 - [Module sources and `[components]` (AGENTS.md)](../../../../AGENTS.md)
-- [Loadable modules](../../../../gitbooks/developing/loadable-modules.md)
+- [Loadable modules](../../../../docs/gitbooks/en/developing/loadable-modules.md)
 - [tinybus submodule](../../../../vendor/tinybus/README.md)
-- [Architecture overview](../../../../gitbooks/developing/architecture.md)
+- [Architecture overview](../../../../docs/gitbooks/en/developing/architecture.md)
 
 The connector host consumes verified release v0.14.0 (contract 1.13). The
 argument/default/filter/classification and trigger-archive adapters call bus
