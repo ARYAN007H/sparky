@@ -1,7 +1,6 @@
 use super::*;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
 
 use crate::threads::store::ConversationMessage;
 
@@ -80,11 +79,7 @@ fn thread() -> Vec<ConversationMessage> {
     ]
 }
 
-async fn run(
-    remixer: &ScriptedRemixer,
-    request_id: &str,
-    budget: Duration,
-) -> Option<String> {
+async fn run(remixer: &ScriptedRemixer, request_id: &str, budget: Duration) -> Option<String> {
     remix_with(
         remixer,
         options_with(None, 3, true),
@@ -213,10 +208,7 @@ async fn a_remix_that_returns_the_same_text_is_not_a_change() {
 #[tokio::test]
 async fn a_module_error_sends_the_original() {
     let remixer = ScriptedRemixer::new(Err("module unavailable".into()));
-    assert_eq!(
-        run(&remixer, "req-err", Duration::from_secs(5)).await,
-        None
-    );
+    assert_eq!(run(&remixer, "req-err", Duration::from_secs(5)).await, None);
 }
 
 #[tokio::test]
@@ -308,7 +300,10 @@ fn the_cooldown_env_beats_config_and_bad_values_fall_back() {
         options_with(Some("5"), 3, true).meme_cooldown_turns,
         Some(5)
     );
-    assert_eq!(options_with(Some("0"), 3, true).meme_cooldown_turns, Some(0));
+    assert_eq!(
+        options_with(Some("0"), 3, true).meme_cooldown_turns,
+        Some(0)
+    );
     assert_eq!(
         options_with(Some("often"), 3, true).meme_cooldown_turns,
         Some(3)

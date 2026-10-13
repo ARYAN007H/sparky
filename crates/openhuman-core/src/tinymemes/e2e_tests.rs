@@ -74,7 +74,10 @@ async fn the_real_module_fails_open_and_reads_its_documents_through_the_host() {
     assert_eq!(response.reply, "That's done.");
 
     let legacy = config.workspace_dir.join("tinymemes/remixed.json");
-    assert!(!legacy.exists(), "the module's LoadIndex adopted the old file");
+    assert!(
+        !legacy.exists(),
+        "the module's LoadIndex adopted the old file"
+    );
     assert_eq!(
         docs::load(&config, IndexKind::Remixed).unwrap().as_deref(),
         Some("[\"old-1\"]")

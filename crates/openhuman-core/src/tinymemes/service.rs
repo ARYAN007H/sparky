@@ -111,8 +111,7 @@ pub(crate) async fn remix(
         .map_err(|error| error.to_string())?;
     let registration = callbacks::register(config);
     request.correlation = registration.correlation().to_owned();
-    let outcome: tinybus::Result<RemixResult> =
-        proxy.call(remix_methods::REMIX, (request,)).await;
+    let outcome: tinybus::Result<RemixResult> = proxy.call(remix_methods::REMIX, (request,)).await;
     match outcome {
         Ok(Ok(response)) => {
             // Background research may still call back; the module's `End`

@@ -101,7 +101,9 @@ pub(super) fn register(config: &Config) -> Registration {
 
 /// The session a callback answers for, if its remix is still registered.
 pub(super) fn session(correlation: &str) -> Option<Arc<Session>> {
-    registry().get(correlation).map(|entry| entry.session.clone())
+    registry()
+        .get(correlation)
+        .map(|entry| entry.session.clone())
 }
 
 /// The module finished this remix: forget it.

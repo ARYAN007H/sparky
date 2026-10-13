@@ -22,7 +22,11 @@ struct Bus {
 async fn bus() -> Bus {
     let bus = MemoryBus::new();
     Broker::new().spawn(bus.clone());
-    let connect = || async { Connection::connect(bus.connect().await.unwrap()).await.unwrap() };
+    let connect = || async {
+        Connection::connect(bus.connect().await.unwrap())
+            .await
+            .unwrap()
+    };
     let (host, module, intruder) = (connect().await, connect().await, connect().await);
     install(&host).await.unwrap();
     module.request_name(STATE_INTERFACE).await.unwrap();
@@ -34,7 +38,12 @@ async fn bus() -> Bus {
 }
 
 impl Bus {
-    async fn call(&self, from: &Connection, member: &str, payload: Value) -> tinybus::Result<Value> {
+    async fn call(
+        &self,
+        from: &Connection,
+        member: &str,
+        payload: Value,
+    ) -> tinybus::Result<Value> {
         let host = self.host.unique_name().unwrap();
         from.proxy(host.as_str(), HOST_PATH, HOST_INTERFACE)
             .unwrap()
@@ -105,7 +114,8 @@ async fn remixes_for_different_workspaces_are_served_at_once_each_for_its_own() 
 
     // Both are live together: neither waits for the other.
     let save = |registration: &callbacks::Registration, json: &str| {
-        let payload = json!({ "correlation": registration.correlation(), "kind": "slang", "json": json });
+        let payload =
+            json!({ "correlation": registration.correlation(), "kind": "slang", "json": json });
         bus.call(&bus.module, host_methods::SAVE_INDEX, payload)
     };
     let (saved_a, saved_b) = tokio::join!(save(&a, "{\"a\":1}"), save(&b, "{\"b\":1}"));

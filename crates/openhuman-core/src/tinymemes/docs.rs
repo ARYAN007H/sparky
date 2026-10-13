@@ -14,8 +14,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
-use tinystoragedrivers::{CollectionSpec, Precondition};
 use tinymemes_bus::IndexKind;
+use tinystoragedrivers::{CollectionSpec, Precondition};
 
 use crate::config::Config;
 use crate::storage::documents::{text, Repo};
@@ -69,9 +69,14 @@ pub(super) fn load(config: &Config, kind: IndexKind) -> Result<Option<String>> {
     // `Absent`: a concurrent save wins over the old file's content.
     let adopted = legacy.clone();
     let written = repo.run(move |docs| async move {
-        docs.put(COLLECTION, id, json!({ FIELD: adopted }), Precondition::Absent)
-            .await
-            .map(|_| ())
+        docs.put(
+            COLLECTION,
+            id,
+            json!({ FIELD: adopted }),
+            Precondition::Absent,
+        )
+        .await
+        .map(|_| ())
     });
     match written {
         Ok(()) => {

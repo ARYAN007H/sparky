@@ -46,9 +46,13 @@ async fn an_index_saved_through_the_host_loads_back_per_kind() {
         ("memes", "{\"memes\":2}"),
         ("remixed", "[\"m1\"]"),
     ] {
-        let loaded = dispatch(&session, host_methods::LOAD_INDEX, json!([{ "kind": kind }]))
-            .await
-            .unwrap();
+        let loaded = dispatch(
+            &session,
+            host_methods::LOAD_INDEX,
+            json!([{ "kind": kind }]),
+        )
+        .await
+        .unwrap();
         assert_eq!(decode::<Option<String>>(loaded), Ok(Some(body.into())));
     }
 }
@@ -114,7 +118,10 @@ fn registrations_are_independent_and_forgotten_on_drop() {
     assert!(session(a.correlation()).is_some() && session(b.correlation()).is_some());
     let a_id = a.correlation().to_owned();
     drop(a);
-    assert!(session(&a_id).is_none(), "a failed call leaves nothing behind");
+    assert!(
+        session(&a_id).is_none(),
+        "a failed call leaves nothing behind"
+    );
     assert!(session(b.correlation()).is_some());
     assert!(session("").is_none() && session("unknown").is_none());
 }
@@ -125,7 +132,10 @@ fn a_kept_registration_lives_until_the_module_reports_the_end() {
     let registration = register(&config_in(dir.path()));
     let id = registration.correlation().to_owned();
     registration.keep_for_background();
-    assert!(session(&id).is_some(), "background research may still call back");
+    assert!(
+        session(&id).is_some(),
+        "background research may still call back"
+    );
     end(&id);
     assert!(session(&id).is_none());
     end(&id);
