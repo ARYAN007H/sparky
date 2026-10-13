@@ -4,7 +4,11 @@ use serde_json::json;
 use tinyflows_drivers::catalog::FlowCatalogDocuments;
 
 fn documents(namespace: &str) -> FlowState {
-    let scoped = MemoryStorage::new()
+    documents_on(&MemoryStorage::new(), namespace)
+}
+
+fn documents_on(storage: &MemoryStorage, namespace: &str) -> FlowState {
+    let scoped = storage
         .for_scope(&Scope::new("local").unwrap())
         .unwrap();
     FlowState::Documents(FlowStateDocuments::new(
@@ -41,7 +45,11 @@ async fn the_workspace_database_backs_both_views() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn namespaces_keep_flows_apart() {
-    let (a, b) = (documents("flow:a"), documents("flow:b"));
+    let storage = MemoryStorage::new();
+    let (a, b) = (
+        documents_on(&storage, "flow:a"),
+        documents_on(&storage, "flow:b"),
+    );
     a.store("k", json!(1)).await.unwrap();
     assert_eq!(b.load("k").await.unwrap(), None);
 }

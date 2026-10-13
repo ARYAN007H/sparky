@@ -6,6 +6,7 @@ use std::collections::BTreeMap;
 use tempfile::TempDir;
 use tinyflows_drivers::catalog::FlowCatalogDocuments;
 use tinyflows_drivers::schedule::CronDocuments;
+use tinyflows::engine::Checkpointer;
 use tinyflows_drivers::DriverCheckpointer;
 
 fn fixtures() -> PathBuf {
@@ -97,8 +98,7 @@ fn the_flow_catalog_comes_across_whole_and_the_legacy_files_are_untouched() {
     let outcome = import_flows(&backend, &Scope::local(), &config).unwrap();
     assert!(written(outcome) > 0);
 
-    let expected = expected();
-    let expected = &expected["catalog"];
+    let expected = expected()["catalog"].clone();
     let catalog = FlowCatalogDocuments::new(documents(&backend, &Scope::local()));
     crate::storage::block_on_anyhow(async move {
         let (flows, _) = catalog.list_flows().await?;
@@ -158,8 +158,7 @@ fn flow_checkpoints_come_across_with_their_lineage() {
 
     let checkpointer =
         DriverCheckpointer::<Value>::new(documents(&backend, &Scope::local()));
-    let expected = expected();
-    let expected = &expected["checkpoints"];
+    let expected = expected()["checkpoints"].clone();
     crate::storage::block_on_anyhow(async move {
         for thread in ["run-1", "Run Two/Upper"] {
             let imported = checkpointer.get_thread(thread).await?;
@@ -188,8 +187,7 @@ fn cron_jobs_and_runs_come_across_with_their_fields() {
     let outcome = import_cron(&backend, &Scope::local(), &config, dir.path(), "").unwrap();
     assert_eq!(written(outcome), 3 + 4);
 
-    let expected = expected();
-    let expected = &expected["cron"];
+    let expected = expected()["cron"].clone();
     let cron = CronDocuments::new(documents(&backend, &Scope::local()));
     crate::storage::block_on_anyhow(async move {
         for legacy in expected["jobs"].as_array().unwrap() {
