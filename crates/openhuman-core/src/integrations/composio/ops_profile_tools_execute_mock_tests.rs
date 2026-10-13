@@ -83,7 +83,7 @@ async fn composio_list_tools_via_mock_with_filter() {
                 "success": true,
                 "data": {"tools": [
                     {"type":"function","function":{"name":"GMAIL_SEND_EMAIL"}},
-                    {"type":"function","function":{"name":"GMAIL_SEARCH"}}
+                    {"type":"function","function":{"name":"GMAIL_FETCH_EMAILS"}}
                 ]}
             }))
         }),
@@ -95,6 +95,40 @@ async fn composio_list_tools_via_mock_with_filter() {
         .await
         .unwrap();
     assert_eq!(outcome.value.tools.len(), 2);
+}
+
+#[tokio::test]
+async fn composio_list_tools_lets_the_module_apply_the_scope_preference_and_catalog() {
+    // The host no longer opts out of the module's scope filter
+    // (`apply_user_scopes` defaults on): an admin-scoped action, and one the
+    // gmail catalog does not name, never reach the caller.
+    let _serialised = module_guard().await;
+    let app = Router::new().route(
+        "/agent-integrations/composio/tools",
+        get(|| async {
+            Json(json!({
+                "success": true,
+                "data": {"tools": [
+                    {"type":"function","function":{"name":"GMAIL_FETCH_EMAILS"}},
+                    {"type":"function","function":{"name":"GMAIL_DELETE_MESSAGE"}},
+                    {"type":"function","function":{"name":"GMAIL_NOT_IN_THE_CATALOG"}}
+                ]}
+            }))
+        }),
+    );
+    let base = start_mock_backend(app).await;
+    let tmp = tempfile::tempdir().unwrap();
+    let config = config_with_backend(&tmp, base);
+    let outcome = composio_list_tools(&config, Some(vec!["gmail".into()]), None)
+        .await
+        .unwrap();
+    let names: Vec<&str> = outcome
+        .value
+        .tools
+        .iter()
+        .map(|tool| tool.function.name.as_str())
+        .collect();
+    assert_eq!(names, ["GMAIL_FETCH_EMAILS"]);
 }
 
 #[tokio::test]
