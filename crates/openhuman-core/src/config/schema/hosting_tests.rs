@@ -1,10 +1,9 @@
 use super::*;
 
 #[test]
-fn hosting_is_off_and_points_at_vercel_by_default() {
+fn hosting_points_at_vercel_by_default() {
     let config = HostingConfig::default();
 
-    assert!(!config.enabled);
     assert_eq!(config.provider, "vercel");
     assert!(!config.has_api_key());
     assert_eq!(config.team(), None);
@@ -25,7 +24,6 @@ fn a_blank_key_or_team_is_the_same_as_none() {
 #[test]
 fn a_configured_key_and_team_are_reported() {
     let config = HostingConfig {
-        enabled: true,
         api_key: "token".to_string(),
         team: " team_abc ".to_string(),
         ..HostingConfig::default()

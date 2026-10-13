@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 fn config_with(workspace: &std::path::Path, enabled: bool, api_key: &str) -> Config {
     let mut config = Config::default();
     config.workspace_dir = workspace.to_path_buf();
-    config.hosting.enabled = enabled;
+    config.components.hosting = enabled;
     config.hosting.api_key = api_key.to_string();
     config
 }
@@ -21,7 +21,6 @@ fn account_fixture(
 ) -> Account {
     let mut config = Config::default();
     config.workspace_dir = workspace_dir;
-    config.hosting.enabled = true;
     config.hosting.api_key = "fixture-secret".to_owned();
     let account = Account::from_config(&config)
         .expect("configuration")

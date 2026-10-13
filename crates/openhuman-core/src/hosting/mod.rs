@@ -48,7 +48,8 @@ impl std::fmt::Debug for Account {
 impl Account {
     /// Resolve the enabled provider and credential without loading its module.
     pub fn from_config(config: &Config) -> anyhow::Result<Option<Self>> {
-        if !config.hosting.enabled {
+        if !crate::core::runtime::ComponentSet::from_config(&config.components).hosting {
+            tracing::debug!("[hosting] component disabled; tools not registered");
             return Ok(None);
         }
         let provider = config.hosting.provider.trim().to_ascii_lowercase();
