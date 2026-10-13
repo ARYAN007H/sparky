@@ -38,6 +38,20 @@ use tinyagents_harness::turn_deadline::{parse_backstop, TurnDeadline};
 /// Environment override for the backstop, in seconds; `0` disables it.
 pub const TURN_BACKSTOP_ENV: &str = "OPENHUMAN_WEB_TURN_TIMEOUT_SECS";
 
+/// Time kept back from the post-loop grounded close so the turn can commit and
+/// emit its reply before the backstop drops it.
+const CLOSE_RESERVE: Duration = Duration::from_secs(10);
+
+/// How long the post-loop grounded close may run as of `now`: the backstop
+/// remainder minus [`CLOSE_RESERVE`], zero once that has passed (#7716).
+/// Host-side until the harness `TurnDeadline` grows the same accessor.
+pub fn close_budget(deadline: &TurnDeadline, now: std::time::Instant) -> Duration {
+    deadline
+        .backstop()
+        .saturating_sub(deadline.elapsed_at(now))
+        .saturating_sub(CLOSE_RESERVE)
+}
+
 /// The backstop in force for this process (env [`TURN_BACKSTOP_ENV`]).
 pub fn configured_backstop() -> Option<Duration> {
     parse_backstop(std::env::var(TURN_BACKSTOP_ENV).ok().as_deref())
