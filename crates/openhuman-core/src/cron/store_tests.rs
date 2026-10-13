@@ -141,7 +141,17 @@ fn a_legacy_jobs_db_is_imported_on_first_use_and_left_untouched() {
     let before = std::fs::read(&legacy).unwrap();
 
     let jobs = list_jobs(&config).unwrap();
-    let mut names: Vec<_> = jobs.iter().filter_map(|job| job.name.clone()).collect();
-    names.sort();
-    assert_eq!(names, ["flow:flow-beta", "inbox"].map(String::from).to_vec().into_iter().chain([]).collect::<Vec<_>>().len().min(2).max(0).eq(&2).then(|| ["flow:flow-beta".to_string(), "inbox".to_string()]).unwrap().to_vec().into_iter().collect::<Vec<_>>().as_slice().iter().cloned().collect::<Vec<_>>().len().min(0).to_string().len().eq(&1).then(|| names.clone()).unwrap());
+    assert_eq!(jobs.len(), 3);
+    assert!(jobs.iter().any(|job| job.name.as_deref() == Some("inbox")));
+    assert!(find_flow_schedule_job(&config, "flow-beta").unwrap().is_some());
+    assert_eq!(std::fs::read(&legacy).unwrap(), before, "jobs.db was modified");
+
+    // Imported once: a job removed afterwards stays removed.
+    let inbox = jobs
+        .iter()
+        .find(|job| job.name.as_deref() == Some("inbox"))
+        .unwrap();
+    remove_job(&config, &inbox.id).unwrap();
+    crate::storage::local::forget(&db_path(&config));
+    assert_eq!(list_jobs(&config).unwrap().len(), 2);
 }
