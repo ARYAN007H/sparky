@@ -48,7 +48,6 @@ pub(super) struct ResolvedCallFigures {
 /// An [`EventListener`] that mirrors harness events onto openhuman's progress
 /// sink and cost tracker.
 pub(crate) struct OpenhumanEventBridge {
-    pub(super) on_progress: Option<Sender<AgentProgress>>,
     pub(super) model: String,
     /// Telemetry provider id (`"managed"`, `"openai"`, …) — from
     /// [`Provider::telemetry_provider_id`](crate::inference::provider::Provider::telemetry_provider_id).
