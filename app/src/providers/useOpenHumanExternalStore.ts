@@ -54,6 +54,10 @@ const DERIVED_TRANSCRIPT_PAGE_LIMIT = 500;
  */
 const DERIVED_TRANSCRIPT_MAX_PAGES = 20;
 
+/** A projected item the core still rewrites in place: a running sub-agent or tool call. */
+const isUnsettled = (item: DerivedDisplayItem) =>
+  (item.kind === 'subagent' || item.kind === 'toolCall') && item.status === 'running';
+
 /**
  * Everything the assistant-ui surface needs about the *currently running* turn
  * that is not a message, a tool part or a stream delta.
@@ -152,13 +156,16 @@ export function useCoreTranscriptProjection(
   latest.current = { threadId, liveRequestId };
   // Newest-first items already fetched for one thread, and the thread's
   // `total` when they were. Cursors are chronological, so items older than the
-  // newest page never move and a refresh only needs that page (#7731).
+  // newest page keep their position and a refresh only needs that page (#7731).
   const held = useRef<{ threadId: string; total: number; items: DerivedDisplayItem[] } | null>(
     null
   );
   // One fetch loop at a time; a change while it runs asks for one more pass.
+  // `loop` numbers the loops, so an abandoned one stays stale even when its
+  // thread is selected again.
   const inFlight = useRef<string | null>(null);
   const rerun = useRef(false);
+  const loop = useRef(0);
 
   useEffect(() => {
     if (!threadId) {
@@ -175,7 +182,8 @@ export function useCoreTranscriptProjection(
       rerun.current = true;
       return;
     }
-    const stale = () => latest.current.threadId !== threadId;
+    const id = ++loop.current;
+    const stale = () => loop.current !== id || latest.current.threadId !== threadId;
     const project = (items: DerivedDisplayItem[], partial = false) => {
       const live = latest.current.liveRequestId;
       const mapped = mapDisplayItems(items, { skipRequestIds: live ? new Set([live]) : undefined });
@@ -207,12 +215,16 @@ export function useCoreTranscriptProjection(
       // Chronological index of the page's oldest item.
       const lower = Math.max(0, first.total - first.items.length);
       let items = first.items;
-      if (prev && first.total >= prev.total && lower <= prev.total) {
+      const older = prev ? prev.items.slice(prev.total - lower) : [];
+      if (prev && first.total >= prev.total && lower <= prev.total && !older.some(isUnsettled)) {
         // The newest page reaches into what is held: keep the held items older
-        // than it. A shrunk total (edit, regenerate) or a gap walks in full.
-        // ponytail: assumes items older than the newest page never change; if
-        // the core starts rewriting old items, refetch the overlap instead.
-        items = [...items, ...prev.items.slice(prev.total - lower)];
+        // than it, within the same cap as a full walk. A shrunk total (edit,
+        // regenerate), a gap, or an older item still running (a detached
+        // sub-agent finishes in place) walks in full.
+        items = [...items, ...older].slice(
+          0,
+          DERIVED_TRANSCRIPT_PAGE_LIMIT * DERIVED_TRANSCRIPT_MAX_PAGES
+        );
       } else {
         // Paint the newest page immediately, then walk the older pages and
         // re-project once with the whole history. A page that begins mid-turn
@@ -238,18 +250,18 @@ export function useCoreTranscriptProjection(
     };
     inFlight.current = threadId;
     void (async () => {
-      try {
-        do {
-          rerun.current = false;
+      do {
+        rerun.current = false;
+        try {
           await refresh();
-        } while (rerun.current && !stale());
-      } catch {
-        // A missing/older core has no settled process trail; message text and
-        // the live socket projection remain usable. Navigation must not fail.
-        // A transient refresh failure must not erase the last complete trail.
-      } finally {
-        if (inFlight.current === threadId) inFlight.current = null;
-      }
+        } catch {
+          // A missing/older core has no settled process trail; message text and
+          // the live socket projection remain usable. Navigation must not fail.
+          // A transient refresh failure must not erase the last complete trail,
+          // and a pass queued meanwhile still runs.
+        }
+      } while (rerun.current && !stale());
+      if (loop.current === id) inFlight.current = null;
     })();
   }, [liveRequestId, revision, threadId]);
 
