@@ -25,14 +25,8 @@ fn tool_call_requires_server_and_tool() {
 async fn with_workspace<F: std::future::Future>(body: F) -> F::Output {
     let _env_lock = crate::config::TEST_ENV_LOCK.lock().await;
     let workspace = tempfile::tempdir().expect("workspace");
-    unsafe {
-        std::env::set_var("OPENHUMAN_WORKSPACE", workspace.path());
-    }
-    let output = body.await;
-    unsafe {
-        std::env::remove_var("OPENHUMAN_WORKSPACE");
-    }
-    output
+    let _workspace_env = crate::config::test_env::EnvVarGuard::workspace_unlocked(workspace.path());
+    body.await
 }
 
 fn params(value: Value) -> Map<String, Value> {
