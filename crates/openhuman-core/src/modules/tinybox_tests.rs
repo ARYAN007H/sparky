@@ -475,7 +475,7 @@ fn every_host_operation_is_a_member_of_the_canonical_contract() {
     ];
     assert_eq!(methods, contract::METHODS[..methods.len()]);
     assert!(contract::METHODS.contains(&SELECT_SHELL));
-    assert!(contract::METHODS.contains(&START_SHELL_EXEC));
+    assert!(contract::METHODS.contains(&START_NATIVE_SHELL_EXEC));
 }
 
 #[test]
@@ -514,7 +514,8 @@ fn every_member_the_host_calls_is_named_in_the_pinned_contract() {
         RUN_DOCKER_WITHOUT_WORKSPACE,
         SELECT_SHELL,
         RESOLVE_LOCAL_GRANTS,
-        START_SHELL_EXEC,
+        START_NATIVE_SHELL_EXEC,
+        VALIDATE_DOCKER_POLICY,
     ];
     for member in called {
         assert!(
@@ -547,6 +548,52 @@ async fn shell_selection_and_start_use_contract_members_with_typed_requests() {
     let log = calls.lock().expect("call log lock");
     assert_eq!(log[1].0, "SelectShell");
     assert_eq!(log[1].1, json!([request]));
+}
+
+#[tokio::test]
+async fn native_shell_start_calls_the_native_member_not_the_two_argument_shell_member() {
+    let (_service, client, calls) = mock_client().await;
+    let request = contract::ShellExecRequest {
+        process: contract::ResourceId("p".to_owned()),
+        resource: contract::ResourceId("r".to_owned()),
+        shell: contract::SelectShellRequest {
+            command: "echo hi".to_owned(),
+            preserve_pipeline_status: false,
+            runtime_path: None,
+            python_utf8: true,
+        },
+        cwd: None,
+        extra_env: Default::default(),
+        state_dir: "/state".to_owned(),
+        timeout_ms: 1_000,
+        stdin: None,
+        jail: None,
+        hide_window: true,
+    };
+    let _: () = call_with_client(&client, START_NATIVE_SHELL_EXEC, (request.clone(),), true)
+        .await
+        .expect("native shell start call");
+    let log = calls.lock().expect("call log lock");
+    let (member, args) = log.last().expect("start call logged");
+    assert_eq!(member, "StartNativeShellExec");
+    assert_eq!(*args, json!([request]));
+}
+
+#[tokio::test]
+async fn docker_policy_validation_uses_its_typed_member_and_request() {
+    let (_service, client, calls) = mock_client().await;
+    let request = contract::DockerPolicyRequest {
+        network: Some("host".to_owned()),
+        workspace: Some("/".to_owned()),
+        read_only_mounts: vec!["/etc".to_owned()],
+    };
+    let _: () = call_with_client(&client, VALIDATE_DOCKER_POLICY, (request.clone(),), false)
+        .await
+        .expect("policy validation call");
+    let log = calls.lock().expect("call log lock");
+    let (member, args) = log.last().expect("validation call logged");
+    assert_eq!(member, "ValidateDockerPolicy");
+    assert_eq!(*args, json!([request]));
 }
 
 #[tokio::test]
