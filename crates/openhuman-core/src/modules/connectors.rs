@@ -66,6 +66,29 @@ pub use names::methods;
 pub fn module_config(config: &Config) -> Result<serde_json::Value, String> {
     let state_dir = config.workspace_dir.join("state");
 
+    // A host-pinned credential outranks the mode and the credential store, the
+    // way `resolve_composio_route` resolves it, so the module's configured route
+    // (executes, the connected-integrations overview) is the pinned tenant too.
+    if let Some(pinned) = config.composio.host_credential.as_ref() {
+        let base = pinned.direct_base_urls().map(|urls| urls.v3.clone());
+        let destination = base
+            .as_deref()
+            .unwrap_or("https://backend.composio.dev/api/v3");
+        let mut payload = serde_json::json!({
+            "route": "direct",
+            "api_key": pinned.api_key(),
+            "entity_id": pinned.entity(),
+            "base_url": base,
+            "state_dir": state_dir,
+        });
+        if let Some(transport) =
+            crate::integrations::composio::client::module_transport(destination)
+        {
+            payload["transport"] = serde_json::json!(transport);
+        }
+        return Ok(payload);
+    }
+
     match config.composio.mode.trim() {
         // Empty is the default, for hand-edited configs that omit the field.
         "" | COMPOSIO_MODE_BACKEND => {

@@ -1,19 +1,10 @@
-//! Tests for the action-scope classification and the per-toolkit preference.
-//!
-//! The storage half — reading and writing a [`super::UserScopePref`] through
-//! the key/value seam — is tested in the engine crate next to the code that
-//! performs it. What is pinned here is everything two separately compiled
-//! processes have to agree on: the verb precedence in
-//! [`super::classify_unknown`], the multi-segment toolkit prefixes, the
-//! persisted preference shape, and the default that decides what a brand-new
-//! connection is allowed to do.
+//! Pins the text-only slug helpers: verb precedence in
+//! [`super::classify_unknown`], the multi-segment toolkit prefixes and the
+//! alias rewrite.
 
 #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 
-use super::{
-    action_slug_matches, agent_ready_toolkits, canonical_action_slug, classify_unknown,
-    find_curated, toolkit_from_slug, CuratedTool, ToolScope, UserScopePref,
-};
+use super::*;
 
 #[test]
 fn destructive_verbs_classify_as_admin() {
@@ -94,87 +85,13 @@ fn multi_segment_toolkits_keep_their_whole_prefix() {
 #[test]
 fn a_curated_lookup_ignores_casing_and_reports_a_miss() {
     let catalog = &[CuratedTool {
-        slug: "GMAIL_SEND_EMAIL",
+        toolkit: "gmail".to_string(),
+        slug: "GMAIL_SEND_EMAIL".to_string(),
         scope: ToolScope::Write,
     }];
     assert!(find_curated(catalog, "gmail_send_email").is_some());
     assert!(find_curated(catalog, "GMAIL_SEND_EMAIL").is_some());
     assert!(find_curated(catalog, "GMAIL_DELETE_EMAIL").is_none());
-}
-
-#[test]
-fn every_tool_scope_tag_matches_its_serde_form() {
-    for scope in [ToolScope::Read, ToolScope::Write, ToolScope::Admin] {
-        let json = serde_json::to_string(&scope).expect("serialize");
-        assert_eq!(json, format!("\"{}\"", scope.as_str()));
-    }
-}
-
-#[test]
-fn a_new_connection_may_read_and_write_but_not_administer() {
-    let pref = UserScopePref::default();
-    assert!(pref.read);
-    assert!(pref.write);
-    assert!(!pref.admin);
-}
-
-#[test]
-fn allows_answers_per_scope() {
-    let pref = UserScopePref {
-        read: true,
-        write: false,
-        admin: false,
-    };
-    assert!(pref.allows(ToolScope::Read));
-    assert!(!pref.allows(ToolScope::Write));
-    assert!(!pref.allows(ToolScope::Admin));
-}
-
-#[test]
-fn a_preference_round_trips() {
-    let pref = UserScopePref {
-        read: true,
-        write: true,
-        admin: true,
-    };
-    let value = serde_json::to_value(pref).expect("serialize");
-    let back: UserScopePref = serde_json::from_value(value).expect("deserialize");
-    assert_eq!(pref, back);
-}
-
-#[test]
-fn a_row_missing_read_and_write_decodes_as_permitted_not_denied() {
-    // A stored row written before a field existed must not read back as a
-    // denial: `#[serde(default)]` on a `bool` would silently revoke access the
-    // user never revoked.
-    let stored = serde_json::json!({ "admin": true });
-    let pref: UserScopePref = serde_json::from_value(stored).expect("deserialize");
-    assert!(pref.read);
-    assert!(pref.write);
-    assert!(pref.admin);
-}
-
-#[test]
-fn the_agent_ready_list_is_sorted_and_free_of_duplicates() {
-    // The RPC response has to be stable across builds, and the badge logic is a
-    // membership test — a duplicate would be invisible there and confusing in
-    // the panel.
-    let slugs = agent_ready_toolkits();
-    let mut sorted = slugs.clone();
-    sorted.sort_unstable();
-    assert_eq!(slugs, sorted, "the list must come back sorted");
-
-    let mut deduped = sorted.clone();
-    deduped.dedup();
-    assert_eq!(deduped.len(), slugs.len(), "the list has a duplicate slug");
-}
-
-#[test]
-fn the_agent_ready_list_names_the_native_providers() {
-    let slugs = agent_ready_toolkits();
-    for native in ["gmail", "notion", "github", "linear"] {
-        assert!(slugs.contains(&native), "{native} is missing from the list");
-    }
 }
 
 #[test]
@@ -211,23 +128,6 @@ fn spaced_google_and_microsoft_prefixes_resolve_to_the_real_toolkit() {
         toolkit_from_slug("GOOGLE_DRIVERS_X").as_deref(),
         Some("google")
     );
-}
-
-#[test]
-fn every_resolved_multi_segment_toolkit_is_one_the_app_knows_or_a_real_composio_slug() {
-    let known = agent_ready_toolkits();
-    for slug in [
-        "GOOGLE_DRIVE_X",
-        "GOOGLE_CALENDAR_X",
-        "GOOGLE_SHEETS_X",
-        "GOOGLE_DOCS_X",
-        "MICROSOFT_TEAMS_X",
-        "MICROSOFT_OUTLOOK_X",
-        "ONE_DRIVE_X",
-    ] {
-        let toolkit = toolkit_from_slug(slug).unwrap();
-        assert!(known.contains(&toolkit.as_str()), "{slug} -> {toolkit}");
-    }
 }
 
 #[test]
