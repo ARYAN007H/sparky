@@ -27,7 +27,9 @@ use crate::agent::tinyagents::turn_policy::effective_max_iterations;
 use crate::agent::tinyagents::turn_run_error::map_turn_run_error;
 use crate::agent::tinyagents::turn_run_finalize::finalize_turn_outcome;
 use crate::agent::tinyagents::{journal, routes, steering_forwarder};
+use tinyagents_harness::events::{CapPauser, PauseRecorder};
 use tinyagents_harness::ids::TaskId;
+use tinyagents_harness::observability::turn_observer;
 use tinyagents_harness::run_queue::RunQueue;
 use tinyagents_session::transcript::TranscriptMessage;
 
@@ -463,7 +465,7 @@ pub(super) async fn run_turn_via_tinyagents_body(
         }
     }
     let sink = EventSink::with_stream_id(journal_run_id.as_str());
-    tinyagents_harness::observability::turn_observer::install(&mut harness, &sink, hosted_root.is_some());
+    turn_observer::install(&mut harness, &sink, hosted_root.is_some());
     let events = Some(sink);
     // Attach the event bridge for EVERY turn — including an unobserved
     // (`on_progress = None`) background/cron turn (#4467, item 3). The bridge's
@@ -503,25 +505,19 @@ pub(super) async fn run_turn_via_tinyagents_body(
     // the turn's task, where the task-local is in scope; the listener need not.
     if pause_at_cap {
         if let (Some(events), Some(handle)) = (&events, &handle) {
-            // Only the TOP-LEVEL turn's cap pause is binding on dispatch. A
-            // sub-agent reaching its own model-call cap is a routine outcome —
-            // it summarises and hands its result back (`hit_cap`) — and the
-            // parent may legitimately keep delegating afterwards. Recording a
-            // child's cap here would stop the whole turn's fan-out on a signal
-            // that says nothing about the parent's budget, so `subagent_scope`
-            // gates it: `None` is the chat turn, `Some` is a delegated child.
-            // The child still gets its advisory `Pause` either way.
+            // Only the top-level turn's cap pause is binding on dispatch; a
+            // delegated child reaching its own cap is routine and must not
+            // stop the parent's fan-out (it still gets its advisory `Pause`).
             let dispatch_guard = subagent_scope
                 .is_none()
                 .then(|| run_context.dispatch.clone())
                 .flatten();
-            let recorder: Option<tinyagents_harness::events::PauseRecorder> =
-                dispatch_guard.map(|guard| {
-                    Arc::new(move |completed: u64, cap: u64| {
-                        guard.record_pause_requested(completed, cap)
-                    }) as tinyagents_harness::events::PauseRecorder
-                });
-            match tinyagents_harness::events::CapPauser::with_recorder(
+            let recorder = dispatch_guard.map(|guard| {
+                Arc::new(move |completed: u64, cap: u64| {
+                    guard.record_pause_requested(completed, cap)
+                }) as PauseRecorder
+            });
+            match CapPauser::with_recorder(
                 handle.clone(),
                 max_iterations,
                 ctx.run_id().as_str(),
