@@ -18,22 +18,14 @@ use tinychannels_bus::methods;
 const MODULE_ID: &str = "tinychannels";
 
 /// Return a client for the compiled, linked TinyChannels module fixture.
+///
+/// BLOCKED on the tinybus epic: `tinychannels-module` v0.1.29 pins `tinybus =0.1.4`
+/// while the workspace tinybus is 0.1.3, so the module cannot be a dev-dependency
+/// and the fixture cannot be linked. Tests that need it fail with this message
+/// until the dependency is restored.
 pub(crate) async fn client() -> ModuleClient {
-    register_linked(MODULE_ID, tinychannels_module::linked_module);
-    let mut config = Config::default();
-    config.modules.source = ModuleSourceMode::Linked;
-    ops::ensure_loaded(&config, MODULE_ID)
-        .await
-        .expect("the linked TinyChannels module should be admitted through the seam");
-    let proxy = host::runtime()
-        .await
-        .expect("the module host should be running")
-        .proxy(
-            tinychannels_module::BUS_NAME,
-            tinychannels_module::OBJECT_PATH,
-        )
-        .expect("the linked TinyChannels proxy should be valid");
-    ModuleClient::fixture(proxy)
+    let _ = (MODULE_ID, register_linked::<fn()>, &host::runtime, &ops::ensure_loaded);
+    panic!("tinychannels-module fixture unavailable: blocked on tinybus 0.1.4 (tinybus epic)")
 }
 
 #[tokio::test]
