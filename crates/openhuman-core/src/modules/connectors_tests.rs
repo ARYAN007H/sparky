@@ -290,7 +290,10 @@ fn an_unconfigured_route_still_carries_the_offered_toolkit_policy() {
     // module falls back to must not drop the operator's policy.
     assert!(module_config(&config).is_err());
     let fallback = super::ops::module_config_for_test(&config, MODULE_ID);
-    assert_eq!(fallback["offered_toolkits"]["deny"], serde_json::json!(["twitter"]));
+    assert_eq!(
+        fallback["offered_toolkits"]["deny"],
+        serde_json::json!(["twitter"])
+    );
 }
 
 #[test]

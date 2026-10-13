@@ -17,9 +17,7 @@ fn parity_router() -> Router {
         // Hosted backend route.
         .route(
             "/agent-integrations/composio/toolkits",
-            get(|| async {
-                Json(json!({"success": true, "data": {"toolkits": ["gmail"]}}))
-            }),
+            get(|| async { Json(json!({"success": true, "data": {"toolkits": ["gmail"]}})) }),
         )
         .route(
             "/agent-integrations/composio/connections",
@@ -42,10 +40,17 @@ fn parity_router() -> Router {
                 ]}))
             }),
         )
-        .route("/tools", get(|| async { Json(json!({"items": direct_tools()})) }))
+        .route(
+            "/tools",
+            get(|| async { Json(json!({"items": direct_tools()})) }),
+        )
 }
 
-const SLUGS: [&str; 3] = ["GMAIL_FETCH_EMAILS", "GMAIL_SEND_EMAIL", "GMAIL_DELETE_MESSAGE"];
+const SLUGS: [&str; 3] = [
+    "GMAIL_FETCH_EMAILS",
+    "GMAIL_SEND_EMAIL",
+    "GMAIL_DELETE_MESSAGE",
+];
 
 fn backend_tools() -> Vec<Value> {
     SLUGS

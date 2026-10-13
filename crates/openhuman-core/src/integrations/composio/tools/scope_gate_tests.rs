@@ -61,7 +61,12 @@ fn the_scope_error_names_the_toolkit_and_the_unlock_path() {
     assert!(message.contains("write=false"), "{message}");
 }
 
-fn visible(toolkit: &str, has_catalog: bool, slugs: &[&str], pref: UserScopePref) -> VisibleToolsResponse {
+fn visible(
+    toolkit: &str,
+    has_catalog: bool,
+    slugs: &[&str],
+    pref: UserScopePref,
+) -> VisibleToolsResponse {
     VisibleToolsResponse {
         toolkit: toolkit.to_owned(),
         preference: pref,
@@ -79,7 +84,12 @@ fn visible(toolkit: &str, has_catalog: bool, slugs: &[&str], pref: UserScopePref
 
 #[test]
 fn a_slug_in_the_modules_visible_list_is_allowed_regardless_of_case() {
-    let listing = visible("gmail", true, &["GMAIL_SEND_EMAIL"], UserScopePref::default());
+    let listing = visible(
+        "gmail",
+        true,
+        &["GMAIL_SEND_EMAIL"],
+        UserScopePref::default(),
+    );
     assert!(matches!(
         decide_from_visible("gmail_send_email", &listing),
         ToolDecision::Allow

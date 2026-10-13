@@ -86,12 +86,8 @@ pub(super) async fn evaluate_tool_visibility(config: &Config, slug: &str) -> Too
         toolkit: toolkit.clone(),
         preference: None,
     };
-    match connectors::call::<_, VisibleToolsResponse>(
-        config,
-        methods::LIST_VISIBLE_TOOLS,
-        request,
-    )
-    .await
+    match connectors::call::<_, VisibleToolsResponse>(config, methods::LIST_VISIBLE_TOOLS, request)
+        .await
     {
         Ok(visible) => decide_from_visible(slug, &visible),
         Err(error) => {

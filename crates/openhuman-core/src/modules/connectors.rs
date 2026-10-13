@@ -202,9 +202,7 @@ fn route_config(config: &Config) -> Result<serde_json::Value, String> {
 /// boot when it was already serving from the search path. A failure only
 /// delays the snapshot: the next connector call primes it again.
 pub async fn prime_catalogs(config: &Config) {
-    if let Err(error) =
-        crate::integrations::composio::contract::curated::prime(config).await
-    {
+    if let Err(error) = crate::integrations::composio::contract::curated::prime(config).await {
         tracing::debug!("[connectors] catalog prime failed: {error}");
     }
 }
