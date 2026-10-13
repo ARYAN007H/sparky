@@ -86,7 +86,7 @@ export function formatReport(violations) {
 function loadMetadata(root, manifest) {
   const r = spawnSync(
     'cargo',
-    ['metadata', '--format-version', '1', '--no-deps', '--manifest-path', resolve(root, manifest)],
+    ['metadata', '--format-version', '1', '--manifest-path', resolve(root, manifest)],
     { cwd: root, encoding: 'utf8', maxBuffer: 1 << 30 }
   );
   if (r.status !== 0) throw new Error(`cargo metadata failed for ${manifest}: ${r.stderr}`);
@@ -100,13 +100,23 @@ export function main(argv) {
     if (argv[i] === '--metadata') files.push(argv[++i]);
     else root = resolve(argv[i]);
   }
+  let docs;
   try {
-    const docs = files.length
+    docs = files.length
       ? files.map(f => JSON.parse(readFileSync(f, 'utf8')))
       : MANIFESTS.map(m => loadMetadata(root, m));
-    return { code: 0, docs };
   } catch (err) {
     console.error(`storage-owner: cannot read inputs: ${err.message}`);
-    return { code: 2, docs: [] };
+    return 2;
   }
+  const seen = new Set();
+  const violations = docs
+    .flatMap(d => checkMetadata(d))
+    .filter(v => !seen.has(`${v.package}|${v.detail}`) && seen.add(`${v.package}|${v.detail}`));
+  console.log(formatReport(violations));
+  return violations.length ? 1 : 0;
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  process.exit(main(process.argv.slice(2)));
 }
