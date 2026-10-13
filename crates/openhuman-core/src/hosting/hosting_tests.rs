@@ -186,14 +186,14 @@ fn tool_declarations_match_the_released_module_contract() {
 #[test]
 fn the_module_registry_pins_the_released_hosts_artifact_set() {
     let record = crate::modules::registry::find("tinyhosts").expect("registered module");
-    assert_eq!(record.version, "0.3.0");
+    assert_eq!(record.version, "0.4.0");
     assert_eq!(record.assets.len(), 11);
     assert!(record.assets.iter().all(|asset| {
-        asset.archive.starts_with("tinyhosts-0.3.0-") && asset.sha256.len() == 64
+        asset.archive.starts_with("tinyhosts-0.4.0-") && asset.sha256.len() == 64
     }));
     assert_eq!(
         record.asset_for("ubuntu-24.04-x86_64").unwrap().sha256,
-        "368f00ee397649481ff8f61d33eeb8b908cc416d6b2f9d4ef3c81263d6b0460e"
+        "ffaf1b749808185b01ed36a90d013c8492d03a113cc63eb02657191983c99b1d"
     );
 }
 
@@ -227,15 +227,14 @@ async fn released_artifact_serves_providers_and_confidential_local_preparation()
         .path()
         .canonicalize()
         .expect("canonical workspace");
-    let operation: tinyhosts_bus::rpc::Operation =
-        tinyhosts_bus::rpc::Operation::PrepareBundle {
-            directory: tinyhosts_bus::preparation::AuthorizedDirectory {
-                workspace: workspace.to_string_lossy().into_owned(),
-                path: "site".to_owned(),
-                max_bytes: tinyhosts_bus::preparation::MAX_PREPARATION_BYTES,
-                max_files: tinyhosts_bus::preparation::MAX_PREPARATION_FILES,
-            },
-        };
+    let operation: tinyhosts_bus::rpc::Operation = tinyhosts_bus::rpc::Operation::PrepareBundle {
+        directory: tinyhosts_bus::preparation::AuthorizedDirectory {
+            workspace: workspace.to_string_lossy().into_owned(),
+            path: "site".to_owned(),
+            max_bytes: tinyhosts_bus::preparation::MAX_PREPARATION_BYTES,
+            max_files: tinyhosts_bus::preparation::MAX_PREPARATION_FILES,
+        },
+    };
     let tinyhosts_bus::rpc::Outcome::PreparedBundle(prepared) = account
         .execute(operation)
         .await
