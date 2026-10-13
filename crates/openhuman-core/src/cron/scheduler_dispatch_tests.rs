@@ -34,7 +34,7 @@ fn security(config: &Config) -> Arc<SecurityPolicy> {
 
 /// A system job row named `name`, already due.
 fn due_system_job(config: &Config, name: &str) -> CronJob {
-    let mut job = ensure_system_job(
+    let job = ensure_system_job(
         config,
         name,
         Schedule::Every {
@@ -42,7 +42,7 @@ fn due_system_job(config: &Config, name: &str) -> CronJob {
         },
     )
     .unwrap();
-    // Due now, both in the row the next poll reads and in the value we pass.
+    // Due now in the row the next poll reads.
     crate::cron::update_job(
         config,
         &job.id,
@@ -56,7 +56,6 @@ fn due_system_job(config: &Config, name: &str) -> CronJob {
     .unwrap();
     force_due(config, &job.id);
     // The runtime claims against the stored row, so hand back exactly that.
-    let _ = &mut job;
     cron::get_job(config, &job.id).unwrap()
 }
 
