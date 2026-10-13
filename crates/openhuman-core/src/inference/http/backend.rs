@@ -12,6 +12,10 @@
 //! - `"openhuman"` -> OpenHuman backend (session JWT)
 
 use async_trait::async_trait;
+use tinyinference_llm::model::{
+    ChatModel, DeferredHandle, DeferredStatus, InputModality, InputSource, ModelProfile,
+    ModelRequest, ModelResponse, ModelStream,
+};
 use tinyinference_llm::providers::openai::server_http::{
     strip_temperature_suffix, BackendFailure, ChatBackend, ListedModel, ResolvedChat,
 };
@@ -23,6 +27,49 @@ const LOG_PREFIX: &str = "[inference::http]";
 
 /// Resolves `/v1` requests against the loaded OpenHuman [`Config`].
 pub(super) struct HostChatBackend;
+
+/// Adapts the factory's shared `Arc<dyn ChatModel>` to the owned box the pinned
+/// `ResolvedChat` takes. tinyinference#98 makes `ResolvedChat` hold an `Arc`;
+/// delete this wrapper once the tinyagents pin carries that commit.
+struct SharedChatModel(std::sync::Arc<dyn ChatModel<()>>);
+
+#[async_trait]
+impl ChatModel<()> for SharedChatModel {
+    fn profile(&self) -> Option<&ModelProfile> {
+        self.0.profile()
+    }
+    fn supports_input(
+        &self,
+        modality: InputModality,
+        mime_type: &str,
+        source: InputSource,
+    ) -> bool {
+        self.0.supports_input(modality, mime_type, source)
+    }
+    fn cache_identity(&self) -> Option<String> {
+        self.0.cache_identity()
+    }
+    async fn invoke(
+        &self,
+        state: &(),
+        request: ModelRequest,
+    ) -> tinyinference_llm::Result<ModelResponse> {
+        self.0.invoke(state, request).await
+    }
+    async fn stream(
+        &self,
+        state: &(),
+        request: ModelRequest,
+    ) -> tinyinference_llm::Result<ModelStream> {
+        self.0.stream(state, request).await
+    }
+    async fn fetch_deferred(
+        &self,
+        handle: &DeferredHandle,
+    ) -> tinyinference_llm::Result<DeferredStatus> {
+        self.0.fetch_deferred(handle).await
+    }
+}
 
 /// Bare model names (no `:`, not the `openhuman` sentinel) are local Ollama models.
 pub(super) fn provider_string_for(model: &str) -> String {
@@ -74,7 +121,7 @@ impl ChatBackend for HostChatBackend {
             );
         }
         Ok(ResolvedChat {
-            chat_model,
+            chat_model: Box::new(SharedChatModel(chat_model)),
             model_id,
             temperature: raw,
         })
