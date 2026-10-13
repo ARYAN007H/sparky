@@ -27,6 +27,8 @@ async fn test_config(tmp: &TempDir) -> Config {
 
 fn test_job(command: &str) -> CronJob {
     CronJob {
+        claim_generation: 0,
+        policy: Default::default(),
         id: "test-job".into(),
         expression: "* * * * *".into(),
         schedule: tinyflows_schedule::types::Schedule::Cron {
