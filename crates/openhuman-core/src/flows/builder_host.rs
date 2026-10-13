@@ -77,12 +77,7 @@ impl FlowStore for FlowsHost {
         ops::load_flow_graph(&self.config, id)
     }
 
-    async fn create(
-        &self,
-        name: String,
-        graph: Value,
-        require_approval: bool,
-    ) -> PortResult<Flow> {
+    async fn create(&self, name: String, graph: Value, require_approval: bool) -> PortResult<Flow> {
         ops::flows_create(&self.config, name, graph, require_approval)
             .await
             .map(|o| o.value)
@@ -109,7 +104,9 @@ impl FlowStore for FlowsHost {
     }
 
     async fn duplicate(&self, id: &str) -> PortResult<Flow> {
-        ops::flows_duplicate(&self.config, id).await.map(|o| o.value)
+        ops::flows_duplicate(&self.config, id)
+            .await
+            .map(|o| o.value)
     }
 
     async fn history(&self, id: &str, limit: usize) -> PortResult<Vec<FlowRevision>> {
@@ -123,7 +120,9 @@ impl FlowStore for FlowsHost {
     }
 
     async fn get_run(&self, run_id: &str) -> PortResult<FlowRun> {
-        ops::flows_get_run(&self.config, run_id).await.map(|o| o.value)
+        ops::flows_get_run(&self.config, run_id)
+            .await
+            .map(|o| o.value)
     }
 
     async fn resume(

@@ -5,6 +5,11 @@ use super::builder_tools::{
     GetToolContractTool, GetToolOutputSampleTool, ListConnectableToolkitsTool,
     ListFlowConnectionsTool, SearchToolCatalogTool,
 };
+use super::memory_tools::{FlowMemoryRecallTool, FlowMemoryRememberTool};
+use super::tools::{ProposeWorkflowTool, RunFlowTool};
+use crate::config::Config;
+use crate::security::SecurityPolicy;
+use std::sync::Arc;
 use tinyflows_copilot::tools::{
     CancelFlowRunTool, CreateWorkflowTool, DryRunWorkflowTool, DuplicateFlowTool, EditWorkflowTool,
     GetFlowHistoryTool, GetFlowRunTool, GetFlowTool, GetNodeKindContractTool,
@@ -12,11 +17,6 @@ use tinyflows_copilot::tools::{
     ResumeFlowRunTool, ReviseWorkflowTool, SaveWorkflowTool, SuggestWorkflowsTool,
     ValidateWorkflowTool,
 };
-use super::memory_tools::{FlowMemoryRecallTool, FlowMemoryRememberTool};
-use super::tools::{ProposeWorkflowTool, RunFlowTool};
-use crate::config::Config;
-use crate::security::SecurityPolicy;
-use std::sync::Arc;
 use tinytools::Tool;
 
 /// Build the flow tool family in its persisted catalogue order.
@@ -43,11 +43,19 @@ pub(crate) fn tools(config: Arc<Config>, security: &Arc<SecurityPolicy>) -> Vec<
         // graph (saved flow or inline) instead of re-emitting the whole graph,
         // then validate + gate + return a proposal (same contract as revise).
         // Proposal-only — never persists.
-        Box::new(EditWorkflowTool::new(host.clone(), host.clone(), host.clone())),
+        Box::new(EditWorkflowTool::new(
+            host.clone(),
+            host.clone(),
+            host.clone(),
+        )),
         // Standalone validate (F3): run the SAME structural + hard-gate stack
         // the propose/save tools use, without emitting a proposal — a pure
         // check so the agent can self-verify a draft mid-build. Read-only.
-        Box::new(ValidateWorkflowTool::new(host.clone(), host.clone(), host.clone())),
+        Box::new(ValidateWorkflowTool::new(
+            host.clone(),
+            host.clone(),
+            host.clone(),
+        )),
         // Read a saved flow's revision history (F6) — prior graph snapshots the
         // agent can inspect / pick a rollback target from. Read-only.
         Box::new(GetFlowHistoryTool::new(host.clone())),
@@ -93,7 +101,11 @@ pub(crate) fn tools(config: Arc<Config>, security: &Arc<SecurityPolicy>) -> Vec<
         // not rely on prompt prose or memory for node config shapes. Read-only.
         Box::new(ListNodeKindsTool::new(kinds.clone())),
         Box::new(GetNodeKindContractTool::new(kinds)),
-        Box::new(DryRunWorkflowTool::new(host.clone(), host.clone(), host.clone())),
+        Box::new(DryRunWorkflowTool::new(
+            host.clone(),
+            host.clone(),
+            host.clone(),
+        )),
         // Real end-to-end test run of a SAVED flow (Write / external-effect). The
         // workflow-builder prompt requires it to ask the user for confirmation
         // first, and the flow's own approval gate still pauses outbound nodes.
@@ -103,7 +115,11 @@ pub(crate) fn tools(config: Arc<Config>, security: &Arc<SecurityPolicy>) -> Vec<
         // turn from the Flows prompt bar is propose-only (see #4596) — Accept
         // + the canvas's own Save persist the graph. The tool itself can
         // never create a flow or change enabled/require_approval.
-        Box::new(SaveWorkflowTool::new(host.clone(), host.clone(), host.clone())),
+        Box::new(SaveWorkflowTool::new(
+            host.clone(),
+            host.clone(),
+            host.clone(),
+        )),
         // Flow Scout discovery: the `flow_discovery` agent's terminal emit
         // sink. Read-only reasoning over the user's data ends by calling
         // `suggest_workflows`, which persists workflow ideas for the Flows page

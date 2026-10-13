@@ -126,15 +126,17 @@ async fn flows_build_hides_the_live_run_tool_from_the_builder_belt() {
         live_runner.external_effect(),
         "the flows live-runner must be external-effect for the #4593 concern to apply"
     );
-    let resumer =
-        crate::flows::builder_tools::tests_support::resume_flow_run_tool(std::sync::Arc::new(config.clone()));
+    let resumer = crate::flows::builder_tools::tests_support::resume_flow_run_tool(
+        std::sync::Arc::new(config.clone()),
+    );
     assert!(
         resumer.external_effect(),
         "resume_flow_run advances a real run's outbound effects, so it must be \
          external-effect for the same #4593/#4881 concern to apply"
     );
-    let canceller =
-        crate::flows::builder_tools::tests_support::cancel_flow_run_tool(std::sync::Arc::new(config.clone()));
+    let canceller = crate::flows::builder_tools::tests_support::cancel_flow_run_tool(
+        std::sync::Arc::new(config.clone()),
+    );
     assert!(
         canceller.external_effect(),
         "cancel_flow_run is external-effect since the T-M3 fix — it stays hidden on THIS \
