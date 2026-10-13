@@ -1,18 +1,17 @@
 //! What the module asks of the host while it works on a remix: one
-//! completion, one Jev evaluation, one web search, and the learned slang and
-//! meme index documents.
+//! completion, one Jev evaluation, one web search, and the learned-state
+//! documents ([`super::docs`]).
 //!
-//! The contract carries no correlation id, so a callback cannot say which
-//! remix it belongs to. Remixes therefore run one at a time per process: the
-//! [`Session`] of the running remix is the one callbacks answer for, and a
-//! callback arriving with no session is refused as unsupported.
-//!
-//! Index documents live at `<workspace>/tinymemes/{slang,meme}-index.json`,
-//! the files the in-process engine used, so learned state carries over.
+//! Every callback carries the correlation id of the remix it belongs to (the
+//! module echoes the one the host put in the request). A [`Registry`] entry
+//! per id holds that remix's workspace, so remixes for different workspaces
+//! run side by side and a callback with no live id is refused. An entry lives
+//! until the module reports the request finished with `End` (background
+//! research can outlast the call), or is swept after [`MAX_AGE`].
 
-use std::future::Future;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::collections::HashMap;
+use std::sync::{Arc, LazyLock, Mutex};
+use std::time::{Duration, Instant};
 
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -22,12 +21,11 @@ use tinymemes_bus::{
     LoadIndexRequest, SaveIndexRequest, SearchRequest,
 };
 
-use super::{inference, jev, remixed, search};
+use super::{docs, inference, jev, search};
 use crate::config::Config;
-use crate::security::secret_storage::file_store::write_atomic;
 
-const SLANG_FILE: &str = "slang-index.json";
-const MEMES_FILE: &str = "meme-index.json";
+/// How long an entry may live without its `End`.
+const MAX_AGE: Duration = Duration::from_secs(15 * 60);
 
 /// The workspace one remix runs for.
 pub(super) struct Session {
@@ -42,40 +40,90 @@ impl Session {
             jev: tokio::sync::OnceCell::new(),
         }
     }
+}
 
-    fn index_path(&self, kind: IndexKind) -> PathBuf {
-        let file = match kind {
-            IndexKind::Slang => SLANG_FILE,
-            IndexKind::Memes => MEMES_FILE,
-        };
-        self.config.workspace_dir.join(remixed::DIR).join(file)
+struct Entry {
+    session: Arc<Session>,
+    registered: Instant,
+}
+
+static REGISTRY: LazyLock<Mutex<HashMap<String, Entry>>> = LazyLock::new(Mutex::default);
+
+fn registry() -> std::sync::MutexGuard<'static, HashMap<String, Entry>> {
+    REGISTRY.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// A registered remix. Dropping it forgets the remix unless it was
+/// [`kept`](Self::keep_for_background) for research that runs on after the
+/// call returns.
+pub(super) struct Registration {
+    correlation: String,
+    keep: bool,
+}
+
+impl Registration {
+    /// The id to put in the request.
+    pub(super) fn correlation(&self) -> &str {
+        &self.correlation
+    }
+
+    /// The call succeeded: leave the entry for the module's `End`.
+    pub(super) fn keep_for_background(mut self) {
+        self.keep = true;
     }
 }
 
-static ACTIVE: Mutex<Option<Arc<Session>>> = Mutex::new(None);
-static GATE: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
-
-/// Clears the active session when the remix ends, including when the future
-/// is dropped by a timeout.
-struct ActiveGuard;
-
-impl Drop for ActiveGuard {
+impl Drop for Registration {
     fn drop(&mut self) {
-        *ACTIVE.lock().unwrap_or_else(|e| e.into_inner()) = None;
+        if !self.keep {
+            registry().remove(&self.correlation);
+        }
     }
 }
 
-/// Run `work` as the one active remix, answering its callbacks for `config`.
-pub(super) async fn run_with<T>(config: &Config, work: impl Future<Output = T>) -> T {
-    let _turn = GATE.lock().await;
-    *ACTIVE.lock().unwrap_or_else(|e| e.into_inner()) = Some(Arc::new(Session::new(config)));
-    let _clear = ActiveGuard;
-    work.await
+/// Register a remix for `config`'s workspace under a fresh correlation id.
+pub(super) fn register(config: &Config) -> Registration {
+    let correlation = uuid::Uuid::new_v4().to_string();
+    let mut sessions = registry();
+    sessions.retain(|_, entry| entry.registered.elapsed() < MAX_AGE);
+    sessions.insert(
+        correlation.clone(),
+        Entry {
+            session: Arc::new(Session::new(config)),
+            registered: Instant::now(),
+        },
+    );
+    Registration {
+        correlation,
+        keep: false,
+    }
 }
 
-/// The session callbacks currently answer for, if a remix is running.
-pub(super) fn active() -> Option<Arc<Session>> {
-    ACTIVE.lock().unwrap_or_else(|e| e.into_inner()).clone()
+/// The session a callback answers for, if its remix is still registered.
+pub(super) fn session(correlation: &str) -> Option<Arc<Session>> {
+    registry().get(correlation).map(|entry| entry.session.clone())
+}
+
+/// The module finished this remix: forget it.
+pub(super) fn end(correlation: &str) {
+    if registry().remove(correlation).is_some() {
+        log::debug!("[tinymemes] remix ended correlation={correlation}");
+    }
+}
+
+/// The correlation id a callback payload carries (`[ { "correlation": .. } ]`).
+pub(super) fn correlation_of(payload: &Value) -> Option<&str> {
+    payload
+        .as_array()?
+        .first()?
+        .get("correlation")?
+        .as_str()
+        .filter(|c| !c.is_empty())
+}
+
+#[cfg(test)]
+pub(super) fn live_count() -> usize {
+    registry().len()
 }
 
 fn args<T: DeserializeOwned>(value: Value) -> Result<T, tinybus::Error> {
@@ -105,6 +153,12 @@ pub(super) async fn dispatch(
         // The remixed text is returned to the caller, which delivers it
         // itself; nothing is handed over through the module.
         host_methods::DELIVER => reply(HostResult::Ok(())),
+        host_methods::END => {
+            if let Some(correlation) = correlation_of(&payload) {
+                end(correlation);
+            }
+            reply(HostResult::Ok(()))
+        }
         _ => Err(tinybus::Error::failed("unknown tinymemes host operation")),
     }
 }
@@ -155,10 +209,10 @@ async fn search(
 }
 
 async fn load_index(session: &Session, request: LoadIndexRequest) -> HostResult<Option<String>> {
-    let path = session.index_path(request.kind);
-    match crate::core::runtime::spawn_blocking_scoped(move || std::fs::read_to_string(path)).await {
-        Ok(Ok(json)) => Ok(Some(json)),
-        Ok(Err(error)) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+    let config = session.config.clone();
+    let kind: IndexKind = request.kind;
+    match crate::core::runtime::spawn_blocking_scoped(move || docs::load(&config, kind)).await {
+        Ok(Ok(document)) => Ok(document),
         Ok(Err(error)) => {
             log::warn!("[tinymemes] cannot read index: {error}");
             Err(HostFailure::Backend)
@@ -171,10 +225,11 @@ async fn load_index(session: &Session, request: LoadIndexRequest) -> HostResult<
 }
 
 async fn save_index(session: &Session, request: SaveIndexRequest) -> HostResult<()> {
-    let path = session.index_path(request.kind);
-    let json = request.json;
-    match crate::core::runtime::spawn_blocking_scoped(move || write_atomic(&path, json.as_bytes()))
-        .await
+    let config = session.config.clone();
+    match crate::core::runtime::spawn_blocking_scoped(move || {
+        docs::save(&config, request.kind, request.json)
+    })
+    .await
     {
         Ok(Ok(())) => Ok(()),
         Ok(Err(error)) => {
