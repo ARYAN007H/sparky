@@ -39,7 +39,11 @@ fn spec_keeps_the_slug_as_provider_name_and_picks_the_kind_from_auth() {
     assert_eq!(openai.model, "m");
     assert!(!openai.requires_api_key);
     let claude = cloud_provider_spec(
-        &entry("anthropic", "https://api.anthropic.com/v1", AuthStyle::Anthropic),
+        &entry(
+            "anthropic",
+            "https://api.anthropic.com/v1",
+            AuthStyle::Anthropic,
+        ),
         "claude",
     );
     assert_eq!(claude.kind, ProviderKind::Anthropic);
@@ -65,9 +69,13 @@ fn registry_builds_a_model_for_every_unmanaged_builtin_preset() {
 
 #[test]
 fn discovery_request_carries_bearer_auth_and_pins_openrouter_sorting() {
-    let creds = entry("openrouter", "https://openrouter.ai/api/v1", AuthStyle::Bearer);
-    let request = cloud_discovery_request(&build(&creds, "m", "sk-or"))
-        .expect("openrouter has a listing");
+    let creds = entry(
+        "openrouter",
+        "https://openrouter.ai/api/v1",
+        AuthStyle::Bearer,
+    );
+    let request =
+        cloud_discovery_request(&build(&creds, "m", "sk-or")).expect("openrouter has a listing");
     assert_eq!(request.endpoint, "https://openrouter.ai/api/v1");
     assert!(request
         .headers
@@ -77,7 +85,11 @@ fn discovery_request_carries_bearer_auth_and_pins_openrouter_sorting() {
 
 #[test]
 fn discovery_request_uses_x_api_key_for_anthropic_and_skips_codex_oauth() {
-    let claude = entry("anthropic", "https://api.anthropic.com/v1", AuthStyle::Anthropic);
+    let claude = entry(
+        "anthropic",
+        "https://api.anthropic.com/v1",
+        AuthStyle::Anthropic,
+    );
     let request = cloud_discovery_request(&build(&claude, "claude", "sk-ant")).expect("listing");
     assert!(request.headers.iter().any(|(name, _)| name == "x-api-key"));
 

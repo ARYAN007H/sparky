@@ -22,8 +22,8 @@
 use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use tinyinference_providers::auth_registry::ProviderAuthErrorRegistry;
 pub use tinyinference_providers::auth_registry::ProviderAuthError;
+use tinyinference_providers::auth_registry::ProviderAuthErrorRegistry;
 
 /// The process-lived registry. Episode tracking lives in
 /// `tinyinference-providers`; this module supplies the process singleton, the

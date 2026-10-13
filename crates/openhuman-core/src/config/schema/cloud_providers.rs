@@ -13,7 +13,9 @@ use serde::{Deserialize, Serialize};
 
 use std::sync::LazyLock;
 
-use tinyinference_providers::builtin::{BuiltinAuthStyle, BUILTIN_CLOUD_PROVIDERS as UPSTREAM_BUILTINS};
+use tinyinference_providers::builtin::{
+    BuiltinAuthStyle, BUILTIN_CLOUD_PROVIDERS as UPSTREAM_BUILTINS,
+};
 
 /// A built-in cloud provider preset in the host's [`AuthStyle`] vocabulary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -33,7 +35,9 @@ const OPENHUMAN_PRESET: BuiltinCloudProvider = BuiltinCloudProvider {
     auth_style: AuthStyle::OpenhumanJwt,
 };
 
-impl From<&'static tinyinference_providers::builtin::BuiltinCloudProvider> for BuiltinCloudProvider {
+impl From<&'static tinyinference_providers::builtin::BuiltinCloudProvider>
+    for BuiltinCloudProvider
+{
     fn from(preset: &'static tinyinference_providers::builtin::BuiltinCloudProvider) -> Self {
         Self {
             slug: preset.slug,

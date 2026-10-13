@@ -75,16 +75,17 @@ impl<'a> CloudBuild<'a> {
         }
     }
 
-    fn registry(&self) -> ProviderRegistry<impl tinyinference_llm::providers::registry::CredentialResolver + '_> {
+    fn registry(
+        &self,
+    ) -> ProviderRegistry<impl tinyinference_llm::providers::registry::CredentialResolver + '_>
+    {
         let key = self.key.to_string();
         ProviderRegistry::new(move |_: &ProviderSpec| Ok(key.clone()))
     }
 }
 
 /// Builds the chat model for a resolved cloud route through the registry.
-pub(super) fn build_cloud_model(
-    build: CloudBuild<'_>,
-) -> anyhow::Result<Arc<dyn ChatModel<()>>> {
+pub(super) fn build_cloud_model(build: CloudBuild<'_>) -> anyhow::Result<Arc<dyn ChatModel<()>>> {
     log::debug!(
         "[providers][cloud-spec] build slug={} kind={} auth={:?}",
         build.spec.provider,
