@@ -60,7 +60,7 @@ fn sub_agents_become_workers_in_a_catalogue_of_the_agents_own() {
     let helper = own.get("lead-helper").expect("the helper is listed");
     assert_eq!(helper.agent_tier, AgentTier::Worker);
     assert!(helper.subagents.is_empty());
-    assert!(!helper.searches_connected_mcp);
+    assert!(!helper.extensions.searches_connected_mcp);
     assert_eq!(helper.when_to_use, "helps the lead");
     assert!(own.get("lead").is_some(), "the agent itself is listed");
     assert!(
