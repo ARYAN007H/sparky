@@ -147,7 +147,7 @@ implements ([`vendor/tinyflows/crates/tinyflows/src/caps/mod.rs`](https://github
 | `ToolInvoker`      | `tool_call`                     | `OpenHumanTools`            | Composio + native `oh:` tools                    |
 | `HttpClient`       | `http_request`                  | `OpenHumanHttp`             | `HttpRequestTool` (allowlist + DNS-rebind guard) |
 | `CodeRunner`       | `code`                          | `OpenHumanCode`             | the sandbox (`execute_in_sandbox`)               |
-| `StateStore`       | resumable/stateful runs         | `tinyflows_sqlite::flows::SqliteStateStore` | a namespaced KV table in `flows.db`  |
+| `StateStore`       | resumable/stateful runs         | `FlowState` (`FlowStateDocuments`)          | namespaced documents in the catalog  |
 | `WorkflowResolver` | `sub_workflow` by id            | `OpenHumanWorkflowResolver` | the saved-flow store (`load_flow_graph`)         |
 | `MemoryProvider`   | `memory`                        | `OpenHumanMemory`           | the memory store (`tinyflows/memory_adapter.rs`) |
 
