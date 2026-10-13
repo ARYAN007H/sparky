@@ -182,11 +182,11 @@ async fn config() -> tinybus::Result<crate::config::Config> {
         .map_err(|e| method_error(format!("config unavailable: {e}")))
 }
 
-/// Serializes changes to site files and holds the forget epoch: the number of
-/// times any site was forgotten in this process.
-fn guard() -> &'static tokio::sync::Mutex<u64> {
-    static GUARD: OnceLock<tokio::sync::Mutex<u64>> = OnceLock::new();
-    GUARD.get_or_init(|| tokio::sync::Mutex::new(0))
+/// Serializes changes to site files and holds the forget epochs: for each
+/// workspace, the number of times a site was forgotten in it.
+fn guard() -> &'static tokio::sync::Mutex<HashMap<PathBuf, u64>> {
+    static GUARD: OnceLock<tokio::sync::Mutex<HashMap<PathBuf, u64>>> = OnceLock::new();
+    GUARD.get_or_init(|| tokio::sync::Mutex::new(HashMap::new()))
 }
 
 /// Learning switched in Browser settings since the process started, by
@@ -252,13 +252,15 @@ pub async fn forget(
         },
         None => None,
     };
-    let mut epoch = guard().lock().await;
+    let mut epochs = guard().lock().await;
     // A task still running there would write it all back when it ends; its
     // save now carries a stale epoch.
+    let epoch = epochs.entry(config.workspace_dir.clone()).or_insert(0);
     *epoch += 1;
+    let epoch = *epoch;
     let store = SiteStore::new(sites_dir(&config.workspace_dir));
     let forgotten = store.forget(site.as_deref()).await?;
-    tracing::debug!(forgotten, epoch = *epoch, "[site-memory-host] forgot sites");
+    tracing::debug!(forgotten, epoch, "[site-memory-host] forgot sites");
     Ok(usize::try_from(forgotten).unwrap_or(usize::MAX))
 }
 
@@ -298,14 +300,12 @@ async fn load_site(
     config: &crate::config::Config,
     request: LoadSiteRequest,
 ) -> std::io::Result<LoadSiteResponse> {
-    let epoch = guard().lock().await;
+    let epochs = guard().lock().await;
+    let epoch = epochs.get(&config.workspace_dir).copied().unwrap_or(0);
     let dir = sites_dir(&config.workspace_dir);
     sweep(&dir).await;
     let memory = SiteStore::new(dir).load(&request.site).await?;
-    Ok(LoadSiteResponse {
-        memory,
-        epoch: *epoch,
-    })
+    Ok(LoadSiteResponse { memory, epoch })
 }
 
 /// `Save`, under `config`: refused when learning is off or the site was
@@ -314,10 +314,11 @@ async fn save_site(
     config: &crate::config::Config,
     request: SaveSiteRequest,
 ) -> std::io::Result<SaveSiteResponse> {
-    let epoch = guard().lock().await;
-    if request.epoch != *epoch || !learning(config) {
+    let epochs = guard().lock().await;
+    let epoch = epochs.get(&config.workspace_dir).copied().unwrap_or(0);
+    if request.epoch != epoch || !learning(config) {
         tracing::debug!(
-            stale = request.epoch != *epoch,
+            stale = request.epoch != epoch,
             "[site-memory-host] save refused"
         );
         return Ok(SaveSiteResponse { saved: false });
