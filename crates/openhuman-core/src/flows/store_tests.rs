@@ -63,7 +63,6 @@ fn legacy_flows_drafts_and_checkpoints_are_imported_on_first_use_and_left_untouc
         "flow-alpha"
     );
 
-    use tinyflows::engine::Checkpointer;
     let checkpointer = crate::flows::tinyflows::open_flow_checkpointer(&config).unwrap();
     let thread = crate::storage::block_on_anyhow(async move {
         Ok(checkpointer.get_thread("run-1").await?.len())
