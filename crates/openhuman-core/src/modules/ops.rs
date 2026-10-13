@@ -1,47 +1,42 @@
-//! Loading modules, and deciding when not to.
+//! The host adapter over `tinybus::module::Resolver`.
 //!
-//! [`ensure_loaded`] is the entry point every caller uses. It resolves a module
-//! once per process and remembers the outcome — including failure, which is the
-//! part worth explaining.
+//! The resolver ladder (already loaded, override, search path, release cache,
+//! prune), the once-per-process resolution slots, failure caching, the module
+//! runtime and the client all live in `tinybus::module`. This file is only what
+//! OpenHuman contributes to them:
 //!
-//! tinybus never unloads a library. A module that was refused, faulted, or failed
-//! to initialise keeps whatever it mapped, and loading it again cannot reach a
-//! different outcome without a restart. Retrying would therefore mean paying a
-//! download and a `dlopen` on every tool call to arrive at the same error, so a
-//! failure is cached and returned directly. The user-visible consequence is that
-//! fixing a module means restarting the core, which is stated in the error.
+//! - [`resolver`] turns a [`Config`] and the compiled [`registry`] into the
+//!   resolver's plain inputs: the install directory, whether a cache miss may
+//!   reach the network, the source each module is served from (see
+//!   [`super::source`]), the `[components]` gate, per-module initialisation
+//!   configuration and the shared Sentry reporter ([`super::report`]).
+//! - [`client`] is a `tinybus::module::ModuleClient` over that resolver.
+//! - [`list`] and [`state_of`] shape the resolver's answers into the
+//!   `modules.list` RPC output.
 //!
-//! # Where an artifact comes from, and where it stays
+//! # Failures are cached, not retried
 //!
-//! Resolution order is cheapest-first: already loaded, the configured source
-//! (`[modules] source`, per-module overrides; see [`super::source`]),
-//! the module search path, then the release cache. The cache is a directory per
-//! module version under [`install_dir`], filled by the first load — downloaded,
-//! verified against the digest in [`registry`], extracted — and re-verified from
-//! disk on every later launch. That is the difference between a launch that
-//! maps a library in milliseconds and one that downloads five archives over
-//! whatever network it happens to be on: the second is what every launch did
-//! before the cache existed, and on a link with one unreachable CDN address it
-//! cost minutes during which every memory call and every chat turn waited.
+//! tinybus never unloads a library. A module that was refused, faulted, or
+//! failed to initialise keeps whatever it mapped, and loading it again cannot
+//! reach a different outcome without a restart, so the resolver caches the
+//! failure and returns it directly. The user-visible consequence is that fixing
+//! a module means restarting the core, which the error says.
 //!
-//! # How callers wait
-//!
-//! Each module has one slot in [`super::resolution`]. The first caller runs the
-//! resolution as a process-lifetime task and every other caller waits on its
-//! outcome; two modules never queue behind each other. [`ensure_loaded_within`]
-//! bounds the wait, so a caller with a deadline of its own can report the module
-//! as still loading instead of hanging into that deadline.
+//! The first caller for a module decides its resolution; later callers, with
+//! whatever configuration they hold, wait on that outcome.
 
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 use super::types::{ModuleRecord, ModuleSource, ModuleState, ModuleStatus};
-use super::{host, registry, source};
+use super::{linked, registry, report, runtime, source};
 use crate::config::Config;
 use tinybus::module::platform::host_candidates;
-use tinybus::module::resolution::{self, Claim, Resolution, ResolutionState, Waited};
-use tinybus::module::{load_first_admitted, prune_stale_versions, ReleaseAsset, ReleasePlan};
+use tinybus::module::{
+    Availability, LoadError, ModuleClient, ModuleSource as ResolverSource, Resolver,
+    ResolverInputs,
+};
 
 /// Environment variable naming a directory of bundled release archives, for
 /// headless hosts (the Docker image, the CLI tarball, bench bundles).
