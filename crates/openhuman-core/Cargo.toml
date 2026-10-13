@@ -138,7 +138,7 @@ tinyagents-harness = { path = "../../vendor/tinyagents/crates/tinyagents-harness
     "multimodal",
     "builtin-tools",
 ] }
-tinybox-bus = { path = "../../vendor/tinybox/crates/tinybox-bus", optional = true }
+tinybox-bus = { path = "../../vendor/tinybox/crates/tinybox-bus" }
 tinyagents-definition = { path = "../../vendor/tinyagents/crates/tinyagents-definition" }
 # Live (realtime voice) agent sessions: `tinyagents-live` runs a
 # `tinyliveagents` provider session (Gemini Live direct/relayed, ElevenLabs
@@ -670,7 +670,6 @@ tinymemes = ["dep:tinymemes"]
 # the first call. They are wire vocabulary only (no I/O, no runtime).
 modules = [
     "tinybus/modules",
-    "dep:tinybox-bus",
     "dep:tinydocs-bus",
     "dep:tinyhosts-bus",
     "dep:tinyvoice-bus",
