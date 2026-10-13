@@ -2011,7 +2011,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -5622,7 +5622,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.60.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -6189,7 +6189,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.60.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -6258,7 +6258,7 @@ dependencies = [
  "security-framework 3.7.0",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.60.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -7214,10 +7214,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix 1.1.5",
- "windows-sys 0.60.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -7524,6 +7524,7 @@ dependencies = [
 name = "tinyagents-runtime"
 version = "2.1.4"
 dependencies = [
+ "anyhow",
  "async-trait",
  "chrono",
  "regex",
@@ -7581,14 +7582,14 @@ dependencies = [
 
 [[package]]
 name = "tinybox-bus"
-version = "0.1.28"
+version = "0.1.29"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "tinybox-core"
-version = "0.1.28"
+version = "0.1.29"
 dependencies = [
  "async-trait",
  "serde",
@@ -7732,7 +7733,7 @@ dependencies = [
 
 [[package]]
 name = "tinyconnectors-bus"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -7778,7 +7779,7 @@ dependencies = [
 
 [[package]]
 name = "tinyflows"
-version = "0.8.16"
+version = "0.8.17"
 dependencies = [
  "async-trait",
  "futures-timer",
@@ -8065,7 +8066,7 @@ dependencies = [
 
 [[package]]
 name = "tinyjuice-bus"
-version = "0.9.2"
+version = "0.10.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -8180,7 +8181,7 @@ dependencies = [
 
 [[package]]
 name = "tinyskills"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "cap-fs-ext",
  "cap-std",
@@ -8197,7 +8198,7 @@ dependencies = [
 
 [[package]]
 name = "tinyskills-drivers"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "cap-std",
  "serde_json",
@@ -8209,7 +8210,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "tinystoragedrivers-core",
  "tinystoragedrivers-file",
@@ -8221,7 +8222,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-bus"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -8230,7 +8231,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-client"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "serde",
@@ -8243,7 +8244,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-core"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "serde",
@@ -8254,7 +8255,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-file"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "libc",
@@ -8266,7 +8267,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-mongodb"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -8280,7 +8281,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-s3"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "bytes",
  "futures-util",
@@ -8294,7 +8295,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-secrets"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "atomicwrites",
@@ -8317,7 +8318,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-sqlite"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "rusqlite",
  "serde_json",
@@ -8404,7 +8405,7 @@ dependencies = [
 
 [[package]]
 name = "tinywallet"
-version = "0.20.0"
+version = "0.22.0"
 dependencies = [
  "coins-bip32",
  "coins-bip39",
@@ -8423,7 +8424,7 @@ dependencies = [
 
 [[package]]
 name = "tinywallet-bus"
-version = "0.20.0"
+version = "0.22.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -8432,7 +8433,7 @@ dependencies = [
 
 [[package]]
 name = "tinywallet-crypto"
-version = "0.20.0"
+version = "0.22.0"
 dependencies = [
  "bech32 0.12.0",
  "bs58",
@@ -8445,7 +8446,7 @@ dependencies = [
 
 [[package]]
 name = "tinywallet-x402"
-version = "0.20.0"
+version = "0.22.0"
 
 [[package]]
 name = "tokio"
@@ -9702,7 +9703,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.60.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

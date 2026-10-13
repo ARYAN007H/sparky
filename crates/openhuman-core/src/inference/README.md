@@ -35,7 +35,8 @@ Every caller starts with a role (`chat`, `reasoning`, `agentic`, `coding`, `visi
   constructor by prefix:
      +-- managed_backend.rs       "openhuman" / "cloud" -> OpenHumanBackendModel
      +-- local_runtime.rs         ollama / lmstudio / mlx / local-openai
-     +-- cloud_slug.rs            "<slug>:<model>" BYOK, OpenAI or Anthropic wire
+     +-- cloud_slug.rs            "<slug>:<model>" BYOK: host gates, headers, TLS client
+     +-- cloud_spec.rs            CloudProviderCreds -> ProviderSpec -> tinyinference ProviderRegistry
      +-- subprocess_providers.rs  claude_agent_sdk:, claude-code:
      v
   (Arc<dyn ChatModel<()>>, resolved model id)
@@ -193,12 +194,12 @@ picks the provider the same way a provider string does.
 | [`mod.rs`](./mod.rs) | Module declarations and re-exports. Also `local_runtime_config` (projects `config.local_ai` into TinyInference's input), `local_vision_mode`, `disabled_local_ai_status`, the `LocalModelConfig` impl for `Config`, and `INFERENCE_COMPILED_IN`. |
 | `ops.rs` | `inference_*` business operations returning `Outcome<T>`: status, prompt, summarize, vision, sentiment, provider tests, model listing, settings updates, OpenAI OAuth wrappers, diagnostics. Demotes expected user-config failures to `warn!`. |
 | [`schemas.rs`](./schemas.rs), `schemas/` | The `inference.*` controller registry. `catalog.rs` has the schemas; `prompt_handlers.rs`, `settings_handlers.rs`, `oauth_handlers.rs` and `claude_code_handlers.rs` hold the thin handlers. |
-| `context_window.rs` | Per-turn context-window resolution (override, provider, local profile, static guess). |
+| `context_window.rs` | Per-turn context-window inputs (override, discovery request, static and local windows); the precedence and remembered windows are `tinyinference_llm::model::context_window::ContextWindowResolver`. |
 | `model_context.rs` | Static context-window table, the remembered window lookup, and vision capability checks. |
-| `auth_error_registry.rs` | Process-lived registry of rejected BYO provider keys, with a once-per-episode latch. |
+| `auth_error_registry.rs` | Process singleton and user-facing copy over `tinyinference_providers::auth_registry::ProviderAuthErrorRegistry` (the once-per-episode latch). |
 | `failure_copy/` | `table.rs` maps a failure class to the wire `error_type`, source, retry verdict and user copy. `halt.rs` has loop-guard halt summaries. |
 | `provider/` | Model construction and provider policy. See [`provider/README.md`](provider/README.md). |
-| `provider/factory.rs`, [`provider/factory/`](./provider/factory/) | Provider-string grammar and model construction: `routing`, `tiers`, `primary_cloud`, `access_gates`, `credentials`, `managed_backend`, `local_runtime`, `cloud_slug`, `subprocess_providers`, `discovery`, `chat_model`, `turn_model`. |
+| `provider/factory.rs`, [`provider/factory/`](./provider/factory/) | Provider-string grammar and model construction: `routing`, `tiers`, `primary_cloud`, `access_gates`, `credentials`, `managed_backend`, `local_runtime`, `cloud_slug`, `cloud_spec`, `subprocess_providers`, `discovery`, `chat_model`, `turn_model`. |
 | `provider/openhuman_backend_model*.rs` | Managed backend `ChatModel`, its call path and its usage/billing projection. |
 | `provider/openai_codex.rs` | Codex routing metadata for the `openai` slug when Codex OAuth is connected. |
 | [`provider/error_code.rs`](./provider/error_code.rs), [`provider/error_classify.rs`](./provider/error_classify.rs) | Managed `errorCode` extraction and Sentry ownership; OpenHuman policy over TinyInference's classifier. |
@@ -324,6 +325,6 @@ shared config take `inference_test_guard()` / `inference_test_guard_async()` fro
 ## Further reading
 
 - [Parent module README](../../README.md)
-- [Automatic model routing](../../../../gitbooks/features/model-routing/README.md)
-- [Local models and bring your own key](../../../../gitbooks/features/model-routing/local-and-byok-models.md)
-- [Pluggable engines](../../../../gitbooks/developing/engines.md)
+- [Automatic model routing](../../../../docs/gitbooks/en/features/model-routing/README.md)
+- [Local models and bring your own key](../../../../docs/gitbooks/en/features/model-routing/local-and-byok-models.md)
+- [Pluggable engines](../../../../docs/gitbooks/en/developing/engines.md)

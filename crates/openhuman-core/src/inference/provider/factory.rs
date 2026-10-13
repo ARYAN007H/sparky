@@ -33,6 +33,7 @@
 //! - [`managed_backend`] — the managed OpenHuman backend model.
 //! - [`local_runtime`] — Ollama / LM Studio / MLX / OMLX / local-openai.
 //! - [`cloud_slug`] — `<slug>:<model>` BYOK cloud providers.
+//! - [`cloud_spec`] — `CloudProviderCreds` → `ProviderSpec` → `ProviderRegistry`.
 //! - [`subprocess_providers`] — Claude Agent SDK and Claude Code CLI.
 //! - [`chat_model`] — the one-shot `create_chat_model*` entry points.
 //! - [`turn_model`] — the per-turn `create_turn_chat_model*` entry points.
@@ -40,6 +41,7 @@
 pub(crate) mod access_gates;
 mod chat_model;
 mod cloud_slug;
+mod cloud_spec;
 mod credentials;
 mod discovery;
 mod local_runtime;

@@ -82,6 +82,7 @@ const STORAGE_E2E_TARGETS = [
   "storage_agent_scopes_e2e",
   "storage_delegation_e2e",
   "storage_default_import_e2e",
+  "storage_desktop_upgrade_e2e",
   "cli_storage_url_e2e",
 ];
 const STORAGE_LIB_FILTERS = [
@@ -462,8 +463,8 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           run:
             "cargo test --manifest-path Cargo.toml -p openhuman --no-default-features --lib --" +
             " core::all:: core::cli:: core::invoke:: core::session_expiry:: core::legacy_aliases:: core::runtime::" +
-            " agent::registry::agents::loader:: commands::ops::tests:: cron::store::" +
-            " memory::people::contacts_gate_tests:: memory::layout_migration::" +
+            " agent::registry::agents::loader:: commands::ops::tests:: memory::people::contacts_gate_tests::" +
+            " memory::layout_migration::" +
             " openhuman::config:: openhuman::platform::socket::event_handlers:: tools::schemas:: tools::ops::tests::",
         },
         {
@@ -471,15 +472,17 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           // module host while keeping web3 disabled, so its wallet callback
           // gate is exercised rather than silently selecting zero tests.
           // MCP resources do not touch test_support; introspection stays
-          // scoped to avoid tests that require the complete product.
+          // scoped to avoid tests that require the complete product. The
+          // wallet grant's ungated tests sit beside a web3-gated one, so they
+          // run here with web3 off (check-gated-test-allowlist.sh).
           name: "gate-contract-tests-features",
           when: gateSmoke,
           run:
             "cargo test --manifest-path Cargo.toml -p openhuman --no-default-features" +
-            " --features modules,mcp,e2e-test-support,flows,storage-sqlite,web3,hosting --lib --" +
-            " modules::host:: modules::registry:: modules::ops::components_tests::" +
-            " mcp::server::resources:: storage::import::tinyflows::" +
-            " tools::implementations::network::tests:: test_support::introspect::",
+            " --features modules,mcp,e2e-test-support --lib --" +
+            " modules::host:: modules::registry:: modules::storage_grant_tinywallet::" +
+            " modules::storage_grant_tinyconnectors::" +
+            " mcp::server::resources:: test_support::introspect::",
         },
         {
           name: "kernel-floor",

@@ -4,7 +4,7 @@
 //! endpoint the turn actually talks to.
 
 use super::*;
-use tinyinference_llm::model::discover::{pinned_openrouter_providers, DiscoveryRequest};
+use tinyinference_llm::model::discover::DiscoveryRequest;
 
 /// The discovery request for `provider` (a role's resolved provider string)
 /// serving `model`, or `None` when the route has no listing to ask:
@@ -66,22 +66,21 @@ pub(crate) fn model_limits_request(
         log::debug!("[model_limits] codex oauth routing has no window listing slug={slug}");
         return None;
     }
-    let endpoint = resolution.codex.endpoint.clone();
-    let mut request = DiscoveryRequest::new(&endpoint, &resolution.effective_model);
-    let key = resolution.key.trim();
-    if !key.is_empty() {
-        request = match resolution.entry.auth_style {
-            AuthStyle::Anthropic => request
-                .with_header("x-api-key", key)
-                .with_header("anthropic-version", "2023-06-01"),
-            AuthStyle::Bearer => request.with_header("Authorization", format!("Bearer {key}")),
-            AuthStyle::None | AuthStyle::OpenhumanJwt => request,
-        };
-    }
-    if let Some(options) = super::cloud_slug::openrouter_default_provider_options(&endpoint) {
-        request = request.with_pinned_providers(pinned_openrouter_providers(&options));
-    }
-    Some(request)
+    let auth_style = super::cloud_spec::registry_auth_style(resolution.entry.auth_style)?;
+    let (extra_headers, temperature_unsupported) = (Vec::new(), Vec::new());
+    super::cloud_spec::cloud_discovery_request(&super::cloud_spec::CloudBuild {
+        spec: super::cloud_spec::cloud_provider_spec(resolution.entry, &resolution.effective_model),
+        auth_style,
+        key: resolution.key.as_str(),
+        temperature_override: None,
+        temperature_unsupported_models: &temperature_unsupported,
+        native_tool_calling: true,
+        extra_headers: &extra_headers,
+        extra_query_params: &[],
+        user_agent: None,
+        codex: Some(&resolution.codex),
+        http: None,
+    })
 }
 
 /// The managed backend's catalogue listing, authenticated with the backend
