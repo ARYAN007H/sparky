@@ -75,21 +75,36 @@ pub async fn load_declared_modules(config: &Config) {
         }
     }
 
-    // A connector module placed on the search path is already serving, so
-    // nothing asks to resolve it. Resolve it now (a no-op load that finds it
-    // serving): finishing a resolution reads its catalogs into the host.
-    let connectors_serving = registry::find(super::connectors::MODULE_ID).is_some_and(|record| {
-        runtime
-            .host()
-            .list()
-            .iter()
-            .any(|info| info.manifest.bus_name.as_str() == record.bus_name)
-    });
-    if connectors_serving {
-        if let Err(reason) = ops::ensure_loaded(config, super::connectors::MODULE_ID).await {
-            log::debug!("[modules] serving connector module not resolved at boot: {reason}");
-        }
+    warm_connector_catalogs(config);
+}
+
+/// Read the connector module's curated catalogs into the host in the
+/// background, so the synchronous lookups that gate an action (scope, approval,
+/// flow checks) never run against an empty snapshot ahead of the first
+/// connector call.
+///
+/// Off the boot path: the module may need loading (or downloading, when the
+/// configuration allows it), and a slow or failed load must not hold the core
+/// up. A failure is only logged; the next connector call primes it again. Not
+/// started when the user turned Composio off or the connector component is
+/// disabled.
+fn warm_connector_catalogs(config: &Config) {
+    use crate::config::schema::COMPOSIO_MODE_DISABLED;
+    if config.composio.mode.trim() == COMPOSIO_MODE_DISABLED
+        || ops::disabled_component(config, super::connectors::MODULE_ID).is_some()
+    {
+        log::debug!("[modules] connector catalog warm-up skipped: connectors are off");
+        return;
     }
+    let config = config.clone();
+    tokio::spawn(async move {
+        log::debug!("[modules] connector catalog warm-up starting");
+        if let Err(reason) = ops::ensure_loaded(&config, super::connectors::MODULE_ID).await {
+            log::debug!("[modules] connector catalog warm-up: module not loaded: {reason}");
+            return;
+        }
+        super::connectors::prime_catalogs(&config).await;
+    });
 }
 
 #[cfg(test)]
