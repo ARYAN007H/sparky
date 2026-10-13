@@ -148,8 +148,8 @@ test("the storage module, tests and allowlisted fallbacks are not flagged", () =
       [`${SRC}/storage/driver.rs`]: "fn f() { let c = Connection::open(p); }\n",
       [`${SRC}/foo/store_tests.rs`]: "fn f() { std::fs::write(p, b); }\n",
       [`${SRC}/foo/tests/common.rs`]: "fn f() { File::create(p); }\n",
-      [`${SRC}/cron/policy.rs`]:
-        "fn f() {\n    let conn = Connection::open(&path)\n}\n",
+      [`${SRC}/security/approval/store_import.rs`]:
+        "fn f() {\n    let conn = Connection::open(&db_path).with_context(|| {\n}\n",
     },
     [],
   );
@@ -182,10 +182,11 @@ test("--write-baseline records the current sites", () => {
 });
 
 test("an allowlisted file may hold only its pinned site", () => {
-  const file = `${SRC}/platform/cost/tracker.rs`;
+  const file = `${SRC}/desktop/control/ops.rs`;
+  const pinned = "let mut temporary = tempfile::NamedTempFile::new_in(parent)";
   const found = scan(
     file,
-    "let mut file = OpenOptions::new()\nstd::fs::write(c, d);\nConnection::open(p);\n",
+    `${pinned}\nstd::fs::write(c, d);\nConnection::open(p);\n`,
   );
   const kept = withoutAllowed(file, found);
   assert.deepEqual(
@@ -199,7 +200,7 @@ test("an allowlisted file may hold only its pinned site", () => {
   assert.equal(
     withoutAllowed(
       file,
-      scan(file, "x();\nlet mut file = OpenOptions::new()\n"),
+      scan(file, `x();\n${pinned}\n`),
     ).length,
     0,
   );
