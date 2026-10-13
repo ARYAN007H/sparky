@@ -6,6 +6,37 @@ use super::types::{
     WORKSPACE_INTERNAL_FILES,
 };
 
+/// Credential-store path segments, matched case-insensitively at any depth.
+pub(crate) const SENSITIVE_COMPONENTS: &[&str] =
+    &[".ssh", ".gnupg", ".aws", ".azure", ".kube", "keychains"];
+/// Single-file credential stores have no protected parent directory.
+pub(crate) const SENSITIVE_FILES: &[&str] = &[".netrc", ".git-credentials", ".pgpass", ".npmrc"];
+/// Consecutive segment pairs that mark a credential store. Windows DPAPI
+/// stores live under `...\Microsoft\{Protect,Credentials,Crypto,Vault}`; the
+/// pair keeps the generic second name from matching an unrelated directory.
+pub(crate) const SENSITIVE_PAIRS: &[[&str; 2]] = &[
+    [".docker", "config.json"],
+    [".cargo", "credentials.toml"],
+    ["microsoft", "protect"],
+    ["microsoft", "credentials"],
+    ["microsoft", "crypto"],
+    ["microsoft", "vault"],
+];
+/// Core OS directories matched by absolute (lower-cased) prefix. `/private` is
+/// intentionally absent: macOS temp dirs canonicalize under `/private/var`.
+pub(crate) const ALWAYS_FORBIDDEN_PREFIXES: &[&str] = &[
+    "/etc",
+    "/root",
+    "/boot",
+    "/proc",
+    "/sys",
+    "/system",
+    "c:/windows",
+    "c:/program files",
+    "c:/program files (x86)",
+    "c:/programdata",
+];
+
 impl SecurityPolicy {
     /// Expand a leading `~/` to the user's home directory. Delegates to
     /// [`crate::config::expand_tilde`] — the single source of truth —
@@ -483,10 +514,6 @@ impl SecurityPolicy {
         {
             return true;
         }
-        // Windows DPAPI / credential stores live under `…\Microsoft\{Protect,
-        // Credentials,Crypto,Vault}` — match the pair so the generic second
-        // name can't false-positive an unrelated project directory.
-
         // (b) Core OS directories — matched by absolute prefix. Unconditional,
         // unlike the user-overridable `forbidden_paths`.
         ALWAYS_FORBIDDEN_PREFIXES
