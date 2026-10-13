@@ -1,6 +1,5 @@
 //! `OpenHumanSessionHost::from_config` factory methods and internal `build_session_agent_inner` constructor.
 
-use super::dispatcher::{resolve_dispatcher_kind, DispatcherKind};
 use super::host_tools::derive_turn_workspace_descriptor;
 use super::should_synthesize_delegation_tools;
 use crate::agent::harness::host_definition::{
@@ -640,14 +639,20 @@ impl OpenHumanSessionHost {
                 .chain(delegation_tools.iter())
                 .map(|tool| (tool.name(), tool.parameters_schema())),
         );
-        let dispatcher_kind = resolve_dispatcher_kind(&dispatcher_choice, supports_native);
+        let dispatcher_kind =
+            tinytools_agent::dialect::ToolCallFormat::resolve(&dispatcher_choice, supports_native);
         let tool_dispatcher: Box<dyn ToolDialect> = match dispatcher_kind {
-            DispatcherKind::Native => Box::new(NativeDialect),
-            DispatcherKind::Xml => Box::new(XmlDialect),
-            DispatcherKind::PFormat => Box::new(PFormatDialect::new(pformat_registry.clone())),
-            DispatcherKind::Code(style) => {
-                Box::new(CodeDialect::new(style, pformat_registry.clone()))
-            }
+            ToolCallFormat::Native => Box::new(NativeDialect),
+            ToolCallFormat::Json => Box::new(XmlDialect),
+            ToolCallFormat::PFormat => Box::new(PFormatDialect::new(pformat_registry.clone())),
+            ToolCallFormat::Python => Box::new(CodeDialect::new(
+                tinytools_agent::dialect::CodeStyle::Python,
+                pformat_registry.clone(),
+            )),
+            ToolCallFormat::TypeScript => Box::new(CodeDialect::new(
+                tinytools_agent::dialect::CodeStyle::TypeScript,
+                pformat_registry.clone(),
+            )),
         };
 
         log::debug!(

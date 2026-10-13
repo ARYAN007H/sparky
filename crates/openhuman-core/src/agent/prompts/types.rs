@@ -249,68 +249,6 @@ pub fn swap_deferred_for_discovery_bridge<'a>(
     }
 }
 
-/// How TinyTools should render and parse an agent's tool calls.
-///
-/// The prompt layer carries this only to select the TinyTools dialect; it does
-/// not define a tool-call protocol of its own.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub enum ToolCallFormat {
-    /// Compact positional legacy dialect.
-    PFormat,
-    /// JSON-in-tag rendering with full schemas. The default.
-    #[default]
-    Json,
-    /// Provider supplies structured tool calls — catalogue is
-    /// informational. Renders in the same JSON-schema form as `Json`.
-    Native,
-    /// Python `def` signatures; the model calls `name(arg="value")`.
-    Python,
-    /// TypeScript `function` signatures; the model calls `name({arg: "value"})`.
-    TypeScript,
-}
-
-impl ToolCallFormat {
-    /// The harness policy that speaks this format.
-    ///
-    /// `Native` maps to `Auto` rather than forcing native: the session only
-    /// picks it when the provider profile supports native tools, and `Auto`
-    /// resolves to the same thing while still letting the harness fall back
-    /// for a model that turns out not to.
-    pub(crate) fn harness_dispatcher(self) -> tinyagents_harness::config::ToolDispatcher {
-        use tinyagents_harness::config::ToolDispatcher;
-        match self {
-            ToolCallFormat::PFormat => ToolDispatcher::Pformat,
-            ToolCallFormat::Json => ToolDispatcher::Xml,
-            ToolCallFormat::Native => ToolDispatcher::Auto,
-            ToolCallFormat::Python => ToolDispatcher::Python,
-            ToolCallFormat::TypeScript => ToolDispatcher::Typescript,
-        }
-    }
-
-    /// The code style behind a code-call format, `None` for the others.
-    pub(crate) fn code_style(self) -> Option<tinytools_agent::dialect::CodeStyle> {
-        match self {
-            ToolCallFormat::Python => Some(tinytools_agent::dialect::CodeStyle::Python),
-            ToolCallFormat::TypeScript => Some(tinytools_agent::dialect::CodeStyle::TypeScript),
-            ToolCallFormat::PFormat | ToolCallFormat::Json | ToolCallFormat::Native => None,
-        }
-    }
-}
-
-/// Map the canonical dialect's catalogue spelling onto the host prompt wire
-/// vocabulary at the prompt boundary.
-pub(crate) fn tool_call_format_from_dialect(
-    format: tinytools_agent::dialect::ToolCallFormat,
-) -> ToolCallFormat {
-    match format {
-        tinytools_agent::dialect::ToolCallFormat::PFormat => ToolCallFormat::PFormat,
-        tinytools_agent::dialect::ToolCallFormat::Json => ToolCallFormat::Json,
-        tinytools_agent::dialect::ToolCallFormat::Native => ToolCallFormat::Native,
-        tinytools_agent::dialect::ToolCallFormat::Python => ToolCallFormat::Python,
-        tinytools_agent::dialect::ToolCallFormat::TypeScript => ToolCallFormat::TypeScript,
-    }
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Authenticated user identity
 // ─────────────────────────────────────────────────────────────────────────────
@@ -361,7 +299,7 @@ pub struct PromptContext<'a> {
     /// When non-empty, only tools in this set are rendered. Skills
     /// section is also omitted when a filter is active.
     pub visible_tool_names: &'a std::collections::HashSet<String>,
-    pub tool_call_format: ToolCallFormat,
+    pub tool_call_format: tinytools_agent::dialect::ToolCallFormat,
     /// Active Composio integrations the user has connected.
     pub connected_integrations: &'a [ConnectedIntegration],
     /// Pre-rendered `## Connected Identities` markdown block loaded once
