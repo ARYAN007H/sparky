@@ -1,6 +1,6 @@
 //! Workflow creation: scaffolding new SKILL.md-based skills on disk.
 
-use serde::{Deserialize};
+use serde::Deserialize;
 use std::path::Path;
 
 use tinyskills::{
