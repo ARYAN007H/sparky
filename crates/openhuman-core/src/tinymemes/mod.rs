@@ -6,11 +6,17 @@
 //! domain keeps what is the host's:
 //!
 //! - the `OPENHUMAN_TINYMEMES` flag and the A/B split ([`arm`]);
-//! - the thread as the user saw it, with earlier remixed replies tagged
-//!   ([`history`], [`remixed`]);
+//! - the thread as the user saw it, each message named by its id
+//!   ([`history`]); the module keeps the ring of remixed ids itself and tags
+//!   earlier remixed replies from it;
 //! - the callbacks the module asks for while it works: OpenHuman inference,
-//!   managed Jev, web search and the workspace index files ([`callbacks`],
-//!   served over the bus by [`service`]).
+//!   managed Jev, web search and the learned-state documents ([`callbacks`],
+//!   [`docs`], served over the bus by [`service`]). Each carries the remix's
+//!   correlation id, so remixes for different workspaces run side by side.
+//!
+//! The module also owns the `TINYMEMES_*` environment overrides (OpenRouter key
+//! and model, Jev route), the LLM fallback when this host has no Jev, and the
+//! slang and meme research it runs in the background after delivery.
 //!
 //! Behaviour:
 //!
@@ -26,17 +32,17 @@
 
 mod arm;
 mod callbacks;
+mod docs;
 mod history;
 mod inference;
 mod jev;
-mod remixed;
 mod search;
 pub(crate) mod service;
 
 use crate::config::Config;
 use async_trait::async_trait;
 use std::time::{Duration, Instant};
-use tinymemes_bus::{RemixRequest, RemixResponse, SkipReason};
+use tinymemes_bus::{RemixOptions, RemixRequest, RemixResponse, SkipReason};
 
 pub(crate) use arm::Arm;
 pub(crate) use arm::FLAG_ENV;
@@ -47,6 +53,7 @@ pub(crate) fn flag_enabled(value: &str) -> bool {
 }
 
 const TIMEOUT_ENV: &str = "OPENHUMAN_TINYMEMES_TIMEOUT_MS";
+const COOLDOWN_ENV: &str = "OPENHUMAN_TINYMEMES_MEME_COOLDOWN";
 
 /// Whether this thread's answer text must be held back from streaming because
 /// its final reply will be remixed (treatment arm). The UI then shows only the
@@ -126,20 +133,16 @@ async fn remix_final_reply(
         return None;
     }
     let started = Instant::now();
-    let Some((remixed, messages)) = load(config, thread_id).await else {
-        log_outcome(&turn, started, "engine_unavailable", None);
-        return None;
-    };
     // Fail open: without the thread, the reading would judge the reply out of
     // context, so the original goes out instead.
-    let Some(messages) = messages else {
+    let Some(messages) = load(config, thread_id).await else {
         log_outcome(&turn, started, "history_unavailable", None);
         return None;
     };
     let remixer = ModuleRemixer { config };
     remix_with(
         &remixer,
-        &remixed,
+        options(config),
         &messages,
         &turn,
         started,
@@ -178,29 +181,43 @@ fn gate(arm: Arm, turn: &TurnInfo<'_>) -> bool {
     }
 }
 
-/// The workspace's remixed-id store and the thread as stored. Both are
-/// blocking file work, so they run off the async runtime. `None` when the
-/// store cannot be opened; the inner `None` when the thread cannot be read.
+/// The thread as stored. Blocking file work, so it runs off the async
+/// runtime. `None` when the thread cannot be read.
 async fn load(
     config: &Config,
     thread_id: &str,
-) -> Option<(
-    std::sync::Arc<remixed::RemixedIds>,
-    Option<Vec<crate::threads::store::ConversationMessage>>,
-)> {
+) -> Option<Vec<crate::threads::store::ConversationMessage>> {
     let config = config.clone();
     let thread_id = thread_id.to_owned();
     crate::core::runtime::spawn_blocking_scoped(move || {
-        let ids = remixed::for_workspace(&config.workspace_dir)?;
-        let messages =
-            crate::threads::store::get_messages(config.workspace_dir.clone(), &thread_id)
-                .map_err(|e| log::warn!("[tinymemes] thread history unavailable: {e}"))
-                .ok();
-        Some((ids, messages))
+        crate::threads::store::get_messages(config.workspace_dir.clone(), &thread_id)
+            .map_err(|e| log::warn!("[tinymemes] thread history unavailable: {e}"))
+            .ok()
     })
     .await
     .ok()
     .flatten()
+}
+
+/// What the host decides for the module: the meme cooldown
+/// (`OPENHUMAN_TINYMEMES_MEME_COOLDOWN` over `[memes] meme_cooldown`) and
+/// whether web search can serve research at all.
+fn options(config: &Config) -> RemixOptions {
+    options_with(
+        std::env::var(COOLDOWN_ENV).ok().as_deref(),
+        config.memes.meme_cooldown,
+        search::OpenHumanSearch::available(config).is_some(),
+    )
+}
+
+fn options_with(env: Option<&str>, configured: u32, research: bool) -> RemixOptions {
+    RemixOptions {
+        meme_cooldown_turns: Some(
+            env.and_then(|v| v.trim().parse::<u32>().ok())
+                .unwrap_or(configured),
+        ),
+        research,
+    }
 }
 
 /// The remix time budget: `OPENHUMAN_TINYMEMES_TIMEOUT_MS` when set, else
@@ -223,7 +240,7 @@ fn budget_with(env: Option<&str>, configured_ms: u64) -> Duration {
 #[allow(clippy::too_many_arguments)]
 async fn remix_with(
     remixer: &dyn Remixer,
-    remixed: &std::sync::Arc<remixed::RemixedIds>,
+    options: RemixOptions,
     messages: &[crate::threads::store::ConversationMessage],
     turn: &TurnInfo<'_>,
     started: Instant,
@@ -232,12 +249,17 @@ async fn remix_with(
     budget: Duration,
 ) -> Option<String> {
     let request = RemixRequest {
-        conversation: history::history_turns(messages, user_message, |id| remixed.contains(id)),
+        conversation: history::history_turns(messages, user_message),
         reply: reply.to_owned(),
         region: None,
         enabled: true,
         timeout_ms: u64::try_from(budget.as_millis()).unwrap_or(u64::MAX),
         deliver: false,
+        // Set by the service, which owns the registry of live remixes.
+        correlation: String::new(),
+        // The module remembers this id when the reply goes out remixed.
+        reply_id: Some(crate::threads::store::run_reply_message_id(turn.request_id)),
+        options,
     };
     // The module enforces `timeout_ms` itself; this outer bound also covers
     // module load, callback serving and the bus hop.
@@ -260,12 +282,6 @@ async fn remix_with(
     // Whether the delivered reply actually changed.
     let changed = response.remixed && response.reply.trim() != reply.trim();
     let result = if changed {
-        let id = crate::threads::store::run_reply_message_id(turn.request_id);
-        let remixed = remixed.clone();
-        if let Err(e) = crate::core::runtime::spawn_blocking_scoped(move || remixed.mark(id)).await
-        {
-            log::warn!("[tinymemes] remixed-id write task failed: {e}");
-        }
         "remixed"
     } else {
         match response.skipped {
