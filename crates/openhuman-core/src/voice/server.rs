@@ -16,6 +16,7 @@
 
 pub(crate) mod hotkey_listener;
 mod pipeline;
+mod recorder;
 mod runtime;
 mod singleton;
 mod types;
