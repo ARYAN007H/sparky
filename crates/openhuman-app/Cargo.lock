@@ -3878,7 +3878,7 @@ dependencies = [
  "tinyskills",
  "tinyskills-drivers",
  "tinystoragedrivers",
- "tinystoragedrivers-bus 0.7.0",
+ "tinystoragedrivers-bus",
  "tinystoragedrivers-client",
  "tinytools",
  "tinytools-agent",
@@ -7122,12 +7122,10 @@ dependencies = [
 
 [[package]]
 name = "tinymemes-bus"
-version = "0.2.0"
+version = "0.3.1"
 dependencies = [
  "serde",
  "serde_json",
- "tinybus",
- "tinystoragedrivers-bus 0.5.0",
 ]
 
 [[package]]
@@ -7242,16 +7240,6 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-bus"
-version = "0.5.0"
-source = "git+https://github.com/tinyhumansai/tinystoragedrivers?rev=7c5596f37e5d5440fbfa3a049a3ca98571885584#7c5596f37e5d5440fbfa3a049a3ca98571885584"
-dependencies = [
- "serde",
- "serde_json",
- "tinybus",
-]
-
-[[package]]
-name = "tinystoragedrivers-bus"
 version = "0.7.0"
 dependencies = [
  "serde",
@@ -7266,7 +7254,7 @@ dependencies = [
  "async-trait",
  "serde",
  "serde_json",
- "tinystoragedrivers-bus 0.7.0",
+ "tinystoragedrivers-bus",
  "tinystoragedrivers-core",
  "tinystoragedrivers-secrets",
  "tokio",
