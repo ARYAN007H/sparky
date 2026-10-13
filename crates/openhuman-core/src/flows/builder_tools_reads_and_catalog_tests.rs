@@ -461,6 +461,25 @@ async fn search_tool_catalog_flags_runtime_gated_uncurated_rows() {
 }
 
 #[tokio::test]
+async fn search_catalog_does_not_show_a_toolkit_the_host_does_not_offer() {
+    seed_live_catalog_cache("offeredpolicytest", vec![twt_lookup(), twt_replies()]);
+    let mut config = Config::default();
+    let offered = search_catalog(&config, "tweet", Some("offeredpolicytest"), 40).await;
+    assert!(
+        !offered.results.is_empty(),
+        "control: the toolkit is searchable"
+    );
+
+    config.composio.offered_toolkits_deny = vec!["OfferedPolicyTest".into()];
+    let denied = search_catalog(&config, "tweet", Some("offeredpolicytest"), 40).await;
+    assert!(
+        denied.results.is_empty(),
+        "a denied toolkit must not be searchable by name: {:?}",
+        denied.results
+    );
+}
+
+#[tokio::test]
 async fn search_catalog_multiword_miss_falls_back_to_per_keyword() {
     seed_live_catalog_cache("twtfallbacktest", vec![twt_lookup(), twt_replies()]);
     let config = Config::default();
