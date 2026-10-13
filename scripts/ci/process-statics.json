@@ -1,1 +1,12 @@
-[]
+[
+  {
+    "file": "crates/openhuman-core/src/mcp/module_client.rs",
+    "scope": "",
+    "name": "LIFECYCLE_GATE",
+    "type": "tokio::sync::Mutex<()>",
+    "count": 1,
+    "category": "A",
+    "reason": "Serializes TinyMCP open/close transitions, which the module admits one at a time process-wide; it guards no data and carries no tenant state.",
+    "verification": "mcp/module_client_tests.rs: concurrent_workspaces_open_one_at_a_time_through_the_module_lifecycle_gate"
+  }
+]
