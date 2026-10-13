@@ -8,7 +8,7 @@
 
 use std::sync::{Arc, OnceLock};
 
-use tinybus::module::{FailureReport, FailureReporter, FailureSink, Reason};
+use tinybus::module::{classify, FailureReport, FailureReporter, FailureSink, ModuleCallError, Reason};
 
 use super::registry;
 
@@ -80,6 +80,28 @@ pub(crate) fn unavailable(module: &str) {
     if let Some(record) = registry::find(module) {
         reporter().report(record.id, record.version, Reason::ModuleUnavailable);
     }
+}
+
+/// Report a bus failure from a call made on a proxy the caller holds, without
+/// exposing its payload, and return the sanitised outcome. A module that
+/// reports itself unavailable is a cached, once-per-process event; every other
+/// failure is a distinct invocation.
+pub(crate) fn proxy_failure(
+    record: &'static super::types::ModuleRecord,
+    error: &tinybus::Error,
+) -> ModuleCallError {
+    let (outcome, reason) = classify(error);
+    if reason == Reason::ModuleUnavailable {
+        reporter().report(record.id, record.version, reason);
+    } else {
+        reporter().report_invocation(record.id, record.version, reason);
+    }
+    outcome
+}
+
+/// Report that the module bus itself could not be reached for `record`.
+pub(crate) fn transport_failed(record: &'static super::types::ModuleRecord) {
+    reporter().report(record.id, record.version, Reason::TransportFailed);
 }
 
 #[cfg(test)]

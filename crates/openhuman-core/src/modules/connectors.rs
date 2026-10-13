@@ -321,7 +321,7 @@ async fn proxy_to_serving() -> Result<Proxy, String> {
     let record =
         registry::find(MODULE_ID).ok_or_else(|| format!("unknown module '{MODULE_ID}'"))?;
     let runtime = super::runtime::runtime().await.map_err(|_| {
-        super::failure::report(record, super::failure::Reason::TransportFailed);
+        super::report::transport_failed(record);
         tinybus::module::ModuleCallError::TransportFailed.to_string()
     })?;
     runtime
@@ -372,7 +372,7 @@ pub(crate) async fn proxy_without_reconcile() -> Result<Proxy, String> {
 }
 
 fn bus_failure(member: &str, error: &tinybus::Error) -> String {
-    let outcome = super::client::report_proxy_failure(
+    let outcome = super::report::proxy_failure(
         registry::find(MODULE_ID).expect("registered connector module"),
         error,
     );

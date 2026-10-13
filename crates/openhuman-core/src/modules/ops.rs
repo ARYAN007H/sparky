@@ -32,7 +32,6 @@ use std::time::Duration;
 use super::types::{ModuleRecord, ModuleSource, ModuleState, ModuleStatus};
 use super::{linked, registry, report, runtime, source};
 use crate::config::Config;
-use tinybus::module::platform::host_candidates;
 use tinybus::module::{
     Availability, LoadError, ModuleClient, ModuleSource as ResolverSource, Resolver,
     ResolverInputs,
@@ -173,7 +172,7 @@ pub fn resolver(config: &Config) -> Resolver {
 /// facade before the first call when artifacts ship with the host.
 #[must_use]
 pub fn client(config: Config) -> ModuleClient {
-    crate::modules::ops::client(resolver(&config))
+    ModuleClient::new(resolver(&config))
 }
 
 /// Log which source serves each module and warn about a local build whose

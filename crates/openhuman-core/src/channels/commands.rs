@@ -6,7 +6,6 @@
 
 use super::runtime::hydrate_channel_credentials;
 use crate::config::Config;
-use tinybus::module::ModuleClient;
 use anyhow::Result;
 use std::time::Duration;
 use tinychannels_bus::{ChannelHealthState, HttpProxyPolicy};

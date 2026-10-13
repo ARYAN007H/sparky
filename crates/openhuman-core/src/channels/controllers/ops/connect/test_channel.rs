@@ -5,7 +5,7 @@ use tinychannels_bus::{methods, ChannelControllerRequest, ChannelControllerResul
 
 use crate::config::Config;
 use crate::core::Outcome;
-use tinybus::module::{ModuleCallError, ModuleClient};
+use tinybus::module::ModuleCallError;
 
 use tinychannels_bus::controllers::ChannelAuthMode;
 use tinychannels_bus::controllers::ChannelTestResult;

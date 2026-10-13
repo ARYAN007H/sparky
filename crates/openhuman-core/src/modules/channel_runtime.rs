@@ -49,7 +49,7 @@ impl Cleanup {
         result.map_err(|error| {
             let record = super::registry::find("tinychannels").expect("registered channel module");
             if !self.reported.swap(true, Ordering::AcqRel) {
-                super::client::report_proxy_failure(record, &error)
+                super::report::proxy_failure(record, &error)
             } else {
                 ModuleCallError::TransportFailed
             }
