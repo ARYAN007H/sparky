@@ -159,11 +159,11 @@ async fn a_secret_outside_the_modules_grant_is_still_refused() {
     let _turn = TURN.lock().await;
     let bus = boot(Arc::new(MemoryStorage::new())).await;
     let refused = bus.set_secret("someone_elses/key", b"x").await;
-    assert!(refused.is_err(), "grant must be enforced behind attestation");
-    assert!(!matches!(
-        refused,
-        Err(tinybus::Error::NotAttested { .. })
-    ));
+    assert!(
+        refused.is_err(),
+        "grant must be enforced behind attestation"
+    );
+    assert!(!matches!(refused, Err(tinybus::Error::NotAttested { .. })));
 }
 
 #[tokio::test(flavor = "multi_thread")]

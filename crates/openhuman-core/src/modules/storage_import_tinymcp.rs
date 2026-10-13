@@ -185,7 +185,9 @@ async fn import_into(
         Err(error) if matches!(error.kind(), ErrorKind::Conflict | ErrorKind::AlreadyExists) => {}
         Err(error) => return Err(anyhow!("write the marker: {:?}", error.kind())),
     }
-    tracing::info!("{LOG_PREFIX} imported servers={servers} secrets={secret_count} audit={audited}");
+    tracing::info!(
+        "{LOG_PREFIX} imported servers={servers} secrets={secret_count} audit={audited}"
+    );
     Ok(Outcome::Imported {
         servers,
         secrets: secret_count,

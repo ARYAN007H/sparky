@@ -64,9 +64,8 @@ pub(super) async fn attach(
     connection: &tinybus::Connection,
     host: Arc<StorageHost>,
 ) -> tinybus::Result<()> {
-    *PENDING
-        .lock()
-        .unwrap_or_else(|poison| poison.into_inner()) = Some((host, tokio::runtime::Handle::current()));
+    *PENDING.lock().unwrap_or_else(|poison| poison.into_inner()) =
+        Some((host, tokio::runtime::Handle::current()));
     modules.attach_linked_with_config(export::linked_module()?, serde_json::json!({}))?;
     let name = STORAGE_INTERFACE;
     let deadline = tokio::time::Instant::now() + READY_DEADLINE;

@@ -44,7 +44,10 @@ fn legacy_dir() -> tempfile::TempDir {
     for (path, schema) in [(CLIENTS_DB, OLD_CLIENTS), (AUDIT_DB, AUDIT)] {
         let file = dir.path().join(path);
         std::fs::create_dir_all(file.parent().unwrap()).unwrap();
-        Connection::open(file).unwrap().execute_batch(schema).unwrap();
+        Connection::open(file)
+            .unwrap()
+            .execute_batch(schema)
+            .unwrap();
     }
     dir
 }
@@ -110,11 +113,15 @@ async fn servers_env_and_audit_rows_move_into_the_modules_storage() {
         .await
         .unwrap()
         .expect("env secret");
-    let env: std::collections::BTreeMap<String, String> =
-        serde_json::from_slice(&stored).unwrap();
+    let env: std::collections::BTreeMap<String, String> = serde_json::from_slice(&stored).unwrap();
     assert_eq!(env["API_KEY"], "sk-secret");
     assert_eq!(env["REGION"], "eu");
-    assert!(rig.secrets.get("mcp_client_env/srv-2").await.unwrap().is_none());
+    assert!(rig
+        .secrets
+        .get("mcp_client_env/srv-2")
+        .await
+        .unwrap()
+        .is_none());
 
     let audit = rig
         .scoped
@@ -139,7 +146,9 @@ async fn the_import_runs_once_and_never_resurrects_a_deleted_server() {
         .unwrap();
     let docs = rig.scoped.documents();
     let held = docs.get(SERVERS, "srv-1").await.unwrap().unwrap();
-    docs.delete(SERVERS, "srv-1", held.unchanged()).await.unwrap();
+    docs.delete(SERVERS, "srv-1", held.unchanged())
+        .await
+        .unwrap();
 
     let again = import_into(&rig.scoped, &rig.secrets, legacy.path())
         .await
@@ -163,7 +172,10 @@ async fn the_legacy_files_are_left_untouched() {
         .unwrap();
     let after = [CLIENTS_DB, AUDIT_DB].map(|path| digest(&legacy.path().join(path)));
     assert_eq!(before, after);
-    assert!(!legacy.path().join("mcp_clients/mcp_clients.db-wal").exists());
+    assert!(!legacy
+        .path()
+        .join("mcp_clients/mcp_clients.db-wal")
+        .exists());
 }
 
 #[tokio::test]
@@ -174,9 +186,14 @@ async fn a_record_the_module_already_wrote_is_not_overwritten() {
     docs.ensure_collection(&CollectionSpec::new(SERVERS))
         .await
         .unwrap();
-    docs.put(SERVERS, "srv-1", json!({"server_id": "srv-1", "newer": true}), Precondition::Absent)
-        .await
-        .unwrap();
+    docs.put(
+        SERVERS,
+        "srv-1",
+        json!({"server_id": "srv-1", "newer": true}),
+        Precondition::Absent,
+    )
+    .await
+    .unwrap();
     rig.secrets
         .set("mcp_client_env/srv-1", b"{\"API_KEY\":\"rotated\"}")
         .await
@@ -195,7 +212,12 @@ async fn a_record_the_module_already_wrote_is_not_overwritten() {
     );
     let kept = docs.get(SERVERS, "srv-1").await.unwrap().unwrap();
     assert_eq!(kept.doc["newer"], true);
-    let secret = rig.secrets.get("mcp_client_env/srv-1").await.unwrap().unwrap();
+    let secret = rig
+        .secrets
+        .get("mcp_client_env/srv-1")
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(&secret[..], b"{\"API_KEY\":\"rotated\"}");
 }
 
@@ -216,9 +238,15 @@ async fn an_unreadable_file_writes_no_marker_so_the_next_start_retries() {
     let dir = tempfile::tempdir().unwrap();
     let file = dir.path().join(CLIENTS_DB);
     std::fs::create_dir_all(file.parent().unwrap()).unwrap();
-    std::fs::write(&file, b"this is not a sqlite database at all, just text padding").unwrap();
+    std::fs::write(
+        &file,
+        b"this is not a sqlite database at all, just text padding",
+    )
+    .unwrap();
     let rig = rig();
-    assert!(import_into(&rig.scoped, &rig.secrets, dir.path()).await.is_err());
+    assert!(import_into(&rig.scoped, &rig.secrets, dir.path())
+        .await
+        .is_err());
     let marker = rig
         .scoped
         .documents()
