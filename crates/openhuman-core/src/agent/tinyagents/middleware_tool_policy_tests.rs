@@ -9,13 +9,13 @@ use super::*;
 // the route out of the session's own delegation tools.
 
 use crate::agent::orchestration::tools::{ArchetypeDelegationTool, DelegationTarget};
+use crate::tools::toolpacks::{append_pack_tools, bind_pack_registry};
+use tinyagents_harness::tool::packs::USE_SKILL;
+use tinytools::{PermissionLevel, ToolResult};
 use tinytools::{
     TaskProfile, TaskRiskLevel, ToolCapability, ToolPolicyAction, ToolPolicyDecision,
     ToolPolicySession,
 };
-use crate::tools::toolpacks::{append_pack_tools, bind_pack_registry};
-use tinyagents_harness::tool::packs::USE_SKILL;
-use tinytools::{PermissionLevel, ToolResult};
 
 struct RoutingFakeTool(&'static str);
 
@@ -326,8 +326,8 @@ async fn a_session_without_the_delegate_is_not_told_to_call_it() {
 /// "Registered and callable: yes".
 #[tokio::test]
 async fn use_skill_reaches_a_withheld_packed_tool() {
-    use tinytools::ToolPolicyEngine;
     use crate::tools::toolpacks::strip_packed_from_visible;
+    use tinytools::ToolPolicyEngine;
 
     let mut tools: Vec<Box<dyn tinytools::Tool>> = vec![Box::new(RoutingFakeTool("goal_set"))];
     append_pack_tools(&mut tools);
@@ -376,8 +376,8 @@ async fn use_skill_reaches_a_withheld_packed_tool() {
 /// remove, one hop later. The hint must fall back to the owning agent instead.
 #[tokio::test]
 async fn a_prompt_hidden_delegate_is_not_offered_as_a_direct_route() {
-    use tinytools::ToolPolicyEngine;
     use crate::tools::toolpacks::strip_packed_from_visible;
+    use tinytools::ToolPolicyEngine;
 
     let mut tools: Vec<Box<dyn tinytools::Tool>> = vec![
         Box::new(RoutingFakeTool("propose_workflow")),

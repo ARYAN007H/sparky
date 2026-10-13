@@ -1,7 +1,7 @@
 use super::*;
 use crate::security::AutonomyLevel;
-use tinytools::status::POLICY_BLOCKED_MARKER;
 use tempfile::TempDir;
+use tinytools::status::POLICY_BLOCKED_MARKER;
 
 fn security(autonomy: AutonomyLevel) -> Arc<SecurityPolicy> {
     Arc::new(SecurityPolicy {
