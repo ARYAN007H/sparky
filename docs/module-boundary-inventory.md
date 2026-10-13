@@ -25,7 +25,7 @@ copying its implementation into a host, or accepting weaker isolation.
 | tinyvoice | None | tinyvoice-bus | core voice capture/hotkeys | Module-owned devices, recording and continuous capture, bounded audio reads/batches, explicit lease cleanup; computer module permission decisions |
 | tinyruntime | tinyruntime-pyserver | tinyruntime-bus | core Python worker, optional TinyJuice ML | Excluded from this migration: TinyRuntime is being removed separately |
 | tinydocs / tinymemory | none | tinydocs-bus | core memory converter and file sources | Bus DocumentConverter replaces OfficeConverter, including XLSX and existing PDF/DOCX/PPTX format coverage; ingestion metadata remains host-owned; `[components].documents = false` refuses `ensure_loaded("tinydocs")` and the `documents` tool group, makes the converter answer `COMPONENT_DISABLED:documents`, and degrades attachment ingest to a note |
-| tinysearch | none observed | tinysearch-bus | core module search proxy | Preserve existing bus adapter; enforce contract and host dependency graphs |
+| tinysearch | none observed | tinysearch-bus (v0.5.0, contract 2.2) | core module search proxy | Preserve existing bus adapter; enforce contract and host dependency graphs |
 
 ## Gate behavior
 
