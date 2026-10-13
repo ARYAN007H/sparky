@@ -1764,6 +1764,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "dirs"
+version = "7.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d57d423b3c82e89b9a24ca3091fee61f456a26edbd28d26c65906f4bc1dcd8f"
+dependencies = [
+ "dirs-sys",
+]
+
+[[package]]
 name = "dirs-sys"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3327,8 +3336,15 @@ version = "3.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f90e485abfd3189510c996e77be55056a51038b0fa5805e6c97b5dcf0d9ab55"
 dependencies = [
+ "aho-corasick",
+ "base64 0.22.1",
  "bstr",
  "jaq-core",
+ "jiff",
+ "libm",
+ "log",
+ "regex-bites",
+ "urlencoding",
 ]
 
 [[package]]
@@ -3340,10 +3356,12 @@ dependencies = [
  "defmt",
  "jiff-core",
  "jiff-static",
+ "jiff-tzdb-platform",
  "log",
  "portable-atomic",
  "portable-atomic-util",
  "serde_core",
+ "windows-link",
 ]
 
 [[package]]
@@ -3366,6 +3384,21 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "jiff-tzdb"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa8377070c6bae868759445e5a77f66d84f0b72f3a054bfb00e6d038b8282da7"
+
+[[package]]
+name = "jiff-tzdb-platform"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "875a5a69ac2bab1a891711cf5eccbec1ce0341ea805560dcd90b7a2e925132e8"
+dependencies = [
+ "jiff-tzdb",
 ]
 
 [[package]]
@@ -4542,7 +4575,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "directories",
- "dirs",
+ "dirs 6.0.0",
  "dotenvy",
  "env_logger",
  "flate2",
@@ -4588,7 +4621,7 @@ dependencies = [
  "tinyagents-tasks",
  "tinybox-bus",
  "tinybox-core",
- "tinybus",
+ "tinybus 0.1.3",
  "tinychannels",
  "tinychannels-bus",
  "tinychannels-module",
@@ -4682,7 +4715,7 @@ dependencies = [
  "tinyagents-harness",
  "tinyagents-session",
  "tinyagents-tasks",
- "tinybus",
+ "tinybus 0.1.3",
  "tinychannels",
  "tinycomputer-bus",
  "tinydocs-bus",
@@ -4716,7 +4749,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "dirs",
+ "dirs 6.0.0",
  "env_logger",
  "futures-core",
  "jsonschema",
@@ -4731,7 +4764,7 @@ dependencies = [
  "tinyagents-graph",
  "tinyagents-harness",
  "tinyagents-session",
- "tinybus",
+ "tinybus 0.1.3",
  "tinyflows-schedule",
  "tinyinference-embeddings",
  "tinyinference-llm",
@@ -4755,6 +4788,7 @@ dependencies = [
  "openhuman-rpc",
  "tinychannels-module",
  "tinydocs-module",
+ "tinyjuice-module",
 ]
 
 [[package]]
@@ -5964,6 +5998,12 @@ dependencies = [
  "memchr",
  "regex-syntax",
 ]
+
+[[package]]
+name = "regex-bites"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6a15a2fa0bfda9361941c45550896ae87b15cc6c8c939ea350079670332e211"
 
 [[package]]
 name = "regex-syntax"
@@ -7213,7 +7253,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.5",
  "windows-sys 0.61.2",
@@ -7441,7 +7481,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "chrono-tz",
- "dirs",
+ "dirs 6.0.0",
  "flate2",
  "futures",
  "regex",
@@ -7610,7 +7650,28 @@ dependencies = [
  "tar",
  "tempfile",
  "thiserror 2.0.20",
- "tinybus-macros",
+ "tinybus-macros 0.1.3",
+ "tokio",
+ "toml 1.1.6+spec-1.1.0",
+ "tracing",
+ "ureq",
+ "zip 2.4.2",
+]
+
+[[package]]
+name = "tinybus"
+version = "0.1.4"
+dependencies = [
+ "async-trait",
+ "flate2",
+ "libc",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tar",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tinybus-macros 0.1.4",
  "tokio",
  "toml 1.1.6+spec-1.1.0",
  "tracing",
@@ -7628,13 +7689,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "tinybus-macros"
+version = "0.1.4"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "tinybus-module"
 version = "0.1.3"
 dependencies = [
  "async-trait",
  "serde",
  "serde_json",
- "tinybus",
+ "tinybus 0.1.3",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "tinybus-module"
+version = "0.1.4"
+dependencies = [
+ "async-trait",
+ "serde",
+ "serde_json",
+ "tinybus 0.1.4",
  "tokio",
  "tracing",
 ]
@@ -7707,8 +7789,8 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.11.0",
- "tinybus",
- "tinybus-module",
+ "tinybus 0.1.3",
+ "tinybus-module 0.1.3",
  "tinychannels",
  "tinychannels-bus",
  "tokio",
@@ -7785,8 +7867,8 @@ dependencies = [
  "serde",
  "sha2 0.11.0",
  "thiserror 2.0.20",
- "tinybus",
- "tinybus-module",
+ "tinybus 0.1.3",
+ "tinybus-module 0.1.3",
  "tinydocs",
  "tinydocs-bus",
  "tokio",
@@ -8063,12 +8145,47 @@ dependencies = [
 ]
 
 [[package]]
+name = "tinyjuice"
+version = "0.9.0"
+dependencies = [
+ "async-trait",
+ "dirs 7.0.0",
+ "hex",
+ "jaq-core",
+ "jaq-json",
+ "jaq-std",
+ "log",
+ "once_cell",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "thiserror 2.0.20",
+ "tinyjuice-bus",
+ "tokio",
+ "unicode-segmentation",
+ "unicode-width",
+]
+
+[[package]]
 name = "tinyjuice-bus"
-version = "0.7.1"
+version = "0.9.0"
 dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "tinyjuice-module"
+version = "0.9.0"
+dependencies = [
+ "serde_json",
+ "tinybus 0.1.4",
+ "tinybus-module 0.1.4",
+ "tinyjuice",
+ "tinyjuice-bus",
+ "tokio",
 ]
 
 [[package]]
@@ -8206,7 +8323,7 @@ version = "0.7.0"
 dependencies = [
  "serde",
  "serde_json",
- "tinybus",
+ "tinybus 0.1.3",
 ]
 
 [[package]]
