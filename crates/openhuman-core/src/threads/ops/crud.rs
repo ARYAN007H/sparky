@@ -19,7 +19,6 @@ use crate::threads::{
 };
 use crate::web_chat as web_channel;
 use std::path::PathBuf;
-use tinyagents_session::turn_state;
 
 /// Lists all conversation threads.
 pub async fn threads_list(

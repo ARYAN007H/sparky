@@ -5,7 +5,6 @@ use crate::core::Outcome;
 use crate::threads::store as conversations;
 use crate::threads::{ApiEnvelope, EmptyRequest, PurgeConversationThreadsResponse};
 use std::path::PathBuf;
-use tinyagents_session::turn_state;
 
 /// Purges all conversation threads and messages.
 ///
