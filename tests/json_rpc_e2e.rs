@@ -9366,7 +9366,11 @@ async fn mcp_clients_reconfigure_then_retire_over_rpc() {
     )
     .await;
     let retired = peel_logs_envelope(assert_no_jsonrpc_error(&retired, "config_set (retire)"));
-    assert_eq!(retired.get("removed"), Some(&json!(["echo-reconf"])), "{retired}");
+    assert_eq!(
+        retired.get("removed"),
+        Some(&json!(["echo-reconf"])),
+        "{retired}"
+    );
     let status = post_json_rpc(&rpc_base, 9960, "openhuman.mcp_clients_status", json!({})).await;
     let status = peel_logs_envelope(assert_no_jsonrpc_error(&status, "status (retired)"));
     assert_eq!(status["servers"], json!([]), "{status}");
