@@ -10,7 +10,7 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 use serde_json::json;
 
-use crate::channels::traits::{Channel, ChannelMessage, SendMessage};
+use tinychannels_bus::{Channel, ChannelMessage, SendMessage};
 use crate::web_chat::{publish_web_channel_event, WebChannelEvent};
 
 /// The event name a relayed reply is published under.

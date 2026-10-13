@@ -1,5 +1,5 @@
 use super::*;
-use crate::channels::traits::ChannelMessage;
+use tinychannels_bus::ChannelMessage;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::sync::mpsc;
 

@@ -3,7 +3,7 @@ use crate::channels::context::{
     conversation_history_key, ChannelRuntimeContext, RouteSelectionMap, TurnModelSourceCacheMap,
 };
 use crate::channels::host::ChannelTurnStateSubscriber;
-use crate::channels::traits::ChannelMessage;
+use tinychannels_bus::ChannelMessage;
 use crate::core::events::DomainEvent;
 use async_trait::async_trait;
 use std::collections::HashMap;

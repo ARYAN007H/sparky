@@ -1,5 +1,5 @@
 use super::*;
-use crate::channels::traits;
+use tinychannels_bus as traits;
 use async_trait::async_trait;
 use tinytools::{Tool, ToolResult};
 

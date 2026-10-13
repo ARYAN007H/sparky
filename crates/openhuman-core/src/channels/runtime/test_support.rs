@@ -8,7 +8,7 @@ pub use super::startup::test_support::resolve_yuanbao_app_secret_for_test;
 use crate::agent::bus::{AgentTurnRequest, AgentTurnResponse, AGENT_RUN_TURN_METHOD};
 use crate::agent::progress::AgentProgress;
 use crate::channels::context::{ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS};
-use crate::channels::traits::{ChannelMessage, SendMessage};
+use tinychannels_bus::{ChannelMessage, SendMessage};
 use crate::channels::Channel;
 use crate::channels::ChannelSystemPrompt;
 use crate::config::{MultimodalConfig, MultimodalFileConfig, ReliabilityConfig};

@@ -1,7 +1,7 @@
 //! Tests for the channel approval-surface and turn-state subscribers.
 
 use super::*;
-use crate::channels::traits::{ChannelMessage, SendMessage};
+use tinychannels_bus::{ChannelMessage, SendMessage};
 use std::path::Path;
 use std::sync::Mutex as StdMutex;
 use tempfile::tempdir;

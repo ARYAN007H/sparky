@@ -10,7 +10,7 @@ use crate::channels::context::{
 use crate::channels::routes::{
     get_or_create_turn_model_source, get_route_selection, handle_runtime_command_if_needed,
 };
-use crate::channels::traits;
+use tinychannels_bus as traits;
 use crate::channels::{ChannelSendExt, SendMessage};
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;

@@ -10,7 +10,7 @@ use log::debug;
 
 use super::super::cloud_transcribe::transcribe_cloud;
 use super::helpers::base64_decode;
-use super::traits::{SttProvider, SttResult};
+use tinychannels_bus::{SttProvider, SttResult};
 use crate::config::Config;
 use crate::core::Outcome;
 use tinyinference_voice::cloud::{CloudTranscribeOptions, CloudTranscribeResult};

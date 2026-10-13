@@ -6,7 +6,7 @@
 //! picks up those events and dispatches to the appropriate channel, keeping
 //! channel construction out of the scheduler.
 
-use crate::channels::traits::{Channel, SendMessage};
+use tinychannels_bus::{Channel, SendMessage};
 use crate::core::events::DomainEvent;
 use async_trait::async_trait;
 use std::collections::HashMap;

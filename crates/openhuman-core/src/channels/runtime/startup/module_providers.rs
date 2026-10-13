@@ -3,7 +3,7 @@
 use super::callback::ChannelHostCallbacks;
 use super::credentials::hydrate_channel_credentials;
 use crate::channels::runtime::dispatch::RuntimeChannelMessage;
-use crate::channels::traits::{Channel, ChannelMessage, SendMessage};
+use tinychannels_bus::{Channel, ChannelMessage, SendMessage};
 use crate::config::Config;
 use crate::modules::channel_runtime::ChannelRuntimeLease;
 use crate::modules::client::{ModuleCallError, ModuleClient, ModuleObjectClient};

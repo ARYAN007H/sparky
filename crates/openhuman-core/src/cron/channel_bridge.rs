@@ -8,7 +8,7 @@
 //! it starts; nothing registers in a core with no channels, and every accessor
 //! then answers "unavailable" instead of failing.
 
-use crate::channels::traits::{Channel, SendMessage};
+use tinychannels_bus::{Channel, SendMessage};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
 use tinyagents_session::transcript::TranscriptMessage;

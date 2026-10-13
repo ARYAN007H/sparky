@@ -3,7 +3,7 @@
 use log::debug;
 
 use super::stt_providers::ExternalSttProvider;
-use super::traits::{SttProvider, TtsProvider};
+use tinychannels_bus::{SttProvider, TtsProvider};
 use super::tts_providers::ExternalTtsProvider;
 use crate::config::Config;
 

@@ -5,7 +5,7 @@ use log::debug;
 
 use super::super::local_speech::{synthesize_piper, PiperOptions};
 use super::super::reply_speech::{synthesize_reply, ReplySpeechOptions};
-use super::traits::TtsProvider;
+use tinychannels_bus::TtsProvider;
 use crate::config::Config;
 use crate::core::Outcome;
 use tinyinference_voice::external_tts::{ExternalTtsClient, TtsApiStyle};
