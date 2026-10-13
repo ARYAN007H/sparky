@@ -92,7 +92,7 @@ pub(crate) fn take_request_journal_run(request_id: &str) -> Option<String> {
 }
 
 /// Resolve the internal workspace directory (`{workspace}`) whose
-/// `tinyagents_store/` subtree holds the journal + kv stores. Async because the
+/// the tenant's journal and run-status stores belong to. Async because the
 /// config load is async; errors are surfaced so callers can log-and-skip.
 async fn resolve_workspace() -> anyhow::Result<PathBuf> {
     let config = crate::config::ops::load_current_or_init()
@@ -101,18 +101,13 @@ async fn resolve_workspace() -> anyhow::Result<PathBuf> {
     Ok(config.workspace_dir)
 }
 
-/// The journal and key-value stores a turn's events and status go to: the
-/// current agent's host session store when one is installed
-/// ([`crate::agent::session_store::current`]), else the workspace's
-/// `tinyagents_store/`.
-async fn journal_stores() -> anyhow::Result<(Arc<dyn AppendStore>, Arc<dyn Store>)> {
-    if let Some(stores) = crate::agent::session_store::current() {
-        log::debug!("[journal] using the host session store");
-        return Ok((stores.journal, stores.kv));
-    }
+/// The journal and run-status stores a turn's events and status go to: the
+/// calling tenant's, in the storage backend.
+async fn journal_stores() -> anyhow::Result<(Arc<dyn AppendStore>, DriverStatusStore)> {
     let workspace = resolve_workspace().await?;
-    let stores = open_session_stores(&workspace);
-    Ok((Arc::new(stores.journal), Arc::new(stores.kv)))
+    let stores = crate::agent::session_store::stores_or_ephemeral(&workspace);
+    let status = crate::agent::session_store::status_store_for(&workspace);
+    Ok((stores.journal, status))
 }
 
 /// A live handle to a turn's durable journal + status snapshot.
@@ -193,7 +188,7 @@ pub(crate) async fn attach_turn_journal(
     run_id: RunId,
     thread_id: Option<ThreadId>,
 ) -> Option<TurnJournal> {
-    let (journal_store, kv) = match journal_stores().await {
+    let (journal_store, status_store) = match journal_stores().await {
         Ok(stores) => stores,
         Err(err) => {
             log::debug!("[journal] skipping journal attach; {err}");
