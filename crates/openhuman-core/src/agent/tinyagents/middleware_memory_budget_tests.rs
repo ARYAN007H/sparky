@@ -81,3 +81,80 @@ async fn the_same_refusals_unmarked_still_halt_the_run() {
         .collect();
     assert!(pauses_for(unmarked).await > 0);
 }
+
+fn response_with(calls: &[TaToolCall]) -> tinyinference_llm::model::ModelResponse {
+    use tinyinference_llm::message::{AssistantMessage, ContentBlock};
+    let mut response = tinyinference_llm::model::ModelResponse::assistant("saving");
+    response.message = AssistantMessage {
+        id: None,
+        content: vec![ContentBlock::Text("saving".to_string())],
+        tool_calls: calls.to_vec(),
+        usage: None,
+        origin: None,
+    };
+    response.finish_reason = Some("tool_calls".to_string());
+    response
+}
+
+/// The write churn #7293 capped (one save re-issued round after round) no
+/// longer spends the memory budget, so the repeat guard installed by
+/// `harness_assembly` is what stops it: identical learns acknowledge
+/// identically, and the guard halts the run.
+#[tokio::test]
+async fn an_identical_learn_loop_is_halted_by_the_repeat_guard() {
+    use tinyagents_harness::middleware::library::RepeatProgressMiddleware;
+    let tmp = tempfile::tempdir().unwrap();
+    let config = config_in(&tmp);
+    let _engine = bind_reference(&config);
+    let tool = MemoryTool::new(Arc::new(config));
+    let run: RunContext = RunContext::new(RunConfig::new("churn-run"), ());
+    let handle = SteeringHandle::allow_all();
+    let guard = RepeatProgressMiddleware::new(
+        handle.clone(),
+        std::sync::Arc::new(std::sync::Mutex::new(None)),
+        Arc::new(is_repeat_call_exempt),
+    );
+    let mut ctx = ctx();
+    for round in 0..12 {
+        let mut call = TaToolCall::new(
+            format!("learn-{round}"),
+            "memory",
+            json!({"action":"learn","text":"The plan is saved"}),
+        );
+        guard
+            .after_model(
+                &mut ctx,
+                &(),
+                &mut response_with(std::slice::from_ref(&call)),
+            )
+            .await
+            .unwrap();
+        let mut result = match guard.before_tool(&mut ctx, &(), &mut call).await {
+            Err(refusal) => TaToolResult::error(refusal.to_string()),
+            Ok(()) => {
+                let context = ToolExecutionContext::from_run_context(
+                    &run,
+                    CallId::new(format!("learn-{round}")),
+                );
+                let result = tool
+                    .execute_with_context(
+                        call.arguments.clone(),
+                        ToolCallOptions::default(),
+                        Some(&context),
+                    )
+                    .await
+                    .unwrap();
+                assert!(!is_budget_refusal(&result), "writes spend no budget");
+                result
+            }
+        };
+        guard
+            .after_tool(&mut ctx, &(), &invocation(&call.id, "memory"), &mut result)
+            .await
+            .unwrap();
+        if drain_pause_count(&handle) > 0 {
+            return;
+        }
+    }
+    panic!("an identical learn loop never stopped the run");
+}
