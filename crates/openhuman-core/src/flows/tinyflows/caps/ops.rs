@@ -12,7 +12,6 @@
 
 use std::sync::Arc;
 
-use crate::flows::tinyflows::checkpoint_sqlite::SqliteCheckpointer;
 use anyhow::Context;
 use async_trait::async_trait;
 use serde_json::{json, Value};
@@ -663,35 +662,20 @@ pub fn build_capabilities(config: Arc<Config>, state_namespace: impl Into<String
 }
 
 /// Opens the durable, cross-process checkpointer a `flows_run` uses via
-/// `tinyflows::engine::run_with_checkpointer` — this host's
-/// [`SqliteCheckpointer`], stored under `<workspace_dir>/flows/checkpoints.db`,
-/// or, when the host configured a storage backend ([`crate::storage`]),
-/// `tinyflows_drivers::DriverCheckpointer` over it in the acting agent's scope.
+/// `tinyflows::engine::run_with_checkpointer`:
+/// `tinyflows_drivers::DriverCheckpointer` over the flow catalog's storage
+/// ([`crate::flows::store`]) in the acting agent's scope.
 ///
-/// It became host-owned when tinyflows vendored its state-graph runtime and
-/// dropped the SQLite backend with it (tinyflows PR #43). The port keeps the
-/// schema and SQL byte-identical, so an existing `checkpoints.db` — and any
-/// run interrupted before the upgrade — resumes unchanged. See
-/// [`super::super::checkpoint_sqlite`].
+/// tinyflows no longer has a SQLite checkpointer; the `checkpoints.db` it wrote
+/// is imported once, so a run interrupted before the upgrade still resumes.
 pub fn open_flow_checkpointer(
     config: &Config,
 ) -> anyhow::Result<Arc<dyn tinyflows::engine::Checkpointer<serde_json::Value>>> {
-    if let Some(scoped) = crate::storage::current_scoped()? {
-        tracing::debug!(target: "flows", "[flows] opening checkpointer on the storage backend");
-        return Ok(Arc::new(tinyflows_drivers::DriverCheckpointer::<
-            serde_json::Value,
-        >::new(Arc::clone(scoped.documents()))));
-    }
-    let db_path = config.workspace_dir.join("flows").join("checkpoints.db");
-    if let Some(parent) = db_path.parent() {
-        std::fs::create_dir_all(parent)
-            .with_context(|| format!("Failed to create flows directory: {}", parent.display()))?;
-    }
-    tracing::debug!(target: "flows", db = %db_path.display(), "[flows] opening checkpointer");
-    Ok(Arc::new(
-        SqliteCheckpointer::<serde_json::Value>::open(&db_path)
-            .with_context(|| format!("Failed to open flows checkpointer: {}", db_path.display()))?,
-    ))
+    let scoped = crate::flows::store::scoped(config)?;
+    tracing::debug!(target: "flows", "[flows] opening checkpointer on the flow storage");
+    Ok(Arc::new(tinyflows_drivers::DriverCheckpointer::<
+        serde_json::Value,
+    >::new(Arc::clone(scoped.documents()))))
 }
 
 #[cfg(test)]
