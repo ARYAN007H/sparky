@@ -18,11 +18,11 @@ fn test_config(tmp: &TempDir) -> Config {
 }
 
 #[test]
-fn database_lives_at_workspace_cron_schedule_db() {
+fn jobs_live_in_the_workspace_default_database() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     add_job(&config, "*/5 * * * *", "echo ok").unwrap();
-    assert!(tmp.path().join("workspace/cron/schedule.db").is_file());
+    assert!(tmp.path().join("workspace/storage/storage.db").is_file());
 }
 
 #[test]
@@ -66,7 +66,7 @@ fn agent_context(
 }
 
 #[tokio::test]
-async fn an_agents_jobs_live_in_its_own_database() {
+async fn an_agents_jobs_live_in_its_own_scope() {
     use crate::core::runtime::CoreContext;
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
@@ -76,10 +76,6 @@ async fn an_agents_jobs_live_in_its_own_database() {
     })
     .await;
 
-    assert!(tmp
-        .path()
-        .join("workspace/agents/alpha/cron/schedule.db")
-        .is_file());
     let alpha_ids = CoreContext::scope(agent_context(&config, "alpha"), async {
         list_jobs(&config)
             .unwrap()
