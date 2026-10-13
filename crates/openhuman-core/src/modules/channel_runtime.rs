@@ -1,11 +1,11 @@
 //! Identity-scoped channel objects and cancellation-safe callback ownership.
 
-use tinybus::module::{ModuleCallError, ModuleClient, ModuleObjectClient};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
 use std::time::Duration;
+use tinybus::module::{ModuleCallError, ModuleClient, ModuleObjectClient};
 use tinybus::{Connection, ObjectPath, Proxy};
 use tinychannels_bus::{
     methods, ChannelRuntimeReservation, HOST_BUS_NAME, HOST_OBJECT_PATH, OBJECT_PATH,

@@ -1,6 +1,6 @@
 //! Thin adapters for module-owned channel controller operations.
-use tinybus::module::{ModuleCallError, ModuleClient};
 use serde::de::DeserializeOwned;
+use tinybus::module::{ModuleCallError, ModuleClient};
 use tinychannels_bus::{
     methods, ChannelControllerRequest, ChannelControllerResult, HttpProxyPolicy,
 };

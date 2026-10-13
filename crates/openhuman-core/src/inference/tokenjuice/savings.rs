@@ -114,9 +114,7 @@ pub async fn record(
 }
 
 /// Snapshot the module's savings aggregate.
-pub async fn stats(
-    client: &tinybus::module::ModuleClient,
-) -> Result<SavingsAggregate, String> {
+pub async fn stats(client: &tinybus::module::ModuleClient) -> Result<SavingsAggregate, String> {
     client
         .call(MODULE, methods::SAVINGS_STATS, ())
         .await

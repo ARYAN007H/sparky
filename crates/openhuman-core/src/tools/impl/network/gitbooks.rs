@@ -2,10 +2,10 @@
 //! confidential one-shot tool-call contract.
 
 use crate::{config::Config, inference::provider::factory::redact_endpoint};
-use tinybus::module::ModuleClient;
 use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::time::Duration;
+use tinybus::module::ModuleClient;
 use tinytools::{PermissionLevel, Tool, ToolResult};
 
 pub struct GitbooksSearchTool {
@@ -27,7 +27,8 @@ impl GitbooksSearchTool {
         Ok(Self {
             endpoint,
             timeout_secs,
-            client: crate::modules::ops::client(config).with_timeout(Duration::from_secs(timeout_secs)),
+            client: crate::modules::ops::client(config)
+                .with_timeout(Duration::from_secs(timeout_secs)),
         })
     }
 
@@ -120,7 +121,8 @@ impl GitbooksGetPageTool {
         Ok(Self {
             endpoint,
             timeout_secs,
-            client: crate::modules::ops::client(config).with_timeout(Duration::from_secs(timeout_secs)),
+            client: crate::modules::ops::client(config)
+                .with_timeout(Duration::from_secs(timeout_secs)),
         })
     }
 

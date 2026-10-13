@@ -8,7 +8,9 @@
 
 use std::sync::{Arc, OnceLock};
 
-use tinybus::module::{classify, FailureReport, FailureReporter, FailureSink, ModuleCallError, Reason};
+use tinybus::module::{
+    classify, FailureReport, FailureReporter, FailureSink, ModuleCallError, Reason,
+};
 
 use super::registry;
 

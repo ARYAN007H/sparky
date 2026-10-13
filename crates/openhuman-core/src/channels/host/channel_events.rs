@@ -1,11 +1,11 @@
 //! Host-owned approval routing and turn events over the channel module.
 use crate::channels::{Channel, ChannelSendExt, SendMessage};
 use crate::core::events::DomainEvent;
-use tinybus::module::ModuleClient;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use tinybus::module::ModuleClient;
 use tinybus::EventHandler;
 use tinychannels_bus::{capabilities_for, ChannelMessage};
 
@@ -211,7 +211,8 @@ impl ChannelTurnStateSubscriber {
             crate::modules::ops::client(self.config.as_deref().cloned().unwrap_or_default())
         };
         #[cfg(not(test))]
-        let client = crate::modules::ops::client(self.config.as_deref().cloned().unwrap_or_default());
+        let client =
+            crate::modules::ops::client(self.config.as_deref().cloned().unwrap_or_default());
         let result: Result<tinychannels_bus::module_remote::RemoteOperationResult, _> = client
             .call_confidential(
                 "tinychannels",

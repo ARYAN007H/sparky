@@ -64,9 +64,7 @@ pub(crate) struct ChannelRuntimeContext {
 }
 
 /// Resolve the configured module client; unit tests use an attested bus fixture.
-pub(crate) async fn module_client(
-    ctx: &ChannelRuntimeContext,
-) -> tinybus::module::ModuleClient {
+pub(crate) async fn module_client(ctx: &ChannelRuntimeContext) -> tinybus::module::ModuleClient {
     #[cfg(test)]
     if ctx.config.is_none() {
         return super::module_fixture::client().await;

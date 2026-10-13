@@ -3,8 +3,8 @@
 use serde::{de::DeserializeOwned, Serialize};
 use tinycomputer_bus::{names::accessibility as methods, DesktopError, DesktopResponse};
 
-use tinybus::module::{ModuleCallError, ModuleClient};
 use crate::config::Config;
+use tinybus::module::{ModuleCallError, ModuleClient};
 
 pub use tinycomputer_bus::accessibility::{
     FocusQuery, FocusTarget, FocusedTextContext, GlobeBatch, GlobeHandle, GlobeHotkeyStatus,

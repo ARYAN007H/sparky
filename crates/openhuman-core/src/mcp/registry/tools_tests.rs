@@ -342,8 +342,7 @@ impl crate::mcp::module_client::McpModulePort for ToolCallPort {
     async fn validate_server_arguments(
         &self,
         _request: tinymcp_bus::ValidateServerArgumentsRequest,
-    ) -> Result<tinymcp_bus::ServerArgumentsValidation, tinybus::module::ModuleCallError>
-    {
+    ) -> Result<tinymcp_bus::ServerArgumentsValidation, tinybus::module::ModuleCallError> {
         Err(tinybus::module::ModuleCallError::IncompatibleContract)
     }
 
@@ -369,8 +368,7 @@ impl crate::mcp::module_client::McpModulePort for ToolCallPort {
     async fn prepare_agent_tools(
         &self,
         _request: tinymcp_bus::PrepareAgentToolsRequest,
-    ) -> Result<Vec<tinymcp_bus::McpToolPresentation>, tinybus::module::ModuleCallError>
-    {
+    ) -> Result<Vec<tinymcp_bus::McpToolPresentation>, tinybus::module::ModuleCallError> {
         Ok(Vec::new())
     }
 }

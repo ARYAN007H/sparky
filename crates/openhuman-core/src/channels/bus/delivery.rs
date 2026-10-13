@@ -1,13 +1,13 @@
 //! Captured managed transport for module-owned progressive replies.
 use crate::backend::{BackendApiError, BackendClient};
 use crate::modules::channel_runtime::ChannelRuntimeLease;
-use tinybus::module::ModuleCallError;
 use crate::security::credentials::session_support::{
     get_session_token, is_local_session_token, BackendCredential,
 };
 use serde_json::json;
 #[cfg(test)]
 use serde_json::Value;
+use tinybus::module::ModuleCallError;
 use tinychannels_bus::module_progressive::{
     ProgressiveCommand, ProgressiveEvent, ProgressiveResult, ProgressiveTransportRequest,
     ProgressiveTransportResult,
@@ -147,7 +147,8 @@ impl ModuleProgressiveReply {
         session: tokio_util::sync::CancellationToken,
     ) -> anyhow::Result<Self> {
         let callback = ManagedTransport::capture(&config, channel.clone(), session)?;
-        let runtime = ChannelRuntimeLease::open(crate::modules::ops::client(config), callback).await?;
+        let runtime =
+            ChannelRuntimeLease::open(crate::modules::ops::client(config), callback).await?;
         let result: ProgressiveResult = runtime
             .object()
             .call_confidential(

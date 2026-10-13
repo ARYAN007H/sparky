@@ -5,11 +5,11 @@ use super::credentials::hydrate_channel_credentials;
 use crate::channels::runtime::dispatch::RuntimeChannelMessage;
 use crate::config::Config;
 use crate::modules::channel_runtime::ChannelRuntimeLease;
-use tinybus::module::{ModuleCallError, ModuleClient, ModuleObjectClient};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock, Weak};
+use tinybus::module::{ModuleCallError, ModuleClient, ModuleObjectClient};
 use tinychannels_bus::module_runtime::{
     ChannelIngressKind, ChannelMessagePreparation, ConfiguredChannelInfo,
 };

@@ -3,9 +3,9 @@
 use super::shared::credential_provider;
 use crate::config::Config;
 use crate::core::Outcome;
-use tinybus::module::ModuleCallError;
 use crate::security::credentials;
 use serde_json::Value;
+use tinybus::module::ModuleCallError;
 use tinychannels_bus::controllers::ChannelConnectionResult;
 use tinychannels_bus::module_controller::{ChannelConfigUpdate, PreparedChannelConnection};
 use tinychannels_bus::{ChannelAuthMode, ChannelControllerRequest, HttpProxyPolicy};

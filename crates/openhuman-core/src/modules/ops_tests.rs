@@ -547,13 +547,17 @@ fn bundled_dir_skips_a_missing_candidate_for_a_valid_later_one() {
 /// carry the terminal marker the observability classifier demotes on.
 #[test]
 fn a_marked_bus_startup_failure_is_classified_as_module_unavailable() {
-    let marked = ops::resolver(&Config::default()).mark_terminal("the module bus could not start: no runtime".to_string());
+    let marked = ops::resolver(&Config::default())
+        .mark_terminal("the module bus could not start: no runtime".to_string());
     assert!(marked.ends_with("restart the app to try again"), "{marked}");
     assert!(crate::core::observability::is_module_unavailable_message(
         &marked
     ));
     // Idempotent: an already-marked error is not annotated twice.
-    assert_eq!(ops::resolver(&Config::default()).mark_terminal(marked.clone()), marked);
+    assert_eq!(
+        ops::resolver(&Config::default()).mark_terminal(marked.clone()),
+        marked
+    );
 }
 
 #[tokio::test]
@@ -609,13 +613,11 @@ fn status_reports_the_source_that_serves_a_module() {
 }
 
 #[tokio::test]
-#[ignore = "blocked on tinybus 0.1.4 (tinybus epic): tinychannels-module cannot be a dev-dependency"]
 async fn a_registered_linked_factory_serves_the_module_and_status_says_so() {
     use crate::config::schema::ModuleSourceMode;
     use crate::modules::types::ModuleSource;
 
-    // Restore `register_linked("tinychannels", tinychannels_module::linked_module);`
-    // once the tinybus epic lets tinychannels-module be a dev-dependency again.
+    crate::modules::linked::register_linked("tinychannels", tinychannels_module::linked_module);
     let mut config = Config::default();
     config.modules.source = ModuleSourceMode::Linked;
     ops::ensure_loaded(&config, "tinychannels")
@@ -633,9 +635,16 @@ async fn a_registered_linked_factory_serves_the_module_and_status_says_so() {
 
 #[tokio::test]
 async fn attaching_a_linked_module_without_a_factory_fails_with_a_static_reason() {
-    let runtime = crate::modules::runtime::runtime().await.expect("module host");
-    let error = Resolver::load_linked(runtime, "tinyhosts-no-factory", None, serde_json::json!({}))
-        .expect_err("no factory is registered for this id");
+    let runtime = crate::modules::runtime::runtime()
+        .await
+        .expect("module host");
+    let error = Resolver::load_linked(
+        runtime,
+        &registry::find("tinychannels").unwrap().release(),
+        None,
+        serde_json::json!({}),
+    )
+    .expect_err("no factory is registered for this id");
     assert!(error.contains("no linked factory"), "{error}");
     assert!(!error.contains('/'), "{error}");
 }
@@ -645,14 +654,16 @@ async fn a_failing_linked_factory_is_reported_without_its_error_detail() {
     fn failing() -> tinybus::Result<tinybus::module::LinkedModule> {
         Err(tinybus::Error::failed("secret-token /home/user/path"))
     }
-    let runtime = crate::modules::runtime::runtime().await.expect("module host");
+    let runtime = crate::modules::runtime::runtime()
+        .await
+        .expect("module host");
     let error = Resolver::load_linked(
         runtime,
-        "linked-failing-test",
+        &registry::find("tinychannels").unwrap().release(),
         Some(failing),
         serde_json::json!({}),
     )
-        .expect_err("the factory fails");
+    .expect_err("the factory fails");
     assert!(
         error.contains("linked factory could not be started"),
         "{error}"
@@ -731,10 +742,7 @@ async fn a_faulted_module_is_not_retried_in_process() {
             .unwrap_err();
         assert_eq!(again, LoadError::Failed(first.clone()));
     }
-    let status = list(&offline)
-        .into_iter()
-        .find(|m| m.id == MODULE)
-        .unwrap();
+    let status = list(&offline).into_iter().find(|m| m.id == MODULE).unwrap();
     assert_eq!(status.state, ModuleState::Failed);
     assert_eq!(status.detail.as_deref(), Some(first.as_str()));
     table.forget(MODULE);
@@ -784,8 +792,7 @@ fn modules_list_output_keeps_its_wire_shape() {
         );
         if let Some(source) = object.get("source") {
             assert!(
-                ["release", "linked", "source", "local_file"]
-                    .contains(&source.as_str().unwrap()),
+                ["release", "linked", "source", "local_file"].contains(&source.as_str().unwrap()),
                 "{source}"
             );
         }

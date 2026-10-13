@@ -1,7 +1,6 @@
 //! Host ownership and cancellation of opaque TinyVoice capture leases.
 use super::audio_capture::{RecordingResult, TARGET_SAMPLE_RATE};
 use crate::config::Config;
-use tinybus::module::ModuleClient;
 use base64::Engine as _;
 use serde::{de::DeserializeOwned, Serialize};
 use std::collections::HashMap;
@@ -9,6 +8,7 @@ use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
     Arc, LazyLock, Mutex,
 };
+use tinybus::module::ModuleClient;
 use tinyvoice_bus::{
     capture::{
         AudioOutput, CaptureBatch, CaptureError, CaptureHandle, CapturePollRequest, CaptureResult,

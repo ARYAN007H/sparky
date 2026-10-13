@@ -32,10 +32,7 @@ impl McpModulePort for PreparePort {
         })
     }
 
-    async fn close(
-        &self,
-        _: &str,
-    ) -> Result<Option<String>, tinybus::module::ModuleCallError> {
+    async fn close(&self, _: &str) -> Result<Option<String>, tinybus::module::ModuleCallError> {
         Ok(None)
     }
 
@@ -91,10 +88,7 @@ impl McpModulePort for PreparePort {
         &self,
         _: ValidateServerArgumentsRequest,
     ) -> Result<ServerArgumentsValidation, tinybus::module::ModuleCallError> {
-        std::future::ready(Err(
-            tinybus::module::ModuleCallError::IncompatibleContract,
-        ))
-        .await
+        std::future::ready(Err(tinybus::module::ModuleCallError::IncompatibleContract)).await
     }
 
     async fn normalize_tool_arguments(

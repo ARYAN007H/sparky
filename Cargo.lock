@@ -5454,6 +5454,7 @@ dependencies = [
  "tinybus-module 0.1.5",
  "tinychannels",
  "tinychannels-bus",
+ "tinychannels-module",
  "tinychannels-runtime",
  "tinycomputer-bus",
  "tinyconnectors-bus",

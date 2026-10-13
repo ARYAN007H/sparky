@@ -11,8 +11,8 @@ mod relay;
 mod start_channels;
 mod turn_parts;
 
-use tinybus::module::{ModuleCallError, ModuleClient};
 use anyhow::Result;
+use tinybus::module::{ModuleCallError, ModuleClient};
 
 /// Ask the owning module to prepare effective execution limits for this host
 /// runtime. A malformed response fails closed and reports only the module ID.

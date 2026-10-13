@@ -75,16 +75,14 @@ impl crate::mcp::module_client::McpModulePort for RecoveringModulePort {
     async fn prepare_agent_tools(
         &self,
         _request: tinymcp_bus::PrepareAgentToolsRequest,
-    ) -> Result<Vec<tinymcp_bus::McpToolPresentation>, tinybus::module::ModuleCallError>
-    {
+    ) -> Result<Vec<tinymcp_bus::McpToolPresentation>, tinybus::module::ModuleCallError> {
         Ok(Vec::new())
     }
 
     async fn validate_server_arguments(
         &self,
         request: tinymcp_bus::ValidateServerArgumentsRequest,
-    ) -> Result<tinymcp_bus::ServerArgumentsValidation, tinybus::module::ModuleCallError>
-    {
+    ) -> Result<tinymcp_bus::ServerArgumentsValidation, tinybus::module::ModuleCallError> {
         Ok(tinymcp_bus::ServerArgumentsValidation::Valid(
             request.arguments.as_object().cloned().unwrap_or_default(),
         ))

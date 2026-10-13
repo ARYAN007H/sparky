@@ -33,8 +33,7 @@ use super::types::{ModuleRecord, ModuleSource, ModuleState, ModuleStatus};
 use super::{linked, registry, report, runtime, source};
 use crate::config::Config;
 use tinybus::module::{
-    Availability, LoadError, ModuleClient, ModuleSource as ResolverSource, Resolver,
-    ResolverInputs,
+    Availability, LoadError, ModuleClient, ModuleSource as ResolverSource, Resolver, ResolverInputs,
 };
 
 /// Environment variable naming a directory of bundled release archives, for
@@ -368,6 +367,7 @@ fn status_of(config: &Config, record: &ModuleRecord) -> ModuleStatus {
                     Availability::Ready => ModuleState::Ready,
                     Availability::Failed => ModuleState::Failed,
                     Availability::Unsupported => ModuleState::Unsupported,
+                    Availability::Disabled => ModuleState::Disabled,
                 },
                 detail,
             )

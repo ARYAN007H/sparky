@@ -189,7 +189,13 @@ pub async fn ensure_ready(config: &Config) -> Result<(), DocumentCallError> {
 /// Ensure the module is serving and hand back what a call needs.
 async fn ready(
     config: &Config,
-) -> Result<(&'static tinybus::module::ModuleRuntime, &'static super::ModuleRecord), DocumentCallError> {
+) -> Result<
+    (
+        &'static tinybus::module::ModuleRuntime,
+        &'static super::ModuleRecord,
+    ),
+    DocumentCallError,
+> {
     ops::ensure_loaded(config, MODULE_ID)
         .await
         .map_err(DocumentCallError::Unavailable)?;

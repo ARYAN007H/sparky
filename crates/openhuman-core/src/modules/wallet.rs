@@ -497,7 +497,13 @@ pub async fn ensure_ready(config: &Config) -> Result<(), WalletCallError> {
 /// Ensure the module is serving and hand back what a call needs.
 async fn ready(
     config: &Config,
-) -> Result<(&'static tinybus::module::ModuleRuntime, &'static super::ModuleRecord), WalletCallError> {
+) -> Result<
+    (
+        &'static tinybus::module::ModuleRuntime,
+        &'static super::ModuleRecord,
+    ),
+    WalletCallError,
+> {
     ops::ensure_loaded(config, MODULE_ID)
         .await
         .map_err(WalletCallError::Unavailable)?;
