@@ -6,8 +6,17 @@
 //! `<workspace>/state/computer/sites/<site>.json`, readable by its owner
 //! alone. Site memory goes to the module and nowhere else: this file never
 //! publishes it to the event bus, the agent's memory or a prompt.
+//!
+//! The host also owns three policies the module cannot know: whether tasks
+//! learn at all (`browser.learn_from_tasks`, switched live from Browser
+//! settings), the 30-day sweep of site files nothing has changed, and the
+//! forget epoch that stops a task running when its site was forgotten from
+//! writing it back.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, MutexGuard, OnceLock, PoisonError};
+use std::time::UNIX_EPOCH;
 
 use tinybus::ObjectPath;
 use tinycomputer_bus::site_memory::{
@@ -17,6 +26,9 @@ use tinycomputer_bus::site_memory::{
 
 /// Largest site file read or written: anything bigger was not written here.
 const MAX_FILE_BYTES: u64 = 2 * 1024 * 1024;
+
+/// How long a site file is kept without a change.
+const KEEP_SECS: u64 = 30 * 24 * 60 * 60;
 
 /// The directory site files live in.
 pub(super) fn sites_dir(workspace: &Path) -> PathBuf {
@@ -164,43 +176,181 @@ async fn write_private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 #[derive(Clone)]
 struct SiteMemoryHost;
 
-async fn store() -> tinybus::Result<SiteStore> {
-    let config = crate::config::rpc::load_config_with_timeout()
+async fn config() -> tinybus::Result<crate::config::Config> {
+    crate::config::rpc::load_config_with_timeout()
         .await
-        .map_err(|e| method_error(format!("config unavailable: {e}")))?;
-    Ok(SiteStore::new(sites_dir(&config.workspace_dir)))
+        .map_err(|e| method_error(format!("config unavailable: {e}")))
+}
+
+/// Serializes changes to site files and holds the forget epochs: for each
+/// workspace, the number of times a site was forgotten in it.
+fn guard() -> &'static tokio::sync::Mutex<HashMap<PathBuf, u64>> {
+    static GUARD: OnceLock<tokio::sync::Mutex<HashMap<PathBuf, u64>>> = OnceLock::new();
+    GUARD.get_or_init(|| tokio::sync::Mutex::new(HashMap::new()))
+}
+
+/// Learning switched in Browser settings since the process started, by
+/// workspace.
+fn switched() -> MutexGuard<'static, HashMap<PathBuf, bool>> {
+    static SWITCHED: OnceLock<Mutex<HashMap<PathBuf, bool>>> = OnceLock::new();
+    SWITCHED
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+}
+
+/// Records that Browser settings switched learning on or off for
+/// `workspace`. A tool keeps the config it was built with, and a channel's
+/// agent is built once, so the switch outranks that config.
+pub(crate) fn note_switch(workspace: &Path, on: bool) {
+    switched().insert(workspace.to_path_buf(), on);
+}
+
+/// Whether tasks under `config` learn: the latest switch in Browser
+/// settings, else `browser.learn_from_tasks`.
+pub(crate) fn learning(config: &crate::config::Config) -> bool {
+    switched()
+        .get(&config.workspace_dir)
+        .copied()
+        .unwrap_or(config.browser.learn_from_tasks)
+}
+
+/// The site `url` belongs to: its host, lower-cased and without a leading
+/// `www.`; `None` for an address that is not `http(s)` or names no plain
+/// host. The name a task's `StartTask.site` carries.
+#[must_use]
+pub fn site_of(url: &str) -> Option<String> {
+    let parsed = url::Url::parse(url.trim()).ok()?;
+    if !matches!(parsed.scheme(), "http" | "https") {
+        return None;
+    }
+    site_named(parsed.host_str()?)
+}
+
+/// `host` as a site name, or `None` when it is not a plain host name.
+fn site_named(host: &str) -> Option<String> {
+    let host = host.trim().to_ascii_lowercase();
+    let host = host.strip_prefix("www.").unwrap_or(&host);
+    plain_site(host).then(|| host.to_owned())
+}
+
+/// Forgets what was learned about `site` (a host or an address), or about
+/// every site when `None`, also by the tasks still running there. Returns how
+/// many sites were forgotten.
+///
+/// # Errors
+///
+/// Returns an I/O error when a site's file exists and cannot be removed.
+pub async fn forget(config: &crate::config::Config, site: Option<&str>) -> std::io::Result<usize> {
+    let site = match site {
+        Some(named) => match site_of(named).or_else(|| site_named(named)) {
+            Some(site) => Some(site),
+            None => return Ok(0),
+        },
+        None => None,
+    };
+    let mut epochs = guard().lock().await;
+    // A task still running there would write it all back when it ends; its
+    // save now carries a stale epoch.
+    let epoch = epochs.entry(config.workspace_dir.clone()).or_insert(0);
+    *epoch += 1;
+    let epoch = *epoch;
+    let store = SiteStore::new(sites_dir(&config.workspace_dir));
+    let forgotten = store.forget(site.as_deref()).await?;
+    tracing::debug!(forgotten, epoch, "[site-memory-host] forgot sites");
+    Ok(usize::try_from(forgotten).unwrap_or(usize::MAX))
+}
+
+/// Removes the site files nothing changed for [`KEEP_SECS`]: every entry in
+/// them has expired, as has a copy set aside or a write left behind.
+async fn sweep(dir: &Path) {
+    let now = std::time::SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_secs());
+    let Ok(mut entries) = tokio::fs::read_dir(dir).await else {
+        return;
+    };
+    while let Ok(Some(entry)) = entries.next_entry().await {
+        let Ok(metadata) = entry.metadata().await else {
+            continue;
+        };
+        let changed = metadata
+            .modified()
+            .ok()
+            .and_then(|at| at.duration_since(UNIX_EPOCH).ok())
+            .map_or(now, |since| since.as_secs());
+        if metadata.is_file() && changed.saturating_add(KEEP_SECS) <= now {
+            match remove(&entry.path()).await {
+                Ok(_) => {
+                    tracing::debug!("[site-memory-host] removed a site file unchanged for 30 days");
+                }
+                Err(error) => {
+                    tracing::warn!(%error, "[site-memory-host] old site file not removed");
+                }
+            }
+        }
+    }
+}
+
+/// `Load`, under `config`.
+async fn load_site(
+    config: &crate::config::Config,
+    request: LoadSiteRequest,
+) -> std::io::Result<LoadSiteResponse> {
+    let epochs = guard().lock().await;
+    let epoch = epochs.get(&config.workspace_dir).copied().unwrap_or(0);
+    let dir = sites_dir(&config.workspace_dir);
+    sweep(&dir).await;
+    let memory = SiteStore::new(dir).load(&request.site).await?;
+    Ok(LoadSiteResponse { memory, epoch })
+}
+
+/// `Save`, under `config`: refused when learning is off or the site was
+/// forgotten since it was loaded.
+async fn save_site(
+    config: &crate::config::Config,
+    request: SaveSiteRequest,
+) -> std::io::Result<SaveSiteResponse> {
+    let epochs = guard().lock().await;
+    let epoch = epochs.get(&config.workspace_dir).copied().unwrap_or(0);
+    if request.epoch != epoch || !learning(config) {
+        tracing::debug!(
+            stale = request.epoch != epoch,
+            "[site-memory-host] save refused"
+        );
+        return Ok(SaveSiteResponse { saved: false });
+    }
+    let saved = SiteStore::new(sites_dir(&config.workspace_dir))
+        .save(&request.site, &request.memory)
+        .await?;
+    Ok(SaveSiteResponse { saved })
 }
 
 #[tinybus::interface(name = "ai.tinyhumans.tinycomputer.SiteMemoryHost")]
 impl SiteMemoryHost {
     /// One site's memory; empty for a site with nothing kept.
     async fn load(&self, request: LoadSiteRequest) -> tinybus::Result<LoadSiteResponse> {
-        let memory = store()
-            .await?
-            .load(&request.site)
+        load_site(&config().await?, request)
             .await
-            .map_err(method_error)?;
-        Ok(LoadSiteResponse { memory })
+            .map_err(method_error)
     }
 
-    /// Replaces one site's memory.
+    /// Replaces one site's memory, unless learning is off or the site was
+    /// forgotten since it was loaded.
     async fn save(&self, request: SaveSiteRequest) -> tinybus::Result<SaveSiteResponse> {
-        let saved = store()
-            .await?
-            .save(&request.site, &request.memory)
+        save_site(&config().await?, request)
             .await
-            .map_err(method_error)?;
-        Ok(SaveSiteResponse { saved })
+            .map_err(method_error)
     }
 
     /// Forgets one site, or every site.
     async fn forget(&self, request: ForgetSiteRequest) -> tinybus::Result<ForgetSiteResponse> {
-        let forgotten = store()
-            .await?
-            .forget(request.site.as_deref())
+        let forgotten = forget(&config().await?, request.site.as_deref())
             .await
             .map_err(method_error)?;
-        Ok(ForgetSiteResponse { forgotten })
+        Ok(ForgetSiteResponse {
+            forgotten: forgotten as u64,
+        })
     }
 }
 
@@ -215,8 +365,8 @@ pub(super) async fn install(connection: &tinybus::Connection) -> tinybus::Result
     connection
         .serve_at(ObjectPath::new(OBJECT_PATH)?, SiteMemoryHost)
         .await?;
-    // The interface name is served at the module's own bus name; the module
-    // reaches it through the host connection already holding the object.
+    // The module reaches the host by this name (`optional` in its manifest).
+    connection.request_name(INTERFACE).await?;
     tracing::debug!(interface = INTERFACE, "[site-memory-host] served");
     Ok(())
 }

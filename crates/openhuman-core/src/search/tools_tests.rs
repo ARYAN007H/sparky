@@ -88,7 +88,7 @@ fn local_only_blocks_external_search_tool_dispatch() {
 
     let message = local_only_search_block("web_search_tool")
         .expect("search requests must be blocked in LocalOnly mode");
-    assert!(message.contains(crate::security::POLICY_BLOCKED_MARKER));
+    assert!(message.contains(tinytools::status::POLICY_BLOCKED_MARKER));
 }
 
 #[test]

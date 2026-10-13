@@ -146,7 +146,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             .filter_map(tinyagents_runtime::transcript::message_to_native_transcript)
             .collect();
         if crate::agent::multimodal::has_image_placeholders(&messages) {
-            messages = crate::agent::multimodal::rehydrate_image_placeholders(&messages);
+            messages = crate::agent::multimodal::rehydrate_image_placeholders(&messages).await;
         }
 
         // Runtime's `ToolSnapshot` remains the model declaration and final
@@ -267,6 +267,12 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             outcome.wrap_up_injected = false;
         }
 
+        // When the close (and any required-output repair after it) must be
+        // done by, so the turn commits before the backstop drops it.
+        let close_by = request.run_context.data.turn_deadline.map(|deadline| {
+            let now = Instant::now();
+            now + deadline.close_budget(now)
+        });
         let close = grounded_close::close_if_needed(
             &self.turn_model_source,
             &self.model_name,
@@ -276,6 +282,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             &request.history,
             &user_message,
             &outcome,
+            close_by.map(|at| at.saturating_duration_since(Instant::now())),
         )
         .await;
         let mut output = close
@@ -321,23 +328,15 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             .breaker_halt
             .as_deref()
             .is_some_and(|reason| reason.starts_with("Stopping after "));
+        let time_left = close_by.map(|at| at.saturating_duration_since(Instant::now()));
+        let mut repair_usage = grounded_close::RepairUsage::for_model(&self.model_name);
         let required_repair = match required_output.as_ref() {
-            Some(contract) if classified_halt => {
-                if !tinyagents_harness::config::output_satisfies_contract(&output, contract) {
-                    output.push_str("\n\n");
-                    output.push_str(&tinyagents_harness::config::synthesize_block(contract));
-                    if history
-                        .last()
-                        .is_some_and(|message| matches!(message, Message::Assistant(_)))
-                    {
-                        history.pop();
-                    }
-                    history.push(Message::assistant(output.clone()));
-                }
+            Some(contract) if classified_halt || time_left.is_some_and(|left| left.is_zero()) => {
+                append_synthesized_block(&mut output, &mut history, contract);
                 None
             }
             Some(contract) => {
-                grounded_close::repair_required_output(
+                let repair = grounded_close::repair_required_output(
                     &self.turn_model_source,
                     &self.model_name,
                     self.temperature,
@@ -349,13 +348,28 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
                     close.is_none() && request.run_context.data.progress.is_some(),
                     request.run_context.data.progress.as_ref(),
                     outcome.model_calls.saturating_add(1) as u32,
-                )
-                .await
+                    &mut repair_usage,
+                );
+                match time_left {
+                    Some(left) => {
+                        // Bound to what is left so the turn still commits; on
+                        // expiry fall back to the deterministic block.
+                        let repaired = tokio::time::timeout(left, repair).await;
+                        match repaired {
+                            Ok(repaired) => repaired,
+                            Err(_) => {
+                                append_synthesized_block(&mut output, &mut history, contract);
+                                None
+                            }
+                        }
+                    }
+                    None => repair.await,
+                }
             }
             None => None,
         };
-        if let Some(repair) = &required_repair {
-            output = repair.output.clone();
+        if let Some(repaired) = required_repair {
+            output = repaired;
             if history
                 .last()
                 .is_some_and(|message| matches!(message, Message::Assistant(_)))
@@ -370,7 +384,9 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
         // `after_commit`, so a failed/cancelled turn cannot publish its usage
         // or tool outcomes as if they had become durable.
         {
-            let repair_usage = required_repair.as_ref().map(|repair| &repair.usage);
+            // Always billed: a repair that timed out after its call answered
+            // still recorded that call here.
+            let repair_usage = Some(&repair_usage);
             let mut observed = sidecar
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -684,6 +700,28 @@ fn driver_cancelled_with_snapshot(
         }),
         outcome: None,
     }
+}
+
+/// Append the deterministic required-output block when `output` lacks it, and
+/// make that the durable final assistant row. Used when no model repair may
+/// run: a classified halt, or a turn out of time before the backstop.
+fn append_synthesized_block(
+    output: &mut String,
+    history: &mut Vec<Message>,
+    contract: &tinyagents_harness::config::RequiredOutput,
+) {
+    if tinyagents_harness::config::output_satisfies_contract(output, contract) {
+        return;
+    }
+    output.push_str("\n\n");
+    output.push_str(&tinyagents_harness::config::synthesize_block(contract));
+    if history
+        .last()
+        .is_some_and(|message| matches!(message, Message::Assistant(_)))
+    {
+        history.pop();
+    }
+    history.push(Message::assistant(output.clone()));
 }
 
 #[cfg(test)]

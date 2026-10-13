@@ -183,9 +183,11 @@ type Declaration = (&'static str, fn() -> StorageGrant);
 /// A module adds its row here (a declaration is a reviewable build-time
 /// decision, like the registry's digests) and then calls
 /// `ai.tinyhumans.tinystorage.Storage`; a module with no row has no storage at
-/// all. `tinymcp` declares its grant ahead of the release that consumes it: the
-/// pinned module does not call the storage bus yet, so the row serves nothing
-/// until the registry moves to a release that does.
+/// all. `tinymcp` (v0.18.0 and later) reaches its servers, audit log and
+/// environment secrets through this table; so do `tinyconnectors` (v0.18.0:
+/// scope preferences and trigger archive), `tinywallet` (v0.22.0: x402 ledger and
+/// budget hold), `tinybox` (v0.1.29: box records, jail index) and `tinyjuice`
+/// (v0.10.0: CCR blobs).
 #[must_use]
 pub fn declared(module_id: &str) -> Option<StorageGrant> {
     let table: &[Declaration] = &[
@@ -196,6 +198,22 @@ pub fn declared(module_id: &str) -> Option<StorageGrant> {
         (
             super::storage_grant_tinymcp::MODULE_ID,
             super::storage_grant_tinymcp::grant,
+        ),
+        (
+            super::storage_grant_tinyconnectors::MODULE_ID,
+            super::storage_grant_tinyconnectors::grant,
+        ),
+        (
+            super::storage_grant_tinywallet::MODULE_ID,
+            super::storage_grant_tinywallet::grant,
+        ),
+        (
+            super::storage_grant_tinybox::MODULE_ID,
+            super::storage_grant_tinybox::grant,
+        ),
+        (
+            super::storage_grant_tinyjuice::MODULE_ID,
+            super::storage_grant_tinyjuice::grant,
         ),
     ];
     table
@@ -234,7 +252,12 @@ pub(crate) fn authorize(
     if !is_selector(object, selector) {
         return Err(Denied::Malformed);
     }
-    if !grant.has_object(object) {
+    // `Capabilities` is how a module's storage client learns what the host
+    // serves; the client probes every object when it connects and refuses to
+    // bind when one is refused, so a grant without (say) blobs would leave the
+    // whole module without storage. It reveals nothing of the data and every
+    // other call on an ungranted object is still refused.
+    if !grant.has_object(object) && selector != "Capabilities" {
         return Err(Denied::Object);
     }
     let write = is_write(object, selector);

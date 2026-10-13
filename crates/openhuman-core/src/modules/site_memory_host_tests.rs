@@ -85,3 +85,135 @@ fn site_memory_is_never_published_to_agent_memory_or_prompts() {
         assert_eq!(hits, 0, "{forbidden}");
     }
 }
+
+fn workspace_config(dir: &tempfile::TempDir, learn: bool) -> crate::config::Config {
+    let mut config = crate::config::Config {
+        workspace_dir: dir.path().to_path_buf(),
+        ..crate::config::Config::default()
+    };
+    config.browser.learn_from_tasks = learn;
+    config
+}
+
+async fn load(config: &crate::config::Config, site: &str) -> LoadSiteResponse {
+    load_site(config, LoadSiteRequest { site: site.into() })
+        .await
+        .unwrap()
+}
+
+async fn save(config: &crate::config::Config, site: &str, epoch: u64) -> bool {
+    save_site(
+        config,
+        SaveSiteRequest {
+            site: site.into(),
+            memory: memory(),
+            epoch,
+        },
+    )
+    .await
+    .unwrap()
+    .saved
+}
+
+#[tokio::test]
+async fn a_save_under_the_loaded_epoch_is_kept_and_read_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let config = workspace_config(&dir, true);
+    let loaded = load(&config, "keep.example").await;
+    assert!(save(&config, "keep.example", loaded.epoch).await);
+    assert_eq!(load(&config, "keep.example").await.memory, memory());
+}
+
+#[tokio::test]
+async fn a_site_forgotten_after_it_was_loaded_is_not_written_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let config = workspace_config(&dir, true);
+    let loaded = load(&config, "gone.example").await;
+    assert!(save(&config, "gone.example", loaded.epoch).await);
+
+    assert_eq!(
+        forget(&config, Some("https://www.Gone.example/x"))
+            .await
+            .unwrap(),
+        1
+    );
+    // The task that loaded before the forget still holds the old epoch.
+    assert!(!save(&config, "gone.example", loaded.epoch).await);
+    assert!(load(&config, "gone.example").await.memory.is_empty());
+    // One that loads after it saves as usual.
+    let fresh = load(&config, "gone.example").await;
+    assert!(fresh.epoch > loaded.epoch);
+    assert!(save(&config, "gone.example", fresh.epoch).await);
+}
+
+#[tokio::test]
+async fn forgetting_every_site_counts_them_and_an_address_that_names_no_site_forgets_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let config = workspace_config(&dir, true);
+    for site in ["a.example", "b.example"] {
+        let epoch = load(&config, site).await.epoch;
+        assert!(save(&config, site, epoch).await);
+    }
+    assert_eq!(
+        forget(&config, Some("file:///etc/passwd")).await.unwrap(),
+        0
+    );
+    assert_eq!(forget(&config, None).await.unwrap(), 2);
+}
+
+#[tokio::test]
+async fn nothing_is_kept_while_learning_is_off_and_a_settings_switch_outranks_the_config() {
+    let dir = tempfile::tempdir().unwrap();
+    let off = workspace_config(&dir, false);
+    let epoch = load(&off, "off.example").await.epoch;
+    assert!(!save(&off, "off.example", epoch).await);
+
+    note_switch(dir.path(), true);
+    assert!(learning(&off));
+    let epoch = load(&off, "off.example").await.epoch;
+    assert!(save(&off, "off.example", epoch).await);
+    note_switch(dir.path(), false);
+    let epoch = load(&off, "off.example").await.epoch;
+    assert!(!save(&off, "off.example", epoch).await);
+}
+
+#[tokio::test]
+async fn a_load_sweeps_site_files_nothing_changed_for_thirty_days() {
+    let dir = tempfile::tempdir().unwrap();
+    let config = workspace_config(&dir, true);
+    let epoch = load(&config, "old.example").await.epoch;
+    assert!(save(&config, "old.example", epoch).await);
+    assert!(save(&config, "new.example", epoch).await);
+    let old = sites_dir(dir.path()).join("old.example.json");
+    let aged = std::time::SystemTime::now() - std::time::Duration::from_secs(KEEP_SECS + 60);
+    std::fs::File::options()
+        .write(true)
+        .open(&old)
+        .unwrap()
+        .set_modified(aged)
+        .unwrap();
+
+    load(&config, "new.example").await;
+    assert!(!old.exists());
+    assert!(sites_dir(dir.path()).join("new.example.json").exists());
+}
+
+#[test]
+fn a_site_is_its_host_without_www() {
+    assert_eq!(
+        site_of("https://www.Amazon.in/s?k=x").as_deref(),
+        Some("amazon.in")
+    );
+    assert_eq!(
+        site_of(" http://shop.test:8080/cart ").as_deref(),
+        Some("shop.test")
+    );
+    for none in [
+        "ftp://x.test/",
+        "file:///etc/passwd",
+        "not a url",
+        "http://[::1]/",
+    ] {
+        assert_eq!(site_of(none), None, "{none}");
+    }
+}

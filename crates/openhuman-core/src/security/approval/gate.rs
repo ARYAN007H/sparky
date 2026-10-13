@@ -41,7 +41,7 @@ use crate::agent::turn_origin::{self, AgentTurnOrigin, TrustedAutomationSource};
 use crate::config::Config;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
-use crate::security::POLICY_DENIED_MARKER;
+use tinytools::status::POLICY_DENIED_MARKER;
 
 use super::store;
 use super::types::{

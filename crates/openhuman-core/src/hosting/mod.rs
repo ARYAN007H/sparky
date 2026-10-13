@@ -19,6 +19,11 @@ mod tools;
 /// traversal, escapes through symlinks, and non-directories.
 pub use tools::resolve_in_workspace;
 
+/// Test double for the module call: `(member, args, confidential)` to reply text.
+#[cfg(test)]
+type CallFixture =
+    Arc<dyn Fn(&str, serde_json::Value, bool) -> anyhow::Result<String> + Send + Sync>;
+
 /// One configured hosting account and its authorized workspace.
 #[derive(Clone)]
 pub struct Account {
@@ -30,8 +35,7 @@ pub struct Account {
     workspace_dir: PathBuf,
     providers_loaded: Arc<tokio::sync::OnceCell<()>>,
     #[cfg(test)]
-    call_fixture:
-        Option<Arc<dyn Fn(&str, serde_json::Value, bool) -> anyhow::Result<String> + Send + Sync>>,
+    call_fixture: Option<CallFixture>,
 }
 
 impl std::fmt::Debug for Account {

@@ -330,3 +330,29 @@ fn stopped_turn_hands_back_only_its_accepted_rounds() {
         assert_eq!(sidecar.lock().unwrap().model_calls, 2, "{case}");
     }
 }
+
+/// A turn out of time skips the model repair (#7716); the required block is
+/// then synthesized once and becomes the durable final row.
+#[test]
+fn synthesized_block_is_appended_once_and_replaces_the_final_row() {
+    let contract = tinyagents_harness::config::RequiredOutput {
+        block_key: "result".into(),
+        required_keys: vec!["status".into()],
+    };
+    let mut output = "Done.".to_string();
+    let mut history = vec![Message::user("go"), Message::assistant("Done.")];
+
+    append_synthesized_block(&mut output, &mut history, &contract);
+    assert!(tinyagents_harness::config::output_satisfies_contract(
+        &output, &contract
+    ));
+    assert_eq!(
+        history.len(),
+        2,
+        "the final row is replaced, not duplicated"
+    );
+
+    let once = output.clone();
+    append_synthesized_block(&mut output, &mut history, &contract);
+    assert_eq!(output, once, "a satisfied output is left alone");
+}
