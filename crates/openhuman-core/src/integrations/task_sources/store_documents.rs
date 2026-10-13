@@ -36,6 +36,17 @@ pub(super) const SOURCES: &str = "task_sources";
 pub(super) const INGESTED: &str = "ingested_tasks";
 const DOMAIN: &str = "task_sources::store";
 
+/// The legacy `sources.db`, as the storage importer reads it.
+pub(crate) fn import_source() -> crate::storage::import::Source {
+    crate::storage::import::Source {
+        domain: "task_sources",
+        db: "task_sources/sources.db",
+        collections,
+        read_legacy: |scratch, _real| super::store::import::read(scratch),
+        rekey: |record, _config| record,
+    }
+}
+
 fn collections() -> Vec<CollectionSpec> {
     vec![
         CollectionSpec::new(SOURCES).index(IndexSpec::new("by_created", ["created_ms"])),

@@ -3,11 +3,12 @@
 use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec};
 
 /// The `tinybox` module, loaded on demand.
+#[cfg(feature = "modules")]
 pub(crate) const TINYBOX: ModuleRecord = ModuleRecord {
     id: "tinybox",
     description: "Sandbox execution and lifecycle operations through TinyBox",
-    bus_name: "ai.tinyhumans.tinybox.Box",
-    object_path: "/ai/tinyhumans/tinybox/Box",
+    bus_name: tinybox_bus::INTERFACE,
+    object_path: tinybox_bus::OBJECT_PATH,
     version: "0.1.24",
     release_url: "https://github.com/tinyhumansai/tinybox/releases/tag/v0.1.24",
     assets: &[
@@ -111,8 +112,8 @@ pub(crate) const TINYBOX: ModuleRecord = ModuleRecord {
 pub(crate) const TINYCHANNELS: ModuleRecord = ModuleRecord {
     id: "tinychannels",
     description: "Channel provider lifecycle and message transport",
-    bus_name: "ai.tinyhumans.tinychannels.Channels",
-    object_path: "/ai/tinyhumans/tinychannels/Channels",
+    bus_name: tinychannels_bus::names::BUS_NAME,
+    object_path: tinychannels_bus::names::OBJECT_PATH,
     version: "0.1.26",
     release_url: "https://github.com/tinyhumansai/tinychannels/releases/tag/v0.1.26",
     assets: &[
@@ -182,69 +183,70 @@ pub(crate) const TINYCHANNELS: ModuleRecord = ModuleRecord {
     },
 };
 
+#[cfg(feature = "hosting")]
 /// The `tinyhosts` module, loaded on demand.
 pub(crate) const TINYHOSTS: ModuleRecord = ModuleRecord {
     id: "tinyhosts",
     description: "Hosting provider operations",
-    bus_name: "ai.tinyhumans.tinyhosts.Hosting",
-    object_path: "/ai/tinyhumans/tinyhosts/Hosting",
-    version: "0.3.0",
-    release_url: "https://github.com/tinyhumansai/tinyhosts/releases/tag/v0.3.0",
+    bus_name: tinyhosts_bus::BUS_NAME,
+    object_path: tinyhosts_bus::OBJECT_PATH,
+    version: "0.4.0",
+    release_url: "https://github.com/tinyhumansai/tinyhosts/releases/tag/v0.4.0",
     assets: &[
         PlatformAsset {
             host_key: "ubuntu-24.04-x86_64",
-            archive: "tinyhosts-0.3.0-ubuntu-24.04-x86_64.tar.gz",
-            sha256: "368f00ee397649481ff8f61d33eeb8b908cc416d6b2f9d4ef3c81263d6b0460e",
+            archive: "tinyhosts-0.4.0-ubuntu-24.04-x86_64.tar.gz",
+            sha256: "ffaf1b749808185b01ed36a90d013c8492d03a113cc63eb02657191983c99b1d",
         },
         PlatformAsset {
             host_key: "ubuntu-24.04-arm64",
-            archive: "tinyhosts-0.3.0-ubuntu-24.04-arm64.tar.gz",
-            sha256: "e298942fddec8930fd78651632c02abe78968a17ab3589608875b8dc4f731669",
+            archive: "tinyhosts-0.4.0-ubuntu-24.04-arm64.tar.gz",
+            sha256: "10d74c3d50cfe7b099d7ed3cc6017c017f4d807da7622b96482ef0e26371554f",
         },
         PlatformAsset {
             host_key: "ubuntu-22.04-x86_64",
-            archive: "tinyhosts-0.3.0-ubuntu-22.04-x86_64.tar.gz",
-            sha256: "f7c9484176b62357fb449eb79830e3df0eebfd4e0814c8d8e1c58669d829f482",
+            archive: "tinyhosts-0.4.0-ubuntu-22.04-x86_64.tar.gz",
+            sha256: "cdd9a2b222ec368a20db45c55c3deeb40a4dc8ffc47bea73d16f6edfce864cd7",
         },
         PlatformAsset {
             host_key: "ubuntu-22.04-arm64",
-            archive: "tinyhosts-0.3.0-ubuntu-22.04-arm64.tar.gz",
-            sha256: "576ff6204ccaa1e2dc2ef1b27762848efa4555d4d32ef46b4c329daf1e04eac3",
+            archive: "tinyhosts-0.4.0-ubuntu-22.04-arm64.tar.gz",
+            sha256: "4b50f878cd7c65812a05384fd824e59c0be9c02e566b472725b04ef7eacdec19",
         },
         PlatformAsset {
             host_key: "macos-26-arm64",
-            archive: "tinyhosts-0.3.0-macos-26-arm64.tar.gz",
-            sha256: "b0083e70b567659d095a1ff0f9d2c8cb5bafe110d90fb08527c509362ce77a55",
+            archive: "tinyhosts-0.4.0-macos-26-arm64.tar.gz",
+            sha256: "8452dbbf4de45f313e76e75191923ccdb9d294d2a31dced56b14ee284bbf2176",
         },
         PlatformAsset {
             host_key: "macos-26-x86_64",
-            archive: "tinyhosts-0.3.0-macos-26-x86_64.tar.gz",
-            sha256: "44fa7c9efde0c388f154f154809ce2829460bae4931f27d20f8f0d3ee3bf2a8c",
+            archive: "tinyhosts-0.4.0-macos-26-x86_64.tar.gz",
+            sha256: "86882b94ee6a3bdb5796523e000136a3780ca59db66a7c645f8a3ea5c2c930b4",
         },
         PlatformAsset {
             host_key: "macos-15-arm64",
-            archive: "tinyhosts-0.3.0-macos-15-arm64.tar.gz",
-            sha256: "56ca93b2cab2010ff599c38179eb99f6ad67631e39f671be973256c3d9142381",
+            archive: "tinyhosts-0.4.0-macos-15-arm64.tar.gz",
+            sha256: "cbb66815cf8513985afde49b3cb9f8406d2bf538609956467da3a7bdacd21044",
         },
         PlatformAsset {
             host_key: "macos-15-x86_64",
-            archive: "tinyhosts-0.3.0-macos-15-x86_64.tar.gz",
-            sha256: "0ffb9fc8d1c7fc7d95a7808af7722d8c6537a508c0c3a294ecf8fb8a28430207",
+            archive: "tinyhosts-0.4.0-macos-15-x86_64.tar.gz",
+            sha256: "7178b5d5bdb851f4485f8981d99277d160262131c0444996e7a0828209034bda",
         },
         PlatformAsset {
             host_key: "windows-2025-x86_64",
-            archive: "tinyhosts-0.3.0-windows-2025-x86_64.zip",
-            sha256: "3d6d5f7fd0806ac6fd6c2ed0c60a9155d6c09a861ebd1ac0c43864e969f88fb9",
+            archive: "tinyhosts-0.4.0-windows-2025-x86_64.zip",
+            sha256: "6a29fc50de7ed2224d6faa26440c87bb0293d7ed0f703bd5cbb169bcb5f20234",
         },
         PlatformAsset {
             host_key: "windows-2022-x86_64",
-            archive: "tinyhosts-0.3.0-windows-2022-x86_64.zip",
-            sha256: "a5003f1254052828d6fa362b993b0bed6b7256c252f969536090e148378c331f",
+            archive: "tinyhosts-0.4.0-windows-2022-x86_64.zip",
+            sha256: "730aa387d3f18cdc55f9a3fce83f835a3b8da9a26c0f4701c31c76de790081de",
         },
         PlatformAsset {
             host_key: "windows-11-arm64",
-            archive: "tinyhosts-0.3.0-windows-11-arm64.zip",
-            sha256: "21f8909a2a81a541e3d0347510b2bf25baec59438a5536edcd57e65fae7f4a4d",
+            archive: "tinyhosts-0.4.0-windows-11-arm64.zip",
+            sha256: "ab281a73d91117fb12adfc62dfe9e7fbdafa36b5fdfa716c5e440ce33d26a2c5",
         },
     ],
     load: LoadPolicy::Lazy,

@@ -257,6 +257,15 @@ The host files for those three modules fingerprint the configuration and call
 a sign-out reaches a module that is already serving. Secrets travel only in
 that configuration, never in an ordinary method call or an RPC reply.
 
+### Disabled components
+
+`registry::COMPONENT_OF` maps every module id to its `[components]` switch
+(`registry_contract_tests` covers every record). `ops::ensure_loaded*` refuses
+a record whose component is off with `LoadError::Disabled` before any claim,
+download or `dlopen`; `modules.list` reports `ModuleState::Disabled`; boot skips
+the module and `search_path::load_enabled` leaves its search-path artifact
+unopened. See [components](../../../../gitbooks/developing/components.md).
+
 ### Boot
 
 `boot::load_declared_modules` runs as a background bootstrap job
@@ -302,6 +311,7 @@ download, its `dlopen`, or its resident memory.
 | [`search/mod.rs`](search/mod.rs) | `tinysearch` | `module_config` from the host's resolved search policy, and `configured_tool_specs` computed synchronously from that same configuration. |
 | [`search/proxy.rs`](search/proxy.rs) | `tinysearch` | Lazy load, private reinitialization on configuration change, and serialized `list_tools` / `execute_tool`; `refresh_loaded` after settings saves and credential changes. |
 | [`tokenjuice_host.rs`](tokenjuice_host.rs) | `tinyjuice` | The reverse direction: an `MlHost` object the host serves at the contract's `ML_HOST_NAME` / `ML_HOST_PATH` for the module's tool-less summary model call. |
+| [`storage_host.rs`](storage_host.rs), [`storage_grants.rs`](storage_grants.rs) | every module | The reverse direction for storage: serves `ai.tinyhumans.tinystorage.Storage` (objects `Documents`, `Streams`, `Blobs`, `Secrets` at `/ai/tinyhumans/tinystorage/<Object>`) from the installed storage backend. The caller is the broker-authenticated sender mapped to a registry module id; its scope is `module:<id>@<base>` (a profile's is `<profile>~module:<id>`, under the profile's lease fence); its authority is the `StorageGrant` the build declares for it (`storage_grants::declared`, empty today, so no module has storage until it declares some). The host alone runs `ensure_collection`. Every call is audited (module, scope, object, op, target, outcome; no payload). Blob streams and watches answer `unsupported` until a per-module stream and signal route exists. |
 
 `tinybox.rs` supplies the pre-core gateway client.
 `channel_controller.rs` invokes TinyChannels' confidential controller member for
@@ -472,6 +482,7 @@ minimal build small.
 
 ## Further reading
 
+- [Module sources and `[components]` (AGENTS.md)](../../../../AGENTS.md)
 - [Loadable modules](../../../../gitbooks/developing/loadable-modules.md)
 - [tinybus submodule](../../../../vendor/tinybus/README.md)
 - [Architecture overview](../../../../gitbooks/developing/architecture.md)

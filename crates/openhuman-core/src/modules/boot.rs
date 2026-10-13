@@ -40,7 +40,9 @@ pub async fn load_declared_modules(config: &Config) {
     // Search paths first: an artifact an operator has placed deliberately should
     // win over a download, and `ensure_loaded` below then finds it already
     // serving rather than fetching a second copy.
-    for outcome in runtime.host().load_search_paths() {
+    for outcome in
+        super::search_path::load_enabled(runtime.host(), &ops::disabled_lib_stems(config))
+    {
         match outcome {
             Ok(info) => log::info!(
                 "[modules] loaded '{}' {} from the module search path",
@@ -55,6 +57,13 @@ pub async fn load_declared_modules(config: &Config) {
 
     for record in registry::ALL {
         if record.load != LoadPolicy::Eager {
+            continue;
+        }
+        if let Some(component) = ops::disabled_component(config, record.id) {
+            log::info!(
+                "[modules] eager module '{}' skipped: component '{component}' is disabled",
+                record.id
+            );
             continue;
         }
         log::info!("[modules] eager module '{}' resolving at boot", record.id);

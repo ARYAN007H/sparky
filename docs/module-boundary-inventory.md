@@ -18,13 +18,13 @@ copying its implementation into a host, or accepting weaker isolation.
 | tinyconnectors | none | tinyconnectors-bus | core integrations, credentials and triggers | Module-backed argument preparation, action execution and trigger archives; host credential reconciliation and frozen tool restoration remain in OpenHuman |
 | tinymcp | none in normal/build host dependencies | tinymcp-bus | core MCP registry, supervisor, CLI stdio/HTTP server | Merged host adapters use the released v0.14.3 module for registry, supervisor, client and server protocol operations, with approved host callbacks kept in OpenHuman. The 62-member artifact and local focused, lifecycle, registry, native and build gates pass; frozen recorded tool declarations are restored independently of the current catalog |
 | tinychannels | tinychannels, tinychannels-runtime, tinychannels-module (test-only) | tinychannels-bus | core channels, TinyHumans host, CLI REPL | Contract 16 (operation 1.17) is pure; scoped providers, inbound/identity/outbound preparation, remote commands, runtime limits, typing and progressive delivery execute through confidential module calls. Host-owned policy, credentials, persistence and callbacks remain in OpenHuman. Both host implementation exceptions are removed; the 254-test focused suite and released-artifact runtime fixture pass |
-| tinyhosts | none | tinyhosts-bus | core hosting tools | Released Execute/Providers contract consumed through the module; workspace authorization, credentials and approval policy remain in OpenHuman |
-| tinywallet | none in normal/build host dependencies | tinywallet-bus | core wallet/web3/x402 | Complete: v0.19.2 contract 1.13 owns mnemonic validation/derivation, native transactions, Web3 quotes/execution, ERC-20 encoding, and x402 payment parsing/budgets/ledger. OpenHuman retains encrypted-key custody, authenticated transport, explicit approval, and lifecycle orchestration |
+| tinyhosts | none | tinyhosts-bus | core hosting tools | Released Execute/Providers contract consumed through the module (v0.4.0: tool-to-operation mapping, argument shaping, outcome matching and summaries live in `tinyhosts-bus::tools`); workspace authorization, credentials and approval policy remain in OpenHuman |
+| tinywallet | none in normal/build host dependencies | tinywallet-bus | core wallet/web3/x402 | Complete: v0.20.0 contract 1.14 adds mnemonic word-count validation to module-owned mnemonic derivation, native transactions, Web3 quotes/execution, ERC-20 encoding, and x402 payment parsing/budgets/ledger. OpenHuman retains encrypted-key custody, authenticated transport, explicit approval, and lifecycle orchestration |
 | tinybox | tinybox-core (test-only) | tinybox-bus | core sandbox and security, desktop gateways | Merged host cutover uses TinyBox v0.1.24 for sandbox/resource lifecycle, collected and supervised execution, jailed and native shell execution, Docker control, local grants, file transfer and port forwarding. Host authorization and the security floor remain in OpenHuman |
 | tinycomputer | none | tinycomputer-bus | core voice, paste/focus and permission checks | Permission, focus, paste and Globe listener operations use the module; native thread and target rules remain covered |
 | tinyvoice | None | tinyvoice-bus | core voice capture/hotkeys | Module-owned devices, recording and continuous capture, bounded audio reads/batches, explicit lease cleanup; computer module permission decisions |
 | tinyruntime | tinyruntime-pyserver | tinyruntime-bus | core Python worker, optional TinyJuice ML | Excluded from this migration: TinyRuntime is being removed separately |
-| tinydocs / tinymemory | none | tinydocs-bus | core memory converter and file sources | Bus DocumentConverter replaces OfficeConverter, including XLSX and existing PDF/DOCX/PPTX format coverage; ingestion metadata remains host-owned |
+| tinydocs / tinymemory | none | tinydocs-bus | core memory converter and file sources | Bus DocumentConverter replaces OfficeConverter, including XLSX and existing PDF/DOCX/PPTX format coverage; ingestion metadata remains host-owned; `[components].documents = false` refuses `ensure_loaded("tinydocs")` and the `documents` tool group, makes the converter answer `COMPONENT_DISABLED:documents`, and degrades attachment ingest to a note |
 | tinysearch | none observed | tinysearch-bus | core module search proxy | Preserve existing bus adapter; enforce contract and host dependency graphs |
 
 ## Gate behavior
@@ -254,7 +254,7 @@ Connectors, Hosts, Juice, and document adapters onto OpenHuman main
 The existing TinyRuntime removal is preserved; runtime worker migration and
 further bus error-reporting work remain outside this integration.
 
-The host compiles TinyConnectors v0.14.0, TinyHosts v0.3.0, TinyJuice v0.7.1,
+The host compiles TinyConnectors v0.14.0, TinyHosts v0.4.0, TinyJuice v0.7.1,
 and TinyDocs v0.2.0 contracts and executes their affected operations through
 released modules. The module boundary audit reports zero violations and zero
 stale exceptions, with 27 temporary exceptions and one pending contract.
@@ -412,8 +412,8 @@ not establish acceptance of this full cutover.
 
 ## TinyWallet wallet, Web3, and x402 host cutover
 
-TinyWallet v0.19.2 (contract 1.13) is pinned at released source
-`ea1073b833320b4f311e18c2df30dd2bfb1db5b6`. Wallet setup, mnemonic validation
+TinyWallet v0.20.0 (contract 1.14) is pinned at released source
+`f596ed90dc5de8d6cc7d0a5c375b6e555d0283c2`. Wallet setup, mnemonic validation
 and derivation, transaction construction and signing, Web3 quote execution,
 ERC-20 calldata encoding, and x402 payment parsing, budgets and ledger now run
 through the compiled module. OpenHuman keeps encrypted-key custody, authenticated
@@ -422,13 +422,12 @@ management. The host has no normal/build dependency on
 `tinywallet-crypto`, `tinywallet-web3` or `tinywallet-x402`; the wallet module
 implementation remains only a test fixture dependency.
 
-The v0.19.2 release includes the typed Solana transfer-facts approval fix from
-TinyWallet PR #82 and provides 17 platform archives. Independent local
-verification matched every downloaded archive against its GitHub digest and
-embedded `modules.toml` hash; the release workflow also passed the TinyBus
-operation and signing E2E on Linux, macOS and Windows. The module-boundary
-audit reports zero violations and no remaining Wallet implementation
-exceptions. TinyRuntime remains excluded from this migration.
+The v0.20.0 release provides 17 platform archives. Independent local verification
+matched every downloaded archive against its GitHub digest and the embedded
+`modules.toml` hash; the released Ubuntu artifact also passed the TinyBus
+operation and signing E2E. The module-boundary audit reports zero violations
+and no remaining Wallet implementation exceptions. TinyRuntime remains excluded
+from this migration.
 
 ## Current delivery status
 

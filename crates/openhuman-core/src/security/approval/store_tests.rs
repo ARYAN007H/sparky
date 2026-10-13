@@ -1,5 +1,6 @@
 use super::*;
 use crate::security::approval::types::{ApprovalDecision, PendingApproval};
+use crate::storage::rusqlite;
 use chrono::Duration;
 use serde_json::json;
 use tempfile::TempDir;

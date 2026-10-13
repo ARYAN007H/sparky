@@ -26,6 +26,7 @@ pub mod config;
 pub mod documents;
 pub mod fence;
 pub mod fenced_backend;
+pub mod import;
 pub mod lease;
 mod lease_documents;
 mod lease_local;
@@ -35,6 +36,10 @@ pub mod secrets;
 use std::future::Future;
 use std::sync::{Arc, LazyLock, OnceLock, RwLock};
 
+/// SQLite bindings re-exported by the storage driver crate, for the readers
+/// of legacy per-domain SQLite files. The core has no `rusqlite` dependency
+/// of its own: tinystoragedrivers owns the one copy.
+pub use tinystoragedrivers::sqlite::rusqlite;
 pub use tinystoragedrivers::{
     Blocking, CollectionSpec, DocumentStore, DocumentStoreExt, MemoryStorage, Precondition, Scope,
     ScopedStorage, StorageBackend, StorageConfig as StorageUrl, StorageError,

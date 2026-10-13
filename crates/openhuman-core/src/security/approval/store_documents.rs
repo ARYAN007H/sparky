@@ -71,6 +71,17 @@ pub(super) fn current(config: &Config) -> Result<Option<Docs>> {
     Ok(Some(Docs::new(&opened.scoped()?)))
 }
 
+/// The legacy `approval.db`, as the storage importer reads it.
+pub(crate) fn import_source() -> crate::storage::import::Source {
+    crate::storage::import::Source {
+        domain: "approval",
+        db: "approval/approval.db",
+        collections,
+        read_legacy: |scratch, _real| super::store::import::read(scratch),
+        rekey: |record, _config| record,
+    }
+}
+
 /// The collections the approval store keeps.
 pub(super) fn collections() -> Vec<CollectionSpec> {
     vec![

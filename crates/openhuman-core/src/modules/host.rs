@@ -186,6 +186,7 @@ async fn build_runtime() -> tinybus::Result<ModuleRuntime> {
     let connection = Connection::connect(transport.connect().await?).await?;
 
     super::tokenjuice_host::install(&connection).await?;
+    super::storage_host::install(&connection).await?;
     #[cfg(feature = "web3")]
     super::wallet_host::install(&connection).await?;
 

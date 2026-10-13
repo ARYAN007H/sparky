@@ -33,8 +33,6 @@ fn default_composio_mode() -> String {
 #[derive(Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(default)]
 pub struct ComposioConfig {
-    #[serde(default)]
-    pub enabled: bool,
     #[serde(default = "default_entity_id")]
     pub entity_id: String,
     /// When true, the triage pipeline is disabled for all Composio
@@ -99,7 +97,6 @@ impl ComposioConfig {
 impl std::fmt::Debug for ComposioConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ComposioConfig")
-            .field("enabled", &self.enabled)
             .field("entity_id", &self.entity_id)
             .field("triage_disabled", &self.triage_disabled)
             .field("triage_disabled_toolkits", &self.triage_disabled_toolkits)
@@ -190,7 +187,6 @@ fn default_entity_id() -> String {
 impl Default for ComposioConfig {
     fn default() -> Self {
         Self {
-            enabled: false,
             entity_id: default_entity_id(),
             triage_disabled: false,
             triage_disabled_toolkits: Vec::new(),

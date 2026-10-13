@@ -103,3 +103,18 @@ async fn tinyjuice_detects_and_converts_html() {
         .unwrap()
         .contains("hi"));
 }
+
+#[cfg(feature = "web3")]
+#[test]
+fn x402_hook_declines_payment_when_wallet_component_is_off() {
+    let mut config = crate::config::Config::default();
+    assert!(x402::declined_when_wallet_off(&config).is_ok());
+    assert!(config.components.set("wallet", false));
+    assert_eq!(
+        x402::declined_when_wallet_off(&config).unwrap_err(),
+        "COMPONENT_DISABLED:wallet"
+    );
+    // Re-enabling needs no restart of the hook: it reads the config per call.
+    assert!(config.components.set("wallet", true));
+    assert!(x402::declined_when_wallet_off(&config).is_ok());
+}

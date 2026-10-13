@@ -421,6 +421,11 @@ pub struct Config {
     #[serde(default)]
     pub tokenjuice: TokenjuiceConfig,
 
+    /// Per-dependency switches (`[components]`). Narrow-only; applied at the
+    /// next core start.
+    #[serde(default)]
+    pub components: ComponentsConfig,
+
     /// Hosting provider credentials and switch (`hosting` feature).
     #[serde(default)]
     pub hosting: HostingConfig,

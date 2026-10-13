@@ -37,13 +37,17 @@ core/runtime/subscribers.rs
 inference/provider/factory.rs
 memory/layout_migration/map_tests.rs
 mcp/server/resources.rs
-mcp/server/mod.rs
 mcp/server/tools/mod.rs
 modules/host.rs
 modules/host_tests.rs
 modules/registry_tests.rs
 platform/socket/event_handlers.rs
 profiles/surface_tests.rs
+agent/session_host/transcript_compat_tests.rs
+channels/mod.rs
+mcp/host.rs
+modules/registry_contract_tests.rs
+modules/registry.rs
 security/credentials/ops/credential.rs
 skills/bundled/mod.rs
 skills/mod.rs
@@ -61,6 +65,11 @@ web3/stub.rs
 web3/wallet/stub.rs
 web3/x402/stub.rs
 profiles/surface_tests.rs
+agent/session_host/transcript_compat_tests.rs
+channels/mod.rs
+mcp/host.rs
+modules/registry_contract_tests.rs
+modules/registry.rs
 EOF
 )
 

@@ -21,14 +21,14 @@ fn tinycomputer_registry_matches_bus_contract_and_published_release() {
 
 #[test]
 #[cfg(feature = "web3")]
-fn tinywallet_registry_matches_the_verified_v0192_release_manifest() {
+fn tinywallet_registry_matches_the_verified_v020_release_manifest() {
     let wallet = find("tinywallet").expect("compiled TinyWallet module");
-    assert_eq!(wallet.version, "0.19.2");
+    assert_eq!(wallet.version, "0.20.0");
     #[cfg(feature = "web3")]
-    assert_eq!(tinywallet_bus::CONTRACT_VERSION, (1, 13));
+    assert_eq!(tinywallet_bus::CONTRACT_VERSION, (1, 14));
     assert_eq!(
         wallet.release_url,
-        "https://github.com/tinyhumansai/tinywallet/releases/tag/v0.19.2"
+        "https://github.com/tinyhumansai/tinywallet/releases/tag/v0.20.0"
     );
 
     let mut actual = wallet
@@ -40,88 +40,88 @@ fn tinywallet_registry_matches_the_verified_v0192_release_manifest() {
     let mut published = [
         (
             "archlinux-arm64",
-            "tinywallet-module-0.19.2-archlinux-arm64.tar.gz",
-            "df51cab1066c4ea5b6964343a136769b53b61de392a8dcf56f9455b5370a72af",
+            "tinywallet-module-0.20.0-archlinux-arm64.tar.gz",
+            "04641e9a3e69a28d7b29b7055cd6b6f1e710f117e37392426a22eb1867e1a0c8",
         ),
         (
             "archlinux-x86_64",
-            "tinywallet-module-0.19.2-archlinux-x86_64.tar.gz",
-            "e7b0717c82a530b2ca0f44c55938d66f19bb98b0f314032cf8f3336cf23840cc",
+            "tinywallet-module-0.20.0-archlinux-x86_64.tar.gz",
+            "50dbe4f6b296941971712eacc831a9ff5947dfaca3be664687e6a1ae120f9b9d",
         ),
         (
             "fedora-43-arm64",
-            "tinywallet-module-0.19.2-fedora-43-arm64.tar.gz",
-            "c42776335a866fda439fc2d05ac70c6dd120fa0d56359d910bf5fe58e51b354b",
+            "tinywallet-module-0.20.0-fedora-43-arm64.tar.gz",
+            "3802fd3681bfeac1ce90e34c98600258993cc832fa89285895aabea22f0d2b81",
         ),
         (
             "fedora-43-x86_64",
-            "tinywallet-module-0.19.2-fedora-43-x86_64.tar.gz",
-            "4a26baaabad59fa96c0a36b766d8352d8eb72a09d188f7313b136379db34cf73",
+            "tinywallet-module-0.20.0-fedora-43-x86_64.tar.gz",
+            "9767aa07631a03adaed05430c03726f4e19e16b3561f1fc149264eb52332dbc5",
         ),
         (
             "fedora-44-arm64",
-            "tinywallet-module-0.19.2-fedora-44-arm64.tar.gz",
-            "6ac6974fd601959eb8b8726d99abe64389445d53b71f263f5af58e05877ffbb5",
+            "tinywallet-module-0.20.0-fedora-44-arm64.tar.gz",
+            "3974790d265b775f968e5dcaa7e4206d08da52187cad09e438cc278aba9eb540",
         ),
         (
             "fedora-44-x86_64",
-            "tinywallet-module-0.19.2-fedora-44-x86_64.tar.gz",
-            "7589757b00ce3e01e88f01c4d479a6ef2795bf3f361dab3972cde51939e6ef97",
+            "tinywallet-module-0.20.0-fedora-44-x86_64.tar.gz",
+            "83ff87f0d71985e63ac73c95944e534286fde1a04b0a7daa499753e1fe943269",
         ),
         (
             "macos-15-arm64",
-            "tinywallet-module-0.19.2-macos-15-arm64.tar.gz",
-            "4ab4d3b350c2a6684f06dc67f7eb8c54957a5b15390d7b37fb4c38a5a3d3fb6a",
+            "tinywallet-module-0.20.0-macos-15-arm64.tar.gz",
+            "496e61f6ce4a431ee77bf730a713c3d1c8d76b6666f99d15972f7f62623e632f",
         ),
         (
             "macos-15-x86_64",
-            "tinywallet-module-0.19.2-macos-15-x86_64.tar.gz",
-            "2bb7d195371382030c5894e14a57f5a792e3e41b36246bd754174e26b250bb94",
+            "tinywallet-module-0.20.0-macos-15-x86_64.tar.gz",
+            "427b9882eb1ef52be3ba28ed9e292790c60a1f769148b3bbafe4ef5389e1144a",
         ),
         (
             "macos-26-arm64",
-            "tinywallet-module-0.19.2-macos-26-arm64.tar.gz",
-            "f5e36e43bf05321e0fa503f591e1f51471eb6ee06bc6dc39a2857a35aeecc24f",
+            "tinywallet-module-0.20.0-macos-26-arm64.tar.gz",
+            "65955f1a0c921da47e1a2cecc7ba4f19cd775c536f7039878dd6c60c3804b017",
         ),
         (
             "macos-26-x86_64",
-            "tinywallet-module-0.19.2-macos-26-x86_64.tar.gz",
-            "37845264453470cdfee9fea998d4664e1ab948a566e1da2ea585fac53d13b9eb",
+            "tinywallet-module-0.20.0-macos-26-x86_64.tar.gz",
+            "5fa92699fed3cb00c57f29c04fa101d94b24f85aedae91f1b6776d57f7162604",
         ),
         (
             "ubuntu-22.04-arm64",
-            "tinywallet-module-0.19.2-ubuntu-22.04-arm64.tar.gz",
-            "9311690732558c3347ff4a3bbe4a29a09cfd999ce53561080d58f3963d143a54",
+            "tinywallet-module-0.20.0-ubuntu-22.04-arm64.tar.gz",
+            "cce338941314005f54584e567dc5d6c2f9a8a4189c4b47908ead8ceed19ae328",
         ),
         (
             "ubuntu-22.04-x86_64",
-            "tinywallet-module-0.19.2-ubuntu-22.04-x86_64.tar.gz",
-            "016c5e6efc1bb63ce60572edc1ffd61699d3006601d5dc52e51604a91a225bf8",
+            "tinywallet-module-0.20.0-ubuntu-22.04-x86_64.tar.gz",
+            "8712d00897266d0e2b0889ac76fe4da12d1917ffb8e2b3fcc8eb95c1c6f8570e",
         ),
         (
             "ubuntu-24.04-arm64",
-            "tinywallet-module-0.19.2-ubuntu-24.04-arm64.tar.gz",
-            "c68d3b8b2257377aed4d1b852a1eb28c26b4a7c34fb7eb7359720f098dc6216e",
+            "tinywallet-module-0.20.0-ubuntu-24.04-arm64.tar.gz",
+            "1ca76d32b4d66c68b31963f4aa9cfdc6585276fff660d4ab29726dbb29e04499",
         ),
         (
             "ubuntu-24.04-x86_64",
-            "tinywallet-module-0.19.2-ubuntu-24.04-x86_64.tar.gz",
-            "0116da89b2031532b6eefa60f0d77335514c77dd7b5c49c6f556c180b3b24780",
+            "tinywallet-module-0.20.0-ubuntu-24.04-x86_64.tar.gz",
+            "6c092e41f8053851c5d4919e3c8ff6445cac4a9f8526889aa40a500a77ae40ba",
         ),
         (
             "windows-11-arm64",
-            "tinywallet-module-0.19.2-windows-11-arm64.zip",
-            "977e2051dfadc29a7a66884198ac25fc6d4b2d375d45a174889158c6ca7e15f4",
+            "tinywallet-module-0.20.0-windows-11-arm64.zip",
+            "171172d90020470dfbe83d3be480b0d6127b123694fdbf600218acc7cba6f929",
         ),
         (
             "windows-2022-x86_64",
-            "tinywallet-module-0.19.2-windows-2022-x86_64.zip",
-            "99a36e75a71212b22991564d10e18e0bbe3c1c0acae2d17bbe95df14eb6d2bdb",
+            "tinywallet-module-0.20.0-windows-2022-x86_64.zip",
+            "80d5ae3272ae0d32fcc1fcb727573554dffcc34f793d35c9b2603d0a4f8cdb28",
         ),
         (
             "windows-2025-x86_64",
-            "tinywallet-module-0.19.2-windows-2025-x86_64.zip",
-            "c16c1071651cd493dd56af5fdf63992c8667b8becaeac2ad0be4f32a7b6c493a",
+            "tinywallet-module-0.20.0-windows-2025-x86_64.zip",
+            "c56914add49d2529dc4620e1c1a4846961d16da9b4d8fb9005c3d6d23989d51f",
         ),
     ];
     actual.sort_unstable();
@@ -545,7 +545,7 @@ fn a_record_publishes_for_every_host_or_for_none() {
 
 #[test]
 fn find_resolves_known_ids_only() {
-    assert!(find("tinydocs").is_some());
+    assert!(find("tinymcp").is_some());
     assert!(find("not-a-module").is_none());
 }
 

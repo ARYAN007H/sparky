@@ -101,13 +101,13 @@ fn an_override_with_both_path_and_source_is_ignored() {
 #[test]
 fn artifact_in_finds_the_built_library_by_registry_file_name() {
     let dir = tempfile::tempdir().unwrap();
-    let record = crate::modules::registry::find("tinydocs").unwrap();
-    assert_eq!(artifact_in(dir.path(), "tinydocs"), None);
-    let module_dir = dir.path().join("tinydocs");
+    let record = crate::modules::registry::find("tinymcp").unwrap();
+    assert_eq!(artifact_in(dir.path(), "tinymcp"), None);
+    let module_dir = dir.path().join("tinymcp");
     std::fs::create_dir_all(&module_dir).unwrap();
     let file = module_dir.join(record.source.artifact_filename());
     std::fs::write(&file, b"x").unwrap();
-    assert_eq!(artifact_in(dir.path(), "tinydocs"), Some(file));
+    assert_eq!(artifact_in(dir.path(), "tinymcp"), Some(file));
 }
 
 #[test]

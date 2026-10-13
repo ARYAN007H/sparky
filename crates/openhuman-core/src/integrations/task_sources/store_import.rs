@@ -7,6 +7,7 @@
 //! ([`crate::storage::local`]) writes the documents and then renames the
 //! tables to `_legacy_<name>`.
 
+use crate::storage::rusqlite;
 use anyhow::{Context, Result};
 use chrono::DateTime;
 use rusqlite::Connection;

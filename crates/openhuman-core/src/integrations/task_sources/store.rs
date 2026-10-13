@@ -12,6 +12,7 @@
 //! function here is served from the document port instead
 //! (`store_documents.rs`).
 
+use crate::storage::rusqlite;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};

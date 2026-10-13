@@ -3,7 +3,12 @@
 //! existing `approval.db` through the SQLite storage driver, imports the old
 //! tables once and keeps them as `_legacy_<name>`. Through the real binary
 //! and its JSON-RPC surface.
+//!
+//! The last test boots the same workspace on an explicit storage URL, where
+//! the host's importer copies the legacy rows into that backend and leaves the
+//! legacy file byte-for-byte untouched.
 
+use openhuman_core::storage::rusqlite;
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
@@ -179,4 +184,43 @@ fn serve_imports_legacy_approvals_by_default_and_classic_leaves_them() {
         })
         .unwrap();
     assert_eq!(kept, 2, "the retired table is kept as it was");
+}
+
+/// Every byte of `path`, for proving a file was not modified.
+fn bytes(path: &Path) -> Vec<u8> {
+    std::fs::read(path).unwrap()
+}
+
+#[test]
+fn serve_on_an_explicit_url_imports_legacy_approvals_without_touching_the_file() {
+    let tmp = tempfile::tempdir().unwrap();
+    let workspace = tmp.path().join("workspace");
+    legacy_workspace(&workspace);
+    let db = workspace.join("approval").join("approval.db");
+    let before = bytes(&db);
+    let dir_before: Vec<_> = std::fs::read_dir(db.parent().unwrap())
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .collect();
+    let url = format!("sqlite:{}", tmp.path().join("storage").display());
+
+    for boot in 0..2 {
+        let (_server, base) = start(tmp.path(), &workspace, Some(&url));
+        let listed = rpc(&base, "openhuman.approval_list_pending", json!({})).to_string();
+        assert!(listed.contains("still-pending"), "boot {boot}: {listed}");
+        assert!(
+            !listed.contains("already-approved"),
+            "boot {boot}: {listed}"
+        );
+        let recent = rpc(&base, "openhuman.approval_list_recent_decisions", json!({})).to_string();
+        assert!(recent.contains("already-approved"), "boot {boot}: {recent}");
+    }
+
+    assert_eq!(bytes(&db), before, "the legacy database was not modified");
+    let dir_after: Vec<_> = std::fs::read_dir(db.parent().unwrap())
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .collect();
+    assert_eq!(dir_after, dir_before, "no companion file was created");
+    assert!(tables(&db).contains(&"pending_approvals".to_string()));
 }
