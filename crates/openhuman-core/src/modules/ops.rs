@@ -257,7 +257,20 @@ async fn start_resolution(
                 Resolution::Failed(reason)
             }
         };
+        let ready = matches!(resolution, Resolution::Ready);
+        // The connector module's curated catalogs are cached in the host; a
+        // module that has just been (re)resolved may serve other tables, so
+        // drop the snapshot before any waiting caller is released.
+        if id == super::connectors::MODULE_ID {
+            crate::integrations::composio::contract::curated::invalidate();
+        }
         resolution::global().complete(id, resolution, sender);
+        if ready && id == super::connectors::MODULE_ID {
+            // Fill it now rather than at the first connector call, so the
+            // synchronous lookups (tool visibility, flow gates) never read an
+            // empty snapshot in between.
+            super::connectors::prime_catalogs(&config).await;
+        }
     };
     match host::runtime().await {
         Ok(runtime) => {

@@ -77,8 +77,12 @@ pub async fn composio_list_capabilities(
 /// "preview / agent integration coming soon" so users aren't led into
 /// a broken `composio_list_tools` → max-iterations loop. See #2283.
 pub async fn composio_list_agent_ready_toolkits(
+    config: &Config,
 ) -> OpResult<Outcome<super::super::types::ComposioAgentReadyToolkitsResponse>> {
     tracing::debug!("[composio] rpc list_agent_ready_toolkits");
+    // The list is the module's, read through the process snapshot; fill it
+    // first so this does not answer empty ahead of the first connector call.
+    connectors::ensure_catalogs(config).await;
     let toolkits: Vec<String> = agent_ready_toolkits();
     let count = toolkits.len();
     let resp = super::super::types::ComposioAgentReadyToolkitsResponse { toolkits };

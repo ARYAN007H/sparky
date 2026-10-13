@@ -136,6 +136,9 @@ pub(crate) async fn search_catalog(
     // re-exported; see `ListConnectableToolkitsTool::execute` for why (#5560).
     use crate::integrations::composio::contract::agent_ready_toolkits;
 
+    // Curated-catalog lookups below read the module's process snapshot.
+    crate::integrations::composio::module_client::ensure_catalogs(config).await;
+
     let terms: Vec<String> = query
         .split_whitespace()
         .map(|t| t.to_ascii_lowercase())

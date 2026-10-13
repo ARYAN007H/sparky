@@ -74,6 +74,21 @@ pub async fn load_declared_modules(config: &Config) {
             );
         }
     }
+
+    // A connector module that is already serving (found on the search path, so
+    // no resolution ran for it) still needs its catalogs read into the host.
+    if ops::state_of(super::connectors::MODULE_ID) == super::types::ModuleState::Ready
+        || super::host::runtime()
+            .await
+            .is_ok_and(|runtime| {
+                runtime.host().list().iter().any(|info| {
+                    registry::find(super::connectors::MODULE_ID)
+                        .is_some_and(|record| info.manifest.bus_name.as_str() == record.bus_name)
+                })
+            })
+    {
+        super::connectors::prime_catalogs(config).await;
+    }
 }
 
 #[cfg(test)]

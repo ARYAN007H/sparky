@@ -100,6 +100,21 @@ async fn prime_curated_catalogs(config: &crate::config::Config) {
     }
 }
 
+/// Make sure the curated-catalog snapshot is filled before a synchronous
+/// lookup that does not itself call the module (the agent-ready list, catalog
+/// search). The module is loaded if it is not yet, then asked once per pinned
+/// version; a failure is logged and the lookups read every toolkit as
+/// uncurated until a later call succeeds. A build without a module loader has
+/// no catalogs to read and does nothing.
+#[cfg(feature = "modules")]
+pub async fn ensure_catalogs(config: &crate::config::Config) {
+    prime_curated_catalogs(config).await;
+}
+
+/// Without the module loader there is no catalog to read.
+#[cfg(not(feature = "modules"))]
+pub async fn ensure_catalogs(_config: &crate::config::Config) {}
+
 /// Call one member with an argument and decode its reply.
 ///
 /// # Errors

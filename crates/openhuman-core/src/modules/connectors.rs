@@ -196,6 +196,19 @@ fn route_config(config: &Config) -> Result<serde_json::Value, String> {
     }
 }
 
+/// Read the connector module's curated catalogs into the host's snapshot.
+///
+/// Called once the module is serving (see `ops::start_resolution`) and at
+/// boot when it was already serving from the search path. A failure only
+/// delays the snapshot: the next connector call primes it again.
+pub async fn prime_catalogs(config: &Config) {
+    if let Err(error) =
+        crate::integrations::composio::contract::curated::prime(config).await
+    {
+        tracing::debug!("[connectors] catalog prime failed: {error}");
+    }
+}
+
 /// The route description last sent to the module, as a fingerprint.
 ///
 /// Only a hash is kept: comparing routes means comparing bearer tokens, and a
