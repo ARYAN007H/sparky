@@ -275,9 +275,9 @@ impl AgentDefinitionSpec {
         match self.system_prompt {
             Some(prompt) if self.bare_prompt => {
                 def.system_prompt = PromptSource::Verbatim(prompt);
-                def.omit_identity = true;
-                def.omit_safety_preamble = true;
-                def.omit_memory_context = true;
+                def.extensions.omit_identity = true;
+                def.extensions.omit_safety_preamble = true;
+                def.extensions.omit_memory_context = true;
             }
             Some(prompt) => def.system_prompt = PromptSource::Inline(prompt),
             // The orchestrator's dynamic prompt describes a delegation and
@@ -376,7 +376,7 @@ impl AgentDefinitionSpec {
         def.agent_tier = tinyagents_definition::AgentTier::Worker;
         def.subagents.clear();
         def.delegate_name = None;
-        def.searches_connected_mcp = false;
+        def.extensions.searches_connected_mcp = false;
         Ok(def)
     }
 }
