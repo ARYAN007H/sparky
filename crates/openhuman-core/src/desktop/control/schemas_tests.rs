@@ -21,7 +21,7 @@ async fn desktop_controllers_expose_expected_rpc_contracts_and_dispatch_pending(
     assert_eq!(controller("confirm").schema.inputs.len(), 2);
 }
 
-fn scoped_context(computer: bool) -> (tempfile::TempDir, CoreContext) {
+fn scoped_context(computer: bool) -> (tempfile::TempDir, std::sync::Arc<CoreContext>) {
     let dir = tempfile::tempdir().unwrap();
     let mut config = crate::config::Config::default();
     config.workspace_dir = dir.path().to_path_buf();
