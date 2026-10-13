@@ -559,8 +559,8 @@ async fn start_with(
         // screen the user is, once the import is done.
         if read_file(&workspace_dir).state.phase == ImportPhase::Done {
             let started = super::layout_migration::start(
-                config,
-                Arc::new(super::layout_migration::AppHost),
+                config.clone(),
+                Arc::new(super::layout_migration::AppHost::new(config)),
                 // Migration is free: organizing follows a finished import
                 // straight away, free period or not. A shared self-hosted
                 // tree still waits for the takeover consent.
