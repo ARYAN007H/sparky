@@ -702,7 +702,7 @@ Every run appends to a durable event journal (`tinyagents/journal.rs`): a `Store
 
 The remaining store cutover runs on shadow scaffolding. Product behavior is unchanged and divergences are logged:
 
-- Session dual-write / shadow read (`session_host/runtime_session.rs`): session messages dual-write into the TinyAgents store (default-ON flag `config.session_dual_write`); loads shadow-read for parity while the legacy file store stays authoritative.
+- Sessions live in the storage backend (`DriverSessionStores`); the file-era dual-write and shadow read are gone, and `config.session_dual_write` / `session_shadow_reads` no longer have any effect.
 
 Goals and todos are crate-backed outright, with no shadow: thread goals live in the crate `graph.goals` KV store (`agent/goals/store.rs`), and the session todo list lives in the in-process crate `graph.todos` store (`agent/todos/ops.rs`); see [Goals and todos](../../features/goals-and-todos.md).
 

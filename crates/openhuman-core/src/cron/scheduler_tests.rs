@@ -333,24 +333,3 @@ async fn a_pipeline_reports_its_last_stage_rather_than_pipefail() {
          a failure and re-status every existing job with a pipeline in it: {output}"
     );
 }
-
-#[tokio::test]
-async fn without_a_backend_an_agent_needs_its_own_job_store_or_a_legacy_jobs_db() {
-    // The lib test binary installs no storage backend into the process slot.
-    if crate::storage::installed().is_some() {
-        return;
-    }
-    let tmp = TempDir::new().unwrap();
-    let config = test_config(&tmp).await;
-    let db = crate::cron::store::db_path(&config);
-    let _ = std::fs::remove_file(&db);
-    assert!(!agent_jobs_may_exist(&config));
-    std::fs::create_dir_all(db.parent().unwrap()).unwrap();
-    std::fs::write(&db, b"").unwrap();
-    assert!(agent_jobs_may_exist(&config));
-    // The `jobs.db` tinyflows wrote counts too: the first call imports it.
-    std::fs::remove_file(&db).unwrap();
-    assert!(!agent_jobs_may_exist(&config));
-    std::fs::write(crate::cron::store::legacy_db_path(&config), b"").unwrap();
-    assert!(agent_jobs_may_exist(&config));
-}

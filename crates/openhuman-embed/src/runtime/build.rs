@@ -89,7 +89,7 @@ impl RuntimeBuilder {
         validate_storage_feature(self.seams.storage.as_ref())?;
         if self.seams.storage.is_none() {
             if let Some(config) = &self.config {
-                if let Some(url) = openhuman_core::storage::configured_url(config) {
+                if let Some(url) = openhuman_core::storage::explicit_url(config) {
                     validate_storage_feature(Some(&super::StorageSource::Url(url)))?;
                 }
             }
@@ -107,7 +107,7 @@ impl RuntimeBuilder {
             && self
                 .config
                 .as_ref()
-                .and_then(openhuman_core::storage::configured_url)
+                .and_then(openhuman_core::storage::explicit_url)
                 .is_none()
         {
             return Err(RuntimeError::NoSessionStore);
@@ -166,7 +166,7 @@ impl RuntimeBuilder {
         let mut host_seams = std::mem::take(&mut self.seams);
         if host_seams.storage.is_none() {
             if let Some(config) = &config {
-                if let Some(url) = openhuman_core::storage::configured_url(config) {
+                if let Some(url) = openhuman_core::storage::explicit_url(config) {
                     host_seams.storage = Some(super::StorageSource::Url(url));
                 }
             }

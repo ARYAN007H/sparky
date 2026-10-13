@@ -1,13 +1,13 @@
 //! Host wiring for the harness `EmbeddingToolRanker`: adapt the process's
 //! `EmbeddingProvider` onto the vendor `EmbeddingModel` and decide whether the
 //! provider can embed at all. The ranker itself (cosine ranking, the in-memory
-//! and on-disk catalogue cache) lives in `tinyagents-harness`
-//! (`tool::discover::EmbeddingToolRanker`).
+//! and durable catalogue cache) lives in `tinyagents-harness`
+//! (`tool::discover::EmbeddingToolRanker`, `DriverEmbeddingCache`).
 
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use tinyagents_harness::tool::discover::EmbeddingToolRanker;
+use tinyagents_harness::tool::discover::{DriverEmbeddingCache, EmbeddingToolRanker};
 use tinyinference_embeddings::{EmbeddingModel, Error as EmbedError, Result as EmbedResult};
 
 use crate::inference::embedding_host::EmbeddingProvider;
@@ -43,11 +43,32 @@ impl EmbeddingModel for RankerEmbeddingModel {
 }
 
 /// A ranker over `provider` with an in-memory cache; chain
-/// `.with_disk_cache(path)` to persist it. The cache is keyed by the provider's
-/// embedding-space signature, so a model change invalidates it.
+/// `.with_cache(cache)` to persist it (see [`embedding_tool_ranker_in`]). The
+/// cache is keyed by the provider's embedding-space signature, so a model
+/// change invalidates it.
 pub fn embedding_tool_ranker(provider: Arc<dyn EmbeddingProvider>) -> EmbeddingToolRanker {
     let signature = provider.signature();
     EmbeddingToolRanker::new(Arc::new(RankerEmbeddingModel(provider)), signature)
+}
+
+/// A ranker over `provider` whose catalogue embeddings are cached in the
+/// storage backend, in the calling scope (`DriverEmbeddingCache`). When the
+/// backend cannot be had the ranker still works, with its in-memory cache
+/// only.
+pub fn embedding_tool_ranker_in(
+    provider: Arc<dyn EmbeddingProvider>,
+    workspace_dir: &std::path::Path,
+) -> EmbeddingToolRanker {
+    let ranker = embedding_tool_ranker(provider);
+    match crate::storage::local::open("tool_search", workspace_dir).and_then(|o| o.scoped()) {
+        Ok(scoped) => ranker.with_cache(Arc::new(DriverEmbeddingCache::new(Arc::clone(
+            scoped.documents(),
+        )))),
+        Err(error) => {
+            log::warn!("[tool-search] embedding cache unavailable; in-memory only: {error:#}");
+            ranker
+        }
+    }
 }
 
 /// Whether `provider` can embed at all. The `none` provider embeds nothing and

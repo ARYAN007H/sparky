@@ -130,9 +130,6 @@ impl LiveAgentSchedulers {
                         return;
                     }
                 };
-                if !agent_jobs_may_exist(&config) {
-                    return;
-                }
                 let Some(security) = crate::security::live_policy::effective() else {
                     tracing::warn!(agent = %agent_id, "[cron:scheduler] agent has no policy; jobs skipped");
                     return;
@@ -170,16 +167,6 @@ pub async fn run_live_agent_pass(max_concurrent: usize) {
     let mut agents = LiveAgentSchedulers::default();
     agents.tick().await;
     agents.drain().await;
-}
-
-/// Whether an agent can have jobs to poll: with a storage backend its jobs
-/// live in the backend under its scope (`crate::storage`), so there is always
-/// something to ask; without one, only once its own store exists, or the
-/// `jobs.db` tinyflows used to write there (which the first call imports).
-pub(crate) fn agent_jobs_may_exist(config: &Config) -> bool {
-    crate::storage::installed().is_some()
-        || crate::cron::store::db_path(config).exists()
-        || crate::cron::store::legacy_db_path(config).exists()
 }
 
 /// Run `job` now under the caller's `run_id` (also the id its delivery and

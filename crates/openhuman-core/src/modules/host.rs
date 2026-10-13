@@ -195,6 +195,16 @@ async fn build_runtime() -> tinybus::Result<ModuleRuntime> {
         tracing::debug!("[modules] juice component off; MlHost not served");
     }
     super::storage_host::install(&connection).await?;
+    #[cfg(feature = "tinymemes")]
+    {
+        let memes_on = crate::core::runtime::context::CoreContext::current()
+            .is_none_or(|ctx| ctx.components().memes);
+        if memes_on {
+            crate::tinymemes::service::install(&connection).await?;
+        } else {
+            tracing::debug!("[modules] memes component off; Host callbacks not served");
+        }
+    }
     #[cfg(feature = "web3")]
     super::wallet_host::install(&connection).await?;
 

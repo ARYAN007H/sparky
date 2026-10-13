@@ -146,7 +146,7 @@ async fn a_configured_backend_holds_cron_flows_and_flow_state(case: Case) {
     })
     .await
     .unwrap();
-    assert!(workspace.path().join("flows/catalog.db").exists());
+    assert!(workspace.path().join("storage/storage.db").exists());
     // The flow written to the backend is not in the workspace's catalog.
     assert!(flows::ops::flows_list(&config)
         .await
@@ -154,7 +154,6 @@ async fn a_configured_backend_holds_cron_flows_and_flow_state(case: Case) {
         .value
         .is_empty());
     openhuman_core::agent::orchestration::open_delegation_checkpointer(&config).unwrap();
-    assert!(workspace.path().join("graph_checkpoints.db").exists());
 }
 
 /// The stores tinyflows used to write (`jobs.db`, `flows.db`, `checkpoints.db`,

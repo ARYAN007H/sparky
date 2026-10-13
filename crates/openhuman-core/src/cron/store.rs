@@ -1,12 +1,9 @@
 //! Cron persistence: a thin host binding of `tinyflows_drivers::schedule::CronDocuments`.
 //!
 //! Jobs, run history and per-job policy live on the storage ports, in the
-//! acting agent's scope of the installed backend ([`crate::storage`]) or, when
-//! the host configured none, in a SQLite document store of their own
-//! (`<workspace>/cron/schedule.db`, an embedded agent's under
-//! `agents/<id>/cron/`). tinyflows no longer has a SQLite store of its own: the
-//! `jobs.db` it wrote is imported once, read-only, on first use
-//! ([`crate::storage::import`]).
+//! acting agent's scope of the storage backend ([`crate::storage`]). tinyflows no
+//! longer has a SQLite store of its own: the `jobs.db` it wrote is imported
+//! once, read-only, when the backend is installed ([`crate::storage::import`]).
 //!
 //! This module only turns the host [`Config`] into the store's limits
 //! (run-history cap, due-job batch size), so callers keep passing `&Config`.
@@ -23,16 +20,6 @@ use tinyflows_schedule::{
 use super::limits;
 use tinyflows_schedule::AgentJobSpec;
 
-/// The cron store's own database for `config`: `<workspace>/cron/schedule.db`,
-/// or the agent's `<workspace>/agents/<id>/cron/schedule.db` under an embedded
-/// agent's context, so an agent lists, edits and runs only the jobs it
-/// created. Used only when no storage backend is installed.
-pub fn db_path(config: &Config) -> std::path::PathBuf {
-    crate::core::runtime::agent_scope_dir(config)
-        .join("cron")
-        .join("schedule.db")
-}
-
 /// The cron database tinyflows used to write, imported on first use.
 pub fn legacy_db_path(config: &Config) -> std::path::PathBuf {
     crate::storage::import::tinyflows::legacy_jobs_db(&crate::core::runtime::agent_scope_dir(
@@ -42,41 +29,11 @@ pub fn legacy_db_path(config: &Config) -> std::path::PathBuf {
 
 /// The cron job store for this call, in the acting agent's scope.
 pub(crate) fn documents(config: &Config) -> Result<CronDocuments> {
-    let opened = crate::storage::local::open_standing(
-        &db_path(config),
-        "cron::store",
-        config,
-        &|backend, scope, config| legacy_import(backend, scope, config),
-    )?;
+    let opened = crate::storage::local::open("cron::store", &config.workspace_dir)?;
     Ok(
         CronDocuments::new(std::sync::Arc::clone(opened.scoped()?.documents()))
             .with_limits(config.cron.max_run_history, config.scheduler.max_tasks),
     )
-}
-
-/// Brings `jobs.db` into a freshly opened per-store database (the default
-/// layout; with a backend installed the boot-time import did it).
-#[cfg(feature = "flows")]
-fn legacy_import(
-    backend: &std::sync::Arc<dyn crate::storage::StorageBackend>,
-    scope: &crate::storage::Scope,
-    config: &Config,
-) -> Result<()> {
-    let dir = crate::core::runtime::agent_scope_dir(config);
-    crate::storage::import::tinyflows::import_cron(backend, scope, config, &dir, "")?;
-    Ok(())
-}
-
-#[cfg(not(feature = "flows"))]
-fn legacy_import(
-    _backend: &std::sync::Arc<dyn crate::storage::StorageBackend>,
-    _scope: &crate::storage::Scope,
-    config: &Config,
-) -> Result<()> {
-    if legacy_db_path(config).is_file() {
-        tracing::warn!("[cron:store] built without `flows`; the legacy jobs.db is not imported");
-    }
-    Ok(())
 }
 
 /// Runs a document-store call from this synchronous API.
@@ -356,12 +313,7 @@ pub(crate) fn force_next_run_for_test(
     at: DateTime<Utc>,
 ) -> Result<()> {
     use tinystoragedrivers::Precondition;
-    let opened = crate::storage::local::open_standing(
-        &db_path(config),
-        "cron::store",
-        config,
-        &|backend, scope, config| legacy_import(backend, scope, config),
-    )?;
+    let opened = crate::storage::local::open("cron::store", &config.workspace_dir)?;
     let docs = std::sync::Arc::clone(opened.scoped()?.documents());
     let job_id = job_id.to_string();
     run(async move {
