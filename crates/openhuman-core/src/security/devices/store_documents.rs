@@ -30,7 +30,7 @@ pub(crate) fn import_source() -> crate::storage::import::Source {
         domain: "devices",
         db: "devices/devices.db",
         collections,
-        read_legacy: |scratch, _real| super::store::import::read(scratch),
+        read_legacy: |scratch, _real| super::store_import::read(scratch),
         rekey: |record, _config| record,
     }
 }
