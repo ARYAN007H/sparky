@@ -34,10 +34,12 @@
 //!
 //! # What is not here
 //!
-//! Sessions and transcripts are imported by TinyAgents, which owns that
-//! format. The tinyflows stores (cron jobs, the flow catalog and checkpoints)
-//! are copied here with `tinyflows-import`; see [`tinyflows`].
+//! Sessions, transcripts, turn states and the run ledger are read by
+//! TinyAgents' importer, which owns those formats; see [`sessions`]. The
+//! tinyflows stores (cron jobs, the flow catalog and checkpoints) are copied
+//! with `tinyflows-import`; see [`tinyflows`].
 
+pub mod sessions;
 mod snapshot;
 pub mod tinyflows;
 
@@ -186,9 +188,7 @@ pub async fn run(config: &Config) -> Vec<Report> {
     }
     let config = config.clone();
     let joined = tokio::task::spawn_blocking(move || {
-        let mut reports = run_with(&backend, &config, &sources());
-        reports.extend(tinyflows::run_with(&backend, &config));
-        reports
+        run_all(&backend, &config)
     })
     .await;
     match joined {
@@ -202,6 +202,15 @@ pub async fn run(config: &Config) -> Vec<Report> {
             Vec::new()
         }
     }
+}
+
+/// Every importer, in order, over `backend` for `config`'s workspace; from
+/// synchronous code.
+pub fn run_all(backend: &Arc<dyn StorageBackend>, config: &Config) -> Vec<Report> {
+    let mut reports = run_with(backend, config, &sources());
+    reports.extend(tinyflows::run_with(backend, config));
+    reports.extend(sessions::run_with(backend, config));
+    reports
 }
 
 /// [`run`] over an explicit backend and source list, from synchronous code.
