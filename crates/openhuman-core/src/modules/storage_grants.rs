@@ -252,7 +252,12 @@ pub(crate) fn authorize(
     if !is_selector(object, selector) {
         return Err(Denied::Malformed);
     }
-    if !grant.has_object(object) {
+    // `Capabilities` is how a module's storage client learns what the host
+    // serves; the client probes every object when it connects and refuses to
+    // bind when one is refused, so a grant without (say) blobs would leave the
+    // whole module without storage. It reveals nothing of the data and every
+    // other call on an ungranted object is still refused.
+    if !grant.has_object(object) && selector != "Capabilities" {
         return Err(Denied::Object);
     }
     let write = is_write(object, selector);
