@@ -10,7 +10,7 @@ use crate::agent::harness::definition::SandboxMode;
 use crate::config::{RuntimeConfig, SandboxBackend, SandboxConfig};
 use std::collections::HashMap;
 use std::ffi::OsString;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Duration;
 
 /// Safe environment variables forwarded into sandboxed execution.
