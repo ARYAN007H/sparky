@@ -15,7 +15,7 @@ TinyHosts module.
 
 All ten names, descriptions, schemas, and approval classifications are read
 from the release contract's `TOOL_DECLARATIONS_JSON`. OpenHuman keeps the
-workspace containment check and checks that a rollback target is ready before
+workspace containment check; argument shaping, outcome matching, the rollback-ready check and summaries come from `tinyhosts_bus::tools` and `Outcome::matches`. Before
 it asks the module to promote it. The module itself enforces preparation limits
 and validates the uploaded snapshot.
 
