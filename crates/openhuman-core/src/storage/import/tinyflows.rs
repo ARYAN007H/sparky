@@ -49,12 +49,14 @@ pub fn legacy_jobs_db(scope_dir: &Path) -> PathBuf {
 /// Runs `body` unless the marker for `domain` says it already finished, then
 /// records the marker. `body` returns `None` when there is nothing to import
 /// (no marker is written then, so a file that appears later is still seen) and
-/// otherwise `(found, written)`.
+/// otherwise `(found, written, skipped)`. A run that skipped records writes no
+/// marker, so the import is retried at the next boot once the operator has
+/// repaired them (records already written are counted, not duplicated).
 fn marked(
     backend: &Arc<dyn StorageBackend>,
     workspace: &Path,
     domain: &str,
-    body: impl FnOnce() -> Result<Option<(usize, usize)>>,
+    body: impl FnOnce() -> Result<Option<(usize, usize, usize)>>,
 ) -> Result<Outcome> {
     let marker = marker_id(domain, workspace);
     let markers = Repo::on(backend, &Scope::local(), "storage::import", marker_spec)?;
@@ -65,9 +67,18 @@ fn marked(
     if done {
         return Ok(Outcome::AlreadyDone);
     }
-    let Some((found, written)) = body()? else {
+    let Some((found, written, skipped)) = body()? else {
         return Ok(Outcome::NoSource);
     };
+    if skipped > 0 {
+        tracing::warn!(
+            target: "openhuman::storage_import",
+            domain,
+            skipped,
+            "[storage::import] legacy records were skipped; the import stays open for retry"
+        );
+        return Ok(Outcome::Imported { found, written });
+    }
     let body = json!({
         "version": MARKER_VERSION,
         "domain": domain,
@@ -89,10 +100,10 @@ fn marked(
     Ok(Outcome::Imported { found, written })
 }
 
-/// `(found, written)` of a `tinyflows-import` report; problems are logged by
+/// `(found, written, skipped)` of a `tinyflows-import` report; problems are logged by
 /// id only, never with record content.
 #[cfg(feature = "flows")]
-fn counts(domain: &str, report: &tinyflows_import::ImportReport) -> (usize, usize) {
+fn counts(domain: &str, report: &tinyflows_import::ImportReport) -> (usize, usize, usize) {
     for problem in report.problems() {
         tracing::warn!(
             target: "openhuman::storage_import",
@@ -105,7 +116,8 @@ fn counts(domain: &str, report: &tinyflows_import::ImportReport) -> (usize, usiz
         .kinds()
         .map(|(_, tally)| tally.written + tally.existing + tally.invalid)
         .sum();
-    (found, report.total_written())
+    let skipped = report.kinds().map(|(_, tally)| tally.invalid).sum();
+    (found, report.total_written(), skipped)
 }
 
 /// Copies the flow catalog and its checkpoints from `<workspace>/flows` into
@@ -152,9 +164,13 @@ pub fn import_flows(
                 Ok((catalog_report, checkpoint_report))
             }
         })?;
-        let (found_a, written_a) = counts(FLOWS_DOMAIN, &catalog_report);
-        let (found_b, written_b) = counts(FLOWS_DOMAIN, &checkpoint_report);
-        Ok(Some((found_a + found_b, written_a + written_b)))
+        let (found_a, written_a, skipped_a) = counts(FLOWS_DOMAIN, &catalog_report);
+        let (found_b, written_b, skipped_b) = counts(FLOWS_DOMAIN, &checkpoint_report);
+        Ok(Some((
+            found_a + found_b,
+            written_a + written_b,
+            skipped_a + skipped_b,
+        )))
     })
 }
 

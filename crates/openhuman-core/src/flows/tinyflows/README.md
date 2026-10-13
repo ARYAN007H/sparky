@@ -24,8 +24,8 @@ security model); this README covers only the host seam.
   `shell` and `approvals` as `None` (no host shell adapter yet; approvals
   reuse the engine's pause/`flows_resume` fallback).
   - `ops.rs`: `build_capabilities` (assembles the `Capabilities` bundle for
-    one run), `open_flow_checkpointer` (opens the durable SQLite checkpointer
-    at `<workspace_dir>/flows/checkpoints.db`), Composio curation/preflight
+    one run), `open_flow_checkpointer` (a `DriverCheckpointer` on the flow
+    catalog's storage), Composio curation/preflight
     (`is_curated_flow_tool`, `preflight_composio_args`), and the
     `OpenHumanTools` / `PreflightToolInvoker` tool-call adapters.
   - `agent.rs`: `OpenHumanAgentRunner` (`AgentRunner`): resolves an `agent`

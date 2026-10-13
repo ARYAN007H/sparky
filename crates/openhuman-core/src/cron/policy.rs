@@ -23,9 +23,11 @@ pub use tinyflows_schedule::JobPolicy;
 
 use crate::config::Config;
 
-/// Whether `error` is the store's "no such job".
-fn is_missing(error: &anyhow::Error) -> bool {
-    format!("{error:#}").contains("not found")
+/// Whether `error` is the store's "no such job" for `job_id`: its exact
+/// outermost message, so a backend error that merely mentions "not found"
+/// (a missing collection, say) stays on the fail-closed path.
+fn is_missing(error: &anyhow::Error, job_id: &str) -> bool {
+    error.to_string() == format!("Cron job '{job_id}' not found")
 }
 
 /// The policy stored for `job_id`; the default when there is no such job.
@@ -36,7 +38,7 @@ fn is_missing(error: &anyhow::Error) -> bool {
 pub fn get_policy(config: &Config, job_id: &str) -> Result<JobPolicy> {
     match super::store::get_job(config, job_id) {
         Ok(job) => Ok(job.policy),
-        Err(error) if is_missing(&error) => Ok(JobPolicy::default()),
+        Err(error) if is_missing(&error, job_id) => Ok(JobPolicy::default()),
         Err(_) => {
             tracing::warn!(job_id, "[cron:policy] policy unreadable; refusing to run");
             Err(anyhow::anyhow!(
@@ -68,7 +70,7 @@ pub fn set_policy(config: &Config, job_id: &str, policy: JobPolicy) -> Result<()
 /// revert.
 pub fn clear_policy(config: &Config, job_id: &str) -> Result<()> {
     match set_policy(config, job_id, JobPolicy::default()) {
-        Err(error) if is_missing(&error) => Ok(()),
+        Err(error) if is_missing(&error, job_id) => Ok(()),
         other => other,
     }
 }

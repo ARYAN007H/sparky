@@ -360,7 +360,12 @@ fn open_standing_local(
         Some(backend) => Arc::clone(backend),
         None => {
             let dir = db_path.with_extension("files");
-            let url = format!("file:{}", dir.display());
+            let Some(dir_str) = dir.to_str() else {
+                return Err(anyhow!(
+                    "[{domain}] the store path is not valid UTF-8 and cannot be named by a file: URL"
+                ));
+            };
+            let url = format!("file:{dir_str}");
             let backend = super::block_on_anyhow(async move { Ok(super::open(&url).await?) })
                 .with_context(|| format!("[{domain}] open {}", dir.display()))?;
             import(&backend, &Scope::local(), config).with_context(|| {
