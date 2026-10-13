@@ -397,7 +397,7 @@ async fn an_upgraded_job_with_a_side_table_policy_keeps_firing_with_it() {
 }
 
 /// A `flow` schedule row fires through the runtime's trigger sink: the run is
-/// recorded without any `FlowScheduleTick` event in between, and an unknown
+/// recorded without any domain event in between, and an unknown
 /// flow is a no-op rather than a failure.
 #[tokio::test]
 async fn a_flow_schedule_job_fires_through_the_trigger_sink() {
