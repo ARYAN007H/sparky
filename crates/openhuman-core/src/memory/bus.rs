@@ -148,7 +148,7 @@ pub async fn run_system_job(config: &crate::config::Config, job: &str) {
                 std::sync::Arc::new(super::import::scheduler_paused),
             );
             super::lifecycle::jobs::run_due(config).await;
-            super::deletion::drain(config).await;
+            super::deletion::drain_due(config).await;
         }
         _ => {}
     }
