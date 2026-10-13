@@ -25,11 +25,11 @@
 use std::time::Duration;
 
 use crate::tools::implementations::document::format::spec::{
-    WirePresentationSpec, WireSlideImage, WireSlideSpec,
+    SlideImage, SlideSpec, WirePresentationSpec, WireSlideImage, WireSlideSpec,
 };
 use tokio::time::timeout;
 
-use super::types::{GeneratePresentationInput, PresentationError, ResolvedSlideImage};
+use super::types::{GeneratePresentationInput, PresentationError};
 use crate::modules::documents;
 
 /// Run the synthesis. Returns the serialised `.pptx` bytes ready to be written
@@ -39,7 +39,7 @@ use crate::modules::documents;
 /// it surfaces as [`PresentationError::GenerationTimeout`].
 pub(super) async fn generate(
     input: &GeneratePresentationInput,
-    images: &[Vec<ResolvedSlideImage>],
+    images: &[Vec<SlideImage>],
     deadline: Duration,
     config: Option<&crate::config::Config>,
 ) -> Result<Vec<u8>, PresentationError> {
@@ -134,7 +134,7 @@ pub(super) async fn generate(
 /// keeps them consistent.
 fn build_request(
     input: &GeneratePresentationInput,
-    images: &[Vec<ResolvedSlideImage>],
+    images: &[Vec<SlideImage>],
 ) -> (WirePresentationSpec, Vec<u8>) {
     let mut payload = Vec::new();
     let mut slides = Vec::with_capacity(input.slides.len());
