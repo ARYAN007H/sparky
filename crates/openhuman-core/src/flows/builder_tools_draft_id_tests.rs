@@ -212,7 +212,8 @@ async fn revise_workflow_proposal_is_marked_unpersisted() {
     assert_eq!(parsed["persisted"], false);
 }
 
-/// Docs-drift guard (T-m2): the top-of-file module doc table went stale
+/// Docs-drift guard (T-m2), for the Composio-bound half of the belt that stays
+/// in this host (the copilot crate guards its own table): the top-of-file module doc table went stale
 /// enough to list 11 of ~22 tools, mis-describe `DryRunWorkflowTool`'s
 /// permission, and claim a `create_workflow`-adjacent invariant the code
 /// didn't hold — all silently, because nothing checked the table against the
@@ -229,14 +230,6 @@ fn module_doc_tool_table_matches_registered_tools() {
         include_str!("builder_tools.rs"),
         include_str!("builder_tools/catalog_search.rs"),
         include_str!("builder_tools/connection_reads.rs"),
-        include_str!("builder_tools/draft_edit.rs"),
-        include_str!("builder_tools/draft_revise.rs"),
-        include_str!("builder_tools/draft_validate.rs"),
-        include_str!("builder_tools/dry_run.rs"),
-        include_str!("builder_tools/flow_reads.rs"),
-        include_str!("builder_tools/kind_reads.rs"),
-        include_str!("builder_tools/persistence.rs"),
-        include_str!("builder_tools/run_control.rs"),
         include_str!("builder_tools/tool_contract.rs"),
     );
 
