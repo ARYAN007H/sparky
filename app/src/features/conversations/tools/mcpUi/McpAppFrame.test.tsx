@@ -106,6 +106,30 @@ describe('McpAppFrame tool decisions', () => {
     expect(await screen.findByTestId('mcp-ui-confirm')).toBeInTheDocument();
   });
 
+  it('does not reuse an approval for the same tool with different arguments', async () => {
+    const { handlers } = await mountFrame();
+
+    let approved!: Promise<unknown>;
+    act(() => {
+      approved = handlers.callTool('place_order', { item: 'tea' });
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Allow' }));
+    await expect(approved).resolves.toEqual({ tool: 'place_order' });
+
+    let sameArgs!: Promise<unknown>;
+    act(() => {
+      sameArgs = handlers.callTool('place_order', { item: 'tea' });
+    });
+    await expect(sameArgs).resolves.toEqual({ tool: 'place_order' });
+    expect(screen.queryByTestId('mcp-ui-confirm')).toBeNull();
+
+    act(() => {
+      void handlers.callTool('place_order', { item: 'laptop' }).catch(() => undefined);
+    });
+    expect(await screen.findByTestId('mcp-ui-confirm')).toBeInTheDocument();
+    expect(api.toolCall).not.toHaveBeenCalledWith('shop', 'place_order', { item: 'laptop' }, true);
+  });
+
   it('keeps one bridge and hands it newer data for the same widget', async () => {
     const { view } = await mountFrame();
     view.rerender(<McpAppFrame presentation={presentation({ q: 2 })} />);

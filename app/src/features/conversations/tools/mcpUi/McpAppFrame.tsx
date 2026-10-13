@@ -90,13 +90,14 @@ export function McpAppFrame({ presentation }: { presentation: McpUiPresentation 
           if (!serverId) throw new Error('No server for this view');
           const first = await mcpUiApi.toolCall(serverId, name, args, false);
           if (!first.requires_confirmation) return first.result;
-          let decision = decisionsRef.current.get(name);
+          const decisionKey = JSON.stringify([name, args]);
+          let decision = decisionsRef.current.get(decisionKey);
           if (!decision) {
             decision = new Promise<void>((resolve, reject) =>
               setPending({ name, args, resolve, reject })
             );
             decision.catch(() => undefined);
-            decisionsRef.current.set(name, decision);
+            decisionsRef.current.set(decisionKey, decision);
           }
           await decision;
           const confirmed = await mcpUiApi.toolCall(serverId, name, args, true);
