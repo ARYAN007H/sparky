@@ -53,6 +53,9 @@ pub(crate) fn test_main_def() -> AgentDefinition {
         when_to_use: "test-only default parent agent".into(),
         display_name: None,
         system_prompt: PromptSource::Inline("You are the test parent agent.".into()),
+        omit_identity: true,
+        omit_memory_context: true,
+        omit_safety_preamble: true,
         model: ModelSpec::Inherit,
         temperature: 0.0,
         tools: ToolScope::Wildcard,
@@ -68,23 +71,16 @@ pub(crate) fn test_main_def() -> AgentDefinition {
         timeout_secs: None,
         sandbox_mode: SandboxMode::None,
         background: false,
+        tokenjuice_compression: tinyjuice_bus::types::AgentTokenjuiceCompression::Auto,
         subagents: vec![
             SubagentEntry::AgentId("__test_inherit_echo".into()),
             SubagentEntry::AgentId("__test_inherit_parallel_worker".into()),
         ],
         delegate_name: None,
         agent_tier: AgentTier::Chat,
+        searches_connected_mcp: false,
         source: DefinitionSource::Builtin,
     }
-        extensions: crate::agent::harness::host_definition::AgentExt {
-            omit_identity: true,
-            omit_memory_context: true,
-            omit_safety_preamble: true,
-            tokenjuice_compression: tinyjuice_bus::types::AgentTokenjuiceCompression::Auto,
-            searches_connected_mcp: false,
-            ..Default::default()
-        },
-        role: None,
 }
 
 /// Test-only sub-agent: `ModelSpec::Inherit`, wildcard tools, minimal
@@ -102,6 +98,9 @@ pub(crate) fn test_inherit_echo_def() -> AgentDefinition {
         when_to_use: "test-only sub-agent that inherits the parent provider".into(),
         display_name: None,
         system_prompt: PromptSource::Inline("You are a test sub-agent.".into()),
+        omit_identity: true,
+        omit_memory_context: true,
+        omit_safety_preamble: true,
         model: ModelSpec::Inherit,
         temperature: 0.0,
         tools: ToolScope::Named(vec![]),
@@ -117,20 +116,13 @@ pub(crate) fn test_inherit_echo_def() -> AgentDefinition {
         timeout_secs: None,
         sandbox_mode: SandboxMode::None,
         background: false,
+        tokenjuice_compression: tinyjuice_bus::types::AgentTokenjuiceCompression::Auto,
         subagents: vec![],
         delegate_name: None,
         agent_tier: tinyagents_definition::AgentTier::Worker,
+        searches_connected_mcp: false,
         source: DefinitionSource::Builtin,
     }
-        extensions: crate::agent::harness::host_definition::AgentExt {
-            omit_identity: true,
-            omit_memory_context: true,
-            omit_safety_preamble: true,
-            tokenjuice_compression: tinyjuice_bus::types::AgentTokenjuiceCompression::Auto,
-            searches_connected_mcp: false,
-            ..Default::default()
-        },
-        role: None,
 }
 
 /// Test-only sub-agent: inherits the parent's provider and exposes a
@@ -144,6 +136,9 @@ pub(crate) fn test_inherit_parallel_worker_def() -> AgentDefinition {
         when_to_use: "test-only parallel sub-agent that inherits the parent provider".into(),
         display_name: None,
         system_prompt: PromptSource::Inline("You are a test parallel worker.".into()),
+        omit_identity: true,
+        omit_memory_context: true,
+        omit_safety_preamble: true,
         model: ModelSpec::Inherit,
         temperature: 0.0,
         tools: ToolScope::Named(vec!["fixture_step".into()]),
@@ -159,20 +154,13 @@ pub(crate) fn test_inherit_parallel_worker_def() -> AgentDefinition {
         timeout_secs: None,
         sandbox_mode: SandboxMode::None,
         background: false,
+        tokenjuice_compression: tinyjuice_bus::types::AgentTokenjuiceCompression::Auto,
         subagents: vec![],
         delegate_name: None,
         agent_tier: tinyagents_definition::AgentTier::Worker,
+        searches_connected_mcp: false,
         source: DefinitionSource::Builtin,
     }
-        extensions: crate::agent::harness::host_definition::AgentExt {
-            omit_identity: true,
-            omit_memory_context: true,
-            omit_safety_preamble: true,
-            tokenjuice_compression: tinyjuice_bus::types::AgentTokenjuiceCompression::Auto,
-            searches_connected_mcp: false,
-            ..Default::default()
-        },
-        role: None,
 }
 
 #[cfg(test)]

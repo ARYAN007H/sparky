@@ -7,6 +7,9 @@ fn def(id: &str, when_to_use: &str, delegate_name: Option<&str>) -> AgentDefinit
         when_to_use: when_to_use.into(),
         display_name: None,
         system_prompt: PromptSource::Inline(String::new()),
+        omit_identity: true,
+        omit_memory_context: true,
+        omit_safety_preamble: true,
         model: ModelSpec::Inherit,
         temperature: 0.4,
         tools: ToolScope::Wildcard,
@@ -22,20 +25,13 @@ fn def(id: &str, when_to_use: &str, delegate_name: Option<&str>) -> AgentDefinit
         timeout_secs: None,
         sandbox_mode: SandboxMode::None,
         background: false,
+        tokenjuice_compression: tinyjuice_bus::types::AgentTokenjuiceCompression::Auto,
         subagents: vec![],
         delegate_name: delegate_name.map(String::from),
         agent_tier: tinyagents_definition::AgentTier::Worker,
+        searches_connected_mcp: false,
         source: DefinitionSource::Builtin,
     }
-        extensions: crate::agent::harness::host_definition::AgentExt {
-            omit_identity: true,
-            omit_memory_context: true,
-            omit_safety_preamble: true,
-            tokenjuice_compression: tinyjuice_bus::types::AgentTokenjuiceCompression::Auto,
-            searches_connected_mcp: false,
-            ..Default::default()
-        },
-        role: None,
 }
 
 /// A real orchestrator definition that delegates to two named agents
