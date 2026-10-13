@@ -83,6 +83,27 @@ fn disabled_component_answers_component_disabled_over_json_rpc() {
                         Some("mcp")
                     );
 
+                    // `modules.list` reports the same module as Disabled, and only it.
+                    let listed = rpc(&base, "openhuman.modules_list").await;
+                    let modules = listed
+                        .pointer("/result/modules")
+                        .or_else(|| listed.pointer("/result/result/modules"))
+                        .and_then(Value::as_array)
+                        .unwrap_or_else(|| panic!("want modules array: {listed}"));
+                    let state_of = |id: &str| {
+                        modules
+                            .iter()
+                            .find(|m| m.get("id").and_then(Value::as_str) == Some(id))
+                            .and_then(|m| m.get("state").and_then(Value::as_str))
+                            .map(str::to_owned)
+                    };
+                    assert_eq!(state_of("tinymcp").as_deref(), Some("disabled"), "{listed}");
+                    assert_ne!(
+                        state_of("tinydocs").as_deref(),
+                        Some("disabled"),
+                        "{listed}"
+                    );
+
                     // A component left on is untouched.
                     let on = rpc(&base, "openhuman.config_get").await;
                     let msg = on
