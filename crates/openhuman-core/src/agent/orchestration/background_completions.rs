@@ -5,11 +5,11 @@
 //! deduplicates by task id, holds tombstones (collected inline, stopped,
 //! cancelled parent), counts delivery attempts, hands back the records that
 //! gave up, and persists every transition to a per-workspace
-//! `JsonlCompletionStore`, so a completion that was never delivered is
+//! `DriverCompletionStore` (documents in the storage backend), so a completion that was never delivered is
 //! delivered after a restart. This module is the thin host seam over it:
 //!
-//! * one router per workspace, opened lazily next to the task ledger
-//!   (`<workspace>/.openhuman/background_completions.jsonl`);
+//! * one router per workspace, opened lazily beside the task ledger
+//!   (the `orchestration_completions` collection of the storage backend);
 //! * the router's parent key is the **chat thread id** — delivery is
 //!   thread-addressed, and a thread-scoped cancel (Stop, delete, purge) is then
 //!   the router's own `cancel_parent` / `resume_parent`;
