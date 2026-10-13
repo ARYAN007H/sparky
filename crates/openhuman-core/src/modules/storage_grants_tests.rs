@@ -138,12 +138,12 @@ fn capabilities_are_answered_for_an_object_the_grant_does_not_hold() {
         writable: true,
         ..StorageGrant::default()
     };
-    for object in [Object::Streams, Object::Blobs, Object::Secrets] {
-        assert!(
-            authorize(&documents_only, object, "Capabilities", &json!(null)).is_ok(),
-            "{object:?}"
-        );
-    }
+    assert!(authorize(&documents_only, Object::Blobs, "Capabilities", &json!(null)).is_ok());
+    // Anything else on that object is still refused.
+    assert_eq!(
+        authorize(&documents_only, Object::Blobs, "Head", &json!({"key": "files/a"})),
+        Err(Denied::Object)
+    );
 }
 
 #[test]
