@@ -47,7 +47,7 @@ const CAS_ATTEMPTS: usize = 32;
 const DOMAIN: &str = "approval::store";
 
 /// The approval store over one scoped document handle.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(super) struct Docs {
     docs: Arc<dyn DocumentStore>,
 }
@@ -61,6 +61,17 @@ pub(super) struct Docs {
 pub(super) fn current(config: &Config) -> Result<Docs> {
     let opened = local::open(DOMAIN, &config.workspace_dir)?;
     Ok(Docs::new(&opened.scoped()?))
+}
+
+/// The store of embedded agent `agent`'s scope, whichever scope the caller
+/// runs in.
+pub(super) fn for_agent(config: &Config, agent: &str) -> Result<Docs> {
+    let opened = local::open(DOMAIN, &config.workspace_dir)?;
+    let scoped = opened
+        .backend
+        .for_scope(&crate::storage::scope_for_agent(agent))
+        .map_err(|error| anyhow!("[approval::store] open the agent's scope: {error}"))?;
+    Ok(Docs::new(&scoped))
 }
 
 /// The legacy `approval.db`, as the storage importer reads it.

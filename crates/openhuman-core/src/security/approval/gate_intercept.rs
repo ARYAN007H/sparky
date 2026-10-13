@@ -531,6 +531,7 @@ impl ApprovalGate {
                     approval_scope: scope.clone(),
                     thread_key: thread_key.clone(),
                     detached,
+                    docs: store::capture_docs(&self.config).ok(),
                 },
             );
             store::insert_pending(&self.config, &pending, &self.session_id)?;

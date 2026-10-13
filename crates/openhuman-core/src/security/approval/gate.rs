@@ -277,6 +277,10 @@ pub(crate) struct RequestRoute {
     /// sub-agent routed through the origin fallback (#5499). Carried so the
     /// replay path re-emits the same `detached` flag the live event had.
     pub(crate) detached: bool,
+    /// The store the request was parked in, captured under the parking task's
+    /// storage scope, so a decision made from outside that scope (an RPC with
+    /// no agent or profile of its own) reaches the row where it was written.
+    pub(super) docs: Option<super::store_documents::Docs>,
 }
 
 /// Coordinator for pending approvals.

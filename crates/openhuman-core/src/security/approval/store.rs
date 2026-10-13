@@ -96,6 +96,16 @@ pub(super) fn capture_docs(config: &Config) -> Result<Docs, String> {
     super::store_documents::current(config).map_err(|error| error.to_string())
 }
 
+/// [`decide`] in an already-resolved store (the one a request was parked in).
+pub(super) fn decide_in(
+    docs: &Docs,
+    request_id: &str,
+    decision: ApprovalDecision,
+) -> Result<Option<PendingApproval>> {
+    publish_expired(&docs.expire_stale(Utc::now())?);
+    docs.decide(request_id, decision)
+}
+
 /// [`decide`] against a store captured by [`capture_docs`].
 pub(super) fn decide_captured(
     captured: &Result<Docs, String>,
@@ -103,10 +113,7 @@ pub(super) fn decide_captured(
     decision: ApprovalDecision,
 ) -> Result<Option<PendingApproval>> {
     match captured {
-        Ok(docs) => {
-            publish_expired(&docs.expire_stale(Utc::now())?);
-            docs.decide(request_id, decision)
-        }
+        Ok(docs) => decide_in(docs, request_id, decision),
         Err(error) => Err(anyhow::anyhow!(
             "[approval::store] storage scope was unresolved when the request parked: {error}"
         )),
