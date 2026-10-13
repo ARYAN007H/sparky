@@ -10,7 +10,7 @@ use tinytools_std::timeout::{output_or_kill, output_unbounded, ProcessCleanup};
 fn shell_child(command: &str) -> tokio::process::Command {
     let mut cmd = tokio::process::Command::new("sh");
     cmd.arg("-c").arg(command).kill_on_drop(true);
-    openhuman_core::tools::timeout::own_process_group(cmd.as_std_mut());
+    tinytools_std::timeout::own_process_group(cmd.as_std_mut());
     cmd
 }
 
