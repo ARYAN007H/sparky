@@ -550,53 +550,25 @@ async fn shell_selection_and_start_use_contract_members_with_typed_requests() {
     assert_eq!(log[1].1, json!([request]));
 }
 
+/// The fixture bus cannot attest a recipient, so confidential calls are made
+/// unconfidentially here; the member name and positional argument are pinned.
 #[tokio::test]
-async fn native_shell_start_calls_the_native_member_not_the_two_argument_shell_member() {
+async fn native_shell_and_policy_validation_use_their_contract_members() {
     let (_service, client, calls) = mock_client().await;
-    let request = contract::ShellExecRequest {
-        process: contract::ResourceId("p".to_owned()),
-        resource: contract::ResourceId("r".to_owned()),
-        shell: contract::SelectShellRequest {
-            command: "echo hi".to_owned(),
-            preserve_pipeline_status: false,
-            runtime_path: None,
-            python_utf8: true,
-        },
-        cwd: None,
-        extra_env: Default::default(),
-        state_dir: "/state".to_owned(),
-        timeout_ms: 1_000,
-        stdin: None,
-        jail: None,
-        hide_window: true,
+    let policy = contract::DockerPolicyRequest {
+        network: Some("host".to_owned()),
+        ..Default::default()
     };
-    // The fixture bus cannot attest a recipient, so the confidential variant
-    // production uses is exercised unconfidentially here; the member name and
-    // positional argument are what this pins.
-    let _: () = call_with_client(&client, START_NATIVE_SHELL_EXEC, (request.clone(),), false)
+    let shell = json!({"process": "p", "resource": "r", "state_dir": "/s"});
+    let _: () = call_with_client(&client, START_NATIVE_SHELL_EXEC, (shell.clone(),), false)
         .await
         .expect("native shell start call");
-    let log = calls.lock().expect("call log lock");
-    let (member, args) = log.last().expect("start call logged");
-    assert_eq!(member, "StartNativeShellExec");
-    assert_eq!(*args, json!([request]));
-}
-
-#[tokio::test]
-async fn docker_policy_validation_uses_its_typed_member_and_request() {
-    let (_service, client, calls) = mock_client().await;
-    let request = contract::DockerPolicyRequest {
-        network: Some("host".to_owned()),
-        workspace: Some("/".to_owned()),
-        read_only_mounts: vec!["/etc".to_owned()],
-    };
-    let _: () = call_with_client(&client, VALIDATE_DOCKER_POLICY, (request.clone(),), false)
+    let _: () = call_with_client(&client, VALIDATE_DOCKER_POLICY, (policy.clone(),), false)
         .await
         .expect("policy validation call");
     let log = calls.lock().expect("call log lock");
-    let (member, args) = log.last().expect("validation call logged");
-    assert_eq!(member, "ValidateDockerPolicy");
-    assert_eq!(*args, json!([request]));
+    assert_eq!(log[1], ("StartNativeShellExec".to_owned(), json!([shell])));
+    assert_eq!(log[2], ("ValidateDockerPolicy".to_owned(), json!([policy])));
 }
 
 #[tokio::test]
