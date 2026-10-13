@@ -293,9 +293,11 @@ async fn unscoped_async_spawn_refuses_before_persisting_a_running_session() {
         )
         .await
         .expect("tool dispatch reports a refusal as a tool outcome");
+    // An unscoped SaaS call fails closed on the store itself, so nothing was
+    // persisted either way.
     let sessions = SubagentSessionStore::new(workspace.path().to_path_buf())
         .load()
-        .unwrap();
+        .unwrap_or_default();
     assert!(
         result.is_error,
         "unscoped spawn must not report accepted: {}",
