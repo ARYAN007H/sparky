@@ -10,6 +10,7 @@
 //! research can outlast the call), or is swept after [`MAX_AGE`].
 
 use std::collections::HashMap;
+use std::future::Future;
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::{Duration, Instant};
 
@@ -23,14 +24,24 @@ use tinymemes_bus::{
 
 use super::{docs, inference, jev, search};
 use crate::config::Config;
+use crate::core::runtime::{is_saas, CoreContext};
+use crate::memory::scope::MemoryIdentity;
 
 /// How long an entry may live without its `End`.
 const MAX_AGE: Duration = Duration::from_secs(15 * 60);
 
-/// The workspace one remix runs for.
+/// The workspace one remix runs for, and who it runs for.
+///
+/// Callbacks arrive on the module bus, outside the task that asked for the
+/// remix, so the caller's context and memory identity are captured when the
+/// remix is registered and re-entered for each callback ([`Session::enter`]).
+/// In SaaS only the caller's own scope counts, so an unscoped caller's
+/// callbacks fail closed instead of acting as the operator.
 pub(super) struct Session {
     config: Config,
     jev: tokio::sync::OnceCell<Option<Arc<Client>>>,
+    context: Option<Arc<CoreContext>>,
+    identity: Option<MemoryIdentity>,
 }
 
 impl Session {
@@ -38,6 +49,27 @@ impl Session {
         Self {
             config: config.clone(),
             jev: tokio::sync::OnceCell::new(),
+            context: if is_saas() {
+                CoreContext::scoped()
+            } else {
+                CoreContext::current()
+            },
+            identity: crate::memory::scope::current(),
+        }
+    }
+
+    /// Run `fut` as the registering caller.
+    pub(super) async fn enter<F: Future>(&self, fut: F) -> F::Output {
+        let fut = Box::pin(fut);
+        let fut = async {
+            match self.context.clone() {
+                Some(context) => CoreContext::scope(context, fut).await,
+                None => fut.await,
+            }
+        };
+        match self.identity.clone() {
+            Some(identity) => crate::memory::scope::within(identity, fut).await,
+            None => fut.await,
         }
     }
 }
@@ -141,6 +173,14 @@ pub(super) async fn dispatch(
     payload: Value,
 ) -> Result<Value, tinybus::Error> {
     log::debug!("[tinymemes] host callback member={member}");
+    session.enter(answer(session, member, payload)).await
+}
+
+async fn answer(
+    session: &Session,
+    member: &str,
+    payload: Value,
+) -> Result<Value, tinybus::Error> {
     match member {
         host_methods::COMPLETE => reply(complete(session, args(payload)?).await),
         host_methods::EVALUATE => reply(evaluate(session, args(payload)?).await),
