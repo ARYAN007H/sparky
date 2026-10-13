@@ -7756,7 +7756,7 @@ dependencies = [
 
 [[package]]
 name = "tinydocs"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "calamine",
  "docx-rs",
@@ -7770,7 +7770,7 @@ dependencies = [
 
 [[package]]
 name = "tinydocs-bus"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "serde",
  "thiserror 2.0.20",
@@ -7778,7 +7778,7 @@ dependencies = [
 
 [[package]]
 name = "tinydocs-module"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "base64 0.23.1",
  "getrandom 0.4.3",
