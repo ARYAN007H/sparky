@@ -1401,13 +1401,15 @@ fn is_channel_supervisor_restart_message(lower: &str) -> bool {
 /// status integer alone could collide with unrelated log lines containing
 /// `"HTTP error: 5023"` (port number, runbook ID).
 fn is_transient_upstream_http_message(lower: &str) -> bool {
-    tinyinference_llm::failure::TRANSIENT_PROVIDER_HTTP_STATUSES.iter().any(|code| {
-        lower.contains(&format!("api error ({code}"))
-            || lower.contains(&format!("api error {code} "))
-            || lower.contains(&format!("http error: {code} "))
-            || lower.contains(&format!("http error: {code}\n"))
-            || lower.contains(&format!("http error: {code}:"))
-    })
+    tinyinference_llm::failure::TRANSIENT_PROVIDER_HTTP_STATUSES
+        .iter()
+        .any(|code| {
+            lower.contains(&format!("api error ({code}"))
+                || lower.contains(&format!("api error {code} "))
+                || lower.contains(&format!("http error: {code} "))
+                || lower.contains(&format!("http error: {code}\n"))
+                || lower.contains(&format!("http error: {code}:"))
+        })
 }
 
 /// Detect a non-2xx **HTML 403/Forbidden gateway page** returned to a provider

@@ -651,10 +651,7 @@ fn ollama_cloud_internal_500_before_send_matches_raw_and_reraised_shapes() {
         &event_with_exception_value(raw)
     ));
 
-    let reraise = tinyinference_llm::failure::ollama_cloud_internal_500_user_message(
-        None,
-        500,
-    );
+    let reraise = tinyinference_llm::failure::ollama_cloud_internal_500_user_message(None, 500);
     assert!(is_ollama_cloud_internal_500_event(&event_with_message(
         &reraise
     )));
