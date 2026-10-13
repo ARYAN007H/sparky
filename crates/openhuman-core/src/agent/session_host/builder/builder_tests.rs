@@ -456,11 +456,15 @@ fn the_repl_tools_join_a_belt_only_while_handle_mode_is_active() {
 
     let mut inactive = belt();
     super::ensure_repl_tools_visible(&mut inactive, false);
-    assert!(tinyjuice_bus::tools::REPL_TOOLS.iter().all(|n| !inactive.contains(*n)));
+    assert!(tinyjuice_bus::tools::REPL_TOOLS
+        .iter()
+        .all(|n| !inactive.contains(*n)));
 
     let mut active = belt();
     super::ensure_repl_tools_visible(&mut active, true);
-    assert!(tinyjuice_bus::tools::REPL_TOOLS.iter().all(|n| active.contains(*n)));
+    assert!(tinyjuice_bus::tools::REPL_TOOLS
+        .iter()
+        .all(|n| active.contains(*n)));
 
     // "No filter" and "deliberately no tools" both stay as they were.
     let mut unfiltered = std::collections::HashSet::new();
@@ -499,7 +503,11 @@ async fn a_curated_orchestrator_sees_and_holds_every_juice_tool_in_handle_mode()
     );
     let registered: std::collections::HashSet<&str> =
         agent.tools().iter().map(|t| t.name()).collect();
-    for name in tinyjuice_bus::tools::REPL_TOOLS.iter().copied().chain([tinyjuice_bus::tools::RETRIEVE]) {
+    for name in tinyjuice_bus::tools::REPL_TOOLS
+        .iter()
+        .copied()
+        .chain([tinyjuice_bus::tools::RETRIEVE])
+    {
         assert!(
             visible.contains(name),
             "{name} must be visible to the orchestrator"

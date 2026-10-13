@@ -18,7 +18,6 @@ pub fn is_repl_tool(name: &str) -> bool {
     REPL_TOOLS.contains(&name)
 }
 
-
 /// Largest persisted tool-result artifact read through the handle slot: the
 /// same limit `file_read` applies, which is also the most the artifact store
 /// ever writes.
@@ -77,10 +76,7 @@ pub fn repl_tools_for(config: &crate::config::Config) -> Vec<Box<dyn Tool>> {
     if !super::repl_handle_active(config) {
         return Vec::new();
     }
-    log::debug!(
-        "[tokenjuice][repl] registering {}",
-        REPL_TOOLS.join(", ")
-    );
+    log::debug!("[tokenjuice][repl] registering {}", REPL_TOOLS.join(", "));
     repl_tools_with_artifacts(
         Arc::new(ModuleSource {
             config: Some(Arc::new(config.clone())),

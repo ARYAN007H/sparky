@@ -90,13 +90,10 @@ fn juice_off_registers_no_juice_or_recovery_tools() {
     let mut cfg = test_config(&tmp);
     cfg.components.juice = false;
     let names = tool_names(&registry_for(&tmp, &cfg));
-    for absent in tinyjuice_bus::tools::REPL_TOOLS
-        .iter()
-        .chain([
-            &tinyjuice_bus::tools::RETRIEVE,
-            &tinyjuice_bus::tools::LEGACY_RETRIEVE,
-        ])
-    {
+    for absent in tinyjuice_bus::tools::REPL_TOOLS.iter().chain([
+        &tinyjuice_bus::tools::RETRIEVE,
+        &tinyjuice_bus::tools::LEGACY_RETRIEVE,
+    ]) {
         assert!(!names.iter().any(|n| n == absent), "`{absent}` registered");
     }
     // Unchanged elsewhere: the rest of the registry is still there.

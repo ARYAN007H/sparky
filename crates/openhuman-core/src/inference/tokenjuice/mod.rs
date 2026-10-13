@@ -60,7 +60,9 @@ pub fn repl_handle_active(config: &crate::config::Config) -> bool {
 /// Whether TinyJuice may summarize this agent's tool output. Only the
 /// orchestrator gets a summary model, and a zero threshold turns it off.
 pub fn summarizes_tool_output(agent_id: &str, config: &crate::config::Config) -> bool {
-    enabled(config) && agent_id == "orchestrator" && config.context.summarizer_payload_threshold_tokens > 0
+    enabled(config)
+        && agent_id == "orchestrator"
+        && config.context.summarizer_payload_threshold_tokens > 0
 }
 
 /// The TinyJuice tools a compacted result can point the model at: the CCR
