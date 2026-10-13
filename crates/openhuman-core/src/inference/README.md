@@ -57,7 +57,7 @@ The provider-string grammar is documented at the top of `provider/factory.rs`:
 ```
 
 The optional `@<temp>` suffix pins a temperature for that workload. It is stripped
-(`routing::split_model_and_temperature`) before the model id goes upstream. Unknown slugs and
+(`tinyinference_providers::route::split_model_and_temperature`) before the model id goes upstream. Unknown slugs and
 missing credentials produce actionable errors instead of a silent fallback.
 
 Background roles (`vision`, `embeddings`, `memory`, `agentic`, `burst`) fall back to the primary
@@ -156,9 +156,8 @@ A failed provider call passes through several layers, each with one job:
   HTTP / transport error
      |
      v
-  provider/ops/http_error/dispatch.rs   api_error(): run every classifier
-     |  quota_and_credits, local_provider, policy_rejection,
-     |  context_window, auth_failure
+  provider/ops/http_error.rs   api_error(): tinyinference_llm::failure::http
+     |  classifies; HostErrorReporter applies backend guards, demotion, Sentry
      |
      +--> auth_failure.rs: 401 from managed backend -> SessionExpired event
      |                     401/403 on a BYO key -> auth_error_registry::record
@@ -180,7 +179,7 @@ when they stop a turn for repeated tool failures.
 
 ### The OpenAI-compatible endpoint
 
-`http/server.rs` serves `/v1/chat/completions` (with SSE streaming) and `/v1/models`.
+The handlers for `/v1/chat/completions` (with SSE streaming) and `/v1/models` live in `tinyinference_llm::providers::openai::server_http`; `http/backend.rs` is the host `ChatBackend` that resolves models against `Config`.
 `openhuman-rpc` mounts it with `.nest("/v1", openhuman_core::inference::http::router())`, so it sits
 behind the same bearer middleware as `/rpc`. The bearer may be either the per-launch core token or
 a stable user-managed key stored under the `EXTERNAL_OPENAI_COMPAT_PROVIDER` auth profile, which
@@ -204,12 +203,12 @@ picks the provider the same way a provider string does.
 | `provider/openai_codex.rs` | Codex routing metadata for the `openai` slug when Codex OAuth is connected. |
 | [`provider/error_code.rs`](./provider/error_code.rs), [`provider/error_classify.rs`](./provider/error_classify.rs) | Managed `errorCode` extraction and Sentry ownership; OpenHuman policy over TinyInference's classifier. |
 | `provider/fallback_diagnostics.rs` | Explains background-role fallback when it hits a provider with no credentials. |
-| [`provider/ops/`](./provider/ops/) | `http_error/` (classification and `api_error`), `models/` (model catalog listing, local-runtime and OpenRouter entries), `provider_factory.rs` (`ProviderRuntimeOptions`, `list_providers`). |
+| [`provider/ops/`](./provider/ops/) | `http_error.rs` (host reporter over `tinyinference_llm::failure::http`, `api_error`), `models/` (model catalog listing, local-runtime and OpenRouter entries), `provider_factory.rs` (`ProviderRuntimeOptions`, `list_providers`). |
 | [`provider/types.rs`](./provider/types.rs) | Host DTOs kept at product and RPC boundaries: `ChatResponse`, `ProviderDelta`, `BilledUsage`, `AGENT_TURN_MAX_OUTPUT_TOKENS`. |
 | `host_runtime/` | Product policy, RPC and speech bindings over `tinyinference_local`. See [`host_runtime/README.md`](host_runtime/README.md). |
 | `embedding_host/` | Embedding provider selection (managed, Voyage, OpenAI, Cohere, Ollama, custom, noop) and the `embeddings.*` RPC. See [`embedding_host/README.md`](embedding_host/README.md). |
 | `tokenjuice/` | Host adapter for the TinyJuice tool-output compression module, the `juice_retrieve` recovery tool, and the `tokenjuice.*` RPC. See [`tokenjuice/README.md`](tokenjuice/README.md). |
-| `http/` | OpenAI-compatible `/v1` endpoint. `server.rs` (router and handlers) is behind the `http-server` feature; `types.rs` and `EXTERNAL_OPENAI_COMPAT_PROVIDER` stay ungated because `core::auth` reads them. |
+| `http/` | OpenAI-compatible `/v1` endpoint. `backend.rs` (host `ChatBackend` and `router()`) is behind the `http-server` feature; `EXTERNAL_OPENAI_COMPAT_PROVIDER` stays ungated because `core::auth` reads it. |
 
 ## Key types and entry points
 
