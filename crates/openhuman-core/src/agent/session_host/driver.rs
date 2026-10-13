@@ -190,7 +190,9 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             .harness_dispatcher(),
         );
         let cancellation = request.run_context.cancellation.clone();
-        let turn = graph::run_chat_turn_graph(ChatTurnGraph {
+        // Boxed: the graph future is very large, and holding it inline in the
+        // `select!` below overflows the worker stack in debug builds.
+        let turn = Box::pin(graph::run_chat_turn_graph(ChatTurnGraph {
             turn_models,
             model: self.model_name.clone(),
             messages,
@@ -209,7 +211,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             run_context,
             hosted_base: self.hosted_base.clone(),
             agent_id: self.agent_id.clone(),
-        });
+        }));
         // A Stop hands the runtime the rounds the provider already accepted,
         // so the stopped turn's prompt and work stay in the session (#7715).
         let result = tokio::select! {

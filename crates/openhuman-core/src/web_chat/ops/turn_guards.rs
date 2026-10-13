@@ -154,8 +154,11 @@ async fn run_until_stopped<T>(
     turn: impl std::future::Future<Output = T>,
 ) -> Option<T> {
     let turn_cancellation = tinyagents_harness::cancel::CancellationToken::new();
-    let turn = crate::agent::host_overrides::with_cancellation(turn_cancellation.clone(), turn);
-    tokio::pin!(turn);
+    // Boxed rather than stack-pinned: a chat turn's future is very large.
+    let mut turn = Box::pin(crate::agent::host_overrides::with_cancellation(
+        turn_cancellation.clone(),
+        turn,
+    ));
     tokio::select! {
         biased;
         _ = cancel_token.cancelled() => {
