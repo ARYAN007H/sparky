@@ -1,3 +1,19 @@
+    .envs(
+        [
+            "SANDBOX",
+            "CONNECTORS",
+            "CHANNELS",
+            "HOSTING",
+            "MEMES",
+            "COMPUTER",
+            "SEARCH",
+            "DOCUMENTS",
+            "WALLET",
+            "JUICE",
+            "VOICE",
+        ]
+        .map(|name| (format!("OPENHUMAN_COMPONENT_{name}"), "0")),
+    )
 //! Smoke test of the released TinyMCP cdylib under the real host and its
 //! storage backend (#7737): add a server with a secret, restart the core, and
 //! list it again.
