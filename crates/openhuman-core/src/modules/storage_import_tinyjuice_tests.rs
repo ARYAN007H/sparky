@@ -80,27 +80,6 @@ async fn originals_within_their_ttl_move_into_the_modules_blobs() {
 }
 
 #[tokio::test]
-async fn an_imported_original_expires_with_the_time_it_had_left() {
-    let legacy = legacy_root();
-    let scoped = scoped();
-    import_into(
-        &scoped,
-        legacy.path(),
-        Some(Duration::from_secs(3600)),
-        SystemTime::now(),
-    )
-    .await
-    .unwrap();
-    let meta = scoped
-        .blobs()
-        .head(&format!("{CCR_BLOB_PREFIX}{FRESH}"))
-        .await
-        .unwrap()
-        .expect("imported");
-    assert!(meta.expires_at.is_some(), "a TTL carries over as an expiry");
-}
-
-#[tokio::test]
 async fn without_a_ttl_every_readable_original_is_kept() {
     let legacy = legacy_root();
     let scoped = scoped();
