@@ -459,7 +459,7 @@ pub(super) fn schedule(config: Arc<Config>) {
 
 /// Retries all durable partitions belonging to this owner on auth/cron ticks.
 pub(super) fn schedule_all(config: Arc<Config>) {
-    if super::engine::switched_off(config) {
+    if super::engine::switched_off(&config) {
         return;
     }
     crate::core::runtime::spawn_scoped(async move {
