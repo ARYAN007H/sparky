@@ -69,7 +69,7 @@ fn req(tool_name: &str, args: serde_json::Value) -> ToolCallRequest {
 #[cfg(feature = "modules")]
 fn shell_context(
     args: &serde_json::Value,
-    class: crate::modules::tinybox::contract::CommandClass,
+    class: tinybox_bus::shell::CommandClass,
     hidden_execution: bool,
     literal_words: &[&str],
 ) -> serde_json::Value {
@@ -80,7 +80,7 @@ fn shell_context(
 fn shell_context_for_args(
     request_arguments: &serde_json::Value,
     effective_arguments: &serde_json::Value,
-    class: crate::modules::tinybox::contract::CommandClass,
+    class: tinybox_bus::shell::CommandClass,
     hidden_execution: bool,
     literal_words: &[&str],
 ) -> serde_json::Value {
@@ -118,7 +118,7 @@ fn shell_context_for_args(
 
 #[cfg(feature = "modules")]
 fn shell_analysis(
-    class: crate::modules::tinybox::contract::CommandClass,
+    class: tinybox_bus::shell::CommandClass,
     hidden_execution: bool,
     literal_words: &[&str],
 ) -> serde_json::Value {
@@ -227,7 +227,7 @@ async fn a_read_class_shell_command_runs_without_a_prompt() {
             &req(SHELL_TOOL, args.clone()),
             Some(&shell_context(
                 &args,
-                crate::modules::tinybox::contract::CommandClass::Read,
+                tinybox_bus::shell::CommandClass::Read,
                 false,
                 &["ls", "-la"],
             )),
@@ -292,7 +292,7 @@ fn shell_policy_uses_the_effective_arguments_bound_by_the_harness() {
     let context = shell_context_for_args(
         &request_arguments,
         &effective_arguments,
-        crate::modules::tinybox::contract::CommandClass::Write,
+        tinybox_bus::shell::CommandClass::Write,
         false,
         &["touch", "output"],
     );
@@ -320,7 +320,7 @@ async fn a_read_class_shell_command_still_runs_in_read_only_mode() {
             &req(SHELL_TOOL, args.clone()),
             Some(&shell_context(
                 &args,
-                crate::modules::tinybox::contract::CommandClass::Read,
+                tinybox_bus::shell::CommandClass::Read,
                 false,
                 &["ls", "-la"],
             )),
@@ -339,7 +339,7 @@ async fn a_write_shell_command_is_blocked_outright_in_read_only() {
             &req(SHELL_TOOL, args.clone()),
             Some(&shell_context(
                 &args,
-                crate::modules::tinybox::contract::CommandClass::Write,
+                tinybox_bus::shell::CommandClass::Write,
                 false,
                 &["rm", "-rf", "/tmp/x"],
             )),
@@ -364,7 +364,7 @@ async fn hidden_execution_is_blocked_below_the_full_tier() {
             &req(SHELL_TOOL, args.clone()),
             Some(&shell_context(
                 &args,
-                crate::modules::tinybox::contract::CommandClass::Write,
+                tinybox_bus::shell::CommandClass::Write,
                 true,
                 &["echo"],
             )),
@@ -387,7 +387,7 @@ fn the_declared_category_can_only_raise_the_command_class() {
             &full,
             &json!({ "command": "touch f" }),
             &shell_analysis(
-                crate::modules::tinybox::contract::CommandClass::Write,
+                tinybox_bus::shell::CommandClass::Write,
                 false,
                 &["touch", "f"],
             ),
@@ -400,7 +400,7 @@ fn the_declared_category_can_only_raise_the_command_class() {
             &full,
             &json!({ "command": "touch f", "category": "destructive" }),
             &shell_analysis(
-                crate::modules::tinybox::contract::CommandClass::Write,
+                tinybox_bus::shell::CommandClass::Write,
                 false,
                 &["touch", "f"],
             )
@@ -414,7 +414,7 @@ fn the_declared_category_can_only_raise_the_command_class() {
             &full,
             &json!({ "command": "curl https://example.invalid", "category": "read" }),
             &shell_analysis(
-                crate::modules::tinybox::contract::CommandClass::Network,
+                tinybox_bus::shell::CommandClass::Network,
                 false,
                 &["curl", "https://example.invalid"],
             )
@@ -432,7 +432,7 @@ fn a_missing_command_argument_classifies_as_read_rather_than_panicking() {
             &supervised,
             &json!({}),
             &shell_analysis(
-                crate::modules::tinybox::contract::CommandClass::Read,
+                tinybox_bus::shell::CommandClass::Read,
                 false,
                 &[],
             ),
