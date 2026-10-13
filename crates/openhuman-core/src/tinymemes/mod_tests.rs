@@ -106,13 +106,22 @@ async fn run(
 #[test]
 fn the_budget_defaults_to_the_configured_twenty_seconds() {
     let config = Config::default();
-    assert_eq!(budget_with(None, config.memes.timeout_ms), Duration::from_secs(20));
+    assert_eq!(
+        budget_with(None, config.memes.timeout_ms),
+        Duration::from_secs(20)
+    );
 }
 
 #[test]
 fn the_budget_env_override_beats_config_and_bad_values_fall_back() {
-    assert_eq!(budget_with(Some("1500"), 20_000), Duration::from_millis(1500));
-    assert_eq!(budget_with(Some("soon"), 7_000), Duration::from_millis(7_000));
+    assert_eq!(
+        budget_with(Some("1500"), 20_000),
+        Duration::from_millis(1500)
+    );
+    assert_eq!(
+        budget_with(Some("soon"), 7_000),
+        Duration::from_millis(7_000)
+    );
 }
 
 #[test]
@@ -282,4 +291,20 @@ fn flag_values_enable_remixing() {
     assert!(flag_enabled("on"));
     assert!(flag_enabled("ab:30"));
     assert!(!flag_enabled("off"));
+}
+
+#[tokio::test]
+async fn component_off_refuses_the_remix_before_any_module_load() {
+    let mut config = Config::default();
+    config.components.memes = false;
+    let request = RemixRequest {
+        conversation: Vec::new(),
+        reply: "hi".to_owned(),
+        region: None,
+        enabled: true,
+        timeout_ms: 100,
+        deliver: false,
+    };
+    let err = service::remix(&config, request).await.unwrap_err();
+    assert!(err.contains("component is off"), "{err}");
 }

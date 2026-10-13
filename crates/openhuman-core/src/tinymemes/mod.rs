@@ -262,8 +262,7 @@ async fn remix_with(
     let result = if changed {
         let id = crate::threads::store::run_reply_message_id(turn.request_id);
         let remixed = remixed.clone();
-        if let Err(e) =
-            crate::core::runtime::spawn_blocking_scoped(move || remixed.mark(id)).await
+        if let Err(e) = crate::core::runtime::spawn_blocking_scoped(move || remixed.mark(id)).await
         {
             log::warn!("[tinymemes] remixed-id write task failed: {e}");
         }
@@ -306,9 +305,7 @@ fn turn_line(
     format!(
         "[tinymemes] turn arm=treatment bucket={bucket} request_id={request_id} turn_ms={turn_ms} \
          remix_ms={remix_ms} outcome={result} score={} skipped={} wants_more_memes={}",
-        response
-            .and_then(|r| r.score)
-            .map_or(-1, i32::from),
+        response.and_then(|r| r.score).map_or(-1, i32::from),
         response
             .and_then(|r| r.skipped)
             .map_or("none", |s| match s {

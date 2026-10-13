@@ -68,6 +68,16 @@ impl tinybus::Interface for HostService {
     }
 }
 
+const COOLDOWN_ENV: &str = "OPENHUMAN_TINYMEMES_MEME_COOLDOWN";
+
+/// The module reads its meme cooldown from the environment; hand it
+/// `[memes] meme_cooldown` unless the operator already set the variable.
+fn export_cooldown(config: &Config) {
+    if std::env::var_os(COOLDOWN_ENV).is_none() {
+        std::env::set_var(COOLDOWN_ENV, config.memes.meme_cooldown.to_string());
+    }
+}
+
 /// Serve the module's host callbacks on the module bus.
 pub(crate) async fn install(connection: &Connection) -> tinybus::Result<()> {
     connection
@@ -83,6 +93,10 @@ pub(crate) async fn install(connection: &Connection) -> tinybus::Result<()> {
 /// Remix one reply through the loaded module, serving its callbacks for
 /// `config`'s workspace meanwhile.
 pub(crate) async fn remix(config: &Config, request: RemixRequest) -> Result<RemixResponse, String> {
+    if !config.components.memes {
+        return Err("the memes component is off".to_owned());
+    }
+    export_cooldown(config);
     crate::modules::ensure_loaded(config, MODULE_ID).await?;
     let runtime = crate::modules::host::runtime()
         .await

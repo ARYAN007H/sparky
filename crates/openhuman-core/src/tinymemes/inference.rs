@@ -40,7 +40,9 @@ pub(crate) async fn complete(config: &Config, system: &str, user: &str) -> Resul
         .map_err(|e| format!("openhuman inference failed model={resolved}: {e}"))?;
     let text = response.text();
     if text.trim().is_empty() {
-        return Err(format!("openhuman inference returned no text model={resolved}"));
+        return Err(format!(
+            "openhuman inference returned no text model={resolved}"
+        ));
     }
     Ok(text)
 }
