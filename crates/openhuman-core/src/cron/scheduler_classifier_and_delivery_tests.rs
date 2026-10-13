@@ -459,12 +459,7 @@ async fn scheduler_tick_once_publishes_health_recovery_signal_on_empty_queue() {
     // transition and fires the recovery event — same shape as `run()`
     // immediately after boot.
     let mut last_emitted_health: Option<bool> = None;
-    tick_once(
-        &config,
-        &security,
-        &mut last_emitted_health,
-        &mut JobDispatcher::new(1),
-    )
+    tick_once(&config, &mut last_emitted_health, &mut JobDispatcher::new(&config, &security))
     .await;
 
     // Bus delivery is async — wait briefly for the subscriber to drain.
@@ -523,12 +518,7 @@ async fn scheduler_tick_once_does_not_re_emit_recovery_signal_on_steady_state() 
     let mut last_emitted_health: Option<bool> = None;
 
     // First tick: transition from None → Some(true), publishes once.
-    tick_once(
-        &config,
-        &security,
-        &mut last_emitted_health,
-        &mut JobDispatcher::new(1),
-    )
+    tick_once(&config, &mut last_emitted_health, &mut JobDispatcher::new(&config, &security))
     .await;
     assert_eq!(
         last_emitted_health,
@@ -542,12 +532,7 @@ async fn scheduler_tick_once_does_not_re_emit_recovery_signal_on_steady_state() 
     // Some(true)` guard inside `tick_once` short-circuited and no
     // `publish_global` call ran on those ticks.
     for tick in 2..=5 {
-        tick_once(
-            &config,
-            &security,
-            &mut last_emitted_health,
-            &mut JobDispatcher::new(1),
-        )
+        tick_once(&config, &mut last_emitted_health, &mut JobDispatcher::new(&config, &security))
         .await;
         assert_eq!(
             last_emitted_health,
