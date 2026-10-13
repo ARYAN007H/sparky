@@ -268,7 +268,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
 /// no context is on, since the set only narrows.
 fn gate() -> Result<(), String> {
     let on = crate::core::runtime::context::CoreContext::current()
-        .map_or(true, |ctx| ctx.components().juice);
+        .is_none_or(|ctx| ctx.components().juice);
     if on {
         Ok(())
     } else {
