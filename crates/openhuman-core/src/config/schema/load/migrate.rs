@@ -334,6 +334,15 @@ pub(crate) fn migrate_components_with(config: &mut Config, raw: &str, tinymemes:
     #[cfg(not(feature = "tinymemes"))]
     let memes_on = tinymemes.and(None::<bool>);
     disable(config, "memes", memes_on);
+    // The old tool-output compaction master switch, `[tokenjuice]
+    // router_enabled = false`, becomes `[components] juice = false`. The
+    // switch stays as a sub-setting of the on state.
+    let router_enabled = value
+        .as_ref()
+        .and_then(|v| v.get("tokenjuice"))
+        .and_then(|t| t.get("router_enabled"))
+        .and_then(toml::Value::as_bool);
+    disable(config, "juice", router_enabled);
     if !moved.is_empty() {
         tracing::info!(
             "[config][migrate] legacy switches moved to [components]: {}",

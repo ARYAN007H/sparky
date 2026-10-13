@@ -33,3 +33,13 @@ fn domain_mapping_names_real_components() {
         }
     }
 }
+
+#[test]
+fn every_mapped_domain_shows_disabled_when_its_component_is_off() {
+    for cap in super::super::all_capabilities() {
+        if let Some(name) = component_for_domain(cap.domain) {
+            let marked = apply_components(*cap, &off(name));
+            assert_eq!(marked.status, CapabilityStatus::Disabled, "{}", cap.id);
+        }
+    }
+}

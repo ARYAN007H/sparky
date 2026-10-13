@@ -692,12 +692,15 @@ impl OpenHumanSessionHost {
             &self.event_session_id,
         );
 
+        // `[components] juice = false`: truncation only, no compaction/summary.
+        let juice_on =
+            (self.runtime_config.as_ref()).is_none_or(|c| crate::inference::tokenjuice::enabled(c));
         let context_mw = TurnContextMiddleware {
             tool_result_budget_bytes,
-            payload_summarizer: self.payload_summarizer.clone(),
+            payload_summarizer: self.payload_summarizer.clone().filter(|_| juice_on),
             // Rooted outside the project; see `artifact_wiring` (#6408, #6483).
             artifact_store: Some(artifact_store),
-            tokenjuice_compaction_enabled,
+            tokenjuice_compaction_enabled: tokenjuice_compaction_enabled && juice_on,
             tokenjuice_compression: self.tokenjuice_compression,
             runtime_config: self.runtime_config.clone(),
             microcompact_keep_recent,
