@@ -224,10 +224,7 @@ impl McpConfiguredClient {
         reservation: &Arc<CleanupReservation>,
     ) -> Option<bool> {
         table().finish_if_closed(data_dir, client, reservation, || {
-            client
-                .state
-                .try_lock()
-                .is_ok_and(|state| state.is_closed())
+            client.state.try_lock().is_ok_and(|state| state.is_closed())
         })
     }
 
