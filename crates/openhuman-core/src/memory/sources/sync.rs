@@ -12,8 +12,8 @@ use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
 use chrono::{DateTime, Utc};
 use tinymemory_integrations::sources::sync::{
-    self as module, RegisteredSource, SourceRegistry, SyncError, SyncState, SyncStatus, Syncer,
-    SyncUpdate,
+    self as module, RegisteredSource, SourceRegistry, SyncError, SyncState, SyncStatus, SyncUpdate,
+    Syncer,
 };
 use tinymemory_integrations::sources::SourceKind;
 
@@ -115,16 +115,14 @@ static SYNCERS: LazyLock<Mutex<HashMap<PathBuf, Slot>>> =
 
 fn syncer_for(config: &Config) -> Syncer {
     let mut all = SYNCERS.lock().unwrap_or_else(PoisonError::into_inner);
-    let (syncer, slot) = all
-        .entry(config.workspace_dir.clone())
-        .or_insert_with(|| {
-            let slot = Arc::new(Mutex::new(config.clone()));
-            let registry = HostRegistry {
-                workspace: config.workspace_dir.clone(),
-                config: Arc::clone(&slot),
-            };
-            (Syncer::new(Arc::new(registry)), slot)
-        });
+    let (syncer, slot) = all.entry(config.workspace_dir.clone()).or_insert_with(|| {
+        let slot = Arc::new(Mutex::new(config.clone()));
+        let registry = HostRegistry {
+            workspace: config.workspace_dir.clone(),
+            config: Arc::clone(&slot),
+        };
+        (Syncer::new(Arc::new(registry)), slot)
+    });
     *slot.lock().unwrap_or_else(PoisonError::into_inner) = config.clone();
     syncer.clone()
 }

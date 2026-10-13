@@ -38,10 +38,8 @@ use crate::memory::scope::{MemoryIdentity, ResolvedIdentity};
 use crate::memory::types::ImportPhase;
 use crate::threads::store::blocking as threads;
 
-pub use tinymemory_tools::backfill::{
-    pending_range, turns_of, PastTurn, BACKFILL_TAG, MAIN_AGENT,
-};
 use tinymemory_tools::backfill::{first_live_turn, group_items, turn_groups, ThreadMessage};
+pub use tinymemory_tools::backfill::{pending_range, turns_of, PastTurn, BACKFILL_TAG, MAIN_AGENT};
 
 /// Backfills running now, per workspace.
 static RUNNING: LazyLock<Mutex<HashSet<PathBuf>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
