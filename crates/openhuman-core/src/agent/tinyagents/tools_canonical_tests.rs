@@ -342,3 +342,70 @@ fn session_deferred_adapter_reports_deferred_but_never_surfaces_a_hidden_tool() 
     assert_eq!(forced("hidden"), tinytools::ToolExposure::Hidden);
     assert_eq!(forced("deferred"), tinytools::ToolExposure::Deferred);
 }
+
+/// Mirrors `ShellTool::timeout_policy`: unbounded unless the call passes
+/// `timeout_secs`. Its default `policy()` reports an `Inherit` runtime, so a
+/// policy derived from `policy()` alone would lose both answers.
+struct ArgTimedTool;
+
+#[async_trait]
+impl Tool for ArgTimedTool {
+    fn name(&self) -> &str {
+        "arg_timed"
+    }
+
+    fn description(&self) -> &str {
+        "Times itself from its arguments."
+    }
+
+    fn parameters_schema(&self) -> serde_json::Value {
+        serde_json::json!({"type": "object"})
+    }
+
+    fn timeout_policy(&self, args: &serde_json::Value) -> tinytools::ToolTimeout {
+        match args.get("timeout_secs").and_then(serde_json::Value::as_u64) {
+            None | Some(0) => tinytools::ToolTimeout::Unbounded,
+            Some(secs) => tinytools::ToolTimeout::Millis(secs * 1000),
+        }
+    }
+
+    async fn execute(&self, _args: serde_json::Value) -> anyhow::Result<ToolResult> {
+        Ok(ToolResult::default())
+    }
+}
+
+/// The harness bounds a call by the *registered* tool's `timeout_policy`, and
+/// every OpenHuman tool is registered through this adapter. Without forwarding,
+/// a shell call was killed at the inherited 120s even with `timeout_secs=3493`
+/// (#7712).
+#[test]
+fn adapter_forwards_the_wrapped_tools_timeout_policy() {
+    let set: Arc<Vec<Box<dyn Tool>>> = Arc::new(vec![Box::new(ArgTimedTool)]);
+    let adapter =
+        CanonicalSharedToolAdapter::for_name(vec![set], "arg_timed").expect("registered tool");
+
+    assert_eq!(
+        adapter.timeout_policy(&serde_json::json!({})),
+        tinytools::ToolTimeout::Unbounded
+    );
+    assert_eq!(
+        adapter.timeout_policy(&serde_json::json!({"timeout_secs": 300})),
+        tinytools::ToolTimeout::Millis(300_000)
+    );
+}
+
+#[test]
+fn adapter_for_a_missing_tool_inherits_the_default_timeout() {
+    let adapter = CanonicalSharedToolAdapter {
+        sets: Vec::new(),
+        name: "missing".to_string(),
+        description: "missing".to_string(),
+        parameters_schema: serde_json::json!({"type": "object"}),
+        early_exit: None,
+        force_deferred: false,
+    };
+    assert_eq!(
+        adapter.timeout_policy(&serde_json::json!({"timeout_secs": 300})),
+        tinytools::ToolTimeout::Inherit
+    );
+}

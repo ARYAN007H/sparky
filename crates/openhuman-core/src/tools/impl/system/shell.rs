@@ -211,7 +211,7 @@ impl Tool for ShellTool {
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 3600,
-                    "description": "Optional wall-clock timeout (seconds, 1..=3600) for this command before it is killed. Use a larger value for long-running work (builds, test suites, solvers). Omitted or out-of-range falls back to the configured tool timeout."
+                    "description": "Optional wall-clock timeout (seconds, 1..=3600) for this command before it is killed. Use a larger value for long-running work (builds, test suites, solvers). Omitted or 0 runs without a deadline; larger values are capped at 3600."
                 }
             },
             "required": ["command"]
