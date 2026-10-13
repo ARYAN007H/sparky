@@ -114,5 +114,8 @@ fn host_network_and_dangerous_mounts_reach_the_module_unfiltered() {
     let run = build_docker_request(&policy, &request).expect("adapter forwards policy");
     assert_eq!(run.workspace, "/etc");
     assert_eq!(run.network.as_deref(), Some("host"));
-    assert_eq!(run.read_only_mounts, vec!["/var/run/docker.sock".to_owned()]);
+    assert_eq!(
+        run.read_only_mounts,
+        vec!["/var/run/docker.sock".to_owned()]
+    );
 }
