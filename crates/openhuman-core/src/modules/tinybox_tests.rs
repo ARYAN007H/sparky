@@ -663,3 +663,9 @@ async fn docker_status_transport_uses_its_bounded_deadline() {
     .expect_err("cleanup transport must also stop at its bounded deadline plus grace");
     assert!(error.contains("MODULE_CALL_REPORTED"), "{error}");
 }
+
+#[test]
+fn resolve_local_grants_is_a_member_of_the_canonical_contract() {
+    assert_eq!(RESOLVE_LOCAL_GRANTS, "ResolveLocalGrants");
+    assert!(contract::METHODS.contains(&RESOLVE_LOCAL_GRANTS));
+}
