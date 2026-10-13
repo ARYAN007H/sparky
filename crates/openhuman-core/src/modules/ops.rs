@@ -269,12 +269,12 @@ pub async fn ensure_loaded_within(
 /// The state of `id` as the resolution table reports it, without touching it.
 #[must_use]
 pub fn state_of(id: &str) -> ModuleState {
-    match resolver(&Config::default()).state_of(id) {
-        Availability::Available => ModuleState::Available,
-        Availability::Loading => ModuleState::Loading,
-        Availability::Ready => ModuleState::Ready,
-        Availability::Failed => ModuleState::Failed,
-        Availability::Unsupported => ModuleState::Unsupported,
+    use tinybus::module::resolution::{self, ResolutionState};
+    match resolution::global().peek(id) {
+        ResolutionState::Unresolved => ModuleState::Available,
+        ResolutionState::Loading => ModuleState::Loading,
+        ResolutionState::Ready => ModuleState::Ready,
+        ResolutionState::Failed(_) => ModuleState::Failed,
     }
 }
 
@@ -345,37 +345,26 @@ fn status_of(config: &Config, record: &ModuleRecord) -> ModuleStatus {
     // Configuration is authoritative for the current core instance. A module
     // may remain loaded in this process after a prior request, but callers
     // whose configuration disables modules must still be told it is unusable.
-    let (state, detail) = match () {
-        _ if disabled_component(config, record.id).is_some() => (
+    let (state, detail) = match disabled_component(config, record.id) {
+        Some(component) => (
             ModuleState::Disabled,
             Some(format!(
-                "COMPONENT_DISABLED:{} (set [components] {} = true to enable)",
-                disabled_component(config, record.id).unwrap_or_default(),
-                disabled_component(config, record.id).unwrap_or_default()
+                "COMPONENT_DISABLED:{component} (set [components] {component} = true to enable)"
             )),
         ),
-        _ if !config.modules.enabled => (
-            ModuleState::Unsupported,
-            Some("modules are disabled in configuration".to_string()),
-        ),
-        _ => match resolution::global().peek(record.id) {
-            ResolutionState::Ready => (ModuleState::Ready, None),
-            ResolutionState::Loading => (ModuleState::Loading, None),
-            ResolutionState::Failed(reason) => (ModuleState::Failed, Some(reason)),
-            ResolutionState::Unresolved => {
-                let supported = host_candidates()
-                    .iter()
-                    .any(|key| record.asset_for(key).is_some());
-                if supported {
-                    (ModuleState::Available, None)
-                } else {
-                    (
-                        ModuleState::Unsupported,
-                        Some("no artifact is published for this platform".to_string()),
-                    )
-                }
-            }
-        },
+        None => {
+            let (availability, detail) = resolver(config).status_of(&record.release());
+            (
+                match availability {
+                    Availability::Available => ModuleState::Available,
+                    Availability::Loading => ModuleState::Loading,
+                    Availability::Ready => ModuleState::Ready,
+                    Availability::Failed => ModuleState::Failed,
+                    Availability::Unsupported => ModuleState::Unsupported,
+                },
+                detail,
+            )
+        }
     };
     let plan = source::plan(config, record.id);
     let source =
