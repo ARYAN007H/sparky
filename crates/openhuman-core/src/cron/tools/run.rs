@@ -81,7 +81,7 @@ impl Tool for CronRunTool {
             }
         };
 
-        let job = match cron::get_job(&self.config, job_id) {
+        let job = match cron::ops::load_job_for_run(&self.config, job_id) {
             Ok(job) => job,
             Err(e) => {
                 return Ok(ToolResult::error(e.to_string()));

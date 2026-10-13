@@ -16,6 +16,20 @@ pub(crate) fn try_acquire_run(job_id: &str) -> Option<tinyflows_schedule::runtim
     crate::cron::scheduler::try_acquire_run(job_id)
 }
 
+/// Loads `job_id` for a run, failing closed. The job document carries the
+/// run policy (retry budget, single-flight), so a store that cannot produce it
+/// refuses the run. A missing job reads as such; any other error is reduced to
+/// the job id, because backend error text can carry credentials or payloads.
+pub(crate) fn load_job_for_run(config: &Config, job_id: &str) -> Result<CronJob> {
+    cron::get_job(config, job_id).map_err(|error| {
+        if error.to_string() == format!("Cron job '{job_id}' not found") {
+            return error;
+        }
+        tracing::warn!(job_id, "[cron_run] job unreadable; refusing to run");
+        anyhow::anyhow!("cron job {job_id} is unavailable; refusing to run it")
+    })
+}
+
 pub fn add_once(config: &Config, delay: &str, command: &str) -> Result<CronJob> {
     let duration = tinyflows_schedule::validation::parse_human_delay(delay)?;
     let at = chrono::Utc::now() + duration;
@@ -180,7 +194,7 @@ pub async fn cron_run(config: &Config, job_id: &str) -> Result<Outcome<serde_jso
     // Fail closed before queueing anything: an unreadable job refuses the run.
     cron::limits::check_run(
         config,
-        &cron::get_job(config, job_id).map_err(|e| e.to_string())?,
+        &load_job_for_run(config, job_id).map_err(|e| e.to_string())?,
     )
     .map_err(|e| e.to_string())?;
 
@@ -190,7 +204,7 @@ pub async fn cron_run(config: &Config, job_id: &str) -> Result<Outcome<serde_jso
         tracing::debug!(job_id, "[cron_run] rejected duplicate concurrent execution");
         return Err(format!("cron job '{job_id}' is already running"));
     };
-    let job = cron::get_job(config, job_id).map_err(|e| e.to_string())?;
+    let job = load_job_for_run(config, job_id).map_err(|e| e.to_string())?;
 
     // Insert a "queued" placeholder run record immediately so the frontend
     // poller can observe the run as soon as the RPC returns — otherwise the
@@ -226,7 +240,7 @@ pub async fn cron_run(config: &Config, job_id: &str) -> Result<Outcome<serde_jso
 /// delivery and run record as a scheduled run. Refused while a run of the job
 /// (scheduled or another Run Now) is already active.
 pub async fn run_job_now(config: &Config, job_id: &str) -> Result<(bool, String), String> {
-    let job = cron::get_job(config, job_id.trim()).map_err(|e| e.to_string())?;
+    let job = load_job_for_run(config, job_id.trim()).map_err(|e| e.to_string())?;
     cron::limits::check_run(config, &job).map_err(|e| e.to_string())?;
     let Some(_guard) = try_acquire_run(&job.id) else {
         tracing::debug!(job_id = %job.id, "[cron_run] job already running; refused");
