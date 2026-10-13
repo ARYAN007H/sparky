@@ -517,7 +517,7 @@ async fn tool_registry_diagnostics_reports_config_and_audit_store_failures() {
         .mcp_write_audit
         .last_error
         .as_deref()
-        .is_some_and(|error| !error.is_empty()));
+        .is_some_and(|error| error.contains("MCP module unavailable")));
 }
 
 #[tokio::test]
