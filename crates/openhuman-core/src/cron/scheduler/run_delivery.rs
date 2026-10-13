@@ -102,6 +102,22 @@ impl TriggerSink for HostTriggers {
                     .map_or_else(|| flow_id.to_string(), |job| job.id);
                     return Ok(run_system_job(&job_id, name, run_id).await);
                 }
+                // `[components] flows = false`: schedule-triggered flows stop
+                // while agent, shell and system jobs keep running. The tick is
+                // answered, not retried, so the row's recurrence moves on.
+                if !flows_component_enabled() {
+                    tracing::debug!(
+                        target: "flows",
+                        %flow_id,
+                        %run_id,
+                        "[cron] flow schedule trigger skipped: component 'flows' disabled"
+                    );
+                    return Ok(Attempt {
+                        success: true,
+                        output: format!("flow schedule tick skipped for flow {flow_id}: COMPONENT_DISABLED:flows"),
+                        retryable: false,
+                    });
+                }
                 tracing::info!(
                     target: "flows",
                     %flow_id,
@@ -127,6 +143,12 @@ impl TriggerSink for HostTriggers {
             })
             .await
     }
+}
+
+/// Whether `[components] flows` is on in the ambient context. No context
+/// means nothing narrowed it.
+fn flows_component_enabled() -> bool {
+    crate::core::runtime::CoreContext::current().is_none_or(|ctx| ctx.components().flows)
 }
 
 /// A host-owned system job (`system:<name>`): announced on the bus, then its

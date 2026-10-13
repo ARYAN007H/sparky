@@ -373,7 +373,9 @@ fn handle_add(params: Map<String, Value>) -> ControllerFuture {
                         .is_none()
                         .then(tinyflows_schedule::types::DeliveryConfig::default)
                         .or_else(|| {
-                            Some(tinyflows_schedule::validation::default_delivery(origin.as_ref()))
+                            Some(tinyflows_schedule::validation::default_delivery(
+                                origin.as_ref(),
+                            ))
                         })
                 });
                 let delivery_cfg = delivery.clone().unwrap_or_default();

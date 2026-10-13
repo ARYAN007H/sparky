@@ -441,3 +441,10 @@ earlier are refused too.
 - [Parent module README](../../README.md)
 - [Cron and scheduling](../../../../gitbooks/features/native-tools/cron.md)
 - [Workflows](../../../../gitbooks/features/workflows.md)
+
+## Relation to `[components].flows`
+
+`flow` schedule rows are fired through `HostTriggers`. When `[components]
+flows = false`, such a tick is answered as skipped (`COMPONENT_DISABLED:flows`,
+no retry, the recurrence advances) while agent, shell and system jobs keep
+running; `cron.enabled = false` still stops the whole scheduler.

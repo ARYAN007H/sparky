@@ -418,3 +418,42 @@ async fn a_flow_schedule_job_fires_through_the_trigger_sink() {
         .contains("flow schedule tick emitted for flow flow-missing-for-sink"));
     assert!(stored.next_run > Utc::now(), "the recurrence moved on");
 }
+
+/// `[components] flows = false` stops schedule-triggered flow rows (the tick is
+/// answered as skipped and the recurrence moves on) while the row stays valid.
+#[tokio::test]
+async fn a_flow_schedule_job_is_skipped_when_the_flows_component_is_off() {
+    use crate::core::runtime::{ComponentSet, CoreContext};
+
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp).await;
+    let job = cron::add_flow_schedule_job(
+        &config,
+        "flow-off-for-sink",
+        Schedule::Every {
+            every_ms: 3_600_000,
+        },
+    )
+    .unwrap();
+    force_due(&config, &job.id);
+    let job = cron::get_job(&config, &job.id).unwrap();
+    let job_id = job.id.clone();
+
+    let mut off = ComponentSet::all();
+    off.flows = false;
+    let ctx = CoreContext::for_test_with_components(off);
+    let security = security(&config);
+    let cfg = config.clone();
+    CoreContext::scope(ctx, async move {
+        let mut dispatcher = JobDispatcher::new(&cfg, &security);
+        dispatcher.dispatch(vec![job]).await.unwrap();
+        dispatcher.drain().await;
+    })
+    .await;
+
+    let stored = cron::get_job(&config, &job_id).unwrap();
+    let output = stored.last_output.unwrap_or_default();
+    assert!(output.contains("COMPONENT_DISABLED:flows"), "got: {output}");
+    assert!(!output.contains("tick emitted"));
+    assert!(stored.next_run > Utc::now(), "the recurrence moved on");
+}

@@ -499,3 +499,19 @@ Deleted from `crates/openhuman-core/src/cron/`: `scheduler/{dispatch,slot,retry}
 The host keeps the ports in `scheduler/{host,executor,run_delivery}.rs`: `JobStore` over `CronDocuments` (with operator limits), `JobExecutor` (shell and agent attempts, failure classification, the retries-exhausted report), `RunDelivery` (delivery, completion and health events) and `TriggerSink` (the flow's schedule trigger through `FlowTriggerSubscriber::dispatch_schedule_tick`, and `system:<name>` jobs). `scheduler_gate`, system jobs, seeding and the `cron.*` RPC stay. TinyFlows is a plain library gitlink, so there is no registry record or `module-boundaries.json` entry.
 
 Behaviour notes: a job's policy is read from the job document (an unreadable job refuses Run Now with a credential-free message, `ops::load_job_for_run`); `CronJobCompleted` and the scheduler health signal are published from delivery, before the runtime writes the completion; `CronJobTriggered` is no longer published for `flow` rows.
+
+### `[components].flows` toggle (#7564)
+
+`[components] flows = false` (or `OPENHUMAN_COMPONENT_FLOWS=0`) is host-only:
+the flows code stays compiled in. On the next core start it narrows
+`DomainSet::flows` (no flow trigger or run-digest subscribers, no boot
+reconcile), turns the `workflows` tool group off, and answers every `flows.*`
+RPC with `COMPONENT_DISABLED:flows`. `about_app` reports the `flows` and
+`workflow_runs` capability domains as disabled. TinyFlows is a plain library
+gitlink with no registry record, so `modules.list` has no row for it.
+
+Relation to `cron.enabled`: independent switches. With `flows = false` the
+cron scheduler keeps running agent, shell and system jobs, but `flow` schedule
+rows are answered as skipped (`COMPONENT_DISABLED:flows`, not retried) and no
+flow run starts. `cron.enabled = false` stops the whole scheduler, flow
+schedule rows included, regardless of `flows`.
