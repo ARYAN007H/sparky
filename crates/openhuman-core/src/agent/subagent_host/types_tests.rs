@@ -11,7 +11,7 @@ fn legacy_subagent_usage_keeps_its_wire_shape_and_does_not_claim_a_charge() {
     assert_eq!(usage.cost().usd(), None);
     assert_eq!(serde_json::to_value(usage).unwrap(), raw);
     usage.cost_source = crate::agent::cost::CostSource::Charged;
-    let charged = serde_json::to_value(&usage).unwrap();
+    let charged = serde_json::to_value(usage).unwrap();
     assert_eq!(charged["cost_source"], "charged");
     assert_eq!(
         serde_json::from_value::<SubagentUsage>(charged)
