@@ -315,6 +315,7 @@ tinybus = { path = "../../vendor/tinybus/crates/tinybus" }
 # source are distinct packages. Mirrors the root Cargo.toml.
 tinystoragedrivers-core = { path = "../../vendor/tinyagents/vendor/tinystoragedrivers/crates/tinystoragedrivers-core" }
 tinystoragedrivers-sqlite = { path = "../../vendor/tinyagents/vendor/tinystoragedrivers/crates/tinystoragedrivers-sqlite" }
+tinystoragedrivers-secrets = { path = "../../vendor/tinyagents/vendor/tinystoragedrivers/crates/tinystoragedrivers-secrets" }
 
 [patch.crates-io]
 # Keep reqwest defaults disabled in this independent Cargo world too. Without
