@@ -62,7 +62,7 @@ fn run_disabled_case(
 ) {
     std::thread::Builder::new()
         .stack_size(64 * 1024 * 1024)
-        .spawn(|| {
+        .spawn(move || {
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .thread_stack_size(16 * 1024 * 1024)
