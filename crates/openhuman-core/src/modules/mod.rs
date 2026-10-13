@@ -79,6 +79,7 @@ pub mod linked;
 #[cfg(feature = "modules")]
 pub mod ops;
 pub mod registry;
+#[cfg(feature = "modules")]
 pub mod schemas;
 #[cfg(feature = "modules")]
 pub mod search;
