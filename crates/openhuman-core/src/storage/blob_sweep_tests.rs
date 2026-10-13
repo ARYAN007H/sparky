@@ -6,9 +6,10 @@ use tinystoragedrivers::MemoryStorage;
 fn backend_with_clock() -> (Arc<AtomicU64>, Arc<dyn StorageBackend>) {
     let now = Arc::new(AtomicU64::new(1_000));
     let clock = Arc::clone(&now);
-    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::with_clock(Arc::new(
-        move || clock.load(Ordering::SeqCst),
-    )));
+    let backend: Arc<dyn StorageBackend> =
+        Arc::new(MemoryStorage::with_clock(Arc::new(move || {
+            clock.load(Ordering::SeqCst)
+        })));
     (now, backend)
 }
 
