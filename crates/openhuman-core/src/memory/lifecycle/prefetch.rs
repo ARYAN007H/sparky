@@ -40,7 +40,9 @@ fn pack_fits(pack: &TurnPack) -> bool {
     serde_json::to_vec(pack)
         .ok()
         .zip(serde_json::to_vec(&pack.citations).ok())
-        .is_some_and(|(pack, citations)| pack.len().saturating_add(citations.len()) <= MAX_PACK_BYTES)
+        .is_some_and(|(pack, citations)| {
+            pack.len().saturating_add(citations.len()) <= MAX_PACK_BYTES
+        })
 }
 
 #[derive(Clone, Hash, PartialEq, Eq)]

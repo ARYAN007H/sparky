@@ -112,7 +112,10 @@ async fn an_account_wide_refusal_through_the_host_keeps_the_job_without_an_attem
     crate::memory::test_fixtures::RefusingEngine::out_of_credits().bind(&config);
     enqueue(&config, &Namespace::ROOT, vec![build("a")]).await;
     for _ in 0..MAX_ATTEMPTS + 1 {
-        assert_eq!(run(&config, Selection::All).await.unwrap()[0].outcome, "failed");
+        assert_eq!(
+            run(&config, Selection::All).await.unwrap()[0].outcome,
+            "failed"
+        );
     }
     let queue = snapshot(&config).await;
     assert_eq!(queue.pending.len(), 1);
