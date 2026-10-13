@@ -55,8 +55,9 @@ fn due_system_job(config: &Config, name: &str) -> CronJob {
     )
     .unwrap();
     force_due(config, &job.id);
-    job.next_run = Utc::now() - ChronoDuration::seconds(1);
-    job
+    // The runtime claims against the stored row, so hand back exactly that.
+    let _ = &mut job;
+    cron::get_job(config, &job.id).unwrap()
 }
 
 fn force_due(config: &Config, job_id: &str) {
@@ -223,6 +224,7 @@ async fn a_single_flight_job_records_the_missed_slot_as_skipped() {
         },
     )
     .unwrap();
+    let job = cron::get_job(&config, &job.id).unwrap();
     let running = crate::cron::ops::try_acquire_run(&job.id).expect("the job is free");
     let mut dispatcher = JobDispatcher::new(&config, &security(&config));
     dispatcher
@@ -267,6 +269,7 @@ async fn zero_retries_means_exactly_one_attempt() {
         },
     )
     .unwrap();
+    let job = cron::get_job(&config, &job.id).unwrap();
     let (success, output) = execute_job_now(&config, &job, "dispatch-run").await;
     assert!(!success);
     assert!(output.contains("boom"), "{output}");
@@ -311,6 +314,7 @@ async fn a_system_job_handler_error_is_recorded_as_the_run_result() {
         },
     )
     .unwrap();
+    let job = cron::get_job(&config, &job.id).unwrap();
     let mut dispatcher = JobDispatcher::new(&config, &security(&config));
     dispatcher
         .dispatch(vec![job.clone()])

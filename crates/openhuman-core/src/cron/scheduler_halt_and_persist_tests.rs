@@ -412,7 +412,13 @@ async fn scheduler_flow_runs_active_hours_job_and_reschedules_inside_window() {
         "echo active-hours-fired",
     )
     .unwrap();
-    job.next_run = Utc::now() - ChronoDuration::seconds(1);
+    crate::cron::store::force_next_run_for_test(
+        &config,
+        &job.id,
+        Utc::now() - ChronoDuration::seconds(1),
+    )
+    .unwrap();
+    let job = cron::get_job(&config, &job.id).unwrap();
 
     let security = Arc::new(SecurityPolicy::from_config(
         &config.autonomy,
