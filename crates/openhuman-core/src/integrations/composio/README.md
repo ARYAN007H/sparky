@@ -65,7 +65,7 @@ triggers) from a real transport failure.
 | [`crates/openhuman-core/src/integrations/composio/direct_auth/mod.rs`](./direct_auth/mod.rs) | Direct-mode API-key health tracking: a process-local consecutive-401-failure counter (keyed by a non-logged key fingerprint) that short-circuits repeated invalid-key polling. |
 | [`crates/openhuman-core/src/integrations/composio/trigger_history.rs`](./trigger_history.rs) | Lazy host lifecycle owner of a module-side opaque archive handle (`init_global`/`global`). |
 | [`crates/openhuman-core/src/integrations/composio/bus.rs`](./bus.rs) + `bus/` | Trigger, connection-created and config-changed subscribers, and their registration. |
-| [`crates/openhuman-core/src/integrations/composio/contract/`](./contract/) | The Composio vocabulary: catalogs, scopes, profiles, run shapes, task shapes. Plain data and pure functions. |
+| [`crates/openhuman-core/src/integrations/composio/contract/`](./contract/) | The Composio vocabulary: catalogs (a process snapshot of the connector module's `ListCuratedCatalog` and `GetVocabulary` replies, `curated.rs`), scopes, profiles, run shapes, task shapes. Plain data and pure functions. |
 | `*_tests.rs` | Sibling test suites for each file. |
 
 ## Ops layout
