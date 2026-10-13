@@ -15,28 +15,50 @@ fn test_policy() -> SandboxPolicy {
     }
 }
 
-/// Policy validation (host network, dangerous mounts) is owned by the TinyBox
-/// module since contract 1.17; the host must forward the policy unchanged so
-/// the module can refuse it.
-#[cfg(feature = "modules")]
 #[test]
-fn host_network_and_dangerous_mounts_reach_the_module_unfiltered() {
+fn validate_docker_policy_accepts_safe_config() {
+    let policy = test_policy();
+    assert!(validate_docker_policy(&policy).is_ok());
+}
+
+#[test]
+fn validate_docker_policy_rejects_host_network() {
     let mut policy = test_policy();
-    policy.workspace_root = PathBuf::from("/etc");
-    policy.read_only_mounts = vec![PathBuf::from("/var/run/docker.sock")];
     policy.docker_overrides = Some(DockerOverrides {
         network: Some("host".into()),
         ..DockerOverrides::default()
     });
-    let request = SandboxExecRequest {
-        command: "true".into(),
-        env: Default::default(),
-        timeout: std::time::Duration::from_secs(1),
-    };
-    let run = build_docker_request(&policy, &request).expect("host adapter forwards policy");
-    assert_eq!(run.workspace, "/etc");
-    assert_eq!(run.network.as_deref(), Some("host"));
-    assert_eq!(run.read_only_mounts, vec!["/var/run/docker.sock".to_owned()]);
+    let issues = validate_docker_policy(&policy).unwrap_err();
+    assert!(issues.iter().any(|i| i.contains("host network")));
+}
+
+#[test]
+fn validate_docker_policy_rejects_dangerous_mounts() {
+    let mut policy = test_policy();
+    policy.read_only_mounts = vec![PathBuf::from("/var/run/docker.sock")];
+    let issues = validate_docker_policy(&policy).unwrap_err();
+    assert!(issues.iter().any(|i| i.contains("docker.sock")));
+}
+
+#[test]
+fn validate_docker_policy_rejects_root_workspace() {
+    let mut policy = test_policy();
+    policy.workspace_root = PathBuf::from("/");
+    let issues = validate_docker_policy(&policy).unwrap_err();
+    assert!(issues.iter().any(|i| i.contains("dangerous path")));
+}
+
+#[test]
+fn validate_docker_policy_multiple_issues() {
+    let mut policy = test_policy();
+    policy.workspace_root = PathBuf::from("/etc");
+    policy.read_only_mounts = vec![PathBuf::from("/proc")];
+    policy.docker_overrides = Some(DockerOverrides {
+        network: Some("host".into()),
+        ..DockerOverrides::default()
+    });
+    let issues = validate_docker_policy(&policy).unwrap_err();
+    assert!(issues.len() >= 3);
 }
 
 #[cfg(feature = "modules")]

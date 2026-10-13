@@ -215,6 +215,46 @@ fn docker_handle_for_status(available: bool) -> SandboxBackendHandle {
     }
 }
 
+/// Validate that a sandbox policy's Docker configuration doesn't have
+/// dangerous settings (host network, privileged mounts, etc.).
+pub fn validate_docker_policy(policy: &SandboxPolicy) -> Result<(), Vec<String>> {
+    let mut issues = Vec::new();
+
+    if let Some(overrides) = &policy.docker_overrides {
+        if overrides.network.as_deref() == Some("host") {
+            issues.push("Docker sandbox uses host network — defeats network isolation".into());
+        }
+    }
+
+    // Check for dangerous mount paths.
+    let dangerous_mounts = ["/", "/etc", "/var/run/docker.sock", "/proc", "/sys"];
+    for mount in &policy.read_only_mounts {
+        let path_str = mount.to_string_lossy();
+        for &dangerous in &dangerous_mounts {
+            if path_str == dangerous {
+                issues.push(format!(
+                    "Dangerous read-only mount: {path_str} — could leak host secrets"
+                ));
+            }
+        }
+    }
+
+    let workspace_str = policy.workspace_root.to_string_lossy();
+    for &dangerous in &dangerous_mounts {
+        if workspace_str == dangerous {
+            issues.push(format!(
+                "Workspace root is a dangerous path: {workspace_str}"
+            ));
+        }
+    }
+
+    if issues.is_empty() {
+        Ok(())
+    } else {
+        Err(issues)
+    }
+}
+
 #[cfg(test)]
 #[path = "docker_tests.rs"]
 mod tests;
