@@ -94,7 +94,10 @@ fn direct_actions_decode_through_the_bus_tool_args() {
     assert!(direct_action(&json!({"action":"click"})).is_err());
     assert!(direct_action(&json!({"action":"scroll","direction":"diagonal"})).is_err());
     assert!(direct_action(&json!({"action":"arbitrary_script"})).is_err());
-    assert!(direct_action(&json!({"action":"find","by":"text","value":"Save","find_action":"text"})).is_ok());
+    assert!(direct_action(
+        &json!({"action":"find","by":"text","value":"Save","find_action":"text"})
+    )
+    .is_ok());
 }
 
 #[test]
@@ -109,7 +112,13 @@ fn model_visible_browser_schema_is_the_bus_schema() {
     let schema = tinytools::Tool::parameters_schema(&tool);
     assert_eq!(schema, tinycomputer_bus::browser::tool::parameters_schema());
     assert_eq!(schema["required"], json!(["action"]));
-    assert_eq!(schema["properties"]["action"]["enum"].as_array().unwrap().len(), 22);
+    assert_eq!(
+        schema["properties"]["action"]["enum"]
+            .as_array()
+            .unwrap()
+            .len(),
+        22
+    );
 }
 
 #[test]
