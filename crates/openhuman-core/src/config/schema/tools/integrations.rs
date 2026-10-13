@@ -80,8 +80,10 @@ pub struct ComposioConfig {
     /// (case-insensitive; `_` and `-` are ignored, so `google_calendar` is
     /// `googlecalendar`). An empty list offers every toolkit. Narrows what the
     /// connector module lists (tools, toolkits, agent-ready toolkits) without
-    /// touching existing connections or scope preferences. Read when the
-    /// connector module loads, so an edit applies on the next launch.
+    /// touching existing connections or scope preferences. Sent in the module's
+    /// load blob, so an edit applies on the next launch; a connector module
+    /// loaded from the module search path (`OPENHUMAN_MODULE_PATH`) gets no
+    /// host blob and offers every toolkit.
     #[serde(default)]
     pub offered_toolkits_allow: Vec<String>,
     /// Toolkits never offered to the agent, even when `offered_toolkits_allow`

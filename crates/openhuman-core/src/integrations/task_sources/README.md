@@ -18,7 +18,7 @@ Proactive ingestion of work items from external tools. A **task source** is a us
 | File | Role |
 | --- | --- |
 | `crates/openhuman-core/src/integrations/task_sources/mod.rs` | Export-only: module docstring, `mod`/`pub mod` decls, `pub use` re-exports, and the `all_task_sources_*` controller registry pair. |
-| [`crates/openhuman-core/src/integrations/task_sources/types.rs`](./types.rs) | Serde domain types: `ProviderSlug`, `FilterSpec` (provider-tagged enum), `SourceTarget`, `FetchReason`, `TaskSource`, `TaskSourcePatch`, `EnrichedTask`, `FetchOutcome`. |
+| [`crates/openhuman-core/src/integrations/task_sources/types.rs`](./types.rs) | Re-exports the connector vocabulary types (`ProviderSlug`, `FilterSpec`, `SourceTarget`, `FetchReason`, owned by `tinyconnectors_bus::vocabulary`) and defines the host-owned task-source types (`TaskSource`, `TaskSourcePatch`, `EnrichedTask`, `FetchOutcome`) plus `provider_can_fetch`. |
 | `crates/openhuman-core/src/integrations/task_sources/store.rs` | SQLite persistence (`<workspace>/task_sources/sources.db`): `task_sources` + `ingested_tasks` tables, dedup `content_hash`, migrate-on-open. |
 | `crates/openhuman-core/src/integrations/task_sources/ops.rs` | RPC-facing business logic returning `Outcome<T>`: `list`/`get`/`add`/`update`/`remove`/`fetch`/`sync`/`list_tasks`/`preview_filter`/`list_databases`/`status`. |
 | `crates/openhuman-core/src/integrations/task_sources/schemas.rs` | `task_sources` controller schemas + `all_controller_schemas` / `all_registered_controllers` + thin `handle_*` param parsers delegating to `ops.rs`. |
@@ -36,7 +36,7 @@ Proactive ingestion of work items from external tools. A **task source** is a us
 
 Re-exported from `mod.rs`:
 
-- Types: `TaskSource`, `TaskSourcePatch`, `FilterSpec`, `ProviderSlug`, `SourceTarget`, `FetchReason`, `EnrichedTask`, `FetchOutcome`; plus `NormalizedTask`, `TaskContainer`, `TaskFetchFilter`, `TaskKind` re-exported from `crate::integrations::composio::contract` (`pub use crate::integrations::composio::contract::{NormalizedTask, TaskContainer, TaskFetchFilter, TaskKind};` in `mod.rs`).
+- Types: `TaskSource`, `TaskSourcePatch`, `EnrichedTask`, `FetchOutcome`; `FilterSpec`, `ProviderSlug`, `SourceTarget` and `FetchReason` are re-exported from `tinyconnectors_bus::vocabulary` through `types.rs`; plus `NormalizedTask`, `TaskContainer`, `TaskFetchFilter`, `TaskKind` re-exported from `crate::integrations::composio::contract` (`pub use crate::integrations::composio::contract::{NormalizedTask, TaskContainer, TaskFetchFilter, TaskKind};` in `mod.rs`).
 - Functions: `start_periodic_poll`, `run_source_once`.
 - Constant: `TASK_SOURCES_THREAD_ID` (`"task-sources"`).
 - RPC registry: `all_task_sources_controller_schemas`, `all_task_sources_registered_controllers`, `task_sources_schemas`.
