@@ -58,6 +58,7 @@ pub(crate) use load::CONFIG_OWNER_MISMATCH_MARKER;
 pub mod claude_agent_sdk;
 pub use claude_agent_sdk::ClaudeAgentSdkConfig;
 mod local_ai;
+mod memes;
 mod memory;
 mod modules;
 mod observability;
@@ -94,6 +95,7 @@ pub use identity_cost::{
     BudgetAction, BudgetPeriod, BudgetPolicy, BudgetScope, CostConfig, ModelPricing,
 };
 pub use local_ai::{LocalAiConfig, LocalAiUsage};
+pub use memes::MemesConfig;
 pub use memory::{
     migrate_legacy_source, MemoryAgentConfig, MemoryConfig, MemoryConversationsConfig,
     MemoryEngineSettings, MemoryLayoutMode, MemoryRecallConfig, MemorySourceConfig,

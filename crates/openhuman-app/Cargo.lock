@@ -3861,6 +3861,7 @@ dependencies = [
  "tinyflows-schedule",
  "tinyhosts-bus",
  "tinyinference-core",
+ "tinyinference-decisions",
  "tinyinference-embeddings",
  "tinyinference-llm",
  "tinyinference-local",
@@ -3868,7 +3869,7 @@ dependencies = [
  "tinyinference-voice",
  "tinyjuice-bus",
  "tinymcp-bus",
- "tinymemes",
+ "tinymemes-bus",
  "tinymemory-api",
  "tinymemory-integrations",
  "tinymemory-tools",
@@ -3876,7 +3877,7 @@ dependencies = [
  "tinysearch-bus",
  "tinyskills",
  "tinystoragedrivers",
- "tinystoragedrivers-bus",
+ "tinystoragedrivers-bus 0.7.0",
  "tinystoragedrivers-client",
  "tinytools",
  "tinytools-agent",
@@ -7115,18 +7116,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "tinymemes"
-version = "0.1.0"
+name = "tinymemes-bus"
+version = "0.2.0"
 dependencies = [
- "async-trait",
- "futures",
- "reqwest 0.12.28",
  "serde",
  "serde_json",
- "thiserror 2.0.20",
- "tinyinference-decisions",
- "tokio",
- "tracing",
+ "tinybus",
+ "tinystoragedrivers-bus 0.5.0",
 ]
 
 [[package]]
@@ -7229,6 +7225,16 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-bus"
+version = "0.5.0"
+source = "git+https://github.com/tinyhumansai/tinystoragedrivers?rev=7c5596f37e5d5440fbfa3a049a3ca98571885584#7c5596f37e5d5440fbfa3a049a3ca98571885584"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tinybus",
+]
+
+[[package]]
+name = "tinystoragedrivers-bus"
 version = "0.7.0"
 dependencies = [
  "serde",
@@ -7243,7 +7249,7 @@ dependencies = [
  "async-trait",
  "serde",
  "serde_json",
- "tinystoragedrivers-bus",
+ "tinystoragedrivers-bus 0.7.0",
  "tinystoragedrivers-core",
  "tinystoragedrivers-secrets",
  "tokio",
