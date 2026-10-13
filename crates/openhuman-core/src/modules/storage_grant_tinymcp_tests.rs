@@ -29,7 +29,11 @@ fn the_declared_module_id_is_a_registry_module() {
 fn tinymcp_reaches_exactly_its_own_collections() {
     for name in grant().collections.iter().map(|spec| spec.name.clone()) {
         assert!(
-            allowed(Object::Documents, "Get", json!({"collection": name, "id": "x"})),
+            allowed(
+                Object::Documents,
+                "Get",
+                json!({"collection": name, "id": "x"})
+            ),
             "{name}"
         );
     }
@@ -50,7 +54,13 @@ fn tinymcp_reaches_exactly_its_own_collections() {
 #[test]
 fn the_catalog_index_is_declared_for_the_modules_own_search_filters() {
     let grant = grant();
-    let spec = |name: &str| grant.collections.iter().find(|spec| spec.name == name).unwrap();
+    let spec = |name: &str| {
+        grant
+            .collections
+            .iter()
+            .find(|spec| spec.name == name)
+            .unwrap()
+    };
     assert_eq!(spec("mcp_servers").indexes.len(), 2);
     assert_eq!(spec("mcp_registry_index").indexes.len(), 1);
     assert!(spec("mcp_server_names").indexes.is_empty());
@@ -58,16 +68,33 @@ fn the_catalog_index_is_declared_for_the_modules_own_search_filters() {
 
 #[test]
 fn the_audit_stream_and_env_secrets_are_granted_and_nothing_else() {
-    assert!(allowed(Object::Streams, "Append", json!({"stream": "mcp_audit", "payload": {}})));
+    assert!(allowed(
+        Object::Streams,
+        "Append",
+        json!({"stream": "mcp_audit", "payload": {}})
+    ));
     assert_eq!(
-        authorize(&grant(), Object::Streams, "Append", &json!({"stream": "other"})),
+        authorize(
+            &grant(),
+            Object::Streams,
+            "Append",
+            &json!({"stream": "other"})
+        ),
         Err(Denied::Target)
     );
     for name in ["mcp_client_env/srv-1", "mcp_cache_fingerprint_key"] {
-        assert!(allowed(Object::Secrets, "Get", json!({"name": name})), "{name}");
+        assert!(
+            allowed(Object::Secrets, "Get", json!({"name": name})),
+            "{name}"
+        );
     }
     assert_eq!(
-        authorize(&grant(), Object::Secrets, "Get", &json!({"name": "wallet/seed"})),
+        authorize(
+            &grant(),
+            Object::Secrets,
+            "Get",
+            &json!({"name": "wallet/seed"})
+        ),
         Err(Denied::Target)
     );
     assert_eq!(
