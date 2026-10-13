@@ -214,7 +214,7 @@ fn a_harness_runs_a_turn_against_the_provider_it_was_given() {
             let stores =
                 openhuman_core::agent::session_store::provider_for_workspace(&workspace_dir)
                     .for_agent("harness");
-            { let prov = openhuman_core::agent::session_store::provider_for_workspace(&workspace_dir); for k in ["harness","default","local"] { eprintln!("DBG key={k} root={}", prov.for_agent(k).transcripts.root_for_thread(&first.session_id).is_some()); } eprintln!("DBG ws={} sid={}", workspace_dir.display(), first.session_id); }
+            { let prov = openhuman_core::agent::session_store::provider_for_workspace(&workspace_dir); for k in ["harness","default","local"] { eprintln!("DBG key={k} root={}", prov.for_agent(k).transcripts.root_for_thread(&first.session_id).is_some()); } eprintln!("DBG storage={:?}", openhuman_core::storage::installed().map(|s| s.driver().to_string())); let _ = std::process::Command::new("find").arg(workspace_dir.parent().unwrap()).arg("-maxdepth").arg("4").status(); eprintln!("DBG ws={} sid={}", workspace_dir.display(), first.session_id); }
             assert!(
                 stores
                     .transcripts
