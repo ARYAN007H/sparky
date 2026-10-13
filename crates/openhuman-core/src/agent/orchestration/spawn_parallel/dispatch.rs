@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use tinyagents_harness::workspace::WorkspaceIsolation;
+use tinyagents_orchestration::parallel::Worker;
 use tinytools::WorkspaceDescriptor;
 use tokio::sync::mpsc::Sender;
 
@@ -145,7 +146,7 @@ pub(crate) async fn stage_spawn_parallel_workers_from_defs(
     action_root: Option<&Path>,
     parent_workspace_descriptor: Option<&WorkspaceDescriptor>,
     parent_call_id: Option<&str>,
-) -> (Vec<SpawnParallelWorker>, Vec<ParallelAgentResult>) {
+) -> (Vec<Worker<SpawnParallelWorker>>, Vec<ParallelAgentResult>) {
     let mut immediate_results = Vec::new();
     let mut prepared = Vec::new();
 
@@ -264,14 +265,17 @@ pub(crate) async fn stage_spawn_parallel_workers_from_defs(
             parent.session_parent_prefix.as_deref(),
             &task_id,
         );
-        prepared.push(SpawnParallelWorker {
-            definition,
+        prepared.push(Worker {
+            id: task_id,
             prompt,
-            task,
-            task_id,
-            lineage,
-            worktree_path,
-            workspace_descriptor: worker_workspace_descriptor,
+            ownership: task.ownership.clone(),
+            payload: SpawnParallelWorker {
+                definition,
+                task,
+                lineage,
+                worktree_path,
+                workspace_descriptor: worker_workspace_descriptor,
+            },
             dispatch_mode,
         });
     }
