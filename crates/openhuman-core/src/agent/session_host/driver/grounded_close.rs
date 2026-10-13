@@ -262,10 +262,10 @@ pub(super) async fn close_if_needed(
         }
     };
 
-    let (output, usage) = within_close_budget(
+    let mut usage = RepairUsage::for_model(model);
+    let output = within_close_budget(
         budget,
-        model,
-        close_with_one_repair(model, instruction, stop_reason, ask, verify, &fallback),
+        close_with_one_repair(instruction, stop_reason, ask, verify, &fallback, &mut usage),
         &fallback,
     )
     .await;
@@ -273,15 +273,14 @@ pub(super) async fn close_if_needed(
 }
 
 /// Run `close` within `budget`, else ship `fallback` (the deterministic summary
-/// a rejected close ships). `None` (no turn deadline) waits for `close`.
-/// ponytail: usage of calls finished before a timeout is dropped; thread a
-/// shared `RepairUsage` through if that spend must be billed.
+/// a rejected close ships). `None` (no turn deadline) waits for `close`. The
+/// close records into a caller-owned `RepairUsage`, so calls that finished
+/// before a timeout are still billed.
 async fn within_close_budget(
     budget: Option<std::time::Duration>,
-    model: &str,
-    close: impl std::future::Future<Output = (String, RepairUsage)>,
+    close: impl std::future::Future<Output = String>,
     fallback: impl FnOnce() -> String,
-) -> (String, RepairUsage) {
+) -> String {
     let Some(budget) = budget else {
         return close.await;
     };
@@ -293,7 +292,7 @@ async fn within_close_budget(
                 budget_ms,
                 "[session-runtime] grounded close ran out of the turn budget; shipping the deterministic summary"
             );
-            (fallback(), RepairUsage::for_model(model))
+            fallback()
         }
     }
 }
@@ -312,20 +311,19 @@ async fn within_close_budget(
 /// exercised without a provider; the deterministic guard stays here, ahead of
 /// `verify`, because it is the one check that cannot fail open.
 async fn close_with_one_repair<A, AF, V, VF>(
-    model: &str,
     instruction: String,
     stop_reason: Option<&str>,
     ask: A,
     verify: V,
     fallback: impl FnOnce() -> String,
-) -> (String, RepairUsage)
+    usage: &mut RepairUsage,
+) -> String
 where
     A: Fn(String) -> AF,
     AF: std::future::Future<Output = (String, Option<BilledUsage>)>,
     V: Fn(String) -> VF,
     VF: std::future::Future<Output = (Option<CloseViolation>, Option<BilledUsage>)>,
 {
-    let mut usage = RepairUsage::for_model(model);
     let mut prompt = instruction.clone();
     for attempt in 0..2 {
         let (candidate, candidate_usage) = ask(prompt).await;
@@ -343,7 +341,7 @@ where
             violation
         };
         let Some(violation) = violation else {
-            return (candidate, usage);
+            return candidate;
         };
         if attempt > 0 {
             break;
@@ -354,7 +352,7 @@ where
         );
         prompt = close_repair_instruction(&instruction, violation);
     }
-    (fallback(), usage)
+    fallback()
 }
 
 async fn completion(
