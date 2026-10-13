@@ -89,11 +89,13 @@ pub async fn load_declared_modules(config: &Config) {
 /// started when the user turned Composio off or the connector component is
 /// disabled.
 fn warm_connector_catalogs(config: &Config) {
-    use crate::config::schema::COMPOSIO_MODE_DISABLED;
-    if config.composio.mode.trim() == COMPOSIO_MODE_DISABLED
-        || ops::disabled_component(config, super::connectors::MODULE_ID).is_some()
-    {
+    if !should_warm_connector_catalogs(config) {
         log::debug!("[modules] connector catalog warm-up skipped: connectors are off");
+        return;
+    }
+    // Unit tests share one process-wide module slot; a detached load started by
+    // every boot test would race the tests that own it.
+    if cfg!(test) {
         return;
     }
     let config = config.clone();
@@ -105,6 +107,14 @@ fn warm_connector_catalogs(config: &Config) {
         }
         super::connectors::prime_catalogs(&config).await;
     });
+}
+
+/// Whether the connectors are on: Composio is not switched off and the
+/// connector component is not disabled.
+fn should_warm_connector_catalogs(config: &Config) -> bool {
+    use crate::config::schema::COMPOSIO_MODE_DISABLED;
+    config.composio.mode.trim() != COMPOSIO_MODE_DISABLED
+        && ops::disabled_component(config, super::connectors::MODULE_ID).is_none()
 }
 
 #[cfg(test)]
