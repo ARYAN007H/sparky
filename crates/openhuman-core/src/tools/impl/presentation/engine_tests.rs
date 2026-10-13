@@ -9,8 +9,8 @@
 //! call. That agreement is this file's job.
 
 use super::*;
-use crate::tools::implementations::presentation::types::SlideRequest;
 use crate::tools::implementations::document::format::spec::SlideImage;
+use crate::tools::implementations::presentation::types::SlideRequest;
 
 fn slide(title: &str) -> SlideRequest {
     SlideRequest {
