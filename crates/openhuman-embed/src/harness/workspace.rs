@@ -33,7 +33,10 @@ pub enum Workspace {
     /// No durable state on disk: every agent's transcripts, journal, goals and
     /// todos go through the runtime's session store
     /// ([`RuntimeBuilder::session_store`](crate::RuntimeBuilder::session_store)),
-    /// which is required.
+    /// which is required. Without a host storage backend
+    /// ([`RuntimeBuilder::storage`](crate::RuntimeBuilder::storage) or
+    /// `[storage] url`), the core's other documents (run status, cron jobs,
+    /// flows) are kept in memory and lost with the runtime.
     ///
     /// For a cloud host serving many users from one process, where a pod can
     /// be replaced at any moment. A private scratch directory still backs the
