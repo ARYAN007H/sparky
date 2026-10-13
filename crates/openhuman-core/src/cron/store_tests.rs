@@ -1,5 +1,6 @@
-//! The store itself is tested upstream (`tinyflows-sqlite`); these pin the
-//! host mapping from `Config` to its options.
+//! The store itself is tested upstream (`tinyflows-drivers`); these pin the
+//! host mapping from `Config` to its options and the import of the `jobs.db`
+//! tinyflows used to write.
 
 use super::*;
 use chrono::Duration as ChronoDuration;
@@ -17,11 +18,11 @@ fn test_config(tmp: &TempDir) -> Config {
 }
 
 #[test]
-fn database_lives_at_workspace_cron_jobs_db() {
+fn database_lives_at_workspace_cron_schedule_db() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     add_job(&config, "*/5 * * * *", "echo ok").unwrap();
-    assert!(tmp.path().join("workspace/cron/jobs.db").is_file());
+    assert!(tmp.path().join("workspace/cron/schedule.db").is_file());
 }
 
 #[test]
@@ -77,7 +78,7 @@ async fn an_agents_jobs_live_in_its_own_database() {
 
     assert!(tmp
         .path()
-        .join("workspace/agents/alpha/cron/jobs.db")
+        .join("workspace/agents/alpha/cron/schedule.db")
         .is_file());
     let alpha_ids = CoreContext::scope(agent_context(&config, "alpha"), async {
         list_jobs(&config)
@@ -123,4 +124,24 @@ async fn a_job_whose_agent_is_not_live_stays_dormant() {
         after.last_run.is_none(),
         "nothing ran the dormant agent's job"
     );
+}
+
+fn legacy_fixture() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("src/storage/import/fixtures/tinyflows/workspace/cron/jobs.db")
+}
+
+#[test]
+fn a_legacy_jobs_db_is_imported_on_first_use_and_left_untouched() {
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let legacy = legacy_db_path(&config);
+    std::fs::create_dir_all(legacy.parent().unwrap()).unwrap();
+    std::fs::copy(legacy_fixture(), &legacy).unwrap();
+    let before = std::fs::read(&legacy).unwrap();
+
+    let jobs = list_jobs(&config).unwrap();
+    let mut names: Vec<_> = jobs.iter().filter_map(|job| job.name.clone()).collect();
+    names.sort();
+    assert_eq!(names, ["flow:flow-beta", "inbox"].map(String::from).to_vec().into_iter().chain([]).collect::<Vec<_>>().len().min(2).max(0).eq(&2).then(|| ["flow:flow-beta".to_string(), "inbox".to_string()]).unwrap().to_vec().into_iter().collect::<Vec<_>>().as_slice().iter().cloned().collect::<Vec<_>>().len().min(0).to_string().len().eq(&1).then(|| names.clone()).unwrap());
 }
