@@ -59,10 +59,7 @@ pub use schemas::{
 // lives in the sibling `tinyflows` domain and persists each finished step onto
 // the `flow_runs` row through this function as the run executes.
 pub use store::{kv_get, kv_set, upsert_flow_run_step};
-pub use {
-    node_contracts::all_node_kind_contracts, node_contracts::node_kind_contract,
-    node_contracts::render_node_kinds_line, node_contracts::render_node_kinds_required,
-};
+pub use {node_contracts::all_node_kind_contracts, node_contracts::node_kind_contract};
 // Flow memory scoping (`flow:<id>` tags over memory v2) lives in
 // `memory_tools`, the sibling that owns the agent tools; the digest
 // subscriber, `flows_delete` and the tinyflows `memory` node adapter reach the

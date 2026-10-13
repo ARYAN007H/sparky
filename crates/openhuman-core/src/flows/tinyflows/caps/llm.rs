@@ -102,7 +102,7 @@ impl LlmProvider for OpenHumanLlm {
             .map_err(|e| EngineError::Capability(e.to_string()))?;
         // `create_chat_provider` handed back the role's default model. If the node
         // pinned a raw/BYOK id, forward it verbatim instead (issue #4598).
-        let model = resolve_completion_model(node_model, model);
+        let model = agent_prompt::resolve_completion_model(node_model, model, is_raw_passthrough_model);
 
         let mut model_request = ModelRequest::new(
             messages
