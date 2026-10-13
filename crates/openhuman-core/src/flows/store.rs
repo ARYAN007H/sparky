@@ -436,3 +436,7 @@ pub fn set_suggestion_status(config: &Config, id: &str, status: SuggestionStatus
     let id = id.to_string();
     run(async move { docs.set_suggestion_status(&id, status).await })
 }
+
+#[cfg(test)]
+#[path = "store_tests.rs"]
+mod tests;

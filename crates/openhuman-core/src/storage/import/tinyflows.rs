@@ -286,6 +286,6 @@ fn finish(domain: &'static str, outcome: Result<Outcome>) -> Report {
     Report { domain, outcome }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "flows"))]
 #[path = "tinyflows_tests.rs"]
 mod tests;
