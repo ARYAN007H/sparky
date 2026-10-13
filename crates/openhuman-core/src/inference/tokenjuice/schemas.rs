@@ -392,7 +392,11 @@ fn handle_settings_update(params: Map<String, Value>) -> ControllerFuture {
 fn handle_savings_stats(_params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cache = super::cache_stats().await?;
-        let agg = super::savings::stats();
+        let config = crate::config::Config::load_or_init()
+            .await
+            .map_err(|e| e.to_string())?;
+        super::install_from_config(&config).await?;
+        let agg = super::savings::stats(&super::client(&config)).await?;
         Ok(serde_json::json!({
             "attributionModel": super::savings::attribution_model(),
             "total": agg.total,
@@ -405,7 +409,11 @@ fn handle_savings_stats(_params: Map<String, Value>) -> ControllerFuture {
 
 fn handle_savings_reset(_params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        super::savings::reset();
+        let config = crate::config::Config::load_or_init()
+            .await
+            .map_err(|e| e.to_string())?;
+        super::install_from_config(&config).await?;
+        super::savings::reset(&super::client(&config)).await?;
         Ok(serde_json::json!({ "ok": true }))
     })
 }

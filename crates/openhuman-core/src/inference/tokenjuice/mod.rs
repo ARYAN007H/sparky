@@ -127,7 +127,8 @@ pub async fn install_from_config(config: &crate::config::Config) -> Result<(), S
             .unwrap_or_else(|| crate::config::DEFAULT_MODEL.to_string()),
         &config.workspace_dir,
     )
-    .await?;
+    .await
+    .unwrap_or_else(|e| log::debug!("[tokenjuice][savings] configure failed: {e}"));
     let request = install_request(config);
     let fingerprint = serde_json::to_vec(&request).map_err(|error| error.to_string())?;
     static INSTALLED: std::sync::OnceLock<tokio::sync::Mutex<Option<Vec<u8>>>> =
@@ -148,7 +149,7 @@ pub async fn install_from_config(config: &crate::config::Config) -> Result<(), S
 }
 
 /// Construct explicit access over the shared process-wide loader.
-fn client(config: &crate::config::Config) -> crate::modules::client::ModuleClient {
+pub(super) fn client(config: &crate::config::Config) -> crate::modules::client::ModuleClient {
     crate::modules::client::ModuleClient::new(config.clone())
 }
 
@@ -307,7 +308,7 @@ pub async fn compact_tool_output(call: ToolOutputCompaction<'_>) -> CompactedToo
             return CompactedToolOutput::passthrough(content, wants_summary);
         }
     };
-    record_savings(&response);
+    record_savings(&client(&config), &response).await;
     compacted_from(response)
 }
 
@@ -321,16 +322,19 @@ fn compacted_from(response: tinyjuice_bus::wire::CompactResponse) -> CompactedTo
     }
 }
 
-fn record_savings(response: &tinyjuice_bus::wire::CompactResponse) {
+async fn record_savings(
+    client: &crate::modules::client::ModuleClient,
+    response: &tinyjuice_bus::wire::CompactResponse,
+) {
     use std::str::FromStr as _;
-    let kind = ContentKind::from_str(&response.content_kind).unwrap_or(ContentKind::PlainText);
     let compressor = CompressorKind::from_str(&response.compressor).unwrap_or(CompressorKind::None);
     savings::record(
-        kind,
+        client,
         compressor,
         response.original_tokens,
         response.compacted_tokens,
-    );
+    )
+    .await;
 }
 
 pub async fn detect(
@@ -359,11 +363,12 @@ pub async fn compress(
         .await
         .map_err(|error| error.to_string())?;
     savings::record(
-        response.content_kind,
+        &client(&config),
         response.compressor,
         (response.original_bytes as u64).div_ceil(4),
         (response.compacted_bytes as u64).div_ceil(4),
-    );
+    )
+    .await;
     Ok(response)
 }
 
