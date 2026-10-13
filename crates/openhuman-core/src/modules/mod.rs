@@ -89,6 +89,8 @@ mod source;
 #[cfg(feature = "modules")]
 pub mod storage_grants;
 #[cfg(feature = "modules")]
+mod site_memory_host;
+#[cfg(feature = "modules")]
 mod storage_host;
 #[cfg(feature = "modules")]
 pub mod tinybox;
