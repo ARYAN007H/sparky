@@ -148,3 +148,18 @@ fn clearing_the_policy_of_a_missing_job_is_not_an_error() {
     let config = config(&tmp);
     clear_policy(&config, "no-such-job").unwrap();
 }
+
+#[test]
+fn only_the_stores_own_missing_job_message_counts_as_missing() {
+    assert!(is_missing(
+        &anyhow::anyhow!("Cron job 'j1' not found"),
+        "j1"
+    ));
+    assert!(!is_missing(
+        &anyhow::anyhow!("Cron job 'j2' not found"),
+        "j1"
+    ));
+    // A backend failure that merely mentions "not found" must fail closed.
+    let backend = anyhow::anyhow!("collection not found").context("cron store: backend failed");
+    assert!(!is_missing(&backend, "j1"));
+}
