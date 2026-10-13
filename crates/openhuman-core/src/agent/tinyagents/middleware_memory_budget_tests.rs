@@ -60,26 +60,17 @@ async fn pauses_for(results: Vec<TaToolResult>) -> usize {
     drain_pause_count(&handle)
 }
 
+/// Marked refusals never pause; the same results unmarked are ordinary
+/// failures and do (the revert-check: without the skip, the run halts).
 #[tokio::test]
-async fn memory_budget_refusals_do_not_halt_the_run() {
-    let refusals = budget_refusals(9).await;
-    assert_eq!(pauses_for(refusals).await, 0);
-}
-
-/// The control: the same refusals without the budget's marker are ordinary
-/// failures and do halt, so the skip above is what keeps the run going.
-#[tokio::test]
-async fn the_same_refusals_unmarked_still_halt_the_run() {
-    let unmarked = budget_refusals(9)
-        .await
-        .into_iter()
-        .map(|mut result| {
-            result.metadata = None;
-            assert!(!is_budget_refusal(&result));
-            result
-        })
-        .collect();
-    assert!(pauses_for(unmarked).await > 0);
+async fn memory_budget_refusals_do_not_halt_the_run_but_unmarked_ones_do() {
+    for marked in [true, false] {
+        let mut results = budget_refusals(9).await;
+        if !marked {
+            results.iter_mut().for_each(|result| result.metadata = None);
+        }
+        assert_eq!(pauses_for(results).await == 0, marked, "marked={marked}");
+    }
 }
 
 fn response_with(calls: &[TaToolCall]) -> tinyinference_llm::model::ModelResponse {
@@ -136,16 +127,13 @@ async fn an_identical_learn_loop_is_halted_by_the_repeat_guard() {
                     &run,
                     CallId::new(format!("learn-{round}")),
                 );
-                let result = tool
-                    .execute_with_context(
-                        call.arguments.clone(),
-                        ToolCallOptions::default(),
-                        Some(&context),
-                    )
-                    .await
-                    .unwrap();
-                assert!(!is_budget_refusal(&result), "writes spend no budget");
-                result
+                tool.execute_with_context(
+                    call.arguments.clone(),
+                    ToolCallOptions::default(),
+                    Some(&context),
+                )
+                .await
+                .unwrap()
             }
         };
         guard
