@@ -319,3 +319,34 @@ async fn released_queries_keep_cached_originals_in_the_module_and_accept_artifac
     assert!(markdown.contains("hello"));
     assert!(!markdown.contains("secret_script"));
 }
+
+// ── [components] juice ────────────────────────────────────────────────
+
+fn juice_off() -> crate::config::Config {
+    let mut config = crate::config::Config::default();
+    config.components.juice = false;
+    config
+}
+
+#[test]
+fn juice_off_drops_handles_summaries_and_companion_tools() {
+    let on = crate::config::Config::default();
+    assert!(enabled(&on));
+    assert!(repl_handle_active(&on));
+    assert!(!companion_tool_names("orchestrator", &on).is_empty());
+
+    let off = juice_off();
+    assert!(!enabled(&off));
+    assert!(!repl_handle_active(&off));
+    assert!(!summarizes_tool_output("orchestrator", &off));
+    assert!(companion_tool_names("orchestrator", &off).is_empty());
+}
+
+#[tokio::test]
+async fn juice_off_install_never_touches_the_module() {
+    install_from_config(&juice_off()).await.expect("no-op");
+    assert_eq!(
+        crate::modules::state_of("tinyjuice"),
+        crate::modules::types::ModuleState::Available
+    );
+}

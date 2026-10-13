@@ -70,3 +70,16 @@ async fn a_disabled_hosting_component_never_loads_the_tinyhosts_module() {
     let status = statuses.iter().find(|s| s.id == "tinyhosts").unwrap();
     assert_eq!(status.state, ModuleState::Disabled);
 }
+
+#[tokio::test]
+async fn juice_off_refuses_tinyjuice_before_download_or_load() {
+    let config = config_without("juice");
+    let err = ensure_loaded_within(&config, "tinyjuice", None)
+        .await
+        .unwrap_err();
+    assert_eq!(err, LoadError::Disabled("juice"));
+    assert_eq!(state_of("tinyjuice"), ModuleState::Available);
+    let statuses = list(&config);
+    let status = statuses.iter().find(|s| s.id == "tinyjuice").unwrap();
+    assert_eq!(status.state, ModuleState::Disabled);
+}
