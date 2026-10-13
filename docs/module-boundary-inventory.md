@@ -458,3 +458,17 @@ verification was also checked separately against all 17 published archives.
 Actual-source HTTP/session regressions passed 11 tests covering host
 credential-header removal, terminal callback draining, lost-reply retry and
 rejected DELETE preservation.
+
+## TinyFlows generic flow ops (library, v0.8.15)
+
+`flows/ops` no longer carries graph logic that is generic over a
+`WorkflowGraph`. Trigger labels and warnings (`tinyflows::triggers`), graph
+validation and migration (`tinyflows::authoring`), the split-out schema check
+(`tinyflows::wiring`), validation error mapping, the approval manifest walk and
+trust split, and run lifecycle rules (`tinyflows_catalog::{validation,
+approval_manifest, run_management}`) are called from the library directly. The
+trail-off fallback is `tinyflows_copilot::fallback`; the host keeps only the
+adapter that correlates harness history into its `ToolResult`. The host keeps
+approval classification (`SecurityPolicy`), Composio schema lookup, and the
+store, checkpoint, bus and cron effects. TinyFlows is a plain library gitlink,
+so there is no registry record or `module-boundaries.json` entry.
