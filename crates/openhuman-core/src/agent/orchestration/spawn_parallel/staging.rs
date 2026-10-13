@@ -232,7 +232,6 @@ struct AdmitPayload {
 /// subagent allowlist, and whether a worker can write the shared workspace at
 /// all. The module owns arbitration and prompt framing.
 struct SpawnParallelPolicy<'a> {
-    definitions: &'a HashMap<String, AgentDefinition>,
     parent: &'a ParentExecutionContext,
     /// Rejection kind per input index (the module carries only the sentence).
     kinds: RefCell<HashMap<usize, ParallelTaskRejectionKind>>,
@@ -319,7 +318,6 @@ pub(crate) fn prepare_spawn_parallel_tasks_from_defs(
             .collect(),
     );
     let policy = SpawnParallelPolicy {
-        definitions,
         parent,
         kinds: RefCell::new(HashMap::new()),
     };
