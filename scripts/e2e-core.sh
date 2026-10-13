@@ -46,21 +46,28 @@ case "$driver" in
       mongodb://*) ;;
       *) echo "[e2e-core] ERROR: TSD_MONGO_URL must be a mongodb:// URL." >&2; exit 2 ;;
     esac
-    # Judge the complete host (userinfo and port stripped), not a prefix:
-    # mongodb://localhost.example.com must not pass as loopback.
-    hostpart="${base#mongodb://}"
-    hostpart="${hostpart%%/*}"
-    hostpart="${hostpart%%\?*}"
-    hostpart="${hostpart##*@}"
-    hostpart="${hostpart%%,*}"
-    case "$hostpart" in
-      \[::1\]|\[::1\]:*) ;;
-      *) hostpart="${hostpart%%:*}" ;;
-    esac
-    case "$hostpart" in
-      localhost|127.0.0.1|\[::1\]|\[::1\]:*) ;;
-      *) echo "[e2e-core] ERROR: TSD_MONGO_URL must name a local throwaway server." >&2; exit 2 ;;
-    esac
+    # Judge every seed host in full (userinfo, port, query stripped), not a
+    # prefix: mongodb://localhost.example.com or a second remote seed in a
+    # comma-separated list must not pass as loopback.
+    hostlist="${base#mongodb://}"
+    hostlist="${hostlist%%/*}"
+    hostlist="${hostlist%%\?*}"
+    hostlist="${hostlist##*@}"
+    old_ifs="$IFS"
+    IFS=','
+    for hostpart in $hostlist; do
+      IFS="$old_ifs"
+      case "$hostpart" in
+        \[::1\]|\[::1\]:*) ;;
+        *) hostpart="${hostpart%%:*}" ;;
+      esac
+      case "$hostpart" in
+        localhost|127.0.0.1|\[::1\]|\[::1\]:*) ;;
+        *) echo "[e2e-core] ERROR: TSD_MONGO_URL must name only local throwaway servers." >&2; exit 2 ;;
+      esac
+      IFS=','
+    done
+    IFS="$old_ifs"
     db="oh_e2e_core_$(date +%s)_$$"
     head="${base%%\?*}"
     query=""
