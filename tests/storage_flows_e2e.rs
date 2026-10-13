@@ -85,7 +85,19 @@ async fn a_configured_backend_holds_cron_flows_and_flow_state(case: Case) {
     // A job's scheduling policy lives on the backend too.
     let policy_config = config.clone();
     tokio::task::spawn_blocking(move || {
-        use openhuman_core::cron::policy::{self, JobPolicy};
+        use openhuman_core::cron::{CronJobPatch, JobPolicy};
+        let set_policy = |config: &_, id: &str, policy: JobPolicy| {
+            cron::update_job(
+                config,
+                id,
+                CronJobPatch {
+                    policy: Some(policy),
+                    ..CronJobPatch::default()
+                },
+            )
+            .unwrap()
+            .policy
+        };
         let job = cron::add_shell_job(
             &policy_config,
             Some("policy".to_string()),
@@ -97,15 +109,13 @@ async fn a_configured_backend_holds_cron_flows_and_flow_state(case: Case) {
             retries: Some(0),
             single_flight: true,
         };
-        policy::set_policy(&policy_config, &job.id, wanted).unwrap();
-        assert_eq!(policy::get_policy(&policy_config, &job.id).unwrap(), wanted);
+        assert_eq!(set_policy(&policy_config, &job.id, wanted), wanted);
         assert_eq!(
             cron::get_job(&policy_config, &job.id).unwrap().policy,
             wanted
         );
-        policy::clear_policy(&policy_config, &job.id).unwrap();
         assert_eq!(
-            policy::get_policy(&policy_config, &job.id).unwrap(),
+            set_policy(&policy_config, &job.id, JobPolicy::default()),
             JobPolicy::default()
         );
     })

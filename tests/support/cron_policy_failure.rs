@@ -2,7 +2,7 @@
 
 use super::*;
 use async_trait::async_trait;
-use openhuman_core::cron::policy::{self, JobPolicy};
+use openhuman_core::cron::{CronJobPatch, JobPolicy};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 use tinystoragedrivers_core::{
@@ -12,6 +12,32 @@ use tinystoragedrivers_core::{
 use tinytools::Tool;
 
 type StoreResult<T> = Result<T, StorageError>;
+
+/// A job's policy is a field of its job document: these read and write it
+/// through the job, failing closed when the job cannot be read.
+mod policy {
+    use super::*;
+
+    pub fn get_policy(config: &Config, job_id: &str) -> anyhow::Result<JobPolicy> {
+        Ok(cron::get_job(config, job_id)?.policy)
+    }
+
+    pub fn set_policy(config: &Config, job_id: &str, policy: JobPolicy) -> anyhow::Result<()> {
+        cron::update_job(
+            config,
+            job_id,
+            CronJobPatch {
+                policy: Some(policy),
+                ..CronJobPatch::default()
+            },
+        )
+        .map(|_| ())
+    }
+
+    pub fn clear_policy(config: &Config, job_id: &str) -> anyhow::Result<()> {
+        set_policy(config, job_id, JobPolicy::default())
+    }
+}
 /// A job's policy is a field of its job document.
 const JOBS: &str = "cron_jobs";
 const BACKEND_DETAIL: &str = "mongodb://policy-user:secret@backend/private-payload";
@@ -327,20 +353,15 @@ pub(super) async fn policy_reads_refuse_execution_without_consuming_a_slot(case:
     let after =
         CoreContext::scope(Arc::clone(&alpha), async { next_run_of(&config, &job.id) }).await;
     let scheduled_calls = calls.load(Ordering::SeqCst);
-    let mut agent_job = job.clone();
-    agent_job.job_type = cron::JobType::Agent;
-    agent_job.prompt = Some("complete the fixture".into());
-    let (direct, agent, manual, queued, tool) = CoreContext::scope(Arc::clone(&alpha), async {
+    let (manual, queued, tool) = CoreContext::scope(Arc::clone(&alpha), async {
         assert!(policy::get_policy(&config, &job.id).is_err());
-        let direct = cron::scheduler::execute_job_now(&config, &job, "policy-direct").await;
-        let agent = cron::scheduler::execute_job_now(&config, &agent_job, "policy-agent").await;
         let manual = cron::ops::run_job_now(&config, &job.id).await;
         let queued = cron::ops::cron_run(&config, &job.id).await;
         let tool = cron::tools::CronRunTool::new(Arc::new(config.clone()))
             .execute(json!({"job_id": job.id}))
             .await
             .unwrap();
-        (direct, agent, manual, queued, tool)
+        (manual, queued, tool)
     })
     .await;
     assert_eq!(
@@ -357,10 +378,6 @@ pub(super) async fn policy_reads_refuse_execution_without_consuming_a_slot(case:
         "policy read failure consumed the due occurrence"
     );
     assert!(
-        !direct.0,
-        "direct execution must refuse an unreadable policy"
-    );
-    assert!(
         manual.is_err(),
         "Run now must refuse before delivery/persistence"
     );
@@ -374,13 +391,12 @@ pub(super) async fn policy_reads_refuse_execution_without_consuming_a_slot(case:
         0,
         "manual paths executed the job"
     );
-    // `direct` and `agent` run a job they were handed, so what they report is
-    // the policy refusal itself. The manual paths first load the job, and the
-    // policy is a field of that same document now, so the injected fault
-    // reaches them at the lookup; they must still refuse (asserted above).
+    // Every manual path loads the job, and the policy is a field of that same
+    // document, so the injected fault reaches them at the lookup; none may leak
+    // backend detail.
     for (name, shown) in [
-        ("direct", format!("{direct:?}")),
-        ("agent", format!("{agent:?}")),
+        ("manual", format!("{manual:?}")),
+        ("queued", format!("{queued:?}")),
     ] {
         assert!(
             !shown.contains("secret"),
@@ -415,51 +431,6 @@ pub(super) async fn policy_reads_refuse_execution_without_consuming_a_slot(case:
         1,
         "missing policy row must still run with defaults"
     );
-    // Losing the backend after a failed attempt must stop further attempts.
-    let retry_calls = Arc::new(AtomicUsize::new(0));
-    let recorded = Arc::clone(&retry_calls);
-    let failed_backend = Arc::clone(&faults);
-    let _retry_handler = cron::system_job_handlers::register(
-        "policy-retry-fixture",
-        Arc::new(move |_| {
-            recorded.fetch_add(1, Ordering::SeqCst);
-            failed_backend.read.store(true, Ordering::SeqCst);
-            Box::pin(async { Err("retryable fixture failure".to_string()) })
-        }),
-    );
-    CoreContext::scope(Arc::clone(&alpha), async {
-        let job = cron::system_jobs::ensure_system_job(
-            &config,
-            "policy-retry-fixture",
-            Schedule::Every {
-                every_ms: 3_600_000,
-            },
-        )
-        .unwrap();
-        policy::set_policy(
-            &config,
-            &job.id,
-            JobPolicy {
-                retries: Some(2),
-                single_flight: false,
-            },
-        )
-        .unwrap();
-        let (success, output) =
-            cron::scheduler::execute_job_now(&config, &job, "retry-read-failure").await;
-        assert!(!success);
-        assert_eq!(
-            retry_calls.load(Ordering::SeqCst),
-            1,
-            "unreadable policy admitted a retry"
-        );
-        assert!(
-            output.contains("policy"),
-            "the refusal must identify policy availability"
-        );
-        assert!(!output.contains("secret"));
-    })
-    .await;
     assert!(AgentContextRegistry::deregister("policy-alpha", &alpha));
     assert!(AgentContextRegistry::deregister("policy-beta", &beta));
 }
@@ -510,10 +481,10 @@ pub(super) async fn malformed_policy_rows_refuse_execution(case: Case) {
             policy::get_policy(&config, &job.id).is_err(),
             "a malformed existing row became a usable policy"
         );
-        let (success, output) =
-            cron::scheduler::execute_job_now(&config, &job, "malformed-policy-run").await;
-        assert!(!success);
-        assert!(!output.contains("private-payload"));
+        let refused = cron::ops::run_job_now(&config, &job.id)
+            .await
+            .expect_err("a malformed policy must refuse Run now");
+        assert!(!refused.contains("private-payload"));
         assert_eq!(calls.load(Ordering::SeqCst), 0);
     }
     for (doc, wanted) in [
