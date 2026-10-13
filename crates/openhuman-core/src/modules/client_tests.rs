@@ -366,7 +366,7 @@ fn configured_client_timeout_overrides_the_default_for_fixture_calls() {
             .unwrap();
         (proxy, service)
     });
-    let client = ModuleClient::fixture(proxy).with_timeout(std::time::Duration::from_millis(5));
+    let client = crate::modules::ops::fixture_client(proxy).with_timeout(std::time::Duration::from_millis(5));
     let result = runtime.block_on(client.call::<()>("tinysearch", "Delayed", ()));
     assert_eq!(result, Err(ModuleCallError::TransportFailed));
 }
@@ -405,7 +405,7 @@ fn malformed_inner_json_from_a_real_bus_reply_is_reported_as_a_sanitized_fault()
             .unwrap();
         (proxy, service)
     });
-    let client = ModuleClient::fixture(proxy);
+    let client = crate::modules::ops::fixture_client(proxy);
     let events = sentry::test::with_captured_events(|| {
         assert_eq!(
             runtime.block_on(client.call_json::<serde_json::Value>(

@@ -175,6 +175,14 @@ pub fn client(config: Config) -> ModuleClient {
     ModuleClient::new(resolver(&config))
 }
 
+/// A client whose every call goes to `proxy` instead of loading a module. The
+/// module must still be in the registry and modules must still be enabled.
+#[cfg(test)]
+#[must_use]
+pub(crate) fn fixture_client(proxy: tinybus::Proxy) -> ModuleClient {
+    client(Config::default()).with_fixture(proxy)
+}
+
 /// Log which source serves each module and warn about a local build whose
 /// gitlink is ahead of its released pin, once per id per process.
 fn log_plan_once(record: &ModuleRecord, plan: &source::SourcePlan) {

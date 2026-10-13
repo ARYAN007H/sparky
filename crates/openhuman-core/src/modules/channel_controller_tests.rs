@@ -47,7 +47,7 @@ async fn discord_credentials_never_reach_an_unattested_bus() {
         )
         .unwrap();
     let result = discord::<Vec<DiscordGuild>>(
-        &ModuleClient::fixture(proxy.clone()),
+        &crate::modules::ops::fixture_client(proxy.clone()),
         ChannelControllerRequest::DiscordListGuilds {
             config: Default::default(),
             bot_token: "fixture-token".into(),
@@ -58,7 +58,7 @@ async fn discord_credentials_never_reach_an_unattested_bus() {
     .await;
     assert_eq!(result.unwrap_err(), ModuleCallError::TransportFailed);
     let prepared = prepare_connection(
-        &ModuleClient::fixture(proxy),
+        &crate::modules::ops::fixture_client(proxy),
         ChannelControllerRequest::PrepareConnect {
             config: Default::default(),
             channel: "discord".into(),

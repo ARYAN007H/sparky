@@ -51,7 +51,7 @@ impl AccessibilityClient {
     #[cfg(all(test, feature = "modules"))]
     pub(crate) fn fixture(proxy: tinybus::Proxy) -> Self {
         Self {
-            client: ModuleClient::fixture(proxy),
+            client: crate::modules::ops::fixture_client(proxy),
             computer_enabled: true,
         }
     }

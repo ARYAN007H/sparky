@@ -65,7 +65,7 @@ async fn preparation_forwards_host_context_and_preserves_module_validation_error
         .request_name("test.ConnectorProcessing")
         .await
         .unwrap();
-    let client = tinybus::module::ModuleClient::fixture(
+    let client = crate::modules::ops::fixture_client(
         caller
             .proxy(
                 "test.ConnectorProcessing",
