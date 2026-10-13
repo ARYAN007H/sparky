@@ -35,6 +35,15 @@ struct Store {
     reads: HashMap<(String, String), Timed<UiResource>>,
 }
 
+fn scoped(id: &str) -> String {
+    let tenant = crate::core::runtime::tenant::current_tenant_or_isolated("mcp_ui::cache");
+    scoped_for(&tenant, id)
+}
+
+fn scoped_for(tenant: &crate::core::runtime::Tenant, id: &str) -> String {
+    crate::core::runtime::tenant_key(tenant, id)
+}
+
 static STORE: LazyLock<Mutex<Store>> = LazyLock::new(|| Mutex::new(Store::default()));
 
 fn evict<K: Clone + Eq + std::hash::Hash, T>(map: &mut HashMap<K, Timed<T>>, ttl: Duration) {
@@ -57,7 +66,7 @@ pub fn put_inline(entry: InlineEntry) -> String {
     let mut store = STORE.lock();
     evict(&mut store.inline, INLINE_TTL);
     store.inline.insert(
-        id.clone(),
+        scoped(&id),
         Timed {
             at: Instant::now(),
             value: entry,
@@ -73,7 +82,7 @@ pub fn get_inline(id: &str) -> Option<InlineEntry> {
     let store = STORE.lock();
     store
         .inline
-        .get(id)
+        .get(&scoped(id))
         .filter(|entry| entry.at.elapsed() < INLINE_TTL)
         .map(|entry| entry.value.clone())
 }
@@ -84,7 +93,7 @@ pub fn get_read(server_id: &str, uri: &str) -> Option<UiResource> {
     let store = STORE.lock();
     store
         .reads
-        .get(&(server_id.to_string(), uri.to_string()))
+        .get(&(scoped(server_id), uri.to_string()))
         .filter(|entry| entry.at.elapsed() < READ_TTL)
         .map(|entry| entry.value.clone())
 }
@@ -94,7 +103,7 @@ pub fn put_read(server_id: &str, uri: &str, resource: UiResource) {
     let mut store = STORE.lock();
     evict(&mut store.reads, READ_TTL);
     store.reads.insert(
-        (server_id.to_string(), uri.to_string()),
+        (scoped(server_id), uri.to_string()),
         Timed {
             at: Instant::now(),
             value: resource,

@@ -1,1 +1,12 @@
-[]
+[
+  {
+    "file": "crates/openhuman-core/src/mcp/ui/cache.rs",
+    "scope": "",
+    "name": "STORE",
+    "type": "LazyLock<Mutex<Store>>",
+    "count": 1,
+    "category": "B",
+    "reason": "Every entry key is prefixed with the calling tenant's profile and agent scope through tenant_key, and a SaaS call with no tenant scope gets an isolated key that never matches.",
+    "verification": "mcp/ui/cache_tests.rs: entries_are_not_shared_across_tenants"
+  }
+]

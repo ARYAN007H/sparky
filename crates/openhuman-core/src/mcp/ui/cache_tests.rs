@@ -63,3 +63,21 @@ fn eviction_drops_expired_entries() {
     evict(&mut map, Duration::from_secs(1));
     assert!(map.is_empty());
 }
+
+#[test]
+fn entries_are_not_shared_across_tenants() {
+    use crate::core::runtime::Tenant;
+    let tenant = |profile: Option<&str>| Tenant {
+        profile: profile.map(str::to_string),
+        agent: None,
+    };
+    assert_ne!(
+        scoped_for(&tenant(Some("alice")), "doc"),
+        scoped_for(&tenant(Some("bob")), "doc")
+    );
+    assert_ne!(
+        scoped_for(&tenant(Some("alice")), "doc"),
+        scoped_for(&tenant(None), "doc")
+    );
+    assert_eq!(scoped_for(&tenant(None), "doc"), "doc");
+}
