@@ -2,8 +2,8 @@
 //! caller expects, for [`run_turn_via_tinyagents_shared`](super::run_turn_via_tinyagents_shared).
 
 use crate::agent::tinyagents::journal::TurnJournal;
-use crate::agent::tinyagents::model::ModelErrorSlot;
 use crate::agent::tinyagents::turn_models::tinyagents_depth_error;
+use tinyinference_llm::model::ModelErrorSlot;
 
 /// Map the harness's run failure `e` onto the typed error the turn caller
 /// expects, stamping the durable journal's terminal failed status first
