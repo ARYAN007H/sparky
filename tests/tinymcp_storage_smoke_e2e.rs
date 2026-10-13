@@ -85,8 +85,9 @@ fn try_start(
     .env("OPENHUMAN_KEYRING_MASTER_KEY", "44".repeat(32))
     .env_remove("OPENHUMAN_KEYRING_MASTER_KEY_FILE")
     .env_remove("OPENHUMAN_MODE")
+    .env("RUST_LOG", "info")
     .stdout(Stdio::null())
-    .stderr(Stdio::null());
+    .stderr(std::fs::File::create(home.join(format!("core-{port}.log"))).unwrap());
     let mut server = Server(cmd.spawn().expect("spawn openhuman-core"));
     let base = format!("http://127.0.0.1:{port}");
     let client = reqwest::blocking::Client::new();
@@ -183,7 +184,11 @@ fn a_server_added_through_the_released_module_survives_a_restart_in_the_storage_
         assert!(listed.contains(SERVER), "added server is listed: {listed}");
     }
 
-    eprintln!("FILES {:#?}", files(tmp.path()));
+    for f in files(tmp.path()).iter().filter(|f| f.ends_with(".log")) {
+        let t = std::fs::read_to_string(tmp.path().join(f)).unwrap();
+        for l in t.lines().filter(|l| l.contains("storage") || l.contains("mcp") || l.contains("module")) { eprintln!("LOG {l}"); }
+    }
+    let _ = Command::new("cp").args(["-r", storage.to_str().unwrap(), "/tmp/claude-1000/-home-enamakel-work-openhuman/4eb7a87d-943a-4dc1-886c-4a8c3f7c037b/scratchpad/dbcopy"]).status();
     // Second process on the same workspace and URL.
     {
         let (_server, base) = start(tmp.path(), &workspace, &url, &modules);
