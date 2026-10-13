@@ -111,6 +111,7 @@ async fn fixture(
     (
         AccessibilityClient {
             client: ModuleClient::fixture(proxy),
+            computer_enabled: true,
         },
         fixture,
         service,
