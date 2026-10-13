@@ -251,7 +251,7 @@ async fn run_member_loop(
         );
         let _ = run_ledger::release_agent_team_task(&config.workspace_dir, team_id, &task.id).await;
         let _ = run_ledger::mark_agent_team_member_idle(&config.workspace_dir, team_id, member_id).await;
-        record_failure_event(config, team_id, member_id, &task.id, &err.to_string());
+        record_failure_event(config, team_id, member_id, &task.id, &err.to_string()).await;
     }
 }
 
@@ -420,7 +420,7 @@ async fn drive_member(
                     &team_id,
                     &member_id,
                 ).await?;
-                record_failure_event(&config, &team_id, &member_id, &task_id, &reason);
+                record_failure_event(&config, &team_id, &member_id, &task_id, &reason).await;
                 Ok(())
             }
         }
@@ -437,7 +437,7 @@ async fn drive_member(
     .await
 }
 
-fn record_failure_event(
+async fn record_failure_event(
     config: &Config,
     team_id: &str,
     member_id: &str,
