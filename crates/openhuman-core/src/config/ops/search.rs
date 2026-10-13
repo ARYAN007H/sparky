@@ -14,7 +14,8 @@ use crate::config::{
     Config, PresentationMode, ProviderRoute, MANAGED_SEARCH_PROVIDERS, SEARCH_PROVIDERS,
 };
 use crate::core::Outcome;
-use crate::search::providers::{self, parse_role, role_key, ROLES};
+use crate::search::providers;
+use tinysearch_bus::{parse_role, role_key, ROLES};
 
 use super::loader::load_config_with_timeout;
 
@@ -92,9 +93,9 @@ fn supported_routes(provider: &str) -> Vec<&'static str> {
     let managed = MANAGED_SEARCH_PROVIDERS.contains(&provider);
     let mut routes = Vec::new();
     if managed {
-        routes.push(ProviderRoute::Backend.as_str());
+        routes.push(ProviderRoute::Backend.config_name());
     }
-    routes.push(ProviderRoute::Direct.as_str());
+    routes.push(ProviderRoute::Direct.config_name());
     routes
 }
 
@@ -114,10 +115,10 @@ fn apply_provider_patch(
     if let Some(route) = patch.route.as_deref() {
         let route = ProviderRoute::parse(route)
             .ok_or_else(|| format!("route must be managed or direct (got {route:?})"))?;
-        if !supported_routes(provider).contains(&route.as_str()) {
+        if !supported_routes(provider).contains(&route.config_name()) {
             return Err(format!(
                 "{provider} does not support the {} route",
-                route.as_str()
+                route.config_name()
             ));
         }
         let default_enabled = patch.enabled.unwrap_or(true);
@@ -333,7 +334,7 @@ pub(crate) fn search_settings_json_with(config: &Config, managed_available: bool
                 "id": p.id,
                 "label": label(p.id),
                 "enabled": p.enabled,
-                "route": p.route.as_str(),
+                "route": p.route.config_name(),
                 "routes": supported_routes(p.id),
                 "managed_available": p.managed_available,
                 "key_configured": p.key_configured,

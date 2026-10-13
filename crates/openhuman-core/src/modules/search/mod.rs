@@ -11,12 +11,13 @@
 use std::collections::BTreeMap;
 
 use tinysearch_bus::{
-    BackendAuthMode, BackendConfig, PresentationConfig, PresentationMode, ProviderConfig,
+    BackendAuthMode, BackendConfig, PresentationConfig, ProviderConfig,
     ProviderRoute, SearchConfig as ModuleSearchConfig,
 };
 
 use crate::config::Config;
-use crate::search::providers::{self, ResolvedProvider, ROLES};
+use crate::search::providers::{self, ResolvedProvider};
+use tinysearch_bus::ROLES;
 
 mod proxy;
 

@@ -10,7 +10,6 @@ use crate::config::{
 };
 use crate::core::runtime::direct_profile_provider::{validate_endpoint, DirectProfileProvider};
 use crate::core::runtime::SaasConfig;
-use crate::search::providers;
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 use tinysearch_bus::Role;
@@ -127,7 +126,7 @@ impl ProfileProviderSettings {
         ]);
         let role_names = saas.search_role_names.clone();
         let mut used = HashSet::new();
-        for role in crate::search::providers::ROLES {
+        for role in tinysearch_bus::ROLES {
             let canonical = tinysearch_bus::names::role_tool_name(role);
             let name = role_names
                 .get(&role)
@@ -186,7 +185,7 @@ impl ProfileProviderSettings {
     /// An advertised role maps exactly once to its canonical module operation.
     /// Renamed canonical operations and provider-native names never resolve.
     pub fn canonical_role_name(&self, advertised: &str) -> Option<&'static str> {
-        crate::search::providers::ROLES
+        tinysearch_bus::ROLES
             .into_iter()
             .find_map(|role| {
                 (self.advertised_role_name(role) == advertised)
@@ -213,7 +212,7 @@ impl ProfileProviderSettings {
             if self
                 .search
                 .roles
-                .get(providers::role_key(role))
+                .get(tinysearch_bus::role_key(role))
                 .is_none_or(Vec::is_empty)
             {
                 return false;
