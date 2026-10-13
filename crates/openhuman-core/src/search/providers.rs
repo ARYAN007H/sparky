@@ -10,7 +10,7 @@
 use serde::Serialize;
 use tinysearch_bus::{default_role_providers, provider_roles, Role};
 
-use crate::config::{Config, SearchRoute, MANAGED_SEARCH_PROVIDERS, SEARCH_PROVIDERS};
+use crate::config::{Config, ProviderRoute, MANAGED_SEARCH_PROVIDERS, SEARCH_PROVIDERS};
 
 /// One provider's resolved state.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -20,7 +20,7 @@ pub struct ResolvedProvider {
     /// Selected by the user.
     pub enabled: bool,
     /// Chosen route (always `direct` for providers that cannot be managed).
-    pub route: SearchRoute,
+    pub route: ProviderRoute,
     /// Whether the provider can be reached through the managed backend.
     pub managed_capable: bool,
     /// Whether a backend credential exists (session JWT or API key).
@@ -52,7 +52,7 @@ impl ResolvedProvider {
             ProviderStatus::Disabled
         } else if self.usable {
             ProviderStatus::Ready
-        } else if self.route == SearchRoute::Managed {
+        } else if self.route == ProviderRoute::Backend {
             ProviderStatus::SignInRequired
         } else {
             ProviderStatus::NeedsKey
@@ -103,8 +103,8 @@ pub fn resolve_with(config: &Config, managed_available: bool) -> Vec<ResolvedPro
             let managed_capable = MANAGED_SEARCH_PROVIDERS.contains(&id);
             let key_configured = direct_configured(config, id);
             let reachable = match route {
-                SearchRoute::Managed => managed_capable && managed_available,
-                SearchRoute::Direct => key_configured,
+                ProviderRoute::Backend => managed_capable && managed_available,
+                ProviderRoute::Direct => key_configured,
             };
             ResolvedProvider {
                 id,

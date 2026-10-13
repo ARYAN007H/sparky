@@ -6,7 +6,7 @@
 //! router that can point at arbitrary native capabilities.
 
 use crate::config::{
-    Config, SearchConfig, SearchPresentation, SearchProviderSettings, SearchRoute,
+    Config, SearchConfig, PresentationMode, SearchProviderSettings, ProviderRoute,
 };
 use crate::core::runtime::direct_profile_provider::{validate_endpoint, DirectProfileProvider};
 use crate::core::runtime::SaasConfig;
@@ -61,13 +61,13 @@ impl ProfileProviderSettings {
             providers: BTreeMap::new(),
             ..SearchConfig::default()
         });
-        if search.presentation != SearchPresentation::Roles {
+        if search.presentation != PresentationMode::Roles {
             anyhow::bail!("profile search requires role presentation");
         }
         if search.providers.iter().any(|(provider, setting)| {
             setting.enabled
                 && (!matches!(provider.as_str(), "exa" | "gemini")
-                    || setting.route != SearchRoute::Direct)
+                    || setting.route != ProviderRoute::Direct)
         }) {
             anyhow::bail!("profile search permits only direct Exa and Gemini providers");
         }

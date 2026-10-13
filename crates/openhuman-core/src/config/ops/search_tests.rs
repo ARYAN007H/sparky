@@ -44,7 +44,7 @@ fn switching_exa_to_its_own_key() {
         patch(json!({"providers": {"exa": {"route": "direct", "api_key": "e"}}})),
     )
     .unwrap();
-    assert_eq!(config.search.route("exa"), SearchRoute::Direct);
+    assert_eq!(config.search.route("exa"), ProviderRoute::Direct);
     assert_eq!(config.search.exa.key(), Some("e"));
 }
 
@@ -111,7 +111,7 @@ fn legacy_engine_from_an_older_client_still_works() {
     apply_search_patch(&mut config, patch(json!({"engine": "managed"}))).unwrap();
     assert!(config.search.is_enabled());
     apply_search_patch(&mut config, patch(json!({"engine": "parallel"}))).unwrap();
-    assert_eq!(config.search.route("parallel"), SearchRoute::Direct);
+    assert_eq!(config.search.route("parallel"), ProviderRoute::Direct);
     assert!(apply_search_patch(&mut config, patch(json!({"engine": "bing"}))).is_err());
 }
 
@@ -127,7 +127,7 @@ fn limits_presentation_and_allowlist_validate() {
                      "allowed_domains": ["b.com", " a.com ", "b.com"], "allow_all": false})),
     )
     .unwrap();
-    assert_eq!(config.search.presentation, SearchPresentation::AllTools);
+    assert_eq!(config.search.presentation, PresentationMode::AllTools);
     assert_eq!(config.search.max_results, 7);
     assert_eq!(
         config.http_request.allowed_domains,

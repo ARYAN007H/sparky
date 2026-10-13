@@ -1,5 +1,5 @@
 use super::*;
-use crate::config::{SearchProviderSettings, SearchRoute};
+use crate::config::{SearchProviderSettings, ProviderRoute};
 
 fn signed_out_byok_config() -> Config {
     let mut config = Config::default();
@@ -66,7 +66,7 @@ fn no_tools_when_search_is_off_or_nothing_is_usable() {
         "exa".into(),
         SearchProviderSettings {
             enabled: true,
-            route: SearchRoute::Managed,
+            route: ProviderRoute::Backend,
         },
     );
     // No backend credential in a default test config.

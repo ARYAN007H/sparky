@@ -60,7 +60,7 @@ fn a_managed_route_on_a_byok_only_provider_resolves_direct() {
     let mut config = config_with(&[("tavily", SearchProviderSettings::managed())]);
     config.search.tavily.api_key = Some("t".into());
     let tavily = find(&resolve_with(&config, false), "tavily").clone();
-    assert_eq!(tavily.route, SearchRoute::Direct);
+    assert_eq!(tavily.route, ProviderRoute::Direct);
     assert!(tavily.usable);
     assert!(!tavily.managed_capable);
 }

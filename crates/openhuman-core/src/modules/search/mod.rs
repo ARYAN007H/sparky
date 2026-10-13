@@ -15,7 +15,7 @@ use tinysearch_bus::{
     ProviderRoute, SearchConfig as ModuleSearchConfig,
 };
 
-use crate::config::{Config, SearchPresentation, SearchRoute};
+use crate::config::{Config, PresentationMode, ProviderRoute};
 use crate::search::providers::{self, ResolvedProvider, ROLES};
 
 mod proxy;
@@ -80,14 +80,14 @@ fn direct_settings(config: &Config, provider: &str) -> ProviderConfig {
 
 fn provider_config(config: &Config, provider: &ResolvedProvider) -> ProviderConfig {
     let mut settings = match provider.route {
-        SearchRoute::Managed => ProviderConfig {
+        ProviderRoute::Backend => ProviderConfig {
             enabled: true,
             route: ProviderRoute::Backend,
             max_results: Some(config.search.max_results as u64),
             timeout_secs: Some(config.search.timeout_secs),
             ..Default::default()
         },
-        SearchRoute::Direct => direct_settings(config, provider.id),
+        ProviderRoute::Direct => direct_settings(config, provider.id),
     };
     settings.enabled = provider.usable;
     settings
@@ -144,10 +144,10 @@ pub fn module_config(config: &Config) -> ModuleSearchConfig {
         .collect();
     let presentation = PresentationConfig {
         mode: match config.search.presentation {
-            SearchPresentation::Roles => PresentationMode::Roles,
-            SearchPresentation::AllTools => PresentationMode::AllTools,
-            SearchPresentation::Router => PresentationMode::Router,
-            SearchPresentation::OneProvider => PresentationMode::OneProvider,
+            PresentationMode::Roles => PresentationMode::Roles,
+            PresentationMode::AllTools => PresentationMode::AllTools,
+            PresentationMode::Router => PresentationMode::Router,
+            PresentationMode::OneProvider => PresentationMode::OneProvider,
         },
         provider: config.search.presentation_provider.clone(),
         roles,

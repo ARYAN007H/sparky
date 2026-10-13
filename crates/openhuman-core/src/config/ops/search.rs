@@ -11,7 +11,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::config::{
-    Config, SearchPresentation, SearchRoute, MANAGED_SEARCH_PROVIDERS, SEARCH_PROVIDERS,
+    Config, PresentationMode, ProviderRoute, MANAGED_SEARCH_PROVIDERS, SEARCH_PROVIDERS,
 };
 use crate::core::Outcome;
 use crate::search::providers::{self, parse_role, role_key, ROLES};
@@ -92,9 +92,9 @@ fn supported_routes(provider: &str) -> Vec<&'static str> {
     let managed = MANAGED_SEARCH_PROVIDERS.contains(&provider);
     let mut routes = Vec::new();
     if managed {
-        routes.push(SearchRoute::Managed.as_str());
+        routes.push(ProviderRoute::Backend.as_str());
     }
-    routes.push(SearchRoute::Direct.as_str());
+    routes.push(ProviderRoute::Direct.as_str());
     routes
 }
 
@@ -112,7 +112,7 @@ fn apply_provider_patch(
         return Err(format!("unknown search provider: {provider}"));
     }
     if let Some(route) = patch.route.as_deref() {
-        let route = SearchRoute::parse(route)
+        let route = ProviderRoute::parse(route)
             .ok_or_else(|| format!("route must be managed or direct (got {route:?})"))?;
         if !supported_routes(provider).contains(&route.as_str()) {
             return Err(format!(
@@ -133,9 +133,9 @@ fn apply_provider_patch(
     }
     if let Some(enabled) = patch.enabled {
         let default_route = if supported_routes(provider)[0] == "managed" {
-            SearchRoute::Managed
+            ProviderRoute::Backend
         } else {
-            SearchRoute::Direct
+            ProviderRoute::Direct
         };
         config
             .search
@@ -256,7 +256,7 @@ pub fn apply_search_patch(config: &mut Config, update: SearchSettingsPatch) -> R
         apply_roles(config, roles)?;
     }
     if let Some(mode) = update.presentation.as_deref() {
-        config.search.presentation = SearchPresentation::parse(mode).ok_or_else(|| {
+        config.search.presentation = PresentationMode::parse(mode).ok_or_else(|| {
             "presentation must be roles, all_tools, router or one_provider".to_string()
         })?;
     }

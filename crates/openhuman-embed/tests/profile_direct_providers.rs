@@ -10,7 +10,7 @@ use common::{
     chat_completion, chat_requests, runtime_without_master_key, tool_names, PointedTransport,
 };
 use openhuman_embed::config::{
-    SearchConfig, SearchEngineCredentials, SearchPresentation, SearchProviderSettings, SearchRole,
+    SearchConfig, SearchEngineCredentials, PresentationMode, SearchProviderSettings, SearchRole,
 };
 use openhuman_embed::seams::ToolHookDecision;
 use openhuman_embed::{
@@ -122,7 +122,7 @@ async fn scenario() {
     PointedTransport::install(&managed.uri());
 
     let search = SearchConfig {
-        presentation: SearchPresentation::Roles,
+        presentation: PresentationMode::Roles,
         providers: BTreeMap::from([
             ("exa".into(), SearchProviderSettings::direct()),
             ("gemini".into(), SearchProviderSettings::direct()),

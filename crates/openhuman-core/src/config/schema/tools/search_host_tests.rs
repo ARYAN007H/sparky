@@ -1,5 +1,5 @@
 use super::*;
-use crate::config::SearchRoute;
+use crate::config::ProviderRoute;
 
 const KEY: &str = "pinned-brave-secret";
 
@@ -23,7 +23,7 @@ fn pinning_turns_search_on_and_routes_the_provider_direct() {
     assert!(search.is_host_pinned());
     assert_eq!(search.enabled, Some(true));
     assert_eq!(search.providers["brave"], SearchProviderSettings::direct());
-    assert_eq!(search.route("brave"), SearchRoute::Direct);
+    assert_eq!(search.route("brave"), ProviderRoute::Direct);
     assert_eq!(search.direct_key("brave"), Some(KEY));
     assert_eq!(
         search.host_credential("brave").and_then(|c| c.base_url()),

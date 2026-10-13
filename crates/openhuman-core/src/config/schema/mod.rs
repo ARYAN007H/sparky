@@ -123,7 +123,7 @@ pub use tools::{
     IntegrationToggle, IntegrationsConfig, LegacySearchInputs, McpAuthConfig, McpClientConfig,
     McpClientIdentityConfig, McpServerConfig, McpToolExposure, MultimodalConfig,
     MultimodalFileConfig, SearchConfig, SearchEngineCredentials, SearchHostCredential,
-    SearchPresentation, SearchProviderSettings, SearchRoute, SearxngConfig, SecretsConfig,
+    PresentationMode, SearchProviderSettings, ProviderRoute, SearxngConfig, SecretsConfig,
     SeltzConfig, UnknownKeyedSearchProvider, WebSearchConfig, COMPOSIO_MODE_BACKEND,
     COMPOSIO_MODE_DIRECT, COMPOSIO_MODE_DISABLED, MANAGED_SEARCH_PROVIDERS, SEARCH_ENGINE_BRAVE,
     SEARCH_ENGINE_DISABLED, SEARCH_ENGINE_EXA, SEARCH_ENGINE_MANAGED, SEARCH_ENGINE_PARALLEL,

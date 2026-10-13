@@ -106,7 +106,7 @@ impl TinySearchTool {
             provider.usable.hash(&mut hasher);
             provider.key_configured.hash(&mut hasher);
             provider.managed_available.hash(&mut hasher);
-            matches!(provider.route, crate::config::SearchRoute::Managed).hash(&mut hasher);
+            matches!(provider.route, crate::config::ProviderRoute::Backend).hash(&mut hasher);
         }
         hasher.finish()
     }
