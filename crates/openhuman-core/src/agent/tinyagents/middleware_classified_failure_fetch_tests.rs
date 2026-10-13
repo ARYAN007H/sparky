@@ -239,4 +239,3 @@ fn web_fetch_failure_scope_is_the_host_not_the_page() {
         scope("web_fetch", &fetch_args("https://other.test/a"))
     );
 }
-

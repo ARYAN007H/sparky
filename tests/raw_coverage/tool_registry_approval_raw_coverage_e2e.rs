@@ -30,8 +30,8 @@ use openhuman_core::security::approval::{
 };
 use openhuman_core::security::{live_policy, SecurityPolicy};
 use openhuman_core::tools::registry::{registry_entries, registry_entries_for_config};
-use tinytools::registry::denials;
 use openhuman_rpc::server::build_core_http_router;
+use tinytools::registry::denials;
 
 const TEST_RPC_TOKEN: &str = "tool-registry-approval-raw-e2e-token";
 
@@ -54,7 +54,8 @@ fn env_lock() -> tokio::sync::MutexGuard<'static, ()> {
 async fn env_lock_async() -> tokio::sync::MutexGuard<'static, ()> {
     ENV_LOCK
         .get_or_init(|| tokio::sync::Mutex::new(()))
-        .lock().await
+        .lock()
+        .await
 }
 
 fn ensure_rpc_auth() {
@@ -502,10 +503,8 @@ async fn tool_registry_diagnostics_reports_config_and_audit_store_failures() {
         workspace_dir: workspace_file,
         ..Config::default()
     };
-    let diagnostics = openhuman_core::tools::registry::ops::diagnostics_for_config(
-        &broken_audit_config,
-    )
-    .await;
+    let diagnostics =
+        openhuman_core::tools::registry::ops::diagnostics_for_config(&broken_audit_config).await;
     assert!(diagnostics.value.mcp_write_audit.enabled);
     assert_eq!(diagnostics.value.mcp_write_audit.recent_rows, None);
     assert!(diagnostics
