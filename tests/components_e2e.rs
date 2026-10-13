@@ -33,6 +33,33 @@ async fn rpc(base: &str, method: &str) -> Value {
 
 #[test]
 fn disabled_component_answers_component_disabled_over_json_rpc() {
+    run_disabled_case(
+        |c| c.components.mcp = false,
+        "openhuman.mcp_clients_status",
+        "mcp",
+        "tinymcp",
+        "tinydocs",
+    );
+}
+
+#[test]
+fn disabled_channels_component_answers_component_disabled_over_json_rpc() {
+    run_disabled_case(
+        |c| c.components.channels = false,
+        "openhuman.channels_list",
+        "channels",
+        "tinychannels",
+        "tinydocs",
+    );
+}
+
+fn run_disabled_case(
+    disable: fn(&mut Config),
+    method: &'static str,
+    component: &'static str,
+    module_id: &'static str,
+    other_module_id: &'static str,
+) {
     std::thread::Builder::new()
         .stack_size(64 * 1024 * 1024)
         .spawn(|| {
@@ -48,7 +75,7 @@ fn disabled_component_answers_component_disabled_over_json_rpc() {
                         config_path: dir.path().join("config.toml"),
                         ..Config::default()
                     };
-                    config.components.mcp = false;
+                    disable(&mut config);
                     tinyhumans_boot::boot();
                     let _runtime = CoreBuilder::new(HostKind::Library)
                         .config(config)
@@ -64,13 +91,13 @@ fn disabled_component_answers_component_disabled_over_json_rpc() {
                     let app = build_core_http_router(false);
                     let server = tokio::spawn(async move { axum::serve(listener, app).await });
 
-                    let off = rpc(&base, "openhuman.mcp_clients_status").await;
+                    let off = rpc(&base, method).await;
                     let err = off
                         .get("error")
                         .unwrap_or_else(|| panic!("want error: {off}"));
                     assert_eq!(
                         err.get("message").and_then(Value::as_str),
-                        Some("COMPONENT_DISABLED:mcp"),
+                        Some(format!("COMPONENT_DISABLED:{component}").as_str()),
                         "{off}"
                     );
                     assert_eq!(
@@ -80,7 +107,7 @@ fn disabled_component_answers_component_disabled_over_json_rpc() {
                     );
                     assert_eq!(
                         err.pointer("/data/component").and_then(Value::as_str),
-                        Some("mcp")
+                        Some(component)
                     );
 
                     // `modules.list` reports the same module as Disabled, and only it.
@@ -97,9 +124,9 @@ fn disabled_component_answers_component_disabled_over_json_rpc() {
                             .and_then(|m| m.get("state").and_then(Value::as_str))
                             .map(str::to_owned)
                     };
-                    assert_eq!(state_of("tinymcp").as_deref(), Some("disabled"), "{listed}");
+                    assert_eq!(state_of(module_id).as_deref(), Some("disabled"), "{listed}");
                     assert_ne!(
-                        state_of("tinydocs").as_deref(),
+                        state_of(other_module_id).as_deref(),
                         Some("disabled"),
                         "{listed}"
                     );
