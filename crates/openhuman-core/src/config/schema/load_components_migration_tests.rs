@@ -132,3 +132,33 @@ fn juice_migration_round_trip_is_idempotent() {
     assert!(!second.components.juice);
     assert_eq!(saved, toml::to_string(&second).unwrap());
 }
+
+#[test]
+fn voice_switches_all_explicitly_off_disable_the_voice_component() {
+    let c = migrated(
+        "[dictation]\nenabled = false\n[voice_server]\nauto_start = false\nalways_on_enabled = false\n",
+        None,
+    );
+    assert!(!c.components.voice);
+    assert!(c.components.flows, "others stay on");
+}
+
+#[test]
+fn voice_stays_on_when_any_legacy_voice_switch_is_on_or_unset() {
+    let c = migrated(
+        "[dictation]\nenabled = true\n[voice_server]\nauto_start = false\nalways_on_enabled = false\n",
+        None,
+    );
+    assert!(c.components.voice);
+    let c = migrated("[voice_server]\nauto_start = false\n", None);
+    assert!(c.components.voice, "unset keys are not an opt-out");
+}
+
+#[test]
+fn explicit_components_voice_wins_over_legacy_voice_switches() {
+    let c = migrated(
+        "[components]\nvoice = true\n[dictation]\nenabled = false\n[voice_server]\nauto_start = false\nalways_on_enabled = false\n",
+        None,
+    );
+    assert!(c.components.voice);
+}
