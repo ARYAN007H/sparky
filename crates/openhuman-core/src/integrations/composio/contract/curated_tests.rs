@@ -1,11 +1,11 @@
 use super::*;
 use tinyconnectors_bus::vocabulary::{ToolkitVocabulary, VocabularyAction};
 
-fn reply() -> (Vec<BusCuratedTool>, VocabularyResponse) {
-    let listed = vec![BusCuratedTool {
+fn reply() -> (Vec<CuratedTool>, VocabularyResponse) {
+    let listed = vec![CuratedTool {
         toolkit: "gmail".into(),
         slug: "GMAIL_SEND_EMAIL".into(),
-        scope: BusScope::Write,
+        scope: ToolScope::Write,
     }];
     let vocabulary = VocabularyResponse {
         toolkits: vec![
@@ -16,11 +16,11 @@ fn reply() -> (Vec<BusCuratedTool>, VocabularyResponse) {
                 actions: Some(vec![
                     VocabularyAction {
                         slug: "GMAIL_FETCH_EMAILS".into(),
-                        scope: BusScope::Read,
+                        scope: ToolScope::Read,
                     },
                     VocabularyAction {
                         slug: "GMAIL_SEND_EMAIL".into(),
-                        scope: BusScope::Write,
+                        scope: ToolScope::Write,
                     },
                 ]),
             },
@@ -30,7 +30,7 @@ fn reply() -> (Vec<BusCuratedTool>, VocabularyResponse) {
                 native_provider: false,
                 actions: Some(vec![VocabularyAction {
                     slug: "GOOGLECALENDAR_CREATE_EVENT".into(),
-                    scope: BusScope::Write,
+                    scope: ToolScope::Write,
                 }]),
             },
             ToolkitVocabulary {
@@ -40,7 +40,7 @@ fn reply() -> (Vec<BusCuratedTool>, VocabularyResponse) {
                 actions: None,
             },
         ],
-        agent_ready_toolkits: vec![],
+        agent_ready_toolkits: vec!["gmail".into(), "gmail".into(), "Notion".into()],
     };
     (listed, vocabulary)
 }

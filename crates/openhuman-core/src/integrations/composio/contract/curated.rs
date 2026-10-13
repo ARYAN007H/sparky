@@ -126,7 +126,7 @@ fn test_fixture() -> Arc<Snapshot> {
         .clone()
 }
 
-/// Leak each distinct string once: `CuratedTool` carries `&'static str`, and a
+/// Leak each distinct description once: `toolkit_description` hands out `&'static str`, and a
 /// re-read after reinit must not grow the heap by another copy of the tables.
 fn intern(text: &str) -> &'static str {
     static POOL: Mutex<Option<HashSet<&'static str>>> = Mutex::new(None);
