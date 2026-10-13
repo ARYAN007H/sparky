@@ -3872,6 +3872,7 @@ dependencies = [
  "tinymemory-api",
  "tinymemory-integrations",
  "tinymemory-tools",
+ "tinyredact",
  "tinysearch-bus",
  "tinyskills",
  "tinystoragedrivers",
@@ -6572,7 +6573,6 @@ dependencies = [
  "anyhow",
  "async-trait",
  "futures",
- "rusqlite",
  "serde",
  "serde_json",
  "sha2 0.11.0",
@@ -6599,7 +6599,6 @@ dependencies = [
  "futures",
  "regex",
  "reqwest 0.12.28",
- "rusqlite",
  "rustix 1.1.5",
  "serde",
  "serde_json",
@@ -6653,6 +6652,7 @@ dependencies = [
  "tinyagents-session",
  "tinyagents-tasks",
  "tinyinference-llm",
+ "tinystoragedrivers-core",
  "tinytools",
  "tokio",
  "tracing",
@@ -6699,10 +6699,8 @@ dependencies = [
  "async-trait",
  "chrono",
  "fs2",
- "glob",
  "hex",
  "parking_lot",
- "rusqlite",
  "serde",
  "serde_json",
  "sha2 0.11.0",
@@ -6728,6 +6726,7 @@ dependencies = [
  "serde_json",
  "tinyagents-harness",
  "tinyinference-llm",
+ "tinystoragedrivers-core",
  "tinytools",
  "tokio",
  "tracing",
@@ -7081,7 +7080,7 @@ dependencies = [
 
 [[package]]
 name = "tinyjuice-bus"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -7132,7 +7131,7 @@ dependencies = [
 
 [[package]]
 name = "tinymemory-api"
-version = "1.27.2"
+version = "1.28.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -7146,7 +7145,7 @@ dependencies = [
 
 [[package]]
 name = "tinymemory-integrations"
-version = "1.27.2"
+version = "1.28.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -7162,6 +7161,7 @@ dependencies = [
  "thiserror 2.0.20",
  "tinymemory-api",
  "tinymemory-tools",
+ "tinyredact",
  "tokio",
  "tracing",
  "walkdir",
@@ -7169,15 +7169,26 @@ dependencies = [
 
 [[package]]
 name = "tinymemory-tools"
-version = "1.27.2"
+version = "1.28.0"
 dependencies = [
+ "async-trait",
  "chrono",
  "futures",
  "log",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "thiserror 2.0.20",
  "tinymemory-api",
+]
+
+[[package]]
+name = "tinyredact"
+version = "1.28.0"
+dependencies = [
+ "log",
+ "regex",
+ "serde_json",
 ]
 
 [[package]]
@@ -7364,9 +7375,11 @@ checksum = "fd3ca314f692efd6c868f8408f53fe444634a845f96c028b97d35f6a1f79f0ee"
 
 [[package]]
 name = "tinyvoice-bus"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "serde",
+ "serde_json",
+ "thiserror 2.0.20",
 ]
 
 [[package]]

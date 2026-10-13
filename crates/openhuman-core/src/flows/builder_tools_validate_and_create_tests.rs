@@ -390,7 +390,8 @@ async fn edit_workflow_surfaces_draft_write_back_failure() {
     // Updating a draft document aborts; creating, reading and listing do not,
     // so the draft loads and only the write-back fails.
     let conn =
-        crate::storage::rusqlite::Connection::open(crate::flows::store::db_path(&config)).unwrap();
+        crate::storage::rusqlite::Connection::open(config.workspace_dir.join("storage/storage.db"))
+            .unwrap();
     let docs_table: String = conn
         .query_row(
             "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE '%\\_tsd\\_docs' ESCAPE '\\'",

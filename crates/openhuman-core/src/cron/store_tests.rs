@@ -18,11 +18,11 @@ fn test_config(tmp: &TempDir) -> Config {
 }
 
 #[test]
-fn database_lives_at_workspace_cron_schedule_db() {
+fn jobs_live_in_the_workspace_default_database() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     add_job(&config, "*/5 * * * *", "echo ok").unwrap();
-    assert!(tmp.path().join("workspace/cron/schedule.db").is_file());
+    assert!(tmp.path().join("workspace/storage/storage.db").is_file());
 }
 
 #[test]
@@ -66,7 +66,7 @@ fn agent_context(
 }
 
 #[tokio::test]
-async fn an_agents_jobs_live_in_its_own_database() {
+async fn an_agents_jobs_live_in_its_own_scope() {
     use crate::core::runtime::CoreContext;
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
@@ -76,10 +76,6 @@ async fn an_agents_jobs_live_in_its_own_database() {
     })
     .await;
 
-    assert!(tmp
-        .path()
-        .join("workspace/agents/alpha/cron/schedule.db")
-        .is_file());
     let alpha_ids = CoreContext::scope(agent_context(&config, "alpha"), async {
         list_jobs(&config)
             .unwrap()
@@ -132,13 +128,18 @@ fn legacy_fixture() -> std::path::PathBuf {
 }
 
 #[test]
-fn a_legacy_jobs_db_is_imported_on_first_use_and_left_untouched() {
+fn a_legacy_jobs_db_is_imported_by_the_storage_importer_and_left_untouched() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     let legacy = legacy_db_path(&config);
     std::fs::create_dir_all(legacy.parent().unwrap()).unwrap();
     std::fs::copy(legacy_fixture(), &legacy).unwrap();
     let before = std::fs::read(&legacy).unwrap();
+
+    let backend = crate::storage::local::backend_for(&config.workspace_dir).unwrap();
+    for report in crate::storage::import::tinyflows::run_with(&backend, &config) {
+        report.outcome.unwrap();
+    }
 
     let jobs = list_jobs(&config).unwrap();
     assert_eq!(jobs.len(), 3);
@@ -158,6 +159,8 @@ fn a_legacy_jobs_db_is_imported_on_first_use_and_left_untouched() {
         .find(|job| job.name.as_deref() == Some("inbox"))
         .unwrap();
     remove_job(&config, &inbox.id).unwrap();
-    crate::storage::local::forget(&db_path(&config));
+    for report in crate::storage::import::tinyflows::run_with(&backend, &config) {
+        report.outcome.unwrap();
+    }
     assert_eq!(list_jobs(&config).unwrap().len(), 2);
 }

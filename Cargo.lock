@@ -7418,7 +7418,6 @@ dependencies = [
  "anyhow",
  "async-trait",
  "futures",
- "rusqlite",
  "serde",
  "serde_json",
  "sha2 0.11.0",
@@ -7445,7 +7444,6 @@ dependencies = [
  "futures",
  "regex",
  "reqwest 0.12.28",
- "rusqlite",
  "rustix 1.1.5",
  "serde",
  "serde_json",
@@ -7499,6 +7497,7 @@ dependencies = [
  "tinyagents-session",
  "tinyagents-tasks",
  "tinyinference-llm",
+ "tinystoragedrivers-core",
  "tinytools",
  "tokio",
  "tracing",
@@ -7545,10 +7544,8 @@ dependencies = [
  "async-trait",
  "chrono",
  "fs2",
- "glob",
  "hex",
  "parking_lot",
- "rusqlite",
  "serde",
  "serde_json",
  "sha2 0.11.0",
@@ -7574,6 +7571,7 @@ dependencies = [
  "serde_json",
  "tinyagents-harness",
  "tinyinference-llm",
+ "tinystoragedrivers-core",
  "tinytools",
  "tokio",
  "tracing",
@@ -8046,7 +8044,7 @@ dependencies = [
 
 [[package]]
 name = "tinyjuice-bus"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "serde",
  "serde_json",
