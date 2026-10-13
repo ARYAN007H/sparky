@@ -71,6 +71,7 @@ pub fn wrap(inner: Arc<dyn StorageBackend>) -> Arc<dyn StorageBackend> {
     Arc::new(FencedBackend::new(inner, super::fence::registry()))
 }
 
+#[async_trait]
 impl StorageBackend for FencedBackend {
     fn driver(&self) -> &'static str {
         self.inner.driver()
