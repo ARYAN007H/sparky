@@ -1,6 +1,6 @@
 use super::*;
-use tinychannels_bus as traits;
 use async_trait::async_trait;
+use tinychannels_bus as traits;
 use tinytools::{Tool, ToolResult};
 
 struct DummyTool;

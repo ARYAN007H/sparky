@@ -1,6 +1,6 @@
 use super::*;
-use tinychannels_bus::ChannelMessage;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use tinychannels_bus::ChannelMessage;
 use tokio::sync::mpsc;
 
 struct MockChannel {

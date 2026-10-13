@@ -11,8 +11,6 @@
 use crate::modules::client::ModuleClient;
 use tinychannels_bus::methods;
 
-
-
 /// Return a client for the compiled, linked TinyChannels module fixture.
 ///
 /// BLOCKED on the tinybus epic: `tinychannels-module` v0.1.29 pins `tinybus =0.1.4`

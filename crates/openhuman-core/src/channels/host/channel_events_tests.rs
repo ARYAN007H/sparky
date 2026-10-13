@@ -1,11 +1,11 @@
 //! Tests for the channel approval-surface and turn-state subscribers.
 
 use super::*;
-use tinychannels_bus::{ChannelMessage, SendMessage};
 use std::path::Path;
 use std::sync::Mutex as StdMutex;
 use tempfile::tempdir;
 use tinychannels::remote::session_store::with_store_read;
+use tinychannels_bus::{ChannelMessage, SendMessage};
 
 struct RecordingChannel {
     name: String,

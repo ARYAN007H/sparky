@@ -1,7 +1,7 @@
 use super::super::super::Channel;
-use tinychannels_bus as traits;
 use super::{jitter_millis, spawn_supervised_listener, MAX_JITTER_MS};
 use std::sync::{Arc, Mutex};
+use tinychannels_bus as traits;
 use tokio::time::Instant;
 
 #[test]

@@ -3,12 +3,10 @@ use super::*;
 #[test]
 fn every_enabled_feature_registers_exactly_its_own_id() {
     let ids: Vec<&str> = linked_modules().iter().map(|(id, _)| *id).collect();
-    let expected: Vec<&str> = [
-        cfg!(feature = "tinydocs").then_some("tinydocs"),
-    ]
-    .into_iter()
-    .flatten()
-    .collect();
+    let expected: Vec<&str> = [cfg!(feature = "tinydocs").then_some("tinydocs")]
+        .into_iter()
+        .flatten()
+        .collect();
     assert_eq!(ids, expected);
 }
 
