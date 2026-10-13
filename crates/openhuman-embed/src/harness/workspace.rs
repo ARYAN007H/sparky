@@ -92,7 +92,43 @@ pub(crate) struct ResolvedWorkspace {
     /// operator's real `~/.openhuman` credentials while looking hermetic.
     pub(crate) config_path: PathBuf,
     /// `None` for `Dir` / `Inherit`; those directories outlive the runtime.
-    pub(crate) _temp: Option<tempfile::TempDir>,
+    pub(crate) _temp: Option<std::sync::Arc<EphemeralRoot>>,
+}
+
+/// The temp root of an ephemeral workspace, removed when its last holder
+/// drops: the runtime, or a deferred agent cleanup that must keep the files
+/// until the MCP module acknowledges its close. Shared on its own so that
+/// cleanup never has to hold the whole runtime (and its process slot).
+pub(crate) struct EphemeralRoot(Option<tempfile::TempDir>);
+
+impl Drop for EphemeralRoot {
+    fn drop(&mut self) {
+        let Some(temp) = self.0.take() else {
+            return;
+        };
+        // Take ownership of the temp path and remove it with a short retry.
+        // The core's memory/session writers keep running a moment after a
+        // turn returns and can recreate workspace subdirectories while
+        // `TempDir`'s own drop-time removal is racing them, leaving an empty
+        // directory behind. A bounded retry lets those writes settle before
+        // giving up.
+        let root = temp.keep();
+        let mut quiet_passes = 0;
+        for _ in 0..20 {
+            match std::fs::remove_dir_all(&root) {
+                Ok(()) => quiet_passes += 1,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    quiet_passes += 1;
+                }
+                Err(_) => quiet_passes = 0,
+            }
+            if quiet_passes >= 5 {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+        let _ = std::fs::remove_dir_all(&root);
+    }
 }
 
 impl ResolvedWorkspace {
@@ -138,7 +174,7 @@ impl ResolvedWorkspace {
                     workspace_dir,
                     action_dir,
                     config_path: root.join("config.toml"),
-                    _temp: Some(temp),
+                    _temp: Some(std::sync::Arc::new(EphemeralRoot(Some(temp)))),
                 })
             }
             Workspace::Dir(dir) => {
