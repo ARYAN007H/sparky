@@ -69,7 +69,7 @@ pub(crate) async fn module_client(ctx: &ChannelRuntimeContext) -> tinybus::modul
     if ctx.config.is_none() {
         return super::module_fixture::client().await;
     }
-    crate::modules::ops::client(ctx.config.as_deref().cloned().unwrap_or_default())
+    crate::modules::client(ctx.config.as_deref().cloned().unwrap_or_default())
 }
 
 #[cfg(test)]

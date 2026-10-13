@@ -36,7 +36,7 @@ impl TriggerHistory {
         if let Some(client) = self.fixture.as_ref() {
             return client.clone();
         }
-        crate::modules::ops::client(config.clone())
+        crate::modules::client(config.clone())
     }
 
     async fn ensure_lease(

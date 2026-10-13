@@ -115,7 +115,7 @@ impl McpConfiguredClient {
         Ok(Self::with_port(
             data_dir,
             Box::new(TinyMcpPort {
-                root: crate::modules::ops::client(config.clone()),
+                root: crate::modules::client(config.clone()),
             }),
         ))
     }

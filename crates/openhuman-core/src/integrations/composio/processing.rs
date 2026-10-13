@@ -14,7 +14,7 @@ pub(crate) async fn prepare(
     since: Option<String>,
 ) -> Result<Option<serde_json::Value>, String> {
     prepare_with(
-        &crate::modules::ops::client(config.clone()),
+        &crate::modules::client(config.clone()),
         tool,
         arguments,
         timezone,
@@ -56,7 +56,7 @@ pub(crate) async fn filter(
     response: super::types::ComposioExecuteResponse,
     since: String,
 ) -> Result<super::types::ComposioExecuteResponse, String> {
-    crate::modules::ops::client(config.clone())
+    crate::modules::client(config.clone())
         .call(
             "tinyconnectors",
             methods::FILTER_RESPONSE,

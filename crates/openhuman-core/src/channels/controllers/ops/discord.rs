@@ -39,7 +39,7 @@ async fn discord_bot_token(config: &Config) -> Result<String, String> {
 pub async fn discord_list_guilds(config: &Config) -> Result<Outcome<Vec<DiscordGuild>>, String> {
     let token = discord_bot_token(config).await?;
     let guilds = channel_controller::discord(
-        &crate::modules::ops::client(config.clone()),
+        &crate::modules::client(config.clone()),
         ChannelControllerRequest::DiscordListGuilds {
             config: config.channels_config.clone(),
             bot_token: token,
@@ -62,7 +62,7 @@ pub async fn discord_list_channels(
     }
     let token = discord_bot_token(config).await?;
     let channels = channel_controller::discord(
-        &crate::modules::ops::client(config.clone()),
+        &crate::modules::client(config.clone()),
         ChannelControllerRequest::DiscordListChannels {
             config: config.channels_config.clone(),
             guild_id: guild_id.to_owned(),
@@ -90,7 +90,7 @@ pub async fn discord_check_permissions(
     }
     let token = discord_bot_token(config).await?;
     let check = channel_controller::discord(
-        &crate::modules::ops::client(config.clone()),
+        &crate::modules::client(config.clone()),
         ChannelControllerRequest::DiscordCheckPermissions {
             config: config.channels_config.clone(),
             guild_id: guild_id.to_owned(),

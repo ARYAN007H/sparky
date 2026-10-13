@@ -43,7 +43,7 @@ pub struct AccessibilityClient {
 impl AccessibilityClient {
     pub fn new(config: &Config) -> Self {
         Self {
-            client: crate::modules::ops::client(config.clone()),
+            client: crate::modules::client(config.clone()),
             computer_enabled: config.components.computer,
         }
     }

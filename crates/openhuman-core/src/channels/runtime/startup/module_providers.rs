@@ -45,7 +45,7 @@ impl ModuleChannelRuntime {
         context: Arc<OnceLock<Weak<crate::channels::context::ChannelRuntimeContext>>>,
         dispatch: mpsc::Sender<RuntimeChannelMessage>,
     ) -> Result<Self> {
-        let client = crate::modules::ops::client((*config).clone());
+        let client = crate::modules::client((*config).clone());
         // Queued deliveries from before the storage contract move into the
         // module's storage before it starts and reads its queue. Best effort:
         // a failure is retried at the next start, never fatal to channels.

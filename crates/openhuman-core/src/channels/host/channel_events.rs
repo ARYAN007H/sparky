@@ -48,7 +48,7 @@ impl ChannelApprovalSurfaceSubscriber {
         if self.config.is_none() {
             return crate::channels::module_fixture::client().await;
         }
-        crate::modules::ops::client(self.config.as_deref().cloned().unwrap_or_default())
+        crate::modules::client(self.config.as_deref().cloned().unwrap_or_default())
     }
 }
 #[async_trait]
@@ -208,11 +208,11 @@ impl ChannelTurnStateSubscriber {
         let client = if self.config.is_none() {
             crate::channels::module_fixture::client().await
         } else {
-            crate::modules::ops::client(self.config.as_deref().cloned().unwrap_or_default())
+            crate::modules::client(self.config.as_deref().cloned().unwrap_or_default())
         };
         #[cfg(not(test))]
         let client =
-            crate::modules::ops::client(self.config.as_deref().cloned().unwrap_or_default());
+            crate::modules::client(self.config.as_deref().cloned().unwrap_or_default());
         let result: Result<tinychannels_bus::module_remote::RemoteOperationResult, _> = client
             .call_confidential(
                 "tinychannels",

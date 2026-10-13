@@ -31,7 +31,7 @@ pub async fn connect_channel(
         HttpProxyPolicy::default()
     };
     let prepared = crate::modules::channel_controller::prepare_connection(
-        &crate::modules::ops::client(config.clone()),
+        &crate::modules::client(config.clone()),
         ChannelControllerRequest::PrepareConnect {
             config: config.channels_config.clone(),
             channel: channel_id.to_owned(),

@@ -27,7 +27,7 @@ impl GitbooksSearchTool {
         Ok(Self {
             endpoint,
             timeout_secs,
-            client: crate::modules::ops::client(config)
+            client: crate::modules::client(config)
                 .with_timeout(Duration::from_secs(timeout_secs)),
         })
     }
@@ -121,7 +121,7 @@ impl GitbooksGetPageTool {
         Ok(Self {
             endpoint,
             timeout_secs,
-            client: crate::modules::ops::client(config)
+            client: crate::modules::client(config)
                 .with_timeout(Duration::from_secs(timeout_secs)),
         })
     }

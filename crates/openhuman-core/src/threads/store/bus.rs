@@ -359,7 +359,7 @@ async fn persist_channel_turn(
         if config.workspace_dir != workspace_dir {
             return Err("channel workspace changed".into());
         }
-        crate::modules::ops::client(config)
+        crate::modules::client(config)
     };
     let prepared: tinychannels_bus::module_inbound::PreparedChannelInbound = client
         .call_confidential(

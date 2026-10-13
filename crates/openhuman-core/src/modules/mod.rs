@@ -41,6 +41,7 @@
 //! - [`ops`] — the adapter over `tinybus::module::Resolver` and `ModuleClient`:
 //!   builds them from [`Config`](crate::config::Config) and the registry.
 //! - [`report`] — the Sentry sink for terminal module outcomes.
+//! - [`client`] — a `tinybus::module::ModuleClient`, with or without the loader.
 //! - [`schemas`] — the `modules` RPC surface.
 //! - [`boot`] — what happens at startup.
 
@@ -76,7 +77,6 @@ pub mod ops;
 #[cfg(feature = "modules")]
 pub(crate) mod profile_claim;
 pub mod registry;
-#[cfg(feature = "modules")]
 pub(crate) mod report;
 #[cfg(feature = "modules")]
 pub mod runtime;
@@ -124,6 +124,8 @@ pub mod tinybox;
 #[cfg(feature = "modules")]
 mod tokenjuice_host;
 pub mod types;
+#[cfg(not(feature = "modules"))]
+mod unloaded;
 #[cfg(feature = "voice")]
 #[cfg(feature = "modules")]
 pub mod voice;
@@ -145,6 +147,22 @@ pub use ops::{ensure_loaded, ensure_loaded_within, state_of};
 pub use schemas::{all_controller_schemas, all_registered_controllers};
 #[doc(hidden)]
 pub use source::local_artifact;
+/// A `tinybus::module::ModuleClient` that loads modules lazily through the
+/// process-wide resolver (see [`ops`]). Constructing one starts nothing. In a
+/// build without the `modules` feature there is no loader, and every call is
+/// unavailable and reported once with the `loader_disabled` reason.
+#[must_use]
+pub fn client(config: crate::config::Config) -> tinybus::module::ModuleClient {
+    #[cfg(feature = "modules")]
+    {
+        ops::client(config)
+    }
+    #[cfg(not(feature = "modules"))]
+    {
+        unloaded::client(config)
+    }
+}
+
 pub use types::{LoadPolicy, ModuleRecord, ModuleSource, ModuleState, ModuleStatus, PlatformAsset};
 
 /// Imports tinymcp's legacy SQLite files under `data_dir` into the module's

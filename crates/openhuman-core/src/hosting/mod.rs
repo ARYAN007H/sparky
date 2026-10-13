@@ -83,7 +83,7 @@ impl Account {
             return Ok(None);
         }
         Ok(Some(Self {
-            client: crate::modules::ops::client(config.clone()),
+            client: crate::modules::client(config.clone()),
             provider,
             api_key,
             team: config.hosting.team().map(str::to_owned),
@@ -123,7 +123,7 @@ impl Account {
         }
         let workspace_dir = config.workspace_dir.clone();
         Ok(Self {
-            client: crate::modules::ops::client(config),
+            client: crate::modules::client(config),
             provider: "vercel".to_owned(),
             api_key: api_key.trim().to_owned(),
             team: team

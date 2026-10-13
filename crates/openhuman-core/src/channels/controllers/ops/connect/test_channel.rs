@@ -18,7 +18,7 @@ pub async fn test_channel(
     auth_mode: ChannelAuthMode,
     credentials_value: Value,
 ) -> Result<Outcome<ChannelTestResult>, String> {
-    let response = crate::modules::ops::client(config.clone())
+    let response = crate::modules::client(config.clone())
         .call_confidential(
             "tinychannels",
             methods::CHANNEL_CONTROLLER,

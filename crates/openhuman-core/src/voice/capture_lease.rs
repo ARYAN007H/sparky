@@ -125,7 +125,7 @@ pub(super) struct CaptureLease {
 }
 impl CaptureLease {
     pub(super) async fn reserve(config: &Config, kind: Kind) -> Result<Self, String> {
-        let port: Arc<dyn Port> = Arc::new(BusPort(crate::modules::ops::client(config.clone())));
+        let port: Arc<dyn Port> = Arc::new(BusPort(crate::modules::client(config.clone())));
         Self::reserve_with_port(port, kind).await
     }
     async fn reserve_with_port(port: Arc<dyn Port>, kind: Kind) -> Result<Self, String> {

@@ -49,7 +49,7 @@ pub async fn doctor_channels(config: Config) -> Result<()> {
             service_selectors: selectors,
         }
     };
-    let client = crate::modules::ops::client(config.clone())
+    let client = crate::modules::client(config.clone())
         .with_timeout(Duration::from_secs(configured.len() as u64 * 10 + 5));
     let channels =
         crate::modules::channel_health::check(&client, hydrate_channel_credentials(&config), proxy)

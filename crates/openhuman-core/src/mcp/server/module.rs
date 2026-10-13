@@ -182,7 +182,7 @@ impl ServerSession {
     pub(super) fn port_for_config(config: &Config) -> Arc<dyn ServerPort> {
         Self::register_shutdown_hook(config.clone());
         Arc::new(TinyMcpPort {
-            client: crate::modules::ops::client(config.clone()),
+            client: crate::modules::client(config.clone()),
         })
     }
 
@@ -193,7 +193,7 @@ impl ServerSession {
         crate::core::shutdown::register(move || {
             let config = config.clone();
             async move {
-                let client = crate::modules::ops::client(config);
+                let client = crate::modules::client(config);
                 if let Err(error) = client
                     .call::<usize>(MODULE, names::methods::SERVER_SHUTDOWN, ())
                     .await

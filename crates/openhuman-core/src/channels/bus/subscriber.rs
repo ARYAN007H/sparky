@@ -73,7 +73,7 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
             }
         };
         let identity = match crate::modules::channel_controller::prepare_identity(
-            &crate::modules::ops::client(config.clone()),
+            &crate::modules::client(config.clone()),
             tinychannels_bus::module_inbound::PrepareChannelIdentityRequest {
                 channel: channel.clone(),
                 sender: sender.clone(),
