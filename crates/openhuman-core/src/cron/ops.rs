@@ -2,46 +2,18 @@ use crate::config::Config;
 use crate::core::Outcome;
 use crate::security::SecurityPolicy;
 use anyhow::Result;
-use once_cell::sync::Lazy;
 use serde_json::json;
-use std::collections::HashSet;
-use std::sync::Mutex;
 use {
     crate::cron, crate::cron::add_shell_job, crate::cron::update_job,
     tinyflows_schedule::types::CronJob, tinyflows_schedule::types::CronJobPatch,
     tinyflows_schedule::types::CronRun, tinyflows_schedule::types::Schedule,
 };
 
-/// Guard against duplicate concurrent "Run Now" executions per job.
-/// Entries are inserted before spawning and removed when the task completes.
-static ACTIVE_RUNS: Lazy<Mutex<HashSet<String>>> = Lazy::new(|| Mutex::new(HashSet::new()));
-
-/// RAII guard that removes a job ID from `ACTIVE_RUNS` when dropped.
-///
-/// Ensures cleanup runs on normal completion, panic, or future cancellation —
-/// so a hung or aborted background task can never permanently lock a job_id.
-pub(crate) struct ActiveRunGuard {
-    job_id: String,
-}
-
-impl Drop for ActiveRunGuard {
-    fn drop(&mut self) {
-        if let Ok(mut active) = ACTIVE_RUNS.lock() {
-            active.remove(&self.job_id);
-        }
-    }
-}
-
 /// Claim `job_id` as running. `None` when a run (scheduled or Run Now) already
-/// holds it; the claim is released when the guard drops.
-pub(crate) fn try_acquire_run(job_id: &str) -> Option<ActiveRunGuard> {
-    let mut active = ACTIVE_RUNS.lock().ok()?;
-    if !active.insert(job_id.to_string()) {
-        return None;
-    }
-    Some(ActiveRunGuard {
-        job_id: job_id.to_string(),
-    })
+/// holds it; the claim is released when the guard drops, including on panic or
+/// future cancellation, so an aborted task can never lock a job id.
+pub(crate) fn try_acquire_run(job_id: &str) -> Option<tinyflows_schedule::runtime::RunClaim> {
+    crate::cron::scheduler::try_acquire_run(job_id)
 }
 
 pub fn add_once(config: &Config, delay: &str, command: &str) -> Result<CronJob> {
@@ -213,27 +185,13 @@ pub async fn cron_run(config: &Config, job_id: &str) -> Result<Outcome<serde_jso
     )
     .map_err(|e| e.to_string())?;
 
-    // Guard against duplicate concurrent executions for the same job.
-    {
-        let mut active = ACTIVE_RUNS
-            .lock()
-            .map_err(|_| "ACTIVE_RUNS lock poisoned".to_string())?;
-        if active.contains(job_id) {
-            tracing::debug!(job_id, "[cron_run] rejected duplicate concurrent execution");
-            return Err(format!("cron job '{job_id}' is already running"));
-        }
-        active.insert(job_id.to_string());
-    }
-
-    let job = match cron::get_job(config, job_id) {
-        Ok(j) => j,
-        Err(e) => {
-            if let Ok(mut active) = ACTIVE_RUNS.lock() {
-                active.remove(job_id);
-            }
-            return Err(e.to_string());
-        }
+    // Guard against duplicate concurrent executions for the same job. The
+    // claim is taken before the job is loaded and moves into the task.
+    let Some(run_guard) = try_acquire_run(job_id) else {
+        tracing::debug!(job_id, "[cron_run] rejected duplicate concurrent execution");
+        return Err(format!("cron job '{job_id}' is already running"));
     };
+    let job = cron::get_job(config, job_id).map_err(|e| e.to_string())?;
 
     // Insert a "queued" placeholder run record immediately so the frontend
     // poller can observe the run as soon as the RPC returns — otherwise the
@@ -249,11 +207,8 @@ pub async fn cron_run(config: &Config, job_id: &str) -> Result<Outcome<serde_jso
     // Spawn the execution as a background task so the RPC handler returns
     // immediately instead of blocking for the full job duration.
     tokio::spawn(async move {
-        // Drop guard ensures job_id is removed from ACTIVE_RUNS even on panic
-        // or future cancellation, not just on the normal completion path.
-        let _guard = ActiveRunGuard {
-            job_id: job_id_owned.clone(),
-        };
+        // The claim is released even on panic or future cancellation.
+        let _guard = run_guard;
 
         tracing::debug!(job_id = %job_id_owned, "[cron_run] background task started");
         run_and_record(&config_owned, &job).await;
