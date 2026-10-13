@@ -4,7 +4,8 @@ use super::*;
 
 #[tokio::test]
 async fn a_resumed_thread_keeps_recorded_juice_specs_and_executors_when_repl_is_off() {
-    use crate::inference::tokenjuice::{repl_tools_for, REPL_TOOL_NAMES};
+    use crate::inference::tokenjuice::repl_tools_for;
+    use tinyjuice_bus::tools::REPL_TOOLS as REPL_TOOL_NAMES;
 
     crate::agent::harness::definition::AgentDefinitionRegistry::init_global_builtins()
         .expect("builtin definitions");
@@ -147,7 +148,8 @@ async fn a_resumed_thread_keeps_recorded_juice_specs_and_executors_when_repl_is_
 
 #[tokio::test]
 async fn resumed_juice_snapshot_does_not_add_live_repl_declarations() {
-    use crate::inference::tokenjuice::{repl_tools_for, REPL_TOOL_NAMES};
+    use crate::inference::tokenjuice::repl_tools_for;
+    use tinyjuice_bus::tools::REPL_TOOLS as REPL_TOOL_NAMES;
 
     crate::agent::harness::definition::AgentDefinitionRegistry::init_global_builtins()
         .expect("builtin definitions");

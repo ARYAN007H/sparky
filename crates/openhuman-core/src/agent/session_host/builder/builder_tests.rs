@@ -357,7 +357,7 @@ async fn a_zero_tool_agent_does_not_gain_the_compaction_recovery_tool() {
     // quietly become "one tool" — and there is nothing for it to recover,
     // because an agent with no tools produces no tool output to truncate.
     use crate::agent::session_host::types::OpenHumanSessionHost;
-    use crate::inference::tokenjuice::RETRIEVE_TOOL_NAME;
+    use tinyjuice_bus::tools::RETRIEVE;
 
     // Tolerant of an already-initialised singleton: this binary shares one
     // `OnceLock` across every test, so whether we are first is a property of
@@ -415,7 +415,7 @@ async fn a_summarized_agent_sees_the_recovery_tool_with_compaction_off() {
     // the compaction router off (the default). The orchestrator is the agent
     // that gets them, so it must see the tool whatever the router says.
     use crate::agent::session_host::types::OpenHumanSessionHost;
-    use crate::inference::tokenjuice::RETRIEVE_TOOL_NAME;
+    use tinyjuice_bus::tools::RETRIEVE;
 
     let _ = crate::agent::harness::definition::AgentDefinitionRegistry::init_global_builtins();
 
@@ -434,7 +434,7 @@ async fn a_summarized_agent_sees_the_recovery_tool_with_compaction_off() {
 
 #[test]
 fn the_recovery_tool_joins_a_belt_only_when_something_can_point_at_it() {
-    use crate::inference::tokenjuice::RETRIEVE_TOOL_NAME;
+    use tinyjuice_bus::tools::RETRIEVE;
     let belt = || std::collections::HashSet::from(["web_fetch".to_string()]);
 
     let mut unused = belt();
@@ -455,7 +455,7 @@ fn the_recovery_tool_joins_a_belt_only_when_something_can_point_at_it() {
 #[test]
 fn the_repl_tools_join_a_belt_only_while_handle_mode_is_active() {
     use crate::agent::harness::definition::NO_TOOLS_SENTINEL;
-    use crate::inference::tokenjuice::REPL_TOOL_NAMES;
+    use tinyjuice_bus::tools::REPL_TOOLS;
     let belt = || std::collections::HashSet::from(["web_fetch".to_string()]);
 
     let mut inactive = belt();
@@ -483,7 +483,7 @@ async fn a_curated_orchestrator_sees_and_holds_every_juice_tool_in_handle_mode()
     // (`ToolScope::Named`) belt that lacked them was told to call tools it
     // could not dispatch.
     use crate::agent::session_host::types::OpenHumanSessionHost;
-    use crate::inference::tokenjuice::{REPL_TOOL_NAMES, RETRIEVE_TOOL_NAME};
+    use tinyjuice_bus::tools::{REPL_TOOLS as REPL_TOOL_NAMES, RETRIEVE as RETRIEVE_TOOL_NAME};
 
     let _ = crate::agent::harness::definition::AgentDefinitionRegistry::init_global_builtins();
 

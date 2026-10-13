@@ -39,7 +39,7 @@ fn declarations_preserve_names_schemas_and_read_only_caps() {
     let tools = repl_tools();
     assert_eq!(
         tools.iter().map(|t| t.name()).collect::<Vec<_>>(),
-        REPL_TOOL_NAMES
+        tinyjuice_bus::tools::REPL_TOOLS
     );
     for (tool, declaration) in tools
         .iter()

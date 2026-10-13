@@ -21,7 +21,7 @@ OpenHuman-owned files:
 | [`config_patch.rs`](./config_patch.rs) | Partial update shape for the `[tokenjuice]` config block. |
 | [`generate.rs`](./generate.rs) | Turn-bound, single-use summary callbacks. The host registers the model call, sends its opaque ticket through the existing contract, and withdraws the callback when the ticket drops. |
 | [`repl_tools.rs`](./repl_tools.rs) | The three REPL tools (`juice_find`, `juice_extract`, `juice_summarize`) over a stored result. Declarations come from `tinyjuice-bus`; operations execute over `Query` inside the module CCR store. Registered by [`tools/ops.rs`](../../tools/ops.rs) only while `repl_handle_active(config)`. |
-| [`tools.rs`](./tools.rs) | OpenHuman agent tool implementation for the retrieve tool (`RETRIEVE_TOOL_NAME = "juice_retrieve"`; `"tokenjuice_retrieve"` is a recognized recovery-tool alias, not the tool's registered name, see `RECOVERY_TOOL_NAMES`). |
+| [`tools.rs`](./tools.rs) | OpenHuman agent tool implementation for the retrieve tool (`tinyjuice_bus::tools::RETRIEVE` (`"juice_retrieve"`); `"tokenjuice_retrieve"` is a recognized recovery-tool alias, not the tool's registered name, see `RECOVERY_TOOL_NAMES`). |
 | Plain text | Compressed with TinyJuice's deterministic TextCrusher. |
 | [`savings.rs`](./savings.rs) | OpenHuman model-pricing attribution and persisted dashboard stats. |
 
@@ -61,7 +61,7 @@ behavior. There is no linked implementation fallback.
 - `tools/ops.rs` registers `crate::inference::tokenjuice::TokenjuiceRetrieveTool::new()`
   in the agent tool catalog (it is not re-exported through [`tools/mod.rs`](../../tools/mod.rs)) and
   treats every `RECOVERY_TOOL_NAMES` entry as a recovery tool. The registered
-  tool name is `RETRIEVE_TOOL_NAME` (`"juice_retrieve"`);
+  tool name is `tinyjuice_bus::tools::RETRIEVE` (`"juice_retrieve"`);
   `"tokenjuice_retrieve"` and `LEGACY_RETRIEVE_TOOL_NAME`
   (`"retrieve_tool_output"`) are recognized aliases only. Only
   `RECOVERY_TOOL_VISIBLE` (the live tool) is force-added to a curated

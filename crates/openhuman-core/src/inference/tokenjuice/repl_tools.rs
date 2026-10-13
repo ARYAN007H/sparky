@@ -12,10 +12,10 @@ use tinyjuice_bus::wire::{QueryError, QueryRequest, QueryResponse, QueryTarget};
 use tinytools::{PermissionLevel, Tool, ToolResult};
 
 /// The query tools TinyJuice declares. The footer suggests a subset of these.
-pub use tinyjuice_bus::tools::REPL_TOOLS as REPL_TOOL_NAMES;
+use tinyjuice_bus::tools::REPL_TOOLS;
 
 pub fn is_repl_tool(name: &str) -> bool {
-    REPL_TOOL_NAMES.contains(&name)
+    REPL_TOOLS.contains(&name)
 }
 
 
@@ -79,7 +79,7 @@ pub fn repl_tools_for(config: &crate::config::Config) -> Vec<Box<dyn Tool>> {
     }
     log::debug!(
         "[tokenjuice][repl] registering {}",
-        REPL_TOOL_NAMES.join(", ")
+        REPL_TOOLS.join(", ")
     );
     repl_tools_with_artifacts(
         Arc::new(ModuleSource {

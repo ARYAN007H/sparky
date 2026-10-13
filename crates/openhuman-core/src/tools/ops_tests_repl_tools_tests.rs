@@ -30,8 +30,8 @@ fn repl_tools_are_registered_by_default_with_the_recovery_tool() {
     let cfg = test_config(&tmp);
     assert!(crate::inference::tokenjuice::repl_handle_active(&cfg));
     let names = tool_names(&registry_for(&tmp, &cfg));
-    assert_contains_all(&names, crate::inference::tokenjuice::REPL_TOOL_NAMES);
-    assert_contains_all(&names, &[crate::inference::tokenjuice::RETRIEVE_TOOL_NAME]);
+    assert_contains_all(&names, tinyjuice_bus::tools::REPL_TOOLS);
+    assert_contains_all(&names, &[tinyjuice_bus::tools::RETRIEVE]);
 }
 
 #[test]
@@ -54,27 +54,27 @@ fn repl_tools_are_absent_whenever_a_handle_cannot_be_produced() {
             "{label}"
         );
         let names = tool_names(&registry_for(&tmp, &cfg));
-        for absent in crate::inference::tokenjuice::REPL_TOOL_NAMES {
+        for absent in tinyjuice_bus::tools::REPL_TOOLS {
             assert!(
                 !names.iter().any(|n| n == absent),
                 "{label}: `{absent}` must not be registered"
             );
         }
         // The whole-original recovery tool is independent of handle mode.
-        assert_contains_all(&names, &[crate::inference::tokenjuice::RETRIEVE_TOOL_NAME]);
+        assert_contains_all(&names, &[tinyjuice_bus::tools::RETRIEVE]);
     }
 }
 
 #[test]
 fn repl_tools_belong_to_the_inference_family_and_are_read_only() {
     use crate::core::all::DomainGroup;
-    for name in crate::inference::tokenjuice::REPL_TOOL_NAMES {
+    for name in tinyjuice_bus::tools::REPL_TOOLS {
         assert_eq!(tool_group(name), DomainGroup::Inference, "{name}");
     }
     let tmp = TempDir::new().unwrap();
     let cfg = test_config(&tmp);
     let tools = registry_for(&tmp, &cfg);
-    for name in crate::inference::tokenjuice::REPL_TOOL_NAMES {
+    for name in tinyjuice_bus::tools::REPL_TOOLS {
         let tool = find_tool(&tools, name);
         assert_eq!(
             tool.permission_level(),

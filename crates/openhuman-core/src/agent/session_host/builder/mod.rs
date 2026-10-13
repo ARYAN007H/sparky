@@ -246,7 +246,7 @@ pub(super) fn ensure_repl_tools_visible(
         return;
     }
     if !crate::agent::harness::definition::is_empty_tool_scope(visible) {
-        for name in crate::inference::tokenjuice::REPL_TOOL_NAMES {
+        for name in tinyjuice_bus::tools::REPL_TOOLS {
             visible.insert((*name).to_string());
         }
     }

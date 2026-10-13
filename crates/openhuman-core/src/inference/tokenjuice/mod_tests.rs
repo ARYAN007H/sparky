@@ -2,8 +2,8 @@ use super::*;
 
 #[test]
 fn recovery_tool_aliases_remain_stable() {
-    assert!(is_recovery_tool(RETRIEVE_TOOL_NAME));
-    assert!(is_recovery_tool(LEGACY_RETRIEVE_TOOL_NAME));
+    assert!(is_recovery_tool(tinyjuice_bus::tools::RETRIEVE));
+    assert!(is_recovery_tool(LEGACY_tinyjuice_bus::tools::RETRIEVE));
     assert!(!is_recovery_tool("shell"));
 }
 
@@ -53,7 +53,7 @@ async fn the_module_defers_a_summary_until_requested() {
         .text
         .contains("the rate limit is 60 requests a minute"));
     assert!(
-        output.text.contains(RETRIEVE_TOOL_NAME),
+        output.text.contains(tinyjuice_bus::tools::RETRIEVE),
         "the original stays retrievable: {}",
         output.text
     );

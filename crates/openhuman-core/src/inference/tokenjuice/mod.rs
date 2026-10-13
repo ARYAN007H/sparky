@@ -11,20 +11,18 @@ pub mod tools;
 use tinyjuice_bus::names::methods;
 use tinyjuice_bus::types::{AgentTokenjuiceCompression, CompressorKind, ContentKind};
 
-pub use repl_tools::{is_repl_tool, repl_tools, repl_tools_for, REPL_TOOL_NAMES};
+pub use repl_tools::{is_repl_tool, repl_tools, repl_tools_for};
 pub use tools::TokenjuiceRetrieveTool;
 
 use tinyjuice_bus::wire::InstallRequest;
 
-pub use tinyjuice_bus::tools::{
-    LEGACY_RETRIEVE as LEGACY_TINYJUICE_RETRIEVE_TOOL_NAME, RETRIEVE as RETRIEVE_TOOL_NAME,
-};
+use tinyjuice_bus::tools::{LEGACY_RETRIEVE, REPL_TOOLS, RETRIEVE};
 pub const LEGACY_RETRIEVE_TOOL_NAME: &str = "retrieve_tool_output";
 /// Every name the recovery surface answers to: the live tool plus the two
 /// migration aliases a replayed transcript may still call.
 pub const RECOVERY_TOOL_NAMES: &[&str] = &[
-    RETRIEVE_TOOL_NAME,
-    LEGACY_TINYJUICE_RETRIEVE_TOOL_NAME,
+    RETRIEVE,
+    LEGACY_RETRIEVE,
     "tokenjuice_retrieve",
     LEGACY_RETRIEVE_TOOL_NAME,
 ];
@@ -33,7 +31,7 @@ pub const RECOVERY_TOOL_NAMES: &[&str] = &[
 /// advertise. Only the live tool: the aliases stay registered so an old
 /// transcript replays, but putting all three on the wire charged every
 /// Named agent for three copies of one schema.
-pub const RECOVERY_TOOL_VISIBLE: &[&str] = &[RETRIEVE_TOOL_NAME];
+pub const RECOVERY_TOOL_VISIBLE: &[&str] = &[RETRIEVE];
 
 pub fn is_recovery_tool(name: &str) -> bool {
     RECOVERY_TOOL_NAMES.contains(&name)
@@ -72,7 +70,7 @@ pub fn companion_tool_names(agent_id: &str, config: &crate::config::Config) -> V
         names.extend(RECOVERY_TOOL_VISIBLE.iter().copied());
     }
     if repl_handle_active(config) {
-        names.extend(REPL_TOOL_NAMES.iter().copied());
+        names.extend(REPL_TOOLS.iter().copied());
     }
     names
 }
