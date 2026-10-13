@@ -3,7 +3,6 @@ use crate::channels::context::{
     conversation_history_key, ChannelRuntimeContext, RouteSelectionMap, TurnModelSourceCacheMap,
 };
 use crate::channels::host::ChannelTurnStateSubscriber;
-use tinychannels_bus::ChannelMessage;
 use crate::core::events::DomainEvent;
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -13,6 +12,8 @@ use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, Wake, Waker};
 use tinyagents_session::transcript::TranscriptMessage;
 use tinybus::EventHandler;
+use tinychannels::routes::resolve_provider_alias;
+use tinychannels_bus::ChannelMessage;
 use tinytools::{Tool, ToolResult};
 
 struct DummyTool;
@@ -133,62 +134,16 @@ async fn module_route_help_response(
 }
 
 #[test]
-fn runtime_command_parsing_and_provider_support_are_channel_scoped() {
-    assert_eq!(
-        parse_runtime_command("telegram", "/models"),
-        Some(ChannelRuntimeCommand::Portable(
-            PortableCommand::ShowProviders
-        ))
-    );
-    assert_eq!(
-        parse_runtime_command("discord", "/models openai"),
-        Some(ChannelRuntimeCommand::Portable(
-            PortableCommand::SetProvider("openai".into())
-        ))
-    );
-    assert_eq!(
-        parse_runtime_command("telegram", "/model gpt-5"),
-        Some(ChannelRuntimeCommand::Portable(PortableCommand::SetModel(
-            "gpt-5".into()
-        )))
-    );
-    assert_eq!(
-        parse_runtime_command("telegram", "/model"),
-        Some(ChannelRuntimeCommand::Portable(PortableCommand::ShowModel))
-    );
-    assert_eq!(
-        parse_runtime_command("telegram", "/status@OpenHumanBot"),
-        Some(ChannelRuntimeCommand::Remote(RemoteCommand::Status))
-    );
-    assert_eq!(
-        parse_runtime_command("telegram", "/help"),
-        Some(ChannelRuntimeCommand::Remote(RemoteCommand::Help))
-    );
-    assert_eq!(parse_runtime_command("slack", "/models"), None);
-    // Remote control is a provider capability, not a Telegram special case.
-    assert_eq!(
-        parse_runtime_command("discord", "/status"),
-        Some(ChannelRuntimeCommand::Remote(RemoteCommand::Status))
-    );
-    assert_eq!(
-        parse_runtime_command("slack", "/new"),
-        Some(ChannelRuntimeCommand::Remote(RemoteCommand::New))
-    );
-    assert_eq!(parse_runtime_command("email", "/status"), None);
-    assert_eq!(parse_runtime_command("telegram", "hello"), None);
-}
-
-#[test]
 fn provider_alias_and_route_selection_round_trip() {
     let first_provider = provider::list_providers()
         .into_iter()
         .next()
         .expect("provider registry should not be empty");
     assert_eq!(
-        resolve_provider_alias(first_provider.name).as_deref(),
+        resolve_provider_alias(first_provider.name, &provider_descriptors()).as_deref(),
         Some(first_provider.name)
     );
-    assert!(resolve_provider_alias("   ").is_none());
+    assert!(resolve_provider_alias("   ", &provider_descriptors()).is_none());
 
     let ctx = runtime_context(PathBuf::from("/tmp"));
     let sender_key = "telegram_alice_reply";
