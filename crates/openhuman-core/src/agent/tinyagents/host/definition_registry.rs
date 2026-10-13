@@ -420,7 +420,7 @@ impl OpenHumanDefinitionRegistry {
                 out.push(id);
                 continue;
             };
-            match tinyagents_definition::tinyagents_definition::validate_tier_transition(
+            match tinyagents_definition::validate_tier_transition(
                 def.agent_tier,
                 child.agent_tier,
             ) {
