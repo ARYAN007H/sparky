@@ -395,3 +395,7 @@ mod tests;
 #[cfg(test)]
 #[path = "ops_components_tests.rs"]
 mod components_tests;
+
+#[cfg(test)]
+#[path = "ops_client_tests.rs"]
+mod client_tests;
