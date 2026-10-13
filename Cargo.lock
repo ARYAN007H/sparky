@@ -4579,6 +4579,7 @@ dependencies = [
  "tar",
  "tempfile",
  "thiserror 2.0.20",
+ "tiny-artifacts",
  "tinyagents-definition",
  "tinyagents-graph",
  "tinyagents-harness",
@@ -7394,6 +7395,19 @@ checksum = "7e689342a48d2ea927c87ea50cabf8594854bf940e9310208848d680d668ed85"
 dependencies = [
  "num-conv",
  "time-core",
+]
+
+[[package]]
+name = "tiny-artifacts"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tinytools",
+ "uuid",
 ]
 
 [[package]]

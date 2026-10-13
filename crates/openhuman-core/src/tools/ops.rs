@@ -171,6 +171,9 @@ pub fn all_tools_with_runtime(
     tools.extend(crate::agent::artifacts::tools::registered_tools(
         config.clone(),
     ));
+    tools.extend(crate::agent::artifacts::tiny_store::registered_tools(
+        &config.workspace_dir,
+    ));
     tools.extend(crate::integrations::task_sources::tools::registered_tools(
         config.clone(),
     ));

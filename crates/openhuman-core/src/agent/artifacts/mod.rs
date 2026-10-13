@@ -4,6 +4,7 @@ pub mod ops;
 pub mod schemas;
 pub mod store;
 mod store_documents;
+pub mod tiny_store;
 pub mod tools;
 pub mod types;
 

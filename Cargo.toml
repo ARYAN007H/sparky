@@ -99,6 +99,7 @@ tinyinference-providers = { path = "vendor/tinyagents/vendor/tinyinference/crate
 tinyinference-voice = { path = "vendor/tinyagents/vendor/tinyinference/crates/tinyinference-voice" }
 tinyflows = { path = "vendor/tinyflows/crates/tinyflows" }
 tinychannels = { path = "vendor/tinychannels" }
+tiny-artifacts = { path = "vendor/tiny-artifacts/crates/tiny-artifacts" }
 
 # Emit enough release DWARF for server-side Sentry symbolication while keeping
 # shipped binaries small. The CI profile deliberately disables LTO/debug info.
