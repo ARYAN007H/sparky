@@ -3,7 +3,6 @@
 //! grep-friendly trace line for events with no UI surface), plus the
 //! prompt-cache layout diagnostic helper drained after a run.
 
-use std::sync::atomic::Ordering;
 
 use tinyagents_harness::cache::CacheLayoutEvent;
 use tinyagents_harness::events::{AgentEvent, EventListener, EventRecord};
