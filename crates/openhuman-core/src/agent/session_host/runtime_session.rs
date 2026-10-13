@@ -580,50 +580,7 @@ impl OpenHumanTurnPrelude {
     }
 
     async fn finalize_after_durable_commit(&self, receipt: &CommitReceipt<OpenHumanRunContext>) {
-        self.mirror_transcript_after_commit(receipt);
         self.memory_post_turn(receipt);
-    }
-
-    fn mirror_transcript_after_commit(&self, receipt: &CommitReceipt<OpenHumanRunContext>) {
-        let Some(path) = receipt
-            .transcript
-            .as_ref()
-            .map(|commit| commit.path.clone())
-        else {
-            return;
-        };
-        if !crate::agent::session_import::live::dual_write_enabled(self.config.session_dual_write) {
-            return;
-        }
-        let Some(stem) = path
-            .file_stem()
-            .and_then(|stem| stem.to_str())
-            .map(str::to_owned)
-        else {
-            return;
-        };
-        let workspace = self.workspace_dir.clone();
-        tokio::spawn(async move {
-            let read_path = path.clone();
-            let transcript = tokio::task::spawn_blocking(move || {
-                tinyagents_session::transcript::read_transcript(&read_path)
-            })
-            .await;
-            let Ok(Ok(transcript)) = transcript else {
-                log::warn!("[session-store] dual-write transcript read-back failed");
-                return;
-            };
-            if let Err(error) = tinyagents_session::transcript::import::live::write_live_turn(
-                &workspace,
-                &stem,
-                &transcript,
-                crate::agent::session_import::projector::journal_message_from_transcript,
-            )
-            .await
-            {
-                log::warn!("[session-store] dual-write failed stem={stem}: {error:#}");
-            }
-        });
     }
 }
 
