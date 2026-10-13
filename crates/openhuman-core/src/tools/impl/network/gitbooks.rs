@@ -2,7 +2,7 @@
 //! confidential one-shot tool-call contract.
 
 use crate::{
-    config::Config, inference::provider::factory::redact_endpoint, modules::client::ModuleClient,
+    config::Config, inference::provider::factory::redact_endpoint, 
 };
 use async_trait::async_trait;
 use serde_json::{json, Value};

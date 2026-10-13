@@ -497,13 +497,13 @@ pub async fn ensure_ready(config: &Config) -> Result<(), WalletCallError> {
 /// Ensure the module is serving and hand back what a call needs.
 async fn ready(
     config: &Config,
-) -> Result<(&'static host::ModuleRuntime, &'static super::ModuleRecord), WalletCallError> {
+) -> Result<(&'static tinybus::module::ModuleRuntime, &'static super::ModuleRecord), WalletCallError> {
     ops::ensure_loaded(config, MODULE_ID)
         .await
         .map_err(WalletCallError::Unavailable)?;
     let record = registry::find(MODULE_ID)
         .ok_or_else(|| WalletCallError::Unavailable(format!("unknown module '{MODULE_ID}'")))?;
-    let runtime = host::runtime()
+    let runtime = super::runtime::runtime()
         .await
         .map_err(|_| WalletCallError::Unavailable("the module bus is not running".to_string()))?;
     Ok((runtime, record))
@@ -511,7 +511,7 @@ async fn ready(
 
 /// A proxy for the module's object.
 fn proxy(
-    runtime: &'static host::ModuleRuntime,
+    runtime: &'static tinybus::module::ModuleRuntime,
     record: &super::ModuleRecord,
 ) -> Result<tinybus::Proxy, WalletCallError> {
     runtime

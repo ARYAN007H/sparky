@@ -20,10 +20,8 @@ use tinymcp_bus::{
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-use crate::{
-    config::Config,
-    ,
-};
+use crate::config::Config;
+use tinybus::module::{ModuleCallError, ModuleClient};
 
 use super::handler;
 

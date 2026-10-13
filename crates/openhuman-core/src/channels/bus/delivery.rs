@@ -1,9 +1,7 @@
 //! Captured managed transport for module-owned progressive replies.
 use crate::backend::{BackendApiError, BackendClient};
-use crate::modules::{
-    channel_runtime::ChannelRuntimeLease,
-    client::{ModuleCallError, ModuleClient},
-};
+use crate::modules::channel_runtime::ChannelRuntimeLease;
+use tinybus::module::{ModuleCallError, ModuleClient};
 use crate::security::credentials::session_support::{
     get_session_token, is_local_session_token, BackendCredential,
 };

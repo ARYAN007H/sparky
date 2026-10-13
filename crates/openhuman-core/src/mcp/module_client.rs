@@ -26,10 +26,8 @@ use tinymcp_bus::{
     ValidateServerArgumentsRequest,
 };
 
-use crate::{
-    config::Config,
-    ,
-};
+use crate::config::Config;
+use tinybus::module::{ModuleCallError, ModuleClient};
 
 const MODULE: &str = "tinymcp";
 const TRANSITION_TIMEOUT: Duration = Duration::from_secs(30);
