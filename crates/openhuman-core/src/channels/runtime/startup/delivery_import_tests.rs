@@ -39,11 +39,6 @@ fn legacy_state() -> Value {
         id: "done".into(),
         intent_fingerprint: "fp".into(),
         completed_at_unix_ms: now_unix_ms(),
-        ..serde_json::from_value(json!({
-            "id": "done", "intentFingerprint": "fp", "completedAtUnixMs": 0,
-            "messageId": null
-        }))
-        .unwrap()
     };
     let stale = DeliveryTerminalResult {
         id: "old".into(),
