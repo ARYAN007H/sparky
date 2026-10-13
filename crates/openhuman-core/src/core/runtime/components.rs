@@ -187,10 +187,7 @@ pub fn component_disabled(name: &str) -> StructuredRpcError {
 /// Refuse an RPC handler with the encoded `COMPONENT_DISABLED:<name>` error
 /// when the config it loaded has `name` switched off. For handlers that load
 /// their own config and so cannot read the ambient scope.
-pub fn require_config(
-    config: &crate::config::Config,
-    name: &str,
-) -> Result<(), String> {
+pub fn require_config(config: &crate::config::Config, name: &str) -> Result<(), String> {
     if config.components.get(name).unwrap_or(true) {
         Ok(())
     } else {

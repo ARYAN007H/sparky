@@ -249,3 +249,17 @@ async fn released_module_serves_permissions_and_confidential_target_validation()
     assert!(matches!(client.globe_start().await,
         Err(AccessibilityError::Operation(error)) if error.code == "PLATFORM_NOT_SUPPORTED"));
 }
+
+#[tokio::test]
+async fn component_off_refuses_before_reaching_the_module() {
+    let mut config = Config::default();
+    config.components.computer = false;
+    let client = AccessibilityClient::new(&config);
+    assert!(!client.computer_enabled());
+    match client.permissions().await {
+        Err(AccessibilityError::Operation(error)) => {
+            assert_eq!(error.message, "COMPONENT_DISABLED:computer");
+        }
+        other => panic!("expected COMPONENT_DISABLED, got {other:?}"),
+    }
+}
