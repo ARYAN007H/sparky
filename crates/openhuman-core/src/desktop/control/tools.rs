@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::Value;
 use tinycomputer_bus::desktop_tool::{self as declared, ActRequest, DesktopTool as Declared};
 use tinycomputer_bus::{names, GoalContinuation, RunGoalRequest};
 use tinytools::{
@@ -174,7 +174,10 @@ impl Tool for DesktopTool {
                     to_value(request).map(|request| (member, request))
                 }
                 Ok((member, _)) => Err(anyhow::anyhow!("unsupported act request for {member}")),
-                Err(error) => return Ok(ToolResult::error(error.to_string())),
+                Err(declared::ToolArgError::UnsupportedOperation) => {
+                    return Ok(ToolResult::error("Unsupported desktop operation"))
+                }
+                Err(error) => Err(error.into()),
             },
             DesktopToolKind::Goal => {
                 let live_config = match crate::config::rpc::load_config_with_timeout().await {
@@ -208,10 +211,7 @@ impl Tool for DesktopTool {
                 to_value(request).map(|request| (names::methods::RUN_GOAL, request))
             }
         };
-        let (member, request) = match built {
-            Ok(pair) => pair,
-            Err(error) => return Err(error),
-        };
+        let (member, request) = built?;
         let reply = crate::modules::desktop::call(&self.config, member, request).await;
         match reply {
             Ok(response) if response.ok => {
