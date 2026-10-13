@@ -38,7 +38,7 @@ use crate::security::{GateDecision, POLICY_BLOCKED_MARKER};
 #[cfg(test)]
 pub(crate) use crate::integrations::composio::catalog::ProbedOutputSample;
 pub(crate) use crate::integrations::composio::catalog::{
-    apply_probe_override, composio_required_args, fetch_live_toolkit_catalog,
+    composio_required_args, fetch_live_toolkit_catalog,
     probe_tool_output_sample, ToolContract,
 };
 #[cfg(test)]
