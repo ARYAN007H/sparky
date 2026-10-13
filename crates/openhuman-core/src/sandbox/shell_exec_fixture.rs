@@ -43,6 +43,15 @@ pub(crate) async fn run(run: NativeShellRun) -> anyhow::Result<SandboxExecResult
             }
         }
     }
+    if run.python_utf8 {
+        // The module defaults these unless the parent environment sets them.
+        for (name, default) in [("PYTHONUTF8", "1"), ("PYTHONIOENCODING", "utf-8")] {
+            command.env(
+                name,
+                std::env::var_os(name).unwrap_or_else(|| default.into()),
+            );
+        }
+    }
     command.envs(&run.env);
     command
         .current_dir(&run.cwd)
