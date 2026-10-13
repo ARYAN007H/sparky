@@ -83,10 +83,7 @@ impl Default for AgentExt {
 impl AgentExt {
     /// Resolve the authored TokenJuice profile to the concrete per-call policy
     /// for an agent whose model pin is `model`.
-    pub fn effective_tokenjuice_compression(
-        &self,
-        model: &ModelSpec,
-    ) -> AgentTokenjuiceCompression {
+    pub fn tokenjuice_for(&self, model: &ModelSpec) -> AgentTokenjuiceCompression {
         match self.tokenjuice_compression {
             AgentTokenjuiceCompression::Auto => match model {
                 ModelSpec::Hint(hint) if hint.trim().eq_ignore_ascii_case("coding") => {
