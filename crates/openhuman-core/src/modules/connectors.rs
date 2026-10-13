@@ -64,6 +64,24 @@ pub use names::methods;
 /// loudly rather than silently downgrading to the other route, which would send
 /// a user's requests somewhere they did not choose.
 pub fn module_config(config: &Config) -> Result<serde_json::Value, String> {
+    let mut payload = route_config(config)?;
+    payload["offered_toolkits"] = offered_toolkits(config);
+    Ok(payload)
+}
+
+/// The host's offered-toolkit policy as the module reads it
+/// (`tinyconnectors_bus::vocabulary::OfferedToolkits`). Also the whole load
+/// blob when no route can be named, so the policy still applies to the
+/// capability listings of a signed-out module.
+#[must_use]
+pub fn offered_toolkits(config: &Config) -> serde_json::Value {
+    serde_json::json!({
+        "allow": config.composio.offered_toolkits_allow,
+        "deny": config.composio.offered_toolkits_deny,
+    })
+}
+
+fn route_config(config: &Config) -> Result<serde_json::Value, String> {
     let state_dir = config.workspace_dir.join("state");
 
     // A host-pinned credential outranks the mode and the credential store, the
@@ -178,6 +196,17 @@ pub fn module_config(config: &Config) -> Result<serde_json::Value, String> {
     }
 }
 
+/// Read the connector module's curated catalogs into the host's snapshot.
+///
+/// Called once the module is serving (see `ops::start_resolution`) and at
+/// boot when it was already serving from the search path. A failure only
+/// delays the snapshot: the next connector call primes it again.
+pub async fn prime_catalogs(config: &Config) {
+    if let Err(error) = crate::integrations::composio::contract::curated::prime(config).await {
+        tracing::debug!("[connectors] catalog prime failed: {error}");
+    }
+}
+
 /// The route description last sent to the module, as a fingerprint.
 ///
 /// Only a hash is kept: comparing routes means comparing bearer tokens, and a
@@ -221,6 +250,8 @@ async fn ensure_routed(config: &Config, proxy: &Proxy) -> Result<(), String> {
     // it later would strand the history already written there.
     if let Some(object) = route.as_object_mut() {
         object.remove("state_dir");
+        // Load-time like `state_dir`: the policy is not part of the route.
+        object.remove("offered_toolkits");
     }
 
     let current = fingerprint(&route);
