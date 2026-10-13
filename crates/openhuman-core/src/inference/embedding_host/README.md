@@ -3,7 +3,7 @@
 Turns text into vectors for semantic memory search, and lets the provider
 that does it be swapped by config rather than by code change. This is the
 embeddings half of OpenHuman's pluggable-engine story (see
-[gitbooks/developing/engines.md](../../../../../gitbooks/developing/engines.md)):
+[docs/gitbooks/en/developing/engines.md](../../../../../docs/gitbooks/en/developing/engines.md)):
 the same pattern used for chat model providers in [`../provider`](../provider/README.md),
 applied to embeddings.
 
@@ -57,4 +57,4 @@ the wider `inference` domain.
 
 ## Further reading
 
-- [Local AI](../../../../../gitbooks/features/model-routing/local-ai.md)
+- [Local AI](../../../../../docs/gitbooks/en/features/model-routing/local-ai.md)
