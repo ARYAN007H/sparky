@@ -362,6 +362,19 @@ pub(crate) fn migrate_components_with(config: &mut Config, raw: &str, tinymemes:
         .and_then(|t| t.get("router_enabled"))
         .and_then(toml::Value::as_bool);
     disable(config, "juice", router_enabled);
+    // `[sandbox] enabled = false` (and the same key under `[security.sandbox]`)
+    // already meant "no isolation backend"; it now also keeps the TinyBox
+    // module from loading. Unset (auto) and `true` keep the component on.
+    let sandbox_flag = |path: &[&str]| {
+        let mut node = value.as_ref()?;
+        for key in path {
+            node = node.get(key)?;
+        }
+        node.get("enabled").and_then(toml::Value::as_bool)
+    };
+    let sandbox_off = [sandbox_flag(&["sandbox"]), sandbox_flag(&["security", "sandbox"])]
+        .contains(&Some(false));
+    disable(config, "sandbox", sandbox_off.then_some(false));
     if !moved.is_empty() {
         tracing::info!(
             "[config][migrate] legacy switches moved to [components]: {}",
