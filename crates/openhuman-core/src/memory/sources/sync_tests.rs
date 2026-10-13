@@ -42,7 +42,7 @@ async fn wait_for_idle(config: &Config, id: &str) -> state::SourceState {
 }
 
 #[test]
-fn validate_accepts_every_kind_and_refuses_a_bad_url() {
+fn validate_accepts_every_kind_and_refuses_an_empty_target() {
     let mk = |kind, target: &str| MemorySourceConfig {
         id: "s".into(),
         kind,
@@ -61,7 +61,7 @@ fn validate_accepts_every_kind_and_refuses_a_bad_url() {
         validate(&mk(kind, target)).unwrap();
     }
     assert_eq!(
-        validate(&mk(MemorySourceKind::Link, "not a url"))
+        validate(&mk(MemorySourceKind::Folder, ""))
             .unwrap_err()
             .code(),
         INVALID_REQUEST
