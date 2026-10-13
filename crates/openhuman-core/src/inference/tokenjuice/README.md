@@ -87,3 +87,15 @@ behavior. There is no linked implementation fallback.
 - [tinyjuice](../../../../../vendor/tinyjuice/README.md)
 
 Contract types are imported directly from `tinyjuice_bus::types` and `tinyjuice_bus::wire`; the adapter keeps serialization compatibility tests in `mod_contract_tests.rs`.
+
+## `[components] juice`
+
+`[components] juice = false` (or `OPENHUMAN_COMPONENT_JUICE=0`) removes the
+whole module from a core: `modules::ensure_loaded("tinyjuice")` answers
+`COMPONENT_DISABLED:juice` without downloading or loading anything, the `MlHost`
+callback is not served, `juice_*` / `retrieve_tool_output` tools are not
+registered, the tool-output middleware runs with compaction and the summary
+stage off (per-tool cap and byte-budget truncation only), `install_from_config`
+is a no-op, and every `tokenjuice.*` RPC answers `COMPONENT_DISABLED`.
+`[tokenjuice] router_enabled` stays a sub-setting of the on state. There is no
+legacy flag for this component, so there is nothing to migrate.
