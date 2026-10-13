@@ -3,13 +3,13 @@
 //! are honoured and a system job's handler result is what gets recorded.
 
 use super::*;
-use tinyflows_schedule::JobPolicy;
 use crate::cron::system_job_handlers::{register, SystemJobContext};
 use crate::cron::system_jobs::ensure_system_job;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use tempfile::TempDir;
 use tinyflows_schedule::types::Schedule;
+use tinyflows_schedule::JobPolicy;
 
 /// Stores `policy` on the job.
 fn set_policy(config: &Config, job_id: &str, policy: JobPolicy) -> anyhow::Result<()> {
@@ -171,10 +171,7 @@ async fn dispatch_claims_the_slot_so_a_running_job_is_not_due_again() {
     );
     let job = due_system_job(&config, "dispatch-claim");
     let mut dispatcher = JobDispatcher::new(&config, &security(&config));
-    dispatcher
-        .dispatch(vec![job.clone()])
-        .await
-        .unwrap();
+    dispatcher.dispatch(vec![job.clone()]).await.unwrap();
     let stored = cron::get_job(&config, &job.id).unwrap();
     assert!(stored.next_run > Utc::now(), "the running slot is claimed");
     assert!(cron::due_jobs(&config, Utc::now())
@@ -194,10 +191,7 @@ async fn a_job_already_in_flight_is_not_dispatched_again() {
     let job = due_system_job(&config, "dispatch-dedupe");
     let running = crate::cron::ops::try_acquire_run(&job.id).expect("the job is free");
     let mut dispatcher = JobDispatcher::new(&config, &security(&config));
-    dispatcher
-        .dispatch(vec![job.clone()])
-        .await
-        .unwrap();
+    dispatcher.dispatch(vec![job.clone()]).await.unwrap();
     dispatcher.drain().await;
     drop(running);
     assert_eq!(calls.load(Ordering::SeqCst), 0);
@@ -226,10 +220,7 @@ async fn a_single_flight_job_records_the_missed_slot_as_skipped() {
     let job = cron::get_job(&config, &job.id).unwrap();
     let running = crate::cron::ops::try_acquire_run(&job.id).expect("the job is free");
     let mut dispatcher = JobDispatcher::new(&config, &security(&config));
-    dispatcher
-        .dispatch(vec![job.clone()])
-        .await
-        .unwrap();
+    dispatcher.dispatch(vec![job.clone()]).await.unwrap();
     dispatcher.drain().await;
     drop(running);
 
@@ -315,10 +306,7 @@ async fn a_system_job_handler_error_is_recorded_as_the_run_result() {
     .unwrap();
     let job = cron::get_job(&config, &job.id).unwrap();
     let mut dispatcher = JobDispatcher::new(&config, &security(&config));
-    dispatcher
-        .dispatch(vec![job.clone()])
-        .await
-        .unwrap();
+    dispatcher.dispatch(vec![job.clone()]).await.unwrap();
     dispatcher.drain().await;
     let stored = cron::get_job(&config, &job.id).unwrap();
     assert_eq!(stored.last_status.as_deref(), Some("error"));
@@ -392,7 +380,11 @@ async fn an_upgraded_job_with_a_side_table_policy_keeps_firing_with_it() {
     dispatcher.drain().await;
 
     let after = cron::get_job(&config, shell_id).unwrap();
-    assert_eq!(after.last_status.as_deref(), Some("ok"), "the upgraded job ran");
+    assert_eq!(
+        after.last_status.as_deref(),
+        Some("ok"),
+        "the upgraded job ran"
+    );
     assert!(after.policy.single_flight, "its policy survived the run");
 }
 

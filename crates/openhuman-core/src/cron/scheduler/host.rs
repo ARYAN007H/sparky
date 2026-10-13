@@ -101,7 +101,9 @@ impl JobStore for HostStore {
         self.binding
             .within(async {
                 let config = self.binding.config();
-                let jobs = crate::cron::store::documents(&config)?.due_jobs(now).await?;
+                let jobs = crate::cron::store::documents(&config)?
+                    .due_jobs(now)
+                    .await?;
                 Ok(self.keep_runnable(&config, jobs))
             })
             .await
