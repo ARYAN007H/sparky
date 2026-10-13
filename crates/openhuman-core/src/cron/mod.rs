@@ -1,8 +1,8 @@
-//! Scheduled-job runtime: cron/human-delay parsing, the job + run store, the
-//! polling scheduler, and delivery of job output into the agent / channel
-//! pipelines. Shell jobs sandbox through `security::SecurityPolicy`; agent
-//! jobs build an `Agent` directly; flow jobs hand off to
-//! `flows::bus::FlowTriggerSubscriber` via `DomainEvent::FlowScheduleTick`.
+//! Scheduled-job host: the job + run store, the loop that drives the
+//! `tinyflows-schedule` runtime, and delivery of job output into the agent /
+//! channel pipelines. Shell jobs sandbox through `security::SecurityPolicy`;
+//! agent jobs build an `Agent` directly; flow jobs fire the flow's schedule
+//! trigger through the runtime's `TriggerSink`.
 //! See `README.md` for the full module map.
 
 // Host-condition policy (battery / AC / CPU) that throttles background LLM

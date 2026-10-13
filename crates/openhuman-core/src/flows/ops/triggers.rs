@@ -4,7 +4,7 @@ use super::*;
 /// flow's automatic trigger:
 /// - `schedule` — registers/removes the backing `cron` job
 ///   (`cron::add_flow_schedule_job` / `cron::remove_job`) so
-///   `flows::bus::FlowTriggerSubscriber` gets a `FlowScheduleTick` on the
+///   `flows::bus::FlowTriggerSubscriber` gets a schedule trigger from the
 ///   configured cadence.
 /// - `app_event` — no enable-time side effect needed: the subscriber matches
 ///   every `ComposioTriggerReceived` against `store::list_enabled_flows` at
