@@ -3668,7 +3668,7 @@ async fn json_rpc_run_ledger_lifecycle() {
         .await
         .expect("load config");
 
-    tinyagents_session::run_ledger::upsert_agent_run(
+    openhuman::agent::session_store::ledger_sync::upsert_agent_run(
         &config.workspace_dir,
         tinyagents_session::run_ledger::AgentRunUpsert {
             id: "sub-run-1".to_string(),
@@ -3693,7 +3693,7 @@ async fn json_rpc_run_ledger_lifecycle() {
     )
     .expect("seed run");
 
-    tinyagents_session::run_ledger::append_run_event(
+    openhuman::agent::session_store::ledger_sync::append_run_event(
         &config.workspace_dir,
         tinyagents_session::run_ledger::RunEventAppend {
             run_id: "sub-run-1".to_string(),
@@ -3785,9 +3785,8 @@ async fn json_rpc_agent_work_list_groups_runs_by_bucket() {
         .await
         .expect("load config");
 
-    use tinyagents_session::run_ledger::{
-        upsert_agent_run, AgentRunKind, AgentRunStatus, AgentRunUpsert,
-    };
+    use openhuman::agent::session_store::ledger_sync::upsert_agent_run;
+    use tinyagents_session::run_ledger::{AgentRunKind, AgentRunStatus, AgentRunUpsert};
     let seed = |id: &str, status: AgentRunStatus| AgentRunUpsert {
         id: id.to_string(),
         kind: AgentRunKind::Subagent,
@@ -3914,7 +3913,7 @@ async fn json_rpc_workflow_run_definitions_and_runs_roundtrip() {
     );
 
     // Seed a durable workflow run, then list + get it.
-    tinyagents_session::run_ledger::upsert_workflow_run(
+    openhuman::agent::session_store::ledger_sync::upsert_workflow_run(
         &config.workspace_dir,
         tinyagents_session::run_ledger::WorkflowRunUpsert {
             id: "wf-run-1".to_string(),
@@ -4113,10 +4112,10 @@ async fn json_rpc_agent_team_coordination_roundtrip() {
 
     // Mark A done directly via the run ledger, then B claims fine.
     let task_a =
-        tinyagents_session::run_ledger::get_agent_team_task(&config.workspace_dir, &task_a_id)
+        openhuman::agent::session_store::ledger_sync::get_agent_team_task(&config.workspace_dir, &task_a_id)
             .expect("get task A")
             .expect("task A present");
-    tinyagents_session::run_ledger::upsert_agent_team_task(
+    openhuman::agent::session_store::ledger_sync::upsert_agent_team_task(
         &config.workspace_dir,
         tinyagents_session::run_ledger::AgentTeamTaskUpsert {
             id: task_a.id.clone(),

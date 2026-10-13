@@ -32,7 +32,12 @@ fn handles_opened_before_a_rebind_keep_their_backend() {
     rebind_all(&second);
     let new = stores.try_for_agent("agent").unwrap();
     old.turn_states
-        .put(&tinyagents_session::turn_state::TurnState::default())
+        .put(&tinyagents_session::turn_state::TurnState::started(
+            "t",
+            "r",
+            4,
+            "2026-01-01T00:00:00Z",
+        ))
         .ok();
     assert!(
         !Arc::ptr_eq(&old.turn_states, &new.turn_states),
