@@ -388,6 +388,13 @@ pub struct RecorderSession {
 }
 
 impl RecorderSession {
+    /// A session handle for an id no module issued, so host tests can drive
+    /// code that must survive the module being absent.
+    #[cfg(test)]
+    pub(crate) const fn unopened_for_test() -> Self {
+        Self { id: u64::MAX }
+    }
+
     /// Open a stopped session.
     ///
     /// # Errors

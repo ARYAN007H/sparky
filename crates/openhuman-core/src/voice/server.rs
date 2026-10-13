@@ -28,12 +28,12 @@ pub use types::{ServerState, VoiceServerConfig, VoiceServerStatus};
 #[cfg(test)]
 use crate::config::Config;
 #[cfg(test)]
-use crate::voice::audio_capture::RecordingHandle;
-#[cfg(test)]
 use pipeline::{
     build_initial_prompt, capture_expected_app_name, process_recording_bg, push_recent_transcript,
-    truncate_for_log, update_state_if_current,
+    truncate_for_log,
 };
+#[cfg(test)]
+use crate::voice::audio_capture::RecordingHandle;
 #[cfg(test)]
 use std::sync::Arc;
 #[cfg(test)]
