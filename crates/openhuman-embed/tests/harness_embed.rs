@@ -207,15 +207,19 @@ fn a_harness_runs_a_turn_against_the_provider_it_was_given() {
             let requests = common::chat_requests(&provider_server).await;
             assert_eq!(requests.len(), 102, "two serial + 100 concurrent turns");
 
-            // The sessions landed in the harness workspace's storage backend.
-            // With no storage URL that is the workspace default (SQLite under
-            // `<workspace>/storage`); the old `session_db/` files are gone
-            // since the storage-backed session store.
-            let storage_dir = workspace_dir.join(openhuman_core::storage::config::DEFAULT_DIR);
+            // The first session's transcript reads back from the workspace's
+            // session store, whatever backend it was given (the old
+            // `session_db/` files are gone since the storage-backed store). A
+            // harness session id is its thread id.
+            let stores =
+                openhuman_core::agent::session_store::provider_for_workspace(&workspace_dir)
+                    .for_agent("harness");
             assert!(
-                std::fs::read_dir(&storage_dir).is_ok_and(|mut entries| entries.next().is_some()),
-                "sessions were not persisted under the harness workspace's storage ({})",
-                storage_dir.display()
+                stores
+                    .transcripts
+                    .root_for_thread(&first.session_id)
+                    .is_some(),
+                "the first session's transcript was not persisted"
             );
 
             // The harness is one runtime plus one agent, and says so.
