@@ -109,7 +109,7 @@ test('generate then check is stable, edited source fails check, no prose authore
     generateEmbedDocs({ root, capabilities, check: true });
     assert.match(readFileSync(resolve(root, 'docs/gitbooks/en/developing/embed/index.md'), 'utf8'), /println!\("changed"\)/);
     unlinkSync(resolve(root, 'docs/gitbooks/en/developing/embed/retired.md'));
-    assert.throws(() => generateEmbedDocs({ root, capabilities, check: true }), /docs\/gitbooks\/en\/developing\/embed\/retired[.]md/);
+    assert.throws(() => generateEmbedDocs({ root, capabilities, check: true }), /drift.*api-index[.]json/);
     generateEmbedDocs({ root, capabilities });
     generateEmbedDocs({ root, capabilities, check: true });
   } finally { rmSync(root, { recursive: true, force: true }); }
