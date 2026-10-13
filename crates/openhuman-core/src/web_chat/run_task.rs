@@ -167,7 +167,7 @@ pub(crate) async fn run_chat_task(
     // original answer text is not streamed ahead of it.
     #[cfg(feature = "tinymemes")]
     {
-        bridge_metadata.hold_text_stream = crate::tinymemes::holds_text_stream(thread_id);
+        bridge_metadata.hold_text_stream = crate::tinymemes::holds_text_stream(&config, thread_id);
     }
     let bridge = spawn_progress_bridge(
         progress_rx,
