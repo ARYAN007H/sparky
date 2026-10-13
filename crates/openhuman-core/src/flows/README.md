@@ -262,8 +262,8 @@ Top level:
 | `draft_store.rs` | Same binding for the catalog's drafts. |
 | [`bus.rs`](./bus.rs), `bus/` | The three subscribers: `trigger.rs`, `run_digest.rs`, `dedup_commit.rs`. |
 | [`tools.rs`](./tools.rs) | `ProposeWorkflowTool` (`propose_workflow`) and `RunFlowTool` (`run_flow`). |
-| [`builder_tools.rs`](./builder_tools.rs), `builder_tools/` | The 22 `workflow_builder` tools, split by role: `draft_revise.rs`, `draft_edit.rs`, `draft_validate.rs`, `flow_reads.rs`, `run_control.rs`, `persistence.rs`, `connection_reads.rs`, `catalog_search.rs`, `tool_contract.rs`, `kind_reads.rs`, `dry_run.rs`. |
-| [`discovery_tools.rs`](./discovery_tools.rs) | `SuggestWorkflowsTool` (`suggest_workflows`). |
+| [`builder_host.rs`](./builder_host.rs) | `FlowsHost` and `OverlayNodeKinds`: the host implementation of the `tinyflows_copilot::tools` ports (drafts, flows, gates, agents, suggestions, node kinds). The authoring tools themselves, including `suggest_workflows`, live in `tinyflows-copilot`. |
+| [`builder_tools.rs`](./builder_tools.rs), `builder_tools/` | The Composio-bound `workflow_builder` reads: `connection_reads.rs`, `catalog_search.rs`, `tool_contract.rs`. |
 | `memory_tools.rs` | `FlowMemoryRecallTool`, `FlowMemoryRememberTool`, and the flow-memory tag helpers. |
 | `agents/` | `workflow_builder/` and `flow_discovery/` built-in agent definitions and prompt builders. |
 | [`catalogue.rs`](./catalogue.rs) | `flow_entries` lists saved flows as `Workflow` entries with `WorkflowScope::Flow`, so the skill catalogue and `skill_search` show one list. |
