@@ -69,7 +69,15 @@ fn lookups_use_the_installed_snapshot_and_invalidate_clears_it() {
     assert_eq!(toolkit_description("nope"), FALLBACK_DESCRIPTION);
     assert_eq!(curated_scope_for("GMAIL_SEND_EMAIL"), Some(ToolScope::Write));
     invalidate();
-    assert!(catalog_for_toolkit("gmail").is_none());
-    assert_eq!(toolkit_description("gmail"), FALLBACK_DESCRIPTION);
-    assert!(curated_toolkits().is_empty());
+    assert!(store().read().unwrap().is_none());
+}
+
+#[test]
+fn fixture_serves_aliases_and_every_native_provider() {
+    for alias in ["one", "one_drive", "onedrive", "google_calendar", "microsoft"] {
+        assert!(catalog_for_toolkit(alias).is_some(), "{alias}");
+    }
+    assert!(catalog_for_toolkit("flowstestkit").is_none());
+    assert!(has_native_provider("linear"));
+    assert!(!has_native_provider("discord"));
 }

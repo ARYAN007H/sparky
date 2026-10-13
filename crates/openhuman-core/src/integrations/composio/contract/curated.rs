@@ -60,9 +60,60 @@ fn store() -> &'static RwLock<Option<Arc<Snapshot>>> {
 }
 
 fn current() -> Option<Arc<Snapshot>> {
-    store()
+    let installed = store()
         .read()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
+    #[cfg(test)]
+    if installed.is_none() {
+        return Some(test_fixture());
+    }
+    installed
+}
+
+/// What the module serves, frozen from its own fixtures
+/// (`tinyconnectors-sync/src/toolkits/catalog/fixtures`), so unit tests that
+/// read catalogs do not need a loaded module.
+#[cfg(test)]
+fn test_fixture() -> Arc<Snapshot> {
+    use tinyconnectors_bus::vocabulary::{ToolkitVocabulary, VocabularyAction};
+    static FIXTURE: std::sync::OnceLock<Arc<Snapshot>> = std::sync::OnceLock::new();
+    FIXTURE
+        .get_or_init(|| {
+            #[derive(serde::Deserialize)]
+            struct Row {
+                slug: String,
+                scope: BusScope,
+            }
+            let actions: HashMap<String, Vec<Row>> =
+                serde_json::from_str(include_str!("curated_fixtures/catalog-actions.json"))
+                    .expect("catalog fixture");
+            let descriptions: HashMap<String, String> =
+                serde_json::from_str(include_str!("curated_fixtures/descriptions.json"))
+                    .expect("description fixture");
+            let native = ["gmail", "notion", "slack", "clickup", "github", "linear"];
+            let toolkits = descriptions
+                .iter()
+                .map(|(name, description)| ToolkitVocabulary {
+                    toolkit: name.clone(),
+                    description: description.clone(),
+                    native_provider: native.contains(&name.as_str()),
+                    actions: actions.get(name).map(|rows| {
+                        rows.iter()
+                            .map(|row| VocabularyAction {
+                                slug: row.slug.clone(),
+                                scope: row.scope,
+                            })
+                            .collect()
+                    }),
+                })
+                .collect();
+            let vocabulary = VocabularyResponse {
+                toolkits,
+                agent_ready_toolkits: Vec::new(),
+            };
+            Arc::new(build("fixture", &[], &vocabulary))
+        })
         .clone()
 }
 
