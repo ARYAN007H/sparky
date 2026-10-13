@@ -260,20 +260,27 @@ async fn workflow_metadata_is_reused_until_invalidated() {
 fn workflow_metadata_is_reused_body() {
     let workspace = tempfile::tempdir().unwrap();
     let skill = workspace.path().join("skills").join("cached-skill");
-    write(
-        &skill.join("SKILL.md"),
-        "---\nname: cached-skill\ndescription: first version\n---\n",
-    );
-    let first = load_workflow_metadata(workspace.path());
-    assert!(first.iter().any(|item| item.name == "cached-skill"));
-
-    std::fs::remove_dir_all(&skill).unwrap();
-    assert!(
-        load_workflow_metadata(workspace.path())
+    // The metadata cache is process-global and other tests invalidate it
+    // concurrently, so retry the prime-then-reuse phase until one attempt
+    // runs without an interleaved invalidation.
+    let mut reused = false;
+    for _ in 0..50 {
+        write(
+            &skill.join("SKILL.md"),
+            "---\nname: cached-skill\ndescription: first version\n---\n",
+        );
+        let first = load_workflow_metadata(workspace.path());
+        assert!(first.iter().any(|item| item.name == "cached-skill"));
+        std::fs::remove_dir_all(&skill).unwrap();
+        if load_workflow_metadata(workspace.path())
             .iter()
-            .any(|item| item.name == "cached-skill"),
-        "a turn reuses the startup snapshot"
-    );
+            .any(|item| item.name == "cached-skill")
+        {
+            reused = true;
+            break;
+        }
+    }
+    assert!(reused, "a turn reuses the startup snapshot");
 
     crate::skills::ops_discover::invalidate_workflow_metadata_cache();
     assert!(
