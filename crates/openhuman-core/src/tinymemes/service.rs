@@ -138,12 +138,20 @@ pub(crate) async fn remix(
         .map_err(|error| error.to_string())?;
     let registration = callbacks::register(config);
     request.correlation = registration.correlation().to_owned();
+    // A disabled request makes no callbacks and starts no research, so there
+    // is nothing to keep the registration for.
+    let may_research = request.enabled;
+    // One foreground remix at a time per scope; see [`FOREGROUND`].
+    let lock = scope_lock(config);
+    let _foreground = lock.lock().await;
     let outcome: tinybus::Result<RemixResult> = proxy.call(remix_methods::REMIX, (request,)).await;
     match outcome {
         Ok(Ok(response)) => {
             // Background research may still call back; the module's `End`
             // (or the age sweep) retires the entry.
-            registration.keep_for_background();
+            if may_research {
+                registration.keep_for_background();
+            }
             Ok(response)
         }
         Ok(Err(refusal)) => Err(match refusal {
