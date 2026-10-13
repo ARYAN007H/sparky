@@ -19,7 +19,7 @@
 //!
 //! | feature          | status at the current vendor pins |
 //! | ---------------- | --------------------------------- |
-//! | `tinychannels`   | linked |
+//! | `tinychannels`   | waits: v0.1.29 module crate pins `tinybus =0.1.4`, which cannot co-resolve with tinydocs-module (`=0.1.3`) and the workspace `tinybus` 0.1.3 |
 //! | `tinydocs`       | linked (needs tinydocs v0.2.2, whose module crate pins the workspace `tinybus` 0.1.3) |
 //! | `tinybox`        | waits: its module crate pins `tinybus =0.1.2`, which cannot unify with the workspace `tinybus` path |
 //! | `tinyconnectors` | waits: its workspace pins a `tinybus` the host does not carry (0.1.2 at the pin, 0.1.4 upstream) |
@@ -49,8 +49,6 @@ use openhuman_rpc::embed::modules::{register_linked, LinkedFactory};
 #[must_use]
 pub fn linked_modules() -> Vec<(&'static str, LinkedFactory)> {
     let modules: Vec<(&'static str, LinkedFactory)> = vec![
-        #[cfg(feature = "tinychannels")]
-        ("tinychannels", tinychannels_module::linked_module),
         #[cfg(feature = "tinydocs")]
         ("tinydocs", tinydocs_module::linked_module),
     ];
