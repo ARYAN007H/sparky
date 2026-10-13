@@ -1,6 +1,6 @@
 //! Tests for the connector module client.
 
-use super::{methods, module_config, MODULE_ID};
+use super::{methods, module_config, module_config_with_proxy, MODULE_ID};
 use crate::config::schema::{COMPOSIO_MODE_BACKEND, COMPOSIO_MODE_DIRECT};
 use crate::config::Config;
 use crate::modules::registry;
