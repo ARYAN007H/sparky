@@ -141,3 +141,23 @@ fn a_stale_snapshot_does_not_revert_a_newer_session() {
         .unwrap();
     assert_eq!(a.status, DurableSubagentStatus::Failed);
 }
+
+#[test]
+fn a_legacy_session_file_is_imported_once_and_retired() {
+    let dir = tempfile::tempdir().unwrap();
+    let legacy = dir.path().join(".openhuman");
+    std::fs::create_dir_all(&legacy).unwrap();
+    std::fs::write(
+        legacy.join("subagent_sessions.json"),
+        serde_json::to_string(&vec![session("legacy-1")]).unwrap(),
+    )
+    .unwrap();
+    let store = SubagentSessionStore::new(dir.path().to_path_buf());
+
+    let loaded = store.load().unwrap();
+    assert_eq!(loaded.len(), 1);
+    assert_eq!(loaded[0].subagent_session_id, "legacy-1");
+    assert!(!legacy.join("subagent_sessions.json").exists());
+    assert!(legacy.join("subagent_sessions.json.migrated").exists());
+    assert_eq!(store.load().unwrap().len(), 1);
+}

@@ -44,3 +44,29 @@ async fn update_applies_and_persists_a_change() {
     let loaded: BTreeMap<String, u32> = load(&config, IDENTITIES_FILE).await.unwrap();
     assert_eq!(loaded["n"], 2);
 }
+
+#[tokio::test]
+async fn a_legacy_state_file_is_imported_once_and_retired() {
+    let dir = tempfile::tempdir().unwrap();
+    let config = config_in(&dir);
+    let legacy_dir = dir.path().join("integrations");
+    std::fs::create_dir_all(&legacy_dir).unwrap();
+    std::fs::write(legacy_dir.join(USER_SCOPES_FILE), r#"{"gmail":7}"#).unwrap();
+
+    let loaded: BTreeMap<String, u32> = load(&config, USER_SCOPES_FILE).await.unwrap();
+    assert_eq!(loaded["gmail"], 7);
+    assert!(!legacy_dir.join(USER_SCOPES_FILE).exists());
+    assert!(legacy_dir
+        .join(format!("{USER_SCOPES_FILE}.migrated"))
+        .exists());
+
+    // A later edit is not clobbered by a re-import.
+    update(&config, USER_SCOPES_FILE, |v: &mut BTreeMap<String, u32>| {
+        v.insert("gmail".into(), 9);
+        ((), true)
+    })
+    .await
+    .unwrap();
+    let again: BTreeMap<String, u32> = load(&config, USER_SCOPES_FILE).await.unwrap();
+    assert_eq!(again["gmail"], 9);
+}
