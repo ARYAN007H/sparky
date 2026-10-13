@@ -20,7 +20,7 @@ use crate::agent::tinyagents::harness_assembly::{assemble_turn_harness, Assemble
 use crate::agent::tinyagents::host::steering::shared_steering_registry;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent::tinyagents::middleware::TurnContextMiddleware;
-use crate::agent::tinyagents::observability::{CapPauser, OpenhumanEventBridge, SubagentScope};
+use crate::agent::tinyagents::observability::{OpenhumanEventBridge, SubagentScope};
 use crate::agent::tinyagents::turn_models::TurnModels;
 use crate::agent::tinyagents::turn_outcome::TinyagentsTurnOutcome;
 use crate::agent::tinyagents::turn_policy::effective_max_iterations;
@@ -515,12 +515,24 @@ pub(super) async fn run_turn_via_tinyagents_body(
                 .is_none()
                 .then(|| run_context.dispatch.clone())
                 .flatten();
-            events.subscribe(CapPauser::new(
+            let recorder: Option<tinyagents_harness::events::PauseRecorder> =
+                dispatch_guard.map(|guard| {
+                    Arc::new(move |completed: u64, cap: u64| {
+                        guard.record_pause_requested(completed, cap)
+                    }) as tinyagents_harness::events::PauseRecorder
+                });
+            match tinyagents_harness::events::CapPauser::with_recorder(
                 handle.clone(),
                 max_iterations,
                 ctx.run_id().as_str(),
-                dispatch_guard,
-            ));
+                recorder,
+            ) {
+                Ok(pauser) => events.subscribe(pauser),
+                Err(err) => tracing::warn!(
+                    error = %err,
+                    "[tinyagents] model-call cap pauser not installed"
+                ),
+            }
         }
     }
 

@@ -25,7 +25,7 @@ use tinyinference_llm::usage::Usage;
 use crate::agent::progress::AgentProgress;
 
 pub(crate) use cap_pauser::{
-    CapPauser, IterationCursor, ProviderUsageCarry, SubagentScope, ToolFailureMap, ToolNameMap,
+    ProviderUsageCarry, SubagentScope, ToolFailureMap, ToolNameMap,
 };
 pub(crate) use event_bridge::OpenhumanEventBridge;
 pub(crate) use event_projection::surface_cache_layout_events;

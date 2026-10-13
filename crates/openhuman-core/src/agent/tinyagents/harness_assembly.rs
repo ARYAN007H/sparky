@@ -24,7 +24,7 @@ use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent::tinyagents::middleware::{self, TurnContextMiddleware};
 use crate::agent::tinyagents::model::TurnChatModel;
 use crate::agent::tinyagents::observability::{
-    IterationCursor, ProviderUsageCarry, SubagentScope, ToolFailureMap, ToolNameMap,
+    ProviderUsageCarry, SubagentScope, ToolFailureMap, ToolNameMap,
 };
 use crate::agent::tinyagents::routes;
 use crate::agent::tinyagents::stop_hooks;
@@ -157,7 +157,7 @@ pub(super) fn assemble_turn_harness(
     }
     let mut capability_registry: CapabilityRegistry<()> = CapabilityRegistry::new();
 
-    let cursor: IterationCursor = Arc::default();
+    let cursor: tinyagents_harness::events::IterationCursor = Arc::default();
     // Shared `call_id → tool_name` map: the forwarder records the name on
     // tool-call start (the crate `ToolDelta` carries none), the bridge reads it
     // to label the argument fragments now streamed via `MessageDelta.tool_call`.
