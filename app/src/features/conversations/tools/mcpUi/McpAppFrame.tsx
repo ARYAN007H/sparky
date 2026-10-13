@@ -1,5 +1,5 @@
 import debug from 'debug';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import Button from '../../../../components/ui/Button';
 import { ConfirmDialog } from '../../../../components/ui/ConfirmDialog';
@@ -17,6 +17,7 @@ const log = debug('mcp-ui:frame');
 const DEFAULT_HEIGHT = 360;
 
 interface PendingCall {
+  key: string;
   name: string;
   args: Record<string, unknown>;
   resolve: () => void;
@@ -38,12 +39,31 @@ export function McpAppFrame({ presentation }: { presentation: McpUiPresentation 
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [height, setHeight] = useState(DEFAULT_HEIGHT);
   const [contentWidth, setContentWidth] = useState<number | null>(null);
-  const [pending, setPending] = useState<PendingCall | null>(null);
+  const [queue, setQueue] = useState<PendingCall[]>([]);
+  const queueRef = useRef<PendingCall[]>([]);
   const [handoffUrl, setHandoffUrl] = useState<string | null>(null);
   const decisionsRef = useRef(new Map<string, Promise<void>>());
   const presentationRef = useRef(presentation);
   const bridgeRef = useRef<McpAppBridge | null>(null);
   const serverId = presentation.server_id;
+  const pending = queue[0] ?? null;
+
+  const updateQueue = useCallback((next: (current: PendingCall[]) => PendingCall[]) => {
+    queueRef.current = next(queueRef.current);
+    setQueue(queueRef.current);
+  }, []);
+
+  useEffect(() => {
+    const decisions = decisionsRef.current;
+    return () => {
+      const orphaned = queueRef.current;
+      queueRef.current = [];
+      for (const call of orphaned) {
+        decisions.delete(call.key);
+        call.reject(new Error('The view was closed'));
+      }
+    };
+  }, []);
 
   useEffect(() => {
     presentationRef.current = presentation;
@@ -94,7 +114,10 @@ export function McpAppFrame({ presentation }: { presentation: McpUiPresentation 
           let decision = decisionsRef.current.get(decisionKey);
           if (!decision) {
             decision = new Promise<void>((resolve, reject) =>
-              setPending({ name, args, resolve, reject })
+              updateQueue(current => [
+                ...current,
+                { key: decisionKey, name, args, resolve, reject },
+              ])
             );
             decision.catch(() => undefined);
             decisionsRef.current.set(decisionKey, decision);
@@ -127,7 +150,7 @@ export function McpAppFrame({ presentation }: { presentation: McpUiPresentation 
       window.removeEventListener('message', onMessage);
       if (bridgeRef.current === bridge) bridgeRef.current = null;
     };
-  }, [resource, theme, serverId, locale]);
+  }, [resource, theme, serverId, locale, updateQueue]);
 
   if (state.status === 'unavailable') {
     return (
@@ -181,11 +204,11 @@ export function McpAppFrame({ presentation }: { presentation: McpUiPresentation 
           testId="mcp-ui-confirm"
           onConfirm={() => {
             pending.resolve();
-            setPending(null);
+            updateQueue(current => current.slice(1));
           }}
           onCancel={() => {
             pending.reject(new Error('The user declined this action'));
-            setPending(null);
+            updateQueue(current => current.slice(1));
           }}
         />
       ) : null}

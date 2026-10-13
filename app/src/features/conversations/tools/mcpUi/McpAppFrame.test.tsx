@@ -130,6 +130,50 @@ describe('McpAppFrame tool decisions', () => {
     expect(api.toolCall).not.toHaveBeenCalledWith('shop', 'place_order', { item: 'laptop' }, true);
   });
 
+  it('queues concurrent confirmations for different calls and answers them in order', async () => {
+    const { handlers } = await mountFrame();
+
+    let first!: Promise<unknown>;
+    let second!: Promise<unknown>;
+    act(() => {
+      first = handlers.callTool('place_order', { item: 'tea' });
+      second = handlers.callTool('place_order', { item: 'cake' });
+    });
+    await screen.findByTestId('mcp-ui-confirm');
+    expect(screen.getAllByTestId('mcp-ui-confirm')).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
+    await expect(first).resolves.toEqual({ tool: 'place_order' });
+
+    await waitFor(() => expect(screen.getByTestId('mcp-ui-confirm')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
+    await expect(second).resolves.toEqual({ tool: 'place_order' });
+    expect(screen.queryByTestId('mcp-ui-confirm')).toBeNull();
+
+    let again!: Promise<unknown>;
+    act(() => {
+      again = handlers.callTool('place_order', { item: 'tea' });
+    });
+    await expect(again).resolves.toEqual({ tool: 'place_order' });
+    expect(screen.queryByTestId('mcp-ui-confirm')).toBeNull();
+  });
+
+  it('rejects still-queued confirmations when the view unmounts', async () => {
+    const { view, handlers } = await mountFrame();
+
+    let first!: Promise<unknown>;
+    let second!: Promise<unknown>;
+    act(() => {
+      first = handlers.callTool('place_order', { item: 'tea' });
+      second = handlers.callTool('place_order', { item: 'cake' });
+    });
+    await screen.findByTestId('mcp-ui-confirm');
+    const settled = Promise.allSettled([first, second]);
+    view.unmount();
+    const results = await settled;
+    expect(results.map(result => result.status)).toEqual(['rejected', 'rejected']);
+  });
+
   it('keeps one bridge and hands it newer data for the same widget', async () => {
     const { view } = await mountFrame();
     view.rerender(<McpAppFrame presentation={presentation({ q: 2 })} />);
