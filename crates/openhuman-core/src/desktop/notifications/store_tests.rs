@@ -11,7 +11,7 @@
 
 use super::*;
 use chrono::{Duration, Utc};
-use crate::storage::DocumentStore;
+
 use tempfile::TempDir;
 
 fn test_config(dir: &TempDir) -> Config {

@@ -289,6 +289,8 @@ impl Docs {
             "payload": serde_json::to_string(task).context("serialize ingested task payload")?,
             "ingested_at": now.to_rfc3339(),
             "ingested_ms": now.timestamp_millis(),
+            // Breaks ties between arrivals in one millisecond.
+            "ingested_ns": now.timestamp_nanos_opt().unwrap_or(i64::MAX),
         });
         self.0.run(|docs| async move {
             docs.put(INGESTED, &key, doc, Precondition::None)
@@ -300,6 +302,7 @@ impl Docs {
     pub(super) fn list_ingested_refs(&self, source_id: &str) -> Result<Vec<IngestedTaskRef>> {
         let query = Query::filter(Filter::eq("source_id", source_id))
             .sort(Sort::asc("ingested_ms"))
+            .sort(Sort::asc("ingested_ns"))
             .sort(Sort::asc("external_id"));
         self.0.run(|docs| async move {
             Ok(docs
@@ -329,6 +332,7 @@ impl Docs {
         let query =
             Query::filter(Filter::eq("source_id", source_id).and(Filter::exists("payload", true)))
                 .sort(Sort::desc("ingested_ms"))
+                .sort(Sort::desc("ingested_ns"))
                 .limit(limit.max(1));
         self.0.run(|docs| async move {
             let page = docs.query(INGESTED, &query).await?;
