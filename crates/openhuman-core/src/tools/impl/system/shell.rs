@@ -175,11 +175,11 @@ impl ShellTool {
     /// deadline applies only when the caller passes `timeout_secs` (issue
     /// #4023). A `0` explicitly disables it. Any positive value is clamped to
     /// `1..=3600`. See
-    /// [`crate::tools::timeout::explicit_call_timeout_duration`].
+    /// [`tinytools_std::timeout::explicit_call_timeout_duration`].
     fn explicit_timeout(&self, requested: Option<u64>) -> Option<Duration> {
-        crate::tools::timeout::explicit_call_timeout_duration(
+        tinytools_std::timeout::explicit_call_timeout_duration(
             requested,
-            crate::tools::timeout::MAX_TIMEOUT_SECS,
+            tinytools_std::timeout::MAX_TIMEOUT_SECS,
         )
     }
 }
@@ -498,7 +498,7 @@ impl ShellTool {
             }
 
             let mut env = std::collections::BTreeMap::new();
-            for (name, value) in shell_child_env(crate::tools::timeout::CommandEnvironment::var_os)
+            for (name, value) in shell_child_env(tinytools_std::timeout::CommandEnvironment::var_os)
             {
                 let Ok(value) = value.into_string() else {
                     return (
@@ -555,7 +555,7 @@ impl ShellTool {
         };
         cmd.env_clear();
 
-        for (var, val) in shell_child_env(crate::tools::timeout::CommandEnvironment::var_os) {
+        for (var, val) in shell_child_env(tinytools_std::timeout::CommandEnvironment::var_os) {
             cmd.env(var, val);
         }
 
@@ -595,8 +595,8 @@ impl ShellTool {
             if explicit_timeout.is_some() { "explicit" } else { "no" }
         );
         let result = match explicit_timeout {
-            Some(timeout) => crate::tools::timeout::output_or_kill(&mut cmd, timeout).await,
-            None => Ok(crate::tools::timeout::output_unbounded(&mut cmd).await),
+            Some(timeout) => tinytools_std::timeout::output_or_kill(&mut cmd, timeout).await,
+            None => Ok(tinytools_std::timeout::output_unbounded(&mut cmd).await),
         };
 
         let tool_result = match result {
@@ -687,7 +687,7 @@ impl ShellTool {
         // long command isn't killed while still bounding a wedged sandbox.
         let explicit_timeout = self.explicit_timeout(requested_timeout);
         let effective = explicit_timeout.unwrap_or_else(|| {
-            Duration::from_secs(crate::tools::timeout::SANDBOX_UNBOUNDED_CAP_SECS)
+            Duration::from_secs(tinytools_std::timeout::SANDBOX_UNBOUNDED_CAP_SECS)
         });
         tracing::debug!(
             timeout_secs = effective.as_secs(),

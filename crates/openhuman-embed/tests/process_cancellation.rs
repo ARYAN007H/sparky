@@ -2,7 +2,7 @@
 
 #![cfg(target_os = "linux")]
 
-use openhuman_core::tools::timeout::{output_or_kill, output_unbounded, ProcessCleanup};
+use tinytools_std::timeout::{output_or_kill, output_unbounded, ProcessCleanup};
 use std::time::Duration;
 
 /// Cancelling a tool must also stop descendants of its shell.

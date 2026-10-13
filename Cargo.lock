@@ -4740,6 +4740,7 @@ dependencies = [
  "tinymemory-api",
  "tinymemory-tools",
  "tinytools",
+ "tinytools-std",
  "tokio",
  "tokio-stream",
  "tracing-subscriber",

@@ -387,7 +387,7 @@ fn default_tool_result_budget_bytes() -> usize {
 }
 
 fn default_agent_timeout_secs() -> u64 {
-    crate::tools::timeout::DEFAULT_TIMEOUT_SECS
+    tinytools_std::timeout::DEFAULT_TIMEOUT_SECS
 }
 
 fn default_agent_max_tool_iterations() -> usize {

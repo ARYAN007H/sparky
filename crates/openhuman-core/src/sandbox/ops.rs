@@ -459,7 +459,7 @@ async fn execute_unsandboxed(
         cmd.env(k, v);
     }
 
-    let result = crate::tools::timeout::output_or_kill(&mut cmd, timeout).await;
+    let result = tinytools_std::timeout::output_or_kill(&mut cmd, timeout).await;
     match result {
         Ok(Ok(output)) => Ok(SandboxExecResult {
             exit_code: output.status.code().unwrap_or(-1),
