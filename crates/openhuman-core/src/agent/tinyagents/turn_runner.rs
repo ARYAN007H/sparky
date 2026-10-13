@@ -493,18 +493,12 @@ pub(super) async fn run_turn_via_tinyagents_body(
         bridge
     });
 
-    // Cap pauser: stop gracefully at the model-call budget (returning the partial
-    // transcript) so the caller can summarize a checkpoint instead of erroring.
-    //
-    // It is also handed the turn's dispatch guard, so the pause is *recorded* and
-    // not merely requested. `SteeringCommand::Pause` is advisory — honoured at the
-    // loop boundary — and nothing consulted it before dispatching a new sub-agent,
-    // so a dispatch issued in the same instant raced it and took the whole turn
-    // down with the run's remaining wall-clock budget (#5804). The guard is
-    // resolved here rather than inside the listener because this future runs on
-    // the turn's task, where the task-local is in scope; the listener need not.
-    if pause_at_cap {
-        if let (Some(events), Some(handle)) = (&events, &handle) {
+    // Cap pauser: stop gracefully at the model-call budget so the caller can
+    // summarize a checkpoint instead of erroring. `Pause` is advisory, so the
+    // pause is also recorded on the turn's dispatch guard (resolved here, on
+    // the turn's task where the task-local is in scope) to stop a racing
+    // sub-agent dispatch (#5804).
+    if let (Some(events), Some(handle)) = (&events, &handle) {
             // Only the top-level turn's cap pause is binding on dispatch; a
             // delegated child reaching its own cap is routine and must not
             // stop the parent's fan-out (it still gets its advisory `Pause`).
