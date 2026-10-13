@@ -428,7 +428,7 @@ async fn pinned_loader_serves_resolve_local_grants_from_tinybox_v0124() {
         protected: contract::ProtectedPaths::default(),
     };
     let grants: contract::LocalGrants = super::module_client(&config)
-        .call(MODULE_ID, contract::METHODS[31], (request,))
+        .call(MODULE_ID, RESOLVE_LOCAL_GRANTS, (request,))
         .await
         .expect("the published artifact serves ResolveLocalGrants");
     assert_eq!(
@@ -476,6 +476,56 @@ fn every_host_operation_is_a_member_of_the_canonical_contract() {
     assert_eq!(methods, contract::METHODS[..methods.len()]);
     assert!(contract::METHODS.contains(&SELECT_SHELL));
     assert!(contract::METHODS.contains(&START_SHELL_EXEC));
+}
+
+#[test]
+fn every_member_the_host_calls_is_named_in_the_pinned_contract() {
+    let called = [
+        DESCRIBE,
+        CREATE,
+        EXEC,
+        INSPECT,
+        CLOSE,
+        SPAWN,
+        IS_RUNNING,
+        CANCEL,
+        ANALYZE_SHELL,
+        RESERVE,
+        CAPABILITIES,
+        SHUTDOWN,
+        FORWARD,
+        CLOSE_FORWARD,
+        JAIL_STATUS,
+        ANALYZE_COMMAND,
+        BEGIN_FILE_READ,
+        READ_FILE_CHUNK,
+        FINISH_FILE_READ,
+        BEGIN_FILE_WRITE,
+        WRITE_FILE_CHUNK,
+        FINISH_FILE_WRITE,
+        ABORT_FILE_WRITE,
+        START_EXEC,
+        READ_OUTPUT,
+        RELEASE_OUTPUT,
+        START_JAILED_EXEC,
+        RUN_DOCKER,
+        DOCKER_STATUS,
+        CLEANUP_DOCKER,
+        RUN_DOCKER_WITHOUT_WORKSPACE,
+        SELECT_SHELL,
+        RESOLVE_LOCAL_GRANTS,
+        START_SHELL_EXEC,
+    ];
+    for member in called {
+        assert!(
+            contract::METHODS.contains(&member),
+            "{member} is not a member of the pinned tinybox contract"
+        );
+    }
+    let mut unique = called.to_vec();
+    unique.sort_unstable();
+    unique.dedup();
+    assert_eq!(unique.len(), called.len(), "host member names must be distinct");
 }
 
 #[tokio::test]
