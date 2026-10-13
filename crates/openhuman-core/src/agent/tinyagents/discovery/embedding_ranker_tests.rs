@@ -63,7 +63,7 @@ async fn the_ranker_ranks_through_the_provider_and_keys_its_cache_by_signature()
         .await
         .unwrap();
     assert_eq!(hits[0].key, "SLACK_SEND_MESSAGE");
-    let after_first = embedder.calls.load(std::sync::atomic::Ordering::SeqCst);
+    let after_first = embedder.calls.load(Ordering::SeqCst);
 
     // A second ranker over the same workspace reads the stored catalogue
     // embeddings instead of embedding the catalogue again.
@@ -73,7 +73,7 @@ async fn the_ranker_ranks_through_the_provider_and_keys_its_cache_by_signature()
         .await
         .unwrap();
     assert_eq!(hits[0].key, "SLACK_SEND_MESSAGE");
-    let after_second = embedder.calls.load(std::sync::atomic::Ordering::SeqCst);
+    let after_second = embedder.calls.load(Ordering::SeqCst);
     assert_eq!(
         after_second - after_first,
         1,
