@@ -378,7 +378,15 @@ pub(super) async fn policy_reads_refuse_execution_without_consuming_a_slot(case:
         0,
         "manual paths executed the job"
     );
-    assert!(!format!("{direct:?}{agent:?}{manual:?}{queued:?}{tool:?}").contains("secret"));
+    for (name, shown) in [
+        ("direct", format!("{direct:?}")),
+        ("agent", format!("{agent:?}")),
+        ("manual", format!("{manual:?}")),
+        ("queued", format!("{queued:?}")),
+        ("tool", format!("{tool:?}")),
+    ] {
+        assert!(!shown.contains("secret"), "{name} leaked backend detail: {shown}");
+    }
     assert_eq!(
         sqlite_stamp(&config),
         sqlite_before,
