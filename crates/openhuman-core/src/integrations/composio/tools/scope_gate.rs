@@ -5,17 +5,20 @@
 //! `tinyconnectors` (`ListCuratedCatalog` / `GetVocabulary`, `GetUserScopes`);
 //! this file only asks them and turns the answer into the decisions the
 //! tools need: [`resolve_action_scope`] / [`action_mutates_external_state`]
-//! (sandbox and approval gates), [`evaluate_tool_visibility`] and
-//! [`filter_list_tools_response`] (`composio_list_tools`), and the
-//! user-facing scope error.
+//! (sandbox and approval gates), [`evaluate_tool_visibility`] (asks the
+//! module's `ListVisibleTools`), and the user-facing scope error. Listings
+//! need no host filter: `ListTools` applies the stored preference itself.
 
 use crate::config::Config;
+
+use tinyconnectors_bus::names::methods;
+use tinyconnectors_bus::vocabulary::{VisibleToolsRequest, VisibleToolsResponse};
 
 use super::super::contract::{
     catalog_for_toolkit, classify_unknown, find_curated, toolkit_from_slug, ToolScope,
     UserScopePref,
 };
-use super::super::ops::load_user_scope_pref;
+use super::super::module_client as connectors;
 
 /// Decision returned by [`evaluate_tool_visibility`].
 pub(super) enum ToolDecision {
@@ -67,15 +70,69 @@ pub(crate) fn action_mutates_external_state(slug: &str) -> bool {
 }
 
 /// Decide whether a Composio action slug should be visible / executable
-/// for the current user, given the registered provider's curated list
-/// (if any) and the user's stored scope preference.
+/// for the current user.
+///
+/// Asks the connector module which curated actions the user's stored scope
+/// preference exposes for the slug's toolkit (`ListVisibleTools`), so the
+/// preference and the catalog are read from the module that enforces them.
+/// A module that cannot be reached answers as the default preference would,
+/// which is what the host did before the preference moved.
 pub(super) async fn evaluate_tool_visibility(config: &Config, slug: &str) -> ToolDecision {
     let Some(toolkit) = toolkit_from_slug(slug) else {
         // Unparseable slug — let the backend return its own error.
         return ToolDecision::Allow;
     };
-    let pref = load_user_scope_pref(config, &toolkit).await;
-    decide_visibility(&toolkit, slug, pref)
+    let request = VisibleToolsRequest {
+        toolkit: toolkit.clone(),
+        preference: None,
+    };
+    match connectors::call_stateless::<_, VisibleToolsResponse>(
+        config,
+        methods::LIST_VISIBLE_TOOLS,
+        request,
+    )
+    .await
+    {
+        Ok(visible) => decide_from_visible(slug, &visible),
+        Err(error) => {
+            tracing::debug!(
+                toolkit = %toolkit,
+                "[composio][scopes] list_visible_tools failed, using the default preference: {error}"
+            );
+            decide_visibility(&toolkit, slug, UserScopePref::default())
+        }
+    }
+}
+
+/// The decision for `slug` given the module's visible-tool listing for its
+/// toolkit.
+///
+/// A catalogued toolkit exposes exactly `visible.tools`; a curated action
+/// missing from that list is blocked by its scope, and one the catalog does not
+/// name at all is not curated. An uncatalogued toolkit passes through, gated by
+/// the verb heuristic against the preference the module applied.
+fn decide_from_visible(slug: &str, visible: &VisibleToolsResponse) -> ToolDecision {
+    if visible.has_catalog {
+        if visible
+            .tools
+            .iter()
+            .any(|tool| tool.slug.eq_ignore_ascii_case(slug))
+        {
+            return ToolDecision::Allow;
+        }
+        return match catalog_for_toolkit(&visible.toolkit)
+            .and_then(|catalog| find_curated(&catalog, slug).map(|tool| tool.scope))
+        {
+            Some(scope) => ToolDecision::BlockedByScope { scope },
+            None => ToolDecision::NotCurated,
+        };
+    }
+    let scope = classify_unknown(slug);
+    if visible.preference.allows(scope) {
+        ToolDecision::PassthroughCheckScope { scope }
+    } else {
+        ToolDecision::BlockedByScope { scope }
+    }
 }
 
 /// The pure half of [`evaluate_tool_visibility`], given the toolkit's stored
@@ -98,60 +155,6 @@ fn decide_visibility(toolkit: &str, slug: &str, pref: UserScopePref) -> ToolDeci
                 ToolDecision::BlockedByScope { scope }
             }
         }
-    }
-}
-
-/// Filter a freshly-fetched [`super::super::types::ComposioToolsResponse`] in
-/// place: drop tools that aren't curated for their toolkit and tools
-/// whose scope is disabled in the user's pref.
-pub(super) async fn filter_list_tools_response(
-    config: &Config,
-    resp: &mut super::super::types::ComposioToolsResponse,
-) {
-    let before = resp.tools.len();
-    // Compute keep/drop decisions sequentially (the await means we
-    // can't fold this into a single sync `retain` closure). Then zip
-    // each tool with its decision and collect the survivors — clearer
-    // than juggling a parallel index alongside `Vec::retain`.
-    // One preference read per toolkit, not per tool: each read is a bus call.
-    let mut prefs: std::collections::HashMap<String, UserScopePref> =
-        std::collections::HashMap::new();
-    let mut keep: Vec<bool> = Vec::with_capacity(before);
-    for t in &resp.tools {
-        let slug = &t.function.name;
-        let decision = match toolkit_from_slug(slug) {
-            None => ToolDecision::Allow,
-            Some(toolkit) => {
-                let pref = match prefs.get(&toolkit) {
-                    Some(pref) => *pref,
-                    None => {
-                        let pref = load_user_scope_pref(config, &toolkit).await;
-                        prefs.insert(toolkit.clone(), pref);
-                        pref
-                    }
-                };
-                decide_visibility(&toolkit, slug, pref)
-            }
-        };
-        keep.push(matches!(
-            decision,
-            ToolDecision::Allow | ToolDecision::PassthroughCheckScope { .. }
-        ));
-    }
-    let drained = std::mem::take(&mut resp.tools);
-    resp.tools = drained
-        .into_iter()
-        .zip(keep)
-        .filter_map(|(tool, keep_it)| if keep_it { Some(tool) } else { None })
-        .collect();
-    let after = resp.tools.len();
-    if after != before {
-        tracing::debug!(
-            before,
-            after,
-            dropped = before - after,
-            "[composio][scopes] composio_list_tools filtered"
-        );
     }
 }
 

@@ -16,17 +16,12 @@ use tinyconnectors_bus::names::methods;
 /// connected toolkits, then fetch v3 schemas for them. That is the module's
 /// now, and this function no longer branches on which route is live.
 ///
-/// # Why the scope filter is asked for `false`
+/// # Scope filtering
 ///
-/// The module can filter a listing by the user's scope preference, and
-/// eventually it should — it is the half that also refuses an `Execute`, and
-/// one component deciding both is the only arrangement that cannot disagree
-/// with itself.
-///
-/// The preference now lives in the module (`GetUserScopes`), so the two
-/// would agree; the flag stays `false` because the host's scope gate still
-/// applies the preference to what the agent sees (and refuses the execution),
-/// and filtering twice would only hide the host's "blocked by scope" message.
+/// The module applies the user's stored scope preference to the listing (the
+/// default request), the same preference it enforces on `Execute`, so one
+/// component decides both and the two cannot disagree. A curated toolkit
+/// offers only the actions in its catalog.
 pub async fn composio_list_tools(
     config: &Config,
     toolkits: Option<Vec<String>>,
@@ -42,7 +37,7 @@ pub async fn composio_list_tools(
     let request = ComposioListToolsRequest {
         toolkits: toolkits.unwrap_or_default(),
         tags: effective_tags.unwrap_or_default(),
-        apply_user_scopes: false,
+        ..ComposioListToolsRequest::default()
     };
     let named = request.toolkits.len();
 
