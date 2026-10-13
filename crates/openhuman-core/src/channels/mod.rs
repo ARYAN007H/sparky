@@ -125,3 +125,7 @@ pub(crate) use runtime::{session, start_channels_with_session};
 #[cfg(all(test, feature = "channels", feature = "modules"))]
 #[path = "module_fixture_tests.rs"]
 pub(crate) mod module_fixture;
+
+#[cfg(test)]
+#[path = "contract_reexport_tests.rs"]
+mod contract_reexport_tests;
