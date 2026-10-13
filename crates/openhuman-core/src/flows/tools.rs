@@ -184,7 +184,7 @@ impl Tool for ProposeWorkflowTool {
 }
 
 /// Runs a **saved** workflow by id so the `workflow-builder` agent can *test*
-/// it end-to-end. Unlike [`crate::flows::builder_tools::DryRunWorkflowTool`]
+/// it end-to-end. Unlike `tinyflows_copilot::tools::DryRunWorkflowTool`
 /// (a MOCK sandbox), this is a **real** run — so it is `PermissionLevel::Write`
 /// with `external_effect() == true`. Two safety layers remain: the flow's own
 /// `require_approval` gate still pauses outbound-action nodes mid-run, and the
