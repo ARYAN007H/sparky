@@ -15,9 +15,10 @@ TinyHosts module.
 
 All ten names, descriptions, schemas, and approval classifications are read
 from the release contract's `TOOL_DECLARATIONS_JSON`. OpenHuman keeps the
-workspace containment check; argument shaping, outcome matching, the rollback-ready check and summaries come from `tinyhosts_bus::tools` and `Outcome::matches`. Before
-it asks the module to promote it. The module itself enforces preparation limits
-and validates the uploaded snapshot.
+workspace containment check. Argument shaping, outcome matching, the
+rollback-ready check and the model-facing summaries come from
+`tinyhosts_bus::tools` and `Outcome::matches`. The module itself enforces
+preparation limits and validates the uploaded snapshot.
 
 `hosting::Account::from_config` returns no account when hosting is disabled or
 no credential resolves. Invalid providers and blank explicit credentials are
