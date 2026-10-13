@@ -3,13 +3,26 @@
 //! are honoured and a system job's handler result is what gets recorded.
 
 use super::*;
-use crate::cron::policy::{set_policy, JobPolicy};
+use tinyflows_schedule::JobPolicy;
 use crate::cron::system_job_handlers::{register, SystemJobContext};
 use crate::cron::system_jobs::ensure_system_job;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use tempfile::TempDir;
 use tinyflows_schedule::types::Schedule;
+
+/// Stores `policy` on the job.
+fn set_policy(config: &Config, job_id: &str, policy: JobPolicy) -> anyhow::Result<()> {
+    cron::update_job(
+        config,
+        job_id,
+        tinyflows_schedule::types::CronJobPatch {
+            policy: Some(policy),
+            ..Default::default()
+        },
+    )
+    .map(|_| ())
+}
 
 fn security(config: &Config) -> Arc<SecurityPolicy> {
     Arc::new(SecurityPolicy::from_config(
@@ -102,17 +115,17 @@ async fn a_long_job_does_not_hold_up_the_next_poll() {
     let _fast = register("dispatch-fast", counting(Arc::clone(&fast_calls), Ok(())));
 
     let slow = due_system_job(&config, "dispatch-slow");
-    let mut dispatcher = JobDispatcher::new(4);
+    let mut dispatcher = JobDispatcher::new(&config, &security);
     let mut health = None;
     // First poll picks up only the slow job.
-    tick_once(&config, &security, &mut health, &mut dispatcher).await;
+    tick_once(&config, &mut health, &mut dispatcher).await;
     assert!(job_is_running(&slow.id), "the slow job is running");
 
     // The next poll must not wait for it.
     let fast = due_system_job(&config, "dispatch-fast");
     tokio::time::timeout(
         Duration::from_secs(5),
-        tick_once(&config, &security, &mut health, &mut dispatcher),
+        tick_once(&config, &mut health, &mut dispatcher),
     )
     .await
     .expect("a poll returns while an earlier job is still running");
@@ -157,10 +170,11 @@ async fn dispatch_claims_the_slot_so_a_running_job_is_not_due_again() {
         }),
     );
     let job = due_system_job(&config, "dispatch-claim");
-    let mut dispatcher = JobDispatcher::new(4);
+    let mut dispatcher = JobDispatcher::new(&config, &security(&config));
     dispatcher
-        .dispatch(&config, &security(&config), vec![job.clone()])
-        .await;
+        .dispatch(vec![job.clone()])
+        .await
+        .unwrap();
     let stored = cron::get_job(&config, &job.id).unwrap();
     assert!(stored.next_run > Utc::now(), "the running slot is claimed");
     assert!(cron::due_jobs(&config, Utc::now())
@@ -179,10 +193,11 @@ async fn a_job_already_in_flight_is_not_dispatched_again() {
     let _handler = register("dispatch-dedupe", counting(Arc::clone(&calls), Ok(())));
     let job = due_system_job(&config, "dispatch-dedupe");
     let running = crate::cron::ops::try_acquire_run(&job.id).expect("the job is free");
-    let mut dispatcher = JobDispatcher::new(4);
+    let mut dispatcher = JobDispatcher::new(&config, &security(&config));
     dispatcher
-        .dispatch(&config, &security(&config), vec![job.clone()])
-        .await;
+        .dispatch(vec![job.clone()])
+        .await
+        .unwrap();
     dispatcher.drain().await;
     drop(running);
     assert_eq!(calls.load(Ordering::SeqCst), 0);
@@ -209,10 +224,11 @@ async fn a_single_flight_job_records_the_missed_slot_as_skipped() {
     )
     .unwrap();
     let running = crate::cron::ops::try_acquire_run(&job.id).expect("the job is free");
-    let mut dispatcher = JobDispatcher::new(4);
+    let mut dispatcher = JobDispatcher::new(&config, &security(&config));
     dispatcher
-        .dispatch(&config, &security(&config), vec![job.clone()])
-        .await;
+        .dispatch(vec![job.clone()])
+        .await
+        .unwrap();
     dispatcher.drain().await;
     drop(running);
 
@@ -251,9 +267,7 @@ async fn zero_retries_means_exactly_one_attempt() {
         },
     )
     .unwrap();
-    let security =
-        SecurityPolicy::from_config(&config.autonomy, &config.workspace_dir, &config.action_dir);
-    let (success, output) = execute_job_with_retry(&config, &security, &job).await;
+    let (success, output) = execute_job_now(&config, &job, \"dispatch-run\").await;
     assert!(!success);
     assert!(output.contains("boom"), "{output}");
     assert_eq!(calls.load(Ordering::SeqCst), 1);
@@ -271,9 +285,7 @@ async fn without_a_policy_the_configured_retry_budget_applies() {
         counting(Arc::clone(&calls), Err("again".to_string())),
     );
     let job = due_system_job(&config, "dispatch-default-retries");
-    let security =
-        SecurityPolicy::from_config(&config.autonomy, &config.workspace_dir, &config.action_dir);
-    let (success, _) = execute_job_with_retry(&config, &security, &job).await;
+    let (success, _) = execute_job_now(&config, &job, \"dispatch-run\").await;
     assert!(!success);
     assert_eq!(calls.load(Ordering::SeqCst), 2);
 }
@@ -299,10 +311,11 @@ async fn a_system_job_handler_error_is_recorded_as_the_run_result() {
         },
     )
     .unwrap();
-    let mut dispatcher = JobDispatcher::new(4);
+    let mut dispatcher = JobDispatcher::new(&config, &security(&config));
     dispatcher
-        .dispatch(&config, &security(&config), vec![job.clone()])
-        .await;
+        .dispatch(vec![job.clone()])
+        .await
+        .unwrap();
     dispatcher.drain().await;
     let stored = cron::get_job(&config, &job.id).unwrap();
     assert_eq!(stored.last_status.as_deref(), Some("error"));
@@ -317,23 +330,21 @@ async fn a_system_job_without_a_handler_is_still_ok_on_dispatch() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp).await;
     let job = due_system_job(&config, "dispatch-unclaimed");
-    let security =
-        SecurityPolicy::from_config(&config.autonomy, &config.workspace_dir, &config.action_dir);
-    let (success, output) = execute_job_with_retry(&config, &security, &job).await;
+    let (success, output) = execute_job_now(&config, &job, \"dispatch-run\").await;
     assert!(success);
     assert!(output.contains("dispatched"), "{output}");
 }
 
 #[test]
 fn only_one_scheduler_loop_holds_the_slot() {
-    let first = SchedulerSlot::acquire().expect("the slot is free");
+    let first = SchedulerSlot::acquire(LOOP_SCOPE).expect("the slot is free");
     assert!(is_running());
     assert!(
-        SchedulerSlot::acquire().is_none(),
+        SchedulerSlot::acquire(LOOP_SCOPE).is_none(),
         "a second loop is refused"
     );
     drop(first);
     assert!(!is_running());
-    let again = SchedulerSlot::acquire();
+    let again = SchedulerSlot::acquire(LOOP_SCOPE);
     assert!(again.is_some());
 }
