@@ -29,7 +29,6 @@ use super::types::{
 use crate::config::Config;
 use crate::integrations::composio::contract::NormalizedTask;
 use crate::storage::documents::{compare_and_swap, text, Repo};
-use crate::storage::local::{self, ImportPlan};
 use crate::storage::{DocumentStoreExt, StorageError};
 
 pub(super) const SOURCES: &str = "task_sources";
@@ -42,7 +41,7 @@ pub(crate) fn import_source() -> crate::storage::import::Source {
         domain: "task_sources",
         db: "task_sources/sources.db",
         collections,
-        read_legacy: |scratch, _real| super::store::import::read(scratch),
+        read_legacy: |scratch, _real| super::store_import::read(scratch),
         rekey: |record, _config| record,
     }
 }
@@ -55,17 +54,13 @@ fn collections() -> Vec<CollectionSpec> {
     ]
 }
 
-/// The document store for this call: the host's configured backend or, by
-/// default, the document tables in `sources.db` (the legacy tables imported
-/// on first open). `None` keeps the legacy tables.
-pub(super) fn current(config: &Config) -> Result<Option<Docs>> {
-    let plan = ImportPlan {
-        domain: DOMAIN,
-        tables: super::store::import::TABLES,
-        read: &|| super::store::import::read(config),
-    };
-    let db_path = super::store::db_path(config);
-    Ok(local::repo(config, &db_path, DOMAIN, collections, &plan)?.map(Docs))
+/// The document store for this call: the storage backend, in the acting scope.
+pub(super) fn current(config: &Config) -> Result<Docs> {
+    Ok(Docs(Repo::current_for(
+        &config.workspace_dir,
+        DOMAIN,
+        collections,
+    )?))
 }
 
 /// The ledger id for one `(source, external task)`; the length prefix keeps
