@@ -125,6 +125,17 @@ pub fn stores_for(workspace_dir: &Path) -> Option<AgentStores> {
     Some(provider_for_workspace(workspace_dir).for_agent(&key))
 }
 
+/// [`stores_for`] `workspace_dir`, or throwaway in-memory stores for a call
+/// that has no tenant to act for (a SaaS task with no scope), so it neither
+/// fails nor reaches another tenant's records.
+#[must_use]
+pub fn stores_or_ephemeral(workspace_dir: &Path) -> AgentStores {
+    stores_for(workspace_dir).unwrap_or_else(|| {
+        log::warn!("[session_store] no tenant; using throwaway in-memory stores");
+        tinyagents_session::port::InMemorySessionStores::new().for_agent("ephemeral")
+    })
+}
+
 /// The calling tenant's run ledger for `workspace_dir`.
 ///
 /// The installed provider's when it keeps one, else the workspace default's.
