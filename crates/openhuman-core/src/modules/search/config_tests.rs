@@ -1,4 +1,5 @@
 use super::*;
+use tinysearch_bus::PresentationMode;
 use crate::config::SearchProviderSettings;
 
 fn config_in(dir: &std::path::Path) -> Config {
