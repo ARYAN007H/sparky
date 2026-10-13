@@ -278,7 +278,11 @@ async fn skills_component_off_yields_no_catalogue_and_skips_bundled_install() {
 
     let ws_dir = tempfile::tempdir().unwrap();
     write(
-        &ws_dir.path().join("skills").join("ws-only").join("SKILL.md"),
+        &ws_dir
+            .path()
+            .join("skills")
+            .join("ws-only")
+            .join("SKILL.md"),
         "---\nname: ws-only\ndescription: workspace skill\n---\n",
     );
     let mut off = ComponentSet::all();
