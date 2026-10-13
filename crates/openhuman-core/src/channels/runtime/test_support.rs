@@ -21,7 +21,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tinyagents_session::transcript::TranscriptMessage;
+use tinychannels_bus::context::ChatMessage;
 use tinychannels_bus::{ChannelMessage, SendMessage};
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 use tinytools::{Tool, ToolResult};
@@ -396,7 +396,7 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
         conversation_histories.lock().expect("history lock").insert(
             history_key.clone(),
             (0..options.seed_history_len)
-                .map(|idx| TranscriptMessage::assistant(format!("prior {idx} {}", "x".repeat(700))))
+                .map(|idx| ChatMessage::assistant(format!("prior {idx} {}", "x".repeat(700))))
                 .collect(),
         );
     }
