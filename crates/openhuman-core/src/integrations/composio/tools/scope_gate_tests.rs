@@ -167,8 +167,12 @@ async fn a_preference_still_in_the_legacy_file_gates_execution() {
     .unwrap();
 
     let decision = evaluate_tool_visibility(&config, "GMAIL_SEND_EMAIL").await;
-    let restored =
-        super::super::ops::save_user_scope_pref(&config, "gmail", Default::default()).await;
+    let restored = crate::integrations::composio::ops::save_user_scope_pref(
+        &config,
+        "gmail",
+        Default::default(),
+    )
+    .await;
     restored.unwrap();
 
     assert!(matches!(
