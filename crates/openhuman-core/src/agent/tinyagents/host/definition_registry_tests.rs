@@ -237,7 +237,7 @@ fn skills_wildcard_entries_are_not_agent_ids() {
     def.subagents.push(SubagentEntry::Skills(SkillsWildcard {
         skills: "*".to_string(),
     }));
-    assert_eq!(&def.allowed_subagent_ids(), vec!["a_worker".to_string()]);
+    assert_eq!(def.allowed_subagent_ids(), vec!["a_worker".to_string()]);
 }
 
 #[test]
