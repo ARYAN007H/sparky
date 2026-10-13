@@ -105,6 +105,13 @@ impl StorageBackend for FencedBackend {
         ))
     }
 
+    /// Reclaiming blobs that already read as absent changes nothing a reader
+    /// can see, so it needs no fence: it goes straight to the inner driver's
+    /// own implementation rather than the trait default over the fenced view.
+    async fn sweep_expired_blobs(&self, scope: &Scope) -> Result<u64> {
+        self.inner.sweep_expired_blobs(scope).await
+    }
+
     fn database(&self, name: &str) -> Result<Arc<dyn StorageBackend>> {
         Ok(Arc::new(Self {
             inner: self.inner.database(name)?,

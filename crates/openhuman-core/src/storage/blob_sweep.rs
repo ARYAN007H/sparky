@@ -56,7 +56,17 @@ pub async fn sweep_all(backend: Arc<dyn StorageBackend>) -> u64 {
         let backend = Arc::clone(&backend);
         async move {
             match super::current_scope() {
-                Ok(scope) => sweep_scope(backend.as_ref(), &scope).await,
+                Ok(scope) => {
+                    // Modules keep their expiring blobs in their own scopes
+                    // derived from the acting scope (TinyJuice's CCR TTL).
+                    let mut removed = sweep_scope(backend.as_ref(), &scope).await;
+                    for module_scope in crate::modules::expiring_blob_module_scopes() {
+                        if module_scope != scope {
+                            removed += sweep_scope(backend.as_ref(), &module_scope).await;
+                        }
+                    }
+                    removed
+                }
                 Err(error) => {
                     tracing::debug!(%error, "[storage::blob_sweep] no scope for this visit; skipped");
                     0
