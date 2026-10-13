@@ -39,6 +39,7 @@
 //! the libraries that own those formats; see the storage README.
 
 mod snapshot;
+pub mod tinyflows;
 
 use std::path::Path;
 use std::sync::Arc;
@@ -158,7 +159,12 @@ pub async fn run(config: &Config) -> Vec<Report> {
         return Vec::new();
     }
     let config = config.clone();
-    let joined = tokio::task::spawn_blocking(move || run_with(&backend, &config, &sources())).await;
+    let joined = tokio::task::spawn_blocking(move || {
+        let mut reports = run_with(&backend, &config, &sources());
+        reports.extend(tinyflows::run_with(&backend, &config));
+        reports
+    })
+    .await;
     match joined {
         Ok(reports) => reports,
         Err(error) => {
