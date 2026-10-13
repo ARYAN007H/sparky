@@ -53,7 +53,7 @@ impl Tool for ProposeWorkflowTool {
         // `workflow_builder`'s prompt carries an index — and it shipped on
         // every request of every agent holding this tool.
         //
-        // `render_node_kinds_required()` reduces it to the one thing a caller
+        // `tinyflows::catalog::render_node_kinds_required` reduces it to the one thing a caller
         // cannot recover from a failed call: which kinds exist and what config
         // each cannot be built without (401 bytes). Everything else is one
         // `get_node_kind_contract { kind }` away.
@@ -89,7 +89,9 @@ impl Tool for ProposeWorkflowTool {
                  Call `get_node_kind_contract {{ kind }}` for a kind's optional fields, ports, \
                  a worked example, and its gotchas — it is generated from the catalog the \
                  validator enforces, so it is always current.",
-                    kinds = crate::flows::render_node_kinds_required()
+                    kinds = tinyflows::catalog::render_node_kinds_required(
+                        &crate::flows::all_node_kind_contracts()
+                    )
                 )
             })
             .as_str()
@@ -182,7 +184,7 @@ impl Tool for ProposeWorkflowTool {
 }
 
 /// Runs a **saved** workflow by id so the `workflow-builder` agent can *test*
-/// it end-to-end. Unlike [`crate::flows::builder_tools::DryRunWorkflowTool`]
+/// it end-to-end. Unlike `tinyflows_copilot::tools::DryRunWorkflowTool`
 /// (a MOCK sandbox), this is a **real** run — so it is `PermissionLevel::Write`
 /// with `external_effect() == true`. Two safety layers remain: the flow's own
 /// `require_approval` gate still pauses outbound-action nodes mid-run, and the
