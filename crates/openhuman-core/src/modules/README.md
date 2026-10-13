@@ -493,3 +493,7 @@ members; no normal or build edge reaches `tinyconnectors` or its sync library.
 Provider messages remain product output, while terminal bus reports contain
 only the module/version/stage/platform/reason vocabulary. Credential-bearing
 configuration and direct reads use attested confidential calls.
+
+## `[components] computer`
+
+`computer = false` is a ceiling over TinyComputer: desktop and browser tools are not registered, `ensure_loaded("tinycomputer")` refuses, `AccessibilityClient` (Globe hotkey, permissions, paste) answers `COMPONENT_DISABLED:computer`, and the `desktop.*` and `modules.browser_*` / `modules.computer_status` RPC methods answer `COMPONENT_DISABLED`. Effective desktop control is the flag AND the local consent file (`desktop::control::ops::enabled`); the flag never grants consent.
