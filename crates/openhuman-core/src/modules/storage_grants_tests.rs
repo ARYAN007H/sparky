@@ -329,9 +329,9 @@ fn validate_refuses_grants_that_reach_past_a_modules_own_data() {
 }
 
 #[test]
-fn no_module_declares_storage_yet() {
+fn only_modules_with_a_declared_grant_have_storage() {
     for record in crate::modules::registry::ALL {
-        assert!(declared(record.id).is_none(), "{}", record.id);
+        assert_eq!(declared(record.id).is_some(), record.id == "tinymcp", "{}", record.id);
     }
 }
 
