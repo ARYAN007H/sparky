@@ -191,3 +191,34 @@ async fn servers_and_env_secrets_survive_a_restart_of_the_bus_and_host() {
         Some(b"{\"API_KEY\":\"k\"}".to_vec())
     );
 }
+
+/// Why the objects are served from a linked module at all: the same host
+/// served from an ordinary connection is not an attested recipient, so the
+/// broker refuses every secret before it reaches the host.
+#[tokio::test(flavor = "multi_thread")]
+async fn secrets_served_from_a_plain_connection_are_refused_not_attested() {
+    let transport = MemoryBus::new();
+    let broker = Broker::new();
+    broker.spawn(transport.clone());
+    let server = Connection::connect(transport.connect().await.unwrap())
+        .await
+        .unwrap();
+    let caller = Connection::connect(transport.connect().await.unwrap())
+        .await
+        .unwrap();
+    let host = Arc::new(StorageHost::new(
+        Arc::new(Directory(caller.unique_name().unwrap())),
+        Arc::new(Env(Arc::new(MemoryStorage::new()))),
+        Arc::new(NoAudit),
+    ));
+    serve_objects(&server, &host, None).await.unwrap();
+    let bus = Bus {
+        caller,
+        _modules: ModuleHost::new(Broker::new()),
+    };
+    let refused = bus.set_secret("mcp_client_env/x", b"v").await;
+    assert!(
+        matches!(refused, Err(tinybus::Error::NotAttested { .. })),
+        "{refused:?}"
+    );
+}
