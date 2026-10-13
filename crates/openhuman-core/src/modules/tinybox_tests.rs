@@ -567,8 +567,17 @@ async fn native_shell_and_policy_validation_use_their_contract_members() {
         .await
         .expect("policy validation call");
     let log = calls.lock().expect("call log lock");
-    assert_eq!(log[1], ("StartNativeShellExec".to_owned(), json!([shell])));
-    assert_eq!(log[2], ("ValidateDockerPolicy".to_owned(), json!([policy])));
+    let members: Vec<_> = log
+        .iter()
+        .filter(|(name, _)| name != CAPABILITIES)
+        .collect();
+    assert_eq!(
+        members,
+        [
+            &("StartNativeShellExec".to_owned(), json!([shell])),
+            &("ValidateDockerPolicy".to_owned(), json!([policy])),
+        ]
+    );
 }
 
 #[tokio::test]
