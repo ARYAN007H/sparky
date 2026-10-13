@@ -553,7 +553,7 @@ fn find_resolves_known_ids_only() {
 fn tinychannels_registry_matches_scoped_runtime_release() {
     let record = find("tinychannels").expect("compiled TinyChannels module");
     assert_eq!(record.version, "0.1.29");
-    assert_eq!(tinychannels_bus::CONTRACT_VERSION, 16);
+    assert_eq!(tinychannels_bus::CONTRACT_VERSION, 20);
     assert_eq!(
         tinychannels_bus::module_relay::MODULE_OPERATION_VERSION,
         (1, 17)
