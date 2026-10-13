@@ -4,8 +4,8 @@ use crate::agent::harness::host_definition::AgentDefinition;
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::orchestration::spawn_parallel::{
     prepare_spawn_parallel_tasks_from_defs, ParallelTaskRejectionKind, SpawnParallelTaskPreflight,
-    WorkerDispatchMode,
 };
+use tinyagents_orchestration::parallel::WorkerDispatchMode;
 use crate::agent::prompts::ToolCallFormat;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent::OpenHumanSessionHost;

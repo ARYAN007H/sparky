@@ -7,6 +7,7 @@ use std::path::Path;
 
 use tinyagents_harness::workspace::WorkspaceIsolation;
 use tinyagents_orchestration::parallel::Worker;
+use tinyagents_orchestration::parallel::WorkerDispatchMode;
 use tinytools::WorkspaceDescriptor;
 use tokio::sync::mpsc::Sender;
 
@@ -18,7 +19,7 @@ use tinyagents_definition::SandboxMode;
 
 use super::staging::{
     prepare_spawn_parallel_tasks_from_defs, worktree_request_for_task, ParallelTaskRejectionKind,
-    ParallelWorktreeRequest, SpawnParallelTaskPreflight, WorkerDispatchMode,
+    ParallelWorktreeRequest, SpawnParallelTaskPreflight,
 };
 use super::types::{
     ParallelAgentLineage, ParallelAgentResult, ParallelAgentStatus, ParallelAgentTask,
