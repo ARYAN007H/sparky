@@ -37,13 +37,21 @@ pub fn is_recovery_tool(name: &str) -> bool {
     RECOVERY_TOOL_NAMES.contains(&name)
 }
 
+/// Whether the `[components] juice` switch is on. Off means turns truncate
+/// tool output only: no compaction, no summary, no `juice_*` / recovery tools,
+/// and the module is never loaded for it.
+pub fn enabled(config: &crate::config::Config) -> bool {
+    config.components.juice
+}
+
 /// Whether large results are stored behind a handle (stats, head, handle)
 /// instead of being compressed into one blob, and the REPL tools that query
 /// them are offered to the model. Needs the router, the CCR store the handle
 /// points into, and the compaction switch that lets the module rewrite results
 /// at all.
 pub fn repl_handle_active(config: &crate::config::Config) -> bool {
-    config.context.compaction_enabled
+    enabled(config)
+        && config.context.compaction_enabled
         && config.tokenjuice.router_enabled
         && config.tokenjuice.ccr_enabled
         && config.tokenjuice.repl_handle_enabled
@@ -52,7 +60,7 @@ pub fn repl_handle_active(config: &crate::config::Config) -> bool {
 /// Whether TinyJuice may summarize this agent's tool output. Only the
 /// orchestrator gets a summary model, and a zero threshold turns it off.
 pub fn summarizes_tool_output(agent_id: &str, config: &crate::config::Config) -> bool {
-    agent_id == "orchestrator" && config.context.summarizer_payload_threshold_tokens > 0
+    enabled(config) && agent_id == "orchestrator" && config.context.summarizer_payload_threshold_tokens > 0
 }
 
 /// The TinyJuice tools a compacted result can point the model at: the CCR
@@ -66,7 +74,9 @@ pub fn summarizes_tool_output(agent_id: &str, config: &crate::config::Config) ->
 /// was told to call.
 pub fn companion_tool_names(agent_id: &str, config: &crate::config::Config) -> Vec<&'static str> {
     let mut names: Vec<&'static str> = Vec::new();
-    if config.context.compaction_enabled || summarizes_tool_output(agent_id, config) {
+    if enabled(config)
+        && (config.context.compaction_enabled || summarizes_tool_output(agent_id, config))
+    {
         names.extend(RECOVERY_TOOL_VISIBLE.iter().copied());
     }
     if repl_handle_active(config) {
@@ -119,6 +129,10 @@ pub(crate) fn install_request(config: &crate::config::Config) -> InstallRequest 
 }
 
 pub async fn install_from_config(config: &crate::config::Config) -> Result<(), String> {
+    if !enabled(config) {
+        log::debug!("[tokenjuice] component disabled; module install skipped");
+        return Ok(());
+    }
     savings::configure(
         &client(config),
         config

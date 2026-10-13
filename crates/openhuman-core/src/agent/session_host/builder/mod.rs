@@ -224,7 +224,8 @@ pub(super) fn ensure_tinyjuice_tools_visible(
 ) {
     ensure_recovery_tool_visible(
         visible,
-        config.context.compaction_enabled || summarizes_tool_output(agent_id, config),
+        crate::inference::tokenjuice::enabled(config)
+            && (config.context.compaction_enabled || summarizes_tool_output(agent_id, config)),
     );
     ensure_repl_tools_visible(
         visible,
