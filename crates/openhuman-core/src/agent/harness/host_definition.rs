@@ -108,14 +108,28 @@ fn same_definition(a: &AgentDefinition, b: &AgentDefinition) -> bool {
     }
 }
 
-/// The prompt builder behind a `PromptSource::Dynamic(())` marker.
-pub fn dynamic_prompt_builder(def: &AgentDefinition) -> Result<PromptBuilder> {
-    def.extensions.prompt_builder.ok_or_else(|| {
-        anyhow::anyhow!(
-            "agent `{}` declares a dynamic prompt but has no builder",
-            def.id
-        )
-    })
+/// Host accessors on the portable [`AgentDefinition`].
+pub trait AgentDefinitionExt {
+    /// The concrete TokenJuice policy (see [`AgentExt::effective_tokenjuice_compression`]).
+    fn effective_tokenjuice_compression(&self) -> AgentTokenjuiceCompression;
+    /// The prompt builder behind a `PromptSource::Dynamic(())` marker.
+    fn prompt_fn(&self) -> Result<PromptBuilder>;
+}
+
+impl AgentDefinitionExt for AgentDefinition {
+    fn effective_tokenjuice_compression(&self) -> AgentTokenjuiceCompression {
+        self.extensions
+            .effective_tokenjuice_compression(&self.model)
+    }
+
+    fn prompt_fn(&self) -> Result<PromptBuilder> {
+        self.extensions.prompt_builder.ok_or_else(|| {
+            anyhow::anyhow!(
+                "agent `{}` declares a dynamic prompt but has no builder",
+                self.id
+            )
+        })
+    }
 }
 
 /// Re-check the spawn-hierarchy contract over a slice of definitions.

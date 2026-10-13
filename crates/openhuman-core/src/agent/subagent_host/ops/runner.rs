@@ -11,7 +11,9 @@ use std::time::Instant;
 
 use crate::agent::harness::artifact_offload::{new_artifact_offload, offload_oversized_result};
 use crate::agent::harness::fork_context::ParentExecutionContext;
-use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
+use crate::agent::harness::host_definition::{
+    AgentDefinition, AgentDefinitionExt, AgentDefinitionRegistry,
+};
 use crate::agent::prompts::{
     render_subagent_system_prompt_with_format, PromptContext, SubagentRenderOptions,
 };
@@ -945,9 +947,7 @@ async fn run_typed_mode(
             // own channel in per-thread usage reads.
             "subagent",
             // Agent TokenJuice profile → sub-agent context middleware (#4466).
-            definition
-                .extensions
-                .effective_tokenjuice_compression(&definition.model),
+            definition.effective_tokenjuice_compression(),
             // The spawn-wide config snapshot supplies the `[context]`
             // knobs the graph used to load for itself.
             config.as_ref().ok().map(|c| c.as_ref()),
