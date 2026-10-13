@@ -249,7 +249,6 @@ pub mod session_store {
     pub use tinyagents_session::testkit::conformance::{
         session_store_conformance, session_store_isolation_conformance,
     };
-    pub use tinyagents_session::transcript::import::types::{JournalMessage, SessionDescriptor};
     /// The transcript seam a provider's [`AgentStores::transcripts`] implements.
     pub use tinyagents_session::transcript::{
         SessionRef, SessionTranscript, TranscriptHistory, TranscriptLocator, TranscriptMessage,

@@ -1,5 +1,5 @@
 //! The catalog's storage and the import of the files tinyflows used to write
-//! (`flows.db`, `checkpoints.db`, `drafts/*.json`) on first use.
+//! (`flows.db`, `checkpoints.db`, `drafts/*.json`) by the storage importer.
 
 use super::*;
 use tempfile::TempDir;
@@ -30,22 +30,26 @@ fn config(tmp: &TempDir) -> Config {
 }
 
 #[test]
-fn the_catalog_lives_in_its_own_workspace_database() {
+fn the_catalog_lives_in_the_workspace_default_database() {
     let tmp = TempDir::new().unwrap();
     let config = config(&tmp);
     assert!(crate::storage::installed().is_none());
     assert!(list_flows(&config).unwrap().0.is_empty());
-    assert_eq!(db_path(&config), tmp.path().join("flows/catalog.db"));
-    assert!(db_path(&config).is_file());
+    assert!(tmp.path().join("storage/storage.db").is_file());
 }
 
 #[test]
-fn legacy_flows_drafts_and_checkpoints_are_imported_on_first_use_and_left_untouched() {
+fn legacy_flows_drafts_and_checkpoints_are_imported_and_left_untouched() {
     let tmp = TempDir::new().unwrap();
     let config = config(&tmp);
     copy_tree(&fixture_workspace(), tmp.path());
     let flows_db = dir(&config).join("flows.db");
     let before = std::fs::read(&flows_db).unwrap();
+
+    let backend = crate::storage::local::backend_for(&config.workspace_dir).unwrap();
+    for report in crate::storage::import::tinyflows::run_with(&backend, &config) {
+        report.outcome.unwrap();
+    }
 
     let (flows, _) = list_flows(&config).unwrap();
     let mut ids: Vec<_> = flows.iter().map(|flow| flow.id.clone()).collect();
@@ -78,6 +82,8 @@ fn legacy_flows_drafts_and_checkpoints_are_imported_on_first_use_and_left_untouc
 
     // Imported once: a flow removed afterwards stays removed after a restart.
     remove_flow(&config, "flow-alpha").unwrap();
-    crate::storage::local::forget(&db_path(&config));
+    for report in crate::storage::import::tinyflows::run_with(&backend, &config) {
+        report.outcome.unwrap();
+    }
     assert_eq!(list_flows(&config).unwrap().0.len(), 1);
 }

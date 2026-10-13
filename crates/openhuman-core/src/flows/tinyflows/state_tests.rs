@@ -64,7 +64,7 @@ async fn an_unresolved_scope_fails_every_call() {
 }
 
 #[test]
-fn without_a_backend_the_flow_state_is_on_the_workspace_database() {
+fn without_a_backend_the_flow_state_is_in_the_workspace_default_database() {
     let dir = tempfile::tempdir().unwrap();
     let config = Config {
         workspace_dir: dir.path().to_path_buf(),
@@ -76,5 +76,5 @@ fn without_a_backend_the_flow_state_is_on_the_workspace_database() {
         FlowState::open(&config, "flow:a"),
         FlowState::Documents(_)
     ));
-    assert!(crate::flows::store::db_path(&config).is_file());
+    assert!(config.workspace_dir.join("storage/storage.db").is_file());
 }

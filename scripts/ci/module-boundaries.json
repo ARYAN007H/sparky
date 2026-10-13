@@ -7,6 +7,7 @@
     "tinychannels",
     "tinychannels-runtime",
     "tinyhosts",
+    "tinymemes",
     "tinybox-core",
     "tinybox-jail",
     "tinybox-docker",
@@ -35,6 +36,7 @@
     "tinymcp-",
     "tinychannels-",
     "tinyhosts-",
+    "tinymemes-",
     "tinybox-",
     "tinywallet-",
     "tinycomputer-",
@@ -92,6 +94,11 @@
       "name": "tinyhosts-bus",
       "manifest": "vendor/tinyhosts/crates/tinyhosts-bus/Cargo.toml",
       "owner": "https://github.com/tinyhumansai/tinyhosts"
+    },
+    {
+      "name": "tinymemes-bus",
+      "manifest": "vendor/tinymemes/crates/tinymemes-bus/Cargo.toml",
+      "owner": "https://github.com/tinyhumansai/tinymemes"
     },
     {
       "name": "tinybox-bus",

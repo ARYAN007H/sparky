@@ -19,6 +19,7 @@ copying its implementation into a host, or accepting weaker isolation.
 | tinymcp | none in normal/build host dependencies | tinymcp-bus | core MCP registry, supervisor, CLI stdio/HTTP server | Merged host adapters use the released v0.16.1 module (contract 1.23; configured-client receipt machine and client cache are `tinymcp_bus::client_lifecycle`, host keeps only the bus-calling driver; identifier validation, the registry-detail JSON shape and the not-connected explanation are `tinymcp_bus` helpers, so the host's `registry/helpers.rs` is gone; bus members the host never calls are kept for other hosts and documented in `tinymcp_bus::names`) for registry, supervisor, client and server protocol operations, with approved host callbacks kept in OpenHuman. The 62-member artifact and local focused, lifecycle, registry, native and build gates pass; frozen recorded tool declarations are restored independently of the current catalog |
 | tinychannels | tinychannels, tinychannels-runtime, tinychannels-module (test-only) | tinychannels-bus | core channels, TinyHumans host, CLI REPL | Contract 16 (operation 1.17) is pure; scoped providers, inbound/identity/outbound preparation, remote commands, runtime limits, typing and progressive delivery execute through confidential module calls. Host-owned policy, credentials, persistence and callbacks remain in OpenHuman. Both host implementation exceptions are removed; the 254-test focused suite and released-artifact runtime fixture pass |
 | tinyhosts | none | tinyhosts-bus | core hosting tools | Released Execute/Providers contract consumed through the module (v0.4.0: tool-to-operation mapping, argument shaping, outcome matching and summaries live in `tinyhosts-bus::tools`); workspace authorization, credentials and approval policy remain in OpenHuman |
+| tinymemes | none | tinymemes-bus | core `tinymemes` reply remix | Released Remix contract (v0.2.0) consumed through the module: reading, rating, rewrite, slang and meme indexes run in the module; the host serves the Complete, Evaluate, Search, LoadIndex, SaveIndex and Deliver callbacks (OpenHuman inference, managed Jev, web search, workspace index files) and keeps the A/B arm, flag and delivered-history policy |
 | tinywallet | none in normal/build host dependencies | tinywallet-bus | core wallet/web3/x402 | Complete: v0.20.0 contract 1.14 adds mnemonic word-count validation to module-owned mnemonic derivation, native transactions, Web3 quotes/execution, ERC-20 encoding, and x402 payment parsing/budgets/ledger. OpenHuman retains encrypted-key custody, authenticated transport, explicit approval, and lifecycle orchestration |
 | tinybox | tinybox-core (test-only) | tinybox-bus | core sandbox and security, desktop gateways | Merged host cutover uses TinyBox v0.1.24 for sandbox/resource lifecycle, collected and supervised execution, jailed and native shell execution, Docker control, local grants, file transfer and port forwarding. Host authorization and the security floor remain in OpenHuman |
 | tinycomputer | none | tinycomputer-bus | core voice, paste/focus and permission checks | Permission, focus, paste and Globe listener operations use the module; native thread and target rules remain covered |
@@ -331,6 +332,13 @@ leases on cancellation, sign-out and shutdown. Failed cleanup stays registered
 for retry. Microphone authorization remains a TinyComputer call; the host does
 not link TinyVoice or CPAL. The existing hotkey adapter remains module-backed.
 
+TinyVoice v0.2.0 (contract 1.9) owns wake-word sequencing (`SequenceUtterance`)
+and the pre-transcription recording gates (`GateRecording`); the always-on
+adapter calls them by contract constant and keeps only the transcribe and
+deliver callbacks. The stateful hotkey recording session is not on the bus yet,
+so `voice/server/pipeline.rs` and `runtime.rs` stay until a follow-up adds
+session open/advance/close methods (openhuman#7587).
+
 This cut removes the `tinyvoice` and `cpal` host exceptions, leaving nine
 implementation exceptions for Channels, MCP, Box and Wallet. The resolved
 voice-only normal/build graph falls from 323 packages to 318; this is a
@@ -387,6 +395,18 @@ fixture passes callback isolation, acknowledged stop, and final-send replay,
 alongside four lease validation and cancellation tests. Native providers, relay,
 remote-command host adapters and context helpers are still being migrated;
 both Channels implementation exceptions remain.
+
+Follow-up ([#7559](https://github.com/tinyhumansai/openhuman/issues/7559)): the
+host per-sender history cache now stores the bus `ChatMessage` and calls
+`tinychannels_bus::context::{clear_sender_history, compact_sender_history}`
+directly; `TranscriptMessage` is built only at the harness boundary in the
+message processor. `channels/context.rs` keeps just the host-only
+`ChannelRuntimeContext` and the module-call helpers.
+`spawn_scoped_typing_task` (`channels/runtime/dispatch/helpers.rs`) stays as a
+minimal host adapter: it needs `tokio::spawn`/cancellation, which the
+synchronous bus contract cannot hold, and it only drives the module's
+`begin_typing_refresh`/`end_typing_refresh`/`stop_typing` members. The
+`[components] channels = false` toggle is pinned in `tests/components_e2e.rs`.
 
 
 ## Full Channels host cutover validation

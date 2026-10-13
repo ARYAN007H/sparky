@@ -49,6 +49,8 @@ fn disabled_component_answers_component_disabled_over_json_rpc() {
                         ..Config::default()
                     };
                     config.components.mcp = false;
+                    config.components.voice = false;
+                    config.components.channels = false;
                     tinyhumans_boot::boot();
                     let _runtime = CoreBuilder::new(HostKind::Library)
                         .config(config)
@@ -83,7 +85,27 @@ fn disabled_component_answers_component_disabled_over_json_rpc() {
                         Some("mcp")
                     );
 
-                    // `modules.list` reports the same module as Disabled, and only it.
+                    // The voice namespace answers the same typed error.
+                    // (The `voice` family is only registered with the Cargo `voice` gate.)
+                    #[cfg(feature = "voice")]
+                    {
+                        let voice = rpc(&base, "openhuman.voice_status").await;
+                        assert_eq!(
+                            voice.pointer("/error/message").and_then(Value::as_str),
+                            Some("COMPONENT_DISABLED:voice"),
+                            "{voice}"
+                        );
+                    }
+
+                    // The channels namespace answers the same typed error.
+                    let channels = rpc(&base, "openhuman.channels_list").await;
+                    assert_eq!(
+                        channels.pointer("/error/message").and_then(Value::as_str),
+                        Some("COMPONENT_DISABLED:channels"),
+                        "{channels}"
+                    );
+
+                    // `modules.list` reports the same modules as Disabled, and only them.
                     let listed = rpc(&base, "openhuman.modules_list").await;
                     let modules = listed
                         .pointer("/result/modules")
@@ -98,6 +120,11 @@ fn disabled_component_answers_component_disabled_over_json_rpc() {
                             .map(str::to_owned)
                     };
                     assert_eq!(state_of("tinymcp").as_deref(), Some("disabled"), "{listed}");
+                    assert_eq!(
+                        state_of("tinychannels").as_deref(),
+                        Some("disabled"),
+                        "{listed}"
+                    );
                     assert_ne!(
                         state_of("tinydocs").as_deref(),
                         Some("disabled"),

@@ -1,7 +1,8 @@
 //! Paired devices on the `tinystoragedrivers` document port.
 //!
-//! Used instead of `devices/devices.db` when the host configured a storage
-//! backend ([`crate::storage`]); the functions in `store.rs` pick it per call.
+//! Kept in the storage backend ([`crate::storage`]); the functions in
+//! `store.rs` open it per call. The old `devices/devices.db` is read once by
+//! the importer ([`import_source`]).
 //! Devices live under the current call's storage scope (the acting agent,
 //! `local` on a single-user host).
 //!
@@ -18,7 +19,6 @@ use tinystoragedrivers::{CollectionSpec, Filter, IndexSpec, Precondition, Query,
 use crate::config::Config;
 use crate::security::devices::types::PairedDevice;
 use crate::storage::documents::{compare_and_swap, text, Repo};
-use crate::storage::local::{self, ImportPlan};
 use crate::storage::DocumentStoreExt;
 
 pub(super) const DEVICES: &str = "paired_devices";
@@ -30,7 +30,7 @@ pub(crate) fn import_source() -> crate::storage::import::Source {
         domain: "devices",
         db: "devices/devices.db",
         collections,
-        read_legacy: |scratch, _real| super::store::import::read(scratch),
+        read_legacy: |scratch, _real| super::store_import::read(scratch),
         rekey: |record, _config| record,
     }
 }
@@ -39,17 +39,13 @@ fn collections() -> Vec<CollectionSpec> {
     vec![CollectionSpec::new(DEVICES).index(IndexSpec::new("by_active", ["revoked", "created_at"]))]
 }
 
-/// The document store for this call: the host's configured backend or, by
-/// default, the document tables in `devices.db` (the legacy table imported on
-/// first open). `None` keeps the legacy table.
-pub(super) fn current(config: &Config) -> Result<Option<Docs>> {
-    let plan = ImportPlan {
-        domain: DOMAIN,
-        tables: super::store::import::TABLES,
-        read: &|| super::store::import::read(config),
-    };
-    let db_path = super::store::db_path(config);
-    Ok(local::repo(config, &db_path, DOMAIN, collections, &plan)?.map(Docs))
+/// The document store for this call: the storage backend, in the acting scope.
+pub(super) fn current(config: &Config) -> Result<Docs> {
+    Ok(Docs(Repo::current_for(
+        &config.workspace_dir,
+        DOMAIN,
+        collections,
+    )?))
 }
 
 fn to_device(stored: &Versioned<Value>) -> PairedDevice {

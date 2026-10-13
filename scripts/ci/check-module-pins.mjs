@@ -89,6 +89,7 @@ const PIN_MAP = {
   tinybox: { submodule: "vendor/tinybox" },
   tinychannels: { submodule: "vendor/tinychannels" },
   tinyhosts: { submodule: "vendor/tinyhosts" },
+  tinymemes: { submodule: "vendor/tinymemes" },
 };
 
 const failures = [];
