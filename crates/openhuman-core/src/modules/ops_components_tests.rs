@@ -57,6 +57,7 @@ async fn a_disabled_wallet_never_loads_the_tinywallet_module() {
     assert_eq!(state_of("tinywallet"), ModuleState::Available);
 }
 
+#[cfg(feature = "hosting")]
 #[tokio::test]
 async fn a_disabled_hosting_component_never_loads_the_tinyhosts_module() {
     let config = config_without("hosting");
