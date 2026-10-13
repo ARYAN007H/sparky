@@ -149,10 +149,9 @@ fn is_argument_rejection(error: &str) -> bool {
 /// The shell agent commands run under on this host, for a nudge that has to
 /// say which commands exist.
 fn host_shell_description() -> String {
-    let shell = if cfg!(windows) {
-        "cmd.exe"
-    } else {
-        crate::agent::platform_shell::bash_path().unwrap_or("sh")
+    let shell = match crate::agent::host_runtime::host_shell_flavor() {
+        tinybox_bus::ShellFlavor::Cmd => "cmd.exe",
+        tinybox_bus::ShellFlavor::Posix => "bash or sh",
     };
     format!("{} (`{shell}`)", std::env::consts::OS)
 }
