@@ -37,10 +37,12 @@ core/runtime/subscribers.rs
 inference/provider/factory.rs
 mcp/server/resources.rs
 mcp/server/tools/mod.rs
-modules/host.rs
-modules/host_tests.rs
+modules/mod.rs
 modules/ops_components_tests.rs
 modules/registry_tests.rs
+modules/runtime.rs
+modules/runtime_tests.rs
+modules/storage_grant_tinywallet_tests.rs
 platform/socket/event_handlers.rs
 profiles/surface_tests.rs
 agent/session_host/transcript_compat_tests.rs
