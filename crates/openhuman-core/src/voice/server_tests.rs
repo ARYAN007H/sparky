@@ -24,9 +24,15 @@ async fn server_status_initial() {
 #[test]
 fn server_state_follows_the_module_session_phase() {
     use crate::modules::voice::SessionPhase;
-    assert_eq!(ServerState::from(SessionPhase::Stopped), ServerState::Stopped);
+    assert_eq!(
+        ServerState::from(SessionPhase::Stopped),
+        ServerState::Stopped
+    );
     assert_eq!(ServerState::from(SessionPhase::Idle), ServerState::Idle);
-    assert_eq!(ServerState::from(SessionPhase::Recording), ServerState::Recording);
+    assert_eq!(
+        ServerState::from(SessionPhase::Recording),
+        ServerState::Recording
+    );
     assert_eq!(
         ServerState::from(SessionPhase::Transcribing),
         ServerState::Transcribing

@@ -32,7 +32,11 @@ impl Recorder {
     /// Report `input`; `None` when the module could not be reached or the
     /// session is gone. A failure is logged, never fatal: a stale pipeline
     /// finishing after the server stopped lands here by design.
-    pub(super) async fn advance(&self, config: &Config, input: SessionInput) -> Option<SessionAdvance> {
+    pub(super) async fn advance(
+        &self,
+        config: &Config,
+        input: SessionInput,
+    ) -> Option<SessionAdvance> {
         let mut state = self.state.lock().await;
         match self.session.advance(config, input).await {
             Ok(reply) => {
