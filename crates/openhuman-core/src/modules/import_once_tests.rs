@@ -48,7 +48,7 @@ async fn an_unsettled_outcome_and_a_cancelled_import_are_retried() {
     })
     .await;
     let cancelled = tokio::time::timeout(
-        std::time::Duration::from_millis(10),
+        std::time::Duration::from_millis(500),
         import_once("test-retry", MODULE_FOR_TEST, &dir, async {
             count();
             std::future::pending::<anyhow::Result<Done>>().await
