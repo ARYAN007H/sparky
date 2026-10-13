@@ -33,9 +33,9 @@
 //! [`SubagentEntry::Skills`]: tinyagents_definition::SubagentEntry::Skills
 
 use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
-use tinyagents_definition::{SubagentEntry};
 use crate::agent::prompts::ConnectedIntegration;
 use crate::integrations::composio::ComposioActionTool;
+use tinyagents_definition::SubagentEntry;
 
 // SpawnWorkerThreadTool import kept commented while the worker-thread spawn is
 // temporarily disabled (see tinyhumansai/openhuman#1624).

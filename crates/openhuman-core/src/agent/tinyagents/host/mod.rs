@@ -52,8 +52,8 @@ pub use model_resolver::OpenHumanModelResolver;
 pub use progress_sink::OpenHumanProgressSink;
 pub(crate) use run_context::direct_subagent_child;
 pub use run_context::{
-    decide_dispatch, DispatchDecision, DispatchInputs, LastTurnUsage, OpenHumanRunContext, OpenHumanRunExt,
-    SubagentUsageEntry, TurnDispatchState,
+    decide_dispatch, DispatchDecision, DispatchInputs, LastTurnUsage, OpenHumanRunContext,
+    OpenHumanRunExt, SubagentUsageEntry, TurnDispatchState,
 };
 pub(crate) use security_gate::with_untrusted_input_turn;
 pub use security_gate::OpenHumanSecurityGate;

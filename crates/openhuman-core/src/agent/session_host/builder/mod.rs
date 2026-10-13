@@ -25,9 +25,9 @@ pub use host_tools::{HostTools, HostTurnTools, TurnContext};
 #[cfg(test)]
 mod builder_tests;
 
-use crate::agent::harness::host_definition::{AgentDefinition};
-use tinyagents_definition::{ToolScope};
+use crate::agent::harness::host_definition::AgentDefinition;
 use std::sync::Arc;
+use tinyagents_definition::ToolScope;
 use tinytools::ToolPolicySession;
 use tinytools::{Tool, ToolSpec};
 
@@ -274,7 +274,8 @@ pub(super) fn should_synthesize_delegation_tools(def: &AgentDefinition) -> bool 
 /// the name extends at an `_` boundary. Empty when the registry is not up or
 /// the id resolves to nothing, which leaves the schema untouched.
 fn allowed_subagent_ids_for(agent_id: &str) -> Vec<String> {
-    let Some(registry) = crate::agent::harness::host_definition::AgentDefinitionRegistry::current() else {
+    let Some(registry) = crate::agent::harness::host_definition::AgentDefinitionRegistry::current()
+    else {
         return Vec::new();
     };
     let definition = registry.get(agent_id).or_else(|| {

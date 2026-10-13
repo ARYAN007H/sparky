@@ -2318,8 +2318,9 @@ async fn multi_hop_delegation_chain_inner() {
 
 mod streaming_support {
     use async_trait::async_trait;
-    use openhuman_core::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
-use tinyagents_definition::{ToolScope as DefinitionToolScope};
+    use openhuman_core::agent::harness::host_definition::{
+        AgentDefinition, AgentDefinitionRegistry,
+    };
     use openhuman_core::agent::OpenHumanSessionHost;
     use openhuman_core::config::{AgentConfig, ContextConfig};
     use serde_json::json;
@@ -2328,6 +2329,7 @@ use tinyagents_definition::{ToolScope as DefinitionToolScope};
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex};
     use tempfile::TempDir;
+    use tinyagents_definition::ToolScope as DefinitionToolScope;
     use tinyinference_llm::message::{AssistantMessage, ContentBlock};
     use tinyinference_llm::model::{
         ChatModel, ModelProfile, ModelRequest, ModelResponse, ModelStream, ModelStreamItem,

@@ -4,7 +4,6 @@ use super::dispatcher::{resolve_dispatcher_kind, DispatcherKind};
 use super::host_tools::derive_turn_workspace_descriptor;
 use super::should_synthesize_delegation_tools;
 use crate::agent::harness::host_definition::{AgentDefinitionRegistry, NO_TOOLS_SENTINEL};
-use tinyagents_definition::{PromptSource, ToolScope};
 use crate::agent::host_runtime;
 use crate::agent::prompts::SystemPromptBuilder;
 use crate::agent::session_host::types::OpenHumanSessionHost;
@@ -13,6 +12,7 @@ use crate::security::SecurityPolicy;
 use crate::tools;
 use anyhow::Result;
 use std::sync::Arc;
+use tinyagents_definition::{PromptSource, ToolScope};
 use tinytools::Tool;
 use tinytools_agent::dialect::{
     CodeDialect, NativeDialect, PFormatDialect, ToolDialect, XmlDialect,

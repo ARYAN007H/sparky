@@ -7,7 +7,6 @@
 //! * [`build_visible_tool_set`] — union of named tools + extra (delegation) tools.
 
 use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
-use tinyagents_definition::{ToolScope};
 use crate::agent::prompts::ConnectedIntegration;
 use crate::config::Config;
 use crate::integrations::composio::{
@@ -17,6 +16,7 @@ use crate::integrations::composio::{
 use crate::tools::orchestrator_tools;
 use std::collections::HashSet;
 use std::time::Duration;
+use tinyagents_definition::ToolScope;
 use tinytools::Tool;
 
 /// Per-turn scoping fields derived from the active agent definition.

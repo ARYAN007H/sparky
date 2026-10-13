@@ -500,7 +500,9 @@ pub async fn build_with_profile_capabilities(
     let runtime = builder.build().await?;
     // Whoever initialised first won; refuse to serve users from a registry
     // that holds anything but the built-ins.
-    verify_builtin_definitions(crate::agent::harness::host_definition::AgentDefinitionRegistry::global())?;
+    verify_builtin_definitions(
+        crate::agent::harness::host_definition::AgentDefinitionRegistry::global(),
+    )?;
     // A relayed platform message (`channel_relay_inbound`) runs through the
     // channel dispatch pipeline, which asks the native bus for an
     // `agent.run_turn`. The `Agent` family stays off in SaaS (no agent RPCs

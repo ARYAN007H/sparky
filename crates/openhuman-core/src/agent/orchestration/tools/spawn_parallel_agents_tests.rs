@@ -1,8 +1,7 @@
 use super::*;
-use crate::agent::harness::host_definition::AgentDefinitionRegistry;
-use crate::agent::harness::host_definition::{AgentDefinition};
-use tinyagents_definition::{AgentTier, DefinitionSource, ModelSpec, PromptSource, SandboxMode, ToolScope};
 use crate::agent::harness::fork_context::{with_parent_context, ParentExecutionContext};
+use crate::agent::harness::host_definition::AgentDefinition;
+use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::orchestration::spawn_parallel_graph::{
     prepare_spawn_parallel_tasks_from_defs, ParallelTaskRejectionKind, SpawnParallelTaskPreflight,
     WorkerDispatchMode,
@@ -18,6 +17,9 @@ use std::collections::HashMap;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
+};
+use tinyagents_definition::{
+    AgentTier, DefinitionSource, ModelSpec, PromptSource, SandboxMode, ToolScope,
 };
 use tinyagents_harness::tool::ToolDispatch;
 use tinyinference_llm::message::{AssistantMessage, Message};

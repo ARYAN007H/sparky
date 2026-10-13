@@ -30,9 +30,11 @@
 //! collision.
 
 use crate::agent::harness::host_definition::{AgentDefinition, PromptBuilder};
-use tinyagents_definition::{validate_tier_transition, AgentTier, DefinitionSource, PromptSource, SubagentEntry};
 use anyhow::{Context, Result};
 use std::collections::HashMap;
+use tinyagents_definition::{
+    validate_tier_transition, AgentTier, DefinitionSource, PromptSource, SubagentEntry,
+};
 
 /// A single built-in agent: its id plus the metadata TOML and a
 /// function-driven prompt builder.

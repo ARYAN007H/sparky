@@ -6,8 +6,8 @@
 
 use super::types::SubagentRunError;
 use crate::agent::harness::host_definition::AgentDefinition;
-use tinyagents_definition::{PromptSource, ToolScope};
 use crate::agent::prompts::PromptContext;
+use tinyagents_definition::{PromptSource, ToolScope};
 use tinytools::Tool;
 
 // ── Prompt dialect selection ────────────────────────────────────────────
@@ -76,7 +76,9 @@ pub(super) fn is_subagent_spawn_tool(name: &str) -> bool {
     // which let wildcard-scoped children inherit the orchestrator's spawn
     // surface. Resolve the override names via the registry so the strip
     // stays in lockstep with `collect_orchestrator_tools`'s naming.
-    if let Some(registry) = crate::agent::harness::host_definition::AgentDefinitionRegistry::current() {
+    if let Some(registry) =
+        crate::agent::harness::host_definition::AgentDefinitionRegistry::current()
+    {
         return registry
             .list()
             .iter()

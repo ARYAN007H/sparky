@@ -24,9 +24,7 @@ use tinyinference_llm::usage::Usage;
 #[cfg(test)]
 use crate::agent::progress::AgentProgress;
 
-pub(crate) use bridge_types::{
-    ProviderUsageCarry, SubagentScope, ToolFailureMap, ToolNameMap,
-};
+pub(crate) use bridge_types::{ProviderUsageCarry, SubagentScope, ToolFailureMap, ToolNameMap};
 pub(crate) use event_bridge::OpenhumanEventBridge;
 pub(crate) use event_projection::surface_cache_layout_events;
 pub(crate) use graph_tracing::GraphTracingSink;

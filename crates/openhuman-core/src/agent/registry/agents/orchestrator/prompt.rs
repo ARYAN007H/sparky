@@ -10,7 +10,6 @@
 //! delegate to any more. That prose lives here (not in the shared prompts
 //! module) so nobody has to branch on `agent_id` in a shared section impl.
 
-use tinyagents_definition::SubagentEntry;
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::prompts::{
     render_datetime, render_identity, render_tools, render_workspace, ConnectedIntegration,
@@ -20,6 +19,7 @@ use crate::tools::orchestrator_tools::sanitise_slug;
 use crate::tools::toolpacks;
 use anyhow::Result;
 use std::fmt::Write;
+use tinyagents_definition::SubagentEntry;
 use tinyskills::Skill as Workflow;
 
 const ARCHETYPE: &str = include_str!("prompt.md");

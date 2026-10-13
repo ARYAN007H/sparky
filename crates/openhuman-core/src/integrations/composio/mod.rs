@@ -87,4 +87,3 @@ pub use types::{
     ComposioToolsResponse, ComposioTriggerEvent, ComposioTriggerHistoryEntry,
     ComposioTriggerHistoryResult, ComposioTriggerMetadata,
 };
-

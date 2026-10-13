@@ -10,9 +10,8 @@ use std::collections::HashSet;
 use std::time::Instant;
 
 use crate::agent::harness::artifact_offload::{new_artifact_offload, offload_oversized_result};
-use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
-use tinyagents_definition::{validate_tier_transition, AgentTier, IterationPolicy, PromptSource, SandboxMode as AgentSandboxMode};
 use crate::agent::harness::fork_context::ParentExecutionContext;
+use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::agent::prompts::{
     render_subagent_system_prompt_with_format, PromptContext, SubagentRenderOptions,
 };
@@ -25,6 +24,10 @@ use crate::agent::subagent_host::types::{
 };
 use crate::agent::tinyagents::budget::MAX_SPAWN_DEPTH;
 use crate::inference::provider::AGENT_TURN_MAX_OUTPUT_TOKENS;
+use tinyagents_definition::{
+    validate_tier_transition, AgentTier, IterationPolicy, PromptSource,
+    SandboxMode as AgentSandboxMode,
+};
 use tinyagents_harness::artifacts::{
     effective_offload_threshold, extract_artifact_paths, note_artifact_handoff,
     DEFAULT_OFFLOAD_THRESHOLD_BYTES, HANDOFF_STAGE_RECORDED,

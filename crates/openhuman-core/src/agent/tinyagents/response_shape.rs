@@ -161,7 +161,9 @@ pub async fn with_response_shape<F: std::future::Future>(
     let observer = scope.shape.observer.clone();
     let run = RESPONSE_SHAPE.scope(scope, Box::pin(fut));
     match observer {
-        Some(observer) => tinyagents_harness::observability::turn_observer::with_observer(observer, run).await,
+        Some(observer) => {
+            tinyagents_harness::observability::turn_observer::with_observer(observer, run).await
+        }
         None => run.await,
     }
 }

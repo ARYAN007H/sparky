@@ -2,8 +2,11 @@
 
 use serde_json::Value;
 
-use crate::agent::harness::host_definition::{AgentDefinition};
-use tinyagents_definition::{AgentTier, DefinitionSource, IterationPolicy, ModelSpec, PromptSource, SandboxMode, SubagentEntry, ToolScope};
+use crate::agent::harness::host_definition::AgentDefinition;
+use tinyagents_definition::{
+    AgentTier, DefinitionSource, IterationPolicy, ModelSpec, PromptSource, SandboxMode,
+    SubagentEntry, ToolScope,
+};
 
 use super::types::{AgentRegistryEntry, AgentRegistrySource, AgentSubagentPolicy};
 

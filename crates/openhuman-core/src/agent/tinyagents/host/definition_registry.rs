@@ -62,9 +62,9 @@ use crate::agent::harness::host_definition::NO_TOOLS_SENTINEL;
 use crate::agent::harness::host_definition::{
     AgentDefinition as HostAgentDefinition, AgentDefinitionRegistry,
 };
-use tinyagents_definition::{AgentTier, ToolScope};
 use crate::agent::registry::{definition_from_registry_entry, find_custom_in_config};
 use crate::config::Config;
+use tinyagents_definition::{AgentTier, ToolScope};
 
 // ── Registry handle ───────────────────────────────────────────────────────────
 
@@ -420,10 +420,8 @@ impl OpenHumanDefinitionRegistry {
                 out.push(id);
                 continue;
             };
-            match tinyagents_definition::validate_tier_transition(
-                def.agent_tier,
-                child.agent_tier,
-            ) {
+            match tinyagents_definition::validate_tier_transition(def.agent_tier, child.agent_tier)
+            {
                 Ok(()) => out.push(id),
                 Err(reason) => {
                     tracing::warn!(

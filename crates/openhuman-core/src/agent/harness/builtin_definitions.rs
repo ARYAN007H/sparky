@@ -47,7 +47,9 @@ pub fn all() -> Vec<AgentDefinition> {
 /// delegation tools, so the parent must explicitly allow those test children.
 #[cfg(test)]
 pub(crate) fn test_main_def() -> AgentDefinition {
-    use tinyagents_definition::{AgentTier, ModelSpec, PromptSource, SandboxMode, SubagentEntry, ToolScope};
+    use tinyagents_definition::{
+        AgentTier, ModelSpec, PromptSource, SandboxMode, SubagentEntry, ToolScope,
+    };
     AgentDefinition {
         id: "main".into(),
         when_to_use: "test-only default parent agent".into(),

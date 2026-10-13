@@ -137,7 +137,9 @@ fn known_agents() -> HashMap<String, String> {
             .iter()
             .map(|def| def.id.clone())
             .collect();
-    if let Some(current) = crate::agent::harness::host_definition::AgentDefinitionRegistry::current() {
+    if let Some(current) =
+        crate::agent::harness::host_definition::AgentDefinitionRegistry::current()
+    {
         ids.extend(current.list().iter().map(|def| def.id.clone()));
     }
     ids.sort();

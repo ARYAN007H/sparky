@@ -65,7 +65,9 @@ pub(crate) async fn build_root_parent(
     // makes this idempotent: a no-op when the registry is already loaded.
     if crate::agent::harness::host_definition::AgentDefinitionRegistry::global().is_none() {
         if let Err(err) =
-            crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global(&config.workspace_dir)
+            crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global(
+                &config.workspace_dir,
+            )
         {
             // A concurrent init may have won the race and populated the registry,
             // in which case the `AlreadyInitialized`-style error is benign. But if

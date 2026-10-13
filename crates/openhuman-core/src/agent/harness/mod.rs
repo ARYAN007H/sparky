@@ -22,9 +22,9 @@
 
 pub mod artifact_offload;
 pub(crate) mod builtin_definitions;
-pub mod host_definition;
 pub mod fork_context;
 pub(crate) mod graph;
+pub mod host_definition;
 pub(crate) mod tool_result_artifacts;
 
 // NOTE: deliberately no flat re-export here. `artifact_offload::ArtifactKind`

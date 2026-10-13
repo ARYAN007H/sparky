@@ -8,10 +8,10 @@
 use std::path::Path;
 
 use openhuman_core::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
-use tinyagents_definition::{SubagentEntry};
 use openhuman_core::core::all::DomainGroup;
 use openhuman_core::core::runtime::{ContextOverlay, DomainSet};
 use openhuman_core::tools::toolpacks::{GroupMode, ToolGroups};
+use tinyagents_definition::SubagentEntry;
 
 use super::{AgentError, AgentInner, AgentLayout, AgentSpec};
 use crate::harness::Access;
@@ -246,10 +246,8 @@ pub(crate) fn instantiate(runtime: &Runtime, spec: AgentSpec) -> Result<AgentInn
     // delegates only to the sub-agents its host declares, never to the
     // inherited built-in roster (which would otherwise come back as
     // `delegate_*` tools the scope never listed).
-    if matches!(
-        definition.tools,
-        tinyagents_definition::ToolScope::Named(_)
-    ) && !definition.tools.names_a_spawn_tool()
+    if matches!(definition.tools, tinyagents_definition::ToolScope::Named(_))
+        && !definition.tools.names_a_spawn_tool()
         && !definition.subagents.is_empty()
     {
         log::debug!(
@@ -415,9 +413,7 @@ fn own_catalogue(
 /// Adds `tool_search` to a named belt that lacks it. A wildcard belt already
 /// has discovery.
 #[cfg(feature = "mcp")]
-fn opt_named_belt_into_discovery(
-    scope: &mut tinyagents_definition::ToolScope,
-) {
+fn opt_named_belt_into_discovery(scope: &mut tinyagents_definition::ToolScope) {
     use tinyagents_definition::ToolScope;
     const TOOL_SEARCH: &str = "tool_search";
     if let ToolScope::Named(names) = scope {
