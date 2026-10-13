@@ -24,10 +24,10 @@
 //! family must convert to the facade+stub shape (see `voice/`).
 
 pub mod agents;
+pub mod builder_host;
 pub mod builder_tools;
 pub mod bus;
 pub mod catalogue;
-pub mod discovery_tools;
 mod draft_store;
 pub mod memory_tools;
 pub mod node_contracts;

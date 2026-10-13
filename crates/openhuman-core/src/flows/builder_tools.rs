@@ -48,5 +48,9 @@ pub use tool_contract::{GetToolContractTool, GetToolOutputSampleTool};
 use connection_reads::flow_connection_to_json;
 
 #[cfg(test)]
+#[path = "builder_tools_support.rs"]
+pub(crate) mod tests_support;
+
+#[cfg(test)]
 #[path = "builder_tools_tests.rs"]
 mod tests;
