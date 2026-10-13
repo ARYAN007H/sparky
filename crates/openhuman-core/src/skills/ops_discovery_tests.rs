@@ -271,3 +271,39 @@ fn workflow_metadata_is_reused_until_invalidated() {
         "a skill change refreshes the snapshot"
     );
 }
+
+#[tokio::test]
+async fn skills_component_off_yields_no_catalogue_and_skips_bundled_install() {
+    use crate::core::runtime::{ComponentSet, ContextOverlay, CoreContext, DomainSet};
+
+    let ws_dir = tempfile::tempdir().unwrap();
+    write(
+        &ws_dir.path().join("skills").join("ws-only").join("SKILL.md"),
+        "---\nname: ws-only\ndescription: workspace skill\n---\n",
+    );
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = ws_dir.path().to_path_buf();
+    let mut off = ComponentSet::all();
+    off.skills = false;
+    let base = CoreContext::for_test(DomainSet::full(), None);
+    let ctx = base.derive_with(
+        ContextOverlay::new(config, DomainSet::full(), Default::default()).with_components(off),
+    );
+
+    let ws = ws_dir.path().to_path_buf();
+    let (names, installed) = CoreContext::scope(ctx, async move {
+        crate::skills::install_bundled_skills(&ws);
+        (
+            load_workflow_metadata(&ws).len(),
+            crate::skills::bundled::builtin_root(&ws).exists(),
+        )
+    })
+    .await;
+    assert_eq!(names, 0, "disabled skills expose no catalogue");
+    assert!(!installed, "disabled skills materialize no bundled skills");
+}
+
+#[test]
+fn skills_component_enabled_without_context_is_on() {
+    assert!(crate::skills::skills_component_enabled());
+}
