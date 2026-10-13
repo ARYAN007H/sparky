@@ -45,8 +45,6 @@ pub(crate) struct NativeShellRun {
     /// Native confinement; `None` is ordinary local execution.
     #[cfg(feature = "modules")]
     pub(crate) jail: Option<contract::NativeJailConfig>,
-    #[cfg(not(feature = "modules"))]
-    pub(crate) jail: Option<()>,
 }
 
 impl NativeShellRun {
@@ -68,7 +66,20 @@ impl NativeShellRun {
             python_utf8: false,
             hide_window: false,
             isolate_network: false,
+            #[cfg(feature = "modules")]
             jail: None,
+        }
+    }
+
+    #[cfg(test)]
+    fn is_jailed(&self) -> bool {
+        #[cfg(feature = "modules")]
+        {
+            self.jail.is_some()
+        }
+        #[cfg(not(feature = "modules"))]
+        {
+            false
         }
     }
 }
@@ -85,7 +96,7 @@ pub(crate) static USE_FIXTURE: std::sync::atomic::AtomicBool =
 /// A worker owns cancellation and resource cleanup if the caller drops its wait.
 pub(crate) async fn run(config: &Config, run: NativeShellRun) -> anyhow::Result<SandboxExecResult> {
     #[cfg(test)]
-    if run.jail.is_none() && USE_FIXTURE.load(std::sync::atomic::Ordering::SeqCst) {
+    if !run.is_jailed() && USE_FIXTURE.load(std::sync::atomic::Ordering::SeqCst) {
         let _ = config;
         return fixture::run(run).await;
     }

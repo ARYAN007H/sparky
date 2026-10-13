@@ -1,0 +1,62 @@
+//! Test-only stand-in for the module's native shell: unit tests do not load a
+//! native TinyBox artifact, so unjailed runs execute here. The module's own
+//! behaviour (shell selection, environment, scratch) is covered by its crate and
+//! by the released-artifact test; this fixture only has to run a command.
+
+use std::process::Stdio;
+
+use super::{NativeShellRun, SandboxExecResult};
+
+/// Variables the module's safe environment snapshot carries.
+const SNAPSHOT: &[&str] = &[
+    "PATH", "HOME", "TERM", "LANG", "LC_ALL", "LC_CTYPE", "USER", "SHELL", "TMPDIR",
+];
+
+pub(crate) async fn run(run: NativeShellRun) -> anyhow::Result<SandboxExecResult> {
+    let mut command = tokio::process::Command::new(if cfg!(windows) { "cmd" } else { "sh" });
+    if cfg!(windows) {
+        command.arg("/C").arg(&run.command);
+    } else if run.preserve_pipeline_status {
+        command.arg("-c").arg(&run.command);
+    } else {
+        command
+            .arg("-c")
+            .arg(format!("set -o pipefail 2>/dev/null\n{}", run.command));
+    }
+    command.env_clear();
+    for name in SNAPSHOT {
+        if let Some(value) = std::env::var_os(name) {
+            command.env(name, value);
+        }
+    }
+    if cfg!(windows) {
+        for name in ["SystemRoot", "WINDIR", "COMSPEC", "PATHEXT", "TEMP", "TMP"] {
+            if let Some(value) = std::env::var_os(name) {
+                command.env(name, value);
+            }
+        }
+    }
+    command.envs(&run.env);
+    command
+        .current_dir(&run.cwd)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+    crate::tools::timeout::own_process_group(command.as_std_mut());
+    match crate::tools::timeout::output_or_kill(&mut command, run.timeout).await {
+        Ok(Ok(output)) => Ok(SandboxExecResult {
+            exit_code: output.status.code().unwrap_or(-1),
+            stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+            timed_out: false,
+        }),
+        Ok(Err(error)) => anyhow::bail!("Failed to execute command: {error}"),
+        Err(_) => Ok(SandboxExecResult {
+            exit_code: -1,
+            stdout: String::new(),
+            stderr: format!("Command timed out after {}s", run.timeout.as_secs()),
+            timed_out: true,
+        }),
+    }
+}
