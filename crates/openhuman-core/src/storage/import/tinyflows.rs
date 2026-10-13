@@ -272,7 +272,6 @@ pub fn run_with(_backend: &Arc<dyn StorageBackend>, config: &Config) -> Vec<Repo
     Vec::new()
 }
 
-#[cfg(feature = "flows")]
 pub(super) fn finish(domain: &'static str, outcome: Result<Outcome>) -> Report {
     match &outcome {
         Ok(Outcome::Imported { found, written }) => tracing::info!(
