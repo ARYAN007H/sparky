@@ -1,4 +1,5 @@
 use super::*;
+use tinyagents_harness::context::RunConfig;
 use crate::agent::harness::definition::{
     DefinitionSource, ModelSpec, PromptSource, SandboxMode, ToolScope,
 };
