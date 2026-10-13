@@ -35,7 +35,8 @@ use super::*;
 /// listing them would request grants that are never checked.
 pub async fn compute_approval_manifest(config: &Config, graph: &WorkflowGraph) -> Vec<Value> {
     use crate::flows::tinyflows::caps::classify_composio_action_for_tier;
-    use crate::security::{CommandClass, GateDecision, SecurityPolicy};
+    use crate::security::{GateDecision, SecurityPolicy};
+    use tinybox_bus::CommandClass;
     use tinyflows_catalog::approval_manifest::{
         assemble_manifest, manifest_candidates, ManifestCandidate, ManifestClass,
     };
