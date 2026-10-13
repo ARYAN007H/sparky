@@ -2,6 +2,7 @@ use super::*;
 use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
 use std::fs;
 use std::io::Write;
+use tinyagents_definition::PromptSource;
 
 fn named(id: &str, when: &str) -> AgentDefinition {
     let mut definition = AgentDefinitionRegistry::builtins_only()
