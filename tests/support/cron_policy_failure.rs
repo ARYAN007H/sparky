@@ -6,8 +6,8 @@ use openhuman_core::cron::policy::{self, JobPolicy};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 use tinystoragedrivers_core::{
-    Capabilities, CollectionSpec, DocumentStore, Filter, Page, Precondition, Query, ScopedStorage,
-    Sort, StorageBackend, StorageError, Version, Versioned,
+    Capabilities, CollectionSpec, DocumentStore, Filter, Page, Precondition, Query, ReadCheck,
+    ScopedStorage, Sort, StorageBackend, StorageError, Version, Versioned, WriteOp, WriteResult,
 };
 use tinytools::Tool;
 
@@ -145,6 +145,44 @@ impl DocumentStore for Documents {
     }
     async fn drop_collection(&self, collection: &str) -> StoreResult<()> {
         self.inner.drop_collection(collection).await
+    }
+    // The cron store applies its multi-document writes atomically, so the
+    // wrapper forwards batches (and applies the same faults to them).
+    async fn atomic_batch(&self, ops: Vec<WriteOp>) -> StoreResult<Vec<WriteResult>> {
+        self.check_batch(&ops)?;
+        self.inner.atomic_batch(ops).await
+    }
+    async fn atomic_batch_checked(
+        &self,
+        checks: Vec<ReadCheck>,
+        ops: Vec<WriteOp>,
+    ) -> StoreResult<Vec<WriteResult>> {
+        self.check_batch(&ops)?;
+        self.inner.atomic_batch_checked(checks, ops).await
+    }
+}
+
+impl Documents {
+    /// Counts a batch's writes while the read fault is armed (nothing may
+    /// write then) and fails it as its single writes would fail.
+    fn check_batch(&self, ops: &[WriteOp]) -> StoreResult<()> {
+        if self.faults.read.load(Ordering::SeqCst) {
+            self.faults.writes.fetch_add(ops.len(), Ordering::SeqCst);
+        }
+        for op in ops {
+            let fails = match op {
+                WriteOp::Put { collection, .. } => {
+                    collection == JOBS && self.faults.write.load(Ordering::SeqCst)
+                }
+                WriteOp::Delete { collection, .. } => {
+                    collection == JOBS && self.faults.delete.load(Ordering::SeqCst)
+                }
+            };
+            if fails {
+                return Err(StorageError::backend(BACKEND_DETAIL));
+            }
+        }
+        Ok(())
     }
 }
 
