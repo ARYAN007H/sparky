@@ -73,6 +73,9 @@ tinybus = { path = "vendor/tinybus/crates/tinybus" }
 # tinyflows takes the storage crates from the same source as tinyagents.
 tinystoragedrivers-core = { path = "vendor/tinyagents/vendor/tinystoragedrivers/crates/tinystoragedrivers-core" }
 tinystoragedrivers-sqlite = { path = "vendor/tinyagents/vendor/tinystoragedrivers/crates/tinystoragedrivers-sqlite" }
+# tinyinference-providers (the OAuth pending session) names the secrets port by
+# git tag too, and the host hands it a `DocumentSecrets` from the vendored copy.
+tinystoragedrivers-secrets = { path = "vendor/tinyagents/vendor/tinystoragedrivers/crates/tinystoragedrivers-secrets" }
 
 [patch."https://github.com/tinyhumansai/tinyinference"]
 # tinymemes depends on the Jev client by git; resolve it to the vendored copy.

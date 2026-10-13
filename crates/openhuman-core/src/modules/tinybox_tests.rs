@@ -308,7 +308,7 @@ async fn pinned_loader_serves_the_published_tinybox_release() {
 
     crate::modules::ops::ensure_loaded(&config, MODULE_ID)
         .await
-        .expect("the OpenHuman release registry and TinyBus loader admit v0.1.26");
+        .expect("the OpenHuman release registry and TinyBus loader admit v0.1.27");
     let capabilities = super::capabilities(&config)
         .await
         .expect("the loaded release serves TinyBus capabilities");
@@ -343,19 +343,19 @@ async fn pinned_loader_serves_the_published_tinybox_release() {
 }
 
 #[tokio::test]
-#[ignore = "requires the downloaded, checksum-verified TinyBox v0.1.26 archive"]
+#[ignore = "requires the downloaded, checksum-verified TinyBox v0.1.27 archive"]
 async fn pinned_loader_serves_resolve_local_grants_from_tinybox_v0124() {
     let _environment_lock = crate::config::TEST_ENV_LOCK.lock().await;
     let archive = std::env::var_os("TINYBOX_RELEASE_ARTIFACT")
         .map(std::path::PathBuf::from)
-        .expect("set TINYBOX_RELEASE_ARTIFACT to the verified v0.1.26 archive");
+        .expect("set TINYBOX_RELEASE_ARTIFACT to the verified v0.1.27 archive");
     assert!(
         archive.is_file(),
         "missing verified release archive: {archive:?}"
     );
 
     let record = crate::modules::registry::find(MODULE_ID).expect("TinyBox registry record");
-    assert_eq!(record.version, "0.1.26");
+    assert_eq!(record.version, "0.1.27");
     assert_eq!(contract::CONTRACT_VERSION, (1, 17));
     let asset = tinybus::module::platform::host_candidates()
         .iter()
@@ -413,7 +413,7 @@ async fn pinned_loader_serves_resolve_local_grants_from_tinybox_v0124() {
     config.modules.install_dir = Some(install.path().display().to_string());
     crate::modules::ops::ensure_loaded(&config, MODULE_ID)
         .await
-        .expect("the TinyBus loader admits the published v0.1.26 artifact");
+        .expect("the TinyBus loader admits the published v0.1.27 artifact");
 
     let home = tempfile::tempdir().expect("temporary operator home");
     let allowed = home.path().join("workspace");
