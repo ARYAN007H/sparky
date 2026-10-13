@@ -539,7 +539,8 @@ fn build_subagent_context_mw(
             // TokenJuice content-aware compaction gates on the same master
             // `[context].compaction_enabled` the chat path reads
             // (`ContextManager::compaction_enabled`).
-            mw.tokenjuice_compaction_enabled = ctx.compaction_enabled;
+            mw.tokenjuice_compaction_enabled =
+                ctx.compaction_enabled && crate::inference::tokenjuice::enabled(config);
             mw.tool_result_budget_bytes = ctx.tool_result_budget_bytes;
             // Microcompact keep-recent is `0` (disabled) unless microcompact is on.
             mw.microcompact_keep_recent = if ctx.microcompact_enabled {
