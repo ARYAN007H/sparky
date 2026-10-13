@@ -472,3 +472,7 @@ adapter that correlates harness history into its `ToolResult`. The host keeps
 approval classification (`SecurityPolicy`), Composio schema lookup, and the
 store, checkpoint, bus and cron effects. TinyFlows is a plain library gitlink,
 so there is no registry record or `module-boundaries.json` entry.
+
+### TinyFlows builder gate stack (#7551)
+
+`flows/ops/builder_gates.rs` no longer orders the author-time gates. `tinyflows::gates::builder_failures` runs compatibility, saved-workflow, portable authoring and binding gates, then the host stages, then the mock-run argument preflight. The host implements `BuilderGateHost`: `ToolPolicy` (workspace-relative upload paths), `AgentReferences`, `Connections` and `ToolContracts`, plus the saved-workflow lookup. `validate_binding_resolvability` and `validate_required_arg_resolvability` are deleted. Provider connectivity remains an advisory proposal field, not a stage.

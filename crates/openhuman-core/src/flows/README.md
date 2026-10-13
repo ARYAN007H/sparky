@@ -51,7 +51,7 @@ it into a `WorkflowGraph`, and rejects anything `tinyflows::validate::validate`
 refuses. Engine-compatibility checks map topology problems onto
 `FlowValidationError`.
 
-Agent-authored graphs pass one more stack, `run_builder_gates` in
+Agent-authored graphs pass one more stack, `run_builder_gates` (a `tinyflows::gates::BuilderGateHost` over `builder_failures`) in
 [`ops/builder_gates.rs`](./ops/builder_gates.rs). It is the single definition of the author-time hard
 gates, run in increasing cost order and short-circuiting on the first failure:
 engine compatibility, binding resolvability, agent-ref resolvability,
