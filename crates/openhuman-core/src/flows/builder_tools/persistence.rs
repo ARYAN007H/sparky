@@ -356,7 +356,7 @@ impl Tool for SaveWorkflowTool {
         // inside `ops::flows_update`, which the UI/RPC also call for a
         // human's own edits and which must stay permissive) — so an agent
         // can never persist a graph with an unresolvable `tool_call` binding
-        // either. See `ops::validate_binding_resolvability`.
+        // either. See `tinyflows::gates::failures`.
         let graph = match validate_and_migrate_graph(graph_json.clone()) {
             Ok(graph) => graph,
             Err(e) => {
