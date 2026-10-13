@@ -85,12 +85,110 @@ impl super::super::storage_host::AuditSink for NoAudit {
     fn record(&self, _record: &super::super::storage_host::AuditRecord) {}
 }
 
-fn object(name: &str) -> tinybus::Proxy {
-    Bus::proxy(name)
+impl Bus {
+    fn object(&self, name: &str) -> tinybus::Proxy {
+        self.caller
+            .proxy(
+                STORAGE_INTERFACE,
+                format!("/ai/tinyhumans/tinystorage/{name}"),
+                STORAGE_INTERFACE,
+            )
+            .unwrap()
+    }
+
+    async fn set_secret(&self, name: &str, value: &[u8]) -> tinybus::Result<()> {
+        self.object("Secrets")
+            .call_confidential(
+                "Set",
+                (SetSecretRequest {
+                    name: name.into(),
+                    value: value.to_vec(),
+                },),
+            )
+            .await
+    }
+
+    async fn secret(&self, name: &str) -> tinybus::Result<Option<Vec<u8>>> {
+        let reply: SecretValue = self
+            .object("Secrets")
+            .call_confidential("Get", (SecretNameRequest { name: name.into() },))
+            .await?;
+        Ok(reply.value)
+    }
+
+    async fn put_server(&self, id: &str) -> tinybus::Result<()> {
+        let _: serde_json::Value = self
+            .object("Documents")
+            .call(
+                "Put",
+                (json!({
+                    "collection": "mcp_servers",
+                    "document_id": id,
+                    "document_json": json!({"qualified_name": id}).to_string(),
+                    "precondition": {"kind": "none"},
+                }),),
+            )
+            .await?;
+        Ok(())
+    }
+
+    async fn server(&self, id: &str) -> tinybus::Result<serde_json::Value> {
+        self.object("Documents")
+            .call(
+                "Get",
+                (json!({"collection": "mcp_servers", "document_id": id}),),
+            )
+            .await
+    }
 }
 
-impl Bus {
-    fn proxy(_name: &str) -> tinybus::Proxy {
-        unreachable!("replaced below")
+#[tokio::test(flavor = "multi_thread")]
+async fn a_module_reaches_its_secrets_through_the_attested_linked_host() {
+    let _turn = TURN.lock().await;
+    let bus = boot(Arc::new(MemoryStorage::new())).await;
+    bus.set_secret("mcp_client_env/github", b"token-1")
+        .await
+        .expect("the confidential route is delivered to the linked storage module");
+    assert_eq!(
+        bus.secret("mcp_client_env/github").await.unwrap(),
+        Some(b"token-1".to_vec())
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_secret_outside_the_modules_grant_is_still_refused() {
+    let _turn = TURN.lock().await;
+    let bus = boot(Arc::new(MemoryStorage::new())).await;
+    let refused = bus.set_secret("someone_elses/key", b"x").await;
+    assert!(refused.is_err(), "grant must be enforced behind attestation");
+    assert!(!matches!(
+        refused,
+        Err(tinybus::Error::NotAttested { .. })
+    ));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn servers_and_env_secrets_survive_a_restart_of_the_bus_and_host() {
+    let _turn = TURN.lock().await;
+    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::new());
+    {
+        let first = boot(Arc::clone(&backend)).await;
+        first.put_server("io.example/files").await.unwrap();
+        first
+            .set_secret("mcp_client_env/io.example/files", b"{\"API_KEY\":\"k\"}")
+            .await
+            .unwrap();
     }
+    // A new broker, module host and storage host over the same backend: what
+    // a core restart does.
+    let second = boot(backend).await;
+    let server = second.server("io.example/files").await.unwrap();
+    assert_eq!(server["document_id"], "io.example/files");
+    assert_eq!(
+        second
+            .secret("mcp_client_env/io.example/files")
+            .await
+            .unwrap(),
+        Some(b"{\"API_KEY\":\"k\"}".to_vec())
+    );
 }
