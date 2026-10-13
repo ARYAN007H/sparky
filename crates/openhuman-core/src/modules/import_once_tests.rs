@@ -30,7 +30,10 @@ async fn a_concurrent_caller_waits_for_the_running_import() {
         flag.load(std::sync::atomic::Ordering::SeqCst)
     };
     let (_, saw_finished) = tokio::join!(first, second);
-    assert!(saw_finished, "second caller returned before the import ended");
+    assert!(
+        saw_finished,
+        "second caller returned before the import ended"
+    );
 }
 
 #[tokio::test]
