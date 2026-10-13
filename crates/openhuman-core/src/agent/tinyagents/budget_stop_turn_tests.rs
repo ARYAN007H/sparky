@@ -297,10 +297,11 @@ fn a_turn_before_its_wind_down_point_runs_to_its_final_answer() {
                         .expect("scripted turn models build");
                     let (tx, _rx) = tokio::sync::mpsc::channel(64);
                     let mut context = root_context("deadline-fresh", "/tmp/deadline-fresh", tx);
-                    context.turn_deadline =
-                        Some(tinyagents_harness::turn_deadline::TurnDeadline::starting_now(
+                    context.turn_deadline = Some(
+                        tinyagents_harness::turn_deadline::TurnDeadline::starting_now(
                             std::time::Duration::from_secs(900),
-                        ));
+                        ),
+                    );
                     let outcome = run_root_turn_via_hosted_agent(
                         context,
                         hosted_base(),

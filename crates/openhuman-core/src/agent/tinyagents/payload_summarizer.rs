@@ -24,8 +24,8 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use tinyagents_harness::context::RunContext;
-use tinyagents_harness::summarization::summary_child_config;
 use tinyagents_harness::runtime::{AgentHarness, InvalidArgsPolicy, RunPolicy, UnknownToolPolicy};
+use tinyagents_harness::summarization::payload_summarizer::summary_child_config;
 use tinyinference_llm::message::Message;
 use tracing::debug;
 

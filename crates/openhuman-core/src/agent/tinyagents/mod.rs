@@ -21,11 +21,11 @@
 
 mod compaction_carry;
 pub mod config;
+mod context_wiring;
 mod deadline_wind_down;
 pub mod discovery;
 mod embeddings;
 mod harness_assembly;
-mod context_wiring;
 pub(crate) mod harness_tool_registration;
 pub mod host;
 pub(crate) mod hosted_error;
