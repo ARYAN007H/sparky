@@ -4,7 +4,8 @@
 use async_trait::async_trait;
 use tinybus::{CallContext, Connection, InterfaceName, MemberName, ObjectPath};
 use tinymemes_bus::{
-    RemixClient, RemixRefusal, RemixRequest, RemixResponse, HOST_INTERFACE, HOST_METHODS, HOST_PATH,
+    host_methods, remix_methods, RemixRefusal, RemixRequest, RemixResponse, RemixResult,
+    HOST_INTERFACE, HOST_METHODS, HOST_PATH, REMIX_INTERFACE, REMIX_PATH, STATE_INTERFACE,
 };
 
 use super::callbacks;
@@ -60,21 +61,22 @@ impl tinybus::Interface for HostService {
             log::warn!("[tinymemes] refused a host callback from a peer that is not the module");
             return Err(tinybus::Error::failed("unknown tinymemes caller"));
         }
-        let Some(session) = callbacks::active() else {
-            log::debug!("[tinymemes] host callback with no remix running");
-            return Err(tinybus::Error::failed("no tinymemes remix is running"));
+        // The module is the only caller, but it serves many remixes: the
+        // correlation id says which workspace this callback answers for.
+        let correlation = callbacks::correlation_of(&args).map(str::to_owned);
+        if member.as_str() == host_methods::END {
+            // Forgetting an unknown id is harmless, so `End` needs no session.
+            if let Some(correlation) = &correlation {
+                callbacks::end(correlation);
+            }
+            return serde_json::to_value(tinymemes_bus::HostResult::<()>::Ok(()))
+                .map_err(|_| tinybus::Error::failed("invalid tinymemes host response"));
+        }
+        let Some(session) = correlation.as_deref().and_then(callbacks::session) else {
+            log::debug!("[tinymemes] host callback with no live remix for its correlation id");
+            return Err(tinybus::Error::failed("no such tinymemes remix"));
         };
         callbacks::dispatch(&session, member.as_str(), args).await
-    }
-}
-
-const COOLDOWN_ENV: &str = "OPENHUMAN_TINYMEMES_MEME_COOLDOWN";
-
-/// The module reads its meme cooldown from the environment; hand it
-/// `[memes] meme_cooldown` unless the operator already set the variable.
-fn export_cooldown(config: &Config) {
-    if std::env::var_os(COOLDOWN_ENV).is_none() {
-        std::env::set_var(COOLDOWN_ENV, config.memes.meme_cooldown.to_string());
     }
 }
 
@@ -90,21 +92,68 @@ pub(crate) async fn install(connection: &Connection) -> tinybus::Result<()> {
         .await
 }
 
+/// One foreground remix at a time per workspace and acting identity.
+///
+/// The module reads its learned-state documents at the start of a remix and
+/// writes them at the end, so two remixes for one scope at once would each
+/// save a stale snapshot over the other. Different scopes never wait for each
+/// other. Background research that outlives a call is not covered: it can only
+/// lose counters, never a remixed id (the module serializes those itself).
+static FOREGROUND: std::sync::LazyLock<
+    std::sync::Mutex<std::collections::HashMap<String, std::sync::Arc<tokio::sync::Mutex<()>>>>,
+> = std::sync::LazyLock::new(Default::default);
+
+fn scope_lock(config: &Config) -> std::sync::Arc<tokio::sync::Mutex<()>> {
+    let identity = crate::memory::scope::current().unwrap_or_default();
+    let key = format!(
+        "{}\0{}\0{}",
+        config.workspace_dir.display(),
+        identity.agent_id.as_deref().unwrap_or("-"),
+        identity.team.as_deref().unwrap_or("-")
+    );
+    FOREGROUND
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .entry(key)
+        .or_default()
+        .clone()
+}
+
 /// Remix one reply through the loaded module, serving its callbacks for
-/// `config`'s workspace meanwhile.
-pub(crate) async fn remix(config: &Config, request: RemixRequest) -> Result<RemixResponse, String> {
+/// `config`'s workspace meanwhile. `request.correlation` is set here.
+pub(crate) async fn remix(
+    config: &Config,
+    mut request: RemixRequest,
+) -> Result<RemixResponse, String> {
     if !config.components.memes {
         return Err("the memes component is off".to_owned());
     }
-    export_cooldown(config);
     crate::modules::ensure_loaded(config, MODULE_ID).await?;
     let runtime = crate::modules::host::runtime()
         .await
         .map_err(|error| format!("the module bus is not running: {error}"))?;
-    let client = RemixClient::new(runtime.connection()).map_err(|error| error.to_string())?;
-    let outcome = callbacks::run_with(config, client.remix(request)).await;
+    let proxy = runtime
+        .connection()
+        .proxy(STATE_INTERFACE, REMIX_PATH, REMIX_INTERFACE)
+        .map_err(|error| error.to_string())?;
+    let registration = callbacks::register(config);
+    request.correlation = registration.correlation().to_owned();
+    // A disabled request makes no callbacks and starts no research, so there
+    // is nothing to keep the registration for.
+    let may_research = request.enabled;
+    // One foreground remix at a time per scope; see [`FOREGROUND`].
+    let lock = scope_lock(config);
+    let _foreground = lock.lock().await;
+    let outcome: tinybus::Result<RemixResult> = proxy.call(remix_methods::REMIX, (request,)).await;
     match outcome {
-        Ok(Ok(response)) => Ok(response),
+        Ok(Ok(response)) => {
+            // Background research may still call back; the module's `End`
+            // (or the age sweep) retires the entry.
+            if may_research {
+                registration.keep_for_background();
+            }
+            Ok(response)
+        }
         Ok(Err(refusal)) => Err(match refusal {
             RemixRefusal::Closing => "the tinymemes module is closing".to_owned(),
             RemixRefusal::Unauthenticated => "the tinymemes module refused the caller".to_owned(),
@@ -112,3 +161,7 @@ pub(crate) async fn remix(config: &Config, request: RemixRequest) -> Result<Remi
         Err(error) => Err(format!("tinymemes remix call failed: {error}")),
     }
 }
+
+#[cfg(test)]
+#[path = "service_tests.rs"]
+mod tests;

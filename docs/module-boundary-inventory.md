@@ -19,9 +19,9 @@ copying its implementation into a host, or accepting weaker isolation.
 | tinymcp | none in normal/build host dependencies | tinymcp-bus | core MCP registry, supervisor, CLI stdio/HTTP server | Merged host adapters use the released v0.16.1 module (contract 1.23; configured-client receipt machine and client cache are `tinymcp_bus::client_lifecycle`, host keeps only the bus-calling driver; identifier validation, the registry-detail JSON shape and the not-connected explanation are `tinymcp_bus` helpers, so the host's `registry/helpers.rs` is gone; bus members the host never calls are kept for other hosts and documented in `tinymcp_bus::names`) for registry, supervisor, client and server protocol operations, with approved host callbacks kept in OpenHuman. The 62-member artifact and local focused, lifecycle, registry, native and build gates pass; frozen recorded tool declarations are restored independently of the current catalog |
 | tinychannels | tinychannels, tinychannels-runtime, tinychannels-module (test-only) | tinychannels-bus | core channels, TinyHumans host, CLI REPL | Contract 16 (operation 1.17) is pure; scoped providers, inbound/identity/outbound preparation, remote commands, runtime limits, typing and progressive delivery execute through confidential module calls. Host-owned policy, credentials, persistence and callbacks remain in OpenHuman. Both host implementation exceptions are removed; the 254-test focused suite and released-artifact runtime fixture pass |
 | tinyhosts | none | tinyhosts-bus | core hosting tools | Released Execute/Providers contract consumed through the module (v0.4.0: tool-to-operation mapping, argument shaping, outcome matching and summaries live in `tinyhosts-bus::tools`); workspace authorization, credentials and approval policy remain in OpenHuman |
-| tinymemes | none | tinymemes-bus | core `tinymemes` reply remix | Released Remix contract (v0.2.0) consumed through the module: reading, rating, rewrite, slang and meme indexes run in the module; the host serves the Complete, Evaluate, Search, LoadIndex, SaveIndex and Deliver callbacks (OpenHuman inference, managed Jev, web search, workspace index files) and keeps the A/B arm, flag and delivered-history policy |
+| tinymemes | none | tinymemes-bus | core `tinymemes` reply remix | Released Remix contract (v1.1) consumed through the module, which owns the reading, rating, rewrite, slang and meme indexes, the remixed-id ring (behind its `IndexStore` port), the `TINYMEMES_*` env overrides, the LLM-as-Jev fallback and the background slang and meme research. The host serves the Complete, Evaluate, Search, LoadIndex, SaveIndex, Deliver and End callbacks (OpenHuman inference, managed Jev, web search, documents on the storage port), each carrying the remix's correlation id so remixes for different workspaces run concurrently, and keeps the A/B arm, flag and delivered-history policy. `tinymemes-bus` is synchronous and I/O-free (no tinybus or tinystoragedrivers-bus); the typed clients are in `tinymemes-client`, which the host does not link |
 | tinywallet | none in normal/build host dependencies | tinywallet-bus | core wallet/web3/x402 | Complete: v0.20.0 contract 1.14 adds mnemonic word-count validation to module-owned mnemonic derivation, native transactions, Web3 quotes/execution, ERC-20 encoding, and x402 payment parsing/budgets/ledger. OpenHuman retains encrypted-key custody, authenticated transport, explicit approval, and lifecycle orchestration |
-| tinybox | tinybox-core (test-only) | tinybox-bus | core sandbox and security, desktop gateways | Host cutover uses TinyBox v0.1.26 (contract 1.17); the host calls members only through `tinybox_bus::names` constants and uses `tinybox_bus::CommandClass` directly (no host copy or re-export). It covers for sandbox/resource lifecycle, collected and supervised execution, jailed and native shell execution, Docker control, local grants (`ResolveLocalGrants`; the host re-applies `is_always_forbidden` to the reply), file transfer and port forwarding. Host authorization and the security floor remain in OpenHuman |
+| tinybox | tinybox-core (test-only) | tinybox-bus | core sandbox and security, desktop gateways | Host cutover uses TinyBox v0.1.27 (contract 1.17); the host calls members only through `tinybox_bus::names` constants and uses `tinybox_bus::CommandClass` directly (no host copy or re-export). It covers for sandbox/resource lifecycle, collected and supervised execution, jailed and native shell execution, Docker control, local grants (`ResolveLocalGrants`; the host re-applies `is_always_forbidden` to the reply), file transfer and port forwarding. Host authorization and the security floor remain in OpenHuman |
 | tinycomputer | none | tinycomputer-bus | core voice, paste/focus and permission checks | Permission, focus, paste and Globe listener operations use the module; native thread and target rules remain covered |
 | tinyvoice | None | tinyvoice-bus | core voice capture/hotkeys | Module-owned devices, recording and continuous capture, bounded audio reads/batches, explicit lease cleanup; computer module permission decisions |
 | tinyruntime | tinyruntime-pyserver | tinyruntime-bus | core Python worker, optional TinyJuice ML | Excluded from this migration: TinyRuntime is being removed separately |
@@ -486,6 +486,34 @@ adapter that correlates harness history into its `ToolResult`. The host keeps
 approval classification (`SecurityPolicy`), Composio schema lookup, and the
 store, checkpoint, bus and cron effects. TinyFlows is a plain library gitlink,
 so there is no registry record or `module-boundaries.json` entry.
+
+### TinyFlows builder tool belt and observability mappers (#7554, #7557, v0.8.16)
+
+The workflow-builder tools (`revise`, `edit`, `validate`, `dry_run`, `create`,
+`duplicate`, `save`, `resume_flow_run`, `cancel_flow_run`, the flow and run
+reads, `list_agent_definitions`, `list_node_kinds`, `get_node_kind_contract`
+and `suggest_workflows`) are `tinytools::Tool`s in `tinyflows_copilot::tools`
+over the ports `DraftStore`, `FlowStore`, `BuilderGates`, `AgentDirectory`,
+`NodeKindSource` and `SuggestionStore`. `flows/builder_host.rs` is the one
+implementation of those ports (`FlowsHost`, plus `OverlayNodeKinds` for the
+host node-kind notes) and `flows/registration.rs` constructs the tools over it.
+Tool names, descriptions, parameter schemas, permissions and the
+`external_effect` flag are pinned byte-for-byte by
+`flows/registration_tests/flow_tools.snap.json`, recorded before the move.
+`edit_op_shape`, the node-kind line renderers
+(`tinyflows::catalog::render_node_kinds_{line,required}`) and
+`agent_prompt::resolve_completion_model` are upstream; the dedup exactly-once
+settle contract was already `tinyflows::nodes::control_flow::dedup_settle`, so
+only the per-flow lock and the run-finished subscriber remain in
+`flows/bus/dedup_commit.rs`. `observability.rs` and `langfuse_export.rs` call
+`tinyflows::observe::{step_status_str, to_exporter_observations}`.
+
+Stays host: `search_tool_catalog`, `get_tool_contract`,
+`get_tool_output_sample`, `list_connectable_toolkits` and
+`list_flow_connections` (bound to the live Composio catalog, its probe cache and
+the connected accounts). `tinyflows-copilot` is `publish = false` because it
+names `tinytools` by git rev; OpenHuman's `[patch]` redirects it to the
+tinyagents copy, so there is one `Tool` trait.
 
 ### TinyFlows builder gate stack (#7551)
 
