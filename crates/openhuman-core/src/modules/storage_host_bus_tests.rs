@@ -163,6 +163,7 @@ async fn the_bus_hands_the_host_the_brokers_sender_and_nothing_else() {
             .serve_at(
                 path,
                 ObjectService {
+                    runtime: None,
                     object,
                     host: Arc::clone(&host),
                 },

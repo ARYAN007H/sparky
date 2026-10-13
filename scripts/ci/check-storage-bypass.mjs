@@ -92,6 +92,12 @@ export const ALLOW = new Map(
       LEGACY_READER,
     ],
     [
+      "modules/storage_import_tinymcp.rs",
+      "sqlite-open",
+      "Connection::open_with_flags(&copy, OpenFlags::SQLITE_OPEN_READ_WRITE)",
+      LEGACY_READER,
+    ],
+    [
       "config/workspace/state.rs",
       "sqlite-open",
       "let conn = Connection::open(db_path)?;",

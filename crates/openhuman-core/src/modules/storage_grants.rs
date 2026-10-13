@@ -183,9 +183,8 @@ type Declaration = (&'static str, fn() -> StorageGrant);
 /// A module adds its row here (a declaration is a reviewable build-time
 /// decision, like the registry's digests) and then calls
 /// `ai.tinyhumans.tinystorage.Storage`; a module with no row has no storage at
-/// all. `tinymcp` declares its grant ahead of the release that consumes it: the
-/// pinned module does not call the storage bus yet, so the row serves nothing
-/// until the registry moves to a release that does.
+/// all. `tinymcp` (v0.18.0 and later) reaches its servers, audit log and
+/// environment secrets through this table.
 #[must_use]
 pub fn declared(module_id: &str) -> Option<StorageGrant> {
     let table: &[Declaration] = &[
