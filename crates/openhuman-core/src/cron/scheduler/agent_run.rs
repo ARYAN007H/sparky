@@ -164,6 +164,21 @@ pub(super) async fn run_agent_job_for_run(
                     // conversation, with its frozen system prompt and stale tool
                     // names. Every run starts from a fresh prompt instead.
                     start_cron_turn_clean(&mut agent);
+                    // Morning briefing only: Composio task-fetch tools
+                    // (Linear/ClickUp/Notion/Asana) surface only recently
+                    // created/changed tasks. Other cron agents and all chat
+                    // turns leave the window unset. It rides the run context
+                    // (`OpenHumanRunExt`), not a task-local.
+                    if is_morning_briefing_job(job) {
+                        tracing::debug!(
+                            job_id = %job.id,
+                            recency_window_secs = MORNING_BRIEFING_TASK_RECENCY_SECS,
+                            "[cron] applying morning-briefing task recency window"
+                        );
+                        agent.set_task_recency_window(Some(std::time::Duration::from_secs(
+                            MORNING_BRIEFING_TASK_RECENCY_SECS,
+                        )));
+                    }
                     // Scope the run's origin around the turn. A job with no
                     // channel origin runs as `TrustedAutomation { Cron }`: the
                     // approval gate treats it as user-authorized automation

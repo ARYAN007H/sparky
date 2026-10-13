@@ -279,6 +279,10 @@ pub struct OpenHumanSessionHost {
     pub(super) post_turn_hooks: Vec<Arc<dyn PostTurnHook>>,
     pub(super) event_session_id: String,
     pub(super) event_channel: String,
+    /// Recency window handed to every turn's run context so integration
+    /// task-fetch tools only see recently touched tasks (cron morning
+    /// briefing). `None` leaves them unbounded.
+    pub(super) task_recency_window: Option<std::time::Duration>,
     /// Backend/session thread explicitly owned by this agent run. It is kept
     /// separate from event identity: CLI and worker event sessions are not
     /// necessarily user conversation threads.

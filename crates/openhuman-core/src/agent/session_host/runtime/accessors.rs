@@ -250,6 +250,12 @@ impl OpenHumanSessionHost {
             .unwrap_or_default()
     }
 
+    /// Restricts integration task-fetch tools to tasks touched within `window`
+    /// on every later turn of this agent; `None` clears the restriction.
+    pub fn set_task_recency_window(&mut self, window: Option<std::time::Duration>) {
+        self.task_recency_window = window;
+    }
+
     pub fn set_event_context(&mut self, session_id: impl Into<String>, channel: impl Into<String>) {
         self.event_session_id = session_id.into();
         self.event_channel = channel.into();

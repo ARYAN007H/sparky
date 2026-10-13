@@ -439,6 +439,7 @@ impl SessionHostBuilder {
             post_turn_hooks: self.post_turn_hooks,
             event_session_id,
             event_channel,
+            task_recency_window: None,
             thread_id: None,
             agent_definition_name: agent_definition_name.clone(),
             // Canonical registry id — captured here at build time
