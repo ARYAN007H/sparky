@@ -8,6 +8,11 @@ repository.workspace = true
 readme = "README.md"
 publish = false
 
+# Core errors are intentionally carried by this facade's public fallible APIs;
+# keep the same size baseline as the underlying core crate under `-D warnings`.
+[lints.clippy]
+result_large_err = "allow"
+
 [features]
 langfuse = ["openhuman-core/langfuse"]
 # `channels` is in core's default set already; enabling it here too compiles

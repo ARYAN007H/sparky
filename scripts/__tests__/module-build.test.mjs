@@ -141,15 +141,16 @@ function fakeRepo() {
   git("add", ".");
   git("commit", "-q", "-m", "fixture");
   const log = join(root, "cargo.log");
-  const built = join(root, "built-libtinyx_module.so");
+  const built = join(root, "built-module");
+  const artifact = join(root, artifactFilename(SPEC));
   const cargo = join(root, "fake-cargo");
   writeFileSync(
     cargo,
     `#!/usr/bin/env bash
 printf '%s\\n' "$*" >> "${log}"
 printf 'native bytes' > "${built}"
-printf '{"reason":"compiler-artifact","target":{"kind":["cdylib","rlib"]},"filenames":["%s"]}\\n' "${built.replace(/[^/]*$/, "")}libtinyx_module.so"
-cp "${built}" "${built.replace(/[^/]*$/, "")}libtinyx_module.so"
+printf '{"reason":"compiler-artifact","target":{"kind":["cdylib","rlib"]},"filenames":["${artifact}"]}\\n'
+cp "${built}" "${artifact}"
 `,
   );
   chmodSync(cargo, 0o755);

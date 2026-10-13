@@ -177,7 +177,7 @@ mod attestation_guard {
     fn the_current_attested_linux_release_library_is_accepted() {
         assert!(digest_is_pinned(
             record(),
-            "5d0a3ae5881f91966249858cd155e5b9c244bd419d06698d808f972a8d23afc9"
+            "0db559e23300432c7056cfe1fb9f8980a82faacacf9603131173967c80ba0d89"
         ));
     }
 

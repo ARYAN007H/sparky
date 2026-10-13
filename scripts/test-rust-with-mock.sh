@@ -168,6 +168,19 @@ export OPENHUMAN_MODULE_PATH="$tinybox_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_M
 if ! local_module_source_is_source; then
   tinymcp_dir="$(stage_release_module tinymcp "$wallet_platform" "$module_ext")"
   export OPENHUMAN_MODULE_PATH="$tinymcp_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
+else
+  tinymcp_dir="$REPO_ROOT/target/module-sources/tinymcp"
+fi
+if [ "$module_ext" = "dll" ]; then
+  if local_module_source_is_source; then
+    tinymcp_artifact="$tinymcp_dir/tinymcp.dll"
+  else
+    tinymcp_artifact="$tinymcp_dir/tinymcp_module.dll"
+  fi
+elif local_module_source_is_source; then
+  tinymcp_artifact="$tinymcp_dir/libtinymcp.$module_ext"
+else
+  tinymcp_artifact="$tinymcp_dir/libtinymcp_module.$module_ext"
 fi
 
 # Build the source modules in one call (local source mode only). The connector
@@ -289,7 +302,12 @@ run_full_suite() {
 
   while IFS= read -r target; do
     [ -n "$target" ] || continue
-    if [ "$target" = "raw_coverage_all" ]; then
+    if [ "$target" = "tinydocs_linked_e2e" ]; then
+      # This local-only target is intentionally outside the product set; turn
+      # on its linked implementation feature explicitly so the glob does not
+      # silently skip it or Cargo reject it for missing required features.
+      cargo_test --features linked-modules --test "$target" -- "$@"
+    elif [ "$target" = "raw_coverage_all" ]; then
       # These suites used to run as separate integration-test binaries. Run
       # each generated module filter in its own cargo process so local
       # `pnpm test:rust` preserves the same process-global isolation as CI.
@@ -303,6 +321,12 @@ run_full_suite() {
       # binary exercises several workspaces against that shared module object.
       OPENHUMAN_MODULE_PATH="$connectors_module_path" \
         cargo_test --test "$target" -- --ignored --test-threads=1 "$@"
+    elif [ "$target" = "mcp_registry_multi_server" ]; then
+      # The host opens multiple per-workspace clients to one TinyMCP module.
+      # Keep this integration target serial so those module-backed transitions
+      # do not race through the process-global loader.
+      OPENHUMAN_TINYMCP_TEST_MODULE="$tinymcp_artifact" \
+        cargo_test --test "$target" -- --test-threads=1 "$@"
     else
       OPENHUMAN_MODULE_PATH="$connectors_module_path" \
         cargo_test --test "$target" -- "$@"
@@ -347,6 +371,13 @@ elif [ "$#" -ge 2 ] && [ "$1" = "--test" ] && [ "$2" = "mcp_registry_e2e" ]; the
   fi
   OPENHUMAN_MODULE_PATH="$connectors_module_path" \
     cargo_test --test mcp_registry_e2e -- --ignored --test-threads=1 "$@"
+elif [ "$#" -ge 2 ] && [ "$1" = "--test" ] && [ "$2" = "mcp_registry_multi_server" ]; then
+  shift 2
+  if [ "${1:-}" = "--" ]; then
+    shift
+  fi
+  OPENHUMAN_TINYMCP_TEST_MODULE="$tinymcp_artifact" \
+    cargo_test --test mcp_registry_multi_server -- --test-threads=1 "$@"
 else
   cargo_test "$@"
 fi
