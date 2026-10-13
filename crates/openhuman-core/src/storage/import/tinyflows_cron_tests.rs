@@ -20,7 +20,8 @@ fn copy_tree(from: &Path, to: &Path) {
 #[test]
 fn run_with_imports_legacy_cron_jobs_whatever_the_flows_gate() {
     let dir = tempfile::TempDir::new().unwrap();
-    let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/storage/import/fixtures/tinyflows/workspace");
+    let fixtures = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("src/storage/import/fixtures/tinyflows/workspace");
     copy_tree(&fixtures, dir.path());
     let config = Config {
         workspace_dir: dir.path().to_path_buf(),
@@ -39,7 +40,10 @@ fn run_with_imports_legacy_cron_jobs_whatever_the_flows_gate() {
     }
     let docs = Arc::clone(backend.for_scope(&Scope::local()).unwrap().documents());
     let jobs = crate::storage::block_on_anyhow(async move {
-        CronDocuments::new(docs).list_jobs().await.map_err(Into::into)
+        CronDocuments::new(docs)
+            .list_jobs()
+            .await
+            .map_err(Into::into)
     })
     .unwrap();
     assert!(!jobs.is_empty());

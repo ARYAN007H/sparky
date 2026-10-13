@@ -7529,6 +7529,7 @@ dependencies = [
 name = "tinyagents-runtime"
 version = "2.1.4"
 dependencies = [
+ "anyhow",
  "async-trait",
  "chrono",
  "regex",
