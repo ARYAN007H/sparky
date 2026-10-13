@@ -27,10 +27,10 @@ mod direct_mode;
 mod error_utils;
 mod execute;
 mod providers_ops;
+mod scope_prefs;
 mod toolkits;
 mod tools_ops;
 mod triggers;
-mod scope_prefs;
 
 // ── Public re-exports (match original ops.rs public surface) ───────────────
 

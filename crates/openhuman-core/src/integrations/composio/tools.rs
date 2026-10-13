@@ -66,11 +66,11 @@ pub use list_connections::ComposioListConnectionsTool;
 pub use list_toolkits::ComposioListToolkitsTool;
 pub use list_tools::ComposioListToolsTool;
 #[cfg(test)]
-use tinytools::Tool;
-#[cfg(test)]
-use tinytools::{PermissionLevel, ToolCategory};
-#[cfg(test)]
 use render::{
     empty_uncurated_toolkits_message, normalized_scope_toolkits, render_tools_markdown,
     retain_connected_tools,
 };
+#[cfg(test)]
+use tinytools::Tool;
+#[cfg(test)]
+use tinytools::{PermissionLevel, ToolCategory};

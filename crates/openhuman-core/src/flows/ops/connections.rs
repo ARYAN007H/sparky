@@ -125,7 +125,9 @@ async fn normalize_keys(
     match crate::integrations::composio::contract::normalize_connection_identifiers(config, &raw)
         .await
     {
-        Ok(normalized) if normalized.len() == raw.len() => raw.into_iter().zip(normalized).collect(),
+        Ok(normalized) if normalized.len() == raw.len() => {
+            raw.into_iter().zip(normalized).collect()
+        }
         other => {
             tracing::debug!(
                 error = ?other.err(),

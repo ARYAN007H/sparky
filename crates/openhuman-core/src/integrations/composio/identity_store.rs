@@ -31,7 +31,9 @@ pub async fn persist_provider_profile(
 ) -> Result<usize, String> {
     let mut keys = vec![profile.toolkit.clone()];
     keys.extend(profile.connection_id.clone());
-    let mut keys = normalize_connection_identifiers(config, &keys).await?.into_iter();
+    let mut keys = normalize_connection_identifiers(config, &keys)
+        .await?
+        .into_iter();
     let toolkit = keys.next().unwrap_or_default();
     let identifier = keys
         .next()
@@ -163,12 +165,10 @@ pub async fn delete_connected_identity_facets(
     source: &str,
     identifier: &str,
 ) -> Result<usize, String> {
-    let mut keys = normalize_connection_identifiers(
-        config,
-        &[source.to_string(), identifier.to_string()],
-    )
-    .await?
-    .into_iter();
+    let mut keys =
+        normalize_connection_identifiers(config, &[source.to_string(), identifier.to_string()])
+            .await?
+            .into_iter();
     let source = keys.next().unwrap_or_default();
     let identifier = keys.next().unwrap_or_default();
 

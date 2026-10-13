@@ -24,6 +24,6 @@ pub use tinyconnectors_bus::vocabulary::{
 };
 
 pub use curated::{
-    agent_ready_toolkits, catalog_for_toolkit, curated_scope_for, curated_toolkits, has_native_provider,
-    is_action_visible_with_pref, toolkit_description,
+    agent_ready_toolkits, catalog_for_toolkit, curated_scope_for, curated_toolkits,
+    has_native_provider, is_action_visible_with_pref, toolkit_description,
 };
