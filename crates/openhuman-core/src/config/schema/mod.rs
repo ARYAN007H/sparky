@@ -64,6 +64,7 @@ mod observability;
 mod privacy;
 mod proxy;
 mod routes;
+mod memes;
 mod runtime;
 mod runtime_local_jail;
 mod scheduler_gate;
@@ -116,6 +117,7 @@ pub use runtime::{
 pub use runtime_local_jail::LocalJailConfig;
 pub use scheduler_gate::{PauseReason, Policy, SchedulerGateConfig, SchedulerGateMode};
 pub use task_sources::TaskSourcesConfig;
+pub use memes::MemesConfig;
 pub use tokenjuice::TokenjuiceConfig;
 pub use tools::{
     BrowserComputerUseConfig, BrowserConfig, ComposioConfig, ComposioDirectBaseUrls,

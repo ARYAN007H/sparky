@@ -421,6 +421,10 @@ pub struct Config {
     #[serde(default)]
     pub tokenjuice: TokenjuiceConfig,
 
+    /// TinyMemes remix tuning (`[memes]`); the switch is `[components] memes`.
+    #[serde(default)]
+    pub memes: MemesConfig,
+
     /// Per-dependency switches (`[components]`). Narrow-only; applied at the
     /// next core start.
     #[serde(default)]
