@@ -50,23 +50,35 @@ fn candidates() -> Vec<RankCandidate> {
 }
 
 /// The provider adapter carries the embedding through to the vendor ranker, and
-/// the provider's signature keys the disk cache it writes.
+/// the provider's signature keys the cache it writes into the storage backend.
 #[tokio::test]
 async fn the_ranker_ranks_through_the_provider_and_keys_its_cache_by_signature() {
     let tmp = tempfile::tempdir().unwrap();
-    let path = tmp.path().join("cache.json");
     let embedder = Arc::new(BagEmbedder {
         calls: AtomicUsize::new(0),
     });
-    let ranker = embedding_tool_ranker(embedder.clone()).with_disk_cache(path.clone());
+    let ranker = embedding_tool_ranker_in(embedder.clone(), tmp.path());
     let hits = ranker
         .rank("ping alex", &RankContext::empty(), &candidates(), 1)
         .await
         .unwrap();
     assert_eq!(hits[0].key, "SLACK_SEND_MESSAGE");
-    let on_disk: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
-    assert_eq!(on_disk["signature"], "provider=bag;model=bag-v1;dims=3");
+    let after_first = embedder.calls.load(std::sync::atomic::Ordering::SeqCst);
+
+    // A second ranker over the same workspace reads the stored catalogue
+    // embeddings instead of embedding the catalogue again.
+    let again = embedding_tool_ranker_in(embedder.clone(), tmp.path());
+    let hits = again
+        .rank("ping alex", &RankContext::empty(), &candidates(), 1)
+        .await
+        .unwrap();
+    assert_eq!(hits[0].key, "SLACK_SEND_MESSAGE");
+    let after_second = embedder.calls.load(std::sync::atomic::Ordering::SeqCst);
+    assert_eq!(
+        after_second - after_first,
+        1,
+        "only the query was embedded the second time, not the catalogue"
+    );
 }
 
 #[test]
