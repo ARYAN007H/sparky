@@ -124,7 +124,7 @@ pub(crate) async fn store_all(
     let mut placed = Vec::with_capacity(items.len());
     for item in items {
         let node = crate::memory::brain::brain_node(config, layout, &brain_source, &item)?;
-        let item = crate::memory::brain::file_into(node.clone(), item);
+        let item = tinymemory_tools::layout::placement::file_into(node.clone(), item);
         placed.push((node, item));
     }
 
