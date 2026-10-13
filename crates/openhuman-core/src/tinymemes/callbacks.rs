@@ -188,7 +188,10 @@ async fn evaluate(session: &Session, envelope: EvaluateEnvelope) -> HostResult<E
         HostFailure::Backend
     })?;
     let body = serde_json::to_value(result.response).map_err(|_| HostFailure::Backend)?;
-    Ok(EvaluateEnvelope { body })
+    Ok(EvaluateEnvelope {
+        correlation: String::new(),
+        body,
+    })
 }
 
 async fn search(
