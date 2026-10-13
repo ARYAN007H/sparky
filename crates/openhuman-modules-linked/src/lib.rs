@@ -26,7 +26,7 @@
 //! | `tinyvoice`      | waits: upstream main needs nested `tinyagents` submodules that collide with the host's in Cargo.lock |
 //! | `tinymcp`        | waits: `static-link` exists but `linked_module` is not exported |
 //! | `tinycomputer`   | waits: no `static-link` |
-//! | `tinyjuice`      | linked (needs tinyjuice v0.9.0) |
+//! | `tinyjuice`      | waits: v0.9.0 has `static-link` + `linked_module`, but needs `tinybus 0.1.4` (nested `vendor/tinybus`) while the workspace carries 0.1.3, so `LinkedFactory` types do not unify |
 //! | `tinysearch`     | waits: v0.5.0 has `static-link` + `linked_module`, but needs `tinybus ^0.1.4` while its nested `vendor/tinybus` is 0.1.2 and the workspace carries 0.1.3, so Cargo cannot resolve the graph |
 //! | `tinywallet`     | waits: v0.20.0 has `static-link` + `linked_module`, but its nested `vendor/tinybus` (cbb2eea) collides with the workspace `tinybus` (9062dd8) in Cargo.lock; also see the attestation note below |
 //! | `tinyhosts`      | waits: no module crate yet |
@@ -54,8 +54,6 @@ pub fn linked_modules() -> Vec<(&'static str, LinkedFactory)> {
     modules.push(("tinychannels", tinychannels_module::linked_module));
     #[cfg(feature = "tinydocs")]
     modules.push(("tinydocs", tinydocs_module::linked_module));
-    #[cfg(feature = "tinyjuice")]
-    modules.push(("tinyjuice", tinyjuice_module::linked_module));
     modules
 }
 

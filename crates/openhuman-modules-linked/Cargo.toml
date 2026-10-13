@@ -16,7 +16,7 @@
 # with an exported `linked_module` AND resolves against the workspace `tinybus`
 # (0.1.3). These WAIT for the upstream E0.3 work and a re-pin; they have no
 # feature here yet (reasons in `src/lib.rs`):
-#   tinybox, tinyconnectors, tinyvoice, tinymcp, tinycomputer,
+#   tinybox, tinyconnectors, tinyvoice, tinymcp, tinycomputer, tinyjuice,
 #   tinysearch, tinywallet, tinyhosts.
 
 [package]
@@ -30,10 +30,9 @@ publish = false
 
 [features]
 default = []
-all = ["tinychannels", "tinydocs", "tinyjuice"]
+all = ["tinychannels", "tinydocs"]
 tinychannels = ["dep:tinychannels-module"]
 tinydocs = ["dep:tinydocs-module"]
-tinyjuice = ["dep:tinyjuice-module"]
 
 [dependencies]
 # The host reaches the core only through the rpc facade (crate chain).
@@ -41,7 +40,6 @@ openhuman-rpc = { path = "../openhuman-rpc", default-features = false, features 
 log = "0.4"
 
 tinydocs-module = { path = "../../vendor/tinydocs/crates/tinydocs-module", features = ["static-link"], optional = true }
-tinyjuice-module = { path = "../../vendor/tinyjuice/crates/tinyjuice-module", features = ["static-link"], optional = true }
 tinychannels-module = { path = "../../vendor/tinychannels/crates/tinychannels-module", features = ["static-link"], optional = true }
 
 [lints.rust]
