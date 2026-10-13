@@ -337,3 +337,7 @@ fn turn_line(
 #[cfg(test)]
 #[path = "mod_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "e2e_tests.rs"]
+mod e2e_tests;
