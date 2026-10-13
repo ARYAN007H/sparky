@@ -21,7 +21,7 @@ use tinyflows_schedule::{
 };
 
 use super::limits;
-pub use tinyflows_schedule::AgentJobSpec;
+use tinyflows_schedule::AgentJobSpec;
 
 /// The cron store's own database for `config`: `<workspace>/cron/schedule.db`,
 /// or the agent's `<workspace>/agents/<id>/cron/schedule.db` under an embedded
