@@ -199,7 +199,8 @@ fn desktop_workspace(workspace: &Path) -> Fixture {
              PRIMARY KEY (source_id, external_id));
          INSERT INTO task_sources
              (id, provider, filter, interval_secs, target, max_tasks_per_fetch, created_at)
-         VALUES ('src-1', 'github', '{}', 600, 'inbox', 5, '2026-01-01T00:00:00+00:00');
+         VALUES ('src-1', 'github', '{\"provider\":\"github\"}', 600, '\"todo_only\"', 5,
+                 '2026-01-01T00:00:00+00:00');
          PRAGMA user_version = 0;
          INSERT INTO ingested_tasks (source_id, external_id, content_hash, ingested_at)
          VALUES ('src-1', 'issue-9', 'abc', '2026-01-01T00:00:00+00:00');",
