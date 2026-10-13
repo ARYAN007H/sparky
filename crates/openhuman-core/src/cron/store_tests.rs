@@ -132,13 +132,18 @@ fn legacy_fixture() -> std::path::PathBuf {
 }
 
 #[test]
-fn a_legacy_jobs_db_is_imported_on_first_use_and_left_untouched() {
+fn a_legacy_jobs_db_is_imported_by_the_storage_importer_and_left_untouched() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     let legacy = legacy_db_path(&config);
     std::fs::create_dir_all(legacy.parent().unwrap()).unwrap();
     std::fs::copy(legacy_fixture(), &legacy).unwrap();
     let before = std::fs::read(&legacy).unwrap();
+
+    let backend = crate::storage::local::backend_for(&config.workspace_dir).unwrap();
+    for report in crate::storage::import::tinyflows::run_with(&backend, &config) {
+        report.outcome.unwrap();
+    }
 
     let jobs = list_jobs(&config).unwrap();
     assert_eq!(jobs.len(), 3);
@@ -158,6 +163,8 @@ fn a_legacy_jobs_db_is_imported_on_first_use_and_left_untouched() {
         .find(|job| job.name.as_deref() == Some("inbox"))
         .unwrap();
     remove_job(&config, &inbox.id).unwrap();
-    crate::storage::local::forget(&db_path(&config));
+    for report in crate::storage::import::tinyflows::run_with(&backend, &config) {
+        report.outcome.unwrap();
+    }
     assert_eq!(list_jobs(&config).unwrap().len(), 2);
 }
