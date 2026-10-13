@@ -20,6 +20,7 @@
 mod common;
 
 use common::{chat_completion, offline_config, runtime};
+use tinyagents_session::transcript::TranscriptLocator;
 use openhuman_embed::{Access, Harness, Provider, Workspace};
 use serde_json::json;
 use wiremock::matchers::{any, method, path};
