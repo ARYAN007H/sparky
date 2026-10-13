@@ -164,7 +164,7 @@ async fn execute_passthrough_owned(
         )?;
         let process = tinybox::start_shell_exec(config, request)
             .await
-        .map_err(|_| anyhow::anyhow!("TinyBox could not start a command process"))?;
+            .map_err(|_| anyhow::anyhow!("TinyBox could not start a command process"))?;
         collect_process(config, process, timeout).await
     }
     .await;
@@ -240,7 +240,7 @@ async fn execute_owned(
         )?;
         let process = tinybox::start_shell_exec(config, exec)
             .await
-        .map_err(|_| anyhow::anyhow!("TinyBox could not start the native jailed process"))?;
+            .map_err(|_| anyhow::anyhow!("TinyBox could not start the native jailed process"))?;
 
         collect_process(config, process, timeout).await
     }
