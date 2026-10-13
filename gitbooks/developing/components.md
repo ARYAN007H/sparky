@@ -57,10 +57,25 @@ The first load of an older config moves these once into `[components]`, and the 
 | `[mcp_client] enabled = false` | `components.mcp = false` |
 | `[memory] engine = "none"` | `components.memory = false` (`engine` is kept) |
 | `OPENHUMAN_TINYMEMES` set to an off value | `components.memes = false` |
+| `OPENHUMAN_DISABLE_CHANNEL_LISTENERS=1` | `components.channels = false` at load (env override, kept for one release; `OPENHUMAN_COMPONENT_CHANNELS` wins) |
+| `[dictation] enabled`, `[voice_server] auto_start` and `always_on_enabled` all explicitly `false` | `components.voice = false` (any other mix keeps voice on) |
+| `[sandbox] enabled = false` (or `[security.sandbox] enabled = false`) | `components.sandbox = false` (`enabled = true` or unset keeps it on; the old key is kept) |
 | `[composio] enabled` | dropped; it was never read |
 
 A `components.*` key already present in the file always wins over its legacy flag, so the migration is idempotent and turning a component back on sticks.
 
+## Memes
+
+`components.memes` is the master switch: off means no remix and no module load, and the A/B arm is ignored. When on, `OPENHUMAN_TINYMEMES` (`off`, `on`, `ab`, `ab:NN`; build-time default `OPENHUMAN_TINYMEMES_DEFAULT`) picks the threads that are remixed. The `[memes]` section tunes it: `timeout_ms` (default 20000) and `meme_cooldown` (default 3). `OPENHUMAN_TINYMEMES_TIMEOUT_MS` and `OPENHUMAN_TINYMEMES_MEME_COOLDOWN` override them when set.
+
 ## Wallet
 
 `wallet = false` removes the `web3` domain family and tool group, so `wallet.*`, `web3.*` and `x402.*` answer `COMPONENT_DISABLED:wallet`. The x402 payment hook behind `http_request` declines before any quote or signing (the 402 response comes back unpaid), and `tinywallet` is never downloaded, attested or loaded. Keychain material, spending limits (`OPENHUMAN_X402_*_MAX`) and RPC endpoints (`OPENHUMAN_WALLET_RPC_*`) are left as they are, so setting `wallet = true` again restores the wallet on the next core start.
+
+## Voice
+
+`voice = false` removes the `voice` domain family, so `voice.*` answers `COMPONENT_DISABLED:voice`. The embedded voice server, the dictation hotkey listener and always-on listening do not start whatever `[dictation] enabled`, `[voice_server] auto_start` and `always_on_enabled` say, and `tinyvoice` is never downloaded, attested or loaded. `about_app` and `modules.list` report voice as disabled. The Cargo `voice` feature is unchanged.
+
+## Sandbox
+
+`sandbox = false` means the TinyBox module is never downloaded, attested, loaded or initialised, and `sandbox.*` answers `COMPONENT_DISABLED:sandbox`. Sandboxed execution takes the documented fallback, the same as `[sandbox] enabled = false` or `OPENHUMAN_SANDBOX=off`: the command runs unjailed and the Rust path checks, the always-forbidden credential floor and the security policy still apply. TinyBox registers no tools and starts no background services. `modules.list` reports `tinybox` as `disabled`, `about_app` marks the sandbox capability as disabled, and the host `DomainSet` still wins. A SaaS core still requires the per-user container path, so with the module disabled it fails closed instead of running unsandboxed.

@@ -143,3 +143,35 @@ async fn two_profiles_default_agents_keep_separate_session_keys_and_stores() {
         )
     );
 }
+
+#[test]
+fn the_per_workspace_store_recovers_nothing_at_install_time() {
+    // A SaaS core installs it before any profile exists, so `recover` must not
+    // resolve (and so create) a workspace database.
+    assert!(WorkspaceSessionStores.recover().is_ok());
+}
+
+#[test]
+fn each_workspace_keeps_its_sessions_in_its_own_database() {
+    let first = tempfile::tempdir().unwrap();
+    let second = tempfile::tempdir().unwrap();
+    let in_first = provider_for_workspace(first.path()).for_agent("agent");
+    let in_second = provider_for_workspace(second.path()).for_agent("agent");
+
+    in_first
+        .turn_states
+        .put(&tinyagents_session::turn_state::TurnState::started(
+            "thread",
+            "request",
+            4,
+            "2026-01-01T00:00:00Z",
+        ))
+        .unwrap();
+
+    assert!(in_first.turn_states.get("thread").unwrap().is_some());
+    assert!(
+        in_second.turn_states.get("thread").unwrap().is_none(),
+        "the other workspace never saw the turn"
+    );
+    assert!(first.path().join("storage").join("storage.db").is_file());
+}

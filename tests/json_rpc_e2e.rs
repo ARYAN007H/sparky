@@ -3668,7 +3668,7 @@ async fn json_rpc_run_ledger_lifecycle() {
         .await
         .expect("load config");
 
-    tinyagents_session::run_ledger::upsert_agent_run(
+    openhuman_core::agent::session_store::ledger_sync::upsert_agent_run(
         &config.workspace_dir,
         tinyagents_session::run_ledger::AgentRunUpsert {
             id: "sub-run-1".to_string(),
@@ -3693,7 +3693,7 @@ async fn json_rpc_run_ledger_lifecycle() {
     )
     .expect("seed run");
 
-    tinyagents_session::run_ledger::append_run_event(
+    openhuman_core::agent::session_store::ledger_sync::append_run_event(
         &config.workspace_dir,
         tinyagents_session::run_ledger::RunEventAppend {
             run_id: "sub-run-1".to_string(),
@@ -3785,9 +3785,8 @@ async fn json_rpc_agent_work_list_groups_runs_by_bucket() {
         .await
         .expect("load config");
 
-    use tinyagents_session::run_ledger::{
-        upsert_agent_run, AgentRunKind, AgentRunStatus, AgentRunUpsert,
-    };
+    use openhuman_core::agent::session_store::ledger_sync::upsert_agent_run;
+    use tinyagents_session::run_ledger::{AgentRunKind, AgentRunStatus, AgentRunUpsert};
     let seed = |id: &str, status: AgentRunStatus| AgentRunUpsert {
         id: id.to_string(),
         kind: AgentRunKind::Subagent,
@@ -3914,7 +3913,7 @@ async fn json_rpc_workflow_run_definitions_and_runs_roundtrip() {
     );
 
     // Seed a durable workflow run, then list + get it.
-    tinyagents_session::run_ledger::upsert_workflow_run(
+    openhuman_core::agent::session_store::ledger_sync::upsert_workflow_run(
         &config.workspace_dir,
         tinyagents_session::run_ledger::WorkflowRunUpsert {
             id: "wf-run-1".to_string(),
@@ -4112,11 +4111,13 @@ async fn json_rpc_agent_team_coordination_roundtrip() {
     );
 
     // Mark A done directly via the run ledger, then B claims fine.
-    let task_a =
-        tinyagents_session::run_ledger::get_agent_team_task(&config.workspace_dir, &task_a_id)
-            .expect("get task A")
-            .expect("task A present");
-    tinyagents_session::run_ledger::upsert_agent_team_task(
+    let task_a = openhuman_core::agent::session_store::ledger_sync::get_agent_team_task(
+        &config.workspace_dir,
+        &task_a_id,
+    )
+    .expect("get task A")
+    .expect("task A present");
+    openhuman_core::agent::session_store::ledger_sync::upsert_agent_team_task(
         &config.workspace_dir,
         tinyagents_session::run_ledger::AgentTeamTaskUpsert {
             id: task_a.id.clone(),
@@ -9242,6 +9243,149 @@ async fn mcp_clients_declare_connect_tool_call_happy_path() {
         disc_body.get("status").and_then(Value::as_str),
         Some("disconnected"),
         "disconnect should report disconnected: {disc_body}"
+    );
+
+    mock_join.abort();
+    rpc_join.abort();
+}
+
+/// MCP clients **reconfigure and retire** over real JSON-RPC (#7571): connect
+/// and call through a configured client, change the module's client
+/// configuration (registry credentials are part of it, so the host reopens the
+/// module's configured object with a new configuration), prove the install
+/// survives and answers again, then retire it by dropping it from `mcp.json`
+/// and prove neither the install nor a call to it is left behind.
+#[tokio::test]
+async fn mcp_clients_reconfigure_then_retire_over_rpc() {
+    let _env_lock = json_rpc_e2e_env_lock_async().await;
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path();
+    let openhuman_home = home.join(".openhuman");
+
+    let _home_guard = EnvVarGuard::set_to_path("HOME", home);
+    let _workspace_guard = EnvVarGuard::unset("OPENHUMAN_WORKSPACE");
+    let _backend_url_guard = EnvVarGuard::unset("BACKEND_URL");
+    let _vite_backend_guard = EnvVarGuard::unset("VITE_BACKEND_URL");
+
+    let (mock_addr, mock_join) = serve_on_ephemeral(mock_upstream_router()).await;
+    let mock_origin = format!("http://{}", mock_addr);
+    write_min_config(&openhuman_home, &mock_origin);
+    write_min_config(&openhuman_home.join("users").join("local"), &mock_origin);
+
+    let stub_path = env!("CARGO_BIN_EXE_test-mcp-stub");
+    let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
+    let rpc_base = format!("http://{}", rpc_addr);
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    // connect -> list_tools -> call through the configured client
+    let declared = post_json_rpc(
+        &rpc_base,
+        9950,
+        "openhuman.mcp_clients_config_set",
+        json!({ "mcpServers": { "echo-reconf": { "command": stub_path } } }),
+    )
+    .await;
+    assert_no_jsonrpc_error(&declared, "mcp_clients_config_set (declare)");
+    let server_id = installed_server_id(&rpc_base, 9951, "echo-reconf").await;
+    let connect = post_json_rpc(
+        &rpc_base,
+        9952,
+        "openhuman.mcp_clients_connect",
+        json!({ "server_id": server_id }),
+    )
+    .await;
+    assert_no_jsonrpc_error(&connect, "mcp_clients_connect");
+    let listed = post_json_rpc(
+        &rpc_base,
+        9953,
+        "openhuman.mcp_clients_list_tools",
+        json!({ "server_id": server_id }),
+    )
+    .await;
+    let listed = peel_logs_envelope(assert_no_jsonrpc_error(&listed, "list_tools"));
+    assert!(
+        listed.to_string().contains("echo"),
+        "stub should list the echo tool: {listed}"
+    );
+
+    // reconfigure: a different client configuration reopens the configured object
+    let reconf = post_json_rpc(
+        &rpc_base,
+        9954,
+        "openhuman.mcp_clients_registry_settings_set",
+        json!({ "mcp_official_base": "https://registry.reconfigure.example.test" }),
+    )
+    .await;
+    assert_no_jsonrpc_error(&reconf, "registry_settings_set (reconfigure)");
+    let settings = post_json_rpc(
+        &rpc_base,
+        9955,
+        "openhuman.mcp_clients_registry_settings_get",
+        json!({}),
+    )
+    .await;
+    let settings = peel_logs_envelope(assert_no_jsonrpc_error(&settings, "settings_get"));
+    assert_eq!(
+        settings.get("mcp_official_base").and_then(Value::as_str),
+        Some("https://registry.reconfigure.example.test"),
+        "the reopened module serves the new configuration: {settings}"
+    );
+    // The install survives the reopen and is usable again after a connect.
+    assert_eq!(
+        installed_server_id(&rpc_base, 9956, "echo-reconf").await,
+        server_id
+    );
+    let reconnect = post_json_rpc(
+        &rpc_base,
+        9957,
+        "openhuman.mcp_clients_connect",
+        json!({ "server_id": server_id }),
+    )
+    .await;
+    assert_no_jsonrpc_error(&reconnect, "mcp_clients_connect (after reconfigure)");
+    let echoed = post_json_rpc(
+        &rpc_base,
+        9958,
+        "openhuman.mcp_clients_tool_call",
+        json!({
+            "server_id": server_id,
+            "tool_name": "echo",
+            "arguments": { "message": "after reconfigure" }
+        }),
+    )
+    .await;
+    let echoed = peel_logs_envelope(assert_no_jsonrpc_error(&echoed, "tool_call (reconfigured)"));
+    assert_eq!(tool_call_is_error(echoed), Some(false), "{echoed}");
+    assert!(echoed.to_string().contains("after reconfigure"), "{echoed}");
+
+    // retire: dropping the entry uninstalls it and nothing answers for it
+    let retired = post_json_rpc(
+        &rpc_base,
+        9959,
+        "openhuman.mcp_clients_config_set",
+        json!({ "mcpServers": {} }),
+    )
+    .await;
+    let retired = peel_logs_envelope(assert_no_jsonrpc_error(&retired, "config_set (retire)"));
+    assert_eq!(
+        retired.get("removed"),
+        Some(&json!(["echo-reconf"])),
+        "{retired}"
+    );
+    let status = post_json_rpc(&rpc_base, 9960, "openhuman.mcp_clients_status", json!({})).await;
+    let status = peel_logs_envelope(assert_no_jsonrpc_error(&status, "status (retired)"));
+    assert_eq!(status["servers"], json!([]), "{status}");
+    let gone = post_json_rpc(
+        &rpc_base,
+        9961,
+        "openhuman.mcp_clients_tool_call",
+        json!({ "server_id": server_id, "tool_name": "echo", "arguments": {} }),
+    )
+    .await;
+    let gone_text = gone.to_string();
+    assert!(
+        gone.get("error").is_some() || gone_text.contains("\"is_error\":true"),
+        "a retired install must not answer a call: {gone}"
     );
 
     mock_join.abort();

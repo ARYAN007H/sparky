@@ -87,6 +87,9 @@ fn hallucination_mode_wire(mode: HallucinationMode) -> &'static str {
 /// the agent, rather than failing to decode.
 pub use tinyvoice_bus::VoiceIntent;
 
+/// Recording-session vocabulary shared with the loaded TinyVoice module.
+pub use tinyvoice_bus::{GateVerdict, RecordingGates, UtteranceDisposition};
+
 /// Native capture lease types shared with the loaded TinyVoice module.
 pub use tinyvoice_bus::capture::{
     CaptureBatch, CaptureError, CaptureFormat, CaptureHandle, CapturePollRequest, CaptureResult,
@@ -141,42 +144,50 @@ fn clamped(intent: VoiceIntent) -> VoiceIntent {
     }
 }
 
-/// Apply the wake-word gate, returning the command that followed it.
+/// Sequence a transcript through the wake-word gate.
 ///
-/// `None` means the utterance was not addressed to the agent, or the wake word
-/// arrived with nothing after it. Those are the same outcome for a caller, and
-/// the module represents both as an empty string.
+/// The module decides whether an utterance is ignored, a command with the wake
+/// phrase stripped, or a bare wake word; the host only acts on the answer.
 ///
 /// # Errors
 ///
-/// [`VoiceCallError`] when the module is unavailable or the call fails.
-pub async fn extract_command(
+/// [`VoiceCallError`] when the module is unavailable or the call fails. The
+/// caller must treat that as "ignore": this gate keeps a passing conversation
+/// out of the assistant, so it fails closed.
+pub async fn sequence_utterance(
     config: &Config,
     transcript: &str,
     wake_word: &str,
-) -> Result<Option<String>, VoiceCallError> {
-    let command: String = call(config, methods::EXTRACT_COMMAND, (transcript, wake_word)).await?;
-    Ok(if command.is_empty() {
-        None
-    } else {
-        Some(command)
-    })
+) -> Result<UtteranceDisposition, VoiceCallError> {
+    let json: String = call(config, methods::SEQUENCE_UTTERANCE, (transcript, wake_word)).await?;
+    serde_json::from_str(&json)
+        .map_err(|e| VoiceCallError::Failed(format!("could not decode disposition: {e}")))
 }
 
-/// Whether the wake word appears near the start of a transcript.
-///
-/// Distinguished from [`extract_command`] so a caller can acknowledge a bare
-/// "Hey Tiny", which otherwise reads to the user as a dead microphone.
+/// Apply the pre-transcription recording gates (minimum duration, silence).
 ///
 /// # Errors
 ///
 /// [`VoiceCallError`] when the module is unavailable or the call fails.
-pub async fn wake_word_present(
+pub async fn gate_recording(
     config: &Config,
-    transcript: &str,
-    wake_word: &str,
-) -> Result<bool, VoiceCallError> {
-    call(config, methods::WAKE_WORD_PRESENT, (transcript, wake_word)).await
+    duration_secs: f32,
+    peak_rms: f32,
+    gates: RecordingGates,
+) -> Result<GateVerdict, VoiceCallError> {
+    let json: String = call(
+        config,
+        methods::GATE_RECORDING,
+        (
+            duration_secs,
+            peak_rms,
+            gates.min_duration_secs,
+            gates.silence_threshold,
+        ),
+    )
+    .await?;
+    serde_json::from_str(&json)
+        .map_err(|e| VoiceCallError::Failed(format!("could not decode verdict: {e}")))
 }
 
 /// Whether an STT transcript looks like a hallucination rather than speech.

@@ -334,6 +334,50 @@ pub(crate) fn migrate_components_with(config: &mut Config, raw: &str, tinymemes:
     #[cfg(not(feature = "tinymemes"))]
     let memes_on = tinymemes.and(None::<bool>);
     disable(config, "memes", memes_on);
+    // The old tool-output compaction master switch, `[tokenjuice]
+    // router_enabled = false`, becomes `[components] juice = false`. The
+    // switch stays as a sub-setting of the on state.
+    // Voice had three independent switches (`[dictation] enabled`,
+    // `[voice_server] auto_start`, `always_on_enabled`). Only a config that
+    // names all three and has every one off says "no voice at all"; any other
+    // mix keeps the component on, so the old keys keep working for a release.
+    let voice_flag = |table: &str, key: &str| {
+        value
+            .as_ref()
+            .and_then(|v| v.get(table))
+            .and_then(|t| t.get(key))
+            .and_then(toml::Value::as_bool)
+    };
+    let voice_flags = [
+        voice_flag("dictation", "enabled"),
+        voice_flag("voice_server", "auto_start"),
+        voice_flag("voice_server", "always_on_enabled"),
+    ];
+    if voice_flags.iter().all(|f| *f == Some(false)) {
+        disable(config, "voice", Some(false));
+    }
+    let router_enabled = value
+        .as_ref()
+        .and_then(|v| v.get("tokenjuice"))
+        .and_then(|t| t.get("router_enabled"))
+        .and_then(toml::Value::as_bool);
+    disable(config, "juice", router_enabled);
+    // `[sandbox] enabled = false` (and the same key under `[security.sandbox]`)
+    // already meant "no isolation backend"; it now also keeps the TinyBox
+    // module from loading. Unset (auto) and `true` keep the component on.
+    let sandbox_flag = |path: &[&str]| {
+        let mut node = value.as_ref()?;
+        for key in path {
+            node = node.get(key)?;
+        }
+        node.get("enabled").and_then(toml::Value::as_bool)
+    };
+    let sandbox_off = [
+        sandbox_flag(&["sandbox"]),
+        sandbox_flag(&["security", "sandbox"]),
+    ]
+    .contains(&Some(false));
+    disable(config, "sandbox", sandbox_off.then_some(false));
     if !moved.is_empty() {
         tracing::info!(
             "[config][migrate] legacy switches moved to [components]: {}",

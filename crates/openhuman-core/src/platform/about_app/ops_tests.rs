@@ -43,3 +43,14 @@ fn every_mapped_domain_shows_disabled_when_its_component_is_off() {
         }
     }
 }
+
+#[test]
+fn sandbox_capability_shows_disabled_when_sandbox_component_is_off() {
+    let cap = super::super::lookup("security.sandbox_backends").expect("sandbox capability");
+    assert_ne!(cap.status, CapabilityStatus::Disabled);
+    assert_eq!(
+        apply_components(cap, &off("sandbox")).status,
+        CapabilityStatus::Disabled
+    );
+    assert_eq!(apply_components(cap, &off("voice")).status, cap.status);
+}

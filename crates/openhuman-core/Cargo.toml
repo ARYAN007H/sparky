@@ -138,7 +138,7 @@ tinyagents-harness = { path = "../../vendor/tinyagents/crates/tinyagents-harness
     "multimodal",
     "builtin-tools",
 ] }
-tinybox-bus = { path = "../../vendor/tinybox/crates/tinybox-bus", optional = true }
+tinybox-bus = { path = "../../vendor/tinybox/crates/tinybox-bus" }
 tinyagents-definition = { path = "../../vendor/tinyagents/crates/tinyagents-definition" }
 # Live (realtime voice) agent sessions: `tinyagents-live` runs a
 # `tinyliveagents` provider session (Gemini Live direct/relayed, ElevenLabs
@@ -201,6 +201,7 @@ tinytools-std = { path = "../../vendor/tinyagents/vendor/tinytools/crates/tinyto
 # `memory::` is the only module that names the engine side.
 tinymemory-api = { path = "../../vendor/tinymemory/crates/tinymemory-api", features = ["local-safety"] }
 tinymemory-tools = { path = "../../vendor/tinymemory/crates/tinymemory-tools" }
+tinyredact = { path = "../../vendor/tinymemory/crates/tinyredact" }
 tinymemory-integrations = { path = "../../vendor/tinymemory/crates/tinymemory-integrations", default-features = false, features = ["cortex", "brain", "sources-network", "safety", "legacy-import"] }
 # tinyconnectors-bus — the OAuth connector wire contract
 # (https://github.com/tinyhumansai/tinyconnectors). Payload types and member
@@ -277,8 +278,12 @@ once_cell = "1.19"
 parking_lot = "0.12"
 log = "0.4"
 # Final-reply slang + meme remix (runtime flag OPENHUMAN_TINYMEMES, off by
-# default). Vendored submodule: vendor/tinymemes.
-tinymemes = { path = "../../vendor/tinymemes", optional = true }
+# default). The engine runs in the `tinymemes` module; the host links only its
+# `*-bus` contract (vendored submodule: vendor/tinymemes).
+tinymemes-bus = { path = "../../vendor/tinymemes/crates/tinymemes-bus", optional = true }
+# The Jev client the host serves to the module's `Evaluate` callback (managed
+# Jev over the backend's System One proxy). Not a module implementation.
+tinyinference-decisions = { path = "../../vendor/tinyagents/vendor/tinyinference/crates/tinyinference-decisions", optional = true }
 libc = "0.2"
 nu-ansi-term = "0.50"
 base64 = "0.22"
@@ -484,7 +489,8 @@ tokio-tungstenite = { version = "0.29", default-features = false, features = ["c
 # production channel execution uses the TinyBus module contract above.
 tinychannels = { path = "../../vendor/tinychannels", features = ["relay-websocket", "email", "lark", "whatsapp-web"] }
 tinychannels-runtime = { path = "../../vendor/tinychannels/crates/tinychannels-runtime" }
-tinychannels-module = { path = "../../vendor/tinychannels/crates/tinychannels-module", features = ["static-link"] }
+# BLOCKED on tinybus 0.1.4 (tinybus epic): tinychannels-module v0.1.29 pins =0.1.4; workspace tinybus is 0.1.3.
+# tinychannels-module = { path = "../../vendor/tinychannels/crates/tinychannels-module", features = ["static-link"] }
 tinybox-core = { path = "../../vendor/tinybox/crates/tinybox-core" }
 # The TinyMemory reference engine (an in-memory `MemoryEngine`) and the
 # behavioural suite every engine must pass. Memory unit tests bind it as the
@@ -536,9 +542,9 @@ proptest = "1"
 langfuse = ["tinyagents-harness/langfuse"]
 # Storage drivers for `[storage] url` / `OPENHUMAN_STORAGE_URL` (see the
 # `storage` domain). Memory and plain files are always available.
-# `storage-sqlite` is in the contributor set and the product: the small
-# desktop stores (approvals, devices, notifications, task sources) keep their
-# rows in it by default. `storage-mongodb` is in neither; a cloud build turns
+# `storage-sqlite` is in the contributor set and the product: the default
+# backend, `sqlite:<workspace>/storage`, needs it, so a host without it must
+# name another backend. `storage-mongodb` is in neither; a cloud build turns
 # it on. OS keychain support belongs to openhuman-rpc's `os-keyring` feature,
 # not the core or its storage-driver feature set.
 storage-sqlite = ["tinystoragedrivers/sqlite"]
@@ -640,7 +646,7 @@ hosting = ["modules", "dep:tinyhosts-bus"]
 # is still off until `OPENHUMAN_TINYMEMES` (or a build-time
 # `OPENHUMAN_TINYMEMES_DEFAULT`) turns it on. Off in the minimal kernel
 # profiles, so they stay free of its dependencies.
-tinymemes = ["dep:tinymemes"]
+tinymemes = ["modules", "dep:tinymemes-bus", "dep:tinyinference-decisions"]
 # The dynamic module host (`openhuman::modules`): the loader that admits a
 # compiled `cdylib` through tinybus's ABI descriptor, manifest, dependency and
 # SHA-256 gates, plus the `modules` RPC namespace and the registry of modules
@@ -663,7 +669,6 @@ tinymemes = ["dep:tinymemes"]
 # the first call. They are wire vocabulary only (no I/O, no runtime).
 modules = [
     "tinybus/modules",
-    "dep:tinybox-bus",
     "dep:tinydocs-bus",
     "dep:tinyhosts-bus",
     "dep:tinyvoice-bus",

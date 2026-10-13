@@ -96,3 +96,89 @@ fn composio_enabled_is_accepted_and_dropped() {
     let v: toml::Value = toml::from_str(&out).unwrap();
     assert!(v["composio"].get("enabled").is_none());
 }
+
+#[test]
+fn legacy_tokenjuice_router_off_maps_to_components_juice() {
+    let c = migrated("[tokenjuice]\nrouter_enabled = false\n", None);
+    assert!(!c.components.juice);
+    assert!(c.components.search && c.components.mcp && c.components.memory);
+}
+
+#[test]
+fn tokenjuice_router_on_or_absent_keeps_juice_on() {
+    assert!(
+        migrated("[tokenjuice]\nrouter_enabled = true\n", None)
+            .components
+            .juice
+    );
+    assert!(
+        migrated("[tokenjuice]\nccr_enabled = false\n", None)
+            .components
+            .juice
+    );
+}
+
+#[test]
+fn explicit_components_juice_beats_legacy_router_flag() {
+    let raw = "[components]\njuice = true\n[tokenjuice]\nrouter_enabled = false\n";
+    assert!(migrated(raw, None).components.juice);
+}
+
+#[test]
+fn juice_migration_round_trip_is_idempotent() {
+    let first = migrated("[tokenjuice]\nrouter_enabled = false\n", None);
+    let saved = toml::to_string(&first).unwrap();
+    let second = migrated(&saved, None);
+    assert!(!second.components.juice);
+    assert_eq!(saved, toml::to_string(&second).unwrap());
+}
+
+#[test]
+fn voice_switches_all_explicitly_off_disable_the_voice_component() {
+    let c = migrated(
+        "[dictation]\nenabled = false\n[voice_server]\nauto_start = false\nalways_on_enabled = false\n",
+        None,
+    );
+    assert!(!c.components.voice);
+    assert!(c.components.flows, "others stay on");
+}
+
+#[test]
+fn voice_stays_on_when_any_legacy_voice_switch_is_on_or_unset() {
+    let c = migrated(
+        "[dictation]\nenabled = true\n[voice_server]\nauto_start = false\nalways_on_enabled = false\n",
+        None,
+    );
+    assert!(c.components.voice);
+    let c = migrated("[voice_server]\nauto_start = false\n", None);
+    assert!(c.components.voice, "unset keys are not an opt-out");
+}
+
+#[test]
+fn explicit_components_voice_wins_over_legacy_voice_switches() {
+    let c = migrated(
+        "[components]\nvoice = true\n[dictation]\nenabled = false\n[voice_server]\nauto_start = false\nalways_on_enabled = false\n",
+        None,
+    );
+    assert!(c.components.voice);
+}
+
+#[test]
+fn sandbox_enabled_false_maps_to_components_sandbox() {
+    let c = migrated("[sandbox]\nenabled = false\n", None);
+    assert!(!c.components.sandbox);
+    assert_eq!(c.sandbox.enabled, Some(false), "old key kept");
+    let c = migrated("[security.sandbox]\nenabled = false\n", None);
+    assert!(!c.components.sandbox);
+}
+
+#[test]
+fn sandbox_auto_or_on_or_explicit_component_keeps_the_component_on() {
+    for raw in [
+        "[sandbox]\nenabled = true\n",
+        "[sandbox]\nbackend = \"auto\"\n",
+        "[sandbox]\nenabled = false\n[components]\nsandbox = true\n",
+    ] {
+        assert!(migrated(raw, None).components.sandbox, "{raw}");
+    }
+}
