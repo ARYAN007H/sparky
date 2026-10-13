@@ -376,6 +376,7 @@ impl McpConfiguredClient {
                         name: tool.name,
                         description: tool.description.or(tool.title),
                         input_schema: tool.input_schema,
+                        meta: None,
                     })
                     .collect(),
             );

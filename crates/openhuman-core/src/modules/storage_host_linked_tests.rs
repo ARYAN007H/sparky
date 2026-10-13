@@ -1,7 +1,6 @@
 use super::*;
 use async_trait::async_trait;
 use serde_json::json;
-use std::collections::HashMap;
 use tinybus::broker::Broker;
 use tinybus::transport::memory::MemoryBus;
 use tinybus::{BusName, Connection};
@@ -113,7 +112,7 @@ impl Bus {
             .object("Secrets")
             .call_confidential("Get", (SecretNameRequest { name: name.into() },))
             .await?;
-        Ok(reply.value)
+        Ok(Some(reply.value))
     }
 
     async fn put_server(&self, id: &str) -> tinybus::Result<()> {
