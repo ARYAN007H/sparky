@@ -307,9 +307,10 @@ fn a_record_the_backend_already_holds_is_never_overwritten() {
     // A second workspace marker (a different workspace on a shared backend)
     // runs the import again over the same backend.
     let (_other, other_config) = workspace();
-    assert!(
-        written(import_flows(&backend, &Scope::local(), &other_config).unwrap()) < 12,
-        "records already present are counted as existing"
+    assert_eq!(
+        written(import_flows(&backend, &Scope::local(), &other_config).unwrap()),
+        0,
+        "records already present are counted as existing, not written"
     );
     let name = crate::storage::block_on_anyhow(async move {
         Ok(catalog.get_flow("flow-alpha").await?.unwrap().name)
