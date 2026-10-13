@@ -26,7 +26,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 #[cfg(windows)]
-use openhuman_core::agent::harness::definition::SandboxMode;
+use tinyagents_definition::SandboxMode;
 #[cfg(windows)]
 use openhuman_core::config::RuntimeConfig;
 #[cfg(windows)]

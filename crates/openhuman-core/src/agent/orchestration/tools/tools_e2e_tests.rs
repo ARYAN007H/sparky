@@ -1,5 +1,5 @@
 use super::{ArchetypeDelegationTool, DelegationTarget, SpawnSubagentTool, SpawnWorkerThreadTool};
-use crate::agent::harness::definition::AgentDefinitionRegistry;
+use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::harness::{with_parent_context, ParentExecutionContext};
 use crate::agent::prompts::{ConnectedIntegration, ToolCallFormat};
 use crate::threads::store as conversations;

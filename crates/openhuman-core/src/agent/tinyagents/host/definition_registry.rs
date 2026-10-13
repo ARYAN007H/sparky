@@ -3,7 +3,7 @@
 //! Adapts two OpenHuman domains onto
 //! [`tinyagents_harness::host::DefinitionRegistry`]:
 //!
-//! * [`crate::agent::harness::definition::AgentDefinitionRegistry`] —
+//! * [`crate::agent::harness::host_definition::AgentDefinitionRegistry`] —
 //!   the harness registry of built-in ([`load_builtins`](crate::agent::registry::agents::load_builtins)-parsed
 //!   `agent.toml`)
 //!   and workspace-override agent definitions, plus the config-backed
@@ -31,7 +31,7 @@
 //! `AgentDefinition::subagents` is only what an agent *declares*;
 //! `delegates_for` must return the **authorized** set. OpenHuman's authority is
 //! the tier hierarchy, so `delegates_for` applies
-//! [`validate_tier_transition`](crate::agent::harness::definition::validate_tier_transition)
+//! [`validate_tier_transition`](tinyagents_definition::validate_tier_transition)
 //! — the same single source of truth
 //! [`validate_tier_hierarchy`](crate::agent::registry::agents::validate_tier_hierarchy) walks at boot — per declared pair. A `Worker`
 //! parent yields an empty list; a tier-illegal child is dropped. Unknown child
@@ -58,11 +58,9 @@ use async_trait::async_trait;
 use tinyagents_definition::Result;
 use tinyagents_definition::{AgentDefinition, DefinitionRegistry};
 
-use crate::agent::harness::definition::NO_TOOLS_SENTINEL;
-use crate::agent::harness::definition::{
-    AgentDefinition as HostAgentDefinition, AgentDefinitionRegistry, AgentTier, ModelSpec,
-    SubagentEntry, ToolScope,
-};
+use crate::agent::harness::host_definition::NO_TOOLS_SENTINEL;
+use crate::agent::harness::host_definition::{AgentDefinition as HostAgentDefinition, AgentDefinitionRegistry};
+use tinyagents_definition::{AgentTier, ModelSpec, SubagentEntry, ToolScope};
 use crate::agent::registry::{definition_from_registry_entry, find_custom_in_config};
 use crate::config::Config;
 
@@ -404,7 +402,7 @@ impl OpenHumanDefinitionRegistry {
 
     /// Tier-checked delegate ids for `def`.
     ///
-    /// Reuses [`crate::agent::harness::definition::validate_tier_transition`]
+    /// Reuses [`tinyagents_definition::validate_tier_transition`]
     /// — the single source of truth [`validate_tier_hierarchy`](crate::agent::registry::agents::validate_tier_hierarchy) walks at boot —
     /// so this seam can never disagree with the host's boot-time validation.
     fn authorized_delegates(&self, def: &HostAgentDefinition) -> Vec<String> {
@@ -423,7 +421,7 @@ impl OpenHumanDefinitionRegistry {
                 out.push(id);
                 continue;
             };
-            match crate::agent::harness::definition::validate_tier_transition(
+            match tinyagents_definition::validate_tier_transition(
                 def.agent_tier,
                 child.agent_tier,
             ) {

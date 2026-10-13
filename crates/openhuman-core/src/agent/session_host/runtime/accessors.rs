@@ -145,9 +145,9 @@ impl OpenHumanSessionHost {
     /// them replaced by a same-id registry entry.
     pub(crate) fn resolved_definition(
         &self,
-    ) -> Option<Arc<crate::agent::harness::definition::AgentDefinition>> {
+    ) -> Option<Arc<crate::agent::harness::host_definition::AgentDefinition>> {
         self.definition.clone().or_else(|| {
-            crate::agent::harness::definition::AgentDefinitionRegistry::current()
+            crate::agent::harness::host_definition::AgentDefinitionRegistry::current()
                 .and_then(|registry| registry.get(&self.agent_definition_id).cloned())
                 .map(Arc::new)
         })

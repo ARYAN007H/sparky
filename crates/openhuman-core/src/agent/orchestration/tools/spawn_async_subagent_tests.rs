@@ -1,5 +1,5 @@
 use super::*;
-use crate::agent::harness::definition::AgentDefinitionRegistry;
+use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::harness::fork_context::{with_parent_context, ParentExecutionContext};
 use crate::agent::prompts::ToolCallFormat;
 use crate::config::AgentConfig;
@@ -175,7 +175,7 @@ fn accepted_message_hides_task_id_from_prose() {
 #[test]
 fn wait_only_fleet_omits_steering_guidance_and_instruction() {
     let fleet = FleetToolSet::from_scope(
-        &crate::agent::harness::definition::ToolScope::Named(vec!["wait_subagent".to_string()]),
+        &tinyagents_definition::ToolScope::Named(vec!["wait_subagent".to_string()]),
         &[],
     );
     assert!(fleet.can_wait());

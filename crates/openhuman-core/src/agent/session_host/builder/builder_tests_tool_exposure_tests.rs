@@ -9,7 +9,7 @@ fn visible_names(agent_id: &str) -> std::collections::HashSet<String> {
 }
 
 fn visible_names_for(
-    definition: &crate::agent::harness::definition::AgentDefinition,
+    definition: &crate::agent::harness::host_definition::AgentDefinition,
 ) -> std::collections::HashSet<String> {
     let tmp = tempfile::TempDir::new().unwrap();
     let config = test_config(&tmp);

@@ -11,9 +11,8 @@
 //! the test environment).
 
 use super::*;
-use crate::agent::harness::definition::{
-    AgentDefinition, DefinitionSource, ModelSpec, PromptSource, SandboxMode, ToolScope,
-};
+use crate::agent::harness::host_definition::{AgentDefinition};
+use tinyagents_definition::{DefinitionSource, ModelSpec, PromptSource, SandboxMode, ToolScope};
 use async_trait::async_trait;
 use tinytools::{PermissionLevel, Tool, ToolCategory, ToolResult};
 
@@ -72,7 +71,7 @@ fn def_with_scope(scope: ToolScope) -> AgentDefinition {
         tokenjuice_compression: tinyjuice_bus::types::AgentTokenjuiceCompression::Auto,
         subagents: vec![],
         delegate_name: None,
-        agent_tier: crate::agent::harness::definition::AgentTier::Worker,
+        agent_tier: tinyagents_definition::AgentTier::Worker,
         searches_connected_mcp: false,
         source: DefinitionSource::Builtin,
     }

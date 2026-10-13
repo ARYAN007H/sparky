@@ -60,7 +60,7 @@ pub(super) async fn run_agent_job_for_run(
     } else {
         let agent_id = selected_agent_id;
         if let Some(registry) =
-            crate::agent::harness::definition::AgentDefinitionRegistry::current()
+            crate::agent::harness::host_definition::AgentDefinitionRegistry::current()
         {
             if let Some(def) = registry.get(agent_id) {
                 tracing::debug!(
@@ -79,7 +79,7 @@ pub(super) async fn run_agent_job_for_run(
                 // that workload, regardless of which provider it lives
                 // on. Inherit / Exact keep their literal `resolve()`
                 // behaviour because neither relies on the `-v1` trick.
-                use crate::agent::harness::definition::ModelSpec;
+                use tinyagents_definition::ModelSpec;
                 let fallback_model = effective
                     .default_model
                     .clone()

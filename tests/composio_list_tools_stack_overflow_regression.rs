@@ -108,7 +108,8 @@
 #![cfg(not(coverage))]
 
 use async_trait::async_trait;
-use openhuman_core::agent::harness::definition::{AgentDefinitionRegistry, ModelSpec};
+use openhuman_core::agent::harness::host_definition::{AgentDefinitionRegistry};
+use tinyagents_definition::{ModelSpec};
 use openhuman_core::agent::harness::{with_parent_context, ParentExecutionContext};
 use openhuman_core::agent::prompts::ToolCallFormat;
 use openhuman_core::agent::subagent_host::{run_subagent, SubagentRunOptions};

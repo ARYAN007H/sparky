@@ -1,8 +1,7 @@
 use super::*;
-use crate::agent::harness::definition::AgentDefinitionRegistry;
-use crate::agent::harness::definition::{
-    AgentDefinition, AgentTier, DefinitionSource, ModelSpec, PromptSource, SandboxMode, ToolScope,
-};
+use crate::agent::harness::host_definition::AgentDefinitionRegistry;
+use crate::agent::harness::host_definition::{AgentDefinition};
+use tinyagents_definition::{AgentTier, DefinitionSource, ModelSpec, PromptSource, SandboxMode, ToolScope};
 use crate::agent::harness::fork_context::{with_parent_context, ParentExecutionContext};
 use crate::agent::orchestration::spawn_parallel_graph::{
     prepare_spawn_parallel_tasks_from_defs, ParallelTaskRejectionKind, SpawnParallelTaskPreflight,

@@ -7,7 +7,7 @@
 //! session runs under can neither delegate nor act.
 
 use super::*;
-use crate::agent::harness::definition::{SandboxMode, ToolScope};
+use tinyagents_definition::{SandboxMode, ToolScope};
 use crate::agent::tool_policy::{
     ToolCallContext, ToolPolicy, ToolPolicyDecision, ToolPolicyRequest,
 };
@@ -60,8 +60,8 @@ fn request(tool: &str) -> ToolPolicyRequest {
 
 /// The orchestrator's definition is the embed default, and the widest one:
 /// every registered tool, delegation and memory. Host-only must narrow it.
-fn orchestrator_def() -> crate::agent::harness::definition::AgentDefinition {
-    let mut def = crate::agent::harness::definition::AgentDefinitionRegistry::builtins_only()
+fn orchestrator_def() -> crate::agent::harness::host_definition::AgentDefinition {
+    let mut def = crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only()
         .get("orchestrator")
         .cloned()
         .expect("built-in orchestrator");

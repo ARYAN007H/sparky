@@ -14,7 +14,7 @@
 //! that failure and is the fastest way to see these tests fail red.
 
 use super::*;
-use crate::agent::harness::definition::AgentDefinitionRegistry;
+use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::harness::ParentExecutionContext;
 use crate::agent::prompts::ToolCallFormat;
 use crate::agent::tinyagents::tools::CanonicalSharedToolAdapter;

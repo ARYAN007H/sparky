@@ -1,7 +1,5 @@
 use super::*;
-use crate::agent::harness::definition::{
-    DefinitionSource, ModelSpec, PromptSource, SandboxMode, SkillsWildcard, ToolScope,
-};
+use tinyagents_definition::{DefinitionSource, ModelSpec, PromptSource, SandboxMode, SkillsWildcard, ToolScope};
 
 fn def(id: &str, when_to_use: &str, delegate_name: Option<&str>) -> AgentDefinition {
     AgentDefinition {
@@ -30,7 +28,7 @@ fn def(id: &str, when_to_use: &str, delegate_name: Option<&str>) -> AgentDefinit
         tokenjuice_compression: tinyjuice_bus::types::AgentTokenjuiceCompression::Auto,
         subagents: vec![],
         delegate_name: delegate_name.map(String::from),
-        agent_tier: crate::agent::harness::definition::AgentTier::Worker,
+        agent_tier: tinyagents_definition::AgentTier::Worker,
         searches_connected_mcp: false,
         source: DefinitionSource::Builtin,
     }

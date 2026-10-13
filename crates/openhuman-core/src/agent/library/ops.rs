@@ -1,7 +1,5 @@
-use crate::agent::harness::definition::{
-    AgentDefinition, AgentDefinitionRegistry, AgentTier, DefinitionSource, ModelSpec, SandboxMode,
-    SubagentEntry, ToolScope,
-};
+use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
+use tinyagents_definition::{AgentTier, DefinitionSource, ModelSpec, SandboxMode, SubagentEntry, ToolScope};
 use crate::config::rpc as config_rpc;
 
 use super::types::{AgentDefinitionDisplay, AgentDefinitionModel, AgentDefinitionSource};

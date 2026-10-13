@@ -29,7 +29,7 @@ use tinyagents_harness::summarization::payload_summarizer::summary_child_config;
 use tinyinference_llm::message::Message;
 use tracing::debug;
 
-use crate::agent::harness::definition::AgentDefinition;
+use crate::agent::harness::host_definition::AgentDefinition;
 use crate::agent::subagent_host;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 use {

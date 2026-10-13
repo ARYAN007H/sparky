@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 
 use super::live_config::live_composio_config;
 use super::redact::redact_composio_outcome;
-use crate::agent::harness::definition::SandboxMode;
+use tinyagents_definition::SandboxMode;
 use crate::agent::tinyagents::host::run_context::{sandbox_mode_for_tool, task_recency_window_for_tool};
 use crate::config::Config;
 use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolCategory, ToolResult, ToolRunContext};

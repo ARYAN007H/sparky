@@ -3,9 +3,8 @@
 use super::dispatcher::{resolve_dispatcher_kind, DispatcherKind};
 use super::host_tools::derive_turn_workspace_descriptor;
 use super::should_synthesize_delegation_tools;
-use crate::agent::harness::definition::{
-    AgentDefinitionRegistry, PromptSource, ToolScope, NO_TOOLS_SENTINEL,
-};
+use crate::agent::harness::host_definition::{AgentDefinitionRegistry, NO_TOOLS_SENTINEL};
+use tinyagents_definition::{PromptSource, ToolScope};
 use crate::agent::host_runtime;
 use crate::agent::prompts::SystemPromptBuilder;
 use crate::agent::session_host::types::OpenHumanSessionHost;
@@ -126,7 +125,7 @@ impl OpenHumanSessionHost {
     /// booted core.
     pub fn from_config_with_definition(
         config: &Config,
-        definition: &crate::agent::harness::definition::AgentDefinition,
+        definition: &crate::agent::harness::host_definition::AgentDefinition,
     ) -> Result<Self> {
         log::debug!(
             "[agent] from_config_with_definition id={} sandbox={:?}",
@@ -149,7 +148,7 @@ impl OpenHumanSessionHost {
     pub(crate) fn build_session_agent_inner(
         config: &Config,
         agent_id: &str,
-        target_def: Option<&crate::agent::harness::definition::AgentDefinition>,
+        target_def: Option<&crate::agent::harness::host_definition::AgentDefinition>,
         host_only: bool,
         host: Option<&super::HostTools>,
         session_id: Option<&str>,
@@ -431,7 +430,7 @@ impl OpenHumanSessionHost {
             Option<std::collections::HashSet<String>>,
         ) = match (
             target_def,
-            crate::agent::harness::definition::AgentDefinitionRegistry::current(),
+            crate::agent::harness::host_definition::AgentDefinitionRegistry::current(),
         ) {
             // Host-only: no delegation; the host's names join an empty belt.
             _ if host_only => (Vec::new(), Some(super::host_only::empty_belt())),
@@ -713,7 +712,7 @@ impl OpenHumanSessionHost {
         let payload_summarizer: Option<
             std::sync::Arc<dyn crate::agent::tinyagents::payload_summarizer::PayloadSummarizer>,
         > = if !host_only && super::summarizes_tool_output(agent_id, config) {
-            match crate::agent::harness::definition::AgentDefinitionRegistry::current() {
+            match crate::agent::harness::host_definition::AgentDefinitionRegistry::current() {
                 Some(reg) => match reg.get("summarizer") {
                     Some(summarizer_def) => {
                         log::info!(
@@ -879,7 +878,7 @@ impl OpenHumanSessionHost {
 pub(super) fn resolve_target_definition(
     config: &Config,
     agent_id: &str,
-) -> Result<Option<crate::agent::harness::definition::AgentDefinition>> {
+) -> Result<Option<crate::agent::harness::host_definition::AgentDefinition>> {
     let registry = AgentDefinitionRegistry::current();
 
     if let Some(reg) = registry.as_deref() {
@@ -950,7 +949,7 @@ mod provider_role_tests;
 /// Flow readiness shares this path so it checks the provider used at runtime.
 pub(crate) fn provider_role_for_definition(
     default_model: Option<&str>,
-    target_def: Option<&crate::agent::harness::definition::AgentDefinition>,
+    target_def: Option<&crate::agent::harness::host_definition::AgentDefinition>,
 ) -> &'static str {
     let master_hint = default_model
         .is_none()
@@ -958,7 +957,7 @@ pub(crate) fn provider_role_for_definition(
             target_def.and_then(|def| {
                 if def.id == "orchestrator" {
                     match &def.model {
-                        crate::agent::harness::definition::ModelSpec::Hint(hint) => {
+                        tinyagents_definition::ModelSpec::Hint(hint) => {
                             Some(format!("hint:{hint}"))
                         }
                         _ => None,

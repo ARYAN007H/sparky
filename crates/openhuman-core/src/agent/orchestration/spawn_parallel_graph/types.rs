@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use tinytools::WorkspaceDescriptor;
 
-use crate::agent::harness::definition::AgentDefinition;
+use crate::agent::harness::host_definition::AgentDefinition;
 
 use super::staging::WorkerDispatchMode;
 

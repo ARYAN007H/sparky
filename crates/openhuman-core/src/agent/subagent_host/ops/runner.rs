@@ -10,10 +10,8 @@ use std::collections::HashSet;
 use std::time::Instant;
 
 use crate::agent::harness::artifact_offload::{new_artifact_offload, offload_oversized_result};
-use crate::agent::harness::definition::{
-    validate_tier_transition, AgentDefinition, AgentDefinitionRegistry, AgentTier, IterationPolicy,
-    PromptSource, SandboxMode as AgentSandboxMode,
-};
+use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
+use tinyagents_definition::{validate_tier_transition, AgentTier, IterationPolicy, PromptSource, SandboxMode as AgentSandboxMode};
 use crate::agent::harness::fork_context::ParentExecutionContext;
 use crate::agent::prompts::{
     render_subagent_system_prompt_with_format, PromptContext, SubagentRenderOptions,

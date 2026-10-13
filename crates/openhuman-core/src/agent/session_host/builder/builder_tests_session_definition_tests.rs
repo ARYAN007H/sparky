@@ -7,7 +7,8 @@
 //! builder caller had no equivalent, and fell back to the process registry.
 //! These tests pin the route that closes that gap.
 
-use crate::agent::harness::definition::{AgentDefinition, AgentDefinitionRegistry, ToolScope};
+use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
+use tinyagents_definition::{ToolScope};
 use crate::agent::tinyagents::host::OpenHumanDefinitionRegistry;
 use std::sync::Arc;
 use tinyagents_definition::DefinitionRegistry;

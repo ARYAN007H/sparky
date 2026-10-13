@@ -25,7 +25,8 @@ pub use host_tools::{HostTools, HostTurnTools, TurnContext};
 #[cfg(test)]
 mod builder_tests;
 
-use crate::agent::harness::definition::{AgentDefinition, ToolScope};
+use crate::agent::harness::host_definition::{AgentDefinition};
+use tinyagents_definition::{ToolScope};
 use std::sync::Arc;
 use tinytools::ToolPolicySession;
 use tinytools::{Tool, ToolSpec};
@@ -209,7 +210,7 @@ pub(super) fn ensure_recovery_tool_visible(
     // recovery tool has nothing to recover for one — there are no tool outputs
     // to truncate. Adding it would turn "no tools" into "one tool" and put a
     // schema back on a turn whose whole point is that it stays flat.
-    if !crate::agent::harness::definition::is_empty_tool_scope(visible) {
+    if !crate::agent::harness::host_definition::is_empty_tool_scope(visible) {
         for name in crate::inference::tokenjuice::RECOVERY_TOOL_VISIBLE {
             visible.insert((*name).to_string());
         }
@@ -246,7 +247,7 @@ pub(super) fn ensure_repl_tools_visible(
     if !handle_mode_active {
         return;
     }
-    if !crate::agent::harness::definition::is_empty_tool_scope(visible) {
+    if !crate::agent::harness::host_definition::is_empty_tool_scope(visible) {
         for name in tinyjuice_bus::tools::REPL_TOOLS {
             visible.insert((*name).to_string());
         }

@@ -16,7 +16,7 @@ use std::time::Instant;
 
 use tokio::sync::mpsc::Sender;
 
-use crate::agent::harness::definition::SandboxMode;
+use tinyagents_definition::SandboxMode;
 use crate::agent::harness::fork_context::{AgentContextPreparedSource, ParentExecutionContext};
 use crate::agent::progress::AgentProgress;
 use crate::agent::subagent_host::SubagentUsage;

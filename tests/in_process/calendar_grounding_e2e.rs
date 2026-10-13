@@ -114,7 +114,7 @@ async fn test_orchestrator_has_current_date_context() -> Result<()> {
     let model = calendar_model(captured_messages.clone());
     let workspace = tempfile::tempdir()?;
     let _ =
-        openhuman_core::agent::harness::definition::AgentDefinitionRegistry::init_global_builtins();
+        openhuman_core::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins();
 
     let mut agent = OpenHumanSessionHost::builder()
         .chat_model(model)
@@ -164,7 +164,7 @@ async fn test_subagent_has_current_date_context() -> Result<()> {
     let model = calendar_model(captured_messages.clone());
 
     let _ =
-        openhuman_core::agent::harness::definition::AgentDefinitionRegistry::init_global_builtins();
+        openhuman_core::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins();
 
     let parent = openhuman_core::agent::harness::ParentExecutionContext {
         agent_definition_id: "orchestrator".into(),
@@ -195,7 +195,7 @@ async fn test_subagent_has_current_date_context() -> Result<()> {
         run_queue: None,
     };
 
-    let mut def = openhuman_core::agent::harness::definition::AgentDefinitionRegistry::global()
+    let mut def = openhuman_core::agent::harness::host_definition::AgentDefinitionRegistry::global()
         .unwrap()
         .get("critic")
         .unwrap()
@@ -208,7 +208,7 @@ async fn test_subagent_has_current_date_context() -> Result<()> {
     // model spec to Inherit to keep the real definition (prompt, tools,
     // scope) while routing through the captured mock provider. Provider *routing* for Hint sub-agents is covered by
     // `subagent_runner::ops::tests::resolve_subagent_provider_*`.
-    def.model = openhuman_core::agent::harness::definition::ModelSpec::Inherit;
+    def.model = tinyagents_definition::ModelSpec::Inherit;
 
     let _ = openhuman_core::agent::harness::with_parent_context(parent, async {
         openhuman_core::agent::subagent_host::run_subagent(

@@ -183,7 +183,7 @@ impl SessionHostBuilder {
             deferred_names.retain(|name| !self.withheld_tool_names.contains(name));
             if visible_names.is_empty() {
                 visible_names
-                    .insert(crate::agent::harness::definition::NO_TOOLS_SENTINEL.to_string());
+                    .insert(crate::agent::harness::host_definition::NO_TOOLS_SENTINEL.to_string());
             }
         }
         visible_names.extend(self.permanent_tool_names.iter().cloned());

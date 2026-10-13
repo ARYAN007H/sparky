@@ -3,7 +3,7 @@ use super::*;
 #[cfg(feature = "mcp")]
 #[test]
 fn declaring_mcp_servers_opts_a_named_belt_into_tool_search() {
-    use openhuman_core::agent::harness::definition::ToolScope;
+    use tinyagents_definition::ToolScope;
 
     let mut named = ToolScope::Named(vec!["read_file".into()]);
     opt_named_belt_into_discovery(&mut named);
@@ -39,7 +39,7 @@ fn an_agent_without_sub_agents_resolves_through_the_process_catalogue() {
 
 #[test]
 fn sub_agents_become_workers_in_a_catalogue_of_the_agents_own() {
-    use openhuman_core::agent::harness::definition::AgentTier;
+    use tinyagents_definition::AgentTier;
 
     let catalogue = process_catalogue();
     let mut definition = super::super::AgentDefinitionSpec::new()

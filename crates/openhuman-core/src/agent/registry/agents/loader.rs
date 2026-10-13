@@ -29,10 +29,8 @@
 //! into the global registry, where they replace built-ins on `id`
 //! collision.
 
-use crate::agent::harness::definition::{
-    validate_tier_transition, AgentDefinition, AgentTier, DefinitionSource, PromptBuilder,
-    PromptSource, SubagentEntry,
-};
+use crate::agent::harness::host_definition::{AgentDefinition, PromptBuilder};
+use tinyagents_definition::{validate_tier_transition, AgentTier, DefinitionSource, PromptSource, SubagentEntry};
 use anyhow::{Context, Result};
 use std::collections::HashMap;
 
@@ -204,7 +202,7 @@ fn builtin_enabled(_b: &BuiltinAgent) -> bool {
 /// untouched: they name no agent, so there is no tier pair to check.
 ///
 /// Called from [`load_builtins`] for the bundled archetype set and from
-/// [`crate::agent::harness::definition::AgentDefinitionRegistry::load`]
+/// [`crate::agent::harness::host_definition::AgentDefinitionRegistry::load`]
 /// after workspace-local TOML overrides are merged, so custom user
 /// agents that violate the contract fail the boot rather than crashing
 /// at spawn time.

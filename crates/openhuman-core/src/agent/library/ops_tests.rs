@@ -1,5 +1,5 @@
 use super::*;
-use crate::agent::harness::definition::{PromptSource, SkillsWildcard};
+use tinyagents_definition::{PromptSource, SkillsWildcard};
 
 fn definition() -> AgentDefinition {
     AgentDefinition {

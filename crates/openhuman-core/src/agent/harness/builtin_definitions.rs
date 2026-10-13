@@ -119,7 +119,7 @@ pub(crate) fn test_inherit_echo_def() -> AgentDefinition {
         tokenjuice_compression: tinyjuice_bus::types::AgentTokenjuiceCompression::Auto,
         subagents: vec![],
         delegate_name: None,
-        agent_tier: crate::agent::harness::definition::AgentTier::Worker,
+        agent_tier: tinyagents_definition::AgentTier::Worker,
         searches_connected_mcp: false,
         source: DefinitionSource::Builtin,
     }
@@ -157,7 +157,7 @@ pub(crate) fn test_inherit_parallel_worker_def() -> AgentDefinition {
         tokenjuice_compression: tinyjuice_bus::types::AgentTokenjuiceCompression::Auto,
         subagents: vec![],
         delegate_name: None,
-        agent_tier: crate::agent::harness::definition::AgentTier::Worker,
+        agent_tier: tinyagents_definition::AgentTier::Worker,
         searches_connected_mcp: false,
         source: DefinitionSource::Builtin,
     }

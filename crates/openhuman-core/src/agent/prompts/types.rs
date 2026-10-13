@@ -450,7 +450,7 @@ pub enum PromptTier {
 /// Marker a dynamic prompt builder emits on its own line to say "everything
 /// after this belongs to the `Context` tier".
 ///
-/// A [`PromptSource::Dynamic`](crate::agent::harness::definition::PromptSource)
+/// A [`PromptSource::Dynamic`](tinyagents_definition::PromptSource)
 /// builder returns one string. Splitting it on these markers is how it
 /// declares tiers without a second builder signature, and the markers never
 /// reach the model: [`split_prompt_tiers`] removes them, and a renderer that
@@ -503,7 +503,7 @@ pub fn split_prompt_tiers(body: &str, default_tier: PromptTier) -> Vec<(PromptTi
 
 /// Per-definition rendering flags passed into the sub-agent prompt
 /// renderer. Mirrors the `omit_*` fields on
-/// [`crate::agent::harness::definition::AgentDefinition`]
+/// [`crate::agent::harness::host_definition::AgentDefinition`]
 /// but inverted into positive-sense `include_*` form.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SubagentRenderOptions {

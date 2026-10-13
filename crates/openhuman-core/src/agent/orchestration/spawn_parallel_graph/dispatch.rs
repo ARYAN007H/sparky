@@ -9,7 +9,8 @@ use tinyagents_harness::workspace::WorkspaceIsolation;
 use tinytools::WorkspaceDescriptor;
 use tokio::sync::mpsc::Sender;
 
-use crate::agent::harness::definition::{AgentDefinition, SandboxMode};
+use crate::agent::harness::host_definition::{AgentDefinition};
+use tinyagents_definition::{SandboxMode};
 use crate::agent::harness::fork_context::ParentExecutionContext;
 use crate::agent::orchestration::worktree;
 use crate::agent::progress::AgentProgress;

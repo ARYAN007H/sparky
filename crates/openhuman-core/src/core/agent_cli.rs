@@ -27,7 +27,7 @@ use crate::agent::debug::prompt_size::{render_text, PromptSizeReport};
 use crate::agent::debug::{
     dump_agent_prompt, dump_all_agent_prompts, write_prompt_dumps, DumpPromptOptions, DumpedPrompt,
 };
-use crate::agent::harness::definition::AgentDefinitionRegistry;
+use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 
 /// Entry point for `openhuman agent <subcommand>`.
 pub fn run_agent_command(args: &[String]) -> Result<()> {

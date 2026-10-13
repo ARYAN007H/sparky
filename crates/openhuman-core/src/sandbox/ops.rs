@@ -6,7 +6,7 @@ use super::types::{
     ElevatedOp, SandboxBackendHandle, SandboxBackendKind, SandboxExecRequest, SandboxExecResult,
     SandboxPolicy, SandboxStatus, ELEVATED_TOOLS,
 };
-use crate::agent::harness::definition::SandboxMode;
+use tinyagents_definition::SandboxMode;
 use crate::config::{RuntimeConfig, SandboxBackend, SandboxConfig};
 use std::collections::HashMap;
 use std::ffi::OsString;

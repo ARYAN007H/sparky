@@ -231,7 +231,7 @@ fn projected_model_preserves_inherit_exact_and_hint_routing() {
 
 #[test]
 fn skills_wildcard_entries_are_not_agent_ids() {
-    use crate::agent::harness::definition::SkillsWildcard;
+    use tinyagents_definition::SkillsWildcard;
     let mut def = synthetic("lead", AgentTier::Chat, &["a_worker"]);
     def.subagents.push(SubagentEntry::Skills(SkillsWildcard {
         skills: "*".to_string(),

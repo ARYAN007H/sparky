@@ -96,8 +96,8 @@ struct OpenHumanTurnPrelude {
     run_queue:
         Option<Arc<tinyagents_harness::run_queue::RunQueue<crate::agent::queued_turn::QueuedTurn>>>,
     allowed_subagent_ids: std::collections::HashSet<String>,
-    sandbox_mode: crate::agent::harness::definition::SandboxMode,
-    definition: Option<Arc<crate::agent::harness::definition::AgentDefinition>>,
+    sandbox_mode: tinyagents_definition::SandboxMode,
+    definition: Option<Arc<crate::agent::harness::host_definition::AgentDefinition>>,
     runtime_config: Option<Arc<crate::config::Config>>,
     /// This session's tool-rule layers; see `tool_rules.rs`.
     tool_rules: Arc<tinytools::ToolRuleSet>,
@@ -719,7 +719,7 @@ impl OpenHumanSessionHost {
             self.workspace_descriptor.clone(),
             self.resolved_definition()
                 .map(|definition| definition.sandbox_mode)
-                .unwrap_or(crate::agent::harness::definition::SandboxMode::None),
+                .unwrap_or(tinyagents_definition::SandboxMode::None),
             self.hosted_base.clone(),
             self.agent_definition_id.clone(),
         ));
@@ -786,7 +786,7 @@ impl OpenHumanSessionHost {
                 sandbox_mode: self
                     .resolved_definition()
                     .map(|definition| definition.sandbox_mode)
-                    .unwrap_or(crate::agent::harness::definition::SandboxMode::None),
+                    .unwrap_or(tinyagents_definition::SandboxMode::None),
                 definition: self.resolved_definition(),
                 runtime_config: self.runtime_config.clone(),
                 tool_rules: self.session_tool_rules(),

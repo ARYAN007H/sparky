@@ -305,7 +305,7 @@ pub(crate) async fn build_builder_proposal(
 /// `RegistryFallback` "unknown agent_ref" hard error mid-run
 /// (`run_via_registry_fallback` in `tinyflows/caps.rs`) — a real ref is one
 /// that resolves via [`crate::flows::tinyflows::caps::route_for_agent_ref`]
-/// to a harness [`AgentDefinition`](crate::agent::harness::definition::AgentDefinition)
+/// to a harness [`AgentDefinition`](crate::agent::harness::host_definition::AgentDefinition)
 /// (`AgentRoute::Harness`), OR — when it routes to `AgentRoute::RegistryFallback`
 /// — resolves to an *enabled*
 /// [`AgentRegistryEntry`](crate::agent::registry::AgentRegistryEntry)

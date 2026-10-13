@@ -36,7 +36,7 @@ pub struct OpenHumanSessionDriver {
     run_queue:
         Option<Arc<tinyagents_harness::run_queue::RunQueue<crate::agent::queued_turn::QueuedTurn>>>,
     workspace: Option<tinytools::WorkspaceDescriptor>,
-    sandbox_mode: crate::agent::harness::definition::SandboxMode,
+    sandbox_mode: tinyagents_definition::SandboxMode,
     hosted_base: Option<Arc<OpenHumanHostBase>>,
     agent_id: String,
 }
@@ -54,7 +54,7 @@ impl OpenHumanSessionDriver {
             Arc<tinyagents_harness::run_queue::RunQueue<crate::agent::queued_turn::QueuedTurn>>,
         >,
         workspace: Option<tinytools::WorkspaceDescriptor>,
-        sandbox_mode: crate::agent::harness::definition::SandboxMode,
+        sandbox_mode: tinyagents_definition::SandboxMode,
         hosted_base: Option<Arc<OpenHumanHostBase>>,
         agent_id: String,
     ) -> Self {

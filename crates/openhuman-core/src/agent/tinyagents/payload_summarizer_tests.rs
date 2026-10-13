@@ -1,8 +1,6 @@
 use super::*;
 use tinyagents_harness::context::RunConfig;
-use crate::agent::harness::definition::{
-    DefinitionSource, ModelSpec, PromptSource, SandboxMode, ToolScope,
-};
+use tinyagents_definition::{DefinitionSource, ModelSpec, PromptSource, SandboxMode, ToolScope};
 use async_trait::async_trait;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse, ModelStream};
@@ -34,7 +32,7 @@ fn dummy_definition() -> AgentDefinition {
         tokenjuice_compression: tinyjuice_bus::types::AgentTokenjuiceCompression::Auto,
         subagents: vec![],
         delegate_name: None,
-        agent_tier: crate::agent::harness::definition::AgentTier::Worker,
+        agent_tier: tinyagents_definition::AgentTier::Worker,
         searches_connected_mcp: false,
         source: DefinitionSource::Builtin,
     }
