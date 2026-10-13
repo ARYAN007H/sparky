@@ -234,6 +234,14 @@ path = "../../tests/storage_desktop_upgrade_e2e.rs"
 required-features = ["storage-sqlite", "modules"]
 
 [[test]]
+# The released TinyMCP cdylib under the real host: add a server, restart the
+# core, list it (#7737). Ignored without a staged module; the Rust e2e runner
+# stages the registry-pinned release and runs it.
+name = "tinymcp_storage_smoke_e2e"
+path = "../../tests/tinymcp_storage_smoke_e2e.rs"
+required-features = ["storage-sqlite", "modules", "mcp"]
+
+[[test]]
 name = "saas_mode_e2e"
 path = "../../tests/saas_mode_e2e.rs"
 
