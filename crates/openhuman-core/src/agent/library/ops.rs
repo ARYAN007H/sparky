@@ -50,7 +50,7 @@ pub fn metadata_from_definition(def: &AgentDefinition) -> AgentDefinitionDisplay
         direct_tool_names,
         uses_wildcard_tools,
         subagent_ids,
-        includes_memory_context: !def.omit_memory_context,
+        includes_memory_context: !def.extensions.omit_memory_context,
         can_run_as_user_facing_worker,
         write_capable: is_write_capable(def),
         source: match &def.source {

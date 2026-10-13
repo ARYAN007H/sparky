@@ -109,7 +109,7 @@ pub(super) fn host_only_definition(definition: &AgentDefinition) -> AgentDefinit
     // `refresh_delegation_tools` returns before adding any later.
     def.subagents.clear();
     def.sandbox_mode = SandboxMode::ReadOnly;
-    def.omit_memory_context = true;
+    def.extensions.omit_memory_context = true;
     def
 }
 

@@ -626,11 +626,11 @@ fn run_list(args: &[String]) -> Result<()> {
             );
             obj.insert(
                 "omit_safety_preamble".into(),
-                serde_json::Value::Bool(def.omit_safety_preamble),
+                serde_json::Value::Bool(def.extensions.omit_safety_preamble),
             );
             obj.insert(
                 "omit_identity".into(),
-                serde_json::Value::Bool(def.omit_identity),
+                serde_json::Value::Bool(def.extensions.omit_identity),
             );
             arr.push(serde_json::Value::Object(obj));
         }

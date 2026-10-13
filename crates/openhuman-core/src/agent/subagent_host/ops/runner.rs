@@ -715,8 +715,8 @@ async fn run_typed_mode(
 
     // ── Build the narrow system prompt ─────────────────────────────────
     let render_options = SubagentRenderOptions::from_definition_flags(
-        definition.omit_identity,
-        definition.omit_safety_preamble,
+        definition.extensions.omit_identity,
+        definition.extensions.omit_safety_preamble,
     );
 
     let connected_integrations_for_prompt: Vec<crate::agent::prompts::ConnectedIntegration> =
@@ -814,7 +814,7 @@ async fn run_typed_mode(
     let now_str = crate::agent::prompts::current_datetime_line(zone.as_deref());
 
     let mut context_parts: Vec<&str> = Vec::new();
-    if !definition.omit_memory_context {
+    if !definition.extensions.omit_memory_context {
         if let Some(ref mem_ctx) = *parent.memory_context {
             context_parts.push(mem_ctx);
         }

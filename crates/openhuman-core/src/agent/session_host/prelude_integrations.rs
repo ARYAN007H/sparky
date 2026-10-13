@@ -297,7 +297,7 @@ impl OpenHumanTurnPrelude {
         if !self
             .definition
             .as_ref()
-            .is_some_and(|definition| definition.searches_connected_mcp)
+            .is_some_and(|definition| definition.extensions.searches_connected_mcp)
         {
             tracing::trace!(
                 agent = %self.agent_definition_id,

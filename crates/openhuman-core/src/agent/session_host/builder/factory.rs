@@ -98,11 +98,11 @@ impl OpenHumanSessionHost {
                 .unwrap_or_else(|| "legacy".to_string()),
             target_def
                 .as_ref()
-                .map(|d| d.omit_identity)
+                .map(|d| d.extensions.omit_identity)
                 .unwrap_or(false),
             target_def
                 .as_ref()
-                .map(|d| d.omit_memory_context)
+                .map(|d| d.extensions.omit_memory_context)
                 .unwrap_or(false),
             target_def
                 .as_ref()
@@ -348,8 +348,8 @@ impl OpenHumanSessionHost {
                 PromptSource::Verbatim(text) => SystemPromptBuilder::verbatim(text.clone()),
                 PromptSource::Inline(text) => SystemPromptBuilder::for_subagent(
                     text.clone(),
-                    def.omit_identity,
-                    def.omit_safety_preamble,
+                    def.extensions.omit_identity,
+                    def.extensions.omit_safety_preamble,
                 ),
                 PromptSource::File { path } => {
                     let prompt_root = config.workspace_dir.join("agent").join("prompts");
@@ -384,8 +384,8 @@ impl OpenHumanSessionHost {
                     };
                     SystemPromptBuilder::for_subagent(
                         body_text,
-                        def.omit_identity,
-                        def.omit_safety_preamble,
+                        def.extensions.omit_identity,
+                        def.extensions.omit_safety_preamble,
                     )
                 }
             },
@@ -665,7 +665,7 @@ impl OpenHumanSessionHost {
         // Whether a new session gets `context.md` prepended to its first user
         // message; agents without a definition get it.
         let effective_omit_memory_context = target_def
-            .map(|def| def.omit_memory_context)
+            .map(|def| def.extensions.omit_memory_context)
             .unwrap_or(false);
         let effective_tokenjuice_compression = target_def
             .map(|def| def.effective_tokenjuice_compression())
