@@ -1,0 +1,75 @@
+use super::*;
+use tinyconnectors_bus::vocabulary::{ToolkitVocabulary, VocabularyAction};
+
+fn reply() -> (Vec<BusCuratedTool>, VocabularyResponse) {
+    let listed = vec![BusCuratedTool {
+        toolkit: "gmail".into(),
+        slug: "GMAIL_SEND_EMAIL".into(),
+        scope: BusScope::Write,
+    }];
+    let vocabulary = VocabularyResponse {
+        toolkits: vec![
+            ToolkitVocabulary {
+                toolkit: "gmail".into(),
+                description: "Mail".into(),
+                native_provider: true,
+                actions: Some(vec![
+                    VocabularyAction { slug: "GMAIL_FETCH_EMAILS".into(), scope: BusScope::Read },
+                    VocabularyAction { slug: "GMAIL_SEND_EMAIL".into(), scope: BusScope::Write },
+                ]),
+            },
+            ToolkitVocabulary {
+                toolkit: "Google_Calendar".into(),
+                description: "Calendar".into(),
+                native_provider: false,
+                actions: Some(vec![VocabularyAction {
+                    slug: "GOOGLECALENDAR_CREATE_EVENT".into(),
+                    scope: BusScope::Write,
+                }]),
+            },
+            ToolkitVocabulary {
+                toolkit: "unknownkit".into(),
+                description: "generic".into(),
+                native_provider: false,
+                actions: None,
+            },
+        ],
+        agent_ready_toolkits: vec![],
+    };
+    (listed, vocabulary)
+}
+
+#[test]
+fn snapshot_serves_catalogs_aliases_descriptions_and_native_flags() {
+    let (listed, vocabulary) = reply();
+    let snapshot = build("1", &listed, &vocabulary);
+    assert_eq!(snapshot.toolkits, vec!["gmail".to_string()]);
+    assert_eq!(snapshot.catalogs["gmail"].len(), 2);
+    assert_eq!(snapshot.catalogs["gmail"][1].scope, ToolScope::Write);
+    assert!(snapshot.catalogs.contains_key("google_calendar"));
+    assert!(!snapshot.catalogs.contains_key("unknownkit"));
+    assert!(snapshot.native.contains("gmail"));
+    assert_eq!(snapshot.descriptions["gmail"], "Mail");
+}
+
+#[test]
+fn intern_returns_one_allocation_per_distinct_string() {
+    let a = intern("SOME_SLUG_FOR_INTERN_TEST");
+    let b = intern("SOME_SLUG_FOR_INTERN_TEST");
+    assert!(std::ptr::eq(a, b));
+}
+
+#[test]
+fn lookups_use_the_installed_snapshot_and_invalidate_clears_it() {
+    let (listed, vocabulary) = reply();
+    install_for_test(&listed, &vocabulary);
+    assert!(catalog_for_toolkit(" GMAIL ").is_some());
+    assert!(has_native_provider("gmail"));
+    assert_eq!(toolkit_description("gmail"), "Mail");
+    assert_eq!(toolkit_description("nope"), FALLBACK_DESCRIPTION);
+    assert_eq!(curated_scope_for("GMAIL_SEND_EMAIL"), Some(ToolScope::Write));
+    invalidate();
+    assert!(catalog_for_toolkit("gmail").is_none());
+    assert_eq!(toolkit_description("gmail"), FALLBACK_DESCRIPTION);
+    assert!(curated_toolkits().is_empty());
+}
