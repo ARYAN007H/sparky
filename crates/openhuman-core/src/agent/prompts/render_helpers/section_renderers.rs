@@ -2,6 +2,7 @@
 //! [`crate::agent::prompts::sections`], plus the per-turn datetime stamp and the
 //! ambient-environment composer that `agents/<id>/prompt.rs` builders call.
 
+use tinytools_agent::dialect::ToolCallFormat;
 use super::super::sections::*;
 use super::super::types::*;
 use anyhow::Result;

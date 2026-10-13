@@ -266,7 +266,7 @@ impl OpenHumanTurnPrelude {
     }
 
     fn build_system_prompt_tiered(&self) -> Result<crate::agent::prompts::TieredPrompt> {
-        use crate::agent::prompts::{tool_call_format_from_dialect, PromptContext, PromptTool};
+        use crate::agent::prompts::{PromptContext, PromptTool};
         let surface = self
             .tool_surface
             .lock()
@@ -505,7 +505,7 @@ impl OpenHumanTurnPrelude {
         // the prompt was composed for, so a text dialect keeps its schemas off
         // the wire and renders the catalogue itself (`ToolsSection` no longer
         // does), and a code call is recovered against the positional registry.
-        run_context.tool_dialect = crate::agent::prompts::tool_call_format_from_dialect(
+        run_context.tool_dialect = (
             self.tool_dispatcher.tool_call_format(),
         )
         .harness_dispatcher();
@@ -549,7 +549,7 @@ impl OpenHumanTurnPrelude {
             session_id: self.event_session_id.clone(),
             channel: self.event_channel.clone(),
             connected_integrations,
-            tool_call_format: crate::agent::prompts::tool_call_format_from_dialect(
+            tool_call_format: (
                 self.tool_dispatcher.tool_call_format(),
             ),
             session_key: self.session_key.clone(),

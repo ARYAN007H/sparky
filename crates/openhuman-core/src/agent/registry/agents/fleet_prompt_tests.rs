@@ -5,9 +5,10 @@
 //! [`load_builtins`] returns, so an agent added tomorrow is covered without
 //! anyone writing a test for it.
 
+use tinytools_agent::dialect::ToolCallFormat;
 use super::load_builtins;
 use crate::agent::harness::host_definition::AgentDefinition;
-use crate::agent::prompts::{PromptContext, ToolCallFormat};
+use crate::agent::prompts::{PromptContext};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::sync::Arc;
 use tinyagents_definition::{PromptSource, SubagentEntry, ToolScope};

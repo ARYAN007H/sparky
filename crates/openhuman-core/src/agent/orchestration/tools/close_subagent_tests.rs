@@ -1,6 +1,6 @@
 use super::*;
 use crate::agent::harness::fork_context::ParentExecutionContext;
-use crate::agent::prompts::ToolCallFormat;
+use tinytools_agent::dialect::ToolCallFormat;
 use crate::config::AgentConfig;
 use std::collections::HashSet;
 use std::path::Path;

@@ -1,3 +1,4 @@
+use tinytools_agent::dialect::ToolCallFormat;
 use super::*;
 
 #[test]

@@ -70,8 +70,7 @@ use tinyinference_llm::message::Message;
 
 use crate::agent::prompts::{
     load_agents_md_layers, render_connected_identities, AgentsMdContent, ConnectedIntegration,
-    PromptContext, PromptTool, SystemPromptBuilder, ToolCallFormat,
-};
+    PromptContext, PromptTool, SystemPromptBuilder, };
 use crate::config::{Config, DEFAULT_MODEL};
 use tinyskills::Skill as Workflow;
 

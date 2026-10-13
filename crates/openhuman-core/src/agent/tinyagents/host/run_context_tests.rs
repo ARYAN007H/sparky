@@ -261,7 +261,7 @@ fn stale_parent_snapshot() -> ParentExecutionContext {
         session_id: "parent-session".into(),
         channel: "test".into(),
         connected_integrations: Vec::new(),
-        tool_call_format: crate::agent::prompts::ToolCallFormat::Native,
+        tool_call_format: tinytools_agent::dialect::ToolCallFormat::Native,
         session_key: "parent-key".into(),
         session_parent_prefix: None,
         on_progress: None,

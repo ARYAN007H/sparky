@@ -34,6 +34,7 @@
 //! would advertise natively. Either way the total is the total, which is why
 //! the header reports it as one number.
 
+use tinytools_agent::dialect::ToolCallFormat;
 use std::fmt::Write as _;
 
 use super::DumpedPrompt;

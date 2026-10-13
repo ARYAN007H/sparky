@@ -1,7 +1,8 @@
+use tinytools_agent::dialect::ToolCallFormat;
 use super::{ArchetypeDelegationTool, DelegationTarget, SpawnSubagentTool, SpawnWorkerThreadTool};
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::harness::{with_parent_context, ParentExecutionContext};
-use crate::agent::prompts::{ConnectedIntegration, ToolCallFormat};
+use crate::agent::prompts::{ConnectedIntegration};
 use crate::threads::store as conversations;
 use async_trait::async_trait;
 use parking_lot::Mutex;

@@ -275,7 +275,7 @@ fn make_parent(
         session_id: "test-session".into(),
         channel: "test".into(),
         connected_integrations: vec![],
-        tool_call_format: crate::agent::prompts::ToolCallFormat::PFormat,
+        tool_call_format: tinytools_agent::dialect::ToolCallFormat::PFormat,
         session_key: "0_test".into(),
         session_parent_prefix: None,
         on_progress: None,

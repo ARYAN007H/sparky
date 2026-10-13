@@ -1,7 +1,7 @@
 //! History, context, and system prompt management.
 
 use super::super::types::OpenHumanSessionHost;
-use crate::agent::prompts::{tool_call_format_from_dialect, PromptContext, PromptTool};
+use crate::agent::prompts::{PromptContext, PromptTool};
 use tinytools::render_tool_policy_boundary;
 
 use anyhow::Result;

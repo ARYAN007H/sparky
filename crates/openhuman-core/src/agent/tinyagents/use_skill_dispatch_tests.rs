@@ -16,7 +16,7 @@
 use super::*;
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::harness::ParentExecutionContext;
-use crate::agent::prompts::ToolCallFormat;
+use tinytools_agent::dialect::ToolCallFormat;
 use crate::agent::tinyagents::tools::CanonicalSharedToolAdapter;
 use async_trait::async_trait;
 use serde_json::json;

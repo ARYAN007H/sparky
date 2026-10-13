@@ -110,7 +110,7 @@
 use async_trait::async_trait;
 use openhuman_core::agent::harness::host_definition::AgentDefinitionRegistry;
 use openhuman_core::agent::harness::{with_parent_context, ParentExecutionContext};
-use openhuman_core::agent::prompts::ToolCallFormat;
+use tinytools_agent::dialect::ToolCallFormat;
 use openhuman_core::agent::subagent_host::{run_subagent, SubagentRunOptions};
 use openhuman_core::config::AgentConfig;
 use parking_lot::Mutex;

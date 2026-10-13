@@ -6,7 +6,7 @@ use crate::agent::orchestration::spawn_parallel::{
     prepare_spawn_parallel_tasks_from_defs, ParallelTaskRejectionKind, SpawnParallelTaskPreflight,
 };
 use tinyagents_orchestration::parallel::WorkerDispatchMode;
-use crate::agent::prompts::ToolCallFormat;
+use tinytools_agent::dialect::ToolCallFormat;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent::OpenHumanSessionHost;
 use crate::config::AgentConfig;

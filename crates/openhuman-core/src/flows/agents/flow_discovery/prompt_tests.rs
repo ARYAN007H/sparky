@@ -1,5 +1,5 @@
 use super::*;
-use crate::agent::prompts::ToolCallFormat;
+use tinytools_agent::dialect::ToolCallFormat;
 use std::collections::HashSet;
 
 fn ctx() -> PromptContext<'static> {

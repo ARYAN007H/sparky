@@ -19,10 +19,10 @@ use tinytools::Tool;
 /// dialect selection here prevents OpenHuman prompt text from drifting from
 /// the parser that consumes the response.
 pub(crate) fn subagent_prompt_protocol(
-    parent_format: crate::agent::prompts::ToolCallFormat,
+    parent_format: tinytools_agent::dialect::ToolCallFormat,
     tools: &[tinytools::ToolSpec],
-) -> (crate::agent::prompts::ToolCallFormat, String) {
-    use crate::agent::prompts::ToolCallFormat;
+) -> (tinytools_agent::dialect::ToolCallFormat, String) {
+    use tinytools_agent::dialect::ToolCallFormat;
     use tinytools_agent::dialect::{
         CodeDialect, CodeStyle, NativeDialect, PFormatDialect, ToolDialect,
     };
