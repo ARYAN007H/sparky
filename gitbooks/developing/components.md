@@ -57,6 +57,7 @@ The first load of an older config moves these once into `[components]`, and the 
 | `[mcp_client] enabled = false` | `components.mcp = false` |
 | `[memory] engine = "none"` | `components.memory = false` (`engine` is kept) |
 | `OPENHUMAN_TINYMEMES` set to an off value | `components.memes = false` |
+| `OPENHUMAN_DISABLE_CHANNEL_LISTENERS=1` | `components.channels = false` at load (env override, kept for one release; `OPENHUMAN_COMPONENT_CHANNELS` wins) |
 | `[composio] enabled` | dropped; it was never read |
 
 A `components.*` key already present in the file always wins over its legacy flag, so the migration is idempotent and turning a component back on sticks.

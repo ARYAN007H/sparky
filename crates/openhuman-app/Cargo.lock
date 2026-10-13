@@ -6772,13 +6772,16 @@ dependencies = [
 
 [[package]]
 name = "tinychannels-bus"
-version = "0.1.26"
+version = "0.1.29"
 dependencies = [
+ "anyhow",
+ "async-trait",
  "base64 0.23.1",
  "schemars 1.2.2",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
+ "tokio",
 ]
 
 [[package]]
@@ -7078,7 +7081,7 @@ dependencies = [
 
 [[package]]
 name = "tinyjuice-bus"
-version = "0.7.1"
+version = "0.9.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -7188,7 +7191,7 @@ dependencies = [
 
 [[package]]
 name = "tinyskills"
-version = "0.2.10"
+version = "0.4.0"
 dependencies = [
  "cap-fs-ext",
  "cap-std",
@@ -7198,6 +7201,7 @@ dependencies = [
  "serde_norway",
  "sha2 0.11.0",
  "thiserror 2.0.20",
+ "tinytools",
  "tokio",
  "url",
 ]
