@@ -43,7 +43,8 @@ async fn roster_status_labels_are_literal() {
             super::run_queue(),
             super::dummy_abort(),
             rx,
-        );
+        )
+        .expect("fixture registration admitted");
         senders.push((id, tx));
     }
     for (id, tx) in &senders {
@@ -171,7 +172,8 @@ async fn spawn_ledger_record_has_literal_persisted_shape() {
         super::run_queue(),
         super::dummy_abort(),
         rx,
-    );
+    )
+    .expect("fixture registration admitted");
     let text = std::fs::read_to_string(ws.path().join(".openhuman/orchestration_tasks.jsonl"))
         .expect("ledger file at the product path");
     let first: serde_json::Value =

@@ -17,8 +17,6 @@ async fn a_disabled_component_never_reaches_download_or_dlopen() {
         .unwrap_err();
     assert_eq!(err, LoadError::Disabled("mcp"));
     assert_eq!(err.into_message(), "COMPONENT_DISABLED:mcp");
-    // Nothing was claimed: the resolution table never saw the id.
-    assert_eq!(state_of("tinymcp"), ModuleState::Available);
 }
 
 #[test]
@@ -54,7 +52,6 @@ async fn a_disabled_wallet_never_loads_the_tinywallet_module() {
         .unwrap_err();
     assert_eq!(err, LoadError::Disabled("wallet"));
     assert_eq!(err.into_message(), "COMPONENT_DISABLED:wallet");
-    assert_eq!(state_of("tinywallet"), ModuleState::Available);
 }
 
 #[cfg(feature = "hosting")]

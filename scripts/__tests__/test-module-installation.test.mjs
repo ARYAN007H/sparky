@@ -38,6 +38,9 @@ const installer = fileURLToPath(
 const localRustRunner = fileURLToPath(
   new URL("../test-rust-with-mock.sh", import.meta.url),
 );
+const rustE2eRunner = fileURLToPath(
+  new URL("../test-rust-e2e.sh", import.meta.url),
+);
 
 test("locally built native Rust test modules come from build.mjs, not ad hoc cargo builds", () => {
   const source = readFileSync(localRustRunner, "utf8");
@@ -59,12 +62,69 @@ test("local MCP registry E2E tests load the pinned TinyMCP module", () => {
   assert.match(source, /OPENHUMAN_MODULE_PATH="\$tinymcp_dir/);
 });
 
+test("linked TinyDocs E2E enables its required local feature", () => {
+  const localSource = readFileSync(localRustRunner, "utf8");
+  const localBranch = localSource.indexOf('if [ "$target" = "tinydocs_linked_e2e" ]');
+  assert.ok(localBranch >= 0, "the Rust gate gives linked TinyDocs an explicit branch");
+  const localEnd = localSource.indexOf("\n    elif ", localBranch);
+  assert.ok(localEnd > localBranch, "the linked target branch has a bounded body");
+  assert.match(localSource.slice(localBranch, localEnd), /--features linked-modules/);
+
+  const e2eSource = readFileSync(rustE2eRunner, "utf8");
+  const e2eBranch = e2eSource.indexOf('if [ "$suite" = "tinydocs_linked_e2e" ]');
+  assert.ok(e2eBranch >= 0, "the Rust E2E runner gives linked TinyDocs an explicit branch");
+  const e2eEnd = e2eSource.indexOf("\n  fi\n", e2eBranch);
+  assert.ok(e2eEnd > e2eBranch, "the E2E linked target branch has a bounded body");
+  assert.match(
+    e2eSource.slice(e2eBranch, e2eEnd),
+    /--features "\$PRODUCT_FEATURES,linked-modules"/,
+    "the E2E target runs with linked-modules in addition to product features",
+  );
+});
+
 test("MCP registry Rust integration tests run serially", () => {
   const source = readFileSync(localRustRunner, "utf8");
   assert.match(
     source,
     /mcp_registry_e2e[\s\S]*?--test-threads=1/,
     "the TinyMCP process state is shared across test cases",
+  );
+});
+
+test("multi-server MCP tests run serially through the module-backed host", () => {
+  const source = readFileSync(localRustRunner, "utf8");
+  const fullSuiteStart = source.indexOf(
+    'elif [ "$target" = "mcp_registry_multi_server" ]',
+  );
+  assert.ok(fullSuiteStart >= 0, "full Rust gate gives the suite an isolated process");
+  const fullSuiteEnd = source.indexOf("\n    else\n", fullSuiteStart);
+  assert.ok(fullSuiteEnd > fullSuiteStart, "full-suite branch has a bounded body");
+  assert.match(
+    source.slice(fullSuiteStart, fullSuiteEnd),
+    /--test-threads=1/,
+    "parallel tests race through TinyMCP's process-wide module client",
+  );
+  assert.match(
+    source.slice(fullSuiteStart, fullSuiteEnd),
+    /OPENHUMAN_TINYMCP_TEST_MODULE="\$tinymcp_artifact"/,
+    "the tests receive the staged TinyMCP library path",
+  );
+
+  const directStart = source.indexOf(
+    'elif [ "$#" -ge 2 ] && [ "$1" = "--test" ] && [ "$2" = "mcp_registry_multi_server" ]',
+  );
+  assert.ok(directStart >= 0, "the focused runner gives the suite the same isolation");
+  const directEnd = source.indexOf("\nelse\n", directStart);
+  assert.ok(directEnd > directStart, "focused branch has a bounded body");
+  assert.match(
+    source.slice(directStart, directEnd),
+    /--test-threads=1/,
+    "focused and full-suite runs must use the same serialization",
+  );
+  assert.match(
+    source.slice(directStart, directEnd),
+    /OPENHUMAN_TINYMCP_TEST_MODULE="\$tinymcp_artifact"/,
+    "focused runs use the same staged TinyMCP artifact",
   );
 });
 

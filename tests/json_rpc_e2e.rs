@@ -9469,7 +9469,7 @@ async fn mcp_clients_config_round_trip_merges_credentials_and_removes_absent_ser
     assert_eq!(b5.get("removed"), Some(&json!(["echo-rt"])), "{b5}");
     assert_eq!(b5["mcpServers"], json!({}), "{b5}");
 
-    // ── 6. a refused document names the entry and the field ──────────────────
+    // ── 6. a refused document is redacted and leaves the store unchanged ────
     let refused = post_json_rpc(
         &rpc_base,
         9968,
@@ -9480,9 +9480,25 @@ async fn mcp_clients_config_round_trip_merges_credentials_and_removes_absent_ser
     let message = refused["error"]["message"]
         .as_str()
         .expect("a refusal is a JSON-RPC error");
-    assert!(
-        message.contains("`bad`") && message.contains("both"),
-        "refusal should name the entry and the problem: {message}"
+    assert_eq!(
+        message, "MODULE_CALL_REPORTED: module execution failed",
+        "the host reports sanitized module errors instead of exposing remote text"
+    );
+    let after_refusal = post_json_rpc(
+        &rpc_base,
+        9969,
+        "openhuman.mcp_clients_config_get",
+        json!({}),
+    )
+    .await;
+    let after_refusal = peel_logs_envelope(assert_no_jsonrpc_error(
+        &after_refusal,
+        "config_get (after refusal)",
+    ));
+    assert_eq!(
+        after_refusal["mcpServers"],
+        json!({}),
+        "a refused replacement leaves the install store unchanged"
     );
 
     mock_join.abort();

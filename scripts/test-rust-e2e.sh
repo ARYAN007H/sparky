@@ -281,6 +281,16 @@ for suite in "${SUITES[@]}"; do
       --test "$suite" -- --ignored --test-threads=1 ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
     continue
   fi
+  if [ "$suite" = "tinydocs_linked_e2e" ]; then
+    # This local-only E2E target is outside the product feature set. Enable
+    # its required linked implementation explicitly instead of failing Cargo's
+    # required-features check.
+    echo "[rust-e2e]   $CARGO_BIN test --manifest-path Cargo.toml --test $suite (linked-modules)"
+    bash "$SCRIPT_DIR/ci-cancel-aware.sh" "$CARGO_BIN" test \
+      --manifest-path Cargo.toml --features "$PRODUCT_FEATURES,linked-modules" \
+      --test "$suite" -- ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
+    continue
+  fi
 
   if [ "$HAS_EXTRA_ARGS" -eq 1 ]; then
     echo "[rust-e2e]   $CARGO_BIN test --manifest-path Cargo.toml --test $suite -- ${EXTRA_ARGS[*]}"
