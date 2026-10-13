@@ -484,7 +484,13 @@ impl tinybus::Interface for ObjectService {
 /// When the acting scope cannot be resolved (SaaS mode with no profile) or the
 /// module id is not a plain name under a profile.
 pub(crate) fn current_module_scope(module_id: &str) -> Result<Scope, StorageError> {
-    Live::scope_of(module_id)
+    let saas = crate::core::runtime::mode::is_saas();
+    // A module call arrives on the module bus, outside any turn, so with no
+    // tenant the host's default scope applies (refused in SaaS mode).
+    let tenant = crate::core::runtime::current_tenant().unwrap_or_default();
+    let base =
+        crate::storage::scope_from(tenant.profile.as_deref(), tenant.agent.as_deref(), saas)?;
+    module_scope(tenant.profile.as_deref(), &base, module_id)
 }
 
 /// Production wiring: the broker's name owners, the installed backend, the
@@ -514,13 +520,7 @@ impl Environment for Live {
     }
 
     fn module_scope(&self, module_id: &str) -> Result<Scope, StorageError> {
-        let saas = crate::core::runtime::mode::is_saas();
-        // A module call arrives on the module bus, outside any turn, so with no
-        // tenant the host's default scope applies (refused in SaaS mode).
-        let tenant = crate::core::runtime::current_tenant().unwrap_or_default();
-        let base =
-            crate::storage::scope_from(tenant.profile.as_deref(), tenant.agent.as_deref(), saas)?;
-        module_scope(tenant.profile.as_deref(), &base, module_id)
+        current_module_scope(module_id)
     }
 
     fn grant(&self, module_id: &str) -> Option<StorageGrant> {
