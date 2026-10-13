@@ -10,16 +10,19 @@
 use std::path::Path;
 
 use tinyagents_session::run_ledger::{
-    AgentRun, AgentRunUpsert, AgentTeam, AgentTeamMember, AgentTeamTask, AgentTeamTaskUpsert,
-    AgentTeamUpsert, AgentTeamMemberUpsert, ClaimOutcome, LedgerResult, RunEvent,
-    RunEventAppend, RunEventListRequest, RunEventListResponse, WorkflowRun, WorkflowRunUpsert,
+    AgentRun, AgentRunUpsert, AgentTeam, AgentTeamMember, AgentTeamMemberUpsert, AgentTeamTask,
+    AgentTeamTaskUpsert, AgentTeamUpsert, ClaimOutcome, LedgerResult, RunEvent, RunEventAppend,
+    RunEventListRequest, RunEventListResponse, RunTelemetry, RunTelemetryUpsert, WorkflowRun,
+    WorkflowRunUpsert,
 };
 
 use super::with_ledger;
 
 /// Inserts or merges an agent run.
 pub fn upsert_agent_run(workspace_dir: &Path, upsert: AgentRunUpsert) -> LedgerResult<AgentRun> {
-    with_ledger(workspace_dir, |l| async move { l.upsert_agent_run(upsert).await })
+    with_ledger(workspace_dir, |l| async move {
+        l.upsert_agent_run(upsert).await
+    })
 }
 
 /// One agent run by id.
@@ -33,18 +36,26 @@ pub fn upsert_workflow_run(
     workspace_dir: &Path,
     upsert: WorkflowRunUpsert,
 ) -> LedgerResult<WorkflowRun> {
-    with_ledger(workspace_dir, |l| async move { l.upsert_workflow_run(upsert).await })
+    with_ledger(workspace_dir, |l| async move {
+        l.upsert_workflow_run(upsert).await
+    })
 }
 
 /// One workflow run by id.
 pub fn get_workflow_run(workspace_dir: &Path, id: &str) -> LedgerResult<Option<WorkflowRun>> {
     let id = id.to_string();
-    with_ledger(workspace_dir, |l| async move { l.get_workflow_run(&id).await })
+    with_ledger(
+        workspace_dir,
+        |l| async move { l.get_workflow_run(&id).await },
+    )
 }
 
 /// Appends an event to a run's log.
 pub fn append_run_event(workspace_dir: &Path, event: RunEventAppend) -> LedgerResult<RunEvent> {
-    with_ledger(workspace_dir, |l| async move { l.append_run_event(event).await })
+    with_ledger(
+        workspace_dir,
+        |l| async move { l.append_run_event(event).await },
+    )
 }
 
 /// A run's events in sequence order.
@@ -58,9 +69,21 @@ pub fn list_recent_run_events(
     })
 }
 
+/// Merges a telemetry rollup into a run's.
+pub fn upsert_run_telemetry(
+    workspace_dir: &Path,
+    upsert: RunTelemetryUpsert,
+) -> LedgerResult<RunTelemetry> {
+    with_ledger(workspace_dir, |l| async move {
+        l.upsert_run_telemetry(upsert).await
+    })
+}
+
 /// Inserts or updates a team.
 pub fn upsert_agent_team(workspace_dir: &Path, upsert: AgentTeamUpsert) -> LedgerResult<AgentTeam> {
-    with_ledger(workspace_dir, |l| async move { l.upsert_agent_team(upsert).await })
+    with_ledger(workspace_dir, |l| async move {
+        l.upsert_agent_team(upsert).await
+    })
 }
 
 /// Inserts or updates a team member.
@@ -86,7 +109,9 @@ pub fn upsert_agent_team_task(
 /// One team task by id.
 pub fn get_agent_team_task(workspace_dir: &Path, id: &str) -> LedgerResult<Option<AgentTeamTask>> {
     let id = id.to_string();
-    with_ledger(workspace_dir, |l| async move { l.get_agent_team_task(&id).await })
+    with_ledger(workspace_dir, |l| async move {
+        l.get_agent_team_task(&id).await
+    })
 }
 
 /// One team member by id.
@@ -95,7 +120,9 @@ pub fn get_agent_team_member(
     id: &str,
 ) -> LedgerResult<Option<AgentTeamMember>> {
     let id = id.to_string();
-    with_ledger(workspace_dir, |l| async move { l.get_agent_team_member(&id).await })
+    with_ledger(workspace_dir, |l| async move {
+        l.get_agent_team_member(&id).await
+    })
 }
 
 /// Atomically claims a task for a member.
