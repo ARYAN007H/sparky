@@ -29,9 +29,9 @@ use std::time::Duration;
 use async_trait::async_trait;
 use serde_json::Value;
 use tinystoragedrivers::{
-    Blob, BlobMeta, BlobStore, BlobStream, Capabilities, Capability, CollectionSpec, ErrorKind, Filter, Page,
-    Precondition, Query, ReadCheck, Result, SearchHit, Sort, StorageError, StreamEntry,
-    StreamStore, Version, Versioned, WriteOp, WriteResult,
+    Blob, BlobMeta, BlobStore, BlobStream, Capabilities, Capability, CollectionSpec, ErrorKind,
+    Filter, Page, Precondition, Query, ReadCheck, Result, SearchHit, Sort, StorageError,
+    StreamEntry, StreamStore, Version, Versioned, WriteOp, WriteResult,
 };
 
 use super::fence::{FenceRegistry, LeaseFence};
