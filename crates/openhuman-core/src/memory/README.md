@@ -233,12 +233,12 @@ start without explicit consent and resumes after a restart:
   thread store and writing the same turn items the live hooks would, tagged
   `backfill`. It stops short of the first turn live logging already stored.
   Progress is in `conversations_backfill.json`.
-- [`import.rs`](./import.rs) (with [`import_retry.rs`](./import_retry.rs)) imports a v1 store from
-  `<workspace>/memory/memory.db` through `tinymemory-import`. A blocking
-  reader walks the store, the async side scrubs, stores and checkpoints
-  every 25 items in `import_state.json`. Transient engine failures retry
-  with backoff; a stop caused by something that will not pass on its own
-  (credits exhausted, signed out) waits for the user.
+- [`import.rs`](./import.rs) is the host adapter over
+  `tinymemory_integrations::import::Importer` (which owns batching, the
+  checkpoint every 25 items, backoff, the failed-item list and retry). The host
+  keeps the consent gate, the one-run-per-workspace registry, the atomic
+  `import_state.json` store, the tokio pacer, the scheduler pause, the
+  credits-resume policy and the organize step after a finished import.
 - [`layout_migration/`](./layout_migration/) moves memory written before layout v3 from the legacy
   `app:tinymemory/...` tree into the per-user tree. It copies page by page,
   verifies each item by reading it back, switches reads and writes only
@@ -294,7 +294,7 @@ The agent `memory` tool applies the same confinement and overwrites any
 | [`channels.rs`](./channels.rs) | Channel to thread records, for forgetting a channel. |
 | [`deletion.rs`](./deletion.rs) | Hard deletes; the file store and executor for the pending-deletion queue (`tinymemory_tools::deletion`, with retry backoff on background ticks). |
 | [`backfill.rs`](./backfill.rs) | Consent-gated, resumable storing of past chats. |
-| [`import.rs`](./import.rs), [`import_retry.rs`](./import_retry.rs) | Consent-gated, resumable v1 import, and retrying refused items. Skips what v1 synced from Composio connectors (`import_open.rs::open_legacy` turns on `LegacyWorkspace::skip_connector_syncs`); the connectors re-sync it. |
+| [`import.rs`](./import.rs) | Host adapter for the consent-gated, resumable v1 import and the retry of refused items; the driver is the module's `Importer`, which skips what v1 synced from Composio connectors. |
 | [`layout_migration/`](./layout_migration/) | Host adapter over `tinymemory_tools::layout_migration` (copy, placement, cleanup and the job live in tinymemory): `app_host.rs` (the real `LayoutHost`), `claim.rs`, `state.rs` (file-backed `MigrationStateStore`), `service.rs` (RPC/tick entry points). |
 | [`billing.rs`](./billing.rs) | Whether background rewrites are free for the user right now. |
 | [`files.rs`](./files.rs) | Owner-only (0600 / 0700 on unix) writes of the local state files. |
