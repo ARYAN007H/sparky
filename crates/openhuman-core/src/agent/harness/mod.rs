@@ -22,8 +22,7 @@
 
 pub mod artifact_offload;
 pub(crate) mod builtin_definitions;
-pub mod definition;
-pub(crate) mod definition_loader;
+pub mod host_definition;
 pub mod fork_context;
 pub(crate) mod graph;
 pub(crate) mod tool_result_artifacts;
