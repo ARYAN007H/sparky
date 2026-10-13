@@ -106,7 +106,7 @@ re-arms schedules for every enabled flow.
 
 ```text
  cron scheduler                 Composio webhook relay
-      | FlowScheduleTick{flow_id}      | ComposioTriggerReceived{toolkit, slug}
+      | TriggerSink (flow_id)          | ComposioTriggerReceived{toolkit, slug}
       v                                v
  +--------------------------------------------------+
  | bus::FlowTriggerSubscriber                       |
@@ -331,7 +331,7 @@ Agent tools: `core`'s [`tools/ops.rs`](../tools/ops.rs) adds 27 flows tools to t
   checkpoints, and `tinyflows-copilot` owns the authoring manual and pure text heuristics.
   Fix engine and storage behavior there, not here.
 - `cron/` owns scheduling. This domain only arms and removes `JobType::Flow`
-  jobs; the scheduler publishes `DomainEvent::FlowScheduleTick`.
+  jobs; the scheduler fires them through the schedule runtime's `TriggerSink`.
 - [`integrations/composio/`](../integrations/composio/) owns the Composio catalog, connections and trigger
   ingestion. Flows reads them for gates, pickers and `tool_call` execution.
 - `memory/` owns storage. Flows only tags items.

@@ -476,3 +476,13 @@ so there is no registry record or `module-boundaries.json` entry.
 ### TinyFlows builder gate stack (#7551)
 
 `flows/ops/builder_gates.rs` no longer orders the author-time gates. `tinyflows::gates::builder_failures` runs compatibility, saved-workflow, portable authoring and binding gates, then the host stages, then the mock-run argument preflight. The host implements `BuilderGateHost`: `ToolPolicy` (workspace-relative upload paths), `AgentReferences`, `Connections` and `ToolContracts`, plus the saved-workflow lookup. `validate_binding_resolvability` and `validate_required_arg_resolvability` are deleted. Provider connectivity remains an advisory proposal field, not a stage.
+
+### TinyFlows schedule runtime (#7560)
+
+The cron scheduler runtime is `tinyflows_schedule::runtime::Scheduler` (v0.8.15): the poll pass, bounded concurrency, process-wide `RunClaim`s, retry with backoff, rescheduling, single-flight skips and the `cron_job_policies` fold into `CronJob::policy`. `parse_human_delay`, `default_delivery`, `check_origin_requirements` and the delivery-validation rules are `tinyflows_schedule::validation`; the host adds only the channel `allowed_users` lookup.
+
+Deleted from `crates/openhuman-core/src/cron/`: `scheduler/{dispatch,slot,retry}.rs`, the persistence half of `scheduler/run_record.rs`, `policy.rs` and its tests, the core `parse_human_delay`, `validate_delivery`, `check_origin_requirements` and `default_delivery`, and the `DomainEvent::FlowScheduleTick` round trip (`EVENTS_VERSION` 1.11.0). The tests of the moved behaviour (claims, concurrency, single-flight, retry budget, one-shot completion) live in `tinyflows-schedule`.
+
+The host keeps the ports in `scheduler/{host,executor,run_delivery}.rs`: `JobStore` over `CronDocuments` (with operator limits), `JobExecutor` (shell and agent attempts, failure classification, the retries-exhausted report), `RunDelivery` (delivery, completion and health events) and `TriggerSink` (the flow's schedule trigger through `FlowTriggerSubscriber::dispatch_schedule_tick`, and `system:<name>` jobs). `scheduler_gate`, system jobs, seeding and the `cron.*` RPC stay. TinyFlows is a plain library gitlink, so there is no registry record or `module-boundaries.json` entry.
+
+Behaviour notes: a job's policy is read from the job document (an unreadable job refuses Run Now with a credential-free message, `ops::load_job_for_run`); `CronJobCompleted` and the scheduler health signal are published from delivery, before the runtime writes the completion; `CronJobTriggered` is no longer published for `flow` rows.
