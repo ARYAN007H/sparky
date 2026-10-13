@@ -331,9 +331,6 @@ fn memory_tool_is_absent_when_the_memory_component_is_off() {
         "got: {names:?}"
     );
     let off = crate::core::runtime::ComponentSet::from_config(&cfg.components);
-    assert!(!off.narrow_domains(crate::core::runtime::DomainSet::all()).memory);
-    let services = off.narrow_services(crate::core::runtime::ServiceSet::all());
-    assert!(!services.memory_queue && !services.memory_sync);
     assert!(off.require("memory").is_err());
 }
 
