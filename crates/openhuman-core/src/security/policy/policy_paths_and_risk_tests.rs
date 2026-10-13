@@ -73,9 +73,7 @@ fn parse_declared_class_maps_known_and_rejects_unknown() {
 #[cfg(feature = "modules")]
 #[test]
 fn tinybox_command_facts_drive_policy_and_keep_the_path_floor_when_disabled() {
-    use crate::modules::tinybox::contract::{
-        CommandAnalysis, CommandSegment,
-    };
+    use crate::modules::tinybox::contract::{CommandAnalysis, CommandSegment};
 
     let write_segment = CommandSegment {
         source: "ls -la".into(),
@@ -156,9 +154,7 @@ fn tinybox_command_facts_drive_policy_and_keep_the_path_floor_when_disabled() {
 #[cfg(feature = "modules")]
 #[test]
 fn tinybox_fact_allowlist_treats_heredoc_as_data_and_unknown_commands_as_writes() {
-    use crate::modules::tinybox::contract::{
-        CommandAnalysis, CommandSegment,
-    };
+    use crate::modules::tinybox::contract::{CommandAnalysis, CommandSegment};
 
     let policy = SecurityPolicy {
         enabled: true,

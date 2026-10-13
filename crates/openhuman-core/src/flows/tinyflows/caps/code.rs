@@ -16,7 +16,7 @@ use super::*;
 use crate::agent::harness::definition::SandboxMode;
 use crate::config::Config;
 use crate::sandbox::{execute_in_sandbox, resolve_sandbox_policy};
-use crate::security::{SecurityPolicy};
+use crate::security::SecurityPolicy;
 use tinybox_bus::CommandClass;
 
 /// [`CodeRunner`] adapter running sandboxed user code via

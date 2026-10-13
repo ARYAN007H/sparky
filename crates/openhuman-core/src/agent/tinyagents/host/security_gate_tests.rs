@@ -386,11 +386,7 @@ fn the_declared_category_can_only_raise_the_command_class() {
         OpenHumanSecurityGate::shell_decision(
             &full,
             &json!({ "command": "touch f" }),
-            &shell_analysis(
-                tinybox_bus::CommandClass::Write,
-                false,
-                &["touch", "f"],
-            ),
+            &shell_analysis(tinybox_bus::CommandClass::Write, false, &["touch", "f"],),
         ),
         Ok(PolicyGateDecision::Allow)
     );
@@ -399,11 +395,7 @@ fn the_declared_category_can_only_raise_the_command_class() {
         OpenHumanSecurityGate::shell_decision(
             &full,
             &json!({ "command": "touch f", "category": "destructive" }),
-            &shell_analysis(
-                tinybox_bus::CommandClass::Write,
-                false,
-                &["touch", "f"],
-            )
+            &shell_analysis(tinybox_bus::CommandClass::Write, false, &["touch", "f"],)
         ),
         Ok(PolicyGateDecision::Prompt)
     );
@@ -431,11 +423,7 @@ fn a_missing_command_argument_classifies_as_read_rather_than_panicking() {
         OpenHumanSecurityGate::shell_decision(
             &supervised,
             &json!({}),
-            &shell_analysis(
-                tinybox_bus::CommandClass::Read,
-                false,
-                &[],
-            ),
+            &shell_analysis(tinybox_bus::CommandClass::Read, false, &[],),
         ),
         Ok(PolicyGateDecision::Allow)
     );

@@ -84,8 +84,8 @@ use tinyagents_harness::host::security_gate::{GateDecision, ToolCallRequest};
 use crate::agent::tinyagents::policy_denial::PolicyDenial;
 use crate::security::approval::{redact_args, summarize_action, ApprovalGate, GateOutcome};
 use crate::security::policy::{GateDecision as PolicyGateDecision, SecurityPolicy};
-use tinybox_bus::CommandClass;
 use crate::tools::agent_policy::{ToolPolicyAction, ToolPolicySession};
+use tinybox_bus::CommandClass;
 use tinytools::{PermissionLevel, Tool};
 
 #[path = "security_gate_shell_analysis.rs"]

@@ -6,8 +6,8 @@
 //! likely to break, so it is asserted here beside the first.
 
 use super::*;
-use tinybox_bus::CommandClass;
 use std::path::PathBuf;
+use tinybox_bus::CommandClass;
 
 fn disabled_policy() -> SecurityPolicy {
     SecurityPolicy {

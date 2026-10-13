@@ -40,11 +40,11 @@ pub use ops::*;
 pub use policy::validate_path_within_root;
 #[allow(unused_imports)]
 pub use policy::AutonomyLevel;
+#[allow(unused_imports)]
+pub use policy::GateDecision;
 pub use policy::SecurityPolicy;
 pub use policy::ToolOperation;
 pub use policy::{ensure_openhuman_scratch_dir, openhuman_scratch_dir};
-#[allow(unused_imports)]
-pub use policy::GateDecision;
 #[allow(unused_imports)]
 pub use policy::{TrustedAccess, TrustedRoot};
 pub use policy::{POLICY_BLOCKED_MARKER, POLICY_DENIED_MARKER};

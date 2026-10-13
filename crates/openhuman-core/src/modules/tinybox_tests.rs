@@ -525,7 +525,11 @@ fn every_member_the_host_calls_is_named_in_the_pinned_contract() {
     let mut unique = called.to_vec();
     unique.sort_unstable();
     unique.dedup();
-    assert_eq!(unique.len(), called.len(), "host member names must be distinct");
+    assert_eq!(
+        unique.len(),
+        called.len(),
+        "host member names must be distinct"
+    );
 }
 
 #[tokio::test]

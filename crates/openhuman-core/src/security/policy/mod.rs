@@ -15,8 +15,8 @@ pub(crate) use path_checks::{
     ALWAYS_FORBIDDEN_PREFIXES, SENSITIVE_COMPONENTS, SENSITIVE_FILES, SENSITIVE_PAIRS,
 };
 pub use types::{
-    tool_result_artifacts_dir, ActionTracker, AutonomyLevel, CommandRiskLevel,
-    GateDecision, SecurityPolicy, ToolOperation, TrustedAccess, TrustedRoot, POLICY_BLOCKED_MARKER,
+    tool_result_artifacts_dir, ActionTracker, AutonomyLevel, CommandRiskLevel, GateDecision,
+    SecurityPolicy, ToolOperation, TrustedAccess, TrustedRoot, POLICY_BLOCKED_MARKER,
     POLICY_DENIED_MARKER,
 };
 

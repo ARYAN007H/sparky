@@ -27,10 +27,10 @@ use crate::flows;
 #[cfg(test)]
 use crate::security::credentials::HttpCredential;
 use crate::security::credentials::HttpCredentialsStore;
-use crate::security::{SecurityPolicy};
-use tinybox_bus::CommandClass;
+use crate::security::SecurityPolicy;
 #[cfg(test)]
 use crate::security::{GateDecision, POLICY_BLOCKED_MARKER};
+use tinybox_bus::CommandClass;
 
 // The live Composio catalog and probe moved to `composio::catalog` -- the domain
 // that owns Composio's vocabulary. This import is the edge pointing the right
