@@ -5,7 +5,6 @@ use super::*;
 #[tokio::test]
 async fn a_resumed_thread_keeps_recorded_juice_specs_and_executors_when_repl_is_off() {
     use crate::inference::tokenjuice::repl_tools_for;
-    use tinyjuice_bus::tools::REPL_TOOLS as REPL_TOOL_NAMES;
 
     crate::agent::harness::definition::AgentDefinitionRegistry::init_global_builtins()
         .expect("builtin definitions");
@@ -30,7 +29,7 @@ async fn a_resumed_thread_keeps_recorded_juice_specs_and_executors_when_repl_is_
             .iter()
             .map(|spec| spec.name.as_str())
             .collect::<Vec<_>>(),
-        REPL_TOOL_NAMES
+        tinyjuice_bus::tools::REPL_TOOLS
     );
     for spec in &mut recorded_specs {
         spec.description = format!("frozen declaration for {}", spec.name);
@@ -149,7 +148,6 @@ async fn a_resumed_thread_keeps_recorded_juice_specs_and_executors_when_repl_is_
 #[tokio::test]
 async fn resumed_juice_snapshot_does_not_add_live_repl_declarations() {
     use crate::inference::tokenjuice::repl_tools_for;
-    use tinyjuice_bus::tools::REPL_TOOLS as REPL_TOOL_NAMES;
 
     crate::agent::harness::definition::AgentDefinitionRegistry::init_global_builtins()
         .expect("builtin definitions");
@@ -167,7 +165,7 @@ async fn resumed_juice_snapshot_does_not_add_live_repl_declarations() {
     config.tokenjuice.repl_handle_enabled = true;
     let mut recorded_spec = repl_tools_for(&config)
         .into_iter()
-        .find(|tool| tool.name() == REPL_TOOL_NAMES[0])
+        .find(|tool| tool.name() == tinyjuice_bus::tools::REPL_TOOLS[0])
         .expect("juice_find")
         .spec();
     recorded_spec.description = "frozen juice_find declaration".into();
@@ -199,7 +197,7 @@ async fn resumed_juice_snapshot_does_not_add_live_repl_declarations() {
         .filter(|spec| crate::inference::tokenjuice::is_repl_tool(&spec.name))
         .map(|spec| spec.name.as_str())
         .collect::<Vec<_>>();
-    assert_eq!(juice_names, [REPL_TOOL_NAMES[0]]);
+    assert_eq!(juice_names, [tinyjuice_bus::tools::REPL_TOOLS[0]]);
     let frozen = prepared
         .specs()
         .iter()
