@@ -550,8 +550,7 @@ async fn shell_selection_and_start_use_contract_members_with_typed_requests() {
     assert_eq!(log[1].1, json!([request]));
 }
 
-/// The fixture bus cannot attest a recipient, so confidential calls are made
-/// unconfidentially here; the member name and positional argument are pinned.
+/// The fixture bus cannot attest, so these run unconfidentially.
 #[tokio::test]
 async fn native_shell_and_policy_validation_use_their_contract_members() {
     let (_service, client, calls) = mock_client().await;
@@ -567,17 +566,12 @@ async fn native_shell_and_policy_validation_use_their_contract_members() {
         .await
         .expect("policy validation call");
     let log = calls.lock().expect("call log lock");
-    let members: Vec<_> = log
-        .iter()
-        .filter(|(name, _)| name != CAPABILITIES)
-        .collect();
-    assert_eq!(
-        members,
-        [
-            &("StartNativeShellExec".to_owned(), json!([shell])),
-            &("ValidateDockerPolicy".to_owned(), json!([policy])),
-        ]
-    );
+    let called: Vec<_> = log.iter().filter(|(n, _)| n != CAPABILITIES).collect();
+    let expected = [
+        ("StartNativeShellExec".to_owned(), json!([shell])),
+        ("ValidateDockerPolicy".to_owned(), json!([policy])),
+    ];
+    assert_eq!(called, expected.iter().collect::<Vec<_>>());
 }
 
 #[tokio::test]
