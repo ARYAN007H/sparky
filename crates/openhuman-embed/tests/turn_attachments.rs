@@ -1,16 +1,17 @@
 //! Files a host attaches to a turn as bytes reach the model with the
-//! message, and a turn that cannot carry them is refused rather than run
-//! without them.
+//! message, ahead of it, and a turn over the configured limits never runs.
+//! The orchestrator's refusal is in `orchestrator_attachments.rs`: a
+//! caller-built runtime needs a process of its own.
 
 mod common;
 use common::{chat_requests, offline_config, provider, route, runtime, stub_backend};
-use openhuman_embed::{AgentSpec, CoreError, HostAttachment, Runtime, Workspace};
+use openhuman_embed::{AgentSpec, HostAttachment, Runtime, Workspace};
 
 const PNG: &[u8] = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDRpixels";
 const PDF: &[u8] = b"%PDF-1.7\n1 0 obj\n<<>>\nendobj\n";
 
 #[test]
-fn attached_files_reach_the_model_and_the_orchestrator_refuses_them() {
+fn attached_files_reach_the_model_ahead_of_the_message() {
     runtime().block_on(async {
         tokio::spawn(async {
             let backend = stub_backend().await;
@@ -45,7 +46,10 @@ fn attached_files_reach_the_model_and_the_orchestrator_refuses_them() {
             let caption = body.find("what are these?").expect("the caption too");
             assert!(photo < report && report < caption, "{body}");
             assert!(body.contains("image/png") && body.contains("application/pdf"));
-            assert!(!body.contains("IHDRpixels"), "raw bytes in the transcript text");
+            assert!(
+                !body.contains("IHDRpixels"),
+                "raw bytes in the transcript text"
+            );
 
             // Over the configured limit: the turn fails before it runs.
             let before = chat_requests(&model).await.len();
@@ -59,20 +63,6 @@ fn attached_files_reach_the_model_and_the_orchestrator_refuses_them() {
                 .unwrap_err();
             assert!(refused.to_string().contains("count exceeds"), "{refused}");
             assert_eq!(chat_requests(&model).await.len(), before);
-
-            // `AGENT_CHAT` carries a string: the orchestrator path refuses.
-            let refused = runtime
-                .core()
-                .agent()
-                .turn("look")
-                .attach(HostAttachment::new(PNG, "image/png"))
-                .send()
-                .await
-                .unwrap_err();
-            assert!(
-                matches!(&refused, CoreError::Domain { kind: Some(kind), .. } if kind == "attachments_unsupported"),
-                "{refused:?}"
-            );
         })
         .await
         .unwrap();

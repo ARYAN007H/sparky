@@ -69,8 +69,9 @@ async fn references_convert_to_image_and_document_blocks() {
     .await
     .unwrap();
 
-    let message =
-        crate::agent::message_convert::user_message_from_text(&format!("{references}what is this?"));
+    let message = crate::agent::message_convert::user_message_from_text(&format!(
+        "{references}what is this?"
+    ));
     let Message::User(user) = message else {
         panic!("not a user message");
     };
