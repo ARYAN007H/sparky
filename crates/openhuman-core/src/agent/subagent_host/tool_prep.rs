@@ -208,16 +208,25 @@ pub(super) fn prompt_tools_for<'a>(
 }
 
 pub(super) fn load_prompt_source(
-    source: &PromptSource,
+    definition: &AgentDefinition,
     ctx: &PromptContext<'_>,
 ) -> Result<String, SubagentRunError> {
     let workspace_dir = ctx.workspace_dir;
-    match source {
+    match &definition.system_prompt {
         PromptSource::Inline(body) | PromptSource::Verbatim(body) => Ok(body.clone()),
-        PromptSource::Dynamic(build) => build(ctx).map_err(|e| SubagentRunError::PromptLoad {
-            path: format!("<dynamic:{}>", ctx.agent_id),
-            source: std::io::Error::other(e.to_string()),
-        }),
+        PromptSource::Dynamic(()) => {
+            let dynamic_path = || format!("<dynamic:{}>", ctx.agent_id);
+            let build = definition.extensions.prompt_builder.ok_or_else(|| {
+                SubagentRunError::PromptLoad {
+                    path: dynamic_path(),
+                    source: std::io::Error::other("dynamic prompt has no registered builder"),
+                }
+            })?;
+            build(ctx).map_err(|e| SubagentRunError::PromptLoad {
+                path: dynamic_path(),
+                source: std::io::Error::other(e.to_string()),
+            })
+        }
         PromptSource::File { path } => {
             // Try the workspace's `agent/prompts/` first (so users can
             // override built-in prompts), then fall back to the crate's

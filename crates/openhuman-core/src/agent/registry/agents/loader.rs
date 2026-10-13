@@ -267,7 +267,8 @@ fn parse_builtin(b: &BuiltinAgent) -> Result<AgentDefinition> {
         .with_context(|| format!("parsing built-in agent `{}` TOML", b.id))?;
 
     // Install the function-driven prompt builder and stamp the source.
-    def.system_prompt = PromptSource::Dynamic(b.prompt_fn);
+    def.system_prompt = PromptSource::Dynamic(());
+    def.extensions.prompt_builder = Some(b.prompt_fn);
     def.source = DefinitionSource::Builtin;
 
     // Sanity check: file layout id must match declared TOML id. This

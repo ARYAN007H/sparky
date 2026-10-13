@@ -83,9 +83,6 @@ pub fn definition_from_registry_entry(entry: &AgentRegistryEntry) -> AgentDefini
         when_to_use: entry.description.clone(),
         display_name: Some(entry.name.clone()),
         system_prompt: PromptSource::Inline(entry.system_prompt.clone().unwrap_or_default()),
-        omit_identity: true,
-        omit_memory_context: true,
-        omit_safety_preamble: true,
         model: registry_value_to_model_spec(entry.model.as_deref()),
         temperature: 0.4,
         tools: allowlist_to_tool_scope(&entry.tool_allowlist),
@@ -101,7 +98,6 @@ pub fn definition_from_registry_entry(entry: &AgentRegistryEntry) -> AgentDefini
         timeout_secs: None,
         sandbox_mode: SandboxMode::None,
         background: false,
-        tokenjuice_compression: Default::default(),
         subagents: entry
             .subagents
             .allowlist
@@ -111,8 +107,8 @@ pub fn definition_from_registry_entry(entry: &AgentRegistryEntry) -> AgentDefini
             .collect(),
         delegate_name: None,
         agent_tier: AgentTier::Worker,
-        searches_connected_mcp: false,
         source: DefinitionSource::CustomRegistry,
+        ..Default::default()
     }
 }
 

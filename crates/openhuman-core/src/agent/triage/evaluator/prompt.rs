@@ -15,7 +15,8 @@ pub(crate) fn extract_inline_prompt(def: &AgentDefinition) -> Option<String> {
         PromptSource::Inline(body) | PromptSource::Verbatim(body) if !body.is_empty() => {
             Some(body.clone())
         }
-        PromptSource::Dynamic(build) => {
+        PromptSource::Dynamic(()) => {
+            let build = def.extensions.prompt_builder?;
             use crate::agent::prompts::{
                 ConnectedIntegration, PromptContext, PromptTool, ToolCallFormat,
             };

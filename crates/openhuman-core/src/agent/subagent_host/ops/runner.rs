@@ -780,10 +780,10 @@ async fn run_typed_mode(
     let system_prompt = match &definition.system_prompt {
         // The whole prompt, with no sub-agent sections around it.
         PromptSource::Dynamic(_) | PromptSource::Verbatim(_) => {
-            load_prompt_source(&definition.system_prompt, &prompt_ctx)?
+            load_prompt_source(definition, &prompt_ctx)?
         }
         PromptSource::Inline(_) | PromptSource::File { .. } => {
-            let archetype_prompt_body = load_prompt_source(&definition.system_prompt, &prompt_ctx)?;
+            let archetype_prompt_body = load_prompt_source(definition, &prompt_ctx)?;
             render_subagent_system_prompt_with_format(
                 &parent.workspace_dir,
                 &model,
@@ -943,7 +943,9 @@ async fn run_typed_mode(
             "subagent",
             // Agent-level TokenJuice profile → sub-agent context middleware
             // (#4466), so sub-agent tool outputs compact like the chat path.
-            definition.effective_tokenjuice_compression(),
+            definition
+                .extensions
+                .effective_tokenjuice_compression(&definition.model),
             // The spawn-wide config snapshot supplies the `[context]`
             // knobs the graph used to load for itself.
             config.as_ref().ok().map(|c| c.as_ref()),
