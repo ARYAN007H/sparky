@@ -172,7 +172,7 @@ impl ToolPolicyMiddleware {
             })
             .collect();
         tinyagents_harness::tool::packs::NoSuchPackTool {
-            not_found_marker: crate::tools::status::NOT_FOUND_MARKER,
+            not_found_marker: tinytools::status::NOT_FOUND_MARKER,
             skill: pack.id,
             tool,
             callable,

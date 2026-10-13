@@ -56,8 +56,8 @@ pub struct ClearTurnStateResponse {
     pub cleared: bool,
 }
 
-impl From<&crate::tools::status::ClassifiedFailure> for PersistedToolFailure {
-    fn from(f: &crate::tools::status::ClassifiedFailure) -> Self {
+impl From<&tinytools::status::ClassifiedFailure> for PersistedToolFailure {
+    fn from(f: &tinytools::status::ClassifiedFailure) -> Self {
         // Serialize the enums to their wire variant name so the persisted
         // `class`/`category` strings match exactly what the live socket emits
         // (`ClassifiedFailure` serializes each as its bare variant name).

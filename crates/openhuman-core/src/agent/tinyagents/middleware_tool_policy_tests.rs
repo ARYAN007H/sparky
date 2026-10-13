@@ -484,7 +484,7 @@ fn an_invented_tool_name_is_not_found_even_under_the_packs_permission_ceiling() 
         .expect("an invented tool must be answered, not dispatched");
 
     assert!(
-        message.starts_with(crate::tools::status::NOT_FOUND_MARKER),
+        message.starts_with(tinytools::status::NOT_FOUND_MARKER),
         "a restricted channel must still answer an invented name as not-found: {message}"
     );
     assert!(
