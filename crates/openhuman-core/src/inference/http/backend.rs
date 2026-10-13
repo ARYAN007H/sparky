@@ -30,7 +30,10 @@ pub(super) struct HostChatBackend;
 
 /// Adapts the factory's shared `Arc<dyn ChatModel>` to the owned box the pinned
 /// `ResolvedChat` takes. tinyinference#98 makes `ResolvedChat` hold an `Arc`;
-/// delete this wrapper once the tinyagents pin carries that commit.
+/// delete this wrapper once the tinyagents pin carries that commit. That bump
+/// also removes the file turn-state store (tinyagents#430), whose host
+/// migration (`TurnStates` port) belongs to the tinyagents epic, so the pin
+/// has not moved here.
 struct SharedChatModel(std::sync::Arc<dyn ChatModel<()>>);
 
 #[async_trait]
