@@ -47,7 +47,25 @@ pub struct Rebound {
 /// When the new backend cannot be opened or the session store refuses it. The
 /// previous backend stays installed on error.
 pub fn rebind(config: &Config) -> Result<Option<Rebound>> {
-    let Some(current) = super::installed_url() else {
+    rebind_with(config, super::installed_url(), |url, backend| {
+        // Sessions first: no store may read one workspace's sessions beside
+        // another's documents, so both move together.
+        let rebound = crate::agent::session_store::rebind_all(&backend);
+        super::install_for_url(url, backend);
+        rebound
+    })
+}
+
+/// [`rebind`] with the URL the host installed and the installation made
+/// explicit, so the rule is testable without touching the process's slot.
+/// `install` receives the new URL and backend and returns how many session
+/// stores it moved.
+pub(crate) fn rebind_with(
+    config: &Config,
+    current: Option<String>,
+    install: impl FnOnce(&str, Arc<dyn StorageBackend>) -> usize,
+) -> Result<Option<Rebound>> {
+    let Some(current) = current else {
         return Ok(None);
     };
     let Some(next) = super::configured_url(config) else {
@@ -65,18 +83,16 @@ pub fn rebind(config: &Config) -> Result<Option<Rebound>> {
         workspace = %config.workspace_dir.display(),
         "[storage] the workspace moved; reopening the storage backend"
     );
-    if let Some(parent) = config.workspace_dir.join(super::config::DEFAULT_DIR).parent() {
-        std::fs::create_dir_all(parent).ok();
-    }
+    std::fs::create_dir_all(config.workspace_dir.join(super::config::DEFAULT_DIR))
+        .with_context(|| format!("create the storage directory under {}", config.workspace_dir.display()))?;
     let url = next.clone();
     let backend = super::block_on_anyhow(async move { Ok(super::open(&url).await?) })
         .with_context(|| format!("open the storage backend {redacted_to}"))?;
 
-    let rebound = crate::agent::session_store::rebind_all(&backend);
-    super::install_for_url(&next, Arc::clone(&backend));
+    let session_stores = install(&next, Arc::clone(&backend));
     tracing::debug!(
         target: "openhuman::storage",
-        session_stores = rebound,
+        session_stores,
         "[storage] backend reinstalled"
     );
 
