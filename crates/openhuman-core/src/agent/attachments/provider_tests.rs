@@ -668,7 +668,7 @@ async fn pdf_attachment_degrades_to_a_note_when_documents_component_is_off() {
     };
     let (text, cacheable) = model
         .fallback(
-            InputModality::File,
+            InputModality::Document,
             "uploads/t/id/brief.pdf",
             "application/pdf",
             b"%PDF-1.4",
