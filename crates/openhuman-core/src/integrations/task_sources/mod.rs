@@ -17,7 +17,6 @@
 
 pub mod bus;
 pub mod enrich;
-pub mod filter;
 pub mod ops;
 pub mod periodic;
 pub mod pipeline;

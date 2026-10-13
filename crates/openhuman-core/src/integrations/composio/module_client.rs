@@ -100,6 +100,31 @@ async fn prime_curated_catalogs(config: &crate::config::Config) {
     }
 }
 
+/// Make sure the curated-catalog snapshot is filled before a lookup that does
+/// not itself call the module (the agent-ready list, catalog search). The
+/// module is loaded if it is not yet, then asked once per pinned version.
+///
+/// # Errors
+///
+/// The module could not be reached, so the snapshot is empty and an answer read
+/// from it would look like "no curated toolkits" rather than "unknown". A build
+/// without a module loader has no catalogs to read and answers `Ok`.
+#[cfg(feature = "modules")]
+pub async fn ensure_catalogs(config: &crate::config::Config) -> Result<(), String> {
+    super::contract::curated::prime(config)
+        .await
+        .map_err(|error| {
+            tracing::debug!("[composio][curated] prime failed: {error}");
+            error
+        })
+}
+
+/// Without the module loader there is no catalog to read.
+#[cfg(not(feature = "modules"))]
+pub async fn ensure_catalogs(_config: &crate::config::Config) -> Result<(), String> {
+    Ok(())
+}
+
 /// Call one member with an argument and decode its reply.
 ///
 /// # Errors

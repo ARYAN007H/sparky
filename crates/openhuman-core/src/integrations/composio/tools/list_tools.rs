@@ -21,7 +21,6 @@ use super::render::{
     empty_uncurated_toolkits_message, normalized_scope_toolkits, render_tools_markdown,
     retain_connected_tools,
 };
-use super::scope_gate::filter_list_tools_response;
 use tinyconnectors_bus::names::methods;
 
 pub struct ComposioListToolsTool {
@@ -178,14 +177,14 @@ impl ComposioListToolsTool {
             }
         };
 
-        // The module owns the proxy route's query construction; the scope
-        // preference is applied host-side below (`filter_list_tools_response`)
-        // because it is stored where only the host can read it, so the
-        // module is asked not to apply its own defaults on top.
+        // The module owns the route's query construction and applies the
+        // user's stored scope preference to the listing (the default request),
+        // so the host does not filter a second time.
+        super::super::ops::ensure_user_scopes_migrated(&live_config).await;
         let request = ComposioListToolsRequest {
             toolkits: toolkits.clone().unwrap_or_default(),
             tags: tags.clone().unwrap_or_default(),
-            apply_user_scopes: false,
+            ..ComposioListToolsRequest::default()
         };
         let outcome = match connectors::call::<_, ComposioToolsResponse>(
             &live_config,
@@ -195,7 +194,6 @@ impl ComposioListToolsTool {
         .await
         {
             Ok(mut resp) => {
-                filter_list_tools_response(&live_config, &mut resp).await;
                 let mut connected_toolkits: Option<HashSet<String>> = None;
 
                 if !include_unconnected {
