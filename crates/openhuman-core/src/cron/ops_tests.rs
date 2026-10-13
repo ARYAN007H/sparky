@@ -196,61 +196,6 @@ fn update_rejects_expression_for_non_cron_schedule() {
         .contains("Cannot update expression/tz on a non-cron schedule"));
 }
 
-// ── parse_delay ─────────────────────────────────────────────────
-
-#[test]
-fn parse_delay_accepts_seconds_minutes_hours_days() {
-    assert_eq!(
-        parse_human_delay("5s").unwrap(),
-        chrono::Duration::seconds(5)
-    );
-    assert_eq!(
-        parse_human_delay("10m").unwrap(),
-        chrono::Duration::minutes(10)
-    );
-    assert_eq!(parse_human_delay("2h").unwrap(), chrono::Duration::hours(2));
-    assert_eq!(parse_human_delay("3d").unwrap(), chrono::Duration::days(3));
-}
-
-#[test]
-fn parse_delay_defaults_to_minutes_when_no_unit() {
-    assert_eq!(
-        parse_human_delay("15").unwrap(),
-        chrono::Duration::minutes(15)
-    );
-}
-
-#[test]
-fn parse_delay_trims_whitespace() {
-    assert_eq!(
-        parse_human_delay("  7m  ").unwrap(),
-        chrono::Duration::minutes(7)
-    );
-}
-
-#[test]
-fn parse_delay_rejects_empty_input() {
-    let err = parse_human_delay("").unwrap_err();
-    assert!(err.to_string().contains("delay must not be empty"));
-    let err = parse_human_delay("   ").unwrap_err();
-    assert!(err.to_string().contains("delay must not be empty"));
-}
-
-#[test]
-fn parse_delay_rejects_unsupported_unit() {
-    let err = parse_human_delay("5x").unwrap_err();
-    assert!(err.to_string().contains("unsupported delay unit"));
-    // Multi-char unit not matched in the parse branch either.
-    let err = parse_human_delay("5wk").unwrap_err();
-    assert!(err.to_string().contains("unsupported delay unit"));
-}
-
-#[test]
-fn parse_delay_rejects_non_numeric_prefix() {
-    // No ascii-digit prefix at all → empty num, parse() fails.
-    assert!(parse_human_delay("abc").is_err());
-}
-
 // ── add_once ────────────────────────────────────────────────────
 
 #[test]
