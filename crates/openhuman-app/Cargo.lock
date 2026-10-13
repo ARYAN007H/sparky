@@ -6786,7 +6786,7 @@ dependencies = [
 
 [[package]]
 name = "tinycomputer-bus"
-version = "0.12.0"
+version = "0.11.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -6795,7 +6795,7 @@ dependencies = [
 
 [[package]]
 name = "tinyconnectors-bus"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -7381,7 +7381,7 @@ checksum = "fd3ca314f692efd6c868f8408f53fe444634a845f96c028b97d35f6a1f79f0ee"
 
 [[package]]
 name = "tinyvoice-bus"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "serde",
  "serde_json",
