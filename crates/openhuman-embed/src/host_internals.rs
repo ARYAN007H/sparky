@@ -167,7 +167,8 @@ pub mod agent {
     }
     pub mod session_store {
         pub use openhuman_core::agent::session_store::{
-            context_workspace_dir, install, installed, restore,
+            context_workspace_dir, install, installed, restore, ReboundSessionStores,
+            WorkspaceSessionStores,
         };
     }
 }
@@ -292,8 +293,8 @@ pub mod platform {
 
 pub mod storage {
     pub use openhuman_core::storage::{
-        block_on, block_on_anyhow, clear, configured_url, driver_is_shared, install, installed,
-        open, url_from, StorageBackend, STORAGE_URL_VAR,
+        block_on, block_on_anyhow, clear, configured_url, driver_is_shared, install, install_for_url,
+        installed, open, url_from, StorageBackend, STORAGE_URL_VAR,
     };
 }
 
