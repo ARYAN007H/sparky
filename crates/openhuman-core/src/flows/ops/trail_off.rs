@@ -1,5 +1,3 @@
-use super::*;
-
 use tinyflows_copilot::fallback::{self, ToolResult};
 
 // The pure text heuristics (`text_looks_like_question`) and the whole
