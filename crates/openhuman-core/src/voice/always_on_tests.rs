@@ -62,10 +62,9 @@ async fn an_utterance_started_after_stop_never_polls_its_transcription() {
 
 #[tokio::test]
 async fn voice_component_off_keeps_always_on_down_even_when_enabled() {
-    use std::sync::atomic::Ordering;
     let mut config = crate::config::Config::default();
     config.voice_server.always_on_enabled = true;
     config.components.voice = false;
-    super::processor::start_if_enabled(&config).await;
-    assert!(!super::processor::ENABLED.load(Ordering::SeqCst));
+    start_if_enabled(&config).await;
+    assert!(!ENABLED.load(Ordering::SeqCst));
 }
