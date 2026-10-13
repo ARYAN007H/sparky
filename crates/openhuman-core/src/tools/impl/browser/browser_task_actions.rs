@@ -27,7 +27,7 @@ pub(super) fn host_hint(view: &TaskView) -> Option<&'static str> {
 /// not finish. Every other state (running, paused for a person, input or
 /// approval, a checkpoint, done) is a success the model acts on.
 pub(super) fn task_outcome(view: &TaskView, output: Value) -> anyhow::Result<Value> {
-    let marker = crate::tools::status::TASK_FAILED_MARKER;
+    let marker = tinytools::status::TASK_FAILED_MARKER;
     let headline = match &view.status {
         TaskStatus::Failed {
             step, reason, hint, ..

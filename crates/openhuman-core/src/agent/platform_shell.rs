@@ -197,10 +197,10 @@ fn build_tokio_command_with(command: &str, pipefail: PipeFail) -> tokio::process
     configure_shell_args(cmd.as_std_mut(), command, pipefail);
     // Every shell-family child leads its own process group and dies with the
     // handle that owns it, so a deadline (see
-    // `crate::tools::timeout::output_or_kill`) or a cancelled future cannot
+    // `tinytools_std::timeout::output_or_kill`) or a cancelled future cannot
     // leave a pipeline running behind the tool that reported it finished.
     cmd.kill_on_drop(true);
-    crate::tools::timeout::own_process_group(cmd.as_std_mut());
+    tinytools_std::timeout::own_process_group(cmd.as_std_mut());
     cmd
 }
 
@@ -221,8 +221,8 @@ fn build_std_command_with(command: &str, pipefail: PipeFail) -> std::process::Co
     configure_shell_args(&mut cmd, command, pipefail);
     // Same contract as the tokio builder: the child leads its own process
     // group so a deadline can reach the whole pipeline (see
-    // `crate::tools::timeout::kill_process_group`).
-    crate::tools::timeout::own_process_group(&mut cmd);
+    // `tinytools_std::timeout::kill_process_group`).
+    tinytools_std::timeout::own_process_group(&mut cmd);
     cmd
 }
 
