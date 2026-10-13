@@ -111,12 +111,8 @@ async fn execute_owned(
         anyhow::bail!("requested Landlock sandbox is unavailable");
     }
 
-    let mut run = super::shell_exec::NativeShellRun::new(
-        command,
-        working_dir,
-        &policy.state_dir,
-        timeout,
-    );
+    let mut run =
+        super::shell_exec::NativeShellRun::new(command, working_dir, &policy.state_dir, timeout);
     run.workspace = policy.workspace_root.clone();
     run.env = approved_environment(extra_env)?;
     run.isolate_network = true;

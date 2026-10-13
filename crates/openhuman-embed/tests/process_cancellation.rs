@@ -96,9 +96,7 @@ async fn dropped_command(bounded: bool) {
 #[tokio::test]
 async fn captured_commands_preserve_output_and_exit_status() {
     for bounded in [true, false] {
-        let mut cmd = shell_child(
-            "printf stdout; printf stderr >&2; exit 7",
-        );
+        let mut cmd = shell_child("printf stdout; printf stderr >&2; exit 7");
         let output = if bounded {
             output_or_kill(&mut cmd, Duration::from_secs(5))
                 .await

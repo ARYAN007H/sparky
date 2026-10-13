@@ -28,9 +28,9 @@
 pub mod bridge;
 pub mod host;
 pub mod ops;
-mod shell;
 pub mod prompt_eval;
 pub mod schemas;
+mod shell;
 
 pub use ops::{init, PromptVerdict};
 pub use schemas::{

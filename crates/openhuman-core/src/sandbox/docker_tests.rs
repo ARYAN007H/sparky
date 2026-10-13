@@ -46,7 +46,10 @@ async fn validation_never_reports_safe_when_tinybox_is_unavailable() {
     let mut config = crate::config::Config::default();
     config.modules.enabled = false;
     let verdict = validate_docker_policy(&config, &test_policy()).await;
-    assert!(verdict.is_err(), "no module means no verdict, not a clean one");
+    assert!(
+        verdict.is_err(),
+        "no module means no verdict, not a clean one"
+    );
 }
 
 #[cfg(feature = "modules")]

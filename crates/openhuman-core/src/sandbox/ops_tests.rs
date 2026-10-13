@@ -240,7 +240,10 @@ async fn execute_unsandboxed_refuses_non_utf8_environment_instead_of_altering_it
     .await;
 
     assert!(result.is_err());
-    assert!(!marker.exists(), "a refused environment must not run the command");
+    assert!(
+        !marker.exists(),
+        "a refused environment must not run the command"
+    );
 }
 
 /// Caller-approved overrides reach the command on top of the safe snapshot.

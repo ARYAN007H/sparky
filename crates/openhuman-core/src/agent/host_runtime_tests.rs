@@ -121,7 +121,10 @@ fn hide_window_reaches_the_native_runtime_only() {
         true,
     )
     .unwrap();
-    assert!(!docker.hide_window(), "docker runs in a container, not a console");
+    assert!(
+        !docker.hide_window(),
+        "docker runs in a container, not a console"
+    );
 }
 
 /// The shell flavor told to the model is the one TinyBox's `SelectShell`

@@ -196,7 +196,6 @@ fn test_shell(command: &str) -> tokio::process::Command {
     cmd
 }
 
-
 /// The deadline must take the command's whole process group with it. A shell
 /// pipeline is grandchildren of the tool's child, and a `grep -rl … /` the tool
 /// had reported as killed ran on for half an hour at a full core.
@@ -208,10 +207,7 @@ async fn a_timed_out_command_takes_its_whole_process_group_with_it() {
     let pidfile = dir.join("grandchild.pid");
     // `sleep 30 &` is a grandchild in the shell's own process group; `wait`
     // keeps the shell alive past the deadline.
-    let mut cmd = test_shell(&format!(
-        "sleep 30 & echo $! > {}; wait",
-        pidfile.display()
-    ));
+    let mut cmd = test_shell(&format!("sleep 30 & echo $! > {}; wait", pidfile.display()));
     let result = output_or_kill(&mut cmd, Duration::from_millis(700)).await;
     assert!(result.is_err(), "the deadline must fire on a 30s sleep");
 
@@ -254,10 +250,7 @@ async fn a_shell_family_child_dies_with_a_dropped_future() {
     let dir = std::env::temp_dir().join(format!("oh-dropkill-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let pidfile = dir.join("child.pid");
-    let mut cmd = test_shell(&format!(
-        "echo $$ > {}; sleep 30",
-        pidfile.display()
-    ));
+    let mut cmd = test_shell(&format!("echo $$ > {}; sleep 30", pidfile.display()));
     // `timeout` takes the future by value and drops it when the deadline
     // passes -- exactly the abandoned-future path a cancelled tool call takes.
     let _ = tokio::time::timeout(Duration::from_millis(300), cmd.output()).await;

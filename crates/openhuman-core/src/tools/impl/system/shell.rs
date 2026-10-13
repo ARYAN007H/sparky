@@ -708,7 +708,9 @@ fn exec_result(
     effective: Duration,
 ) -> ToolResult {
     match result {
-        Ok(result) if result.timed_out => ToolResult::error(tool_timeout_message(effective.as_secs())),
+        Ok(result) if result.timed_out => {
+            ToolResult::error(tool_timeout_message(effective.as_secs()))
+        }
         Ok(result) if result.success() => {
             if result.stderr.is_empty() {
                 ToolResult::success(result.stdout)

@@ -51,18 +51,12 @@ fn the_tool_describes_the_shell_this_host_actually_spawns() {
         test_runtime(),
         test_audit(),
     );
-    assert_eq!(
-        tool.description(),
-        shell_description(host_shell_flavor())
-    );
+    assert_eq!(tool.description(), shell_description(host_shell_flavor()));
     let command_desc = tool.parameters_schema()["properties"]["command"]["description"]
         .as_str()
         .unwrap()
         .to_string();
-    assert_eq!(
-        command_desc,
-        command_param_description(host_shell_flavor())
-    );
+    assert_eq!(command_desc, command_param_description(host_shell_flavor()));
     assert!(command_param_description(ShellFlavor::Cmd).contains("cmd.exe"));
 }
 
@@ -103,7 +97,10 @@ async fn the_container_environment_forwards_only_the_allowlist_plus_python_defau
         ("OPENAI_API_KEY".to_owned(), "sk-secret".to_owned()),
         ("AWS_SECRET_ACCESS_KEY".to_owned(), "secret".to_owned()),
     ]);
-    let env = scoped.scope(async { container_environment() }).await.unwrap();
+    let env = scoped
+        .scope(async { container_environment() })
+        .await
+        .unwrap();
     assert_eq!(env.get("PATH").map(String::as_str), Some("/bin"));
     assert_eq!(env.get("PYTHONUTF8").map(String::as_str), Some("1"));
     assert!(!env.contains_key("OPENAI_API_KEY"));

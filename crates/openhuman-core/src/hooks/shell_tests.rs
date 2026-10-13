@@ -46,7 +46,12 @@ fn the_hook_command_replaces_the_placeholder_in_the_selected_arguments() {
 #[test]
 fn a_command_that_contains_the_placeholder_text_is_not_rewritten_twice() {
     let process = from_selection(&posix(), PLACEHOLDER);
-    let last = process.get_args().last().unwrap().to_string_lossy().into_owned();
+    let last = process
+        .get_args()
+        .last()
+        .unwrap()
+        .to_string_lossy()
+        .into_owned();
     assert_eq!(last, format!("set -o pipefail\n{PLACEHOLDER}"));
 }
 
