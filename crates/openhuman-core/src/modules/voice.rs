@@ -159,12 +159,7 @@ pub async fn sequence_utterance(
     transcript: &str,
     wake_word: &str,
 ) -> Result<UtteranceDisposition, VoiceCallError> {
-    let json: String = call(
-        config,
-        methods::SEQUENCE_UTTERANCE,
-        (transcript, wake_word),
-    )
-    .await?;
+    let json: String = call(config, methods::SEQUENCE_UTTERANCE, (transcript, wake_word)).await?;
     serde_json::from_str(&json)
         .map_err(|e| VoiceCallError::Failed(format!("could not decode disposition: {e}")))
 }
