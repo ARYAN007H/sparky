@@ -299,3 +299,7 @@ pub async fn import_legacy_tinyjuice(root: &std::path::Path, ttl: Option<std::ti
     #[cfg(not(feature = "modules"))]
     let _ = (root, ttl);
 }
+
+#[cfg(all(test, feature = "modules"))]
+#[path = "import_once_tests.rs"]
+mod import_once_tests;

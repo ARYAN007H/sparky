@@ -179,3 +179,25 @@ fn only_hex_tokens_of_the_hash_length_are_ccr_names() {
         assert!(!is_token(name), "{name}");
     }
 }
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_symlinked_token_is_never_followed_into_storage() {
+    let outside = tempfile::tempdir().unwrap();
+    std::fs::write(outside.path().join("secret"), "credential bytes").unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    std::os::unix::fs::symlink(outside.path().join("secret"), dir.path().join(FRESH)).unwrap();
+    let scoped = scoped();
+    let outcome = import_into(&scoped, dir.path(), None, SystemTime::now())
+        .await
+        .unwrap();
+    assert!(matches!(
+        outcome,
+        Outcome::Imported {
+            imported: 0,
+            skipped: 1,
+            ..
+        }
+    ));
+    assert_eq!(read(&scoped, FRESH).await, None);
+}
