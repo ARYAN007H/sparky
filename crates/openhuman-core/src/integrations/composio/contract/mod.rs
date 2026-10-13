@@ -9,19 +9,19 @@
 //! They are plain data and pure functions: no HTTP, no persistence.
 
 pub mod curated;
-pub mod profile;
+pub mod identity;
 pub mod slug;
-pub mod tasks;
 
-pub use profile::{
-    canonicalize, normalize_connection_identifier, render_connected_identities_section,
-    ConnectedIdentity, IdentityKind, ProviderUserProfile,
+pub use identity::{
+    canonicalize_values, normalize_connection_identifiers, render_connected_identities_section,
 };
 pub use slug::{
     action_slug_matches, canonical_action_slug, classify_unknown, find_curated, toolkit_from_slug,
 };
-pub use tinyconnectors_bus::vocabulary::{CuratedTool, ToolScope, UserScopePref};
-pub use tasks::{GithubFetchMode, NormalizedTask, TaskContainer, TaskFetchFilter, TaskKind};
+pub use tinyconnectors_bus::vocabulary::{
+    ConnectedIdentity, CuratedTool, GithubFetchMode, IdentityKind, NormalizedTask,
+    ProviderUserProfile, TaskContainer, TaskFetchFilter, TaskKind, ToolScope, UserScopePref,
+};
 
 pub use curated::{
     agent_ready_toolkits, catalog_for_toolkit, curated_scope_for, curated_toolkits, has_native_provider,
