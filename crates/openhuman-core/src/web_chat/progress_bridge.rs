@@ -273,7 +273,7 @@ pub(crate) fn spawn_progress_bridge(
     client_id: String,
     thread_id: String,
     request_id: String,
-    turn_state_store: Arc<dyn TurnStates>,
+    turn_state_store: std::sync::Arc<dyn TurnStates>,
     metadata: ChatRequestMetadata,
     config: crate::config::Config,
 ) -> ProgressBridgeHandle {
