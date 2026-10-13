@@ -253,7 +253,10 @@ fn client_key(data_dir: &std::path::Path) -> PathBuf {
     let mut ancestor = data_dir;
     loop {
         if let Ok(real) = ancestor.canonicalize() {
-            return missing.iter().rev().fold(real, |path, part| path.join(part));
+            return missing
+                .iter()
+                .rev()
+                .fold(real, |path, part| path.join(part));
         }
         match (ancestor.parent(), ancestor.file_name()) {
             (Some(parent), Some(name)) => {
