@@ -88,7 +88,7 @@ async fn servers_env_and_audit_rows_move_into_the_modules_storage() {
 
     let docs = rig.scoped.documents();
     let one = docs.get(SERVERS, "srv-1").await.unwrap().unwrap();
-    let body = one.value;
+    let body = one.doc;
     assert_eq!(body["qualified_name"], "io.example/files");
     assert_eq!(body["args"], json!(["--root", "/tmp"]));
     assert_eq!(body["env_keys"], json!(["API_KEY", "REGION"]));
@@ -100,7 +100,7 @@ async fn servers_env_and_audit_rows_move_into_the_modules_storage() {
     assert_eq!(body["last_connected_at"], 1_700_000_005_000_i64);
     let claim_id = hex::encode(sha2::Sha256::digest(b"io.example/files"));
     let claim = docs.get(SERVER_NAMES, &claim_id).await.unwrap().unwrap();
-    assert_eq!(claim.value["server_id"], "srv-1");
+    assert_eq!(claim.doc["server_id"], "srv-1");
 
     // Env values only ever land in the secret, never in a document.
     assert!(!body.to_string().contains("sk-secret"));
@@ -194,7 +194,7 @@ async fn a_record_the_module_already_wrote_is_not_overwritten() {
         }
     );
     let kept = docs.get(SERVERS, "srv-1").await.unwrap().unwrap();
-    assert_eq!(kept.value["newer"], true);
+    assert_eq!(kept.doc["newer"], true);
     let secret = rig.secrets.get("mcp_client_env/srv-1").await.unwrap().unwrap();
     assert_eq!(&secret[..], b"{\"API_KEY\":\"rotated\"}");
 }
