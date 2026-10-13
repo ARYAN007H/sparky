@@ -358,7 +358,7 @@ pub async fn flows_required_connections(
     config: &Config,
     graph_json: Value,
 ) -> Result<Outcome<Value>, String> {
-    let graph = migrate_and_deserialize_graph(graph_json)?;
+    let graph = tinyflows::migrate::deserialize_graph(graph_json)?;
     let required = compute_required_connections(config, &graph).await;
     Ok(Outcome::single_log(
         json!({ "required_connections": required }),

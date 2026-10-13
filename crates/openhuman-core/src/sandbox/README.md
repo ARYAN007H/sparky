@@ -62,7 +62,7 @@ and `state_dir` is the core's internal `workspace_dir`. `allow_network` is
 `!is_remote_session` for `Sandboxed` and `true` for the other modes.
 `env_passthrough` is `SANDBOX_ENV_PASSTHROUGH`. `docker_overrides` is filled
 from `[runtime.docker]` only for the Docker backend, and the mount lists come
-from [`grants.rs`](./grants.rs) only for the Local backend.
+from [`local_grants.rs`](./local_grants.rs) only for the Local backend.
 
 ### The None backend
 
@@ -87,7 +87,7 @@ the core state dir is granted read-write and used for `TMPDIR`, `TEMP`, and
 runs if the module, artifact, or requested enforcement is unavailable.
 
 A real jail (Landlock, Seatbelt) denies everything it is not told about, so
-`grants::resolve_local_jail_grants` computes what everyday commands need,
+TinyBox's `ResolveLocalGrants` (called through `local_grants::with_resolved_grants` at spawn time) computes what everyday commands need,
 controlled by `[runtime.local_jail]` (`LocalJailConfig`):
 
 | Grant | Access | Condition |
@@ -138,7 +138,7 @@ execution refuses to run without the required provider.
 | [`types.rs`](./types.rs) | `SandboxBackendKind`, `SandboxPolicy`, `DockerOverrides`, exec request and result, handle and status, `ElevatedOp`, `ELEVATED_TOOLS`. |
 | [`ops.rs`](./ops.rs) | Policy resolution, backend creation, routed execution (None and Local paths), scratch ownership, the env allowlist, the host off switch, elevated ops. |
 | [`native_jail.rs`](./native_jail.rs) | TinyBox native-jail and cron passthrough request mapping, process/output lifecycle, and fail-closed status checks. |
-| [`grants.rs`](./grants.rs) | The Local jail's filesystem grant set and its credential floor. |
+| [`local_grants.rs`](./local_grants.rs) | Host adapter for `ResolveLocalGrants`: sends the credential floor as input and re-applies it to the module's reply. |
 | [`docker.rs`](./docker.rs) | Policy-to-`RunDocker` mapping, module status/cleanup calls, Docker policy validation. |
 | [`schemas.rs`](./schemas.rs) | The `sandbox.*` controllers. |
 
@@ -211,7 +211,7 @@ The settings surface (`get_sandbox_settings`, `[security.sandbox]` and
 
 ## Tests
 
-Sibling suites: [`types_tests.rs`](./types_tests.rs), [`ops_tests.rs`](./ops_tests.rs), [`grants_tests.rs`](./grants_tests.rs),
+Sibling suites: [`types_tests.rs`](./types_tests.rs), [`ops_tests.rs`](./ops_tests.rs), [`local_grants_tests.rs`](./local_grants_tests.rs),
 [`schemas_tests.rs`](./schemas_tests.rs), [`docker_tests.rs`](./docker_tests.rs) and [`docker_exec_tests.rs`](./docker_exec_tests.rs).
 `native_jail_tests.rs` pins the status floor, grant/environment mapping,
 module-unavailable refusal, and an ignored pinned-artifact Linux execution

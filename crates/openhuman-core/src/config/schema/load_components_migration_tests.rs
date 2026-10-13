@@ -187,3 +187,23 @@ fn composio_backend_mode_or_explicit_components_key_keeps_connectors_on() {
     );
     assert!(c.components.connectors, "explicit components key wins");
 }
+
+#[test]
+fn sandbox_enabled_false_maps_to_components_sandbox() {
+    let c = migrated("[sandbox]\nenabled = false\n", None);
+    assert!(!c.components.sandbox);
+    assert_eq!(c.sandbox.enabled, Some(false), "old key kept");
+    let c = migrated("[security.sandbox]\nenabled = false\n", None);
+    assert!(!c.components.sandbox);
+}
+
+#[test]
+fn sandbox_auto_or_on_or_explicit_component_keeps_the_component_on() {
+    for raw in [
+        "[sandbox]\nenabled = true\n",
+        "[sandbox]\nbackend = \"auto\"\n",
+        "[sandbox]\nenabled = false\n[components]\nsandbox = true\n",
+    ] {
+        assert!(migrated(raw, None).components.sandbox, "{raw}");
+    }
+}

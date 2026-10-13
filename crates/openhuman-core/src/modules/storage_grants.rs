@@ -180,13 +180,18 @@ type Declaration = (&'static str, fn() -> StorageGrant);
 
 /// The modules whose build declares storage, and what each may use.
 ///
-/// Empty today: no loadable module consumes the storage bus yet. A module
-/// that does adds its row here (a declaration is a reviewable build-time
+/// A module adds its row here (a declaration is a reviewable build-time
 /// decision, like the registry's digests) and then calls
-/// `ai.tinyhumans.tinystorage.Storage`; until then it has no storage at all.
+/// `ai.tinyhumans.tinystorage.Storage`; a module with no row has no storage at
+/// all. `tinymcp` declares its grant ahead of the release that consumes it: the
+/// pinned module does not call the storage bus yet, so the row serves nothing
+/// until the registry moves to a release that does.
 #[must_use]
 pub fn declared(module_id: &str) -> Option<StorageGrant> {
-    let table: &[Declaration] = &[];
+    let table: &[Declaration] = &[(
+        super::storage_grant_tinymcp::MODULE_ID,
+        super::storage_grant_tinymcp::grant,
+    )];
     table
         .iter()
         .find(|(id, _)| *id == module_id)

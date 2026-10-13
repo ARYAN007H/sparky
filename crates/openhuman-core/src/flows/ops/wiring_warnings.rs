@@ -208,41 +208,6 @@ pub(super) async fn graph_output_field_warnings(
     warnings
 }
 
-/// Given a Composio action's payload-only `output_schema` (see
-/// [`crate::flows::tinyflows::caps::ToolContract::output_fields`]'s doc —
-/// NEVER includes the runtime `data` envelope) and a `split_out.path`
-/// addressed relative to the ENVELOPE (`json.<envelope_field…>`, e.g.
-/// `"json.data"` or `"json.data.issues"`), resolves whether the path lands on
-/// something that is DEFINITELY not an array.
-///
-/// `Some(true)` — non-array (an object or scalar): a `split_out` over this
-/// path fans out over exactly ONE item, the classic "wrong array path"
-/// signal [`graph_split_out_path_warnings`]'s generic enforcement flags.
-/// `Some(false)` — array: the path is fine. `None` — the path can't be
-/// resolved against the schema at all (an unpublished/unknown nested field,
-/// or a path missing the `data.` segment entirely) — stay silent rather than
-/// guess; that's a distinct failure mode from "resolves to a non-array".
-fn schema_says_path_is_non_array(output_schema: &Value, configured_path: &str) -> Option<bool> {
-    let relative = configured_path
-        .strip_prefix("json.")
-        .unwrap_or(configured_path);
-    if relative == "data" {
-        // Whole-payload access (`json.data`) — non-array unless the payload's
-        // own root schema type is literally "array" (a bare-array response,
-        // e.g. a REST endpoint that returns `[...]` directly), in which case
-        // `json.data` legitimately IS the real list.
-        let ty = output_schema.get("type").and_then(Value::as_str)?;
-        return Some(ty != "array");
-    }
-    let rest = relative.strip_prefix("data.").filter(|r| !r.is_empty())?;
-    let mut node = output_schema;
-    for seg in rest.split('.') {
-        node = node.get("properties")?.get(seg)?;
-    }
-    let ty = node.get("type").and_then(Value::as_str)?;
-    Some(ty != "array")
-}
-
 /// Author-time WARN/suggest (systemic tool-contract fix, Part 2d, extended by
 /// B12): a `split_out` node whose direct predecessor is a `tool_call` calling
 /// a REAL Composio action, checked two ways:
@@ -346,7 +311,7 @@ async fn graph_split_out_path_warnings(config: &Config, graph: &WorkflowGraph) -
                     let Some(schema) = contract.output_schema.as_ref() else {
                         continue;
                     };
-                    if schema_says_path_is_non_array(schema, cp) == Some(true) {
+                    if tinyflows::wiring::schema_says_path_is_non_array(schema, cp) == Some(true) {
                         tracing::warn!(
                             target: "flows",
                             node = %node.id,

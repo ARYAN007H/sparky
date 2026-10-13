@@ -4,7 +4,7 @@
 //! The user asks the assistant in chat to build an automation; the agent
 //! calls this tool with a candidate `tinyflows::model::WorkflowGraph`. The
 //! tool runs the graph through the exact same
-//! [`crate::flows::ops::validate_and_migrate_graph`] path
+//! [`tinyflows::authoring::validate_and_migrate_graph`] path
 //! `flows_create` uses, and returns a `workflow_proposal` summary for the
 //! chat UI's `WorkflowProposalCard` — it never persists anything itself.
 //!
@@ -23,7 +23,8 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 
 use crate::config::Config;
-use crate::flows::ops::{build_builder_proposal, validate_and_migrate_graph};
+use crate::flows::ops::build_builder_proposal;
+use tinyflows::authoring::validate_and_migrate_graph;
 use tinytools::{PermissionLevel, Tool, ToolResult};
 
 pub struct ProposeWorkflowTool {

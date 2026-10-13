@@ -6735,7 +6735,7 @@ dependencies = [
 
 [[package]]
 name = "tinybox-bus"
-version = "0.1.24"
+version = "0.1.26"
 dependencies = [
  "serde",
 ]
@@ -6811,7 +6811,7 @@ dependencies = [
 
 [[package]]
 name = "tinyflows"
-version = "0.8.14"
+version = "0.8.15"
 dependencies = [
  "async-trait",
  "futures-timer",
@@ -7108,7 +7108,7 @@ dependencies = [
 
 [[package]]
 name = "tinymcp-bus"
-version = "0.15.0"
+version = "0.16.1"
 dependencies = [
  "schemars 1.2.2",
  "serde",

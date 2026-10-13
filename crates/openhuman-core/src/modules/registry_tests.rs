@@ -130,13 +130,13 @@ fn tinywallet_registry_matches_the_verified_v020_release_manifest() {
 }
 
 #[test]
-fn tinybox_registry_matches_the_published_v0124_release_manifest() {
+fn tinybox_registry_matches_the_published_v0126_release_manifest() {
     let record = find("tinybox").expect("compiled TinyBox module");
-    assert_eq!(record.version, "0.1.24");
-    assert_eq!(tinybox_bus::CONTRACT_VERSION, (1, 14));
+    assert_eq!(record.version, "0.1.26");
+    assert_eq!(tinybox_bus::CONTRACT_VERSION, (1, 17));
     assert_eq!(
         record.release_url,
-        "https://github.com/tinyhumansai/tinybox/releases/tag/v0.1.24"
+        "https://github.com/tinyhumansai/tinybox/releases/tag/v0.1.26"
     );
 
     let actual = record
@@ -147,88 +147,88 @@ fn tinybox_registry_matches_the_published_v0124_release_manifest() {
     let published = [
         (
             "archlinux-arm64",
-            "tinybox-0.1.24-archlinux-arm64.tar.gz",
-            "11b4c959868e9e13f60af116946145530ca76ad68ab2ceef4fea11a0c2f76c5f",
+            "tinybox-0.1.26-archlinux-arm64.tar.gz",
+            "7f6984d64be252ae4367d188fe08884154301c7a57b93b830189b345aa3f7ac3",
         ),
         (
             "archlinux-x86_64",
-            "tinybox-0.1.24-archlinux-x86_64.tar.gz",
-            "84764f24331dfb5ff1798419e69ada288233506f6d28f4f582f5e6a87f65d9e9",
+            "tinybox-0.1.26-archlinux-x86_64.tar.gz",
+            "35cbc62fb2e24cab231f705bc689954caf11c73352a3eafc51ba810f507687e3",
         ),
         (
             "fedora-43-arm64",
-            "tinybox-0.1.24-fedora-43-arm64.tar.gz",
-            "26763cb6a77e638adfb8641b58aaa0f57493403c7ab4dbca639f35e434fbd20c",
+            "tinybox-0.1.26-fedora-43-arm64.tar.gz",
+            "14112e7ed9d6dd15543ec68e1bfaa212ca0ea2e62a1dd423d409b4ba3087059b",
         ),
         (
             "fedora-43-x86_64",
-            "tinybox-0.1.24-fedora-43-x86_64.tar.gz",
-            "442d67e92c011125350e672a505925008b0bb26c368d3408c24029e60bc12be9",
+            "tinybox-0.1.26-fedora-43-x86_64.tar.gz",
+            "07661b6c59c4f6e40c36a25efe1d99fd1a465291ba4b13d58160b3baafc0762f",
         ),
         (
             "fedora-44-arm64",
-            "tinybox-0.1.24-fedora-44-arm64.tar.gz",
-            "67c0bf40748a1bf9e749bc918cdaddc5ba53f29f9cc3327a7c56fc82ef8dfdee",
+            "tinybox-0.1.26-fedora-44-arm64.tar.gz",
+            "1d1dc263ae85337203b584b4d66b6736ea5bbbe50dfcf0ebd9f83d770e4eceac",
         ),
         (
             "fedora-44-x86_64",
-            "tinybox-0.1.24-fedora-44-x86_64.tar.gz",
-            "5e320dcce68a3b36c61a33647575c9e3f1449388f489e6aa094b7684863ab377",
+            "tinybox-0.1.26-fedora-44-x86_64.tar.gz",
+            "080d50a2527169fbfc4b1cae61dc55468320b1d5d3819db20f05dca29edf3704",
         ),
         (
             "macos-15-arm64",
-            "tinybox-0.1.24-macos-15-arm64.tar.gz",
-            "59a76b8ea5ce093d26616b115cd11493459dcefebec73c2b63fa115e4c70d6f7",
+            "tinybox-0.1.26-macos-15-arm64.tar.gz",
+            "806ef4507a1317c295f08356827d53212a627e329c47f0b41db2fbadd1b10f3e",
         ),
         (
             "macos-15-x86_64",
-            "tinybox-0.1.24-macos-15-x86_64.tar.gz",
-            "dd73c660e3c54004dad55257eeefc812fa8c2b3bf89d82e346b5bb4e95439b7f",
+            "tinybox-0.1.26-macos-15-x86_64.tar.gz",
+            "3a80345165eda9a2ddd7a09e5447c8042eacee2109a2a7f2e7311efd24a45415",
         ),
         (
             "macos-26-arm64",
-            "tinybox-0.1.24-macos-26-arm64.tar.gz",
-            "3c2091b15246cb6fb566c73cbfc2f1a334b9f1d1a4ea58839f3576536321b285",
+            "tinybox-0.1.26-macos-26-arm64.tar.gz",
+            "4c63c88eab009946a05e505c146a879ee8446e94103956721af8fa8ecff30c11",
         ),
         (
             "macos-26-x86_64",
-            "tinybox-0.1.24-macos-26-x86_64.tar.gz",
-            "a077fae96405163fe4cc2ae0dcdfb2dee9e2b8da8ea7f7122d180d0c2f3789eb",
+            "tinybox-0.1.26-macos-26-x86_64.tar.gz",
+            "38ec8ee7bf72783e8c3dbe452664312e1b9f55123a5585132fc1e1e1f19a7f90",
         ),
         (
             "ubuntu-22.04-arm64",
-            "tinybox-0.1.24-ubuntu-22.04-arm64.tar.gz",
-            "beb26115d378dce167ffe6970f57dfd268c9851f10e254306812be3f478f4567",
+            "tinybox-0.1.26-ubuntu-22.04-arm64.tar.gz",
+            "13f9bcdade1873c8cbc82c95e150f06b82182071649906e798bb8d8cd001b9b1",
         ),
         (
             "ubuntu-22.04-x86_64",
-            "tinybox-0.1.24-ubuntu-22.04-x86_64.tar.gz",
-            "be69717def1d836a8e64e3ed544fdb4fb772ef641df68b473e9677f030f94809",
+            "tinybox-0.1.26-ubuntu-22.04-x86_64.tar.gz",
+            "ec051ccaf104cd547c1bd4b6248e8ae09d73ea9f908e8d9a7b696d3238aedddb",
         ),
         (
             "ubuntu-24.04-arm64",
-            "tinybox-0.1.24-ubuntu-24.04-arm64.tar.gz",
-            "4935e8099f1a373b7d3fffc6f5a4019d3e40a4c5c3d360e30c1d311ab6eba777",
+            "tinybox-0.1.26-ubuntu-24.04-arm64.tar.gz",
+            "4057741f50158040f0d2c7c030c15ae81dbb625d03c0a083c7571e4d0a698d52",
         ),
         (
             "ubuntu-24.04-x86_64",
-            "tinybox-0.1.24-ubuntu-24.04-x86_64.tar.gz",
-            "33391c0e42a5dc48328bb3cb2f785c44f4fc056ec5fc125a655c1416669b233e",
+            "tinybox-0.1.26-ubuntu-24.04-x86_64.tar.gz",
+            "ec379c022516f6ec1af6288302aed9344a73b64f95b7be45b7e3e64d974552ec",
         ),
         (
             "windows-11-arm64",
-            "tinybox-0.1.24-windows-11-arm64.zip",
-            "9b00a82bacbba00f528aaf6655bc005fa96751f774cb41cf960cb5c1ac0face9",
+            "tinybox-0.1.26-windows-11-arm64.zip",
+            "342063b0050d3cfd2f6f957e8f0c407d74d6cda0faebcd145832e7ae3221c820",
         ),
         (
             "windows-2022-x86_64",
-            "tinybox-0.1.24-windows-2022-x86_64.zip",
-            "a5b676f18bc1252ee81d614c35fd2b1ffb2b2ecc3a0335face170d2185432255",
+            "tinybox-0.1.26-windows-2022-x86_64.zip",
+            "74b480d762323e8aa63227d7e4f50f7d05783e440838adbd288d4663a420567e",
         ),
         (
             "windows-2025-x86_64",
-            "tinybox-0.1.24-windows-2025-x86_64.zip",
-            "c09e9d417442be2748cea8f6a1fe17b323675400f3e8b82dc647ec5a84eb3b99",
+            "tinybox-0.1.26-windows-2025-x86_64.zip",
+            "f25e8c639c2997fc752bd40840418076a0e86687bd53e746170c05cad5f60abd",
         ),
     ];
 
@@ -236,13 +236,13 @@ fn tinybox_registry_matches_the_published_v0124_release_manifest() {
     assert_eq!(actual, published);
 }
 #[test]
-fn tinymcp_registry_matches_the_published_v0150_release_manifest() {
+fn tinymcp_registry_matches_the_published_v0161_release_manifest() {
     let record = find("tinymcp").expect("compiled TinyMCP module");
-    assert_eq!(record.version, "0.15.0");
-    assert_eq!(tinymcp_bus::CONTRACT_VERSION, (1, 22));
+    assert_eq!(record.version, "0.16.1");
+    assert_eq!(tinymcp_bus::CONTRACT_VERSION, (1, 23));
     assert_eq!(
         record.release_url,
-        "https://github.com/tinyhumansai/tinymcp/releases/tag/v0.15.0"
+        "https://github.com/tinyhumansai/tinymcp/releases/tag/v0.16.1"
     );
     let actual = record
         .assets
@@ -252,88 +252,88 @@ fn tinymcp_registry_matches_the_published_v0150_release_manifest() {
     let published = [
         (
             "archlinux-rolling-arm64",
-            "tinymcp-0.15.0-archlinux-arm64.tar.gz",
-            "c77d02b8c03278ad24294dc63e0cd1ae490d4d17ee7b8543e71c2600176a7b60",
+            "tinymcp-0.16.1-archlinux-arm64.tar.gz",
+            "6a1c3f73c4b3002c7ca35a81170a6e727fc0df942607b5b28a65d1f8afa31565",
         ),
         (
             "archlinux-rolling-x86_64",
-            "tinymcp-0.15.0-archlinux-x86_64.tar.gz",
-            "836259b5cb2a06da6df598593fe2b60670d36faf3151e875946f16ccb5456fff",
+            "tinymcp-0.16.1-archlinux-x86_64.tar.gz",
+            "f6eba52cb67f95c0f21217c02efedc0adc1611204b8e0b49319d9d4b60e53681",
         ),
         (
             "fedora-43-arm64",
-            "tinymcp-0.15.0-fedora-43-arm64.tar.gz",
-            "0ba117c96137e13f958de0a557094a06c58797c7c03eee1b8fedfc25c7f17b6a",
+            "tinymcp-0.16.1-fedora-43-arm64.tar.gz",
+            "34d21f069d145188f0a5a14169f58c71227bca985bacde9062dda8ba8ba8e526",
         ),
         (
             "fedora-43-x86_64",
-            "tinymcp-0.15.0-fedora-43-x86_64.tar.gz",
-            "da5154722f65019f7de2452662f1f46c8425bfba95d0aa6613dab1efff6fec7e",
+            "tinymcp-0.16.1-fedora-43-x86_64.tar.gz",
+            "7b81c3a28db19f54fec6a98b3226e7a96328633b5bf7de398ef082a551832fbf",
         ),
         (
             "fedora-44-arm64",
-            "tinymcp-0.15.0-fedora-44-arm64.tar.gz",
-            "ada62a47ad9d88a4bd9f8e0defe67718a75db2f30e8e298e838b7d5d3f036f4f",
+            "tinymcp-0.16.1-fedora-44-arm64.tar.gz",
+            "e95f24918ea02b355fb269922acc54bb47c49ee31c74f9686903482880851040",
         ),
         (
             "fedora-44-x86_64",
-            "tinymcp-0.15.0-fedora-44-x86_64.tar.gz",
-            "2036d7a13f06bfb243fd7f54626cdcf7ed4653a534ac780503ee9980be1488ca",
+            "tinymcp-0.16.1-fedora-44-x86_64.tar.gz",
+            "ee4a4a2f071d951baeb839d3f05573575585af253645e6735edb1aab0f07cd5d",
         ),
         (
             "macos-15-arm64",
-            "tinymcp-0.15.0-macos-15-arm64.tar.gz",
-            "11aaa66c1dc42ec2b6f6a70c01d1c98e95bef22c7f626d32c6da9455b2cdf38f",
+            "tinymcp-0.16.1-macos-15-arm64.tar.gz",
+            "2aea627b5cf3d5f1d7328dc5ee9b5eb1a67ebd918f6d1dd71987f315b2b9cf47",
         ),
         (
             "macos-15-x86_64",
-            "tinymcp-0.15.0-macos-15-x86_64.tar.gz",
-            "11ee1ecede7599f575d75fcc3e030ea0f18df9ffe91a8264dd20da4453825569",
+            "tinymcp-0.16.1-macos-15-x86_64.tar.gz",
+            "5aa351af862dc496b6fecb1e355f8fe209959c8148a0c4625341e22ffaaee7d9",
         ),
         (
             "macos-26-arm64",
-            "tinymcp-0.15.0-macos-26-arm64.tar.gz",
-            "4062a4a7de2bda4d707960c715412ce61d66e8b5983f05b75ef5bca5931eb866",
+            "tinymcp-0.16.1-macos-26-arm64.tar.gz",
+            "2a7bb7dc867a2f4d033f8c41e9169dad0eee4887b7668ef87df08691021dca5e",
         ),
         (
             "macos-26-x86_64",
-            "tinymcp-0.15.0-macos-26-x86_64.tar.gz",
-            "8a144d5f19bb743186373ec18c118da9f1b772d592a14caed892f808a690c41f",
+            "tinymcp-0.16.1-macos-26-x86_64.tar.gz",
+            "03384b0f0b57410d4de9ab121ac3b3267f7af2ead334c7705b4c7b751285fdd9",
         ),
         (
             "ubuntu-22.04-arm64",
-            "tinymcp-0.15.0-ubuntu-22.04-arm64.tar.gz",
-            "1d3de88aeaf2255d44f5895ae06d7c7b4e2869314fff0efe8661a1eea50d0863",
+            "tinymcp-0.16.1-ubuntu-22.04-arm64.tar.gz",
+            "5226c7b9abf1e11ae2070c6d5c57b804264df2b11b1a317a51c40a18da8189be",
         ),
         (
             "ubuntu-22.04-x86_64",
-            "tinymcp-0.15.0-ubuntu-22.04-x86_64.tar.gz",
-            "aacd2ea47433e8c61941be71b5ff95036afe4435da4c38f2ab1dfa0d31ddade1",
+            "tinymcp-0.16.1-ubuntu-22.04-x86_64.tar.gz",
+            "6c8defda965dfdfb764c6ba7b239cc4656ce98707bda30433d1f77d0b2750087",
         ),
         (
             "ubuntu-24.04-arm64",
-            "tinymcp-0.15.0-ubuntu-24.04-arm64.tar.gz",
-            "c5dcc8c5f74d00f08d8a4dace062ebaaf347edcee7342d11ff0ba9da840e5807",
+            "tinymcp-0.16.1-ubuntu-24.04-arm64.tar.gz",
+            "3df2d754b894f37c54a451b988d7d85242f18a92ea02da1388e38b835c739f3d",
         ),
         (
             "ubuntu-24.04-x86_64",
-            "tinymcp-0.15.0-ubuntu-24.04-x86_64.tar.gz",
-            "fefa976a7e8ea19c3c63ce9dedb6652411258c478b0c16abceaa460c3afb95e7",
+            "tinymcp-0.16.1-ubuntu-24.04-x86_64.tar.gz",
+            "20e98ee6a52bbcbd53714642400a65285f6039cdad89ce64d04a5b7f3deb168c",
         ),
         (
             "windows-11-arm64",
-            "tinymcp-0.15.0-windows-11-arm64.zip",
-            "055fc3a47d050ab5fa76c993ff85d8690dbcaaab31b4673ba40e88575951d9a8",
+            "tinymcp-0.16.1-windows-11-arm64.zip",
+            "dd81b22ada15f34e3d710e5b7cc3c7ad7e5784d1cb7d784760c72ba77f6950f2",
         ),
         (
             "windows-2022-x86_64",
-            "tinymcp-0.15.0-windows-2022-x86_64.zip",
-            "e9f06cc33a3e29f1de05935c26238c2f23c46936544ba55a74ac89e3c8c8f690",
+            "tinymcp-0.16.1-windows-2022-x86_64.zip",
+            "21e1422ca50d4206102d406594e78f54974ef39b401d429b6b41d8bcfc8f901b",
         ),
         (
             "windows-2025-x86_64",
-            "tinymcp-0.15.0-windows-2025-x86_64.zip",
-            "943dea2ae0695c10a9f4376b5025c560f05668f5bd121e06e355bebfc819f970",
+            "tinymcp-0.16.1-windows-2025-x86_64.zip",
+            "e2ed40815c76717d4c01c2b3b5ae05808d7a0c22402b980f0f6bddf1a50be5d3",
         ),
     ];
     assert_eq!(actual, published);

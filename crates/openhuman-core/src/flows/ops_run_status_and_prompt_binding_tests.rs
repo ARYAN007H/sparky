@@ -98,7 +98,7 @@ fn agent_prompt_binding_unaffected() {
         ],
         "edges": [ { "from_node": "t", "to_node": "summarize" } ]
     }));
-    assert!(validate_binding_resolvability(&g).is_empty());
+    assert!(tinyflows::gates::failures(&g).is_empty());
 }
 
 /// Regression for issue #4593 (widened for #4881's `resume_flow_run`/
