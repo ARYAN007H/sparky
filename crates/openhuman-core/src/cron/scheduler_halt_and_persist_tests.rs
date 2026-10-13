@@ -401,7 +401,7 @@ async fn scheduler_flow_runs_active_hours_job_and_reschedules_inside_window() {
         start: active_hm.clone(),
         end: active_hm.clone(),
     };
-    let mut job = cron::add_shell_job(
+    let job = cron::add_shell_job(
         &config,
         Some("active-hours-e2e".into()),
         Schedule::Cron {
