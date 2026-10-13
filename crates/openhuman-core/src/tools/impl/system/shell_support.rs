@@ -30,7 +30,7 @@ pub(super) fn command_failure(code: Option<i32>, stdout: &str, stderr: &str) -> 
 ///
 /// The same exit-code and both-streams surfacing everywhere (#4095); the `-1`
 /// sentinel renders as a signal.
-pub(super) pub(super) fn exec_result(
+pub(super) fn exec_result(
     result: anyhow::Result<crate::sandbox::SandboxExecResult>,
     effective: Duration,
 ) -> ToolResult {
@@ -60,7 +60,8 @@ pub(super) pub(super) fn exec_result(
 /// no-ops for a non-Python command. Native runs get the same from TinyBox's
 /// `python_utf8` request flag; this serves the Docker and sandbox-policy paths,
 /// which forward their environment as plain variables.
-pub(super) const PYTHON_UTF8_DEFAULTS: &[(&str, &str)] = &[("PYTHONUTF8", "1"), ("PYTHONIOENCODING", "utf-8")];
+pub(super) const PYTHON_UTF8_DEFAULTS: &[(&str, &str)] =
+    &[("PYTHONUTF8", "1"), ("PYTHONIOENCODING", "utf-8")];
 
 pub(super) fn python_utf8_env(
     lookup: impl Fn(&str) -> Option<std::ffi::OsString>,
