@@ -77,6 +77,8 @@ async fn stop_fires_the_session_cancellation_and_lets_the_turn_unwind() {
     let stop = async {
         tokio::task::yield_now().await;
         cancel.cancel();
+        // A double Stop is a no-op, not a second unwind.
+        cancel.cancel();
     };
     let (res, ()) = tokio::join!(turn, stop);
     assert!(res.is_none(), "a stopped turn reports a cancel");

@@ -113,9 +113,7 @@ where
 ///
 /// Returns `None` when the turn was cancelled cooperatively before producing a
 /// result — the cancelling side already emitted the user-facing `chat_error`,
-/// so the caller just unwinds quietly. A cancel also fires the turn's session
-/// cancellation and waits up to [`STOPPED_TURN_PERSIST_GRACE`] for the turn to
-/// persist the rounds it completed before it is dropped (#7715). Otherwise `Some(res)` carries the turn's
+/// so the caller just unwinds quietly (see [`run_until_stopped`]). Otherwise `Some(res)` carries the turn's
 /// `Result`. Extracted so `start_chat` and `spawn_parallel_turn` share one copy
 /// of this wiring and can't drift apart (issue #4746 review); the only per-site
 /// differences are the `fork` flag and run-queue handle passed to

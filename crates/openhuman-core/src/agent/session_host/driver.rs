@@ -651,13 +651,9 @@ fn record_snapshot_usage(
     observed.resolved_route = guard.resolved_route.clone();
 }
 
-/// The partial a stopped turn hands the runtime (#7715): the user's prompt and
-/// every round the provider accepted, so the next turn sees the work and
-/// edit/regenerate can find the turn. A stop before the first model call has
-/// no snapshot yet and keeps just the request history (the prompt).
-///
-/// No display partial: the turn_state mirror already appends the streamed
-/// text as the display-only record of an interrupted turn.
+/// A stopped turn's partial (#7715): the prompt and the accepted rounds, or
+/// just the request before the first model call. No display partial: the
+/// turn_state mirror already records the streamed text.
 fn driver_cancelled_with_snapshot(
     snapshot: &crate::agent::tinyagents::TranscriptSnapshotSink,
     sidecar: &std::sync::Arc<

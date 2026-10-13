@@ -269,60 +269,64 @@ fn recorded_declarations_allow_missing_executors_without_authorizing_fresh_names
     assert!(!error.error.to_string().contains("retired_tool"));
 }
 
-/// A Stop keeps the user's prompt and every round the provider accepted
-/// (#7715), so the next turn sees the work and edit/regenerate find the turn.
-/// The streamed tail is left to the turn_state mirror's display record.
+/// A Stop keeps the prompt and every round the provider accepted (#7715), and
+/// nothing past the last answered request: not streamed text, and not a tool
+/// call or result still in flight, which would replay as a dangling call.
 #[test]
-fn stopped_turn_hands_back_its_accepted_rounds() {
-    let snapshot = Arc::new(std::sync::Mutex::new(
-        crate::agent::tinyagents::TranscriptSnapshot {
-            messages: vec![
-                Message::user("build the payment layer"),
+fn stopped_turn_hands_back_only_its_accepted_rounds() {
+    let request = || vec![Message::user("earlier"), Message::user("stop me")];
+    let cases: [(&str, Vec<Message>, usize, &[&str]); 3] = [
+        (
+            "mid-stream text",
+            vec![
+                Message::user("stop me"),
                 Message::tool("call-1", "committed 6b75a4c"),
-                Message::assistant("streamed text the provider never accepted"),
+                Message::assistant("streamed, never accepted"),
             ],
-            accepted_len: 2,
-            request_base_len: 1,
-            model_calls: 2,
-            input_tokens: 40,
-            ..Default::default()
-        },
-    ));
-    let sidecar = sidecar();
-    let failure = driver_cancelled_with_snapshot(
-        &snapshot,
-        &sidecar,
-        std::time::Duration::from_millis(7),
-        vec![Message::user(
-            "unused: the snapshot already holds the request",
-        )],
-    );
-    assert_eq!(failure.error, RuntimeError::Cancelled);
-    let partial = failure.partial.expect("a stopped turn keeps its rounds");
-    let texts: Vec<String> = partial.history.iter().map(|m| m.text()).collect();
-    assert_eq!(texts, ["build the payment layer", "committed 6b75a4c"]);
-    assert!(partial.interrupted);
-    assert!(partial.partial.is_none(), "no second display record");
-    let observed = sidecar.lock().unwrap();
-    assert_eq!(observed.model_calls, 2);
-    assert_eq!(observed.input_tokens, 40);
-    assert_eq!(observed.duration, Some(std::time::Duration::from_millis(7)));
-}
-
-/// A Stop before the first model call has no snapshot yet; the prompt is still
-/// kept so the stopped turn exists in the transcript.
-#[test]
-fn stop_before_the_first_model_call_keeps_the_prompt() {
-    let snapshot = Arc::new(std::sync::Mutex::new(
-        crate::agent::tinyagents::TranscriptSnapshot::default(),
-    ));
-    let failure = driver_cancelled_with_snapshot(
-        &snapshot,
-        &sidecar(),
-        std::time::Duration::ZERO,
-        vec![Message::user("earlier"), Message::user("stop me")],
-    );
-    let partial = failure.partial.expect("the prompt is kept");
-    let texts: Vec<String> = partial.history.iter().map(|m| m.text()).collect();
-    assert_eq!(texts, ["earlier", "stop me"]);
+            2,
+            &["stop me", "committed 6b75a4c"],
+        ),
+        (
+            "during a tool call",
+            vec![
+                Message::user("stop me"),
+                Message::assistant("response that requested the tool"),
+                Message::tool("call-2", "half-written output"),
+            ],
+            1,
+            &["stop me"],
+        ),
+        // Before the first model call the snapshot is empty: keep the request.
+        (
+            "before the first model call",
+            vec![],
+            0,
+            &["earlier", "stop me"],
+        ),
+    ];
+    for (case, messages, accepted_len, expected) in cases {
+        let snapshot = Arc::new(std::sync::Mutex::new(
+            crate::agent::tinyagents::TranscriptSnapshot {
+                messages,
+                accepted_len,
+                request_base_len: 1,
+                model_calls: 2,
+                ..Default::default()
+            },
+        ));
+        let sidecar = sidecar();
+        let failure = driver_cancelled_with_snapshot(
+            &snapshot,
+            &sidecar,
+            std::time::Duration::from_millis(7),
+            request(),
+        );
+        assert_eq!(failure.error, RuntimeError::Cancelled, "{case}");
+        let partial = failure.partial.expect(case);
+        let texts: Vec<String> = partial.history.iter().map(|m| m.text()).collect();
+        assert_eq!(texts, expected, "{case}");
+        assert!(partial.interrupted, "{case}");
+        assert!(partial.partial.is_none(), "{case}: the mirror owns display");
+        assert_eq!(sidecar.lock().unwrap().model_calls, 2, "{case}");
+    }
 }
