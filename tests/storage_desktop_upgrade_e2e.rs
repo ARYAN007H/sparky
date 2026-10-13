@@ -101,7 +101,6 @@ fn write(workspace: &Path, relative: &str, text: &str) {
     std::fs::write(file, text).unwrap();
 }
 
-
 /// Sessions as the classic layout kept them: a transcript, an in-flight turn
 /// snapshot and a `sessions.db` row.
 fn legacy_sessions(workspace: &Path) {

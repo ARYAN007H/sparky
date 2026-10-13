@@ -57,12 +57,7 @@ fn start(home: &Path, workspace: &Path, url: &str, modules: &Path) -> (Server, S
     panic!("openhuman-core never started on a free port");
 }
 
-fn try_start(
-    home: &Path,
-    workspace: &Path,
-    url: &str,
-    modules: &Path,
-) -> Option<(Server, String)> {
+fn try_start(home: &Path, workspace: &Path, url: &str, modules: &Path) -> Option<(Server, String)> {
     let port = free_port();
     let mut cmd = Command::new("sh");
     cmd.args([
@@ -85,6 +80,8 @@ fn try_start(
     .env("OPENHUMAN_KEYRING_MASTER_KEY", "44".repeat(32))
     .env_remove("OPENHUMAN_KEYRING_MASTER_KEY_FILE")
     .env_remove("OPENHUMAN_MODE")
+    // Only the module under test: the others would be fetched from the release
+    // host, and this test never reaches the network.
     // Only the module under test: the others would be fetched from the release
     // host, and this test never reaches the network.
     .envs(
