@@ -183,7 +183,7 @@ pub fn add_agent_job_from_spec(config: &Config, spec: AgentJobSpec) -> Result<Cr
 }
 
 /// Registers (idempotently) the cron job that fires a flow's `schedule`
-/// trigger; see `tinyflows_sqlite::schedule::add_flow_schedule_job`.
+/// trigger; see `CronDocuments::add_flow_schedule_job`.
 pub fn add_flow_schedule_job(
     config: &Config,
     flow_id: &str,
@@ -215,25 +215,16 @@ pub fn get_job(config: &Config, job_id: &str) -> Result<CronJob> {
 pub fn remove_job(config: &Config, id: &str) -> Result<()> {
     let docs = documents(config)?;
     let owned = id.to_string();
+    // The job's policy is a field of the job, so it goes with it.
     run(async move { docs.remove_job(&owned).await })?;
-    if let Err(error) = super::policy::clear_policy(config, id) {
-        tracing::warn!(job_id = id, %error, "[cron:store] removing job policy failed");
-    }
     println!("✅ Removed cron job {id}");
     Ok(())
 }
 
 /// Deletes every cron job in the workspace (E2E `openhuman.test_reset`).
 pub fn clear_all_jobs(config: &Config) -> Result<usize> {
-    let removed = if let Some(docs) = documents(config)? {
-        run(async move { docs.clear_all_jobs().await })?
-    } else {
-        upstream::clear_all_jobs(&opts(config))?
-    };
-    if let Err(error) = super::policy::clear_all_policies(config) {
-        tracing::warn!(%error, "[cron:store] clearing job policies failed");
-    }
-    Ok(removed)
+    let docs = documents(config)?;
+    run(async move { docs.clear_all_jobs().await })
 }
 
 /// Removes duplicate jobs sharing a `name`, keeping the one with most history.
