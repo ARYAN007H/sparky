@@ -72,6 +72,8 @@ async fn the_real_module_fails_open_and_reads_its_documents_through_the_host() {
         .expect("the module answered");
     assert!(!response.remixed, "{response:?}");
     assert_eq!(response.reply, "That's done.");
+    // The module reported the request finished, so nothing is kept for it.
+    assert_eq!(callbacks::live_for(&config.workspace_dir), 0);
 
     let legacy = config.workspace_dir.join("tinymemes/remixed.json");
     assert!(
@@ -95,6 +97,11 @@ async fn a_disabled_request_passes_through_without_a_callback() {
     let response = service::remix(&config, disabled).await.unwrap();
     assert_eq!(response.reply, "hello");
     assert_eq!(response.skipped, Some(SkipReason::Disabled));
+    assert_eq!(
+        callbacks::live_for(&config.workspace_dir),
+        0,
+        "a disabled request keeps no registration"
+    );
     assert!(
         config.workspace_dir.join("tinymemes/remixed.json").exists(),
         "a disabled request reads nothing"

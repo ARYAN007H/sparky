@@ -215,3 +215,21 @@ async fn component_off_refuses_before_any_module_load() {
     let error = remix(&config, request).await.unwrap_err();
     assert!(error.contains("component is off"), "{error}");
 }
+
+#[test]
+fn foreground_remixes_share_a_lock_per_workspace_and_never_across_workspaces() {
+    let (dir_a, dir_b) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let (a, b) = (config_in(dir_a.path()), config_in(dir_b.path()));
+    assert!(std::sync::Arc::ptr_eq(&scope_lock(&a), &scope_lock(&a)));
+    assert!(!std::sync::Arc::ptr_eq(&scope_lock(&a), &scope_lock(&b)));
+}
+
+#[tokio::test]
+async fn a_second_remix_for_one_workspace_waits_for_the_first_but_another_workspace_does_not() {
+    let (dir_a, dir_b) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let (a, b) = (config_in(dir_a.path()), config_in(dir_b.path()));
+    let held = scope_lock(&a);
+    let _first = held.lock().await;
+    assert!(scope_lock(&a).try_lock().is_err(), "same workspace waits");
+    assert!(scope_lock(&b).try_lock().is_ok(), "another workspace does not");
+}

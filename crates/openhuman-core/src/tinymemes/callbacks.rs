@@ -145,6 +145,16 @@ pub(super) fn end(correlation: &str) {
     }
 }
 
+/// How many registered remixes belong to `workspace`; tests use a unique
+/// workspace so parallel tests cannot disturb the count.
+#[cfg(test)]
+pub(super) fn live_for(workspace: &std::path::Path) -> usize {
+    registry()
+        .values()
+        .filter(|entry| entry.session.config.workspace_dir == workspace)
+        .count()
+}
+
 /// The correlation id a callback payload carries (`[ { "correlation": .. } ]`).
 pub(super) fn correlation_of(payload: &Value) -> Option<&str> {
     payload
