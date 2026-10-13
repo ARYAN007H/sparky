@@ -56,7 +56,7 @@ impl FailureSink for SentrySink {
 
 /// The reporter shared by every resolver and client in this process.
 #[must_use]
-pub(super) fn reporter() -> Arc<FailureReporter> {
+pub(crate) fn reporter() -> Arc<FailureReporter> {
     static REPORTER: OnceLock<Arc<FailureReporter>> = OnceLock::new();
     Arc::clone(REPORTER.get_or_init(|| Arc::new(FailureReporter::new(Arc::new(SentrySink)))))
 }
