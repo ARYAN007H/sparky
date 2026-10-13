@@ -22,31 +22,36 @@ fn jail_status_is_ready_only_above_the_isolation_floor() {
 
 #[cfg(feature = "modules")]
 #[test]
-fn shell_request_uses_the_platform_shell_and_caller_known_process_resource() -> anyhow::Result<()> {
+fn shell_exec_request_delegates_shell_selection_to_the_module() -> anyhow::Result<()> {
     let resource = contract::ResourceId("known-resource".to_owned());
+    let process = contract::ResourceId("known-process".to_owned());
     let cwd = tempfile::tempdir()?;
+    let state = tempfile::tempdir()?;
     let env = BTreeMap::from([("LANG".to_owned(), "C".to_owned())]);
-    let request = shell_request(
+    let request = shell_exec_request(
+        process.clone(),
         &resource,
         "printf 'one two'",
         cwd.path(),
         env.clone(),
-        false,
+        state.path(),
+        Duration::from_secs(7),
+        true,
+        None,
     )?;
 
-    let expected = platform_shell::build_std_command("printf 'one two'");
-    let expected_argv = std::iter::once(expected.get_program().to_str().unwrap().to_owned())
-        .chain(
-            expected
-                .get_args()
-                .map(|arg| arg.to_str().unwrap().to_owned()),
-        )
-        .collect::<Vec<_>>();
+    assert_eq!(request.process, process);
     assert_eq!(request.resource, resource);
-    assert_eq!(request.argv, expected_argv);
+    assert_eq!(request.shell.command, "printf 'one two'");
+    assert!(request.shell.preserve_pipeline_status);
+    assert_eq!(request.shell.runtime_path, None);
+    assert!(!request.shell.python_utf8);
     assert_eq!(request.cwd.as_deref(), cwd.path().to_str());
-    assert_eq!(request.env, env);
+    assert_eq!(request.extra_env, env);
+    assert_eq!(request.state_dir, state.path().to_str().unwrap());
+    assert_eq!(request.timeout_ms, 7_000);
     assert_eq!(request.stdin, None);
+    assert!(request.jail.is_none());
     Ok(())
 }
 

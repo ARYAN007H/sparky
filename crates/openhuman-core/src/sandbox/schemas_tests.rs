@@ -203,3 +203,38 @@ async fn handle_validate_policy_dangerous() {
     let val = result.unwrap();
     assert_eq!(val.get("valid").and_then(|v| v.as_bool()), Some(false));
 }
+
+// ── [components] sandbox = false ──────────────────────────────────────
+
+#[tokio::test]
+async fn every_sandbox_method_answers_component_disabled_when_sandbox_is_off() {
+    let mut set = crate::core::runtime::ComponentSet::all();
+    set.sandbox = false;
+    let ctx = crate::core::runtime::context::CoreContext::for_test_with_components(set);
+    let handlers: [fn(Map<String, Value>) -> ControllerFuture; 4] = [
+        handle_status,
+        handle_resolve_policy,
+        handle_cleanup_orphans,
+        handle_validate_policy,
+    ];
+    crate::core::runtime::context::CoreContext::scope(ctx, async {
+        for handler in handlers {
+            let err = handler(Map::new()).await.unwrap_err();
+            let decoded = crate::core::StructuredRpcError::decode(&err).expect("typed error");
+            assert_eq!(decoded.message, "COMPONENT_DISABLED:sandbox");
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn sandbox_methods_are_not_gated_when_sandbox_is_on() {
+    let ctx = crate::core::runtime::context::CoreContext::for_test_with_components(
+        crate::core::runtime::ComponentSet::all(),
+    );
+    crate::core::runtime::context::CoreContext::scope(ctx, async {
+        let err = handle_validate_policy(Map::new()).await.unwrap_err();
+        assert!(!err.contains("COMPONENT_DISABLED"), "{err}");
+    })
+    .await;
+}

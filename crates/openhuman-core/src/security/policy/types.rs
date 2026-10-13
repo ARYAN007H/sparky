@@ -71,17 +71,6 @@ pub enum CommandRiskLevel {
     High,
 }
 
-/// Coarse permission bucket the harness approval gate keys on. TinyBox
-/// supplies parser facts; OpenHuman owns this authorization category.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum CommandClass {
-    Read,
-    Write,
-    Network,
-    Install,
-    Destructive,
-}
-
 /// What the harness should do with an acting tool call of a given
 /// [`CommandClass`] under the session's [`AutonomyLevel`]. Computed by
 /// [`SecurityPolicy::gate_decision`]; the harness translates `Prompt` into an
