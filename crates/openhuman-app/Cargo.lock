@@ -7037,7 +7037,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.11.0",
- "tinystoragedrivers-secrets 0.7.0 (git+https://github.com/tinyhumansai/tinystoragedrivers?tag=v0.7.0)",
+ "tinystoragedrivers-secrets",
  "tracing",
  "url",
  "zeroize",
@@ -7236,7 +7236,7 @@ version = "0.7.0"
 dependencies = [
  "tinystoragedrivers-core",
  "tinystoragedrivers-file",
- "tinystoragedrivers-secrets 0.7.0",
+ "tinystoragedrivers-secrets",
  "tinystoragedrivers-sqlite",
 ]
 
@@ -7268,7 +7268,7 @@ dependencies = [
  "serde_json",
  "tinystoragedrivers-bus 0.7.0",
  "tinystoragedrivers-core",
- "tinystoragedrivers-secrets 0.7.0",
+ "tinystoragedrivers-secrets",
  "tokio",
 ]
 
@@ -7306,29 +7306,6 @@ dependencies = [
  "fs4",
  "hkdf",
  "keyring",
- "rustix 1.1.5",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "tinystoragedrivers-core",
- "tokio",
- "winapi-util",
- "windows-permissions",
- "winsafe",
- "zeroize",
-]
-
-[[package]]
-name = "tinystoragedrivers-secrets"
-version = "0.7.0"
-source = "git+https://github.com/tinyhumansai/tinystoragedrivers?tag=v0.7.0#6d1a1029de402f5937113fcc56e4023e0dc61c94"
-dependencies = [
- "async-trait",
- "atomicwrites",
- "chacha20poly1305",
- "clack-private-fs",
- "fs4",
- "hkdf",
  "rustix 1.1.5",
  "serde",
  "serde_json",
