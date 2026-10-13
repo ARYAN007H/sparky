@@ -300,8 +300,8 @@ async fn scheduled_shell_authorization_fails_closed_when_tinybox_is_disabled() {
 
 /// A pipeline keeps the shell's own exit status, not `pipefail`'s.
 ///
-/// Regression guard for a behaviour change review caught on this branch. Routing
-/// this call site through `platform_shell::build_tokio_command` would have added
+/// Regression guard for a behaviour change review caught on this branch. Running
+/// this call site with the module's default shell semantics would have added
 /// `set -o pipefail`, and `false | true` — which a plain `-lc` reports as
 /// success, because only the last stage counts — would have started reporting
 /// failure. Any existing job ending in a tolerated pipe stage (a `… | grep -q`
