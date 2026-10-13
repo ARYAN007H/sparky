@@ -4,9 +4,9 @@ use serde_json::Value;
 use sha2::Digest;
 use std::collections::BTreeMap;
 use tempfile::TempDir;
+use tinyflows::engine::Checkpointer;
 use tinyflows_drivers::catalog::FlowCatalogDocuments;
 use tinyflows_drivers::schedule::CronDocuments;
-use tinyflows::engine::Checkpointer;
 use tinyflows_drivers::DriverCheckpointer;
 
 fn fixtures() -> PathBuf {
@@ -159,8 +159,7 @@ fn flow_checkpoints_come_across_with_their_lineage() {
     let backend = backend();
     import_flows(&backend, &Scope::local(), &config).unwrap();
 
-    let checkpointer =
-        DriverCheckpointer::<Value>::new(documents(&backend, &Scope::local()));
+    let checkpointer = DriverCheckpointer::<Value>::new(documents(&backend, &Scope::local()));
     let expected = expected()["checkpoints"].clone();
     crate::storage::block_on_anyhow(async move {
         for thread in ["run-1", "Run Two/Upper"] {
@@ -279,10 +278,9 @@ fn an_import_runs_once_and_does_not_resurrect_a_deleted_flow() {
 
     let again = import_flows(&backend, &Scope::local(), &config).unwrap();
     assert_eq!(again, Outcome::AlreadyDone);
-    let still = crate::storage::block_on_anyhow(async move {
-        Ok(catalog.list_flows().await?.0.len())
-    })
-    .unwrap();
+    let still =
+        crate::storage::block_on_anyhow(async move { Ok(catalog.list_flows().await?.0.len()) })
+            .unwrap();
     assert_eq!(still, 1, "the legacy flow came back");
 }
 
@@ -360,15 +358,14 @@ fn an_agents_cron_database_lands_in_that_agents_scope() {
     let (dir, config) = workspace();
     let agent_dir = dir.path().join("agents").join("alpha");
     std::fs::create_dir_all(agent_dir.join("cron")).unwrap();
-    std::fs::copy(
-        legacy_jobs_db(dir.path()),
-        legacy_jobs_db(&agent_dir),
-    )
-    .unwrap();
+    std::fs::copy(legacy_jobs_db(dir.path()), legacy_jobs_db(&agent_dir)).unwrap();
     let backend = backend();
 
     let reports = run_with(&backend, &config);
-    assert!(reports.iter().all(|report| report.outcome.is_ok()), "{reports:?}");
+    assert!(
+        reports.iter().all(|report| report.outcome.is_ok()),
+        "{reports:?}"
+    );
 
     let count = |scope: Scope| {
         let cron = CronDocuments::new(documents(&backend, &scope));

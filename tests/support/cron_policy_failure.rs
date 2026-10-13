@@ -320,16 +320,12 @@ pub(super) async fn policy_reads_refuse_execution_without_consuming_a_slot(case:
             .unwrap();
     })
     .await;
-    let before = CoreContext::scope(Arc::clone(&alpha), async {
-        next_run_of(&config, &job.id)
-    })
-    .await;
+    let before =
+        CoreContext::scope(Arc::clone(&alpha), async { next_run_of(&config, &job.id) }).await;
     faults.read.store(true, Ordering::SeqCst);
     cron::scheduler::run_live_agent_pass(1).await;
-    let after = CoreContext::scope(Arc::clone(&alpha), async {
-        next_run_of(&config, &job.id)
-    })
-    .await;
+    let after =
+        CoreContext::scope(Arc::clone(&alpha), async { next_run_of(&config, &job.id) }).await;
     let scheduled_calls = calls.load(Ordering::SeqCst);
     let mut agent_job = job.clone();
     agent_job.job_type = cron::JobType::Agent;

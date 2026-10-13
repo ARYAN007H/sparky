@@ -143,8 +143,14 @@ fn a_legacy_jobs_db_is_imported_on_first_use_and_left_untouched() {
     let jobs = list_jobs(&config).unwrap();
     assert_eq!(jobs.len(), 3);
     assert!(jobs.iter().any(|job| job.name.as_deref() == Some("inbox")));
-    assert!(find_flow_schedule_job(&config, "flow-beta").unwrap().is_some());
-    assert_eq!(std::fs::read(&legacy).unwrap(), before, "jobs.db was modified");
+    assert!(find_flow_schedule_job(&config, "flow-beta")
+        .unwrap()
+        .is_some());
+    assert_eq!(
+        std::fs::read(&legacy).unwrap(),
+        before,
+        "jobs.db was modified"
+    );
 
     // Imported once: a job removed afterwards stays removed.
     let inbox = jobs

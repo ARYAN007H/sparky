@@ -298,8 +298,8 @@ pub fn open_standing(
     import: StandingImport<'_>,
 ) -> Result<Opened> {
     if let Some(backend) = installed() {
-        let scope = current_scope()
-            .with_context(|| format!("[{domain}] resolve the storage scope"))?;
+        let scope =
+            current_scope().with_context(|| format!("[{domain}] resolve the storage scope"))?;
         return Ok(Opened { backend, scope });
     }
     if crate::core::runtime::mode::is_saas() {

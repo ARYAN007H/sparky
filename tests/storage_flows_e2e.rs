@@ -99,7 +99,10 @@ async fn a_configured_backend_holds_cron_flows_and_flow_state(case: Case) {
         };
         policy::set_policy(&policy_config, &job.id, wanted).unwrap();
         assert_eq!(policy::get_policy(&policy_config, &job.id).unwrap(), wanted);
-        assert_eq!(cron::get_job(&policy_config, &job.id).unwrap().policy, wanted);
+        assert_eq!(
+            cron::get_job(&policy_config, &job.id).unwrap().policy,
+            wanted
+        );
         policy::clear_policy(&policy_config, &job.id).unwrap();
         assert_eq!(
             policy::get_policy(&policy_config, &job.id).unwrap(),
@@ -144,7 +147,6 @@ async fn a_configured_backend_holds_cron_flows_and_flow_state(case: Case) {
     assert!(workspace.path().join("graph_checkpoints.db").exists());
 }
 
-
 /// The stores tinyflows used to write (`jobs.db`, `flows.db`, `checkpoints.db`,
 /// `drafts/`) are copied into a configured backend by the boot-time import,
 /// read-only: the legacy files are byte-identical afterwards.
@@ -183,7 +185,11 @@ async fn legacy_tinyflows_files_are_imported_into_a_configured_backend(case: Cas
     for report in openhuman_core::storage::import::run(&config).await {
         report.outcome.unwrap();
     }
-    assert_eq!(digest(workspace.path()), before, "a legacy file was modified");
+    assert_eq!(
+        digest(workspace.path()),
+        before,
+        "a legacy file was modified"
+    );
 }
 
 fn copy_tree(from: &std::path::Path, to: &std::path::Path) {

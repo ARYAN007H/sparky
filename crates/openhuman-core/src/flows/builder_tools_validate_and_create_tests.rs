@@ -414,7 +414,6 @@ async fn edit_workflow_surfaces_draft_write_back_failure() {
         .await
         .unwrap();
 
-
     assert!(result.is_error, "{}", result.output());
     assert!(
         !result.output().contains("Edits live on draft"),

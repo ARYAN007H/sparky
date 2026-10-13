@@ -51,9 +51,17 @@ fn legacy_flows_drafts_and_checkpoints_are_imported_on_first_use_and_left_untouc
     let mut ids: Vec<_> = flows.iter().map(|flow| flow.id.clone()).collect();
     ids.sort();
     assert_eq!(ids, ["flow-alpha", "flow-beta"]);
-    assert_eq!(super::super::draft_store::list_drafts(&config).unwrap().len(), 2);
+    assert_eq!(
+        super::super::draft_store::list_drafts(&config)
+            .unwrap()
+            .len(),
+        2
+    );
     assert_eq!(list_revisions(&config, "flow-alpha", 10).unwrap().len(), 2);
-    assert_eq!(get_flow_run(&config, "run-done").unwrap().unwrap().flow_id, "flow-alpha");
+    assert_eq!(
+        get_flow_run(&config, "run-done").unwrap().unwrap().flow_id,
+        "flow-alpha"
+    );
 
     use tinyflows::engine::Checkpointer;
     let checkpointer = crate::flows::tinyflows::open_flow_checkpointer(&config).unwrap();

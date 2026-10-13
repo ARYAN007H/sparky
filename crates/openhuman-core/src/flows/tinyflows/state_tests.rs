@@ -8,9 +8,7 @@ fn documents(namespace: &str) -> FlowState {
 }
 
 fn documents_on(storage: &MemoryStorage, namespace: &str) -> FlowState {
-    let scoped = storage
-        .for_scope(&Scope::new("local").unwrap())
-        .unwrap();
+    let scoped = storage.for_scope(&Scope::new("local").unwrap()).unwrap();
     FlowState::Documents(FlowStateDocuments::new(
         FlowCatalogDocuments::new(Arc::clone(scoped.documents())),
         namespace,

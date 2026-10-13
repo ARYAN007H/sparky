@@ -48,8 +48,10 @@ fn documents(config: &Config) -> Result<CronDocuments> {
         config,
         &|backend, scope, config| legacy_import(backend, scope, config),
     )?;
-    Ok(CronDocuments::new(std::sync::Arc::clone(opened.scoped()?.documents()))
-        .with_limits(config.cron.max_run_history, config.scheduler.max_tasks))
+    Ok(
+        CronDocuments::new(std::sync::Arc::clone(opened.scoped()?.documents()))
+            .with_limits(config.cron.max_run_history, config.scheduler.max_tasks),
+    )
 }
 
 /// Brings `jobs.db` into a freshly opened per-store database (the default
