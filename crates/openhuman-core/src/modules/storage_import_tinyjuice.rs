@@ -150,6 +150,48 @@ fn is_token(name: &str) -> bool {
     name.len() == TOKEN_LEN && name.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
+/// The modified time and bytes of a regular file, or `None` for a link,
+/// directory or anything else; the file is never reached through a symlink.
+fn read_regular(path: &Path) -> Result<Option<(SystemTime, Vec<u8>)>> {
+    use std::io::Read;
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW);
+    }
+    let mut file = match options.open(path) {
+        Ok(file) => file,
+        // O_NOFOLLOW refuses a symlink with ELOOP.
+        Err(error) if is_link_refusal(&error) => return Ok(None),
+        Err(error) => return Err(error).with_context(|| format!("open {}", path.display())),
+    };
+    let meta = file
+        .metadata()
+        .with_context(|| format!("stat {}", path.display()))?;
+    if !meta.file_type().is_file() {
+        return Ok(None);
+    }
+    let modified = meta
+        .modified()
+        .with_context(|| format!("stat {}", path.display()))?;
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes)
+        .with_context(|| format!("read {}", path.display()))?;
+    Ok(Some((modified, bytes)))
+}
+
+#[cfg(unix)]
+fn is_link_refusal(error: &std::io::Error) -> bool {
+    error.raw_os_error() == Some(libc::ELOOP)
+}
+
+#[cfg(not(unix))]
+fn is_link_refusal(_: &std::io::Error) -> bool {
+    false
+}
+
 fn read_originals(root: &Path, now: SystemTime) -> Result<(Vec<LegacyOriginal>, usize)> {
     let mut originals = Vec::new();
     let mut skipped = 0usize;
@@ -165,17 +207,12 @@ fn read_originals(root: &Path, now: SystemTime) -> Result<(Vec<LegacyOriginal>, 
             continue;
         };
         let path = entry.path();
-        // Never follow a link: it could point outside the CCR directory.
-        let meta =
-            std::fs::symlink_metadata(&path).with_context(|| format!("stat {}", path.display()))?;
-        if !meta.file_type().is_file() {
+        // Open without following a link (it could point outside the CCR
+        // directory) and read both metadata and bytes from that one handle.
+        let Some((modified, bytes)) = read_regular(&path)? else {
             skipped += 1;
             continue;
-        }
-        let modified = meta
-            .modified()
-            .with_context(|| format!("stat {}", path.display()))?;
-        let bytes = std::fs::read(&path).with_context(|| format!("read {}", path.display()))?;
+        };
         let Ok(text) = String::from_utf8(bytes) else {
             skipped += 1;
             continue;

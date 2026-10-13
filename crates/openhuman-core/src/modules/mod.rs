@@ -260,10 +260,12 @@ pub async fn import_legacy_connectors(state_dir: &std::path::Path) {
 
 /// Imports the x402 ledger's legacy `payments.jsonl` under `workspace_dir`
 /// into the wallet module's storage, once per workspace. Never fails the
-/// caller: an error is logged and the import is retried at the next call.
-pub async fn import_legacy_x402(workspace_dir: &std::path::Path) {
+/// caller: an error is logged and the import is retried at the next call. Returns
+/// false when the import failed, so the caller can refuse to open a ledger that
+/// would ignore the legacy payments.
+pub async fn import_legacy_x402(workspace_dir: &std::path::Path) -> bool {
     #[cfg(all(feature = "modules", feature = "web3"))]
-    import_once(
+    return import_once(
         "x402",
         storage_grant_tinywallet::MODULE_ID,
         workspace_dir,
@@ -271,7 +273,10 @@ pub async fn import_legacy_x402(workspace_dir: &std::path::Path) {
     )
     .await;
     #[cfg(not(all(feature = "modules", feature = "web3")))]
-    let _ = workspace_dir;
+    {
+        let _ = workspace_dir;
+        true
+    }
 }
 
 /// Imports the legacy jail registry index under `<workspace_dir>/jails` into

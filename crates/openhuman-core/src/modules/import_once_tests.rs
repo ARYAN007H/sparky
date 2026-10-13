@@ -23,7 +23,8 @@ async fn a_concurrent_caller_waits_for_the_running_import() {
     let second = async {
         tokio::time::sleep(std::time::Duration::from_millis(20)).await;
         import_once("test-concurrent", MODULE_FOR_TEST, &dir, async {
-            // Only reached if the first import did not settle.
+            panic!("a settled import must not run a second time");
+            #[allow(unreachable_code)]
             Ok(Done(true))
         })
         .await;
