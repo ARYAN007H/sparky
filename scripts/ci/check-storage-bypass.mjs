@@ -14,10 +14,11 @@
 //   json-write   fs::write / File::create / OpenOptions::new() / NamedTempFile - a raw file
 //                store; use the document, stream or secret port
 //
-// A file may keep a rule when it is the legacy fallback of a store that already
-// runs on the port (it serves the host that configured no backend), or when its
-// state is per-machine and must not be shared. Both are listed in ALLOW with the
-// reason; the reason is the review.
+// A file may keep a rule when it is a read-only legacy importer, or when its
+// state is per-machine, bootstrap or non-record bytes. Each is listed in ALLOW
+// with the reason; the reason is the review. A store's own file fallback is
+// never allowed: with no installed backend it uses the workspace default
+// (`storage::local`).
 //
 //   node scripts/ci/check-storage-bypass.mjs
 //   node scripts/ci/check-storage-bypass.mjs --write-baseline
@@ -54,8 +55,6 @@ export const RULES = [
 ];
 
 const SRC = "crates/openhuman-core/src/";
-const FALLBACK =
-  "legacy fallback of a store that already runs on the storage port";
 const LEGACY_READER =
   "the storage importer's read-only reader of a legacy database, opened on a scratch copy of it (never the real file) to bring older installs' rows into the backend";
 
