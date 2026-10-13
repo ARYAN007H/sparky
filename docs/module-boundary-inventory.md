@@ -487,7 +487,7 @@ approval classification (`SecurityPolicy`), Composio schema lookup, and the
 store, checkpoint, bus and cron effects. TinyFlows is a plain library gitlink,
 so there is no registry record or `module-boundaries.json` entry.
 
-### TinyFlows builder tool belt and observability mappers (#7554, #7557)
+### TinyFlows builder tool belt and observability mappers (#7554, #7557, v0.8.16)
 
 The workflow-builder tools (`revise`, `edit`, `validate`, `dry_run`, `create`,
 `duplicate`, `save`, `resume_flow_run`, `cancel_flow_run`, the flow and run
