@@ -245,6 +245,7 @@ pub async fn call_bare<Reply: serde::de::DeserializeOwned>(
     config: &crate::config::Config,
     member: &str,
 ) -> Result<Reply, String> {
+    prime_curated_catalogs(config).await;
     crate::modules::connectors::call_bare(config, member)
         .await
         .map_err(|error| normalize_error(member, error))
