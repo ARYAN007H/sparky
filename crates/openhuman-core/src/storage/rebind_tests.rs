@@ -1,4 +1,5 @@
 use super::*;
+use crate::storage::{CollectionSpec, DocumentStoreExt, Precondition, Scope};
 use crate::storage::import::Outcome;
 use std::sync::Mutex;
 use tempfile::TempDir;
