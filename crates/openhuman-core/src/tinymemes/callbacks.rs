@@ -186,11 +186,7 @@ pub(super) async fn dispatch(
     session.enter(answer(session, member, payload)).await
 }
 
-async fn answer(
-    session: &Session,
-    member: &str,
-    payload: Value,
-) -> Result<Value, tinybus::Error> {
+async fn answer(session: &Session, member: &str, payload: Value) -> Result<Value, tinybus::Error> {
     match member {
         host_methods::COMPLETE => reply(complete(session, args(payload)?).await),
         host_methods::EVALUATE => reply(evaluate(session, args(payload)?).await),

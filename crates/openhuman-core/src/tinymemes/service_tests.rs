@@ -231,5 +231,8 @@ async fn a_second_remix_for_one_workspace_waits_for_the_first_but_another_worksp
     let held = scope_lock(&a);
     let _first = held.lock().await;
     assert!(scope_lock(&a).try_lock().is_err(), "same workspace waits");
-    assert!(scope_lock(&b).try_lock().is_ok(), "another workspace does not");
+    assert!(
+        scope_lock(&b).try_lock().is_ok(),
+        "another workspace does not"
+    );
 }
