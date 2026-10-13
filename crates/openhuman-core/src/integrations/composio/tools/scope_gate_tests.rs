@@ -60,3 +60,77 @@ fn the_scope_error_names_the_toolkit_and_the_unlock_path() {
     assert!(message.contains("Connections → gmail → write"), "{message}");
     assert!(message.contains("write=false"), "{message}");
 }
+
+fn visible(toolkit: &str, has_catalog: bool, slugs: &[&str], pref: UserScopePref) -> VisibleToolsResponse {
+    VisibleToolsResponse {
+        toolkit: toolkit.to_owned(),
+        preference: pref,
+        has_catalog,
+        tools: slugs
+            .iter()
+            .map(|slug| tinyconnectors_bus::vocabulary::CuratedTool {
+                toolkit: toolkit.to_owned(),
+                slug: (*slug).to_owned(),
+                scope: ToolScope::Write,
+            })
+            .collect(),
+    }
+}
+
+#[test]
+fn a_slug_in_the_modules_visible_list_is_allowed_regardless_of_case() {
+    let listing = visible("gmail", true, &["GMAIL_SEND_EMAIL"], UserScopePref::default());
+    assert!(matches!(
+        decide_from_visible("gmail_send_email", &listing),
+        ToolDecision::Allow
+    ));
+}
+
+#[test]
+fn a_curated_slug_missing_from_the_visible_list_is_blocked_by_its_scope() {
+    // The module withheld it: the catalog has it, the preference does not allow it.
+    let listing = visible("gmail", true, &[], only(true, false, false));
+    assert!(matches!(
+        decide_from_visible("GMAIL_SEND_EMAIL", &listing),
+        ToolDecision::BlockedByScope {
+            scope: ToolScope::Write
+        }
+    ));
+}
+
+#[test]
+fn a_slug_the_catalog_never_names_is_not_curated() {
+    let listing = visible("gmail", true, &[], UserScopePref::default());
+    assert!(matches!(
+        decide_from_visible("GMAIL_NOT_A_REAL_ACTION", &listing),
+        ToolDecision::NotCurated
+    ));
+}
+
+#[test]
+fn an_uncatalogued_toolkit_is_gated_by_the_preference_the_module_applied() {
+    let listing = visible("flowstestkit", false, &[], only(true, false, false));
+    assert!(matches!(
+        decide_from_visible("FLOWSTESTKIT_GET_THING", &listing),
+        ToolDecision::PassthroughCheckScope { .. }
+    ));
+    assert!(matches!(
+        decide_from_visible("FLOWSTESTKIT_SEND_THING", &listing),
+        ToolDecision::BlockedByScope {
+            scope: ToolScope::Write
+        }
+    ));
+}
+
+#[test]
+fn the_slack_channel_invite_stays_admin_scoped() {
+    // Regression guard for the connector move: the host classified this `Write`
+    // before the catalogs moved to the module, which decided it is `Admin`
+    // (adding someone to a channel hands them its history). The default
+    // preference, which has no admin, must not offer it.
+    let catalog = catalog_for_toolkit("slack").expect("slack is curated");
+    let invite = find_curated(&catalog, "SLACK_INVITE_USERS_TO_A_SLACK_CHANNEL")
+        .expect("the invite is curated");
+    assert_eq!(invite.scope, ToolScope::Admin);
+    assert!(!UserScopePref::default().allows(invite.scope));
+}
