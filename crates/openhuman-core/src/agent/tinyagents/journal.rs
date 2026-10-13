@@ -6,7 +6,7 @@
 //! stream — transient state that is lost the moment the UI detaches. This module
 //! makes that history **durable**: it attaches, *in addition to* the untouched
 //! bridge, a crate [`StoreEventJournal`] (over the same 04-sessions
-//! [`JsonlAppendStore`] under `{workspace}/tinyagents_store/journal`) plus a
+//! the agent's storage-backed journal stream) plus a
 //! [`HarnessStatusStore`] writer, so a run can be reconstructed after the fact —
 //! even for an unobserved (`on_progress = None`) turn.
 //!
@@ -54,7 +54,7 @@ use tinyagents_harness::observability::{
     HarnessStatusStore, JournalSink, RedactingSink, StoreEventJournal,
 };
 
-use tinyagents_harness::store::{AppendStore, Store};
+use tinyagents_harness::store::AppendStore;
 
 /// Best-effort live request → durable tinyagents journal stream map. The web
 /// progress bridge uses this at turn end to shadow-project spans from the
@@ -91,8 +91,8 @@ pub(crate) fn take_request_journal_run(request_id: &str) -> Option<String> {
         .and_then(|mut runs| runs.remove(request_id))
 }
 
-/// Resolve the internal workspace directory (`{workspace}`) whose
-/// the tenant's journal and run-status stores belong to. Async because the
+/// Resolve the workspace directory the tenant's journal and run-status stores
+/// belong to (the storage backend is resolved from it). Async because the
 /// config load is async; errors are surfaced so callers can log-and-skip.
 async fn resolve_workspace() -> anyhow::Result<PathBuf> {
     let config = crate::config::ops::load_current_or_init()
