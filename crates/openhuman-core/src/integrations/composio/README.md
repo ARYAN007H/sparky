@@ -82,7 +82,7 @@ triggers) from a real transport failure.
 | `triggers` | GitHub repos + trigger CRUD + trigger history |
 | `providers_ops` | `composio_get_user_profile`, `composio_refresh_all_identities` |
 | `direct_mode` | `composio_get_mode`, `composio_set_api_key`, `_clear_...` |
-| `user_scopes` | per-toolkit agent scope prefs in `<workspace>/integrations/composio_user_scopes.json` |
+| `scope_prefs` | per-toolkit agent scope prefs, forwarded to the connector module (`GetUserScopes` / `SetUserScopes`); moves a legacy `composio_user_scopes.json` into the module once |
 
 There is no periodic loop here, and Composio data is not synced into memory.
 
@@ -127,7 +127,7 @@ Namespace `composio`, exposed as `openhuman.composio_*`:
 | `composio.get_mode` | Current routing mode + whether a direct-mode key is set (never returns the key). |
 | `composio.set_api_key` / `composio.clear_api_key` | Store/clear direct-mode Composio API key (key never logged/returned). |
 
-Handlers delegate to `ops/`; scope handlers delegate to `ops::user_scopes`. Exports wired into [`crates/openhuman-core/src/core/all.rs`](../../core/all.rs).
+Handlers delegate to `ops/`; scope handlers delegate to `ops::scope_prefs`. Exports wired into [`crates/openhuman-core/src/core/all.rs`](../../core/all.rs).
 
 ## Agent tools
 
@@ -147,7 +147,7 @@ Published from `ops/` via `crate::core::bus::BUS.publish` (`crate::core::events:
 
 - **Trigger history** (`trigger_history.rs`): JSONL records under `<workspace>/state/triggers/YYYY-MM-DD.jsonl`, partitioned by UTC day, written inside the TinyConnectors module (exclusive file lock on append). The host keeps an opaque lease, closes it on sign-out/shutdown, and releases the old lease before switching user directories. Exposed via `composio.list_trigger_history`.
 - **Direct-mode API key**: stored in the encrypted keychain (via `credentials`); never logged/returned. `direct_auth/mod.rs` additionally tracks a process-local (non-persisted) consecutive-401 counter for the same key.
-- **Connected identities**: `<workspace>/integrations/composio_identities.json` (`identity_store.rs`). **User scope prefs**: `<workspace>/integrations/composio_user_scopes.json` (`ops::user_scopes`). Both written atomically (temp file + rename) under one process-wide lock (`file_store.rs`).
+- **Connected identities**: `<workspace>/integrations/composio_identities.json` (`identity_store.rs`). **User scope prefs**: held by the connector module (`<workspace>/state/composio-user-scopes/`), with the legacy `<workspace>/integrations/composio_user_scopes.json` migrated by `ops::scope_prefs`. The identities file is written atomically (temp file + rename) under one process-wide lock (`file_store.rs`).
 - **Integrations cache**: warmed in the background after app startup/sign-in, then kept for the process lifetime. Connection create/delete, config changes, and a divergent `list_connections` response invalidate it; the change paths eagerly re-warm it. Idle time does not trigger a backend fetch on a chat turn (`connected_integrations.rs`).
 
 ## Dependencies
