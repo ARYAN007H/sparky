@@ -34,9 +34,9 @@
 //!
 //! # What is not here
 //!
-//! Domains whose legacy form is not a small SQLite file (sessions and
-//! transcripts, cron jobs, the flow catalog and checkpoints) are imported by
-//! the libraries that own those formats; see the storage README.
+//! Sessions and transcripts are imported by TinyAgents, which owns that
+//! format. The tinyflows stores (cron jobs, the flow catalog and checkpoints)
+//! are copied here with `tinyflows-import`; see [`tinyflows`].
 
 mod snapshot;
 pub mod tinyflows;
