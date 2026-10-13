@@ -127,3 +127,7 @@ pub(crate) async fn remix(
         Err(error) => Err(format!("tinymemes remix call failed: {error}")),
     }
 }
+
+#[cfg(test)]
+#[path = "service_tests.rs"]
+mod tests;

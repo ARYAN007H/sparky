@@ -14,7 +14,7 @@ fn decode<T: DeserializeOwned>(value: Value) -> HostResult<T> {
 }
 
 #[tokio::test]
-async fn an_index_saved_through_the_host_loads_back() {
+async fn an_index_saved_through_the_host_loads_back_per_kind() {
     let dir = tempfile::tempdir().unwrap();
     let session = Session::new(&config_in(dir.path()));
 
@@ -27,39 +27,30 @@ async fn an_index_saved_through_the_host_loads_back() {
     .unwrap();
     assert_eq!(decode::<Option<String>>(missing), Ok(None));
 
-    let saved = dispatch(
-        &session,
-        host_methods::SAVE_INDEX,
-        json!([{ "kind": "slang", "json": "{\"terms\":1}" }]),
-    )
-    .await
-    .unwrap();
-    assert_eq!(decode::<()>(saved), Ok(()));
-
-    let loaded = dispatch(
-        &session,
-        host_methods::LOAD_INDEX,
-        json!([{ "kind": "slang" }]),
-    )
-    .await
-    .unwrap();
-    assert_eq!(
-        decode::<Option<String>>(loaded),
-        Ok(Some("{\"terms\":1}".into()))
-    );
-    // The other index is a different document.
-    let memes = dispatch(
-        &session,
-        host_methods::LOAD_INDEX,
-        json!([{ "kind": "memes" }]),
-    )
-    .await
-    .unwrap();
-    assert_eq!(decode::<Option<String>>(memes), Ok(None));
-    assert!(dir
-        .path()
-        .join("workspace/tinymemes/slang-index.json")
-        .is_file());
+    for (kind, body) in [
+        ("slang", "{\"terms\":1}"),
+        ("memes", "{\"memes\":2}"),
+        ("remixed", "[\"m1\"]"),
+    ] {
+        let saved = dispatch(
+            &session,
+            host_methods::SAVE_INDEX,
+            json!([{ "kind": kind, "json": body }]),
+        )
+        .await
+        .unwrap();
+        assert_eq!(decode::<()>(saved), Ok(()));
+    }
+    for (kind, body) in [
+        ("slang", "{\"terms\":1}"),
+        ("memes", "{\"memes\":2}"),
+        ("remixed", "[\"m1\"]"),
+    ] {
+        let loaded = dispatch(&session, host_methods::LOAD_INDEX, json!([{ "kind": kind }]))
+            .await
+            .unwrap();
+        assert_eq!(decode::<Option<String>>(loaded), Ok(Some(body.into())));
+    }
 }
 
 #[tokio::test]
@@ -113,15 +104,47 @@ async fn deliver_is_acknowledged_and_unknown_members_are_refused() {
         .is_err());
 }
 
-#[tokio::test]
-async fn callbacks_answer_only_while_a_remix_runs() {
+#[test]
+fn registrations_are_independent_and_forgotten_on_drop() {
     let dir = tempfile::tempdir().unwrap();
     let config = config_in(dir.path());
-    assert!(active().is_none());
-    let seen = run_with(&config, async { active().is_some() }).await;
-    assert!(seen);
-    assert!(
-        active().is_none(),
-        "the session is cleared when the remix ends"
+    let a = register(&config);
+    let b = register(&config);
+    assert_ne!(a.correlation(), b.correlation());
+    assert!(session(a.correlation()).is_some() && session(b.correlation()).is_some());
+    let a_id = a.correlation().to_owned();
+    drop(a);
+    assert!(session(&a_id).is_none(), "a failed call leaves nothing behind");
+    assert!(session(b.correlation()).is_some());
+    assert!(session("").is_none() && session("unknown").is_none());
+}
+
+#[test]
+fn a_kept_registration_lives_until_the_module_reports_the_end() {
+    let dir = tempfile::tempdir().unwrap();
+    let registration = register(&config_in(dir.path()));
+    let id = registration.correlation().to_owned();
+    registration.keep_for_background();
+    assert!(session(&id).is_some(), "background research may still call back");
+    end(&id);
+    assert!(session(&id).is_none());
+    end(&id);
+}
+
+#[test]
+fn the_correlation_id_is_read_from_the_first_argument_only() {
+    assert_eq!(
+        correlation_of(&json!([{ "correlation": "c1", "kind": "slang" }])),
+        Some("c1")
     );
+    for bad in [
+        json!([{ "correlation": "" }]),
+        json!([{ "correlation": 7 }]),
+        json!([{}]),
+        json!([]),
+        json!({ "correlation": "c1" }),
+        json!("c1"),
+    ] {
+        assert_eq!(correlation_of(&bad), None, "{bad}");
+    }
 }
