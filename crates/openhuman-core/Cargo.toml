@@ -248,6 +248,10 @@ tinysearch-bus = { path = "../../vendor/tinysearch/crates/tinysearch-bus", featu
 tinycomputer-bus = { path = "../../vendor/tinycomputer/crates/tinycomputer-bus" }
 # Portable skill metadata, parsing, discovery, and filesystem hardening.
 tinyskills = { path = "../../vendor/tinyskills/crates/tinyskills" }
+# The fetched skill-registry catalog on the storage ports (a `CatalogStore`
+# over `DocumentStore`); ports only, the host picks the backend. Only the
+# `skills` feature compiles the registry that uses it.
+tinyskills-drivers = { path = "../../vendor/tinyskills/crates/tinyskills-drivers", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_path_to_error = "0.1"
@@ -750,7 +754,7 @@ flows = ["modules", "dep:tinyflows", "dep:tinyflows-catalog", "dep:tinyflows-cop
 # Workflow metadata in `openhuman::skills::ops_types` remains compiled with
 # this feature OFF; generic tool-result types come directly from tinytools.
 # Neither is part of the gated behavior. See src/skills/stub.rs.
-skills = ["tinyskills/registry"]
+skills = ["tinyskills/registry", "dep:tinyskills-drivers"]
 # MCP domains, all under the `mcp/` family: `mcp::server` (the `openhuman mcp`
 # stdio/HTTP server exposing our tool surface), `mcp::registry` (dynamic
 # Smithery installs — SQLite, lifecycle, `mcp_clients` RPC namespace),

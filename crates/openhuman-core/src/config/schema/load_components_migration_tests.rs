@@ -164,6 +164,31 @@ fn explicit_components_voice_wins_over_legacy_voice_switches() {
 }
 
 #[test]
+fn composio_mode_disabled_migrates_to_components_connectors_off() {
+    let c = migrated("[composio]\nmode = \"disabled\"\n", None);
+    assert!(!c.components.connectors);
+    assert_eq!(
+        c.composio.mode, "disabled",
+        "mode stays as the route selector"
+    );
+    assert!(c.components.flows && c.components.search);
+}
+
+#[test]
+fn composio_backend_mode_or_explicit_components_key_keeps_connectors_on() {
+    assert!(
+        migrated("[composio]\nmode = \"direct\"\n", None)
+            .components
+            .connectors
+    );
+    let c = migrated(
+        "[composio]\nmode = \"disabled\"\n[components]\nconnectors = true\n",
+        None,
+    );
+    assert!(c.components.connectors, "explicit components key wins");
+}
+
+#[test]
 fn sandbox_enabled_false_maps_to_components_sandbox() {
     let c = migrated("[sandbox]\nenabled = false\n", None);
     assert!(!c.components.sandbox);

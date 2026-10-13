@@ -458,3 +458,35 @@ fn every_member_this_client_calls_is_one_the_contract_declares() {
         );
     }
 }
+
+/// The session input and action tags are a wire contract with the module: a
+/// rename on either side makes a hotkey press a no-op, which looks like a dead
+/// key rather than an error, so the spellings the host sends and expects are
+/// pinned.
+#[test]
+fn recording_session_wire_spellings_match_the_contract() {
+    use super::{SessionAction, SessionAdvance, SessionInput, SessionPhase};
+    assert_eq!(
+        serde_json::to_string(&SessionInput::SetupReady {
+            stop_buffered: false
+        })
+        .unwrap(),
+        r#"{"input":"setup_ready","stop_buffered":false}"#
+    );
+    assert_eq!(
+        serde_json::to_string(&SessionInput::Finished { generation: 4 }).unwrap(),
+        r#"{"input":"finished","generation":4}"#
+    );
+    let reply: SessionAdvance = serde_json::from_str(
+        r#"{"accepted":true,"phase":"recording","generation":2,"action":{"action":"defer_stop","generation":2,"after_ms":1500}}"#,
+    )
+    .unwrap();
+    assert_eq!(reply.phase, SessionPhase::Recording);
+    assert_eq!(
+        reply.action,
+        SessionAction::DeferStop {
+            generation: 2,
+            after_ms: 1500
+        }
+    );
+}

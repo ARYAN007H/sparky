@@ -88,7 +88,10 @@ fn hallucination_mode_wire(mode: HallucinationMode) -> &'static str {
 pub use tinyvoice_bus::VoiceIntent;
 
 /// Recording-session vocabulary shared with the loaded TinyVoice module.
-pub use tinyvoice_bus::{GateVerdict, RecordingGates, UtteranceDisposition};
+pub use tinyvoice_bus::{
+    GateVerdict, RecordingGates, SessionAction, SessionAdvance, SessionInput, SessionPhase,
+    SessionStatus, UtteranceDisposition,
+};
 
 /// Native capture lease types shared with the loaded TinyVoice module.
 pub use tinyvoice_bus::capture::{
@@ -368,6 +371,76 @@ impl VadSession {
     /// [`VoiceCallError`] only when the module itself is unreachable.
     pub async fn close(&self, config: &Config) -> Result<(), VoiceCallError> {
         call(config, methods::VAD_CLOSE, (self.id,)).await
+    }
+}
+
+/// A hotkey-driven recording session held by the module.
+///
+/// The module owns the hotkey -> record -> finish state machine (phase,
+/// generation guard, setup / stop-intent buffering). The host reports facts as
+/// [`SessionInput`]s and performs the one [`SessionAction`] each answer names.
+///
+/// Not `Drop`-based, for the same reason as [`VadSession`]: call
+/// [`close`](Self::close) when the server stops.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RecorderSession {
+    id: u64,
+}
+
+impl RecorderSession {
+    /// A session handle for an id no module issued, so host tests can drive
+    /// code that must survive the module being absent.
+    #[cfg(test)]
+    pub(crate) const fn unopened_for_test() -> Self {
+        Self { id: u64::MAX }
+    }
+
+    /// Open a stopped session.
+    ///
+    /// # Errors
+    ///
+    /// [`VoiceCallError`] when the module is unavailable or at its session cap.
+    pub async fn open(config: &Config) -> Result<Self, VoiceCallError> {
+        let id: u64 = call(config, methods::SESSION_OPEN, ()).await?;
+        Ok(Self { id })
+    }
+
+    /// Apply `input` and return the module's verdict and the action to take.
+    ///
+    /// # Errors
+    ///
+    /// [`VoiceCallError`] when the module is unavailable or the session is not
+    /// open (it was closed, or the process restarted the module).
+    pub async fn advance(
+        &self,
+        config: &Config,
+        input: SessionInput,
+    ) -> Result<SessionAdvance, VoiceCallError> {
+        let json = serde_json::to_string(&input)
+            .map_err(|e| VoiceCallError::Failed(format!("could not encode session input: {e}")))?;
+        let reply: String = call(config, methods::SESSION_ADVANCE, (self.id, json)).await?;
+        serde_json::from_str(&reply)
+            .map_err(|e| VoiceCallError::Failed(format!("could not decode session advance: {e}")))
+    }
+
+    /// The session's phase and latest generation.
+    ///
+    /// # Errors
+    ///
+    /// [`VoiceCallError`] when the module is unavailable or the session is not open.
+    pub async fn status(&self, config: &Config) -> Result<SessionStatus, VoiceCallError> {
+        let reply: String = call(config, methods::SESSION_STATUS, (self.id,)).await?;
+        serde_json::from_str(&reply)
+            .map_err(|e| VoiceCallError::Failed(format!("could not decode session status: {e}")))
+    }
+
+    /// Release the session. Closing one that is already gone is not an error.
+    ///
+    /// # Errors
+    ///
+    /// [`VoiceCallError`] only when the module itself is unreachable.
+    pub async fn close(&self, config: &Config) -> Result<(), VoiceCallError> {
+        call(config, methods::SESSION_CLOSE, (self.id,)).await
     }
 }
 
