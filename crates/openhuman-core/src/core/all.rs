@@ -51,8 +51,8 @@ impl RegisteredController {
 pub use super::domain_group::DomainGroup;
 mod components_gate;
 mod validate;
-use validate::validate_registry;
 pub use components_gate::disabled_component_for_method;
+use validate::validate_registry;
 
 /// A [`RegisteredController`] tagged with the [`DomainGroup`] it belongs to.
 ///
