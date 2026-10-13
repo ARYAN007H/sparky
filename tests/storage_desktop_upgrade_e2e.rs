@@ -27,6 +27,10 @@ use openhuman_core::config::Config;
 use openhuman_core::storage::import::{self, Outcome};
 use openhuman_core::storage::{rusqlite, DocumentStoreExt, Scope, ScopedStorage, StorageBackend};
 use sha2::Digest;
+use tinyagents_session::transcript::{
+    session_stem, write_transcript, SessionRef, TranscriptMessage, TranscriptMeta,
+};
+use tinyagents_session::turn_state::TurnState;
 use tinystoragedrivers_core::Query;
 
 #[macro_use]
@@ -97,6 +101,67 @@ fn write(workspace: &Path, relative: &str, text: &str) {
     std::fs::write(file, text).unwrap();
 }
 
+
+/// Sessions as the classic layout kept them: a transcript, an in-flight turn
+/// snapshot and a `sessions.db` row.
+fn legacy_sessions(workspace: &Path) {
+    let stem = session_stem(&SessionRef::scoped("thread-1", "orchestrator"));
+    let raw = workspace.join("session_raw");
+    std::fs::create_dir_all(&raw).unwrap();
+    let meta = TranscriptMeta {
+        agent_name: "orchestrator".into(),
+        agent_id: Some("orchestrator".into()),
+        agent_type: None,
+        dispatcher: "native".into(),
+        provider: None,
+        model: None,
+        created: "2026-01-01T00:00:00Z".into(),
+        updated: "2026-01-01T00:00:00Z".into(),
+        turn_count: 1,
+        prefix_message_count: None,
+        input_tokens: 0,
+        output_tokens: 0,
+        cached_input_tokens: 0,
+        charged_amount_usd: 0.0,
+        thread_id: Some("thread-1".into()),
+        task_id: None,
+        session_id: None,
+        parent_session_id: None,
+    };
+    write_transcript(
+        &raw.join(format!("{stem}.jsonl")),
+        &[TranscriptMessage::new("user", "hello from the old layout")],
+        &meta,
+        None,
+    )
+    .unwrap();
+    let snapshot = TurnState::started("thread-1", "req-1", 4, "2026-01-01T00:00:00Z");
+    let thread_dir = workspace
+        .join("memory/conversations/turn_states")
+        .join(hex::encode("thread-1"));
+    std::fs::create_dir_all(&thread_dir).unwrap();
+    std::fs::write(
+        thread_dir.join(format!("{}.json", hex::encode("req-1"))),
+        serde_json::to_vec(&snapshot).unwrap(),
+    )
+    .unwrap();
+    sqlite_file(
+        workspace,
+        "session_db/sessions.db",
+        "CREATE TABLE sessions (
+            id TEXT PRIMARY KEY, agent_definition_id TEXT NOT NULL,
+            agent_definition_name TEXT NOT NULL, session_key TEXT NOT NULL,
+            parent_session_id TEXT, thread_id TEXT, source_channel TEXT,
+            status TEXT NOT NULL DEFAULT 'running', model TEXT,
+            turn_count INTEGER NOT NULL DEFAULT 0, input_tokens INTEGER NOT NULL DEFAULT 0,
+            output_tokens INTEGER NOT NULL DEFAULT 0, cached_input_tokens INTEGER NOT NULL DEFAULT 0,
+            cost_usd REAL NOT NULL DEFAULT 0.0, transcript_path TEXT,
+            started_at TEXT NOT NULL, ended_at TEXT);
+         INSERT INTO sessions (id, agent_definition_id, agent_definition_name, session_key, started_at)
+         VALUES ('sess-1', 'orchestrator', 'Orchestrator', 'thread-1', '2026-01-01T00:00:00Z');",
+    );
+}
+
 /// Counts written per legacy store, so the assertions read against the same
 /// numbers the fixture was built from.
 struct Fixture {
@@ -114,6 +179,7 @@ struct Fixture {
 
 /// A whole pre-storage desktop workspace. Returns what was put in it.
 fn desktop_workspace(workspace: &Path) -> Fixture {
+    legacy_sessions(workspace);
     // Flows, cron and checkpoints: the committed fixture, byte for byte.
     copy_tree(&tinyflows_fixture(), workspace);
 
