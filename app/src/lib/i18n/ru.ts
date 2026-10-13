@@ -1887,10 +1887,10 @@ const messages: TranslationMap = {
   'conversations.mcpUi.copyLink': 'Копировать ссылку',
   'conversations.mcpUi.copied': 'Скопировано',
   'conversations.mcpUi.linksLabel': 'Ссылки от этого инструмента',
-  'conversations.mcpUi.widgetTitle': 'Окно инструмента',
-  'conversations.mcpUi.widgetLoading': 'Загрузка окна…',
+  'conversations.mcpUi.widgetTitle': 'Виджет инструмента',
+  'conversations.mcpUi.widgetLoading': 'Загрузка виджета…',
   'conversations.mcpUi.widgetUnavailable':
-    'Это окно больше недоступно. Переподключите сервер, чтобы увидеть его снова.',
+    'Этот виджет больше недоступен. Переподключите сервер, чтобы увидеть его снова.',
   'conversations.mcpUi.confirmTitle': 'Разрешить это действие?',
   'conversations.mcpUi.confirmBody':
     'Это окно хочет запустить {tool}. Это может что-то изменить в этом сервисе.',
