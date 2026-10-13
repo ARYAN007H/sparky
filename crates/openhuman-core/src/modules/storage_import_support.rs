@@ -111,15 +111,15 @@ pub(super) fn parse_jsonl(text: &str) -> (Vec<Value>, usize) {
     (values, skipped)
 }
 
-/// Appends `values` to an empty `stream` in batches; a stream that already
-/// holds records is left alone so a retry cannot duplicate them. Returns the
-/// number appended.
+/// Appends `values` to an empty `stream` in one batch (so a failed attempt
+/// leaves it empty and a retry starts clean); a stream that already holds
+/// records is left alone so a retry cannot duplicate them. Returns the number
+/// appended.
 pub(super) async fn append_if_empty(
     scoped: &ScopedStorage,
     stream: &str,
     values: Vec<Value>,
 ) -> Result<usize> {
-    const BATCH: usize = 500;
     if values.is_empty() {
         return Ok(0);
     }
@@ -132,13 +132,9 @@ pub(super) async fn append_if_empty(
         return Ok(0);
     }
     let total = values.len();
-    let mut rest = values;
-    while !rest.is_empty() {
-        let tail = rest.split_off(rest.len().min(BATCH));
-        streams
-            .append_batch(stream, std::mem::replace(&mut rest, tail))
-            .await
-            .map_err(|error| anyhow!("append to a stream: {:?}", error.kind()))?;
-    }
+    streams
+        .append_batch(stream, values)
+        .await
+        .map_err(|error| anyhow!("append to a stream: {:?}", error.kind()))?;
     Ok(total)
 }
