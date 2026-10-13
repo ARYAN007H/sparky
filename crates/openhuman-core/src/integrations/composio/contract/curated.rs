@@ -26,7 +26,8 @@ const LOG: &str = "[composio][curated]";
 
 /// Description for a toolkit the module has no blurb for, used while the
 /// snapshot is empty.
-pub const FALLBACK_DESCRIPTION: &str = "Interact with this connected service via its available actions";
+pub const FALLBACK_DESCRIPTION: &str =
+    "Interact with this connected service via its available actions";
 
 /// Spellings callers use that are not the module's canonical toolkit slug.
 /// They are resolved by the module (`GetVocabulary` matches aliases), not here;
@@ -121,7 +122,9 @@ fn test_fixture() -> Arc<Snapshot> {
 /// re-read after reinit must not grow the heap by another copy of the tables.
 fn intern(text: &str) -> &'static str {
     static POOL: Mutex<Option<HashSet<&'static str>>> = Mutex::new(None);
-    let mut pool = POOL.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let mut pool = POOL
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let pool = pool.get_or_insert_with(HashSet::new);
     if let Some(found) = pool.get(text) {
         return found;
@@ -235,10 +238,7 @@ pub fn invalidate() {
 /// Replace the snapshot directly. Test seam for callers that exercise the
 /// host adapters without a loaded module.
 #[cfg(test)]
-pub(crate) fn install_for_test(
-    listed: &[BusCuratedTool],
-    vocabulary: &VocabularyResponse,
-) {
+pub(crate) fn install_for_test(listed: &[BusCuratedTool], vocabulary: &VocabularyResponse) {
     *store()
         .write()
         .unwrap_or_else(std::sync::PoisonError::into_inner) =

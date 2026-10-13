@@ -14,8 +14,14 @@ fn reply() -> (Vec<BusCuratedTool>, VocabularyResponse) {
                 description: "Mail".into(),
                 native_provider: true,
                 actions: Some(vec![
-                    VocabularyAction { slug: "GMAIL_FETCH_EMAILS".into(), scope: BusScope::Read },
-                    VocabularyAction { slug: "GMAIL_SEND_EMAIL".into(), scope: BusScope::Write },
+                    VocabularyAction {
+                        slug: "GMAIL_FETCH_EMAILS".into(),
+                        scope: BusScope::Read,
+                    },
+                    VocabularyAction {
+                        slug: "GMAIL_SEND_EMAIL".into(),
+                        scope: BusScope::Write,
+                    },
                 ]),
             },
             ToolkitVocabulary {
@@ -67,14 +73,23 @@ fn lookups_use_the_installed_snapshot_and_invalidate_clears_it() {
     assert!(has_native_provider("gmail"));
     assert_eq!(toolkit_description("gmail"), "Mail");
     assert_eq!(toolkit_description("nope"), FALLBACK_DESCRIPTION);
-    assert_eq!(curated_scope_for("GMAIL_SEND_EMAIL"), Some(ToolScope::Write));
+    assert_eq!(
+        curated_scope_for("GMAIL_SEND_EMAIL"),
+        Some(ToolScope::Write)
+    );
     invalidate();
     assert!(store().read().unwrap().is_none());
 }
 
 #[test]
 fn fixture_serves_aliases_and_every_native_provider() {
-    for alias in ["one", "one_drive", "onedrive", "google_calendar", "microsoft"] {
+    for alias in [
+        "one",
+        "one_drive",
+        "onedrive",
+        "google_calendar",
+        "microsoft",
+    ] {
         assert!(catalog_for_toolkit(alias).is_some(), "{alias}");
     }
     assert!(catalog_for_toolkit("flowstestkit").is_none());
