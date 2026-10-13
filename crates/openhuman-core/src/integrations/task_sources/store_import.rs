@@ -15,7 +15,7 @@ use serde_json::{json, Map, Value};
 
 use super::super::store_documents::{ingested_id, to_doc, INGESTED, SOURCES};
 use crate::config::Config;
-use crate::storage::local::{table_exists, ImportDoc};
+use crate::storage::import::{table_exists, ImportDoc};
 
 /// The legacy tables this import retires.
 pub(crate) const TABLES: &[&str] = &["task_sources", "ingested_tasks"];

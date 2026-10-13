@@ -12,7 +12,7 @@ use serde_json::{json, Value};
 
 use super::super::store_documents::DEVICES;
 use crate::config::Config;
-use crate::storage::local::{table_exists, ImportDoc};
+use crate::storage::import::{table_exists, ImportDoc};
 
 /// The legacy tables this import retires.
 pub(crate) const TABLES: &[&str] = &["paired_devices"];

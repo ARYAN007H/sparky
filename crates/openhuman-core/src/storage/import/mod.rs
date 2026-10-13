@@ -50,11 +50,37 @@ use sha2::Digest;
 use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition};
 
 use super::documents::Repo;
-use super::local::ImportDoc;
+use super::rusqlite;
+use rusqlite::Connection;
+use serde_json::Value;
 use super::{block_on, Scope, StorageBackend};
 use crate::config::Config;
 
 pub use snapshot::Snapshot;
+
+/// One legacy row as a document of the new layout.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImportDoc {
+    /// The collection the store keeps it in.
+    pub collection: &'static str,
+    /// The document id.
+    pub id: String,
+    /// The document body.
+    pub doc: Value,
+}
+
+/// Whether `table` exists on `conn`.
+///
+/// # Errors
+///
+/// When the catalog cannot be read.
+pub fn table_exists(conn: &Connection, table: &str) -> rusqlite::Result<bool> {
+    conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1)",
+        [table],
+        |row| row.get(0),
+    )
+}
 
 /// One record to write: a legacy row, or a driver document, in the shape the
 /// installed backend expects.

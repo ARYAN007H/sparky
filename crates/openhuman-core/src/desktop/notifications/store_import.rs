@@ -24,7 +24,7 @@ use super::super::store_documents::{
     core_id, to_doc, CORE, LOCAL_WORKSPACE, NOTIFICATIONS, SETTINGS,
 };
 use crate::config::Config;
-use crate::storage::local::{table_exists, ImportDoc};
+use crate::storage::import::{table_exists, ImportDoc};
 
 /// The legacy tables this import retires.
 pub(crate) const TABLES: &[&str] = &[
