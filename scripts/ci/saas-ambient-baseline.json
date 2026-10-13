@@ -50,7 +50,7 @@
   },
   {
     "rule": "ambient-config",
-    "path": "crates/openhuman-core/src/agent/orchestration/spawn_parallel_graph/run.rs",
+    "path": "crates/openhuman-core/src/agent/orchestration/spawn_parallel/run.rs",
     "line": 180,
     "text": "match crate::config::Config::load_or_init().await {",
     "occurrence": 1
