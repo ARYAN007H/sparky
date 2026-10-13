@@ -55,10 +55,13 @@ tinytools-std = { path = "vendor/tinyagents/vendor/tinytools/crates/tinytools-st
 tinytools-agent = { path = "vendor/tinyagents/vendor/tinytools/crates/tinytools-agent" }
 
 [patch."https://github.com/tinyhumansai/tinybus"]
-# tinystoragedrivers-bus names tinybus by git rev. Redirect it to the in-tree
-# copy so the graph holds exactly one `tinybus` (one `Interface`, one
-# `Connection`) instead of a second one compiled only for the storage wire types.
+# tinystoragedrivers-bus (and tinywallet, which names tinybus by git rev) name
+# tinybus by git. Redirect them to the in-tree copy so the graph holds exactly
+# one `tinybus` (one `Interface`, one `Connection`) and one module SDK instead of
+# a second set compiled only for the storage wire types.
 tinybus = { path = "vendor/tinybus/crates/tinybus" }
+tinybus-macros = { path = "vendor/tinybus/crates/tinybus-macros" }
+tinybus-module = { path = "vendor/tinybus/crates/tinybus-module" }
 
 [patch."https://github.com/tinyhumansai/tinystoragedrivers"]
 # tinyflows (tinyflows-drivers, tinyflows-import) names the storage crates by
