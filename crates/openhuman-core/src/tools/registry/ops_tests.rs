@@ -391,3 +391,21 @@ async fn the_write_audit_probe_reads_the_store_the_writer_wrote_to() {
     );
     assert!(after.enabled, "the log is enabled when it is readable");
 }
+
+#[test]
+fn diagnostics_report_denials_recorded_through_tinytools() {
+    tinytools::registry::denials::record(
+        "tools.registry_snapshot_probe",
+        "policy",
+        "blocked",
+        "probe denial reason",
+    );
+    let diagnostics = diagnostics_for_config(&Config::default());
+    let denial = diagnostics
+        .value
+        .recent_denials
+        .iter()
+        .find(|d| d.tool == "tools.registry_snapshot_probe")
+        .expect("recorded denial surfaces in diagnostics");
+    assert_eq!(denial.reason, "probe denial reason");
+}
