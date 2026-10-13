@@ -633,7 +633,7 @@ fn voice_capture_release_pins_summary_contract_and_every_platform_digest() {
         (
             "macos-15-arm64",
             "tinyvoice-module-0.2.0-macos-15-arm64.tar.gz",
-            "72c75b371e72c22da9a149b0962395d74131b41910e2ed735d127667f9f38c1d",
+            "340e799db919f145382b372c45d237ef1edbf69afa2fa0ab976eccd850b62f03",
         ),
         (
             "macos-15-x86_64",
