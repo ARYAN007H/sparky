@@ -47,9 +47,33 @@ fn meter_counts_bytes_and_keeps_the_last_non_empty_line() {
 #[test]
 fn meter_truncates_a_long_last_line() {
     let meter = ShellOutputMeter::default();
-    meter.record("x".repeat(500).as_bytes());
+    meter.record(format!("{}\n", "x".repeat(5_000)).as_bytes());
     let (_, line) = meter.snapshot();
     assert_eq!(line.unwrap().chars().count(), LAST_LINE_CHARS);
+}
+
+/// A line split across chunks is reported whole, never from its second half.
+#[test]
+fn meter_joins_a_line_split_across_chunks() {
+    let meter = ShellOutputMeter::default();
+    meter.record(b"Compil");
+    assert_eq!(
+        meter.snapshot().1,
+        None,
+        "an unfinished line is not reported"
+    );
+    meter.record(b"ing serde v1.0\nDown");
+    assert_eq!(meter.snapshot().1.as_deref(), Some("Compiling serde v1.0"));
+    meter.record(b"loading\n");
+    assert_eq!(meter.snapshot().1.as_deref(), Some("Downloading"));
+}
+
+/// A progress bar redrawn with carriage returns reports its latest state.
+#[test]
+fn meter_treats_a_carriage_return_as_a_line_end() {
+    let meter = ShellOutputMeter::default();
+    meter.record(b"\r 10%\r 55%\r");
+    assert_eq!(meter.snapshot().1.as_deref(), Some("55%"));
 }
 
 /// A 40s command that writes output reports twice, with the output it has

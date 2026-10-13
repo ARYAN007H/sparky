@@ -67,6 +67,11 @@ pub(super) struct TurnIds {
     pub(super) request_id: String,
 }
 
+/// Upper bound on closing a stopped turn: config, snapshot read and the
+/// closing model call (itself bounded at 45s). Past it the stop is reported as
+/// a `turn_timeout` error, so closing can never be what hangs the turn.
+const CLOSE_REPLY_BUDGET: Duration = Duration::from_secs(60);
+
 /// Which guard stopped the turn.
 enum Stop {
     Ceiling(Duration),
@@ -157,15 +162,26 @@ where
     let Some(ids) = ids else {
         return Err(fallback);
     };
+    let (config, locale) = activity.turn_context();
     let stopped = StoppedTurn {
         thread_id: &ids.thread_id,
         request_id: &ids.request_id,
         cause,
         stuck,
+        config,
+        locale,
     };
-    match super::super::turn_close::close_reply(stopped).await {
-        Some(reply) => Ok(reply),
-        None => Err(fallback),
+    let close = super::super::turn_close::close_reply(stopped);
+    match tokio::time::timeout(CLOSE_REPLY_BUDGET, close).await {
+        Ok(Some(reply)) => Ok(reply),
+        Ok(None) => Err(fallback),
+        Err(_) => {
+            log::warn!(
+                "[web-channel] closing the stopped turn took over {}s; reporting turn_timeout",
+                CLOSE_REPLY_BUDGET.as_secs()
+            );
+            Err(fallback)
+        }
     }
 }
 

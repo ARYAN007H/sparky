@@ -72,6 +72,10 @@ struct State {
     /// What the last event said the turn did, for the stop reply.
     last_step: Option<Cow<'static, str>>,
     turn_completed: bool,
+    /// The config and reply locale the turn itself resolved, so a stop reply
+    /// is written to the turn's own workspace and in its language.
+    turn_config: Option<Arc<crate::config::Config>>,
+    locale: Option<String>,
 }
 
 /// Where a turn was when it went silent, for the reply that closes it.
@@ -155,6 +159,8 @@ impl TurnActivity {
                 model_call_open: false,
                 last_step: None,
                 turn_completed: false,
+                turn_config: None,
+                locale: None,
             })),
         }
     }
@@ -203,6 +209,21 @@ impl TurnActivity {
 }
 
 impl TurnActivity {
+    /// Record the config and reply locale the turn resolved. A stop reply
+    /// uses these rather than whatever profile is active when it fires.
+    pub(crate) fn remember_turn(&self, config: Arc<crate::config::Config>, locale: Option<String>) {
+        let mut state = self.lock();
+        state.turn_config = Some(config);
+        state.locale = locale;
+    }
+
+    /// The config and locale recorded by [`Self::remember_turn`], if the turn
+    /// got that far.
+    pub(crate) fn turn_context(&self) -> (Option<Arc<crate::config::Config>>, Option<String>) {
+        let state = self.lock();
+        (state.turn_config.clone(), state.locale.clone())
+    }
+
     /// Where the turn was when its last event arrived.
     pub(crate) fn stuck_point(&self) -> StuckPoint {
         let state = self.lock();

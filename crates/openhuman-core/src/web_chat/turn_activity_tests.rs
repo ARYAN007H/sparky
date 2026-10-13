@@ -244,3 +244,14 @@ async fn stuck_point_names_where_the_turn_went_quiet() {
     });
     assert_eq!(activity.stuck_point(), StuckPoint::AfterRun);
 }
+
+#[test]
+fn the_turn_context_is_what_the_turn_recorded() {
+    let activity = TurnActivity::new();
+    assert!(activity.turn_context().0.is_none());
+    let config = Arc::new(crate::config::Config::default());
+    activity.remember_turn(config.clone(), Some("de".into()));
+    let (seen, locale) = activity.turn_context();
+    assert!(Arc::ptr_eq(&seen.expect("config recorded"), &config));
+    assert_eq!(locale.as_deref(), Some("de"));
+}

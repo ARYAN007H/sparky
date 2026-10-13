@@ -24,10 +24,21 @@ pub(crate) const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(15);
 /// Longest last-output line carried in a status line, in characters.
 const LAST_LINE_CHARS: usize = 120;
 
+/// Most characters of an unfinished output line kept until its terminator
+/// arrives. Only the first [`LAST_LINE_CHARS`] are ever shown, so this bounds
+/// memory without changing what a status line says.
+const PENDING_LINE_CHARS: usize = 1_024;
+
 #[derive(Debug, Default)]
 struct Meter {
     bytes: u64,
+    /// The last complete, non-empty output line.
     last_line: Option<String>,
+    /// The start of the line still being written. Output arrives in chunks
+    /// that can split a line anywhere, so a line only counts once its
+    /// terminator arrives; otherwise a status line could quote half of one.
+    pending: String,
+    pending_chars: usize,
 }
 
 /// Output written so far by the shell call running on this task. Cheap to
@@ -36,13 +47,27 @@ struct Meter {
 pub(crate) struct ShellOutputMeter(Arc<Mutex<Meter>>);
 
 impl ShellOutputMeter {
-    /// Fold one chunk of stdout or stderr into the figures.
+    /// Fold one chunk of stdout or stderr into the figures. `\n` and `\r`
+    /// both end a line, so a progress bar redrawn with `\r` reports its
+    /// latest state.
     pub(crate) fn record(&self, chunk: &[u8]) {
         let mut meter = self.0.lock().unwrap_or_else(|p| p.into_inner());
         meter.bytes = meter.bytes.saturating_add(chunk.len() as u64);
         let text = String::from_utf8_lossy(chunk);
-        if let Some(line) = text.lines().map(str::trim).rfind(|line| !line.is_empty()) {
-            meter.last_line = Some(line.chars().take(LAST_LINE_CHARS).collect());
+        for (index, piece) in text.split(['\n', '\r']).enumerate() {
+            if index > 0 {
+                // A terminator preceded this piece: the pending line is done.
+                let line = std::mem::take(&mut meter.pending);
+                meter.pending_chars = 0;
+                let line = line.trim();
+                if !line.is_empty() {
+                    meter.last_line = Some(line.chars().take(LAST_LINE_CHARS).collect());
+                }
+            }
+            let room = PENDING_LINE_CHARS - meter.pending_chars;
+            let kept: String = piece.chars().take(room).collect();
+            meter.pending_chars += kept.chars().count();
+            meter.pending.push_str(&kept);
         }
     }
 
@@ -109,8 +134,15 @@ pub(crate) async fn with_shell_progress<F: std::future::Future>(
             output = &mut work => return output,
             _ = ticker.tick() => {
                 let (bytes, last_line) = meter.snapshot();
-                let message = progress_message(started.elapsed(), bytes, last_line.as_deref());
-                tracing::debug!(%message, "[shell] reporting progress");
+                let elapsed = started.elapsed();
+                // The status line can quote command output, so only its
+                // content-free figures are logged.
+                tracing::debug!(
+                    elapsed_secs = elapsed.as_secs(),
+                    output_bytes = bytes,
+                    "[shell] reporting progress"
+                );
+                let message = progress_message(elapsed, bytes, last_line.as_deref());
                 context.report_progress(ToolProgress::message(message));
             }
         }

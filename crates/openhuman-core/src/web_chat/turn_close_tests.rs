@@ -46,6 +46,8 @@ fn stopped(cause: StopCause, stuck: StuckPoint) -> StoppedTurn<'static> {
         request_id: "req-1",
         cause,
         stuck,
+        config: None,
+        locale: None,
     }
 }
 
@@ -135,4 +137,33 @@ fn the_close_request_carries_the_cause_the_stuck_point_and_the_evidence() {
     assert!(prompt.contains("before the agent started"));
     assert!(prompt.contains("still running: shell (git worktree add)"));
     assert!(request.tools.is_empty(), "the close call has no tools");
+}
+
+/// A turn stopped before its run never handed the request to the agent, so
+/// "continue" would continue nothing: the user is asked to send it again.
+#[test]
+fn a_request_the_agent_never_saw_is_asked_for_again() {
+    let turn = stopped(
+        StopCause::Idle(Duration::from_secs(900)),
+        StuckPoint::BeforeRun,
+    );
+    let reply = plain_reply(&turn, &Evidence::default());
+    assert!(reply.ends_with("Please send it again."), "{reply}");
+    assert!(!reply.contains("continue"), "{reply}");
+    let prompt = format!("{:?}", close_request(&turn, &Evidence::default()).messages);
+    assert!(prompt.contains("never received the user's request"));
+}
+
+#[test]
+fn the_close_request_carries_the_turn_reply_language() {
+    let mut turn = stopped(
+        StopCause::Idle(Duration::from_secs(900)),
+        StuckPoint::AfterRun,
+    );
+    turn.locale = Some("de".into());
+    let prompt = format!("{:?}", close_request(&turn, &Evidence::default()).messages);
+    assert!(prompt.contains("German"), "{prompt}");
+    turn.locale = None;
+    let prompt = format!("{:?}", close_request(&turn, &Evidence::default()).messages);
+    assert!(!prompt.contains("German"));
 }

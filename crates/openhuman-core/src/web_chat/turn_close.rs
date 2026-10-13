@@ -83,6 +83,20 @@ pub(crate) struct StoppedTurn<'a> {
     pub(crate) request_id: &'a str,
     pub(crate) cause: StopCause,
     pub(crate) stuck: StuckPoint,
+    /// The config the turn resolved, when it got that far. Its workspace is
+    /// where the turn's snapshot lives and where the reply is saved, even if
+    /// the active profile changed since.
+    pub(crate) config: Option<std::sync::Arc<crate::config::Config>>,
+    /// The turn's reply locale, so the close is written in its language.
+    pub(crate) locale: Option<String>,
+}
+
+impl StoppedTurn<'_> {
+    /// Whether the agent never received the user's request: the turn stopped
+    /// before its run began, so there is nothing to continue from.
+    fn request_unseen(&self) -> bool {
+        self.stuck == StuckPoint::BeforeRun
+    }
 }
 
 /// What the turn recorded while it ran, as evidence lines.
@@ -186,23 +200,41 @@ pub(crate) fn plain_reply(turn: &StoppedTurn<'_>, evidence: &Evidence) -> String
             out.push('\n');
         }
     }
-    out.push_str("\nSay \"continue\" and I'll pick up from here.");
+    if turn.request_unseen() {
+        out.push_str(
+            "\nYour message didn't reach me before the turn stopped. Please send it again.",
+        );
+    } else {
+        out.push_str("\nSay \"continue\" and I'll pick up from here.");
+    }
     out
 }
 
 fn close_request(turn: &StoppedTurn<'_>, evidence: &Evidence) -> ModelRequest {
+    let next_step = if turn.request_unseen() {
+        "The assistant never received the user's request, so it cannot continue it. Ask the \
+         user to send the request again; do not suggest saying \"continue\"."
+    } else {
+        "The user can say \"continue\" to pick up from here."
+    };
     let user_prompt = format!(
-        "The turn was stopped because {}.\nWhere it got stuck: {}.\n\n{}",
+        "The turn was stopped because {}.\nWhere it got stuck: {}.\n{next_step}\n\n{}",
         turn.cause.describe(),
         turn.stuck.describe(),
         evidence.render()
     );
+    let mut system = CLOSE_SYSTEM_PROMPT.to_string();
+    if let Some(directive) = turn
+        .locale
+        .as_deref()
+        .and_then(super::session::locale_reply_directive)
+    {
+        system.push_str("\n\n");
+        system.push_str(&directive);
+    }
     provider::openhuman_backend_model::without_reasoning(
-        ModelRequest::new(vec![
-            Message::system(CLOSE_SYSTEM_PROMPT),
-            Message::user(user_prompt),
-        ])
-        .with_temperature(0.2),
+        ModelRequest::new(vec![Message::system(system), Message::user(user_prompt)])
+            .with_temperature(0.2),
     )
 }
 
@@ -248,28 +280,55 @@ async fn model_reply(
     }
 }
 
-/// The reply that closes `turn`, or `None` when even the configuration
-/// cannot be read (the caller then reports the stop as an error).
-pub(crate) async fn close_reply(turn: StoppedTurn<'_>) -> Option<WebChatTaskResult> {
-    let config = match config_rpc::load_config_with_timeout().await {
-        Ok(config) => config,
-        Err(error) => {
-            log::warn!(
-                "{LOG_PREFIX} config load failed request_id={}: {error}",
-                turn.request_id
-            );
-            return None;
-        }
-    };
-    let snapshot = TurnStateStore::new(config.workspace_dir.clone())
-        .get_turn(turn.thread_id, turn.request_id)
-        .unwrap_or_else(|error| {
-            log::warn!(
-                "{LOG_PREFIX} turn snapshot unreadable request_id={}: {error}",
-                turn.request_id
-            );
+/// Read the turn's snapshot off the async worker: it is a synchronous disk
+/// read, and a stalled filesystem must not pin the runtime thread.
+async fn read_snapshot(
+    workspace: std::path::PathBuf,
+    thread_id: &str,
+    request_id: &str,
+) -> Option<TurnState> {
+    let (thread_id, request_id) = (thread_id.to_string(), request_id.to_string());
+    let read = tokio::task::spawn_blocking(move || {
+        TurnStateStore::new(workspace).get_turn(&thread_id, &request_id)
+    })
+    .await;
+    match read {
+        Ok(Ok(snapshot)) => snapshot,
+        Ok(Err(error)) => {
+            log::warn!("{LOG_PREFIX} turn snapshot unreadable: {error}");
             None
-        });
+        }
+        Err(error) => {
+            log::warn!("{LOG_PREFIX} turn snapshot read did not finish: {error}");
+            None
+        }
+    }
+}
+
+/// The reply that closes `turn`, or `None` when no configuration is available
+/// (the caller then reports the stop as an error). The caller bounds the
+/// whole call.
+pub(crate) async fn close_reply(turn: StoppedTurn<'_>) -> Option<WebChatTaskResult> {
+    let config = match turn.config.clone() {
+        Some(config) => config,
+        // The turn stopped before it resolved its own config.
+        None => match config_rpc::load_config_with_timeout().await {
+            Ok(config) => std::sync::Arc::new(config),
+            Err(error) => {
+                log::warn!(
+                    "{LOG_PREFIX} config load failed request_id={}: {error}",
+                    turn.request_id
+                );
+                return None;
+            }
+        },
+    };
+    let snapshot = read_snapshot(
+        config.workspace_dir.clone(),
+        turn.thread_id,
+        turn.request_id,
+    )
+    .await;
     let evidence = Evidence::from_snapshot(snapshot.as_ref());
     let reply = match model_reply(&config, &turn, &evidence).await {
         Some(reply) => reply,

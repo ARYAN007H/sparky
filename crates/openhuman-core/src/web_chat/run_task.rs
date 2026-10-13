@@ -120,6 +120,11 @@ pub(crate) async fn run_chat_task(
         log::debug!("[web-channel] thread working folder applied thread_id={thread_id}");
         config.action_dir = dir;
     }
+    // A guard that stops this turn closes it from this turn's own config and
+    // reply language, not from whatever profile is active when it fires.
+    if let Some(activity) = super::turn_activity::current() {
+        activity.remember_turn(std::sync::Arc::new(config.clone()), locale.clone());
+    }
     let model_override = normalize_model_override(model_override);
     // The cached session (or a cold-boot resumed one) is the thread's single
     // live history; every turn on the thread checks it out through this path.
