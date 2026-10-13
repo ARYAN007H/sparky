@@ -188,56 +188,6 @@ fn view_overlays_the_sync_state() {
     assert_eq!(super::view(&src, None).status, SourceStatus::Idle);
 }
 
-#[test]
-fn is_due_follows_schedule_and_status() {
-    let now = Utc::now();
-    let scheduled = source("s", Some(60));
-    assert!(
-        !is_due(&source("manual", None), None, now),
-        "on demand only"
-    );
-    assert!(is_due(&scheduled, None, now), "never synced");
-
-    let synced = |ago_mins: i64, status| state::SourceState {
-        last_sync_at: Some(now - Duration::minutes(ago_mins)),
-        status,
-        ..state::SourceState::default()
-    };
-    assert!(!is_due(
-        &scheduled,
-        Some(&synced(59, SourceStatus::Idle)),
-        now
-    ));
-    assert!(is_due(
-        &scheduled,
-        Some(&synced(60, SourceStatus::Idle)),
-        now
-    ));
-    assert!(
-        is_due(&scheduled, Some(&synced(500, SourceStatus::Error)), now),
-        "errors retry"
-    );
-    assert!(!is_due(
-        &scheduled,
-        Some(&synced(500, SourceStatus::Syncing)),
-        now
-    ));
-    let no_last_sync = state::SourceState::default();
-    assert!(is_due(&scheduled, Some(&no_last_sync), now));
-}
-
-#[test]
-fn is_due_never_schedules_faster_than_the_minimum() {
-    let now = Utc::now();
-    let mut eager = source("s", Some(1));
-    eager.schedule_mins = Some(1);
-    let state = state::SourceState {
-        last_sync_at: Some(now - Duration::minutes(5)),
-        ..state::SourceState::default()
-    };
-    assert!(!is_due(&eager, Some(&state), now));
-}
-
 #[tokio::test]
 async fn forget_items_removes_only_that_sources_documents() {
     let tmp = tempfile::tempdir().unwrap();

@@ -10,7 +10,6 @@
 pub mod state;
 mod sync;
 
-use chrono::{DateTime, Utc};
 use tinymemory_api::{ForgetTarget, MetaFilter};
 
 use crate::config::schema::{MemorySourceConfig, MemorySourceKind};
@@ -18,7 +17,7 @@ use crate::config::Config;
 
 use super::engine;
 use super::error::{MemoryError, MemoryResult};
-use super::types::{SourceStatus, SourceView, SourcesAddParams};
+use super::types::{SourceView, SourcesAddParams};
 
 pub use sync::{start_sync, sync_due, sync_one};
 
