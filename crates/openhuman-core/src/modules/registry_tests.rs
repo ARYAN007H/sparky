@@ -236,13 +236,13 @@ fn tinybox_registry_matches_the_published_v0124_release_manifest() {
     assert_eq!(actual, published);
 }
 #[test]
-fn tinymcp_registry_matches_the_published_v0143_release_manifest() {
+fn tinymcp_registry_matches_the_published_v0150_release_manifest() {
     let record = find("tinymcp").expect("compiled TinyMCP module");
-    assert_eq!(record.version, "0.14.3");
-    assert_eq!(tinymcp_bus::CONTRACT_VERSION, (1, 21));
+    assert_eq!(record.version, "0.15.0");
+    assert_eq!(tinymcp_bus::CONTRACT_VERSION, (1, 22));
     assert_eq!(
         record.release_url,
-        "https://github.com/tinyhumansai/tinymcp/releases/tag/v0.14.3"
+        "https://github.com/tinyhumansai/tinymcp/releases/tag/v0.15.0"
     );
     let actual = record
         .assets
@@ -252,88 +252,88 @@ fn tinymcp_registry_matches_the_published_v0143_release_manifest() {
     let published = [
         (
             "archlinux-rolling-arm64",
-            "tinymcp-0.14.3-archlinux-arm64.tar.gz",
-            "ce3429b277e8d6ff18e5cb2eae508681e282c5a662b04be6e5a6b0baef889309",
+            "tinymcp-0.15.0-archlinux-arm64.tar.gz",
+            "c77d02b8c03278ad24294dc63e0cd1ae490d4d17ee7b8543e71c2600176a7b60",
         ),
         (
             "archlinux-rolling-x86_64",
-            "tinymcp-0.14.3-archlinux-x86_64.tar.gz",
-            "e58fa20f6d4f5041951eeb8799050a251a01b5fde1a6442409ebec4ab0387e28",
+            "tinymcp-0.15.0-archlinux-x86_64.tar.gz",
+            "836259b5cb2a06da6df598593fe2b60670d36faf3151e875946f16ccb5456fff",
         ),
         (
             "fedora-43-arm64",
-            "tinymcp-0.14.3-fedora-43-arm64.tar.gz",
-            "d792e3afd6b9bf715450a08b6dc0ea5640b4e31ec05824e73cabca742dc439d7",
+            "tinymcp-0.15.0-fedora-43-arm64.tar.gz",
+            "0ba117c96137e13f958de0a557094a06c58797c7c03eee1b8fedfc25c7f17b6a",
         ),
         (
             "fedora-43-x86_64",
-            "tinymcp-0.14.3-fedora-43-x86_64.tar.gz",
-            "7d9e36f65058518e58a4a366797786c8c7cd9954070f9a9c2a38f4a4078d6bca",
+            "tinymcp-0.15.0-fedora-43-x86_64.tar.gz",
+            "da5154722f65019f7de2452662f1f46c8425bfba95d0aa6613dab1efff6fec7e",
         ),
         (
             "fedora-44-arm64",
-            "tinymcp-0.14.3-fedora-44-arm64.tar.gz",
-            "ae150372d30a8d90dd82c39a139db36322d03142509a8fa0aaa837227944d315",
+            "tinymcp-0.15.0-fedora-44-arm64.tar.gz",
+            "ada62a47ad9d88a4bd9f8e0defe67718a75db2f30e8e298e838b7d5d3f036f4f",
         ),
         (
             "fedora-44-x86_64",
-            "tinymcp-0.14.3-fedora-44-x86_64.tar.gz",
-            "255559923bd7a2bcf8c7290cfe0d9eb39bde4cfeb99d35bb5ce3dd2c994b1819",
+            "tinymcp-0.15.0-fedora-44-x86_64.tar.gz",
+            "2036d7a13f06bfb243fd7f54626cdcf7ed4653a534ac780503ee9980be1488ca",
         ),
         (
             "macos-15-arm64",
-            "tinymcp-0.14.3-macos-15-arm64.tar.gz",
-            "5100539b489a0ea2e6b64334bd3857b6cf63af8d4c0f20d4efba3c675488d8a0",
+            "tinymcp-0.15.0-macos-15-arm64.tar.gz",
+            "11aaa66c1dc42ec2b6f6a70c01d1c98e95bef22c7f626d32c6da9455b2cdf38f",
         ),
         (
             "macos-15-x86_64",
-            "tinymcp-0.14.3-macos-15-x86_64.tar.gz",
-            "d485623e52b5ea1057ff1ad354c2338ee06666ba0ca4e941439e6b0a703e19da",
+            "tinymcp-0.15.0-macos-15-x86_64.tar.gz",
+            "11ee1ecede7599f575d75fcc3e030ea0f18df9ffe91a8264dd20da4453825569",
         ),
         (
             "macos-26-arm64",
-            "tinymcp-0.14.3-macos-26-arm64.tar.gz",
-            "f147c5fb4220a316e36ce9e68004166faa36b0f31d96f89cf154867b2d1cd13c",
+            "tinymcp-0.15.0-macos-26-arm64.tar.gz",
+            "4062a4a7de2bda4d707960c715412ce61d66e8b5983f05b75ef5bca5931eb866",
         ),
         (
             "macos-26-x86_64",
-            "tinymcp-0.14.3-macos-26-x86_64.tar.gz",
-            "fb07cecdcf1c78076de4e985c089c17a3c7a78e2d3c7f35882eec5b8612c2418",
+            "tinymcp-0.15.0-macos-26-x86_64.tar.gz",
+            "8a144d5f19bb743186373ec18c118da9f1b772d592a14caed892f808a690c41f",
         ),
         (
             "ubuntu-22.04-arm64",
-            "tinymcp-0.14.3-ubuntu-22.04-arm64.tar.gz",
-            "fc0b6c92683abf8b8d3c78983ce325d720482d23ecde60aaa606c5e6e0952e3b",
+            "tinymcp-0.15.0-ubuntu-22.04-arm64.tar.gz",
+            "1d3de88aeaf2255d44f5895ae06d7c7b4e2869314fff0efe8661a1eea50d0863",
         ),
         (
             "ubuntu-22.04-x86_64",
-            "tinymcp-0.14.3-ubuntu-22.04-x86_64.tar.gz",
-            "e7f2eccefbc645c66916c4885658a1dc286f1eb72ec7a7546bbc9f37e4228946",
+            "tinymcp-0.15.0-ubuntu-22.04-x86_64.tar.gz",
+            "aacd2ea47433e8c61941be71b5ff95036afe4435da4c38f2ab1dfa0d31ddade1",
         ),
         (
             "ubuntu-24.04-arm64",
-            "tinymcp-0.14.3-ubuntu-24.04-arm64.tar.gz",
-            "f1cd87ed2a3276a5e8bd483ca134ffb12c0638d94701be83dd54ddbab3f64c51",
+            "tinymcp-0.15.0-ubuntu-24.04-arm64.tar.gz",
+            "c5dcc8c5f74d00f08d8a4dace062ebaaf347edcee7342d11ff0ba9da840e5807",
         ),
         (
             "ubuntu-24.04-x86_64",
-            "tinymcp-0.14.3-ubuntu-24.04-x86_64.tar.gz",
-            "4858b6eb8d246ae3f18f0e3e5de02bf98f98c7cd9ca3489d2049200b09abf15e",
+            "tinymcp-0.15.0-ubuntu-24.04-x86_64.tar.gz",
+            "fefa976a7e8ea19c3c63ce9dedb6652411258c478b0c16abceaa460c3afb95e7",
         ),
         (
             "windows-11-arm64",
-            "tinymcp-0.14.3-windows-11-arm64.zip",
-            "0ab17f2ceb5134984b13746f2c8ac2e04fa632d66faa691d61019d08f1470adc",
+            "tinymcp-0.15.0-windows-11-arm64.zip",
+            "055fc3a47d050ab5fa76c993ff85d8690dbcaaab31b4673ba40e88575951d9a8",
         ),
         (
             "windows-2022-x86_64",
-            "tinymcp-0.14.3-windows-2022-x86_64.zip",
-            "891e9be9218e4e67a6c6ce64f2ca593bd98dc13fb2885a5d2c5d1c787b371fe7",
+            "tinymcp-0.15.0-windows-2022-x86_64.zip",
+            "e9f06cc33a3e29f1de05935c26238c2f23c46936544ba55a74ac89e3c8c8f690",
         ),
         (
             "windows-2025-x86_64",
-            "tinymcp-0.14.3-windows-2025-x86_64.zip",
-            "82e6e42cd586bf5a2dcec7b56fe88b158e5078f4e26e55dd4154ef70467e89d2",
+            "tinymcp-0.15.0-windows-2025-x86_64.zip",
+            "943dea2ae0695c10a9f4376b5025c560f05668f5bd121e06e355bebfc819f970",
         ),
     ];
     assert_eq!(actual, published);
@@ -627,63 +627,63 @@ fn tinychannels_registry_matches_scoped_runtime_release() {
 #[test]
 fn voice_capture_release_pins_summary_contract_and_every_platform_digest() {
     let record = find("tinyvoice").unwrap();
-    assert_eq!(record.version, "0.1.16");
-    assert_eq!(tinyvoice_bus::CONTRACT_VERSION, (1, 5));
+    assert_eq!(record.version, "0.2.0");
+    assert_eq!(tinyvoice_bus::CONTRACT_VERSION, (1, 9));
     let expected = [
         (
             "macos-15-arm64",
-            "tinyvoice-module-0.1.16-macos-15-arm64.tar.gz",
-            "72c75b371e72c22da9a149b0962395d74131b41910e2ed735d127667f9f38c1d",
+            "tinyvoice-module-0.2.0-macos-15-arm64.tar.gz",
+            "340e799db919f145382b372c45d237ef1edbf69afa2fa0ab976eccd850b62f03",
         ),
         (
             "macos-15-x86_64",
-            "tinyvoice-module-0.1.16-macos-15-x86_64.tar.gz",
-            "a293f24b14570ac551be300d1aac28eddb0339066ab4ec0a231b6831fade4734",
+            "tinyvoice-module-0.2.0-macos-15-x86_64.tar.gz",
+            "f5bd0ab69258b5fda58074768c959df41f49ed1fda34a8c2d32027b7feb0348e",
         ),
         (
             "macos-26-arm64",
-            "tinyvoice-module-0.1.16-macos-26-arm64.tar.gz",
-            "8003a988fdc2eb4a6be724caf6d1ba16a97d3bbf7372921630bb180f02dfeb28",
+            "tinyvoice-module-0.2.0-macos-26-arm64.tar.gz",
+            "7a7babe46af562e9833d59a594f66babe76bdc0a7b925754d04bde8579bb1299",
         ),
         (
             "macos-26-x86_64",
-            "tinyvoice-module-0.1.16-macos-26-x86_64.tar.gz",
-            "20142bb6bb285b863b626d2d49c4879331de1f34cfc2847755d038adf5664abe",
+            "tinyvoice-module-0.2.0-macos-26-x86_64.tar.gz",
+            "a29df2511d63eec3c1cb97bdee2a13a7da94f3c53f5f36cb217c271363e6c2fa",
         ),
         (
             "ubuntu-22.04-arm64",
-            "tinyvoice-module-0.1.16-ubuntu-22.04-arm64.tar.gz",
-            "be42ffdf401d10bdaac083b05c42ebbeeca4f25649286cd0ada608fa02045c23",
+            "tinyvoice-module-0.2.0-ubuntu-22.04-arm64.tar.gz",
+            "e59e98a6844e6e202da9df539d63dedc0cb2c7c733b8cd91ff6fc6b9a2baf9a0",
         ),
         (
             "ubuntu-22.04-x86_64",
-            "tinyvoice-module-0.1.16-ubuntu-22.04-x86_64.tar.gz",
-            "9a43aedb59617d6322537c411f91710ffe31c9595066592e0abc6086aca13a1a",
+            "tinyvoice-module-0.2.0-ubuntu-22.04-x86_64.tar.gz",
+            "57330db85525148a78352882181ab7008fd79c18528289ed43f11cdae4f01c31",
         ),
         (
             "ubuntu-24.04-arm64",
-            "tinyvoice-module-0.1.16-ubuntu-24.04-arm64.tar.gz",
-            "620167d61a331ad1260f3f432552cca57af4a0696b51b3e7d8d62ad1f0337a06",
+            "tinyvoice-module-0.2.0-ubuntu-24.04-arm64.tar.gz",
+            "d9cfea6d2a910e98f6609dbca65d3bbdcc3950f40615545a0ce14d9117ce34cd",
         ),
         (
             "ubuntu-24.04-x86_64",
-            "tinyvoice-module-0.1.16-ubuntu-24.04-x86_64.tar.gz",
-            "90de2c9dce82e9d8e3864e9e0f827f1110599a3b5148d905a2841492145a1015",
+            "tinyvoice-module-0.2.0-ubuntu-24.04-x86_64.tar.gz",
+            "7993badf940bfbc988c078f9c1ba40af29a6e4177ead8680b78e7a98545cc5e4",
         ),
         (
             "windows-11-arm64",
-            "tinyvoice-module-0.1.16-windows-11-arm64.zip",
-            "8272daea789109e6034ee3af5ad9a46e5559b511f9cf6c965c14225e1c59c69e",
+            "tinyvoice-module-0.2.0-windows-11-arm64.zip",
+            "d7be3ffd3e6bd2d3deb7f334d447250cb31228f49dfec86e3a24c4d3e4d93754",
         ),
         (
             "windows-2022-x86_64",
-            "tinyvoice-module-0.1.16-windows-2022-x86_64.zip",
-            "89fc25bdddbcb77393f8618aa4f7f00f9cd9abd27dd1e35ad184aafb4fe4fb9d",
+            "tinyvoice-module-0.2.0-windows-2022-x86_64.zip",
+            "15190a7cd8a3d49d4b4c9b4e3e39247fa936ecea9a7d5f7becd2911e97a8636b",
         ),
         (
             "windows-2025-x86_64",
-            "tinyvoice-module-0.1.16-windows-2025-x86_64.zip",
-            "271ba8c8476c22535f9fba0086b0aa0a253f9d228cd6f6a73e91cbe24dfa8a2a",
+            "tinyvoice-module-0.2.0-windows-2025-x86_64.zip",
+            "57c802f2e1c07c66aae10de26013f3ddb6f02d5309fb6ea5f0580d048501bd86",
         ),
     ];
     assert_eq!(record.assets.len(), expected.len());

@@ -43,7 +43,7 @@ fn account_fixture(
             let request: serde_json::Value = serde_json::from_str(request)?;
             let response = match request.get("operation").and_then(serde_json::Value::as_str) {
                 Some("prepare_bundle") => serde_json::json!({"result":"prepared_bundle","value":{
-                    "contract_version":[1,1],
+                    "contract_version":[1,2],
                     "bundle":[{"path":"index.html","contents":"aGVsbG8="}],
                     "file_count":1,"total_bytes":5,"skipped_entries":0,"scanned_entries":1
                 }}),
@@ -242,7 +242,7 @@ async fn released_artifact_serves_providers_and_confidential_local_preparation()
         panic!("typed prepared bundle");
     };
 
-    assert_eq!(prepared.contract_version, (1, 1));
+    assert_eq!(prepared.contract_version, (1, 2));
     assert_eq!(prepared.file_count, 1);
     assert_eq!(prepared.total_bytes, html.len() as u64);
     assert_eq!(prepared.bundle.len(), 1);

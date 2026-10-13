@@ -31,14 +31,6 @@ async fn rpc(base: &str, method: &str) -> Value {
         .expect("json")
 }
 
-/// One core per process (the first context becomes the process default), so
-/// every disabled component is switched off in the same boot and asserted in
-/// turn: `(rpc method, component, module id)`.
-const DISABLED_CASES: &[(&str, &str, &str)] = &[
-    ("openhuman.mcp_clients_status", "mcp", "tinymcp"),
-    ("openhuman.channels_list", "channels", "tinychannels"),
-];
-
 #[test]
 fn disabled_component_answers_component_disabled_over_json_rpc() {
     std::thread::Builder::new()
@@ -57,6 +49,7 @@ fn disabled_component_answers_component_disabled_over_json_rpc() {
                         ..Config::default()
                     };
                     config.components.mcp = false;
+                    config.components.voice = false;
                     config.components.channels = false;
                     tinyhumans_boot::boot();
                     let _runtime = CoreBuilder::new(HostKind::Library)
@@ -73,27 +66,44 @@ fn disabled_component_answers_component_disabled_over_json_rpc() {
                     let app = build_core_http_router(false);
                     let server = tokio::spawn(async move { axum::serve(listener, app).await });
 
-                    for (method, component, _) in DISABLED_CASES {
-                        let off = rpc(&base, method).await;
-                        let err = off
-                            .get("error")
-                            .unwrap_or_else(|| panic!("want error for {method}: {off}"));
-                        let want = format!("COMPONENT_DISABLED:{component}");
+                    let off = rpc(&base, "openhuman.mcp_clients_status").await;
+                    let err = off
+                        .get("error")
+                        .unwrap_or_else(|| panic!("want error: {off}"));
+                    assert_eq!(
+                        err.get("message").and_then(Value::as_str),
+                        Some("COMPONENT_DISABLED:mcp"),
+                        "{off}"
+                    );
+                    assert_eq!(
+                        err.pointer("/data/kind").and_then(Value::as_str),
+                        Some("component_disabled"),
+                        "{off}"
+                    );
+                    assert_eq!(
+                        err.pointer("/data/component").and_then(Value::as_str),
+                        Some("mcp")
+                    );
+
+                    // The voice namespace answers the same typed error.
+                    // (The `voice` family is only registered with the Cargo `voice` gate.)
+                    #[cfg(feature = "voice")]
+                    {
+                        let voice = rpc(&base, "openhuman.voice_status").await;
                         assert_eq!(
-                            err.get("message").and_then(Value::as_str),
-                            Some(want.as_str()),
-                            "{off}"
-                        );
-                        assert_eq!(
-                            err.pointer("/data/kind").and_then(Value::as_str),
-                            Some("component_disabled"),
-                            "{off}"
-                        );
-                        assert_eq!(
-                            err.pointer("/data/component").and_then(Value::as_str),
-                            Some(*component)
+                            voice.pointer("/error/message").and_then(Value::as_str),
+                            Some("COMPONENT_DISABLED:voice"),
+                            "{voice}"
                         );
                     }
+
+                    // The channels namespace answers the same typed error.
+                    let channels = rpc(&base, "openhuman.channels_list").await;
+                    assert_eq!(
+                        channels.pointer("/error/message").and_then(Value::as_str),
+                        Some("COMPONENT_DISABLED:channels"),
+                        "{channels}"
+                    );
 
                     // `modules.list` reports the same modules as Disabled, and only them.
                     let listed = rpc(&base, "openhuman.modules_list").await;
@@ -109,9 +119,12 @@ fn disabled_component_answers_component_disabled_over_json_rpc() {
                             .and_then(|m| m.get("state").and_then(Value::as_str))
                             .map(str::to_owned)
                     };
-                    for (_, _, module_id) in DISABLED_CASES {
-                        assert_eq!(state_of(module_id).as_deref(), Some("disabled"), "{listed}");
-                    }
+                    assert_eq!(state_of("tinymcp").as_deref(), Some("disabled"), "{listed}");
+                    assert_eq!(
+                        state_of("tinychannels").as_deref(),
+                        Some("disabled"),
+                        "{listed}"
+                    );
                     assert_ne!(
                         state_of("tinydocs").as_deref(),
                         Some("disabled"),
