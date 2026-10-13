@@ -252,6 +252,14 @@ fn a_harness_runs_a_turn_against_the_provider_it_was_given() {
                 "got {err:?}"
             );
 
+            // Dropping the agent only schedules its MCP close, and the deferred
+            // close keeps the ephemeral workspace until it is acknowledged;
+            // removing the agent awaits the close first.
+            harness
+                .runtime()
+                .remove_agent(openhuman_embed::HARNESS_AGENT_ID)
+                .await
+                .expect("the harness agent is removed and its cleanup acknowledged");
             drop(harness);
             assert!(
                 !workspace_dir.exists(),
