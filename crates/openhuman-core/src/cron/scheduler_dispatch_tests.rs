@@ -370,6 +370,8 @@ async fn an_upgraded_job_with_a_side_table_policy_keeps_firing_with_it() {
         .unwrap();
     }
 
+    // Reading first runs the legacy import, which the direct write below skips.
+    cron::get_job(&config, shell_id).unwrap();
     force_due(&config, shell_id);
     let job = cron::get_job(&config, shell_id).unwrap();
     assert_eq!(job.policy.retries, Some(0));
