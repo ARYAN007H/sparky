@@ -11,7 +11,7 @@ use tinyjuice_bus::wire::{QueryError, QueryRequest, QueryResponse, QueryTarget};
 use tinytools::{PermissionLevel, Tool, ToolResult};
 
 /// The query tools TinyJuice declares. The footer suggests a subset of these.
-pub const REPL_TOOL_NAMES: &[&str] = &["juice_find", "juice_extract", "juice_summarize"];
+pub use tinyjuice_bus::tools::REPL_TOOLS as REPL_TOOL_NAMES;
 
 pub fn is_repl_tool(name: &str) -> bool {
     REPL_TOOL_NAMES.contains(&name)

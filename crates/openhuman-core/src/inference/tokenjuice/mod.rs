@@ -16,8 +16,9 @@ pub use tools::TokenjuiceRetrieveTool;
 
 use tinyjuice_bus::wire::InstallRequest;
 
-pub const RETRIEVE_TOOL_NAME: &str = "juice_retrieve";
-pub const LEGACY_TINYJUICE_RETRIEVE_TOOL_NAME: &str = "tinyjuice_retrieve";
+pub use tinyjuice_bus::tools::{
+    LEGACY_RETRIEVE as LEGACY_TINYJUICE_RETRIEVE_TOOL_NAME, RETRIEVE as RETRIEVE_TOOL_NAME,
+};
 pub const LEGACY_RETRIEVE_TOOL_NAME: &str = "retrieve_tool_output";
 /// Every name the recovery surface answers to: the live tool plus the two
 /// migration aliases a replayed transcript may still call.
