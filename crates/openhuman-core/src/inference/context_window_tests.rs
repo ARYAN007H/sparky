@@ -333,6 +333,8 @@ async fn failed_ollama_probe_is_remembered_and_not_retried() {
     let tmp = TempDir::new().unwrap();
     let mut config = openrouter_config(&tmp);
     config.local_ai.base_url = Some("http://127.0.0.1:11434".to_string());
+    // The resolver remembers provider-sourced windows process-wide, so this
+    // test uses a model id no other test resolves successfully.
     let fetcher = FakeFetcher::default();
     let cache = ModelLimitsCache::default();
     for _ in 0..3 {
@@ -340,8 +342,8 @@ async fn failed_ollama_probe_is_remembered_and_not_retried() {
             &fetcher,
             &cache,
             "chat",
-            "ollama:qwen3:14b",
-            "qwen3:14b",
+            "ollama:qwen3:failed-probe",
+            "qwen3:failed-probe",
             &config,
         )
         .await;
