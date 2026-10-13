@@ -1,8 +1,8 @@
 use super::*;
 use crate::memory::error::INVALID_REQUEST;
 use crate::memory::test_fixtures::{bind_reference, config_in, stored};
-use chrono::Utc;
 use crate::memory::types::SourceStatus;
+use chrono::Utc;
 use tinymemory_api::{DocumentBody, MemoryMeta, SourceKind, SourceRef, StoreItem};
 
 fn add_params(kind: &str, target: &str) -> SourcesAddParams {

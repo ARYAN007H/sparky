@@ -1,8 +1,8 @@
 use super::*;
-use tinymemory_api::Reach;
 use crate::memory::scope::MemoryIdentity;
 use crate::memory::test_fixtures::{bind_reference, config_in, stored, RefusingEngine};
 use serde_json::json;
+use tinymemory_api::Reach;
 use tinymemory_api::{MetaFilter, Namespace};
 
 fn facts(config: &Config) -> CallFacts {
