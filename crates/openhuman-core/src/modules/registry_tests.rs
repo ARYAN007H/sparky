@@ -628,7 +628,7 @@ fn tinychannels_registry_matches_scoped_runtime_release() {
 fn voice_capture_release_pins_summary_contract_and_every_platform_digest() {
     let record = find("tinyvoice").unwrap();
     assert_eq!(record.version, "0.2.0");
-    assert_eq!(tinyvoice_bus::CONTRACT_VERSION, (1, 5));
+    assert_eq!(tinyvoice_bus::CONTRACT_VERSION, (1, 9));
     let expected = [
         (
             "macos-15-arm64",
