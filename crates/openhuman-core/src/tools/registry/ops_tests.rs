@@ -405,7 +405,7 @@ fn diagnostics_report_denials_recorded_through_tinytools() {
         .value
         .recent_denials
         .iter()
-        .find(|d| d.tool == "tools.registry_snapshot_probe")
+        .find(|d| d.tool_name == "tools.registry_snapshot_probe")
         .expect("recorded denial surfaces in diagnostics");
     assert_eq!(denial.reason, "probe denial reason");
 }
