@@ -128,16 +128,6 @@
       "scope": "tinychannels-bus",
       "package": "tokio",
       "reason": "tinychannels-bus (vendor/tinychannels) still carries a provider trait with async-trait/anyhow/tokio::sync; the contract needs to be split upstream in tinyhumansai/tinychannels before this edge can go (tracked under #7523)."
-    },
-    {
-      "scope": "tinymemes-bus",
-      "package": "tinybus",
-      "reason": "tinymemes-bus (vendor/tinymemes) is a typed TinyBus client and depends on tinybus + tinystoragedrivers-bus; the client half needs to leave the contract crate upstream in tinyhumansai/tinymemes (tracked under #7523)."
-    },
-    {
-      "scope": "tinymemes-bus",
-      "package": "tinystoragedrivers-bus",
-      "reason": "tinymemes-bus (vendor/tinymemes) is a typed TinyBus client and depends on tinybus + tinystoragedrivers-bus; the client half needs to leave the contract crate upstream in tinyhumansai/tinymemes (tracked under #7523)."
     }
   ],
   "excludedSubsystems": [

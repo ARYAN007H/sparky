@@ -765,14 +765,14 @@
   {
     "rule": "ambient-context",
     "path": "crates/openhuman-core/src/mcp/module_client.rs",
-    "line": 497,
+    "line": 513,
     "text": "let Some(context) = crate::core::runtime::CoreContext::current() else {",
     "occurrence": 1
   },
   {
     "rule": "ambient-context",
     "path": "crates/openhuman-core/src/mcp/module_client.rs",
-    "line": 500,
+    "line": 516,
     "text": "context.session_agent().is_some()",
     "occurrence": 1
   },
@@ -840,6 +840,13 @@
     "occurrence": 1
   },
   {
+    "rule": "bare-spawn",
+    "path": "crates/openhuman-core/src/modules/boot.rs",
+    "line": 102,
+    "text": "tokio::spawn(async move {",
+    "occurrence": 1
+  },
+  {
     "rule": "ambient-context",
     "path": "crates/openhuman-core/src/modules/host.rs",
     "line": 190,
@@ -856,14 +863,14 @@
   {
     "rule": "bare-spawn",
     "path": "crates/openhuman-core/src/modules/ops.rs",
-    "line": 360,
+    "line": 367,
     "text": "let found_on_search_path = tokio::task::spawn_blocking(move || {",
     "occurrence": 1
   },
   {
     "rule": "ambient-context",
     "path": "crates/openhuman-core/src/platform/about_app/ops.rs",
-    "line": 42,
+    "line": 43,
     "text": "CoreContext::current().map_or_else(ComponentSet::all, |ctx| ctx.components())",
     "occurrence": 1
   },
@@ -998,6 +1005,13 @@
     "path": "crates/openhuman-core/src/skills/catalog/registry.rs",
     "line": 58,
     "text": "Self::from_lookup(|name| std::env::var(name).ok(), dirs::home_dir())",
+    "occurrence": 1
+  },
+  {
+    "rule": "bare-spawn",
+    "path": "crates/openhuman-core/src/skills/catalog/store.rs",
+    "line": 53,
+    "text": "tokio::task::spawn_blocking(move || {",
     "occurrence": 1
   },
   {
@@ -1166,13 +1180,6 @@
     "path": "crates/openhuman-core/src/threads/store/blocking.rs",
     "line": 72,
     "text": "match tokio::task::spawn_blocking(f).await {",
-    "occurrence": 1
-  },
-  {
-    "rule": "env-mutation",
-    "path": "crates/openhuman-core/src/tinymemes/service.rs",
-    "line": 77,
-    "text": "std::env::set_var(COOLDOWN_ENV, config.memes.meme_cooldown.to_string());",
     "occurrence": 1
   },
   {
