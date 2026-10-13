@@ -116,9 +116,6 @@ pub(crate) async fn tick_live_agents(dispatcher: &mut JobDispatcher) {
                     return;
                 }
             };
-            if !agent_jobs_may_exist(&config) {
-                return;
-            }
             let jobs = match due_jobs(&config, Utc::now()) {
                 Ok(jobs) => jobs,
                 Err(error) => {
@@ -148,16 +145,6 @@ pub async fn run_live_agent_pass(max_concurrent: usize) {
     let mut dispatcher = JobDispatcher::new(max_concurrent.max(1));
     tick_live_agents(&mut dispatcher).await;
     dispatcher.drain().await;
-}
-
-/// Whether an agent can have jobs to poll: with a storage backend its jobs
-/// live in the backend under its scope (`crate::storage`), so there is always
-/// something to ask; without one, only once its own store exists, or the
-/// `jobs.db` tinyflows used to write there (which the first call imports).
-pub(crate) fn agent_jobs_may_exist(config: &Config) -> bool {
-    crate::storage::installed().is_some()
-        || crate::cron::store::db_path(config).exists()
-        || crate::cron::store::legacy_db_path(config).exists()
 }
 
 /// Single poll cycle of the scheduler loop, extracted so tests can drive

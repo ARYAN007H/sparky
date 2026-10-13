@@ -1,12 +1,9 @@
 //! Cron persistence: a thin host binding of `tinyflows_drivers::schedule::CronDocuments`.
 //!
 //! Jobs, run history and per-job policy live on the storage ports, in the
-//! acting agent's scope of the installed backend ([`crate::storage`]) or, when
-//! the host configured none, in a SQLite document store of their own
-//! (`<workspace>/cron/schedule.db`, an embedded agent's under
-//! `agents/<id>/cron/`). tinyflows no longer has a SQLite store of its own: the
-//! `jobs.db` it wrote is imported once, read-only, on first use
-//! ([`crate::storage::import`]).
+//! acting agent's scope of the storage backend ([`crate::storage`]). tinyflows no
+//! longer has a SQLite store of its own: the `jobs.db` it wrote is imported
+//! once, read-only, when the backend is installed ([`crate::storage::import`]).
 //!
 //! This module only turns the host [`Config`] into the store's limits
 //! (run-history cap, due-job batch size), so callers keep passing `&Config`.
