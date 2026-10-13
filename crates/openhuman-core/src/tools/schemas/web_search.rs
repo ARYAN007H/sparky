@@ -61,7 +61,7 @@ async fn run_role_tool_with(
         .await
         .map_err(|error| crate::search::tools::user_facing_error(&error))?;
     let payload = json!({
-        "provider": crate::search::render::provider_label(&response.provider),
+        "provider": tinysearch_bus::labels::provider_label(&response.provider),
         "provider_id": response.provider,
         "role": response.role,
         "results": response.results,

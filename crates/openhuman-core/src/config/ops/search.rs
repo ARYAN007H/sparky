@@ -69,7 +69,7 @@ const LISTED_PROVIDERS: &[&str] = &[
 ];
 
 fn label(provider: &str) -> String {
-    crate::search::render::provider_label(provider)
+    tinysearch_bus::labels::provider_label(provider)
 }
 
 fn docs_url(provider: &str) -> Option<&'static str> {
