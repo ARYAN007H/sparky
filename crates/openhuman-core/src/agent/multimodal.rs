@@ -596,6 +596,7 @@ fn stash() -> Option<BlobAttachmentStash> {
 fn memory_stash() -> &'static BlobAttachmentStash {
     static MEMORY: OnceLock<BlobAttachmentStash> = OnceLock::new();
     MEMORY.get_or_init(|| {
+        use tinystoragedrivers::StorageBackend as _;
         let scoped = tinystoragedrivers::MemoryStorage::new()
             .for_scope(&tinystoragedrivers::Scope::local())
             .expect("the memory backend binds the local scope");
