@@ -24,11 +24,12 @@
 
 use std::ops::Range;
 use std::sync::Arc;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use serde_json::Value;
 use tinystoragedrivers::{
-    Blob, BlobMeta, BlobStore, Capabilities, Capability, CollectionSpec, ErrorKind, Filter, Page,
+    Blob, BlobMeta, BlobStore, BlobStream, Capabilities, Capability, CollectionSpec, ErrorKind, Filter, Page,
     Precondition, Query, ReadCheck, Result, SearchHit, Sort, StorageError, StreamEntry,
     StreamStore, Version, Versioned, WriteOp, WriteResult,
 };
