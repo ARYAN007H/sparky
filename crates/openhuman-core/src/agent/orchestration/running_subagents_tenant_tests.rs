@@ -299,7 +299,7 @@ async fn unscoped_async_spawn_refuses_before_persisting_a_running_session() {
         Ok(sessions) => sessions,
         Err(err) => {
             assert!(
-                err.contains("no profile in SaaS mode; refusing a shared storage scope"),
+                err.contains("no tenant scope in SaaS mode; refusing to act as the operator"),
                 "unexpected store error: {err}"
             );
             Vec::new()
