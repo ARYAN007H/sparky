@@ -2,6 +2,7 @@ use super::*;
 use crate::security::approval::types::{ApprovalDecision, PendingApproval};
 use chrono::Duration;
 use serde_json::json;
+use crate::storage::{DocumentStore, DocumentStoreExt};
 use tempfile::TempDir;
 
 fn test_config() -> (Config, TempDir) {
