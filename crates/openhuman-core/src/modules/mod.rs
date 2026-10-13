@@ -36,8 +36,11 @@
 //! - [`wallet`] — the host half of the `tinywallet` module, which builds and
 //!   assembles transactions while the signing key stays in this process.
 //! - [`linked`] — the registry of modules linked into the executable (local development).
-//! - [`host`] — the module broker, connection and loader.
-//! - [`ops`] — resolving, loading, and reporting status.
+//! - [`runtime`] — the process-wide `tinybus::module::ModuleRuntime` and the host
+//!   callbacks served on its bus.
+//! - [`ops`] — the adapter over `tinybus::module::Resolver` and `ModuleClient`:
+//!   builds them from [`Config`](crate::config::Config) and the registry.
+//! - [`report`] — the Sentry sink for terminal module outcomes.
 //! - [`schemas`] — the `modules` RPC surface.
 //! - [`boot`] — what happens at startup.
 
@@ -55,7 +58,6 @@ pub(crate) mod channel_controller;
 pub(crate) mod channel_health;
 #[cfg(all(feature = "channels", feature = "modules"))]
 pub(crate) mod channel_runtime;
-pub mod client;
 #[cfg(feature = "modules")]
 pub mod computer;
 #[cfg(feature = "modules")]
@@ -67,9 +69,6 @@ pub mod desktop;
 #[cfg(feature = "documents")]
 #[cfg(feature = "modules")]
 pub mod documents;
-mod failure;
-#[cfg(feature = "modules")]
-pub mod host;
 #[cfg(feature = "modules")]
 pub mod linked;
 #[cfg(feature = "modules")]
@@ -77,6 +76,10 @@ pub mod ops;
 #[cfg(feature = "modules")]
 pub(crate) mod profile_claim;
 pub mod registry;
+#[cfg(feature = "modules")]
+pub(crate) mod report;
+#[cfg(feature = "modules")]
+pub mod runtime;
 #[cfg(feature = "modules")]
 pub mod schemas;
 #[cfg(feature = "modules")]
@@ -137,7 +140,7 @@ pub(crate) mod web3_service;
 pub(crate) mod x402_service;
 
 #[cfg(feature = "modules")]
-pub use ops::{ensure_loaded, ensure_loaded_within, state_of, LoadError};
+pub use ops::{ensure_loaded, ensure_loaded_within, state_of};
 #[cfg(feature = "modules")]
 pub use schemas::{all_controller_schemas, all_registered_controllers};
 #[doc(hidden)]

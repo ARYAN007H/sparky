@@ -22,7 +22,7 @@ struct LeaseState {
     object: ModuleObjectClient,
     cleanup: Cleanup,
     closing: Mutex<Option<tokio::task::JoinHandle<Result<(), ModuleCallError>>>>,
-    runtime: &'static super::host::ModuleRuntime,
+    runtime: &'static tinybus::module::ModuleRuntime,
 }
 
 #[derive(Clone)]
@@ -95,7 +95,7 @@ impl ChannelRuntimeLease {
             .call_confidential("tinychannels", methods::RESERVE_RUNTIME, ())
             .await?;
         validate_reservation(&reservation)?;
-        let runtime = super::host::runtime()
+        let runtime = super::runtime::runtime()
             .await
             .map_err(|_| ModuleCallError::TransportFailed)?;
         let (sender, receiver) = tokio::sync::oneshot::channel();
@@ -114,7 +114,7 @@ impl ChannelRuntimeLease {
         client: ModuleClient,
         reservation: ChannelRuntimeReservation,
         callback: impl tinybus::service::Interface,
-        runtime: &'static super::host::ModuleRuntime,
+        runtime: &'static tinybus::module::ModuleRuntime,
     ) -> Result<Self, ModuleCallError> {
         let callback_path = ObjectPath::new(&reservation.host_object_path)
             .map_err(|_| ModuleCallError::ModuleFault)?;
@@ -200,7 +200,7 @@ async fn join_cleanup(
 
 fn runtime_transport(
     client: &ModuleClient,
-    runtime: &'static super::host::ModuleRuntime,
+    runtime: &'static tinybus::module::ModuleRuntime,
 ) -> Result<(Connection, Proxy), ModuleCallError> {
     #[cfg(test)]
     if let Some(proxy) = client.fixture_proxy() {

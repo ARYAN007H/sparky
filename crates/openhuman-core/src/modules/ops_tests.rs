@@ -58,7 +58,7 @@ async fn invalid_installer_bundle_is_reported_without_falling_back_to_the_cache(
     std::fs::create_dir_all(&bundle_dir).unwrap();
     std::fs::write(bundle_dir.join(record.assets[0].archive), b"").unwrap();
 
-    let runtime = crate::modules::host::runtime().await.unwrap();
+    let runtime = crate::modules::runtime::runtime().await.unwrap();
     let error = ops::load_cached(
         runtime,
         record,
@@ -79,7 +79,7 @@ async fn absent_installer_bundle_uses_the_existing_cache_miss_path() {
     let record = test_bundled_record();
     let bundled = tempfile::tempdir().unwrap();
     let user_cache = tempfile::tempdir().unwrap();
-    let runtime = crate::modules::host::runtime().await.unwrap();
+    let runtime = crate::modules::runtime::runtime().await.unwrap();
     let error = ops::load_cached(
         runtime,
         record,
@@ -624,7 +624,7 @@ async fn a_registered_linked_factory_serves_the_module_and_status_says_so() {
 
 #[tokio::test]
 async fn attaching_a_linked_module_without_a_factory_fails_with_a_static_reason() {
-    let runtime = crate::modules::host::runtime().await.expect("module host");
+    let runtime = crate::modules::runtime::runtime().await.expect("module host");
     let error = ops::load_linked(runtime, "tinyhosts-no-factory", serde_json::json!({}))
         .expect_err("no factory is registered for this id");
     assert!(error.contains("no linked factory"), "{error}");
@@ -637,7 +637,7 @@ async fn a_failing_linked_factory_is_reported_without_its_error_detail() {
         Err(tinybus::Error::failed("secret-token /home/user/path"))
     }
     crate::modules::linked::register_linked("linked-failing-test", failing);
-    let runtime = crate::modules::host::runtime().await.expect("module host");
+    let runtime = crate::modules::runtime::runtime().await.expect("module host");
     let error = ops::load_linked(runtime, "linked-failing-test", serde_json::json!({}))
         .expect_err("the factory fails");
     assert!(

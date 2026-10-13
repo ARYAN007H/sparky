@@ -320,7 +320,7 @@ pub async fn proxy(config: &Config) -> Result<Proxy, String> {
 async fn proxy_to_serving() -> Result<Proxy, String> {
     let record =
         registry::find(MODULE_ID).ok_or_else(|| format!("unknown module '{MODULE_ID}'"))?;
-    let runtime = super::host::runtime().await.map_err(|_| {
+    let runtime = super::runtime::runtime().await.map_err(|_| {
         super::failure::report(record, super::failure::Reason::TransportFailed);
         tinybus::module::ModuleCallError::TransportFailed.to_string()
     })?;
