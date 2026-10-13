@@ -161,7 +161,7 @@ pub(super) fn enqueue(
     args: &serde_json::Value,
     facts: &CallFacts,
 ) -> MemoryResult<serde_json::Value> {
-    if config.memory.engine == super::engine::DISABLED_ENGINE {
+    if super::engine::switched_off(config) {
         return Err(MemoryError::Off("memory is disabled".into()));
     }
     let confinement = super::user_scope::confinement(config)?;
@@ -459,7 +459,7 @@ pub(super) fn schedule(config: Arc<Config>) {
 
 /// Retries all durable partitions belonging to this owner on auth/cron ticks.
 pub(super) fn schedule_all(config: Arc<Config>) {
-    if config.memory.engine == super::engine::DISABLED_ENGINE {
+    if super::engine::switched_off(config) {
         return;
     }
     crate::core::runtime::spawn_scoped(async move {
@@ -565,7 +565,7 @@ impl WriteExecutor for Executor<'_> {
 }
 
 async fn drain_locked(config: &Config, file: &Path, state: &OwnerState, generation: u64) -> usize {
-    if config.memory.engine == super::engine::DISABLED_ENGINE {
+    if super::engine::switched_off(config) {
         return 0;
     }
     let active = binding(config);
