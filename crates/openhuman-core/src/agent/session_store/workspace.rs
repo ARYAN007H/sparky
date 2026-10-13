@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
 use tinyagents_session::port::{AgentStores, SessionStoreProvider};
-use tinyagents_session::run_ledger::RunLedgerStore;
+use tinyagents_session::run_ledger::{LedgerError, LedgerResult, RunLedgerStore};
 use tinyagents_session::DriverSessionStores;
 use tinystoragedrivers::{DocumentStore, MemoryStorage, StorageBackend};
 
@@ -201,19 +201,49 @@ pub fn status_store_for(workspace_dir: &Path) -> tinyagents_harness::observabili
     tinyagents_harness::observability::DriverStatusStore::new(docs)
 }
 
-/// Runs a run-ledger call from synchronous code on the shared storage bridge.
+/// Runs one run-ledger operation on the calling tenant's ledger for
+/// `workspace_dir`, from synchronous code (the shared storage bridge).
+///
+/// `op` receives the ledger and returns the future to run; it is invoked on
+/// the calling thread and the future runs on the bridge.
 ///
 /// # Errors
 ///
-/// The ledger's own error, or the bridge's when it cannot run.
-pub fn run_ledger_blocking<T, F>(future: F) -> Result<T, String>
+/// [`LedgerError`] from the operation, or an `unavailable` driver error when
+/// the tenant has no ledger (a SaaS task with no scope, or a backend that
+/// refused the scope).
+pub fn with_ledger<T, F, Fut>(workspace_dir: &Path, op: F) -> LedgerResult<T>
 where
-    F: std::future::Future<Output = tinyagents_session::run_ledger::LedgerResult<T>>
-        + Send
-        + 'static,
+    F: FnOnce(Arc<dyn RunLedgerStore>) -> Fut,
+    Fut: std::future::Future<Output = LedgerResult<T>> + Send + 'static,
     T: Send + 'static,
 {
-    crate::storage::block_on(async move { Ok(future.await) })
-        .map_err(|error| error.to_string())?
-        .map_err(|error| error.to_string())
+    let ledger = ledger_for(workspace_dir).ok_or_else(|| {
+        LedgerError::from(tinystoragedrivers::StorageError::unavailable(
+            "no run ledger for the calling tenant",
+        ))
+    })?;
+    let future = op(ledger);
+    match crate::storage::block_on(async move { Ok(future.await) }) {
+        Ok(result) => result,
+        Err(error) => Err(LedgerError::from(error)),
+    }
+}
+
+/// [`with_ledger`] for async callers: the same ledger, awaited in place.
+///
+/// # Errors
+///
+/// As [`with_ledger`].
+pub async fn with_ledger_async<T, F, Fut>(workspace_dir: &Path, op: F) -> LedgerResult<T>
+where
+    F: FnOnce(Arc<dyn RunLedgerStore>) -> Fut,
+    Fut: std::future::Future<Output = LedgerResult<T>>,
+{
+    let ledger = ledger_for(workspace_dir).ok_or_else(|| {
+        LedgerError::from(tinystoragedrivers::StorageError::unavailable(
+            "no run ledger for the calling tenant",
+        ))
+    })?;
+    op(ledger).await
 }
