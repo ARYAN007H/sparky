@@ -269,7 +269,10 @@ async fn drive_member(
     run_id: &str,
     model_override: Option<String>,
 ) -> Result<()> {
-    let ledger = SessionTeamLedger::new(config.workspace_dir.clone());
+    let ledger = SessionTeamLedger::new(
+        crate::agent::session_store::require_ledger(&config.workspace_dir)
+            .map_err(|e| anyhow!("{e}"))?,
+    )?;
     let delivered = deliver_pending_messages(&ledger, team_id, member_id)?;
     let prompt = build_member_prompt(task, &delivered.messages);
 
