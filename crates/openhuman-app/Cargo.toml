@@ -309,9 +309,10 @@ tinyinference-voice = { path = "../../vendor/tinyagents/vendor/tinyinference/cra
 tinybus = { path = "../../vendor/tinybus/crates/tinybus" }
 
 [patch."https://github.com/tinyhumansai/tinystoragedrivers"]
-# tinyflows names the storage crates by git tag; redirect them to the copy
-# tinyagents vendors so this world links one `DocumentStore` trait and one
-# `libsqlite3-sys`. Mirrors the root Cargo.toml.
+# tinyflows names the storage crates by git tag (v0.7.0); redirect them to the
+# copy tinyagents vendors so this world links one `DocumentStore` trait and one
+# `libsqlite3-sys`. Still needed although the versions agree: a git and a path
+# source are distinct packages. Mirrors the root Cargo.toml.
 tinystoragedrivers-core = { path = "../../vendor/tinyagents/vendor/tinystoragedrivers/crates/tinystoragedrivers-core" }
 tinystoragedrivers-sqlite = { path = "../../vendor/tinyagents/vendor/tinystoragedrivers/crates/tinystoragedrivers-sqlite" }
 

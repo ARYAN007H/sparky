@@ -545,7 +545,7 @@ async fn boot_sweep_handles_schema_init_failure_gracefully() {
 
     let warning = String::from_utf8(capture.0.lock().unwrap().clone()).unwrap();
     assert!(
-        warning.contains("Failed to create flows directory"),
+        warning.contains("create the directory"),
         "the sweep warning must preserve the operation context, got {warning:?}"
     );
     assert!(

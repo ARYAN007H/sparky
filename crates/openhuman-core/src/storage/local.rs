@@ -204,38 +204,7 @@ fn open_default(
 ) -> Result<Option<Opened>> {
     // Held across the import so two threads never both import one file.
     let mut opened = OPENED.lock().unwrap_or_else(PoisonError::into_inner);
-    // A file deleted or replaced since it was opened (a data reset in this
-    // process) is dropped, so its handle is released and the file is created
-    // and imported afresh.
-    if opened
-        .get(db_path)
-        .is_some_and(|entry| entry.identity != file_id(db_path))
-    {
-        opened.remove(db_path);
-    }
-    if !opened.contains_key(db_path) {
-        if let Some(parent) = db_path.parent() {
-            std::fs::create_dir_all(parent).with_context(|| {
-                format!(
-                    "[{}] create the directory {}",
-                    plan.domain,
-                    parent.display()
-                )
-            })?;
-        }
-        // Opened by path, not through a URL string, so a path that is not
-        // UTF-8 keeps naming the file the legacy tables are in.
-        let storage = tinystoragedrivers::sqlite::SqliteStorage::open(db_path)
-            .map_err(|error| anyhow!("[{}] open {}: {error}", plan.domain, db_path.display()))?;
-        opened.insert(
-            db_path.to_path_buf(),
-            OpenedDb {
-                backend: Arc::new(storage),
-                identity: file_id(db_path),
-                imported: false,
-            },
-        );
-    }
+    ensure_open(&mut opened, db_path, plan.domain)?;
     let entry = opened.get_mut(db_path).expect("inserted above");
     let handle = Opened {
         backend: Arc::clone(&entry.backend),
@@ -260,6 +229,156 @@ fn open_default(
     );
     entry.imported = true;
     Ok(Some(handle))
+}
+
+/// Opens `db_path` with the SQLite driver unless `opened` already holds a live
+/// handle on it. A file deleted or replaced since it was opened (a data reset
+/// in this process) is dropped, so its handle is released and the file is
+/// created afresh.
+#[cfg(feature = "storage-sqlite")]
+fn ensure_open(
+    opened: &mut HashMap<PathBuf, OpenedDb>,
+    db_path: &Path,
+    domain: &'static str,
+) -> Result<()> {
+    if opened
+        .get(db_path)
+        .is_some_and(|entry| entry.identity != file_id(db_path))
+    {
+        opened.remove(db_path);
+    }
+    if !opened.contains_key(db_path) {
+        if let Some(parent) = db_path.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("[{domain}] create the directory {}", parent.display()))?;
+        }
+        // Opened by path, not through a URL string, so a path that is not
+        // UTF-8 keeps naming the file the legacy tables are in.
+        let storage = tinystoragedrivers::sqlite::SqliteStorage::open(db_path)
+            .map_err(|error| anyhow!("[{domain}] open {}: {error}", db_path.display()))?;
+        opened.insert(
+            db_path.to_path_buf(),
+            OpenedDb {
+                backend: Arc::new(storage),
+                identity: file_id(db_path),
+                imported: false,
+            },
+        );
+    }
+    Ok(())
+}
+
+/// Reads a standing store's legacy files into a freshly opened backend.
+/// Receives the backend, the scope its records live under and the config.
+pub type StandingImport<'a> = &'a dyn Fn(&Arc<dyn StorageBackend>, &Scope, &Config) -> Result<()>;
+
+/// The storage a store that has **no legacy tables** uses for this call.
+///
+/// Cron jobs, the flow catalog, flow state and checkpoints used to live in
+/// SQLite files owned by tinyflows (`jobs.db`, `flows.db`, `checkpoints.db`).
+/// tinyflows no longer has a storage backend, so these stores are always on the
+/// ports, whatever the storage URL says:
+///
+/// - with a backend installed, that backend under the acting scope (the legacy
+///   files were imported into it at boot, see [`super::import`]);
+/// - otherwise, a SQLite file at `db_path` of the store's own, opened once per
+///   process, whose first open runs `import` over the legacy files (read-only:
+///   they are copied before they are read, and never written). The classic
+///   opt-out has no meaning here and is treated like the default.
+///
+/// # Errors
+///
+/// In SaaS mode with no backend installed (a SaaS process always names an
+/// explicit backend), when the scope cannot be resolved, or when the file
+/// cannot be opened or imported.
+pub fn open_standing(
+    db_path: &Path,
+    domain: &'static str,
+    config: &Config,
+    import: StandingImport<'_>,
+) -> Result<Opened> {
+    if let Some(backend) = installed() {
+        let scope =
+            current_scope().with_context(|| format!("[{domain}] resolve the storage scope"))?;
+        return Ok(Opened { backend, scope });
+    }
+    if crate::core::runtime::mode::is_saas() {
+        return Err(anyhow!(
+            "[{domain}] SaaS mode needs an explicit storage backend (OPENHUMAN_STORAGE_URL)"
+        ));
+    }
+    open_standing_local(db_path, domain, config, import)
+}
+
+#[cfg(feature = "storage-sqlite")]
+fn open_standing_local(
+    db_path: &Path,
+    domain: &'static str,
+    config: &Config,
+    import: StandingImport<'_>,
+) -> Result<Opened> {
+    let mut opened = OPENED.lock().unwrap_or_else(PoisonError::into_inner);
+    ensure_open(&mut opened, db_path, domain)?;
+    let entry = opened.get_mut(db_path).expect("inserted above");
+    let handle = Opened {
+        backend: Arc::clone(&entry.backend),
+        scope: Scope::local(),
+    };
+    if !entry.imported {
+        import(&handle.backend, &handle.scope, config).with_context(|| {
+            format!(
+                "[{domain}] importing the legacy files failed; they are untouched and the \
+                 import is retried on the next call"
+            )
+        })?;
+        tracing::debug!(
+            domain,
+            path = %db_path.display(),
+            "[storage::local] opened the standing store"
+        );
+        entry.imported = true;
+    }
+    Ok(handle)
+}
+
+/// Without `storage-sqlite` the standing stores keep JSON files beside where
+/// the database would be, on the always-compiled file driver.
+#[cfg(not(feature = "storage-sqlite"))]
+fn open_standing_local(
+    db_path: &Path,
+    domain: &'static str,
+    config: &Config,
+    import: StandingImport<'_>,
+) -> Result<Opened> {
+    static FILES: std::sync::LazyLock<
+        std::sync::Mutex<std::collections::HashMap<std::path::PathBuf, Arc<dyn StorageBackend>>>,
+    > = std::sync::LazyLock::new(Default::default);
+    let mut opened = FILES
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let backend = match opened.get(db_path) {
+        Some(backend) => Arc::clone(backend),
+        None => {
+            let dir = db_path.with_extension("files");
+            let Some(dir_str) = dir.to_str() else {
+                return Err(anyhow!(
+                    "[{domain}] the store path is not valid UTF-8 and cannot be named by a file: URL"
+                ));
+            };
+            let url = format!("file:{dir_str}");
+            let backend = super::block_on_anyhow(async move { Ok(super::open(&url).await?) })
+                .with_context(|| format!("[{domain}] open {}", dir.display()))?;
+            import(&backend, &Scope::local(), config).with_context(|| {
+                format!("[{domain}] importing the legacy files failed; they are untouched")
+            })?;
+            opened.insert(db_path.to_path_buf(), Arc::clone(&backend));
+            backend
+        }
+    };
+    Ok(Opened {
+        backend,
+        scope: Scope::local(),
+    })
 }
 
 /// Copies `plan`'s old rows into `handle` and retires the old tables.

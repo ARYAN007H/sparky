@@ -34,11 +34,12 @@
 //!
 //! # What is not here
 //!
-//! Domains whose legacy form is not a small SQLite file (sessions and
-//! transcripts, cron jobs, the flow catalog and checkpoints) are imported by
-//! the libraries that own those formats; see the storage README.
+//! Sessions and transcripts are imported by TinyAgents, which owns that
+//! format. The tinyflows stores (cron jobs, the flow catalog and checkpoints)
+//! are copied here with `tinyflows-import`; see [`tinyflows`].
 
 mod snapshot;
+pub mod tinyflows;
 
 use std::path::Path;
 use std::sync::Arc;
@@ -158,7 +159,12 @@ pub async fn run(config: &Config) -> Vec<Report> {
         return Vec::new();
     }
     let config = config.clone();
-    let joined = tokio::task::spawn_blocking(move || run_with(&backend, &config, &sources())).await;
+    let joined = tokio::task::spawn_blocking(move || {
+        let mut reports = run_with(&backend, &config, &sources());
+        reports.extend(tinyflows::run_with(&backend, &config));
+        reports
+    })
+    .await;
     match joined {
         Ok(reports) => reports,
         Err(error) => {
@@ -217,9 +223,9 @@ pub fn run_with(
 
 /// The marker id for `source` in `workspace`: a backend shared by several
 /// workspaces keeps one marker per workspace.
-fn marker_id(source: &Source, workspace: &Path) -> String {
+fn marker_id(domain: &str, workspace: &Path) -> String {
     let digest = sha2::Sha256::digest(workspace.as_os_str().as_encoded_bytes());
-    format!("{}@{}", source.domain, &hex::encode(digest)[..16])
+    format!("{domain}@{}", &hex::encode(digest)[..16])
 }
 
 fn marker_spec() -> Vec<CollectionSpec> {
@@ -232,7 +238,7 @@ fn import_one(
     source: &Source,
 ) -> Result<Outcome> {
     let domain = source.domain;
-    let marker = marker_id(source, &config.workspace_dir);
+    let marker = marker_id(domain, &config.workspace_dir);
     let repo = Repo::on(backend, &Scope::local(), domain, source.collections)?;
     let markers = Repo::on(backend, &Scope::local(), "storage::import", marker_spec)?;
 
@@ -322,7 +328,7 @@ pub fn is_done(
     config: &Config,
     source: &Source,
 ) -> Result<bool> {
-    let marker = marker_id(source, &config.workspace_dir);
+    let marker = marker_id(source.domain, &config.workspace_dir);
     let scoped = backend
         .for_scope(&Scope::local())
         .map_err(|error| anyhow!("open the local scope: {error}"))?;

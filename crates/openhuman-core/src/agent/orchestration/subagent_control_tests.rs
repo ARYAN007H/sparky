@@ -97,7 +97,8 @@ async fn cancel_of_a_finished_run_reports_its_outcome_and_rewrites_nothing() {
             Arc::new(RunQueue::new()),
             tokio::spawn(async {}).abort_handle(),
             rx,
-        );
+        )
+        .expect("fixture registration admitted");
         tx.send(status).expect("status channel open");
 
         let mut params = Map::new();

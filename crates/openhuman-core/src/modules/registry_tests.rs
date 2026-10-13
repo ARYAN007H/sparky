@@ -722,3 +722,16 @@ fn source_artifact_file_names_follow_the_platform_convention() {
         }
     }
 }
+
+#[test]
+fn tinysearch_registry_matches_bus_contract_and_published_release() {
+    let search = find("tinysearch").expect("compiled search module");
+    assert_eq!(search.bus_name, tinysearch_bus::names::INTERFACE);
+    assert_eq!(search.object_path, tinysearch_bus::names::OBJECT_PATH);
+    assert_eq!(search.version, "0.5.0");
+    assert_eq!(tinysearch_bus::CONTRACT_VERSION, (2, 2));
+    assert_eq!(
+        search.asset_for("ubuntu-24.04-x86_64").unwrap().sha256,
+        "e038b2529e40d834f4754f3566aaafc5cb5c4a2f0b643a389b4b66ba7f91db74"
+    );
+}

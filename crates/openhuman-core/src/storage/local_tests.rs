@@ -142,3 +142,74 @@ fn retiring_a_table_releases_its_index_names() {
     )
     .unwrap();
 }
+
+#[test]
+fn a_standing_store_opens_once_per_file_and_imports_once() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    // No test in this binary installs a backend, so the slot is empty.
+    assert!(installed().is_none());
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("sub/standing.db");
+    let config = config(None);
+    let imports = AtomicUsize::new(0);
+    let import = |_: &Arc<dyn StorageBackend>, scope: &Scope, _: &Config| {
+        assert_eq!(scope, &Scope::local());
+        imports.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    };
+
+    let first = open_standing(&path, "test::standing", &config, &import).unwrap();
+    let repo = Repo::on(&first.backend, &first.scope, "test::standing", collections).unwrap();
+    repo.run(|docs| async move {
+        docs.put(
+            "things",
+            "a",
+            json!({"n": 1}),
+            tinystoragedrivers::Precondition::None,
+        )
+        .await
+    })
+    .unwrap();
+
+    // The second call finds the same store with its record, and does not
+    // import again.
+    let second = open_standing(&path, "test::standing", &config, &import).unwrap();
+    let repo = Repo::on(
+        &second.backend,
+        &second.scope,
+        "test::standing",
+        collections,
+    )
+    .unwrap();
+    let found = repo
+        .run(|docs| async move { docs.get("things", "a").await })
+        .unwrap();
+    assert!(found.is_some());
+    assert_eq!(imports.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn a_failed_standing_import_is_retried_on_the_next_call() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    assert!(installed().is_none());
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("retry.db");
+    let config = config(None);
+    let attempts = AtomicUsize::new(0);
+    let import = |_: &Arc<dyn StorageBackend>, _: &Scope, _: &Config| {
+        if attempts.fetch_add(1, Ordering::SeqCst) == 0 {
+            Err(anyhow!("legacy file unreadable"))
+        } else {
+            Ok(())
+        }
+    };
+
+    let error = open_standing(&path, "test::retry", &config, &import)
+        .err()
+        .expect("the first import fails");
+    assert!(format!("{error:#}").contains("legacy file unreadable"));
+    open_standing(&path, "test::retry", &config, &import).unwrap();
+    assert_eq!(attempts.load(Ordering::SeqCst), 2);
+}
