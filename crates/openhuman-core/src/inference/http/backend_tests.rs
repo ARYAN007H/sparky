@@ -14,7 +14,10 @@ fn configured_models_lists_sentinel_and_strips_temperature_suffix() {
     config.default_model = Some("gpt-4o@0.7".to_string());
     config.chat_provider = Some("acme:claude@1".to_string());
     config.local_ai.chat_model_id = "qwen".to_string();
-    let ids: Vec<String> = configured_models(&config).into_iter().map(|m| m.id).collect();
+    let ids: Vec<String> = configured_models(&config)
+        .into_iter()
+        .map(|m| m.id)
+        .collect();
     assert_eq!(ids[0], "openhuman");
     assert!(ids.contains(&"gpt-4o".to_string()));
     assert!(ids.contains(&"acme:claude".to_string()));

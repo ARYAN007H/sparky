@@ -106,7 +106,10 @@ pub(super) fn configured_models(config: &Config) -> Vec<ListedModel> {
         .map(str::trim)
         .filter(|model| !model.is_empty())
     {
-        push(strip_temperature_suffix(default_model).to_string(), "openhuman");
+        push(
+            strip_temperature_suffix(default_model).to_string(),
+            "openhuman",
+        );
     }
 
     for cp in &config.cloud_providers {
@@ -119,7 +122,10 @@ pub(super) fn configured_models(config: &Config) -> Vec<ListedModel> {
     }
 
     if !config.local_ai.chat_model_id.is_empty() {
-        push(format!("ollama:{}", config.local_ai.chat_model_id), "ollama");
+        push(
+            format!("ollama:{}", config.local_ai.chat_model_id),
+            "ollama",
+        );
     }
 
     for provider_string in [
