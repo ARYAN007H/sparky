@@ -136,12 +136,9 @@ pub async fn sync_one(config: &Config, source: &MemorySourceConfig) -> MemoryRes
 }
 
 async fn run(config: &Config, source: &MemorySourceConfig) -> Result<u64, SyncError> {
-    let bound = engine::resolve(config).engine().map_err(|error| {
-        SyncError::Engine(tinymemory_api::Error::new(
-            tinymemory_api::ErrorKind::Unavailable,
-            error.to_string(),
-        ))
-    })?;
+    let bound = engine::resolve(config)
+        .engine()
+        .map_err(|error| SyncError::Invalid(error.to_string()))?;
     let collected = module::read_source(
         &registered(source),
         &config.action_dir,
