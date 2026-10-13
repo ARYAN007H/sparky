@@ -93,7 +93,7 @@ mod storage_grant_tinymcp;
 #[cfg(feature = "modules")]
 pub mod storage_grants;
 #[cfg(feature = "modules")]
-mod storage_host;
+pub(crate) mod storage_host;
 #[cfg(feature = "modules")]
 pub mod tinybox;
 #[cfg(feature = "modules")]
