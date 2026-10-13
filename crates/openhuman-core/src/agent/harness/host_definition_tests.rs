@@ -225,9 +225,6 @@ when_to_use = "CUSTOM OVERRIDE"
 
 [system_prompt]
 inline = "custom prompt"
-
-[tools]
-wildcard = {}
 "#,
     );
 
@@ -427,4 +424,39 @@ fn coding_hint_resolves_auto_tokenjuice_to_light() {
         ext.effective_tokenjuice_compression(&ModelSpec::Inherit),
         Profile::Full
     );
+}
+
+/// Pins tinyagents#441: existing definitions on disk spell an unrestricted
+/// scope as `[tools] wildcard = {}`. Needs `vendor/tinyagents` at or after
+/// tinyagents `2e706e81`; the pin stays at `a7c9d23c` until the host moves to
+/// the session-thread store that landed in tinyagents#440 (openhuman#7688),
+/// so this fails at the current pin.
+#[test]
+fn a_legacy_wildcard_table_tool_scope_still_loads_from_a_user_definition() {
+    let ws = fresh_workspace();
+    let agents_dir = ws.path().join("agents");
+    fs::create_dir_all(&agents_dir).unwrap();
+    write_toml(
+        &agents_dir.join("legacy.toml"),
+        r#"
+id = "legacy_wildcard"
+when_to_use = "legacy tools table"
+
+[system_prompt]
+inline = "legacy"
+
+[tools]
+wildcard = {}
+"#,
+    );
+    let defs = user_defs(ws.path());
+    assert_eq!(
+        defs.len(),
+        1,
+        "the legacy wildcard spelling must not be skipped"
+    );
+    assert!(matches!(
+        defs[0].tools,
+        tinyagents_definition::ToolScope::Wildcard
+    ));
 }
