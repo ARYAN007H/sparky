@@ -160,11 +160,11 @@ pub async fn import_legacy_mcp(data_dir: &std::path::Path) {
 /// The (importer, directory) pairs this process already imported, so a hot
 /// call path pays for the marker lookup once rather than on every call.
 #[cfg(feature = "modules")]
-fn imported_once() -> &'static std::sync::Mutex<std::collections::HashSet<(&'static str, std::path::PathBuf)>>
-{
-    static DONE: std::sync::OnceLock<
-        std::sync::Mutex<std::collections::HashSet<(&'static str, std::path::PathBuf)>>,
-    > = std::sync::OnceLock::new();
+type ImportedSet = std::sync::Mutex<std::collections::HashSet<(&'static str, std::path::PathBuf)>>;
+
+#[cfg(feature = "modules")]
+fn imported_once() -> &'static ImportedSet {
+    static DONE: std::sync::OnceLock<ImportedSet> = std::sync::OnceLock::new();
     DONE.get_or_init(Default::default)
 }
 
