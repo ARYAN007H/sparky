@@ -91,7 +91,7 @@ pub use openhuman_core::tools::toolpacks::{GroupMode, ToolGroups};
 // vendored tinytools. An embedder that took `tinytools` as its own dependency
 // would build tools of a different, incompatible type.
 pub use openhuman_core::agent::tinyagents::host::LastTurnUsage;
-pub use openhuman_core::agent::{HostTools, HostTurnTools, TurnContext};
+pub use openhuman_core::agent::{HostAttachment, HostTools, HostTurnTools, TurnContext};
 pub use openhuman_core::{
     CoreBuilder, CoreRuntime, DaemonConfig, DomainSet, HostKind, ServiceSet, TokenSource,
 };

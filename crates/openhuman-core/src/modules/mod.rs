@@ -29,8 +29,8 @@
 //! - [`registry`] — the compiled-in set of loadable modules and their digests.
 //! - [`documents`] — the host half of the `tinydocs` module's three operations.
 //! - [`browser`] and [`browser_task`] — TinyComputer browser members and tasks
-//!   without linking the browser engine into the core; [`browser_sites`] keeps
-//!   what finished tasks learned about each site for the next task there, and
+//!   without linking the browser engine into the core; [`site_memory_host`] serves
+//!   where the module keeps what finished tasks learned about each site, and
 //!   [`profile_claim`] asks the module to claim the persistent Chrome profile
 //!   for a browser about to start.
 //! - [`wallet`] — the host half of the `tinywallet` module, which builds and
@@ -46,8 +46,6 @@ pub mod accessibility;
 pub mod boot;
 #[cfg(feature = "modules")]
 pub mod browser;
-#[cfg(feature = "modules")]
-pub(crate) mod browser_sites;
 #[cfg(feature = "modules")]
 pub mod browser_task;
 #[cfg(feature = "modules")]
@@ -86,7 +84,7 @@ pub mod search;
 #[cfg(feature = "modules")]
 mod search_path;
 #[cfg(feature = "modules")]
-mod site_memory_host;
+pub(crate) mod site_memory_host;
 mod source;
 #[cfg(feature = "modules")]
 mod storage_grant_tinychannels;

@@ -292,7 +292,7 @@ fn a_record_the_backend_already_holds_is_never_overwritten() {
     import_flows(&backend, &Scope::local(), &config).unwrap();
     let flow = {
         let catalog = catalog.clone();
-        crate::storage::block_on_anyhow(async move { Ok(catalog.get_flow("flow-alpha").await?) })
+        crate::storage::block_on_anyhow(async move { catalog.get_flow("flow-alpha").await })
             .unwrap()
     };
     let mut changed = flow.expect("imported");

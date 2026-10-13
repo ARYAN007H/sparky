@@ -4707,6 +4707,7 @@ dependencies = [
  "tinystoragedrivers-core",
  "tinytools",
  "tinytools-agent",
+ "tinytools-std",
  "tokio",
  "tokio-stream",
  "tokio-tungstenite 0.29.0",
@@ -4751,6 +4752,7 @@ dependencies = [
  "tinymemory-api",
  "tinymemory-tools",
  "tinytools",
+ "tinytools-std",
  "tokio",
  "tokio-stream",
  "tracing-subscriber",
@@ -7591,14 +7593,14 @@ dependencies = [
 
 [[package]]
 name = "tinybox-bus"
-version = "0.1.27"
+version = "0.1.28"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "tinybox-core"
-version = "0.1.27"
+version = "0.1.28"
 dependencies = [
  "async-trait",
  "serde",
@@ -7733,7 +7735,7 @@ dependencies = [
 
 [[package]]
 name = "tinycomputer-bus"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "serde",
  "serde_json",

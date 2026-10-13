@@ -408,14 +408,15 @@ pub(super) async fn policy_reads_refuse_execution_without_consuming_a_slot(case:
         sqlite_before,
         "configured storage fell back to SQLite"
     );
-    let reads = faults.calls.lock().unwrap();
-    assert!(reads
-        .iter()
-        .any(|(scope, id)| scope == "profile:policy-alpha" && id == &job.id));
-    assert!(reads
-        .iter()
-        .any(|(scope, id)| scope == "profile:policy-beta" && id == &job.id));
-    drop(reads);
+    {
+        let reads = faults.calls.lock().unwrap();
+        assert!(reads
+            .iter()
+            .any(|(scope, id)| scope == "profile:policy-alpha" && id == &job.id));
+        assert!(reads
+            .iter()
+            .any(|(scope, id)| scope == "profile:policy-beta" && id == &job.id));
+    }
     faults.read.store(false, Ordering::SeqCst);
     CoreContext::scope(Arc::clone(&alpha), async {
         policy::clear_policy(&config, &job.id).unwrap();

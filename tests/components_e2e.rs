@@ -52,6 +52,7 @@ fn disabled_component_answers_component_disabled_over_json_rpc() {
                     config.components.voice = false;
                     config.components.channels = false;
                     config.components.sandbox = false;
+                    config.components.computer = false;
                     tinyhumans_boot::boot();
                     let _runtime = CoreBuilder::new(HostKind::Library)
                         .config(config)
@@ -119,6 +120,30 @@ fn disabled_component_answers_component_disabled_over_json_rpc() {
                             .and_then(Value::as_str),
                         Some("sandbox")
                     );
+
+                    // The computer ceiling closes every desktop and browser control
+                    // surface, including the read-only pending-action listing.
+                    for method in [
+                        "openhuman.desktop_status",
+                        "openhuman.desktop_probe",
+                        "openhuman.desktop_pending",
+                        "openhuman.modules_computer_status",
+                        "openhuman.modules_browser_check_readiness",
+                    ] {
+                        let computer = rpc(&base, method).await;
+                        assert_eq!(
+                            computer.pointer("/error/message").and_then(Value::as_str),
+                            Some("COMPONENT_DISABLED:computer"),
+                            "{method}: {computer}"
+                        );
+                        assert_eq!(
+                            computer
+                                .pointer("/error/data/component")
+                                .and_then(Value::as_str),
+                            Some("computer"),
+                            "{method}: {computer}"
+                        );
+                    }
 
                     // `modules.list` reports the same modules as Disabled, and only them.
                     let listed = rpc(&base, "openhuman.modules_list").await;

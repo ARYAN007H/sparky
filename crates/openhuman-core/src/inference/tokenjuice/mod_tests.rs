@@ -344,9 +344,15 @@ fn juice_off_drops_handles_summaries_and_companion_tools() {
 
 #[tokio::test]
 async fn juice_off_install_never_touches_the_module() {
-    install_from_config(&juice_off()).await.expect("no-op");
-    assert_eq!(
-        crate::modules::state_of("tinyjuice"),
-        crate::modules::types::ModuleState::Available
-    );
+    let off = juice_off();
+    install_from_config(&off).await.expect("no-op");
+    // The resolution slot is process-global and other tests legitimately load
+    // tinyjuice into it, so its absolute state (`Available`) cannot be asserted
+    // here. The listing for a juice-off config reports `Disabled` with no
+    // source whatever the slot holds, which is what "never touches the module"
+    // means to a caller.
+    let statuses = crate::modules::ops::list(&off);
+    let status = statuses.iter().find(|s| s.id == "tinyjuice").unwrap();
+    assert_eq!(status.state, crate::modules::types::ModuleState::Disabled);
+    assert!(status.source.is_none());
 }

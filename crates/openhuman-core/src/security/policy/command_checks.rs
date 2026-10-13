@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 #[cfg(test)]
 use super::types::CommandRiskLevel;
-use super::types::{AutonomyLevel, GateDecision, SecurityPolicy, POLICY_BLOCKED_MARKER};
+use super::types::{AutonomyLevel, GateDecision, SecurityPolicy};
 #[cfg(test)]
 use crate::util::floor_char_boundary;
 use tinybox_bus::CommandClass;
@@ -18,6 +18,7 @@ use tinybox_core::shell::scan::{
     has_leading_env_assignment, normalized_command_name, skip_env_assignments,
     split_unquoted_segments, strip_quoted_heredoc_bodies,
 };
+use tinytools::status::POLICY_BLOCKED_MARKER;
 
 impl SecurityPolicy {
     /// Apply the supervised allowlist to parser facts returned by TinyBox.

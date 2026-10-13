@@ -694,7 +694,7 @@ A breaker halt at the top level is likewise never a silent finish, and the break
 
 Accepted text is streamed only after the check, so a rejected reply never renders.
 
-Classified tool failures (`crates/openhuman-core/src/tools/status/`): every failed tool call is classified into a transport-agnostic `ClassifiedFailure { class, category, cause_plain, next_action, recoverable }`. Classes cover `MissingPermission`, `MissingApp`, `ServiceUnavailable`, `BadCredentials`, `BlockedByPolicy`, `ModelConnection`, `Timeout`, `Denied`, `ApprovalExpired`; categories map 1:1 to UI states: _recoverable_ (safe auto-retry), _blocked by policy_ (change settings), _needs user confirmation_ (sign in / install / grant), _user declined_ (never auto-retried). The classification rides `AgentProgress::ToolCallCompleted.failure` (including for sub-agent calls) into the chat timeline.
+Classified tool failures (`tinytools::status`, vendored under `vendor/tinyagents/vendor/tinytools`): every failed tool call is classified into a transport-agnostic `ClassifiedFailure { class, category, cause_plain, next_action, recoverable }`. Classes cover `MissingPermission`, `MissingApp`, `ServiceUnavailable`, `BadCredentials`, `BlockedByPolicy`, `ModelConnection`, `Timeout`, `Denied`, `ApprovalExpired`; categories map 1:1 to UI states: _recoverable_ (safe auto-retry), _blocked by policy_ (change settings), _needs user confirmation_ (sign in / install / grant), _user declined_ (never auto-retried). The classification rides `AgentProgress::ToolCallCompleted.failure` (including for sub-agent calls) into the chat timeline.
 
 ## Journals, replay and migration shadows
 

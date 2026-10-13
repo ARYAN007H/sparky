@@ -16,8 +16,7 @@ pub(crate) use path_checks::{
 };
 pub use types::{
     tool_result_artifacts_dir, ActionTracker, AutonomyLevel, CommandRiskLevel, GateDecision,
-    SecurityPolicy, ToolOperation, TrustedAccess, TrustedRoot, POLICY_BLOCKED_MARKER,
-    POLICY_DENIED_MARKER,
+    SecurityPolicy, ToolOperation, TrustedAccess, TrustedRoot,
 };
 
 #[cfg(test)]

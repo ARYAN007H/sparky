@@ -37,6 +37,14 @@ const TRANSITION_POLL_INTERVAL: Duration = Duration::from_millis(20);
 static SHUTDOWN_REGISTERED: AtomicBool = AtomicBool::new(false);
 static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
 
+/// TinyMCP admits one directory lifecycle transition at a time across every
+/// workspace it serves, and answers a second concurrent open or close with
+/// `InvalidArgument: a directory lifecycle transition is pending`. The module
+/// does not queue them, so the host serializes them here: the gate is held from
+/// the first lifecycle call until the transition has been polled to a terminal
+/// status (the module releases its own gate only then).
+static LIFECYCLE_GATE: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 #[async_trait]
 pub(crate) trait McpModulePort: Send + Sync {
     async fn open_configured(
@@ -435,11 +443,19 @@ impl McpConfiguredClient {
         state: &mut ConfiguredLifecycle,
         requested: Option<&McpClientConfig>,
     ) -> Result<Option<tinymcp_bus::client_lifecycle::OpenObject>, ModuleCallError> {
+        let mut gate = None;
         loop {
             let step = match requested {
                 Some(config) => state.open_step(config),
                 None => state.close_step(),
             };
+            if gate.is_none() && !matches!(step, Step::Ready(_) | Step::Closed) {
+                log::debug!(
+                    "[mcp] waiting for the module lifecycle gate data_dir_len={}",
+                    self.data_dir.len()
+                );
+                gate = Some(LIFECYCLE_GATE.lock().await);
+            }
             match step {
                 Step::Ready(object) => return Ok(Some(object)),
                 Step::Closed => return Ok(None),
