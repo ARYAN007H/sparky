@@ -15,20 +15,23 @@ pub fn exists(_config: &Config) -> bool {
 /// [`PendingApproval::belongs_to`]).
 ///
 /// An embedded agent's requests are kept in its own storage scope, so the rows
-/// of `Some(agent)` are read there whichever scope the caller runs in (under a
-/// SaaS profile every agent shares the profile's scope, which is the caller's).
+/// of `Some(agent)` are read there as well as in the caller's scope, whichever
+/// scope the caller runs in (under a SaaS profile every agent shares the
+/// profile's scope, which is the caller's).
 pub fn list_pending_for_agent(
     config: &Config,
     agent: Option<&str>,
 ) -> Result<Vec<PendingApproval>> {
-    let rows = match agent {
-        Some(agent) if !acts_for_a_profile() => {
-            let docs = super::super::store_documents::for_agent(config, agent)?;
-            super::publish_expired(&docs.expire_stale(chrono::Utc::now())?);
-            docs.list_pending()?
+    let mut rows = super::list_pending(config)?;
+    if let Some(agent) = agent.filter(|_| !acts_for_a_profile()) {
+        let docs = super::super::store_documents::for_agent(config, agent)?;
+        super::publish_expired(&docs.expire_stale(chrono::Utc::now())?);
+        for row in docs.list_pending()? {
+            if !rows.iter().any(|seen| seen.request_id == row.request_id) {
+                rows.push(row);
+            }
         }
-        _ => super::list_pending(config)?,
-    };
+    }
     Ok(rows
         .into_iter()
         .filter(|row| row.belongs_to(agent))
