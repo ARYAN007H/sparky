@@ -625,7 +625,7 @@
   {
     "rule": "ambient-config",
     "path": "crates/openhuman-core/src/inference/provider/ops/models/catalog_listing.rs",
-    "line": 66,
+    "line": 39,
     "text": "let config = crate::config::Config::load_or_init()",
     "occurrence": 1
   },
