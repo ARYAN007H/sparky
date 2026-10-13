@@ -313,6 +313,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             .as_deref()
             .is_some_and(|reason| reason.starts_with("Stopping after "));
         let time_left = close_by.map(|at| at.saturating_duration_since(Instant::now()));
+        let mut repair_usage = grounded_close::RepairUsage::for_model(&self.model_name);
         let required_repair = match required_output.as_ref() {
             Some(contract) if classified_halt || time_left.is_some_and(|left| left.is_zero()) => {
                 append_synthesized_block(&mut output, &mut history, contract);
@@ -331,6 +332,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
                     close.is_none() && request.run_context.data.progress.is_some(),
                     request.run_context.data.progress.as_ref(),
                     outcome.model_calls.saturating_add(1) as u32,
+                    &mut repair_usage,
                 );
                 match time_left {
                     Some(left) => {
@@ -350,8 +352,8 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             }
             None => None,
         };
-        if let Some(repair) = &required_repair {
-            output = repair.output.clone();
+        if let Some(repaired) = required_repair {
+            output = repaired;
             if history
                 .last()
                 .is_some_and(|message| matches!(message, Message::Assistant(_)))
@@ -366,7 +368,9 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
         // `after_commit`, so a failed/cancelled turn cannot publish its usage
         // or tool outcomes as if they had become durable.
         {
-            let repair_usage = required_repair.as_ref().map(|repair| &repair.usage);
+            // Always billed: a repair that timed out after its call answered
+            // still recorded that call here.
+            let repair_usage = Some(&repair_usage);
             let mut observed = sidecar
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner());

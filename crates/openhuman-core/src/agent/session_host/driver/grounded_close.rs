@@ -90,6 +90,8 @@ fn classified_halt_close(outcome: &TinyagentsTurnOutcome) -> Option<GroundedClos
 /// Repair an otherwise valid terminal reply which omits the host's required
 /// structured-output block.  This mirrors the legacy session contract while
 /// keeping the repair call and its usage inside the explicit driver sidecar.
+/// The call records into the caller-owned `usage` before streaming, so a
+/// repair cut off by the turn deadline is still billed.
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn repair_required_output(
     source: &TurnModelSource,
@@ -103,7 +105,8 @@ pub(super) async fn repair_required_output(
     reply_already_streamed: bool,
     progress: Option<&tokio::sync::mpsc::Sender<crate::agent::progress::AgentProgress>>,
     iteration: u32,
-) -> Option<GroundedClose> {
+    usage: &mut RepairUsage,
+) -> Option<String> {
     use tinyagents_harness::config as required;
 
     if required::output_satisfies_contract(reply, contract) {
@@ -119,7 +122,6 @@ pub(super) async fn repair_required_output(
     )));
     let (candidate, candidate_usage) =
         completion(source, model, temperature, thread_id, prompt_history).await;
-    let mut usage = RepairUsage::for_model(model);
     usage.record(candidate_usage, true);
     let candidate = candidate.trim().to_owned();
     let candidate_is_usable = !candidate.is_empty()
@@ -132,7 +134,7 @@ pub(super) async fn repair_required_output(
         } else {
             format!("{}\n\n{reply}", required::synthesize_block(contract))
         };
-        return Some(GroundedClose { output, usage });
+        return Some(output);
     }
 
     // The main loop may have already emitted the original reply.  Never
@@ -157,10 +159,7 @@ pub(super) async fn repair_required_output(
             tracing::debug!(%error, "[session-runtime] required-output repair progress receiver closed");
         }
     }
-    Some(GroundedClose {
-        output: format!("{reply}{continuation}"),
-        usage,
-    })
+    Some(format!("{reply}{continuation}"))
 }
 
 /// The tool-less closing instruction for `outcome`: the cap checkpoint when the

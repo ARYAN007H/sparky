@@ -295,3 +295,49 @@ async fn timed_out_close_keeps_the_usage_of_finished_calls() {
     assert_eq!(output, FALLBACK);
     assert_eq!(usage.model_calls, 1, "the answered ask is recorded");
 }
+
+/// The same for the required-output repair (#7721 review): its call answered,
+/// then streaming the correction outlived the turn budget. The caller-owned
+/// accumulator still holds the call.
+#[tokio::test(start_paused = true)]
+async fn timed_out_repair_keeps_the_usage_of_its_answered_call() {
+    use crate::agent::progress::AgentProgress;
+    let source = crate::agent::tinyagents::TurnModelSource::from_model(std::sync::Arc::new(
+        tinyagents_harness::testkit::ScriptedModel::replies(vec!["no block"]),
+    ));
+    let contract = tinyagents_harness::config::RequiredOutput {
+        block_key: "result".into(),
+        required_keys: vec!["status".into()],
+    };
+    // A full channel whose receiver is alive: the correction's send blocks.
+    let (progress, _receiver) = tokio::sync::mpsc::channel(1);
+    assert!(progress
+        .try_send(AgentProgress::TextDelta {
+            delta: "earlier".into(),
+            iteration: 1,
+        })
+        .is_ok());
+    let mut usage = RepairUsage::for_model("test-model");
+
+    let repaired = tokio::time::timeout(
+        std::time::Duration::from_secs(20),
+        repair_required_output(
+            &source,
+            "test-model",
+            0.0,
+            None,
+            &tinytools_agent::dialect::NativeDialect,
+            &contract,
+            &[],
+            "Done.",
+            true,
+            Some(&progress),
+            2,
+            &mut usage,
+        ),
+    )
+    .await;
+
+    assert!(repaired.is_err(), "the blocked send outlives the budget");
+    assert_eq!(usage.model_calls, 1, "the answered repair call is recorded");
+}
