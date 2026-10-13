@@ -11,7 +11,6 @@ use crate::core::runtime::ComponentSet;
 pub fn component_for_domain(domain: &str) -> Option<&'static str> {
     Some(match domain {
         "flows" | "workflow_runs" => "flows",
-        "skills" => "skills",
         "memory" => "memory",
         "channels" => "channels",
         "voice" => "voice",

@@ -274,21 +274,16 @@ fn workflow_metadata_is_reused_until_invalidated() {
 
 #[tokio::test]
 async fn skills_component_off_yields_no_catalogue_and_skips_bundled_install() {
-    use crate::core::runtime::{ComponentSet, ContextOverlay, CoreContext, DomainSet};
+    use crate::core::runtime::{ComponentSet, CoreContext};
 
     let ws_dir = tempfile::tempdir().unwrap();
     write(
         &ws_dir.path().join("skills").join("ws-only").join("SKILL.md"),
         "---\nname: ws-only\ndescription: workspace skill\n---\n",
     );
-    let mut config = crate::config::Config::default();
-    config.workspace_dir = ws_dir.path().to_path_buf();
     let mut off = ComponentSet::all();
     off.skills = false;
-    let base = CoreContext::for_test(DomainSet::full(), None);
-    let ctx = base.derive_with(
-        ContextOverlay::new(config, DomainSet::full(), Default::default()).with_components(off),
-    );
+    let ctx = CoreContext::for_test_with_components(off);
 
     let ws = ws_dir.path().to_path_buf();
     let (names, installed) = CoreContext::scope(ctx, async move {
