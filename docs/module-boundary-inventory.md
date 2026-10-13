@@ -332,12 +332,13 @@ leases on cancellation, sign-out and shutdown. Failed cleanup stays registered
 for retry. Microphone authorization remains a TinyComputer call; the host does
 not link TinyVoice or CPAL. The existing hotkey adapter remains module-backed.
 
-TinyVoice v0.2.0 (contract 1.9) owns wake-word sequencing (`SequenceUtterance`)
-and the pre-transcription recording gates (`GateRecording`); the always-on
-adapter calls them by contract constant and keeps only the transcribe and
-deliver callbacks. The stateful hotkey recording session is not on the bus yet,
-so `voice/server/pipeline.rs` and `runtime.rs` stay until a follow-up adds
-session open/advance/close methods (openhuman#7587).
+TinyVoice v0.3.0 (contract 1.10) owns wake-word sequencing (`SequenceUtterance`),
+the pre-transcription recording gates (`GateRecording`) and the hotkey recording
+state machine (`SessionOpen` / `SessionAdvance` / `SessionStatus` /
+`SessionClose`). The always-on adapter and `voice/server` call them by contract
+constant; the host keeps only native recording setup, transcription, text
+delivery and the Globe composition, and reports each fact to the session and
+performs the one action it answers with (openhuman#7587).
 
 This cut removes the `tinyvoice` and `cpal` host exceptions, leaving nine
 implementation exceptions for Channels, MCP, Box and Wallet. The resolved
