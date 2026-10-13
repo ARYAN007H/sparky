@@ -10,7 +10,7 @@ use {tinyflows_schedule::types::CronJob, tinyflows_schedule::types::SessionTarge
 
 /// Recency window the morning briefing installs around its turn so Composio
 /// task-fetch tools only surface tasks created/changed in the last day. Read
-/// by the `composio_execute` handler via `current_task_recency_window`.
+/// by the `composio_execute` handler via the run context (`OpenHumanRunExt`).
 pub(super) const MORNING_BRIEFING_TASK_RECENCY_SECS: u64 = 24 * 60 * 60;
 
 /// [`run_agent_job_for_run`] under a fresh run id.
@@ -202,28 +202,7 @@ pub(super) async fn run_agent_job_for_run(
                         }
                         None => Box::pin(turn),
                     };
-                    // Morning briefing only: install a 24h task-recency window
-                    // so Composio task-fetch tools (Linear/ClickUp/Notion/Asana)
-                    // surface only recently created/changed tasks. Other cron
-                    // agents and all chat turns leave the window unset.
-                    if is_morning_briefing_job(job) {
-                        tracing::debug!(
-                            job_id = %job.id,
-                            recency_window_secs = MORNING_BRIEFING_TASK_RECENCY_SECS,
-                            "[cron] applying morning-briefing task recency window"
-                        );
-                        crate::integrations::composio::task_recency_context::with_task_recency_window(
-                            std::time::Duration::from_secs(MORNING_BRIEFING_TASK_RECENCY_SECS),
-                            turn,
-                        )
-                        .await
-                    } else {
-                        tracing::trace!(
-                            job_id = %job.id,
-                            "[cron] task recency window not applied for this job"
-                        );
-                        turn.await
-                    }
+                    turn.await
                 }
                 Err(e) => Err(e),
             }
