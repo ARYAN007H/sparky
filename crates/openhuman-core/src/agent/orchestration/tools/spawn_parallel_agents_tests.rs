@@ -2,7 +2,7 @@ use super::*;
 use crate::agent::harness::fork_context::{with_parent_context, ParentExecutionContext};
 use crate::agent::harness::host_definition::AgentDefinition;
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
-use crate::agent::orchestration::spawn_parallel_graph::{
+use crate::agent::orchestration::spawn_parallel::{
     prepare_spawn_parallel_tasks_from_defs, ParallelTaskRejectionKind, SpawnParallelTaskPreflight,
     WorkerDispatchMode,
 };
