@@ -104,10 +104,52 @@ async fn run(
 }
 
 #[test]
-fn the_budget_defaults_to_twenty_seconds() {
-    if std::env::var(TIMEOUT_ENV).is_err() {
-        assert_eq!(budget(), DEFAULT_TIMEOUT);
+fn the_budget_defaults_to_the_configured_twenty_seconds() {
+    let config = Config::default();
+    assert_eq!(budget_with(None, config.memes.timeout_ms), Duration::from_secs(20));
+}
+
+#[test]
+fn the_budget_env_override_beats_config_and_bad_values_fall_back() {
+    assert_eq!(budget_with(Some("1500"), 20_000), Duration::from_millis(1500));
+    assert_eq!(budget_with(Some("soon"), 7_000), Duration::from_millis(7_000));
+}
+
+#[test]
+fn component_off_disables_every_arm() {
+    let mut config = Config::default();
+    config.components.memes = false;
+    for mode in [arm::Mode::On, arm::Mode::Ab { percent: 100 }] {
+        assert_eq!(arm::arm_for(&config, mode, "t1"), Arm::Disabled);
     }
+    assert!(!holds_text_stream(&config, "t1"));
+}
+
+#[test]
+fn arm_is_honoured_only_when_the_component_is_on() {
+    let config = Config::default();
+    assert!(config.components.memes);
+    assert_eq!(arm::arm_for(&config, arm::Mode::Off, "t1"), Arm::Disabled);
+    assert_eq!(arm::arm_for(&config, arm::Mode::On, "t1"), Arm::Treatment);
+    assert_eq!(
+        arm::arm_for(&config, arm::Mode::Ab { percent: 0 }, "t1"),
+        Arm::Control
+    );
+}
+
+#[test]
+fn precedence_matrix_env_beats_build_default_and_component_gates_both() {
+    // env set wins over the build default; unset falls to it; neither is off.
+    assert_eq!(arm::resolve_mode(Some("off"), Some("on")), arm::Mode::Off);
+    assert_eq!(arm::resolve_mode(Some("on"), None), arm::Mode::On);
+    assert_eq!(arm::resolve_mode(None, Some("on")), arm::Mode::On);
+    assert_eq!(arm::resolve_mode(None, None), arm::Mode::Off);
+    let mut config = Config::default();
+    config.components.memes = false;
+    assert_eq!(
+        arm::arm_for(&config, arm::resolve_mode(Some("on"), Some("on")), "t"),
+        Arm::Disabled
+    );
 }
 
 #[test]

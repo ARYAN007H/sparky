@@ -47,13 +47,12 @@ pub(crate) fn flag_enabled(value: &str) -> bool {
 }
 
 const TIMEOUT_ENV: &str = "OPENHUMAN_TINYMEMES_TIMEOUT_MS";
-const DEFAULT_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// Whether this thread's answer text must be held back from streaming because
 /// its final reply will be remixed (treatment arm). The UI then shows only the
 /// remixed reply instead of the original streaming in and being replaced.
-pub(crate) fn holds_text_stream(thread_id: &str) -> bool {
-    arm::assign(arm::mode(), thread_id) == Arm::Treatment
+pub(crate) fn holds_text_stream(config: &Config, thread_id: &str) -> bool {
+    arm::arm_for(config, arm::mode(), thread_id) == Arm::Treatment
 }
 
 /// Something that can remix one reply: the module in production, a script in
@@ -92,7 +91,7 @@ pub(crate) async fn remix_task_reply(
         return;
     }
     if let Some(remixed) = remix_final_reply(
-        arm::assign(arm::mode(), thread_id),
+        arm::arm_for(config, arm::mode(), thread_id),
         config,
         thread_id,
         request_id,
@@ -146,7 +145,7 @@ async fn remix_final_reply(
         started,
         user_message,
         reply,
-        budget(),
+        budget(config),
     )
     .await
 }
@@ -204,13 +203,20 @@ async fn load(
     .flatten()
 }
 
-/// The remix time budget: `OPENHUMAN_TINYMEMES_TIMEOUT_MS`, else 20 s.
-fn budget() -> Duration {
-    std::env::var(TIMEOUT_ENV)
-        .ok()
-        .and_then(|v| v.parse::<u64>().ok())
-        .map(Duration::from_millis)
-        .unwrap_or(DEFAULT_TIMEOUT)
+/// The remix time budget: `OPENHUMAN_TINYMEMES_TIMEOUT_MS` when set, else
+/// `[memes] timeout_ms`.
+fn budget(config: &Config) -> Duration {
+    budget_with(
+        std::env::var(TIMEOUT_ENV).ok().as_deref(),
+        config.memes.timeout_ms,
+    )
+}
+
+fn budget_with(env: Option<&str>, configured_ms: u64) -> Duration {
+    Duration::from_millis(
+        env.and_then(|v| v.trim().parse::<u64>().ok())
+            .unwrap_or(configured_ms),
+    )
 }
 
 /// Read, rate, and remix `reply` against the thread, within `budget`.
