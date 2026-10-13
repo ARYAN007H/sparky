@@ -267,7 +267,7 @@ async fn zero_retries_means_exactly_one_attempt() {
         },
     )
     .unwrap();
-    let (success, output) = execute_job_now(&config, &job, \"dispatch-run\").await;
+    let (success, output) = execute_job_now(&config, &job, "dispatch-run").await;
     assert!(!success);
     assert!(output.contains("boom"), "{output}");
     assert_eq!(calls.load(Ordering::SeqCst), 1);
@@ -285,7 +285,7 @@ async fn without_a_policy_the_configured_retry_budget_applies() {
         counting(Arc::clone(&calls), Err("again".to_string())),
     );
     let job = due_system_job(&config, "dispatch-default-retries");
-    let (success, _) = execute_job_now(&config, &job, \"dispatch-run\").await;
+    let (success, _) = execute_job_now(&config, &job, "dispatch-run").await;
     assert!(!success);
     assert_eq!(calls.load(Ordering::SeqCst), 2);
 }
@@ -330,7 +330,7 @@ async fn a_system_job_without_a_handler_is_still_ok_on_dispatch() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp).await;
     let job = due_system_job(&config, "dispatch-unclaimed");
-    let (success, output) = execute_job_now(&config, &job, \"dispatch-run\").await;
+    let (success, output) = execute_job_now(&config, &job, "dispatch-run").await;
     assert!(success);
     assert!(output.contains("dispatched"), "{output}");
 }
