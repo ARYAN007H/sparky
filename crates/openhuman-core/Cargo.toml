@@ -541,9 +541,9 @@ proptest = "1"
 langfuse = ["tinyagents-harness/langfuse"]
 # Storage drivers for `[storage] url` / `OPENHUMAN_STORAGE_URL` (see the
 # `storage` domain). Memory and plain files are always available.
-# `storage-sqlite` is in the contributor set and the product: the small
-# desktop stores (approvals, devices, notifications, task sources) keep their
-# rows in it by default. `storage-mongodb` is in neither; a cloud build turns
+# `storage-sqlite` is in the contributor set and the product: the default
+# backend, `sqlite:<workspace>/storage`, needs it, so a host without it must
+# name another backend. `storage-mongodb` is in neither; a cloud build turns
 # it on. OS keychain support belongs to openhuman-rpc's `os-keyring` feature,
 # not the core or its storage-driver feature set.
 storage-sqlite = ["tinystoragedrivers/sqlite"]
