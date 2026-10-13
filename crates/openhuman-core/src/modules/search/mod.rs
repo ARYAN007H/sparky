@@ -15,7 +15,7 @@ use tinysearch_bus::{
     ProviderRoute, SearchConfig as ModuleSearchConfig,
 };
 
-use crate::config::{Config, PresentationMode, ProviderRoute};
+use crate::config::Config;
 use crate::search::providers::{self, ResolvedProvider, ROLES};
 
 mod proxy;
@@ -143,12 +143,7 @@ pub fn module_config(config: &Config) -> ModuleSearchConfig {
         .map(|role| (role, providers::role_order(config, role)))
         .collect();
     let presentation = PresentationConfig {
-        mode: match config.search.presentation {
-            PresentationMode::Roles => PresentationMode::Roles,
-            PresentationMode::AllTools => PresentationMode::AllTools,
-            PresentationMode::Router => PresentationMode::Router,
-            PresentationMode::OneProvider => PresentationMode::OneProvider,
-        },
+        mode: config.search.presentation,
         provider: config.search.presentation_provider.clone(),
         roles,
     };
