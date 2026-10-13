@@ -2,8 +2,8 @@
 
 #![cfg(target_os = "linux")]
 
-use tinytools_std::timeout::{output_or_kill, output_unbounded, ProcessCleanup};
 use std::time::Duration;
+use tinytools_std::timeout::{output_or_kill, output_unbounded, ProcessCleanup};
 
 /// Cancelling a tool must also stop descendants of its shell.
 #[cfg(target_os = "linux")]

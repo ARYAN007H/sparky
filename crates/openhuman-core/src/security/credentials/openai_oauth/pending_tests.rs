@@ -50,7 +50,12 @@ fn a_fresh_legacy_session_is_adopted_once_and_the_file_is_left_alone() {
     runtime().block_on(async {
         adopt_legacy(tmp.path(), &secrets).await;
         assert_eq!(
-            secrets.get(PENDING_SECRET).await.unwrap().unwrap().as_slice(),
+            secrets
+                .get(PENDING_SECRET)
+                .await
+                .unwrap()
+                .unwrap()
+                .as_slice(),
             bytes.as_slice()
         );
 
@@ -91,7 +96,12 @@ fn a_session_already_in_the_store_wins_over_the_legacy_file() {
         secrets.set(PENDING_SECRET, b"newer").await.unwrap();
         adopt_legacy(tmp.path(), &secrets).await;
         assert_eq!(
-            secrets.get(PENDING_SECRET).await.unwrap().unwrap().as_slice(),
+            secrets
+                .get(PENDING_SECRET)
+                .await
+                .unwrap()
+                .unwrap()
+                .as_slice(),
             b"newer"
         );
     });

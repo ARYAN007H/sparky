@@ -89,7 +89,9 @@ pub fn set_tool_timeout_secs(config_secs: u64) -> u64 {
             "[tool_timeout] config update ignored: env {ENV_VAR}={effective}s overrides requested {config_secs}s"
         );
     } else {
-        log::debug!("[tool_timeout] runtime timeout set to {effective}s (requested {config_secs}s)");
+        log::debug!(
+            "[tool_timeout] runtime timeout set to {effective}s (requested {config_secs}s)"
+        );
     }
     effective
 }

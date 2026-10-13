@@ -224,7 +224,3 @@ pub async fn execute_tool(
         result,
     })
 }
-
-#[cfg(test)]
-#[path = "ops_tests.rs"]
-mod tests;

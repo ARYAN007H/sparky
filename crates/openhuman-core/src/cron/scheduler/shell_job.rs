@@ -186,7 +186,7 @@ pub(super) async fn run_job_command_with_timeout(
             Ok(child) => child,
             Err(_) => return (false, "Command execution is unavailable.".to_owned()),
         };
-        return match time::timeout(timeout, child.wait_with_output()).await {
+        match time::timeout(timeout, child.wait_with_output()).await {
             Ok(Ok(output)) => {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 let stderr = String::from_utf8_lossy(&output.stderr);
@@ -203,7 +203,7 @@ pub(super) async fn run_job_command_with_timeout(
                 false,
                 format!("job timed out after {}s", timeout.as_secs_f64()),
             ),
-        };
+        }
     }
 
     #[cfg(not(test))]

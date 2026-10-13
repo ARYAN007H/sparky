@@ -1,6 +1,6 @@
 //! Tests for the connector module client.
 
-use super::{methods, module_config, MODULE_ID};
+use super::{methods, module_config, module_config_with_proxy, MODULE_ID};
 use crate::config::schema::{COMPOSIO_MODE_BACKEND, COMPOSIO_MODE_DIRECT};
 use crate::config::Config;
 use crate::modules::registry;
@@ -89,27 +89,28 @@ fn direct_mode_takes_the_api_key_from_the_config_file() {
 fn direct_mode_hands_the_module_the_hosts_proxy_policy() {
     // Part of the route description, so a proxy change reconfigures the module.
     use crate::config::schema::{ProxyConfig, ProxyScope};
-    use crate::config::{runtime_proxy_config, set_runtime_proxy_config};
 
-    let _env = crate::config::TEST_ENV_LOCK.blocking_lock();
     let mut config = bare_config();
     config.composio.mode = COMPOSIO_MODE_DIRECT.to_string();
     config.composio.api_key = Some("sk-from-file".to_string());
 
-    let previous = runtime_proxy_config();
-    set_runtime_proxy_config(ProxyConfig {
-        enabled: true,
-        https_proxy: Some("http://127.0.0.1:3128".into()),
-        no_proxy: vec!["localhost".into()],
-        // Scoped to Composio so no other test's loopback request is proxied.
-        scope: ProxyScope::Services,
-        services: vec!["tool.composio".into()],
-        ..ProxyConfig::default()
-    });
-    let proxied = module_config(&config).expect("resolves");
-    set_runtime_proxy_config(ProxyConfig::default());
-    let plain = module_config(&config).expect("resolves");
-    set_runtime_proxy_config(previous);
+    // The policy is passed in rather than installed as the process-global
+    // runtime proxy: every config load republishes that global, so installing
+    // it here raced any concurrent test that loads a config.
+    let proxied = module_config_with_proxy(
+        &config,
+        &ProxyConfig {
+            enabled: true,
+            https_proxy: Some("http://127.0.0.1:3128".into()),
+            no_proxy: vec!["localhost".into()],
+            // Scoped to Composio so no other test's loopback request is proxied.
+            scope: ProxyScope::Services,
+            services: vec!["tool.composio".into()],
+            ..ProxyConfig::default()
+        },
+    )
+    .expect("resolves");
+    let plain = module_config_with_proxy(&config, &ProxyConfig::default()).expect("resolves");
 
     assert_eq!(proxied["transport"]["proxy_url"], "http://127.0.0.1:3128");
     assert_eq!(proxied["transport"]["no_proxy"][0], "localhost");

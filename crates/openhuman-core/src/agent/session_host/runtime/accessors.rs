@@ -3,9 +3,9 @@
 //! (which rebuilds the tool policy snapshot on every change).
 
 use super::super::types::{OpenHumanSessionHost, SessionHostBuilder};
-use tinytools::ToolPolicyEngine;
 use std::collections::HashSet;
 use std::sync::Arc;
+use tinytools::ToolPolicyEngine;
 use tinytools::{Tool, ToolSpec};
 use tinytools_agent::dialect::TranscriptEntry;
 
@@ -119,9 +119,7 @@ impl OpenHumanSessionHost {
     }
 
     #[cfg(test)]
-    pub(crate) fn tool_policy_session_for_test(
-        &self,
-    ) -> &tinytools::ToolPolicySession {
+    pub(crate) fn tool_policy_session_for_test(&self) -> &tinytools::ToolPolicySession {
         &self.tool_policy_session
     }
 
