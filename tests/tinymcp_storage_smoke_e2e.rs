@@ -174,7 +174,14 @@ fn a_server_added_through_the_released_module_survives_a_restart_in_the_storage_
     let workspace = tmp.path().join("workspace");
     std::fs::create_dir_all(&workspace).unwrap();
     let storage = tmp.path().join("storage");
-    let url = format!("sqlite:{}", storage.display());
+    // `scripts/e2e-core.sh` points the run at a backend with OPENHUMAN_STORAGE_URL
+    // (sqlite or a MongoDB replica set); on its own the test uses a sqlite file.
+    let inherited = std::env::var("OPENHUMAN_STORAGE_URL")
+        .ok()
+        .filter(|url| !url.trim().is_empty());
+    let url = inherited
+        .clone()
+        .unwrap_or_else(|| format!("sqlite:{}", storage.display()));
 
     // First process: add a stdio server (disabled, so nothing is dialled) with
     // an env secret.
@@ -236,8 +243,10 @@ fn a_server_added_through_the_released_module_survives_a_restart_in_the_storage_
         leftovers.is_empty(),
         "legacy module databases were created: {leftovers:?}"
     );
-    assert!(
-        storage.exists(),
-        "the server record lives in the configured backend"
-    );
+    if inherited.is_none() {
+        assert!(
+            storage.exists(),
+            "the server record lives in the configured backend"
+        );
+    }
 }

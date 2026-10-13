@@ -15,21 +15,19 @@
 # (the storage-mongodb workflow does exactly this). The URL must be loopback:
 # the run creates a database of its own and writes to it.
 #
-# Extra arguments after the driver name are suites for scripts/test-rust-e2e.sh
-# (`--suite <name>`); the default is the headless set below.
+# What runs: `tests/tinymcp_storage_smoke_e2e.rs` spawns the real `openhuman-core
+# serve` twice on one workspace with OPENHUMAN_STORAGE_URL set, loads the
+# registry-pinned TinyMCP cdylib (staged and digest-verified, no network once
+# staged), adds a server, restarts and lists it. Extra arguments go to the test
+# binary.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+extra_features=""
 driver="${1:-sqlite}"
 [ $# -gt 0 ] && shift
-
-# Suites that boot the core headless (JSON-RPC and the CLI) and so honour
-# OPENHUMAN_STORAGE_URL. Suites that pin their own storage setup (the
-# storage_*_e2e matrix, which opens each driver itself) are run by their own CI
-# lanes.
-DEFAULT_SUITES=(json_rpc_e2e cli_storage_url_e2e)
 
 scratch="$(mktemp -d "$REPO_ROOT/target/e2e-core.XXXXXX" 2>/dev/null || { mkdir -p "$REPO_ROOT/target" && mktemp -d "$REPO_ROOT/target/e2e-core.XXXXXX"; })"
 trap 'rm -rf "$scratch"' EXIT
@@ -56,10 +54,10 @@ case "$driver" in
     authority="${authority%%/*}"
     export OPENHUMAN_STORAGE_URL="mongodb://${authority}/${db}${query}"
     # The product build carries the sqlite driver only; add mongodb.
-    export OPENHUMAN_E2E_EXTRA_FEATURES="storage-mongodb"
+    extra_features=",storage-mongodb"
     ;;
   *)
-    echo "usage: $0 [sqlite|mongodb] [--suite <name> ...]" >&2
+    echo "usage: $0 [sqlite|mongodb] [test-binary args]" >&2
     exit 2
     ;;
 esac
@@ -69,9 +67,18 @@ esac
 export OPENHUMAN_KEYRING_MASTER_KEY="${OPENHUMAN_KEYRING_MASTER_KEY:-$(printf '55%.0s' $(seq 1 32))}"
 
 echo "[e2e-core] driver=$driver (OPENHUMAN_STORAGE_URL set)"
-if [ $# -eq 0 ]; then
-  args=()
-  for suite in "${DEFAULT_SUITES[@]}"; do args+=(--suite "$suite"); done
-  set -- "${args[@]}"
-fi
-exec bash "$SCRIPT_DIR/test-rust-e2e.sh" "$@"
+
+module_target="$(bash "$SCRIPT_DIR/ci/native-test-module-platform.sh")"
+IFS=$'\t' read -r module_ext module_platform <<< "$module_target"
+export REPO_ROOT
+# shellcheck source=modules/stage-local-modules.sh
+source "$SCRIPT_DIR/modules/stage-local-modules.sh"
+tinymcp_dir="$(stage_release_module tinymcp "$module_platform" "$module_ext")"
+export OPENHUMAN_MODULE_PATH="$tinymcp_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
+
+export RUST_MIN_STACK="${RUST_MIN_STACK:-16777216}"
+cd "$REPO_ROOT"
+features="$(bash "$SCRIPT_DIR/ci/product-features.sh")$extra_features"
+bash "$SCRIPT_DIR/ci-cancel-aware.sh" cargo test -p openhuman-cli \
+  --features "$features" --test tinymcp_storage_smoke_e2e -- \
+  --ignored --test-threads=1 "$@"
