@@ -145,7 +145,10 @@ fn every_record_maps_to_a_real_component() {
         assert!(
             ALL.iter().any(|r| r.id == *id)
                 || !cfg!(feature = "modules")
-                || matches!(*id, "tinydocs" | "tinywallet" | "tinyvoice" | "tinyhosts" | "tinymemes"),
+                || matches!(
+                    *id,
+                    "tinydocs" | "tinywallet" | "tinyvoice" | "tinyhosts" | "tinymemes"
+                ),
             "mapping for unknown module '{id}'"
         );
     }
