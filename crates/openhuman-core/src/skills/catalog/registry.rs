@@ -19,9 +19,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, PoisonError, RwLock};
 use std::time::Duration;
 
-use tinyskills::{
-    FetchPolicy, HermesIndexSource, RegistryLimits, RegistryTimeouts, SkillRegistry,
-};
+use tinyskills::{FetchPolicy, HermesIndexSource, RegistryLimits, RegistryTimeouts, SkillRegistry};
 
 use super::store::HostCatalogStore;
 use super::transport::ReqwestTransport;
