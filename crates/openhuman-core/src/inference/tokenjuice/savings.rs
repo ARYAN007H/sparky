@@ -68,7 +68,12 @@ fn request(
     original_tokens: u64,
     compacted_tokens: u64,
 ) -> Option<RecordSavingsRequest> {
-    request_for(attribution_model(), compressor, original_tokens, compacted_tokens)
+    request_for(
+        attribution_model(),
+        compressor,
+        original_tokens,
+        compacted_tokens,
+    )
 }
 
 /// [`request`] for an explicit attribution `model`.

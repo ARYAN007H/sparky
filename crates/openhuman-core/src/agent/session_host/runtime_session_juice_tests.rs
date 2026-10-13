@@ -226,3 +226,98 @@ async fn resumed_juice_snapshot_does_not_add_live_repl_declarations() {
         "an empty frozen transcript must not gain Juice declarations from the live catalog"
     );
 }
+
+/// `[components] juice = false` end to end through a turn's wiring: the
+/// session builds its tool-output middleware with compaction and the summary
+/// stage off, the tinyjuice module is never claimed, and a large compressible
+/// tool result enters the transcript uncompressed.
+#[tokio::test]
+async fn juice_off_turn_loads_no_module_and_passes_tool_output_through() {
+    use crate::agent::tinyagents::middleware::tool_output::ToolOutputMiddleware;
+    use tinyagents_harness::context::{RunConfig, RunContext};
+    use tinyagents_harness::middleware::{Middleware, ToolInvocationIdentity};
+
+    crate::agent::harness::definition::AgentDefinitionRegistry::init_global_builtins()
+        .expect("builtin definitions");
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let mut config = crate::config::Config {
+        workspace_dir: tmp.path().join("workspace"),
+        action_dir: tmp.path().join("workspace"),
+        config_path: tmp.path().join("config.toml"),
+        modules: crate::config::schema::ModulesConfig {
+            enabled: true,
+            allow_download: false,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    std::fs::create_dir_all(&config.workspace_dir).expect("workspace");
+    config.context.compaction_enabled = true;
+    config.tokenjuice.router_enabled = true;
+    assert!(config.components.set("juice", false));
+
+    let mut host = crate::agent::OpenHumanSessionHost::from_config_for_agent(&config, "summarizer")
+        .expect("summarizer session");
+    host.ensure_runtime_session().expect("runtime session");
+    let context_mw = host
+        .runtime_state
+        .lock()
+        .expect("runtime state")
+        .context_middleware
+        .clone()
+        .expect("context middleware");
+    assert!(
+        !context_mw.tokenjuice_compaction_enabled,
+        "juice off must switch tool-output compaction off"
+    );
+    assert!(
+        context_mw.payload_summarizer.is_none(),
+        "juice off must drop the summary stage"
+    );
+
+    // Run the middleware exactly as the turn would, on a result that
+    // compaction would otherwise rewrite (a large uniform JSON array).
+    let rows: Vec<serde_json::Value> = (0..200)
+        .map(|i| serde_json::json!({"id": i, "name": format!("row-{i}"), "status": "ok"}))
+        .collect();
+    let payload = serde_json::to_string(&rows).expect("payload");
+    assert!(payload.len() >= config.tokenjuice.min_bytes_to_compress);
+    let mw = ToolOutputMiddleware {
+        budget_bytes: 1_000_000,
+        payload_summarizer: context_mw.payload_summarizer.clone(),
+        artifact_store: None,
+        tokenjuice_compaction_enabled: context_mw.tokenjuice_compaction_enabled,
+        tokenjuice_compression: context_mw.tokenjuice_compression,
+        runtime_config: context_mw.runtime_config.clone(),
+        tool_policies: Default::default(),
+        artifact_reads: Default::default(),
+        focus_by_call: Default::default(),
+        summary_focus_tools: Default::default(),
+        raw_fetches: Default::default(),
+        file_reads: Default::default(),
+    };
+    let mut ctx = RunContext::new(
+        RunConfig::new("juice-off-turn"),
+        crate::agent::tinyagents::host::OpenHumanRunContext::new(),
+    );
+    let mut result = tinytools::ToolResult::success(&payload);
+    mw.after_tool(
+        &mut ctx,
+        &(),
+        &ToolInvocationIdentity::new(
+            tinyagents_harness::ids::CallId::new("juice-off-1"),
+            "some_other_tool",
+        ),
+        &mut result,
+    )
+    .await
+    .expect("after_tool");
+    assert_eq!(result.output(), payload, "tool output must pass through");
+
+    // The module was never asked for: the refusal is typed and nothing was
+    // downloaded (downloads are off, so a claim would have ended in Failed).
+    let err = crate::modules::ensure_loaded_within(&config, "tinyjuice", None)
+        .await
+        .unwrap_err();
+    assert_eq!(err, crate::modules::LoadError::Disabled("juice"));
+}

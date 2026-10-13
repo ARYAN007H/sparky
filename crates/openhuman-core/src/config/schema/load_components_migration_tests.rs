@@ -106,8 +106,16 @@ fn legacy_tokenjuice_router_off_maps_to_components_juice() {
 
 #[test]
 fn tokenjuice_router_on_or_absent_keeps_juice_on() {
-    assert!(migrated("[tokenjuice]\nrouter_enabled = true\n", None).components.juice);
-    assert!(migrated("[tokenjuice]\nccr_enabled = false\n", None).components.juice);
+    assert!(
+        migrated("[tokenjuice]\nrouter_enabled = true\n", None)
+            .components
+            .juice
+    );
+    assert!(
+        migrated("[tokenjuice]\nccr_enabled = false\n", None)
+            .components
+            .juice
+    );
 }
 
 #[test]

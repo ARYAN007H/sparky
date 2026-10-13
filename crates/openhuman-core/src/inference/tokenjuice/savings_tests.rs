@@ -37,8 +37,18 @@ fn host_pricing_over_module_math_reproduces_the_old_totals() {
 
     // (model, compressor, original, compacted)
     let events: [(&str, CompressorKind, u64, u64); 5] = [
-        ("claude-sonnet-4-6", CompressorKind::SmartCrusher, 2000, 1000),
-        ("claude-sonnet-4-6", CompressorKind::SmartCrusher, 10000, 2500),
+        (
+            "claude-sonnet-4-6",
+            CompressorKind::SmartCrusher,
+            2000,
+            1000,
+        ),
+        (
+            "claude-sonnet-4-6",
+            CompressorKind::SmartCrusher,
+            10000,
+            2500,
+        ),
         ("claude-sonnet-4-6", CompressorKind::TextCrusher, 5000, 5000),
         ("no-such-model-xyz", CompressorKind::TextCrusher, 4000, 1000),
         ("claude-sonnet-4-6", CompressorKind::TextCrusher, 800, 900),
@@ -69,7 +79,10 @@ fn host_pricing_over_module_math_reproduces_the_old_totals() {
     }
 
     // Old totals: 3 shrinking events (equal and expanded are ignored).
-    assert_eq!((total.0, total.1, total.2, total.3), (3, 16000, 4500, 11500));
+    assert_eq!(
+        (total.0, total.1, total.2, total.3),
+        (3, 16000, 4500, 11500)
+    );
     // (1000 + 7500) tokens priced at $3 / 1M; the unpriced model adds none.
     assert!((total.4 - 0.0255).abs() < 1e-12, "cost {}", total.4);
 
@@ -81,5 +94,8 @@ fn host_pricing_over_module_math_reproduces_the_old_totals() {
     let smart = by_compressor[CompressorKind::SmartCrusher.as_str()];
     assert_eq!((smart.0, smart.1), (2, 8500));
     assert!((smart.2 - 0.0255).abs() < 1e-12);
-    assert_eq!(by_compressor[CompressorKind::TextCrusher.as_str()], (1, 3000, 0.0));
+    assert_eq!(
+        by_compressor[CompressorKind::TextCrusher.as_str()],
+        (1, 3000, 0.0)
+    );
 }
