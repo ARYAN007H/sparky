@@ -107,7 +107,7 @@ impl RuntimeBuilder {
             && self
                 .config
                 .as_ref()
-                .and_then(openhuman_core::storage::configured_url)
+                .and_then(openhuman_core::storage::explicit_url)
                 .is_none()
         {
             return Err(RuntimeError::NoSessionStore);
