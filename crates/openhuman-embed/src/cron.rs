@@ -493,7 +493,7 @@ impl<'a> Cron<'a> {
         let Some(target) = JobTarget::from_job(&job) else {
             return Ok(None);
         };
-        let policy = job.policy.clone();
+        let policy = job.policy;
         Ok(Some(ScheduledJob {
             name: job.name.clone().unwrap_or_default(),
             schedule: JobSchedule::from_core(&job.schedule),
