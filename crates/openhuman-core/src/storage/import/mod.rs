@@ -217,9 +217,9 @@ pub fn run_with(
 
 /// The marker id for `source` in `workspace`: a backend shared by several
 /// workspaces keeps one marker per workspace.
-fn marker_id(source: &Source, workspace: &Path) -> String {
+fn marker_id(domain: &str, workspace: &Path) -> String {
     let digest = sha2::Sha256::digest(workspace.as_os_str().as_encoded_bytes());
-    format!("{}@{}", source.domain, &hex::encode(digest)[..16])
+    format!("{domain}@{}", &hex::encode(digest)[..16])
 }
 
 fn marker_spec() -> Vec<CollectionSpec> {
@@ -232,7 +232,7 @@ fn import_one(
     source: &Source,
 ) -> Result<Outcome> {
     let domain = source.domain;
-    let marker = marker_id(source, &config.workspace_dir);
+    let marker = marker_id(domain, &config.workspace_dir);
     let repo = Repo::on(backend, &Scope::local(), domain, source.collections)?;
     let markers = Repo::on(backend, &Scope::local(), "storage::import", marker_spec)?;
 
@@ -322,7 +322,7 @@ pub fn is_done(
     config: &Config,
     source: &Source,
 ) -> Result<bool> {
-    let marker = marker_id(source, &config.workspace_dir);
+    let marker = marker_id(source.domain, &config.workspace_dir);
     let scoped = backend
         .for_scope(&Scope::local())
         .map_err(|error| anyhow!("open the local scope: {error}"))?;
