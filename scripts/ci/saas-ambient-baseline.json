@@ -590,14 +590,14 @@
   {
     "rule": "ambient-config",
     "path": "crates/openhuman-core/src/inference/http/backend.rs",
-    "line": 43,
+    "line": 90,
     "text": "let config = Config::load_or_init().await.map_err(|e| {",
     "occurrence": 1
   },
   {
     "rule": "ambient-config",
     "path": "crates/openhuman-core/src/inference/http/backend.rs",
-    "line": 84,
+    "line": 131,
     "text": "let config = Config::load_or_init().await.map_err(|e| {",
     "occurrence": 2
   },
