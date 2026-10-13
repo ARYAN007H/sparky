@@ -42,6 +42,7 @@ mod records_computer;
 mod records_docs_wallet;
 mod records_extra;
 mod records_mcp_connectors;
+#[cfg(feature = "tinymemes")]
 mod records_memes;
 mod records_memory_juice;
 mod records_search;
