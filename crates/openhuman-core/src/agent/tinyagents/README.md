@@ -47,7 +47,7 @@ The adapter seam between OpenHuman and the vendored [`tinyagents`](../../../../.
 | [`steering_forwarder.rs`](./steering_forwarder.rs) | Host adapter over `tinyagents_harness::run_queue::SteeringForwarderGuard` (forwards `RunQueue` steer/collect messages into the harness `SteeringHandle`; abort-on-drop so drop-based cancellation always deregisters it, issue #4456): `QueuedMessage for QueuedTurn`, the `RunQueue*` domain-event sink and the steering-registry cleanup hook. |
 | [`stop_hooks.rs`](./stop_hooks.rs) | Host accounting and halt-summary projection for the TinyAgents stop-hook middleware; budget and goal policies remain in OpenHuman. |
 | `summarize.rs` | `ModelSummarizer` / `FaultTolerantCachingSummarizer` plus a context-window-aware `SummarizationPolicy` driving the crate's `ContextCompressionMiddleware`. |
-| [`embeddings.rs`](./embeddings.rs) | `ProviderEmbeddingModel`: adapts `crate::inference::embedding_host::EmbeddingProvider` onto the crate's `EmbeddingModel` trait. |
+| [`embeddings.rs`](./embeddings.rs) | `ProviderEmbeddingModel`: cost-recording binding over the host-built `tinyinference_embeddings::EmbeddingModel`. |
 | [`todos.rs`](./todos.rs) | `todos_store` / `scratch_todos_store` (the crate `Store` behind per-thread agent todos, `tinyagents_graph::todos`). |
 | [`config.rs`](./config.rs) | Maps OpenHuman's `Config` (including model pins) onto `tinyagents_harness::config` structs. |
 | `*_tests.rs` | Sibling test suites for each file/part group above. |

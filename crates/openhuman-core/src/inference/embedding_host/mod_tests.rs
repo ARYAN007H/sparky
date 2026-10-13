@@ -5,6 +5,7 @@
 //! `embeddings` module.
 
 use super::*;
+use tinyinference_embeddings::EmbeddingModel;
 
 // ── create_embedding_provider_with_credentials ───────────
 
