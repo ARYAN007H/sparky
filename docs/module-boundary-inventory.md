@@ -18,7 +18,7 @@ copying its implementation into a host, or accepting weaker isolation.
 | tinyconnectors | none | tinyconnectors-bus | core integrations, credentials and triggers | Module-backed argument preparation, action execution and trigger archives; host credential reconciliation and frozen tool restoration remain in OpenHuman |
 | tinymcp | none in normal/build host dependencies | tinymcp-bus | core MCP registry, supervisor, CLI stdio/HTTP server | Merged host adapters use the released v0.14.3 module for registry, supervisor, client and server protocol operations, with approved host callbacks kept in OpenHuman. The 62-member artifact and local focused, lifecycle, registry, native and build gates pass; frozen recorded tool declarations are restored independently of the current catalog |
 | tinychannels | tinychannels, tinychannels-runtime, tinychannels-module (test-only) | tinychannels-bus | core channels, TinyHumans host, CLI REPL | Contract 16 (operation 1.17) is pure; scoped providers, inbound/identity/outbound preparation, remote commands, runtime limits, typing and progressive delivery execute through confidential module calls. Host-owned policy, credentials, persistence and callbacks remain in OpenHuman. Both host implementation exceptions are removed; the 254-test focused suite and released-artifact runtime fixture pass |
-| tinyhosts | none | tinyhosts-bus | core hosting tools | Released Execute/Providers contract consumed through the module; workspace authorization, credentials and approval policy remain in OpenHuman |
+| tinyhosts | none | tinyhosts-bus | core hosting tools | Released Execute/Providers contract consumed through the module (v0.4.0: tool-to-operation mapping, argument shaping, outcome matching and summaries live in `tinyhosts-bus::tools`); workspace authorization, credentials and approval policy remain in OpenHuman |
 | tinywallet | none in normal/build host dependencies | tinywallet-bus | core wallet/web3/x402 | Complete: v0.19.0 contract 1.13 owns mnemonic validation/derivation, native transactions, Web3 quotes/execution, ERC-20 encoding, and x402 payment parsing/budgets/ledger. OpenHuman retains encrypted-key custody, authenticated transport, explicit approval, and lifecycle orchestration |
 | tinybox | tinybox-core (test-only) | tinybox-bus | core sandbox and security, desktop gateways | Merged host cutover uses TinyBox v0.1.24 for sandbox/resource lifecycle, collected and supervised execution, jailed and native shell execution, Docker control, local grants, file transfer and port forwarding. Host authorization and the security floor remain in OpenHuman |
 | tinycomputer | none | tinycomputer-bus | core voice, paste/focus and permission checks | Permission, focus, paste and Globe listener operations use the module; native thread and target rules remain covered |
@@ -254,7 +254,7 @@ Connectors, Hosts, Juice, and document adapters onto OpenHuman main
 The existing TinyRuntime removal is preserved; runtime worker migration and
 further bus error-reporting work remain outside this integration.
 
-The host compiles TinyConnectors v0.14.0, TinyHosts v0.3.0, TinyJuice v0.7.1,
+The host compiles TinyConnectors v0.14.0, TinyHosts v0.4.0, TinyJuice v0.7.1,
 and TinyDocs v0.2.0 contracts and executes their affected operations through
 released modules. The module boundary audit reports zero violations and zero
 stale exceptions, with 27 temporary exceptions and one pending contract.
