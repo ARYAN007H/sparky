@@ -85,3 +85,18 @@ async fn juice_off_refuses_tinyjuice_before_download_or_load() {
     assert_eq!(status.state, ModuleState::Disabled);
     assert!(status.source.is_none());
 }
+
+#[cfg(feature = "voice")]
+#[tokio::test]
+async fn voice_off_refuses_tinyvoice_before_download_or_load() {
+    let config = config_without("voice");
+    let err = ensure_loaded_within(&config, "tinyvoice", None)
+        .await
+        .unwrap_err();
+    assert_eq!(err, LoadError::Disabled("voice"));
+    assert_eq!(err.into_message(), "COMPONENT_DISABLED:voice");
+    let statuses = list(&config);
+    let status = statuses.iter().find(|s| s.id == "tinyvoice").unwrap();
+    assert_eq!(status.state, ModuleState::Disabled);
+    assert!(status.source.is_none());
+}
