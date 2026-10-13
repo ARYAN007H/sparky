@@ -308,10 +308,12 @@ fn handle_validate_policy(params: Map<String, Value>) -> ControllerFuture {
             Ok(p) => p,
             Err(e) => return Err(format!("Invalid policy: {e}")),
         };
-        let result = match super::docker::validate_docker_policy(&policy) {
-            Ok(()) => serde_json::json!({ "valid": true, "issues": [] }),
-            Err(issues) => serde_json::json!({ "valid": false, "issues": issues }),
-        };
+        let config = crate::config::ops::load_config_with_timeout().await?;
+        // The module owns the verdict; a missing one is an error, never "valid".
+        let issues = super::docker::validate_docker_policy(&config, &policy)
+            .await
+            .map_err(|error| format!("Policy validation is unavailable: {error}"))?;
+        let result = serde_json::json!({ "valid": issues.is_empty(), "issues": issues });
         to_json(Outcome::new(result, vec![]))
     })
 }

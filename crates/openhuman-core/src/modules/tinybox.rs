@@ -53,7 +53,8 @@ const CLEANUP_DOCKER: &str = contract::names::CLEANUP_DOCKER;
 const RUN_DOCKER_WITHOUT_WORKSPACE: &str = contract::names::RUN_DOCKER_WITHOUT_WORKSPACE;
 const SELECT_SHELL: &str = contract::names::SELECT_SHELL;
 const RESOLVE_LOCAL_GRANTS: &str = contract::names::RESOLVE_LOCAL_GRANTS;
-const START_SHELL_EXEC: &str = contract::names::START_SHELL_EXEC;
+const START_NATIVE_SHELL_EXEC: &str = contract::names::START_NATIVE_SHELL_EXEC;
+const VALIDATE_DOCKER_POLICY: &str = contract::names::VALIDATE_DOCKER_POLICY;
 const DOCKER_CALL_GRACE: Duration = Duration::from_secs(5);
 
 #[cfg(test)]
@@ -170,7 +171,7 @@ pub async fn start_jailed_exec(
 /// Ask TinyBox which shell it would spawn for a command on its machine.
 ///
 /// The reply is discovery only: the host never spawns the plan itself, it
-/// executes through [`start_shell_exec`].
+/// executes through [`start_native_shell_exec`].
 pub async fn select_shell(
     config: &Config,
     request: contract::SelectShellRequest,
@@ -182,11 +183,20 @@ pub async fn select_shell(
 ///
 /// The caller has already authorized the command; the module owns shell
 /// selection, the safe child environment and cleanup.
-pub async fn start_shell_exec(
+pub async fn start_native_shell_exec(
     config: &Config,
     request: contract::ShellExecRequest,
 ) -> Result<contract::ProcessRef, String> {
-    call(config, START_SHELL_EXEC, (request,), true).await
+    call(config, START_NATIVE_SHELL_EXEC, (request,), true).await
+}
+
+/// Ask TinyBox whether a Docker run would weaken isolation, without starting
+/// one. This is the same check `RunDocker` enforces before creating a container.
+pub async fn validate_docker_policy(
+    config: &Config,
+    request: contract::DockerPolicyRequest,
+) -> Result<contract::DockerPolicyReport, String> {
+    call(config, VALIDATE_DOCKER_POLICY, (request,), false).await
 }
 
 /// Ask TinyBox to resolve the existing toolchain and configured grants for the

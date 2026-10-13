@@ -257,12 +257,12 @@ async fn security_policy_block_halts_without_spending_the_retry_budget() {
 /// The spawn used to name `sh` itself, and `CreateProcessW` cannot resolve that
 /// on Windows — so every scheduled shell job failed there with `spawn error:
 /// program not found` while the identical job ran on macOS and Linux. Routing it
-/// through `agent::platform_shell`, which every other shell spawn in the crate
-/// already used, is what makes this pass.
+/// through the module's native shell member, which selects the shell per
+/// platform, is what makes this pass.
 ///
 /// `echo` and the assertion on its output are deliberately shell-agnostic: the
 /// test names neither `sh` nor `cmd`, so it keeps holding if the platform matrix
-/// in `platform_shell` changes.
+/// in the module changes.
 #[tokio::test]
 async fn a_shell_job_runs_on_this_platform() {
     let tmp = TempDir::new().unwrap();
@@ -300,8 +300,8 @@ async fn scheduled_shell_authorization_fails_closed_when_tinybox_is_disabled() {
 
 /// A pipeline keeps the shell's own exit status, not `pipefail`'s.
 ///
-/// Regression guard for a behaviour change review caught on this branch. Routing
-/// this call site through `platform_shell::build_tokio_command` would have added
+/// Regression guard for a behaviour change review caught on this branch. Running
+/// this call site with the module's default shell semantics would have added
 /// `set -o pipefail`, and `false | true` — which a plain `-lc` reports as
 /// success, because only the last stage counts — would have started reporting
 /// failure. Any existing job ending in a tolerated pipe stage (a `… | grep -q`
