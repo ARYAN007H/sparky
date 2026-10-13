@@ -7,9 +7,7 @@
 //! orchestration down. What stays here is the record shape and the
 //! reconciliation of orphaned tasks on boot.
 
-use std::path::Path;
-#[cfg(test)]
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 
 use tinyagents_orchestration::subagent::{

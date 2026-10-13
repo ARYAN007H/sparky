@@ -4,7 +4,7 @@ use crate::storage::rusqlite;
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 
-use super::types::{FilterSpec, ProviderSlug, SourceTarget, TaskSource};
+use super::super::types::{FilterSpec, ProviderSlug, SourceTarget, TaskSource};
 
 pub(super) const SELECT_SOURCE_COLUMNS: &str =
     "SELECT id, provider, connection_id, name, enabled, filter, \

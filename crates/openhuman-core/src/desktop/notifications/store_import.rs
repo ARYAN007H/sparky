@@ -19,6 +19,10 @@ use anyhow::{Context, Result};
 use rusqlite::Connection;
 use serde_json::json;
 
+#[path = "store_import_rows.rs"]
+mod store_rows;
+use store_rows::rows_to_notifications;
+
 use super::store_documents::{
     core_id, to_doc, CORE, LOCAL_WORKSPACE, NOTIFICATIONS, SETTINGS,
 };
@@ -145,7 +149,7 @@ fn read_rows(conn: &Connection, workspace: &str) -> Result<Vec<ImportDoc>> {
         let rows = stmt
             .query(())
             .context("[notifications::import] query integration_notifications")?;
-        for notification in super::rows_to_notifications(rows)? {
+        for notification in rows_to_notifications(rows)? {
             docs.push(ImportDoc {
                 collection: NOTIFICATIONS,
                 id: notification.id.clone(),
