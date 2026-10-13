@@ -1,9 +1,8 @@
 //! `gitbooks` — answer questions about OpenHuman through the TinyMCP module's
 //! confidential one-shot tool-call contract.
 
-use crate::{
-    config::Config, inference::provider::factory::redact_endpoint, 
-};
+use crate::{config::Config, inference::provider::factory::redact_endpoint};
+use tinybus::module::ModuleClient;
 use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::time::Duration;

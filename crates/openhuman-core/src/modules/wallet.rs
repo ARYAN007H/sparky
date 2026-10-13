@@ -77,7 +77,7 @@ use tinywallet_bus::wire::{
 };
 use zeroize::Zeroize;
 
-use super::{host, ops, registry};
+use super::{ops, registry};
 use crate::config::Config;
 
 /// Registry id of the module these calls go to.

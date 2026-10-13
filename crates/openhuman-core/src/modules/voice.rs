@@ -31,7 +31,7 @@
 
 use tinyvoice_bus::names::methods;
 
-use super::{host, ops, registry};
+use super::{ops, registry};
 use crate::config::Config;
 
 /// Registry id of the module these calls go to.
