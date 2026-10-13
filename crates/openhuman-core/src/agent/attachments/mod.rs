@@ -11,6 +11,7 @@ use tinyagents_harness::multimodal::{
 use crate::config::Config;
 use crate::security::SecurityPolicy;
 
+pub(crate) mod host;
 pub(crate) mod legacy;
 pub(crate) mod provider;
 
@@ -457,7 +458,8 @@ pub(crate) async fn has_resolvable_image(
 ) -> anyhow::Result<bool> {
     let rehydrated = crate::agent::multimodal::rehydrate_image_placeholders(&[
         tinyagents_session::transcript::TranscriptMessage::user(prompt),
-    ]);
+    ])
+    .await;
     let mut paths = parse(prompt)
         .1
         .into_iter()

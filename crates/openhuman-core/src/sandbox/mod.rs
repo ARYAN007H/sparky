@@ -15,6 +15,7 @@ pub(crate) mod local_grants;
 pub(crate) mod native_jail;
 pub mod ops;
 pub mod schemas;
+pub(crate) mod shell_exec;
 pub mod types;
 
 pub use ops::{

@@ -12,7 +12,7 @@
 //! deciding it should.
 //!
 //! Search is the third way: pay for the one skill that matches, and nothing for
-//! the rest. It is the same bargain [`crate::tools::implementations::meta::deferred`]
+//! the rest. It is the same bargain [`tinytools::deferred`]
 //! makes for deferred tool schemas, over a different corpus.
 //!
 //! # What it returns, and what it does not

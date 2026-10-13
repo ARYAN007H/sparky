@@ -1,10 +1,11 @@
 use std::path::{Path, PathBuf};
 
-use super::types::{SecurityPolicy, TrustedAccess, POLICY_BLOCKED_MARKER};
+use super::types::{SecurityPolicy, TrustedAccess};
 use super::types::{
     ACCOUNT_CONFIG_FILE, ARTIFACTS_DIR, ARTIFACT_TOOL_RESULTS_DIR, WORKSPACE_INTERNAL_DIRS,
     WORKSPACE_INTERNAL_FILES,
 };
+use tinytools::status::POLICY_BLOCKED_MARKER;
 
 /// Credential-store path segments, matched case-insensitively at any depth.
 pub(crate) const SENSITIVE_COMPONENTS: &[&str] =

@@ -286,7 +286,7 @@ Turn execution:
 | [`cost.rs`](./cost.rs) | Per-turn token and cost accounting (`TurnCost`) |
 | [`message_convert.rs`](./message_convert.rs), [`messages.rs`](./messages.rs) | Conversions between `TranscriptMessage` rows and TinyAgents `Message`s; the `history_wire` adapter for host-owned files |
 | `attachments/`, [`multimodal.rs`](./multimodal.rs) | Durable user uploads and provider-side attachment resolution; legacy marker compatibility ([README](attachments/README.md)) |
-| [`host_runtime.rs`](./host_runtime.rs), [`platform_shell.rs`](./platform_shell.rs) | Native and Docker shell `RuntimeAdapter`s and the shared `cmd.exe` vs `sh` selection |
+| [`host_runtime.rs`](./host_runtime.rs) | Native and Docker shell `RuntimeAdapter`s; the shell flavor is the contract's `tinybox_bus::ShellFlavor` and execution is TinyBox's |
 | `session_store/` | Process-wide `SessionStoreProvider` slot for hosts with their own database |
 
 Delegation and coordination:
@@ -440,12 +440,12 @@ Integration coverage is in [`tests/agent_harness_e2e.rs`](../../../../tests/agen
 `tests/in_process/agent_*.rs`, aggregated into the `in_process_all` target.
 
 Related docs:
-[agent harness architecture](../../../../gitbooks/developing/architecture/agent-harness.md),
-[agent observability](../../../../gitbooks/developing/agent-observability.md).
+[agent harness architecture](../../../../docs/gitbooks/en/developing/architecture/agent-harness.md),
+[agent observability](../../../../docs/gitbooks/en/developing/agent-observability.md).
 
 ## Further reading
 
 - [Parent module README](../../README.md)
-- [Deep architecture reference](../../../../gitbooks/developing/architecture.md)
-- [The orchestrator](../../../../gitbooks/features/orchestration.md)
+- [Deep architecture reference](../../../../docs/gitbooks/en/developing/architecture.md)
+- [The orchestrator](../../../../docs/gitbooks/en/features/orchestration.md)
 - [tinyagents](../../../../vendor/tinyagents/README.md)
