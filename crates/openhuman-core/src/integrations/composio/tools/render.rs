@@ -164,4 +164,3 @@ pub(super) fn render_tools_markdown(resp: &super::super::types::ComposioToolsRes
     }
     out
 }
-

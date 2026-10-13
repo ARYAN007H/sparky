@@ -22,7 +22,11 @@ fn wire_conversion_round_trips_every_flag() {
 #[test]
 fn row_key_normalises_the_toolkit() {
     assert_eq!(UserScopePref::key(" GitHub "), "github");
-    assert_eq!(UserScopePref::key("   "), "", "an all-whitespace toolkit has no row");
+    assert_eq!(
+        UserScopePref::key("   "),
+        "",
+        "an all-whitespace toolkit has no row"
+    );
 }
 
 #[tokio::test]
@@ -45,12 +49,13 @@ async fn legacy_prefs_stay_on_disk_until_the_module_takes_them() {
     std::fs::write(&path, legacy).unwrap();
 
     let pref = load_or_default(&config, "github").await;
-    assert_eq!(pref, UserScopePref::default(), "unreachable module fails open");
+    assert_eq!(
+        pref,
+        UserScopePref::default(),
+        "unreachable module fails open"
+    );
     assert_eq!(std::fs::read_to_string(&path).unwrap(), legacy);
-    assert!(!migrated()
-        .lock()
-        .unwrap()
-        .contains(&config.workspace_dir));
+    assert!(!migrated().lock().unwrap().contains(&config.workspace_dir));
 }
 
 #[tokio::test]
@@ -70,8 +75,5 @@ async fn a_workspace_with_no_legacy_file_is_marked_migrated() {
     let dir = tempfile::tempdir().unwrap();
     let config = config_in(&dir);
     migrate_legacy(&config).await;
-    assert!(migrated()
-        .lock()
-        .unwrap()
-        .contains(&config.workspace_dir));
+    assert!(migrated().lock().unwrap().contains(&config.workspace_dir));
 }
