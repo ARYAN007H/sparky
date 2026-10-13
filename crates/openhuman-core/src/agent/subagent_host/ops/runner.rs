@@ -946,9 +946,7 @@ async fn run_typed_mode(
             "subagent",
             // Agent-level TokenJuice profile → sub-agent context middleware
             // (#4466), so sub-agent tool outputs compact like the chat path.
-            definition
-                .extensions
-                .effective_tokenjuice_compression(&definition.model),
+            effective_tokenjuice_compression(definition),
             // The spawn-wide config snapshot supplies the `[context]`
             // knobs the graph used to load for itself.
             config.as_ref().ok().map(|c| c.as_ref()),

@@ -344,13 +344,7 @@ impl OpenHumanSessionHost {
         // body and get wrapped by [`SystemPromptBuilder::for_subagent`].
         let prompt_builder = match target_def {
             Some(def) => match &def.system_prompt {
-                PromptSource::Dynamic(()) => match def.extensions.prompt_builder {
-                    Some(build) => SystemPromptBuilder::from_dynamic(build),
-                    None => anyhow::bail!(
-                        "agent `{}` declares a dynamic prompt but has no builder",
-                        def.id
-                    ),
-                },
+                PromptSource::Dynamic(()) => SystemPromptBuilder::from_dynamic(dynamic_prompt_builder(def)?),
                 PromptSource::Verbatim(text) => SystemPromptBuilder::verbatim(text.clone()),
                 PromptSource::Inline(text) => SystemPromptBuilder::for_subagent(
                     text.clone(),
@@ -674,7 +668,7 @@ impl OpenHumanSessionHost {
             .map(|def| def.extensions.omit_memory_context)
             .unwrap_or(false);
         let effective_tokenjuice_compression = target_def
-            .map(|def| def.extensions.effective_tokenjuice_compression(&def.model))
+            .map(|def| effective_tokenjuice_compression(def))
             .unwrap_or(tinyjuice_bus::types::AgentTokenjuiceCompression::Full);
 
         // Stamp the resolved agent definition id onto the OpenHumanSessionHost via the

@@ -108,6 +108,19 @@ fn same_definition(a: &AgentDefinition, b: &AgentDefinition) -> bool {
     }
 }
 
+/// The concrete TokenJuice policy for `def` (see
+/// [`AgentExt::effective_tokenjuice_compression`]).
+pub fn effective_tokenjuice_compression(def: &AgentDefinition) -> AgentTokenjuiceCompression {
+    def.extensions.effective_tokenjuice_compression(&def.model)
+}
+
+/// The prompt builder behind a `PromptSource::Dynamic(())` marker.
+pub fn dynamic_prompt_builder(def: &AgentDefinition) -> Result<PromptBuilder> {
+    def.extensions
+        .prompt_builder
+        .ok_or_else(|| anyhow::anyhow!("agent `{}` declares a dynamic prompt but has no builder", def.id))
+}
+
 /// Re-check the spawn-hierarchy contract over a slice of definitions.
 pub fn validate_tier_hierarchy(defs: &[AgentDefinition]) -> Result<()> {
     let mut set = DefinitionSet::<AgentExt>::new();
