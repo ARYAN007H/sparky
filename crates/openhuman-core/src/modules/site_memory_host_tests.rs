@@ -131,7 +131,12 @@ async fn a_site_forgotten_after_it_was_loaded_is_not_written_back() {
     let loaded = load(&config, "gone.example").await;
     assert!(save(&config, "gone.example", loaded.epoch).await);
 
-    assert_eq!(forget(&config, Some("https://www.Gone.example/x")).await.unwrap(), 1);
+    assert_eq!(
+        forget(&config, Some("https://www.Gone.example/x"))
+            .await
+            .unwrap(),
+        1
+    );
     // The task that loaded before the forget still holds the old epoch.
     assert!(!save(&config, "gone.example", loaded.epoch).await);
     assert!(load(&config, "gone.example").await.memory.is_empty());
@@ -149,7 +154,10 @@ async fn forgetting_every_site_counts_them_and_an_address_that_names_no_site_for
         let epoch = load(&config, site).await.epoch;
         assert!(save(&config, site, epoch).await);
     }
-    assert_eq!(forget(&config, Some("file:///etc/passwd")).await.unwrap(), 0);
+    assert_eq!(
+        forget(&config, Some("file:///etc/passwd")).await.unwrap(),
+        0
+    );
     assert_eq!(forget(&config, None).await.unwrap(), 2);
 }
 
@@ -192,9 +200,20 @@ async fn a_load_sweeps_site_files_nothing_changed_for_thirty_days() {
 
 #[test]
 fn a_site_is_its_host_without_www() {
-    assert_eq!(site_of("https://www.Amazon.in/s?k=x").as_deref(), Some("amazon.in"));
-    assert_eq!(site_of(" http://shop.test:8080/cart ").as_deref(), Some("shop.test"));
-    for none in ["ftp://x.test/", "file:///etc/passwd", "not a url", "http://[::1]/"] {
+    assert_eq!(
+        site_of("https://www.Amazon.in/s?k=x").as_deref(),
+        Some("amazon.in")
+    );
+    assert_eq!(
+        site_of(" http://shop.test:8080/cart ").as_deref(),
+        Some("shop.test")
+    );
+    for none in [
+        "ftp://x.test/",
+        "file:///etc/passwd",
+        "not a url",
+        "http://[::1]/",
+    ] {
         assert_eq!(site_of(none), None, "{none}");
     }
 }

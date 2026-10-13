@@ -26,7 +26,10 @@ fn scoped_context(computer: bool) -> (tempfile::TempDir, std::sync::Arc<CoreCont
     let mut config = crate::config::Config::default();
     config.workspace_dir = dir.path().to_path_buf();
     config.components.computer = computer;
-    (dir, CoreContext::for_test_with_config(DomainSet::full(), config))
+    (
+        dir,
+        CoreContext::for_test_with_config(DomainSet::full(), config),
+    )
 }
 
 #[tokio::test]
@@ -44,7 +47,9 @@ async fn every_desktop_controller_answers_component_disabled_when_computer_is_of
     let (_dir, context) = scoped_context(false);
     CoreContext::scope(context, async {
         for function in ["status", "probe", "pending"] {
-            let error = (controller(function).handler)(Map::new()).await.unwrap_err();
+            let error = (controller(function).handler)(Map::new())
+                .await
+                .unwrap_err();
             assert!(
                 error.contains("COMPONENT_DISABLED:computer"),
                 "{function}: {error}"
@@ -52,7 +57,9 @@ async fn every_desktop_controller_answers_component_disabled_when_computer_is_of
         }
         let mut params = Map::new();
         params.insert("enabled".to_owned(), Value::Bool(true));
-        let error = (controller("set_enabled").handler)(params).await.unwrap_err();
+        let error = (controller("set_enabled").handler)(params)
+            .await
+            .unwrap_err();
         assert!(error.contains("COMPONENT_DISABLED:computer"), "{error}");
         let mut params = Map::new();
         params.insert("confirmation_id".to_owned(), Value::String("id".to_owned()));

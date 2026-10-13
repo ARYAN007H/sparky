@@ -241,10 +241,7 @@ fn site_named(host: &str) -> Option<String> {
 /// # Errors
 ///
 /// Returns an I/O error when a site's file exists and cannot be removed.
-pub async fn forget(
-    config: &crate::config::Config,
-    site: Option<&str>,
-) -> std::io::Result<usize> {
+pub async fn forget(config: &crate::config::Config, site: Option<&str>) -> std::io::Result<usize> {
     let site = match site {
         Some(named) => match site_of(named).or_else(|| site_named(named)) {
             Some(site) => Some(site),
