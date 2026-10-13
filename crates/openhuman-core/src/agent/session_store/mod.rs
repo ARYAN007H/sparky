@@ -20,6 +20,7 @@ pub use agent_transcripts::{agent_transcript_root, AgentTranscriptFiles};
 use tinyagents_session::port::{AgentStores, SessionStoreProvider};
 
 mod agent_transcripts;
+pub mod ledger_sync;
 mod rebound;
 mod workspace;
 

@@ -20,8 +20,8 @@ use crate::agent::prompts::ToolCallFormat;
 use crate::config::{AgentConfig, Config};
 use tinyagents_orchestration::teams::{SessionTeamLedger, TeamService};
 use tinyagents_session::run_ledger::{
-    AgentTeam, AgentTeamMember, AgentTeamMemberStatus, AgentTeamMemberUpsert, AgentTeamStatus,
-    AgentTeamTask, AgentTeamTaskStatus, AgentTeamTaskUpsert, AgentTeamUpsert, ClaimOutcome,
+    AgentTeamMemberStatus, AgentTeamMemberUpsert, AgentTeamStatus, AgentTeamTaskStatus,
+    AgentTeamTaskUpsert, AgentTeamUpsert,
 };
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 use tinytools::Tool;
@@ -98,82 +98,7 @@ fn team_service(config: &Config) -> TeamService<SessionTeamLedger> {
     TeamService::new(SessionTeamLedger::new(ledger).unwrap())
 }
 
-/// Synchronous views of the team ledger the tests seed and inspect, on the
-/// storage backend of the test's workspace.
-mod run_ledger {
-    use super::*;
-    use crate::agent::session_store::with_ledger;
-    use std::path::Path;
-
-    type Res<T> = anyhow::Result<T>;
-
-    pub(super) fn upsert_agent_team(ws: &Path, upsert: AgentTeamUpsert) -> Res<AgentTeam> {
-        Ok(with_ledger(ws, |l| async move { l.upsert_agent_team(upsert).await })?)
-    }
-
-    pub(super) fn upsert_agent_team_member(
-        ws: &Path,
-        upsert: AgentTeamMemberUpsert,
-    ) -> Res<AgentTeamMember> {
-        Ok(with_ledger(ws, |l| async move { l.upsert_agent_team_member(upsert).await })?)
-    }
-
-    pub(super) fn upsert_agent_team_task(
-        ws: &Path,
-        upsert: AgentTeamTaskUpsert,
-    ) -> Res<AgentTeamTask> {
-        Ok(with_ledger(ws, |l| async move { l.upsert_agent_team_task(upsert).await })?)
-    }
-
-    pub(super) fn claim_agent_team_task(
-        ws: &Path,
-        team_id: &str,
-        task_id: &str,
-        member_id: &str,
-        token: &str,
-    ) -> Res<ClaimOutcome> {
-        let (team_id, task_id, member_id, token) = (
-            team_id.to_string(),
-            task_id.to_string(),
-            member_id.to_string(),
-            token.to_string(),
-        );
-        Ok(with_ledger(ws, |l| async move {
-            l.claim_agent_team_task(&team_id, &task_id, &member_id, &token).await
-        })?)
-    }
-
-    pub(super) fn mark_agent_team_member_running(
-        ws: &Path,
-        team_id: &str,
-        member_id: &str,
-        task_id: &str,
-        worker: &str,
-        run_id: &str,
-    ) -> Res<Option<AgentTeamMember>> {
-        let (team_id, member_id, task_id, worker, run_id) = (
-            team_id.to_string(),
-            member_id.to_string(),
-            task_id.to_string(),
-            worker.to_string(),
-            run_id.to_string(),
-        );
-        Ok(with_ledger(ws, |l| async move {
-            l.mark_agent_team_member_running(&team_id, &member_id, &task_id, &worker, &run_id)
-                .await
-        })?)
-    }
-
-    pub(super) fn get_agent_team_task(ws: &Path, id: &str) -> Res<Option<AgentTeamTask>> {
-        let id = id.to_string();
-        Ok(with_ledger(ws, |l| async move { l.get_agent_team_task(&id).await })?)
-    }
-
-    pub(super) fn get_agent_team_member(ws: &Path, id: &str) -> Res<Option<AgentTeamMember>> {
-        let id = id.to_string();
-        Ok(with_ledger(ws, |l| async move { l.get_agent_team_member(&id).await })?)
-    }
-}
+use crate::agent::session_store::ledger_sync as run_ledger;
 
 fn seed_team(config: &Config, team_id: &str) {
     run_ledger::upsert_agent_team(
