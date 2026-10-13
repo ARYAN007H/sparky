@@ -83,10 +83,10 @@ pub(super) fn container_environment() -> Option<std::collections::BTreeMap<Strin
     let inherited = crate::sandbox::ops::SANDBOX_ENV_PASSTHROUGH
         .iter()
         .filter_map(|name| {
-            crate::tools::timeout::CommandEnvironment::var_os(name).map(|value| (*name, value))
+            tinytools_std::timeout::CommandEnvironment::var_os(name).map(|value| (*name, value))
         })
         .chain(python_utf8_env(
-            crate::tools::timeout::CommandEnvironment::var_os,
+            tinytools_std::timeout::CommandEnvironment::var_os,
         ));
     for (name, value) in inherited {
         env.insert(name.to_owned(), value.into_string().ok()?);

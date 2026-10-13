@@ -3973,6 +3973,7 @@ dependencies = [
  "tinymemory-api",
  "tinymemory-tools",
  "tinytools",
+ "tinytools-std",
  "tokio",
  "tokio-stream",
  "url",
@@ -6787,7 +6788,7 @@ dependencies = [
 
 [[package]]
 name = "tinycomputer-bus"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "serde",
  "serde_json",

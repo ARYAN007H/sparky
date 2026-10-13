@@ -91,7 +91,7 @@ pub(super) fn command(command: &str) -> tokio::process::Command {
     // A hook leads its own process group and dies with the handle that owns it,
     // so a deadline cannot leave its pipeline running.
     process.kill_on_drop(true);
-    crate::tools::timeout::own_process_group(process.as_std_mut());
+    tinytools_std::timeout::own_process_group(process.as_std_mut());
     process
 }
 

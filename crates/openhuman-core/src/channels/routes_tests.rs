@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use std::task::{Context, Poll, Wake, Waker};
+use std::task::{Context, Poll, Waker};
 use tinybus::EventHandler;
 use tinychannels::routes::resolve_provider_alias;
 use tinychannels_bus::context::ChatMessage;
@@ -238,12 +238,6 @@ fn model_command_messages_use_thread_aware_history_keys() {
     );
 }
 
-struct NoopWake;
-
-impl Wake for NoopWake {
-    fn wake(self: Arc<Self>) {}
-}
-
 #[cfg(feature = "modules")]
 #[tokio::test]
 async fn sign_out_cancels_remote_invalidation_while_it_waits_for_the_session_table() {
@@ -269,7 +263,7 @@ async fn sign_out_cancels_remote_invalidation_while_it_waits_for_the_session_tab
             },
         );
         let mut operation = Box::pin(callback.dispatch_controller_backend(request));
-        let waker = Waker::from(Arc::new(NoopWake));
+        let waker = Waker::noop().clone();
         let mut task_context = Context::from_waker(&waker);
 
         assert!(

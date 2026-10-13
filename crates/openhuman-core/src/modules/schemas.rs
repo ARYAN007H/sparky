@@ -253,7 +253,7 @@ fn handle_browser_forget_sites(params: Map<String, Value>) -> ControllerFuture {
         };
         let config = config_rpc::load_config_with_timeout().await?;
         crate::core::runtime::components::require_config(&config, "computer")?;
-        let forgotten = super::browser_sites::forget(&config, site.as_deref())
+        let forgotten = super::site_memory_host::forget(&config, site.as_deref())
             .await
             .map_err(|error| format!("could not forget learned site data: {error}"))?;
         tracing::info!(

@@ -1,6 +1,7 @@
 use super::*;
 use tinyagents_harness::tool::response_fields_from_schema;
 use tinyflows::nodes::integration::agent_prompt::scale_timeout_for_iteration_cap;
+use tinytools::status::POLICY_BLOCKED_MARKER;
 
 /// The tier gate an `http_request` (Network-class) node calls: BLOCKED under
 /// a read-only tier, and passed through (to the ApprovalGate) under

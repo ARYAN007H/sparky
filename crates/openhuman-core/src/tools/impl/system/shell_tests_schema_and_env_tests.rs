@@ -295,7 +295,9 @@ fn shell_timeout_honors_explicit_per_call_value() {
     // Above the cap clamps down to MAX_TIMEOUT_SECS (3600).
     assert_eq!(
         tool.explicit_timeout(Some(9_999)),
-        Some(Duration::from_secs(crate::tools::timeout::MAX_TIMEOUT_SECS))
+        Some(Duration::from_secs(
+            tinytools_std::timeout::MAX_TIMEOUT_SECS
+        ))
     );
 }
 

@@ -153,11 +153,11 @@ impl ShellTool {
     /// deadline applies only when the caller passes `timeout_secs` (issue
     /// #4023). A `0` explicitly disables it. Any positive value is clamped to
     /// `1..=3600`. See
-    /// [`crate::tools::timeout::explicit_call_timeout_duration`].
+    /// [`tinytools_std::timeout::explicit_call_timeout_duration`].
     fn explicit_timeout(&self, requested: Option<u64>) -> Option<Duration> {
-        crate::tools::timeout::explicit_call_timeout_duration(
+        tinytools_std::timeout::explicit_call_timeout_duration(
             requested,
-            crate::tools::timeout::MAX_TIMEOUT_SECS,
+            tinytools_std::timeout::MAX_TIMEOUT_SECS,
         )
     }
 }
@@ -531,9 +531,9 @@ impl ShellTool {
         // A turn that owns its child environment (library agents) keeps it: the
         // module starts from the process snapshot, so the turn's own values for
         // the functional variables are passed as approved overrides.
-        if crate::tools::timeout::CommandEnvironment::is_active() {
+        if tinytools_std::timeout::CommandEnvironment::is_active() {
             for name in crate::sandbox::ops::SANDBOX_ENV_PASSTHROUGH {
-                if let Some(value) = crate::tools::timeout::CommandEnvironment::var_os(name) {
+                if let Some(value) = tinytools_std::timeout::CommandEnvironment::var_os(name) {
                     let Ok(value) = value.into_string() else {
                         return (
                             false,
@@ -582,7 +582,7 @@ impl ShellTool {
         // gets the module's ceiling.
         let explicit_timeout = self.explicit_timeout(requested_timeout);
         let effective = explicit_timeout.unwrap_or_else(|| {
-            Duration::from_secs(crate::tools::timeout::SANDBOX_UNBOUNDED_CAP_SECS)
+            Duration::from_secs(tinytools_std::timeout::SANDBOX_UNBOUNDED_CAP_SECS)
         });
         tracing::debug!(
             timeout_secs = effective.as_secs(),
@@ -664,7 +664,7 @@ impl ShellTool {
         // long command isn't killed while still bounding a wedged sandbox.
         let explicit_timeout = self.explicit_timeout(requested_timeout);
         let effective = explicit_timeout.unwrap_or_else(|| {
-            Duration::from_secs(crate::tools::timeout::SANDBOX_UNBOUNDED_CAP_SECS)
+            Duration::from_secs(tinytools_std::timeout::SANDBOX_UNBOUNDED_CAP_SECS)
         });
         tracing::debug!(
             timeout_secs = effective.as_secs(),

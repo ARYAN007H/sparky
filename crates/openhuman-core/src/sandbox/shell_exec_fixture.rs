@@ -59,8 +59,8 @@ pub(crate) async fn run(run: NativeShellRun) -> anyhow::Result<SandboxExecResult
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
-    crate::tools::timeout::own_process_group(command.as_std_mut());
-    match crate::tools::timeout::output_or_kill(&mut command, run.timeout).await {
+    tinytools_std::timeout::own_process_group(command.as_std_mut());
+    match tinytools_std::timeout::output_or_kill(&mut command, run.timeout).await {
         Ok(Ok(output)) => Ok(SandboxExecResult {
             exit_code: output.status.code().unwrap_or(-1),
             stdout: String::from_utf8_lossy(&output.stdout).into_owned(),

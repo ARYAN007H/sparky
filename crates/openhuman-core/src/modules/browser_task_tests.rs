@@ -78,47 +78,30 @@ async fn start_refuses_a_task_without_origins() {
 }
 
 #[test]
-fn only_the_module_refusing_a_flow_reads_as_a_refused_flow() {
-    let refused: AgentResponse<u32> = AgentResponse {
-        ok: false,
-        data: None,
-        error: Some(AgentError::new(
-            "INVALID_FLOW",
-            "step 2 is not a step",
-            "fix the flow",
-            true,
-        )),
+fn the_module_is_told_the_site_only_while_learning_is_on() {
+    let workspace = tempfile::tempdir().unwrap();
+    let mut config = Config {
+        workspace_dir: workspace.path().to_path_buf(),
+        ..Config::default()
     };
-    assert!(refused_flow(
-        &unwrap_response("StartTask", refused).unwrap_err()
-    ));
-    let other: AgentResponse<u32> = AgentResponse {
-        ok: false,
-        data: None,
-        error: Some(AgentError::new(
-            "PLANNER_UNAVAILABLE",
-            "no planner",
-            "configure one",
-            false,
-        )),
-    };
-    assert!(!refused_flow(
-        &unwrap_response("StartTask", other).unwrap_err()
-    ));
-    // Only the code counts, not a message that quotes it.
-    let quoted: AgentResponse<u32> = AgentResponse {
-        ok: false,
-        data: None,
-        error: Some(AgentError::new(
-            "PLANNER_UNAVAILABLE",
-            "[INVALID_FLOW] was the last answer",
-            "configure one",
-            false,
-        )),
-    };
-    assert!(!refused_flow(
-        &unwrap_response("StartTask", quoted).unwrap_err()
-    ));
+    config.browser.learn_from_tasks = true;
+    let mut on_a_site = task();
+    on_a_site.site = Some("shop.test".to_owned());
+
+    assert_eq!(
+        start_request(&config, &on_a_site).site.as_deref(),
+        Some("shop.test")
+    );
+    // A switch in Browser settings outranks the config a tool was built with.
+    super::super::site_memory_host::note_switch(workspace.path(), false);
+    assert_eq!(start_request(&config, &on_a_site).site, None);
+    super::super::site_memory_host::note_switch(workspace.path(), true);
+    assert_eq!(
+        start_request(&config, &on_a_site).site.as_deref(),
+        Some("shop.test")
+    );
+    // A task that names no site hands the module none.
+    assert_eq!(start_request(&config, &task()).site, None);
 }
 
 #[test]

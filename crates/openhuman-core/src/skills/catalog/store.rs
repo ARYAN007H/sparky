@@ -86,7 +86,9 @@ impl HostCatalogStore {
             }
             // A refresh saved a catalog between the read and the import: that
             // one is newer than the file, so it wins.
-            Err(error) if matches!(error.kind(), ErrorKind::Conflict | ErrorKind::AlreadyExists) => {
+            Err(error)
+                if matches!(error.kind(), ErrorKind::Conflict | ErrorKind::AlreadyExists) =>
+            {
                 store.load(registry).await
             }
             Err(error) => Err(StoreError::Io(error.to_string())),

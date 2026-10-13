@@ -94,7 +94,7 @@ fn a_users_own_python_encoding_settings_win() {
 #[cfg(feature = "modules")]
 #[tokio::test]
 async fn the_container_environment_forwards_only_the_allowlist_plus_python_defaults() {
-    let scoped = crate::tools::timeout::CommandEnvironment::new([
+    let scoped = tinytools_std::timeout::CommandEnvironment::new([
         ("PATH".to_owned(), "/bin".to_owned()),
         ("OPENAI_API_KEY".to_owned(), "sk-secret".to_owned()),
         ("AWS_SECRET_ACCESS_KEY".to_owned(), "secret".to_owned()),

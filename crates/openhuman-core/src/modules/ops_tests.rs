@@ -405,7 +405,7 @@ async fn a_loader_error_carries_the_terminal_marker_exactly_once() {
     // `blocking` marks a loader error terminal, but tinybus' release-cache path
     // and `load_local` already say so; appending again doubled the sentence.
     // The failure policy keys on both phrases, so each must stay, once.
-    let marker = crate::tools::status::MODULE_FAULT_MARKER;
+    let marker = tinytools::status::MODULE_FAULT_MARKER;
     for loader_error in [
         "module 'tinydocs' could not be loaded: digest mismatch. This is terminal for the \
          running process; restart the app to try again",

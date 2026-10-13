@@ -246,13 +246,6 @@
   },
   {
     "rule": "json-write",
-    "path": "crates/openhuman-core/src/modules/browser_sites/store.rs",
-    "line": 174,
-    "text": "let mut options = tokio::fs::OpenOptions::new();",
-    "occurrence": 1
-  },
-  {
-    "rule": "json-write",
     "path": "crates/openhuman-core/src/modules/browser_task_report.rs",
     "line": 304,
     "text": "let mut options = tokio::fs::OpenOptions::new();",
@@ -261,7 +254,7 @@
   {
     "rule": "json-write",
     "path": "crates/openhuman-core/src/modules/site_memory_host.rs",
-    "line": 147,
+    "line": 159,
     "text": "let mut options = tokio::fs::OpenOptions::new();",
     "occurrence": 1
   },

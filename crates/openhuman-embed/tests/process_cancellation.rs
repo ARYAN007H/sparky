@@ -2,8 +2,8 @@
 
 #![cfg(target_os = "linux")]
 
-use openhuman_core::tools::timeout::{output_or_kill, output_unbounded, ProcessCleanup};
 use std::time::Duration;
+use tinytools_std::timeout::{output_or_kill, output_unbounded, ProcessCleanup};
 
 /// A shell child that leads its own process group and dies with its handle, as
 /// the module-owned shell children do.
