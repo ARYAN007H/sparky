@@ -201,6 +201,20 @@ pub fn status_store_for(workspace_dir: &Path) -> tinyagents_harness::observabili
     tinyagents_harness::observability::DriverStatusStore::new(docs)
 }
 
+/// The calling tenant's run ledger for `workspace_dir` ([`ledger_for`]), or an
+/// `unavailable` driver error when it has none.
+///
+/// # Errors
+///
+/// A SaaS task with no scope, or a backend that refused the scope.
+pub fn require_ledger(workspace_dir: &Path) -> LedgerResult<Arc<dyn RunLedgerStore>> {
+    ledger_for(workspace_dir).ok_or_else(|| {
+        LedgerError::from(tinystoragedrivers::StorageError::unavailable(
+            "no run ledger for the calling tenant",
+        ))
+    })
+}
+
 /// Runs one run-ledger operation on the calling tenant's ledger for
 /// `workspace_dir`, from synchronous code (the shared storage bridge).
 ///
@@ -218,11 +232,7 @@ where
     Fut: std::future::Future<Output = LedgerResult<T>> + Send + 'static,
     T: Send + 'static,
 {
-    let ledger = ledger_for(workspace_dir).ok_or_else(|| {
-        LedgerError::from(tinystoragedrivers::StorageError::unavailable(
-            "no run ledger for the calling tenant",
-        ))
-    })?;
+    let ledger = require_ledger(workspace_dir)?;
     let future = op(ledger);
     match crate::storage::block_on(async move { Ok(future.await) }) {
         Ok(result) => result,
@@ -240,10 +250,6 @@ where
     F: FnOnce(Arc<dyn RunLedgerStore>) -> Fut,
     Fut: std::future::Future<Output = LedgerResult<T>>,
 {
-    let ledger = ledger_for(workspace_dir).ok_or_else(|| {
-        LedgerError::from(tinystoragedrivers::StorageError::unavailable(
-            "no run ledger for the calling tenant",
-        ))
-    })?;
+    let ledger = require_ledger(workspace_dir)?;
     op(ledger).await
 }
