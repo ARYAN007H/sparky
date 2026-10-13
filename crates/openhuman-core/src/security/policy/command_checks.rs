@@ -5,7 +5,7 @@ use super::types::CommandRiskLevel;
 use super::types::{AutonomyLevel, GateDecision, SecurityPolicy, POLICY_BLOCKED_MARKER};
 #[cfg(test)]
 use crate::util::floor_char_boundary;
-use tinybox_bus::shell::CommandClass;
+use tinybox_bus::CommandClass;
 #[cfg(test)]
 use tinybox_core::shell::classify::{classify_segment, has_hidden_execution};
 #[cfg(test)]

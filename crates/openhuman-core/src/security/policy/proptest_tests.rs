@@ -6,7 +6,7 @@
 //! the hand-enumerated cases in `policy_tests.rs`.
 
 use super::types::SecurityPolicy;
-use tinybox_bus::shell::CommandClass;
+use tinybox_bus::CommandClass;
 use proptest::prelude::*;
 
 proptest! {

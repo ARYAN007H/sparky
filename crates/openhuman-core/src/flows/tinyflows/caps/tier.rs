@@ -9,7 +9,7 @@ use serde_json::Value;
 use tinyflows::error::{EngineError, Result};
 
 use crate::security::{GateDecision, SecurityPolicy, POLICY_BLOCKED_MARKER};
-use tinybox_bus::shell::CommandClass;
+use tinybox_bus::CommandClass;
 
 /// Hard autonomy-tier gate for an *acting* flow node (Phase 2).
 ///

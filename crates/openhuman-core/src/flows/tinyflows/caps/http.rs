@@ -20,7 +20,7 @@ use super::*;
 use crate::config::{Config, HttpRequestConfig};
 use crate::security::credentials::{HttpCredential, HttpCredentialsStore};
 use crate::security::{SecurityPolicy};
-use tinybox_bus::shell::CommandClass;
+use tinybox_bus::CommandClass;
 use crate::tools::http_request_tool;
 use tinytools::Tool as _;
 

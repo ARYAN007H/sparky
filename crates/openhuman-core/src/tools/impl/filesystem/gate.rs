@@ -11,8 +11,9 @@ use async_trait::async_trait;
 use tinytools_std::filesystem::FsGate;
 
 use crate::security::policy::{TrustedAccess, TrustedRoot};
-use tinybox_bus::shell::CommandClass;
-use crate::security::{AutonomyLevel, CommandClass, GateDecision, SecurityPolicy};
+use tinybox_bus::CommandClass;
+use crate::security::{AutonomyLevel, GateDecision, SecurityPolicy};
+use tinybox_bus::CommandClass;
 
 /// Clone `security` and scope it to `root`, a run's workspace descriptor root.
 ///

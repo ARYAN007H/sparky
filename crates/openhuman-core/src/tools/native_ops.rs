@@ -6,7 +6,7 @@ use crate::config::Config;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 use crate::security::{SecurityPolicy};
-use tinybox_bus::shell::CommandClass;
+use tinybox_bus::CommandClass;
 use crate::tools;
 use crate::tools::native_ops_types::{ExecuteToolOutcome, RuntimeToolSummary};
 use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolScope};

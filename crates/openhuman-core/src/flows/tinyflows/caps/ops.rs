@@ -28,7 +28,7 @@ use crate::flows;
 use crate::security::credentials::HttpCredential;
 use crate::security::credentials::HttpCredentialsStore;
 use crate::security::{SecurityPolicy};
-use tinybox_bus::shell::CommandClass;
+use tinybox_bus::CommandClass;
 #[cfg(test)]
 use crate::security::{GateDecision, POLICY_BLOCKED_MARKER};
 
