@@ -96,3 +96,29 @@ fn a_pinned_key_is_never_serialized_or_printed() {
     let reloaded: SearchConfig = toml::from_str(&toml).unwrap();
     assert!(!reloaded.is_host_pinned());
 }
+
+#[test]
+fn existing_config_toml_search_section_deserializes_and_round_trips_unchanged() {
+    let existing = r#"
+presentation = "one_provider"
+presentation_provider = "exa"
+
+[providers.exa]
+enabled = true
+route = "managed"
+
+[providers.brave]
+enabled = true
+route = "direct"
+"#;
+    let search: SearchConfig = toml::from_str(existing).unwrap();
+    assert_eq!(search.presentation, crate::config::PresentationMode::OneProvider);
+    assert_eq!(search.route("exa"), ProviderRoute::Backend);
+    assert_eq!(search.route("brave"), ProviderRoute::Direct);
+
+    // The config spelling stays `managed` on write, never the wire `backend`.
+    let written = toml::to_string(&search).unwrap();
+    assert!(written.contains("route = \"managed\""), "{written}");
+    assert!(!written.contains("backend"), "{written}");
+    assert!(written.contains("presentation = \"one_provider\""), "{written}");
+}
