@@ -7,8 +7,7 @@ use serde_json::json;
 
 use crate::threads::turn_state::mirror::ObserveProgress;
 use crate::web_chat::{SubagentProgressDetail, WebChannelEvent};
-use tinyagents_session::port::TurnStates;
-use tinyagents_session::turn_state::TurnStateMirror;
+use tinyagents_session::{port::TurnStates, turn_state::TurnStateMirror};
 
 use super::event_bus::publish_web_channel_event;
 use super::types::ChatRequestMetadata;
