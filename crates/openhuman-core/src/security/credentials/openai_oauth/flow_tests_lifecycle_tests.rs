@@ -96,8 +96,6 @@ fn complete_openai_oauth_rejects_missing_pending_session() {
 
 #[test]
 fn complete_openai_oauth_rejects_expired_pending_session() {
-    use tinystoragedrivers::secrets::SecretStore as _;
-
     let tmp = tempdir().unwrap();
     let config = test_config(&tmp);
     let pending = pending::store(&config).unwrap();
@@ -129,8 +127,6 @@ fn complete_openai_oauth_rejects_expired_pending_session() {
 
 #[test]
 fn start_openai_oauth_keeps_the_pending_session_in_the_secret_store_not_a_file() {
-    use tinystoragedrivers::secrets::SecretStore as _;
-
     let tmp = tempdir().unwrap();
     let config = test_config(&tmp);
     let start = runtime().block_on(start_openai_oauth(&config)).unwrap();

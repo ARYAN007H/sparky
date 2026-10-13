@@ -26,8 +26,8 @@ pub use host_tools::{HostTools, HostTurnTools, TurnContext};
 mod builder_tests;
 
 use crate::agent::harness::definition::{AgentDefinition, ToolScope};
-use crate::tools::agent_policy::ToolPolicySession;
 use std::sync::Arc;
+use tinytools::ToolPolicySession;
 use tinytools::{Tool, ToolSpec};
 
 /// Drop entries with duplicate `name` fields, first occurrence wins.

@@ -405,7 +405,7 @@ async fn a_loader_error_carries_the_terminal_marker_exactly_once() {
     // `blocking` marks a loader error terminal, but tinybus' release-cache path
     // and `load_local` already say so; appending again doubled the sentence.
     // The failure policy keys on both phrases, so each must stay, once.
-    let marker = crate::tools::status::MODULE_FAULT_MARKER;
+    let marker = tinytools::status::MODULE_FAULT_MARKER;
     for loader_error in [
         "module 'tinydocs' could not be loaded: digest mismatch. This is terminal for the \
          running process; restart the app to try again",
@@ -600,25 +600,23 @@ fn status_reports_the_source_that_serves_a_module() {
 }
 
 #[tokio::test]
-#[ignore = "blocked on tinybus 0.1.4 (tinybus epic): tinychannels-module cannot be a dev-dependency"]
-async fn a_registered_linked_factory_serves_the_module_and_status_says_so() {
+async fn a_pinned_release_module_serves_the_module_and_status_says_so() {
     use crate::config::schema::ModuleSourceMode;
     use crate::modules::types::ModuleSource;
 
-    // Restore `register_linked("tinychannels", tinychannels_module::linked_module);`
-    // once the tinybus epic lets tinychannels-module be a dev-dependency again.
     let mut config = Config::default();
-    config.modules.source = ModuleSourceMode::Linked;
+    config.modules.enabled = true;
+    config.modules.source = ModuleSourceMode::Release;
     ops::ensure_loaded(&config, "tinychannels")
         .await
-        .expect("the linked module is admitted through the seam");
+        .expect("the pinned release module is admitted through the seam");
 
     let status = list(&config)
         .into_iter()
         .find(|m| m.id == "tinychannels")
         .expect("tinychannels is registered");
     assert_eq!(status.state, ModuleState::Ready);
-    assert_eq!(status.source, Some(ModuleSource::Linked));
+    assert_eq!(status.source, Some(ModuleSource::Release));
     assert_eq!(status.detail, None);
 }
 

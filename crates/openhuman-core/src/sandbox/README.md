@@ -38,8 +38,10 @@ backend, execute.
        +--------------+------------------+
        v              v                  v
   None           Local                 Docker
-  host shell     TinyBox StartJailedExec TinyBox RunDocker
-  (env cleared)  with explicit jail     action_dir mounted at /workspace
+  TinyBox        TinyBox               TinyBox RunDocker
+  StartNative-   StartNativeShellExec  action_dir mounted at /workspace
+  ShellExec      with explicit jail
+  (no jail)
 ```
 
 ### Resolving a policy
@@ -66,24 +68,27 @@ from [`local_grants.rs`](./local_grants.rs) only for the Local backend.
 
 ### The None backend
 
-`execute_unsandboxed` builds the command with `agent::platform_shell` (so
-Windows gets `cmd.exe /C`), clears the environment, and forwards only
-`SANDBOX_ENV_PASSTHROUGH` (`PATH`, `HOME`, `TERM`, `LANG`, `LC_ALL`,
-`LC_CTYPE`, `USER`, `SHELL`, `TMPDIR`) plus the Windows process-bootstrap
-variables and the caller's extra env. A passthrough variable that is set but
-empty is an error. The command runs under `tools::timeout::output_or_kill`.
+`execute_unsandboxed` maps the command onto TinyBox's `StartNativeShellExec`
+through [`shell_exec.rs`](./shell_exec.rs): a module-owned `passthrough` resource
+rooted at the working directory, the host's own network, no jail. TinyBox
+selects the shell (`cmd.exe` on Windows, bash with `pipefail` or `sh` elsewhere),
+starts the child from its safe environment snapshot (`SANDBOX_ENV_PASSTHROUGH`
+plus the Windows process-bootstrap variables, an empty value being an error),
+applies the caller's UTF-8 overrides, owns the per-call scratch directory and
+enforces the runtime budget. The host never spawns the shell itself, and without
+the `modules` feature the run is refused.
 
 ### The Local backend
 
 `native_jail.rs` asks the pinned TinyBox module for `JailStatus`, creates a
 module-owned `passthrough` resource rooted at `policy.workspace_root`, and
-starts the shell through `StartJailedExec`. The request carries only the
+starts the shell through `StartNativeShellExec` with a jail. The request carries only the
 resolved read-only/read-write grants, network policy, and a required enforced
 isolation floor. TinyBox owns the jail provider, child process, pipe capture,
 and kill/reap acknowledgement; OpenHuman reads bounded output batches and
-closes the resource after terminal cleanup. A per-call scratch directory under
-the core state dir is granted read-write and used for `TMPDIR`, `TEMP`, and
-`TMP` unless the caller supplied one. No host-local jail or unconfined fallback
+closes the resource after terminal cleanup. TinyBox owns the per-call scratch
+directory under the core state dir: it grants it read-write and points `TMPDIR`,
+`TEMP`, and `TMP` at it unless the caller supplied one. No host-local jail or unconfined fallback
 runs if the module, artifact, or requested enforcement is unavailable.
 
 A real jail (Landlock, Seatbelt) denies everything it is not told about, so
@@ -115,9 +120,10 @@ any extra drops, `--security-opt no-new-privileges`, a read-only rootfs with
 `/tmp` and `/var/tmp` tmpfs mounts, memory and CPU limits (512 MB and 1 CPU by
 default), and only the passthrough env plus the request's env. Containers
 carry the label `openhuman.sandbox=true`; TinyBox owns the bounded daemon status
-probe and label-scoped orphan cleanup. `validate_docker_policy` rejects host
-networking and a mount or workspace root of `/`, `/etc`, `/proc`, `/sys` or the
-Docker socket.
+probe and label-scoped orphan cleanup. `validate_docker_policy` asks TinyBox's
+`ValidateDockerPolicy` member (the check `RunDocker` itself enforces), which
+reports host networking and a mount or workspace root of `/`, `/etc`, `/proc`,
+`/sys` or the Docker socket; with no module there is no verdict, never a clean one.
 
 ### Backend status
 
@@ -171,8 +177,9 @@ Registered through `all_sandbox_registered_controllers()` in `core/all.rs`:
   `is_remote` flag.
 - `sandbox.cleanup_orphans`: kill labelled orphan containers, returns the
   count.
-- `sandbox.validate_policy`: run `validate_docker_policy` on a supplied
-  policy, returns `valid` and `issues`.
+- `sandbox.validate_policy`: ask TinyBox (`ValidateDockerPolicy`) about a
+  supplied policy, returns `valid` and `issues`; an error when the module is
+  unavailable.
 
 The settings surface (`get_sandbox_settings`, `[security.sandbox]` and
 `[runtime.docker]`) is in `config/ops/sandbox.rs`, which reads
@@ -187,7 +194,9 @@ The settings surface (`get_sandbox_settings`, `[security.sandbox]` and
   are `security/`. The autonomy policy is off by default there, so for a
   default install the sandbox and the `is_always_forbidden` floor are what
   bound an agent.
-- Shell construction for each platform is `agent::platform_shell`.
+- Shell selection and the child environment for each platform are TinyBox's
+  (`SelectShell` / `StartNativeShellExec`); `agent::host_runtime::host_shell_flavor`
+  only tells the model which family that is.
 - The agent's `SandboxMode` is declared in its definition
   (`agent::harness::definition`) and read per call through
   the explicit agent sandbox mode supplied by the tool execution context.

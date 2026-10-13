@@ -108,6 +108,14 @@ async fn migrate_legacy(config: &Config) {
         .insert(workspace);
 }
 
+/// Run the one-time legacy-file migration, so a module-side read of the
+/// preference (a visibility query, a filtered listing) sees rows a user stored
+/// before the preference moved into the module. Idempotent per workspace; the
+/// pref reads and writes below call it themselves.
+pub(crate) async fn ensure_migrated(config: &Config) {
+    migrate_legacy(config).await;
+}
+
 /// The scope pref stored for `toolkit`, or the default when none is.
 ///
 /// **This read fails open**: a module that cannot be reached lands on the

@@ -1,28 +1,23 @@
-//! A linked TinyChannels module fixture for host-side unit tests.
+//! The pinned TinyChannels release fixture for host-side unit tests.
 //!
-//! These tests exercise the real owning module over TinyBus without downloading
-//! a release artifact or reaching a provider service. The module is attached
-//! through the same seam local development uses: the factory is registered with
-//! [`register_linked`] and `[modules] source = "linked"` makes
-//! `ops::ensure_loaded` attach it to the process-wide module host, which lives
-//! on a process-lifetime runtime, so it outlives the short Tokio runtimes of
-//! individual tests.
+//! These tests exercise the real owning module over TinyBus without contacting
+//! provider services. The host test runner stages the checksum-pinned module
+//! release in `OPENHUMAN_MODULE_PATH`, and the regular release loader attaches
+//! it to the process-wide module host.
 
+use crate::config::Config;
 use crate::modules::client::ModuleClient;
 use tinychannels_bus::methods;
 
-/// Return a client for the compiled, linked TinyChannels module fixture.
-///
-/// BLOCKED on the tinybus epic: `tinychannels-module` v0.1.29 pins `tinybus =0.1.4`
-/// while the workspace tinybus is 0.1.3, so the module cannot be a dev-dependency
-/// and the fixture cannot be linked. Tests that need it fail with this message
-/// until the dependency is restored.
+/// Return a client for the checksum-pinned TinyChannels test module.
 pub(crate) async fn client() -> ModuleClient {
-    panic!("tinychannels-module fixture unavailable: blocked on tinybus 0.1.4 (tinybus epic)")
+    let mut config = Config::default();
+    config.modules.enabled = true;
+    ModuleClient::new(config)
 }
 
 #[tokio::test]
-async fn linked_module_prepares_runtime_limits_over_confidential_bus_call() {
+async fn released_module_prepares_runtime_limits_over_confidential_bus_call() {
     use tinychannels_bus::module_control::{ChannelControlRequest, ChannelControlResult};
 
     let response: ChannelControlResult = client()
@@ -48,7 +43,7 @@ async fn linked_module_prepares_runtime_limits_over_confidential_bus_call() {
 }
 
 #[tokio::test]
-async fn linked_module_prepares_legacy_inbound_facts_over_confidential_bus_call() {
+async fn released_module_prepares_legacy_inbound_facts_over_confidential_bus_call() {
     use tinychannels_bus::module_inbound::{
         ChannelInboundSource, PrepareChannelInboundRequest, PreparedChannelInbound,
     };

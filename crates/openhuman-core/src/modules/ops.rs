@@ -257,6 +257,13 @@ async fn start_resolution(
                 Resolution::Failed(reason)
             }
         };
+        // The connector module's curated catalogs are cached in the host; a
+        // module that has just been (re)resolved may serve other tables, so
+        // drop the snapshot before any waiting caller is released. The next
+        // connector call (or the boot warm-up) reads it again.
+        if id == super::connectors::MODULE_ID {
+            crate::integrations::composio::contract::curated::invalidate();
+        }
         resolution::global().complete(id, resolution, sender);
     };
     match host::runtime().await {
@@ -427,7 +434,7 @@ where
 
 /// Append the terminal-fault sentence to `error` unless it already has it.
 pub(super) fn mark_terminal(error: String) -> String {
-    let marker = crate::tools::status::MODULE_FAULT_MARKER;
+    let marker = tinytools::status::MODULE_FAULT_MARKER;
     if error.contains(marker) {
         return error;
     }
@@ -545,10 +552,16 @@ fn module_config(config: &Config, id: &str) -> serde_json::Value {
                 error = %error,
                 "[connectors] no route configured; loading with the capability surface only"
             );
-            serde_json::json!({})
+            serde_json::json!({ "offered_toolkits": super::connectors::offered_toolkits(config) })
         });
     }
     serde_json::json!({})
+}
+
+/// [`module_config`] for a test in a sibling module.
+#[cfg(test)]
+pub(super) fn module_config_for_test(config: &Config, id: &str) -> serde_json::Value {
+    module_config(config, id)
 }
 
 /// Where downloaded artifacts are kept.

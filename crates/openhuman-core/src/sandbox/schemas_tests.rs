@@ -161,11 +161,10 @@ async fn handle_resolve_policy_uses_loaded_action_dir() {
     );
 }
 
-#[tokio::test]
-async fn handle_validate_policy_valid() {
+fn docker_policy_params(workspace: &str) -> Map<String, Value> {
     let policy = super::super::types::SandboxPolicy {
         backend: super::super::types::SandboxBackendKind::Docker,
-        workspace_root: std::path::PathBuf::from("/tmp/safe"),
+        workspace_root: std::path::PathBuf::from(workspace),
         state_dir: std::path::PathBuf::from("/tmp/state"),
         read_only_mounts: vec![],
         read_write_mounts: vec![],
@@ -175,33 +174,31 @@ async fn handle_validate_policy_valid() {
     };
     let mut params = Map::new();
     params.insert("policy".into(), serde_json::to_value(&policy).unwrap());
-    let result = handle_validate_policy(params).await;
-    assert!(result.is_ok());
-    let val = result.unwrap();
-    assert_eq!(val.get("valid").and_then(|v| v.as_bool()), Some(true));
+    params
 }
 
 #[tokio::test]
-async fn handle_validate_policy_dangerous() {
-    let policy = super::super::types::SandboxPolicy {
-        backend: super::super::types::SandboxBackendKind::Docker,
-        workspace_root: std::path::PathBuf::from("/"),
-        state_dir: std::path::PathBuf::from("/tmp/state"),
-        read_only_mounts: vec![],
-        read_write_mounts: vec![],
-        allow_network: false,
-        env_passthrough: vec![],
-        docker_overrides: Some(super::super::types::DockerOverrides {
-            network: Some("host".into()),
-            ..Default::default()
-        }),
-    };
+async fn handle_validate_policy_rejects_a_malformed_policy() {
     let mut params = Map::new();
-    params.insert("policy".into(), serde_json::to_value(&policy).unwrap());
-    let result = handle_validate_policy(params).await;
-    assert!(result.is_ok());
-    let val = result.unwrap();
-    assert_eq!(val.get("valid").and_then(|v| v.as_bool()), Some(false));
+    params.insert("policy".into(), Value::String("not a policy".into()));
+    let err = handle_validate_policy(params).await.unwrap_err();
+    assert!(err.contains("Invalid policy"), "{err}");
+}
+
+/// The verdict belongs to the TinyBox module. With none available the RPC must
+/// say so; answering `valid: true` for an unchecked policy would fail open.
+#[cfg(feature = "modules")]
+#[tokio::test]
+async fn handle_validate_policy_errors_instead_of_passing_when_tinybox_is_unavailable() {
+    let mut config = crate::config::Config::default();
+    config.modules.enabled = false;
+    let ctx = scoped_ctx(config);
+    let result = CoreContext::scope(ctx, async {
+        handle_validate_policy(docker_policy_params("/")).await
+    })
+    .await;
+    let err = result.unwrap_err();
+    assert!(err.contains("Policy validation is unavailable"), "{err}");
 }
 
 // ── [components] sandbox = false ──────────────────────────────────────

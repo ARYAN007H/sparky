@@ -64,6 +64,36 @@ pub use names::methods;
 /// loudly rather than silently downgrading to the other route, which would send
 /// a user's requests somewhere they did not choose.
 pub fn module_config(config: &Config) -> Result<serde_json::Value, String> {
+    module_config_with_proxy(config, &crate::config::runtime_proxy_config())
+}
+
+/// [`module_config`] against an explicit proxy policy rather than the
+/// process-global runtime one.
+pub(crate) fn module_config_with_proxy(
+    config: &Config,
+    proxy: &crate::config::schema::ProxyConfig,
+) -> Result<serde_json::Value, String> {
+    let mut payload = route_config(config, proxy)?;
+    payload["offered_toolkits"] = offered_toolkits(config);
+    Ok(payload)
+}
+
+/// The host's offered-toolkit policy as the module reads it
+/// (`tinyconnectors_bus::vocabulary::OfferedToolkits`). Also the whole load
+/// blob when no route can be named, so the policy still applies to the
+/// capability listings of a signed-out module.
+#[must_use]
+pub fn offered_toolkits(config: &Config) -> serde_json::Value {
+    serde_json::json!({
+        "allow": config.composio.offered_toolkits_allow,
+        "deny": config.composio.offered_toolkits_deny,
+    })
+}
+
+fn route_config(
+    config: &Config,
+    proxy: &crate::config::schema::ProxyConfig,
+) -> Result<serde_json::Value, String> {
     let state_dir = config.workspace_dir.join("state");
 
     // A host-pinned credential outranks the mode and the credential store, the
@@ -82,7 +112,7 @@ pub fn module_config(config: &Config) -> Result<serde_json::Value, String> {
             "state_dir": state_dir,
         });
         if let Some(transport) =
-            crate::integrations::composio::client::module_transport(destination)
+            crate::integrations::composio::client::module_transport_with_proxy(destination, proxy)
         {
             payload["transport"] = serde_json::json!(transport);
         }
@@ -165,7 +195,10 @@ pub fn module_config(config: &Config) -> Result<serde_json::Value, String> {
                 .as_deref()
                 .unwrap_or("https://backend.composio.dev/api/v3");
             if let Some(transport) =
-                crate::integrations::composio::client::module_transport(destination)
+                crate::integrations::composio::client::module_transport_with_proxy(
+                    destination,
+                    proxy,
+                )
             {
                 payload["transport"] = serde_json::json!(transport);
             }
@@ -175,6 +208,17 @@ pub fn module_config(config: &Config) -> Result<serde_json::Value, String> {
             "unknown composio mode: \"{unknown}\". Supported: \"{COMPOSIO_MODE_BACKEND}\", \
              \"{COMPOSIO_MODE_DIRECT}\""
         )),
+    }
+}
+
+/// Read the connector module's curated catalogs into the host's snapshot.
+///
+/// Called once the module is serving (see `ops::start_resolution`) and at
+/// boot when it was already serving from the search path. A failure only
+/// delays the snapshot: the next connector call primes it again.
+pub async fn prime_catalogs(config: &Config) {
+    if let Err(error) = crate::integrations::composio::contract::curated::prime(config).await {
+        tracing::debug!("[connectors] catalog prime failed: {error}");
     }
 }
 
@@ -221,6 +265,8 @@ async fn ensure_routed(config: &Config, proxy: &Proxy) -> Result<(), String> {
     // it later would strand the history already written there.
     if let Some(object) = route.as_object_mut() {
         object.remove("state_dir");
+        // Load-time like `state_dir`: the policy is not part of the route.
+        object.remove("offered_toolkits");
     }
 
     let current = fingerprint(&route);

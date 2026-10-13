@@ -90,10 +90,18 @@ local_source_ids=()
 if local_module_source_is_source; then
   local_source_ids+=(tinyconnectors tinyjuice tinysearch tinyhosts tinymcp)
 else
-  for released_id in tinyjuice tinysearch; do
+  for released_id in tinychannels tinyjuice tinysearch; do
     released_dir="$(stage_release_module "$released_id" "$wallet_platform" "$module_ext")"
     export OPENHUMAN_MODULE_PATH="$released_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
   done
+fi
+
+# TinyChannels host unit tests use the pinned module artifact through the
+# regular loader. Its source module is not linked into the core: tinychannels-
+# module currently requires TinyBus 0.1.4 while this host pins 0.1.3.
+if local_module_source_is_source; then
+  released_dir="$(stage_release_module tinychannels "$wallet_platform" "$module_ext")"
+  export OPENHUMAN_MODULE_PATH="$released_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
 fi
 
 # Wallet JSON-RPC E2E sends a recovery phrase only to an attested module. Build
@@ -232,6 +240,11 @@ run_raw_coverage_modules() {
          [ "$module" = "composio_tools_direct_raw_coverage_e2e" ] ||
          [ "$module" = "tools_composio_large_round25_raw_coverage_e2e" ]; } &&
        true; then
+      OPENHUMAN_MODULE_PATH="$connectors_module_path" \
+        cargo_test --test raw_coverage_all -- "${module}::" --test-threads=1 "$@"
+    elif [ "$module" = "automation_scheduling_e2e" ]; then
+      # This target executes a scheduled shell job through the verified TinyBox
+      # release, which the ordinary isolated raw-coverage processes do not see.
       OPENHUMAN_MODULE_PATH="$connectors_module_path" \
         cargo_test --test raw_coverage_all -- "${module}::" --test-threads=1 "$@"
     else
