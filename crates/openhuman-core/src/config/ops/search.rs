@@ -373,6 +373,9 @@ pub(crate) fn search_settings_json_with(config: &Config, managed_available: bool
         .collect();
     json!({
         "enabled": search_enabled,
+        "component_disabled": !config.components.search,
+        "component_disabled_reason": (!config.components.search)
+            .then_some("COMPONENT_DISABLED:search (set [components] search = true to enable)"),
         "presentation": config.search.presentation.as_str(),
         "presentation_provider": config.search.presentation_provider,
         "max_results": config.search.max_results,
