@@ -30,11 +30,6 @@ fn classified_errors_become_actionable_messages() {
         "The search request was rejected: urls must not be empty"
     );
     assert_eq!(user_facing_error("boom"), "Web search failed: boom");
-    assert_eq!(
-        error_code("x tinysearch.rate_limited: y"),
-        Some("rate_limited")
-    );
-    assert_eq!(error_code("plain"), None);
 }
 
 #[test]
@@ -146,21 +141,6 @@ fn the_unavailable_verdict_tells_the_model_to_stop_rather_than_wait() {
 }
 
 #[test]
-fn only_the_exhaustion_verdict_is_treated_as_final() {
-    // A rate limit clears on its own; a low balance and a rejected argument
-    // each have a message naming what to change. None of them may latch.
-    assert!(exhausts_providers(
-        "tinysearch.provider_unavailable: all down"
-    ));
-    assert!(!exhausts_providers("tinysearch.rate_limited: slow down"));
-    assert!(!exhausts_providers("tinysearch.insufficient_balance: 402"));
-    assert!(!exhausts_providers(
-        "tinysearch.invalid_arguments: urls must not be empty"
-    ));
-    assert!(!exhausts_providers("boom"));
-}
-
-#[test]
 fn a_tool_starts_with_nothing_recorded() {
     let config = nothing_usable_config();
     let tool = TinySearchTool::recorded(spec("web_search_tool"));
@@ -247,7 +227,7 @@ fn a_rejected_provider_key_names_the_provider_and_the_fix() {
         "Web search is unavailable: tavily rejected the configured API key (HTTP 401). Update \
          the key under Connections → Search, or remove it to use managed search."
     );
-    assert!(!exhausts_providers(
+    assert!(!tinysearch_bus::errors::exhausts_providers(
         "tinysearch.provider_unauthorized: tavily rejected the configured API key (HTTP 401)"
     ));
 }
@@ -262,7 +242,7 @@ fn a_rejected_backend_credential_asks_for_the_right_fix() {
     let key = backend_unauthorized_message(true);
     assert!(key.contains("rejected the configured API key"), "{key}");
     assert!(!key.contains("Sign in again"), "{key}");
-    assert!(!exhausts_providers(
+    assert!(!tinysearch_bus::errors::exhausts_providers(
         "tinysearch.backend_unauthorized: rejected"
     ));
 }
