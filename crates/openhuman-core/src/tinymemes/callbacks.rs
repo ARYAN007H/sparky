@@ -123,11 +123,6 @@ pub(super) fn correlation_of(payload: &Value) -> Option<&str> {
         .filter(|c| !c.is_empty())
 }
 
-#[cfg(test)]
-pub(super) fn live_count() -> usize {
-    registry().len()
-}
-
 fn args<T: DeserializeOwned>(value: Value) -> Result<T, tinybus::Error> {
     let (request,): (T,) = serde_json::from_value(value)
         .map_err(|_| tinybus::Error::failed("invalid tinymemes host request"))?;

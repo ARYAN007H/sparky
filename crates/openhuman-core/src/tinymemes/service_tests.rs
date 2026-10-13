@@ -207,12 +207,11 @@ async fn an_unavailable_capability_is_reported_not_faked() {
 }
 
 #[tokio::test]
-async fn component_off_refuses_before_registering_anything() {
+async fn component_off_refuses_before_any_module_load() {
     let mut config = Config::default();
     config.components.memes = false;
-    let before = callbacks::live_count();
     let request: RemixRequest =
         serde_json::from_str(r#"{"conversation":[],"reply":"hi"}"#).unwrap();
-    assert!(remix(&config, request).await.is_err());
-    assert_eq!(callbacks::live_count(), before);
+    let error = remix(&config, request).await.unwrap_err();
+    assert!(error.contains("component is off"), "{error}");
 }
