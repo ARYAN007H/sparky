@@ -174,6 +174,19 @@ async fn message_append_with_config(
             || request.message.content.contains("[FILE:");
         let durable_files = crate::agent::attachments::parse(&request.message.content).1;
         let durable_upload = !durable_files.is_empty();
+        // Raw and durable uploads both live under the thread's working folder,
+        // where the turn reads them (#7714).
+        let workspace = if raw_upload || durable_upload {
+            crate::agent::attachments::thread_action_dir(
+                config,
+                persistence_dir,
+                Some(&request.thread_id),
+            )
+            .await
+            .map_err(|error| ThreadsError::Message(format!("stage user attachments: {error}")))?
+        } else {
+            config.action_dir.clone()
+        };
         if durable_upload {
             let image_count = durable_files
                 .iter()
@@ -200,14 +213,6 @@ async fn message_append_with_config(
                     "attachment count exceeds configured limit".into(),
                 ));
             }
-            // Uploads were staged under the thread's working folder, if any.
-            let workspace = crate::agent::attachments::thread_action_dir(
-                config,
-                persistence_dir,
-                Some(&request.thread_id),
-            )
-            .await
-            .map_err(|error| ThreadsError::Message(format!("validate user attachment: {error}")))?;
             for file in &durable_files {
                 let scope = crate::agent::attachments::AttachmentAccessScope {
                     external_channel: matches!(
@@ -261,7 +266,7 @@ async fn message_append_with_config(
         request.message.content = crate::agent::attachments::stage_turn(
             &request.message.content,
             Some(config),
-            None,
+            Some(&tinytools::WorkspaceDescriptor::new(workspace)),
             Some(&request.thread_id),
             origin,
         )

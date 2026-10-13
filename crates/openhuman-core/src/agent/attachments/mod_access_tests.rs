@@ -80,7 +80,6 @@ async fn delegation_rejects_malformed_explicit_paths_and_external_reads_before_c
             "mention picture.png in prose",
             &serde_json::json!({}),
             None,
-            None,
             None
         )
         .await
@@ -98,7 +97,6 @@ async fn delegation_rejects_malformed_explicit_paths_and_external_reads_before_c
             "task",
             &serde_json::json!({"image_paths": image_paths}),
             None,
-            None,
             None
         )
         .await
@@ -109,7 +107,6 @@ async fn delegation_rejects_malformed_explicit_paths_and_external_reads_before_c
         &serde_json::json!({"image_paths": ["picture.png"]}),
         None,
         Some(&external_origin()),
-        None,
     )
     .await
     .unwrap_err();
@@ -175,8 +172,9 @@ async fn thread_folder_upload_is_staged_where_the_turn_reads_it() {
     );
 
     // Stage the way `start_chat` does, then read the way the turn does: its
-    // config acts in the thread folder and the request scope names no
-    // workspace of its own.
+    // request scope comes from a run context carrying the thread folder as its
+    // workspace (`run_task`), which a delegated child inherits along with a
+    // freshly loaded, global `action_dir` config.
     let staged = stage(
         UPLOAD,
         "bound",
@@ -190,13 +188,13 @@ async fn thread_folder_upload_is_staged_where_the_turn_reads_it() {
     .unwrap();
     let (_, files) = parse(&staged);
     assert_eq!(files.len(), 1);
-    let turn_config = Config {
-        action_dir: folder.clone(),
-        ..config.clone()
-    };
-    let turn_scope = AttachmentAccessScope::default();
-    assert!(!is_missing_local_reference(&turn_config, &files[0].path, &turn_scope).await);
-    let path = resolve_path(&turn_config, &files[0].path, &turn_scope)
+    let mut context = crate::agent::tinyagents::host::OpenHumanRunContext::new();
+    context.workspace = Some(tinytools::WorkspaceDescriptor::new(folder.clone()));
+    let mut request = tinyinference_llm::model::ModelRequest::new(Vec::new());
+    attach_request_scope(&mut request, &context);
+    let turn_scope = take_request_scope(&mut request.metadata);
+    assert!(!is_missing_local_reference(&config, &files[0].path, &turn_scope).await);
+    let path = resolve_path(&config, &files[0].path, &turn_scope)
         .await
         .unwrap();
     assert_eq!(tokio::fs::read(path).await.unwrap(), b"a");

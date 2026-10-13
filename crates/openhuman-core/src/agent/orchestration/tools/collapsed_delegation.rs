@@ -370,7 +370,6 @@ pub(crate) async fn execute_collapsed_delegation_with_live_parent(
             .and_then(|ctx| ctx.workspace())
             .or(run_context.workspace.as_ref()),
         run_context.origin.as_ref(),
-        run_context.thread_id.as_deref(),
     )
     .await
     {

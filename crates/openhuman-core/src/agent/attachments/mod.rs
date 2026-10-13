@@ -424,27 +424,6 @@ pub(crate) async fn stage(
     Ok(out)
 }
 
-/// Config and scope for a delegated reference: the explicit workspace, else
-/// the thread's folder, which is where the turn staged its uploads (#7714).
-async fn acting_config(
-    workspace: Option<&tinytools::WorkspaceDescriptor>,
-    thread_id: Option<&str>,
-) -> anyhow::Result<(Config, AttachmentAccessScope)> {
-    let mut config = crate::config::rpc::load_config_with_timeout()
-        .await
-        .map_err(anyhow::Error::msg)?;
-    let action_dir = match workspace {
-        Some(workspace) => workspace.root.clone(),
-        None => thread_action_dir(&config, &config.workspace_dir, thread_id).await?,
-    };
-    config.action_dir = action_dir;
-    let scope = AttachmentAccessScope {
-        external_channel: false,
-        workspace: workspace.map(|workspace| workspace.root.clone()),
-    };
-    Ok((config, scope))
-}
-
 /// Explicit image forwarding for delegation. A filename mentioned in prose
 /// grants no read; only the typed argument or a legacy image marker does.
 pub(crate) async fn delegation_prompt(
@@ -452,7 +431,6 @@ pub(crate) async fn delegation_prompt(
     args: &serde_json::Value,
     workspace: Option<&tinytools::WorkspaceDescriptor>,
     origin: Option<&crate::agent::turn_origin::AgentTurnOrigin>,
-    thread_id: Option<&str>,
 ) -> anyhow::Result<String> {
     let mut prompt = prompt.to_string();
     if let Some(value) = args.get("image_paths") {
@@ -476,7 +454,16 @@ pub(crate) async fn delegation_prompt(
     ) {
         anyhow::bail!("local attachment reads are disabled for external channel input");
     }
-    let (config, scope) = acting_config(workspace, thread_id).await?;
+    let mut config = crate::config::rpc::load_config_with_timeout()
+        .await
+        .map_err(anyhow::Error::msg)?;
+    if let Some(workspace) = workspace {
+        config.action_dir = workspace.root.clone();
+    }
+    let scope = AttachmentAccessScope {
+        external_channel: false,
+        workspace: workspace.map(|workspace| workspace.root.clone()),
+    };
     stage(&prompt, "delegation", &config, &scope).await
 }
 
@@ -485,7 +472,6 @@ pub(crate) async fn has_resolvable_image(
     prompt: &str,
     workspace: Option<&tinytools::WorkspaceDescriptor>,
     origin: Option<&crate::agent::turn_origin::AgentTurnOrigin>,
-    thread_id: Option<&str>,
 ) -> anyhow::Result<bool> {
     let rehydrated = crate::agent::multimodal::rehydrate_image_placeholders(&[
         tinyagents_session::transcript::TranscriptMessage::user(prompt),
@@ -500,13 +486,22 @@ pub(crate) async fn has_resolvable_image(
     if paths.is_empty() {
         return Ok(false);
     }
+    let mut config = crate::config::rpc::load_config_with_timeout()
+        .await
+        .map_err(anyhow::Error::msg)?;
     if matches!(
         origin,
         Some(crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel { .. })
     ) {
         anyhow::bail!("local attachment reads are disabled for external channel input");
     }
-    let (config, scope) = acting_config(workspace, thread_id).await?;
+    if let Some(workspace) = workspace {
+        config.action_dir = workspace.root.clone();
+    }
+    let scope = AttachmentAccessScope {
+        external_channel: false,
+        workspace: workspace.map(|workspace| workspace.root.clone()),
+    };
     for path in paths {
         let path = legacy::migrate_path(&config, &path, &scope)
             .await?
