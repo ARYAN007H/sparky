@@ -486,6 +486,34 @@ approval classification (`SecurityPolicy`), Composio schema lookup, and the
 store, checkpoint, bus and cron effects. TinyFlows is a plain library gitlink,
 so there is no registry record or `module-boundaries.json` entry.
 
+### TinyFlows builder tool belt and observability mappers (#7554, #7557)
+
+The workflow-builder tools (`revise`, `edit`, `validate`, `dry_run`, `create`,
+`duplicate`, `save`, `resume_flow_run`, `cancel_flow_run`, the flow and run
+reads, `list_agent_definitions`, `list_node_kinds`, `get_node_kind_contract`
+and `suggest_workflows`) are `tinytools::Tool`s in `tinyflows_copilot::tools`
+over the ports `DraftStore`, `FlowStore`, `BuilderGates`, `AgentDirectory`,
+`NodeKindSource` and `SuggestionStore`. `flows/builder_host.rs` is the one
+implementation of those ports (`FlowsHost`, plus `OverlayNodeKinds` for the
+host node-kind notes) and `flows/registration.rs` constructs the tools over it.
+Tool names, descriptions, parameter schemas, permissions and the
+`external_effect` flag are pinned byte-for-byte by
+`flows/registration_tests/flow_tools.snap.json`, recorded before the move.
+`edit_op_shape`, the node-kind line renderers
+(`tinyflows::catalog::render_node_kinds_{line,required}`) and
+`agent_prompt::resolve_completion_model` are upstream; the dedup exactly-once
+settle contract was already `tinyflows::nodes::control_flow::dedup_settle`, so
+only the per-flow lock and the run-finished subscriber remain in
+`flows/bus/dedup_commit.rs`. `observability.rs` and `langfuse_export.rs` call
+`tinyflows::observe::{step_status_str, to_exporter_observations}`.
+
+Stays host: `search_tool_catalog`, `get_tool_contract`,
+`get_tool_output_sample`, `list_connectable_toolkits` and
+`list_flow_connections` (bound to the live Composio catalog, its probe cache and
+the connected accounts). `tinyflows-copilot` is `publish = false` because it
+names `tinytools` by git rev; OpenHuman's `[patch]` redirects it to the
+tinyagents copy, so there is one `Tool` trait.
+
 ### TinyFlows builder gate stack (#7551)
 
 `flows/ops/builder_gates.rs` no longer orders the author-time gates. `tinyflows::gates::builder_failures` runs compatibility, saved-workflow, portable authoring and binding gates, then the host stages, then the mock-run argument preflight. The host implements `BuilderGateHost`: `ToolPolicy` (workspace-relative upload paths), `AgentReferences`, `Connections` and `ToolContracts`, plus the saved-workflow lookup. `validate_binding_resolvability` and `validate_required_arg_resolvability` are deleted. Provider connectivity remains an advisory proposal field, not a stage.
