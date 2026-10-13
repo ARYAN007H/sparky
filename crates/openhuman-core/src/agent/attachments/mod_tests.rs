@@ -320,6 +320,7 @@ async fn vision_without_explicit_references_fails_before_configuration_or_infere
     assert!(!has_resolvable_image(
         "Describe a filename mentioned only in prose: picture.png",
         None,
+        None,
         None
     )
     .await
@@ -327,6 +328,7 @@ async fn vision_without_explicit_references_fails_before_configuration_or_infere
     assert!(delegation_prompt(
         "task",
         &serde_json::json!({ "image_paths": [42] }),
+        None,
         None,
         None
     )

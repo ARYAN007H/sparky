@@ -200,13 +200,21 @@ async fn message_append_with_config(
                     "attachment count exceeds configured limit".into(),
                 ));
             }
+            // Uploads were staged under the thread's working folder, if any.
+            let workspace = crate::agent::attachments::thread_action_dir(
+                config,
+                persistence_dir,
+                Some(&request.thread_id),
+            )
+            .await
+            .map_err(|error| ThreadsError::Message(format!("validate user attachment: {error}")))?;
             for file in &durable_files {
                 let scope = crate::agent::attachments::AttachmentAccessScope {
                     external_channel: matches!(
                         origin,
                         Some(crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel { .. })
                     ),
-                    workspace: Some(config.action_dir.clone()),
+                    workspace: Some(workspace.clone()),
                 };
                 let path = crate::agent::attachments::resolve_path(config, &file.path, &scope)
                     .await
