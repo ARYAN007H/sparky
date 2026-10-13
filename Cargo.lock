@@ -4618,6 +4618,7 @@ dependencies = [
  "tinyredact",
  "tinysearch-bus",
  "tinyskills",
+ "tinyskills-drivers",
  "tinystoragedrivers",
  "tinystoragedrivers-bus 0.7.0",
  "tinystoragedrivers-client",
@@ -8181,6 +8182,18 @@ dependencies = [
  "tinytools",
  "tokio",
  "url",
+]
+
+[[package]]
+name = "tinyskills-drivers"
+version = "0.4.0"
+dependencies = [
+ "cap-std",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tinyskills",
+ "tinystoragedrivers-core 0.7.0",
+ "tokio",
 ]
 
 [[package]]
