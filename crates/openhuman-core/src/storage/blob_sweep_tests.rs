@@ -67,10 +67,11 @@ async fn sweeping_through_the_fenced_backend_reaches_the_driver() {
     let scope = Scope::local();
     put_expiring(&inner, &scope, "gone", 10).await;
     now.store(2_000, Ordering::SeqCst);
-    let fenced: Arc<dyn StorageBackend> = Arc::new(super::super::fenced_backend::FencedBackend::new(
-        inner,
-        Arc::new(crate::storage::fence::FenceRegistry::new(|| 0)),
-    ));
+    let fenced: Arc<dyn StorageBackend> =
+        Arc::new(super::super::fenced_backend::FencedBackend::new(
+            inner,
+            Arc::new(crate::storage::fence::FenceRegistry::new(|| 0)),
+        ));
     assert_eq!(sweep_scope(fenced.as_ref(), &scope).await, 1);
 }
 
