@@ -558,6 +558,12 @@ fn module_config(config: &Config, id: &str) -> serde_json::Value {
     serde_json::json!({})
 }
 
+/// [`module_config`] for a test in a sibling module.
+#[cfg(test)]
+pub(super) fn module_config_for_test(config: &Config, id: &str) -> serde_json::Value {
+    module_config(config, id)
+}
+
 /// Where downloaded artifacts are kept.
 ///
 /// The user cache directory, falling back to the workspace when there is none —
