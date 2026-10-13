@@ -38,7 +38,7 @@ use run_record::*;
 use shell_job::*;
 
 pub use delivery::deliver_job;
-pub(crate) use host::{is_run_active, try_acquire_run, JobDispatcher};
+pub(crate) use host::{try_acquire_run, JobDispatcher};
 
 use crate::config::Config;
 use crate::core::bus::BUS;

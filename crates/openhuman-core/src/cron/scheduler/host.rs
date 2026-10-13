@@ -192,11 +192,6 @@ pub(crate) fn try_acquire_run(job_id: &str) -> Option<RunClaim> {
     RunClaim::acquire(CLAIM_SCOPE, job_id)
 }
 
-/// Whether a scheduled or manual run of `job_id` is in flight.
-pub(crate) fn is_run_active(job_id: &str) -> bool {
-    RunClaim::is_running(CLAIM_SCOPE, job_id)
-}
-
 /// One scope's scheduler: polls its store, dispatches under its context and
 /// owns the tasks it started (dropping it aborts them).
 pub(crate) struct JobDispatcher {

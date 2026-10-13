@@ -6,8 +6,6 @@ use super::failure_classification::classify_agent_anyhow_for_user;
 use super::origin_context::build_run_prompt;
 use crate::agent::OpenHumanSessionHost;
 use crate::config::Config;
-use crate::core::bus::BUS;
-use crate::core::events::DomainEvent;
 use {tinyflows_schedule::types::CronJob, tinyflows_schedule::types::SessionTarget};
 
 /// Recency window the morning briefing installs around its turn so Composio
