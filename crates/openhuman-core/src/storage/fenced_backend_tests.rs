@@ -422,3 +422,60 @@ impl StorageBackend for NoFencing {
         self.0.database(name)
     }
 }
+
+/// The run ledger claims team tasks with `atomic_batch_checked`. The fenced
+/// view must pass it through to a driver that supports it (the default trait
+/// method answers `Unsupported`), and still refuse it for a stale lease.
+#[tokio::test]
+async fn a_checked_batch_reaches_the_driver_through_the_fenced_view() {
+    use tinystoragedrivers::{ExpectedDocument, ReadCheck};
+
+    let shared: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::new());
+    let a = Node::new("a", &shared);
+    let docs = Arc::clone(a.scoped("plain").documents());
+    docs.ensure_collection(&CollectionSpec::new("things"))
+        .await
+        .unwrap();
+
+    let applied = docs
+        .atomic_batch_checked(
+            vec![ReadCheck {
+                collection: "things".into(),
+                id: "dependency".into(),
+                expected: ExpectedDocument::Absent,
+            }],
+            vec![WriteOp::Put {
+                collection: "things".into(),
+                id: "claimed".into(),
+                doc: json!({ "by": "a" }),
+                precondition: Precondition::Absent,
+            }],
+        )
+        .await
+        .expect("the checked batch is not answered Unsupported");
+    assert_eq!(applied.len(), 1);
+    assert!(docs.get("things", "claimed").await.unwrap().is_some());
+
+    // The dependency is validated: a check that no longer holds writes nothing.
+    docs.put("things", "dependency", json!({}), Precondition::Absent)
+        .await
+        .unwrap();
+    let conflict = docs
+        .atomic_batch_checked(
+            vec![ReadCheck {
+                collection: "things".into(),
+                id: "dependency".into(),
+                expected: ExpectedDocument::Absent,
+            }],
+            vec![WriteOp::Put {
+                collection: "things".into(),
+                id: "second".into(),
+                doc: json!({}),
+                precondition: Precondition::Absent,
+            }],
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(conflict.kind(), ErrorKind::Conflict);
+    assert!(docs.get("things", "second").await.unwrap().is_none());
+}
