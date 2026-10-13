@@ -28,7 +28,9 @@ async fn legacy(workspace: &Path, id: &str, name: &str, bytes: &[u8], status: Ar
     save_artifact_args(workspace, id, &serde_json::json!({ "title": name }))
         .await
         .unwrap();
-    std::fs::write(workspace.join("artifacts").join(id).join(name), bytes).unwrap();
+    let dir = workspace.join("artifacts").join(id);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join(name), bytes).unwrap();
 }
 
 fn legacy_path(workspace: &Path, id: &str, name: &str) -> PathBuf {
