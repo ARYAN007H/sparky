@@ -5,11 +5,9 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::agent::tinyagents::model::{
-    BuiltTurnModels, ErrorSlotModel, ProfileOverrideModel, TierRoutes, TurnChatModel,
-};
-use crate::agent::tinyagents::routes;
+use crate::agent::tinyagents::model::{BuiltTurnModels, TierRoutes, TurnChatModel};
 use tinyagents_harness::host::{ModelResolveRequest, ModelResolver};
+use tinyinference_llm::model::{ErrorSlotModel, ProfileOverrideModel};
 use tinyinference_llm::model::{ResolvedModelRoute, RouteRecordingModel};
 
 pub(crate) fn tinyagents_depth_error(
@@ -280,7 +278,7 @@ fn build_turn_models_crate(
             // turn's own model, which is registered as the default primary), each pinned to
             // the tier alias so the crate registry resolves cross-route fallback across them.
             let mut routes: TierRoutes = Vec::new();
-            for &tier in routes::WORKLOAD_ROUTE_TIERS {
+            for &tier in tinyinference_llm::model::workload::WORKLOAD_ROUTE_TIERS {
                 if tier == model {
                     continue;
                 }
@@ -530,7 +528,7 @@ impl TurnModelSource {
                     let mut models = Self::from_model(custom)
                         .with_attachment_config(source.config.clone())
                         .build(model, temperature, context_window, thread_id)?;
-                    for &tier in routes::WORKLOAD_ROUTE_TIERS {
+                    for &tier in tinyinference_llm::model::workload::WORKLOAD_ROUTE_TIERS {
                         let role = crate::inference::provider::factory::role_for_model_tier(tier);
                         if let Some(custom) = local
                             .role_models

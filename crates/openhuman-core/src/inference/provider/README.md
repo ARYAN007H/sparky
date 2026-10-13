@@ -59,10 +59,10 @@ previously `providers/` (pre-consolidation single-crate layout); see
 - `crate::inference::auth_error_registry`: surfaces OpenHuman per-provider auth errors
   back to the UI.
 - `crate::core::bus` (`BUS.publish`) / `crate::core::events::DomainEvent`:
-  `ops/http_error/auth_failure.rs::publish_backend_session_expired` and
+  `ops/http_error.rs::publish_backend_session_expired` and
   `openhuman_backend_model.rs` publish `DomainEvent::SessionExpired` when the
   managed backend reports an auth failure, so the credentials layer can
-  clear/refresh the session; [`ops/http_error/auth_failure.rs`](./ops/http_error/auth_failure.rs) also publishes
+  clear/refresh the session; [`ops/http_error.rs`](./ops/http_error.rs) also publishes
   `DomainEvent::ProviderApiKeyRejected` the first time a BYO key is rejected.
 - `crate::mcp::server::local` (via the vendored `claude_code` driver), the Claude Code
   provider points the sandboxed `claude` subprocess at the in-process MCP
@@ -78,7 +78,7 @@ consumers: the agent harness ([`agent/session_host/builder/factory.rs`](../../ag
 [`web_chat/web_errors/`](../../web_chat/web_errors/) (`classify.rs`, `budget.rs`, `retry.rs`, `timeout.rs`,
 `backend_error_code.rs`, `provider_detail.rs`, `response_predicates.rs`), `voice/factory/{helpers,mod}.rs`,
 [`inference/ops.rs`](../ops.rs) / [`inference/schemas/`](../schemas/) /
-[`inference/http/server.rs`](../http/server.rs),
+[`inference/http/backend.rs`](../http/server.rs),
 `flows/tinyflows/caps/{llm,prompt,agent}.rs`, [`cron/scheduler/failure_classification.rs`](../../cron/scheduler/failure_classification.rs)
 (`is_budget_exhausted_message`), and [`threads/ops/usage.rs`](../../threads/ops/usage.rs) (`UsageInfo`).
 

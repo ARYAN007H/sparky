@@ -615,9 +615,9 @@ default = ["media", "skills", "flows", "mcp", "channels", "http-server", "schedu
 #
 # `web_chat`'s event payload types (`WebChannelEvent`, `TurnUsagePayload`, …)
 # stay compiled in BOTH builds, since ~10 always-on domains construct them.
-# Likewise `inference::http::types` and `EXTERNAL_OPENAI_COMPAT_PROVIDER` stay
+# Likewise `EXTERNAL_OPENAI_COMPAT_PROVIDER` stays
 # compiled for the server's auth policy.
-http-server = ["dep:axum"]
+http-server = ["dep:axum", "tinyinference-llm/server-http"]
 # The public inference gate is retained for host feature compatibility.
 # Native permission probes execute through the TinyComputer module.
 inference = ["modules"]
