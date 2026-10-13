@@ -40,7 +40,7 @@ fn reply() -> (Vec<CuratedTool>, VocabularyResponse) {
                 actions: None,
             },
         ],
-        agent_ready_toolkits: vec!["gmail".into(), "gmail".into(), "Notion".into()],
+        agent_ready_toolkits: vec!["notion".into(), "gmail".into(), "gmail".into()],
     };
     (listed, vocabulary)
 }
@@ -95,4 +95,22 @@ fn fixture_serves_aliases_and_every_native_provider() {
     assert!(catalog_for_toolkit("flowstestkit").is_none());
     assert!(has_native_provider("linear"));
     assert!(!has_native_provider("discord"));
+}
+
+#[test]
+fn agent_ready_list_is_the_modules_sorted_and_deduplicated() {
+    let (listed, vocabulary) = reply();
+    let snapshot = build("1", &listed, &vocabulary);
+    assert_eq!(snapshot.agent_ready, vec!["gmail", "notion"]);
+}
+
+#[test]
+fn fixture_agent_ready_list_names_the_native_providers() {
+    let slugs = agent_ready_toolkits();
+    let mut sorted = slugs.clone();
+    sorted.sort_unstable();
+    assert_eq!(slugs, sorted);
+    for native in ["gmail", "notion", "github", "linear"] {
+        assert!(slugs.iter().any(|s| s == native), "{native} missing");
+    }
 }
