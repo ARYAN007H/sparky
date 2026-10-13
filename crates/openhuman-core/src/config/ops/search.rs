@@ -69,7 +69,7 @@ const LISTED_PROVIDERS: &[&str] = &[
 ];
 
 fn label(provider: &str) -> String {
-    tinysearch_bus::labels::provider_label(provider)
+    tinysearch_bus::labels::provider_label(provider).into_owned()
 }
 
 fn docs_url(provider: &str) -> Option<&'static str> {

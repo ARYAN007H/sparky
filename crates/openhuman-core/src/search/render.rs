@@ -27,7 +27,8 @@ pub fn render(
     let provider = provider_label(&response.provider);
     let mut result = ToolResult::success(bus_render::render_text(response, subject, max_results));
     if prefer_markdown {
-        result.markdown_formatted = Some(bus_render::render_markdown(response, subject, max_results));
+        result.markdown_formatted =
+            Some(bus_render::render_markdown(response, subject, max_results));
     }
     result.metadata = Some(metadata(response, subject, &provider, max_results));
     result
