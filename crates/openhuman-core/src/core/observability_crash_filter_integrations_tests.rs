@@ -629,7 +629,7 @@ fn ollama_cloud_internal_500_reraise_routes_through_expected_path() {
     // demote to `TransientUpstreamHttp` when re-reported at the agent / RPC
     // boundary (`provider_chat` → `report_error_or_expected`), so the
     // `domain=agent` half of the flood is suppressed too.
-    let reraise = crate::inference::provider::ollama_cloud_internal_500_user_message(
+    let reraise = tinyinference_llm::failure::ollama_cloud_internal_500_user_message(
         Some("minimax-m3:cloud"),
         reqwest::StatusCode::INTERNAL_SERVER_ERROR,
     );
@@ -651,7 +651,7 @@ fn ollama_cloud_internal_500_before_send_matches_raw_and_reraised_shapes() {
         &event_with_exception_value(raw)
     ));
 
-    let reraise = crate::inference::provider::ollama_cloud_internal_500_user_message(
+    let reraise = tinyinference_llm::failure::ollama_cloud_internal_500_user_message(
         None,
         reqwest::StatusCode::INTERNAL_SERVER_ERROR,
     );

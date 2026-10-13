@@ -101,7 +101,7 @@ fn managed_limits_request(model: &str, config: &Config) -> Option<DiscoveryReque
     let inference_base = crate::backend::inference_base_url(&config.api_url).ok()?;
     let endpoint = format!("{}/openai/v1", inference_base.trim_end_matches('/'));
     let api_base = crate::backend::base_url(&config.api_url).ok()?;
-    let listing_url = crate::inference::provider::append_query_param(
+    let listing_url = tinyinference_llm::catalog::append_query_param(
         &crate::util::url::join_url(&api_base, "/openai/v1/models"),
         "catalog",
         "openrouter",
