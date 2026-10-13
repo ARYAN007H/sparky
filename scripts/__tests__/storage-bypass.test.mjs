@@ -142,7 +142,7 @@ test("a new database open fails the check", () => {
   );
 });
 
-test("the storage module, tests and allowlisted fallbacks are not flagged", () => {
+test("the storage module, tests and allowlisted sites are not flagged", () => {
   const { status } = run(
     {
       [`${SRC}/storage/driver.rs`]: "fn f() { let c = Connection::open(p); }\n",
@@ -221,7 +221,7 @@ test("a call split across lines is still found", () => {
 });
 
 test("a verbatim copy of an allowlisted line is still a finding", () => {
-  const file = `${SRC}/security/approval/store.rs`;
+  const file = `${SRC}/security/approval/store_import.rs`;
   const line = "let conn = Connection::open(&db_path).with_context(|| {";
   const kept = withoutAllowed(file, scan(file, `${line}\n});\n${line}\n});\n`));
   assert.deepEqual(
