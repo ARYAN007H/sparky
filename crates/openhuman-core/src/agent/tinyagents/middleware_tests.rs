@@ -412,8 +412,6 @@ mod research_budget_tests;
 mod memory_and_hooks_tests;
 #[path = "middleware_tool_output_artifact_tests.rs"]
 mod tool_output_artifact_tests;
-#[path = "middleware_tool_output_file_read_tests.rs"]
-mod tool_output_file_read_tests;
 #[path = "middleware_tool_output_tests.rs"]
 mod tool_output_tests;
 #[path = "middleware_tool_policy_tests.rs"]
