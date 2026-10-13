@@ -61,6 +61,7 @@ pub(super) use super::tool_prep::filter_tool_indices;
 pub(super) use super::types::{SubagentMode, SubagentRunError, SubagentRunOptions};
 #[cfg(test)]
 pub(super) use crate::agent::harness::host_definition::{AgentDefinition};
+#[cfg(test)]
 use tinyagents_definition::{PromptSource};
 #[cfg(test)]
 pub(super) use crate::agent::harness::fork_context::ParentExecutionContext;

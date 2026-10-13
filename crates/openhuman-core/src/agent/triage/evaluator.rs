@@ -49,6 +49,7 @@ use super::envelope::TriggerEnvelope;
 use super::routing::ResolvedProvider;
 #[cfg(test)]
 use crate::agent::harness::host_definition::{AgentDefinition};
+#[cfg(test)]
 use tinyagents_definition::{PromptSource};
 #[cfg(test)]
 pub(crate) use arm::{classify_error, ArmError};

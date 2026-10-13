@@ -59,8 +59,10 @@ use tinyagents_definition::Result;
 use tinyagents_definition::{AgentDefinition, DefinitionRegistry};
 
 use crate::agent::harness::host_definition::NO_TOOLS_SENTINEL;
-use crate::agent::harness::host_definition::{AgentDefinition as HostAgentDefinition, AgentDefinitionRegistry};
-use tinyagents_definition::{AgentTier, ModelSpec, SubagentEntry, ToolScope};
+use crate::agent::harness::host_definition::{
+    AgentDefinition as HostAgentDefinition, AgentDefinitionRegistry,
+};
+use tinyagents_definition::{AgentTier, ToolScope};
 use crate::agent::registry::{definition_from_registry_entry, find_custom_in_config};
 use crate::config::Config;
 
