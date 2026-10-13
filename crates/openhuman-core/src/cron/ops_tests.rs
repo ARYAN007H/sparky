@@ -480,11 +480,11 @@ async fn cron_run_rejects_duplicate_concurrent_execution() {
     let config = test_config(&tmp);
     let job = make_job(&config, "*/5 * * * *", None, "echo hello");
 
-    // Seed ACTIVE_RUNS directly to simulate an in-flight execution without
+    // Hold the run claim directly to simulate an in-flight execution without
     // spawning a real long-running subprocess (deterministic, no timing dependency).
-    ACTIVE_RUNS.lock().unwrap().insert(job.id.clone());
+    let running = try_acquire_run(&job.id).expect("the job is free");
     let err = cron_run(&config, &job.id).await.unwrap_err();
-    ACTIVE_RUNS.lock().unwrap().remove(&job.id);
+    drop(running);
 
     assert!(
         err.contains("already running"),
