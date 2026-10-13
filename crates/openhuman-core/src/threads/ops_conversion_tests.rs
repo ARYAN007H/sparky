@@ -398,7 +398,12 @@ async fn threads_purge_removes_every_turn_state_snapshot() {
     let store = crate::agent::session_store::turn_states_for(&dir);
     store.put(&snapshot).expect("put snapshot");
     store
-        .put(&TurnState::started("thread-b", "req-2", 4, "2026-01-01T00:00:01Z"))
+        .put(&TurnState::started(
+            "thread-b",
+            "req-2",
+            4,
+            "2026-01-01T00:00:01Z",
+        ))
         .expect("put second snapshot");
 
     // Queue background sub-agent results across sessions; a full purge must wipe

@@ -147,9 +147,8 @@ pub(super) async fn finalize_flow_stream(
             tinyagents_session::turn_state::TurnLifecycle::Interrupted
         };
         let now = chrono::Utc::now().to_rfc3339();
-        if let Err(err) =
-            crate::agent::session_store::turn_states_for(&config.workspace_dir)
-                .settle_turn(&target.thread_id, &target.request_id, lifecycle, &now)
+        if let Err(err) = crate::agent::session_store::turn_states_for(&config.workspace_dir)
+            .settle_turn(&target.thread_id, &target.request_id, lifecycle, &now)
         {
             tracing::warn!(
                 target: "flows",

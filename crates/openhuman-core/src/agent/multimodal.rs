@@ -620,12 +620,12 @@ fn fallback_attachments_dir() -> PathBuf {
         .unwrap_or_else(|| std::env::temp_dir().join("openhuman-attachments"))
 }
 
-/// `id -> marker target` for the placeholders in `messages`: a legacy sidecar
-/// file in the attachments directory (its path), else the blob stash's bytes as
-/// a `data:` URI. The marker target is carried as a `PathBuf` only because that
-/// is the harness's index type; it is rendered verbatim inside `[IMAGE:…]`.
+/// `id -> marker target` for the placeholders in `messages`: the blob stash's
+/// bytes as a `data:` URI, else (for an id the stash lacks) a legacy sidecar
+/// file in the attachments directory, as its path. The marker target is carried
+/// as a `PathBuf` only because that is the harness's index type; it is rendered
+/// verbatim inside `[IMAGE:…]`.
 async fn build_attachment_index(messages: &[TranscriptMessage]) -> HashMap<String, PathBuf> {
-    let mut index = legacy_attachment_index();
     let mut wanted = Vec::new();
     for row in messages {
         wanted.extend(placeholder_ids(&row.content));
@@ -635,27 +635,33 @@ async fn build_attachment_index(messages: &[TranscriptMessage]) -> HashMap<Strin
             }
         }
     }
-    wanted.retain(|id| !index.contains_key(id));
     wanted.sort();
     wanted.dedup();
+    let mut index = HashMap::new();
     if wanted.is_empty() {
         return index;
     }
-    let Some(stash) = stash() else {
-        return index;
-    };
-    for id in wanted {
-        match stash.read_data_uri(&id).await {
-            Ok(Some(data_uri)) => {
-                index.insert(id, PathBuf::from(data_uri));
+    if let Some(stash) = stash() {
+        for id in &wanted {
+            match stash.read_data_uri(id).await {
+                Ok(Some(data_uri)) => {
+                    index.insert(id.clone(), PathBuf::from(data_uri));
+                }
+                Ok(None) => {}
+                Err(err) => tracing::warn!(
+                    target: "multimodal",
+                    id = %id,
+                    reason = %err,
+                    "[multimodal::images][stash] could not read attachment; trying legacy sidecars"
+                ),
             }
-            Ok(None) => {}
-            Err(err) => tracing::warn!(
-                target: "multimodal",
-                id = %id,
-                reason = %err,
-                "[multimodal::images][stash] could not read attachment; placeholder keeps its text"
-            ),
+        }
+    }
+    if index.len() < wanted.len() {
+        for (id, path) in legacy_attachment_index() {
+            if wanted.contains(&id) {
+                index.entry(id).or_insert(path);
+            }
         }
     }
     index
@@ -677,8 +683,11 @@ fn placeholder_ids(text: &str) -> Vec<String> {
 /// directory (written before the blob stash). Symlinks and nested entries are
 /// ignored.
 fn legacy_attachment_index() -> HashMap<String, PathBuf> {
-    let dir = attachments_dir();
-    let Ok(entries) = std::fs::read_dir(&dir) else {
+    legacy_attachment_index_in(&attachments_dir())
+}
+
+fn legacy_attachment_index_in(dir: &std::path::Path) -> HashMap<String, PathBuf> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
         return HashMap::new();
     };
     entries

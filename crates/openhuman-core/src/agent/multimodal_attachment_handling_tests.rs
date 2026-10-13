@@ -310,3 +310,16 @@ async fn sweep_keeps_fresh_attachments() {
         "fresh attachment {id} retained after sweep"
     );
 }
+
+#[test]
+fn legacy_sidecar_files_stay_indexed_by_id() {
+    // Conversations written before the blob stash keep `<id>.<ext>` files in the
+    // attachments directory; their placeholders must still resolve.
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("abc123.png"), b"png").unwrap();
+    std::fs::create_dir(dir.path().join("nested")).unwrap();
+    std::fs::write(dir.path().join("bad name.png"), b"png").unwrap();
+    let index = legacy_attachment_index_in(dir.path());
+    assert_eq!(index.len(), 1, "{index:?}");
+    assert_eq!(index["abc123"], dir.path().join("abc123.png"));
+}
