@@ -115,11 +115,6 @@ pub trait AgentDefinitionExt {
 }
 
 impl AgentDefinitionExt for AgentDefinition {
-    fn effective_tokenjuice_compression(&self) -> AgentTokenjuiceCompression {
-        self.extensions
-            .effective_tokenjuice_compression(&self.model)
-    }
-
     fn prompt_fn(&self) -> Result<PromptBuilder> {
         self.extensions.prompt_builder.ok_or_else(|| {
             anyhow::anyhow!(
