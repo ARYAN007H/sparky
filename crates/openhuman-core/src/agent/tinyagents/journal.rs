@@ -5,8 +5,8 @@
 //! mirrors the harness [`EventSink`] onto openhuman's in-process `AgentProgress`
 //! stream — transient state that is lost the moment the UI detaches. This module
 //! makes that history **durable**: it attaches, *in addition to* the untouched
-//! bridge, a crate [`StoreEventJournal`] (over the same 04-sessions
-//! the agent's storage-backed journal stream) plus a
+//! bridge, a crate [`StoreEventJournal`] (over the
+//! agent's storage-backed journal stream) plus a
 //! [`HarnessStatusStore`] writer, so a run can be reconstructed after the fact —
 //! even for an unobserved (`on_progress = None`) turn.
 //!
