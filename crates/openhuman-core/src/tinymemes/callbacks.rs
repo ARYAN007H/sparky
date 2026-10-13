@@ -156,8 +156,7 @@ async fn search(
 
 async fn load_index(session: &Session, request: LoadIndexRequest) -> HostResult<Option<String>> {
     let path = session.index_path(request.kind);
-    match crate::core::runtime::spawn_blocking_scoped(move || std::fs::read_to_string(path)).await
-    {
+    match crate::core::runtime::spawn_blocking_scoped(move || std::fs::read_to_string(path)).await {
         Ok(Ok(json)) => Ok(Some(json)),
         Ok(Err(error)) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Ok(Err(error)) => {

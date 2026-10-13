@@ -4,8 +4,7 @@
 use async_trait::async_trait;
 use tinybus::{CallContext, Connection, InterfaceName, MemberName, ObjectPath};
 use tinymemes_bus::{
-    RemixClient, RemixRefusal, RemixRequest, RemixResponse, HOST_INTERFACE, HOST_METHODS,
-    HOST_PATH,
+    RemixClient, RemixRefusal, RemixRequest, RemixResponse, HOST_INTERFACE, HOST_METHODS, HOST_PATH,
 };
 
 use super::callbacks;
@@ -83,10 +82,7 @@ pub(crate) async fn install(connection: &Connection) -> tinybus::Result<()> {
 
 /// Remix one reply through the loaded module, serving its callbacks for
 /// `config`'s workspace meanwhile.
-pub(crate) async fn remix(
-    config: &Config,
-    request: RemixRequest,
-) -> Result<RemixResponse, String> {
+pub(crate) async fn remix(config: &Config, request: RemixRequest) -> Result<RemixResponse, String> {
     crate::modules::ensure_loaded(config, MODULE_ID).await?;
     let runtime = crate::modules::host::runtime()
         .await

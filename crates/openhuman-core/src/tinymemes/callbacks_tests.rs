@@ -18,9 +18,13 @@ async fn an_index_saved_through_the_host_loads_back() {
     let dir = tempfile::tempdir().unwrap();
     let session = Session::new(&config_in(dir.path()));
 
-    let missing = dispatch(&session, host_methods::LOAD_INDEX, json!([{ "kind": "slang" }]))
-        .await
-        .unwrap();
+    let missing = dispatch(
+        &session,
+        host_methods::LOAD_INDEX,
+        json!([{ "kind": "slang" }]),
+    )
+    .await
+    .unwrap();
     assert_eq!(decode::<Option<String>>(missing), Ok(None));
 
     let saved = dispatch(
@@ -32,14 +36,25 @@ async fn an_index_saved_through_the_host_loads_back() {
     .unwrap();
     assert_eq!(decode::<()>(saved), Ok(()));
 
-    let loaded = dispatch(&session, host_methods::LOAD_INDEX, json!([{ "kind": "slang" }]))
-        .await
-        .unwrap();
-    assert_eq!(decode::<Option<String>>(loaded), Ok(Some("{\"terms\":1}".into())));
+    let loaded = dispatch(
+        &session,
+        host_methods::LOAD_INDEX,
+        json!([{ "kind": "slang" }]),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        decode::<Option<String>>(loaded),
+        Ok(Some("{\"terms\":1}".into()))
+    );
     // The other index is a different document.
-    let memes = dispatch(&session, host_methods::LOAD_INDEX, json!([{ "kind": "memes" }]))
-        .await
-        .unwrap();
+    let memes = dispatch(
+        &session,
+        host_methods::LOAD_INDEX,
+        json!([{ "kind": "memes" }]),
+    )
+    .await
+    .unwrap();
     assert_eq!(decode::<Option<String>>(memes), Ok(None));
     assert!(dir
         .path()
@@ -52,7 +67,9 @@ async fn without_managed_jev_evaluate_is_unsupported() {
     let dir = tempfile::tempdir().unwrap();
     let session = Session::new(&config_in(dir.path()));
     let request = json!([{ "body": { "questions": {}, "messages": [] } }]);
-    let result = dispatch(&session, host_methods::EVALUATE, request).await.unwrap();
+    let result = dispatch(&session, host_methods::EVALUATE, request)
+        .await
+        .unwrap();
     assert_eq!(
         decode::<EvaluateEnvelope>(result),
         Err(HostFailure::Unsupported)
@@ -103,5 +120,8 @@ async fn callbacks_answer_only_while_a_remix_runs() {
     assert!(active().is_none());
     let seen = run_with(&config, async { active().is_some() }).await;
     assert!(seen);
-    assert!(active().is_none(), "the session is cleared when the remix ends");
+    assert!(
+        active().is_none(),
+        "the session is cleared when the remix ends"
+    );
 }

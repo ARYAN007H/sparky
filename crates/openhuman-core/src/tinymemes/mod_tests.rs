@@ -139,9 +139,16 @@ async fn a_remixed_reply_is_delivered_and_remembered() {
 async fn an_unchanged_reply_sends_the_original() {
     let dir = tempfile::tempdir().unwrap();
     let ids = store(dir.path());
-    for reason in [SkipReason::BelowThreshold, SkipReason::Failed, SkipReason::Timeout] {
+    for reason in [
+        SkipReason::BelowThreshold,
+        SkipReason::Failed,
+        SkipReason::Timeout,
+    ] {
         let remixer = ScriptedRemixer::new(Ok(skipped_response("Build failed again.", reason)));
-        assert_eq!(run(&remixer, &ids, "req-skip", Duration::from_secs(5)).await, None);
+        assert_eq!(
+            run(&remixer, &ids, "req-skip", Duration::from_secs(5)).await,
+            None
+        );
     }
     assert!(!ids.contains(&crate::threads::store::run_reply_message_id("req-skip")));
 }
@@ -151,7 +158,10 @@ async fn a_remix_that_returns_the_same_text_is_not_a_change() {
     let dir = tempfile::tempdir().unwrap();
     let ids = store(dir.path());
     let remixer = ScriptedRemixer::new(Ok(remixed_response("Build failed again. ")));
-    assert_eq!(run(&remixer, &ids, "req-same", Duration::from_secs(5)).await, None);
+    assert_eq!(
+        run(&remixer, &ids, "req-same", Duration::from_secs(5)).await,
+        None
+    );
     assert!(!ids.contains(&crate::threads::store::run_reply_message_id("req-same")));
 }
 
@@ -160,7 +170,10 @@ async fn a_module_error_sends_the_original() {
     let dir = tempfile::tempdir().unwrap();
     let ids = store(dir.path());
     let remixer = ScriptedRemixer::new(Err("module unavailable".into()));
-    assert_eq!(run(&remixer, &ids, "req-err", Duration::from_secs(5)).await, None);
+    assert_eq!(
+        run(&remixer, &ids, "req-err", Duration::from_secs(5)).await,
+        None
+    );
 }
 
 #[tokio::test]
@@ -192,8 +205,16 @@ async fn a_disabled_flag_leaves_the_task_reply_alone() {
     )
     .await;
     assert_eq!(out, None);
-    remix_task_reply(&config, "thread", "req", "msg", &mut reply, "placeholder", Duration::ZERO)
-        .await;
+    remix_task_reply(
+        &config,
+        "thread",
+        "req",
+        "msg",
+        &mut reply,
+        "placeholder",
+        Duration::ZERO,
+    )
+    .await;
     assert_eq!(reply, "Build failed again.");
 }
 
@@ -205,7 +226,12 @@ fn the_turn_line_reports_the_outcome_without_user_content() {
     let some = turn_line(&t, 9, "remixed", Some(&remixed_response("secret text")));
     assert!(some.contains("score=7") && some.contains("request_id=req-1"));
     assert!(!some.contains("secret text"));
-    let skipped = turn_line(&t, 9, "unchanged", Some(&skipped_response("x", SkipReason::BelowThreshold)));
+    let skipped = turn_line(
+        &t,
+        9,
+        "unchanged",
+        Some(&skipped_response("x", SkipReason::BelowThreshold)),
+    );
     assert!(skipped.contains("skipped=below_threshold"));
 }
 
