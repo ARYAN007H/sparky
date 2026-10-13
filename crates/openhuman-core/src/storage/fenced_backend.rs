@@ -29,7 +29,7 @@ use async_trait::async_trait;
 use serde_json::Value;
 use tinystoragedrivers::{
     Blob, BlobMeta, BlobStore, Capabilities, Capability, CollectionSpec, ErrorKind, Filter, Page,
-    Precondition, Query, Result, SearchHit, Sort, StorageError, StreamEntry, StreamStore, Version,
+    Precondition, Query, ReadCheck, Result, SearchHit, Sort, StorageError, StreamEntry, StreamStore, Version,
     Versioned, WriteOp, WriteResult,
 };
 
@@ -280,6 +280,18 @@ impl DocumentStore for FencedDocuments {
         fenced_write!(self, "documents.atomic_batch", documents.atomic_batch(ops))
     }
 
+    async fn atomic_batch_checked(
+        &self,
+        checks: Vec<ReadCheck>,
+        ops: Vec<WriteOp>,
+    ) -> Result<Vec<WriteResult>> {
+        fenced_write!(
+            self,
+            "documents.atomic_batch_checked",
+            documents.atomic_batch_checked(checks, ops)
+        )
+    }
+
     async fn search(&self, collection: &str, text: &str, limit: usize) -> Result<Vec<SearchHit>> {
         self.inner.search(collection, text, limit).await
     }
@@ -290,6 +302,23 @@ impl DocumentStore for FencedDocuments {
             "documents.drop_collection",
             documents.drop_collection(collection)
         )
+    }
+
+    async fn watch(
+        &self,
+        collection: &str,
+        filter: &Filter,
+        options: &tinystoragedrivers::WatchOptions,
+    ) -> Result<Box<dyn tinystoragedrivers::DocumentWatch>> {
+        self.inner.watch(collection, filter, options).await
+    }
+
+    async fn validate_collection_spec(&self, required: &CollectionSpec) -> Result<()> {
+        self.inner.validate_collection_spec(required).await
+    }
+
+    async fn collections(&self, prefix: &str) -> Result<Vec<String>> {
+        self.inner.collections(prefix).await
     }
 }
 
