@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::inference::provider::factory::cloud_slug::openrouter_default_provider_options;
+use tinyinference_llm::providers::registry::openrouter_default_provider_options;
 
 #[test]
 fn crate_native_chat_model_factory_preserves_invalid_route_diagnostics() {

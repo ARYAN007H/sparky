@@ -409,8 +409,3 @@ pub(super) fn try_create_cloud_slug_chat_model_from_string_with_native_tools(
     });
     Some(chat.map(|chat| (chat, effective_model)))
 }
-
-/// Baked request options for a direct OpenRouter endpoint (`provider.sort =
-/// price`), `None` for every other host. The policy and its rationale live with
-/// the registry in `tinyinference-llm`.
-pub(crate) use tinyinference_llm::providers::registry::openrouter_default_provider_options;
