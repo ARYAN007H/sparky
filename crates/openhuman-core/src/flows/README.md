@@ -45,13 +45,13 @@ the engine, the capability seam).
 ### Saving a flow
 
 A graph arrives as raw JSON, from the canvas, an import, a draft promotion or
-an agent tool. `ops::validate_and_migrate_graph` (in [`ops/validation.rs`](./ops/validation.rs)) runs
+an agent tool. `tinyflows::authoring::validate_and_migrate_graph` runs
 it through `tinyflows::migrate::migrate` to upgrade older schemas, deserializes
 it into a `WorkflowGraph`, and rejects anything `tinyflows::validate::validate`
 refuses. Engine-compatibility checks map topology problems onto
 `FlowValidationError`.
 
-Agent-authored graphs pass one more stack, `run_builder_gates` in
+Agent-authored graphs pass one more stack, `run_builder_gates` (a `tinyflows::gates::BuilderGateHost` over `builder_failures`) in
 [`ops/builder_gates.rs`](./ops/builder_gates.rs). It is the single definition of the author-time hard
 gates, run in increasing cost order and short-circuiting on the first failure:
 engine compatibility, binding resolvability, agent-ref resolvability,
@@ -106,7 +106,7 @@ re-arms schedules for every enabled flow.
 
 ```text
  cron scheduler                 Composio webhook relay
-      | FlowScheduleTick{flow_id}      | ComposioTriggerReceived{toolkit, slug}
+      | TriggerSink (flow_id)          | ComposioTriggerReceived{toolkit, slug}
       v                                v
  +--------------------------------------------------+
  | bus::FlowTriggerSubscriber                       |
@@ -289,7 +289,7 @@ Top level:
 - `ops::flows_create` / `ops::flows_update` (`ops/definitions.rs`,
   [`ops/updates.rs`](./ops/updates.rs)): the save paths that enforce born-disabled and forced
   approval.
-- `ops::validate_and_migrate_graph` (`ops/validation.rs`): the one
+- `tinyflows::authoring::validate_and_migrate_graph`: the one
   structural-validation door.
 - `run_builder_gates` (`ops/builder_gates.rs`): the agent-authored hard-gate
   stack.
@@ -331,7 +331,7 @@ Agent tools: `core`'s [`tools/ops.rs`](../tools/ops.rs) adds 27 flows tools to t
   checkpoints, and `tinyflows-copilot` owns the authoring manual and pure text heuristics.
   Fix engine and storage behavior there, not here.
 - `cron/` owns scheduling. This domain only arms and removes `JobType::Flow`
-  jobs; the scheduler publishes `DomainEvent::FlowScheduleTick`.
+  jobs; the scheduler fires them through the schedule runtime's `TriggerSink`.
 - [`integrations/composio/`](../integrations/composio/) owns the Composio catalog, connections and trigger
   ingestion. Flows reads them for gates, pickers and `tool_call` execution.
 - `memory/` owns storage. Flows only tags items.

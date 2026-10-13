@@ -28,7 +28,7 @@ pub fn legacy_db_path(config: &Config) -> std::path::PathBuf {
 }
 
 /// The cron job store for this call, in the acting agent's scope.
-fn documents(config: &Config) -> Result<CronDocuments> {
+pub(crate) fn documents(config: &Config) -> Result<CronDocuments> {
     let opened = crate::storage::local::open("cron::store", &config.workspace_dir)?;
     Ok(
         CronDocuments::new(std::sync::Arc::clone(opened.scoped()?.documents()))
