@@ -60,11 +60,7 @@ fn a_configured_backend_holds_the_approvals_instead_of_approval_db(case: Case) {
     // configured backend's requests are not in it.
     assert!(openhuman_core::storage::clear());
     assert!(store::list_pending(&config).unwrap().is_empty());
-    assert!(workspace
-        .path()
-        .join("storage")
-        .join("storage.db")
-        .exists());
+    assert!(workspace.path().join("storage").join("storage.db").exists());
 }
 
 driver_cases!(sync a_configured_backend_holds_the_approvals_instead_of_approval_db);
