@@ -607,7 +607,7 @@ pub(super) async fn install(
     modules: &tinybus::module::ModuleHost,
 ) -> tinybus::Result<()> {
     let host = live_host(connection);
-    match super::storage_host_linked::attach(modules, Arc::clone(&host)) {
+    match super::storage_host_linked::attach(modules, connection, Arc::clone(&host)).await {
         Ok(()) => {
             tracing::debug!("[storage_host] serving storage from the attested linked module");
             Ok(())
