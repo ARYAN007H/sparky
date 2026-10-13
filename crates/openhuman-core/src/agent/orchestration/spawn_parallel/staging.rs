@@ -16,7 +16,7 @@ use std::path::PathBuf;
 use std::cell::RefCell;
 
 use tinyagents_graph::parallel::{parse_relative_claim_paths, ClaimConflict, ClaimPathError};
-pub(crate) use tinyagents_orchestration::parallel::WorkerDispatchMode;
+use tinyagents_orchestration::parallel::WorkerDispatchMode;
 use tinyagents_orchestration::parallel::{
     AdmissionPolicy, AdmissionVerdict, Plan, Preflight, Rejection, RejectionKind, Task,
 };
