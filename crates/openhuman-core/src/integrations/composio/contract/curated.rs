@@ -188,6 +188,36 @@ fn build(
     snapshot
 }
 
+/// Registry id of the connector module.
+const MODULE_ID: &str = "tinyconnectors";
+
+#[cfg(feature = "modules")]
+async fn module_call<Request, Reply>(
+    config: &crate::config::Config,
+    member: &str,
+    request: Request,
+) -> Result<Reply, String>
+where
+    Request: serde::Serialize + Send,
+    Reply: serde::de::DeserializeOwned,
+{
+    crate::modules::connectors::call_stateless(config, member, request).await
+}
+
+/// Without the module loader there is no catalog to read.
+#[cfg(not(feature = "modules"))]
+async fn module_call<Request, Reply>(
+    _config: &crate::config::Config,
+    member: &str,
+    _request: Request,
+) -> Result<Reply, String>
+where
+    Request: serde::Serialize + Send,
+    Reply: serde::de::DeserializeOwned,
+{
+    Err(format!("{member}: this build has no module loader"))
+}
+
 /// Read the catalogs from the connector module into the process snapshot.
 /// A snapshot read from the currently pinned module version is kept as is.
 ///
@@ -195,13 +225,13 @@ fn build(
 ///
 /// The module could not be reached; the previous snapshot (if any) stays.
 pub async fn prime(config: &crate::config::Config) -> Result<(), String> {
-    let version = crate::modules::registry::find(crate::modules::connectors::MODULE_ID)
+    let version = crate::modules::registry::find(MODULE_ID)
         .map(|record| record.version.to_owned())
         .unwrap_or_default();
     if current().is_some_and(|snapshot| snapshot.module_version == version) {
         return Ok(());
     }
-    let listed: Vec<CuratedTool> = crate::modules::connectors::call_stateless(
+    let listed: Vec<CuratedTool> = module_call(
         config,
         methods::LIST_CURATED_CATALOG,
         CuratedCatalogRequest { toolkit: None },
@@ -214,7 +244,7 @@ pub async fn prime(config: &crate::config::Config) -> Result<(), String> {
         }
     }
     names.extend(ALIAS_SPELLINGS.iter().map(|alias| (*alias).to_owned()));
-    let vocabulary: VocabularyResponse = crate::modules::connectors::call_stateless(
+    let vocabulary: VocabularyResponse = module_call(
         config,
         methods::GET_VOCABULARY,
         VocabularyRequest { toolkits: names },
