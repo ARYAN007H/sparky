@@ -333,7 +333,15 @@ fn only_modules_with_a_declared_grant_have_storage() {
     for record in crate::modules::registry::ALL {
         assert_eq!(
             declared(record.id).is_some(),
-            matches!(record.id, "tinymcp" | "tinychannels"),
+            matches!(
+                record.id,
+                "tinymcp"
+                    | "tinychannels"
+                    | "tinyconnectors"
+                    | "tinywallet"
+                    | "tinybox"
+                    | "tinyjuice"
+            ),
             "{}",
             record.id
         );
