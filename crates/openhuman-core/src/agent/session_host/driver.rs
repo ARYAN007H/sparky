@@ -260,6 +260,11 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             &request.history,
             &user_message,
             &outcome,
+            request
+                .run_context
+                .data
+                .turn_deadline
+                .map(|deadline| deadline.close_budget(Instant::now())),
         )
         .await;
         let mut output = close

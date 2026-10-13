@@ -204,6 +204,7 @@ pub(super) async fn close_if_needed(
     base_history: &[tinyinference_llm::message::Message],
     user_message: &str,
     outcome: &TinyagentsTurnOutcome,
+    budget: Option<std::time::Duration>,
 ) -> Option<GroundedClose> {
     let needs_cap_close = outcome.hit_cap && !outcome.wrap_up_injected;
     let needs_final_close = outcome.text.trim().is_empty() || outcome.breaker_halt.is_some();
@@ -261,9 +262,43 @@ pub(super) async fn close_if_needed(
         }
     };
 
-    let (output, usage) =
-        close_with_one_repair(model, instruction, stop_reason, ask, verify, fallback).await;
+    let (output, usage) = within_close_budget(
+        budget,
+        model,
+        close_with_one_repair(model, instruction, stop_reason, ask, verify, &fallback),
+        &fallback,
+    )
+    .await;
     Some(GroundedClose { output, usage })
+}
+
+/// Run `close` within `budget` (the turn deadline's
+/// [`close_budget`](crate::agent::turn_deadline::TurnDeadline::close_budget)),
+/// or ship `fallback` when it runs out. `None` (no deadline) waits for `close`.
+///
+/// The fallback is the same deterministic summary a rejected close ships, so a
+/// slow or stalled provider costs the user the model's wording, not the answer.
+/// Usage of calls that finished before the timeout is not recorded.
+async fn within_close_budget(
+    budget: Option<std::time::Duration>,
+    model: &str,
+    close: impl std::future::Future<Output = (String, RepairUsage)>,
+    fallback: impl FnOnce() -> String,
+) -> (String, RepairUsage) {
+    let Some(budget) = budget else {
+        return close.await;
+    };
+    match tokio::time::timeout(budget, close).await {
+        Ok(closed) => closed,
+        Err(_) => {
+            let budget_ms = budget.as_millis() as u64;
+            tracing::warn!(
+                budget_ms,
+                "[session-runtime] grounded close ran out of the turn budget; shipping the deterministic summary"
+            );
+            (fallback(), RepairUsage::for_model(model))
+        }
+    }
 }
 
 /// Ask for a closing message, screen it, and on a violation ask exactly once

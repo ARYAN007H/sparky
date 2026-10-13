@@ -248,3 +248,45 @@ fn a_capped_truncated_turn_gets_the_cap_checkpoint() {
     assert!(!out.contains("ran out of output tokens"), "{out}");
     assert!(out.contains("<tool_records>"), "{out}");
 }
+
+/// The production failure (#7716): the close model never answered, and the
+/// backstop dropped the turn with no summary. Within its budget the close
+/// gives up and ships the deterministic summary instead.
+#[tokio::test]
+async fn stalled_close_model_ships_the_fallback_within_the_budget() {
+    let instruction = final_answer_instruction(None, false, RECORDS);
+    let ask = |_prompt: String| std::future::pending::<(String, Option<BilledUsage>)>();
+    let verify = |_candidate: String| async { (None, None) };
+    let fallback = || FALLBACK.to_string();
+
+    let started = std::time::Instant::now();
+    let (output, usage) = within_close_budget(
+        Some(std::time::Duration::from_millis(20)),
+        "test-model",
+        close_with_one_repair("test-model", instruction, None, ask, verify, &fallback),
+        &fallback,
+    )
+    .await;
+
+    assert_eq!(output, FALLBACK);
+    assert_eq!(usage.model_calls, 0);
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(5),
+        "the budget, not the stalled call, ended the close"
+    );
+}
+
+#[tokio::test]
+async fn close_that_finishes_in_budget_or_without_one_ships_its_reply() {
+    let closed = || async {
+        (
+            CLEAN_REPLY.to_string(),
+            RepairUsage::for_model("test-model"),
+        )
+    };
+    for budget in [Some(std::time::Duration::from_secs(60)), None] {
+        let (output, _) =
+            within_close_budget(budget, "test-model", closed(), || FALLBACK.to_string()).await;
+        assert_eq!(output, CLEAN_REPLY, "budget {budget:?}");
+    }
+}
