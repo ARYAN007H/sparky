@@ -206,7 +206,9 @@ fn a_failed_standing_import_is_retried_on_the_next_call() {
         }
     };
 
-    let error = open_standing(&path, "test::retry", &config, &import).unwrap_err();
+    let error = open_standing(&path, "test::retry", &config, &import)
+        .err()
+        .expect("the first import fails");
     assert!(format!("{error:#}").contains("legacy file unreadable"));
     open_standing(&path, "test::retry", &config, &import).unwrap();
     assert_eq!(attempts.load(Ordering::SeqCst), 2);
