@@ -155,7 +155,7 @@ async fn flow_tool_allowed(
     // Path A: a toolkit OpenHuman ships a static curated catalog for keeps its
     // strict curated-action + per-user scope gating (unchanged from B2).
     if let Some(catalog) = catalog_for_toolkit(&toolkit) {
-        let Some(curated) = find_curated(catalog, slug) else {
+        let Some(curated) = find_curated(&catalog, slug) else {
             tracing::debug!(target: "flows", %slug, %toolkit, "[flows] tool_call curation: reject — slug is not a curated action of this toolkit");
             return false;
         };

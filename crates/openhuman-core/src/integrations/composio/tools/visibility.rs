@@ -51,7 +51,7 @@ fn resolve_action_scope_sync(slug: &str) -> ToolScope {
     };
     let catalog = catalog_for_toolkit(&toolkit);
     if let Some(cat) = catalog {
-        if let Some(entry) = find_curated(cat, slug) {
+        if let Some(entry) = find_curated(&cat, slug) {
             return entry.scope;
         }
     }
@@ -81,7 +81,7 @@ pub(super) async fn evaluate_tool_visibility(config: &Config, slug: &str) -> Too
     // for every toolkit that had a native provider.
     let catalog = catalog_for_toolkit(&toolkit);
     match catalog {
-        Some(catalog) => match find_curated(catalog, slug) {
+        Some(catalog) => match find_curated(&catalog, slug) {
             Some(curated) if pref.allows(curated.scope) => ToolDecision::Allow,
             Some(curated) => ToolDecision::BlockedByScope {
                 scope: curated.scope,

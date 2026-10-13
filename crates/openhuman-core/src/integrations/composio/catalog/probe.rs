@@ -211,7 +211,7 @@ pub(super) fn resolve_composio_action_scope(
         // A static catalog exists for this toolkit — only a genuinely
         // curated entry's scope is trustworthy; an uncurated slug fails
         // closed rather than being guessed via the verb heuristic.
-        Some(catalog) => find_curated(catalog, slug).map(|curated| curated.scope),
+        Some(catalog) => find_curated(&catalog, slug).map(|curated| curated.scope),
         // No static catalog anywhere for this toolkit — the heuristic is
         // the only available signal (still gated by the connected-toolkit
         // check below in `probe_tool_output_sample`).

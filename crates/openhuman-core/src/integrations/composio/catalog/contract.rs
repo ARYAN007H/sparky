@@ -330,7 +330,7 @@ pub(crate) async fn fetch_live_toolkit_catalog(
                 response_fields_from_schema(tool.function.output_parameters.as_ref());
             let primary_array_path =
                 compute_composio_array_path(tool.function.output_parameters.as_ref());
-            let is_curated = curated_catalog.is_some_and(|cat| find_curated(cat, &slug).is_some());
+            let is_curated = curated_catalog.as_ref().is_some_and(|cat| find_curated(&cat, &slug).is_some());
             ToolContract {
                 slug,
                 toolkit: key.clone(),
