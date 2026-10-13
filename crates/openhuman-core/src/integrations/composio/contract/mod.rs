@@ -10,15 +10,12 @@
 
 pub mod curated;
 pub mod identity;
-pub mod slug;
 
 pub use identity::{
     canonicalize_values, normalize_connection_identifiers, render_connected_identities_section,
 };
-pub use slug::{
-    action_slug_matches, canonical_action_slug, classify_unknown, find_curated, toolkit_from_slug,
-};
 pub use tinyconnectors_bus::vocabulary::{
+    action_slug_matches, canonical_action_slug, classify_unknown, find_curated, toolkit_from_slug,
     ConnectedIdentity, CuratedTool, GithubFetchMode, IdentityKind, NormalizedTask,
     ProviderUserProfile, TaskContainer, TaskFetchFilter, TaskKind, ToolScope, UserScopePref,
 };
