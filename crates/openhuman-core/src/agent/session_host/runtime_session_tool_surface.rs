@@ -9,7 +9,7 @@ impl OpenHumanTurnPrelude {
     /// this request is prepared.
     pub(super) fn refresh_delegation_tool_surface(&self) -> anyhow::Result<()> {
         use crate::agent::harness::definition::AgentDefinitionRegistry;
-        use crate::tools::agent_policy::ToolPolicyEngine;
+        use tinytools::ToolPolicyEngine;
         use crate::tools::orchestrator_tools::collect_orchestrator_tools;
 
         let Some(registry) = AgentDefinitionRegistry::current() else {

@@ -188,7 +188,7 @@ async fn read_only_autonomy_denies_an_acting_tool() {
     assert!(!decision.is_allowed());
     let reason = decision.denial_reason().expect("a Deny carries a reason");
     assert!(
-        reason.contains(crate::security::POLICY_BLOCKED_MARKER),
+        reason.contains(tinytools::status::POLICY_BLOCKED_MARKER),
         "the machine-recognisable marker must survive rendering: {reason}"
     );
 }
@@ -350,7 +350,7 @@ async fn a_write_shell_command_is_blocked_outright_in_read_only() {
     assert!(decision
         .denial_reason()
         .expect("denial reason")
-        .contains(crate::security::POLICY_BLOCKED_MARKER));
+        .contains(tinytools::status::POLICY_BLOCKED_MARKER));
 }
 
 #[tokio::test]

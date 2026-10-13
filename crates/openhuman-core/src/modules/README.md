@@ -213,7 +213,7 @@ cold download never stalls other tasks. Later launches re-verify the cached
 artifact from disk instead of downloading again.
 
 A panic inside the loader is reported as an error carrying
-`crate::tools::status::MODULE_FAULT_MARKER` and "restart the app to try
+`tinytools::status::MODULE_FAULT_MARKER` and "restart the app to try
 again", rather than unwinding into whoever was waiting.
 
 ### Bundled archives

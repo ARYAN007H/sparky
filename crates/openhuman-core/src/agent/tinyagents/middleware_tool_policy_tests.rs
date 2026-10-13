@@ -9,7 +9,7 @@ use super::*;
 // the route out of the session's own delegation tools.
 
 use crate::agent::orchestration::tools::{ArchetypeDelegationTool, DelegationTarget};
-use crate::tools::agent_policy::{
+use tinytools::{
     TaskProfile, TaskRiskLevel, ToolCapability, ToolPolicyAction, ToolPolicyDecision,
     ToolPolicySession,
 };
@@ -326,7 +326,7 @@ async fn a_session_without_the_delegate_is_not_told_to_call_it() {
 /// "Registered and callable: yes".
 #[tokio::test]
 async fn use_skill_reaches_a_withheld_packed_tool() {
-    use crate::tools::agent_policy::ToolPolicyEngine;
+    use tinytools::ToolPolicyEngine;
     use crate::tools::toolpacks::strip_packed_from_visible;
 
     let mut tools: Vec<Box<dyn tinytools::Tool>> = vec![Box::new(RoutingFakeTool("goal_set"))];
@@ -376,7 +376,7 @@ async fn use_skill_reaches_a_withheld_packed_tool() {
 /// remove, one hop later. The hint must fall back to the owning agent instead.
 #[tokio::test]
 async fn a_prompt_hidden_delegate_is_not_offered_as_a_direct_route() {
-    use crate::tools::agent_policy::ToolPolicyEngine;
+    use tinytools::ToolPolicyEngine;
     use crate::tools::toolpacks::strip_packed_from_visible;
 
     let mut tools: Vec<Box<dyn tinytools::Tool>> = vec![
@@ -484,7 +484,7 @@ fn an_invented_tool_name_is_not_found_even_under_the_packs_permission_ceiling() 
         .expect("an invented tool must be answered, not dispatched");
 
     assert!(
-        message.starts_with(crate::tools::status::NOT_FOUND_MARKER),
+        message.starts_with(tinytools::status::NOT_FOUND_MARKER),
         "a restricted channel must still answer an invented name as not-found: {message}"
     );
     assert!(

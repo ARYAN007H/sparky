@@ -90,7 +90,7 @@ pub struct Turn {
     trace_content: crate::observe::TraceContent,
     hooks: openhuman_core::agent::hooks::HookScope,
     tools: Option<openhuman_core::agent::HostTools>,
-    tool_env: Option<openhuman_core::tools::timeout::CommandEnvironment>,
+    tool_env: Option<tinytools_std::timeout::CommandEnvironment>,
 }
 
 impl Turn {
@@ -161,7 +161,7 @@ impl Turn {
     /// Interpreter pools are bypassed so a pooled process cannot carry another
     /// turn's environment. Independently spawned host tasks must carry the scope.
     pub fn tool_env(mut self, env: impl IntoIterator<Item = (String, String)>) -> Self {
-        self.tool_env = Some(openhuman_core::tools::timeout::CommandEnvironment::new(env));
+        self.tool_env = Some(tinytools_std::timeout::CommandEnvironment::new(env));
         self
     }
 
