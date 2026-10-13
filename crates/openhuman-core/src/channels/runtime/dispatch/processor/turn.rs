@@ -17,8 +17,8 @@ use crate::util::truncate_with_ellipsis;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tinyagents_session::transcript::TranscriptMessage;
-use tinychannels_bus::context::ChatMessage;
 use tinychannels_bus as traits;
+use tinychannels_bus::context::ChatMessage;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::AbortOnDropHandle;
 
