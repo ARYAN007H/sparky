@@ -275,8 +275,16 @@ pub(crate) async fn run_engine_loop(
             return;
         }
     };
+    let store = match workflow_store(config) {
+        Ok(store) => store,
+        Err(error) => {
+            log::error!(target: LOG_TARGET, "[workflow_run_engine] loop.no_store run={run_id} err={error:#}");
+            clear_cancel_signal(run_id, &cancel);
+            return;
+        }
+    };
     let engine = WorkflowEngine::new(
-        workflow_store(config)?,
+        store,
         Arc::new(super::super::host::OpenHumanWorkflowExecutor::new(
             run_id,
             model_override,
