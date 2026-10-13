@@ -361,7 +361,7 @@ fn open_standing_local(
         None => {
             let dir = db_path.with_extension("files");
             let url = format!("file:{}", dir.display());
-            let backend = super::block_on_anyhow(async { Ok(super::open(&url).await?) })
+            let backend = super::block_on_anyhow(async move { Ok(super::open(&url).await?) })
                 .with_context(|| format!("[{domain}] open {}", dir.display()))?;
             import(&backend, &Scope::local(), config).with_context(|| {
                 format!("[{domain}] importing the legacy files failed; they are untouched")
