@@ -135,13 +135,16 @@ fn the_flow_catalog_comes_across_whole_and_the_legacy_files_are_untouched() {
         assert_eq!(drafts, ["draft-1", "draft-2"]);
         assert_eq!(catalog.list_suggestions(None, 50).await?.len(), 2);
         for entry in expected["kv"].as_array().unwrap() {
-            let value = catalog
-                .kv_get(
-                    entry["namespace"].as_str().unwrap(),
-                    entry["key"].as_str().unwrap(),
-                )
-                .await?;
-            assert_eq!(value.as_ref(), Some(&entry["value"]), "kv {entry}");
+            let (namespace, key, value) = (
+                entry[0].as_str().unwrap(),
+                entry[1].as_str().unwrap(),
+                &entry[2],
+            );
+            assert_eq!(
+                catalog.kv_get(namespace, key).await?.as_ref(),
+                Some(value),
+                "{namespace}/{key}"
+            );
         }
         Ok(())
     })
