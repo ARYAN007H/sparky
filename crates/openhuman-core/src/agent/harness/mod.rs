@@ -14,7 +14,7 @@
 //!   identity, global skills) to keep sub-agent prompts small.
 //!
 //! ## Key Sub-modules
-//! - **[`definition`]**: Data structures for defining an agent's archetype.
+//! - **[`host_definition`]**: OpenHuman's extension slot and registry over `tinyagents-definition`.
 //! - **[`fork_context`]**: Task-local storage for parent context sharing.
 //!
 //! Cancellation is handled by the tinyagents steering channel (see
@@ -30,10 +30,6 @@ pub(crate) mod tool_result_artifacts;
 // NOTE: deliberately no flat re-export here. `artifact_offload::ArtifactKind`
 // would shadow the unrelated `openhuman::agent::artifacts::ArtifactKind` for anyone
 // glob-importing this module; callers import the owning library directly.
-pub use definition::{
-    AgentDefinition, AgentDefinitionRegistry, DefinitionSource, ModelSpec, PromptSource,
-    SandboxMode, ToolScope,
-};
 pub use fork_context::{
     current_parent, with_parent_context, AgentContextPreparedSource, ParentExecutionContext,
 };
