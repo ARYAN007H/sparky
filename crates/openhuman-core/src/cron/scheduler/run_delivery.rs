@@ -73,11 +73,18 @@ impl RunDelivery for HostDelivery {
 
 pub(super) struct HostTriggers {
     binding: Binding,
+    /// Holds the per-flow in-flight dedupe across ticks.
+    #[cfg(feature = "flows")]
+    flows: std::sync::OnceLock<crate::flows::bus::FlowTriggerSubscriber>,
 }
 
 impl HostTriggers {
     pub(super) fn new(binding: Binding) -> Self {
-        Self { binding }
+        Self {
+            binding,
+            #[cfg(feature = "flows")]
+            flows: std::sync::OnceLock::new(),
+        }
     }
 }
 
@@ -102,7 +109,14 @@ impl TriggerSink for HostTriggers {
                     "[cron] flow schedule trigger fired"
                 );
                 #[cfg(feature = "flows")]
-                crate::flows::bus::dispatch_schedule_tick(&self.binding.config(), flow_id).await;
+                self.flows
+                    .get_or_init(|| {
+                        crate::flows::bus::FlowTriggerSubscriber::new(std::sync::Arc::new(
+                            self.binding.config(),
+                        ))
+                    })
+                    .dispatch_schedule_tick(flow_id)
+                    .await;
                 #[cfg(not(feature = "flows"))]
                 tracing::warn!(%flow_id, "[cron] built without `flows`; schedule trigger dropped");
                 Ok(Attempt {
