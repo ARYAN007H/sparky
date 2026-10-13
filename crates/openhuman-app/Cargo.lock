@@ -3849,6 +3849,7 @@ dependencies = [
  "tinyagents-tasks",
  "tinybox-bus",
  "tinybus",
+ "tinybus-module",
  "tinychannels-bus",
  "tinycomputer-bus",
  "tinyconnectors-bus",
@@ -6773,6 +6774,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "tinybus-module"
+version = "0.1.3"
+dependencies = [
+ "async-trait",
+ "serde",
+ "serde_json",
+ "tinybus",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "tinychannels-bus"
 version = "0.1.30"
 dependencies = [
@@ -7125,7 +7138,7 @@ dependencies = [
 
 [[package]]
 name = "tinymcp-bus"
-version = "0.16.1"
+version = "0.18.0"
 dependencies = [
  "schemars 1.2.2",
  "serde",

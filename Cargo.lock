@@ -4591,6 +4591,7 @@ dependencies = [
  "tinybox-bus",
  "tinybox-core",
  "tinybus",
+ "tinybus-module",
  "tinychannels",
  "tinychannels-bus",
  "tinychannels-runtime",
@@ -8096,7 +8097,7 @@ dependencies = [
 
 [[package]]
 name = "tinymcp-bus"
-version = "0.16.1"
+version = "0.18.0"
 dependencies = [
  "schemars",
  "serde",
