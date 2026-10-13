@@ -2559,6 +2559,12 @@ Ordered fallbacks and required exploration: [routing](ROUTING.md).
 Host telemetry and the existing exporter: [observers](OBSERVERS.md).
 
 <!-- Source: docs/gitbooks/en/developing/embedding.md -->
+---
+description: >-
+  How to run the OpenHuman core inside your own Rust program: one Runtime,
+  with any number of separately configured Agents on it.
+icon: code
+---
 # Embedding OpenHuman
 
 The embedding documentation now lives in the [Embedding section](embed/README.md).
