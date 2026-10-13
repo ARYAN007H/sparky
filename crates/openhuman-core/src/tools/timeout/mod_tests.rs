@@ -1,7 +1,11 @@
 use super::*;
 
+/// The timeout settings are process-global; tests that push values serialize here.
+static SETTINGS_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[test]
 fn config_push_reaches_module_and_harness_settings() {
+    let _guard = SETTINGS_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     // Skip when an operator override would legitimately win.
     if env_override_active() {
         return;
@@ -18,6 +22,7 @@ fn config_push_reaches_module_and_harness_settings() {
 
 #[test]
 fn out_of_range_config_push_falls_back_to_default() {
+    let _guard = SETTINGS_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     if env_override_active() {
         return;
     }
