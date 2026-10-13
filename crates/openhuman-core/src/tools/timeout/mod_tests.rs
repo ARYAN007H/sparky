@@ -185,6 +185,18 @@ fn resolve_effective_table() {
     }
 }
 
+/// A shell child that leads its own process group and dies with its handle, as
+/// the module-owned shell children do; the deadline helpers under test must
+/// reach everything it starts.
+#[cfg(unix)]
+fn test_shell(command: &str) -> tokio::process::Command {
+    let mut cmd = tokio::process::Command::new("sh");
+    cmd.arg("-c").arg(command).kill_on_drop(true);
+    own_process_group(cmd.as_std_mut());
+    cmd
+}
+
+
 /// The deadline must take the command's whole process group with it. A shell
 /// pipeline is grandchildren of the tool's child, and a `grep -rl … /` the tool
 /// had reported as killed ran on for half an hour at a full core.
@@ -196,7 +208,7 @@ async fn a_timed_out_command_takes_its_whole_process_group_with_it() {
     let pidfile = dir.join("grandchild.pid");
     // `sleep 30 &` is a grandchild in the shell's own process group; `wait`
     // keeps the shell alive past the deadline.
-    let mut cmd = crate::agent::platform_shell::build_tokio_command(&format!(
+    let mut cmd = test_shell(&format!(
         "sleep 30 & echo $! > {}; wait",
         pidfile.display()
     ));
@@ -242,7 +254,7 @@ async fn a_shell_family_child_dies_with_a_dropped_future() {
     let dir = std::env::temp_dir().join(format!("oh-dropkill-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let pidfile = dir.join("child.pid");
-    let mut cmd = crate::agent::platform_shell::build_tokio_command(&format!(
+    let mut cmd = test_shell(&format!(
         "echo $$ > {}; sleep 30",
         pidfile.display()
     ));
