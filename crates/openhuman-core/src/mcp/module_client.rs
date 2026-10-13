@@ -377,12 +377,7 @@ impl McpConfiguredClient {
                 family: server.name.clone(),
                 display_name: server.name.clone(),
                 tools,
-                default_exposure: match declared.expose {
-                    crate::config::McpToolExposure::Direct => tinymcp_bus::McpToolExposure::Direct,
-                    crate::config::McpToolExposure::Deferred => {
-                        tinymcp_bus::McpToolExposure::Deferred
-                    }
-                },
+                default_exposure: declared.expose,
                 direct_tools: declared.direct_tools.clone(),
             });
         }
