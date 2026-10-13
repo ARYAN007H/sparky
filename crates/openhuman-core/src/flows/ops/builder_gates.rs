@@ -341,7 +341,7 @@ pub(crate) async fn build_builder_proposal(
 /// load_config_with_timeout` per node; an all-`Harness`/no-custom-ref graph
 /// still never reads it at all.
 pub(crate) async fn validate_agent_refs(config: &Config, graph: &WorkflowGraph) -> Vec<String> {
-    use crate::agent::harness::AgentDefinitionRegistry;
+    use crate::agent::harness::host_definition::AgentDefinitionRegistry;
     use crate::agent::registry::AgentRegistryEntry;
     use crate::flows::tinyflows::caps::{route_for_agent_ref, AgentRoute};
 

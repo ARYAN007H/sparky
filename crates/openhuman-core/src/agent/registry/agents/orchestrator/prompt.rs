@@ -11,7 +11,7 @@
 //! module) so nobody has to branch on `agent_id` in a shared section impl.
 
 use crate::agent::harness::definition::SubagentEntry;
-use crate::agent::harness::AgentDefinitionRegistry;
+use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::prompts::{
     render_datetime, render_identity, render_tools, render_workspace, ConnectedIntegration,
     PromptContext, ToolCallFormat,

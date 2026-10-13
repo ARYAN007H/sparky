@@ -74,7 +74,7 @@ pub(crate) async fn flows_build_with_extra_hidden_tools(
 
     // The registry must be initialised before building a named builtin agent
     // (idempotent — mirrors `flows_discover`).
-    crate::agent::harness::AgentDefinitionRegistry::init_global(&config.workspace_dir)
+    crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global(&config.workspace_dir)
         .map_err(|e| format!("failed to initialise agent registry: {e}"))?;
 
     // Issue #4868 — the session builder (`build_session_agent_inner`) now

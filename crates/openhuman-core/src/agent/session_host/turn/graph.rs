@@ -28,7 +28,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use tokio::sync::mpsc::Sender;
 
-use crate::agent::harness::SandboxMode;
+use tinyagents_definition::SandboxMode;
 use crate::agent::progress::AgentProgress;
 use crate::agent::tinyagents::{
     run_root_turn_via_hosted_agent, TinyagentsTurnOutcome, TurnContextMiddleware,

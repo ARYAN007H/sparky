@@ -81,7 +81,7 @@ async fn start_channels_inner(mut config: Config, session: CancellationToken) ->
     // Initialise the sub-agent definition registry from this workspace.
     // Idempotent — `bootstrap_core_runtime` may also call it.
     if let Err(err) =
-        crate::agent::harness::AgentDefinitionRegistry::init_global(&config.workspace_dir)
+        crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global(&config.workspace_dir)
     {
         tracing::warn!(
             "AgentDefinitionRegistry::init_global failed: {err} — \

@@ -128,7 +128,7 @@ fn boot_refuses_an_unseeded_definition_registry() {
 
 #[test]
 fn boot_accepts_a_builtins_only_registry() {
-    let registry = crate::agent::harness::AgentDefinitionRegistry::builtins_only();
+    let registry = crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only();
     verify_builtin_definitions(Some(&registry)).unwrap();
 }
 

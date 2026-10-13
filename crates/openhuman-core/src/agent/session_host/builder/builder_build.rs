@@ -352,12 +352,12 @@ impl SessionHostBuilder {
         let hosted_config = Arc::new(hosted_config);
         #[cfg(test)]
         let definitions = Some(
-            crate::agent::harness::AgentDefinitionRegistry::current().unwrap_or_else(|| {
-                Arc::new(crate::agent::harness::AgentDefinitionRegistry::builtins_only())
+            crate::agent::harness::host_definition::AgentDefinitionRegistry::current().unwrap_or_else(|| {
+                Arc::new(crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only())
             }),
         );
         #[cfg(not(test))]
-        let definitions = crate::agent::harness::AgentDefinitionRegistry::current();
+        let definitions = crate::agent::harness::host_definition::AgentDefinitionRegistry::current();
         // A caller that brought its own definition is the authority for this
         // session, so it does not need a process registry to exist before it
         // may run a turn. The stand-in is deliberately *empty* rather than
@@ -371,7 +371,7 @@ impl SessionHostBuilder {
         let definitions = definitions.or_else(|| {
             session_definition
                 .is_some()
-                .then(|| Arc::new(crate::agent::harness::AgentDefinitionRegistry::default()))
+                .then(|| Arc::new(crate::agent::harness::host_definition::AgentDefinitionRegistry::default()))
         });
         let hosted_base = definitions.map(|definitions| {
             Arc::new(crate::agent::tinyagents::host::OpenHumanHostBase {

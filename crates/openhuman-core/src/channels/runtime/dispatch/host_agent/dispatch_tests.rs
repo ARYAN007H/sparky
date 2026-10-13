@@ -319,7 +319,7 @@ async fn bound_channel_runs_its_host_agent() {
     let tmp = tempfile::tempdir().unwrap();
     // Every host boots the definition registry; a session's hosted authority
     // is built from it.
-    crate::agent::harness::AgentDefinitionRegistry::init_global_builtins().unwrap();
+    crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins().unwrap();
     let mut agent_config = config(&tmp, None);
     agent_config.default_model = Some("fixture".into());
     let route = crate::config::schema::EphemeralRoute::from_params(

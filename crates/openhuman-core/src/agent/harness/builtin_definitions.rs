@@ -8,9 +8,9 @@
 //! Custom TOML definitions loaded later by
 //! [`super::definition_loader`] override any built-in with the same id.
 
-use super::definition::AgentDefinition;
+use super::host_definition::AgentDefinition;
 #[cfg(test)]
-use super::definition::DefinitionSource;
+use tinyagents_definition::DefinitionSource;
 
 /// All built-in definitions, in stable order.
 ///
@@ -47,9 +47,7 @@ pub fn all() -> Vec<AgentDefinition> {
 /// delegation tools, so the parent must explicitly allow those test children.
 #[cfg(test)]
 pub(crate) fn test_main_def() -> AgentDefinition {
-    use super::definition::{
-        AgentTier, ModelSpec, PromptSource, SandboxMode, SubagentEntry, ToolScope,
-    };
+    use tinyagents_definition::{AgentTier, ModelSpec, PromptSource, SandboxMode, SubagentEntry, ToolScope};
     AgentDefinition {
         id: "main".into(),
         when_to_use: "test-only default parent agent".into(),
@@ -94,7 +92,7 @@ pub(crate) fn test_main_def() -> AgentDefinition {
 /// `subagent_host::ops::tests::resolve_subagent_source_*`.
 #[cfg(test)]
 pub(crate) fn test_inherit_echo_def() -> AgentDefinition {
-    use super::definition::{ModelSpec, PromptSource, SandboxMode, ToolScope};
+    use tinyagents_definition::{ModelSpec, PromptSource, SandboxMode, ToolScope};
     AgentDefinition {
         id: "__test_inherit_echo".into(),
         when_to_use: "test-only sub-agent that inherits the parent provider".into(),
@@ -132,7 +130,7 @@ pub(crate) fn test_inherit_echo_def() -> AgentDefinition {
 /// repeated nested tool calls through the real sub-agent loop.
 #[cfg(test)]
 pub(crate) fn test_inherit_parallel_worker_def() -> AgentDefinition {
-    use super::definition::{ModelSpec, PromptSource, SandboxMode, ToolScope};
+    use tinyagents_definition::{ModelSpec, PromptSource, SandboxMode, ToolScope};
     AgentDefinition {
         id: "__test_inherit_parallel_worker".into(),
         when_to_use: "test-only parallel sub-agent that inherits the parent provider".into(),
