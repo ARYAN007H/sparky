@@ -30,8 +30,7 @@ pub struct Account {
     workspace_dir: PathBuf,
     providers_loaded: Arc<tokio::sync::OnceCell<()>>,
     #[cfg(test)]
-    call_fixture:
-        Option<Arc<dyn Fn(&str, serde_json::Value, bool) -> anyhow::Result<String> + Send + Sync>>,
+    call_fixture: Option<CallFixture>,
 }
 
 impl std::fmt::Debug for Account {
