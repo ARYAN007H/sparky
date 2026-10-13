@@ -207,19 +207,17 @@ fn a_harness_runs_a_turn_against_the_provider_it_was_given() {
             let requests = common::chat_requests(&provider_server).await;
             assert_eq!(requests.len(), 102, "two serial + 100 concurrent turns");
 
-            // The first session's transcript reads back from the workspace's
-            // session store, whatever backend it was given (the old
-            // `session_db/` files are gone since the storage-backed store). A
-            // harness session id is its thread id.
-            let stores =
-                openhuman_core::agent::session_store::provider_for_workspace(&workspace_dir)
-                    .for_agent("harness");
-            { let prov = openhuman_core::agent::session_store::provider_for_workspace(&workspace_dir); for k in ["harness","default","local"] { eprintln!("DBG key={k} root={}", prov.for_agent(k).transcripts.root_for_thread(&first.session_id).is_some()); } eprintln!("DBG storage={:?}", openhuman_core::storage::installed().map(|s| s.driver().to_string())); let _ = std::process::Command::new("find").arg(workspace_dir.parent().unwrap()).arg("-maxdepth").arg("4").status(); eprintln!("DBG ws={} sid={}", workspace_dir.display(), first.session_id); }
+            // The first session's transcript landed in the harness agent's
+            // own transcript root under the workspace (the old
+            // `session_db/` files are gone). A harness session id is its
+            // thread id.
+            let transcripts =
+                openhuman_core::agent::session_store::AgentTranscriptFiles::new(
+                    &workspace_dir,
+                    "harness",
+                );
             assert!(
-                stores
-                    .transcripts
-                    .root_for_thread(&first.session_id)
-                    .is_some(),
+                transcripts.root_for_thread(&first.session_id).is_some(),
                 "the first session's transcript was not persisted"
             );
 
