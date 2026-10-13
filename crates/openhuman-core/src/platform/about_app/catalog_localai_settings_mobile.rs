@@ -386,7 +386,7 @@ Capability {
                       Configurable per agent/session/channel with safe defaults for non-main sessions.",
         how_to: "Set sandbox_mode = \"sandboxed\" in agent.toml, or configure runtime.kind = \
                  \"docker\" in the TOML config. Use openhuman.sandbox_status / \
-                 openhuman.sandbox_resolve_policy RPC to inspect.",
+                 openhuman.sandbox_resolve_policy RPC to inspect. Switched off by [components] sandbox = false (also set by the legacy [sandbox] enabled = false), which never loads the TinyBox module, runs commands unjailed under the Rust path checks, and answers COMPONENT_DISABLED:sandbox.",
         status: CapabilityStatus::Beta,
         privacy: None,
     },

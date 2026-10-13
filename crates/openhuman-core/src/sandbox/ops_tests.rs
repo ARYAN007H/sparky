@@ -294,3 +294,43 @@ fn sandbox_off_value_keeps_sandbox_on_otherwise() {
         assert!(!sandbox_off_value(v), "{v:?} must leave the sandbox on");
     }
 }
+
+// ── [components] sandbox = false ──────────────────────────────────────
+
+#[tokio::test]
+async fn sandbox_off_component_forces_the_unsandboxed_fallback_and_no_module_load() {
+    let mut set = crate::core::runtime::ComponentSet::all();
+    set.sandbox = false;
+    let ctx = crate::core::runtime::context::CoreContext::for_test_with_components(set);
+    crate::core::runtime::context::CoreContext::scope(ctx, async {
+        assert!(sandbox_component_off());
+        assert!(sandbox_disabled_by_host());
+        assert!(!command_requires_sandbox(Some(SandboxMode::Sandboxed))
+            .await
+            .unwrap());
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn sandbox_component_is_on_without_a_context_or_when_enabled() {
+    assert!(!sandbox_component_off());
+    let ctx = crate::core::runtime::context::CoreContext::for_test_with_components(
+        crate::core::runtime::ComponentSet::all(),
+    );
+    crate::core::runtime::context::CoreContext::scope(ctx, async {
+        assert!(!sandbox_component_off());
+    })
+    .await;
+}
+
+#[test]
+fn config_disables_sandbox_for_legacy_flag_or_component() {
+    let mut config = crate::config::Config::default();
+    assert!(!config_disables_sandbox(&config));
+    config.sandbox.enabled = Some(false);
+    assert!(config_disables_sandbox(&config));
+    config.sandbox.enabled = None;
+    config.components.sandbox = false;
+    assert!(config_disables_sandbox(&config));
+}
