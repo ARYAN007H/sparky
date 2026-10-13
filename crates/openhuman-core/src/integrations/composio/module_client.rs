@@ -88,6 +88,18 @@ const WITHOUT_MODULES: &str =
     "composio is unavailable in this build: connectors run in the `tinyconnectors` module, \
      which needs the `modules` feature";
 
+/// Fill the process snapshot of the module's curated catalogs, once per
+/// pinned module version. The synchronous catalog lookups read that snapshot,
+/// so it must exist before the first call whose reply they gate. A failure is
+/// logged and the call proceeds: the lookups then read every toolkit as
+/// uncurated until a later call succeeds.
+#[cfg(feature = "modules")]
+async fn prime_curated_catalogs(config: &crate::config::Config) {
+    if let Err(error) = super::contract::curated::prime(config).await {
+        tracing::debug!("[composio][curated] prime failed: {error}");
+    }
+}
+
 /// Call one member with an argument and decode its reply.
 ///
 /// # Errors
@@ -108,6 +120,7 @@ where
     Request: serde::Serialize + Send,
     Reply: serde::de::DeserializeOwned,
 {
+    prime_curated_catalogs(config).await;
     crate::modules::connectors::call(config, member, request)
         .await
         .map_err(|error| normalize_error(member, error))
@@ -170,6 +183,7 @@ where
     Request: serde::Serialize + Send,
     Reply: serde::de::DeserializeOwned,
 {
+    prime_curated_catalogs(config).await;
     crate::modules::connectors::call_stateless(config, member, request).await
 }
 
@@ -231,6 +245,7 @@ pub async fn call_bare<Reply: serde::de::DeserializeOwned>(
     config: &crate::config::Config,
     member: &str,
 ) -> Result<Reply, String> {
+    prime_curated_catalogs(config).await;
     crate::modules::connectors::call_bare(config, member)
         .await
         .map_err(|error| normalize_error(member, error))
