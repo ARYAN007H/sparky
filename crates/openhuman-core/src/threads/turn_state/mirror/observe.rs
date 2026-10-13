@@ -123,7 +123,7 @@ impl ObserveProgress for TurnStateMirror {
                     // Persist the plain-language failure so the explanation
                     // survives a thread switch / cold boot (#4459). Clear it on
                     // a (re-)success so a retried row doesn't keep stale copy.
-                    entry.failure = failure.as_ref().map(PersistedToolFailure::from);
+                    entry.failure = failure.as_ref().map(persisted_tool_failure);
                     // Persist the (capped) result text so the rehydrated
                     // timeline can show what the tool returned, matching the
                     // live `tool_result` socket payload.
@@ -321,7 +321,7 @@ impl ObserveProgress for TurnStateMirror {
                         } else {
                             ToolTimelineStatus::Error
                         };
-                        let persisted_failure = failure.as_ref().map(PersistedToolFailure::from);
+                        let persisted_failure = failure.as_ref().map(persisted_tool_failure);
                         if let Some(call) = activity
                             .tool_calls
                             .iter_mut()
