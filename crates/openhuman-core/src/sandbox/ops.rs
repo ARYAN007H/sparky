@@ -66,7 +66,7 @@ pub async fn command_requires_sandbox(sandbox_mode: Option<SandboxMode>) -> Resu
         return Ok(true);
     }
     let config = crate::config::ops::load_config_with_timeout().await?;
-    if config.sandbox.enabled == Some(false) {
+    if config_disables_sandbox(&config) {
         return Ok(false);
     }
     Ok(matches!(
@@ -98,7 +98,7 @@ pub(crate) async fn resolve_command_policy(
         &config.runtime,
         false,
     );
-    if config.sandbox.enabled != Some(false) && !sandbox_disabled_by_host() {
+    if !config_disables_sandbox(&config) && !sandbox_disabled_by_host() {
         apply_requested_backend(&mut policy, &config.sandbox, &config.runtime, &config)
             .await
             .map_err(|error| error.to_string())?;
@@ -107,7 +107,25 @@ pub(crate) async fn resolve_command_policy(
 }
 
 fn sandbox_disabled_by_host() -> bool {
-    sandbox_off_value(std::env::var(SANDBOX_OFF_ENV).ok().as_deref())
+    sandbox_off_value(std::env::var(SANDBOX_OFF_ENV).ok().as_deref()) || sandbox_component_off()
+}
+
+/// `[components] sandbox = false` in the ambient core context. With no context
+/// the component is on, since the set only narrows.
+pub(crate) fn sandbox_component_off() -> bool {
+    let off = crate::core::runtime::context::CoreContext::current()
+        .is_some_and(|ctx| !ctx.components().sandbox);
+    if off {
+        tracing::debug!("[sandbox] component 'sandbox' disabled, using the unsandboxed fallback");
+    }
+    off
+}
+
+/// The saved config says no isolation: the legacy `enabled = false` flag or
+/// `[components] sandbox = false`.
+fn config_disables_sandbox(config: &crate::config::Config) -> bool {
+    config.sandbox.enabled == Some(false)
+        || !crate::core::runtime::ComponentSet::from_config(&config.components).sandbox
 }
 
 /// Resolve a `SandboxPolicy` from the agent's `SandboxMode`, the
@@ -297,7 +315,7 @@ pub async fn execute_in_sandbox(
             .await
             .map_err(|e| anyhow::anyhow!("Cannot read sandbox configuration: {e}"))?;
         module_config = Some(config.clone());
-        if config.sandbox.enabled == Some(false) {
+        if config_disables_sandbox(&config) {
             false
         } else {
             apply_requested_backend(
