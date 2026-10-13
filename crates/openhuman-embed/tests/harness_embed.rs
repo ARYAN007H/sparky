@@ -214,7 +214,7 @@ fn a_harness_runs_a_turn_against_the_provider_it_was_given() {
             let stores =
                 openhuman_core::agent::session_store::provider_for_workspace(&workspace_dir)
                     .for_agent("harness");
-            eprintln!("DBG installed={} sid={} latest={} root={}", openhuman_core::agent::session_store::is_installed(), first.session_id, stores.transcripts.latest_for_agent("harness").is_some(), stores.transcripts.root_for_thread(&first.session_id).is_some());
+            { let prov = openhuman_core::agent::session_store::provider_for_workspace(&workspace_dir); for k in ["harness","default","local"] { eprintln!("DBG key={k} root={}", prov.for_agent(k).transcripts.root_for_thread(&first.session_id).is_some()); } eprintln!("DBG ws={} sid={}", workspace_dir.display(), first.session_id); }
             assert!(
                 stores
                     .transcripts
