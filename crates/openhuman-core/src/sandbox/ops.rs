@@ -2,7 +2,6 @@
 //! routed execution.
 
 use super::docker;
-use super::grants::{resolve_local_jail_grants, JailGrants};
 use super::types::{
     ElevatedOp, SandboxBackendHandle, SandboxBackendKind, SandboxExecRequest, SandboxExecResult,
     SandboxPolicy, SandboxStatus, ELEVATED_TOOLS,
@@ -67,7 +66,7 @@ pub async fn command_requires_sandbox(sandbox_mode: Option<SandboxMode>) -> Resu
         return Ok(true);
     }
     let config = crate::config::ops::load_config_with_timeout().await?;
-    if config.sandbox.enabled == Some(false) {
+    if config_disables_sandbox(&config) {
         return Ok(false);
     }
     Ok(matches!(
@@ -99,7 +98,7 @@ pub(crate) async fn resolve_command_policy(
         &config.runtime,
         false,
     );
-    if config.sandbox.enabled != Some(false) && !sandbox_disabled_by_host() {
+    if !config_disables_sandbox(&config) && !sandbox_disabled_by_host() {
         apply_requested_backend(&mut policy, &config.sandbox, &config.runtime, &config)
             .await
             .map_err(|error| error.to_string())?;
@@ -108,7 +107,25 @@ pub(crate) async fn resolve_command_policy(
 }
 
 fn sandbox_disabled_by_host() -> bool {
-    sandbox_off_value(std::env::var(SANDBOX_OFF_ENV).ok().as_deref())
+    sandbox_off_value(std::env::var(SANDBOX_OFF_ENV).ok().as_deref()) || sandbox_component_off()
+}
+
+/// `[components] sandbox = false` in the ambient core context. With no context
+/// the component is on, since the set only narrows.
+pub(crate) fn sandbox_component_off() -> bool {
+    let off = crate::core::runtime::context::CoreContext::current()
+        .is_some_and(|ctx| !ctx.components().sandbox);
+    if off {
+        tracing::debug!("[sandbox] component 'sandbox' disabled, using the unsandboxed fallback");
+    }
+    off
+}
+
+/// The saved config says no isolation: the legacy `enabled = false` flag or
+/// `[components] sandbox = false`.
+fn config_disables_sandbox(config: &crate::config::Config) -> bool {
+    config.sandbox.enabled == Some(false)
+        || !crate::core::runtime::ComponentSet::from_config(&config.components).sandbox
 }
 
 /// Resolve a `SandboxPolicy` from the agent's `SandboxMode`, the
@@ -165,21 +182,14 @@ pub fn resolve_sandbox_policy(
         _ => true,
     };
 
-    // The jail denies whatever it is not told about, so a local policy carries
-    // the toolchain/git grants everyday commands need (see `sandbox::grants`).
-    let grants = if backend == SandboxBackendKind::Local {
-        host_local_jail_grants(runtime_config)
-    } else {
-        JailGrants::default()
-    };
-
+    // The jail denies whatever it is not told about; the toolchain/git grants
+    // everyday commands need are resolved by TinyBox at spawn time
+    // (`sandbox::local_grants`), so the policy starts without mounts.
     tracing::debug!(
         mode = ?mode,
         backend = ?backend,
         is_remote = is_remote_session,
         action_dir = %action_dir.display(),
-        read_only_grants = grants.read_only.len(),
-        read_write_grants = grants.read_write.len(),
         "[sandbox] resolved policy"
     );
 
@@ -187,8 +197,8 @@ pub fn resolve_sandbox_policy(
         backend,
         workspace_root: action_dir.to_path_buf(),
         state_dir: state_dir.to_path_buf(),
-        read_only_mounts: grants.read_only,
-        read_write_mounts: grants.read_write,
+        read_only_mounts: Vec::new(),
+        read_write_mounts: Vec::new(),
         allow_network,
         env_passthrough: SANDBOX_ENV_PASSTHROUGH
             .iter()
@@ -305,7 +315,7 @@ pub async fn execute_in_sandbox(
             .await
             .map_err(|e| anyhow::anyhow!("Cannot read sandbox configuration: {e}"))?;
         module_config = Some(config.clone());
-        if config.sandbox.enabled == Some(false) {
+        if config_disables_sandbox(&config) {
             false
         } else {
             apply_requested_backend(
@@ -343,9 +353,10 @@ pub async fn execute_in_sandbox(
                         anyhow::anyhow!("Cannot read module configuration: {error}")
                     })?,
             };
+            let policy = super::local_grants::with_resolved_grants(&config, policy).await?;
             super::native_jail::execute(
                 &config,
-                policy,
+                &policy,
                 command,
                 working_dir,
                 &extra_env,
@@ -405,11 +416,6 @@ pub(crate) async fn apply_requested_backend(
         }
         SandboxBackend::Landlock => {
             super::native_jail::require_backend(config, "landlock").await?;
-            if policy.backend != SandboxBackendKind::Local {
-                let grants = host_local_jail_grants(runtime);
-                policy.read_only_mounts = grants.read_only;
-                policy.read_write_mounts = grants.read_write;
-            }
             policy.backend = SandboxBackendKind::Local;
             policy.docker_overrides = None;
             Ok(true)
@@ -523,27 +529,6 @@ impl Drop for CallDir {
 pub fn is_elevated_op(tool_name: &str) -> bool {
     ELEVATED_TOOLS.contains(&tool_name)
 }
-
-fn host_local_jail_grants(runtime: &RuntimeConfig) -> JailGrants {
-    local_jail_grants_with_home(runtime, crate::core::runtime::is_saas(), || {
-        dirs::home_dir()
-    })
-}
-
-// Shared by initial selection and an explicit backend switch. SaaS callers
-// have no operator-home grants, even if the helper is reached directly.
-fn local_jail_grants_with_home(
-    runtime: &RuntimeConfig,
-    saas: bool,
-    home: impl FnOnce() -> Option<PathBuf>,
-) -> JailGrants {
-    let home = if saas { None } else { home() };
-    resolve_local_jail_grants(home.as_deref(), &runtime.local_jail)
-}
-
-#[cfg(test)]
-#[path = "ops_host_grants_tests.rs"]
-mod host_grants_tests;
 
 /// Build an `ElevatedOp` for audit logging when a tool bypasses the sandbox.
 pub fn build_elevated_op(tool_name: &str, command: &str, reason: &str) -> ElevatedOp {

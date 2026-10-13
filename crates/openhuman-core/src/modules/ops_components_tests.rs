@@ -100,3 +100,16 @@ async fn voice_off_refuses_tinyvoice_before_download_or_load() {
     assert_eq!(status.state, ModuleState::Disabled);
     assert!(status.source.is_none());
 }
+
+#[tokio::test]
+async fn a_disabled_sandbox_never_loads_the_tinybox_module() {
+    let config = config_without("sandbox");
+    let err = ensure_loaded_within(&config, "tinybox", None)
+        .await
+        .unwrap_err();
+    assert_eq!(err, LoadError::Disabled("sandbox"));
+    assert_eq!(err.into_message(), "COMPONENT_DISABLED:sandbox");
+    let statuses = list(&config);
+    let status = statuses.iter().find(|s| s.id == "tinybox").unwrap();
+    assert_eq!(status.state, ModuleState::Disabled);
+}

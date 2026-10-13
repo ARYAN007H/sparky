@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 
 use crate::config::Config;
 use crate::flows::ops;
-use crate::flows::ops::validate_and_migrate_graph;
+use tinyflows::authoring::validate_and_migrate_graph;
 use tinytools::{PermissionLevel, Tool, ToolResult};
 
 /// `create_workflow`: the gated create tool (audit F4/F12). Persists a NEW
@@ -356,7 +356,7 @@ impl Tool for SaveWorkflowTool {
         // inside `ops::flows_update`, which the UI/RPC also call for a
         // human's own edits and which must stay permissive) — so an agent
         // can never persist a graph with an unresolvable `tool_call` binding
-        // either. See `ops::validate_binding_resolvability`.
+        // either. See `tinyflows::gates::failures`.
         let graph = match validate_and_migrate_graph(graph_json.clone()) {
             Ok(graph) => graph,
             Err(e) => {
@@ -387,7 +387,7 @@ impl Tool for SaveWorkflowTool {
         // Composio args) were previously computed by propose/revise but never
         // surfaced again at save time — add them here so the agent sees any
         // non-fatal wiring gaps that remain in the final persisted graph.
-        let mut warnings = ops::graph_trigger_warnings(&graph);
+        let mut warnings = tinyflows::triggers::graph_trigger_warnings(&graph);
         warnings.extend(ops::graph_wiring_warnings(&self.config, &graph).await);
 
         tracing::info!(

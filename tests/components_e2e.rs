@@ -51,6 +51,7 @@ fn disabled_component_answers_component_disabled_over_json_rpc() {
                     config.components.mcp = false;
                     config.components.voice = false;
                     config.components.channels = false;
+                    config.components.sandbox = false;
                     tinyhumans_boot::boot();
                     let _runtime = CoreBuilder::new(HostKind::Library)
                         .config(config)
@@ -105,6 +106,20 @@ fn disabled_component_answers_component_disabled_over_json_rpc() {
                         "{channels}"
                     );
 
+                    // The sandbox namespace answers the same typed error.
+                    let sandbox = rpc(&base, "openhuman.sandbox_status").await;
+                    assert_eq!(
+                        sandbox.pointer("/error/message").and_then(Value::as_str),
+                        Some("COMPONENT_DISABLED:sandbox"),
+                        "{sandbox}"
+                    );
+                    assert_eq!(
+                        sandbox
+                            .pointer("/error/data/component")
+                            .and_then(Value::as_str),
+                        Some("sandbox")
+                    );
+
                     // `modules.list` reports the same modules as Disabled, and only them.
                     let listed = rpc(&base, "openhuman.modules_list").await;
                     let modules = listed
@@ -125,6 +140,7 @@ fn disabled_component_answers_component_disabled_over_json_rpc() {
                         Some("disabled"),
                         "{listed}"
                     );
+                    assert_eq!(state_of("tinybox").as_deref(), Some("disabled"), "{listed}");
                     assert_ne!(
                         state_of("tinydocs").as_deref(),
                         Some("disabled"),
