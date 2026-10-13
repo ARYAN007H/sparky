@@ -357,7 +357,10 @@ async fn mock_opaque_tool_call_upstream_ref_matches_native_and_composio_upstream
         ],
         "edges": []
     }));
-    let up = |expr: &str| tinyflows::preflight::mock_opaque_tool_call_upstream_ref(expr, &g, "sink").map(str::to_string);
+    let up = |expr: &str| {
+        tinyflows::preflight::mock_opaque_tool_call_upstream_ref(expr, &g, "sink")
+            .map(str::to_string)
+    };
     assert_eq!(
         up("=nodes.native_up.item.json.url").as_deref(),
         Some("native_up")
