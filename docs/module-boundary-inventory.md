@@ -396,6 +396,18 @@ alongside four lease validation and cancellation tests. Native providers, relay,
 remote-command host adapters and context helpers are still being migrated;
 both Channels implementation exceptions remain.
 
+Follow-up ([#7559](https://github.com/tinyhumansai/openhuman/issues/7559)): the
+host per-sender history cache now stores the bus `ChatMessage` and calls
+`tinychannels_bus::context::{clear_sender_history, compact_sender_history}`
+directly; `TranscriptMessage` is built only at the harness boundary in the
+message processor. `channels/context.rs` keeps just the host-only
+`ChannelRuntimeContext` and the module-call helpers.
+`spawn_scoped_typing_task` (`channels/runtime/dispatch/helpers.rs`) stays as a
+minimal host adapter: it needs `tokio::spawn`/cancellation, which the
+synchronous bus contract cannot hold, and it only drives the module's
+`begin_typing_refresh`/`end_typing_refresh`/`stop_typing` members. The
+`[components] channels = false` toggle is pinned in `tests/components_e2e.rs`.
+
 
 ## Full Channels host cutover validation
 
