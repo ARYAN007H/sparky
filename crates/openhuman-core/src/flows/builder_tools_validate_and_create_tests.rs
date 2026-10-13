@@ -365,14 +365,14 @@ async fn edit_workflow_edits_a_draft_and_writes_back() {
     assert_eq!(reloaded.graph["nodes"].as_array().unwrap().len(), 3);
 }
 
-// T-m6: when the draft write-back itself fails (here: a genuine permission
-// denial on the drafts dir, not a mock), the response must surface the
-// failure instead of claiming "Edits live on draft {id}" — the exact
-// wording that used to ship regardless of whether the write actually landed.
-#[cfg(unix)]
+// T-m6: when the draft write-back itself fails (here: a genuine write lock on
+// the catalog database held by another connection, not a mock), the response
+// must surface the failure instead of claiming "Edits live on draft {id}" —
+// the exact wording that used to ship regardless of whether the write
+// actually landed. Reads still work under the lock (WAL), so the draft loads
+// and only the write-back fails, after the database's busy timeout.
 #[tokio::test]
 async fn edit_workflow_surfaces_draft_write_back_failure() {
-    use std::os::unix::fs::PermissionsExt;
     use tinyflows_catalog::DraftOrigin;
 
     let tmp = TempDir::new().unwrap();
@@ -388,20 +388,9 @@ async fn edit_workflow_surfaces_draft_write_back_failure() {
     .unwrap()
     .value;
 
-    // Force the final `flows_draft_update` write to genuinely fail: strip
-    // write permission from the drafts dir after the draft file already
-    // exists in it (create_dir_all is a no-op; the write of the new tmp
-    // file inside it is what fails).
-    let drafts_dir = config.workspace_dir.join("flows").join("drafts");
-    std::fs::set_permissions(&drafts_dir, std::fs::Permissions::from_mode(0o555)).unwrap();
-    let probe = drafts_dir.join(".write_probe");
-    let write_is_blocked = std::fs::write(&probe, b"x").is_err();
-    let _ = std::fs::remove_file(&probe);
-    if !write_is_blocked {
-        // Running as root — permissions are ignored, assertion is moot.
-        std::fs::set_permissions(&drafts_dir, std::fs::Permissions::from_mode(0o755)).unwrap();
-        return;
-    }
+    let lock =
+        crate::storage::rusqlite::Connection::open(crate::flows::store::db_path(&config)).unwrap();
+    lock.execute_batch("BEGIN IMMEDIATE").unwrap();
 
     let tool = EditWorkflowTool::new(config.clone());
     let result = tool
@@ -412,8 +401,7 @@ async fn edit_workflow_surfaces_draft_write_back_failure() {
         .await
         .unwrap();
 
-    // Restore so the tempdir can be cleaned up.
-    std::fs::set_permissions(&drafts_dir, std::fs::Permissions::from_mode(0o755)).unwrap();
+    lock.execute_batch("ROLLBACK").unwrap();
 
     assert!(result.is_error, "{}", result.output());
     assert!(
