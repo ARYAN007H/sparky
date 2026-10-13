@@ -1,5 +1,6 @@
 use super::*;
 use serde_json::json;
+use tinycomputer_bus::agent::AgentError;
 
 fn task() -> BrowserTask {
     BrowserTask {
