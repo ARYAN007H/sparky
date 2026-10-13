@@ -13,9 +13,11 @@
 //! [`StorageMode::Url`].
 //!
 //! The default is [`StorageMode::Default`]: no backend is installed and
-//! nothing about the large stores changes (`sessions.db`, `flows.db`,
-//! `jobs.db` and `graph_checkpoints.db` are already SQLite files served as
-//! they are). The small stores (approvals, devices, notifications, task
+//! nothing about the large stores changes (`sessions.db` and
+//! `graph_checkpoints.db` are already SQLite files served as they are). Cron
+//! jobs and the flow catalog are on the ports in every mode, in SQLite document
+//! databases of their own when no backend is installed
+//! ([`super::local::open_standing`]). The small stores (approvals, devices, notifications, task
 //! sources) keep their rows as document tables inside their own `.db` files,
 //! `<workspace>/<domain>/<name>.db`, importing the rows of their old tables
 //! once ([`super::local`]). The workspace directory is therefore the default's

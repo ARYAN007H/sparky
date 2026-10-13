@@ -8,10 +8,13 @@ One URL picks it: `OPENHUMAN_STORAGE_URL`, else `[storage] url` in
 `config.toml` (`config::StorageConfig`), else the default,
 `sqlite:<workspace_dir>` (`storage::config`).
 
-The default installs no process-wide backend. The large relational stores
-(`sessions.db`, `flows.db`, `jobs.db`, `graph_checkpoints.db`) keep serving
-their own SQLite files as they always have, so nothing is migrated or
-duplicated. The small stores (approvals, devices, notifications, task
+The default installs no process-wide backend. `sessions.db` and
+`graph_checkpoints.db` keep serving their own SQLite files as they always have,
+so nothing is migrated or duplicated. Cron jobs and the flow catalog are on the
+ports whatever the URL says (tinyflows has no SQLite store of its own): with no
+backend installed they use SQLite document databases of their own
+(`cron/schedule.db`, `flows/catalog.db`), importing the old `jobs.db`,
+`flows.db`, `checkpoints.db` and `drafts/` on first use. The small stores (approvals, devices, notifications, task
 sources) keep their rows as document tables inside their existing `.db` file
 (`approval/approval.db`, `devices/devices.db`, `notifications/notifications.db`,
 `task_sources/sources.db`): the first call in a process opens it with the
@@ -38,9 +41,12 @@ on.
 `import/` copies the four small stores' legacy SQLite files into an installed
 backend once, read-only (see the module doc and the architecture page). The
 core calls `import::run` from `bootstrap_core_runtime` before any domain store
-opens; `run_with` takes an explicit backend for tests. Sessions, cron jobs and
-the flow catalog are not imported here: their formats belong to TinyAgents and
-TinyFlows.
+opens; `run_with` takes an explicit backend for tests. The tinyflows stores (cron
+jobs with their runs and policies, the flow catalog with its drafts, and flow
+checkpoints) are copied by `import::tinyflows` with `tinyflows-import`, which
+keeps ids, writes only what is absent and reads copies of the files; a build
+without the `flows` gate imports no cron jobs. Sessions are not imported here:
+their format belongs to TinyAgents.
 
 ## Entry points
 

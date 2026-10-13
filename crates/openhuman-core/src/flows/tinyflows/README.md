@@ -15,8 +15,9 @@ security model); this README covers only the host seam.
 
 - [`mod.rs`](./mod.rs): export-focused. Re-exports `caps::build_capabilities` and
   `caps::open_flow_checkpointer`, the two entry points `flows::ops*.rs`
-  calls to drive a run; re-exports `tinyflows_sqlite::checkpoint` as
-  `checkpoint_sqlite` under its historical path.
+  calls to drive a run. The checkpointer is `tinyflows_drivers::DriverCheckpointer`
+  on the flow catalog's storage; the `checkpoints.db` tinyflows used to write is
+  imported once.
 - `caps/`: every capability adapter except `memory`, plus construction,
   curation, preflight, and invocation logic. `build_capabilities` also fills
   `tasks` with the engine's own `TokioTaskRunner` and deliberately leaves
@@ -45,8 +46,7 @@ security model); this README covers only the host seam.
     graph, output, or logs.
   - `code.rs`: `OpenHumanCode` (`CodeRunner`); runs JS/Python through
     `sandbox::execute_in_sandbox` under `CODE_RUN_TIMEOUT_SECS`.
-  - `StateStore` is `tinyflows_sqlite::flows::SqliteStateStore` (built in
-    `ops.rs`), namespaced per flow (`"flow:<id>"`) so saved flows never
+  - `StateStore` is `FlowState` (`state.rs`, `FlowStateDocuments`), namespaced per flow (`"flow:<id>"`) so saved flows never
     collide on a state key.
   - `resolver.rs`: `OpenHumanWorkflowResolver` (`WorkflowResolver`);
     resolves a `sub_workflow` node's id to a stored workflow.
