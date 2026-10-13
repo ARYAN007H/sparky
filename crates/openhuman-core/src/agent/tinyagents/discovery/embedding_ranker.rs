@@ -9,7 +9,6 @@ use std::sync::Arc;
 use tinyagents_harness::tool::discover::{DriverEmbeddingCache, EmbeddingToolRanker};
 use tinyinference_embeddings::EmbeddingModel;
 
-
 /// A ranker over `provider` with an in-memory cache; chain
 /// `.with_cache(cache)` to persist it (see [`embedding_tool_ranker_in`]). The
 /// cache is keyed by the provider's embedding-space signature, so a model

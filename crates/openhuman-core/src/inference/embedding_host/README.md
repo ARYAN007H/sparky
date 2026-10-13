@@ -32,17 +32,12 @@ Declared in [`mod.rs`](./mod.rs) and resolved by [`factory.rs`](./factory.rs):
 | [`rpc.rs`](./rpc.rs) + `rpc/` (`api_keys.rs`, `embed.rs`, `settings.rs`) | The `embeddings` RPC handlers: get/update settings, set/clear API key, embed text, test a connection. |
 | [`schemas.rs`](./schemas.rs) | Controller schemas and thin handlers for the `embeddings` RPC namespace, registered as `all_embeddings_controller_schemas` / `all_embeddings_registered_controllers`. |
 
-## Why the trait lives here, not in the engine
+## The model contract lives in TinyInference
 
-`EmbeddingProvider` is defined in `tinymemory_api::host` and only re-exported
-by `provider_trait.rs`, because the extracted memory subsystem takes an
-`Arc<dyn EmbeddingProvider>` from this host and both sides need to name the
-same type. `TinyInferenceEmbeddingProvider` is the adapter that wraps a
-TinyInference `EmbeddingModel` (what `factory.rs` and `cloud_adapter.rs`
-build) to satisfy that trait. The signature format itself is not
-re-derived here: `format_embedding_signature` stays the contract's, so a
-vector written before this module existed and one written after land in the
-same embedding space.
+Callers hold `tinyinference_embeddings::EmbeddingModel` directly (batches are
+`&[String]`). The trait, `format_embedding_signature` and `NoopEmbeddingModel`
+are owned by `tinyinference-embeddings`; this host only binds credentials,
+rate limits and the managed cloud transport onto it.
 
 ## How it fits
 

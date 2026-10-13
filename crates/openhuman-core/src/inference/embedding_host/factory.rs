@@ -3,11 +3,11 @@
 use std::sync::Arc;
 
 use crate::config::Config;
-use tinyinference_embeddings::EmbeddingModel;
 use tinyinference_embeddings::factory::{
     create_configured_embedding_model, create_default_embedding_model, CredentialResolver,
     EmbeddingFactorySettings, ManagedModelFactory,
 };
+use tinyinference_embeddings::EmbeddingModel;
 
 use super::cloud::OpenHumanCloudEmbeddingModel;
 
