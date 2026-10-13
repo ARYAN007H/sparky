@@ -109,7 +109,7 @@ approvals, cancellation and product orchestration. Stateful resources cross
 the bus as opaque handles with explicit cleanup operations.
 
 This boundary is still being migrated. The
-[module boundary inventory](../../../docs/module-boundary-inventory.md) names
+[module boundary inventory](../../../../module-boundary-inventory.md) names
 existing exceptions and required upstream work. `pnpm rust:module-boundaries`
 checks host normal/build dependency graphs and independently resolved contract
 graphs. Its transitional pass does not certify completion;

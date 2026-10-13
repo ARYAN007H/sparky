@@ -92,4 +92,4 @@ releasing its local handle.
   in analytics or logs. Use the shared endpoint redactor for endpoint logging.
 
 For implementation details, see the [MCP server](../mcp-server.md) and
-[`crates/openhuman-core/src/mcp/README.md`](../../../crates/openhuman-core/src/mcp/README.md).
+[`crates/openhuman-core/src/mcp/README.md`](../../../../../crates/openhuman-core/src/mcp/README.md).

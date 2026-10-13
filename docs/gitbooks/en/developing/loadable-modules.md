@@ -28,7 +28,7 @@ implementation fallback when a module is unavailable. Stateful adapters release
 module-owned resources through explicit close, cancellation and shutdown calls.
 
 The remaining migration work and temporary dependency exceptions are tracked
-in [the module-boundary inventory](../../docs/module-boundary-inventory.md).
+in [the module-boundary inventory](../../../module-boundary-inventory.md).
 
 ## The registry
 
