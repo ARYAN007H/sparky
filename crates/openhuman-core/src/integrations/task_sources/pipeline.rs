@@ -14,7 +14,7 @@ use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 
 use super::types::{FetchOutcome, FetchReason, TaskSource};
-use super::{enrich, filter, route, store};
+use super::{enrich, route, store};
 
 /// Run a single fetch pass over `source`. Captures errors into the
 /// returned [`FetchOutcome`] rather than propagating them.

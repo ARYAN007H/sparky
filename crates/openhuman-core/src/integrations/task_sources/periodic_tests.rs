@@ -1,5 +1,7 @@
 use super::*;
-use crate::integrations::task_sources::types::{FilterSpec, ProviderSlug, SourceTarget};
+use crate::integrations::task_sources::types::{
+    provider_can_fetch, FilterSpec, ProviderSlug, SourceTarget,
+};
 use chrono::Utc;
 use serde_json::json;
 
@@ -99,7 +101,7 @@ fn no_provider_can_fetch_today() {
 /// proof the source was skipped before `run_source_once` ran.
 ///
 /// This asserts through the scheduler rather than on the predicate, on
-/// purpose: a test that only checked `can_fetch()` would still pass if the
+/// purpose: a test that only checked `provider_can_fetch` would still pass if the
 /// guard were deleted from `run_one_tick`, which is the exact regression this
 /// PR exists to prevent.
 ///

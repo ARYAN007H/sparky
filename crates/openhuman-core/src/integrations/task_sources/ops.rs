@@ -14,7 +14,7 @@ use crate::integrations::composio::contract::{NormalizedTask, TaskContainer};
 use super::types::{
     FetchReason, FilterSpec, ProviderSlug, SourceTarget, TaskSource, TaskSourcePatch,
 };
-use super::{filter, pipeline, store};
+use super::{pipeline, store};
 
 /// List all configured task sources.
 pub async fn list(config: &Config) -> Result<Outcome<Vec<TaskSource>>, String> {
