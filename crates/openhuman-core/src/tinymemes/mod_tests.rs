@@ -80,19 +80,14 @@ fn thread() -> Vec<ConversationMessage> {
     ]
 }
 
-fn store(dir: &std::path::Path) -> Arc<remixed::RemixedIds> {
-    remixed::for_workspace(dir).unwrap()
-}
-
 async fn run(
     remixer: &ScriptedRemixer,
-    ids: &Arc<remixed::RemixedIds>,
     request_id: &str,
     budget: Duration,
 ) -> Option<String> {
     remix_with(
         remixer,
-        ids,
+        options_with(None, 3, true),
         &thread(),
         &turn(request_id),
         Instant::now(),
@@ -170,26 +165,29 @@ fn only_the_treatment_arm_passes_the_gate() {
 }
 
 #[tokio::test]
-async fn a_remixed_reply_is_delivered_and_remembered() {
-    let dir = tempfile::tempdir().unwrap();
-    let ids = store(dir.path());
+async fn a_remixed_reply_is_delivered_and_named_for_the_module_to_remember() {
     let remixer = ScriptedRemixer::new(Ok(remixed_response("Arre yaar, build phir fail!")));
-    let out = run(&remixer, &ids, "req-ok", Duration::from_secs(5)).await;
+    let out = run(&remixer, "req-ok", Duration::from_secs(5)).await;
     assert_eq!(out.as_deref(), Some("Arre yaar, build phir fail!"));
-    assert!(ids.contains(&crate::threads::store::run_reply_message_id("req-ok")));
 
-    // The module saw the thread with the earlier remixed reply flagged.
+    // The module remembers remixed ids itself: it is told which id this reply
+    // will have, and the thread's turns carry theirs.
     let request = remixer.last.lock().unwrap().clone().unwrap();
     assert!(request.enabled && !request.deliver);
     assert_eq!(request.reply, "Build failed again.");
     assert_eq!(request.timeout_ms, 5000);
     assert_eq!(request.conversation.last().unwrap().text, "phir se fail");
+    assert_eq!(
+        request.reply_id,
+        Some(crate::threads::store::run_reply_message_id("req-ok"))
+    );
+    assert_eq!(request.conversation[1].id.as_deref(), Some("r1"));
+    assert_eq!(request.options.meme_cooldown_turns, Some(3));
+    assert!(request.options.research);
 }
 
 #[tokio::test]
 async fn an_unchanged_reply_sends_the_original() {
-    let dir = tempfile::tempdir().unwrap();
-    let ids = store(dir.path());
     for reason in [
         SkipReason::BelowThreshold,
         SkipReason::Failed,
@@ -197,43 +195,35 @@ async fn an_unchanged_reply_sends_the_original() {
     ] {
         let remixer = ScriptedRemixer::new(Ok(skipped_response("Build failed again.", reason)));
         assert_eq!(
-            run(&remixer, &ids, "req-skip", Duration::from_secs(5)).await,
+            run(&remixer, "req-skip", Duration::from_secs(5)).await,
             None
         );
     }
-    assert!(!ids.contains(&crate::threads::store::run_reply_message_id("req-skip")));
 }
 
 #[tokio::test]
 async fn a_remix_that_returns_the_same_text_is_not_a_change() {
-    let dir = tempfile::tempdir().unwrap();
-    let ids = store(dir.path());
     let remixer = ScriptedRemixer::new(Ok(remixed_response("Build failed again. ")));
     assert_eq!(
-        run(&remixer, &ids, "req-same", Duration::from_secs(5)).await,
+        run(&remixer, "req-same", Duration::from_secs(5)).await,
         None
     );
-    assert!(!ids.contains(&crate::threads::store::run_reply_message_id("req-same")));
 }
 
 #[tokio::test]
 async fn a_module_error_sends_the_original() {
-    let dir = tempfile::tempdir().unwrap();
-    let ids = store(dir.path());
     let remixer = ScriptedRemixer::new(Err("module unavailable".into()));
     assert_eq!(
-        run(&remixer, &ids, "req-err", Duration::from_secs(5)).await,
+        run(&remixer, "req-err", Duration::from_secs(5)).await,
         None
     );
 }
 
 #[tokio::test]
 async fn a_slow_remix_times_out_to_the_original() {
-    let dir = tempfile::tempdir().unwrap();
-    let ids = store(dir.path());
     let mut remixer = ScriptedRemixer::new(Ok(remixed_response("too late")));
     remixer.delay = Duration::from_secs(30);
-    let out = run(&remixer, &ids, "req-slow", Duration::from_millis(50)).await;
+    let out = run(&remixer, "req-slow", Duration::from_millis(50)).await;
     assert_eq!(out, None);
 }
 
@@ -304,7 +294,25 @@ async fn component_off_refuses_the_remix_before_any_module_load() {
         enabled: true,
         timeout_ms: 100,
         deliver: false,
+        correlation: String::new(),
+        reply_id: None,
+        options: RemixOptions::default(),
     };
     let err = service::remix(&config, request).await.unwrap_err();
     assert!(err.contains("component is off"), "{err}");
+}
+
+#[test]
+fn the_cooldown_env_beats_config_and_bad_values_fall_back() {
+    assert_eq!(
+        options_with(Some("5"), 3, true).meme_cooldown_turns,
+        Some(5)
+    );
+    assert_eq!(options_with(Some("0"), 3, true).meme_cooldown_turns, Some(0));
+    assert_eq!(
+        options_with(Some("often"), 3, true).meme_cooldown_turns,
+        Some(3)
+    );
+    assert_eq!(options_with(None, 4, false).meme_cooldown_turns, Some(4));
+    assert!(!options_with(None, 4, false).research);
 }
