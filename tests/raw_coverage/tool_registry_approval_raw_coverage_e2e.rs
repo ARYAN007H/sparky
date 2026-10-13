@@ -1011,11 +1011,15 @@ async fn approval_rpc_decision_paths_persist_always_allow_and_recent_audit() {
     let second_init = ApprovalGate::init_global(Config::default(), "session-ignored-second");
     assert_eq!(second_init.session_id(), gate.session_id());
 
-    let approval_dir = config.workspace_dir.join("approval");
-    if approval_dir.exists() {
-        std::fs::remove_dir_all(&approval_dir).expect("remove approval dir before failure branch");
+    // Approvals are documents in the workspace's default storage database
+    // (`sqlite:<workspace>/storage`, 5995128210). Drop the cached handle and
+    // block that directory, so the store's next open fails.
+    openhuman_core::storage::local::forget(&config.workspace_dir);
+    let storage_dir = config.workspace_dir.join("storage");
+    if storage_dir.exists() {
+        std::fs::remove_dir_all(&storage_dir).expect("remove storage dir before failure branch");
     }
-    std::fs::write(&approval_dir, "not a directory").expect("replace approval dir with file");
+    std::fs::write(&storage_dir, "not a directory").expect("replace storage dir with file");
 
     gate.record_execution(
         &request_id,
