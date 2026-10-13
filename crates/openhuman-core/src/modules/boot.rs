@@ -75,19 +75,20 @@ pub async fn load_declared_modules(config: &Config) {
         }
     }
 
-    // A connector module that is already serving (found on the search path, so
-    // no resolution ran for it) still needs its catalogs read into the host.
-    if ops::state_of(super::connectors::MODULE_ID) == super::types::ModuleState::Ready
-        || super::host::runtime()
-            .await
-            .is_ok_and(|runtime| {
-                runtime.host().list().iter().any(|info| {
-                    registry::find(super::connectors::MODULE_ID)
-                        .is_some_and(|record| info.manifest.bus_name.as_str() == record.bus_name)
-                })
-            })
-    {
-        super::connectors::prime_catalogs(config).await;
+    // A connector module placed on the search path is already serving, so
+    // nothing asks to resolve it. Resolve it now (a no-op load that finds it
+    // serving): finishing a resolution reads its catalogs into the host.
+    let connectors_serving = registry::find(super::connectors::MODULE_ID).is_some_and(|record| {
+        runtime
+            .host()
+            .list()
+            .iter()
+            .any(|info| info.manifest.bus_name.as_str() == record.bus_name)
+    });
+    if connectors_serving {
+        if let Err(reason) = ops::ensure_loaded(config, super::connectors::MODULE_ID).await {
+            log::debug!("[modules] serving connector module not resolved at boot: {reason}");
+        }
     }
 }
 
