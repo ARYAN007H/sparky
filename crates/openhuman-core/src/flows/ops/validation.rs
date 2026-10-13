@@ -27,7 +27,7 @@ pub(super) fn ensure_config_aware_engine_compatible(
 /// member that caused it (`nodes[1]: missing field ...`). The implementation is
 /// `tinyflows::migrate::deserialize_graph`; this alias keeps the host's
 /// call sites (and the authoring tools' error text) unchanged.
-pub(crate) use tinyflows::migrate::deserialize_graph as migrate_and_deserialize_graph;
+pub(crate) use tinyflows::migrate::deserialize_graph as tinyflows::migrate::deserialize_graph;
 
 /// Checks literal `workflow_id` children reachable from an authoring candidate.
 ///
@@ -58,7 +58,7 @@ pub(crate) fn config_aware_engine_compatibility_errors(
     config: &Config,
     graph: &WorkflowGraph,
 ) -> Vec<String> {
-    let direct = engine_compatibility_errors(graph);
+    let direct = tinyflows_catalog::validation::engine_compatibility_errors(graph);
     if !direct.is_empty() {
         return direct
             .into_iter()
@@ -84,7 +84,7 @@ pub fn flows_validate(graph_json: Value) -> Outcome<tinyflows_catalog::FlowValid
     // failure short-circuits with one error; a deserializable graph is then run
     // through `validate_all` so the author sees every structural problem in one
     // pass instead of one round-trip per error.
-    let graph = match migrate_and_deserialize_graph(graph_json) {
+    let graph = match tinyflows::migrate::deserialize_graph(graph_json) {
         Ok(graph) => graph,
         Err(error) => {
             tracing::debug!(target: "flows", %error, "[flows] flows_validate: graph could not be migrated/parsed");
@@ -107,7 +107,7 @@ pub fn flows_validate(graph_json: Value) -> Outcome<tinyflows_catalog::FlowValid
 
     let structural = tinyflows::validate::validate_all(&graph);
     if !structural.is_empty() {
-        let error_details: Vec<_> = structural.iter().map(to_flow_validation_error).collect();
+        let error_details: Vec<_> = structural.iter().map(tinyflows_catalog::validation::to_flow_validation_error).collect();
         let errors: Vec<String> = error_details.iter().map(|e| e.message.clone()).collect();
         tracing::debug!(
             target: "flows",
@@ -125,7 +125,7 @@ pub fn flows_validate(graph_json: Value) -> Outcome<tinyflows_catalog::FlowValid
         );
     }
 
-    let error_details = engine_compatibility_errors(&graph);
+    let error_details = tinyflows_catalog::validation::engine_compatibility_errors(&graph);
     if !error_details.is_empty() {
         let errors = error_details
             .iter()

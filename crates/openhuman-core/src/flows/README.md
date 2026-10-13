@@ -45,7 +45,7 @@ the engine, the capability seam).
 ### Saving a flow
 
 A graph arrives as raw JSON, from the canvas, an import, a draft promotion or
-an agent tool. `ops::validate_and_migrate_graph` (in [`ops/validation.rs`](./ops/validation.rs)) runs
+an agent tool. `tinyflows::authoring::validate_and_migrate_graph` runs
 it through `tinyflows::migrate::migrate` to upgrade older schemas, deserializes
 it into a `WorkflowGraph`, and rejects anything `tinyflows::validate::validate`
 refuses. Engine-compatibility checks map topology problems onto
@@ -289,7 +289,7 @@ Top level:
 - `ops::flows_create` / `ops::flows_update` (`ops/definitions.rs`,
   [`ops/updates.rs`](./ops/updates.rs)): the save paths that enforce born-disabled and forced
   approval.
-- `ops::validate_and_migrate_graph` (`ops/validation.rs`): the one
+- `tinyflows::authoring::validate_and_migrate_graph`: the one
   structural-validation door.
 - `run_builder_gates` (`ops/builder_gates.rs`): the agent-authored hard-gate
   stack.

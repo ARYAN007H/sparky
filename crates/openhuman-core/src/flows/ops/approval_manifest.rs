@@ -236,7 +236,7 @@ pub async fn flows_approval_manifest(
             // `store::get_flow` already returns a migrated, deserialized graph.
             (flow.graph, Some(id.to_string()))
         }
-        (None, Some(graph_json)) => (migrate_and_deserialize_graph(graph_json)?, None),
+        (None, Some(graph_json)) => (tinyflows::migrate::deserialize_graph(graph_json)?, None),
         (None, None) => return Err("provide 'id' or 'graph'".to_string()),
     };
 

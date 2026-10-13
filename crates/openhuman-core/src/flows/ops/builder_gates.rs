@@ -162,7 +162,7 @@ pub(crate) async fn validate_required_arg_resolvability(graph: &WorkflowGraph) -
 /// opts that call into the *same* gates an agent save must pass, so the two
 /// planes converge on one definition instead of diverging.
 pub(crate) async fn strict_gate(config: &Config, graph_json: &Value) -> Result<(), String> {
-    let graph = migrate_and_deserialize_graph(graph_json.clone())?;
+    let graph = tinyflows::migrate::deserialize_graph(graph_json.clone())?;
     let structural = tinyflows::validate::validate_all(&graph);
     if !structural.is_empty() {
         let messages: Vec<String> = structural.iter().map(ToString::to_string).collect();

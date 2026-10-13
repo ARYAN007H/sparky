@@ -74,7 +74,7 @@ fn referenced_child_graph(workflow_id: &str) -> Value {
 }
 
 fn structurally_valid_graph(value: Value) -> WorkflowGraph {
-    let graph = migrate_and_deserialize_graph(value).expect("graph should deserialize");
+    let graph = tinyflows::migrate::deserialize_graph(value).expect("graph should deserialize");
     tinyflows::validate::validate(&graph).expect("fixture should be structurally valid");
     graph
 }

@@ -124,7 +124,7 @@ async fn edit_workflow_does_not_persist_an_incompatible_saved_child_reference() 
             { "from_node": "c", "to_node": "m" }
         ]
     });
-    let child_graph = ops::migrate_and_deserialize_graph(legacy_child).unwrap();
+    let child_graph = tinyflows::migrate::deserialize_graph(legacy_child).unwrap();
     tinyflows::validate::validate(&child_graph).unwrap();
     let child = crate::flows::store::create_flow(
         &config,

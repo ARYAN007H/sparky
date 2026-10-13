@@ -96,7 +96,7 @@ async fn compute_required_connections_flags_missing_composio_toolkits() {
         ],
         "edges": [ { "from_node": "t", "to_node": "send" } ]
     });
-    let graph = migrate_and_deserialize_graph(graph_json).unwrap();
+    let graph = tinyflows::migrate::deserialize_graph(graph_json).unwrap();
     let required = compute_required_connections(&config, &graph).await;
     assert_eq!(required.len(), 1);
     assert_eq!(required[0]["toolkit"], "gmail");
@@ -120,7 +120,7 @@ async fn compute_required_connections_skips_native_and_http_nodes() {
             { "from_node": "search", "to_node": "http" }
         ]
     });
-    let graph = migrate_and_deserialize_graph(graph_json).unwrap();
+    let graph = tinyflows::migrate::deserialize_graph(graph_json).unwrap();
     let required = compute_required_connections(&config, &graph).await;
     assert!(
         required.is_empty(),
