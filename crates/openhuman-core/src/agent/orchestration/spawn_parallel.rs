@@ -36,7 +36,7 @@ pub(crate) use types::ParallelAgentTask;
 
 #[cfg(test)]
 pub(crate) use staging::{
-    prepare_spawn_parallel_tasks_from_defs, with_ownership_boundary, ParallelTaskRejectionKind,
+    prepare_spawn_parallel_tasks_from_defs, ParallelTaskRejectionKind,
     SpawnParallelTaskPreflight, WorkerDispatchMode,
 };
 #[cfg(test)]
