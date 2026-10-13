@@ -14,6 +14,7 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use serde_json::Value;
+use tinysearch_bus::errors::Category;
 use tinysearch_bus::{errors, ExecuteToolRequest, ToolSpec};
 use tinytools::{Tool, ToolCallOptions, ToolCategory, ToolExposure, ToolResult};
 
