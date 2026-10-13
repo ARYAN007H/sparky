@@ -146,17 +146,37 @@ async fn run(config: &Config, source: &MemorySourceConfig) -> Result<u64, SyncEr
     )
     .await?;
     let layout = super::layout_of_source(config, source);
-    let brain_source = crate::memory::brain::brain_source(source.kind);
+    place_and_store(
+        config,
+        &bound,
+        collected.items,
+        (source.kind, &source.id),
+        &layout,
+    )
+    .await
+}
+
+/// Files `items` into `layout`'s brain, each under the brain source it
+/// belongs to (`memory::brain::brain_node`), stores them through the module,
+/// and queues one belief build per node touched. Returns how many were stored.
+pub(crate) async fn place_and_store(
+    config: &Config,
+    bound: &engine::BoundEngine,
+    items: Vec<tinymemory_api::StoreItem>,
+    (kind, source_id): (MemorySourceKind, &str),
+    layout: &tinymemory_tools::MemoryLayout,
+) -> Result<u64, SyncError> {
+    let brain_source = crate::memory::brain::brain_source(kind);
     // Placing an item under its brain node is pure, so every one is placed up
     // front: the module stores `(node, item)` pairs and reports the nodes hit.
-    let mut placed = Vec::with_capacity(collected.items.len());
-    for item in collected.items {
-        let node = crate::memory::brain::brain_node(config, &layout, &brain_source, &item)
+    let mut placed = Vec::with_capacity(items.len());
+    for item in items {
+        let node = crate::memory::brain::brain_node(config, layout, &brain_source, &item)
             .map_err(|error| SyncError::Invalid(error.to_string()))?;
         let item = tinymemory_tools::layout::placement::file_into(node.clone(), item);
         placed.push((node, item));
     }
-    let stored = module::store_all(bound.engine.as_ref(), &source.id, placed).await?;
+    let stored = module::store_all(bound.engine.as_ref(), source_id, placed).await?;
     // An engine that rebuilds beliefs on its own needs no build job.
     let automatic =
         bound.engine.descriptor().consolidation == tinymemory_api::Consolidation::Automatic;

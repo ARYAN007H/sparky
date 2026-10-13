@@ -274,7 +274,7 @@ async fn a_sync_queues_a_belief_build_only_for_an_engine_that_waits_for_one() {
             id: "reference".into(),
             endpoint: "memory://reference".into(),
         };
-        let stored = store_all(
+        let stored = place_and_store(
             &config,
             &bound,
             vec![note()],
@@ -306,7 +306,7 @@ async fn github_files_per_repository_only_when_switched_on() {
     let sync = |config: Config, items| {
         let bound = bound.clone();
         async move {
-            store_all(
+            place_and_store(
                 &config,
                 &bound,
                 items,
