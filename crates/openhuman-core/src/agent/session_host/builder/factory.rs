@@ -339,14 +339,15 @@ impl OpenHumanSessionHost {
         // `with_defaults()` branch only fires when the registry is
         // unavailable (pre-startup, tests). `PromptSource::Dynamic`
         // agents install a [`DynamicPromptSection`] that re-runs the
-        // builder against the live [`PromptContext`] at
-        // `build_system_prompt` time, so `connected_integrations`
-        // fetched asynchronously on session start land in the prompt.
+        // builder against the live [`PromptContext`] at `build_system_prompt`
+        // time, so late `connected_integrations` land in the prompt.
         // `Inline`/`File` sources still resolve to just the archetype
         // body and get wrapped by [`SystemPromptBuilder::for_subagent`].
         let prompt_builder = match target_def {
             Some(def) => match &def.system_prompt {
-                PromptSource::Dynamic(()) => SystemPromptBuilder::from_dynamic(dynamic_prompt_builder(def)?),
+                PromptSource::Dynamic(()) => {
+                    SystemPromptBuilder::from_dynamic(dynamic_prompt_builder(def)?)
+                }
                 PromptSource::Verbatim(text) => SystemPromptBuilder::verbatim(text.clone()),
                 PromptSource::Inline(text) => SystemPromptBuilder::for_subagent(
                     text.clone(),

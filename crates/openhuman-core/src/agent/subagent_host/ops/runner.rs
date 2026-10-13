@@ -944,9 +944,10 @@ async fn run_typed_mode(
             // provenance), distinguishing delegated spend from the parent's
             // own channel in per-thread usage reads.
             "subagent",
-            // Agent-level TokenJuice profile → sub-agent context middleware
-            // (#4466), so sub-agent tool outputs compact like the chat path.
-            definition.extensions.effective_tokenjuice_compression(&definition.model),
+            // Agent TokenJuice profile → sub-agent context middleware (#4466).
+            definition
+                .extensions
+                .effective_tokenjuice_compression(&definition.model),
             // The spawn-wide config snapshot supplies the `[context]`
             // knobs the graph used to load for itself.
             config.as_ref().ok().map(|c| c.as_ref()),
