@@ -53,7 +53,7 @@ tinyhosts = ["dep:tinyhosts"]
 tinyjuice = ["dep:tinyjuice-module"]
 tinymcp = ["dep:tinymcp"]
 tinysearch = ["dep:tinysearch"]
-tinyvoice = []
+tinyvoice = ["dep:tinyvoice-module"]
 tinywallet = ["dep:tinywallet-module"]
 
 [dependencies]
@@ -71,6 +71,7 @@ tinyhosts = { path = "../../vendor/tinyhosts", features = ["static-link"], optio
 tinyjuice-module = { path = "../../vendor/tinyjuice/crates/tinyjuice-module", features = ["static-link"], optional = true }
 tinymcp = { path = "../../vendor/tinymcp/crates/tinymcp", features = ["static-link"], optional = true }
 tinysearch = { path = "../../vendor/tinysearch/crates/tinysearch", features = ["static-link"], optional = true }
+tinyvoice-module = { path = "../../vendor/tinyvoice/crates/tinyvoice-module", features = ["static-link"], optional = true }
 tinywallet-module = { path = "../../vendor/tinywallet/crates/tinywallet-module", features = ["static-link"], optional = true }
 
 [lints.rust]
