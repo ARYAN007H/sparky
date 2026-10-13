@@ -431,7 +431,7 @@ pub struct Config {
     pub hosting: HostingConfig,
 
     /// Storage backend for state on the `tinystoragedrivers` ports
-    /// (`[storage]`). Empty keeps the classic on-disk layout.
+    /// (`[storage]`). Empty uses the default, `sqlite:<workspace>/storage`.
     #[serde(default)]
     pub storage: StorageConfig,
 
