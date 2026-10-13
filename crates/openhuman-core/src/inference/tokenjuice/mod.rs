@@ -9,7 +9,7 @@ pub mod schemas;
 pub mod tools;
 
 use tinyjuice_bus::names::methods;
-use tinyjuice_bus::types::{AgentTokenjuiceCompression, CompressorKind, ContentKind};
+use tinyjuice_bus::types::{AgentTokenjuiceCompression, CompressorKind};
 
 pub use repl_tools::{is_repl_tool, repl_tools, repl_tools_for};
 pub use tools::TokenjuiceRetrieveTool;
