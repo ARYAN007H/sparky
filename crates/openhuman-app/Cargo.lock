@@ -6772,7 +6772,7 @@ dependencies = [
 
 [[package]]
 name = "tinychannels-bus"
-version = "0.1.30"
+version = "0.1.29"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6811,7 +6811,7 @@ dependencies = [
 
 [[package]]
 name = "tinyflows"
-version = "0.8.14"
+version = "0.8.15"
 dependencies = [
  "async-trait",
  "futures-timer",
