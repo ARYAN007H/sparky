@@ -13,6 +13,7 @@ mod compaction_log;
 mod event_bridge;
 mod event_projection;
 mod graph_tracing;
+mod tool_progress_projection;
 
 #[cfg(test)]
 use std::sync::Arc;

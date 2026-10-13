@@ -32,16 +32,18 @@ fn pauses_once_after_the_wind_down_point() {
     );
 }
 
-/// The harness's own default turn ceiling is later than the web backstop.
-/// That ordering is what dropped long turns. The clamp must therefore always
-/// bring it below the backstop.
+/// The web backstop defaults to the harness's own default turn ceiling, so
+/// the unclamped ceiling ends no earlier than the backstop. Letting the
+/// backstop drop a turn before the harness stops it is what lost long turns.
+/// The clamp must therefore always bring the ceiling below the backstop.
 #[test]
 fn the_default_harness_ceiling_is_clamped_below_the_backstop() {
     let backstop = Duration::from_secs(crate::agent::turn_deadline::DEFAULT_TURN_BACKSTOP_SECS);
     let default_ms = crate::agent::tinyagents::DEFAULT_AGENT_TURN_TIMEOUT_SECS * 1_000;
-    assert!(
-        default_ms > backstop.as_millis() as u64,
-        "precondition: the unclamped ceiling is later than the backstop"
+    assert_eq!(
+        default_ms,
+        backstop.as_millis() as u64,
+        "the default backstop is the harness's default turn ceiling"
     );
     let now = Instant::now();
     let clamped = TurnDeadline::new(now, backstop)

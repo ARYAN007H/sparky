@@ -1,0 +1,273 @@
+//! Inactivity tracking for one web-chat turn.
+//!
+//! The web-turn guard (`ops::turn_guards`) used to drop a turn a fixed 900s
+//! after it started, whether or not the turn was still working. A turn that
+//! streamed a model reply or a tool result every few seconds died exactly as a
+//! wedged one did. The guard exists to catch the wedged turn, so it now asks a
+//! narrower question: has the turn been **silent with nothing in flight** for
+//! the idle window?
+//!
+//! * Every [`AgentProgress`] event the turn emits restarts the idle clock.
+//! * While a parent-scope model call (`IterationStarted` →
+//!   `ModelCallCompleted`) or a tool call (`ToolCallStarted` →
+//!   `ToolCallCompleted`) is open, the turn is never idle, however long the
+//!   call is silent. Those calls carry their own bounds: the harness per-model
+//!   call ceiling and the tool's own `timeout_secs`, both under the harness
+//!   turn ceiling. A silent provider retry (minutes) or a long shell build is
+//!   in flight, not idle.
+//! * A tool approval parks before `ToolCallStarted`, so it counts as silence.
+//!   It is bounded by the approval TTL (600s by default), below the default
+//!   idle window.
+//!
+//! What remains idle is time no other bound covers: session checkout before
+//! the run, the persistence plumbing after it, or a harness that went silent
+//! with no call open. The fixed total ceiling still exists (the backstop in
+//! `agent::turn_deadline`) and still anchors the harness wind-down; it no
+//! longer doubles as the hang detector.
+//!
+//! The clock is [`tokio::time::Instant`], so time the machine spends asleep is
+//! not counted as idle, and tests can drive it with a paused runtime.
+
+use std::borrow::Cow;
+use std::collections::HashSet;
+use std::future::Future;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+use tokio::sync::mpsc;
+use tokio::time::Instant;
+
+use crate::agent::progress::AgentProgress;
+
+/// Default idle window for a web-chat turn, in seconds.
+pub(crate) const DEFAULT_TURN_IDLE_SECS: u64 = 900;
+
+/// Environment override for the idle window, in seconds; `0` disables it.
+pub(crate) const TURN_IDLE_ENV: &str = "OPENHUMAN_WEB_TURN_IDLE_SECS";
+
+/// Longest the watchdog sleeps between checks while a call is in flight. A
+/// call that closes is followed by a full idle window measured from its close,
+/// so this only bounds how late the watchdog notices that.
+const IN_FLIGHT_RECHECK: Duration = Duration::from_secs(15);
+
+/// Pure core of [`configured_idle_window`]: an absent or unparseable value
+/// falls back to [`DEFAULT_TURN_IDLE_SECS`]; `0` disables the idle guard.
+pub(crate) fn parse_idle_window(env_value: Option<&str>) -> Option<Duration> {
+    let secs = env_value
+        .and_then(|v| v.trim().parse::<u64>().ok())
+        .unwrap_or(DEFAULT_TURN_IDLE_SECS);
+    (secs > 0).then(|| Duration::from_secs(secs))
+}
+
+/// The idle window in force for this process (env [`TURN_IDLE_ENV`]).
+pub(crate) fn configured_idle_window() -> Option<Duration> {
+    parse_idle_window(std::env::var(TURN_IDLE_ENV).ok().as_deref())
+}
+
+#[derive(Debug)]
+struct State {
+    last_event: Instant,
+    open_tool_calls: HashSet<String>,
+    model_call_open: bool,
+    /// What the last event said the turn did, for the stop reply.
+    last_step: Option<Cow<'static, str>>,
+    turn_completed: bool,
+}
+
+/// Where a turn was when it went silent, for the reply that closes it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum StuckPoint {
+    /// No progress event at all: the turn never got past session setup.
+    BeforeRun,
+    /// The agent loop was between steps; `after` names its last step.
+    BetweenSteps { after: String },
+    /// The agent loop had finished; the reply was being saved or delivered.
+    AfterRun,
+}
+
+impl StuckPoint {
+    /// One plain-language clause naming where the turn stopped.
+    pub(crate) fn describe(&self) -> String {
+        match self {
+            Self::BeforeRun => {
+                "before the agent started: the turn never got past setting up the chat \
+                 session"
+                    .to_string()
+            }
+            Self::BetweenSteps { after } => {
+                format!("between steps: {after}, and the agent's next step never started")
+            }
+            Self::AfterRun => {
+                "after the agent finished, while its reply was being saved".to_string()
+            }
+        }
+    }
+}
+
+/// The step an event reports, as a clause for [`StuckPoint::BetweenSteps`].
+/// `None` for bookkeeping (cost, usage, captured content) that says nothing
+/// about what the turn was doing.
+fn step_of(event: &AgentProgress) -> Option<Cow<'static, str>> {
+    Some(match event {
+        AgentProgress::TurnStarted => "the turn started".into(),
+        AgentProgress::IterationStarted { .. } => "a model call started".into(),
+        AgentProgress::ModelCallCompleted {
+            subagent_task_id: None,
+            ..
+        } => "the model replied".into(),
+        AgentProgress::ToolCallStarted { tool_name, .. } => {
+            format!("the `{tool_name}` tool started").into()
+        }
+        AgentProgress::ToolCallCompleted {
+            tool_name, success, ..
+        } => {
+            let outcome = if *success { "finished" } else { "failed" };
+            format!("the `{tool_name}` tool {outcome}").into()
+        }
+        AgentProgress::TextDelta { .. } | AgentProgress::ThinkingDelta { .. } => {
+            "the model was writing".into()
+        }
+        AgentProgress::ToolCallProgress { .. } => "a tool reported progress".into(),
+        AgentProgress::SubagentSpawned { .. }
+        | AgentProgress::SubagentCompleted { .. }
+        | AgentProgress::SubagentFailed { .. }
+        | AgentProgress::SubagentAwaitingUser { .. } => "a sub-agent reported progress".into(),
+        _ => return None,
+    })
+}
+
+/// Shared activity record for one turn. Cheap to clone; every clone sees the
+/// same state.
+#[derive(Clone, Debug)]
+pub(crate) struct TurnActivity {
+    state: Arc<Mutex<State>>,
+}
+
+impl TurnActivity {
+    /// A record whose idle clock starts now, with nothing in flight. The turn
+    /// emits no progress before its session is checked out, so that phase is
+    /// measured from here.
+    pub(crate) fn new() -> Self {
+        Self {
+            state: Arc::new(Mutex::new(State {
+                last_event: Instant::now(),
+                open_tool_calls: HashSet::new(),
+                model_call_open: false,
+                last_step: None,
+                turn_completed: false,
+            })),
+        }
+    }
+
+    fn lock(&self) -> std::sync::MutexGuard<'_, State> {
+        self.state.lock().unwrap_or_else(|p| p.into_inner())
+    }
+
+    /// Fold one progress event into the record.
+    pub(crate) fn observe(&self, event: &AgentProgress) {
+        let mut state = self.lock();
+        state.last_event = Instant::now();
+        if let Some(step) = step_of(event) {
+            state.last_step = Some(step);
+        }
+        match event {
+            AgentProgress::IterationStarted { .. } => state.model_call_open = true,
+            AgentProgress::ModelCallCompleted {
+                subagent_task_id: None,
+                ..
+            } => state.model_call_open = false,
+            AgentProgress::ToolCallStarted { call_id, .. } => {
+                state.open_tool_calls.insert(call_id.clone());
+            }
+            AgentProgress::ToolCallCompleted { call_id, .. } => {
+                state.open_tool_calls.remove(call_id);
+            }
+            AgentProgress::TurnCompleted { .. } => {
+                state.open_tool_calls.clear();
+                state.model_call_open = false;
+                state.turn_completed = true;
+            }
+            _ => {}
+        }
+    }
+
+    /// How long the turn has been idle as of `now`, or `None` while a model or
+    /// tool call is in flight.
+    pub(crate) fn idle_for(&self, now: Instant) -> Option<Duration> {
+        let state = self.lock();
+        if state.model_call_open || !state.open_tool_calls.is_empty() {
+            return None;
+        }
+        Some(now.saturating_duration_since(state.last_event))
+    }
+}
+
+impl TurnActivity {
+    /// Where the turn was when its last event arrived.
+    pub(crate) fn stuck_point(&self) -> StuckPoint {
+        let state = self.lock();
+        if state.turn_completed {
+            return StuckPoint::AfterRun;
+        }
+        match &state.last_step {
+            None => StuckPoint::BeforeRun,
+            Some(step) => StuckPoint::BetweenSteps {
+                after: step.to_string(),
+            },
+        }
+    }
+}
+
+/// Resolve once the turn has been idle for `window`, returning the idle time
+/// observed. Never resolves while the turn keeps emitting progress or keeps a
+/// call in flight.
+pub(crate) async fn idle_watchdog(activity: TurnActivity, window: Duration) -> Duration {
+    loop {
+        let wait = match activity.idle_for(Instant::now()) {
+            Some(idle) if idle >= window => return idle,
+            Some(idle) => window - idle,
+            None => IN_FLIGHT_RECHECK.min(window),
+        };
+        tokio::time::sleep(wait).await;
+    }
+}
+
+/// Interpose `activity` on a turn's progress stream: every event the agent
+/// sends is folded into the record, then forwarded in order to the returned
+/// receiver (the progress bridge). The forwarder only records and forwards, so
+/// it drains the agent-side channel faster than the bridge, which publishes.
+/// It ends when the agent's sender drops, closing the bridge's stream in turn.
+pub(crate) fn tap(
+    activity: TurnActivity,
+    mut agent_rx: mpsc::Receiver<AgentProgress>,
+    capacity: usize,
+) -> mpsc::Receiver<AgentProgress> {
+    let (bridge_tx, bridge_rx) = mpsc::channel(capacity);
+    tokio::spawn(async move {
+        while let Some(event) = agent_rx.recv().await {
+            activity.observe(&event);
+            if bridge_tx.send(event).await.is_err() {
+                break;
+            }
+        }
+    });
+    bridge_rx
+}
+
+tokio::task_local! {
+    static CURRENT_TURN_ACTIVITY: TurnActivity;
+}
+
+/// The activity record scoped on the current task, if any.
+pub(crate) fn current() -> Option<TurnActivity> {
+    CURRENT_TURN_ACTIVITY.try_with(Clone::clone).ok()
+}
+
+/// Run `future` with `activity` scoped on the task.
+pub(crate) async fn with_turn_activity<F: Future>(activity: TurnActivity, future: F) -> F::Output {
+    CURRENT_TURN_ACTIVITY.scope(activity, future).await
+}
+
+#[cfg(test)]
+#[path = "turn_activity_tests.rs"]
+mod tests;

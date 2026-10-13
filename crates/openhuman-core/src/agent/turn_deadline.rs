@@ -11,17 +11,24 @@
 //! This module is the single source of truth for the backstop and for the two
 //! points the harness derives from it:
 //!
-//! * **wind-down** (`backstop - min(120s, backstop/5)`, 780s by default): the
+//! * **wind-down** (`backstop - min(120s, backstop/5)`, 3480s by default): the
 //!   harness pauses the run at the next safe point, after a model call or a
 //!   tool result. The driver then writes the grounded close from the work
 //!   already in hand. The margin before the backstop pays for that close.
-//! * **hard stop** (`backstop - min(60s, backstop/10)`, 840s by default): the
+//! * **hard stop** (`backstop - min(60s, backstop/10)`, 3540s by default): the
 //!   harness `max_wall_clock_ms` is clamped to this. A single tool call that
 //!   runs across the wind-down point is then interrupted by the harness's own
 //!   typed `Timeout` before the backstop drops the turn.
 //!
 //! For every positive backstop, `wind_down < hard_stop < backstop`
 //! (see `turn_deadline_tests.rs`).
+//!
+//! The backstop defaults to the harness turn ceiling (3600s). It bounds a turn
+//! that stays busy; it is not the hang detector. A turn that goes silent with
+//! no model or tool call in flight is ended much earlier by the web-turn idle
+//! guard (`web_chat::turn_activity`, 900s of inactivity by default). The
+//! backstop used to be 900s and did both jobs, so a turn that was working
+//! steadily was still wound down at 780s.
 //!
 //! The web-turn guard scopes the deadline on a task-local
 //! ([`with_turn_deadline`]). The top-level session turn
@@ -32,8 +39,9 @@
 use std::future::Future;
 use std::time::{Duration, Instant};
 
-/// Default outer wall-clock backstop for one web-chat turn, in seconds.
-pub const DEFAULT_TURN_BACKSTOP_SECS: u64 = 900;
+/// Default outer wall-clock backstop for one web-chat turn, in seconds: the
+/// harness's own default turn ceiling (`DEFAULT_AGENT_TURN_TIMEOUT_SECS`).
+pub const DEFAULT_TURN_BACKSTOP_SECS: u64 = 3_600;
 
 /// Environment override for the backstop, in seconds; `0` disables it.
 pub const TURN_BACKSTOP_ENV: &str = "OPENHUMAN_WEB_TURN_TIMEOUT_SECS";

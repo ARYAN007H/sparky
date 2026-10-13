@@ -103,12 +103,14 @@ pub(crate) async fn run(config: &Config, run: NativeShellRun) -> anyhow::Result<
     #[cfg(feature = "modules")]
     {
         let config = config.clone();
+        // Read before the spawn: the caller's progress meter is task-local.
+        let meter = super::shell_progress::current_meter();
         tracing::debug!(
             jailed = run.jail.is_some(),
             timeout_ms = run.timeout.as_millis() as u64,
             "[sandbox:shell] starting native shell through TinyBox"
         );
-        tokio::spawn(async move { run_owned(&config, run).await })
+        tokio::spawn(async move { run_owned(&config, run, meter).await })
             .await
             .map_err(|_| anyhow::anyhow!("TinyBox shell worker did not finish"))?
     }
@@ -120,7 +122,11 @@ pub(crate) async fn run(config: &Config, run: NativeShellRun) -> anyhow::Result<
 }
 
 #[cfg(feature = "modules")]
-async fn run_owned(config: &Config, run: NativeShellRun) -> anyhow::Result<SandboxExecResult> {
+async fn run_owned(
+    config: &Config,
+    run: NativeShellRun,
+    meter: Option<super::shell_progress::ShellOutputMeter>,
+) -> anyhow::Result<SandboxExecResult> {
     let resource = tinybox::reserve(config, contract::ReserveRequest::Resource)
         .await
         .map_err(|_| anyhow::anyhow!("TinyBox could not reserve a command resource"))?;
@@ -155,7 +161,7 @@ async fn run_owned(config: &Config, run: NativeShellRun) -> anyhow::Result<Sandb
         let process = tinybox::start_native_shell_exec(config, request)
             .await
             .map_err(|_| anyhow::anyhow!("TinyBox could not start the command process"))?;
-        collect_process(config, process, timeout).await
+        collect_process(config, process, timeout, meter).await
     }
     .await;
     let close = tinybox::close(config, resource).await;
@@ -204,6 +210,7 @@ async fn collect_process(
     config: &Config,
     process: contract::ProcessRef,
     timeout: Duration,
+    meter: Option<super::shell_progress::ShellOutputMeter>,
 ) -> anyhow::Result<SandboxExecResult> {
     use contract::{ExecutionFailure, ExecutionState, OutputStream};
 
@@ -230,6 +237,9 @@ async fn collect_process(
         let has_chunks = !batch.chunks.is_empty();
         let state = batch.state;
         for chunk in batch.chunks {
+            if let Some(meter) = &meter {
+                meter.record(&chunk.bytes);
+            }
             match chunk.stream {
                 OutputStream::Stdout => stdout.extend_from_slice(&chunk.bytes),
                 OutputStream::Stderr => stderr.extend_from_slice(&chunk.bytes),

@@ -1,11 +1,11 @@
 use super::*;
 
 #[test]
-fn default_deadlines_are_780s_840s_900s() {
+fn default_deadlines_are_3480s_3540s_3600s() {
     let deadline = TurnDeadline::starting_now(Duration::from_secs(DEFAULT_TURN_BACKSTOP_SECS));
-    assert_eq!(deadline.wind_down_after(), Duration::from_secs(780));
-    assert_eq!(deadline.hard_stop_after(), Duration::from_secs(840));
-    assert_eq!(deadline.backstop(), Duration::from_secs(900));
+    assert_eq!(deadline.wind_down_after(), Duration::from_secs(3_480));
+    assert_eq!(deadline.hard_stop_after(), Duration::from_secs(3_540));
+    assert_eq!(deadline.backstop(), Duration::from_secs(3_600));
 }
 
 /// The ordering production was missing: the harness must stop (and before
@@ -46,11 +46,11 @@ fn harness_wall_clock_is_always_clamped_below_the_backstop() {
     let clamped = deadline
         .clamp_wall_clock_ms(Some(harness_default_ms), now)
         .expect("clamped ceiling");
-    assert_eq!(clamped, 840_000);
+    assert_eq!(clamped, 3_540_000);
     assert!(clamped < backstop_ms);
 
     let unbounded = deadline.clamp_wall_clock_ms(None, now).expect("bounded");
-    assert_eq!(unbounded, 840_000);
+    assert_eq!(unbounded, 3_540_000);
 
     // A configured ceiling that is already tighter is kept.
     assert_eq!(
@@ -84,10 +84,10 @@ fn should_wind_down_flips_at_the_wind_down_point() {
 
 #[test]
 fn parse_backstop_defaults_and_disables() {
-    assert_eq!(parse_backstop(None), Some(Duration::from_secs(900)));
+    assert_eq!(parse_backstop(None), Some(Duration::from_secs(3_600)));
     assert_eq!(
         parse_backstop(Some("garbage")),
-        Some(Duration::from_secs(900))
+        Some(Duration::from_secs(3_600))
     );
     assert_eq!(
         parse_backstop(Some(" 120 ")),

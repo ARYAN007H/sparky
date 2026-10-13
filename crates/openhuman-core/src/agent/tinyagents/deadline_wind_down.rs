@@ -1,6 +1,6 @@
 //! Wind a top-level turn down before the outer backstop drops it.
 //!
-//! [`TurnDeadline`] puts the wind-down point at 780s under the default 900s
+//! [`TurnDeadline`] puts the wind-down point at 3480s under the default 3600s
 //! web backstop. Once that point has passed, [`DeadlineWindDownMiddleware`]
 //! sends [`SteeringCommand::Pause`] at the next safe checkpoint: after a model
 //! call (that call's tool round still runs) or after a tool result (so a long
