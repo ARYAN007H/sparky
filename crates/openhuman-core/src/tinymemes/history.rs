@@ -15,7 +15,6 @@ pub(super) fn should_remix(reply: &str, placeholder: &str) -> bool {
 pub(super) fn history_turns(
     messages: &[ConversationMessage],
     current_user_message: &str,
-    is_remixed: impl Fn(&str) -> bool,
 ) -> Vec<WireTurn> {
     let mut turns: Vec<WireTurn> = messages
         .iter()
@@ -25,11 +24,15 @@ pub(super) fn history_turns(
                 role: WireRole::User,
                 text: m.content.clone(),
                 remixed: false,
+                id: Some(m.id.clone()),
             }),
             "agent" | "assistant" => Some(WireTurn {
                 role: WireRole::Assistant,
                 text: m.content.clone(),
-                remixed: is_remixed(&m.id),
+                // Whether it went out remixed is the module's to say: it keeps
+                // the ring of remixed ids and matches them by this id.
+                remixed: false,
+                id: Some(m.id.clone()),
             }),
             _ => None,
         })
@@ -43,6 +46,7 @@ pub(super) fn history_turns(
             role: WireRole::User,
             text: current.to_owned(),
             remixed: false,
+            id: None,
         });
     }
     turns
