@@ -31,8 +31,8 @@
 //! - [`browser`] and [`browser_task`] — TinyComputer browser members and tasks
 //!   without linking the browser engine into the core; [`browser_sites`] keeps
 //!   what finished tasks learned about each site for the next task there, and
-//!   [`browser_profile`] tells whether a Chrome holds the persistent profile
-//!   and claims it for a browser about to start.
+//!   [`profile_claim`] asks the module to claim the persistent Chrome profile
+//!   for a browser about to start.
 //! - [`wallet`] — the host half of the `tinywallet` module, which builds and
 //!   assembles transactions while the signing key stays in this process.
 //! - [`linked`] — the registry of modules linked into the executable (local development).
@@ -47,7 +47,7 @@ pub mod boot;
 #[cfg(feature = "modules")]
 pub mod browser;
 #[cfg(feature = "modules")]
-pub(crate) mod browser_profile;
+pub(crate) mod profile_claim;
 #[cfg(feature = "modules")]
 pub(crate) mod browser_sites;
 #[cfg(feature = "modules")]
