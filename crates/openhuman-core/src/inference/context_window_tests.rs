@@ -239,7 +239,8 @@ async fn unknown_model_without_provider_data_is_unknown() {
         resolved,
         ResolvedWindow {
             window: None,
-            source: WindowSource::Unknown
+            source: WindowSource::Unknown,
+            max_output_tokens: None,
         }
     );
 }
