@@ -48,7 +48,8 @@ fn visible_tool_names(def: &AgentDefinition, definitions: &[AgentDefinition]) ->
 }
 
 fn render(def: &AgentDefinition, definitions: &[AgentDefinition]) -> String {
-    let PromptSource::Dynamic(build) = &def.system_prompt else {
+    let (PromptSource::Dynamic(()), Some(build)) = (&def.system_prompt, def.extensions.prompt_builder)
+    else {
         panic!("built-in `{}` must carry a dynamic prompt", def.id);
     };
     let workspace = tempfile::TempDir::new().expect("temp workspace");

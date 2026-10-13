@@ -158,7 +158,8 @@ fn every_builtin_has_a_prompt_body() {
     let empty_visible: std::collections::HashSet<String> = std::collections::HashSet::new();
     for def in load_builtins().unwrap() {
         match &def.system_prompt {
-            PromptSource::Dynamic(build) => {
+            PromptSource::Dynamic(()) => {
+                let build = def.extensions.prompt_builder.expect("dynamic prompt builder");
                 let ctx = PromptContext {
                     workspace_dir: std::path::Path::new("."),
                     model_name: "test",

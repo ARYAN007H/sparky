@@ -134,7 +134,8 @@ fn boot_accepts_a_builtins_only_registry() {
 
 #[test]
 fn boot_refuses_a_registry_with_workspace_definitions() {
-    use crate::agent::harness::{AgentDefinitionRegistry, DefinitionSource};
+    use crate::agent::harness::host_definition::AgentDefinitionRegistry;
+    use tinyagents_definition::DefinitionSource;
     let mut custom = AgentDefinitionRegistry::builtins_only()
         .get("orchestrator")
         .cloned()
