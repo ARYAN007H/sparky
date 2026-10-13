@@ -244,8 +244,20 @@ async fn load_workflow_metadata_skips_user_roots_under_a_hidden_context() {
     );
 }
 
-#[test]
-fn workflow_metadata_is_reused_until_invalidated() {
+#[tokio::test]
+async fn workflow_metadata_is_reused_until_invalidated() {
+    // Scope an explicit skills-on context: the process default context other
+    // tests install may have the component off.
+    let ctx = crate::core::runtime::CoreContext::for_test_with_components(
+        crate::core::runtime::ComponentSet::all(),
+    );
+    crate::core::runtime::CoreContext::scope(ctx, async {
+        workflow_metadata_is_reused_body();
+    })
+    .await;
+}
+
+fn workflow_metadata_is_reused_body() {
     let workspace = tempfile::tempdir().unwrap();
     let skill = workspace.path().join("skills").join("cached-skill");
     write(
