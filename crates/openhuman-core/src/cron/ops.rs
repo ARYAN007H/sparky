@@ -45,7 +45,7 @@ pub(crate) fn try_acquire_run(job_id: &str) -> Option<ActiveRunGuard> {
 }
 
 pub fn add_once(config: &Config, delay: &str, command: &str) -> Result<CronJob> {
-    let duration = parse_human_delay(delay)?;
+    let duration = tinyflows_schedule::validation::parse_human_delay(delay)?;
     let at = chrono::Utc::now() + duration;
     add_once_at(config, at, command)
 }
@@ -139,29 +139,6 @@ pub fn update_cron_job(
     };
 
     update_job(config, id, patch)
-}
-
-/// Parse a human-friendly delay string (e.g. "5m", "2h", "30s") into a
-/// `chrono::Duration`. Defaults to minutes when no unit is given.
-pub fn parse_human_delay(input: &str) -> Result<chrono::Duration> {
-    let input = input.trim();
-    if input.is_empty() {
-        anyhow::bail!("delay must not be empty");
-    }
-    let split = input
-        .find(|c: char| !c.is_ascii_digit())
-        .unwrap_or(input.len());
-    let (num, unit) = input.split_at(split);
-    let amount: i64 = num.parse()?;
-    let unit = if unit.is_empty() { "m" } else { unit };
-    let duration = match unit {
-        "s" => chrono::Duration::seconds(amount),
-        "m" => chrono::Duration::minutes(amount),
-        "h" => chrono::Duration::hours(amount),
-        "d" => chrono::Duration::days(amount),
-        _ => anyhow::bail!("unsupported delay unit '{unit}', use s/m/h/d"),
-    };
-    Ok(duration)
 }
 
 pub async fn cron_list(config: &Config) -> Result<Outcome<Vec<CronJob>>, String> {
