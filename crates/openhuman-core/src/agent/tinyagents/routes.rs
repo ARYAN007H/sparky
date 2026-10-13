@@ -11,11 +11,6 @@ use tinyagents_registry::{WorkloadRoute, WorkloadRouter};
 use tinyinference_llm::model::workload::WORKLOAD_ROUTES;
 use tinyinference_llm::model::{CapabilitySet, ModelRequest};
 
-pub(super) use tinyinference_llm::model::workload::{
-    ROUTE_AGENTIC, ROUTE_BURST, ROUTE_CHAT, ROUTE_CODING, ROUTE_REASONING, ROUTE_SUMMARIZATION,
-    ROUTE_VISION, WORKLOAD_ROUTE_TIERS,
-};
-
 /// The workload routing table (fallback chains and the vision `image_in` gate)
 /// projected into the crate [`WorkloadRouter`] from the upstream declarative
 /// [`WORKLOAD_ROUTES`] table, which owns the policy.
