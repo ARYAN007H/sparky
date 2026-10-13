@@ -117,3 +117,7 @@ pub(crate) fn tools(config: Arc<Config>, security: &Arc<SecurityPolicy>) -> Vec<
         Box::new(FlowMemoryRememberTool::new(security.clone())),
     ]
 }
+
+#[cfg(test)]
+#[path = "registration_tests.rs"]
+mod tests;
