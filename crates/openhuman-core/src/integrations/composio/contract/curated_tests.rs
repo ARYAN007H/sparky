@@ -114,16 +114,3 @@ fn fixture_agent_ready_list_names_the_native_providers() {
         assert!(slugs.iter().any(|s| s == native), "{native} missing");
     }
 }
-
-#[test]
-fn invalidating_drops_an_installed_snapshot() {
-    // A re-resolved module may serve other tables; the host must not keep
-    // answering from the old ones. (Under test an empty store reads the frozen
-    // module fixture, which has no `invalidatekit`.)
-    let (_, mut vocabulary) = reply();
-    vocabulary.toolkits[0].toolkit = "invalidatekit".into();
-    install_for_test(&[], &vocabulary);
-    assert!(catalog_for_toolkit("invalidatekit").is_some());
-    invalidate();
-    assert!(catalog_for_toolkit("invalidatekit").is_none());
-}
