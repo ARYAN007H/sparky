@@ -185,7 +185,15 @@ async fn build_runtime() -> tinybus::Result<ModuleRuntime> {
     let host = ModuleHost::new(broker);
     let connection = Connection::connect(transport.connect().await?).await?;
 
-    super::tokenjuice_host::install(&connection).await?;
+    // The summary callback exists for the module alone; with the component off
+    // the module never loads, so nothing would call it.
+    let juice_on = crate::core::runtime::context::CoreContext::current()
+        .is_none_or(|ctx| ctx.components().juice);
+    if juice_on {
+        super::tokenjuice_host::install(&connection).await?;
+    } else {
+        tracing::debug!("[modules] juice component off; MlHost not served");
+    }
     super::storage_host::install(&connection).await?;
     #[cfg(feature = "web3")]
     super::wallet_host::install(&connection).await?;
