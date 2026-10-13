@@ -261,7 +261,7 @@ impl Tool for McpRegistryToolCallTool {
         let client = crate::mcp::module_client::McpConfiguredClient::for_config(&self.config)
             .map_err(|_| anyhow::anyhow!("mcp_registry_tool_call: MCP module is unavailable"))?;
         let normalized: serde_json::Map<String, Value> = client
-            .normalize_tool_arguments(args.get("arguments").cloned().unwrap_or(Value::Null))
+            .normalize_tool_arguments(args.get("arguments").cloned())
             .await
             .map_err(|_| anyhow::anyhow!("mcp_registry_tool_call: invalid tool arguments"))?;
         let arguments = Value::Object(normalized);
