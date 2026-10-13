@@ -120,12 +120,14 @@ pub(crate) fn install_request(config: &crate::config::Config) -> InstallRequest 
 
 pub async fn install_from_config(config: &crate::config::Config) -> Result<(), String> {
     savings::configure(
+        &client(config),
         config
             .default_model
             .clone()
             .unwrap_or_else(|| crate::config::DEFAULT_MODEL.to_string()),
         &config.workspace_dir,
-    );
+    )
+    .await?;
     let request = install_request(config);
     let fingerprint = serde_json::to_vec(&request).map_err(|error| error.to_string())?;
     static INSTALLED: std::sync::OnceLock<tokio::sync::Mutex<Option<Vec<u8>>>> =
