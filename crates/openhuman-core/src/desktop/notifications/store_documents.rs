@@ -44,7 +44,7 @@ use crate::storage::documents::{compare_and_swap, text, Repo, CAS_ATTEMPTS};
 use crate::storage::{DocumentStore, DocumentStoreExt, StorageError};
 
 pub(super) const NOTIFICATIONS: &str = "integration_notifications";
-const DEDUP: &str = "notification_dedup";
+pub(super) const DEDUP: &str = "notification_dedup";
 pub(super) const SETTINGS: &str = "notification_settings";
 pub(super) const CORE: &str = "core_notifications";
 
@@ -194,7 +194,7 @@ fn to_notification(stored: &Versioned<Value>) -> IntegrationNotification {
 
 /// The dedup document id for one piece of content. Each part is length
 /// prefixed, so no two distinct tuples hash the same input.
-fn dedup_id(provider: &str, account_id: Option<&str>, title: &str, body: &str) -> String {
+pub(super) fn dedup_id(provider: &str, account_id: Option<&str>, title: &str, body: &str) -> String {
     let mut hasher = Sha256::new();
     for part in [Some(provider), account_id, Some(title), Some(body)] {
         match part {
