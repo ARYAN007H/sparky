@@ -400,7 +400,12 @@ async fn diagnostics_report_denials_recorded_through_tinytools() {
         "blocked",
         "probe denial reason",
     );
-    let diagnostics = diagnostics_for_config(&Config::default()).await;
+    let workspace = tempfile::tempdir().expect("tempdir");
+    let config = Config {
+        workspace_dir: workspace.path().to_path_buf(),
+        ..Config::default()
+    };
+    let diagnostics = diagnostics_for_config(&config).await;
     let denial = diagnostics
         .value
         .recent_denials
