@@ -8,9 +8,6 @@ fn make_def_named_tools(names: &[&str]) -> AgentDefinition {
         when_to_use: "t".into(),
         display_name: None,
         system_prompt: PromptSource::Inline("system".into()),
-        omit_identity: true,
-        omit_memory_context: true,
-        omit_safety_preamble: true,
         model: ModelSpec::Inherit,
         temperature: 0.4,
         tools: ToolScope::Named(names.iter().map(|s| s.to_string()).collect()),
@@ -26,13 +23,20 @@ fn make_def_named_tools(names: &[&str]) -> AgentDefinition {
         timeout_secs: None,
         sandbox_mode: tinyagents_definition::SandboxMode::None,
         background: false,
-        tokenjuice_compression: tinyjuice_bus::types::AgentTokenjuiceCompression::Auto,
         subagents: vec![],
         delegate_name: None,
         agent_tier: tinyagents_definition::AgentTier::Worker,
-        searches_connected_mcp: false,
         source: tinyagents_definition::DefinitionSource::Builtin,
     }
+        extensions: crate::agent::harness::host_definition::AgentExt {
+            omit_identity: true,
+            omit_memory_context: true,
+            omit_safety_preamble: true,
+            tokenjuice_compression: tinyjuice_bus::types::AgentTokenjuiceCompression::Auto,
+            searches_connected_mcp: false,
+            ..Default::default()
+        },
+        role: None,
 }
 
 /// Local tool used to populate `parent_tools` in tests.

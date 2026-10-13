@@ -147,9 +147,6 @@ fn definition_with_tool_scope(
         when_to_use: "test definition".into(),
         display_name: None,
         system_prompt: PromptSource::Inline("test prompt".into()),
-        omit_identity: true,
-        omit_memory_context: true,
-        omit_safety_preamble: true,
         model: ModelSpec::Inherit,
         temperature: 0.0,
         tools,
@@ -165,13 +162,20 @@ fn definition_with_tool_scope(
         timeout_secs: None,
         sandbox_mode,
         background: false,
-        tokenjuice_compression: Default::default(),
         subagents: Vec::new(),
         delegate_name: None,
         agent_tier: AgentTier::Worker,
-        searches_connected_mcp: false,
         source: DefinitionSource::Builtin,
     }
+        extensions: crate::agent::harness::host_definition::AgentExt {
+            omit_identity: true,
+            omit_memory_context: true,
+            omit_safety_preamble: true,
+            tokenjuice_compression: Default::default(),
+            searches_connected_mcp: false,
+            ..Default::default()
+        },
+        role: None,
 }
 
 #[derive(Default)]

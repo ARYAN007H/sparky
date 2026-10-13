@@ -7,9 +7,6 @@ fn definition() -> AgentDefinition {
         when_to_use: "Use for research.".to_string(),
         display_name: Some("Researcher".to_string()),
         system_prompt: PromptSource::Inline("hidden prompt".to_string()),
-        omit_identity: true,
-        omit_memory_context: true,
-        omit_safety_preamble: true,
         model: ModelSpec::Hint("reasoning".to_string()),
         temperature: 0.2,
         tools: ToolScope::Named(vec!["web_search".to_string(), "file_read".to_string()]),
@@ -25,7 +22,6 @@ fn definition() -> AgentDefinition {
         timeout_secs: None,
         sandbox_mode: SandboxMode::ReadOnly,
         background: false,
-        tokenjuice_compression: tinyjuice_bus::types::AgentTokenjuiceCompression::Auto,
         subagents: vec![
             SubagentEntry::AgentId("critic".to_string()),
             SubagentEntry::Skills(SkillsWildcard {
@@ -34,9 +30,17 @@ fn definition() -> AgentDefinition {
         ],
         delegate_name: None,
         agent_tier: AgentTier::Worker,
-        searches_connected_mcp: false,
         source: DefinitionSource::Builtin,
     }
+        extensions: crate::agent::harness::host_definition::AgentExt {
+            omit_identity: true,
+            omit_memory_context: true,
+            omit_safety_preamble: true,
+            tokenjuice_compression: tinyjuice_bus::types::AgentTokenjuiceCompression::Auto,
+            searches_connected_mcp: false,
+            ..Default::default()
+        },
+        role: None,
 }
 
 #[test]
