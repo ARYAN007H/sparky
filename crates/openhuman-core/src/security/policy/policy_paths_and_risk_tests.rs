@@ -1,4 +1,5 @@
 use super::*;
+use tinybox_bus::CommandClass;
 
 #[test]
 fn always_forbidden_blocks_core_os_dirs_cross_platform() {
@@ -73,7 +74,7 @@ fn parse_declared_class_maps_known_and_rejects_unknown() {
 #[test]
 fn tinybox_command_facts_drive_policy_and_keep_the_path_floor_when_disabled() {
     use crate::modules::tinybox::contract::{
-        CommandAnalysis, CommandClass as ModuleClass, CommandSegment,
+        CommandAnalysis, CommandSegment,
     };
 
     let write_segment = CommandSegment {
@@ -82,7 +83,7 @@ fn tinybox_command_facts_drive_policy_and_keep_the_path_floor_when_disabled() {
         basename: "ls".into(),
         normalized_name: "ls".into(),
         arguments: vec!["-la".into()],
-        class: ModuleClass::Write,
+        class: CommandClass::Write,
         leading_env_assignment: false,
         dangerous_env_prefix: false,
         executor: false,
@@ -156,7 +157,7 @@ fn tinybox_command_facts_drive_policy_and_keep_the_path_floor_when_disabled() {
 #[test]
 fn tinybox_fact_allowlist_treats_heredoc_as_data_and_unknown_commands_as_writes() {
     use crate::modules::tinybox::contract::{
-        CommandAnalysis, CommandClass as ModuleClass, CommandSegment,
+        CommandAnalysis, CommandSegment,
     };
 
     let policy = SecurityPolicy {
@@ -174,7 +175,7 @@ fn tinybox_fact_allowlist_treats_heredoc_as_data_and_unknown_commands_as_writes(
             basename: "cat".into(),
             normalized_name: "cat".into(),
             arguments: vec!["notes.txt".into()],
-            class: ModuleClass::Write,
+            class: CommandClass::Write,
             leading_env_assignment: false,
             dangerous_env_prefix: false,
             executor: false,
@@ -197,7 +198,7 @@ fn tinybox_fact_allowlist_treats_heredoc_as_data_and_unknown_commands_as_writes(
             basename: "unrecognized-tool".into(),
             normalized_name: "unrecognized-tool".into(),
             arguments: vec!["--flag".into()],
-            class: ModuleClass::Write,
+            class: CommandClass::Write,
             leading_env_assignment: false,
             dangerous_env_prefix: false,
             executor: false,
