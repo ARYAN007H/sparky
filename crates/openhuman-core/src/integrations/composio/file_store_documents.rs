@@ -129,7 +129,7 @@ impl Docs {
         self.0.run(|docs| async move {
             match docs.put(STATE, &id, doc, Precondition::Absent).await {
                 Ok(_) => Ok(true),
-                Err(error) if error.kind() == tinystoragedrivers::ErrorKind::Conflict => Ok(false),
+                Err(error) if error.kind() == ErrorKind::Conflict => Ok(false),
                 Err(error) => Err(error),
             }
         })

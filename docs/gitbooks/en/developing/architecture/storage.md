@@ -113,7 +113,7 @@ A SaaS core with no URL keeps one default database per profile workspace, and it
 
 ### What is not on the ports yet
 
-The keyring or `secrets.enc` and the path-bound artifact bytes and media still use files. Cost tracking, the Composio state, sub-agent sessions and agent artifact records have no file fallback: with no backend installed they use the workspace's own default (`sqlite:<workspace>/storage`), the same as a host would, and a legacy cost ledger or artifact `meta.json` is imported once. The vault watcher's mtime table stays a per-machine SQLite file on purpose, because its rows are absolute paths on one host. On first read with a backend installed, the auth-profile and HTTP-credential stores copy the records in their files into the backend, and the keyring adopts a secret it finds in the process backend. The source files are left untouched.
+The keyring or `secrets.enc` and the path-bound artifact bytes and media still use files. Cost tracking, the Composio state, sub-agent sessions and agent artifact records have no file fallback: with no backend installed they use the workspace's own default (`sqlite:<workspace>/storage`), the same as a host would, and a legacy cost ledger, artifact `meta.json`, Composio state file or sub-agent session file is imported once (and the file renamed to `*.migrated`). The vault watcher's mtime table stays a per-machine SQLite file on purpose, because its rows are absolute paths on one host. On first read with a backend installed, the auth-profile and HTTP-credential stores copy the records in their files into the backend, and the keyring adopts a secret it finds in the process backend. The source files are left untouched.
 
 ### Importing the legacy small stores
 
