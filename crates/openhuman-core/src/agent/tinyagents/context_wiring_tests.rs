@@ -8,8 +8,11 @@ fn outcome_source_returns_captured_content_by_call_id() {
     assert!(source.content_for("missing").unwrap().is_none());
     sink.lock().unwrap().push(ToolCallOutcome {
         call_id: "c1".into(),
+        name: "t".into(),
+        arguments: serde_json::Value::Null,
+        success: true,
         content: "body".into(),
-        ..Default::default()
+        duration_ms: 0,
     });
     assert_eq!(source.content_for("c1").unwrap().as_deref(), Some("body"));
 }
