@@ -50,8 +50,8 @@ pub const SKILL_SEARCH_NAME: &str = "skill_search";
 
 /// Compact per-result projection, via the module's capped projection with the
 /// host's `sanitize_for_llm` supplied as the sanitiser.
-fn project(workflow: &Workflow) -> tinyskills::search::SkillHit {
-    tinyskills::search::project(workflow, tinytools_std::sanitize::sanitize_for_llm)
+fn project(workflow: &Workflow) -> tinyskills::SkillHit {
+    tinyskills::project(workflow, tinytools_std::sanitize::sanitize_for_llm)
 }
 
 /// Search installed skills by capability.
@@ -145,7 +145,7 @@ impl Tool for SkillSearchTool {
             .unwrap_or(DEFAULT_LIMIT);
 
         let workflows = self.visible();
-        let matches = tinyskills::search::rank(&workflows, query, limit);
+        let matches = tinyskills::rank(&workflows, query, limit);
         tracing::debug!(
             installed = workflows.len(),
             matched = matches.len(),

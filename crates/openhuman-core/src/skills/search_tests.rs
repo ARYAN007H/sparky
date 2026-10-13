@@ -48,7 +48,7 @@ fn the_projection_omits_the_body_and_caps_the_description() {
     keys.sort();
     assert_eq!(keys, ["description", "id", "name", "scope", "tags"]);
     assert!(
-        obj["description"].as_str().expect("str").len() <= tinyskills::search::MAX_DESCRIPTION + 8,
+        obj["description"].as_str().expect("str").len() <= tinyskills::MAX_DESCRIPTION + 8,
         "description must be capped"
     );
 }
@@ -91,7 +91,7 @@ fn a_hit_reports_how_many_were_searched() {
     // `installed` is what lets the model tell "nothing matched" from "you have
     // three skills and none is close" without a second call.
     let all = corpus();
-    let hits = tinyskills::search::rank(&all, "changelog", 5);
+    let hits = tinyskills::rank(&all, "changelog", 5);
     let value = render(&hits, all.len());
     assert_eq!(value["matched"], 1);
     assert_eq!(value["installed"], 3);
