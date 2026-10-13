@@ -20,9 +20,9 @@
 mod common;
 
 use common::{chat_completion, offline_config, runtime};
-use tinyagents_session::transcript::TranscriptLocator;
 use openhuman_embed::{Access, Harness, Provider, Workspace};
 use serde_json::json;
+use tinyagents_session::transcript::TranscriptLocator;
 use wiremock::matchers::{any, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -212,11 +212,10 @@ fn a_harness_runs_a_turn_against_the_provider_it_was_given() {
             // own transcript root under the workspace (the old
             // `session_db/` files are gone). A harness session id is its
             // thread id.
-            let transcripts =
-                openhuman_core::agent::session_store::AgentTranscriptFiles::new(
-                    &workspace_dir,
-                    "harness",
-                );
+            let transcripts = openhuman_core::agent::session_store::AgentTranscriptFiles::new(
+                &workspace_dir,
+                "harness",
+            );
             assert!(
                 transcripts.root_for_thread(&first.session_id).is_some(),
                 "the first session's transcript was not persisted"
