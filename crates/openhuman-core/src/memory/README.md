@@ -285,14 +285,14 @@ The agent `memory` tool applies the same confinement and overwrites any
 | [`lifecycle/sender.rs`](./lifecycle/sender.rs) | Maps a channel message's sender to an observed actor. |
 | [`lifecycle/date_hint.rs`](./lifecycle/date_hint.rs) | Optional model call that works out which days a turn refers to. |
 | [`ops.rs`](./ops.rs) | Engine list/get/set, recall, fetch, learn, forget, erase all, items list. |
-| [`tool_budget.rs`](./tool_budget.rs), [`tool_writes.rs`](./tool_writes.rs) | Agent call deadlines and durable, owner-scoped admission/delivery of optional writes. |
+| [`tool_budget.rs`](./tool_budget.rs), [`tool_writes.rs`](./tool_writes.rs) | Agent call deadlines; owner-scoped admission and file store for optional writes. The FIFO, coalescing and fencing are `tinymemory_tools::pending`. |
 | [`confine.rs`](./confine.rs) | Confines the RPC surface to the acting identity's subtree. |
 | [`explore.rs`](./explore.rs) | The facet explorer behind `memory_explore` and `memory_items_get`. |
 | [`brain.rs`](./brain.rs) | Brain source mapping and the `memory_brain_*` ops. |
 | [`convert.rs`](./convert.rs) | The document converter chain used by brain ingest and file sources. |
 | [`sources/`](./sources/) | The `[[memory.sources]]` registry (`mod.rs`), sync state (`state.rs`) and sync (`sync.rs`). |
 | [`channels.rs`](./channels.rs) | Channel to thread records, for forgetting a channel. |
-| [`deletion.rs`](./deletion.rs) | Hard deletes and the pending-deletion queue with its drain. |
+| [`deletion.rs`](./deletion.rs) | Hard deletes; the file store and executor for the pending-deletion queue (`tinymemory_tools::deletion`, with retry backoff on background ticks). |
 | [`backfill.rs`](./backfill.rs) | Consent-gated, resumable storing of past chats. |
 | [`import.rs`](./import.rs), [`import_retry.rs`](./import_retry.rs) | Consent-gated, resumable v1 import, and retrying refused items. Skips what v1 synced from Composio connectors (`import_open.rs::open_legacy` turns on `LegacyWorkspace::skip_connector_syncs`); the connectors re-sync it. |
 | [`layout_migration/`](./layout_migration/) | Host adapter over `tinymemory_tools::layout_migration` (copy, placement, cleanup and the job live in tinymemory): `app_host.rs` (the real `LayoutHost`), `claim.rs`, `state.rs` (file-backed `MigrationStateStore`), `service.rs` (RPC/tick entry points). |
