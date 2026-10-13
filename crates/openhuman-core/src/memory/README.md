@@ -279,8 +279,8 @@ The agent `memory` tool applies the same confinement and overwrites any
 | [`local_root.rs`](./local_root.rs) | The persistent install-id root of a signed-out session. |
 | [`lifecycle/mod.rs`](./lifecycle/mod.rs) | Builds `AgentMemory` for an identity under the `[memory.recall]` policy. |
 | [`lifecycle/hooks.rs`](./lifecycle/hooks.rs) | Lifecycle operations and bounded manual wrappers; `TurnPack`, `MemoryTurn`. |
-| [`lifecycle/prefetch.rs`](./lifecycle/prefetch.rs) | Scoped in-memory packs and bounded automatic background refresh. |
-| [`lifecycle/jobs.rs`](./lifecycle/jobs.rs) | The persisted background job queue and the `memory_background` run. |
+| [`lifecycle/prefetch.rs`](./lifecycle/prefetch.rs) | Host adapter over `tinymemory_tools::prefetch::Prefetcher`: the key (workspace, config fingerprint, identity, thread), the per-context cache registry, the tokio runtime port and the turn-pack work. |
+| [`lifecycle/jobs.rs`](./lifecycle/jobs.rs) | Host adapter over `tinymemory_tools::queue::JobQueue`: a file `QueueStore` over `memory/jobs.json`, one queue per workspace, the engine and build delay, and the `memory_background` cron run. |
 | [`lifecycle/views.rs`](./lifecycle/views.rs) | Policy get/set, pack preview, agents list, jobs list/run for the UI. |
 | [`lifecycle/sender.rs`](./lifecycle/sender.rs) | Maps a channel message's sender to an observed actor. |
 | [`lifecycle/date_hint.rs`](./lifecycle/date_hint.rs) | Optional model call that works out which days a turn refers to. |
