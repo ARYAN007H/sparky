@@ -335,8 +335,7 @@ pub async fn execute_in_sandbox(
                         anyhow::anyhow!("Cannot read module configuration: {error}")
                     })?,
             };
-            let policy =
-                super::local_grants::with_resolved_grants(&config, policy).await?;
+            let policy = super::local_grants::with_resolved_grants(&config, policy).await?;
             super::native_jail::execute(
                 &config,
                 &policy,

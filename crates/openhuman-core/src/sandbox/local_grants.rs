@@ -25,10 +25,7 @@ pub(crate) struct JailGrants {
 
 /// The operator home a grant set may be built from. A tenant never reads the
 /// operator's home, so SaaS callers get none and `home` is not consulted.
-pub(crate) fn grant_home(
-    saas: bool,
-    home: impl FnOnce() -> Option<PathBuf>,
-) -> Option<PathBuf> {
+pub(crate) fn grant_home(saas: bool, home: impl FnOnce() -> Option<PathBuf>) -> Option<PathBuf> {
     if saas {
         None
     } else {

@@ -2,7 +2,9 @@ use super::*;
 
 #[test]
 fn saas_never_consults_the_operator_home() {
-    let home = grant_home(true, || panic!("a tenant must not read the operator's home"));
+    let home = grant_home(true, || {
+        panic!("a tenant must not read the operator's home")
+    });
     assert!(home.is_none());
 }
 
@@ -26,11 +28,17 @@ mod with_module {
                 "/etc".into(),
                 "/home/op/.rustup".into(),
             ],
-            read_write: vec!["/home/op/.aws/sso".into(), "/home/op/.cargo/registry".into()],
+            read_write: vec![
+                "/home/op/.aws/sso".into(),
+                "/home/op/.cargo/registry".into(),
+            ],
         };
         let grants = admit_module_grants(reply, false);
         assert_eq!(grants.read_only, [PathBuf::from("/home/op/.rustup")]);
-        assert_eq!(grants.read_write, [PathBuf::from("/home/op/.cargo/registry")]);
+        assert_eq!(
+            grants.read_write,
+            [PathBuf::from("/home/op/.cargo/registry")]
+        );
     }
 
     #[test]
