@@ -13,15 +13,22 @@ const SNAPSHOT: &[&str] = &[
 ];
 
 pub(crate) async fn run(run: NativeShellRun) -> anyhow::Result<SandboxExecResult> {
-    let mut command = tokio::process::Command::new(if cfg!(windows) { "cmd" } else { "sh" });
+    let bash = ["/usr/bin/bash", "/bin/bash"]
+        .into_iter()
+        .find(|path| std::path::Path::new(path).exists());
+    let mut command = tokio::process::Command::new(if cfg!(windows) {
+        "cmd"
+    } else {
+        bash.unwrap_or("sh")
+    });
     if cfg!(windows) {
         command.arg("/C").arg(&run.command);
-    } else if run.preserve_pipeline_status {
-        command.arg("-c").arg(&run.command);
-    } else {
+    } else if bash.is_some() && !run.preserve_pipeline_status {
         command
             .arg("-c")
-            .arg(format!("set -o pipefail 2>/dev/null\n{}", run.command));
+            .arg(format!("set -o pipefail\n{}", run.command));
+    } else {
+        command.arg("-c").arg(&run.command);
     }
     command.env_clear();
     for name in SNAPSHOT {
