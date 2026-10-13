@@ -276,12 +276,13 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
         // A Stop during the close or the repair after it hands back the
         // accepted rounds like a Stop during the loop, instead of letting the
         // runtime's grace expire and drop the turn (#7776).
+        let accepted_history = request.history.clone();
         let stopped = || {
             driver_cancelled_with_snapshot(
                 &snapshot,
                 &sidecar,
                 started.elapsed(),
-                request.history.clone(),
+                accepted_history.clone(),
             )
         };
         let close = tokio::select! {
@@ -350,32 +351,34 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
                 None
             }
             Some(contract) => {
-                let repair = grounded_close::repair_required_output(
-                    &self.turn_model_source,
-                    &self.model_name,
-                    self.temperature,
-                    request.run_context.data.thread_id.as_deref(),
-                    self.dispatcher.as_ref(),
-                    contract,
-                    &history,
-                    &output,
-                    close.is_none() && request.run_context.data.progress.is_some(),
-                    request.run_context.data.progress.as_ref(),
-                    outcome.model_calls.saturating_add(1) as u32,
-                    &mut repair_usage,
-                );
-                tokio::pin!(repair);
-                let repaired = tokio::select! {
-                    biased;
-                    _ = cancellation.cancelled() => return Err(stopped()),
-                    repaired = async {
-                        match time_left {
-                            // Bound to what is left so the turn still commits;
-                            // on expiry fall back to the deterministic block.
-                            Some(left) => tokio::time::timeout(left, &mut repair).await.ok(),
-                            None => Some((&mut repair).await),
-                        }
-                    } => repaired,
+                let repaired = {
+                    let repair = grounded_close::repair_required_output(
+                        &self.turn_model_source,
+                        &self.model_name,
+                        self.temperature,
+                        request.run_context.data.thread_id.as_deref(),
+                        self.dispatcher.as_ref(),
+                        contract,
+                        &history,
+                        &output,
+                        close.is_none() && request.run_context.data.progress.is_some(),
+                        request.run_context.data.progress.as_ref(),
+                        outcome.model_calls.saturating_add(1) as u32,
+                        &mut repair_usage,
+                    );
+                    tokio::pin!(repair);
+                    tokio::select! {
+                        biased;
+                        _ = cancellation.cancelled() => return Err(stopped()),
+                        repaired = async {
+                            match time_left {
+                                // Bound to what is left so the turn still commits;
+                                // on expiry fall back to the deterministic block.
+                                Some(left) => tokio::time::timeout(left, &mut repair).await.ok(),
+                                None => Some((&mut repair).await),
+                            }
+                        } => repaired,
+                    }
                 };
                 match repaired {
                     Some(repaired) => repaired,
