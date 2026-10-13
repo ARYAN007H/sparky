@@ -76,6 +76,8 @@ pub fn cancel_run(run_id: &str) -> bool {
         None => false,
     };
     log::debug!("[workflows::run-cancel] cancel requested run_id={run_id} (found={found})");
+    found
+}
 
 /// `<runs_dir>/<skill>_<UTC ts>_<short run id>.log`, stamped with the host clock.
 pub fn run_log_path(workspace: &Path, workflow_id: &str, run_id: &str) -> PathBuf {
@@ -105,7 +107,6 @@ pub async fn write_footer(
     let finished = chrono::Utc::now().to_rfc3339();
     tinyskills::run_log::write_footer(path, status, elapsed_ms, &finished, output)
 }
-
 
 /// One log line for a step, or `None` for events too noisy to log per-event
 /// (token / argument deltas, cost ticks — the final text lands in the footer).
@@ -217,16 +218,6 @@ pub async fn drain_to_log(
     }
     stop
 }
-
-/// Detect the degenerate "model emitted the same paragraph many times in one
-/// generation" final-response failure mode we keep seeing on autonomous runs
-/// (e.g. `"Now I understand the structure..." × 23`, `"Good, the repo is
-/// cloned. Let me narrow down..." × 8`). When this fires we don't want the
-/// autonomous-skill path to mark the run `DONE` and have callers treat the
-/// degenerate text as a real result — we want it surfaced as `DEGENERATE` with
-/// the offending line attached, so the caller can retry / fail loud.
-///
-/// Splits on line boundaries (each repeat we've observed lands on its own
 
 #[cfg(test)]
 #[path = "run_log_tests.rs"]
