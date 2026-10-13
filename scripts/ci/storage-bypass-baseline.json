@@ -442,13 +442,6 @@
   },
   {
     "rule": "json-write",
-    "path": "crates/openhuman-core/src/tinymemes/host.rs",
-    "line": 267,
-    "text": "std::fs::write(&tmp, contents)?;",
-    "occurrence": 1
-  },
-  {
-    "rule": "json-write",
     "path": "crates/openhuman-core/src/tools/impl/document/mod.rs",
     "line": 264,
     "text": "if let Err(err) = tokio::fs::write(&output_path, &bytes).await {",
