@@ -111,7 +111,8 @@ where
     D: serde::Deserializer<'de>,
 {
     let overlay = serde_json::Value::deserialize(de)?;
-    let mut base = serde_json::to_value(default_client_identity()).map_err(serde::de::Error::custom)?;
+    let mut base =
+        serde_json::to_value(default_client_identity()).map_err(serde::de::Error::custom)?;
     if let (Some(base), serde_json::Value::Object(overlay)) = (base.as_object_mut(), overlay) {
         base.extend(overlay);
     }
