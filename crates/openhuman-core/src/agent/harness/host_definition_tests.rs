@@ -417,13 +417,10 @@ fn coding_hint_resolves_auto_tokenjuice_to_light() {
     use tinyjuice_bus::types::AgentTokenjuiceCompression as Profile;
     let ext = AgentExt::default();
     assert_eq!(
-        ext.effective_tokenjuice_compression(&ModelSpec::Hint(" Coding ".into())),
+        ext.tokenjuice_for(&ModelSpec::Hint(" Coding ".into())),
         Profile::Light
     );
-    assert_eq!(
-        ext.effective_tokenjuice_compression(&ModelSpec::Inherit),
-        Profile::Full
-    );
+    assert_eq!(ext.tokenjuice_for(&ModelSpec::Inherit), Profile::Full);
 }
 
 /// Pins tinyagents#441: existing definitions on disk spell an unrestricted

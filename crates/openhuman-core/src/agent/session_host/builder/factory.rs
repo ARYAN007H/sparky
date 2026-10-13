@@ -669,7 +669,7 @@ impl OpenHumanSessionHost {
             .map(|def| def.extensions.omit_memory_context)
             .unwrap_or(false);
         let effective_tokenjuice_compression = target_def
-            .map(|def| def.effective_tokenjuice_compression())
+            .map(|def| def.extensions.tokenjuice_for(&def.model))
             .unwrap_or(tinyjuice_bus::types::AgentTokenjuiceCompression::Full);
 
         // Stamp the resolved agent definition id onto the OpenHumanSessionHost via the

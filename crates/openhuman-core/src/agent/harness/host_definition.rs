@@ -54,7 +54,7 @@ pub struct AgentExt {
     pub omit_safety_preamble: bool,
     /// Per-agent TokenJuice tool-result compression profile. `auto` keeps
     /// compression on for normal agents and resolves coding-model agents to
-    /// `light`; see [`AgentExt::effective_tokenjuice_compression`].
+    /// `light`; see [`AgentExt::tokenjuice_for`].
     #[serde(default)]
     pub tokenjuice_compression: AgentTokenjuiceCompression,
     /// Whether this agent's turns can search and call the tools of every
@@ -108,10 +108,8 @@ fn same_definition(a: &AgentDefinition, b: &AgentDefinition) -> bool {
     }
 }
 
-/// Host accessors on the portable [`AgentDefinition`].
+/// Host accessor on the portable [`AgentDefinition`].
 pub trait AgentDefinitionExt {
-    /// The concrete TokenJuice policy (see [`AgentExt::effective_tokenjuice_compression`]).
-    fn effective_tokenjuice_compression(&self) -> AgentTokenjuiceCompression;
     /// The prompt builder behind a `PromptSource::Dynamic(())` marker.
     fn prompt_fn(&self) -> Result<PromptBuilder>;
 }
