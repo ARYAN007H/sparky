@@ -53,6 +53,7 @@ const DOCKER_STATUS: &str = contract::METHODS[28];
 const CLEANUP_DOCKER: &str = contract::METHODS[29];
 const RUN_DOCKER_WITHOUT_WORKSPACE: &str = contract::METHODS[30];
 const SELECT_SHELL: &str = contract::names::SELECT_SHELL;
+const RESOLVE_LOCAL_GRANTS: &str = contract::names::RESOLVE_LOCAL_GRANTS;
 const START_SHELL_EXEC: &str = contract::names::START_SHELL_EXEC;
 const DOCKER_CALL_GRACE: Duration = Duration::from_secs(5);
 
@@ -187,6 +188,18 @@ pub async fn start_shell_exec(
     request: contract::ShellExecRequest,
 ) -> Result<contract::ProcessRef, String> {
     call(config, START_SHELL_EXEC, (request,), true).await
+}
+
+/// Ask TinyBox to resolve the existing toolchain and configured grants for the
+/// local jail.
+///
+/// The request carries the host's protected-path floor as input; the reply is
+/// a candidate set the host must still pass through its own floor.
+pub async fn resolve_local_grants(
+    config: &Config,
+    request: contract::ResolveLocalGrantsRequest,
+) -> Result<contract::LocalGrants, String> {
+    call(config, RESOLVE_LOCAL_GRANTS, (request,), false).await
 }
 
 /// Run one bounded Docker-isolated command through TinyBox.

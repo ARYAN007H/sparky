@@ -2,7 +2,6 @@
 //! routed execution.
 
 use super::docker;
-use super::grants::{resolve_local_jail_grants, JailGrants};
 use super::types::{
     ElevatedOp, SandboxBackendHandle, SandboxBackendKind, SandboxExecRequest, SandboxExecResult,
     SandboxPolicy, SandboxStatus, ELEVATED_TOOLS,
@@ -165,21 +164,14 @@ pub fn resolve_sandbox_policy(
         _ => true,
     };
 
-    // The jail denies whatever it is not told about, so a local policy carries
-    // the toolchain/git grants everyday commands need (see `sandbox::grants`).
-    let grants = if backend == SandboxBackendKind::Local {
-        host_local_jail_grants(runtime_config)
-    } else {
-        JailGrants::default()
-    };
-
+    // The jail denies whatever it is not told about; the toolchain/git grants
+    // everyday commands need are resolved by TinyBox at spawn time
+    // (`sandbox::local_grants`), so the policy starts without mounts.
     tracing::debug!(
         mode = ?mode,
         backend = ?backend,
         is_remote = is_remote_session,
         action_dir = %action_dir.display(),
-        read_only_grants = grants.read_only.len(),
-        read_write_grants = grants.read_write.len(),
         "[sandbox] resolved policy"
     );
 
@@ -187,8 +179,8 @@ pub fn resolve_sandbox_policy(
         backend,
         workspace_root: action_dir.to_path_buf(),
         state_dir: state_dir.to_path_buf(),
-        read_only_mounts: grants.read_only,
-        read_write_mounts: grants.read_write,
+        read_only_mounts: Vec::new(),
+        read_write_mounts: Vec::new(),
         allow_network,
         env_passthrough: SANDBOX_ENV_PASSTHROUGH
             .iter()
@@ -343,9 +335,11 @@ pub async fn execute_in_sandbox(
                         anyhow::anyhow!("Cannot read module configuration: {error}")
                     })?,
             };
+            let policy =
+                super::local_grants::with_resolved_grants(&config, policy).await?;
             super::native_jail::execute(
                 &config,
-                policy,
+                &policy,
                 command,
                 working_dir,
                 &extra_env,
@@ -405,11 +399,6 @@ pub(crate) async fn apply_requested_backend(
         }
         SandboxBackend::Landlock => {
             super::native_jail::require_backend(config, "landlock").await?;
-            if policy.backend != SandboxBackendKind::Local {
-                let grants = host_local_jail_grants(runtime);
-                policy.read_only_mounts = grants.read_only;
-                policy.read_write_mounts = grants.read_write;
-            }
             policy.backend = SandboxBackendKind::Local;
             policy.docker_overrides = None;
             Ok(true)
@@ -523,27 +512,6 @@ impl Drop for CallDir {
 pub fn is_elevated_op(tool_name: &str) -> bool {
     ELEVATED_TOOLS.contains(&tool_name)
 }
-
-fn host_local_jail_grants(runtime: &RuntimeConfig) -> JailGrants {
-    local_jail_grants_with_home(runtime, crate::core::runtime::is_saas(), || {
-        dirs::home_dir()
-    })
-}
-
-// Shared by initial selection and an explicit backend switch. SaaS callers
-// have no operator-home grants, even if the helper is reached directly.
-fn local_jail_grants_with_home(
-    runtime: &RuntimeConfig,
-    saas: bool,
-    home: impl FnOnce() -> Option<PathBuf>,
-) -> JailGrants {
-    let home = if saas { None } else { home() };
-    resolve_local_jail_grants(home.as_deref(), &runtime.local_jail)
-}
-
-#[cfg(test)]
-#[path = "ops_host_grants_tests.rs"]
-mod host_grants_tests;
 
 /// Build an `ElevatedOp` for audit logging when a tool bypasses the sandbox.
 pub fn build_elevated_op(tool_name: &str, command: &str, reason: &str) -> ElevatedOp {
