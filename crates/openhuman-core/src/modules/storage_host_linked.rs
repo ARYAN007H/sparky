@@ -21,7 +21,6 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use tinybus::module::ModuleHost;
-use tinybus::BusName;
 use tinystoragedrivers_bus::STORAGE_INTERFACE;
 
 use super::storage_host::{serve_objects, StorageHost};
@@ -69,10 +68,10 @@ pub(super) async fn attach(
         .lock()
         .unwrap_or_else(|poison| poison.into_inner()) = Some((host, tokio::runtime::Handle::current()));
     modules.attach_linked_with_config(export::linked_module()?, serde_json::json!({}))?;
-    let name = BusName::new(STORAGE_INTERFACE)?;
+    let name = STORAGE_INTERFACE;
     let deadline = tokio::time::Instant::now() + READY_DEADLINE;
     loop {
-        if matches!(connection.name_owner(name.clone()).await, Ok(Some(_))) {
+        if matches!(connection.name_owner(&name).await, Ok(Some(_))) {
             return Ok(());
         }
         if tokio::time::Instant::now() >= deadline {
