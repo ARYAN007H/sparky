@@ -10,7 +10,7 @@ use anyhow::{Context, Result};
 use rusqlite::Connection;
 use serde_json::{json, Value};
 
-use super::super::store_documents::DEVICES;
+use super::store_documents::DEVICES;
 use crate::config::Config;
 use crate::storage::import::{table_exists, ImportDoc};
 
