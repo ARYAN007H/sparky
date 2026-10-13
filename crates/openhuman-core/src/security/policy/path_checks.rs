@@ -470,53 +470,26 @@ impl SecurityPolicy {
 
         // (a) Credential stores — matched by path segment, location-independent
         // (catches e.g. `C:\Users\x\.ssh` and `~/Library/Keychains`).
-        const SENSITIVE_COMPONENTS: &[&str] =
-            &[".ssh", ".gnupg", ".aws", ".azure", ".kube", "keychains"];
         if segments.iter().any(|s| SENSITIVE_COMPONENTS.contains(s)) {
             return true;
         }
         // Single-file credential stores have no protected parent directory.
-        const SENSITIVE_FILES: &[&str] = &[".netrc", ".git-credentials", ".pgpass", ".npmrc"];
         if segments.iter().any(|s| SENSITIVE_FILES.contains(s)) {
-            return true;
-        }
-        if segments.windows(2).any(|w| w == [".docker", "config.json"]) {
             return true;
         }
         if segments
             .windows(2)
-            .any(|w| w == [".cargo", "credentials.toml"])
+            .any(|w| SENSITIVE_PAIRS.iter().any(|pair| w == *pair))
         {
             return true;
         }
         // Windows DPAPI / credential stores live under `…\Microsoft\{Protect,
         // Credentials,Crypto,Vault}` — match the pair so the generic second
         // name can't false-positive an unrelated project directory.
-        if segments.windows(2).any(|w| {
-            w[0] == "microsoft" && matches!(w[1], "protect" | "credentials" | "crypto" | "vault")
-        }) {
-            return true;
-        }
 
         // (b) Core OS directories — matched by absolute prefix. Unconditional,
         // unlike the user-overridable `forbidden_paths`.
-        const SYSTEM_PREFIXES: &[&str] = &[
-            // POSIX
-            "/etc",
-            "/root",
-            "/boot",
-            "/proc",
-            "/sys",
-            // macOS (note: /private is intentionally NOT blocked — macOS temp
-            // dirs and /etc canonicalize under /private/var and /private/etc).
-            "/system",
-            // Windows
-            "c:/windows",
-            "c:/program files",
-            "c:/program files (x86)",
-            "c:/programdata",
-        ];
-        SYSTEM_PREFIXES
+        ALWAYS_FORBIDDEN_PREFIXES
             .iter()
             .any(|p| lc_path == *p || lc_path.starts_with(&format!("{p}/")))
     }
