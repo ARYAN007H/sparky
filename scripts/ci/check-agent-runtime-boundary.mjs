@@ -144,6 +144,7 @@ const bridgeSymbols = [
   "execute_openhuman_tool",
   "assemble_turn_harness",
   "run_turn_via_tinyagents_shared",
+  "run_root_turn_via_hosted_agent",
 ];
 const deletedTaskLocalModules = [
   "fork_context",

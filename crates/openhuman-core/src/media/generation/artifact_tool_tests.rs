@@ -172,8 +172,8 @@ async fn files_a_single_generated_artifact() {
 
     // Original staged file is gone (moved).
     assert!(!staging.join("stub-0.png").exists());
-    // Metadata may live in the configured storage backend; resolve it through
-    // the artifact store and verify the user-facing file it records.
+    // The artifact record lives in the document store (no `meta.json`), and
+    // its user-facing file remains resolvable from the visible Files folder.
     let meta = crate::agent::artifacts::store::get_artifact(&workspace, artifact_id)
         .await
         .expect("artifact metadata is persisted");

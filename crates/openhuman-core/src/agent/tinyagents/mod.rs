@@ -74,9 +74,6 @@ pub(crate) use crate::agent::message_convert::ta_call_to_oh_call;
 
 #[allow(unused_imports)] // Wired into the recall/retrieval facade in workstream 09.2.
 pub(crate) use embeddings::ProviderEmbeddingModel;
-pub(crate) use middleware::{
-    render_unanswered_steps, TranscriptSnapshot, TranscriptSnapshotSink, TurnContextMiddleware,
-};
 pub(crate) use observability::SubagentScope;
 pub(crate) use reasoning::{apply_requested_effort, parse_reasoning_effort};
 pub(crate) use turn_exec::{run_root_turn_via_hosted_agent, run_turn_via_tinyagents_shared};
@@ -89,6 +86,7 @@ pub(crate) use turn_policy::{
     agent_turn_wall_clock_ms_for, chat_provider_is_local, local_web_turn_backstop_secs,
     ToolPolicyEnforcement,
 };
+pub(crate) use turn_exec::TurnSpec;
 
 // Test-only glue so `tinyagents_tests.rs`'s `use super::*;` sees the
 // lower-level policy helpers it exercises directly (they otherwise stay

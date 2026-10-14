@@ -1,5 +1,5 @@
 //! Turn a completed `tinyagents` harness run into a
-//! [`TinyagentsTurnOutcome`], for [`run_turn_via_tinyagents_shared`](super::turn_exec::run_turn_via_tinyagents_shared).
+//! [`TinyagentsTurnOutcome`], for [`TurnSpec::run`](super::TurnSpec::run).
 //!
 //! Split out of the runner: everything here executes only on the success path
 //! (after the drive future returns `Ok`), covering journal completion,

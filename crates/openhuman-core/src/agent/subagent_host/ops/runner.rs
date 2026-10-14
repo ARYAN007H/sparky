@@ -121,7 +121,7 @@ pub(crate) async fn run_subagent_direct(
     // every caller doesn't have to carry this future's state inline.
     // Tools that delegate run inside the parent agent's already-deep
     // turn poll (the boxed tinyagents harness drive future in
-    // `run_turn_via_tinyagents_shared`), so the parent's stack would
+    // `TurnSpec::run`), so the parent's stack would
     // otherwise pile (parent turn state + dispatch_subagent state +
     // run_subagent's wrapper state + run_typed_mode state + child turn
     // state) onto tokio's 2 MiB worker stack and abort with "thread
@@ -299,7 +299,7 @@ pub(crate) async fn run_subagent_direct(
         // When the worker opted into git-worktree isolation, its isolated
         // checkout is carried on the `WorkspaceDescriptor` prepared below and
         // threaded onto the run's tinyagents `RunContext`
-        // (`run_turn_via_tinyagents_shared` → `RunContext::with_workspace`).
+        // (`TurnSpec::run` → `RunContext::with_workspace`).
         // Every tool call then receives it via
         // `ToolExecutionContext::from_run_context`, so acting tools (shell, git)
         // resolve their CWD to that worktree (`effective_action_dir_for_context`)
