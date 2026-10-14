@@ -2,11 +2,11 @@
 //! shared tools end up registered on the assembled harness.
 
 use super::*;
-use crate::agent::tinyagents::turn_policy::{
-    DEFAULT_MODEL_CALL_TIMEOUT_SECS, LOCAL_MODEL_CALL_TIMEOUT_SECS,
-};
 use crate::agent::tinyagents::TurnModelSource;
 use async_trait::async_trait;
+use tinyagents_harness::turn_policy::{
+    DEFAULT_MODEL_CALL_TIMEOUT_SECS, LOCAL_MODEL_CALL_TIMEOUT_SECS,
+};
 use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
 use tinytools::{Tool, ToolResult};
 

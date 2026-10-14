@@ -1,30 +1,3 @@
-use super::*;
-
-#[test]
-fn all_topologies_includes_member_delegation_and_workflow_scheduler() {
-    let reports = all_graph_topologies();
-    for name in [
-        "agent_teams:member",
-        "delegation",
-        "workflow_runs:scheduler_preview",
-    ] {
-        let report = reports
-            .iter()
-            .find(|r| r.name == name)
-            .unwrap_or_else(|| panic!("the {name} graph should be exported"));
-        assert!(
-            report.ok,
-            "{name} graph should validate structurally: {:?}",
-            report.errors
-        );
-        assert!(
-            report.mermaid.contains("flowchart"),
-            "{name} mermaid should render: {}",
-            report.mermaid
-        );
-    }
-}
-
 #[test]
 fn all_topologies_names_do_not_collide_with_production_tools() {
     let tmp = tempfile::tempdir().expect("create tempdir");
@@ -63,7 +36,7 @@ fn all_topologies_names_do_not_collide_with_production_tools() {
         "expected spawn_parallel_agents in production all_tools registration"
     );
 
-    let reports = all_graph_topologies();
+    let reports = tinyagents_orchestration::topology::all_graph_topologies();
     for report in &reports {
         assert!(
             !tool_names.contains(report.name),

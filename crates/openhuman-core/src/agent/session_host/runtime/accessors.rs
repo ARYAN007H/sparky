@@ -255,6 +255,12 @@ impl OpenHumanSessionHost {
         self.task_recency_window = window;
     }
 
+    /// Runs this agent as an unattended autonomous tree: sub-agent iteration
+    /// caps are lifted to `cap` on every later turn; `None` clears the lift.
+    pub fn set_autonomous_iter_cap(&mut self, cap: Option<usize>) {
+        self.autonomous_iter_cap = cap;
+    }
+
     pub fn set_event_context(&mut self, session_id: impl Into<String>, channel: impl Into<String>) {
         self.event_session_id = session_id.into();
         self.event_channel = channel.into();
@@ -556,6 +562,19 @@ impl OpenHumanSessionHost {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .pending_turn_overrides = overrides;
+    }
+
+    /// Ask the **next** turn to shape every model call (response format,
+    /// output cap) and report its final call into `scope`. Consumed at the
+    /// start of that turn, like [`Self::set_next_turn_overrides`].
+    pub fn set_next_turn_response_shape(
+        &mut self,
+        scope: Option<Arc<tinyagents_harness::middleware::ResponseShapeScope>>,
+    ) {
+        self.runtime_state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .pending_response_shape = scope;
     }
 
     /// Set the reply-language instruction every following user message

@@ -1,26 +1,67 @@
-//! The pinned TinyChannels release fixture for host-side unit tests.
+//! A linked TinyChannels module fixture for host-side unit tests.
 //!
-//! These tests exercise the real owning module over TinyBus without contacting
-//! provider services. The host test runner stages the checksum-pinned module
-//! release in `OPENHUMAN_MODULE_PATH`, and the regular release loader attaches
-//! it to the process-wide module host.
+//! These tests exercise the real owning module over TinyBus without downloading
+//! a release artifact or reaching a provider service. The module is attached
+//! through the same seam local development uses: the factory is registered with
+//! [`register_linked`] and `[modules] source = "linked"` makes
+//! `ops::ensure_loaded` attach it to the process-wide module host, which lives
+//! on a process-lifetime runtime, so it outlives the short Tokio runtimes of
+//! individual tests.
 
+use crate::config::schema::ModuleSourceMode;
 use crate::config::Config;
-use crate::modules::client::ModuleClient;
-#[cfg(feature = "e2e-test-support")]
+use crate::modules::linked::register_linked;
+use crate::modules::{ops, runtime};
+use std::sync::Arc;
+use tinybus::module::ModuleClient;
 use tinychannels_bus::methods;
 
-/// Return a client for the checksum-pinned TinyChannels test module.
+const MODULE_ID: &str = "tinychannels";
+
+/// Return a client for the compiled, linked TinyChannels module fixture.
 pub(crate) async fn client() -> ModuleClient {
+    register_linked(MODULE_ID, tinychannels_module::linked_module);
     let mut config = Config::default();
-    config.modules.enabled = true;
-    config.modules.allow_download = false;
-    ModuleClient::new(config)
+    config.modules.source = ModuleSourceMode::Linked;
+    ops::ensure_loaded(&config, MODULE_ID)
+        .await
+        .expect("the linked TinyChannels module should be admitted through the seam");
+    let proxy = runtime::runtime()
+        .await
+        .expect("the module host should be running")
+        .proxy(
+            tinychannels_module::BUS_NAME,
+            tinychannels_module::OBJECT_PATH,
+        )
+        .expect("the linked TinyChannels proxy should be valid");
+    ops::fixture_client(proxy)
+}
+
+/// Temporarily install in-memory storage for module callbacks in isolated tests.
+pub(crate) struct MemoryStorageGuard {
+    previous: Option<Arc<dyn crate::storage::StorageBackend>>,
+}
+
+/// Give the linked module a writable backend for storage-backed fixture calls.
+pub(crate) fn install_memory_storage() -> MemoryStorageGuard {
+    MemoryStorageGuard {
+        previous: crate::storage::install(Arc::new(crate::storage::MemoryStorage::new())),
+    }
+}
+
+impl Drop for MemoryStorageGuard {
+    fn drop(&mut self) {
+        crate::storage::clear();
+        if let Some(previous) = self.previous.take() {
+            crate::storage::install(previous);
+        }
+    }
 }
 
 #[tokio::test]
 #[cfg(feature = "e2e-test-support")]
-async fn released_module_prepares_runtime_limits_over_confidential_bus_call() {
+async fn linked_module_prepares_runtime_limits_over_confidential_bus_call() {
+    let _storage = install_memory_storage();
     use tinychannels_bus::module_control::{ChannelControlRequest, ChannelControlResult};
 
     let response: ChannelControlResult = client()
@@ -47,7 +88,8 @@ async fn released_module_prepares_runtime_limits_over_confidential_bus_call() {
 
 #[tokio::test]
 #[cfg(feature = "e2e-test-support")]
-async fn released_module_prepares_legacy_inbound_facts_over_confidential_bus_call() {
+async fn linked_module_prepares_legacy_inbound_facts_over_confidential_bus_call() {
+    let _storage = install_memory_storage();
     use tinychannels_bus::module_inbound::{
         ChannelInboundSource, PrepareChannelInboundRequest, PreparedChannelInbound,
     };

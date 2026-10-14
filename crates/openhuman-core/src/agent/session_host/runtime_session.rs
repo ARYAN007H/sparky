@@ -55,6 +55,7 @@ pub(super) struct OpenHumanSessionState {
     required_output: Option<tinyagents_harness::config::RequiredOutput>,
     pub(crate) pending_turn_overrides: super::types::TurnOverrides,
     pub(super) active_turn_overrides: super::types::TurnOverrides,
+    pub(crate) pending_response_shape: super::types::PendingResponseShape,
     pub(super) reply_language_directive: Option<String>,
     pub(super) time_zone: Option<String>,
     prelude: Option<OpenHumanTurnPrelude>,
@@ -438,10 +439,9 @@ impl OpenHumanTurnPrelude {
             }
         }
         // Build the roster from this turn's *effective* visible tool set
-        // (snapshotted under the tool-surface lock, then released) rather
-        // than the parent definition's static scope alone: a hide or named
-        // restriction can narrow what this turn can actually call below the
-        // definition's baseline, and the roster must not advertise a fleet
+        // (snapshotted under the tool-surface lock, then released), not the
+        // definition's static scope: a hide or named restriction can narrow
+        // what this turn can call, and the roster must not advertise a fleet
         // control the turn cannot invoke.
         let turn_fleet = {
             let visible = self
@@ -482,9 +482,9 @@ impl OpenHumanTurnPrelude {
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             mutable.last_memory_context = (!context.is_empty()).then_some(context);
         }
+        run_context.response_shape = turn.response_shape.clone();
         run_context.attach_parent(self.parent_context());
         self.apply_pending_announcements(&mut enriched);
-
         run_context.attachment_placeholders = Arc::new(
             crate::agent::multimodal::extract_image_placeholders_in_text(original_user_message),
         );

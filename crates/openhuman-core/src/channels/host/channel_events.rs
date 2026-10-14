@@ -1,11 +1,11 @@
 //! Host-owned approval routing and turn events over the channel module.
 use crate::channels::{Channel, ChannelSendExt, SendMessage};
 use crate::core::events::DomainEvent;
-use crate::modules::client::ModuleClient;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use tinybus::module::ModuleClient;
 use tinybus::EventHandler;
 use tinychannels_bus::{capabilities_for, ChannelMessage};
 
@@ -48,7 +48,7 @@ impl ChannelApprovalSurfaceSubscriber {
         if self.config.is_none() {
             return crate::channels::module_fixture::client().await;
         }
-        ModuleClient::new(self.config.as_deref().cloned().unwrap_or_default())
+        crate::modules::client(self.config.as_deref().cloned().unwrap_or_default())
     }
 }
 #[async_trait]
@@ -165,7 +165,7 @@ impl EventHandler<DomainEvent> for ChannelApprovalSurfaceSubscriber {
                             .await;
                     }
                     Ok(_) => {
-                        ModuleClient::report_malformed_reply("tinychannels");
+                        crate::modules::report::malformed_reply("tinychannels");
                     }
                     Err(_) => {}
                 }
@@ -197,27 +197,21 @@ impl ChannelTurnStateSubscriber {
             cancellation: tokio_util::sync::CancellationToken::new(),
         }
     }
-    async fn mark(
-        &self,
-        channel: &str,
-        reply_target: &str,
-        event_ws: &PathBuf,
-        busy: bool,
-    ) -> bool {
+    async fn mark(&self, channel: &str, reply_target: &str, event_ws: &PathBuf, busy: bool) {
         if self.cancellation.is_cancelled()
             || !capabilities_for(channel).remote_control
             || *event_ws != self.workspace_dir
         {
-            return false;
+            return;
         }
         #[cfg(test)]
         let client = if self.config.is_none() {
             crate::channels::module_fixture::client().await
         } else {
-            ModuleClient::new(self.config.as_deref().cloned().unwrap_or_default())
+            crate::modules::client(self.config.as_deref().cloned().unwrap_or_default())
         };
         #[cfg(not(test))]
-        let client = ModuleClient::new(self.config.as_deref().cloned().unwrap_or_default());
+        let client = crate::modules::client(self.config.as_deref().cloned().unwrap_or_default());
         let result: Result<tinychannels_bus::module_remote::RemoteOperationResult, _> = client
             .call_confidential(
                 "tinychannels",
@@ -233,7 +227,6 @@ impl ChannelTurnStateSubscriber {
         if result.is_err() {
             tracing::debug!("channel turn status unavailable");
         }
-        result.is_ok()
     }
 }
 #[async_trait]
@@ -251,21 +244,17 @@ impl EventHandler<DomainEvent> for ChannelTurnStateSubscriber {
                 reply_target,
                 workspace_dir,
                 ..
-            } => {
-                self.mark(channel, reply_target, workspace_dir, true).await;
-            }
+            } => self.mark(channel, reply_target, workspace_dir, true).await,
             DomainEvent::ChannelMessageProcessed {
                 channel,
                 reply_target,
                 workspace_dir,
                 ..
-            } => {
-                self.mark(channel, reply_target, workspace_dir, false).await;
-            }
+            } => self.mark(channel, reply_target, workspace_dir, false).await,
             _ => {}
         }
     }
 }
-#[cfg(all(test, feature = "modules", feature = "e2e-test-support"))]
+#[cfg(test)]
 #[path = "channel_events_tests.rs"]
 mod tests;

@@ -188,6 +188,7 @@ test("an explicit workspace requires its own keyring key", () => {
     const workspace = path.join(tree.root, "persistent-workspace");
     const res = run(tree, "e2e-web-session.sh", {
       OPENHUMAN_WORKSPACE: workspace,
+      OPENHUMAN_E2E_ALLOW_EPHEMERAL_KEY: "",
       OPENHUMAN_KEYRING_MASTER_KEY: "",
       OPENHUMAN_KEYRING_MASTER_KEY_FILE: "",
     });

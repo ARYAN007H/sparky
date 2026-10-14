@@ -1,4 +1,5 @@
 use super::*;
+use tinyagents_harness::cost::CostSource;
 
 fn counts(input: u64, output: u64, cached: u64) -> BilledUsage {
     BilledUsage::from_counts(input, output).with_cached_input_tokens(cached)
@@ -106,5 +107,39 @@ fn unknown_model_has_no_known_price() {
     assert_eq!(
         estimate_call_cost_usd("totally-unknown-model", &counts(1_000, 100, 0)),
         None
+    );
+}
+
+/// Regression pin for the move of the cost vocabulary into the harness: a
+/// scripted four-call turn (two charged, one catalogue-estimated, one free
+/// route) totals exactly what it did before the cutover.
+#[test]
+fn a_scripted_multi_call_turn_totals_are_unchanged() {
+    let calls = [
+        (
+            UNCATALOGUED,
+            counts(4_000, 200, 3_000).with_charged_usd(0.0125),
+        ),
+        (
+            UNCATALOGUED,
+            counts(4_500, 150, 4_000).with_charged_usd(0.0075),
+        ),
+        // 1M uncached input at $3 + 1M cached at $0.30 + 1M output at $15.
+        (CATALOGUED, counts(2_000_000, 1_000_000, 1_000_000)),
+        ("vendor/model:free", counts(900, 50, 0)),
+    ];
+    let mut turn = TurnCost::new();
+    for (model, usage) in &calls {
+        turn.add_call(model, usage);
+    }
+    assert_eq!(turn.call_count, 4);
+    assert_eq!(turn.input_tokens, 2_009_400);
+    assert_eq!(turn.output_tokens, 1_000_400);
+    assert_eq!(turn.cached_input_tokens, 1_007_000);
+    assert_eq!(turn.cost.source, CostSource::Estimated);
+    let total = turn.total_usd().expect("every call is priced");
+    assert!(
+        (total - (0.0125 + 0.0075 + 18.30)).abs() < 1e-9,
+        "total {total}"
     );
 }

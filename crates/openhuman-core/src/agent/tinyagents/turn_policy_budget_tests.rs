@@ -19,33 +19,6 @@ fn tool_results_carry_their_duration() {
 }
 
 #[test]
-fn stream_timeouts_are_set_explicitly_with_first_event_off() {
-    let mut limits = RunPolicy::default().limits;
-    apply_stream_limits(&mut limits, None, None, None);
-    assert_eq!(limits.stream_idle_timeout_ms, Some(120_000));
-    assert_eq!(limits.stream_first_event_timeout_ms, None);
-    assert_eq!(limits.max_consecutive_stream_idle_timeouts, Some(5));
-}
-
-#[test]
-fn stream_timeout_env_overrides_parse() {
-    assert_eq!(parse_stream_idle_timeout_ms(Some("30")), Some(30_000));
-    assert_eq!(parse_stream_idle_timeout_ms(Some("0")), None);
-    assert_eq!(parse_stream_idle_timeout_ms(Some("junk")), Some(120_000));
-    assert_eq!(
-        parse_stream_first_event_timeout_ms(Some("45")),
-        Some(45_000)
-    );
-    assert_eq!(parse_stream_first_event_timeout_ms(Some("0")), None);
-    assert_eq!(parse_stream_first_event_timeout_ms(None), None);
-    assert_eq!(parse_max_consecutive_stream_idle_timeouts(Some("0")), None);
-    assert_eq!(
-        parse_max_consecutive_stream_idle_timeouts(Some("2")),
-        Some(2)
-    );
-}
-
-#[test]
 fn local_providers_get_longer_ceilings_than_hosted_ones() {
     let hosted = run_policy_for_provider(10, false, false);
     let local = run_policy_for_provider(10, false, true);
@@ -72,7 +45,7 @@ fn local_web_backstop_sits_above_the_local_turn_ceiling() {
     let backstop = local_web_turn_backstop_secs();
     assert_eq!(
         backstop,
-        turn_secs.map(|s| s + LOCAL_WEB_TURN_BACKSTOP_GRACE_SECS)
+        turn_secs.map(|s| s + tinyagents_harness::turn_policy::LOCAL_WEB_TURN_BACKSTOP_GRACE_SECS)
     );
 }
 

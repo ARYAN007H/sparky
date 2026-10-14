@@ -19,14 +19,12 @@ use tokio::sync::mpsc::Sender;
 use crate::agent::harness::fork_context::{AgentContextPreparedSource, ParentExecutionContext};
 use crate::agent::progress::AgentProgress;
 use crate::agent::subagent_host::SubagentUsage;
-use crate::agent::tinyagents::turn_outcome::ToolOutcomeSink;
-use crate::agent::tinyagents::{
-    turn_outcome::ToolCallOutcome, turn_policy::ToolPolicyEnforcement, TurnContextMiddleware,
-};
+use crate::agent::tinyagents::{turn_policy::ToolPolicyEnforcement, TurnContextMiddleware};
 use crate::agent::turn_origin::AgentTurnOrigin;
 use tinyagents_definition::SandboxMode;
 use tinyagents_harness::middleware::StopHook;
 use tinyagents_harness::store::InMemoryStore as ToolResultArtifactIndexStore;
+use tinyagents_harness::turn_outcome::{ToolCallOutcome, ToolOutcomeSink};
 use tinyinference_llm::model::ResolvedModelRoute;
 
 /// Allocate a durable-unique root [`RunConfig`](tinyagents_harness::context::RunConfig).
@@ -92,7 +90,7 @@ pub struct LastTurnUsage {
     pub cost_usd: Option<f64>,
     /// Whether `cost_usd` is entirely provider-charged or includes a catalog
     /// estimate (`Unknown` exactly when `cost_usd` is `None`).
-    pub cost_source: crate::agent::cost::CostSource,
+    pub cost_source: tinyagents_harness::cost::CostSource,
     pub context_window: u64,
     /// Tokens the root agent's context held after the turn's final model call
     /// (that call's input plus its reply): the numerator of the context-window
@@ -121,7 +119,7 @@ pub(crate) struct SessionTurnSidecar {
     pub cached_input_tokens: u64,
     /// The turn's own cost (sub-agents excluded): every call's reported
     /// charge, else catalog estimate, else unknown.
-    pub cost: crate::agent::cost::CostTally,
+    pub cost: tinyagents_harness::cost::CostTally,
     /// Input and output tokens of the turn's final model call. The totals
     /// above sum every call of the turn (its spend); these are the context the
     /// model last held, the numerator of the context-window gauge.
@@ -149,7 +147,7 @@ pub(crate) struct SessionTurnSidecar {
     /// How the turn was stopped early, if it was (breaker, wind-down,
     /// iteration cap). The driver classifies it; `after_commit` carries it on
     /// `TurnCompleted` so the trace shows a stopped turn at `WARNING`.
-    pub stop: Option<crate::agent::turn_stop::TurnStop>,
+    pub stop: Option<tinyagents_harness::turn_stop::TurnStop>,
 }
 
 /// Immutable inputs to the host's pre-dispatch policy.
@@ -272,6 +270,11 @@ impl TurnDispatchState {
 pub struct OpenHumanRunContext {
     /// Explicit shared model-call budget inherited by synchronous children.
     pub model_budget: Option<super::super::budget::ModelBudget>,
+    /// The response format and output cap this root turn asks of every model
+    /// call, and the slot its final call is reported into. Carried explicitly
+    /// from the caller (`agent_chat`) through the session; children never
+    /// inherit it.
+    pub response_shape: Option<Arc<tinyagents_harness::middleware::ResponseShapeScope>>,
     /// A host can narrow synchronous delegation depth; children inherit this.
     pub max_spawn_depth: Option<usize>,
     /// Trust/routing source used by OpenHuman approval and attribution policy.
@@ -299,6 +302,9 @@ pub struct OpenHumanRunContext {
     pub dispatch: Option<Arc<TurnDispatchState>>,
     /// Optional task recency restriction for integration tools.
     pub task_recency_window: Option<Duration>,
+    /// Autonomous skill-run iteration cap lifted onto every sub-agent in the
+    /// tree (inherited by `child()` through the clone); `None` for ordinary turns.
+    pub autonomous_iter_cap: Option<usize>,
     /// Sandbox mode of the agent definition executing this turn.
     pub sandbox_mode: Option<SandboxMode>,
     /// Zero-based OpenHuman subagent depth (the root is zero).
@@ -439,6 +445,7 @@ impl OpenHumanRunContext {
     pub fn new() -> Self {
         Self {
             model_budget: super::super::budget::current(),
+            response_shape: None,
             max_spawn_depth: super::super::budget::spawn_depth_limit(),
             origin: None,
             progress: None,
@@ -451,6 +458,7 @@ impl OpenHumanRunContext {
             attachment_placeholders: Arc::new(Vec::new()),
             dispatch: None,
             task_recency_window: None,
+            autonomous_iter_cap: None,
             sandbox_mode: None,
             spawn_depth: 0,
             subagent_usage: Arc::new(Mutex::new(Vec::new())),
@@ -563,6 +571,7 @@ impl OpenHumanRunContext {
         child.subagent_usage = Arc::new(Mutex::new(Vec::new()));
         child.resolved_route = Arc::new(Mutex::new(None));
         child.memory_turn = None;
+        child.response_shape = None;
         child
     }
 

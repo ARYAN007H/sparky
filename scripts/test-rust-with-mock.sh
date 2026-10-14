@@ -304,19 +304,19 @@ run_build_only_reaper_test() {
     -- --exact --test-threads=1 "$@"
 }
 
-run_tinychannels_release_fixture_tests() {
-  # These confidential calls require the checksum-pinned release module and
-  # run in a fresh process so module-loader state cannot leak into the unit
-  # suite. The fixture disables downloads; only this staged path may serve it.
+run_tinychannels_linked_fixture_tests() {
+  # These confidential calls use the linked test module and run in fresh
+  # processes so process-wide module-loader state cannot leak into the unit
+  # suite. The linked source is explicit and never falls back to downloading.
   OPENHUMAN_MODULE_PATH="$tinychannels_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}" \
-    cargo_test --features e2e-test-support --lib channels::module_fixture:: \
+    cargo_test --lib channels::module_fixture:: \
       -- --test-threads=1 "$@"
   OPENHUMAN_MODULE_PATH="$tinychannels_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}" \
     cargo_test --features e2e-test-support --lib \
-      modules::ops::tests::a_pinned_release_module_serves_the_module_and_status_says_so \
+      modules::ops::tests::a_registered_linked_factory_serves_the_module_and_status_says_so \
       -- --exact --test-threads=1 "$@"
   OPENHUMAN_MODULE_PATH="$tinychannels_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}" \
-    cargo_test --features e2e-test-support --lib \
+    cargo_test --lib \
     channels::host::channel_events::tests:: -- --test-threads=1 "$@"
 }
 
@@ -331,7 +331,7 @@ run_full_suite() {
   # `--workspace --bins` picks them up there (plus the TUI binary).
   cargo_test --bins -- --test-threads=1 "$@"
   run_build_only_reaper_test "$@"
-  run_tinychannels_release_fixture_tests "$@"
+  run_tinychannels_linked_fixture_tests "$@"
   cargo_test --doc -- "$@"
 
   while IFS= read -r target; do

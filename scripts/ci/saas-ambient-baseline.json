@@ -778,23 +778,16 @@
   },
   {
     "rule": "ambient-context",
-    "path": "crates/openhuman-core/src/modules/host.rs",
-    "line": 190,
+    "path": "crates/openhuman-core/src/modules/runtime.rs",
+    "line": 86,
     "text": "let juice_on = crate::core::runtime::context::CoreContext::current()",
     "occurrence": 1
   },
   {
     "rule": "ambient-context",
-    "path": "crates/openhuman-core/src/modules/host.rs",
-    "line": 201,
+    "path": "crates/openhuman-core/src/modules/runtime.rs",
+    "line": 97,
     "text": "let memes_on = crate::core::runtime::context::CoreContext::current()",
-    "occurrence": 1
-  },
-  {
-    "rule": "bare-spawn",
-    "path": "crates/openhuman-core/src/modules/ops.rs",
-    "line": 367,
-    "text": "let found_on_search_path = tokio::task::spawn_blocking(move || {",
     "occurrence": 1
   },
   {

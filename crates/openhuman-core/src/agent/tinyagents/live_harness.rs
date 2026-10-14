@@ -117,7 +117,7 @@ pub(crate) fn assemble_live_tool_harness(
     harness.push_tool_middleware(Arc::new(middleware::credential_scrub_middleware()));
     harness.push_middleware(Arc::new(ArgRecoveryMiddleware::new(tool_sets.clone())));
     let registered_tools = harness.tools().names();
-    harness.push_middleware(Arc::new(middleware::PackedToolRouteMiddleware::new(
+    harness.push_middleware(Arc::new(middleware::packed_tool_route_middleware(
         registered_tools,
         route_session,
     )));

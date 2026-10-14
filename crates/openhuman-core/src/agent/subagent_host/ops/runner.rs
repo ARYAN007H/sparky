@@ -15,7 +15,7 @@ use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionReg
 use crate::agent::prompts::{
     render_subagent_system_prompt_with_format, PromptContext, SubagentRenderOptions,
 };
-use crate::agent::subagent_host::subagent_iter_cap_with_autonomous_lift;
+use crate::agent::subagent_host::definition_iter_cap;
 use crate::agent::subagent_host::tool_prep::{
     filter_tool_indices, is_subagent_spawn_tool, load_prompt_source, subagent_prompt_protocol,
 };
@@ -711,7 +711,7 @@ async fn run_typed_mode(
         agent_id = %definition.id,
         model = %model,
         tool_count = allowed_names.len(),
-        max_iterations = subagent_iter_cap_with_autonomous_lift(definition.effective_max_iterations()),
+        max_iterations = definition_iter_cap(&options.run_context, definition),
         iteration_policy = ?definition.iteration_policy,
         "[subagent_host:typed] resolved configuration"
     );
@@ -923,7 +923,7 @@ async fn run_typed_mode(
             Vec::new(),
             filtered_specs.clone(),
             allowed_names,
-            subagent_iter_cap_with_autonomous_lift(definition.effective_max_iterations()),
+            definition_iter_cap(&options.run_context, definition),
             options.run_queue.clone(),
             parent.on_progress.clone(),
             &definition.id,
@@ -989,7 +989,7 @@ async fn run_typed_mode(
         // result + blocker instead of treating the summary as a finished answer
         // or re-spinning the identical delegation (#4096).
         crate::agent::subagent_host::types::SubagentRunStatus::Incomplete {
-            reason: crate::agent::turn_stop::SUBAGENT_ITERATION_CAP_REASON.into(),
+            reason: tinyagents_harness::turn_stop::SUBAGENT_ITERATION_CAP_REASON.into(),
         }
     } else {
         // A clean final response. (An `ask_user_clarification` early-exit is
