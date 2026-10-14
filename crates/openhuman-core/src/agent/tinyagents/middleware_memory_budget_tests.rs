@@ -3,6 +3,7 @@
 //! (#7717).
 
 use super::*;
+use crate::agent::tinyagents::middleware::repeated_failure::RepeatedToolFailureMiddleware;
 use crate::memory::test_fixtures::{bind_reference, config_in};
 use crate::memory::tools::{is_budget_refusal, MemoryTool};
 use tinyagents_harness::ids::CallId;

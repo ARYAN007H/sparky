@@ -42,6 +42,9 @@ use crate::agent::artifacts::{
     create_artifact_for_call, fail_artifact, finalize_artifact, ArtifactKind,
 };
 use crate::tools::host_extensions::tool_call_id;
+use tinyagents_harness::tinyinference_video::ProgressFn;
+
+use super::progress::{video_status_observer, JobStateSlot};
 
 /// Maximum characters of the prompt kept in a generated artifact's title.
 const TITLE_PROMPT_CHARS: usize = 60;
@@ -55,7 +58,14 @@ pub struct MediaArtifactTool<T: Tool> {
     /// Visible folder each generated file is moved into (#5505).
     files_dir: crate::agent::artifacts::FileRoots,
     blobs: Option<Arc<dyn tinystoragedrivers::BlobStore>>,
+    /// Builds the inner tool for one call around that call's poll observer.
+    /// Set for the video tool, whose `WaitPolicy::progress` hook is fixed at
+    /// construction: a tool per call lets the observer record into the call's
+    /// own [`JobStateSlot`]. `inner` still answers the static `Tool` metadata.
+    per_call: Option<PerCallInner<T>>,
 }
+
+type PerCallInner<T> = std::sync::Arc<dyn Fn(ProgressFn) -> T + Send + Sync>;
 
 impl<T: Tool> MediaArtifactTool<T> {
     /// `kind` is the artifact category to file every generated output
@@ -74,6 +84,7 @@ impl<T: Tool> MediaArtifactTool<T> {
             workspace_dir: workspace_dir.into(),
             files_dir: files_dir.into(),
             blobs: None,
+            per_call: None,
         }
     }
 
@@ -83,6 +94,17 @@ impl<T: Tool> MediaArtifactTool<T> {
     #[must_use]
     pub fn with_blobs(mut self, blobs: Arc<dyn tinystoragedrivers::BlobStore>) -> Self {
         self.blobs = Some(blobs);
+        self
+    }
+
+    /// Run each call on a tool built by `build` around that call's poll
+    /// observer, so a long job's polled state reaches that call's heartbeat.
+    #[must_use]
+    pub fn with_per_call_inner(
+        mut self,
+        build: impl Fn(ProgressFn) -> T + Send + Sync + 'static,
+    ) -> Self {
+        self.per_call = Some(std::sync::Arc::new(build));
         self
     }
 
@@ -352,12 +374,18 @@ impl<T: Tool> Tool for MediaArtifactTool<T> {
             ArtifactKind::Video => "Generating video",
             _ => "Generating image",
         };
+        let job_state = JobStateSlot::default();
+        let per_call_inner = self
+            .per_call
+            .as_ref()
+            .map(|build| build(video_status_observer(job_state.clone())));
+        let inner = per_call_inner.as_ref().unwrap_or(&self.inner);
         let result = super::progress::with_progress_heartbeat(
             context,
             label,
             super::progress::HEARTBEAT_INTERVAL,
-            self.inner
-                .execute_with_context(args.clone(), options, context),
+            job_state,
+            inner.execute_with_context(args.clone(), options, context),
         )
         .await?;
         if result.is_error {

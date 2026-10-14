@@ -486,7 +486,7 @@ impl SessionHostBuilder {
             payload_summarizer: self.payload_summarizer,
             tokenjuice_compression: self.tokenjuice_compression,
             tool_policy: self.tool_policy.unwrap_or_else(|| {
-                Arc::new(crate::agent::tinyagents::middleware::AllowAllToolPolicy)
+                Arc::new(crate::agent::tinyagents::middleware::tool_policy::AllowAllToolPolicy)
             }),
             last_seen_integrations_hash: 0,
             composio_integrations_rx: None,

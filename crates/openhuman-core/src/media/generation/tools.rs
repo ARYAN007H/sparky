@@ -56,9 +56,9 @@ pub fn build_media_tools(root_config: &Config, action_dir: &Path) -> Vec<Box<dyn
         &root_config.workspace_dir,
         crate::agent::artifacts::FileRoots::from_config(root_config),
         // Each poll's job state feeds the call's progress heartbeat
-        // (`super::progress`), so a multi-minute wait is not silent.
-        WaitPolicy::new(VIDEO_POLL_INTERVAL, VIDEO_WAIT_BUDGET)
-            .with_progress(super::progress::video_status_observer()),
+        // (`super::progress`, wired per call by `MediaArtifactTool`), so a
+        // multi-minute wait is not silent.
+        WaitPolicy::new(VIDEO_POLL_INTERVAL, VIDEO_WAIT_BUDGET),
     )
 }
 
@@ -93,22 +93,38 @@ pub fn media_tools_from(
         ),
         Box::new(
             MediaArtifactTool::new(
-                GenerateVideoTool::new(Arc::clone(&video), output)
-                    .with_name(VIDEO_TOOL_NAME)
-                    .with_description(VIDEO_DESCRIPTION)
-                    .with_permission_level(PermissionLevel::Execute)
-                    .with_category(ToolCategory::Workflow)
-                    .with_wait_policy(video_wait),
+                video_tool(&video, &output, video_wait.clone()),
                 ArtifactKind::Video,
                 workspace_dir.to_path_buf(),
                 files,
             )
-            .with_blobs(output_blobs),
+            .with_blobs(output_blobs)
+            .with_per_call_inner({
+                let video = Arc::clone(&video);
+                let output = output.clone();
+                move |observer| {
+                    video_tool(&video, &output, video_wait.clone().with_progress(observer))
+                }
+            }),
         ),
         Box::new(MediaListModelsTool { image, video }),
     ];
     tracing::debug!("[media_generation] registered {} media tools", tools.len());
     tools
+}
+
+/// The video generation tool over `video`, with `wait` bounding each job.
+fn video_tool(
+    video: &Arc<dyn VideoGenerator>,
+    output: &MediaOutput,
+    wait: WaitPolicy,
+) -> GenerateVideoTool {
+    GenerateVideoTool::new(Arc::clone(video), output.clone())
+        .with_name(VIDEO_TOOL_NAME)
+        .with_description(VIDEO_DESCRIPTION)
+        .with_permission_level(PermissionLevel::Execute)
+        .with_category(ToolCategory::Workflow)
+        .with_wait_policy(wait)
 }
 
 /// Local reference files may be read and uploaded only from the action
