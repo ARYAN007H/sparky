@@ -34,21 +34,6 @@ pub use workspace::{
 static PROVIDER: LazyLock<RwLock<Option<Arc<dyn SessionStoreProvider>>>> =
     LazyLock::new(|| RwLock::new(None));
 
-tokio::task_local! {
-    /// A provider for one task tree only, ahead of the process-wide one; how
-    /// tests in a shared binary use a store without touching each other.
-    static SCOPED: Arc<dyn SessionStoreProvider>;
-}
-
-/// Runs `future` with `provider` as the session store, for that task only.
-/// Tasks it spawns do not inherit it.
-pub async fn scope<F: std::future::Future>(
-    provider: Arc<dyn SessionStoreProvider>,
-    future: F,
-) -> F::Output {
-    SCOPED.scope(provider, future).await
-}
-
 /// Routes every agent's session state through `provider`, replacing any
 /// earlier one.
 pub fn install(provider: Arc<dyn SessionStoreProvider>) -> Option<Arc<dyn SessionStoreProvider>> {
@@ -97,17 +82,12 @@ pub fn restore(provider: Option<Arc<dyn SessionStoreProvider>>) {
     *PROVIDER.write().unwrap_or_else(PoisonError::into_inner) = provider;
 }
 
-/// The provider in effect: the task's [`scope`]d one, else the installed
-/// one, if any.
+/// The provider in effect: the context's host-override one, else the
+/// installed one, if any.
 #[must_use]
 pub fn installed() -> Option<Arc<dyn SessionStoreProvider>> {
-    SCOPED
-        .try_with(Arc::clone)
-        .ok()
-        .or_else(|| {
-            crate::core::runtime::CoreContext::current_host_overrides()
-                .and_then(|local| local.session_store.clone())
-        })
+    crate::core::runtime::CoreContext::current_host_overrides()
+        .and_then(|local| local.session_store.clone())
         .or_else(|| {
             PROVIDER
                 .read()
