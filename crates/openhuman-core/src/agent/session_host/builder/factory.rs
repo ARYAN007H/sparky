@@ -639,18 +639,19 @@ impl OpenHumanSessionHost {
                 .chain(delegation_tools.iter())
                 .map(|tool| (tool.name(), tool.parameters_schema())),
         );
-        let dispatcher_kind =
-            ToolCallFormat::resolve(&dispatcher_choice, supports_native);
+        let dispatcher_kind = ToolCallFormat::resolve(&dispatcher_choice, supports_native);
         let tool_dispatcher: Box<dyn ToolDialect> = match dispatcher_kind {
             ToolCallFormat::Native => Box::new(NativeDialect),
             ToolCallFormat::Json => Box::new(XmlDialect),
             ToolCallFormat::PFormat => Box::new(PFormatDialect::new(pformat_registry.clone())),
-            ToolCallFormat::Python => {
-                Box::new(CodeDialect::new(CodeStyle::Python, pformat_registry.clone()))
-            }
-            ToolCallFormat::TypeScript => {
-                Box::new(CodeDialect::new(CodeStyle::TypeScript, pformat_registry.clone()))
-            }
+            ToolCallFormat::Python => Box::new(CodeDialect::new(
+                CodeStyle::Python,
+                pformat_registry.clone(),
+            )),
+            ToolCallFormat::TypeScript => Box::new(CodeDialect::new(
+                CodeStyle::TypeScript,
+                pformat_registry.clone(),
+            )),
         };
 
         log::debug!(
