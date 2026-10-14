@@ -239,7 +239,7 @@ impl Tool for SpawnParallelAgentsTool {
         tool_context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
         let parent_call_id = crate::tools::host_extensions::tool_call_id(tool_context);
-let workspace_descriptor = tool_context.and_then(|ctx| ctx.workspace().cloned());
+        let workspace_descriptor = tool_context.and_then(|ctx| ctx.workspace().cloned());
         execute_spawn_parallel_agents(
             args,
             tinyagents_harness::CancellationToken::new(),

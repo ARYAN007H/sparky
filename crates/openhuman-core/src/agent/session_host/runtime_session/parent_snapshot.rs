@@ -37,8 +37,7 @@ impl OpenHumanTurnPrelude {
             model_name: self.model_name.clone(),
             temperature: self.temperature,
             workspace_dir: self.workspace_dir.clone(),
-            workspace_descriptor: inherited_workspace
-                .or_else(|| self.workspace_descriptor.clone()),
+            workspace_descriptor: inherited_workspace.or_else(|| self.workspace_descriptor.clone()),
             agent_config: self.config.clone(),
             workflows: Arc::new(workflows),
             memory_context: Arc::new(memory_context),

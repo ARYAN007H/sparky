@@ -136,7 +136,7 @@ pub(crate) async fn execute_archetype_delegation(
     tool_context: Option<&dyn ToolRunContext>,
     run_context: crate::agent::tinyagents::host::OpenHumanRunContext,
 ) -> anyhow::Result<ToolResult> {
-execute_archetype_delegation_with_live_parent(
+    execute_archetype_delegation_with_live_parent(
         agent_id,
         tool_name,
         args,

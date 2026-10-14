@@ -213,12 +213,15 @@ async fn e2e_orchestrator_answers_coding_agent_question_and_resumes_child() {
 
     let first = (async {
         session
-            .spawn_agent(parent.clone(), SpawnAgentRequest {
-                agent_id: "task_manager_agent".to_string(),
-                prompt: "Implement RPC wiring for AGENT_ORCH_E2E".to_string(),
-                model: Some("test-model".to_string()),
-                ..Default::default()
-            })
+            .spawn_agent(
+                parent.clone(),
+                SpawnAgentRequest {
+                    agent_id: "task_manager_agent".to_string(),
+                    prompt: "Implement RPC wiring for AGENT_ORCH_E2E".to_string(),
+                    model: Some("test-model".to_string()),
+                    ..Default::default()
+                },
+            )
             .await
     })
     .await
@@ -250,14 +253,18 @@ async fn e2e_orchestrator_answers_coding_agent_question_and_resumes_child() {
     // `follow_up` did internally.
     let follow_up = (async {
         session
-            .spawn_agent(parent.clone(), SpawnAgentRequest {
-                agent_id: "task_manager_agent".to_string(),
-                prompt: "Continue after the orchestrator answered: ORCH_ANSWER_USE_RPC".to_string(),
-                context: Some("Parent answered: use controller registry".to_string()),
-                model: Some("test-model".to_string()),
-                parent_agent_id: Some(first.orchestration_id.clone()),
-                ..Default::default()
-            })
+            .spawn_agent(
+                parent.clone(),
+                SpawnAgentRequest {
+                    agent_id: "task_manager_agent".to_string(),
+                    prompt: "Continue after the orchestrator answered: ORCH_ANSWER_USE_RPC"
+                        .to_string(),
+                    context: Some("Parent answered: use controller registry".to_string()),
+                    model: Some("test-model".to_string()),
+                    parent_agent_id: Some(first.orchestration_id.clone()),
+                    ..Default::default()
+                },
+            )
             .await
     })
     .await
@@ -303,28 +310,37 @@ async fn e2e_orchestrator_waits_for_multiple_parallel_coding_subagents() {
 
     let spawned = (async {
         let alpha = session
-            .spawn_agent(parent.clone(), SpawnAgentRequest {
-                agent_id: "task_manager_agent".to_string(),
-                prompt: "Work independently on PARALLEL_ALPHA".to_string(),
-                model: Some("test-model".to_string()),
-                ..Default::default()
-            })
+            .spawn_agent(
+                parent.clone(),
+                SpawnAgentRequest {
+                    agent_id: "task_manager_agent".to_string(),
+                    prompt: "Work independently on PARALLEL_ALPHA".to_string(),
+                    model: Some("test-model".to_string()),
+                    ..Default::default()
+                },
+            )
             .await?;
         let beta = session
-            .spawn_agent(parent.clone(), SpawnAgentRequest {
-                agent_id: "task_manager_agent".to_string(),
-                prompt: "Work independently on PARALLEL_BETA".to_string(),
-                model: Some("test-model".to_string()),
-                ..Default::default()
-            })
+            .spawn_agent(
+                parent.clone(),
+                SpawnAgentRequest {
+                    agent_id: "task_manager_agent".to_string(),
+                    prompt: "Work independently on PARALLEL_BETA".to_string(),
+                    model: Some("test-model".to_string()),
+                    ..Default::default()
+                },
+            )
             .await?;
         let gamma = session
-            .spawn_agent(parent.clone(), SpawnAgentRequest {
-                agent_id: "task_manager_agent".to_string(),
-                prompt: "Work independently on PARALLEL_GAMMA".to_string(),
-                model: Some("test-model".to_string()),
-                ..Default::default()
-            })
+            .spawn_agent(
+                parent.clone(),
+                SpawnAgentRequest {
+                    agent_id: "task_manager_agent".to_string(),
+                    prompt: "Work independently on PARALLEL_GAMMA".to_string(),
+                    model: Some("test-model".to_string()),
+                    ..Default::default()
+                },
+            )
             .await?;
         Ok::<_, OrchestrationError>(vec![
             alpha.orchestration_id,
@@ -427,12 +443,15 @@ async fn e2e_abort_all_cancels_an_in_flight_child_for_a_concurrent_waiter() {
 
     let spawned = (async {
         session
-            .spawn_agent(parent.clone(), SpawnAgentRequest {
-                agent_id: "task_manager_agent".to_string(),
-                prompt: "Park until the orchestrator interrupts".to_string(),
-                model: Some("test-model".to_string()),
-                ..Default::default()
-            })
+            .spawn_agent(
+                parent.clone(),
+                SpawnAgentRequest {
+                    agent_id: "task_manager_agent".to_string(),
+                    prompt: "Park until the orchestrator interrupts".to_string(),
+                    model: Some("test-model".to_string()),
+                    ..Default::default()
+                },
+            )
             .await
     })
     .await

@@ -123,7 +123,9 @@ impl WorkflowExecutor for OpenHumanWorkflowExecutor {
             ));
         }
         let parent = self.parent.clone().ok_or_else(|| {
-            OrchestrationError("workflow child spawn requires a parent execution context".to_owned())
+            OrchestrationError(
+                "workflow child spawn requires a parent execution context".to_owned(),
+            )
         })?;
         let response = self
             .session

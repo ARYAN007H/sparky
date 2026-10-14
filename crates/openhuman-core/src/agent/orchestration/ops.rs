@@ -25,9 +25,7 @@
 use super::types::{
     AgentSnapshot, SpawnAgentRequest, SpawnAgentResponse, WaitAgentOptions, WaitAgentResponse,
 };
-use crate::agent::harness::fork_context::{
-    ParentExecutionContext,
-};
+use crate::agent::harness::fork_context::ParentExecutionContext;
 use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::agent::progress::AgentProgress;
 use crate::agent::subagent_host::{

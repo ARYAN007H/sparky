@@ -239,7 +239,7 @@ impl Tool for SpawnAsyncSubagentTool {
         options: ToolCallOptions,
         tool_context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
-self.execute_with_context_inner(
+        self.execute_with_context_inner(
             args,
             options,
             tool_context,

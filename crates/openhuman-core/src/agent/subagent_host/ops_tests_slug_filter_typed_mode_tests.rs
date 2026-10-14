@@ -164,20 +164,23 @@ async fn typed_mode_returns_text_through_runner() {
         run_subagent(
             &def,
             "summarise X",
-            with_parent(parent.clone(), SubagentRunOptions {
-                workspace_descriptor: None,
-                skill_filter_override: None,
-                context: None,
-                model_override: None,
-                task_id: Some("t1".into()),
-                thread_id: None,
-                run_context: Default::default(),
-                worker_thread_id: None,
-                initial_history: None,
-                checkpoint_dir: None,
-                worktree_action_dir: None,
-                run_queue: None,
-            }),
+            with_parent(
+                parent.clone(),
+                SubagentRunOptions {
+                    workspace_descriptor: None,
+                    skill_filter_override: None,
+                    context: None,
+                    model_override: None,
+                    task_id: Some("t1".into()),
+                    thread_id: None,
+                    run_context: Default::default(),
+                    worker_thread_id: None,
+                    initial_history: None,
+                    checkpoint_dir: None,
+                    worktree_action_dir: None,
+                    run_queue: None,
+                },
+            ),
         )
         .await
     })
@@ -213,7 +216,12 @@ async fn capped_no_progress_subagent_returns_incomplete_status() {
     def.max_iterations = 2;
 
     let outcome = (async {
-        run_subagent(&def, "read the file", with_parent(parent.clone(), SubagentRunOptions::default())).await
+        run_subagent(
+            &def,
+            "read the file",
+            with_parent(parent.clone(), SubagentRunOptions::default()),
+        )
+        .await
     })
     .await
     .expect("a cap halt is still Ok (not Err)");
@@ -265,11 +273,14 @@ async fn run_queue_steer_lands_in_subagent_history() {
         run_subagent(
             &def,
             "investigate the bug",
-            with_parent(parent.clone(), SubagentRunOptions {
-                task_id: Some("t-steer".into()),
-                run_queue: Some(run_queue),
-                ..Default::default()
-            }),
+            with_parent(
+                parent.clone(),
+                SubagentRunOptions {
+                    task_id: Some("t-steer".into()),
+                    run_queue: Some(run_queue),
+                    ..Default::default()
+                },
+            ),
         )
         .await
     })
@@ -383,20 +394,23 @@ async fn typed_mode_filters_tools_by_skill_filter() {
         run_subagent(
             &def,
             "lookup",
-            with_parent(parent.clone(), SubagentRunOptions {
-                workspace_descriptor: None,
-                skill_filter_override: Some("notion".into()),
-                context: None,
-                model_override: None,
-                task_id: None,
-                thread_id: None,
-                run_context: Default::default(),
-                worker_thread_id: None,
-                initial_history: None,
-                checkpoint_dir: None,
-                worktree_action_dir: None,
-                run_queue: None,
-            }),
+            with_parent(
+                parent.clone(),
+                SubagentRunOptions {
+                    workspace_descriptor: None,
+                    skill_filter_override: Some("notion".into()),
+                    context: None,
+                    model_override: None,
+                    task_id: None,
+                    thread_id: None,
+                    run_context: Default::default(),
+                    worker_thread_id: None,
+                    initial_history: None,
+                    checkpoint_dir: None,
+                    worktree_action_dir: None,
+                    run_queue: None,
+                },
+            ),
         )
         .await
     })
@@ -437,7 +451,12 @@ async fn typed_mode_executes_one_tool_then_returns() {
     let def = make_def_named_tools(&["file_read"]);
 
     let outcome = (async {
-        run_subagent(&def, "read x", with_parent(parent.clone(), SubagentRunOptions::default())).await
+        run_subagent(
+            &def,
+            "read x",
+            with_parent(parent.clone(), SubagentRunOptions::default()),
+        )
+        .await
     })
     .await
     .expect("runner should succeed");
@@ -473,7 +492,12 @@ async fn typed_mode_blocks_unallowed_tool_calls() {
     let def = make_def_named_tools(&["file_read"]);
 
     let outcome = (async {
-        run_subagent(&def, "do thing", with_parent(parent.clone(), SubagentRunOptions::default())).await
+        run_subagent(
+            &def,
+            "do thing",
+            with_parent(parent.clone(), SubagentRunOptions::default()),
+        )
+        .await
     })
     .await
     .expect("runner should succeed");
@@ -529,7 +553,12 @@ async fn subagent_emits_checkpoint_at_iteration_cap_instead_of_erroring() {
     def.max_iterations = 2;
 
     let outcome = (async {
-        run_subagent(&def, "keep reading forever", with_parent(parent.clone(), SubagentRunOptions::default())).await
+        run_subagent(
+            &def,
+            "keep reading forever",
+            with_parent(parent.clone(), SubagentRunOptions::default()),
+        )
+        .await
     })
     .await
     .expect("hitting the iteration cap should return a checkpoint, not error");
@@ -556,7 +585,12 @@ async fn subagent_checkpoint_falls_back_to_deterministic_when_summary_empty() {
     def.max_iterations = 2;
 
     let outcome = (async {
-        run_subagent(&def, "keep reading forever", with_parent(parent.clone(), SubagentRunOptions::default())).await
+        run_subagent(
+            &def,
+            "keep reading forever",
+            with_parent(parent.clone(), SubagentRunOptions::default()),
+        )
+        .await
     })
     .await
     .expect("empty summary should fall back, not error");
@@ -585,7 +619,14 @@ async fn runner_allows_spawn_at_max_depth() {
                 depth: MAX_SPAWN_DEPTH - 1,
                 max_depth: MAX_SPAWN_DEPTH,
             },
-            async { run_subagent(&def, "x", with_parent(parent.clone(), SubagentRunOptions::default())).await },
+            async {
+                run_subagent(
+                    &def,
+                    "x",
+                    with_parent(parent.clone(), SubagentRunOptions::default()),
+                )
+                .await
+            },
         )
         .await
     })

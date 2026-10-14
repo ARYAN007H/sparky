@@ -249,7 +249,10 @@ fn tool_response(name: &str, args: &str) -> ModelResponse {
 /// Uses a no-op memory backend so we don't have to spin up a real one.
 /// `options` with `parent` bound as the run's explicit parent execution
 /// context, the way a spawning tool or orchestration surface supplies it.
-fn with_parent(parent: ParentExecutionContext, mut options: SubagentRunOptions) -> SubagentRunOptions {
+fn with_parent(
+    parent: ParentExecutionContext,
+    mut options: SubagentRunOptions,
+) -> SubagentRunOptions {
     options.run_context.parent = Some(parent);
     options
 }

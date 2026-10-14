@@ -145,7 +145,7 @@ impl Tool for SpawnWorkerThreadTool {
         _options: ToolCallOptions,
         tool_context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
-self.execute_with_parent_context(
+        self.execute_with_parent_context(
             args,
             tool_context,
             crate::agent::tinyagents::host::OpenHumanRunContext::new(),

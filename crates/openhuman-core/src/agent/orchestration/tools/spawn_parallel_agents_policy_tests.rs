@@ -157,13 +157,16 @@ async fn rejects_more_tasks_than_parent_parallel_limit() {
     let tool = SpawnParallelAgentsTool::new();
     let parent = parent_context(2);
     let result = (async {
-        tool.execute_under_parent(json!({
-            "tasks": [
-                { "agent_id": "researcher", "prompt": "one" },
-                { "agent_id": "planner", "prompt": "two" },
-                { "agent_id": "critic", "prompt": "three" }
-            ]
-        }), parent.clone())
+        tool.execute_under_parent(
+            json!({
+                "tasks": [
+                    { "agent_id": "researcher", "prompt": "one" },
+                    { "agent_id": "planner", "prompt": "two" },
+                    { "agent_id": "critic", "prompt": "three" }
+                ]
+            }),
+            parent.clone(),
+        )
         .await
     })
     .await
@@ -183,12 +186,15 @@ async fn collects_immediate_task_validation_failures() {
     let parent = parent_context(4);
 
     let result = (async {
-        tool.execute_under_parent(json!({
-            "tasks": [
-                { "agent_id": " ", "prompt": "missing agent", "ownership": "files: none" },
-                { "agent_id": "__missing_agent__", "prompt": "unknown agent" }
-            ]
-        }), parent.clone())
+        tool.execute_under_parent(
+            json!({
+                "tasks": [
+                    { "agent_id": " ", "prompt": "missing agent", "ownership": "files: none" },
+                    { "agent_id": "__missing_agent__", "prompt": "unknown agent" }
+                ]
+            }),
+            parent.clone(),
+        )
         .await
     })
     .await

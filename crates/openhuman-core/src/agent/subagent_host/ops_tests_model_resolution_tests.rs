@@ -14,7 +14,14 @@ async fn runner_rejects_spawn_beyond_max_depth() {
                 depth: MAX_SPAWN_DEPTH,
                 max_depth: MAX_SPAWN_DEPTH,
             },
-            async { run_subagent(&def, "x", with_parent(parent.clone(), SubagentRunOptions::default())).await },
+            async {
+                run_subagent(
+                    &def,
+                    "x",
+                    with_parent(parent.clone(), SubagentRunOptions::default()),
+                )
+                .await
+            },
         )
         .await
     })
@@ -52,10 +59,13 @@ async fn typed_mode_model_override_pins_exact_model_for_spawn() {
         run_subagent(
             &def,
             "use the pinned model",
-            with_parent(parent.clone(), SubagentRunOptions {
-                model_override: Some("deepseek/deepseek-r2".into()),
-                ..Default::default()
-            }),
+            with_parent(
+                parent.clone(),
+                SubagentRunOptions {
+                    model_override: Some("deepseek/deepseek-r2".into()),
+                    ..Default::default()
+                },
+            ),
         )
         .await
     })
@@ -90,7 +100,12 @@ async fn typed_mode_emits_child_progress_events_when_sink_attached() {
 
     let def = make_def_named_tools(&["file_read"]);
     let outcome = (async {
-        run_subagent(&def, "read x", with_parent(parent.clone(), SubagentRunOptions::default())).await
+        run_subagent(
+            &def,
+            "read x",
+            with_parent(parent, SubagentRunOptions::default()),
+        )
+        .await
     })
     .await
     .expect("runner should succeed");
@@ -165,7 +180,12 @@ async fn typed_mode_forwards_child_text_and_thinking_deltas() {
 
     let def = make_def_named_tools(&[]);
     let outcome = (async {
-        run_subagent(&def, "answer me", with_parent(parent.clone(), SubagentRunOptions::default())).await
+        run_subagent(
+            &def,
+            "answer me",
+            with_parent(parent, SubagentRunOptions::default()),
+        )
+        .await
     })
     .await
     .expect("runner should succeed");
@@ -238,7 +258,12 @@ async fn typed_mode_progress_emission_is_a_noop_without_sink() {
     assert!(parent.on_progress.is_none());
     let def = make_def_named_tools(&[]);
     let outcome = (async {
-        run_subagent(&def, "x", with_parent(parent.clone(), SubagentRunOptions::default())).await
+        run_subagent(
+            &def,
+            "x",
+            with_parent(parent.clone(), SubagentRunOptions::default()),
+        )
+        .await
     })
     .await
     .expect("runner should succeed");
@@ -552,14 +577,18 @@ fn nested_subagent_dispatch_runs_on_a_constrained_worker_stack() {
             PermissionLevel::Execute
         }
         async fn execute(&self, _args: serde_json::Value) -> anyhow::Result<ToolResult> {
-            let parent = self.parent.get().cloned().expect("parent set before the run");
+            let parent = self
+                .parent
+                .get()
+                .cloned()
+                .expect("parent set before the run");
             let outcome = run_subagent(
                 &self.inner_def,
                 "inner go",
                 with_parent(parent, SubagentRunOptions::default()),
             )
             .await
-                .map_err(|e| anyhow::anyhow!("nested run_subagent failed: {e}"))?;
+            .map_err(|e| anyhow::anyhow!("nested run_subagent failed: {e}"))?;
             Ok(ToolResult::success(outcome.output))
         }
     }
@@ -597,7 +626,12 @@ fn nested_subagent_dispatch_runs_on_a_constrained_worker_stack() {
         let outer_def = make_def_named_tools(&["delegate_inner"]);
 
         (async {
-            run_subagent(&outer_def, "outer go", with_parent(parent.clone(), SubagentRunOptions::default())).await
+            run_subagent(
+                &outer_def,
+                "outer go",
+                with_parent(parent.clone(), SubagentRunOptions::default()),
+            )
+            .await
         })
         .await
     });
