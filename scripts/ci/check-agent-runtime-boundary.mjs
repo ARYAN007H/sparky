@@ -147,7 +147,6 @@ const bridgeSymbols = [
   "run_root_turn_via_hosted_agent",
 ];
 const deletedTaskLocalModules = [
-  "fork_context",
   "sandbox_context",
   "spawn_depth_context",
   "task_recency_context",
