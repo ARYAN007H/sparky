@@ -610,21 +610,22 @@ async fn approval_gate_rpc_decision_resumes_parked_tool_and_records_execution() 
                 request_id: None,
             },
             async move {
- let turn = ApprovalTurnContext::chat(ApprovalChatContext {
+                let turn = ApprovalTurnContext::chat(ApprovalChatContext {
                     thread_id: "worker-b-thread".to_string(),
                     client_id: "worker-b-client".to_string(),
                     // No turn in scope in this fixture; the field is documented as
                     // carried only when the caller has one (`gate.rs:91-95`).
                     request_id: None,
                 });
-                    gate_for_task
-                        .intercept_audited(&turn, 
-                            "tools.web_search",
-                            "search the web for coverage",
-                            json!({ "query": "<redacted>", "max_results": 3 }),
-                        )
-                        .await
-                },
+                gate_for_task
+                    .intercept_audited(
+                        &turn,
+                        "tools.web_search",
+                        "search the web for coverage",
+                        json!({ "query": "<redacted>", "max_results": 3 }),
+                    )
+                    .await
+            },
         )
         .await
     });
