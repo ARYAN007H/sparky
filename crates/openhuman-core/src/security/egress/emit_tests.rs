@@ -204,3 +204,53 @@ async fn carries_risk_fields_when_present() {
     assert_eq!(descriptor.risk_level, IdentificationRisk::High);
     assert_eq!(descriptor.risk_categories, vec!["email"]);
 }
+
+fn chat(thread: &str) -> ApprovalChatContext {
+    ApprovalChatContext {
+        thread_id: thread.to_string(),
+        client_id: format!("client-{thread}"),
+        request_id: Some(format!("req-{thread}")),
+    }
+}
+
+/// A ledger carries the turn's chat to every disclosure raised through it, so
+/// a disclosure made deep in the provider factory chain still reaches the chat
+/// that triggered it, and two turns' ledgers never mix.
+#[tokio::test]
+async fn a_routed_ledger_attaches_its_chat_to_every_disclosure() {
+    crate::core::bus::init().await.expect("bus init");
+    let mut rx = crate::core::bus::BUS.get().unwrap().receiver();
+
+    let ledger_a = EgressLedger::per_turn().routed_to(Some(chat("thread-a")));
+    let ledger_b = EgressLedger::per_turn().routed_to(Some(chat("thread-b")));
+    emit_external_transfer_in(
+        &ledger_a,
+        EgressDescriptor::inference("openhuman", "svc-routed-ledger-a", true),
+    );
+    // An await point between the two turns' disclosures.
+    tokio::task::yield_now().await;
+    emit_external_transfer_in(
+        &ledger_b,
+        EgressDescriptor::inference("openhuman", "svc-routed-ledger-b", true),
+    );
+
+    let (_, thread_a, client_a) = find_pending(&mut rx, "svc-routed-ledger-a").await;
+    assert_eq!(thread_a.as_deref(), Some("thread-a"));
+    assert_eq!(client_a.as_deref(), Some("client-thread-a"));
+    let (_, thread_b, client_b) = find_pending(&mut rx, "svc-routed-ledger-b").await;
+    assert_eq!(thread_b.as_deref(), Some("thread-b"));
+    assert_eq!(client_b.as_deref(), Some("client-thread-b"));
+}
+
+#[tokio::test]
+async fn a_disclosure_outside_a_chat_turn_is_unrouted() {
+    crate::core::bus::init().await.expect("bus init");
+    let mut rx = crate::core::bus::BUS.get().unwrap().receiver();
+
+    emit_external_transfer_in(
+        &EgressLedger::per_turn(),
+        EgressDescriptor::inference("openhuman", "svc-unrouted-ledger", true),
+    );
+    let (_, thread_id, client_id) = find_pending(&mut rx, "svc-unrouted-ledger").await;
+    assert_eq!((thread_id, client_id), (None, None));
+}
