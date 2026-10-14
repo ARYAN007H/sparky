@@ -135,11 +135,30 @@ async fn sweep_host_profiles(backend: &dyn StorageBackend) -> u64 {
     let Some(host) = crate::profiles::host::host() else {
         return 0;
     };
-    match host.ids().await {
-        Ok(ids) => sweep_profiles(backend, &ids).await,
-        Err(error) => {
+    match bounded_listing(SCOPE_SWEEP_TIMEOUT, host.ids()).await {
+        Some(Ok(ids)) => sweep_profiles(backend, &ids).await,
+        Some(Err(error)) => {
             tracing::warn!(%error, "[storage::blob_sweep] could not list profiles; skipped");
             0
+        }
+        None => 0,
+    }
+}
+
+/// Awaits a profile listing for at most `limit`; `None` (logged) when it hangs,
+/// so a stuck registry cannot stall the scheduler. Retried on the next tick.
+async fn bounded_listing<T>(
+    limit: Duration,
+    listing: impl std::future::Future<Output = T>,
+) -> Option<T> {
+    match tokio::time::timeout(limit, listing).await {
+        Ok(value) => Some(value),
+        Err(_) => {
+            tracing::warn!(
+                limit_secs = limit.as_secs_f32(),
+                "[storage::blob_sweep] profile listing timed out; retrying on the next tick"
+            );
+            None
         }
     }
 }

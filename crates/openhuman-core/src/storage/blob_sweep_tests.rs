@@ -171,3 +171,15 @@ async fn a_hung_scope_sweep_times_out_and_counts_as_zero() {
     let removed = sweep_scope_within(&hung, &Scope::local(), Duration::from_secs(30)).await;
     assert_eq!(removed, 0);
 }
+
+#[tokio::test]
+async fn a_hung_profile_listing_times_out_instead_of_stalling() {
+    let hung = bounded_listing(
+        Duration::from_millis(20),
+        std::future::pending::<Result<Vec<String>, String>>(),
+    )
+    .await;
+    assert!(hung.is_none());
+    let ok = bounded_listing(Duration::from_secs(5), async { 7u8 }).await;
+    assert_eq!(ok, Some(7));
+}
