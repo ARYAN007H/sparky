@@ -174,7 +174,7 @@ pub(crate) async fn run_channel_turn_via_graph(
         max_output_tokens: Some(crate::inference::provider::AGENT_TURN_MAX_OUTPUT_TOKENS),
         // Context middlewares: cache-align + default tool-result byte cap (the
         // channel path has no session `ContextManager` to source config from).
-        context_mw: crate::agent::tinyagents::middleware::TurnContextMiddleware::defaults(),
+        context_mw: crate::agent::tinyagents::middleware::turn_context::TurnContextMiddleware::defaults(),
         // Channel/CLI path carries its own gating; no session `.tool_policy()`.
         tool_policy: None,
         // Interactive channel/CLI turn — never serve a cached model response.

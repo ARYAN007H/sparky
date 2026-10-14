@@ -255,7 +255,7 @@ pub(super) fn install_turn_middleware(
     // Repeated failures stop the run using each tool's declared side effects.
     let repeated_failure = handle.as_ref().map(|handle| {
         let (t, halt) = (REPEATED_TOOL_FAILURE_THRESHOLD, halt_summary.clone());
-        let mw = middleware::RepeatedToolFailureMiddleware::new(handle.clone(), t, halt);
+        let mw = middleware::repeated_failure::RepeatedToolFailureMiddleware::new(handle.clone(), t, halt);
         Arc::new(mw.with_tool_facts(tool_sets_lookup(tool_sets.clone())))
     });
     if let Some(mw) = &repeated_failure {
@@ -297,7 +297,7 @@ pub(super) fn install_turn_middleware(
         tags
     };
     harness.push_middleware(Arc::new(
-        middleware::OpenHumanToolExposureShadowMiddleware::new(
+        middleware::tool_exposure::OpenHumanToolExposureShadowMiddleware::new(
             &candidate_names,
             allowed.as_ref(),
             exposure_tags,
@@ -334,7 +334,7 @@ pub(super) fn install_turn_middleware(
     // made its `after_tool` run first and record the full raw payload of every
     // call, bloating the per-turn sink and feeding failure classification /
     // `ToolCallRecord.output_summary` pre-cap content.
-    harness.push_middleware(Arc::new(middleware::ToolOutcomeCaptureMiddleware::new(
+    harness.push_middleware(Arc::new(middleware::tool_outcome_capture::ToolOutcomeCaptureMiddleware::new(
         tool_outcome_sink.clone(),
         failure_map.clone(),
     )));
@@ -452,7 +452,7 @@ pub(super) fn install_turn_middleware(
     if !hosted_security_gate {
         harness.push_tool_middleware(Arc::new(ApprovalGateMiddleware::new(
             "approval_security",
-            Arc::new(middleware::ApprovalSecurityMiddleware::new(
+            Arc::new(middleware::approval::ApprovalSecurityMiddleware::new(
                 tool_sets.clone(),
             )),
         )));
@@ -461,7 +461,7 @@ pub(super) fn install_turn_middleware(
     // CLI/RPC-only scope gate — a tool restricted to explicit CLI/RPC invocation
     // must not run from the model loop. Intrinsic to the tool, so installed on
     // every path (channel/session/sub-agent).
-    harness.push_tool_middleware(Arc::new(middleware::CliRpcOnlyMiddleware::new(
+    harness.push_tool_middleware(Arc::new(middleware::cli_rpc_only::CliRpcOnlyMiddleware::new(
         tool_sets.clone(),
     )));
 
@@ -476,7 +476,7 @@ pub(super) fn install_turn_middleware(
         .as_ref()
         .map(|enforcement| enforcement.session.clone());
     if let Some(enforcement) = tool_policy {
-        harness.push_tool_middleware(Arc::new(middleware::ToolPolicyMiddleware::new(
+        harness.push_tool_middleware(Arc::new(middleware::tool_policy::ToolPolicyMiddleware::new(
             enforcement.policy,
             enforcement.session,
             tool_sets.clone(),
@@ -493,7 +493,7 @@ pub(super) fn install_turn_middleware(
     // capture sink can observe the unredacted content — covering the parent,
     // sub-agent, persisted-transcript, and `ToolCallOutcome` surfaces by
     // construction since every path shares this seam.
-    harness.push_tool_middleware(Arc::new(middleware::credential_scrub_middleware()));
+    harness.push_tool_middleware(Arc::new(middleware::credential_scrub::credential_scrub_middleware()));
 
     // Malformed-argument recovery (`before_tool`): repair a call's non-object
     // arguments before the crate's schema gate — decode JSON-encoded-string args
@@ -514,7 +514,7 @@ pub(super) fn install_turn_middleware(
     // `ArgRecoveryMiddleware` so it wraps recovered arguments; before the
     // embedder hooks so they observe the call that actually runs.
     let registered_tools = harness.tools().names();
-    harness.push_middleware(Arc::new(middleware::packed_tool_route_middleware(
+    harness.push_middleware(Arc::new(middleware::packed_tool_route::packed_tool_route_middleware(
         registered_tools,
         route_session,
     )));
@@ -531,7 +531,7 @@ pub(super) fn install_turn_middleware(
     let mut embedder_tool_hooks = crate::agent::hooks::embedder_tool_hooks();
     embedder_tool_hooks.extend(scoped_tool_hooks);
     if !embedder_tool_hooks.is_empty() {
-        harness.push_middleware(Arc::new(middleware::EmbedderToolHooksMiddleware::new(
+        harness.push_middleware(Arc::new(middleware::embedder_hooks::EmbedderToolHooksMiddleware::new(
             embedder_tool_hooks,
         )));
     }
@@ -552,7 +552,7 @@ pub(super) fn install_turn_middleware(
     // The turn's memory pack rides every request of the turn, after every
     // reduction step and after the transcript snapshot, so it is never
     // compacted, trimmed or persisted (`memory::lifecycle::hooks::pre_turn`).
-    harness.push_middleware(Arc::new(middleware::memory_pack_middleware()));
+    harness.push_middleware(Arc::new(middleware::memory_pack::memory_pack_middleware()));
 
     TurnWiring {
         halt_summary,
