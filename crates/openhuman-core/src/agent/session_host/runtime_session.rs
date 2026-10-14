@@ -970,7 +970,6 @@ impl OpenHumanSessionHost {
                             Some(crate::agent::tinyagents::ToolPolicyEnforcement {
                                 policy: prelude.tool_policy.clone(),
                                 session: policy_session,
-                                session_id: policy_session_id,
                                 channel: policy_channel,
                                 agent_definition_id: prelude.agent_definition_id.clone(),
                             });

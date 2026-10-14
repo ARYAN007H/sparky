@@ -26,7 +26,6 @@ pub(crate) struct ToolPolicyEnforcement {
     /// permission ceiling (deny + per-call permission-level gate) the in-house
     /// engine ran in `agent_tool_exec`.
     pub session: tinytools::ToolPolicySession,
-    pub session_id: String,
     pub channel: String,
     pub agent_definition_id: String,
 }
