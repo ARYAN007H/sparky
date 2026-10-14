@@ -23,7 +23,7 @@
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/agent/orchestration/ops.rs",
-    "line": 418,
+    "line": 416,
     "text": "let handle = tokio::spawn(crate::agent::turn_origin::propagate(async move {",
     "occurrence": 1
   },
@@ -303,7 +303,7 @@
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/inference/provider/factory/managed_backend.rs",
-    "line": 38,
+    "line": 40,
     "text": ".with_thread_id(thread_id),",
     "occurrence": 1
   },
