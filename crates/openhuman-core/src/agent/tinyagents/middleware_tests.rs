@@ -62,7 +62,11 @@ impl StubSummarizer {
     }
 }
 
-impl tinyagents_harness::summarization::payload_summarizer::PayloadSummarizer<crate::agent::tinyagents::host::OpenHumanRunContext> for StubSummarizer {
+impl
+    tinyagents_harness::summarization::payload_summarizer::PayloadSummarizer<
+        crate::agent::tinyagents::host::OpenHumanRunContext,
+    > for StubSummarizer
+{
     type Prepared = crate::inference::tokenjuice::generate::PreparedGenerate;
     type Error = anyhow::Error;
 

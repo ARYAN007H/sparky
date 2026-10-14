@@ -4,9 +4,9 @@
 //! left, the way the session driver does.
 
 use super::*;
-use tinyagents_harness::middleware::is_repeat_call_exempt;
 use crate::agent::session_host::stop_summary::{render_stop_summary, StopReasonKind};
 use crate::agent::session_host::turn_checkpoint::CheckpointToolResult;
+use tinyagents_harness::middleware::is_repeat_call_exempt;
 use tinyagents_harness::middleware::library::{
     RepeatProgressMiddleware, REPEAT_GUARD_BLOCKED, REPEAT_GUARD_HALTED, REPEAT_GUARD_METADATA_KEY,
 };

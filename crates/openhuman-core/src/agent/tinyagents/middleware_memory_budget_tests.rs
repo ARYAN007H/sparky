@@ -3,10 +3,10 @@
 //! (#7717).
 
 use super::*;
-use tinyagents_harness::middleware::is_repeat_call_exempt;
 use crate::memory::test_fixtures::{bind_reference, config_in};
 use crate::memory::tools::{is_budget_refusal, MemoryTool};
 use tinyagents_harness::ids::CallId;
+use tinyagents_harness::middleware::is_repeat_call_exempt;
 use tinyagents_harness::tool::ToolExecutionContext;
 use tinytools::ToolCallOptions;
 
