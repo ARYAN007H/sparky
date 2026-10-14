@@ -517,6 +517,9 @@ struct AgentTurnOptions {
         Option<std::sync::Arc<tinyagents_harness::observability::turn_observer::ObserverScope>>,
     untrusted_input: bool,
     attachments: Vec<openhuman_core::agent::HostAttachment>,
+    /// The explicit per-turn values the core honours: live progress and the
+    /// host environment (budget, depth, cancellation, hooks, tool-belt authority).
+    chat_env: openhuman_core::inference::host_runtime::ops::AgentChatEnv,
 }
 
 async fn dispatch(
@@ -563,9 +566,48 @@ async fn dispatch(
                     expected_user_state: true,
                 });
             }
-            call::<_, String>(&rt, AGENT_CHAT, &request)
-                .await
-                .map(|reply| (reply, None))
+            // Native, like the `Agent` arm: the progress sink and host
+            // environment are non-serializable values that ride the call as
+            // explicit arguments, which the JSON-RPC envelope could not carry.
+            // Gated and scoped exactly as the RPC dispatch would be.
+            if !rt.context().domains().inference {
+                return Err(CoreError::Unavailable { method: AGENT_CHAT });
+            }
+            let ctx = std::sync::Arc::clone(rt.context());
+            let chat_env = options.chat_env;
+            let turn: futures_box::BoxFuture<'_, Result<AgentReply, CoreError>> =
+                Box::pin(async move {
+                    use openhuman_core::inference::host_runtime::ops::{
+                        agent_chat_reply_for, AgentChatTarget,
+                    };
+                    let mut config = openhuman_core::config::rpc::load_config_with_timeout()
+                        .await
+                        .map_err(|raw| CoreError::from_rpc_string(AGENT_CHAT, raw))?;
+                    let target = match request.agent_id.as_deref().map(str::trim) {
+                        Some(id) if !id.is_empty() => AgentChatTarget::AgentId(id),
+                        _ => AgentChatTarget::Orchestrator,
+                    };
+                    let route = openhuman_core::config::schema::EphemeralRoute::from_params(
+                        request.inference_url.clone(),
+                        request.api_key.clone(),
+                    )
+                    .map(|route| route.with_headers(request.inference_headers.clone()));
+                    agent_chat_reply_for(
+                        &mut config,
+                        target,
+                        &request.message,
+                        request.model_override.clone(),
+                        request.temperature,
+                        request.thread_id.clone(),
+                        request.cwd.clone(),
+                        route,
+                        chat_env,
+                    )
+                    .await
+                    .map(|reply| (reply.text, None))
+                    .map_err(|raw| CoreError::from_rpc_string(AGENT_CHAT, raw))
+                });
+            rt.run_in(ctx, turn).await
         }
         TurnTarget::Agent(agent) => {
             if !agent.ctx.domains().inference {
@@ -610,6 +652,7 @@ async fn dispatch(
                         request.thread_id,
                         request.cwd,
                         route,
+                        options.chat_env,
                     )
                     .await;
                     // The shape preserves provider charges and root-call totals
