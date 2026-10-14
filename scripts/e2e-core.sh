@@ -9,8 +9,9 @@
 #   scripts/e2e-core.sh sqlite     # sqlite:<scratch dir>
 #   scripts/e2e-core.sh mongodb    # needs TSD_MONGO_URL (a local replica set)
 #
-# MongoDB: start one with
-#   vendor/tinyagents/vendor/tinystoragedrivers/.github/scripts/start-mongo-replset.sh 27017
+# MongoDB: start one with tinystoragedrivers' .github/scripts/start-mongo-replset.sh
+# (https://github.com/tinyhumansai/tinystoragedrivers, tag v0.11.0) as
+#   bash start-mongo-replset.sh 27017
 # and export TSD_MONGO_URL=mongodb://127.0.0.1:27017/tsd_test?directConnection=true
 # (the storage-mongodb workflow does exactly this). The URL must be loopback:
 # the run creates a database of its own and writes to it.
