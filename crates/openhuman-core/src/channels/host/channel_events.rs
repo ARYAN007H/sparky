@@ -211,8 +211,7 @@ impl ChannelTurnStateSubscriber {
             crate::modules::client(self.config.as_deref().cloned().unwrap_or_default())
         };
         #[cfg(not(test))]
-        let client =
-            crate::modules::client(self.config.as_deref().cloned().unwrap_or_default());
+        let client = crate::modules::client(self.config.as_deref().cloned().unwrap_or_default());
         let result: Result<tinychannels_bus::module_remote::RemoteOperationResult, _> = client
             .call_confidential(
                 "tinychannels",
