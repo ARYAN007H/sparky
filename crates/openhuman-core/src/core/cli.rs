@@ -83,6 +83,8 @@ pub fn run_from_cli_args_with(
     host_boot: Option<crate::core::server_launcher::HostBoot>,
 ) -> Result<()> {
     load_dotenv_for_cli()?;
+    // The CLI is the host: its commands run under the one process context.
+    let ctx = DispatchCtx::process_default();
 
     let launch = parse_launch_options(args)?;
     crate::config::set_cli_inference_overrides(launch.provider.as_deref(), launch.model.as_deref());
