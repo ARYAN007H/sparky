@@ -677,12 +677,11 @@ async fn a_streamed_blob_is_still_bound_by_the_grant_and_the_length() {
 async fn an_inline_blob_no_frame_can_carry_fails_fast_instead_of_hanging() {
     let _turn = TURN.lock().await;
     let rig = rig("tinyjuice").await;
-    // 17 MiB as a JSON array of numbers is far over the 16 MiB frame. The call
-    // must come back as an error well inside the probe's own 6 s timeout, not
-    // run into the caller's.
+    // 5 000 000 bytes as a JSON array of numbers (`255,` each) is a 20 MB
+    // frame, over the 16 MiB cap.
     let started = std::time::Instant::now();
     let big: Value = rig
-        .member("PutBlob", ("tinyjuice_ccr/over-frame", 17 * MIB as usize))
+        .member("PutBlob", ("tinyjuice_ccr/over-frame", 5_000_000usize))
         .await;
     assert!(big.get("err").is_some(), "an oversized frame must fail: {big}");
     assert!(
