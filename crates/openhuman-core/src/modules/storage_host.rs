@@ -32,27 +32,39 @@
 //! The reference `StorageServer` of `tinystoragedrivers-client` answers the
 //! messages once a call is allowed; this file adds only the host's decisions.
 //!
-//! Not served yet, and refused as `unsupported` rather than faked: blobs over
-//! a bus stream (`PutStream`/`GetStream`) and watches (`WatchOpen`), which
-//! need a per-module stream and signal route.
+//! Blobs over a bus stream (`PutStream`/`GetStream`) and watches (`WatchOpen`)
+//! go through `tinystoragedrivers-busproxy`, which binds them to the peer: an
+//! upload is read with `Connection::accept_stream_from` only from the
+//! authenticated caller that opened it, a download is opened toward that
+//! caller, and a watch's invalidations are unicast to the subscribing caller
+//! with `Connection::emit_to`. Every decision above still applies first.
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::Value;
-use tinybus::{BusName, CallContext, InterfaceName, MemberName, ObjectPath};
+use tinybus::BusName;
 use tinystoragedrivers::secrets::{DocumentSecrets, KeyProvider};
-use tinystoragedrivers_bus::{StorageFailure, StorageKind, STORAGE_INTERFACE};
+use tinystoragedrivers::BlobReader;
+use tinystoragedrivers_bus::{
+    BlobKeyRequest, BlobStreamHead, PutBlobStreamRequest, StorageFailure, StorageKind,
+    WatchChanged,
+};
+use tinystoragedrivers_busproxy::{HostFailure, StorageCall, StorageEndpoint};
+use tokio::sync::broadcast;
+
 use tinystoragedrivers_client::{Admission, StorageServer};
 
 use super::storage_grants::{authorize, declared, filter_reply, Object, Plan, StorageGrant};
 use crate::storage::{Scope, StorageBackend, StorageError};
 
-/// Where the four objects are served: `<root>/<Object>`.
-const OBJECT_ROOT: &str = "/ai/tinyhumans/tinystorage";
-const ERROR_DENIED: &str = "ai.tinyhumans.tinystorage.Error.Denied";
-const ERROR_STORAGE: &str = "ai.tinyhumans.tinystorage.Error.Storage";
+/// The largest blob a module may send by `PutStream`. The body is bounded per
+/// chunk by the bus and by its declared length by the server, so this is the
+/// host's own ceiling on one module's single upload.
+const MAX_STREAMED_BLOB_BYTES: u64 = 256 * 1024 * 1024;
+/// Relays kept for callers that never became a bound module.
+const MAX_IDLE_RELAYS: usize = 256;
 
 /// Maps a broker-authenticated sender to a registry module id.
 #[async_trait]
@@ -121,21 +133,18 @@ pub(crate) enum HostError {
     Storage(StorageFailure),
 }
 
-impl From<HostError> for tinybus::Error {
+impl From<HostError> for HostFailure {
     fn from(error: HostError) -> Self {
         match error {
-            HostError::Denied(label) => tinybus::Error::MethodFailed {
-                name: ERROR_DENIED.to_string(),
-                message: label.to_string(),
-            },
-            HostError::Storage(failure) => tinybus::Error::MethodFailed {
-                name: ERROR_STORAGE.to_string(),
-                message: serde_json::to_value(failure.kind)
-                    .ok()
-                    .and_then(|kind| kind.as_str().map(str::to_owned))
-                    .unwrap_or_else(|| "backend".to_string()),
-            },
+            HostError::Denied(label) => HostFailure::Denied(label),
+            HostError::Storage(failure) => HostFailure::Storage(failure),
         }
+    }
+}
+
+impl From<HostError> for tinybus::Error {
+    fn from(error: HostError) -> Self {
+        HostFailure::from(error).into()
     }
 }
 
