@@ -37,7 +37,7 @@ mod module_backed {
     use std::sync::Mutex;
 
     use crate::mcp::module_client::{McpConfiguredClient, McpModulePort};
-    use crate::modules::client::ModuleCallError;
+    use tinybus::module::ModuleCallError;
     use tinymcp_bus::{
         agent_tools::{McpToolPresentation, PrepareAgentToolsRequest},
         config::{McpClientConfig, OpenConfiguredResponse, TransitionStatus},

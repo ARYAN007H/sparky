@@ -146,6 +146,15 @@ pub async fn install_from_config(config: &crate::config::Config) -> Result<(), S
     .await
     .unwrap_or_else(|e| log::debug!("[tokenjuice][savings] configure failed: {e}"));
     let request = install_request(config);
+    // The module keeps the durable tier on its blob storage; originals the old
+    // disk tier wrote move across first (once per directory, best effort).
+    if let Some(root) = request.disk_tier_root.as_deref() {
+        crate::modules::import_legacy_tinyjuice(
+            std::path::Path::new(root),
+            request.ccr_ttl_secs.map(std::time::Duration::from_secs),
+        )
+        .await;
+    }
     let fingerprint = serde_json::to_vec(&request).map_err(|error| error.to_string())?;
     static INSTALLED: std::sync::OnceLock<tokio::sync::Mutex<Option<Vec<u8>>>> =
         std::sync::OnceLock::new();
@@ -165,8 +174,8 @@ pub async fn install_from_config(config: &crate::config::Config) -> Result<(), S
 }
 
 /// Construct explicit access over the shared process-wide loader.
-pub(super) fn client(config: &crate::config::Config) -> crate::modules::client::ModuleClient {
-    crate::modules::client::ModuleClient::new(config.clone())
+pub(super) fn client(config: &crate::config::Config) -> tinybus::module::ModuleClient {
+    crate::modules::client(config.clone())
 }
 
 /// Everything the module considers about one tool result.
@@ -339,7 +348,7 @@ fn compacted_from(response: tinyjuice_bus::wire::CompactResponse) -> CompactedTo
 }
 
 async fn record_savings(
-    client: &crate::modules::client::ModuleClient,
+    client: &tinybus::module::ModuleClient,
     response: &tinyjuice_bus::wire::CompactResponse,
 ) {
     use std::str::FromStr as _;

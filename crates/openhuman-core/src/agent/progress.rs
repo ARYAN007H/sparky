@@ -181,7 +181,7 @@ pub enum AgentProgress {
         /// breaker or iteration cap) and handed back as incomplete. The trace
         /// collector closes the subagent span at `WARNING` with it. `None` for
         /// a sub-agent that finished normally.
-        stop: Option<crate::agent::turn_stop::TurnStop>,
+        stop: Option<tinyagents_harness::turn_stop::TurnStop>,
     },
 
     /// A sub-agent failed.
@@ -223,7 +223,7 @@ pub enum AgentProgress {
         iteration: u32,
         /// Maximum iterations configured for this child run.
         max_iterations: u32,
-        /// `true` when the agent uses [`IterationPolicy::Extended`](crate::agent::harness::definition::IterationPolicy::Extended).
+        /// `true` when the agent uses [`IterationPolicy::Extended`](tinyagents_definition::IterationPolicy::Extended).
         /// The UI uses this to show "step N" instead of "turn N/M".
         extended_policy: bool,
     },
@@ -422,7 +422,7 @@ pub enum AgentProgress {
         /// completion path. Content-free; the trace collector closes the turn
         /// span at `WARNING` with it. `None` for a turn that finished on its
         /// own.
-        stop: Option<crate::agent::turn_stop::TurnStop>,
+        stop: Option<tinyagents_harness::turn_stop::TurnStop>,
     },
 
     /// The turn's content: the user's prompt and the model's final reply.

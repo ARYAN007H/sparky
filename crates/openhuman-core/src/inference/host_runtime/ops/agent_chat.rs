@@ -133,7 +133,7 @@ pub enum AgentChatTarget<'a> {
     /// can honour it: the other two resolve a definition the caller does not
     /// hold, so there is no agent for a host belt to belong to.
     Definition {
-        definition: &'a crate::agent::harness::definition::AgentDefinition,
+        definition: &'a crate::agent::harness::host_definition::AgentDefinition,
         host: Option<&'a crate::agent::HostTools>,
         /// History to seed this turn with, as `(role, content)` rows, instead
         /// of whatever the session would otherwise resume.
@@ -168,8 +168,12 @@ pub enum AgentChatTarget<'a> {
         untrusted_input: bool,
         /// A response format and output cap for every model call of the turn,
         /// and the slot its final call is reported into.
-        shape: Option<
-            &'a std::sync::Arc<crate::agent::tinyagents::response_shape::ResponseShapeScope>,
+        shape: Option<&'a std::sync::Arc<tinyagents_harness::middleware::ResponseShapeScope>>,
+        /// The observer scoped around the caller, re-established around the
+        /// turn because the dispatch may run on a worker task that does not
+        /// inherit task locals.
+        observer: Option<
+            &'a std::sync::Arc<tinyagents_harness::observability::turn_observer::ObserverScope>,
         >,
         /// Files the host attaches to this turn as bytes, in order.
         ///
@@ -201,6 +205,7 @@ impl std::fmt::Debug for AgentChatTarget<'_> {
                 host_only,
                 untrusted_input,
                 shape,
+                observer,
                 attachments,
             } => f
                 .debug_struct("Definition")
@@ -212,6 +217,7 @@ impl std::fmt::Debug for AgentChatTarget<'_> {
                 .field("untrusted_input", untrusted_input)
                 .field("attachments", &attachments.len())
                 .field("shaped", &shape.is_some())
+                .field("observed", &observer.is_some())
                 .finish(),
         }
     }
@@ -220,9 +226,9 @@ impl std::fmt::Debug for AgentChatTarget<'_> {
 // Definitions are reusable snapshots. A turn override belongs only to the
 // definition passed to this call's factory, which otherwise wins over Config.
 fn definition_for_turn(
-    definition: &crate::agent::harness::definition::AgentDefinition,
+    definition: &crate::agent::harness::host_definition::AgentDefinition,
     temperature: Option<f64>,
-) -> std::borrow::Cow<'_, crate::agent::harness::definition::AgentDefinition> {
+) -> std::borrow::Cow<'_, crate::agent::harness::host_definition::AgentDefinition> {
     match temperature {
         Some(temperature) => {
             let mut scoped = definition.clone();
@@ -501,6 +507,14 @@ pub async fn agent_chat_reply_for(
             seed.len()
         );
     }
+    // The response shape rides the session explicitly (no task-local): the
+    // next turn takes it into its run context.
+    if let AgentChatTarget::Definition {
+        shape: Some(scope), ..
+    } = target
+    {
+        agent.set_next_turn_response_shape(Some(std::sync::Arc::clone(scope)));
+    }
     // Live progress for in-process embedders. `OpenHumanSessionHost::from_config` never
     // attaches a sink itself, so there is nothing to clobber here; callers that
     // set one explicitly (web chat, platform socket, flows, skills) hold their
@@ -544,9 +558,14 @@ pub async fn agent_chat_reply_for(
     };
     let outcome = match target {
         AgentChatTarget::Definition {
-            shape: Some(scope), ..
+            observer: Some(observer),
+            ..
         } => {
-            crate::agent::tinyagents::response_shape::with_response_shape(scope.clone(), run).await
+            tinyagents_harness::observability::turn_observer::with_observer(
+                std::sync::Arc::clone(observer),
+                run,
+            )
+            .await
         }
         _ => run.await,
     };

@@ -19,13 +19,12 @@
 //! `ask_user_clarification` early-exit pause are all re-wired onto the
 //! tinyagents harness.
 
-mod compaction_carry;
 pub mod config;
+mod context_wiring;
 mod deadline_wind_down;
 pub mod discovery;
 mod embeddings;
 mod harness_assembly;
-mod harness_context_ladder;
 pub(crate) mod harness_tool_registration;
 pub mod host;
 pub(crate) mod hosted_error;
@@ -40,7 +39,7 @@ pub(crate) mod observability;
 pub mod run_mode;
 // `pub` since issue #6014, and the inconsistency it removes is the point:
 // `AgentBuilder::payload_summarizer` is a **public** setter taking
-// `Arc<dyn PayloadSummarizer>`, so the seam was already advertised to embedders
+// `Arc<DynPayloadSummarizer>`, so the seam was already advertised to embedders
 // — while the trait itself, its outcome type and its reason enum were all
 // `pub(crate)`, which made the setter uncallable from outside this crate. An
 // embedder could therefore see the extension point, and could not use it.
@@ -50,21 +49,17 @@ pub mod run_mode;
 // multi-tenancy), so "bring your own summarizer" is the case this seam exists
 // for rather than an exotic one.
 pub mod budget;
-mod budget_charge;
 pub mod payload_summarizer;
 mod policy_denial;
 pub(crate) mod reaper;
 pub(crate) mod reasoning;
 pub(crate) mod replay;
-pub mod response_shape;
 mod routes;
 mod steering_forwarder;
 pub(crate) mod stop_hooks;
 pub mod todos;
 pub(crate) mod tools;
-mod topology;
 mod turn_models;
-pub mod turn_observer;
 mod turn_outcome;
 mod turn_policy;
 mod turn_run_error;
@@ -78,7 +73,6 @@ pub(crate) use crate::agent::message_convert::chat_message_to_message;
 #[cfg(feature = "flows")]
 pub(crate) use crate::agent::message_convert::ta_call_to_oh_call;
 
-pub(crate) use compaction_carry::{last_user_message, CompactionCarry};
 #[allow(unused_imports)] // Wired into the recall/retrieval facade in workstream 09.2.
 pub(crate) use embeddings::ProviderEmbeddingModel;
 pub(crate) use middleware::{
@@ -86,14 +80,11 @@ pub(crate) use middleware::{
 };
 pub(crate) use observability::SubagentScope;
 pub(crate) use reasoning::{apply_requested_effort, parse_reasoning_effort};
-pub(crate) use topology::all_graph_topologies;
 pub use turn_models::TurnModelSource;
 pub(crate) use turn_models::TurnModels;
-pub(crate) use turn_outcome::{
-    HaltSummarySlot, TinyagentsTurnOutcome, ToolCallOutcome, ToolOutcomeSink,
-};
+pub(crate) use turn_outcome::TinyagentsTurnOutcome;
 #[cfg(test)]
-pub(crate) use turn_policy::{agent_turn_wall_clock_ms, is_subagent_spawn_or_delegate_tool};
+pub(crate) use turn_policy::is_subagent_spawn_or_delegate_tool;
 pub(crate) use turn_policy::{
     agent_turn_wall_clock_ms_for, chat_provider_is_local, local_web_turn_backstop_secs,
     ToolPolicyEnforcement,
@@ -106,10 +97,7 @@ pub(crate) use turn_runner::{run_root_turn_via_hosted_agent, run_turn_via_tinyag
 #[cfg(test)]
 use tinyagents_harness::runtime::InvalidArgsPolicy;
 #[cfg(test)]
-use turn_policy::{
-    model_call_wall_clock_ms, parse_agent_turn_wall_clock_ms, parse_model_call_wall_clock_ms,
-    run_policy_for, DEFAULT_AGENT_TURN_TIMEOUT_SECS, DEFAULT_MODEL_CALL_TIMEOUT_SECS,
-};
+use turn_policy::run_policy_for;
 
 #[cfg(test)]
 #[path = "nested_calls_tests.rs"]
@@ -117,6 +105,9 @@ mod nested_calls_tests;
 #[cfg(test)]
 #[path = "prompt_cache_golden_tests.rs"]
 mod prompt_cache_golden_tests;
+#[cfg(test)]
+#[path = "topology_collision_tests.rs"]
+mod topology_collision_tests;
 #[cfg(test)]
 #[path = "tinyagents_tests.rs"]
 mod tests;

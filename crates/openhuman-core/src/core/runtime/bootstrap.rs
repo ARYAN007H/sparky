@@ -94,8 +94,8 @@ pub(crate) async fn bootstrap_core_runtime(
     // Stamp them as `Interrupted` so the UI can offer a retry without
     // confusing a stale `Streaming` lifecycle for an in-flight turn.
     //
-    // A host session store holds turn snapshots and runs per agent, not under
-    // this workspace, so it does its own repair, once, instead of both sweeps.
+    // An installed host session store repairs itself, once; with none, the
+    // workspace default store is swept.
     let host_store = crate::agent::session_store::installed();
     if let Some(provider) = &host_store {
         match provider.recover() {
@@ -105,10 +105,9 @@ pub(crate) async fn bootstrap_core_runtime(
     }
     if host_store.is_none() {
         let now = chrono::Utc::now().to_rfc3339();
-        match tinyagents_session::turn_state::store::mark_all_interrupted(
-            workspace_dir.clone(),
-            &now,
-        ) {
+        match crate::agent::session_store::default_turn_states_for(&workspace_dir)
+            .mark_all_interrupted(&now)
+        {
             Ok(0) => {}
             Ok(count) => {
                 log::info!("[runtime] marked {count} stale turn snapshot(s) as interrupted")
@@ -188,7 +187,9 @@ pub(crate) async fn bootstrap_core_runtime(
     // multiple times. Uses the per-user scoped workspace_dir.
     if agent_enabled {
         if let Err(err) =
-            crate::agent::harness::AgentDefinitionRegistry::init_global(&workspace_dir)
+            crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global(
+                &workspace_dir,
+            )
         {
             log::warn!(
                 "[runtime] AgentDefinitionRegistry::init_global failed: {err} — \

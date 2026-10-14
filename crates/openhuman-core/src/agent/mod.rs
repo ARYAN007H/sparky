@@ -26,7 +26,6 @@ pub mod context;
 pub mod context_breakdown;
 pub(crate) mod cost;
 pub mod debug;
-pub mod error;
 pub mod goals;
 pub mod harness;
 pub mod hooks;
@@ -93,7 +92,7 @@ pub mod turn_deadline;
 pub mod turn_origin;
 /// How a turn that reached the completion path was stopped early (breaker,
 /// deadline wind-down, iteration cap), carried to traces and parent tools.
-pub mod turn_stop;
+pub mod turn_projection;
 /// Turn-workspace task-local — the per-turn filesystem root an embedder binds
 /// a single agent turn to. Read by the session builder (as the turn's default
 /// cwd) and by the path policy (as a read/write trusted root), so a host that

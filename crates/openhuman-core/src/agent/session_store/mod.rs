@@ -16,19 +16,19 @@
 
 use std::sync::{Arc, LazyLock, PoisonError, RwLock};
 
-pub use agent_transcripts::{agent_transcript_root, AgentTranscriptFiles};
 use tinyagents_session::port::{AgentStores, SessionStoreProvider};
+use tinyagents_session::transcript::{agent_transcript_root, AgentTranscriptFiles};
 
-mod agent_transcripts;
 pub mod ledger_sync;
 mod rebound;
 mod workspace;
 
 pub use rebound::{rebind_all, ReboundSessionStores};
 pub use workspace::{
-    current_documents_for, ledger_for, provider_for_workspace, release_workspace_defaults,
-    require_ledger, status_store_for, stores_for, stores_or_ephemeral, with_ledger,
-    with_ledger_async, WorkspaceSessionStores,
+    attachment_stash_for, current_documents_for, default_turn_states_for, ledger_for,
+    provider_for_workspace, release_workspace_defaults, require_ledger, status_store_for,
+    stores_for, stores_or_ephemeral, turn_states_for, with_ledger, with_ledger_async,
+    WorkspaceSessionStores,
 };
 
 static PROVIDER: LazyLock<RwLock<Option<Arc<dyn SessionStoreProvider>>>> =

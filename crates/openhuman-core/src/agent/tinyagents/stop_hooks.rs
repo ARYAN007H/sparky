@@ -21,7 +21,7 @@ pub(super) fn install(
     handle: Option<&SteeringHandle>,
     model: &str,
     hooks: Vec<Arc<dyn StopHook<TurnCost>>>,
-    halt_summary: super::HaltSummarySlot,
+    halt_summary: tinyagents_harness::turn_outcome::HaltSummarySlot,
 ) {
     if handle.is_some() && !hooks.is_empty() {
         harness.push_middleware(Arc::new(
@@ -40,7 +40,7 @@ pub(super) fn install(
 }
 
 fn record_halt_summary(
-    halt_summary: &super::HaltSummarySlot,
+    halt_summary: &tinyagents_harness::turn_outcome::HaltSummarySlot,
     report: &tinyagents_harness::middleware::library::StopReport,
 ) {
     *halt_summary

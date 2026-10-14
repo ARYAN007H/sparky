@@ -351,15 +351,16 @@ async fn persist_channel_turn(
     workspace_dir: &Path,
     descriptor: ChannelTurnDescriptor<'_>,
 ) -> Result<(), String> {
-    #[cfg(test)]
+    // The fixture exists only where both features compile it (channels/mod.rs).
+    #[cfg(all(test, feature = "channels", feature = "modules"))]
     let client = crate::channels::module_fixture::client().await;
-    #[cfg(not(test))]
+    #[cfg(not(all(test, feature = "channels", feature = "modules")))]
     let client = {
         let config = crate::config::rpc::load_config_with_timeout().await?;
         if config.workspace_dir != workspace_dir {
             return Err("channel workspace changed".into());
         }
-        crate::modules::client::ModuleClient::new(config)
+        crate::modules::client(config)
     };
     let prepared: tinychannels_bus::module_inbound::PreparedChannelInbound = client
         .call_confidential(

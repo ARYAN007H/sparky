@@ -55,12 +55,17 @@ pub struct TurnOverrides {
     pub suppress_transcript_autoload: bool,
 }
 
+/// The next turn's response shape, consumed at its start.
+pub(crate) type PendingResponseShape =
+    Option<Arc<tinyagents_harness::middleware::ResponseShapeScope>>;
+
 /// What the runtime hook hands one user turn's request enrichment: this
 /// turn's [`TurnOverrides`] (consumed) and the reply-language instruction the
 /// host armed with `set_reply_language_directive` (kept for later turns).
 #[derive(Debug, Default)]
 pub(crate) struct TurnInputs {
     pub(crate) overrides: TurnOverrides,
+    pub(crate) response_shape: PendingResponseShape,
     pub(crate) reply_language_directive: Option<String>,
     pub(crate) time_zone: Option<String>,
 }
@@ -82,6 +87,7 @@ impl super::runtime_session::OpenHumanSessionState {
     pub(super) fn take_turn_inputs(&mut self) -> TurnInputs {
         TurnInputs {
             overrides: std::mem::take(&mut self.active_turn_overrides),
+            response_shape: self.pending_response_shape.take(),
             reply_language_directive: self.reply_language_directive.clone(),
             time_zone: self.time_zone.clone(),
         }
@@ -279,6 +285,13 @@ pub struct OpenHumanSessionHost {
     pub(super) post_turn_hooks: Vec<Arc<dyn PostTurnHook>>,
     pub(super) event_session_id: String,
     pub(super) event_channel: String,
+    /// Recency window handed to every turn's run context so integration
+    /// task-fetch tools only see recently touched tasks (cron morning
+    /// briefing). `None` leaves them unbounded.
+    pub(super) task_recency_window: Option<std::time::Duration>,
+    /// Autonomous skill-run iteration cap handed to every turn's run context
+    /// (lifts sub-agent iteration caps); `None` for ordinary agents.
+    pub(super) autonomous_iter_cap: Option<usize>,
     /// Backend/session thread explicitly owned by this agent run. It is kept
     /// separate from event identity: CLI and worker event sessions are not
     /// necessarily user conversation threads.
@@ -303,7 +316,7 @@ pub struct OpenHumanSessionHost {
     /// `subagents` list post-fetch) stay correct even after the web
     /// channel's per-thread rename.
     ///
-    /// [`AgentDefinitionRegistry`]: crate::agent::harness::definition::AgentDefinitionRegistry
+    /// [`AgentDefinitionRegistry`]: crate::agent::harness::host_definition::AgentDefinitionRegistry
     pub(super) agent_definition_id: String,
     /// Injected transcript locator, or `None` to use real files.
     ///
@@ -408,7 +421,7 @@ pub struct OpenHumanSessionHost {
     /// built from an explicit definition (a library host's per-agent spec)
     /// keeps those settings instead of having them silently replaced by
     /// whatever the process-global registry holds under the same id.
-    pub(super) definition: Option<Arc<crate::agent::harness::definition::AgentDefinition>>,
+    pub(super) definition: Option<Arc<crate::agent::harness::host_definition::AgentDefinition>>,
     /// Built by `from_config_host_only`: the belt is the host's tools alone.
     pub(super) host_only: bool,
     /// The next messages are untrusted data, so `run_single` skips the
@@ -426,7 +439,7 @@ pub struct OpenHumanSessionHost {
     /// when oversized tool results need summarizer-subagent compression before
     /// they enter agent history.
     pub(super) payload_summarizer:
-        Option<Arc<dyn crate::agent::tinyagents::payload_summarizer::PayloadSummarizer>>,
+        Option<Arc<crate::agent::tinyagents::payload_summarizer::DynPayloadSummarizer>>,
     /// Per-agent TokenJuice profile for tool results entering this session's
     /// model context.
     pub(super) tokenjuice_compression: tinyjuice_bus::types::AgentTokenjuiceCompression,
@@ -592,8 +605,9 @@ pub struct SessionHostBuilder {
     ///
     /// `None` (the default) leaves every existing caller as it was.
     ///
-    /// [`AgentDefinitionRegistry`]: crate::agent::harness::definition::AgentDefinitionRegistry
-    pub(super) session_definition: Option<Arc<crate::agent::harness::definition::AgentDefinition>>,
+    /// [`AgentDefinitionRegistry`]: crate::agent::harness::host_definition::AgentDefinitionRegistry
+    pub(super) session_definition:
+        Option<Arc<crate::agent::harness::host_definition::AgentDefinition>>,
     /// Directory chain of parent session keys for a sub-agent. `None`
     /// (default) means this is a root session — its transcript lands
     /// flat in `session_raw/DDMMYYYY/{session_key}.jsonl`. Populated
@@ -613,7 +627,7 @@ pub struct SessionHostBuilder {
     /// [`super::builder::OpenHumanSessionHost::build_session_agent_inner`] sets this
     /// to a `SubagentPayloadSummarizer` instance.
     pub(super) payload_summarizer:
-        Option<Arc<dyn crate::agent::tinyagents::payload_summarizer::PayloadSummarizer>>,
+        Option<Arc<crate::agent::tinyagents::payload_summarizer::DynPayloadSummarizer>>,
     /// Per-agent TokenJuice tool-output compression profile.
     pub(super) tokenjuice_compression: tinyjuice_bus::types::AgentTokenjuiceCompression,
     /// Optional pre-execution tool policy. Defaults to allow-all.

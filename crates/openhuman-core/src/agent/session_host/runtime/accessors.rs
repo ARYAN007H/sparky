@@ -5,7 +5,6 @@
 use super::super::types::{OpenHumanSessionHost, SessionHostBuilder};
 use std::collections::HashSet;
 use std::sync::Arc;
-use tinytools::ToolPolicyEngine;
 use tinytools::{Tool, ToolSpec};
 use tinytools_agent::dialect::TranscriptEntry;
 
@@ -145,9 +144,9 @@ impl OpenHumanSessionHost {
     /// them replaced by a same-id registry entry.
     pub(crate) fn resolved_definition(
         &self,
-    ) -> Option<Arc<crate::agent::harness::definition::AgentDefinition>> {
+    ) -> Option<Arc<crate::agent::harness::host_definition::AgentDefinition>> {
         self.definition.clone().or_else(|| {
-            crate::agent::harness::definition::AgentDefinitionRegistry::current()
+            crate::agent::harness::host_definition::AgentDefinitionRegistry::current()
                 .and_then(|registry| registry.get(&self.agent_definition_id).cloned())
                 .map(Arc::new)
         })
@@ -248,6 +247,18 @@ impl OpenHumanSessionHost {
                 crate::agent::message_convert::messages_to_history_projection(session.history())
             })
             .unwrap_or_default()
+    }
+
+    /// Restricts integration task-fetch tools to tasks touched within `window`
+    /// on every later turn of this agent; `None` clears the restriction.
+    pub fn set_task_recency_window(&mut self, window: Option<std::time::Duration>) {
+        self.task_recency_window = window;
+    }
+
+    /// Runs this agent as an unattended autonomous tree: sub-agent iteration
+    /// caps are lifted to `cap` on every later turn; `None` clears the lift.
+    pub fn set_autonomous_iter_cap(&mut self, cap: Option<usize>) {
+        self.autonomous_iter_cap = cap;
     }
 
     pub fn set_event_context(&mut self, session_id: impl Into<String>, channel: impl Into<String>) {
@@ -500,7 +511,7 @@ impl OpenHumanSessionHost {
         // at all.
         let all_tools = self.all_tool_refs();
         let reachable = self.reachable_tool_names();
-        let mut session = ToolPolicyEngine::build_session_from_refs(
+        let mut session = crate::tools::policy_session::build_policy_session(
             &self.agent_definition_name,
             &self.event_channel,
             "session",
@@ -551,6 +562,19 @@ impl OpenHumanSessionHost {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .pending_turn_overrides = overrides;
+    }
+
+    /// Ask the **next** turn to shape every model call (response format,
+    /// output cap) and report its final call into `scope`. Consumed at the
+    /// start of that turn, like [`Self::set_next_turn_overrides`].
+    pub fn set_next_turn_response_shape(
+        &mut self,
+        scope: Option<Arc<tinyagents_harness::middleware::ResponseShapeScope>>,
+    ) {
+        self.runtime_state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .pending_response_shape = scope;
     }
 
     /// Set the reply-language instruction every following user message

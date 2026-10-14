@@ -218,13 +218,13 @@ coding workers, and background completion delivery. See
 
 ### Agent definitions, registry and prompts
 
-An `AgentDefinition` ([`harness/definition/`](./harness/definition/)) is an archetype: id, tier,
+An `AgentDefinition` ([`harness/host_definition.rs`](./harness/host_definition.rs), vocabulary in `tinyagents-definition`) is an archetype: id, tier,
 prompt source, model spec, `ToolScope`, `SandboxMode`, iteration policy and
 allowed sub-agents. Built-ins live in `registry/agents/<id>/` as an
 `agent.toml` plus `prompt.md` (orchestrator, planner, critic, summarizer,
 trigger_triage, trigger_reactor, vision_agent and others). Custom
 definitions are TOML files under `<workspace>/agents/*.toml`, with
-`~/.openhuman/agents/*.toml` as a fallback ([`harness/definition_loader.rs`](./harness/definition_loader.rs)).
+`~/.openhuman/agents/*.toml` as a fallback (`tinyagents_definition::DefinitionSet::load_dirs`, driven from [`harness/host_definition.rs`](./harness/host_definition.rs)).
 `AgentDefinitionRegistry` holds the merged set; `agent.reload_definitions`
 rebuilds it.
 
@@ -282,7 +282,6 @@ Turn execution:
 | [`tool_policy.rs`](./tool_policy.rs) | `ToolPolicy`, the pre-execution allow/deny hook installed through the builder |
 | [`hooks.rs`](./hooks.rs) | `PostTurnHook` background hooks, including ones registered by embedders |
 | [`queued_turn.rs`](./queued_turn.rs) | `QueuedTurn`, the payload for a message sent while a turn is running |
-| [`error.rs`](./error.rs) | `AgentError`, typed retryable and permanent loop errors |
 | [`cost.rs`](./cost.rs) | Per-turn token and cost accounting (`TurnCost`) |
 | [`message_convert.rs`](./message_convert.rs), [`messages.rs`](./messages.rs) | Conversions between `TranscriptMessage` rows and TinyAgents `Message`s; the `history_wire` adapter for host-owned files |
 | `attachments/`, [`multimodal.rs`](./multimodal.rs) | Durable user uploads and provider-side attachment resolution; legacy marker compatibility ([README](attachments/README.md)) |
@@ -342,7 +341,7 @@ Persistence, setup and RPC:
 - `AgentProgress` (`progress.rs`): turn, iteration, tool, text and thinking
   deltas, cost updates and the `Subagent*` family.
 - `AgentDefinition`, `AgentDefinitionRegistry`, `ToolScope`, `SandboxMode`
-  (`harness/definition/`): what an agent is.
+  (`harness/host_definition.rs` + `tinyagents-definition`): what an agent is.
 - `ParentExecutionContext` ([`harness/fork_context.rs`](./harness/fork_context.rs)): task-local parent
   state a sub-agent reads; `orchestration::parent_context::build_root_parent`
   builds one for runs with no parent turn.
@@ -440,12 +439,12 @@ Integration coverage is in [`tests/agent_harness_e2e.rs`](../../../../tests/agen
 `tests/in_process/agent_*.rs`, aggregated into the `in_process_all` target.
 
 Related docs:
-[agent harness architecture](../../../../gitbooks/developing/architecture/agent-harness.md),
-[agent observability](../../../../gitbooks/developing/agent-observability.md).
+[agent harness architecture](../../../../docs/gitbooks/en/developing/architecture/agent-harness.md),
+[agent observability](../../../../docs/gitbooks/en/developing/agent-observability.md).
 
 ## Further reading
 
 - [Parent module README](../../README.md)
-- [Deep architecture reference](../../../../gitbooks/developing/architecture.md)
-- [The orchestrator](../../../../gitbooks/features/orchestration.md)
+- [Deep architecture reference](../../../../docs/gitbooks/en/developing/architecture.md)
+- [The orchestrator](../../../../docs/gitbooks/en/features/orchestration.md)
 - [tinyagents](../../../../vendor/tinyagents/README.md)

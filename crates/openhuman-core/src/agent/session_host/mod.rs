@@ -42,7 +42,6 @@ mod hooks;
 // Tool surface for live voice sessions (`voice::live`).
 #[cfg(feature = "voice")]
 mod live_tools;
-mod managed_tools;
 mod prefix_snapshot;
 mod recorded_tools;
 mod runtime;
@@ -76,8 +75,13 @@ mod artifact_wiring;
 #[cfg(test)]
 mod orphaned_head_resume_tests;
 #[cfg(test)]
+mod response_shape_turn_tests;
+#[cfg(test)]
 mod runtime_adapter_tests;
 #[cfg(test)]
 mod transcript_compat_tests;
 #[cfg(test)]
 mod typed_transcript_compat_tests;
+#[cfg(test)]
+#[path = "transcript_resume_stable_tests.rs"]
+mod transcript_resume_stable_tests;

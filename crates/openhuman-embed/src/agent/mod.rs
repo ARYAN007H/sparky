@@ -5,7 +5,7 @@
 //! [`Runtime::agent`](crate::Runtime::agent) assembled from an
 //! [`AgentSpec`]: its own `Config` (provider route and model, MCP servers,
 //! autonomy tier, `action_dir`), its
-//! [`AgentDefinition`](openhuman_core::agent::harness::definition::AgentDefinition)
+//! [`AgentDefinition`](openhuman_core::agent::harness::host_definition::AgentDefinition)
 //! (system prompt, tool scope, sandbox mode), its
 //! derived
 //! [`CoreContext`](openhuman_core::core::runtime::CoreContext) every turn
@@ -33,7 +33,7 @@ pub use spec::{AgentSpec, MemoryBinding};
 use std::path::Path;
 use std::sync::Arc;
 
-use openhuman_core::agent::harness::definition::AgentDefinition;
+use openhuman_core::agent::harness::host_definition::AgentDefinition;
 use openhuman_core::config::Config;
 use openhuman_core::core::runtime::{CoreContext, CoreRuntime};
 
@@ -172,10 +172,11 @@ impl AgentInner {
         if schedule_mcp_cleanup {
             // Keep an ephemeral runtime workspace alive until an outstanding
             // module close is acknowledged. The cleanup callback is retained
-            // by the path reservation if close needs a later retry.
-            let runtime_guard = Arc::clone(&self._runtime_guard);
+            // by the path reservation if close needs a later retry, so it
+            // holds only the workspace, never the runtime's process slot.
+            let workspace = self._runtime_guard.workspace_keepalive();
             let keep_workspace = Arc::new(move || {
-                let _ = &runtime_guard;
+                let _ = &workspace;
                 true
             });
             openhuman_core::mcp::host::schedule_agent_close_with_cleanup(

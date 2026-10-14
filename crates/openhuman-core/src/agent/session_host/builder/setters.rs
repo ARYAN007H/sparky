@@ -335,7 +335,7 @@ impl SessionHostBuilder {
     /// [`OpenHumanDefinitionRegistry::with_session_definition`]: crate::agent::tinyagents::host::OpenHumanDefinitionRegistry::with_session_definition
     pub fn agent_definition(
         mut self,
-        definition: Arc<crate::agent::harness::definition::AgentDefinition>,
+        definition: Arc<crate::agent::harness::host_definition::AgentDefinition>,
     ) -> Self {
         self.session_definition = Some(definition);
         self
@@ -363,13 +363,13 @@ impl SessionHostBuilder {
 
     /// Wire the model behind TinyJuice's oversized-tool-result summary into the
     /// agent. `ToolOutputMiddleware` calls
-    /// [`crate::agent::tinyagents::payload_summarizer::PayloadSummarizer::prepare`]
+    /// [`crate::agent::tinyagents::payload_summarizer::DynPayloadSummarizer::prepare`]
     /// for a large result and TinyJuice runs the call if it decides to
     /// summarize. Currently set only for the orchestrator session by
     /// [`OpenHumanSessionHost::build_session_agent_inner`].
     pub fn payload_summarizer(
         mut self,
-        summarizer: Arc<dyn crate::agent::tinyagents::payload_summarizer::PayloadSummarizer>,
+        summarizer: Arc<crate::agent::tinyagents::payload_summarizer::DynPayloadSummarizer>,
     ) -> Self {
         self.payload_summarizer = Some(summarizer);
         self

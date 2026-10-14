@@ -92,9 +92,10 @@ tinyflows-copilot = { path = "../../vendor/tinyflows/crates/tinyflows-copilot", 
 # Reads the stores tinyflows hosts used before storage moved onto the ports
 # (`flows.db`, `jobs.db`, `checkpoints.db`, drafts) and copies them into the
 # port-backed stores, read-only (`storage::import`). It needs the engine and the
-# catalog, so it rides the `flows` gate; a build without `flows` imports no
-# legacy cron jobs.
-tinyflows-import = { path = "../../vendor/tinyflows/crates/tinyflows-import", optional = true }
+# catalog, so those importers ride the `flows` gate (`tinyflows-import/engine`,
+# `store`, `catalog`); the `schedule` importer is always on, so a build without
+# `flows` still imports legacy cron jobs.
+tinyflows-import = { path = "../../vendor/tinyflows/crates/tinyflows-import", default-features = false, features = ["schedule"] }
 # TinyAgents — Rust LLM orchestration framework (LangGraph/LangChain-style):
 # durable state graphs, agent-loop harness, model/tool registries, REPL +
 # `.rag` workflow language. openhuman's agent engine + orchestration run on this
@@ -158,6 +159,10 @@ tinystoragedrivers = { path = "../../vendor/tinyagents/vendor/tinystoragedrivers
 # `modules::storage_host` interface answers loaded modules with. Modules only.
 tinystoragedrivers-bus = { path = "../../vendor/tinyagents/vendor/tinystoragedrivers/crates/tinystoragedrivers-bus", optional = true }
 tinystoragedrivers-client = { path = "../../vendor/tinyagents/vendor/tinystoragedrivers/crates/tinystoragedrivers-client", optional = true }
+# The module-side export macro, used only to wrap the host's own storage server
+# as a *linked* module (`modules/storage_host_linked.rs`): a linked module is the
+# one in-process recipient the bus attests, so it is how `Secrets` can be served.
+tinybus-module = { path = "../../vendor/tinybus/crates/tinybus-module", optional = true }
 tinyagents-runtime = { path = "../../vendor/tinyagents/crates/tinyagents-runtime" }
 tinyagents-orchestration = { path = "../../vendor/tinyagents/crates/tinyagents-orchestration" }
 tinyagents-tasks = { path = "../../vendor/tinyagents/crates/tinyagents-tasks" }
@@ -501,8 +506,9 @@ tokio-tungstenite = { version = "0.29", default-features = false, features = ["c
 # production channel execution uses the TinyBus module contract above.
 tinychannels = { path = "../../vendor/tinychannels", features = ["relay-websocket", "email", "lark", "whatsapp-web"] }
 tinychannels-runtime = { path = "../../vendor/tinychannels/crates/tinychannels-runtime" }
-# BLOCKED on tinybus 0.1.4 (tinybus epic): tinychannels-module v0.1.29 pins =0.1.4; workspace tinybus is 0.1.3.
-# tinychannels-module = { path = "../../vendor/tinychannels/crates/tinychannels-module", features = ["static-link"] }
+# The real TinyChannels module, linked into the test binary (never the product)
+# as the fixture behind `channels::module_fixture`.
+tinychannels-module = { path = "../../vendor/tinychannels/crates/tinychannels-module", features = ["static-link"] }
 tinybox-core = { path = "../../vendor/tinybox/crates/tinybox-core" }
 # The TinyMemory reference engine (an in-memory `MemoryEngine`) and the
 # behavioural suite every engine must pass. Memory unit tests bind it as the
@@ -614,9 +620,9 @@ default = ["media", "skills", "flows", "mcp", "channels", "http-server", "schedu
 #
 # `web_chat`'s event payload types (`WebChannelEvent`, `TurnUsagePayload`, …)
 # stay compiled in BOTH builds, since ~10 always-on domains construct them.
-# Likewise `inference::http::types` and `EXTERNAL_OPENAI_COMPAT_PROVIDER` stay
+# Likewise `EXTERNAL_OPENAI_COMPAT_PROVIDER` stays
 # compiled for the server's auth policy.
-http-server = ["dep:axum"]
+http-server = ["dep:axum", "tinyinference-llm/server-http"]
 # The public inference gate is retained for host feature compatibility.
 # Native permission probes execute through the TinyComputer module.
 inference = ["modules"]
@@ -687,6 +693,7 @@ modules = [
     "dep:tinywallet-bus",
     "dep:tinystoragedrivers-bus",
     "dep:tinystoragedrivers-client",
+    "dep:tinybus-module",
 ]
 # Voice domain: STT/TTS providers, the standalone dictation
 # server, and always-on listening.
@@ -746,7 +753,7 @@ media = ["tinyagents-harness/media"]
 # runtime `DomainSet::flows` flag (#4796): the feature narrows the compile-time
 # surface, `DomainSet` gates it at runtime.
 # NOTE: this gate does NOT drop `tinyagents` itself — 26+ domains consume it.
-flows = ["modules", "dep:tinyflows", "dep:tinyflows-catalog", "dep:tinyflows-copilot", "dep:tinyflows-import", "tinyflows-drivers/catalog"]
+flows = ["modules", "dep:tinyflows", "dep:tinyflows-catalog", "dep:tinyflows-copilot", "tinyflows-import/engine", "tinyflows-import/store", "tinyflows-import/catalog", "tinyflows-drivers/catalog"]
 # Skills domains: `openhuman::skills` (metadata/discovery/install),
 # `openhuman::skill_runtime` (SKILL.md execution + the skill_executor agent),
 # and `openhuman::skill_registry` (remote catalogs + the skill_setup agent).

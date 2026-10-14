@@ -11,7 +11,7 @@ use super::types::{
     ComposioTriggerEvent, ComposioTriggerHistoryEntry, ComposioTriggerHistoryResult,
 };
 use crate::config::Config;
-use crate::modules::client::ModuleClient;
+use tinybus::module::ModuleClient;
 use tinyconnectors_bus::names::methods;
 
 static GLOBAL_TRIGGER_HISTORY: OnceLock<Arc<TriggerHistory>> = OnceLock::new();
@@ -36,7 +36,7 @@ impl TriggerHistory {
         if let Some(client) = self.fixture.as_ref() {
             return client.clone();
         }
-        ModuleClient::new(config.clone())
+        crate::modules::client(config.clone())
     }
 
     async fn ensure_lease(
@@ -57,6 +57,9 @@ impl TriggerHistory {
         let state_dir = state_dir
             .to_str()
             .ok_or_else(|| "trigger archive requires a UTF-8 state directory".to_owned())?;
+        // The archive opens on the module's storage: bring yesterday's JSONL
+        // files across first (once per state directory, best effort).
+        crate::modules::import_legacy_connectors(&config.workspace_dir.join("state")).await;
         let handle = client
             .call(
                 "tinyconnectors",

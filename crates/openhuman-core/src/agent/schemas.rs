@@ -318,7 +318,7 @@ struct GetDefinitionParams {
 fn handle_get_definition(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<GetDefinitionParams>(params)?;
-        let registry = crate::agent::harness::AgentDefinitionRegistry::current()
+        let registry = crate::agent::harness::host_definition::AgentDefinitionRegistry::current()
             .ok_or_else(|| "AgentDefinitionRegistry not initialised".to_string())?;
         match registry.get(p.id.trim()) {
             Some(def) => Ok(serde_json::json!({ "definition": def })),
@@ -332,7 +332,8 @@ fn handle_reload_definitions(_params: Map<String, Value>) -> ControllerFuture {
         // The global registry is OnceLock-backed so live reload is a
         // no-op in v1. Reply with a status payload that explains this
         // and tells the caller how to refresh.
-        let already_loaded = crate::agent::harness::AgentDefinitionRegistry::global().is_some();
+        let already_loaded =
+            crate::agent::harness::host_definition::AgentDefinitionRegistry::global().is_some();
         Ok(serde_json::json!({
             "status": "noop",
             "registry_initialised": already_loaded,
@@ -479,7 +480,7 @@ fn handle_triage_evaluate(params: Map<String, Value>) -> ControllerFuture {
 
 fn handle_graph_topologies(_params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async {
-        let reports = crate::agent::tinyagents::all_graph_topologies();
+        let reports = tinyagents_orchestration::topology::all_graph_topologies();
         let agents = crate::agent::registry::agents::load_builtins()
             .map_err(|e| format!("loading built-in agent graph resolutions: {e}"))?
             .into_iter()
@@ -619,7 +620,7 @@ fn handle_registry_snapshot(_params: Map<String, Value>) -> ControllerFuture {
         }
 
         // ── Graphs: structure-only topology reports ─────────────────────────
-        let reports = crate::agent::tinyagents::all_graph_topologies();
+        let reports = tinyagents_orchestration::topology::all_graph_topologies();
         let graph_count = reports.len();
         for report in &reports {
             let mut meta = ComponentMetadata::new(report.name, ComponentKind::Graph)
