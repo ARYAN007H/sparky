@@ -233,16 +233,18 @@ async fn oversized_result_is_offloaded_and_the_parent_gets_a_readable_pointer() 
 async fn offload_failure_keeps_the_inline_payload_for_the_summarizer_fallback() {
     // The soft-failure contract the summarizer detour depends on: a refused
     // offload must never cost the caller its content.
-    let offload = new_artifact_offload(
-        PathBuf::from("/proc/nonexistent-action-root"),
-        None,
-        "worker",
-        "task-1",
-    );
+    // The blob write succeeds but the file cannot be materialised for the
+    // reader: no pointer to an unopenable path may reach the parent.
+    let offload = new_artifact_offload(memory_blobs(), None, "worker", "task-1");
     let big = "x".repeat(10_000);
 
-    let (text, artifact) =
-        offload_oversized_result(big.clone(), &offload, DEFAULT_OFFLOAD_THRESHOLD_BYTES).await;
+    let (text, artifact) = offload_oversized_result(
+        big.clone(),
+        &offload,
+        DEFAULT_OFFLOAD_THRESHOLD_BYTES,
+        &PathBuf::from("/proc/nonexistent-action-root"),
+    )
+    .await;
 
     assert_eq!(
         text, big,
