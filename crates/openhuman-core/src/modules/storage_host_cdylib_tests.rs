@@ -11,7 +11,7 @@
 //! What this proves, per the issue:
 //! * a module cannot reach another module's collections, another scope, or a
 //!   collection its grant never declared;
-//! * a blob over the 16 MiB frame cannot go inline;
+//! * a blob over the inline cap (1 MiB) is refused and stores nothing;
 //! * `PutStream`, `GetStream` and `WatchOpen` are refused as unsupported.
 //!
 //! What still waits for tinybus 0.1.5 (#7781): the positive halves of the last
