@@ -294,13 +294,10 @@ pub async fn import_legacy_tinybox(workspace_dir: &std::path::Path) {
     let _ = workspace_dir;
 }
 
-/// Imports the legacy on-disk CCR tier under `root` into the tinyjuice
-/// module's blob storage, once per directory. `ttl` is the configured original
-/// lifetime. Never fails the caller: an error is logged and the import is
-/// retried at the next install.
 /// Scopes, under the current tenant, that hold expiring blobs written by
 /// modules (today TinyJuice's CCR originals), for the blob sweeper. A module
-/// whose scope cannot be resolved here is skipped.
+/// whose scope cannot be resolved here is skipped. Without the `modules`
+/// feature no module writes blobs, so there is nothing to sweep.
 #[cfg(feature = "modules")]
 pub(crate) fn expiring_blob_module_scopes() -> Vec<crate::storage::Scope> {
     [storage_grant_tinyjuice::MODULE_ID]
@@ -309,11 +306,16 @@ pub(crate) fn expiring_blob_module_scopes() -> Vec<crate::storage::Scope> {
         .collect()
 }
 
+/// See the `modules` build: with the feature off no module writes blobs.
 #[cfg(not(feature = "modules"))]
 pub(crate) fn expiring_blob_module_scopes() -> Vec<crate::storage::Scope> {
     Vec::new()
 }
 
+/// Imports the legacy on-disk CCR tier under `root` into the tinyjuice
+/// module's blob storage, once per directory. `ttl` is the configured original
+/// lifetime. Never fails the caller: an error is logged and the import is
+/// retried at the next install.
 pub async fn import_legacy_tinyjuice(root: &std::path::Path, ttl: Option<std::time::Duration>) {
     #[cfg(feature = "modules")]
     import_once(

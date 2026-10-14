@@ -35,7 +35,7 @@ pub struct OpenHumanSessionDriver {
     run_queue:
         Option<Arc<tinyagents_harness::run_queue::RunQueue<crate::agent::queued_turn::QueuedTurn>>>,
     workspace: Option<tinytools::WorkspaceDescriptor>,
-    sandbox_mode: crate::agent::harness::definition::SandboxMode,
+    sandbox_mode: tinyagents_definition::SandboxMode,
     hosted_base: Option<Arc<OpenHumanHostBase>>,
     agent_id: String,
 }
@@ -53,7 +53,7 @@ impl OpenHumanSessionDriver {
             Arc<tinyagents_harness::run_queue::RunQueue<crate::agent::queued_turn::QueuedTurn>>,
         >,
         workspace: Option<tinytools::WorkspaceDescriptor>,
-        sandbox_mode: crate::agent::harness::definition::SandboxMode,
+        sandbox_mode: tinyagents_definition::SandboxMode,
         hosted_base: Option<Arc<OpenHumanHostBase>>,
         agent_id: String,
     ) -> Self {
@@ -183,10 +183,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
         // composed for: a text dialect strips schemas off the wire and needs
         // the positional registry to recover P-Format / code-style calls.
         let run_context = request.run_context.data.clone().with_tool_dialect(
-            crate::agent::prompts::tool_call_format_from_dialect(
-                self.dispatcher.tool_call_format(),
-            )
-            .harness_dispatcher(),
+            tinyagents_harness::dialect::dispatcher_for_format(self.dispatcher.tool_call_format()),
         );
         let cancellation = request.run_context.cancellation.clone();
         // Boxed: the graph future is very large, and holding it inline in the
@@ -270,7 +267,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
         // done by, so the turn commits before the backstop drops it.
         let close_by = request.run_context.data.turn_deadline.map(|deadline| {
             let now = Instant::now();
-            now + deadline.close_budget(now)
+            now + crate::agent::turn_deadline::close_budget(&deadline, now)
         });
         // A Stop during the close or the repair after it hands back the
         // accepted rounds like a Stop during the loop, instead of letting the
