@@ -25,7 +25,6 @@
 //! owning submodule directly (no re-export facade).
 
 pub(crate) mod approval;
-pub(crate) mod cli_rpc_only;
 pub(crate) mod credential_scrub;
 pub(crate) mod embedder_hooks;
 pub(crate) mod failure_policy;
@@ -33,7 +32,6 @@ pub(crate) mod fetched_site;
 pub(crate) mod memory_pack;
 pub(crate) mod packed_tool_route;
 pub(crate) mod repeated_failure;
-pub(crate) mod tool_exposure;
 pub(crate) mod tool_outcome_capture;
 pub(crate) mod tool_output;
 pub(crate) mod tool_policy;

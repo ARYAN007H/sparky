@@ -95,7 +95,7 @@ pub(crate) fn assemble_live_tool_harness(
         )),
     )));
     harness.push_tool_middleware(Arc::new(
-        middleware::cli_rpc_only::CliRpcOnlyMiddleware::new(tool_sets.clone()),
+        tinyagents_harness::middleware::CliRpcOnlyMiddleware::new(tool_sets.clone()),
     ));
     let route_session = tool_policy
         .as_ref()
