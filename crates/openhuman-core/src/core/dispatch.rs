@@ -3,6 +3,7 @@
 //! This module coordinates the routing of incoming requests to either the
 //! core subsystem or the OpenHuman domain-specific handlers.
 
+use crate::core::runtime::DispatchCtx;
 use crate::core::legacy_aliases::resolve_legacy;
 use crate::core::rpc_log;
 use crate::core::types::{AppState, InvocationResult};

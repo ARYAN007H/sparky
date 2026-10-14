@@ -21,6 +21,7 @@
 //! See the pluggable-core work (`core::runtime`) for how this fits with
 //! [`context`](crate::core::runtime::context) and `services`.
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use crate::config::Config;
@@ -439,7 +440,7 @@ impl CoreRuntime {
     ) -> Result<serde_json::Value, String> {
         log::trace!("[core-runtime] invoke_in method={method}");
         CoreContext::scope(
-            ctx,
+            Arc::clone(&ctx),
             crate::core::invoke::invoke_method(
                 crate::core::runtime::DispatchCtx::new(ctx),
                 crate::core::invoke::default_state(),

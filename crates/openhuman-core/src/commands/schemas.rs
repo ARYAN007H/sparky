@@ -53,9 +53,9 @@ pub fn schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_list(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_list(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        super::ops::commands_list()
+        super::ops::commands_list(&ctx)
             .await?
             .into_cli_compatible_json()
     })

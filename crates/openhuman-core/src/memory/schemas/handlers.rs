@@ -52,7 +52,7 @@ pub(super) fn engines_list(_ctx: DispatchCtx, params: Map<String, Value>) -> Con
     })
 }
 
-pub(super) fn engine_get(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn engine_get(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         parse::<EmptyParams>(params)?;
         to_json(ops::engine_get(&load().await?).await)

@@ -7,6 +7,7 @@
 //! - Persisting the `PairedDevice` record after a successful handshake.
 //! - Publishing `DomainEvent::DevicePaired / DevicePeerOnline / DevicePeerOffline`.
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::{Arc, OnceLock};
 
 use crate::core::bus::BUS;
@@ -604,6 +605,7 @@ async fn handle_encrypted_rpc_frame(channel_id: &str, frame_bytes: &[u8]) {
     );
 
     let result = crate::core::invoke::invoke_method(
+        crate::core::runtime::DispatchCtx::process_default(),
         crate::core::invoke::default_state(),
         &request.method,
         request.params,
