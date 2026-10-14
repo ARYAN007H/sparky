@@ -31,9 +31,7 @@ use tinybus::{
     StreamWriter,
 };
 use tinystoragedrivers_busproxy::connect_storage;
-use tinystoragedrivers_core::{
-    BlobReader, Filter, StorageBackend, WatchNotice, WatchOptions,
-};
+use tinystoragedrivers_core::{BlobReader, Filter, StorageBackend, WatchNotice, WatchOptions};
 use tokio::io::AsyncReadExt;
 
 const STORAGE: &str = "ai.tinyhumans.tinystorage.Storage";
@@ -129,7 +127,12 @@ impl Probe {
         };
         if let Err(error) = scoped
             .documents()
-            .put(collection, id, json!({ "from": "probe" }), Default::default())
+            .put(
+                collection,
+                id,
+                json!({ "from": "probe" }),
+                Default::default(),
+            )
             .await
         {
             return failed(error);
@@ -154,7 +157,11 @@ impl Probe {
         let host = tinybus::BusName::new(STORAGE)?;
         let writer = self
             .connection
-            .open_stream_with_timeout(&host, StreamDescriptor::with_len(len), Duration::from_secs(6))
+            .open_stream_with_timeout(
+                &host,
+                StreamDescriptor::with_len(len),
+                Duration::from_secs(6),
+            )
             .await?;
         let reference = serde_json::to_value(writer.stream_ref())?;
         *OPEN.lock().unwrap() = Some((writer, len));
@@ -170,7 +177,10 @@ impl Probe {
         }
         let head = json!({ "key": key, "len": len });
         let proxy = self.host_proxy()?;
-        let calling = proxy.call::<Value>("PutStream", (head, serde_json::to_value(writer.stream_ref())?));
+        let calling = proxy.call::<Value>(
+            "PutStream",
+            (head, serde_json::to_value(writer.stream_ref())?),
+        );
         let sending = async {
             let chunk = vec![FILL; CHUNK];
             let mut left = len as usize;
@@ -193,7 +203,11 @@ impl Probe {
     }
 
     async fn raw_get_stream(&self, key: &str) -> Result<Value> {
-        let reply: Value = match self.host_proxy()?.call("GetStream", (json!({ "key": key }),)).await {
+        let reply: Value = match self
+            .host_proxy()?
+            .call("GetStream", (json!({ "key": key }),))
+            .await
+        {
             Ok(reply) => reply,
             Err(Error::MethodFailed { name, message }) => {
                 return Ok(json!({ "err": { "name": name, "message": message } }));
@@ -222,7 +236,7 @@ impl Interface for Probe {
             "RawGetStream",
         ]
         .map(|member| MemberName::new(member).expect("a fixed name"))
-            .to_vec()
+        .to_vec()
     }
 
     async fn call(&self, member: &MemberName, args: Value) -> Result<Value> {
