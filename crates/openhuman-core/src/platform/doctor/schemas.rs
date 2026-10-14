@@ -70,16 +70,16 @@ pub fn schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_report(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_report(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
         to_json(crate::platform::doctor::rpc::doctor_report(&config).await?)
     })
 }
 
-fn handle_models(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_models(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
         let use_cache = read_optional::<bool>(&params, "use_cache")?.unwrap_or(true);
         to_json(crate::platform::doctor::rpc::doctor_models(&config, use_cache).await?)
     })

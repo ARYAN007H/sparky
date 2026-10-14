@@ -28,6 +28,7 @@
 //!   (`agent::orchestration::background_delivery`), none of which have a
 //!   human waiting on suggestions for their next message.
 
+use crate::core::runtime::DispatchCtx;
 use std::time::Duration;
 
 use serde::Deserialize;
@@ -98,7 +99,7 @@ pub(crate) fn spawn_follow_up_suggestions(
     ));
 }
 
-async fn generate_and_emit(
+async fn generate_and_emit(ctx: &DispatchCtx, 
     client_id: &str,
     thread_id: &str,
     request_id: &str,
@@ -115,7 +116,7 @@ async fn generate_and_emit(
         return;
     }
 
-    let config = match config_rpc::load_config_with_timeout().await {
+    let config = match config_rpc::load_config_with_timeout(&ctx).await {
         Ok(c) => c,
         Err(err) => {
             log::debug!(

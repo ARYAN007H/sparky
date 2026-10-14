@@ -7,6 +7,7 @@
 //! installed or removed. They know nothing about *how* the credential was
 //! obtained — that is the host's business.
 
+use crate::core::runtime::DispatchCtx;
 use crate::config::{
     default_root_openhuman_dir, pre_login_user_dir, read_active_user_id, user_openhuman_dir,
     write_active_user_id, Config,
@@ -109,8 +110,8 @@ pub(super) fn deactivate_user_scope() -> Result<(), String> {
 /// The config that reflects the current `active_user.toml` — reloaded after an
 /// activation so credentials, keys and workspaces land in the user-scoped
 /// location — or `fallback` when the reload fails.
-pub(super) async fn reload_config_or(_fallback: &Config) -> Result<Config, String> {
-    crate::config::load_config_with_timeout()
+pub(super) async fn reload_config_or(ctx: &DispatchCtx, _fallback: &Config) -> Result<Config, String> {
+    crate::config::load_config_with_timeout(&ctx)
         .await
         .map_err(|error| error.to_string())
 }

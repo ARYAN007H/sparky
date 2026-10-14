@@ -5,6 +5,7 @@
 //! transport, authenticated wallet-backend transport, and a confirmation
 //! decision bound to an in-flight confirmed execution request.
 
+use crate::core::runtime::DispatchCtx;
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::sync::{Mutex, OnceLock};
@@ -160,9 +161,9 @@ pub(super) fn has_endpoint_reference_for_test(reference: &str) -> bool {
         .is_ok_and(|references| references.contains_key(reference))
 }
 
-pub(crate) async fn wallet_accounts_snapshot(
+pub(crate) async fn wallet_accounts_snapshot(ctx: &DispatchCtx, 
 ) -> Result<tinywallet_bus::wire::WalletAccountsResponse, String> {
-    let status = crate::web3::wallet::status()
+    let status = crate::web3::wallet::status(&ctx)
         .await
         .map_err(|error| error.to_string())?
         .value;
@@ -513,9 +514,9 @@ struct WalletHost;
 impl WalletHost {
     /// Public wallet setup state and addresses; encrypted secrets never leave
     /// the host's custody store through this callback.
-    async fn wallet_accounts(&self) -> tinybus::Result<HostResponse> {
+    async fn wallet_accounts(&self, ctx: &DispatchCtx) -> tinybus::Result<HostResponse> {
         Ok(HostResponse::WalletAccounts(
-            wallet_accounts_snapshot().await.map_err(callback_error)?,
+            wallet_accounts_snapshot(&ctx).await.map_err(callback_error)?,
         ))
     }
 
@@ -632,8 +633,8 @@ impl WalletHost {
     }
 
     /// Perform only the named authenticated wallet-backend request.
-    async fn wallet_backend(&self, request: WalletBackendRequest) -> tinybus::Result<HostResponse> {
-        let config = crate::config::rpc::load_config_with_timeout()
+    async fn wallet_backend(&self, ctx: &DispatchCtx, request: WalletBackendRequest) -> tinybus::Result<HostResponse> {
+        let config = crate::config::rpc::load_config_with_timeout(&ctx)
             .await
             .map_err(callback_error)?;
         let client =

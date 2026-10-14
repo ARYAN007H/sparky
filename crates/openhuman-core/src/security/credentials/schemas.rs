@@ -193,18 +193,18 @@ pub fn schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_auth_set_credential(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_auth_set_credential(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
         let payload =
             deserialize_params::<crate::security::credentials::SetCredentialRequest>(params)?;
-        to_json(crate::security::credentials::rpc::set_credential(&config, payload).await?)
+        to_json(crate::security::credentials::rpc::set_credential(&ctx, &config, payload).await?)
     })
 }
 
-fn handle_auth_clear_credential(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_auth_clear_credential(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
         let payload = deserialize_params::<AuthClearCredentialParams>(params)?;
         let kind = match payload
             .kind
@@ -218,33 +218,33 @@ fn handle_auth_clear_credential(_ctx: DispatchCtx, params: Map<String, Value>) -
             ),
             None => None,
         };
-        to_json(crate::security::credentials::rpc::clear_credential(&config, kind).await?)
+        to_json(crate::security::credentials::rpc::clear_credential(&ctx, &config, kind).await?)
     })
 }
 
-fn handle_auth_get_state(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_auth_get_state(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
         to_json(crate::security::credentials::rpc::auth_get_state(&config).await?)
     })
 }
 
 fn handle_auth_get_session_token(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
         to_json(crate::security::credentials::rpc::auth_get_session_token_json(&config).await?)
     })
 }
 
 fn handle_auth_store_provider_credentials(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
         let payload = deserialize_params::<AuthStoreProviderCredentialsParams>(params)?;
         to_json(
             crate::security::credentials::rpc::store_provider_credentials(
@@ -261,11 +261,11 @@ fn handle_auth_store_provider_credentials(
 }
 
 fn handle_auth_remove_provider_credentials(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
         let payload = deserialize_params::<AuthRemoveProviderCredentialsParams>(params)?;
         to_json(
             crate::security::credentials::rpc::remove_provider_credentials(
@@ -279,11 +279,11 @@ fn handle_auth_remove_provider_credentials(
 }
 
 fn handle_auth_list_provider_credentials(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
         let payload = if params.is_empty() {
             AuthListProviderCredentialsParams::default()
         } else {

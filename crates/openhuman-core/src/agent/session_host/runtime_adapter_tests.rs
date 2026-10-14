@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
@@ -599,7 +600,7 @@ async fn production_turn_path_wires_an_artifact_store_outside_the_project() {
         .build()
         .expect("session build");
 
-    host.ensure_runtime_session()
+    host.ensure_runtime_session(&DispatchCtx::process_default())
         .expect("ensure runtime session");
 
     let state = host
@@ -641,7 +642,7 @@ async fn artifact_store_stays_in_the_workspace_without_a_descriptor() {
         .build()
         .expect("session build");
 
-    host.ensure_runtime_session()
+    host.ensure_runtime_session(&DispatchCtx::process_default())
         .expect("ensure runtime session");
 
     let state = host

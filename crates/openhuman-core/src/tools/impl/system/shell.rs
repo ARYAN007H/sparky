@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::shell_description::{command_param_description, shell_description};
 #[cfg(feature = "modules")]
 use super::shell_support::container_environment;
@@ -263,7 +264,7 @@ impl Tool for ShellTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> anyhow::Result<ToolResult> {
-        self.execute_in_context(args, None).await
+        self.execute_in_context(&DispatchCtx::ambient(), args, None).await
     }
 
     async fn execute_with_context(
@@ -272,13 +273,13 @@ impl Tool for ShellTool {
         _options: ToolCallOptions,
         context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
-        self.execute_in_context(args, context).await
+        self.execute_in_context(&DispatchCtx::ambient(), args, context).await
     }
 }
 
 impl ShellTool {
     async fn execute_in_context(
-        &self,
+        &self, ctx: &DispatchCtx,
         args: serde_json::Value,
         context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
@@ -297,7 +298,7 @@ impl ShellTool {
         let (allowed, result) = crate::sandbox::shell_progress::with_shell_progress(
             context,
             crate::sandbox::shell_progress::HEARTBEAT_INTERVAL,
-            |meter| self.run_with_security_in_context(command, requested_timeout, context, meter),
+            |meter| self.run_with_security_in_context(&ctx, command, requested_timeout, context, meter),
         )
         .await;
         let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
@@ -334,7 +335,7 @@ impl ShellTool {
     }
 
     async fn run_with_security_in_context(
-        &self,
+        &self, ctx: &DispatchCtx,
         command: &str,
         requested_timeout: Option<u64>,
         context: Option<&dyn ToolRunContext>,
@@ -596,7 +597,7 @@ impl ShellTool {
         );
         let config = match self.analysis_config.as_deref() {
             Some(config) => config.clone(),
-            None => match crate::config::ops::load_config_with_timeout().await {
+            None => match crate::config::ops::load_config_with_timeout(&ctx).await {
                 Ok(config) => config,
                 Err(e) => {
                     return (

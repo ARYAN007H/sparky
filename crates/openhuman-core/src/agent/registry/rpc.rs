@@ -1,5 +1,6 @@
 //! RPC payloads and handlers for the agent registry domain.
 
+use crate::core::runtime::DispatchCtx;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -21,10 +22,10 @@ pub struct ListResponse {
     pub agents: Vec<AgentRegistryEntry>,
 }
 
-pub async fn list_rpc(req: ListRequest) -> Result<Outcome<ListResponse>, String> {
+pub async fn list_rpc(ctx: &DispatchCtx, req: ListRequest) -> Result<Outcome<ListResponse>, String> {
     Ok(Outcome::new(
         ListResponse {
-            agents: ops::list_agents(req.include_disabled).await?,
+            agents: ops::list_agents(&ctx, req.include_disabled).await?,
         },
         vec![],
     ))
@@ -38,12 +39,12 @@ pub struct AvailableToolsResponse {
     pub tools: Vec<AgentToolInfo>,
 }
 
-pub async fn available_tools_rpc(
+pub async fn available_tools_rpc(ctx: &DispatchCtx, 
     _req: AvailableToolsRequest,
 ) -> Result<Outcome<AvailableToolsResponse>, String> {
     Ok(Outcome::new(
         AvailableToolsResponse {
-            tools: ops::available_tools().await?,
+            tools: ops::available_tools(&ctx).await?,
         },
         vec![],
     ))
@@ -59,10 +60,10 @@ pub struct GetResponse {
     pub agent: Option<AgentRegistryEntry>,
 }
 
-pub async fn get_rpc(req: GetRequest) -> Result<Outcome<GetResponse>, String> {
+pub async fn get_rpc(ctx: &DispatchCtx, req: GetRequest) -> Result<Outcome<GetResponse>, String> {
     Ok(Outcome::new(
         GetResponse {
-            agent: ops::get_agent(&req.id).await?,
+            agent: ops::get_agent(&ctx, &req.id).await?,
         },
         vec![],
     ))
@@ -116,10 +117,10 @@ impl CreateCustomRequest {
     }
 }
 
-pub async fn create_custom_rpc(req: CreateCustomRequest) -> Result<Outcome<AgentResponse>, String> {
+pub async fn create_custom_rpc(ctx: &DispatchCtx, req: CreateCustomRequest) -> Result<Outcome<AgentResponse>, String> {
     Ok(Outcome::new(
         AgentResponse {
-            agent: ops::upsert_custom_agent(req.into_entry()).await?,
+            agent: ops::upsert_custom_agent(&ctx, req.into_entry()).await?,
         },
         vec![],
     ))
@@ -135,10 +136,10 @@ pub struct AgentResponse {
     pub agent: AgentRegistryEntry,
 }
 
-pub async fn upsert_custom_rpc(req: UpsertCustomRequest) -> Result<Outcome<AgentResponse>, String> {
+pub async fn upsert_custom_rpc(ctx: &DispatchCtx, req: UpsertCustomRequest) -> Result<Outcome<AgentResponse>, String> {
     Ok(Outcome::new(
         AgentResponse {
-            agent: ops::upsert_custom_agent(req.agent).await?,
+            agent: ops::upsert_custom_agent(&ctx, req.agent).await?,
         },
         vec![],
     ))
@@ -151,10 +152,10 @@ pub struct UpdateRequest {
     pub patch: AgentRegistryPatch,
 }
 
-pub async fn update_rpc(req: UpdateRequest) -> Result<Outcome<AgentResponse>, String> {
+pub async fn update_rpc(ctx: &DispatchCtx, req: UpdateRequest) -> Result<Outcome<AgentResponse>, String> {
     Ok(Outcome::new(
         AgentResponse {
-            agent: ops::update_agent(&req.id, req.patch).await?,
+            agent: ops::update_agent(&ctx, &req.id, req.patch).await?,
         },
         vec![],
     ))
@@ -166,10 +167,10 @@ pub struct SetEnabledRequest {
     pub enabled: bool,
 }
 
-pub async fn set_enabled_rpc(req: SetEnabledRequest) -> Result<Outcome<AgentResponse>, String> {
+pub async fn set_enabled_rpc(ctx: &DispatchCtx, req: SetEnabledRequest) -> Result<Outcome<AgentResponse>, String> {
     Ok(Outcome::new(
         AgentResponse {
-            agent: ops::set_agent_enabled(&req.id, req.enabled).await?,
+            agent: ops::set_agent_enabled(&ctx, &req.id, req.enabled).await?,
         },
         vec![],
     ))
@@ -185,10 +186,10 @@ pub struct RemoveResponse {
     pub removed: bool,
 }
 
-pub async fn remove_rpc(req: RemoveRequest) -> Result<Outcome<RemoveResponse>, String> {
+pub async fn remove_rpc(ctx: &DispatchCtx, req: RemoveRequest) -> Result<Outcome<RemoveResponse>, String> {
     Ok(Outcome::new(
         RemoveResponse {
-            removed: ops::remove_agent(&req.id).await?,
+            removed: ops::remove_agent(&ctx, &req.id).await?,
         },
         vec![],
     ))

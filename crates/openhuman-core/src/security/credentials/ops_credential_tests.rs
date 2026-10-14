@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::security::credentials::api_key;
 
@@ -20,6 +21,7 @@ async fn same_token_refresh_preserves_issuing_backend_and_refuses_rebinding() {
         )
         .unwrap();
     let state = set_credential(
+        &DispatchCtx::process_default(),
         &config,
         SetCredentialRequest {
             token: "synthetic-session".into(),
@@ -35,6 +37,7 @@ async fn same_token_refresh_preserves_issuing_backend_and_refuses_rebinding() {
         Some("https://issuer.example")
     );
     let error = set_credential(
+        &DispatchCtx::process_default(),
         &config,
         SetCredentialRequest {
             token: "synthetic-session".into(),
@@ -96,9 +99,9 @@ async fn decrypt_secret_round_trips_noise_through_migrate_path() {
 async fn set_credential_rejects_empty_or_whitespace_token() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
-    let err = store_session(&config, "", None, None).await.unwrap_err();
+    let err = store_session(&DispatchCtx::process_default(), &config, "", None, None).await.unwrap_err();
     assert!(err.contains("token is required"));
-    let err = store_session(&config, "   ", None, None).await.unwrap_err();
+    let err = store_session(&DispatchCtx::process_default(), &config, "   ", None, None).await.unwrap_err();
     assert!(err.contains("token is required"));
 }
 
@@ -107,6 +110,7 @@ async fn set_credential_rejects_unknown_kind() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     let err = set_credential(
+        &DispatchCtx::process_default(),
         &config,
         SetCredentialRequest {
             token: "x".into(),
@@ -127,7 +131,7 @@ async fn set_credential_rejects_an_expired_jwt_without_storing() {
         "sub": "user-1",
         "exp": (chrono::Utc::now() - chrono::Duration::hours(1)).timestamp()
     }));
-    let err = store_session(&config, &token, None, None)
+    let err = store_session(&DispatchCtx::process_default(), &config, &token, None, None)
         .await
         .unwrap_err();
     assert!(err.starts_with("CREDENTIAL_EXPIRED:"), "{err}");
@@ -146,7 +150,7 @@ async fn set_credential_requires_a_user_id_for_a_session() {
     let token = jwt_with_payload(json!({
         "exp": (chrono::Utc::now() + chrono::Duration::hours(1)).timestamp()
     }));
-    let err = store_session(&config, &token, None, None)
+    let err = store_session(&DispatchCtx::process_default(), &config, &token, None, None)
         .await
         .unwrap_err();
     assert!(err.contains("userId required"), "{err}");
@@ -222,7 +226,7 @@ async fn set_credential_derives_the_user_id_from_the_jwt_subject() {
         "sub": "from-claims",
         "exp": (chrono::Utc::now() + chrono::Duration::hours(1)).timestamp()
     }));
-    let state = store_session(&config, &token, None, None)
+    let state = store_session(&DispatchCtx::process_default(), &config, &token, None, None)
         .await
         .unwrap()
         .value;
@@ -258,7 +262,7 @@ async fn set_credential_with_the_same_token_and_user_is_a_cheap_refresh() {
     assert!(first.logs.join(" ").contains("user directory activated"));
 
     // The host's `/auth/me` answer arrives: same token, same user.
-    let user_config = crate::config::load_config_with_timeout().await.unwrap();
+    let user_config = crate::config::load_config_with_timeout(&DispatchCtx::process_default()).await.unwrap();
     let second = store_session(
         &user_config,
         &token,
@@ -288,6 +292,7 @@ async fn set_credential_for_a_different_user_signs_the_previous_one_out_first() 
     let config = test_config(&tmp);
     let exp = (chrono::Utc::now() + chrono::Duration::hours(1)).timestamp();
     store_session(
+        &DispatchCtx::process_default(),
         &config,
         &jwt_with_payload(json!({ "sub": "alice", "exp": exp })),
         None,
@@ -295,8 +300,9 @@ async fn set_credential_for_a_different_user_signs_the_previous_one_out_first() 
     )
     .await
     .unwrap();
-    let alice_config = crate::config::load_config_with_timeout().await.unwrap();
+    let alice_config = crate::config::load_config_with_timeout(&DispatchCtx::process_default()).await.unwrap();
     let result = store_session(
+        &DispatchCtx::process_default(),
         &alice_config,
         &jwt_with_payload(json!({ "sub": "bob", "exp": exp })),
         None,
@@ -328,6 +334,7 @@ async fn set_and_clear_api_key_credential() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     let state = set_credential(
+        &DispatchCtx::process_default(),
         &config,
         SetCredentialRequest {
             token: "sk-live".into(),
@@ -342,7 +349,7 @@ async fn set_and_clear_api_key_credential() {
     assert_eq!(state.credential.as_deref(), Some("api-key"));
     assert!(state.user_id.is_none());
 
-    let cleared = clear_credential(&config, Some(session_support::CredentialKind::ApiKey))
+    let cleared = clear_credential(&DispatchCtx::process_default(), &config, Some(session_support::CredentialKind::ApiKey))
         .await
         .unwrap()
         .value;
@@ -377,8 +384,9 @@ async fn clearing_the_session_preserves_a_coexisting_api_key() {
 
     // Store the API key against the now-active user-scoped config, exactly
     // as the dispatcher would for a follow-up `auth.set_credential` call.
-    let user_scoped = crate::config::load_config_with_timeout().await.unwrap();
+    let user_scoped = crate::config::load_config_with_timeout(&DispatchCtx::process_default()).await.unwrap();
     set_credential(
+        &DispatchCtx::process_default(),
         &user_scoped,
         SetCredentialRequest {
             token: "sk-live".into(),
@@ -394,7 +402,7 @@ async fn clearing_the_session_preserves_a_coexisting_api_key() {
     );
 
     // Sign the session out only — the API key must not be cleared.
-    let cleared = clear_credential(&user_scoped, Some(session_support::CredentialKind::Session))
+    let cleared = clear_credential(&DispatchCtx::process_default(), &user_scoped, Some(session_support::CredentialKind::Session))
         .await
         .unwrap()
         .value;
@@ -404,7 +412,7 @@ async fn clearing_the_session_preserves_a_coexisting_api_key() {
     // The process is now back on the pre-login/signed-out config. The key
     // must be readable — and `auth.get_state` must report it — from there,
     // not stranded under the deactivated user directory.
-    let signed_out = crate::config::load_config_with_timeout().await.unwrap();
+    let signed_out = crate::config::load_config_with_timeout(&DispatchCtx::process_default()).await.unwrap();
     assert_ne!(
         signed_out.config_path, user_scoped.config_path,
         "sign-out must have rebound to a different (pre-login) config"
@@ -447,8 +455,9 @@ async fn clearing_the_session_preserves_the_active_key_over_a_stale_destination_
 
     // Key A already sits at the real pre-login/signed-out scope — e.g. left
     // over from an earlier api-key-only run before any session existed.
-    let pre_login = crate::config::load_config_with_timeout().await.unwrap();
+    let pre_login = crate::config::load_config_with_timeout(&DispatchCtx::process_default()).await.unwrap();
     set_credential(
+        &DispatchCtx::process_default(),
         &pre_login,
         SetCredentialRequest {
             token: "sk-stale-a".into(),
@@ -472,8 +481,9 @@ async fn clearing_the_session_preserves_the_active_key_over_a_stale_destination_
         .unwrap();
 
     // Key B is the one actually active while the session is up.
-    let user_scoped = crate::config::load_config_with_timeout().await.unwrap();
+    let user_scoped = crate::config::load_config_with_timeout(&DispatchCtx::process_default()).await.unwrap();
     set_credential(
+        &DispatchCtx::process_default(),
         &user_scoped,
         SetCredentialRequest {
             token: "sk-live-b".into(),
@@ -490,11 +500,11 @@ async fn clearing_the_session_preserves_the_active_key_over_a_stale_destination_
 
     // A session-only clear must preserve key B as the effective credential,
     // not let the stale key A at the destination win by default.
-    clear_credential(&user_scoped, Some(session_support::CredentialKind::Session))
+    clear_credential(&DispatchCtx::process_default(), &user_scoped, Some(session_support::CredentialKind::Session))
         .await
         .unwrap();
 
-    let signed_out = crate::config::load_config_with_timeout().await.unwrap();
+    let signed_out = crate::config::load_config_with_timeout(&DispatchCtx::process_default()).await.unwrap();
     assert_eq!(
         api_key::get_api_key(&signed_out).unwrap().as_deref(),
         Some("sk-live-b"),
@@ -523,8 +533,9 @@ async fn clearing_without_a_kind_removes_a_user_scoped_api_key_at_its_source() {
         .await
         .unwrap();
 
-    let user_scoped = crate::config::load_config_with_timeout().await.unwrap();
+    let user_scoped = crate::config::load_config_with_timeout(&DispatchCtx::process_default()).await.unwrap();
     set_credential(
+        &DispatchCtx::process_default(),
         &user_scoped,
         SetCredentialRequest {
             token: "sk-live".into(),
@@ -536,7 +547,7 @@ async fn clearing_without_a_kind_removes_a_user_scoped_api_key_at_its_source() {
     .unwrap();
     assert!(api_key::has_api_key(&user_scoped));
 
-    let cleared = clear_credential(&user_scoped, None).await.unwrap().value;
+    let cleared = clear_credential(&DispatchCtx::process_default(), &user_scoped, None).await.unwrap().value;
     assert_eq!(cleared["removed"], true);
     assert_eq!(cleared["removedSession"], true);
     assert_eq!(
@@ -550,7 +561,7 @@ async fn clearing_without_a_kind_removes_a_user_scoped_api_key_at_its_source() {
         "the api key must be gone from its real (user-scoped) location, not just the \
          post-teardown config clear_credential ends up using"
     );
-    let signed_out = crate::config::load_config_with_timeout().await.unwrap();
+    let signed_out = crate::config::load_config_with_timeout(&DispatchCtx::process_default()).await.unwrap();
     assert!(!api_key::has_api_key(&signed_out));
     assert!(
         !auth_get_state(&signed_out)
@@ -569,6 +580,7 @@ async fn clear_credential_without_a_kind_removes_everything() {
     let _home = EnvVarGuard::set("HOME", tmp.path());
     let config = test_config(&tmp);
     set_credential(
+        &DispatchCtx::process_default(),
         &config,
         SetCredentialRequest {
             token: "sk-live".into(),
@@ -578,7 +590,7 @@ async fn clear_credential_without_a_kind_removes_everything() {
     )
     .await
     .unwrap();
-    let cleared = clear_credential(&config, None).await.unwrap().value;
+    let cleared = clear_credential(&DispatchCtx::process_default(), &config, None).await.unwrap().value;
     assert_eq!(cleared["removed"], true);
     assert_eq!(cleared["removedApiKey"], true);
     assert!(
@@ -603,7 +615,7 @@ async fn store_session_local_token_rejects_missing_user_payload() {
     let _home = EnvVarGuard::set("HOME", tmp.path());
     let config = test_config(&tmp);
     let local_token = "header.payload.local";
-    let err = store_session(&config, local_token, None, None)
+    let err = store_session(&DispatchCtx::process_default(), &config, local_token, None, None)
         .await
         .unwrap_err();
     assert!(

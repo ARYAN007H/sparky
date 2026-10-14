@@ -51,7 +51,7 @@ pub async fn invoke_method(
             // local credential cannot use. This extra config read happens only
             // on a classified session-expiry error, never on the normal path.
             let local =
-                crate::security::credentials::session_support::current_session_is_local().await;
+                crate::security::credentials::session_support::current_session_is_local(&ctx).await;
             if should_publish_session_expired(msg, local) {
                 log::warn!(
                     "[jsonrpc] confirmed session expiry for method='{}' — publishing SessionExpired: {}",

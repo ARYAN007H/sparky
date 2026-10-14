@@ -1,6 +1,7 @@
 //! Durable user uploads in the acting workspace. Provider resolution never
 //! changes the original file or writes inline media into session records.
 
+use crate::core::runtime::DispatchCtx;
 use std::path::{Component, Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -426,7 +427,7 @@ pub(crate) async fn stage(
 
 /// Explicit image forwarding for delegation. A filename mentioned in prose
 /// grants no read; only the typed argument or a legacy image marker does.
-pub(crate) async fn delegation_prompt(
+pub(crate) async fn delegation_prompt(ctx: &DispatchCtx, 
     prompt: &str,
     args: &serde_json::Value,
     workspace: Option<&tinytools::WorkspaceDescriptor>,
@@ -454,7 +455,7 @@ pub(crate) async fn delegation_prompt(
     ) {
         anyhow::bail!("local attachment reads are disabled for external channel input");
     }
-    let mut config = crate::config::rpc::load_config_with_timeout()
+    let mut config = crate::config::rpc::load_config_with_timeout(&ctx)
         .await
         .map_err(anyhow::Error::msg)?;
     if let Some(workspace) = workspace {
@@ -468,7 +469,7 @@ pub(crate) async fn delegation_prompt(
 }
 
 /// Validate a vision task's explicit references before constructing inference.
-pub(crate) async fn has_resolvable_image(
+pub(crate) async fn has_resolvable_image(ctx: &DispatchCtx, 
     prompt: &str,
     workspace: Option<&tinytools::WorkspaceDescriptor>,
     origin: Option<&crate::agent::turn_origin::AgentTurnOrigin>,
@@ -487,7 +488,7 @@ pub(crate) async fn has_resolvable_image(
     if paths.is_empty() {
         return Ok(false);
     }
-    let mut config = crate::config::rpc::load_config_with_timeout()
+    let mut config = crate::config::rpc::load_config_with_timeout(&ctx)
         .await
         .map_err(anyhow::Error::msg)?;
     if matches!(

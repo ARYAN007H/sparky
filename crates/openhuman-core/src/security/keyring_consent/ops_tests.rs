@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 
 #[tokio::test]
@@ -10,7 +11,7 @@ async fn keyring_status_returns_ok() {
 
 #[tokio::test]
 async fn keyring_consent_decide_rejects_invalid_mode() {
-    let result = keyring_consent_decide("invalid".to_string()).await;
+    let result = keyring_consent_decide(&DispatchCtx::process_default(), "invalid".to_string()).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("invalid mode"));
 }

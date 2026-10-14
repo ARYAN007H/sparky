@@ -41,6 +41,7 @@
 //! embedding builds use `--no-default-features --features "<list>"`. See the
 //! `[features]` block in `Cargo.toml` for the full gate list and rationale.
 
+use crate::core::runtime::DispatchCtx;
 // The RPC dispatch chokepoint wraps each handler future in an ambient
 // `CoreContext` scope (Phase 2). Combined with the already very deep async type
 // stacks in the axum routes that fan out into the tinyagents harness, the extra
@@ -112,7 +113,7 @@ pub use core::types::HostKind;
 ///
 /// Returns an error if command execution fails.
 pub fn run_core_from_args(args: &[String]) -> anyhow::Result<()> {
-    run_core_from_args_with(args, None)
+    run_core_from_args_with(&ctx, args, None)
 }
 
 /// [`run_core_from_args`] with a host-supplied boot description.
@@ -125,7 +126,7 @@ pub fn run_core_from_args(args: &[String]) -> anyhow::Result<()> {
 /// # Errors
 ///
 /// Returns an error if command execution fails.
-pub fn run_core_from_args_with(
+pub fn run_core_from_args_with(ctx: &DispatchCtx, 
     args: &[String],
     host_boot: Option<core::server_launcher::HostBoot>,
 ) -> anyhow::Result<()> {
@@ -138,5 +139,5 @@ pub fn run_core_from_args_with(
     {
         security::secret_storage::init_master_key().map_err(anyhow::Error::msg)?;
     }
-    core::cli::run_from_cli_args_with(args, host_boot)
+    core::cli::run_from_cli_args_with(&ctx, args, host_boot)
 }

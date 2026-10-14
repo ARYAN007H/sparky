@@ -5,6 +5,7 @@
 //! `ConnectionCreated` fetch so freshly-connected work shows up without
 //! waiting for the next periodic tick.
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::{Arc, OnceLock};
 
 use async_trait::async_trait;
@@ -62,8 +63,8 @@ impl EventHandler<DomainEvent> for TaskSourcesConnectionSubscriber {
 /// loaded inside it — so an agent whose own config disables task sources is
 /// skipped even when the process config enables them, and the other way
 /// round.
-async fn fire_in_scope(provider: ProviderSlug, toolkit: &str, connection_id: &str) {
-    let config = match config_rpc::load_config_with_timeout().await {
+async fn fire_in_scope(ctx: &DispatchCtx, provider: ProviderSlug, toolkit: &str, connection_id: &str) {
+    let config = match config_rpc::load_config_with_timeout(&ctx).await {
         Ok(config) => config,
         Err(e) => {
             tracing::debug!(error = %e, "[task_sources:bus] load_config failed, skipping scope");
@@ -78,7 +79,7 @@ async fn fire_in_scope(provider: ProviderSlug, toolkit: &str, connection_id: &st
 
 /// Starts a one-shot fetch for every enabled source of `provider` in the
 /// current storage scope that the new connection serves.
-async fn fire_for_connection(
+async fn fire_for_connection(ctx: &DispatchCtx, 
     config: &crate::config::Config,
     provider: ProviderSlug,
     toolkit: &str,
@@ -115,7 +116,7 @@ async fn fire_for_connection(
         // Scoped: the fetch keeps the scope's agent context.
         crate::core::runtime::spawn_scoped(async move {
             let _ =
-                pipeline::run_source_once(&config, &source, FetchReason::ConnectionCreated).await;
+                pipeline::run_source_once(&ctx, &config, &source, FetchReason::ConnectionCreated).await;
         });
     }
 }

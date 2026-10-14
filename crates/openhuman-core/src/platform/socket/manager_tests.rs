@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 use serde_json::json;
 
@@ -191,6 +192,7 @@ async fn emit_still_succeeds_after_server_error_on_live_connection() {
     // to the readiness flag, which is owned by the connection loop.
     let (sink_tx, _sink_rx) = mpsc::unbounded_channel::<String>();
     super::super::event_handlers::handle_sio_event(
+        &DispatchCtx::process_default(),
         "error",
         json!({ "message": "boom" }),
         &sink_tx,

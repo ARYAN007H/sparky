@@ -82,12 +82,12 @@ pub(super) struct InferenceListModelsParams {
 }
 
 pub(super) fn handle_inference_resolve_model(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<InferenceResolveModelParams>(params)?;
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
         let resolved =
             crate::inference::provider::factory::resolve_model_for_hint(&p.hint, &config);
         // Whether the resolved model accepts image input — drives the chat UI's
@@ -105,24 +105,24 @@ pub(super) fn handle_inference_resolve_model(
 }
 
 pub(super) fn handle_inference_status(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
         to_json(crate::inference::rpc::inference_status(&config).await?)
     })
 }
 
 pub(super) fn handle_inference_get_client_config(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
-    Box::pin(async move { to_json(crate::inference::rpc::inference_get_client_config().await?) })
+    Box::pin(async move { to_json(crate::inference::rpc::inference_get_client_config(&ctx).await?) })
 }
 
 pub(super) fn handle_inference_update_model_settings(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
@@ -255,12 +255,12 @@ pub(super) fn handle_inference_update_model_settings(
             memory_provider: update.memory_provider,
             embeddings_provider: update.embeddings_provider,
         };
-        to_json(crate::inference::rpc::inference_update_model_settings(patch).await?)
+        to_json(crate::inference::rpc::inference_update_model_settings(&ctx, patch).await?)
     })
 }
 
 pub(super) fn handle_inference_update_local_settings(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
@@ -281,7 +281,7 @@ pub(super) fn handle_inference_update_local_settings(
             usage_embeddings: update.usage_embeddings,
             api_key: update.api_key,
         };
-        to_json(crate::inference::rpc::inference_update_local_settings(patch).await?)
+        to_json(crate::inference::rpc::inference_update_local_settings(&ctx, patch).await?)
     })
 }
 
@@ -303,11 +303,11 @@ pub(super) fn handle_inference_provider_auth_errors(
 }
 
 pub(super) fn handle_inference_diagnostics(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
         to_json(crate::inference::rpc::inference_diagnostics(&config).await?)
     })
 }

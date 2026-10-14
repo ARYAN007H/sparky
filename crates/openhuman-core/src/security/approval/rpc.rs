@@ -3,6 +3,7 @@
 //! Exposed as `approval_list_pending` and `approval_decide` through
 //! the controller registry (see [`super::schemas`]).
 
+use crate::core::runtime::DispatchCtx;
 use anyhow::anyhow;
 
 use crate::core::Outcome;
@@ -201,7 +202,7 @@ pub async fn approval_preauthorize_flow(
 /// Apply a decision to a pending row. Errors when the request id is
 /// unknown / already decided / belongs to a different session. With
 /// `agent_id`, also errors when the request belongs to another agent.
-pub async fn approval_decide(
+pub async fn approval_decide(ctx: &DispatchCtx, 
     request_id: &str,
     decision: ApprovalDecision,
     agent_id: Option<&str>,
@@ -292,7 +293,7 @@ pub async fn approval_decide(
             row.tool_name
         ));
     } else if decision == ApprovalDecision::ApproveAlwaysForTool {
-        match crate::config::ops::add_auto_approve_tool(&row.tool_name).await {
+        match crate::config::ops::add_auto_approve_tool(&ctx, &row.tool_name).await {
             Ok(()) => {
                 tracing::info!(
                     tool = row.tool_name.as_str(),

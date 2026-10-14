@@ -103,10 +103,11 @@ fn unknown_schema() -> ControllerSchema {
     }
 }
 
-fn handle_quote(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_quote(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
         let quote = web3_service::quote(
+            &ctx,
             &config,
             None,
             methods::WEB3_SWAP_QUOTE,
@@ -118,12 +119,12 @@ fn handle_quote(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFutu
     })
 }
 
-fn handle_execute(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_execute(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let parsed: web3_service::ExecuteParams = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("invalid params: {e}"))?;
-        let config = config_rpc::load_config_with_timeout().await?;
-        let result = web3_service::execute(&config, None, parsed.quote_id, parsed.confirmed)
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let result = web3_service::execute(&ctx, &config, None, parsed.quote_id, parsed.confirmed)
             .await
             .map_err(|error| error.to_string())?;
         Outcome::new(result, vec!["web3 transaction broadcast".to_string()])
@@ -131,10 +132,10 @@ fn handle_execute(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFu
     })
 }
 
-fn handle_routes(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_routes(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
-        let routes = web3_service::routes(&config)
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let routes = web3_service::routes(&ctx, &config)
             .await
             .map_err(|error| error.to_string())?;
         Outcome::new(routes, vec!["web3 supported routes listed".to_string()])

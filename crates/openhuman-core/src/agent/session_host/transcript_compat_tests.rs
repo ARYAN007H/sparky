@@ -14,6 +14,7 @@
 //! Regenerate only when deliberately adding a scenario:
 //! `OH_REGEN_SESSION_COMPAT=1 cargo test -p openhuman --lib regenerate_session_compat -- --ignored`.
 
+use crate::core::runtime::DispatchCtx;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -277,12 +278,12 @@ fn normalize_clock(value: &mut Value) {
 }
 
 /// Everything the model observes after resuming a scenario.
-async fn snapshot(scenario: &'static Scenario) -> Value {
-    snapshot_with(scenario, "").await
+async fn snapshot(ctx: &DispatchCtx, scenario: &'static Scenario) -> Value {
+    snapshot_with(&ctx, scenario, "").await
 }
 
 /// [`snapshot`] over the `variant` generation of the scenario's head fixture.
-pub(super) async fn snapshot_with(scenario: &'static Scenario, variant: &str) -> Value {
+pub(super) async fn snapshot_with(ctx: &DispatchCtx, scenario: &'static Scenario, variant: &str) -> Value {
     let root = tempfile::tempdir().expect("tempdir");
     let next = model(
         vec![ModelResponse::assistant("next reply")],
@@ -298,7 +299,7 @@ pub(super) async fn snapshot_with(scenario: &'static Scenario, variant: &str) ->
     place_fixture(root.path(), scenario, &stem, variant);
 
     assert!(
-        host.resume_bound_session().await.expect("resume"),
+        host.resume_bound_session(&ctx).await.expect("resume"),
         "{}: fixture must resume",
         scenario.name
     );
@@ -341,7 +342,7 @@ pub(super) fn golden(name: &str) -> Value {
 fn every_committed_transcript_resumes_to_the_recorded_model_view() {
     for scenario in SCENARIOS {
         run_async(async move {
-            let got = snapshot(scenario).await;
+            let got = snapshot(&DispatchCtx::process_default(), scenario).await;
             let want = golden(scenario.name);
             assert_eq!(
                 got, want,
@@ -399,7 +400,7 @@ async fn capture_turns(name: &str, native: bool, responses: Vec<ModelResponse>, 
     copy_session(root.path(), &stem, &fixture(&format!("{name}.jsonl")));
 }
 
-async fn capture_all() {
+async fn capture_all(ctx: &DispatchCtx, ) {
     std::fs::create_dir_all(FIXTURE_DIR).expect("fixture dir");
     let text = |s: &str| response(vec![ContentBlock::Text(s.into())], Vec::new());
 
@@ -561,7 +562,7 @@ async fn capture_all() {
     }
 
     for scenario in SCENARIOS {
-        let snapshot = snapshot(scenario).await;
+        let snapshot = snapshot(&ctx, scenario).await;
         std::fs::write(
             fixture(&format!("{}.golden.json", scenario.name)),
             serde_json::to_string_pretty(&snapshot).expect("golden") + "\n",
@@ -576,24 +577,24 @@ fn regenerate_session_compat() {
     if std::env::var("OH_REGEN_SESSION_COMPAT").as_deref() != Ok("1") {
         return;
     }
-    run_async(capture_all());
+    run_async(capture_all(&DispatchCtx::process_default()));
 }
 
 /// Archived declarations survive replay, but retired executors never return.
 #[cfg(feature = "voice")]
 #[test]
 fn resumed_thread_with_retired_podcast_tool_remains_usable() {
-    assert_retired_tool_replay(true);
+    assert_retired_tool_replay(&DispatchCtx::process_default(), true);
 }
 
 #[cfg(feature = "voice")]
 #[test]
 fn latest_agent_session_with_retired_podcast_tool_remains_usable() {
-    assert_retired_tool_replay(false);
+    assert_retired_tool_replay(&DispatchCtx::process_default(), false);
 }
 
 #[cfg(feature = "voice")]
-fn assert_retired_tool_replay(identity_bound: bool) {
+fn assert_retired_tool_replay(ctx: &DispatchCtx, identity_bound: bool) {
     run_async(async move {
         const RETIRED: &str = "audio_generate_podcast";
         struct ArchivedAudioTool;
@@ -671,12 +672,12 @@ fn assert_retired_tool_replay(identity_bound: bool) {
         };
         if identity_bound {
             assert!(resumed
-                .resume_bound_session()
+                .resume_bound_session(&ctx)
                 .await
                 .expect("resume archive"));
         } else {
             resumed
-                .ensure_runtime_session()
+                .ensure_runtime_session(&ctx)
                 .expect("cold runtime session");
             assert!(matches!(
                 resumed.turn_resume_mode(),

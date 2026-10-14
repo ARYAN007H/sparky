@@ -16,6 +16,7 @@
 //! carried explicitly into [`run_subagent`] so it can inherit the provider
 //! and tools.
 
+use crate::core::runtime::DispatchCtx;
 use anyhow::{anyhow, Context};
 
 use crate::agent::harness::fork_context::ParentExecutionContext;
@@ -235,7 +236,7 @@ async fn build_triage_parent(
     Ok(parent_ctx)
 }
 
-async fn dispatch_target_agent(agent_id: &str, prompt: &str) -> anyhow::Result<String> {
+async fn dispatch_target_agent(ctx: &DispatchCtx, agent_id: &str, prompt: &str) -> anyhow::Result<String> {
     #[cfg(test)]
     if agent_id.starts_with("missing-agent-") {
         return Err(anyhow!(
@@ -243,7 +244,7 @@ async fn dispatch_target_agent(agent_id: &str, prompt: &str) -> anyhow::Result<S
         ));
     }
 
-    let config = crate::config::ops::load_current_or_init()
+    let config = crate::config::ops::load_current_or_init(&ctx)
         .await
         .context("loading config for sub-agent dispatch")?;
 

@@ -6,6 +6,7 @@
 //! calls and tool execution until the model returns without further tool calls
 //! (or the iteration budget is exhausted).
 
+use crate::core::runtime::DispatchCtx;
 use std::collections::HashSet;
 use std::time::Instant;
 
@@ -112,7 +113,7 @@ use result_cap::apply_max_result_chars;
 /// final assistant text. On failure the error is suitable for stringifying
 /// into a `tool_result` block — including the two dispatch refusals, whose
 /// messages tell the model to summarise rather than delegate again.
-pub(crate) async fn run_subagent_direct(
+pub(crate) async fn run_subagent_direct(ctx: &DispatchCtx, 
     definition: &AgentDefinition,
     task_prompt: &str,
     mut options: SubagentRunOptions,
@@ -281,7 +282,7 @@ pub(crate) async fn run_subagent_direct(
 
         // Loaded once per spawn (see `LoadedConfig`), after the tier gate so a
         // rejected spawn never initialises config on first run.
-        let loaded_config: LoadedConfig = Box::pin(crate::config::ops::load_current_or_init())
+        let loaded_config: LoadedConfig = Box::pin(crate::config::ops::load_current_or_init(&ctx))
             .await
             .map(std::sync::Arc::new)
             .map_err(|e| e.to_string());
@@ -325,6 +326,7 @@ pub(crate) async fn run_subagent_direct(
         let run_result = Box::pin(with_run_depth(RunDepth { depth: attempted_depth, max_depth }, async {
             with_file_state_agent_id(task_id.clone(), async {
                 Box::pin(run_typed_mode(
+                    &ctx,
                     definition,
                     task_prompt,
                     &options,
@@ -555,7 +557,7 @@ type LoadedConfig = Result<std::sync::Arc<crate::config::Config>, String>;
 /// This mode builds a brand-new, minimized system prompt specifically for the
 /// agent's archetype. It filters the parent's tools down to only those allowed
 /// by the definition and per-spawn overrides.
-async fn run_typed_mode(
+async fn run_typed_mode(ctx: &DispatchCtx, 
     definition: &AgentDefinition,
     task_prompt: &str,
     options: &SubagentRunOptions,
@@ -772,7 +774,7 @@ async fn run_typed_mode(
         visible_tool_names: &visible_tool_names,
         tool_call_format: prompt_tool_call_format,
         connected_integrations: &connected_integrations_for_prompt,
-        connected_identities_md: crate::agent::prompts::render_connected_identities(),
+        connected_identities_md: crate::agent::prompts::render_connected_identities(&ctx),
         user_identity: crate::security::credentials::identity::peek_credential_user_identity(),
         personality_roster: vec![],
         agents_md_global: agents_md.global.clone(),

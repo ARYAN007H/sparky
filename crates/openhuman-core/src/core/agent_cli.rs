@@ -20,6 +20,7 @@
 //! any built-in or workspace-custom agent id (e.g. `planner`,
 //! `critic`).
 
+use crate::core::runtime::DispatchCtx;
 use anyhow::{anyhow, Result};
 use std::path::PathBuf;
 
@@ -30,16 +31,16 @@ use crate::agent::debug::{
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 
 /// Entry point for `openhuman agent <subcommand>`.
-pub fn run_agent_command(args: &[String]) -> Result<()> {
+pub fn run_agent_command(ctx: &DispatchCtx, args: &[String]) -> Result<()> {
     if args.is_empty() || is_help(&args[0]) {
         print_agent_help();
         return Ok(());
     }
 
     match args[0].as_str() {
-        "dump-prompt" => run_dump_prompt(&args[1..]),
+        "dump-prompt" => run_dump_prompt(&ctx, &args[1..]),
         "dump-all" => run_dump_all(&args[1..]),
-        "prompt-size" => run_prompt_size(&args[1..]),
+        "prompt-size" => run_prompt_size(&ctx, &args[1..]),
         "list" => run_list(&args[1..]),
         other => Err(anyhow!(
             "unknown agent subcommand '{other}'. Run `openhuman agent --help`."
@@ -147,7 +148,7 @@ fn parse_prompt_size_flags(args: &[String]) -> Result<PromptSizeFlags> {
 /// With `--agent`, renders one agent. Without it, renders every registered
 /// agent through the same `dump_all_agent_prompts` path `dump-all` uses, so
 /// the fleet view and the per-agent view cannot disagree.
-fn run_prompt_size(args: &[String]) -> Result<()> {
+fn run_prompt_size(ctx: &DispatchCtx, args: &[String]) -> Result<()> {
     let flags = parse_prompt_size_flags(args)?;
     init_quiet_logging(flags.verbose);
 
@@ -176,7 +177,7 @@ fn run_prompt_size(args: &[String]) -> Result<()> {
             options.workspace_dir_override = flags.workspace.clone();
             options.config_path_override = config_path.clone();
             options.model_override = flags.model.clone();
-            vec![rt.block_on(PromptSizeReport::build(options))?]
+            vec![rt.block_on(PromptSizeReport::build(&ctx, options))?]
         }
         None => {
             let dumps: Vec<DumpedPrompt> = rt.block_on(async {
@@ -421,7 +422,7 @@ fn parse_dump_flags(args: &[String]) -> Result<DumpFlags> {
     Ok(out)
 }
 
-fn run_dump_prompt(args: &[String]) -> Result<()> {
+fn run_dump_prompt(ctx: &DispatchCtx, args: &[String]) -> Result<()> {
     let flags = parse_dump_flags(args)?;
     let agent = flags.agent.clone().ok_or_else(|| {
         anyhow!("--agent <id> is required (e.g. `orchestrator`, `planner`, `critic`)")
@@ -453,7 +454,7 @@ fn run_dump_prompt(args: &[String]) -> Result<()> {
         .max_blocking_threads(crate::core::runtime::MAX_BLOCKING_THREADS)
         .build()?;
     log::debug!("[agent-cli] run_dump_prompt: calling dump_agent_prompt");
-    let dumped = rt.block_on(async { dump_agent_prompt(options).await })?;
+    let dumped = rt.block_on(async { dump_agent_prompt(&ctx, options).await })?;
     log::debug!(
         "[agent-cli] run_dump_prompt: dump returned (tools={}, skill_tools={}, prompt_bytes={})",
         dumped.tool_names.len(),

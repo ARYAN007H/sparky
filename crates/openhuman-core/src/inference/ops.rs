@@ -1,5 +1,6 @@
 //! JSON-RPC controller surface for inference operations.
 
+use crate::core::runtime::DispatchCtx;
 use crate::config::rpc as config_rpc;
 use crate::config::Config;
 use crate::core::Outcome;
@@ -250,9 +251,9 @@ pub async fn inference_analyze_sentiment(
     result
 }
 
-pub async fn inference_get_client_config() -> Result<Outcome<Value>, String> {
+pub async fn inference_get_client_config(ctx: &DispatchCtx, ) -> Result<Outcome<Value>, String> {
     debug!("{LOG_PREFIX} get_client_config:start");
-    let result = config_rpc::load_and_get_client_config_snapshot().await;
+    let result = config_rpc::load_and_get_client_config_snapshot(&ctx).await;
     match &result {
         Ok(_) => debug!("{LOG_PREFIX} get_client_config:ok"),
         Err(err) => warn!(error = %err, "{LOG_PREFIX} get_client_config:error"),
@@ -260,11 +261,11 @@ pub async fn inference_get_client_config() -> Result<Outcome<Value>, String> {
     result
 }
 
-pub async fn inference_update_model_settings(
+pub async fn inference_update_model_settings(ctx: &DispatchCtx, 
     update: config_rpc::ModelSettingsPatch,
 ) -> Result<Outcome<Value>, String> {
     debug!("{LOG_PREFIX} update_model_settings:start");
-    let result = config_rpc::load_and_apply_model_settings(update).await;
+    let result = config_rpc::load_and_apply_model_settings(&ctx, update).await;
     match &result {
         Ok(_) => debug!("{LOG_PREFIX} update_model_settings:ok"),
         Err(err) => warn!(error = %err, "{LOG_PREFIX} update_model_settings:error"),
@@ -272,18 +273,18 @@ pub async fn inference_update_model_settings(
     result
 }
 
-pub async fn inference_update_local_settings(
+pub async fn inference_update_local_settings(ctx: &DispatchCtx, 
     update: config_rpc::LocalAiSettingsPatch,
 ) -> Result<Outcome<Value>, String> {
     debug!("{LOG_PREFIX} update_local_settings:start");
-    let result = config_rpc::load_and_apply_local_ai_settings(update).await;
+    let result = config_rpc::load_and_apply_local_ai_settings(&ctx, update).await;
     match &result {
         Ok(_) => {
             debug!("{LOG_PREFIX} update_local_settings:ok");
             // The endpoint, provider or models may have changed: drop the
             // cached probe verdict so the next status poll re-probes the
             // user's runtime instead of reporting the old endpoint's state.
-            match config_rpc::load_config_with_timeout().await {
+            match config_rpc::load_config_with_timeout(&ctx).await {
                 Ok(config) => {
                     let runtime = crate::inference::local_runtime_config(&config);
                     local_runtime::global(&config).reset_to_idle(&runtime);

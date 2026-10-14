@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 
 fn config_with_rules(tmp: &tempfile::TempDir) -> crate::config::Config {
@@ -47,7 +48,7 @@ fn a_session_composes_the_operator_and_definition_layers() {
 
 /// A text-dialect session over the per-thread goal tools under `rules`,
 /// returning its rendered prompt and declared tool names.
-async fn goal_session_prompt(rules: serde_json::Value) -> (String, Vec<String>) {
+async fn goal_session_prompt(ctx: &DispatchCtx, rules: serde_json::Value) -> (String, Vec<String>) {
     let _ = crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins();
     let action_dir = tempfile::tempdir().expect("tempdir");
     let config = crate::config::Config {
@@ -64,7 +65,7 @@ async fn goal_session_prompt(rules: serde_json::Value) -> (String, Vec<String>) 
         .build()
         .expect("session build");
     host.set_thread_id(Some("thread-1"));
-    host.ensure_runtime_session().expect("runtime session");
+    host.ensure_runtime_session(&ctx).expect("runtime session");
     let prelude = host
         .runtime_state
         .lock()
@@ -73,11 +74,11 @@ async fn goal_session_prompt(rules: serde_json::Value) -> (String, Vec<String>) 
         .clone()
         .expect("prelude");
     let prompt = prelude
-        .build_system_prompt_tiered()
+        .build_system_prompt_tiered(&ctx)
         .expect("system prompt")
         .text;
     let declared = prelude
-        .prepare(true)
+        .prepare(&ctx, true)
         .await
         .expect("tool surface")
         .tools
@@ -94,13 +95,13 @@ async fn goal_session_prompt(rules: serde_json::Value) -> (String, Vec<String>) 
 /// declared tool list the harness admits calls from.
 #[tokio::test]
 async fn a_rule_hidden_tool_leaves_the_rendered_prompt_but_stays_declared() {
-    let (control, _) = goal_session_prompt(serde_json::json!({})).await;
+    let (control, _) = goal_session_prompt(&DispatchCtx::process_default(), serde_json::json!({})).await;
     assert!(
         control.contains("goal_complete"),
         "the fixture surfaces goal_complete"
     );
 
-    let (prompt, declared) = goal_session_prompt(serde_json::json!({ "rules": [
+    let (prompt, declared) = goal_session_prompt(&DispatchCtx::process_default(), serde_json::json!({ "rules": [
         { "effect": "hide", "match": { "name": "goal_complete" } },
     ] }))
     .await;

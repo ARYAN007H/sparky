@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 use parking_lot::RwLock;
 use serde_json::json;
@@ -84,7 +85,7 @@ fn parse_sio_event_returns_none_when_json_invalid() {
 fn handle_sio_event_ready_sets_connected() {
     let shared = make_shared();
     let (tx, _rx) = mpsc::unbounded_channel::<String>();
-    handle_sio_event("ready", json!({}), &tx, &shared);
+    handle_sio_event(&DispatchCtx::process_default(), "ready", json!({}), &tx, &shared);
     assert_eq!(*shared.status.read(), ConnectionStatus::Connected);
 }
 
@@ -92,7 +93,7 @@ fn handle_sio_event_ready_sets_connected() {
 fn handle_sio_event_error_sets_error_status() {
     let shared = make_shared();
     let (tx, _rx) = mpsc::unbounded_channel::<String>();
-    handle_sio_event("error", json!({"msg":"oops"}), &tx, &shared);
+    handle_sio_event(&DispatchCtx::process_default(), "error", json!({"msg":"oops"}), &tx, &shared);
     assert_eq!(*shared.status.read(), ConnectionStatus::Error);
 }
 
@@ -115,6 +116,7 @@ fn handle_sio_event_debug_truncation_respects_utf8_boundary() {
     let shared = make_shared();
     let (tx, _rx) = mpsc::unbounded_channel::<String>();
     handle_sio_event(
+        &DispatchCtx::process_default(),
         "weird.unrelated.event",
         serde_json::Value::String(inner),
         &tx,
@@ -128,7 +130,7 @@ fn handle_sio_event_unknown_event_is_noop_on_status() {
     let shared = make_shared();
     let (tx, _rx) = mpsc::unbounded_channel::<String>();
     // Start disconnected — an unhandled event must not flip status.
-    handle_sio_event("weird.unrelated.event", json!({}), &tx, &shared);
+    handle_sio_event(&DispatchCtx::process_default(), "weird.unrelated.event", json!({}), &tx, &shared);
     assert_eq!(*shared.status.read(), ConnectionStatus::Disconnected);
 }
 
@@ -137,7 +139,7 @@ fn handle_sio_event_channel_message_missing_channel_is_dropped() {
     let shared = make_shared();
     let (tx, _rx) = mpsc::unbounded_channel::<String>();
     // No "channel" field → the dispatcher must return without touching status.
-    handle_sio_event("telegram:message", json!({"message": "hi"}), &tx, &shared);
+    handle_sio_event(&DispatchCtx::process_default(), "telegram:message", json!({"message": "hi"}), &tx, &shared);
     assert_eq!(*shared.status.read(), ConnectionStatus::Disconnected);
 }
 
@@ -146,6 +148,7 @@ fn handle_sio_event_channel_message_empty_text_is_dropped() {
     let shared = make_shared();
     let (tx, _rx) = mpsc::unbounded_channel::<String>();
     handle_sio_event(
+        &DispatchCtx::process_default(),
         "telegram:message",
         json!({"channel": "tg:123", "message": "   "}),
         &tx,
@@ -203,6 +206,6 @@ fn handle_sio_event_payload_redacted_no_panic_on_multibyte_boundary() {
     let shared = make_shared();
     let (tx, _rx) = mpsc::unbounded_channel::<String>();
     // Any event name exercises the pre-match log path. Must not panic.
-    handle_sio_event("anything.unhandled", payload, &tx, &shared);
+    handle_sio_event(&DispatchCtx::process_default(), "anything.unhandled", payload, &tx, &shared);
     assert_eq!(*shared.status.read(), ConnectionStatus::Disconnected);
 }

@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::{
     grouped_schemas, is_help_only, load_dotenv_for_cli, parse_function_params, parse_input_value,
     parse_launch_options,
@@ -279,7 +280,7 @@ fn mcp_server_alias_reports_disabled_build_when_gate_off() {
 fn tui_subcommand_points_to_the_separate_executable() {
     let _guard = env_lock();
 
-    let err = crate::core::cli::run_from_cli_args(&["tui".to_string()])
+    let err = crate::core::cli::run_from_cli_args(&DispatchCtx::process_default(), &["tui".to_string()])
         .expect_err("`openhuman tui` must point to the standalone terminal client");
     let msg = err.to_string();
 
@@ -298,7 +299,7 @@ fn tui_subcommand_points_to_the_separate_executable() {
 fn chat_alias_points_to_the_separate_executable() {
     let _guard = env_lock();
 
-    let err = crate::core::cli::run_from_cli_args(&["chat".to_string()])
+    let err = crate::core::cli::run_from_cli_args(&DispatchCtx::process_default(), &["chat".to_string()])
         .expect_err("`openhuman chat` must point to the standalone terminal client");
 
     assert!(

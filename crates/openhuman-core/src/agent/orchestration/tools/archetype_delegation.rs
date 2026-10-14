@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use async_trait::async_trait;
 use serde_json::json;
 use serde_json::Value;
@@ -149,7 +150,7 @@ pub(crate) async fn execute_archetype_delegation(
 
 /// Typed-harness counterpart that preserves a live parent for the blocking
 /// archetype child.
-pub(crate) async fn execute_archetype_delegation_with_live_parent(
+pub(crate) async fn execute_archetype_delegation_with_live_parent(ctx: &DispatchCtx, 
     agent_id: &str,
     tool_name: &str,
     args: serde_json::Value,
@@ -176,6 +177,7 @@ pub(crate) async fn execute_archetype_delegation_with_live_parent(
     }
     let prompt = render_structured_handoff(&raw_prompt, &args);
     let prompt = match crate::agent::attachments::delegation_prompt(
+        &ctx,
         &prompt,
         &args,
         tool_context

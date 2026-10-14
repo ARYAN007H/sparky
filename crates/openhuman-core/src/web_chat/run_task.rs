@@ -4,6 +4,7 @@
 //! to a failed turn. Called from `start_chat` and `spawn_parallel_turn`
 //! (`ops/start_chat.rs`/`ops/parallel_turn.rs`) once the message has been validated.
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 use tinyagents_harness::run_queue::RunQueue;
 
@@ -25,7 +26,7 @@ use tinyinference_llm::failure::is_empty_provider_response_text;
 #[cfg(any(test, debug_assertions))]
 use super::ops::TEST_FORCED_RUN_CHAT_TASK_ERROR;
 
-pub(crate) async fn run_chat_task(
+pub(crate) async fn run_chat_task(ctx: &DispatchCtx, 
     client_id: &str,
     thread_id: &str,
     request_id: &str,
@@ -116,7 +117,7 @@ pub(crate) async fn run_chat_task(
         }
     }
 
-    let mut config = config_rpc::load_config_with_timeout().await?;
+    let mut config = config_rpc::load_config_with_timeout(&ctx).await?;
     // A thread started in a chosen folder acts there, not in the global
     // `action_dir`. Applied before checkout so the session agent, its security
     // policy (which grants `action_dir` as a trusted root) and its tools are
@@ -205,7 +206,7 @@ pub(crate) async fn run_chat_task(
     // default test-thread stack — see the channels web-turn coverage tests).
     #[cfg(feature = "tinymemes")]
     let turn_started = std::time::Instant::now();
-    let turn = Box::pin(agent.run_single_with_approval(message, Some(origin), approval));
+    let turn = Box::pin(agent.run_single_with_approval(&ctx, message, Some(origin), approval));
     let mut result = match turn.await {
         Ok(response) => {
             // A successful turn proves the thread's balance is usable, so drop

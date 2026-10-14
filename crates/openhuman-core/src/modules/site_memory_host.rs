@@ -13,6 +13,7 @@
 //! forget epoch that stops a task running when its site was forgotten from
 //! writing it back.
 
+use crate::core::runtime::DispatchCtx;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard, OnceLock, PoisonError};
@@ -176,8 +177,8 @@ async fn write_private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 #[derive(Clone)]
 struct SiteMemoryHost;
 
-async fn config() -> tinybus::Result<crate::config::Config> {
-    crate::config::rpc::load_config_with_timeout()
+async fn config(ctx: &DispatchCtx, ) -> tinybus::Result<crate::config::Config> {
+    crate::config::rpc::load_config_with_timeout(&ctx)
         .await
         .map_err(|e| method_error(format!("config unavailable: {e}")))
 }
@@ -329,23 +330,23 @@ async fn save_site(
 #[tinybus::interface(name = "ai.tinyhumans.tinycomputer.SiteMemoryHost")]
 impl SiteMemoryHost {
     /// One site's memory; empty for a site with nothing kept.
-    async fn load(&self, request: LoadSiteRequest) -> tinybus::Result<LoadSiteResponse> {
-        load_site(&config().await?, request)
+    async fn load(&self, ctx: &DispatchCtx, request: LoadSiteRequest) -> tinybus::Result<LoadSiteResponse> {
+        load_site(&config(&ctx).await?, request)
             .await
             .map_err(method_error)
     }
 
     /// Replaces one site's memory, unless learning is off or the site was
     /// forgotten since it was loaded.
-    async fn save(&self, request: SaveSiteRequest) -> tinybus::Result<SaveSiteResponse> {
-        save_site(&config().await?, request)
+    async fn save(&self, ctx: &DispatchCtx, request: SaveSiteRequest) -> tinybus::Result<SaveSiteResponse> {
+        save_site(&config(&ctx).await?, request)
             .await
             .map_err(method_error)
     }
 
     /// Forgets one site, or every site.
-    async fn forget(&self, request: ForgetSiteRequest) -> tinybus::Result<ForgetSiteResponse> {
-        let forgotten = forget(&config().await?, request.site.as_deref())
+    async fn forget(&self, ctx: &DispatchCtx, request: ForgetSiteRequest) -> tinybus::Result<ForgetSiteResponse> {
+        let forgotten = forget(&config(&ctx).await?, request.site.as_deref())
             .await
             .map_err(method_error)?;
         Ok(ForgetSiteResponse {

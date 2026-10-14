@@ -1,5 +1,6 @@
 //! `channel_relay_inbound`: record a relayed message and run its turn.
 
+use crate::core::runtime::DispatchCtx;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -23,12 +24,12 @@ use crate::security::SecurityPolicy;
 ///
 /// A message already recorded on its thread (`message_id`) is acknowledged as
 /// a duplicate and runs no turn, so a gateway can retry a delivery.
-pub async fn channel_relay_inbound(params: RelayInboundParams) -> Result<Outcome<Value>, String> {
+pub async fn channel_relay_inbound(ctx: &DispatchCtx, params: RelayInboundParams) -> Result<Outcome<Value>, String> {
     params.validate()?;
     // In SaaS a relayed message must run as its user: with no tenant scope
     // there is no workspace, stream or config it may touch.
     let tenant = crate::core::runtime::current_tenant().map_err(|error| error.to_string())?;
-    let config = crate::config::rpc::load_config_with_timeout().await?;
+    let config = crate::config::rpc::load_config_with_timeout(&ctx).await?;
     let identity = crate::modules::channel_controller::prepare_identity(
         &crate::modules::client(config.clone()),
         tinychannels_bus::module_inbound::PrepareChannelIdentityRequest {

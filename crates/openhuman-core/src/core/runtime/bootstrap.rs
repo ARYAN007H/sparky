@@ -6,6 +6,7 @@
 //! [`CoreRuntime::start_services`](super::CoreRuntime::start_services)
 //! once a transport has bound, or directly when there is none.
 
+use crate::core::runtime::DispatchCtx;
 /// Initializes long-lived socket/event-bus infrastructure.
 ///
 /// `host_kind` identifies the embedding process (Tauri desktop shell vs
@@ -14,7 +15,7 @@
 /// env override is ignored and a domain event is published so the UI can
 /// surface a banner; under CLI / Docker the override is honored (with a
 /// noisy log + a domain event so any connected dashboard can flag it).
-pub(crate) async fn bootstrap_core_runtime(
+pub(crate) async fn bootstrap_core_runtime(ctx: &DispatchCtx, 
     host_kind: crate::core::types::HostKind,
     config: Option<crate::config::Config>,
     domains: crate::core::runtime::DomainSet,
@@ -69,6 +70,7 @@ pub(crate) async fn bootstrap_core_runtime(
     // bootstrap_core_runtime() cannot double-subscribe (and a later, wider
     // DomainSet still installs its newly-enabled groups).
     super::subscribers::register_domain_subscribers(
+        &ctx,
         workspace_dir.clone(),
         cfg.clone(),
         embedded_core,

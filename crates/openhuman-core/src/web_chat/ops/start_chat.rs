@@ -3,6 +3,7 @@
 //! run-queue dispatch, and the spawned turn body that delivers a response or
 //! classifies and reports a failure.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::json;
 use std::sync::Arc;
 use tinyagents_harness::run_queue::{QueueLane, RunQueue};
@@ -160,7 +161,7 @@ pub fn start_chat<'a>(
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn start_chat_inner(
+async fn start_chat_inner(ctx: &DispatchCtx, 
     client_id: &str,
     thread_id: &str,
     message: &str,
@@ -190,7 +191,7 @@ async fn start_chat_inner(
     // Save originals before scanning, history, memory, or queue persistence.
     // A missing config/root cannot safely accept an upload.
     let mut message = if message.contains("[FILE:") || message.contains("[IMAGE:") {
-        let config = crate::config::rpc::load_config_with_timeout()
+        let config = crate::config::rpc::load_config_with_timeout(&ctx)
             .await
             .map_err(|error| {
                 StartChatError::Other(format!("upload configuration unavailable: {error}"))

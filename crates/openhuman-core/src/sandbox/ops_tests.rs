@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::config::RuntimeConfig;
 
@@ -94,7 +95,7 @@ async fn create_sandbox_backend_none() {
         &RuntimeConfig::default(),
         false,
     );
-    let handle = create_sandbox_backend(&policy).await;
+    let handle = create_sandbox_backend(&DispatchCtx::process_default(), &policy).await;
     assert_eq!(handle.kind, SandboxBackendKind::None);
     assert_eq!(handle.status, SandboxStatus::Ready);
 }
@@ -207,6 +208,7 @@ async fn execute_in_sandbox_none_backend() {
         false,
     );
     let result = execute_in_sandbox(
+        &DispatchCtx::process_default(),
         &policy,
         "echo sandbox-test",
         Path::new("/tmp"),
@@ -282,6 +284,7 @@ async fn execute_in_sandbox_none_backend_runs_on_every_os() {
         false,
     );
     let result = execute_in_sandbox(
+        &DispatchCtx::process_default(),
         &policy,
         "echo sandbox-test",
         tempdir.path(),
@@ -354,7 +357,7 @@ async fn sandbox_off_component_forces_the_unsandboxed_fallback_and_no_module_loa
     crate::core::runtime::context::CoreContext::scope(ctx, async {
         assert!(sandbox_component_off());
         assert!(sandbox_disabled_by_host());
-        assert!(!command_requires_sandbox(Some(SandboxMode::Sandboxed))
+        assert!(!command_requires_sandbox(&ctx, Some(SandboxMode::Sandboxed))
             .await
             .unwrap());
     })

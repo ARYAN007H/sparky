@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::{group_first_time_when_bus_ready, DomainSubscriberPlan};
 use crate::config::test_env::EnvVarGuard;
 
@@ -198,6 +199,7 @@ async fn tool_timeout_seeds_on_channelless_core_boot() {
     // so even `none()` must seed. `embedded_core = true` skips the standalone
     // process-exit shutdown subscriber.
     super::register_domain_subscribers(
+        &DispatchCtx::process_default(),
         tmp.path().to_path_buf(),
         config,
         true,

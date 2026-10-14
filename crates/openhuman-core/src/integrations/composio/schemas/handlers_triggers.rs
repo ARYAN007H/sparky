@@ -16,11 +16,11 @@ use super::params::{
 use super::util::{read_required_non_empty, to_json};
 
 pub(super) fn handle_list_github_repos(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
         let payload: ListGithubReposParams = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("invalid params: {e}"))?;
         to_json(ops::composio_list_github_repos(&config, payload.connection_id).await?)
@@ -28,11 +28,11 @@ pub(super) fn handle_list_github_repos(
 }
 
 pub(super) fn handle_create_trigger(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
         let payload: CreateTriggerParams = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("invalid params: {e}"))?;
         let slug = payload.slug.trim();
@@ -52,11 +52,11 @@ pub(super) fn handle_create_trigger(
 }
 
 pub(super) fn handle_list_trigger_history(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
         let payload: TriggerHistoryParams = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("invalid params: {e}"))?;
         to_json(ops::composio_list_trigger_history(&config, payload.limit).await?)
@@ -64,11 +64,11 @@ pub(super) fn handle_list_trigger_history(
 }
 
 pub(super) fn handle_list_available_triggers(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
         let payload: ListAvailableTriggersParams = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("invalid params: {e}"))?;
         let toolkit = payload.toolkit.trim();
@@ -82,11 +82,11 @@ pub(super) fn handle_list_available_triggers(
 }
 
 pub(super) fn handle_list_triggers(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
         let payload: ListTriggersParams = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("invalid params: {e}"))?;
         to_json(ops::composio_list_triggers(&config, payload.toolkit).await?)
@@ -94,11 +94,11 @@ pub(super) fn handle_list_triggers(
 }
 
 pub(super) fn handle_enable_trigger(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
         let payload: EnableTriggerParams = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("invalid params: {e}"))?;
         let connection_id = payload.connection_id.trim();
@@ -117,11 +117,11 @@ pub(super) fn handle_enable_trigger(
 }
 
 pub(super) fn handle_disable_trigger(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
         let trigger_id = read_required_non_empty(&params, "trigger_id")?;
         to_json(ops::composio_disable_trigger(&config, &trigger_id).await?)
     })

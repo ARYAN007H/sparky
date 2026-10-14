@@ -26,6 +26,7 @@
 //! context-window summarization step (`tinyagents::summarize`) ahead of the
 //! deterministic front-trim.
 
+use crate::core::runtime::DispatchCtx;
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -44,7 +45,7 @@ use tinytools::Tool;
 /// `on_progress` is `Some`, the run streams and mirrors progress onto
 /// `AgentProgress`; pass `None` for a fire-and-forget final-text turn.
 #[allow(clippy::too_many_arguments)]
-pub(crate) async fn run_channel_turn_via_graph(
+pub(crate) async fn run_channel_turn_via_graph(ctx: &DispatchCtx, 
     source: TurnModelSource,
     history: &mut Vec<TranscriptMessage>,
     tools_registry: Arc<Vec<Box<dyn Tool>>>,
@@ -102,7 +103,7 @@ pub(crate) async fn run_channel_turn_via_graph(
                 anyhow::bail!("attachments are disabled for this channel input");
             }
             if attachment_config.is_none() {
-                let mut config = crate::config::rpc::load_config_with_timeout()
+                let mut config = crate::config::rpc::load_config_with_timeout(&ctx)
                     .await
                     .map_err(anyhow::Error::msg)?;
                 config.multimodal = multimodal.clone();

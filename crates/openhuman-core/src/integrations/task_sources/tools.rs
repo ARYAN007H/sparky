@@ -11,6 +11,7 @@
 //! mutators — `add`, `update`, `remove` — change ingestion behaviour and
 //! cascade history, so they ship default-OFF via `tools/user_filter.rs`.
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -183,7 +184,7 @@ impl Tool for TaskSourceFetchTool {
     async fn execute(&self, args: serde_json::Value) -> anyhow::Result<ToolResult> {
         log::debug!("[tool][task_sources] fetch invoked");
         let id = read_required_str(&args, "id")?;
-        emit!(ops::fetch(&self.config, &id).await, "task_source_fetch")
+        emit!(ops::fetch(&DispatchCtx::ambient(), &self.config, &id).await, "task_source_fetch")
     }
 }
 

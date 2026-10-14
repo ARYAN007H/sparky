@@ -8,6 +8,7 @@
 
 #![allow(unused_imports)]
 
+use crate::core::runtime::DispatchCtx;
 use std::borrow::Cow;
 use std::sync::Arc;
 
@@ -266,7 +267,7 @@ impl AgentRunner for OpenHumanAgentRunner {
                             "[flows] agent_runner: FALLBACK path — persona-shaping single \
                              completion for a custom registry entry"
                         );
-                        self.run_via_registry_fallback(agent_ref, request, conn)
+                        self.run_via_registry_fallback(&DispatchCtx::ambient(), agent_ref, request, conn)
                             .await
                     }
                 }
@@ -321,7 +322,7 @@ impl OpenHumanAgentRunner {
     /// nodes (the tinyflows engine already fans those out) instead of
     /// reaching for a background sub-agent from inside a single node.
     async fn run_via_harness(
-        &self,
+        &self, ctx: &DispatchCtx,
         agent_ref: &str,
         request: Value,
         conn: Option<&str>,
@@ -452,10 +453,10 @@ impl OpenHumanAgentRunner {
         > = if let Some(escalated) = escalated_origin {
             Box::pin(turn_origin::with_origin(
                 escalated,
-                agent.run_single_with_approval(&prompt, None, self.approval.clone()),
+                agent.run_single_with_approval(&ctx, &prompt, None, self.approval.clone()),
             ))
         } else {
-            Box::pin(agent.run_single_with_approval(&prompt, None, self.approval.clone()))
+            Box::pin(agent.run_single_with_approval(&ctx, &prompt, None, self.approval.clone()))
         };
         // A host agent's turn reads its own context (config, domains, tool
         // groups, session store); the origin task-local is untouched.
@@ -503,13 +504,13 @@ impl OpenHumanAgentRunner {
     /// with no harness definition — the pre-Phase-A behavior, kept so custom
     /// agents don't regress.
     async fn run_via_registry_fallback(
-        &self,
+        &self, ctx: &DispatchCtx,
         agent_ref: &str,
         request: Value,
         conn: Option<&str>,
     ) -> Result<Value> {
         // Resolve + validate the requested agent kind against the registry.
-        let entry = crate::agent::registry::get_agent(agent_ref)
+        let entry = crate::agent::registry::get_agent(&ctx, agent_ref)
             .await
             .map_err(EngineError::Capability)?
             .ok_or_else(|| {

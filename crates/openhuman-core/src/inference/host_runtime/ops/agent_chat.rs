@@ -1,5 +1,6 @@
 //! Agent chat turns: the full tool-using turn and the simple no-tools variant.
 
+use crate::core::runtime::DispatchCtx;
 use crate::agent::OpenHumanSessionHost;
 use crate::config::Config;
 use crate::core::Outcome;
@@ -366,7 +367,7 @@ async fn agent_chat_for_inner(
 /// [`agent_chat_for`], keeping whether the turn stopped at its iteration cap.
 /// The `inference.agent_chat` controller answers from this.
 #[allow(clippy::too_many_arguments)]
-pub async fn agent_chat_reply_for(
+pub async fn agent_chat_reply_for(ctx: &DispatchCtx, 
     config: &mut Config,
     target: AgentChatTarget<'_>,
     message: &str,
@@ -517,7 +518,7 @@ pub async fn agent_chat_reply_for(
     {
         agent.clear_history();
         agent
-            .seed_resume_from_messages(seed.to_vec(), message)
+            .seed_resume_from_messages(&ctx, seed.to_vec(), message)
             .map_err(|e| e.to_string())?;
         agent.set_next_turn_overrides(crate::agent::session_host::TurnOverrides {
             suppress_transcript_autoload: true,
@@ -569,7 +570,7 @@ pub async fn agent_chat_reply_for(
     // instead of the narrower one it asked for.
     let run = crate::agent::turn_origin::with_origin(
         effective_agent_chat_origin(),
-        agent.run_single_with_approval(message, None, approval),
+        agent.run_single_with_approval(&ctx, message, None, approval),
     );
     // `untrusted_input` was set on the session above; the turn's run context
     // carries it to the security gate, so no extra scope is needed here.

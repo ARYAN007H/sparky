@@ -3,6 +3,7 @@
 //! history, run under the hard per-turn ceiling with the same chat-scoped
 //! approval surface web chat installs.
 
+use crate::core::runtime::DispatchCtx;
 use std::time::Duration;
 
 use log::{info, warn};
@@ -69,13 +70,13 @@ const VOICE_MODEL: &str = "hint:chat";
 /// under the hard per-turn ceiling, then detach the sink so the forwarder's
 /// channel closes. Runs entirely on the background task, so the ack deadline in
 /// the caller covers both the build and the model round-trips.
-pub(super) async fn run_voice_turn(
+pub(super) async fn run_voice_turn(ctx: &DispatchCtx, 
     correlation_id: &str,
     messages: &[Value],
     prompt: &str,
     progress_tx: tokio::sync::mpsc::Sender<AgentProgress>,
 ) -> Result<String, String> {
-    let mut agent = build_voice_agent(correlation_id, messages, prompt).await?;
+    let mut agent = build_voice_agent(&ctx, correlation_id, messages, prompt).await?;
 
     // Attach the streaming sink before the turn: its presence switches the harness
     // onto the true per-token streaming path, and each `AgentProgress::TextDelta`
@@ -92,12 +93,12 @@ pub(super) async fn run_voice_turn(
 
 /// Construct the per-turn voice orchestrator: load config, pin the fast voice
 /// model, isolate the transcript namespace, and seed the relayed history.
-async fn build_voice_agent(
+async fn build_voice_agent(ctx: &DispatchCtx, 
     correlation_id: &str,
     messages: &[Value],
     prompt: &str,
 ) -> Result<OpenHumanSessionHost, String> {
-    let config = crate::config::ops::load_config_with_timeout().await?;
+    let config = crate::config::ops::load_config_with_timeout(&ctx).await?;
     let mut agent = OpenHumanSessionHost::from_config_for_agent(&config, "orchestrator")
         .map_err(|e| format!("orchestrator build failed: {e}"))?;
     agent.set_event_context(format!("voice_{correlation_id}"), "voice_agent");
@@ -112,7 +113,7 @@ async fn build_voice_agent(
     // so follow-ups like "what about tomorrow?" keep their context. No-ops when
     // there is nothing prior to the current user message.
     let history = messages_to_history_pairs(messages);
-    if let Err(e) = agent.seed_resume_from_messages(history, prompt) {
+    if let Err(e) = agent.seed_resume_from_messages(&ctx, history, prompt) {
         warn!("[voice-harness] seed prior messages failed correlation={correlation_id}: {e}");
     }
 
@@ -126,7 +127,7 @@ async fn build_voice_agent(
 
 /// Run the orchestrator turn under the hard per-turn ceiling. The streaming sink
 /// must already be attached; deltas flow out while this runs.
-async fn run_single_with_timeout(
+async fn run_single_with_timeout(ctx: &DispatchCtx, 
     agent: &mut OpenHumanSessionHost,
     correlation_id: &str,
     prompt: &str,
@@ -145,6 +146,7 @@ async fn run_single_with_timeout(
     };
     agent.set_thread_id(Some(VOICE_CHAT_THREAD_ID));
     let scoped_run = agent.run_single_with_approval(
+        &ctx,
         prompt,
         None,
         crate::security::approval::ApprovalTurnContext::chat(approval_ctx),
