@@ -707,14 +707,15 @@ async fn run_typed_mode(
     let filtered_specs = crate::agent::session_host::dedup_visible_tool_specs(filtered_specs);
     let filtered_specs = dedup_tool_specs_by_name(&definition.id, filtered_specs);
 
+    let iteration_cap = subagent_iter_cap_with_autonomous_lift(
+        options.run_context.autonomous_iter_cap,
+        definition.effective_max_iterations(),
+    );
     tracing::debug!(
         agent_id = %definition.id,
         model = %model,
         tool_count = allowed_names.len(),
-        max_iterations = subagent_iter_cap_with_autonomous_lift(
-            options.run_context.autonomous_iter_cap,
-            definition.effective_max_iterations(),
-        ),
+        max_iterations = iteration_cap,
         iteration_policy = ?definition.iteration_policy,
         "[subagent_host:typed] resolved configuration"
     );
@@ -926,10 +927,7 @@ async fn run_typed_mode(
             Vec::new(),
             filtered_specs.clone(),
             allowed_names,
-            subagent_iter_cap_with_autonomous_lift(
-                options.run_context.autonomous_iter_cap,
-                definition.effective_max_iterations(),
-            ),
+            iteration_cap,
             options.run_queue.clone(),
             parent.on_progress.clone(),
             &definition.id,
