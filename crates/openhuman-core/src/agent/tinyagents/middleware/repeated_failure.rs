@@ -8,7 +8,11 @@ use async_trait::async_trait;
 
 use tinyagents_harness::context::RunContext;
 use tinyagents_harness::error::Result as TaResult;
-use tinyagents_harness::middleware::{repeat_guard_marker, Middleware, ToolInvocationIdentity};
+use tinyagents_harness::middleware::{
+    call_effect, dispatch_target, is_repeat_call_exempt, repeat_guard_marker, CallEffect, Middleware,
+    StopLatch, ToolFactsLookup, ToolInvocationIdentity, RECOVERABLE_NO_PROGRESS_FAILURE_THRESHOLD,
+    RECOVERABLE_REPEAT_FAILURE_THRESHOLD,
+};
 use tinyagents_harness::no_progress::{
     ClassifiedFailure, ClassifiedFailureTracker, NoProgress, NoProgressTracker, ToolAttempt,
 };
@@ -16,13 +20,7 @@ use tinyagents_harness::steering::SteeringHandle;
 use tinyinference_llm::tool::ToolCall as TaToolCall;
 use tinytools::ToolResult as TaToolResult;
 
-use super::call_effect::{call_effect, dispatch_target, CallEffect, ToolFactsLookup};
 use super::fetched_site::{fetch_host_scope, heuristic_text};
-use super::loop_guards::{
-    is_repeat_call_exempt, RECOVERABLE_NO_PROGRESS_FAILURE_THRESHOLD,
-    RECOVERABLE_REPEAT_FAILURE_THRESHOLD,
-};
-use super::stop_latch::StopLatch;
 pub(crate) use crate::inference::failure_copy::user_actionable_escalation;
 use crate::inference::failure_copy::{
     recoverable_identical_halt_summary, recoverable_no_progress_halt_summary,
@@ -132,7 +130,7 @@ impl RepeatedToolFailureMiddleware {
     }
 
     /// Judge each call's side effect from the registered tools' own
-    /// declarations ([`super::call_effect::tool_sets_lookup`]) rather than
+    /// declarations ([`tinyagents_harness::middleware::tool_sets_lookup`]) rather than
     /// from tool names alone.
     pub(crate) fn with_tool_facts(mut self, lookup: ToolFactsLookup) -> Self {
         self.tool_facts = Some(lookup);

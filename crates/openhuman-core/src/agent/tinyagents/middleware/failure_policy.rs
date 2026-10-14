@@ -2,7 +2,7 @@
 //! ([`recovery_policy_with_effect`]), split out of `repeated_failure.rs` so the breaker
 //! stays readable: the ladder driver lives there, the classification here.
 
-use super::call_effect::{call_effect, CallEffect};
+use tinyagents_harness::middleware::{call_effect, CallEffect};
 use super::fetched_site::fetched_site_policy;
 use tinyinference_llm::failure::is_recoverable_failure_text as is_recoverable_tool_failure;
 
@@ -23,7 +23,7 @@ pub(super) fn recovery_policy(
 }
 
 /// [`recovery_policy`] for a call whose side effect is already known
-/// ([`super::call_effect::call_effect`]). `CallEffect::Unknown` falls back to
+/// ([`tinyagents_harness::middleware::call_effect`]). `CallEffect::Unknown` falls back to
 /// reading `tool`'s name.
 pub(super) fn recovery_policy_with_effect(
     tool: &str,

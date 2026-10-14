@@ -370,7 +370,7 @@ fn a_web_search_tool_timeout_is_transient_not_an_uncertain_action() {
                 ))) as Box<dyn tinytools::Tool>
             })
             .collect();
-    let lookup = super::super::call_effect::tool_sets_lookup(vec![std::sync::Arc::new(tools)]);
+    let lookup = tinyagents_harness::middleware::tool_sets_lookup(vec![std::sync::Arc::new(tools)]);
     for name in ["web_answer_tool", "web_search_tool", "web_contents_tool"] {
         let args = serde_json::json!({"query": "what changed in the release"});
         let effect = call_effect(Some(&lookup), name, &args);

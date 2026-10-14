@@ -407,9 +407,6 @@ mod memory_budget_tests;
 #[path = "middleware_stop_cause_tests.rs"]
 mod stop_cause_tests;
 
-#[path = "middleware_research_budget_tests.rs"]
-mod research_budget_tests;
-
 #[path = "middleware_memory_and_hooks_tests.rs"]
 mod memory_and_hooks_tests;
 #[path = "middleware_tool_output_artifact_tests.rs"]
