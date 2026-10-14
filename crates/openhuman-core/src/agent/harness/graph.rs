@@ -58,6 +58,7 @@ pub(crate) async fn run_channel_turn_via_graph(
     on_progress: Option<Sender<AgentProgress>>,
     origin: Option<crate::agent::turn_origin::AgentTurnOrigin>,
     sandbox_mode: tinyagents_definition::SandboxMode,
+    approval: crate::security::approval::ApprovalTurnContext,
 ) -> Result<crate::agent::tinyagents::TinyagentsTurnOutcome> {
     let extra_arc = Arc::new(extra_tools);
 
@@ -140,6 +141,7 @@ pub(crate) async fn run_channel_turn_via_graph(
     let turn_origin = origin.clone();
     let mut run_context = crate::agent::tinyagents::host::OpenHumanRunContext::new();
     run_context.origin = origin;
+    run_context.approval = approval;
     run_context.sandbox_mode = Some(sandbox_mode);
     run_context.workspace = attachment_workspace.map(tinytools::WorkspaceDescriptor::new);
     seed_channel_attachments(&mut run_context, &prepared);

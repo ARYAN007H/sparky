@@ -134,6 +134,7 @@ pub(super) async fn try_arm(
         // tool call originating from this turn as remote-attacker input
         // (the triage agent doesn't usually invoke such tools — it
         // classifies and routes — but label correctly for defense in depth).
+        approval: Default::default(),
         origin: crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel {
             sender_name: None,
             channel: envelope.source.slug().to_string(),
