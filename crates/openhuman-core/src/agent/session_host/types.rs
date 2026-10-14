@@ -11,7 +11,6 @@ use crate::agent::hooks::PostTurnHook;
 use crate::agent::progress::AgentProgress;
 use crate::agent::prompts::SystemPromptBuilder;
 use crate::agent::tinyagents::TurnModelSource;
-use crate::agent::tool_policy::ToolPolicy;
 use std::sync::Arc;
 use tinytools::ToolPolicySession;
 use tinytools::{Tool, ToolSpec};
@@ -292,6 +291,9 @@ pub struct OpenHumanSessionHost {
     /// Autonomous skill-run iteration cap handed to every turn's run context
     /// (lifts sub-agent iteration caps); `None` for ordinary agents.
     pub(super) autonomous_iter_cap: Option<usize>,
+    /// Per-turn host environment (budget, cancellation, deadline, hooks, ...)
+    /// handed in by the entry point; copied onto every turn's run context.
+    pub(super) host_env: crate::agent::turn_env::HostTurnEnv,
     /// Backend/session thread explicitly owned by this agent run. It is kept
     /// separate from event identity: CLI and worker event sessions are not
     /// necessarily user conversation threads.
@@ -446,7 +448,7 @@ pub struct OpenHumanSessionHost {
     /// Pre-execution policy hook for tool calls in this session. The
     /// default policy allows all calls so existing agents keep their
     /// behaviour unless a caller opts into stricter policy.
-    pub(super) tool_policy: Arc<dyn ToolPolicy>,
+    pub(super) tool_policy: Arc<dyn tinyagents_harness::middleware::ToolCallPolicy<crate::agent::tinyagents::host::OpenHumanRunContext>>,
     /// Hash of the Composio connection set this OpenHumanSessionHost last reconciled
     /// against. Compared at top-of-turn to a fresh hash computed from
     /// [`crate::integrations::composio::cached_active_integrations`]; on
@@ -631,7 +633,7 @@ pub struct SessionHostBuilder {
     /// Per-agent TokenJuice tool-output compression profile.
     pub(super) tokenjuice_compression: tinyjuice_bus::types::AgentTokenjuiceCompression,
     /// Optional pre-execution tool policy. Defaults to allow-all.
-    pub(super) tool_policy: Option<Arc<dyn ToolPolicy>>,
+    pub(super) tool_policy: Option<Arc<dyn tinyagents_harness::middleware::ToolCallPolicy<crate::agent::tinyagents::host::OpenHumanRunContext>>>,
 }
 
 impl Default for SessionHostBuilder {

@@ -442,6 +442,7 @@ impl SessionHostBuilder {
             event_channel,
             task_recency_window: None,
             autonomous_iter_cap: None,
+            host_env: crate::agent::turn_env::HostTurnEnv::default(),
             thread_id: None,
             agent_definition_name: agent_definition_name.clone(),
             // Canonical registry id — captured here at build time
@@ -486,7 +487,7 @@ impl SessionHostBuilder {
             tokenjuice_compression: self.tokenjuice_compression,
             tool_policy: self
                 .tool_policy
-                .unwrap_or_else(|| Arc::new(crate::agent::tool_policy::AllowAllToolPolicy)),
+                .unwrap_or_else(|| Arc::new(crate::agent::tinyagents::middleware::AllowAllToolPolicy)),
             last_seen_integrations_hash: 0,
             composio_integrations_rx: None,
             skill_events_rx: None,

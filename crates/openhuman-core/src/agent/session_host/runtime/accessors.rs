@@ -255,6 +255,34 @@ impl OpenHumanSessionHost {
         self.task_recency_window = window;
     }
 
+    /// Hands the host environment of the turns this session runs (shared
+    /// model budget, cancellation, deadline, hooks, tool-belt authority).
+    ///
+    /// Call it after building the session and before its first turn: the
+    /// completed-turn callbacks join the learning sink's set and the tool belt
+    /// authority is read when the runtime session is first created.
+    pub fn set_host_env(&mut self, env: crate::agent::turn_env::HostTurnEnv) {
+        for hook in env.hooks.post_turn_hooks() {
+            if !self
+                .post_turn_hooks
+                .iter()
+                .any(|existing| Arc::ptr_eq(existing, hook))
+            {
+                self.post_turn_hooks.push(Arc::clone(hook));
+            }
+        }
+        tracing::debug!(
+            env = ?env,
+            "[session_host] host turn env installed"
+        );
+        self.host_env = env;
+    }
+
+    /// The host environment installed with [`Self::set_host_env`].
+    pub fn host_env(&self) -> &crate::agent::turn_env::HostTurnEnv {
+        &self.host_env
+    }
+
     /// Runs this agent as an unattended autonomous tree: sub-agent iteration
     /// caps are lifted to `cap` on every later turn; `None` clears the lift.
     pub fn set_autonomous_iter_cap(&mut self, cap: Option<usize>) {

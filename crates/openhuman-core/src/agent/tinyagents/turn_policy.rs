@@ -14,19 +14,18 @@ use tinyagents_harness::turn_policy::{
 
 use crate::agent::tinyagents::budget::MAX_SPAWN_DEPTH;
 
-/// The builder-configured [`ToolPolicy`](crate::agent::tool_policy::ToolPolicy)
+/// The builder-configured [`ToolCallPolicy`](tinyagents_harness::middleware::ToolCallPolicy)
 /// plus the session context a policy check needs, handed to the shared turn seam
 /// so it can install the [`ToolPolicyMiddleware`](super::middleware::ToolPolicyMiddleware).
 /// `None` means "no policy enforcement on this turn" (the channel/CLI + sub-agent
 /// paths, which carry their own gating).
 #[derive(Clone)]
 pub(crate) struct ToolPolicyEnforcement {
-    pub policy: std::sync::Arc<dyn crate::agent::tool_policy::ToolPolicy>,
+    pub policy: std::sync::Arc<dyn tinyagents_harness::middleware::ToolCallPolicy<crate::agent::tinyagents::host::OpenHumanRunContext>>,
     /// The session's channel-permission snapshot — enforces the per-channel
     /// permission ceiling (deny + per-call permission-level gate) the in-house
     /// engine ran in `agent_tool_exec`.
     pub session: tinytools::ToolPolicySession,
-    pub session_id: String,
     pub channel: String,
     pub agent_definition_id: String,
 }
@@ -117,7 +116,7 @@ fn env_overrides() -> TurnPolicyOverrides {
 
 /// Build the harness [`RunPolicy`] for an openhuman turn (hosted provider).
 pub(crate) fn run_policy_for(max_iterations: usize, response_cache_enabled: bool) -> RunPolicy {
-    run_policy_for_provider(max_iterations, response_cache_enabled, false)
+    run_policy_for_provider(max_iterations, response_cache_enabled, false, None)
 }
 
 /// [`run_policy_for`] with the turn's provider locality: a local / self-hosted
@@ -125,15 +124,16 @@ pub(crate) fn run_policy_for(max_iterations: usize, response_cache_enabled: bool
 /// providers keep the tight defaults so a wedged call is still caught fast.
 ///
 /// Cross-route fallback (`RunPolicy.fallback`) is orthogonal and populated
-/// per-turn by [`assemble_turn_harness`](super::harness_assembly::assemble_turn_harness).
+/// per-turn by [`turn_run_policy`](super::turn_plan::turn_run_policy).
 pub(crate) fn run_policy_for_provider(
     max_iterations: usize,
     response_cache_enabled: bool,
     local_provider: bool,
+    tool_call_cap: Option<usize>,
 ) -> RunPolicy {
     run_policy(&TurnPolicyOptions {
         max_model_calls: max_iterations,
-        max_tool_calls: crate::agent::stop_hooks::tool_call_limit(max_iterations),
+        max_tool_calls: crate::agent::stop_hooks::tool_call_limit(max_iterations, tool_call_cap),
         max_depth: MAX_SPAWN_DEPTH,
         local_provider,
         response_cache_enabled,

@@ -5,7 +5,7 @@
 //! typed chat turn's calls do. This module assembles an `AgentHarness` with
 //! the session's exact tool surface and the **tool-boundary** part of the turn
 //! harness's middleware stack, in the same order as
-//! [`assemble_turn_harness`](super::harness_assembly):
+//! [`install_turn_middleware`](super::turn_middleware):
 //!
 //! 1. the SDK tool-policy projection (`require_sandbox`),
 //! 2. human-in-the-loop approval (`ApprovalSecurityMiddleware` through the
@@ -27,11 +27,10 @@ use tinyagents_harness::middleware::{
     ApprovalGateMiddleware, ArgRecoveryMiddleware, ToolPolicyMiddleware as TaToolPolicyMiddleware,
 };
 use tinyagents_harness::runtime::AgentHarness;
-use tinyagents_registry::CapabilityRegistry;
 
-use super::harness_tool_registration::register_turn_tools_and_agents;
 use super::host::OpenHumanRunContext;
 use super::middleware;
+use super::tool_registration::{capability_diagnostics, host_tool_set_builder};
 use super::turn_policy::run_policy_for;
 use super::ToolPolicyEnforcement;
 
@@ -51,6 +50,9 @@ pub(crate) struct LiveToolSurface {
     /// Whether the session is bound to a chat thread (thread-scoped tools are
     /// only offered then).
     pub(crate) has_thread: bool,
+    /// The session's agent/turn tool callbacks, registered after the
+    /// runtime's global ones.
+    pub(crate) tool_hooks: Vec<Arc<dyn crate::agent::hooks::ToolHook>>,
 }
 
 /// Builds the live session's tool harness.
@@ -62,23 +64,17 @@ pub(crate) fn assemble_live_tool_harness(
         allowed,
         tool_policy,
         has_thread,
+        tool_hooks,
     } = surface;
     let mut harness: AgentHarness<(), OpenHumanRunContext> = AgentHarness::new();
     harness.with_policy(run_policy_for(LIVE_MAX_TOOL_CALLS, false));
     crate::tools::timeout::install_harness_tool_timeouts(&mut harness);
 
-    let mut capability_registry: CapabilityRegistry<()> = CapabilityRegistry::new();
-    let (tool_count, names, diagnostics, _snapshot) = register_turn_tools_and_agents(
-        &mut harness,
-        &mut capability_registry,
-        &tool_sets,
-        &Some(allowed),
-        &HashSet::new(),
-        None,
-        false,
-        has_thread,
-        &HashSet::new(),
-    );
+    let allowed = Some(allowed);
+    let report = host_tool_set_builder(&tool_sets, &allowed, has_thread, &HashSet::new())
+        .register(&mut harness, None);
+    let (tool_count, names) = (report.registered.len(), report.plan.candidates);
+    let diagnostics = capability_diagnostics(&[], &tool_sets, &report.registered);
     for diagnostic in &diagnostics {
         tracing::warn!(
             kind = diagnostic.kind.as_str(),
@@ -109,9 +105,7 @@ pub(crate) fn assemble_live_tool_harness(
             enforcement.policy,
             enforcement.session,
             tool_sets.clone(),
-            enforcement.session_id,
             enforcement.channel,
-            enforcement.agent_definition_id,
         )));
     }
     harness.push_tool_middleware(Arc::new(middleware::credential_scrub_middleware()));
@@ -121,7 +115,8 @@ pub(crate) fn assemble_live_tool_harness(
         registered_tools,
         route_session,
     )));
-    let embedder_tool_hooks = crate::agent::hooks::turn_tool_hooks();
+    let mut embedder_tool_hooks = crate::agent::hooks::embedder_tool_hooks();
+    embedder_tool_hooks.extend(tool_hooks);
     if !embedder_tool_hooks.is_empty() {
         harness.push_middleware(Arc::new(middleware::EmbedderToolHooksMiddleware::new(
             embedder_tool_hooks,

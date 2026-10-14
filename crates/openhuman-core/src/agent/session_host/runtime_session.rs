@@ -74,7 +74,7 @@ struct OpenHumanTurnPrelude {
     /// Host prompt/utilisation state, shared by the runtime hooks. It is not
     /// generic conversation state and the runtime never persists it.
     context: Arc<std::sync::Mutex<crate::agent::context::ContextManager>>,
-    tool_policy: Arc<dyn crate::agent::tool_policy::ToolPolicy>,
+    tool_policy: Arc<dyn tinyagents_harness::middleware::ToolCallPolicy<crate::agent::tinyagents::host::OpenHumanRunContext>>,
     tool_dispatcher: Arc<dyn tinytools_agent::dialect::ToolDialect>,
     workspace_dir: std::path::PathBuf,
     action_dir: std::path::PathBuf,
@@ -96,6 +96,7 @@ struct OpenHumanTurnPrelude {
     on_progress: Option<tokio::sync::mpsc::Sender<crate::agent::progress::AgentProgress>>,
     run_queue:
         Option<Arc<tinyagents_harness::run_queue::RunQueue<crate::agent::queued_turn::QueuedTurn>>>,
+    host_env: crate::agent::turn_env::HostTurnEnv,
     allowed_subagent_ids: std::collections::HashSet<String>,
     sandbox_mode: tinyagents_definition::SandboxMode,
     definition: Option<Arc<crate::agent::harness::host_definition::AgentDefinition>>,
@@ -190,7 +191,6 @@ impl OpenHumanTurnPrelude {
         Arc<Vec<Box<dyn tinytools::Tool>>>,
         tinytools::ToolPolicySession,
         String,
-        String,
     ) {
         let surface = self
             .tool_surface
@@ -200,7 +200,6 @@ impl OpenHumanTurnPrelude {
             surface.tools.clone(),
             surface.synthesized_tools.clone(),
             surface.tool_policy_session.clone(),
-            surface.event_session_id.clone(),
             surface.event_channel.clone(),
         )
     }
@@ -245,7 +244,7 @@ impl OpenHumanTurnPrelude {
                     )
                     .filter(|spec| {
                         self.thread_id.is_some()
-                            || !crate::agent::tinyagents::harness_tool_registration::is_thread_goal_tool(
+                            || !crate::agent::tinyagents::tool_registration::is_thread_goal_tool(
                                 &spec.name,
                             )
                     })
@@ -279,7 +278,7 @@ impl OpenHumanTurnPrelude {
             .filter(|spec| !withheld.contains(&spec.name))
             .filter(|spec| {
                 self.thread_id.is_some()
-                    || !crate::agent::tinyagents::harness_tool_registration::is_thread_goal_tool(
+                    || !crate::agent::tinyagents::tool_registration::is_thread_goal_tool(
                         &spec.name,
                     )
             })
@@ -292,7 +291,7 @@ impl OpenHumanTurnPrelude {
             .chain(surface.synthesized_tools.iter())
             .filter(|tool| {
                 self.thread_id.is_some()
-                    || !crate::agent::tinyagents::harness_tool_registration::is_thread_goal_tool(
+                    || !crate::agent::tinyagents::tool_registration::is_thread_goal_tool(
                         tool.name(),
                     )
             })
@@ -306,7 +305,7 @@ impl OpenHumanTurnPrelude {
         visible_tool_names.retain(|name| !surface.permanent_tool_names.contains(name));
         if self.thread_id.is_none() {
             visible_tool_names.retain(|name| {
-                !crate::agent::tinyagents::harness_tool_registration::is_thread_goal_tool(name)
+                !crate::agent::tinyagents::tool_registration::is_thread_goal_tool(name)
             });
         }
         crate::agent::prompts::swap_deferred_for_discovery_bridge(
@@ -507,51 +506,6 @@ impl OpenHumanTurnPrelude {
             self.tool_dispatcher.tool_call_format(),
         );
         format!("{}\n\n{enriched}", turn.preamble())
-    }
-
-    fn parent_context(&self) -> crate::agent::harness::ParentExecutionContext {
-        let surface = self
-            .tool_surface
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let (workflows, memory_context, connected_integrations) = {
-            let mutable = self
-                .mutable
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            (
-                mutable.workflows.clone(),
-                mutable.last_memory_context.clone(),
-                mutable.connected_integrations.clone(),
-            )
-        };
-        crate::agent::harness::ParentExecutionContext {
-            agent_definition_id: self.agent_definition_id.clone(),
-            allowed_subagent_ids: self.allowed_subagent_ids.clone(),
-            turn_model_source: self.turn_model_source.clone(),
-            all_tools: surface.tools.clone(),
-            all_tool_specs: surface.durable_tool_specs.clone(),
-            visible_tool_names: surface.visible_tool_names.clone(),
-            visible_tool_specs: surface.visible_tool_specs.clone(),
-            subagent_tool_ceiling_names: self.subagent_tool_ceiling_names.clone(),
-            model_name: self.model_name.clone(),
-            temperature: self.temperature,
-            workspace_dir: self.workspace_dir.clone(),
-            workspace_descriptor: crate::agent::harness::current_parent()
-                .and_then(|parent| parent.workspace_descriptor)
-                .or_else(|| self.workspace_descriptor.clone()),
-            agent_config: self.config.clone(),
-            workflows: Arc::new(workflows),
-            memory_context: Arc::new(memory_context),
-            session_id: self.event_session_id.clone(),
-            channel: self.event_channel.clone(),
-            connected_integrations,
-            tool_call_format: self.tool_dispatcher.tool_call_format(),
-            session_key: self.session_key.clone(),
-            session_parent_prefix: self.session_parent_prefix.clone(),
-            on_progress: self.on_progress.clone(),
-            run_queue: self.run_queue.clone(),
-        }
     }
 
     fn apply_pending_announcements(&self, enriched: &mut String) {
@@ -774,6 +728,7 @@ impl OpenHumanSessionHost {
                 session_parent_prefix: self.session_parent_prefix.clone(),
                 on_progress: self.on_progress.clone(),
                 run_queue: self.run_queue.clone(),
+                host_env: self.host_env.clone(),
                 allowed_subagent_ids: self
                     .resolved_definition()
                     .map(|definition| definition.allowed_subagent_ids().into_iter().collect())
@@ -938,7 +893,6 @@ impl OpenHumanSessionHost {
                             mut current_tools,
                             mut current_synthesized_tools,
                             policy_session,
-                            policy_session_id,
                             policy_channel,
                         ) = prelude.current_tool_source();
                         if turn.overrides.suppress_tools {
@@ -970,7 +924,6 @@ impl OpenHumanSessionHost {
                             Some(crate::agent::tinyagents::ToolPolicyEnforcement {
                                 policy: prelude.tool_policy.clone(),
                                 session: policy_session,
-                                session_id: policy_session_id,
                                 channel: policy_channel,
                                 agent_definition_id: prelude.agent_definition_id.clone(),
                             });
@@ -1045,9 +998,7 @@ impl OpenHumanSessionHost {
         let mut builder = SessionBuilder::new(driver)
             .codec(Arc::new(OpenHumanTranscriptCodec))
             .hooks(hooks)
-            .retain_recorded_tools(
-                !self.host_only && crate::agent::tool_snapshot_scope::retain_recorded_tools(),
-            );
+            .retain_recorded_tools(!self.host_only && !self.host_env.fresh_tool_snapshot);
         let meta = self.runtime_transcript_meta();
         builder = match self.session.clone() {
             Some(session) => builder.session(session_locator, session, meta),
@@ -1120,6 +1071,7 @@ mod tool_surface;
 #[path = "runtime_session_juice_tests.rs"]
 mod juice_tests;
 
+mod parent_snapshot;
 #[path = "prelude_integrations.rs"]
 mod prelude_integrations;
 

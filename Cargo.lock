@@ -5473,6 +5473,7 @@ dependencies = [
  "tinyinference-providers",
  "tinyinference-voice",
  "tinyjuice-bus",
+ "tinymcp",
  "tinymcp-bus",
  "tinymemes-bus",
  "tinymemory-api",
@@ -5484,6 +5485,7 @@ dependencies = [
  "tinyskills-drivers",
  "tinystoragedrivers",
  "tinystoragedrivers-bus",
+ "tinystoragedrivers-busproxy",
  "tinystoragedrivers-client",
  "tinytools",
  "tinytools-agent",
@@ -8203,7 +8205,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix 1.1.5",
  "windows-sys 0.61.2",
@@ -8435,7 +8437,6 @@ dependencies = [
  "futures",
  "regex",
  "reqwest 0.12.28",
- "rustix 1.1.5",
  "serde",
  "serde_json",
  "sha2 0.11.0",
@@ -9459,6 +9460,7 @@ dependencies = [
  "dirs 7.0.0",
  "futures-util",
  "parking_lot",
+ "regex",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
@@ -9613,7 +9615,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "tinystoragedrivers-core",
  "tinystoragedrivers-file",
@@ -9625,7 +9627,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-bus"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -9634,7 +9636,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-busproxy"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "async-trait",
  "serde",
@@ -9648,7 +9650,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-client"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "async-trait",
  "serde",
@@ -9661,7 +9663,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-core"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "async-trait",
  "serde",
@@ -9672,7 +9674,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-file"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "async-trait",
  "libc",
@@ -9684,7 +9686,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-mongodb"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -9698,7 +9700,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-s3"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "bytes",
  "futures-util",
@@ -9712,7 +9714,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-secrets"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "async-trait",
  "atomicwrites",
@@ -9735,7 +9737,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-sqlite"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "rusqlite",
  "serde_json",
@@ -11261,7 +11263,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

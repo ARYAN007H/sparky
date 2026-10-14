@@ -50,7 +50,7 @@ pub(crate) use tool_exposure::OpenHumanToolExposureShadowMiddleware;
 pub(crate) use tool_outcome_capture::ToolOutcomeCaptureMiddleware;
 #[cfg(test)]
 pub(crate) use tool_output::ToolOutputMiddleware;
-pub(crate) use tool_policy::ToolPolicyMiddleware;
+pub(crate) use tool_policy::{AllowAllToolPolicy, ToolPolicyMiddleware};
 pub(crate) use turn_context::{
     render_unanswered_steps, TranscriptSnapshot, TranscriptSnapshotSink, TurnContextMiddleware,
 };

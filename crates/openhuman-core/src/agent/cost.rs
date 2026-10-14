@@ -17,7 +17,7 @@
 //! $4.25 when the provider billed about $0.30.
 
 use crate::inference::provider::BilledUsage;
-use tinyagents_harness::cost::{CallCost, CallUsage, CostTally};
+use tinyagents_harness::cost::{CallCost, CallUsage};
 
 /// Whether a model names an explicitly free OpenRouter variant.
 pub(crate) fn is_free_model(model: &str) -> bool {
@@ -62,38 +62,12 @@ pub fn call_cost(model: &str, usage: &BilledUsage) -> CallCost {
     tinyagents_harness::cost::call_cost(lookup_pricing(model).as_ref(), &call_usage(usage))
 }
 
-/// Running cost / token tally across every provider call inside a
-/// single turn of the tool-call loop.
-#[derive(Debug, Clone, Default)]
-pub struct TurnCost {
-    pub input_tokens: u64,
-    pub output_tokens: u64,
-    pub cached_input_tokens: u64,
-    pub cost: CostTally,
-    pub call_count: u32,
-}
-
-impl TurnCost {
-    /// New empty accumulator.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Fold a single provider call's usage into the running totals.
-    pub fn add_call(&mut self, model: &str, usage: &BilledUsage) {
-        self.input_tokens = self.input_tokens.saturating_add(usage.input_tokens);
-        self.output_tokens = self.output_tokens.saturating_add(usage.output_tokens);
-        self.cached_input_tokens = self
-            .cached_input_tokens
-            .saturating_add(usage.cached_input_tokens());
-        self.cost.add(call_cost(model, usage));
-        self.call_count = self.call_count.saturating_add(1);
-    }
-
-    /// The turn's cost so far, or `None` when any call's cost is unknown.
-    pub fn total_usd(&self) -> Option<f64> {
-        self.cost.usd()
-    }
+/// A turn's accumulator, priced with the product catalog: what the stop-hook
+/// chain starts every run from.
+pub(crate) fn turn_cost() -> tinyagents_harness::cost::TurnCost {
+    tinyagents_harness::cost::TurnCost::with_pricing(std::sync::Arc::new(|model: &str| {
+        lookup_pricing(model)
+    }))
 }
 
 #[cfg(test)]

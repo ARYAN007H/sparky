@@ -413,7 +413,7 @@ impl TurnContextMiddleware {
         // `CLEARED_PLACEHOLDER` and it was summarizing placeholders. The one
         // component able to preserve those results in condensed form never saw
         // them. The caller now sites it AFTER compression, so the ladder reads
-        // summarize → blank → evict. See `assemble_turn_harness`.
+        // summarize → blank → evict. See `install_turn_middleware`.
         if self.tool_result_budget_bytes > 0
             || self.payload_summarizer.is_some()
             || self.tokenjuice_compaction_enabled

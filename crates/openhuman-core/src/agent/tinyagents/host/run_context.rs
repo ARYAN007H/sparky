@@ -282,7 +282,15 @@ pub struct OpenHumanRunContext {
     /// UI/event progress receiver for this turn tree.
     pub progress: Option<Sender<AgentProgress>>,
     /// Stop policies evaluated after each model call.
-    pub stop_hooks: Vec<Arc<dyn StopHook<crate::agent::cost::TurnCost>>>,
+    pub stop_hooks: Vec<Arc<dyn StopHook<tinyagents_harness::cost::TurnCost>>>,
+    /// Agent/turn tool callbacks, registered after the runtime's global ones.
+    pub tool_hooks: Vec<Arc<dyn crate::agent::hooks::ToolHook>>,
+    /// Host cap on real tool invocations for this turn tree; `None` leaves the
+    /// product default. Inherited by children.
+    pub tool_call_limit: Option<usize>,
+    /// This turn's input is untrusted data (a host-only reviewer reading a PR
+    /// diff), so the security gate built for it does not screen the input.
+    pub untrusted_input_turn: bool,
     /// Wall-clock deadline of the top-level turn this run belongs to, set
     /// only by the session turn entry point from the web backstop
     /// (`agent::turn_deadline`). The harness winds the run down and clamps
@@ -380,6 +388,18 @@ pub struct OpenHumanRunContext {
     pub(crate) memory_turn: Option<Arc<crate::memory::lifecycle::hooks::MemoryTurn>>,
 }
 
+/// The host callbacks and caps a turn's harness assembly installs, taken from
+/// the explicit run context.
+#[derive(Clone, Default)]
+pub(crate) struct HarnessHostPolicy {
+    /// Stop policies evaluated after each model call.
+    pub(crate) stop_hooks: Vec<Arc<dyn StopHook<tinyagents_harness::cost::TurnCost>>>,
+    /// Agent/turn tool callbacks, registered after the runtime's global ones.
+    pub(crate) tool_hooks: Vec<Arc<dyn crate::agent::hooks::ToolHook>>,
+    /// The host's cap on real tool invocations.
+    pub(crate) tool_call_cap: Option<usize>,
+}
+
 /// Minimal immutable authority view exposed to shared tools through the
 /// harness's typed state-view seam.
 #[derive(Clone, Debug, Default)]
@@ -444,12 +464,15 @@ impl OpenHumanRunContext {
     /// actually owns; `None` is an explicit absence, not an ambient fallback.
     pub fn new() -> Self {
         Self {
-            model_budget: super::super::budget::current(),
+            model_budget: None,
             response_shape: None,
-            max_spawn_depth: super::super::budget::spawn_depth_limit(),
+            max_spawn_depth: None,
             origin: None,
             progress: None,
-            stop_hooks: crate::agent::stop_hooks::current_stop_hooks(),
+            stop_hooks: Vec::new(),
+            tool_hooks: Vec::new(),
+            tool_call_limit: None,
+            untrusted_input_turn: false,
             turn_deadline: None,
             parent: None,
             prepared_context_sources: Arc::new(Vec::new()),
@@ -464,7 +487,7 @@ impl OpenHumanRunContext {
             subagent_usage: Arc::new(Mutex::new(Vec::new())),
             parent_subagent_usage: None,
             resolved_route: Arc::new(Mutex::new(None)),
-            cancellation: crate::agent::host_overrides::current_cancellation(),
+            cancellation: tinyagents_harness::cancel::CancellationToken::default(),
             thread_id: None,
             root_run_id: None,
             workspace: None,
@@ -545,6 +568,39 @@ impl OpenHumanRunContext {
     ) -> &ParentExecutionContext {
         parent.on_progress = self.progress.clone().or(parent.on_progress);
         self.parent.insert(parent)
+    }
+
+    /// The callbacks and caps this turn's harness assembly installs.
+    pub(crate) fn harness_host_policy(&self) -> HarnessHostPolicy {
+        HarnessHostPolicy {
+            stop_hooks: self.stop_hooks.clone(),
+            tool_hooks: self.tool_hooks.clone(),
+            tool_call_cap: self.tool_call_limit,
+        }
+    }
+
+    /// The real tool invocation budget for a turn of `max_iterations`: the
+    /// product default, narrowed by the host's explicit cap.
+    pub(crate) fn tool_call_limit_for(&self, max_iterations: usize) -> usize {
+        crate::agent::stop_hooks::tool_call_limit(max_iterations, self.tool_call_limit)
+    }
+
+    /// Applies the host environment an entry point handed to the session:
+    /// shared budget, delegation depth, cancellation, deadline and hooks.
+    #[must_use]
+    pub(crate) fn with_host_env(mut self, env: &crate::agent::turn_env::HostTurnEnv) -> Self {
+        self.model_budget = env.model_budget.clone().or(self.model_budget);
+        self.max_spawn_depth = env.spawn_depth_limit.or(self.max_spawn_depth);
+        if let Some(cancellation) = &env.cancellation {
+            self.cancellation = cancellation.clone();
+        }
+        self.turn_deadline = env.turn_deadline.or(self.turn_deadline);
+        self.tool_call_limit = env.tool_call_limit.or(self.tool_call_limit);
+        self.stop_hooks
+            .extend(env.hooks.stop_hooks().iter().cloned());
+        self.tool_hooks
+            .extend(env.hooks.tool_hooks().iter().cloned());
+        self
     }
 
     /// Sets the same cancellation token on this context and its TinyAgents run.

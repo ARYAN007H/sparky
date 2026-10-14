@@ -94,7 +94,7 @@ impl ApprovalSecurityMiddleware {
 
 /// Host side of the harness approval seam: the tool-set lookup, the global
 /// [`ApprovalGate`] hookup and the terminal audit row. The harness
-/// `ApprovalGateMiddleware` drives it (see `harness_assembly`).
+/// `ApprovalGateMiddleware` drives it (see `turn_middleware`).
 #[async_trait]
 impl ApprovalResolver<crate::agent::tinyagents::host::OpenHumanRunContext>
     for ApprovalSecurityMiddleware
