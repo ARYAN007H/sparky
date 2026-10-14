@@ -244,7 +244,7 @@ impl OpenHumanTurnPrelude {
                     )
                     .filter(|spec| {
                         self.thread_id.is_some()
-                            || !crate::agent::tinyagents::harness_tool_registration::is_thread_goal_tool(
+                            || !crate::agent::tinyagents::tool_registration::is_thread_goal_tool(
                                 &spec.name,
                             )
                     })
@@ -278,7 +278,7 @@ impl OpenHumanTurnPrelude {
             .filter(|spec| !withheld.contains(&spec.name))
             .filter(|spec| {
                 self.thread_id.is_some()
-                    || !crate::agent::tinyagents::harness_tool_registration::is_thread_goal_tool(
+                    || !crate::agent::tinyagents::tool_registration::is_thread_goal_tool(
                         &spec.name,
                     )
             })
@@ -291,7 +291,7 @@ impl OpenHumanTurnPrelude {
             .chain(surface.synthesized_tools.iter())
             .filter(|tool| {
                 self.thread_id.is_some()
-                    || !crate::agent::tinyagents::harness_tool_registration::is_thread_goal_tool(
+                    || !crate::agent::tinyagents::tool_registration::is_thread_goal_tool(
                         tool.name(),
                     )
             })
@@ -305,7 +305,7 @@ impl OpenHumanTurnPrelude {
         visible_tool_names.retain(|name| !surface.permanent_tool_names.contains(name));
         if self.thread_id.is_none() {
             visible_tool_names.retain(|name| {
-                !crate::agent::tinyagents::harness_tool_registration::is_thread_goal_tool(name)
+                !crate::agent::tinyagents::tool_registration::is_thread_goal_tool(name)
             });
         }
         crate::agent::prompts::swap_deferred_for_discovery_bridge(

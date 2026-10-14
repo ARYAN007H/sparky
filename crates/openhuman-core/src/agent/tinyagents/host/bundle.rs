@@ -174,7 +174,7 @@ impl OpenHumanHostBundleFactory {
         let models = Arc::new(OpenHumanModelResolver::new(Arc::clone(&inputs.config)));
         let budget = Arc::new(OpenHumanBudgetGate::new(Arc::clone(&inputs.config)));
         // The turn's live `AgentProgress` channel is fed by exactly one
-        // producer: `OpenhumanEventBridge`, which `turn_runner` subscribes to
+        // producer: `OpenhumanEventBridge`, which `turn_exec` subscribes to
         // the run's `EventSink` on every turn and which carries what the UI
         // needs (iteration attribution, thinking, tool-argument fragments,
         // sub-agent scoping, cost). The harness also mirrors the loop onto the

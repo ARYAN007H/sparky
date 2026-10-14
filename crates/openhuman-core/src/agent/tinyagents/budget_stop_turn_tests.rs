@@ -84,7 +84,10 @@ impl StopHook<tinyagents_harness::cost::TurnCost> for RecordingBudgetStopHook {
         self.inner.name()
     }
 
-    async fn check(&self, state: &TurnState<'_, tinyagents_harness::cost::TurnCost>) -> StopDecision {
+    async fn check(
+        &self,
+        state: &TurnState<'_, tinyagents_harness::cost::TurnCost>,
+    ) -> StopDecision {
         let decision = self.inner.check(state).await;
         if let StopDecision::Stop { reason } = &decision {
             *self.reason.lock().expect("stop reason lock") = Some(reason.clone());
