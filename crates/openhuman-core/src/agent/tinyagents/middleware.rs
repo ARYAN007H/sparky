@@ -43,9 +43,6 @@ pub(crate) use embedder_hooks::EmbedderToolHooksMiddleware;
 pub(crate) use memory_pack::memory_pack_middleware;
 pub(crate) use packed_tool_route::packed_tool_route_middleware;
 pub(crate) use repeated_failure::RepeatedToolFailureMiddleware;
-pub(crate) use tinyagents_harness::middleware::{
-    CliRpcOnlyMiddleware, ToolExposureShadowMiddleware,
-};
 pub(crate) use tool_outcome_capture::ToolOutcomeCaptureMiddleware;
 #[cfg(test)]
 pub(crate) use tool_output::ToolOutputMiddleware;

@@ -296,11 +296,13 @@ pub(super) fn install_turn_middleware(
         }
         tags
     };
-    harness.push_middleware(Arc::new(middleware::ToolExposureShadowMiddleware::new(
-        &candidate_names,
-        allowed.as_ref(),
-        exposure_tags,
-    )));
+    harness.push_middleware(Arc::new(
+        tinyagents_harness::middleware::ToolExposureShadowMiddleware::new(
+            &candidate_names,
+            allowed.as_ref(),
+            exposure_tags,
+        ),
+    ));
 
     // Prompt-cache prefix protection (issue #4249, 03.2). The vendor loop owns
     // the stable-prefix layout (`PromptSegment`s built from the session's frozen
@@ -459,9 +461,9 @@ pub(super) fn install_turn_middleware(
     // CLI/RPC-only scope gate — a tool restricted to explicit CLI/RPC invocation
     // must not run from the model loop. Intrinsic to the tool, so installed on
     // every path (channel/session/sub-agent).
-    harness.push_tool_middleware(Arc::new(middleware::CliRpcOnlyMiddleware::new(
-        tool_sets.clone(),
-    )));
+    harness.push_tool_middleware(Arc::new(
+        tinyagents_harness::middleware::CliRpcOnlyMiddleware::new(tool_sets.clone()),
+    ));
 
     // Builder-configured tool policy (`.tool_policy()`), enforced at the tool
     // boundary. The in-house engine ran this in `agent_tool_exec`; the tinyagents
