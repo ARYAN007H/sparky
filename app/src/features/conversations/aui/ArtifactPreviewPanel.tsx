@@ -3,9 +3,12 @@
 import {
   Check,
   Clipboard,
+  Code2,
   Download,
+  Eye,
+  FileBox,
   FileText,
-  GripVertical,
+  Save,
   X,
 } from 'lucide-react';
 import {
@@ -30,11 +33,11 @@ interface ArtifactPreviewPanelProps {
   onClose: () => void;
 }
 
-interface VersionEntry {
+interface ArtifactBodyResponse {
+  kind: string;
+  title: string;
   version: number;
   body: string;
-  createdAt: string;
-  note?: string;
 }
 
 // ─── Constants ──────────────────────────────────────────────────
@@ -146,15 +149,10 @@ export function ArtifactPreviewPanel({ artifactId, onClose }: ArtifactPreviewPan
         </Button>
       </div>
 
-      {/* Toolbar */}
-      {activeArtifact && (
-        <ArtifactToolbar artifact={activeArtifact} allArtifacts={allArtifacts} />
-      )}
-
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-hidden">
         {activeArtifact ? (
-          <ArtifactContent artifact={activeArtifact} />
+          <ArtifactContentPanel artifact={activeArtifact} />
         ) : (
           <div className="flex items-center justify-center h-full p-4 text-sm text-muted-foreground">
             {t('chat.artifact.notFound')}
@@ -165,93 +163,37 @@ export function ArtifactPreviewPanel({ artifactId, onClose }: ArtifactPreviewPan
   );
 }
 
-// ─── Toolbar (version, copy, download) ──────────────────────────
+// ─── Content panel (fetches and renders) ────────────────────────
 
-function ArtifactToolbar({
-  artifact,
-  allArtifacts,
-}: {
-  artifact: ArtifactSnapshot;
-  allArtifacts: ArtifactSnapshot[];
-}) {
-  const { t } = useT();
-  const [copied, setCopied] = useState(false);
-
-  // Find the current index among same-titled artifacts for version hint
-  const sameTitle = allArtifacts.filter(a => a.title === artifact.title);
-  const versionIndex = sameTitle.indexOf(artifact);
-
-  const handleCopy = useCallback(() => {
-    // In a full implementation, copy the artifact body
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }, []);
-
-  const handleDownload = useCallback(() => {
-    // In a full implementation, trigger file download via the file URL
-  }, []);
-
-  return (
-    <div className="flex items-center justify-between border-b px-3 py-1.5 shrink-0 bg-muted/10">
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-medium text-muted-foreground capitalize">{artifact.kind}</span>
-        {versionIndex >= 0 && (
-          <span className="text-[11px] text-muted-foreground/60 border-l pl-2">
-            v{versionIndex + 1}
-          </span>
-        )}
-      </div>
-      <div className="flex items-center gap-1">
-        <Button variant="ghost" size="xs" onClick={handleCopy} title={t('chat.artifact.copy')}>
-          {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Clipboard className="h-3.5 w-3.5" />}
-        </Button>
-        <Button variant="ghost" size="xs" onClick={handleDownload} title={t('chat.artifact.download')}>
-          <Download className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Content renderer ──────────────────────────────────────────
-
-function ArtifactContent({ artifact }: { artifact: ArtifactSnapshot }) {
-  const [content, setContent] = useState<string | null>(null);
+function ArtifactContentPanel({ artifact }: { artifact: ArtifactSnapshot }) {
+  const [bodyResult, setBodyResult] = useState<ArtifactBodyResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [artifactKind, setArtifactKind] = useState<string>(artifact.kind);
-  const [version, setVersion] = useState(1);
+  const [error, setError] = useState<string | null>(null);
 
-  // Fetch artifact body from versioned store via Tauri IPC
   useEffect(() => {
     if (!artifact.artifactId) {
       setLoading(false);
       return;
     }
-
     let cancelled = false;
     setLoading(true);
+    setError(null);
 
     const fetchBody = async () => {
       try {
-        const result = await invoke<{ kind: string; title: string; version: number; body: string }>(
-          'read_artifact_body',
-          { artifactId: artifact.artifactId },
-        );
-        if (cancelled) return;
-        setContent(result.body);
-        setArtifactKind(result.kind);
-        setVersion(result.version);
+        const result = await invoke<ArtifactBodyResponse>('read_artifact_body', {
+          artifactId: artifact.artifactId,
+        });
+        if (!cancelled) setBodyResult(result);
       } catch (err) {
-        // Fallback: show a placeholder
-        if (cancelled) return;
-        setContent(`# ${artifact.title}\n\n*Kind: ${artifact.kind}\nPath: ${artifact.path || '—'}*`);
+        if (!cancelled) setError(String(err));
       }
       if (!cancelled) setLoading(false);
     };
 
     fetchBody();
     return () => { cancelled = true; };
-  }, [artifact.artifactId, artifact.title, artifact.kind, artifact.path]);
+  }, [artifact.artifactId]);
 
   if (loading) {
     return (
@@ -261,44 +203,213 @@ function ArtifactContent({ artifact }: { artifact: ArtifactSnapshot }) {
     );
   }
 
-  const kind = artifactKind || artifact.kind;
+  const kind = bodyResult?.kind || artifact.kind;
+  const body = bodyResult?.body || '';
+  const version = bodyResult?.version || 1;
 
-  switch (kind) {
-    case 'html':
-      return <HtmlViewer content={content || ''} />;
-    case 'markdown':
-    case 'text':
-    case 'document':
-    default:
-      return <TextViewer content={content || `# ${artifact.title}\n\n*Kind: ${artifact.kind}\nPath: ${artifact.path}*`} language={kind} />;
+  // Binary / file-reference kinds → FileViewer (metadata + download)
+  if (kind === 'file' || kind === 'image') {
+    return <FileViewer artifact={artifact} body={body} version={version} error={error} />;
   }
-}
 
-// ─── HTML viewer ──────────────────────────────────────────────
-
-function HtmlViewer({ content }: { content: string }) {
+  // Text-based kinds → EditableTextViewer (preview + code editor + save)
   return (
-    <iframe
-      srcDoc={content}
-      className="w-full h-full border-0"
-      sandbox="allow-scripts allow-same-origin"
-      title="HTML preview"
+    <EditableTextViewer
+      artifact={artifact}
+      body={body}
+      version={version}
+      kind={kind}
+      error={error}
     />
   );
 }
 
-// ─── Text / Markdown viewer ───────────────────────────────────
+// ─── File viewer (binary / file-reference kinds) ────────────────
 
-function TextViewer({ content, language }: { content: string; language: string }) {
+function FileViewer({
+  artifact,
+  body,
+  version,
+  error,
+}: {
+  artifact: ArtifactSnapshot;
+  body: string;
+  version: number;
+  error: string | null;
+}) {
+  const filePath = body || artifact.path || '';
+  const fileName = filePath.split('/').pop() || filePath;
+
   return (
-    <div className="h-full flex flex-col">
-      <div className="border-b bg-muted/20 px-3 py-1.5 text-[11px] font-medium text-muted-foreground flex items-center gap-2">
-        <FileText className="h-3 w-3" />
-        <span className="uppercase">{language}</span>
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between border-b px-3 py-1.5 shrink-0 bg-muted/10">
+        <div className="flex items-center gap-2">
+          <FileBox className="h-4 w-4 text-muted-foreground" />
+          <span className="text-xs font-medium text-muted-foreground capitalize">{artifact.kind}</span>
+          <span className="text-[11px] text-muted-foreground/60 border-l pl-2">v{version}</span>
+        </div>
       </div>
-      <pre className="flex-1 overflow-auto p-4 text-sm font-mono leading-relaxed whitespace-pre-wrap break-words">
-        {content}
-      </pre>
+
+      <div className="flex-1 overflow-auto p-6">
+        <div className="flex flex-col items-center justify-center gap-4 text-center">
+          <FileBox className="h-12 w-12 text-muted-foreground/40" />
+          <div>
+            <p className="text-sm font-medium break-all">{fileName}</p>
+            <p className="text-xs text-muted-foreground mt-1 break-all">{filePath}</p>
+            <p className="text-xs text-muted-foreground mt-2">
+              Binary {artifact.kind} — preview not available
+            </p>
+            {error && <p className="text-xs text-destructive mt-2">{error}</p>}
+          </div>
+          {filePath && (
+            <a
+              href={`file://${filePath}`}
+              download={fileName}
+              className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Download
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Editable text viewer (markdown / text / html) ──────────────
+
+function EditableTextViewer({
+  artifact,
+  body,
+  version,
+  kind,
+  error,
+}: {
+  artifact: ArtifactSnapshot;
+  body: string;
+  version: number;
+  kind: string;
+  error: string | null;
+}) {
+  const [tab, setTab] = useState<'preview' | 'code'>('preview');
+  const [editedBody, setEditedBody] = useState(body);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Sync when body changes (switching artifact tabs)
+  useEffect(() => {
+    setEditedBody(body);
+    setSaved(false);
+  }, [body]);
+
+  const handleSave = useCallback(async () => {
+    setSaving(true);
+    try {
+      await invoke('save_artifact_body', {
+        args: {
+          artifact_id: artifact.artifactId,
+          body: editedBody,
+          note: null,
+        },
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      console.error('[ArtifactPreviewPanel] save failed:', err);
+    }
+    setSaving(false);
+  }, [artifact.artifactId, editedBody]);
+
+  const handleCopy = useCallback(() => {
+    void navigator.clipboard.writeText(editedBody);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [editedBody]);
+
+  const isHtml = kind === 'html';
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between border-b px-3 py-1.5 shrink-0 bg-muted/10">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground capitalize">{kind}</span>
+          <span className="text-[11px] text-muted-foreground/60 border-l pl-2">v{version}</span>
+        </div>
+        <div className="flex items-center gap-0.5">
+          <div className="flex items-center rounded border mr-2">
+            <button
+              onClick={() => setTab('preview')}
+              className={`flex items-center gap-1 px-2 py-0.5 text-xs ${
+                tab === 'preview'
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Eye className="h-3 w-3" />
+              Preview
+            </button>
+            <button
+              onClick={() => setTab('code')}
+              className={`flex items-center gap-1 px-2 py-0.5 text-xs ${
+                tab === 'code'
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Code2 className="h-3 w-3" />
+              Code
+            </button>
+          </div>
+
+          <Button variant="ghost" size="xs" onClick={handleCopy} title="Copy to clipboard">
+            {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Clipboard className="h-3.5 w-3.5" />}
+          </Button>
+          <Button variant="ghost" size="xs" onClick={handleSave} disabled={saving} title="Save as new version">
+            {saving ? (
+              <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            ) : saved ? (
+              <Check className="h-3.5 w-3.5 text-green-500" />
+            ) : (
+              <Save className="h-3.5 w-3.5" />
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {/* Error banner */}
+      {error && (
+        <div className="border-b bg-destructive/10 px-3 py-1.5 text-[11px] text-destructive">
+          {error}
+        </div>
+      )}
+
+      {/* Content area */}
+      {tab === 'preview' ? (
+        isHtml ? (
+          <iframe
+            srcDoc={editedBody}
+            className="w-full flex-1 border-0"
+            sandbox="allow-scripts allow-same-origin"
+            title="HTML preview"
+          />
+        ) : (
+          <div className="flex-1 overflow-auto">
+            <pre className="p-4 text-sm font-mono leading-relaxed whitespace-pre-wrap break-words">
+              {editedBody}
+            </pre>
+          </div>
+        )
+      ) : (
+        <textarea
+          value={editedBody}
+          onChange={e => setEditedBody(e.target.value)}
+          className="flex-1 w-full resize-none border-0 bg-background p-4 text-sm font-mono leading-relaxed outline-none focus:ring-0"
+          spellCheck={false}
+        />
+      )}
     </div>
   );
 }

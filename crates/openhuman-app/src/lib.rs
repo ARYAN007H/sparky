@@ -3304,6 +3304,7 @@ pub fn run() {
             // front of this went with the shell's `rfd` dependency.
             artifact_commands::download_artifact_to_downloads,
             artifact_commands::read_artifact_body,
+            artifact_commands::save_artifact_body,
             // Native directory chooser for the folder memory-source (#5831).
             // Unlike the Save-As dialog above it, this one has no renderer-side
             // substitute: a `webkitdirectory` input cannot report where the

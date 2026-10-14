@@ -26,7 +26,7 @@
 //! written outside the Downloads directory.
 
 use std::path::{Path, PathBuf};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// Resolve an artifact id to the file the core's artifact store vouches for,
 /// in the given workspace. Isolated from config loading for unit testing.
@@ -83,6 +83,57 @@ pub async fn read_artifact_body(artifact_id: String) -> Result<ArtifactBodyResul
         .unwrap_or("")
         .to_string();
     Ok(ArtifactBodyResult { kind, title, version: versions, body })
+}
+
+#[derive(Deserialize)]
+pub struct SaveArtifactBodyArgs {
+    pub artifact_id: String,
+    pub body: String,
+    pub note: Option<String>,
+}
+
+#[tauri::command]
+pub async fn save_artifact_body(args: SaveArtifactBodyArgs) -> Result<(), String> {
+    let config = openhuman_rpc::embed::config::load_config_with_timeout().await?;
+    let path = config.workspace_dir
+        .join("artifacts/versioned")
+        .join(&args.artifact_id)
+        .with_extension("json");
+
+    // Read existing record
+    let json = tokio::fs::read_to_string(&path)
+        .await
+        .map_err(|e| format!("artifact {} not found: {e}", args.artifact_id))?;
+    let mut record: serde_json::Value = serde_json::from_str(&json)
+        .map_err(|e| format!("artifact {} parse error: {e}", args.artifact_id))?;
+
+    // Add new version
+    let now = chrono::Utc::now().to_rfc3339();
+    let new_version = serde_json::json!({
+        "version": record["versions"].as_array().map(|v| v.len() as u64 + 1).unwrap_or(1),
+        "body": args.body,
+        "created_at": now,
+        "note": args.note.unwrap_or_default(),
+    });
+
+    record["versions"]
+        .as_array_mut()
+        .ok_or_else(|| "versions is not an array".to_string())?
+        .push(new_version);
+    record["updated_at"] = serde_json::Value::String(now);
+
+    let updated = serde_json::to_string_pretty(&record)
+        .map_err(|e| format!("serialization error: {e}"))?;
+    tokio::fs::write(&path, &updated)
+        .await
+        .map_err(|e| format!("write error: {e}"))?;
+
+    log::info!(
+        "[artifact_commands] save_artifact_body id={} version={}",
+        args.artifact_id,
+        record["versions"].as_array().map(|v| v.len()).unwrap_or(0)
+    );
+    Ok(())
 }
 
 /// Maximum number of `(N)` suffixes we'll append when picking a
