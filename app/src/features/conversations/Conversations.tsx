@@ -2395,7 +2395,7 @@ const Conversations = ({
             </div>
           </SidebarContent>
           <div className="flex h-full w-full min-w-0">
-            <div className="flex-1 min-w-0">{mainPanel}</div>
+            {mainPanel}
             {previewArtifactId && (
               <ArtifactPreviewPanel
                 artifactId={previewArtifactId}

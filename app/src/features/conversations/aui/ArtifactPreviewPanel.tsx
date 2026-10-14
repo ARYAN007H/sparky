@@ -1,21 +1,48 @@
 'use client';
 
-import { X, GripVertical } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Check,
+  Clipboard,
+  Download,
+  FileText,
+  GripVertical,
+  X,
+} from 'lucide-react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import { Button } from '../../../components/ui';
 import { useT } from '../../../lib/i18n/I18nContext';
 import { useAppSelector } from '../../../store/hooks';
 import type { ArtifactSnapshot } from '../../../store/chatRuntimeSlice';
 
+// ─── Types ──────────────────────────────────────────────────────
+
 interface ArtifactPreviewPanelProps {
+  /** If set, panel opens scoped to this single artifact. */
   artifactId: string;
   onClose: () => void;
 }
 
-const MIN_WIDTH = 320;
-const MAX_WIDTH = 960;
-const DEFAULT_WIDTH = 480;
+interface VersionEntry {
+  version: number;
+  body: string;
+  createdAt: string;
+  note?: string;
+}
+
+// ─── Constants ──────────────────────────────────────────────────
+
+const MIN_WIDTH = 360;
+const MAX_WIDTH = 1200;
+const DEFAULT_WIDTH = 520;
+
+// ─── Main panel ─────────────────────────────────────────────────
 
 export function ArtifactPreviewPanel({ artifactId, onClose }: ArtifactPreviewPanelProps) {
   const { t } = useT();
@@ -24,16 +51,29 @@ export function ArtifactPreviewPanel({ artifactId, onClose }: ArtifactPreviewPan
   const startXRef = useRef(0);
   const startWidthRef = useRef(0);
 
-  const artifactsByThread = useAppSelector(state => state.chatRuntime.artifactsByThread);
-
-  const artifact = useMemo<ArtifactSnapshot | undefined>(() => {
-    for (const threadArtifacts of Object.values(artifactsByThread)) {
-      const found = threadArtifacts.find(a => a.artifactId === artifactId);
-      if (found) return found;
+  // All artifacts for the current thread — we show them as tabs
+  const artifactsByThread = useAppSelector(s => s.chatRuntime.artifactsByThread);
+  const allArtifacts = useMemo(() => {
+    const list: ArtifactSnapshot[] = [];
+    for (const arr of Object.values(artifactsByThread)) {
+      for (const a of arr) {
+        if (a.status === 'ready') list.push(a);
+      }
     }
-    return undefined;
-  }, [artifactsByThread, artifactId]);
+    return list.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+  }, [artifactsByThread]);
 
+  // Active tab — start with the requested artifact, or the first one
+  const [activeId, setActiveId] = useState(artifactId);
+  const activeArtifact = useMemo(
+    () => allArtifacts.find(a => a.artifactId === activeId),
+    [allArtifacts, activeId],
+  );
+
+  // Keep activeId in sync if the parent passes a new artifactId
+  useEffect(() => { setActiveId(artifactId); }, [artifactId]);
+
+  // ── Resize ──
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     dragRef.current = true;
@@ -44,25 +84,23 @@ export function ArtifactPreviewPanel({ artifactId, onClose }: ArtifactPreviewPan
   }, [panelWidth]);
 
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
+    const onMove = (e: MouseEvent) => {
       if (!dragRef.current) return;
       const delta = startXRef.current - e.clientX;
-      const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidthRef.current + delta));
-      setPanelWidth(newWidth);
+      setPanelWidth(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidthRef.current + delta)));
     };
-    const handleMouseUp = () => {
+    const onUp = () => {
       if (!dragRef.current) return;
       dragRef.current = false;
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
     };
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
   }, []);
+
+  const showTabs = allArtifacts.length > 1;
 
   return (
     <div
@@ -71,38 +109,54 @@ export function ArtifactPreviewPanel({ artifactId, onClose }: ArtifactPreviewPan
     >
       {/* Drag handle */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize hover:bg-primary/20 active:bg-primary/30 z-10"
+        className="absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize hover:bg-primary/20 active:bg-primary/30 z-20"
         onMouseDown={handleMouseDown}
       />
 
       {/* Header */}
-      <div className="flex items-center justify-between border-b px-4 py-3 shrink-0 pl-5">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="flex flex-col gap-0.5 min-w-0">
-            <span className="text-sm font-medium truncate">
-              {artifact?.title || t('chat.artifact.preview')}
-            </span>
-            {artifact && (
-              <span className="text-xs text-muted-foreground capitalize">{artifact.kind}</span>
-            )}
-          </div>
+      <div className="flex items-center justify-between border-b shrink-0">
+        <div className="flex items-center gap-1 min-w-0 flex-1 overflow-x-auto">
+          {showTabs ? (
+            allArtifacts.map(a => (
+              <button
+                key={a.artifactId}
+                onClick={() => setActiveId(a.artifactId)}
+                className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium border-b-2 transition-colors shrink-0 ${
+                  a.artifactId === activeId
+                    ? 'border-primary text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <FileText className="h-3.5 w-3.5" />
+                <span className="truncate max-w-[120px]">{a.title}</span>
+              </button>
+            ))
+          ) : (
+            <div className="flex items-center gap-2 px-4 py-2.5 min-w-0">
+              <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="text-sm font-medium truncate">
+                {activeArtifact?.title || t('chat.artifact.preview')}
+              </span>
+            </div>
+          )}
         </div>
-        <Button variant="ghost" size="xs" onClick={onClose} className="shrink-0">
+        <Button variant="ghost" size="xs" onClick={onClose} className="mr-2 shrink-0">
           <X className="h-4 w-4" />
         </Button>
       </div>
 
+      {/* Toolbar */}
+      {activeArtifact && (
+        <ArtifactToolbar artifact={activeArtifact} allArtifacts={allArtifacts} />
+      )}
+
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
-        {!artifact ? (
-          <p className="text-sm text-muted-foreground">{t('chat.artifact.notFound')}</p>
-        ) : artifact.status === 'ready' ? (
-          <ArtifactContent artifact={artifact} />
+      <div className="flex-1 overflow-y-auto">
+        {activeArtifact ? (
+          <ArtifactContent artifact={activeArtifact} />
         ) : (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-sm text-muted-foreground">
-              {artifact.status === 'in_progress' ? t('conversations.tools.working') : t('chat.artifact.failed')}
-            </p>
+          <div className="flex items-center justify-center h-full p-4 text-sm text-muted-foreground">
+            {t('chat.artifact.notFound')}
           </div>
         )}
       </div>
@@ -110,74 +164,140 @@ export function ArtifactPreviewPanel({ artifactId, onClose }: ArtifactPreviewPan
   );
 }
 
-/** Renders artifact content based on kind. */
-function ArtifactContent({ artifact }: { artifact: ArtifactSnapshot }) {
-  // For now show metadata. In a full implementation, this would:
-  // 1. Fetch the artifact body from the versioned store or file
-  // 2. Render HTML in an iframe, text/markdown in a <pre>, etc.
-  const fileUrl = artifact.path ? `/api/files/${artifact.path}` : null;
+// ─── Toolbar (version, copy, download) ──────────────────────────
+
+function ArtifactToolbar({
+  artifact,
+  allArtifacts,
+}: {
+  artifact: ArtifactSnapshot;
+  allArtifacts: ArtifactSnapshot[];
+}) {
+  const { t } = useT();
+  const [copied, setCopied] = useState(false);
+
+  // Find the current index among same-titled artifacts for version hint
+  const sameTitle = allArtifacts.filter(a => a.title === artifact.title);
+  const versionIndex = sameTitle.indexOf(artifact);
+
+  const handleCopy = useCallback(() => {
+    // In a full implementation, copy the artifact body
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, []);
+
+  const handleDownload = useCallback(() => {
+    // In a full implementation, trigger file download via the file URL
+  }, []);
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
-        <MetaRow label="ID" value={artifact.artifactId} />
-        <MetaRow label="Status" value={artifact.status} />
-        <MetaRow label="Kind" value={artifact.kind} />
-        {artifact.sizeBytes != null && (
-          <MetaRow label="Size" value={formatBytes(artifact.sizeBytes)} />
+    <div className="flex items-center justify-between border-b px-3 py-1.5 shrink-0 bg-muted/10">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-medium text-muted-foreground capitalize">{artifact.kind}</span>
+        {versionIndex >= 0 && (
+          <span className="text-[11px] text-muted-foreground/60 border-l pl-2">
+            v{versionIndex + 1}
+          </span>
         )}
-        {artifact.path && <MetaRow label="File" value={artifact.path} mono />}
       </div>
-
-      {/* Content area - placeholder for now */}
-      {artifact.kind === 'html' && <HtmlPreview html={artifact as never} />}
-      {(artifact.kind === 'markdown' || artifact.kind === 'text' || artifact.kind === 'document') && (
-        <TextPreview artifact={artifact} />
-      )}
-    </div>
-  );
-}
-
-function MetaRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div className="flex items-start gap-2 text-sm">
-      <span className="text-muted-foreground shrink-0 w-12">{label}:</span>
-      <span className={`break-all ${mono ? 'font-mono text-xs' : ''}`}>{value}</span>
-    </div>
-  );
-}
-
-function HtmlPreview({ html }: { html: string }) {
-  return (
-    <div className="rounded-lg border overflow-hidden">
-      <iframe
-        srcDoc={html}
-        className="w-full h-[400px]"
-        sandbox="allow-same-origin"
-        title="HTML Preview"
-      />
-    </div>
-  );
-}
-
-function TextPreview({ artifact }: { artifact: ArtifactSnapshot }) {
-  return (
-    <div className="rounded-lg border">
-      <div className="border-b bg-muted/30 px-3 py-2 text-xs font-medium text-muted-foreground">
-        Content preview
+      <div className="flex items-center gap-1">
+        <Button variant="ghost" size="xs" onClick={handleCopy} title={t('chat.artifact.copy')}>
+          {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Clipboard className="h-3.5 w-3.5" />}
+        </Button>
+        <Button variant="ghost" size="xs" onClick={handleDownload} title={t('chat.artifact.download')}>
+          <Download className="h-3.5 w-3.5" />
+        </Button>
       </div>
-      <pre className="p-4 text-sm whitespace-pre-wrap break-words max-h-[500px] overflow-y-auto font-mono">
-        {/* Placeholder: would fetch actual content from versioned store */}
-        {artifact.path ? `Load content from: ${artifact.path}` : 'No content available'}
+    </div>
+  );
+}
+
+// ─── Content renderer ──────────────────────────────────────────
+
+function ArtifactContent({ artifact }: { artifact: ArtifactSnapshot }) {
+  const [content, setContent] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch content from the file path when possible
+  useEffect(() => {
+    if (!artifact.path && !artifact.artifactId) {
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+
+    // Try to read the file content via the core's workspace file API
+    const fetchContent = async () => {
+      try {
+        // Use the artifact's path to fetch content
+        // In dev mode the core serves workspace files
+        const url = `http://localhost:7799/workspace/files/${encodeURIComponent(artifact.path || '')}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const text = await res.text();
+          if (!cancelled) setContent(text);
+        } else {
+          // Fallback: show the file path
+          if (!cancelled) setContent(`// Content from: ${artifact.path}\n// (use ai.get_artifact to read the file)`);
+        }
+      } catch {
+        if (!cancelled) setContent(`// Could not load: ${artifact.path}`);
+      }
+      if (!cancelled) setLoading(false);
+    };
+
+    fetchContent();
+    return () => { cancelled = true; };
+  }, [artifact.path, artifact.artifactId]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full p-8">
+        <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  switch (artifact.kind) {
+    case 'html':
+      return <HtmlViewer content={content || ''} />;
+    case 'markdown':
+    case 'text':
+    case 'document':
+    default:
+      return <TextViewer content={content || `// ${artifact.title}\n// Kind: ${artifact.kind}\n// Path: ${artifact.path}`} language={artifact.kind} />;
+  }
+}
+
+// ─── HTML viewer ──────────────────────────────────────────────
+
+function HtmlViewer({ content }: { content: string }) {
+  return (
+    <iframe
+      srcDoc={content}
+      className="w-full h-full border-0"
+      sandbox="allow-scripts allow-same-origin"
+      title="HTML preview"
+    />
+  );
+}
+
+// ─── Text / Markdown viewer ───────────────────────────────────
+
+function TextViewer({ content, language }: { content: string; language: string }) {
+  return (
+    <div className="h-full flex flex-col">
+      <div className="border-b bg-muted/20 px-3 py-1.5 text-[11px] font-medium text-muted-foreground flex items-center gap-2">
+        <FileText className="h-3 w-3" />
+        <span className="uppercase">{language}</span>
+      </div>
+      <pre className="flex-1 overflow-auto p-4 text-sm font-mono leading-relaxed whitespace-pre-wrap break-words">
+        {content}
       </pre>
     </div>
   );
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export default ArtifactPreviewPanel;
