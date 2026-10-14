@@ -17,7 +17,7 @@
 //! The per-turn tool budget ([`with_tool_call_limit`]) also lives here, on a
 //! task-local.
 
-pub use crate::agent::cost::TurnCost;
+use tinyagents_harness::cost::TurnCost;
 use async_trait::async_trait;
 use std::sync::Arc;
 

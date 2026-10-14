@@ -24,7 +24,7 @@ impl OpenHumanSessionHost {
         context.workspace = self.workspace_descriptor.clone();
         // The web backstop's deadline, when this turn runs under one: the
         // harness winds down before it instead of being dropped by it.
-        context.turn_deadline = crate::agent::turn_deadline::current();
+        context.turn_deadline = crate::agent::session_host::turn_backstop::current();
         let cancellation = context.cancellation.clone();
         let root_config = context.root_run_config("openhuman-session");
         let mut options = TurnOptions {
@@ -40,6 +40,7 @@ impl OpenHumanSessionHost {
             resume: self.turn_resume_mode(),
             cancellation,
             run_context: context.into_tinyagents(root_config),
+            controls: Default::default(),
         };
         // Load persisted state before the normal turn lifecycle so the host
         // can read native recorded declarations for both bound sessions and

@@ -422,6 +422,7 @@ async fn runtime_adapter_passes_host_context_commits_before_finalize_and_emits_o
                 cancellation: cancellation.clone(),
                 run_context: context
                     .into_tinyagents(tinyagents_harness::context::RunConfig::new("adapter-turn")),
+                controls: Default::default(),
             },
         )
         .await

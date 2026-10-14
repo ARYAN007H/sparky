@@ -50,6 +50,10 @@ const embedContractExports = new Map(
         // Existing embed tool injection API now names its contract directly.
         "pub use tinytools::{PermissionLevel, Tool, ToolExposure, ToolResult};",
         "pub use tinyagents_harness::middleware::{StopDecision, StopHook};",
+        // The harness cost tally is the stop-hook metrics type (#7600).
+        "pub use tinyagents_harness::cost::TurnCost;",
+        // The tool-call policy seam `HostTools::with_policy` takes (#7600).
+        "pub use tinyagents_harness::middleware::{PolicyDecision, ToolCallPolicy};",
         "pub use tinyagents_session::port::{AppendStore, InMemorySessionStores, InMemoryTranscriptLocator, InMemoryTurnStates, Store, TurnStates};",
         "pub use tinyagents_session::testkit::conformance::{session_store_conformance, session_store_isolation_conformance};",
         "pub use tinyagents_session::transcript::{SessionRef, SessionTranscript, TranscriptHistory, TranscriptLocator, TranscriptMessage, TranscriptMeta, TranscriptPartial, TranscriptRead, TranscriptTurn};",
