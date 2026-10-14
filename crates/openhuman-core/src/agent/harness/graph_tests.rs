@@ -65,6 +65,7 @@ async fn channel_turn_runs_through_the_graph() {
         None,
         tinyagents_definition::SandboxMode::None,
         Default::default(),
+        Default::default(),
     )
     .await
     .expect("channel graph turn runs");
@@ -127,6 +128,7 @@ async fn channel_turn_pauses_on_ask_user_clarification() {
         None,
         None,
         tinyagents_definition::SandboxMode::None,
+        Default::default(),
         Default::default(),
     )
     .await

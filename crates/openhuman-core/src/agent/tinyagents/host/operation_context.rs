@@ -17,6 +17,9 @@ pub(crate) struct HostOperationContext {
     /// tools that act on behalf of the spawning agent when no memory identity
     /// is scoped (see `memory::tools::CallFacts::gather`).
     pub(crate) parent_agent_id: Option<String>,
+    /// Who the run acts as on memory; see
+    /// [`OpenHumanRunContext::memory_identity`](super::OpenHumanRunContext::memory_identity).
+    pub(crate) memory_identity: Option<crate::memory::scope::MemoryIdentity>,
 }
 
 /// Reads the spawning agent's definition id from the explicit tool carrier.
@@ -31,6 +34,20 @@ pub(crate) fn parent_agent_id_for_tool(
         })
         .and_then(|context| context.state::<HostOperationContext>())
         .and_then(|host| host.parent_agent_id.clone())
+}
+
+/// Reads the run's memory identity from the explicit tool carrier. Direct tool
+/// dispatch has none.
+pub(crate) fn memory_identity_for_tool(
+    context: Option<&dyn tinytools::ToolRunContext>,
+) -> Option<crate::memory::scope::MemoryIdentity> {
+    context
+        .and_then(tinytools::ToolRunContext::host_extension)
+        .and_then(|extension| {
+            extension.downcast_ref::<tinyagents_harness::tool::ToolExecutionContext>()
+        })
+        .and_then(|context| context.state::<HostOperationContext>())
+        .and_then(|host| host.memory_identity.clone())
 }
 
 /// Reads the calling agent's sandbox policy from the explicit tool carrier.
