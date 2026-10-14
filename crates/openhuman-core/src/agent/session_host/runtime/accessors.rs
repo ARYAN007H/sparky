@@ -5,7 +5,6 @@
 use super::super::types::{OpenHumanSessionHost, SessionHostBuilder};
 use std::collections::HashSet;
 use std::sync::Arc;
-use tinytools::ToolPolicyEngine;
 use tinytools::{Tool, ToolSpec};
 use tinytools_agent::dialect::TranscriptEntry;
 
@@ -506,7 +505,7 @@ impl OpenHumanSessionHost {
         // at all.
         let all_tools = self.all_tool_refs();
         let reachable = self.reachable_tool_names();
-        let mut session = ToolPolicyEngine::build_session_from_refs(
+        let mut session = crate::tools::policy_session::build_policy_session(
             &self.agent_definition_name,
             &self.event_channel,
             "session",
