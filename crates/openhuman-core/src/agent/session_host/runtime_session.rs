@@ -861,6 +861,8 @@ impl OpenHumanSessionHost {
                             .unwrap_or_else(|poisoned| poisoned.into_inner())
                             .take_turn_inputs();
                         let origin = options.run_context.data.origin.clone();
+                        let memory_identity =
+                            options.run_context.data.memory_identity.clone();
                         let (enriched, memory_turn) = futures::join!(
                             prelude.enrich_request(
                                 &original_user_message,
@@ -875,6 +877,7 @@ impl OpenHumanSessionHost {
                                 view.committed_turns,
                                 view.history.last().filter(|last| **last == request.input),
                                 origin,
+                                memory_identity,
                             )),
                         );
                         options.run_context.data.memory_turn = memory_turn;
