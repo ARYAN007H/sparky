@@ -504,8 +504,9 @@ fn parent_context(
         session_parent_prefix: None,
         on_progress: None,
         run_queue: None,
+    },
+        host_env: Default::default(),
     }
-}
 
 struct ScriptedModel {
     responses: Vec<(&'static str, &'static str)>,

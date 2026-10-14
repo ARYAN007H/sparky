@@ -116,8 +116,9 @@ fn parent_execution_context(workspace_dir: &Path) -> ParentExecutionContext {
         session_parent_prefix: None,
         on_progress: None,
         run_queue: None,
+    },
+        host_env: Default::default(),
     }
-}
 
 /// Builds the `use_skill` registration exactly as
 /// `register_turn_tools_and_agents` does: a durable registry containing the

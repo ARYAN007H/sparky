@@ -280,8 +280,9 @@ fn make_parent(
         session_parent_prefix: None,
         on_progress: None,
         run_queue: None,
+    },
+        host_env: Default::default(),
     }
-}
 
 // ── Runtime spawn-hierarchy (tier) gate (issue #4098) ───────────────────────
 // `tier_gate_decision` is the pure decision the runtime gate in `run_subagent`
