@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 use std::process::Command;
 use tinyagents_harness::workspace::{create_git_worktree, GitWorktreeBaseRef, GitWorktreeStatus};
