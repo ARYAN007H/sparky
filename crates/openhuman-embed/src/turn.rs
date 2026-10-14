@@ -41,7 +41,6 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use super::call::call;
 use super::error::CoreError;
 use openhuman_core::agent::progress::AgentProgress;
 use openhuman_core::agent::turn_origin::AgentTurnOrigin;
