@@ -238,7 +238,7 @@ fn specialist_agents_are_registered_with_narrow_tools() {
         }
         // `omit_memory_context = false` opens the deck builder's session
         // with the compiled memory context.
-        assert!(!presentation.omit_memory_context);
+        assert!(!presentation.extensions.omit_memory_context);
     }
 }
 
