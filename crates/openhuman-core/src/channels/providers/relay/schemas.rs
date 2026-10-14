@@ -3,6 +3,7 @@
 //! It shares the `channel` namespace with `channel.web_chat`: both start a
 //! turn on one of the caller's conversation threads.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use super::ops::channel_relay_inbound;

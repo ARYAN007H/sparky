@@ -2,6 +2,7 @@
 //! `create_trigger`, `list_trigger_history`, `list_available_triggers`,
 //! `list_triggers`, `enable_trigger`, `disable_trigger`.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::config::rpc as config_rpc;

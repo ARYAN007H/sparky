@@ -29,6 +29,7 @@
 //! call counters, usage/cost totals, and timestamps — never prompt text, tool
 //! arguments, or provider payloads.
 
+use crate::core::runtime::DispatchCtx;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 

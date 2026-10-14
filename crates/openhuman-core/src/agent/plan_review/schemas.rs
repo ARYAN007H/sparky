@@ -1,6 +1,7 @@
 //! JSON-RPC surface for the plan-review gate: `openhuman.plan_review_decide`
 //! resolves a parked interactive turn (approve / reject / revise-with-feedback).
 
+use crate::core::runtime::DispatchCtx;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_json::{Map, Value};

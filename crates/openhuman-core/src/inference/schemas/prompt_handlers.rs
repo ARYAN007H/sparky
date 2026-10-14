@@ -1,6 +1,7 @@
 //! Handlers that run a model: summarize, prompt, vision prompt, provider
 //! model test, should-react, and sentiment analysis.
 
+use crate::core::runtime::DispatchCtx;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 

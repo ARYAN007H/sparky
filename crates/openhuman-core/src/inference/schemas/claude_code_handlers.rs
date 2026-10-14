@@ -1,6 +1,7 @@
 //! Handlers for the Claude Code provider: version and auth probes, and its
 //! full-access setting.
 
+use crate::core::runtime::DispatchCtx;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 

@@ -3,6 +3,7 @@
 //! MCP clients use. All of them call the TinySearch module's role tools, so an
 //! RPC caller gets the same provider choice and fallback as the agent.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{json, Map, Value};
 
 use crate::config::rpc as config_rpc;

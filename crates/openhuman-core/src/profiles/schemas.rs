@@ -4,6 +4,7 @@
 //! which only `DomainSet::saas()` enables, so a single-user core never serves
 //! them.
 
+use crate::core::runtime::DispatchCtx;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_json::{Map, Value};

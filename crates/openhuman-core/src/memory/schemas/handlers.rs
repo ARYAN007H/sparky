@@ -1,6 +1,7 @@
 //! Thin JSON-RPC handlers: parse params, load config, delegate to the ops,
 //! and persist config for the setters.
 
+use crate::core::runtime::DispatchCtx;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::{json, Map, Value};

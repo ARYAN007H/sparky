@@ -3,6 +3,7 @@
 //! `list_connections`, `authorize`, `delete_connection`, `get_mode`,
 //! `set_api_key`, `clear_api_key`.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::config::rpc as config_rpc;

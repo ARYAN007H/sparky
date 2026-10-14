@@ -3,6 +3,7 @@
 //! The first cut exposes normalized provider event ingestion plus a queue
 //! listing endpoint suitable for local-first assistive UI surfaces.
 
+use crate::core::runtime::DispatchCtx;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 

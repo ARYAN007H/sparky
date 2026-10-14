@@ -1,6 +1,7 @@
 //! Controller schema + handler for `openhuman.session_import_run`: a manual
 //! retry of the boot-time import of legacy session files into the backend.
 
+use crate::core::runtime::DispatchCtx;
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 

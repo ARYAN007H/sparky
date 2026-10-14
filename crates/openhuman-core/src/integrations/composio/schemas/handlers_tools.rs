@@ -1,5 +1,6 @@
 //! Tool-discovery and execution handlers: `list_tools`, `execute`.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::config::rpc as config_rpc;

@@ -1,6 +1,7 @@
 //! `mcp_clients` handler implementations — deserialise params and delegate
 //! to `ops.rs`.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::config::rpc as config_rpc;

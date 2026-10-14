@@ -5,6 +5,7 @@
 //! [`super::engine`] phase scheduler. Namespace `workflow_run` — distinct from
 //! the existing `workflows` domain (SKILL.md/WORKFLOW.md discovery).
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::config::rpc as config_rpc;

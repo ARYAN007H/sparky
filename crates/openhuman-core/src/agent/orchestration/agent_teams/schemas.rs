@@ -7,6 +7,7 @@
 //! close a team, and — via `start_member` — spawn a live worker that claims and
 //! runs a task to completion (see [`super::runtime`]).
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::config::rpc as config_rpc;

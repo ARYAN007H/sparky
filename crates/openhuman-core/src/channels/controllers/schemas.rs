@@ -1,5 +1,6 @@
 //! RPC controller schemas and handlers for the channels domain.
 
+use crate::core::runtime::DispatchCtx;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_json::{Map, Value};

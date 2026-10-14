@@ -6,6 +6,7 @@
 //! fetch an offloaded original. Mirrors the controller pattern in
 //! `threads/schemas.rs`.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::core::all::{ControllerFuture, RegisteredController};

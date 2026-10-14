@@ -1,5 +1,6 @@
 //! Handlers for third-party integration settings: web search and Composio triggers.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::config::rpc as config_rpc;

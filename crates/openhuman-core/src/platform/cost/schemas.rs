@@ -1,5 +1,6 @@
 //! Controller schemas and JSON-RPC dispatchers for the cost dashboard.
 
+use crate::core::runtime::DispatchCtx;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 

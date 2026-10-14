@@ -1,6 +1,7 @@
 //! Handlers for the OpenAI OAuth flow: start, complete, Codex CLI import,
 //! status, and disconnect.
 
+use crate::core::runtime::DispatchCtx;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 

@@ -1,5 +1,6 @@
 //! Controller-registry schemas for `openhuman.agent_registry_*`.
 
+use crate::core::runtime::DispatchCtx;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 

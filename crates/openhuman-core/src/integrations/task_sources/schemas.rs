@@ -5,6 +5,7 @@
 //! `all_*` registry pair, and thin handlers that parse params and
 //! delegate to [`super::ops`].
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::config::rpc as config_rpc;

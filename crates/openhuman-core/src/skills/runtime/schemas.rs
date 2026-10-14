@@ -5,6 +5,7 @@
 //! `skills_read_run_log` controllers in `skills/schemas/` wrap the same run
 //! machinery; new scripts should call `skill_runtime_*` directly.
 
+use crate::core::runtime::DispatchCtx;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 

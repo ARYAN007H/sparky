@@ -1,5 +1,6 @@
 //! `mcp_ui` controller schemas and handlers.
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use serde_json::{Map, Value};

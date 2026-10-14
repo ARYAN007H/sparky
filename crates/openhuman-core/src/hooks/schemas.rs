@@ -7,6 +7,7 @@
 //! trying to trigger it — asking the agent to run `rm -rf` to see whether the
 //! deny rule fires — is the failure mode this surface exists to prevent.
 
+use crate::core::runtime::DispatchCtx;
 use serde::de::DeserializeOwned;
 use serde_json::{json, Map, Value};
 

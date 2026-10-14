@@ -1,5 +1,6 @@
 //! Handler for the `tools_composio_execute` controller schema.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{json, Map, Value};
 
 use crate::config::rpc as config_rpc;

@@ -1,5 +1,6 @@
 //! Handlers for agent behaviour settings: autonomy, privacy, browser, sandbox, and memory sync.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::config::rpc as config_rpc;

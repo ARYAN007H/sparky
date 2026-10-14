@@ -9,6 +9,7 @@
 //! compiled into [`super::registry`], and a method that could point the loader at
 //! an arbitrary path would turn this namespace into remote code execution.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 use std::sync::Arc;
 use tinycomputer_bus::browser::SessionOptions;

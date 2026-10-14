@@ -5,6 +5,7 @@
 //! `ops.rs` and skill execution lives in `skill_runtime`; this layer is
 //! intentionally thin.
 
+use crate::core::runtime::DispatchCtx;
 use std::path::Path;
 
 use serde_json::{Map, Value};

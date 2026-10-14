@@ -1,5 +1,6 @@
 //! Controller schemas and RPC handlers for the `socket` namespace.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{json, Map, Value};
 
 use crate::core::all::{ControllerFuture, RegisteredController};

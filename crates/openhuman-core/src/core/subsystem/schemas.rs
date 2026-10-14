@@ -19,6 +19,7 @@
 //! ([`SubsystemStatus`]), so adding one is a one-line change with no wire
 //! change for existing rows.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::core::all::{ControllerFuture, RegisteredController};

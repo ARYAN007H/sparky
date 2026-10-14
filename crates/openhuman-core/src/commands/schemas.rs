@@ -1,6 +1,7 @@
 //! RPC/CLI controller surface for the `commands` domain: one read-only
 //! method, `commands.list`.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::core::all::{ControllerFuture, RegisteredController};

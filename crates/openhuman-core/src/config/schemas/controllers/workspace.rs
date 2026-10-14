@@ -1,5 +1,6 @@
 //! Handlers for workspace state: onboarding flags, analytics, dashboard, data and agent paths, and local-data reset.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::config::rpc as config_rpc;

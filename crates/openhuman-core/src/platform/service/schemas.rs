@@ -4,6 +4,7 @@
 //! management (install, start, stop, etc.) and provides the mapping between
 //! RPC methods and their underlying implementation handlers.
 
+use crate::core::runtime::DispatchCtx;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 

@@ -14,6 +14,7 @@
 //! the thread stays alive and the user expects to see that their sub-agent was
 //! cancelled.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{json, Map, Value};
 
 use crate::agent::orchestration::running_subagents::{CancelledSubagent, SteerError};

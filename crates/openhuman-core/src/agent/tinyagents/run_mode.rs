@@ -15,6 +15,7 @@
 //! harness and pushes `plan_mode_middleware(handle, ..)` when a handle exists
 //! for the thread.
 
+use crate::core::runtime::DispatchCtx;
 use std::collections::HashMap;
 use std::sync::Arc;
 

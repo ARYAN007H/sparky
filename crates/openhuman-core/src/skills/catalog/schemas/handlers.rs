@@ -1,5 +1,6 @@
 //! RPC handler functions for `openhuman.skill_registry_*` controllers.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::core::all::ControllerFuture;

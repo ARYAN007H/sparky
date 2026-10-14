@@ -3,6 +3,7 @@
 //! Wires `approval_list_pending` and `approval_decide` into the
 //! global registry consumed by `crates/openhuman-core/src/core/all.rs`.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::core::all::{ControllerFuture, RegisteredController};

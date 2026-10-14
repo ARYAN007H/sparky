@@ -2,6 +2,7 @@
 //! config, model and local-runtime settings updates, model listing, device
 //! auth errors, and diagnostics.
 
+use crate::core::runtime::DispatchCtx;
 use serde::de::Deserializer;
 use serde::Deserialize;
 use serde_json::{Map, Value};

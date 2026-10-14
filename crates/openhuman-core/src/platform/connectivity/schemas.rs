@@ -6,6 +6,7 @@
 //! the host process tree and can't be answered from inside the sidecar
 //! itself.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::core::all::{ControllerFuture, RegisteredController};

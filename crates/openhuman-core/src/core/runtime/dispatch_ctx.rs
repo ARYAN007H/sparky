@@ -12,6 +12,7 @@
 //! [`CoreContext`], or the helpers built on it) rather than reaching for an
 //! ambient one.
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use super::CoreContext;

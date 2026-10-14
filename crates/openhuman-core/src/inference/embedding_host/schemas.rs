@@ -1,5 +1,6 @@
 //! Controller schemas and handler registrations for the embeddings domain.
 
+use crate::core::runtime::DispatchCtx;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 

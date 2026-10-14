@@ -1,5 +1,6 @@
 //! Thin JSON-RPC handlers that parse params and delegate to [`super::super::ops`].
 
+use crate::core::runtime::DispatchCtx;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 

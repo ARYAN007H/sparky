@@ -2,6 +2,7 @@
 //! `get_user_profile`, `refresh_all_identities`, `sync`, `get_user_scopes`,
 //! `set_user_scopes`.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::config::rpc as config_rpc;

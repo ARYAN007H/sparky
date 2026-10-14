@@ -1,5 +1,6 @@
 //! Controller schemas + handlers for the dashboard domain.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::core::all::{ControllerFuture, RegisteredController};
