@@ -53,13 +53,11 @@ async fn a_remote_triage_escalation_parks_with_an_audit_row_rather_than_an_unkno
 
     // `Box::pin` + a short timeout drives the future into the park without
     // waiting out the TTL; nothing decides it, so it must still be pending.
-    let turn = ApprovalTurnContext::default();
     let mut fut = Box::pin(turn_origin::with_origin(
         remote_trigger_origin(&envelope),
-        gate.intercept(
-            &turn,
-            "escalate to orchestrator",
+        gate.intercept(&ApprovalTurnContext::default(), 
             "triage.escalate",
+            "escalate to orchestrator",
             serde_json::json!({}),
         ),
     ));
@@ -91,10 +89,9 @@ async fn a_local_triage_escalation_is_allowed_without_a_prompt() {
     let (gate, _dir) = test_gate();
     let outcome = turn_origin::with_origin(
         local_trigger_origin(),
-        gate.intercept(
-            &Default::default(),
-            "escalate to orchestrator",
+        gate.intercept(&ApprovalTurnContext::default(), 
             "triage.escalate",
+            "escalate to orchestrator",
             serde_json::json!({}),
         ),
     )
@@ -118,7 +115,7 @@ async fn intercept_with_unknown_origin_denies() {
     // tools from unlabelled call sites.
     let (gate, _dir) = test_gate();
     let outcome = gate
-        .intercept(&Default::default(), "run ls", "shell", serde_json::json!({}))
+        .intercept(&ApprovalTurnContext::default(), "shell", "run ls", serde_json::json!({}))
         .await;
     match outcome {
         GateOutcome::Deny { reason } => assert!(reason.contains("origin label")),
@@ -137,7 +134,7 @@ async fn intercept_with_trusted_cron_origin_denies_external_effect() {
     };
     let outcome = turn_origin::with_origin(
         origin,
-        gate.intercept(&Default::default(), "run ls", "shell", serde_json::json!({})),
+        gate.intercept(&ApprovalTurnContext::default(), "shell", "run ls", serde_json::json!({})),
     )
     .await;
     assert!(matches!(outcome, GateOutcome::Deny { .. }));
@@ -160,7 +157,7 @@ async fn intercept_with_workflow_origin_trust_root_allows_without_prompt() {
     };
     let outcome = turn_origin::with_origin(
         origin,
-        gate.intercept(&Default::default(), "post to slack", "composio", serde_json::json!({})),
+        gate.intercept(&ApprovalTurnContext::default(), "composio", "post to slack", serde_json::json!({})),
     )
     .await;
     assert!(matches!(outcome, GateOutcome::Allow));
@@ -190,7 +187,7 @@ async fn intercept_with_workflow_require_approval_persists_and_ttl_denies() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             origin,
-            g.intercept(&Default::default(), "post to slack", "composio", serde_json::json!({})),
+            g.intercept(&ApprovalTurnContext::default(), "composio", "post to slack", serde_json::json!({})),
         )
         .await
     });

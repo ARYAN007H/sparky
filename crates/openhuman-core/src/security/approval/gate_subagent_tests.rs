@@ -76,12 +76,12 @@ async fn an_async_subagent_park_reaches_the_parent_thread_detached_with_a_short_
 
     let before = chrono::Utc::now();
     let g = gate.clone();
-    // Origin propagated, the chat approval context not — the state
+    // Origin propagated, APPROVAL_CHAT_CONTEXT not — the state
     // `spawn_async_subagent` leaves its detached child in.
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             async_subagent_origin("thread-parent"),
-            g.intercept(&Default::default(), "generate an image", tool, serde_json::json!({})),
+            g.intercept(&ApprovalTurnContext::default(), tool, "generate an image", serde_json::json!({})),
         )
         .await
     });
@@ -207,10 +207,9 @@ async fn an_expired_park_tells_the_model_nobody_answered() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             async_subagent_origin("thread-expiry"),
-            g.intercept(
-                &Default::default(),
-                "generate a clip",
+            g.intercept(&ApprovalTurnContext::default(), 
                 "media_generate_video",
+                "generate a clip",
                 serde_json::json!({}),
             ),
         )
@@ -250,7 +249,7 @@ async fn every_detached_park_on_a_thread_stays_recoverable() {
         handles.push(tokio::spawn(async move {
             turn_origin::with_origin(
                 async_subagent_origin("thread-multi"),
-                g.intercept(&Default::default(), "generate media", tool, serde_json::json!({})),
+                g.intercept(&ApprovalTurnContext::default(), tool, "generate media", serde_json::json!({})),
             )
             .await
         }));
