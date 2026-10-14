@@ -18,6 +18,7 @@ pub(crate) async fn client() -> ModuleClient {
 }
 
 #[tokio::test]
+#[cfg(feature = "e2e-test-support")]
 async fn released_module_prepares_runtime_limits_over_confidential_bus_call() {
     use tinychannels_bus::module_control::{ChannelControlRequest, ChannelControlResult};
 
@@ -44,6 +45,7 @@ async fn released_module_prepares_runtime_limits_over_confidential_bus_call() {
 }
 
 #[tokio::test]
+#[cfg(feature = "e2e-test-support")]
 async fn released_module_prepares_legacy_inbound_facts_over_confidential_bus_call() {
     use tinychannels_bus::module_inbound::{
         ChannelInboundSource, PrepareChannelInboundRequest, PreparedChannelInbound,

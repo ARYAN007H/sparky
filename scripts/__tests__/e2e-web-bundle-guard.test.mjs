@@ -200,6 +200,34 @@ test("an explicit workspace requires its own keyring key", () => {
   }
 });
 
+test("an ephemeral explicit workspace can generate a private key", () => {
+  const tree = makeTree("e2e-web-session.sh");
+  try {
+    const distWeb = path.join(tree.root, "app", "dist-web");
+    fs.mkdirSync(distWeb, { recursive: true });
+    fs.writeFileSync(path.join(distWeb, MARKER), "VITE_OPENHUMAN_TARGET=web\n");
+    fs.writeFileSync(
+      path.join(distWeb, ".e2e-build-ports.json"),
+      '{"e2e_mock_port":"18473","openhuman_core_port":"17788"}\n',
+    );
+
+    const res = run(tree, "e2e-web-session.sh", {
+      OPENHUMAN_WORKSPACE: path.join(tree.root, "ci-workspace"),
+      OPENHUMAN_E2E_ALLOW_EPHEMERAL_KEY: "1",
+      OPENHUMAN_KEYRING_MASTER_KEY: "",
+      OPENHUMAN_KEYRING_MASTER_KEY_FILE: "/host/master.key",
+    });
+
+    assert.match(res.output, /standalone core binary is missing/);
+    assert.ok(
+      tree.calls().some((call) => call.includes("randomBytes")),
+      "an explicitly marked ephemeral workspace gets a fresh key",
+    );
+  } finally {
+    tree.cleanup();
+  }
+});
+
 test("the session accepts a marked bundle and proceeds past the guard", () => {
   // Pins that the guard is not simply always-fail. With the marker present the
   // session starts the mock backend and reaches its next precondition — the

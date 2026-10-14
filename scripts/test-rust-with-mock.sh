@@ -311,6 +311,13 @@ run_tinychannels_release_fixture_tests() {
   OPENHUMAN_MODULE_PATH="$tinychannels_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}" \
     cargo_test --features e2e-test-support --lib channels::module_fixture:: \
       -- --test-threads=1 "$@"
+  OPENHUMAN_MODULE_PATH="$tinychannels_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}" \
+    cargo_test --features e2e-test-support --lib \
+      modules::ops::tests::a_pinned_release_module_serves_the_module_and_status_says_so \
+      -- --exact --test-threads=1 "$@"
+  OPENHUMAN_MODULE_PATH="$tinychannels_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}" \
+    cargo_test --features e2e-test-support --lib \
+    channels::host::channel_events::tests:: -- --test-threads=1 "$@"
 }
 
 run_full_suite() {

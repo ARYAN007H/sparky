@@ -197,12 +197,18 @@ impl ChannelTurnStateSubscriber {
             cancellation: tokio_util::sync::CancellationToken::new(),
         }
     }
-    async fn mark(&self, channel: &str, reply_target: &str, event_ws: &PathBuf, busy: bool) {
+    async fn mark(
+        &self,
+        channel: &str,
+        reply_target: &str,
+        event_ws: &PathBuf,
+        busy: bool,
+    ) -> bool {
         if self.cancellation.is_cancelled()
             || !capabilities_for(channel).remote_control
             || *event_ws != self.workspace_dir
         {
-            return;
+            return false;
         }
         #[cfg(test)]
         let client = if self.config.is_none() {
@@ -227,6 +233,7 @@ impl ChannelTurnStateSubscriber {
         if result.is_err() {
             tracing::debug!("channel turn status unavailable");
         }
+        result.is_ok()
     }
 }
 #[async_trait]
@@ -244,17 +251,21 @@ impl EventHandler<DomainEvent> for ChannelTurnStateSubscriber {
                 reply_target,
                 workspace_dir,
                 ..
-            } => self.mark(channel, reply_target, workspace_dir, true).await,
+            } => {
+                self.mark(channel, reply_target, workspace_dir, true).await;
+            }
             DomainEvent::ChannelMessageProcessed {
                 channel,
                 reply_target,
                 workspace_dir,
                 ..
-            } => self.mark(channel, reply_target, workspace_dir, false).await,
+            } => {
+                self.mark(channel, reply_target, workspace_dir, false).await;
+            }
             _ => {}
         }
     }
 }
-#[cfg(test)]
+#[cfg(all(test, feature = "modules", feature = "e2e-test-support"))]
 #[path = "channel_events_tests.rs"]
 mod tests;

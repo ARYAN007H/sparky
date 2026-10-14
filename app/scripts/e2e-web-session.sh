@@ -30,9 +30,14 @@ export OPENHUMAN_WORKSPACE
 export OPENHUMAN_KEYRING_BACKEND="${OPENHUMAN_KEYRING_BACKEND:-file}"
 if [ -n "$E2E_WEB_WORKSPACE_EXPLICIT" ]; then
   if [ -z "${OPENHUMAN_KEYRING_MASTER_KEY:-}" ] &&
-    [ -z "${OPENHUMAN_KEYRING_MASTER_KEY_FILE:-}" ]; then
+    [ -z "${OPENHUMAN_KEYRING_MASTER_KEY_FILE:-}" ] &&
+    [ "${OPENHUMAN_E2E_ALLOW_EPHEMERAL_KEY:-}" != "1" ]; then
     echo "ERROR: an explicit OPENHUMAN_WORKSPACE requires OPENHUMAN_KEYRING_MASTER_KEY or OPENHUMAN_KEYRING_MASTER_KEY_FILE." >&2
     exit 2
+  fi
+  if [ "${OPENHUMAN_E2E_ALLOW_EPHEMERAL_KEY:-}" = "1" ] &&
+    [ -z "${OPENHUMAN_KEYRING_MASTER_KEY:-}" ]; then
+    unset OPENHUMAN_KEYRING_MASTER_KEY_FILE
   fi
 else
   # A disposable workspace must not accidentally inherit a key-file path

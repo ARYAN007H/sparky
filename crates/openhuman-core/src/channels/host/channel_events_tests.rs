@@ -133,50 +133,18 @@ async fn approvals_for_web_email_or_unrouted_requests_are_ignored() {
     assert!(discord.sent.lock().unwrap().is_empty());
 }
 
-async fn remote_status(ws: &Path, channel: &str, reply_target: &str) -> Option<String> {
-    let client = crate::channels::module_fixture::client().await;
-    let result: tinychannels_bus::module_remote::RemoteOperationResult = client
-        .call_confidential(
-            "tinychannels",
-            tinychannels_bus::methods::EXECUTE_REMOTE,
-            (tinychannels_bus::module_remote::RemoteOperation::Execute {
-                workspace_dir: ws.to_string_lossy().into_owned(),
-                message: ChannelMessage {
-                    id: "status-1".into(),
-                    channel: channel.into(),
-                    sender: "alice".into(),
-                    reply_target: reply_target.into(),
-                    content: "/status".into(),
-                    timestamp: 0,
-                    thread_ts: None,
-                    sender_name: None,
-                },
-                route: tinychannels_bus::module_remote::RemoteRoute {
-                    provider: "openai".into(),
-                    model: "test-model".into(),
-                },
-                history_len: 0,
-            },),
-        )
-        .await
-        .expect("the release module should answer the status command");
-    result.reply
-}
-
 #[tokio::test]
-async fn turn_state_events_leave_remote_status_idle_after_completion() {
+async fn turn_state_accepts_busy_and_idle_updates_for_remote_channels() {
     let dir = tempdir().unwrap();
     let ws = dir.path().to_path_buf();
     let sub = ChannelTurnStateSubscriber::new(ws.clone());
     assert_eq!(sub.name(), "channels::turn_state");
     assert_eq!(sub.domains(), Some(&["channel"][..]));
     for channel in ["telegram", "discord"] {
-        sub.handle(&received(channel, "chat-99", None, &ws)).await;
-        sub.handle(&processed(channel, "chat-99", &ws)).await;
-        let status = remote_status(&ws, channel, "chat-99")
-            .await
-            .expect("/status should return a response");
-        assert!(status.contains("idle"), "{channel}: {status}");
+        let busy = sub.mark(channel, "chat-99", &ws, true).await;
+        assert!(busy, "{channel}: MarkTurn(busy=true) must be accepted");
+        let idle = sub.mark(channel, "chat-99", &ws, false).await;
+        assert!(idle, "{channel}: MarkTurn(busy=false) must be accepted");
     }
 }
 
@@ -185,13 +153,20 @@ async fn turn_state_ignores_non_remote_channels_and_stale_workspaces() {
     let dir = tempdir().unwrap();
     let ws = dir.path().to_path_buf();
     let sub = ChannelTurnStateSubscriber::new(ws.clone());
-    sub.handle(&received("email", "a@b.c", None, &ws)).await;
-    assert!(remote_status(&ws, "email", "a@b.c").await.is_none());
     let other = tempdir().unwrap().path().to_path_buf();
-    sub.handle(&received("telegram", "chat-1", None, &other))
-        .await;
-    let status = remote_status(&ws, "telegram", "chat-1")
-        .await
-        .expect("/status should return a response");
-    assert!(status.contains("idle"), "{status}");
+    let busy = sub.mark("telegram", "chat-1", &ws, true).await;
+    assert!(busy, "a matching workspace should accept MarkTurn");
+    assert!(
+        !sub.mark("email", "a@b.c", &ws, true).await,
+        "non-remote channels must not receive MarkTurn"
+    );
+    assert!(
+        !sub.mark("telegram", "chat-1", &other, false).await,
+        "a stale workspace must not clear turn state"
+    );
+    let status = sub.mark("telegram", "chat-1", &ws, false).await;
+    assert!(
+        status,
+        "the matching workspace should accept the idle update"
+    );
 }

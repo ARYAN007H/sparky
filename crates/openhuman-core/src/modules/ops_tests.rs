@@ -599,6 +599,7 @@ fn status_reports_the_source_that_serves_a_module() {
     }
 }
 
+#[cfg(feature = "e2e-test-support")]
 #[tokio::test]
 async fn a_pinned_release_module_serves_the_module_and_status_says_so() {
     use crate::config::schema::ModuleSourceMode;
@@ -606,6 +607,7 @@ async fn a_pinned_release_module_serves_the_module_and_status_says_so() {
 
     let mut config = Config::default();
     config.modules.enabled = true;
+    config.modules.allow_download = false;
     config.modules.source = ModuleSourceMode::Release;
     ops::ensure_loaded(&config, "tinychannels")
         .await
