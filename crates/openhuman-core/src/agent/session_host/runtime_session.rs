@@ -544,9 +544,7 @@ impl OpenHumanTurnPrelude {
             session_id: self.event_session_id.clone(),
             channel: self.event_channel.clone(),
             connected_integrations,
-            tool_call_format: (
-                self.tool_dispatcher.tool_call_format(),
-            ),
+            tool_call_format: self.tool_dispatcher.tool_call_format(),
             session_key: self.session_key.clone(),
             session_parent_prefix: self.session_parent_prefix.clone(),
             on_progress: self.on_progress.clone(),

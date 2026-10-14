@@ -60,6 +60,7 @@
 //! host files into the prompt (and thence to the inference provider); this
 //! adapter goes through it rather than reading the files itself.
 
+use tinytools_agent::dialect::ToolCallFormat;
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -95,7 +96,7 @@ pub struct OpenHumanContextComposer {
     /// it.
     model_name: String,
     /// How the tool catalogue renders. Left at the OpenHuman default
-    /// ([`ToolCallFormat::PFormat`]) unless the caller pins it, since the
+    /// ([`ToolCallFormat::Json`]) unless the caller pins it, since the
     /// authoritative value lives on the agent's tool dispatcher, which is not
     /// reachable from a `TurnContextRequest`.
     tool_call_format: ToolCallFormat,
