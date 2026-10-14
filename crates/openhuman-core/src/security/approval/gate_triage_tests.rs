@@ -239,14 +239,11 @@ async fn a_parked_approval_is_recoverable_from_its_thread_for_replay() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             origin,
-            APPROVAL_CHAT_CONTEXT.scope(
-                ctx,
-                g.intercept(
+            g.intercept(&ApprovalTurnContext::chat(ctx), 
                     "create_workflow",
                     "create a workflow",
                     serde_json::json!({ "name": "nightly" }),
                 ),
-            ),
         )
         .await
     });
@@ -300,15 +297,12 @@ async fn intercept_audited_for_call_threads_tool_call_id_onto_the_pending_row_an
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             web_origin(),
-            APPROVAL_CHAT_CONTEXT.scope(
-                chat_ctx(),
-                g.intercept_audited_for_call(
+            g.intercept_audited_for_call(&ApprovalTurnContext::chat(chat_ctx()), 
                     "composio",
                     "send slack",
                     serde_json::json!({}),
                     Some("call-abc"),
                 ),
-            ),
         )
         .await
     });
@@ -343,15 +337,12 @@ async fn timeout_publishes_approval_decided_with_expired_resolution() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             web_origin(),
-            APPROVAL_CHAT_CONTEXT.scope(
-                chat_ctx(),
-                g.intercept_audited_for_call(
+            g.intercept_audited_for_call(&ApprovalTurnContext::chat(chat_ctx()), 
                     "composio",
                     "timed out",
                     serde_json::json!({}),
                     Some("call-expire"),
                 ),
-            ),
         )
         .await
     });

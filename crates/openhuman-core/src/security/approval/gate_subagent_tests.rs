@@ -137,8 +137,7 @@ async fn an_inline_chat_park_is_not_detached_and_keeps_the_full_window() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             web_origin(),
-            APPROVAL_CHAT_CONTEXT
-                .scope(chat_ctx(), g.intercept(tool, "run", serde_json::json!({}))),
+            g.intercept(&ApprovalTurnContext::chat(chat_ctx()), tool, "run", serde_json::json!({})),
         )
         .await
     });
@@ -176,16 +175,13 @@ async fn an_inline_subagent_park_uses_the_short_window_without_being_detached() 
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             web_origin(),
-            APPROVAL_CHAT_CONTEXT.scope(
-                chat_ctx(),
-                tinyagents_harness::context::with_run_depth(
+            tinyagents_harness::context::with_run_depth(
                     tinyagents_harness::context::RunDepth {
                         depth: 1,
                         max_depth: crate::agent::tinyagents::budget::MAX_SPAWN_DEPTH,
                     },
-                    g.intercept("skill_registry_install", "install", serde_json::json!({})),
+                    g.intercept(&ApprovalTurnContext::chat(chat_ctx()), "skill_registry_install", "install", serde_json::json!({})),
                 ),
-            ),
         )
         .await
     });

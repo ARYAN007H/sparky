@@ -56,10 +56,11 @@ fn park_as(
         ctx,
         turn_origin::with_origin(
             web_origin(),
-            APPROVAL_CHAT_CONTEXT.scope(chat_ctx(), async move {
-                gate.intercept_audited("shell", "run it", serde_json::json!({}))
+            async move {
+ let turn = ApprovalTurnContext::chat(chat_ctx());
+                gate.intercept_audited(&turn, "shell", "run it", serde_json::json!({}))
                     .await
-            }),
+            },
         ),
     ))
 }

@@ -172,10 +172,7 @@ async fn intercept_audited_returns_request_id_only_when_allowed_and_persisted() 
         // turn whose origin labels it as web-routable.
         turn_origin::with_origin(
             web_origin(),
-            APPROVAL_CHAT_CONTEXT.scope(
-                chat_ctx(),
-                g.intercept_audited("composio", "send slack", serde_json::json!({})),
-            ),
+            g.intercept_audited(&ApprovalTurnContext::chat(chat_ctx()), "composio", "send slack", serde_json::json!({})),
         )
         .await
     });
@@ -210,10 +207,7 @@ async fn intercept_audited_id_is_none_for_denied_some_for_approved() {
     let denied = tokio::spawn(async move {
         turn_origin::with_origin(
             web_origin(),
-            APPROVAL_CHAT_CONTEXT.scope(
-                chat_ctx(),
-                g.intercept_audited("composio", "send slack", serde_json::json!({})),
-            ),
+            g.intercept_audited(&ApprovalTurnContext::chat(chat_ctx()), "composio", "send slack", serde_json::json!({})),
         )
         .await
     });
@@ -234,10 +228,7 @@ async fn intercept_audited_id_is_none_for_denied_some_for_approved() {
     let first = tokio::spawn(async move {
         turn_origin::with_origin(
             web_origin(),
-            APPROVAL_CHAT_CONTEXT.scope(
-                chat_ctx(),
-                g.intercept_audited("pushover", "first send", serde_json::json!({})),
-            ),
+            g.intercept_audited(&ApprovalTurnContext::chat(chat_ctx()), "pushover", "first send", serde_json::json!({})),
         )
         .await
     });
@@ -280,13 +271,10 @@ async fn flow_origin_park_populates_source_context_with_flow_and_run_id() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             flow_origin("flow-1", true),
-            APPROVAL_FLOW_RUN_CONTEXT.scope(
-                FlowRunContext {
+            g.intercept_audited(&ApprovalTurnContext::default().with_flow_run(FlowRunContext {
                     flow_id: "flow-1".to_string(),
                     run_id: "run-1".to_string(),
-                },
-                g.intercept_audited("composio", "post to slack", serde_json::json!({})),
-            ),
+                }), "composio", "post to slack", serde_json::json!({})),
         )
         .await
     });
@@ -331,10 +319,7 @@ async fn chat_origin_park_has_no_source_context() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             web_origin(),
-            APPROVAL_CHAT_CONTEXT.scope(
-                chat_ctx(),
-                g.intercept_audited("composio", "send slack", serde_json::json!({})),
-            ),
+            g.intercept_audited(&ApprovalTurnContext::chat(chat_ctx()), "composio", "send slack", serde_json::json!({})),
         )
         .await
     });
@@ -371,13 +356,10 @@ async fn flow_tool_trust_auto_allows_before_parking() {
 
     let outcome = turn_origin::with_origin(
         flow_origin("flow-trusted", true),
-        APPROVAL_FLOW_RUN_CONTEXT.scope(
-            FlowRunContext {
+        gate.intercept(&ApprovalTurnContext::default().with_flow_run(FlowRunContext {
                 flow_id: "flow-trusted".to_string(),
                 run_id: "run-1".to_string(),
-            },
-            gate.intercept("composio", "post to slack", serde_json::json!({})),
-        ),
+            }), "composio", "post to slack", serde_json::json!({})),
     )
     .await;
 
@@ -394,13 +376,10 @@ async fn flow_tool_trust_auto_allows_before_parking() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             flow_origin("flow-trusted", true),
-            APPROVAL_FLOW_RUN_CONTEXT.scope(
-                FlowRunContext {
+            g.intercept(&ApprovalTurnContext::default().with_flow_run(FlowRunContext {
                     flow_id: "flow-trusted".to_string(),
                     run_id: "run-1".to_string(),
-                },
-                g.intercept("pushover", "send push", serde_json::json!({})),
-            ),
+                }), "pushover", "send push", serde_json::json!({})),
         )
         .await
     });
@@ -439,13 +418,10 @@ async fn decide_approve_always_for_flow_then_insert_flow_trust_composes_to_auto_
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             flow_origin("flow-2", true),
-            APPROVAL_FLOW_RUN_CONTEXT.scope(
-                FlowRunContext {
+            g.intercept_audited(&ApprovalTurnContext::default().with_flow_run(FlowRunContext {
                     flow_id: "flow-2".to_string(),
                     run_id: "run-2".to_string(),
-                },
-                g.intercept_audited("composio", "post to slack", serde_json::json!({})),
-            ),
+                }), "composio", "post to slack", serde_json::json!({})),
         )
         .await
     });
@@ -499,13 +475,10 @@ async fn flow_origin_park_publishes_flow_approval_request_and_notification() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             flow_origin("flow-9", true),
-            APPROVAL_FLOW_RUN_CONTEXT.scope(
-                FlowRunContext {
+            g.intercept_audited(&ApprovalTurnContext::default().with_flow_run(FlowRunContext {
                     flow_id: "flow-9".to_string(),
                     run_id: "run-9".to_string(),
-                },
-                g.intercept_audited("composio", "post to slack", serde_json::json!({})),
-            ),
+                }), "composio", "post to slack", serde_json::json!({})),
         )
         .await
     });

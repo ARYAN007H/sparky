@@ -30,15 +30,12 @@ async fn gated_call(
         ctx,
         turn_origin::with_origin(
             origin,
-            APPROVAL_CHAT_CONTEXT.scope(
-                chat_ctx(),
-                gate.intercept_audited_bounded(
+            gate.intercept_audited_bounded(&ApprovalTurnContext::chat(chat_ctx()), 
                     tool,
                     "run it",
                     serde_json::json!({}),
                     Some(Duration::from_millis(100)),
                 ),
-            ),
         ),
     )
     .await
@@ -170,10 +167,11 @@ fn park(
         ctx,
         turn_origin::with_origin(
             web_origin(),
-            APPROVAL_CHAT_CONTEXT.scope(chat_ctx(), async move {
-                gate.intercept_audited("shell", "run it", serde_json::json!({}))
+            async move {
+ let turn = ApprovalTurnContext::chat(chat_ctx());
+                gate.intercept_audited(&turn, "shell", "run it", serde_json::json!({}))
                     .await
-            }),
+            },
         ),
     ))
 }
@@ -311,10 +309,11 @@ async fn an_agent_cannot_decide_a_request_the_process_parked() {
     let g = Arc::clone(&gate);
     let process = tokio::spawn(turn_origin::with_origin(
         web_origin(),
-        APPROVAL_CHAT_CONTEXT.scope(chat_ctx(), async move {
-            g.intercept_audited("shell", "run it", serde_json::json!({}))
+        async move {
+ let turn = ApprovalTurnContext::chat(chat_ctx());
+            g.intercept_audited(&turn, "shell", "run it", serde_json::json!({}))
                 .await
-        }),
+        },
     ));
     let request_id = loop {
         if let Some(request_id) = gate.pending_for_agent_thread(None, "t-test") {

@@ -24,7 +24,7 @@ async fn pending_for_thread_tracks_request_under_chat_context_and_clears() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             origin,
-            APPROVAL_CHAT_CONTEXT.scope(ctx, g.intercept("shell", "run ls", serde_json::json!({}))),
+            g.intercept(&ApprovalTurnContext::chat(ctx), "shell", "run ls", serde_json::json!({})),
         )
         .await
     });
@@ -125,10 +125,7 @@ async fn waiter_future_dropped_mid_park_evicts_waiter_clears_routing_and_denies_
     // than just a `Pin<&mut _>` reference.
     let mut fut = Box::pin(turn_origin::with_origin(
         web_origin(),
-        APPROVAL_CHAT_CONTEXT.scope(
-            chat_ctx(),
-            g.intercept("shell", "run rm", serde_json::json!({})),
-        ),
+        g.intercept(&ApprovalTurnContext::chat(chat_ctx()), "shell", "run rm", serde_json::json!({})),
     ));
 
     // Poll it just long enough to register the waiter, persist the pending
@@ -205,15 +202,12 @@ async fn intercept_audited_bounded_abandons_park_and_leaves_row_pending() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             origin,
-            APPROVAL_CHAT_CONTEXT.scope(
-                ctx,
-                g.intercept_audited_bounded(
+            g.intercept_audited_bounded(&ApprovalTurnContext::chat(ctx), 
                     "shell",
                     "run ls",
                     serde_json::json!({}),
                     Some(Duration::from_millis(100)),
                 ),
-            ),
         )
         .await
     });
@@ -374,13 +368,7 @@ async fn copilot_streaming_park_persists_the_clamped_expiry() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             web_origin(),
-            APPROVAL_CHAT_CONTEXT.scope(
-                chat_ctx(),
-                APPROVAL_COPILOT_STREAM_CONTEXT.scope(
-                    (),
-                    g.intercept("composio", "send slack", serde_json::json!({})),
-                ),
-            ),
+            g.intercept(&ApprovalTurnContext::chat(chat_ctx()).with_copilot_stream(), "composio", "send slack", serde_json::json!({})),
         )
         .await
     });
