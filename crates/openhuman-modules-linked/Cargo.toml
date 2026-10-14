@@ -60,7 +60,6 @@ tinywallet = ["dep:tinywallet-module"]
 # The host reaches the core only through the rpc facade (crate chain).
 openhuman-rpc = { path = "../openhuman-rpc", default-features = false, features = ["modules"] }
 log = "0.4"
-tinybus = { path = "../../vendor/tinybus/crates/tinybus", default-features = false, features = ["modules"] }
 
 tinybox-module = { path = "../../vendor/tinybox/crates/tinybox-module", features = ["static-link"], optional = true }
 tinychannels-module = { path = "../../vendor/tinychannels/crates/tinychannels-module", features = ["static-link"], optional = true }
@@ -75,6 +74,7 @@ tinyvoice-module = { path = "../../vendor/tinyvoice/crates/tinyvoice-module", fe
 tinywallet-module = { path = "../../vendor/tinywallet/crates/tinywallet-module", features = ["static-link"], optional = true }
 
 [dev-dependencies]
+tinybus = { path = "../../vendor/tinybus/crates/tinybus", default-features = false, features = ["modules"] }
 serde_json = "1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 
