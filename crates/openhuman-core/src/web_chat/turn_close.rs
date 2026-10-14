@@ -12,7 +12,9 @@
 //! [`CLOSE_TIMEOUT`]. The provider may be what stalled, so when that call
 //! fails, times out or returns nothing, a plain reply built from the same
 //! evidence is used instead. Either way the turn ends in an ordinary
-//! delivered reply that is saved in the thread.
+//! delivered reply that is saved in the thread. A turn that stopped before
+//! resolving its own config has no workspace to write to and nothing to
+//! summarize, so it ends in the guard's `turn_timeout` error instead.
 
 use std::time::Duration;
 
@@ -21,7 +23,6 @@ use tinyagents_session::turn_state::{ToolTimelineStatus, TurnState};
 use tinyinference_llm::message::Message;
 use tinyinference_llm::model::ModelRequest;
 
-use crate::config::rpc as config_rpc;
 use crate::inference::provider;
 
 use super::turn_activity::StuckPoint;
@@ -306,23 +307,22 @@ async fn read_snapshot(
     }
 }
 
-/// The reply that closes `turn`, or `None` when no configuration is available
-/// (the caller then reports the stop as an error). The caller bounds the
-/// whole call.
+/// The reply that closes `turn`, or `None` when the turn stopped before it
+/// resolved its own config (the caller then reports the stop as an error).
+///
+/// The reply is written to and read from the turn's own workspace only. A turn
+/// that never resolved its config has no workspace of its own, and loading the
+/// active profile instead could file the reply under a different user after a
+/// credential switch. Such a turn also has nothing to summarize: it stopped
+/// before the agent saw the request. The caller bounds the whole call.
 pub(crate) async fn close_reply(turn: StoppedTurn<'_>) -> Option<WebChatTaskResult> {
-    let config = match turn.config.clone() {
-        Some(config) => config,
-        // The turn stopped before it resolved its own config.
-        None => match config_rpc::load_config_with_timeout().await {
-            Ok(config) => std::sync::Arc::new(config),
-            Err(error) => {
-                log::warn!(
-                    "{LOG_PREFIX} config load failed request_id={}: {error}",
-                    turn.request_id
-                );
-                return None;
-            }
-        },
+    let Some(config) = turn.config.clone() else {
+        log::info!(
+            "{LOG_PREFIX} turn stopped before resolving its config; reporting the stop \
+             request_id={}",
+            turn.request_id
+        );
+        return None;
     };
     let snapshot = read_snapshot(
         config.workspace_dir.clone(),

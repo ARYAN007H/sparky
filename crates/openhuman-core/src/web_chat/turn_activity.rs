@@ -11,7 +11,8 @@
 //! * While a parent-scope model call (`IterationStarted` →
 //!   `ModelCallCompleted`) or a tool call (`ToolCallStarted` →
 //!   `ToolCallCompleted`) is open, the turn is never idle, however long the
-//!   call is silent. Those calls carry their own bounds: the harness per-model
+//!   call is silent, up to [`OPEN_CALL_EXPIRY`] (a lost completion event must
+//!   not hold the guard off for the rest of the turn). Those calls carry their own bounds: the harness per-model
 //!   call ceiling and the tool's own `timeout_secs`, both under the harness
 //!   turn ceiling. A silent provider retry (minutes) or a long shell build is
 //!   in flight, not idle.
@@ -29,7 +30,7 @@
 //! not counted as idle, and tests can drive it with a paused runtime.
 
 use std::borrow::Cow;
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -44,6 +45,14 @@ pub(crate) const DEFAULT_TURN_IDLE_SECS: u64 = 900;
 
 /// Environment override for the idle window, in seconds; `0` disables it.
 pub(crate) const TURN_IDLE_ENV: &str = "OPENHUMAN_WEB_TURN_IDLE_SECS";
+
+/// How long a call may stay open without its completion event before the
+/// record stops counting it as in flight. Completion events can be dropped
+/// under sustained backpressure; without a bound one lost `ToolCallCompleted`
+/// would hold the idle guard off for the rest of the turn. Twice the harness's
+/// per-model-call ceiling (900s). A long shell call is unaffected: its progress
+/// heartbeat (every 15s) keeps the turn active on its own.
+const OPEN_CALL_EXPIRY: Duration = Duration::from_secs(1_800);
 
 /// Longest the watchdog sleeps between checks while a call is in flight. A
 /// call that closes is followed by a full idle window measured from its close,
@@ -67,8 +76,10 @@ pub(crate) fn configured_idle_window() -> Option<Duration> {
 #[derive(Debug)]
 struct State {
     last_event: Instant,
-    open_tool_calls: HashSet<String>,
-    model_call_open: bool,
+    /// Open tool calls by call id, with when each started.
+    open_tool_calls: HashMap<String, Instant>,
+    /// When the open parent model call started, if one is open.
+    model_call_open: Option<Instant>,
     /// What the last event said the turn did, for the stop reply.
     last_step: Option<Cow<'static, str>>,
     turn_completed: bool,
@@ -155,8 +166,8 @@ impl TurnActivity {
         Self {
             state: Arc::new(Mutex::new(State {
                 last_event: Instant::now(),
-                open_tool_calls: HashSet::new(),
-                model_call_open: false,
+                open_tool_calls: HashMap::new(),
+                model_call_open: None,
                 last_step: None,
                 turn_completed: false,
                 turn_config: None,
@@ -170,27 +181,38 @@ impl TurnActivity {
     }
 
     /// Fold one progress event into the record.
+    ///
+    /// Completion events can be lost, so later events also close what they
+    /// prove finished. The agent loop runs model call, then that call's tool
+    /// round, then the next model call: a `ToolCallStarted` means the model
+    /// call that requested it returned, and an `IterationStarted` means the
+    /// previous tool round finished.
     pub(crate) fn observe(&self, event: &AgentProgress) {
+        let now = Instant::now();
         let mut state = self.lock();
-        state.last_event = Instant::now();
+        state.last_event = now;
         if let Some(step) = step_of(event) {
             state.last_step = Some(step);
         }
         match event {
-            AgentProgress::IterationStarted { .. } => state.model_call_open = true,
+            AgentProgress::IterationStarted { .. } => {
+                state.open_tool_calls.clear();
+                state.model_call_open = Some(now);
+            }
             AgentProgress::ModelCallCompleted {
                 subagent_task_id: None,
                 ..
-            } => state.model_call_open = false,
+            } => state.model_call_open = None,
             AgentProgress::ToolCallStarted { call_id, .. } => {
-                state.open_tool_calls.insert(call_id.clone());
+                state.model_call_open = None;
+                state.open_tool_calls.insert(call_id.clone(), now);
             }
             AgentProgress::ToolCallCompleted { call_id, .. } => {
                 state.open_tool_calls.remove(call_id);
             }
             AgentProgress::TurnCompleted { .. } => {
                 state.open_tool_calls.clear();
-                state.model_call_open = false;
+                state.model_call_open = None;
                 state.turn_completed = true;
             }
             _ => {}
@@ -198,10 +220,14 @@ impl TurnActivity {
     }
 
     /// How long the turn has been idle as of `now`, or `None` while a model or
-    /// tool call is in flight.
+    /// tool call is in flight. A call open longer than [`OPEN_CALL_EXPIRY`] no
+    /// longer counts: its completion event was most likely lost.
     pub(crate) fn idle_for(&self, now: Instant) -> Option<Duration> {
         let state = self.lock();
-        if state.model_call_open || !state.open_tool_calls.is_empty() {
+        let live = |started: &Instant| now.saturating_duration_since(*started) < OPEN_CALL_EXPIRY;
+        if state.model_call_open.as_ref().is_some_and(live)
+            || state.open_tool_calls.values().any(live)
+        {
             return None;
         }
         Some(now.saturating_duration_since(state.last_event))

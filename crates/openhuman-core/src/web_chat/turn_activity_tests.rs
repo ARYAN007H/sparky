@@ -90,7 +90,7 @@ async fn every_event_restarts_the_idle_clock() {
 async fn an_open_model_call_is_never_idle() {
     let activity = TurnActivity::new();
     activity.observe(&iteration_started());
-    tokio::time::advance(Duration::from_secs(3_000)).await;
+    tokio::time::advance(Duration::from_secs(1_500)).await;
     assert_eq!(activity.idle_for(Instant::now()), None);
     activity.observe(&model_call_completed(None));
     assert_eq!(activity.idle_for(Instant::now()), Some(Duration::ZERO));
@@ -111,7 +111,7 @@ async fn open_tool_calls_are_never_idle() {
     let activity = TurnActivity::new();
     activity.observe(&tool_started("a"));
     activity.observe(&tool_started("b"));
-    tokio::time::advance(Duration::from_secs(3_000)).await;
+    tokio::time::advance(Duration::from_secs(1_500)).await;
     activity.observe(&tool_completed("a"));
     assert_eq!(activity.idle_for(Instant::now()), None);
     activity.observe(&tool_completed("b"));
@@ -162,7 +162,7 @@ async fn a_long_tool_call_holds_off_the_watchdog_until_it_closes() {
     let activity = TurnActivity::new();
     activity.observe(&tool_started("build"));
     let watchdog = tokio::spawn(idle_watchdog(activity.clone(), WINDOW));
-    tokio::time::sleep(Duration::from_secs(2_400)).await;
+    tokio::time::sleep(Duration::from_secs(1_500)).await;
     assert!(!watchdog.is_finished());
     activity.observe(&tool_completed("build"));
     let idle = watchdog.await.expect("watchdog task");
@@ -254,4 +254,61 @@ fn the_turn_context_is_what_the_turn_recorded() {
     let (seen, locale) = activity.turn_context();
     assert!(Arc::ptr_eq(&seen.expect("config recorded"), &config));
     assert_eq!(locale.as_deref(), Some("de"));
+}
+
+/// A lost `ToolCallCompleted` does not leave the call open: the next model
+/// call proves the tool round finished.
+#[tokio::test(start_paused = true)]
+async fn the_next_model_call_closes_a_tool_whose_completion_was_lost() {
+    let activity = TurnActivity::new();
+    activity.observe(&tool_started("a"));
+    // `tool_completed("a")` is dropped under backpressure.
+    activity.observe(&iteration_started());
+    activity.observe(&model_call_completed(None));
+    assert_eq!(activity.idle_for(Instant::now()), Some(Duration::ZERO));
+}
+
+/// A lost `ModelCallCompleted` does not leave the model call open: the tool
+/// call it requested proves it returned.
+#[tokio::test(start_paused = true)]
+async fn a_tool_call_closes_a_model_call_whose_completion_was_lost() {
+    let activity = TurnActivity::new();
+    activity.observe(&iteration_started());
+    // `model_call_completed(None)` is dropped under backpressure.
+    activity.observe(&tool_started("a"));
+    activity.observe(&tool_completed("a"));
+    assert_eq!(activity.idle_for(Instant::now()), Some(Duration::ZERO));
+}
+
+/// When a lost completion is the turn's last event, the call stops counting
+/// as in flight after the expiry, so the idle guard still stops the turn.
+#[tokio::test(start_paused = true)]
+async fn a_call_left_open_by_a_lost_completion_expires() {
+    let activity = TurnActivity::new();
+    activity.observe(&tool_started("a"));
+    // `tool_completed("a")` is dropped, and the turn then goes silent.
+    tokio::time::advance(OPEN_CALL_EXPIRY - Duration::from_secs(1)).await;
+    assert_eq!(activity.idle_for(Instant::now()), None);
+    tokio::time::advance(Duration::from_secs(1)).await;
+    assert_eq!(activity.idle_for(Instant::now()), Some(OPEN_CALL_EXPIRY));
+    let idle = idle_watchdog(activity, WINDOW).await;
+    assert!(idle >= WINDOW);
+}
+
+/// A long shell call keeps reporting progress, so it stays active past the
+/// expiry of its open-call record.
+#[tokio::test(start_paused = true)]
+async fn a_long_call_that_reports_progress_stays_active_past_the_expiry() {
+    let activity = TurnActivity::new();
+    activity.observe(&tool_started("build"));
+    let watchdog = tokio::spawn(idle_watchdog(activity.clone(), WINDOW));
+    for _ in 0..(3_600 / 15) {
+        tokio::time::sleep(Duration::from_secs(15)).await;
+        activity.observe(&AgentProgress::ToolCallProgress {
+            call_id: "build".into(),
+            message: "running".into(),
+        });
+    }
+    assert!(!watchdog.is_finished(), "an hour of progress beats");
+    watchdog.abort();
 }
