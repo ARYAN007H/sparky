@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 
 #[test]
@@ -33,7 +34,7 @@ fn the_controller_is_registered() {
 async fn malformed_params_are_refused_before_any_work() {
     let mut params = Map::new();
     params.insert("channel".into(), Value::String("telegram".into()));
-    let err = handle_relay_inbound(params)
+    let err = handle_relay_inbound(DispatchCtx::process_default(), params)
         .await
         .expect_err("missing fields");
     assert!(err.contains("invalid params"), "{err}");

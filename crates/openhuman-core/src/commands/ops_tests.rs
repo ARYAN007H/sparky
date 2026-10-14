@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 use serde_json::json;
 
@@ -64,7 +65,7 @@ async fn commands_list_always_includes_every_builtin_even_if_catalogs_fail() {
     // end (no config override) — the important assertion is that whatever
     // they do, every builtin is still present and the call itself never
     // errors.
-    let outcome = commands_list().await.expect("commands_list must not fail");
+    let outcome = commands_list(DispatchCtx::process_default()).await.expect("commands_list must not fail");
     let ids: Vec<&str> = outcome
         .value
         .commands

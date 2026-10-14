@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::core::runtime::context::CoreContext;
 use crate::core::runtime::DomainSet;
@@ -29,7 +30,7 @@ fn registered_controllers_match_schemas() {
 #[tokio::test]
 async fn handle_status_returns_json() {
     let ctx = scoped_ctx(crate::config::Config::default());
-    let result = CoreContext::scope(ctx, async { handle_status(Map::new()).await }).await;
+    let result = CoreContext::scope(ctx, async { handle_status(DispatchCtx::process_default(), Map::new()).await }).await;
     assert!(result.is_ok());
 }
 
@@ -38,7 +39,7 @@ async fn handle_resolve_policy_none() {
     let mut params = Map::new();
     params.insert("sandbox_mode".into(), Value::String("none".into()));
     let ctx = scoped_ctx(crate::config::Config::default());
-    let result = CoreContext::scope(ctx, async { handle_resolve_policy(params).await }).await;
+    let result = CoreContext::scope(ctx, async { handle_resolve_policy(DispatchCtx::process_default(), params).await }).await;
     assert!(result.is_ok());
 }
 
@@ -48,7 +49,7 @@ async fn handle_resolve_policy_sandboxed_remote() {
     params.insert("sandbox_mode".into(), Value::String("sandboxed".into()));
     params.insert("is_remote".into(), Value::Bool(true));
     let ctx = scoped_ctx(crate::config::Config::default());
-    let result = CoreContext::scope(ctx, async { handle_resolve_policy(params).await }).await;
+    let result = CoreContext::scope(ctx, async { handle_resolve_policy(DispatchCtx::process_default(), params).await }).await;
     assert!(result.is_ok());
     let val = result.unwrap();
     let backend = val.get("backend").and_then(|b| b.as_str());
@@ -80,7 +81,7 @@ async fn handle_resolve_policy_honors_loaded_docker_runtime() {
     params.insert("sandbox_mode".into(), Value::String("sandboxed".into()));
     params.insert("is_remote".into(), Value::Bool(false));
 
-    let val = CoreContext::scope(ctx, async { handle_resolve_policy(params).await })
+    let val = CoreContext::scope(ctx, async { handle_resolve_policy(DispatchCtx::process_default(), params).await })
         .await
         .expect("resolve_policy should succeed under the scoped config");
 
@@ -118,7 +119,7 @@ async fn handle_status_honors_loaded_docker_runtime() {
     params.insert("backend".into(), Value::String("local".into()));
     params.insert("is_remote".into(), Value::Bool(false));
 
-    let val = CoreContext::scope(ctx, async { handle_status(params).await })
+    let val = CoreContext::scope(ctx, async { handle_status(DispatchCtx::process_default(), params).await })
         .await
         .expect("status should succeed under the scoped config");
 
@@ -149,7 +150,7 @@ async fn handle_resolve_policy_uses_loaded_action_dir() {
     let mut params = Map::new();
     params.insert("sandbox_mode".into(), Value::String("none".into()));
 
-    let val = CoreContext::scope(ctx, async { handle_resolve_policy(params).await })
+    let val = CoreContext::scope(ctx, async { handle_resolve_policy(DispatchCtx::process_default(), params).await })
         .await
         .expect("resolve_policy should succeed under the scoped config");
 
@@ -181,7 +182,7 @@ fn docker_policy_params(workspace: &str) -> Map<String, Value> {
 async fn handle_validate_policy_rejects_a_malformed_policy() {
     let mut params = Map::new();
     params.insert("policy".into(), Value::String("not a policy".into()));
-    let err = handle_validate_policy(params).await.unwrap_err();
+    let err = handle_validate_policy(DispatchCtx::process_default(), params).await.unwrap_err();
     assert!(err.contains("Invalid policy"), "{err}");
 }
 
@@ -194,7 +195,7 @@ async fn handle_validate_policy_errors_instead_of_passing_when_tinybox_is_unavai
     config.modules.enabled = false;
     let ctx = scoped_ctx(config);
     let result = CoreContext::scope(ctx, async {
-        handle_validate_policy(docker_policy_params("/")).await
+        handle_validate_policy(DispatchCtx::process_default(), docker_policy_params("/")).await
     })
     .await;
     let err = result.unwrap_err();
@@ -230,7 +231,7 @@ async fn sandbox_methods_are_not_gated_when_sandbox_is_on() {
         crate::core::runtime::ComponentSet::all(),
     );
     crate::core::runtime::context::CoreContext::scope(ctx, async {
-        let err = handle_validate_policy(Map::new()).await.unwrap_err();
+        let err = handle_validate_policy(DispatchCtx::process_default(), Map::new()).await.unwrap_err();
         assert!(!err.contains("COMPONENT_DISABLED"), "{err}");
     })
     .await;

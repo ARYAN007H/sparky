@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use serde_json::Map;
 
 use super::*;
@@ -5,7 +6,7 @@ use super::*;
 // ── Controller extensions (crates above the core) ──────────────────────────
 
 fn ext_controller(namespace: &'static str, function: &'static str) -> RegisteredController {
-    fn handler(_params: Map<String, serde_json::Value>) -> ControllerFuture {
+    fn handler(_ctx: DispatchCtx, _params: Map<String, serde_json::Value>) -> ControllerFuture {
         Box::pin(async { Ok(serde_json::json!({"ext": true})) })
     }
     RegisteredController {
@@ -38,7 +39,7 @@ async fn registry_extension_is_visible_to_every_lookup_and_dispatches() {
         Some("Registry extension probe.")
     );
 
-    let result = try_invoke_registered_rpc("openhuman.ext_probe_ping", Map::new())
+    let result = try_invoke_registered_rpc(DispatchCtx::ambient(), "openhuman.ext_probe_ping", Map::new())
         .await
         .expect("extension method is dispatchable")
         .expect("handler succeeds");
@@ -96,7 +97,7 @@ async fn registry_extension_is_gated_by_its_domain_group() {
     let ctx = CoreContext::for_test(domains, None);
     let hidden = CoreContext::scope(ctx, async {
         (
-            try_invoke_registered_rpc("openhuman.ext_gate_ping", Map::new())
+            try_invoke_registered_rpc(DispatchCtx::ambient(), "openhuman.ext_gate_ping", Map::new())
                 .await
                 .is_none(),
             schema_for_rpc_method("openhuman.ext_gate_ping").is_none(),

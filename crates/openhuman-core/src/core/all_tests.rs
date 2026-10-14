@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use serde_json::Map;
 
 use super::*;
@@ -17,7 +18,7 @@ fn schema(
     }
 }
 
-fn noop_handler(_params: Map<String, Value>) -> ControllerFuture {
+fn noop_handler(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async { Ok(Value::Null) })
 }
 
@@ -799,7 +800,7 @@ fn validate_registry_rejects_duplicate_registered_controllers() {
 
 #[tokio::test]
 async fn try_invoke_registered_rpc_returns_none_for_unknown_method() {
-    let out = try_invoke_registered_rpc("openhuman.not_a_real_method_xyz_123", Map::new()).await;
+    let out = try_invoke_registered_rpc(DispatchCtx::ambient(), "openhuman.not_a_real_method_xyz_123", Map::new()).await;
     assert!(out.is_none(), "unknown methods must return None");
 }
 
@@ -807,7 +808,7 @@ async fn try_invoke_registered_rpc_returns_none_for_unknown_method() {
 async fn try_invoke_registered_rpc_returns_some_for_known_method() {
     // `openhuman.health_snapshot` is registered at startup and takes no
     // required params — it must route and produce Some(_).
-    let out = try_invoke_registered_rpc("openhuman.health_snapshot", Map::new()).await;
+    let out = try_invoke_registered_rpc(DispatchCtx::ambient(), "openhuman.health_snapshot", Map::new()).await;
     assert!(out.is_some(), "known method must route");
 }
 
@@ -821,7 +822,7 @@ async fn try_invoke_registered_rpc_routes_security_policy_info() {
     let ctx = CoreContext::for_test_with_config(DomainSet::full(), config);
     let out = CoreContext::scope(
         ctx,
-        try_invoke_registered_rpc("openhuman.security_policy_info", Map::new()),
+        try_invoke_registered_rpc(DispatchCtx::ambient(), "openhuman.security_policy_info", Map::new()),
     )
     .await
     .expect("security policy info should be registered")
@@ -966,7 +967,7 @@ async fn dispatch_returns_none_for_gated_method() {
         .expect("a flows.* method exists in the full registry");
 
     let ctx = CoreContext::for_test(DomainSet::harness(), None);
-    let out = CoreContext::scope(ctx, try_invoke_registered_rpc(&gated_method, Map::new())).await;
+    let out = CoreContext::scope(ctx, try_invoke_registered_rpc(DispatchCtx::ambient(), &gated_method, Map::new())).await;
     assert!(
         out.is_none(),
         "gated method `{gated_method}` must dispatch as None under harness()"
@@ -977,7 +978,7 @@ async fn dispatch_returns_none_for_gated_method() {
     let ctx = CoreContext::for_test(DomainSet::harness(), None);
     let out = CoreContext::scope(
         ctx,
-        try_invoke_registered_rpc("openhuman.security_policy_info", Map::new()),
+        try_invoke_registered_rpc(DispatchCtx::ambient(), "openhuman.security_policy_info", Map::new()),
     )
     .await;
     assert!(

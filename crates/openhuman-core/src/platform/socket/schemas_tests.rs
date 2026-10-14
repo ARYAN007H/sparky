@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 
 #[test]
@@ -100,16 +101,16 @@ async fn handlers_error_without_initialized_manager() {
         return;
     }
 
-    let err = handle_disconnect(Map::new()).await.unwrap_err();
+    let err = handle_disconnect(DispatchCtx::process_default(), Map::new()).await.unwrap_err();
     assert!(err.contains("SocketManager not initialized"));
 
-    let err = handle_state(Map::new()).await.unwrap_err();
+    let err = handle_state(DispatchCtx::process_default(), Map::new()).await.unwrap_err();
     assert!(err.contains("SocketManager not initialized"));
 
-    let err = handle_connect(Map::new()).await.unwrap_err();
+    let err = handle_connect(DispatchCtx::process_default(), Map::new()).await.unwrap_err();
     assert!(err.contains("SocketManager not initialized"));
 
-    let err = handle_emit(Map::new()).await.unwrap_err();
+    let err = handle_emit(DispatchCtx::process_default(), Map::new()).await.unwrap_err();
     assert!(err.contains("SocketManager not initialized"));
 }
 
