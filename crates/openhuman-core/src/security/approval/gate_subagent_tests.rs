@@ -76,7 +76,7 @@ async fn an_async_subagent_park_reaches_the_parent_thread_detached_with_a_short_
 
     let before = chrono::Utc::now();
     let g = gate.clone();
-    // Origin propagated, APPROVAL_CHAT_CONTEXT not — the state
+    // Origin propagated, the chat approval context not — the state
     // `spawn_async_subagent` leaves its detached child in.
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(

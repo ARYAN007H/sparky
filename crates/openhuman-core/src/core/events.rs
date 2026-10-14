@@ -641,7 +641,7 @@ pub enum DomainEvent {
     /// `EgressSurfaceSubscriber` (defined in
     /// `crates/openhuman-core/src/web_chat/event_bus.rs`) when the emitting
     /// turn carries chat routing. `thread_id` / `client_id` come from the
-    /// ambient `APPROVAL_CHAT_CONTEXT` and are `None` for CLI / cron /
+    /// the egress ledger's chat routing and are `None` for CLI / cron /
     /// background transfers (no chat surface to route to).
     ///
     /// Only external transfers fire this event — local-only inference
@@ -720,7 +720,7 @@ pub enum DomainEvent {
     /// is on disk and ready to be downloaded. Published by
     /// [`crate::agent::artifacts::store::finalize_artifact`].
     /// Bridged to the web channel as an `artifact_ready` socket event
-    /// when the publishing turn carries an `APPROVAL_CHAT_CONTEXT`
+    /// when the publishing turn carries an `ApprovalChatContext`
     /// (see [`crate::security::approval::ApprovalChatContext`]).
     /// Sub-task #2779 of #1535.
     ArtifactReady {
@@ -747,7 +747,7 @@ pub enum DomainEvent {
         /// Final on-disk file size in bytes.
         size_bytes: u64,
         /// Chat thread the artifact belongs to, when the producing
-        /// turn carried an `APPROVAL_CHAT_CONTEXT`. `None` for CLI /
+        /// turn carried an `ApprovalChatContext`. `None` for CLI /
         /// cron / sub-agent paths — no client to fan out to.
         thread_id: Option<String>,
         /// Socket.IO client id (room) to surface the card to, when
@@ -811,7 +811,7 @@ pub enum DomainEvent {
         /// place without flicker.
         path: String,
         /// Chat thread the artifact belongs to, when the producing turn
-        /// carried an `APPROVAL_CHAT_CONTEXT`. `None` for CLI / cron /
+        /// carried an `ApprovalChatContext`. `None` for CLI / cron /
         /// sub-agent paths — no client to fan out to.
         thread_id: Option<String>,
         /// Socket.IO client id (room) to surface the card to, when known.

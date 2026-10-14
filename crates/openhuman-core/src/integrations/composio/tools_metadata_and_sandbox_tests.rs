@@ -134,7 +134,7 @@ async fn connect_tool_execute_rejects_missing_toolkit() {
 
 #[tokio::test]
 async fn connect_tool_refuses_without_interactive_chat_context() {
-    // No `APPROVAL_CHAT_CONTEXT` in scope → background/cron turn. There is no
+    // No chat approval context → background/cron turn. There is no
     // surface for the Connect card, so the tool must fail closed (it returns
     // before touching the network).
     let t = ComposioConnectTool::new(fake_config_arc());

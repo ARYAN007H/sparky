@@ -5,7 +5,7 @@
 //! durably-persisted reply: `start_chat` (`ops/start_chat.rs`) validates and
 //! preprocesses the message, applies the queue mode against the thread's
 //! in-flight state, and spawns `run_task::run_chat_task` under the cancel
-//! token / idle guard / wall-clock backstop / `APPROVAL_CHAT_CONTEXT` scope
+//! token / idle guard / wall-clock backstop / approval-context hand-off
 //! (`run_turn_under_cancel_and_deadline`, `ops/turn_guards.rs`). `run_chat_task`
 //! resolves or builds the cached session `Agent` (`session.rs`), spawns
 //! `spawn_progress_bridge` alongside the run, and returns the result; the

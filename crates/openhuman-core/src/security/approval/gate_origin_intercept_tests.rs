@@ -262,7 +262,7 @@ async fn intercept_audited_id_is_none_for_denied_some_for_approved() {
 async fn flow_origin_park_populates_source_context_with_flow_and_run_id() {
     // A `require_approval: true` flow still parks (same shape as before
     // this change) but the persisted row must now carry the flow/run
-    // correlation the `APPROVAL_FLOW_RUN_CONTEXT` task-local supplies —
+    // correlation the turn's `flow_run` supplies —
     // the origin alone only carries `flow_id`, not `run_id`.
     let (gate, _dir) = test_gate();
     let gate = Arc::new(gate);
