@@ -10,6 +10,7 @@ use tinyinference_embeddings::factory::{
 use tinyinference_embeddings::EmbeddingModel;
 
 use super::cloud::OpenHumanCloudEmbeddingModel;
+use crate::security::approval::ApprovalChatContext;
 
 fn settings(
     provider: &str,
@@ -25,12 +26,13 @@ fn settings(
     }
 }
 
-fn managed_factory(config: &Config) -> ManagedModelFactory {
+fn managed_factory(config: &Config, chat: Option<ApprovalChatContext>) -> ManagedModelFactory {
     let config = config.clone();
     Arc::new(move |model, dimensions| {
-        Ok(Box::new(OpenHumanCloudEmbeddingModel::from_config(
-            &config, model, dimensions,
-        )))
+        Ok(Box::new(
+            OpenHumanCloudEmbeddingModel::from_config(&config, model, dimensions)
+                .routed_to(chat.clone()),
+        ))
     })
 }
 
