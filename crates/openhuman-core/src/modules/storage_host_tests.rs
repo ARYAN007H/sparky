@@ -698,6 +698,9 @@ async fn every_call_is_audited_without_its_payload() {
 #[path = "storage_host_bus_tests.rs"]
 mod bus;
 
+#[path = "storage_host_cdylib_tests.rs"]
+mod cdylib;
+
 async fn set_secret(rig: &Rig) -> Result<Value, HostError> {
     let who = alpha();
     rig.host
