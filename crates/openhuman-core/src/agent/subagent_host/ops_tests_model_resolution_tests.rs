@@ -532,6 +532,9 @@ fn nested_subagent_dispatch_runs_on_a_constrained_worker_stack() {
 
     struct RecursiveDelegateTool {
         inner_def: AgentDefinition,
+        /// The explicit parent the nested run is spawned under (filled once the
+        /// parent snapshot, which itself holds this tool, exists).
+        parent: Arc<std::sync::OnceLock<ParentExecutionContext>>,
     }
 
     #[async_trait]
@@ -549,8 +552,13 @@ fn nested_subagent_dispatch_runs_on_a_constrained_worker_stack() {
             PermissionLevel::Execute
         }
         async fn execute(&self, _args: serde_json::Value) -> anyhow::Result<ToolResult> {
-            let outcome = run_subagent(&self.inner_def, "inner go", SubagentRunOptions::default())
-                .await
+            let parent = self.parent.get().cloned().expect("parent set before the run");
+            let outcome = run_subagent(
+                &self.inner_def,
+                "inner go",
+                with_parent(parent, SubagentRunOptions::default()),
+            )
+            .await
                 .map_err(|e| anyhow::anyhow!("nested run_subagent failed: {e}"))?;
             Ok(ToolResult::success(outcome.output))
         }
@@ -576,11 +584,16 @@ fn nested_subagent_dispatch_runs_on_a_constrained_worker_stack() {
         ]);
 
         let inner_def = make_def_named_tools(&[]);
-        let delegate_tool: Box<dyn Tool> = Box::new(RecursiveDelegateTool { inner_def });
+        let parent_slot = Arc::new(std::sync::OnceLock::new());
+        let delegate_tool: Box<dyn Tool> = Box::new(RecursiveDelegateTool {
+            inner_def,
+            parent: parent_slot.clone(),
+        });
         let parent = make_parent(
             Arc::clone(&(provider.clone() as Arc<dyn ChatModel<()>>)),
             vec![delegate_tool],
         );
+        let _ = parent_slot.set(parent.clone());
         let outer_def = make_def_named_tools(&["delegate_inner"]);
 
         (async {
