@@ -299,12 +299,12 @@ async fn handle_agent_run_turn(req: AgentTurnRequest) -> Result<AgentTurnRespons
     );
     // Memory acts as the target agent (the root when none is named) for
     // the whole channel turn.
-    let memory_agent = target_agent_id.clone().unwrap_or_default();
+    let memory_identity = crate::memory::scope::MemoryIdentity::root()
+        .child(target_agent_id.as_deref().unwrap_or_default());
     let graph_origin = origin.clone();
     let outcome = turn_origin::with_origin(
         origin,
-        crate::memory::scope::within_agent(
-            &memory_agent,
+        {
             with_file_state_agent_id(file_state_id, async {
                 // Channel/CLI turns run through the tinyagents harness
                 // (issue #4249); the legacy `run_tool_call_loop` is removed.
@@ -329,10 +329,11 @@ async fn handle_agent_run_turn(req: AgentTurnRequest) -> Result<AgentTurnRespons
                     Some(graph_origin),
                     sandbox_mode,
                     approval,
+                    memory_identity,
                 )
                 .await
-            }),
-        ),
+            })
+        },
     )
     .await
     .map_err(|e| e.to_string())?;
