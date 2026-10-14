@@ -16,7 +16,7 @@ use tinyinference_llm::message::Message;
 use tinyinference_llm::model::{ModelRequest, ModelResponse, ResolvedModelRoute};
 use tinytools::{ToolPolicy as TaToolPolicy, ToolResult as TaToolResult};
 
-use crate::agent::tinyagents::payload_summarizer::PayloadSummarizer;
+use crate::agent::tinyagents::payload_summarizer::DynPayloadSummarizer;
 use crate::agent::tinyagents::turn_outcome::ToolCallOutcome;
 use tinyagents_harness::artifacts::tool_results::ToolResultArtifactStore;
 use tinyjuice_bus::types::AgentTokenjuiceCompression;
@@ -37,7 +37,7 @@ pub(crate) struct TurnContextMiddleware {
     /// Per-tool-result byte cap. `0` disables the cap.
     pub(crate) tool_result_budget_bytes: usize,
     /// The model behind TinyJuice's tool-output summary. `None` disables it.
-    pub(crate) payload_summarizer: Option<Arc<dyn PayloadSummarizer>>,
+    pub(crate) payload_summarizer: Option<Arc<DynPayloadSummarizer>>,
     /// Optional action-workspace artifact sink for oversized tool results.
     pub(crate) artifact_store: Option<ToolResultArtifactStore>,
     /// Whether TokenJuice content-aware compaction runs before output caps.

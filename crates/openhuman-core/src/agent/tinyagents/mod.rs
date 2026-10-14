@@ -39,7 +39,7 @@ pub(crate) mod observability;
 pub mod run_mode;
 // `pub` since issue #6014, and the inconsistency it removes is the point:
 // `AgentBuilder::payload_summarizer` is a **public** setter taking
-// `Arc<dyn PayloadSummarizer>`, so the seam was already advertised to embedders
+// `Arc<DynPayloadSummarizer>`, so the seam was already advertised to embedders
 // — while the trait itself, its outcome type and its reason enum were all
 // `pub(crate)`, which made the setter uncallable from outside this crate. An
 // embedder could therefore see the extension point, and could not use it.

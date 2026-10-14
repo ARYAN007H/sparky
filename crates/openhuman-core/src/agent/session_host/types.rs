@@ -430,7 +430,7 @@ pub struct OpenHumanSessionHost {
     /// when oversized tool results need summarizer-subagent compression before
     /// they enter agent history.
     pub(super) payload_summarizer:
-        Option<Arc<dyn crate::agent::tinyagents::payload_summarizer::PayloadSummarizer>>,
+        Option<Arc<crate::agent::tinyagents::payload_summarizer::DynPayloadSummarizer>>,
     /// Per-agent TokenJuice profile for tool results entering this session's
     /// model context.
     pub(super) tokenjuice_compression: tinyjuice_bus::types::AgentTokenjuiceCompression,
@@ -618,7 +618,7 @@ pub struct SessionHostBuilder {
     /// [`super::builder::OpenHumanSessionHost::build_session_agent_inner`] sets this
     /// to a `SubagentPayloadSummarizer` instance.
     pub(super) payload_summarizer:
-        Option<Arc<dyn crate::agent::tinyagents::payload_summarizer::PayloadSummarizer>>,
+        Option<Arc<crate::agent::tinyagents::payload_summarizer::DynPayloadSummarizer>>,
     /// Per-agent TokenJuice tool-output compression profile.
     pub(super) tokenjuice_compression: tinyjuice_bus::types::AgentTokenjuiceCompression,
     /// Optional pre-execution tool policy. Defaults to allow-all.

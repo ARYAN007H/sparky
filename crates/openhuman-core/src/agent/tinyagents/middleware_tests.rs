@@ -19,7 +19,7 @@ use tinyinference_llm::tool::ToolCall as TaToolCall;
 use tinytools::{ToolPolicy as TaToolPolicy, ToolResult as TaToolResult};
 
 use crate::agent::context::CLEARED_PLACEHOLDER;
-use crate::agent::tinyagents::payload_summarizer::PayloadSummarizer;
+use crate::agent::tinyagents::payload_summarizer::DynPayloadSummarizer;
 use tinyagents_harness::context::{RunConfig, RunContext};
 use tinyinference_llm::model::ModelRequest;
 use tinyjuice_bus::types::AgentTokenjuiceCompression;
@@ -62,7 +62,10 @@ impl StubSummarizer {
     }
 }
 
-impl PayloadSummarizer for StubSummarizer {
+impl tinyagents_harness::summarization::payload_summarizer::PayloadSummarizer<crate::agent::tinyagents::host::OpenHumanRunContext> for StubSummarizer {
+    type Prepared = crate::inference::tokenjuice::generate::PreparedGenerate;
+    type Error = anyhow::Error;
+
     fn prepare(
         &self,
         _parent_ctx: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
@@ -86,7 +89,7 @@ fn summarizing_config() -> Arc<crate::config::Config> {
     Arc::new(config)
 }
 
-fn summarizer_mw(ps: Arc<dyn PayloadSummarizer>) -> ToolOutputMiddleware {
+fn summarizer_mw(ps: Arc<DynPayloadSummarizer>) -> ToolOutputMiddleware {
     ToolOutputMiddleware {
         // Large enough that the byte-budget backstop never fires, so these
         // tests observe the summary stage alone.

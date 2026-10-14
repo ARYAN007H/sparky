@@ -18,7 +18,7 @@ use tinytools::{ToolPolicy as TaToolPolicy, ToolResult as TaToolResult};
 use crate::agent::harness::tool_result_artifacts::{
     artifact_read_target, page_artifact_read, TINYAGENTS_TOOL_RESULT_ARTIFACT_STORE,
 };
-use crate::agent::tinyagents::payload_summarizer::PayloadSummarizer;
+use crate::agent::tinyagents::payload_summarizer::DynPayloadSummarizer;
 use crate::inference::tokenjuice::generate::GenerateTicket;
 use tinyagents_harness::artifacts::tool_results::{
     apply_per_result_persistence, ArtifactRead, ToolResultArtifactStore,
@@ -178,7 +178,7 @@ pub(crate) struct ToolOutputMiddleware {
     pub(crate) budget_bytes: usize,
     /// The model behind TinyJuice's summary stage. `None` means this agent's
     /// results are never summarized.
-    pub(crate) payload_summarizer: Option<Arc<dyn PayloadSummarizer>>,
+    pub(crate) payload_summarizer: Option<Arc<DynPayloadSummarizer>>,
     pub(crate) artifact_store: Option<ToolResultArtifactStore>,
     pub(crate) tokenjuice_compaction_enabled: bool,
     pub(crate) tokenjuice_compression: AgentTokenjuiceCompression,
