@@ -104,7 +104,11 @@ async fn sweep_profiles_reclaims_each_profiles_own_scope() {
 
     let ids = vec!["acme".to_string(), "globex".to_string()];
     assert_eq!(sweep_profiles(backend.as_ref(), &ids).await, 2);
-    assert_eq!(sweep_profiles(backend.as_ref(), &ids).await, 0, "idempotent");
+    assert_eq!(
+        sweep_profiles(backend.as_ref(), &ids).await,
+        0,
+        "idempotent"
+    );
     let kept = backend.for_scope(&acme).unwrap().blobs().get("kept").await;
     assert!(kept.unwrap().is_some(), "an unexpired blob survives");
 }
@@ -128,7 +132,10 @@ async fn sweep_profiles_reaches_the_modules_scopes_for_that_profile() {
     assert!(!module_scopes.is_empty(), "TinyJuice owns expiring blobs");
     put_expiring(&backend, &module_scopes[0], "tinyjuice_ccr/t", 10).await;
     now.store(2_000, Ordering::SeqCst);
-    assert_eq!(sweep_profiles(backend.as_ref(), &["acme".to_string()]).await, 1);
+    assert_eq!(
+        sweep_profiles(backend.as_ref(), &["acme".to_string()]).await,
+        1
+    );
 }
 
 /// A backend whose sweep never completes.
