@@ -158,6 +158,48 @@ pub async fn offload_oversized_result(
     }
 }
 
+/// Offload one finished sub-agent run's `output` for the tenant in scope: the
+/// artifact goes to its blob store and is materialised under the policy's
+/// action root (`action_dir` without a policy), the parent's root.
+///
+/// With no blob store for the tenant (a SaaS task with no scope, a refused
+/// backend) nothing is offloaded and `output` comes back untouched, like every
+/// other soft failure.
+pub async fn offload_run_result(
+    output: String,
+    policy: Option<Arc<SecurityPolicy>>,
+    action_dir: std::path::PathBuf,
+    agent_id: String,
+    task_id: &str,
+    threshold_bytes: usize,
+) -> (String, Option<OffloadedArtifact>) {
+    let materialize_root = policy
+        .as_ref()
+        .map(|p| p.action_dir.clone())
+        .unwrap_or_else(|| action_dir.clone());
+    let workspace_dir = policy
+        .as_ref()
+        .map(|p| p.workspace_dir.clone())
+        .unwrap_or(action_dir);
+    let Some(blobs) = crate::agent::session_store::artifact_blobs_for(&workspace_dir) else {
+        tracing::debug!(
+            task_id = %task_id,
+            agent_id = %agent_id,
+            "[artifact] no blob store for the acting tenant — skipping offload (summarizer/truncation backstop applies)"
+        );
+        return (output, None);
+    };
+    let offload = new_artifact_offload(blobs, policy.clone(), agent_id, task_id);
+    offload_oversized_result(
+        output,
+        &offload,
+        threshold_bytes,
+        &materialize_root,
+        policy.as_deref(),
+    )
+    .await
+}
+
 /// Write the stored (redacted) body of `artifact` to `root/<key>`.
 async fn materialize(
     offload: &ArtifactOffload,

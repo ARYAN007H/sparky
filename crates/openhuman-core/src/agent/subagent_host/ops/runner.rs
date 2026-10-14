@@ -9,7 +9,7 @@
 use std::collections::HashSet;
 use std::time::Instant;
 
-use crate::agent::harness::artifact_offload::{new_artifact_offload, offload_oversized_result};
+use crate::agent::harness::artifact_offload::offload_run_result;
 use crate::agent::harness::fork_context::ParentExecutionContext;
 use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::agent::prompts::{
@@ -477,37 +477,13 @@ async fn offload_outcome_artifacts(
     // The parent that receives the pointer resolves relative paths against ITS
     // action root, so the stored artifact is materialised there (also for a
     // worktree-isolated worker) and the handed-back `outputs/…` path opens.
-    let materialize_root = policy
-        .as_ref()
-        .map(|p| p.action_dir.clone())
-        .unwrap_or_else(|| action_dir.clone());
-    let workspace_dir = policy
-        .as_ref()
-        .map(|p| p.workspace_dir.clone())
-        .unwrap_or_else(|| action_dir.clone());
-    let blobs = crate::agent::session_store::artifact_blobs_for(&workspace_dir);
-    let Some(blobs) = blobs else {
-        tracing::debug!(
-            task_id = %task_id,
-            agent_id = %outcome.agent_id,
-            "[artifact] no blob store for the acting tenant — skipping offload (summarizer/truncation backstop applies)"
-        );
-        outcome.artifact_paths = paths;
-        note_artifact_handoff(
-            HANDOFF_STAGE_RECORDED,
-            &outcome.agent_id,
-            task_id,
-            &outcome.artifact_paths,
-        );
-        return;
-    };
-    let offload = new_artifact_offload(blobs, policy.clone(), outcome.agent_id.clone(), task_id);
-    let (output, _artifact) = offload_oversized_result(
+    let (output, _artifact) = offload_run_result(
         std::mem::take(&mut outcome.output),
-        &offload,
+        policy,
+        action_dir,
+        outcome.agent_id.clone(),
+        task_id,
         threshold,
-        &materialize_root,
-        policy.as_deref(),
     )
     .await;
     outcome.output = output;
