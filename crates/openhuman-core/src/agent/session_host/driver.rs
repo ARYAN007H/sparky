@@ -267,7 +267,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
         // done by, so the turn commits before the backstop drops it.
         let close_by = request.run_context.data.turn_deadline.map(|deadline| {
             let now = Instant::now();
-            now + crate::agent::turn_deadline::close_budget(&deadline, now)
+            now + deadline.close_budget(now)
         });
         // A Stop during the close or the repair after it hands back the
         // accepted rounds like a Stop during the loop, instead of letting the

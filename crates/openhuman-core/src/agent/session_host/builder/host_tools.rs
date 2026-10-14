@@ -31,7 +31,6 @@ use std::sync::Arc;
 
 use tinytools::Tool;
 
-use crate::agent::tool_policy::ToolPolicy;
 use crate::agent::OpenHumanSessionHost;
 use crate::config::Config;
 use anyhow::Result;
@@ -62,7 +61,7 @@ pub struct HostTurnTools {
     /// enforce one through the session's tool policy.
     pub withheld: HashSet<String>,
     /// The session's admission gate, if the host sets one.
-    pub policy: Option<Arc<dyn ToolPolicy>>,
+    pub policy: Option<Arc<dyn tinyagents_harness::middleware::ToolCallPolicy<crate::agent::tinyagents::host::OpenHumanRunContext>>>,
 }
 
 impl HostTurnTools {
@@ -171,7 +170,7 @@ impl HostTurnTools {
     /// session should keep an existing policy for calls the host does not own,
     /// the host composes the two and passes the result here.
     #[must_use]
-    pub fn with_policy(mut self, policy: Arc<dyn ToolPolicy>) -> Self {
+    pub fn with_policy(mut self, policy: Arc<dyn tinyagents_harness::middleware::ToolCallPolicy<crate::agent::tinyagents::host::OpenHumanRunContext>>) -> Self {
         self.policy = Some(policy);
         self
     }
@@ -190,7 +189,7 @@ impl HostTurnTools {
 /// The parts of a host turn belt that the session builder applies after
 /// expanding the agent's static scope.
 pub(super) struct MergedHostTurnTools {
-    pub policy: Option<Arc<dyn ToolPolicy>>,
+    pub policy: Option<Arc<dyn tinyagents_harness::middleware::ToolCallPolicy<crate::agent::tinyagents::host::OpenHumanRunContext>>>,
     pub withheld: HashSet<String>,
     pub permanent: HashSet<String>,
     pub scope_additions: HashSet<String>,

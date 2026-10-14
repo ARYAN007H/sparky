@@ -583,9 +583,7 @@ pub(super) fn assemble_turn_harness(
             enforcement.policy,
             enforcement.session,
             tool_sets.clone(),
-            enforcement.session_id,
             enforcement.channel,
-            enforcement.agent_definition_id,
         )));
     }
 

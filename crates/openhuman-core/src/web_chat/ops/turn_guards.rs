@@ -13,7 +13,7 @@ use crate::agent::turn_env::HostTurnEnv;
 /// (env `OPENHUMAN_WEB_TURN_TIMEOUT_SECS=0`).
 ///
 /// This is the OUTER safety net (issue #4746), and the single source of truth
-/// for the turn's deadlines (`agent::turn_deadline`, default 900s). The
+/// for the turn's deadlines (`agent::session_host::turn_backstop`, default 900s). The
 /// harness derives two earlier points from it:
 ///
 /// * **wind-down** at backstop minus `min(120s, backstop/5)`, 780s by default.
@@ -35,7 +35,7 @@ use crate::agent::turn_env::HostTurnEnv;
 /// nothing delivered. Override via `OPENHUMAN_WEB_TURN_TIMEOUT_SECS`; set it to
 /// `0` to disable the backstop and the derived deadlines with it.
 fn web_turn_deadline() -> Option<Duration> {
-    crate::agent::turn_deadline::configured_backstop()
+    crate::agent::session_host::turn_backstop::configured_backstop()
 }
 
 /// The backstop for a turn that has to be allowed to run long: one on a local /
@@ -79,7 +79,7 @@ where
     match deadline {
         // The session turn carries the matching `TurnDeadline` on its explicit
         // host environment (`run_turn_under_cancel_and_deadline`), so the
-        // harness (`agent::turn_deadline`) winds down before `d`. The turn
+        // harness (`agent::session_host::turn_backstop`) winds down before `d`. The turn
         // future is boxed: it is very large and would otherwise be held inline
         // by the timeout wrapper and overflow the worker stack.
         Some(d) => match tokio::time::timeout(d, Box::pin(fut)).await {

@@ -19,7 +19,7 @@ use super::{PostTurnHook, ToolHook};
 pub struct HookScope {
     tools: Vec<Arc<dyn ToolHook>>,
     post_turn: Vec<Arc<dyn PostTurnHook>>,
-    stop: Vec<Arc<dyn tinyagents_harness::middleware::StopHook<crate::agent::cost::TurnCost>>>,
+    stop: Vec<Arc<dyn tinyagents_harness::middleware::StopHook<tinyagents_harness::cost::TurnCost>>>,
 }
 
 impl HookScope {
@@ -36,7 +36,7 @@ impl HookScope {
     /// Append a usage observer/budget policy checked after each model call.
     pub fn push_stop(
         &mut self,
-        hook: Arc<dyn tinyagents_harness::middleware::StopHook<crate::agent::cost::TurnCost>>,
+        hook: Arc<dyn tinyagents_harness::middleware::StopHook<tinyagents_harness::cost::TurnCost>>,
     ) {
         self.stop.push(hook);
     }
@@ -54,7 +54,7 @@ impl HookScope {
     /// The scope's own stop policies, in registration order.
     pub fn stop_hooks(
         &self,
-    ) -> &[Arc<dyn tinyagents_harness::middleware::StopHook<crate::agent::cost::TurnCost>>] {
+    ) -> &[Arc<dyn tinyagents_harness::middleware::StopHook<tinyagents_harness::cost::TurnCost>>] {
         &self.stop
     }
 

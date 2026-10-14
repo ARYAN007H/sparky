@@ -1,4 +1,6 @@
-//! Wall-clock deadline of one top-level agent turn.
+//! Host side of the wall-clock deadline of one top-level agent turn: the env
+//! override. The deadline itself (`close_budget`
+//! included) is `tinyagents_harness::turn_deadline::TurnDeadline`.
 //!
 //! A web-chat turn runs under an outer backstop (`web_chat::ops::turn_guards`)
 //! that drops the turn future when it elapses. Dropping it discards
@@ -22,7 +24,7 @@
 //!   typed `Timeout` before the backstop drops the turn.
 //!
 //! For every positive backstop, `wind_down < hard_stop < backstop`
-//! (see `turn_deadline_tests.rs`).
+//! (see `turn_backstop_tests.rs`).
 //!
 //! The web-turn guard builds the deadline and hands it to the session it runs
 //! (`HostTurnEnv::turn_deadline`). The top-level session turn
@@ -37,25 +39,11 @@ use tinyagents_harness::turn_deadline::{parse_backstop, TurnDeadline};
 /// Environment override for the backstop, in seconds; `0` disables it.
 pub const TURN_BACKSTOP_ENV: &str = "OPENHUMAN_WEB_TURN_TIMEOUT_SECS";
 
-/// Time kept back from the post-loop grounded close so the turn can commit and
-/// emit its reply before the backstop drops it.
-const CLOSE_RESERVE: Duration = Duration::from_secs(10);
-
-/// How long the post-loop grounded close may run as of `now`: the backstop
-/// remainder minus [`CLOSE_RESERVE`], zero once that has passed (#7716).
-/// Host-side until the harness `TurnDeadline` grows the same accessor.
-pub fn close_budget(deadline: &TurnDeadline, now: std::time::Instant) -> Duration {
-    deadline
-        .backstop()
-        .saturating_sub(deadline.elapsed_at(now))
-        .saturating_sub(CLOSE_RESERVE)
-}
-
 /// The backstop in force for this process (env [`TURN_BACKSTOP_ENV`]).
 pub fn configured_backstop() -> Option<Duration> {
     parse_backstop(std::env::var(TURN_BACKSTOP_ENV).ok().as_deref())
 }
 
 #[cfg(test)]
-#[path = "turn_deadline_tests.rs"]
+#[path = "turn_backstop_tests.rs"]
 mod tests;

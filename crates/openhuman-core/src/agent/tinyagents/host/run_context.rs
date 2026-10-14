@@ -282,7 +282,7 @@ pub struct OpenHumanRunContext {
     /// UI/event progress receiver for this turn tree.
     pub progress: Option<Sender<AgentProgress>>,
     /// Stop policies evaluated after each model call.
-    pub stop_hooks: Vec<Arc<dyn StopHook<crate::agent::cost::TurnCost>>>,
+    pub stop_hooks: Vec<Arc<dyn StopHook<tinyagents_harness::cost::TurnCost>>>,
     /// Agent/turn tool callbacks, registered after the runtime's global ones.
     pub tool_hooks: Vec<Arc<dyn crate::agent::hooks::ToolHook>>,
     /// Host cap on real tool invocations for this turn tree; `None` leaves the
@@ -393,7 +393,7 @@ pub struct OpenHumanRunContext {
 #[derive(Clone, Default)]
 pub(crate) struct HarnessHostPolicy {
     /// Stop policies evaluated after each model call.
-    pub(crate) stop_hooks: Vec<Arc<dyn StopHook<crate::agent::cost::TurnCost>>>,
+    pub(crate) stop_hooks: Vec<Arc<dyn StopHook<tinyagents_harness::cost::TurnCost>>>,
     /// Agent/turn tool callbacks, registered after the runtime's global ones.
     pub(crate) tool_hooks: Vec<Arc<dyn crate::agent::hooks::ToolHook>>,
     /// The host's cap on real tool invocations.

@@ -9,7 +9,7 @@
 use std::collections::HashSet;
 use std::time::Instant;
 
-use crate::agent::harness::artifact_offload::{new_artifact_offload, offload_oversized_result};
+use crate::agent::harness::artifact_offload::offload_run_result;
 use crate::agent::harness::fork_context::ParentExecutionContext;
 use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::agent::prompts::{
@@ -474,19 +474,18 @@ async fn offload_outcome_artifacts(
     let threshold =
         effective_offload_threshold(DEFAULT_OFFLOAD_THRESHOLD_BYTES, definition.max_result_chars);
 
-    // Worktree-isolated workers write inside their own checkout, but the parent
-    // that receives the pointer resolves relative paths against ITS action root.
-    // Render against that root so the handed-back path is one the parent can
-    // actually open (relative when the worktree nests inside it, absolute when
-    // it does not) rather than a bare `outputs/…` that silently misses.
-    let render_root = policy
-        .as_ref()
-        .map(|p| p.action_dir.clone())
-        .unwrap_or_else(|| action_dir.clone());
-    let offload = new_artifact_offload(action_dir, policy, outcome.agent_id.clone(), task_id)
-        .with_render_root(render_root);
-    let (output, _artifact) =
-        offload_oversized_result(std::mem::take(&mut outcome.output), &offload, threshold).await;
+    // The parent that receives the pointer resolves relative paths against ITS
+    // action root, so the stored artifact is materialised there (also for a
+    // worktree-isolated worker) and the handed-back `outputs/…` path opens.
+    let (output, _artifact) = offload_run_result(
+        std::mem::take(&mut outcome.output),
+        policy,
+        action_dir,
+        outcome.agent_id.clone(),
+        task_id,
+        threshold,
+    )
+    .await;
     outcome.output = output;
 
     // Merge: the harness pointer (if it fired) plus any worker-authored pointer

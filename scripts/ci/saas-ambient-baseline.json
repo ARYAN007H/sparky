@@ -128,7 +128,7 @@
   {
     "rule": "bare-spawn",
     "path": "crates/openhuman-core/src/agent/turn_origin.rs",
-    "line": 382,
+    "line": 377,
     "text": "tokio::spawn(propagate(fut))",
     "occurrence": 1
   },

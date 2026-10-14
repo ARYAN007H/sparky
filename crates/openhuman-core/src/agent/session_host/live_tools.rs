@@ -30,9 +30,8 @@ impl OpenHumanSessionHost {
             tool_policy: Some(ToolPolicyEnforcement {
                 policy: self.tool_policy.clone(),
                 session: self.tool_policy_session.clone(),
-                session_id: self.event_session_id.clone(),
-                channel: self.event_channel.clone(),
                 agent_definition_id: self.agent_definition_id.clone(),
+                channel: self.event_channel.clone(),
             }),
             has_thread: self.thread_id.is_some(),
         }
