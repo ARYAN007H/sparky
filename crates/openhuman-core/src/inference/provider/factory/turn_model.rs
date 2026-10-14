@@ -46,6 +46,7 @@ pub(crate) fn create_turn_chat_model_with_native_tools(
         model,
         temperature,
         native_tool_calling,
+        &EgressLedger::none(),
     )
     .map(|(chat, _, _)| chat)
 }
@@ -218,6 +219,7 @@ pub(crate) fn create_turn_chat_model_from_string_with_native_tools(
         model,
         temperature,
         native_tool_calling,
+        &EgressLedger::none(),
     )
     .map(|(chat, _, _)| chat)
 }
@@ -283,5 +285,6 @@ pub(crate) fn create_turn_chat_model_from_string_with_native_tools_and_route(
         model,
         temperature,
         native_tool_calling,
+        egress,
     )
 }
