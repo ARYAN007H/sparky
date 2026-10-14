@@ -235,9 +235,8 @@ pub(super) fn failure_scope(tool: &str, arguments: &serde_json::Value) -> String
 
 #[cfg(test)]
 pub(super) use super::failure_policy::recovery_policy;
-pub(super) use super::failure_policy::{
-    is_command_exit_report, missing_program_nudge, recovery_policy_with_effect,
-};
+pub(super) use super::failure_policy::{missing_program_nudge, recovery_policy_with_effect};
+use tinyagents_harness::no_progress::is_command_exit_report;
 
 /// Detect a **body-level** failure from `validate_workflow` / `dry_run_workflow`
 /// (issue: flows breaker doesn't see repeated invalid-graph loops). Both tools

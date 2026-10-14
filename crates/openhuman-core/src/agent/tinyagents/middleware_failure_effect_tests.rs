@@ -111,7 +111,7 @@ fn a_timeout_before_the_tool_ran_is_transient() {
         ),
         Some((
             "invalid_arguments",
-            super::super::failure_policy::ARGUMENT_SCHEMA_RECOVERY
+            tinyagents_harness::no_progress::ARGUMENT_SCHEMA_RECOVERY
         ))
     );
 }
