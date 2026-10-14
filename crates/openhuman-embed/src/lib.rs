@@ -102,9 +102,7 @@ pub use tinytools::{PermissionLevel, Tool, ToolExposure, ToolResult};
 /// Live agent-turn progress for in-process embedders.
 pub mod agent_progress {
     pub use openhuman_core::agent::progress::AgentProgress;
-    pub use openhuman_core::agent::progress_sink::{
-        current_progress_sink, with_progress_sink, ProgressSink, AGENT_PROGRESS_SINK,
-    };
+    pub use openhuman_core::agent::progress_sink::ProgressSink;
 }
 
 /// The skill registry: the host transport an embedder passes to

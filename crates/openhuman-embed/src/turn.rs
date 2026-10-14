@@ -18,9 +18,9 @@
 //! the value. [`TurnRequest`] pins the spelling in one place, next to a test
 //! that decodes it as the controller does.
 //!
-//! # The two ambient scopes, and why they are not optional
+//! # The ambient origin scope, and why it is not optional
 //!
-//! A turn reads two `tokio` task-locals that no parameter can carry:
+//! A turn reads one `tokio` task-local that no parameter can carry yet:
 //!
 //! - **origin** ([`turn_origin`](openhuman_core::agent::turn_origin)) — the
 //!   caller's statement of authority. The approval gate is *fail-closed*: an
@@ -28,12 +28,15 @@
 //!   else — a workflow's blanket automation grant, say — must scope it around
 //!   the dispatch. Miss it and the turn still succeeds while every acting tool
 //!   quietly refuses, which reads as a bad model rather than a missing scope.
-//! - **progress** ([`progress_sink`](openhuman_core::agent::progress_sink)) —
-//!   the call resolves to one final string, so an embedder that wants tool
-//!   calls and deltas has to have installed the sink *before* awaiting.
 //!
-//! Both are established by [`Turn::send`], so a host never has to know they
-//! exist. That is the whole reason this facade is worth having over `invoke`.
+//! Everything else a turn needs rides explicit values handed to the core
+//! (`AgentChatEnv`): the **progress** sink
+//! ([`progress_sink`](openhuman_core::agent::progress_sink)) and the host
+//! environment (shared budget, delegation depth, cancellation, hooks, tool-belt
+//! authority).
+//!
+//! The origin is established by [`Turn::send`], so a host never has to know it
+//! exists. That is the whole reason this facade is worth having over `invoke`.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -68,6 +71,11 @@ pub(crate) enum TurnTarget {
 /// on, so a host can build it in one place and send it from another.
 pub struct Turn {
     budget: Option<crate::budget::ModelBudget>,
+    /// A narrower model-directed delegation depth for this turn (fanout leaves).
+    spawn_depth_limit: Option<usize>,
+    /// The native token this turn's run tree observes, minted by `send` and
+    /// handed to the core on the turn's host environment.
+    native_cancellation: Option<crate::CancellationToken>,
     target: TurnTarget,
     request: TurnRequest,
     session_id: Option<String>,
@@ -99,6 +107,8 @@ impl Turn {
         Self {
             target,
             budget: None,
+            spawn_depth_limit: None,
+            native_cancellation: None,
             request: TurnRequest::new(message),
             session_id: None,
             origin: None,
@@ -399,6 +409,12 @@ impl Turn {
     /// Enforce the ledger across this tool loop, retries and synchronous children.
     pub fn budget(mut self, budget: crate::budget::ModelBudget) -> Self {
         self.budget = Some(budget);
+        self
+    }
+
+    /// Narrow the model-directed delegation depth for this turn tree.
+    pub(crate) fn with_spawn_depth_limit(mut self, limit: usize) -> Self {
+        self.spawn_depth_limit = Some(limit);
         self
     }
 
