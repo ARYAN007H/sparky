@@ -212,14 +212,18 @@ async fn test_subagent_has_current_date_context() -> Result<()> {
     // `subagent_runner::ops::tests::resolve_subagent_provider_*`.
     def.model = tinyagents_definition::ModelSpec::Inherit;
 
-    let _ = openhuman_core::agent::harness::with_parent_context(parent, async {
-        openhuman_core::agent::subagent_host::run_subagent(
-            &def,
-            "list my calendar events for today",
-            openhuman_core::agent::subagent_host::SubagentRunOptions::default(),
-        )
-        .await
-    })
+    let mut run_data = openhuman_core::agent::tinyagents::host::OpenHumanRunContext::new();
+    run_data.parent = Some(parent);
+    let run_context = tinyagents_harness::context::RunContext::new(
+        tinyagents_harness::context::RunConfig::new("calendar-grounding-parent"),
+        run_data,
+    );
+    let _ = openhuman_core::agent::subagent_host::run_subagent_with_parent(
+        &run_context,
+        def,
+        "list my calendar events for today",
+        openhuman_core::agent::subagent_host::SubagentRunOptions::default(),
+    )
     .await?;
 
     let messages = captured_messages.lock();

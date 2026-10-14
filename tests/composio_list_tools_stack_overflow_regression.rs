@@ -109,14 +109,16 @@
 
 use async_trait::async_trait;
 use openhuman_core::agent::harness::host_definition::AgentDefinitionRegistry;
-use openhuman_core::agent::harness::{with_parent_context, ParentExecutionContext};
-use openhuman_core::agent::subagent_host::{run_subagent, SubagentRunOptions};
+use openhuman_core::agent::harness::ParentExecutionContext;
+use openhuman_core::agent::subagent_host::{run_subagent_with_parent, SubagentRunOptions};
+use openhuman_core::agent::tinyagents::host::OpenHumanRunContext;
 use openhuman_core::config::AgentConfig;
 use parking_lot::Mutex;
 use serde_json::json;
 use std::sync::Arc;
 use tempfile::tempdir;
 use tinyagents_definition::ModelSpec;
+use tinyagents_harness::context::{RunConfig, RunContext};
 use tinyinference_llm::message::AssistantMessage;
 use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
 use tinyinference_llm::tool::ToolCall;
@@ -351,13 +353,14 @@ async fn drive_subagent() {
     // stack the cargo-test process aborts (SIGABRT / SIGBUS) and no
     // test report is emitted. We don't care whether the sub-agent
     // semantically "succeeded" — only that the runtime did not abort.
-    let _ = with_parent_context(parent, async move {
-        run_subagent(
-            &def,
-            "list available gmail actions",
-            SubagentRunOptions::default(),
-        )
-        .await
-    })
+    let mut run_data = OpenHumanRunContext::new();
+    run_data.parent = Some(parent);
+    let run_context = RunContext::new(RunConfig::new("stack-regression-parent"), run_data);
+    let _ = run_subagent_with_parent(
+        &run_context,
+        def,
+        "list available gmail actions",
+        SubagentRunOptions::default(),
+    )
     .await;
 }
