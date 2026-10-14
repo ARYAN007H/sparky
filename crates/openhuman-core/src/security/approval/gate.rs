@@ -158,23 +158,6 @@ pub struct ApprovalChatContext {
     pub request_id: Option<String>,
 }
 
-tokio::task_local! {
-    pub static APPROVAL_CHAT_CONTEXT: ApprovalChatContext;
-}
-
-tokio::task_local! {
-    /// Marks a park as originating from the Flow Canvas copilot's streaming
-    /// `flows_build` path — scoped by `flows::ops::flows_build` around the
-    /// streaming `agent.run_single(&prompt)` call, alongside the existing
-    /// `AgentTurnOrigin::WebChat` + [`APPROVAL_CHAT_CONTEXT`] double-scope that
-    /// path already uses. Presence alone is the signal (no fields needed): when
-    /// set, the park window is clamped to [`COPILOT_APPROVAL_TTL`] instead of
-    /// the gate's own (possibly env-overridden) TTL. Absent for every other
-    /// caller — in particular, plain main-chat `WebChat` turns do not scope
-    /// this, so they keep the full [`DEFAULT_APPROVAL_TTL`].
-    pub static APPROVAL_COPILOT_STREAM_CONTEXT: ();
-}
-
 /// Per-run flow context (flow-approval-surface, PR2 of the tinyflows
 /// approval-surfacing design). `flows::ops::flows_run` / `flows_resume`
 /// scope this around the engine invocation, alongside the existing
@@ -188,10 +171,6 @@ tokio::task_local! {
 pub struct FlowRunContext {
     pub flow_id: String,
     pub run_id: String,
-}
-
-tokio::task_local! {
-    pub static APPROVAL_FLOW_RUN_CONTEXT: FlowRunContext;
 }
 
 /// Parse a chat reply to a parked approval into a binary decision (v1). Only an
