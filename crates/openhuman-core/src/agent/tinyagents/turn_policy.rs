@@ -117,7 +117,7 @@ fn env_overrides() -> TurnPolicyOverrides {
 
 /// Build the harness [`RunPolicy`] for an openhuman turn (hosted provider).
 pub(crate) fn run_policy_for(max_iterations: usize, response_cache_enabled: bool) -> RunPolicy {
-    run_policy_for_provider(max_iterations, response_cache_enabled, false)
+    run_policy_for_provider(max_iterations, response_cache_enabled, false, None)
 }
 
 /// [`run_policy_for`] with the turn's provider locality: a local / self-hosted
@@ -130,10 +130,11 @@ pub(crate) fn run_policy_for_provider(
     max_iterations: usize,
     response_cache_enabled: bool,
     local_provider: bool,
+    tool_call_cap: Option<usize>,
 ) -> RunPolicy {
     run_policy(&TurnPolicyOptions {
         max_model_calls: max_iterations,
-        max_tool_calls: crate::agent::stop_hooks::tool_call_limit(max_iterations),
+        max_tool_calls: crate::agent::stop_hooks::tool_call_limit(max_iterations, tool_call_cap),
         max_depth: MAX_SPAWN_DEPTH,
         local_provider,
         response_cache_enabled,

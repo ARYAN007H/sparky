@@ -70,6 +70,8 @@ pub(super) fn assemble_turn_harness(
     // The turn's agent/turn tool callbacks (`OpenHumanRunContext::tool_hooks`),
     // registered after the runtime's global ones.
     scoped_tool_hooks: Vec<Arc<dyn crate::agent::hooks::ToolHook>>,
+    // The host's cap on real tool invocations (`OpenHumanRunContext::tool_call_limit`).
+    tool_call_cap: Option<usize>,
     tool_policy: Option<ToolPolicyEnforcement>,
     required_capabilities: Option<CapabilitySet>,
     deterministic_cacheable: bool,
@@ -121,6 +123,7 @@ pub(super) fn assemble_turn_harness(
         max_iterations,
         deterministic_cacheable,
         turn_models.is_local(),
+        tool_call_cap,
     );
     let route_fallback = routes::route_fallback_policy(model);
     policy.fallback = route_fallback.clone();
