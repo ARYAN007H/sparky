@@ -3,6 +3,14 @@ use serde_json::Map;
 
 use super::*;
 
+/// Dispatches under the calling task's ambient context.
+pub(super) async fn ambient_rpc(
+    method: &str,
+    params: Map<String, serde_json::Value>,
+) -> Option<Result<serde_json::Value, String>> {
+    try_invoke_registered_rpc(DispatchCtx::ambient(), method, params).await
+}
+
 // ── Controller extensions (crates above the core) ──────────────────────────
 
 fn ext_controller(namespace: &'static str, function: &'static str) -> RegisteredController {

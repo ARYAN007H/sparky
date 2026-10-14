@@ -1,9 +1,5 @@
 use crate::core::runtime::DispatchCtx;
-
-/// Dispatches under the calling task's ambient context.
-async fn ambient_rpc(method: &str, params: Map<String, Value>) -> Option<Result<Value, String>> {
-    try_invoke_registered_rpc(DispatchCtx::ambient(), method, params).await
-}
+use extensions_tests::ambient_rpc;
 use serde_json::Map;
 
 use super::*;
@@ -805,8 +801,7 @@ fn validate_registry_rejects_duplicate_registered_controllers() {
 
 #[tokio::test]
 async fn try_invoke_registered_rpc_returns_none_for_unknown_method() {
-    let out = ambient_rpc("openhuman.not_a_real_method_xyz_123", Map::new())
-    .await;
+    let out = ambient_rpc("openhuman.not_a_real_method_xyz_123", Map::new()).await;
     assert!(out.is_none(), "unknown methods must return None");
 }
 
@@ -814,8 +809,7 @@ async fn try_invoke_registered_rpc_returns_none_for_unknown_method() {
 async fn try_invoke_registered_rpc_returns_some_for_known_method() {
     // `openhuman.health_snapshot` is registered at startup and takes no
     // required params — it must route and produce Some(_).
-    let out = ambient_rpc("openhuman.health_snapshot", Map::new())
-    .await;
+    let out = ambient_rpc("openhuman.health_snapshot", Map::new()).await;
     assert!(out.is_some(), "known method must route");
 }
 
@@ -974,11 +968,7 @@ async fn dispatch_returns_none_for_gated_method() {
         .expect("a flows.* method exists in the full registry");
 
     let ctx = CoreContext::for_test(DomainSet::harness(), None);
-    let out = CoreContext::scope(
-        ctx,
-        ambient_rpc(&gated_method, Map::new()),
-    )
-    .await;
+    let out = CoreContext::scope(ctx, ambient_rpc(&gated_method, Map::new())).await;
     assert!(
         out.is_none(),
         "gated method `{gated_method}` must dispatch as None under harness()"
