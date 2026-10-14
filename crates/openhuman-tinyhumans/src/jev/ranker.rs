@@ -13,8 +13,8 @@ use openhuman_embed::__host::agent::tinyagents::discovery::{
     embedding_provider_is_usable, embedding_tool_ranker_in,
 };
 use openhuman_embed::__host::config::Config;
-use openhuman_embed::__host::security::approval::ApprovalChatContext;
 use openhuman_embed::__host::inference::embedding_host::EmbeddingModel;
+use openhuman_embed::__host::security::approval::ApprovalChatContext;
 use tinyjevclient::Client;
 use tinytools::{RankCandidate, RankContext, RankError, RankHit, ToolRanker};
 use tinytools_jev::{JevRanker, JevRankerConfig, JevStrategy};

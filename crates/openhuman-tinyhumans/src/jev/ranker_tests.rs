@@ -69,7 +69,9 @@ fn no_embedding_provider_disables_the_search() {
         ..Config::default()
     };
     config.memory.embedding_provider = "none".into();
-    let err = retriever_for(&config, None, &default_embedder()).err().map(|e| e.to_string());
+    let err = retriever_for(&config, None, &default_embedder())
+        .err()
+        .map(|e| e.to_string());
     assert!(
         err.as_deref()
             .is_some_and(|e| e.contains("no usable embedding provider")),
@@ -89,7 +91,9 @@ fn quiet_config(tmp: &tempfile::TempDir) -> Config {
 /// An embedder that records the chat each provider was built for and embeds
 /// nothing (the `none` provider), so a search stops at "no usable embedding
 /// provider" after the retriever was requested.
-fn recording_embedder(seen: Arc<std::sync::Mutex<Vec<Option<ApprovalChatContext>>>>) -> EmbedderFactory {
+fn recording_embedder(
+    seen: Arc<std::sync::Mutex<Vec<Option<ApprovalChatContext>>>>,
+) -> EmbedderFactory {
     Arc::new(move |config, chat| {
         seen.lock().unwrap().push(chat.clone());
         let mut quiet = config.clone();
