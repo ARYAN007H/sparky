@@ -227,7 +227,7 @@ pub fn capture() -> Option<AgentTurnOrigin> {
 ///
 /// # Why this is inherit-only
 ///
-/// `AGENT_TURN_ORIGIN` is a `tokio` task-local, so it is **lost** the moment
+/// the scoped `CoreContext` is a `tokio` task-local, so the origin it carries is **lost** the moment
 /// work moves onto a new task via `tokio::spawn`. An async sub-agent, team
 /// member, or workflow phase therefore runs unlabelled, the approval gate reads
 /// [`AgentTurnOrigin::Unknown`], and every `external_effect` tool (shell/exec)
@@ -295,18 +295,14 @@ pub async fn with_inherited_origin<F: std::future::Future>(
 /// This only ever *carries* a decision the parent entry point already made — it
 /// cannot manufacture trust that did not exist on the spawning task.
 pub fn propagate<F: std::future::Future>(fut: F) -> impl std::future::Future<Output = F::Output> {
-    let captured = current();
+    // The origin is a field of the scoped context, so carrying the context
+    // carries the origin and nothing else: a task with no scoped context stays
+    // unlabelled.
     let context = crate::core::runtime::CoreContext::scoped();
     async move {
-        let run = async move {
-            match captured {
-                Some(origin) => with_origin(origin, fut).await,
-                None => fut.await,
-            }
-        };
         match context {
-            Some(context) => crate::core::runtime::CoreContext::scope(context, run).await,
-            None => run.await,
+            Some(context) => crate::core::runtime::CoreContext::scope(context, fut).await,
+            None => fut.await,
         }
     }
 }
