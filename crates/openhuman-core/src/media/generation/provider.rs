@@ -252,3 +252,7 @@ impl VideoGenerator for GuardedVideo {
         self.inner.list_models().await
     }
 }
+
+#[cfg(test)]
+#[path = "provider_tests.rs"]
+mod tests;
