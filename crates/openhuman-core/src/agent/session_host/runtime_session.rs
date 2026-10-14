@@ -551,8 +551,8 @@ impl OpenHumanTurnPrelude {
             session_parent_prefix: self.session_parent_prefix.clone(),
             on_progress: self.on_progress.clone(),
             run_queue: self.run_queue.clone(),
-        },
-        host_env: Default::default(),
+            host_env: self.host_env.clone(),
+        }
     }
 
     fn apply_pending_announcements(&self, enriched: &mut String) {
