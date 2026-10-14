@@ -680,11 +680,10 @@ impl ShellTool {
             "[shell] starting sandboxed command"
         );
 
-        let result =
-            sandbox::ops::execute_in_sandbox_metered(
-                &policy, command, action_dir, extra_env, effective, meter,
-            )
-            .await;
+        let result = sandbox::ops::execute_in_sandbox_metered(
+            &policy, command, action_dir, extra_env, effective, meter,
+        )
+        .await;
         (true, exec_result(result, effective))
     }
 }
