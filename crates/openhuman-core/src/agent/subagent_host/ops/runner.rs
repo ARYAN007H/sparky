@@ -15,7 +15,7 @@ use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionReg
 use crate::agent::prompts::{
     render_subagent_system_prompt_with_format, PromptContext, SubagentRenderOptions,
 };
-use crate::agent::subagent_host::subagent_iter_cap_with_autonomous_lift;
+use crate::agent::subagent_host::definition_iter_cap;
 use crate::agent::subagent_host::tool_prep::{
     filter_tool_indices, is_subagent_spawn_tool, load_prompt_source, subagent_prompt_protocol,
 };
@@ -707,15 +707,11 @@ async fn run_typed_mode(
     let filtered_specs = crate::agent::session_host::dedup_visible_tool_specs(filtered_specs);
     let filtered_specs = dedup_tool_specs_by_name(&definition.id, filtered_specs);
 
-    let iteration_cap = subagent_iter_cap_with_autonomous_lift(
-        options.run_context.autonomous_iter_cap,
-        definition.effective_max_iterations(),
-    );
     tracing::debug!(
         agent_id = %definition.id,
         model = %model,
         tool_count = allowed_names.len(),
-        max_iterations = iteration_cap,
+        max_iterations = definition_iter_cap(&options.run_context, definition),
         iteration_policy = ?definition.iteration_policy,
         "[subagent_host:typed] resolved configuration"
     );
@@ -927,7 +923,7 @@ async fn run_typed_mode(
             Vec::new(),
             filtered_specs.clone(),
             allowed_names,
-            iteration_cap,
+            definition_iter_cap(&options.run_context, definition),
             options.run_queue.clone(),
             parent.on_progress.clone(),
             &definition.id,
