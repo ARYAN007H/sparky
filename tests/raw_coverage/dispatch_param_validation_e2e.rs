@@ -17,7 +17,7 @@
 //! is easy to write a test that looks like it covers the dispatch path and does
 //! not. These tests pin the observable behaviour on both sides of that line.
 
-use openhuman::core::runtime::DispatchCtx;
+use openhuman_core::core::runtime::DispatchCtx;
 use serde_json::{json, Map};
 
 use openhuman_core::core::all::{

@@ -45,7 +45,7 @@
 //! serialization mechanism, the same reasoning as `tests/agent_harness_e2e.rs:8-12`.
 #![allow(clippy::await_holding_lock)]
 
-use openhuman::core::runtime::DispatchCtx;
+use openhuman_core::core::runtime::DispatchCtx;
 use crate::env_guard::EnvVarGuard;
 use std::path::{Path, PathBuf};
 use std::sync::{OnceLock};

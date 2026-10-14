@@ -5,7 +5,7 @@
 //! direct public API calls cover persistence/redaction/provider branches that
 //! are otherwise only indirectly reachable from the controllers.
 
-use openhuman::core::runtime::DispatchCtx;
+use openhuman_core::core::runtime::DispatchCtx;
 use crate::env_guard::EnvVarGuard;
 use crate::rpc_harness::{error_message, payload};
 use std::path::Path;

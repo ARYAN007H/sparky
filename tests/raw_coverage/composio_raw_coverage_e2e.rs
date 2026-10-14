@@ -3,7 +3,7 @@
 //! These tests avoid live Composio/backend calls and exercise public helper
 //! surfaces that feed the JSON-RPC and agent-tool paths.
 
-use openhuman::core::runtime::DispatchCtx;
+use openhuman_core::core::runtime::DispatchCtx;
 use std::sync::{Arc, OnceLock};
 
 use serde_json::{json, Value};

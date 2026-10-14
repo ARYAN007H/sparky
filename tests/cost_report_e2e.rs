@@ -6,7 +6,7 @@
 //! and the config is found through `OPENHUMAN_WORKSPACE`, so the phases below
 //! must share one process and run in order.
 
-use openhuman::core::runtime::DispatchCtx;
+use openhuman_core::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use chrono::{Datelike, Duration, Utc};
