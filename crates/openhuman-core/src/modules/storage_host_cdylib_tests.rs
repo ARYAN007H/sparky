@@ -493,7 +493,10 @@ async fn a_blob_over_the_frame_cannot_go_inline() {
     // nothing; the way for a big body is `PutStream` (#7781).
     for (len, name) in [(2usize * 1024 * 1024, "over-cap"), (9_000_000, "over-frame")] {
         let key = format!("tinyjuice_ccr/{name}");
+        eprintln!("[cdylib-test] inline blob {name} ({len} bytes)");
+        let started = std::time::Instant::now();
         let big: Value = rig.probe.call("PutBlob", (key.as_str(), len)).await.unwrap();
+        eprintln!("[cdylib-test] {name} answered in {:?}: {}", started.elapsed(), big.to_string().chars().take(200).collect::<String>());
         assert!(big.get("err").is_some(), "{name}: an oversized inline blob must fail: {big}");
         let handle = rig.backend.for_scope(&rig.scope("tinyjuice")).unwrap();
         assert!(handle.blobs().head(&key).await.unwrap().is_none(), "{name}");
