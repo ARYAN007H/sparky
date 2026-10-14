@@ -296,7 +296,7 @@ pub async fn with_inherited_origin<F: std::future::Future>(
 /// calls reaches the approval gate as [`AgentTurnOrigin::Unknown`] and is
 /// refused — even though the parent turn that delegated the work was properly
 /// labelled. That is the same failure mode
-/// [`fork_context::with_parent_context`](crate::agent::harness::fork_context)
+/// the parent `ParentExecutionContext`
 /// and an explicit [`OpenHumanRunContext`](crate::agent::tinyagents::host::OpenHumanRunContext)
 /// already re-install explicitly at those spawn sites; the origin is the third
 /// thing that has to travel with them.
