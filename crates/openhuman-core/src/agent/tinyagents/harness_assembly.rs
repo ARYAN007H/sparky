@@ -7,8 +7,9 @@ use std::sync::Arc;
 use tinyagents_harness::cache::InMemoryResponseCache;
 use tinyagents_harness::middleware::{
     plan_mode_middleware, ApprovalGateMiddleware, ArgRecoveryMiddleware, BudgetLimits,
-    BudgetMiddleware, BudgetParityObserver, ContextCompressionMiddleware, PromptCacheGuardMiddleware,
-    RepeatProgressMiddleware, RunModeHandle, ToolPolicyMiddleware as TaToolPolicyMiddleware,
+    BudgetMiddleware, BudgetParityObserver, ContextCompressionMiddleware,
+    PromptCacheGuardMiddleware, RepeatProgressMiddleware, RunModeHandle,
+    ToolPolicyMiddleware as TaToolPolicyMiddleware,
 };
 use tinyagents_harness::runtime::AgentHarness;
 use tinyagents_harness::steering::SteeringHandle;
