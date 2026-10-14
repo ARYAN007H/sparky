@@ -19,7 +19,7 @@ use serde_json::{json, Map, Value};
 const METHOD: &str = "openhuman.embed_seam_probe_ping";
 const POLICY_MARKER: u32 = 4242;
 
-fn ping(_params: Map<String, Value>) -> ControllerFuture {
+fn ping(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async { Ok(json!({ "pong": true })) })
 }
 
