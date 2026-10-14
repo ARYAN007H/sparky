@@ -77,7 +77,14 @@ async fn a_summary_model_that_cannot_prepare_leaves_the_payload_intact() {
     // payload is untouched, and disclosed as unsummarized like any other
     // failed summary, so the model does not re-run the tool for one.
     struct Unpreparable;
-    impl PayloadSummarizer for Unpreparable {
+    impl
+        tinyagents_harness::summarization::payload_summarizer::PayloadSummarizer<
+            crate::agent::tinyagents::host::OpenHumanRunContext,
+        > for Unpreparable
+    {
+        type Prepared = crate::inference::tokenjuice::generate::PreparedGenerate;
+        type Error = anyhow::Error;
+
         fn prepare(
             &self,
             _parent_ctx: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,

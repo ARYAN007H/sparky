@@ -713,7 +713,7 @@ impl OpenHumanSessionHost {
         // `None` and their tool results stay untouched (the summarizer
         // itself MUST be `None` to avoid recursive self-summarization).
         let payload_summarizer: Option<
-            std::sync::Arc<dyn crate::agent::tinyagents::payload_summarizer::PayloadSummarizer>,
+            std::sync::Arc<crate::agent::tinyagents::payload_summarizer::DynPayloadSummarizer>,
         > = if !host_only && super::summarizes_tool_output(agent_id, config) {
             match crate::agent::harness::host_definition::AgentDefinitionRegistry::current() {
                 Some(reg) => match reg.get("summarizer") {

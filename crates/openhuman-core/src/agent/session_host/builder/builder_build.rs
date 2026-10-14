@@ -46,10 +46,11 @@ impl SessionHostBuilder {
         // The synthesised set lives beside the durable registry, never inside
         // it (`OpenHumanSessionHost::synthesized_tools`); a durable name wins a collision.
         let synthesized_tools = self.synthesized_tools.unwrap_or_default();
-        super::super::managed_tools::reject_synthesized_collisions(
+        tinyagents_runtime::reject_synthesized_collisions(
             &self.permanent_tool_names,
             &synthesized_tools,
-        )?;
+        )
+        .map_err(anyhow::Error::msg)?;
         let synthesized_tools = super::drop_synthesized_name_collisions(&tools, synthesized_tools);
         let synthesized_tool_names: std::collections::HashSet<String> = synthesized_tools
             .iter()
