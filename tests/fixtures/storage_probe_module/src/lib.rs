@@ -253,6 +253,7 @@ impl Interface for Probe {
             }
             _ => {}
         }
+        let t_start = std::time::Instant::now();
         let (object, selector, request, confidential): (String, String, Value, bool) =
             if member.as_str() == "PutBlob" {
                 // `[key, len]`: the body is built here, because a body that
@@ -277,6 +278,7 @@ impl Interface for Probe {
                 STORAGE,
             )?
             .with_timeout(std::time::Duration::from_secs(6));
+        eprintln!("PROBE-TIMING built request in {:?}", t_start.elapsed());
         let t0 = std::time::Instant::now();
         let reply: Result<Value> = if confidential {
             proxy.call_confidential(&selector, (request,)).await
