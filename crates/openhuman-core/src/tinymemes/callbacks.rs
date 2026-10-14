@@ -25,7 +25,6 @@ use tinymemes_bus::{
 use super::{docs, inference, jev, search};
 use crate::config::Config;
 use crate::core::runtime::CoreContext;
-use crate::memory::scope::MemoryIdentity;
 
 /// How long an entry may live without its `End`.
 const MAX_AGE: Duration = Duration::from_secs(15 * 60);
@@ -41,7 +40,6 @@ pub(super) struct Session {
     config: Config,
     jev: tokio::sync::OnceCell<Option<Arc<Client>>>,
     context: Option<Arc<CoreContext>>,
-    identity: Option<MemoryIdentity>,
 }
 
 impl Session {
@@ -53,7 +51,6 @@ impl Session {
             // single-user process falls back to its default context on the
             // callback side as anywhere else, and SaaS fails closed.
             context: CoreContext::scoped(),
-            identity: crate::memory::scope::current(),
         }
     }
 
