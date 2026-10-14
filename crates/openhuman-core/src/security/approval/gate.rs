@@ -145,7 +145,7 @@ pub fn is_unanswered_approval_reason(reason: &str) -> bool {
 /// (inside an [`ApprovalTurnContext`]); the turn's run context carries it to
 /// the gate and to the tools that read it. Absent for non-chat callers (CLI,
 /// detached sub-agents) — their approvals are simply not chat-routable.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ApprovalChatContext {
     pub thread_id: String,
     pub client_id: String,
