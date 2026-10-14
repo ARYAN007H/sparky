@@ -3,6 +3,7 @@
 //! The session itself is not an RPC — it runs over the `/ws/live-voice`
 //! WebSocket (`ws.rs`).
 
+use crate::core::runtime::DispatchCtx;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
@@ -117,21 +118,21 @@ struct TestParams {
     provider: String,
 }
 
-fn handle_live_providers(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_live_providers(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         to_value(ops::live_providers(&config).value)
     })
 }
 
-fn handle_live_settings_get(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_live_settings_get(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         to_value(ops::live_settings_get(&config).value)
     })
 }
 
-fn handle_live_settings_set(params: Map<String, Value>) -> ControllerFuture {
+fn handle_live_settings_set(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let patch: LiveSettingsPatch = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("invalid params: {e}"))?;
@@ -140,7 +141,7 @@ fn handle_live_settings_set(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_live_test_provider(params: Map<String, Value>) -> ControllerFuture {
+fn handle_live_test_provider(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params: TestParams = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("invalid params: {e}"))?;
