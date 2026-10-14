@@ -119,6 +119,11 @@ pub struct CoreContext {
     profile: Option<String>,
     /// What the agent this context was derived for owns.
     agent: agent_parts::AgentParts,
+    /// A context that exists only to carry a turn origin where no core was
+    /// booted ([`CoreContext::bare`]). Every reader other than the turn-origin
+    /// ones treats it as if nothing were scoped: [`CoreContext::current`] and
+    /// [`CoreContext::scoped`] skip it.
+    bare: bool,
 }
 
 /// The workspace a context is bound to.
@@ -290,6 +295,7 @@ impl CoreContext {
             session_agent: None,
             profile: None,
             agent: Default::default(),
+            bare: false,
         });
         let _ = DEFAULT_CONTEXT.set(ctx.clone());
 
@@ -415,6 +421,7 @@ impl CoreContext {
             session_agent: overlay.session_agent.or_else(|| self.session_agent.clone()),
             profile: overlay.profile.or_else(|| self.profile.clone()),
             agent,
+            bare: self.bare,
         })
     }
 
@@ -571,6 +578,7 @@ impl CoreContext {
             session_agent: None,
             profile: None,
             agent: Default::default(),
+            bare: false,
         })
     }
 
@@ -615,6 +623,7 @@ impl CoreContext {
             session_agent: None,
             profile: None,
             agent: Default::default(),
+            bare: false,
         })
     }
 }

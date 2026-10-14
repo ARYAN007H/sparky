@@ -197,7 +197,8 @@ pub fn current_is_user_authored() -> bool {
 /// single-point remediation that covers every caller (web channel, channel
 /// runtime, cron, background jobs, CLI).
 pub async fn with_origin<F: std::future::Future>(origin: AgentTurnOrigin, fut: F) -> F::Output {
-    let context = crate::core::runtime::CoreContext::current()
+    let context = crate::core::runtime::CoreContext::scoped_for_turn()
+        .or_else(crate::core::runtime::CoreContext::default_context)
         .unwrap_or_else(crate::core::runtime::CoreContext::bare);
     crate::core::runtime::CoreContext::scope_with_turn_origin(context, Some(origin), Box::pin(fut))
         .await
@@ -208,7 +209,8 @@ pub async fn with_origin<F: std::future::Future>(origin: AgentTurnOrigin, fut: F
 /// caller scoped one; the gate maps that to [`AgentTurnOrigin::Unknown`]
 /// (fail closed).
 pub fn current() -> Option<AgentTurnOrigin> {
-    crate::core::runtime::CoreContext::scoped().and_then(|context| context.turn_origin().cloned())
+    crate::core::runtime::CoreContext::scoped_for_turn()
+        .and_then(|context| context.turn_origin().cloned())
 }
 
 /// Capture the ambient origin so it can be carried across a `tokio::spawn`
@@ -298,7 +300,7 @@ pub fn propagate<F: std::future::Future>(fut: F) -> impl std::future::Future<Out
     // The origin is a field of the scoped context, so carrying the context
     // carries the origin and nothing else: a task with no scoped context stays
     // unlabelled.
-    let context = crate::core::runtime::CoreContext::scoped();
+    let context = crate::core::runtime::CoreContext::scoped_for_turn();
     async move {
         match context {
             Some(context) => crate::core::runtime::CoreContext::scope(context, fut).await,
