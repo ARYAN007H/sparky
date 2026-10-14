@@ -1496,3 +1496,6 @@ mod registry_tests;
 
 #[path = "all_domain_plan_tests.rs"]
 mod domain_plan_tests;
+
+#[path = "all_dispatch_ctx_tests.rs"]
+mod dispatch_ctx_tests;
