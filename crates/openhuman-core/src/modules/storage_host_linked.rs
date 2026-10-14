@@ -29,6 +29,11 @@ use super::storage_host::{serve_objects, StorageHost};
 /// admitted, because a linked module's setup is a plain function with no state.
 static PENDING: Mutex<Option<(Arc<StorageHost>, tokio::runtime::Handle)>> = Mutex::new(None);
 
+/// The pending slot is process-wide, so every test that attaches (here and in
+/// `storage_host_cdylib_tests`) takes a turn on this one lock.
+#[cfg(test)]
+pub(super) static TEST_TURN: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 /// How long [`attach`] waits for the module to claim the interface name.
 const READY_DEADLINE: Duration = Duration::from_secs(5);
 

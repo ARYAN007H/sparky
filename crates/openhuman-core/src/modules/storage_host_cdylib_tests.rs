@@ -47,9 +47,7 @@ use tinystoragedrivers_bus::STORAGE_INTERFACE;
 
 const PROBE: &str = "ai.tinyhumans.test.StorageProbe";
 
-/// The linked storage module's pending slot is process-wide, so every test
-/// that attaches takes a turn.
-static TURN: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+use crate::modules::storage_host_linked::TEST_TURN as TURN;
 
 fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
