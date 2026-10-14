@@ -187,13 +187,27 @@ background sub-agents. `state::cancel_in_flight_gracefully` cancels the token
 first and only hard-aborts the task if it has not unwound after a short grace
 period.
 
-The wall-clock backstop defaults to 900 s (`DEFAULT_WEB_TURN_TIMEOUT_SECS`)
-and is set with `OPENHUMAN_WEB_TURN_TIMEOUT_SECS` (`0` disables it). It is an
-outer safety net. The primary guard is the harness policy's
-`max_wall_clock_ms` (600 s by default), which interrupts a hung model or tool
-call and returns a proper timeout. The backstop only fires when a turn wedges
-outside the harness run, for example in session assembly, so the client still
-gets a terminal event instead of an endless heartbeat stream (#4746).
+Two guards make sure a turn always ends in a terminal event instead of an
+endless heartbeat stream (#4746):
+
+- The **idle guard** ([`turn_activity.rs`](./turn_activity.rs)) ends a turn
+  that has emitted no progress event, with no model or tool call in flight, for
+  900 s (`OPENHUMAN_WEB_TURN_IDLE_SECS`, `0` disables it). `run_chat_task` taps
+  the turn's progress stream into a per-turn activity record on its way to the
+  bridge. Every event restarts the clock, and an open model call
+  (`IterationStarted` → `ModelCallCompleted`) or tool call (`ToolCallStarted`
+  → `ToolCallCompleted`) holds it, so a silent provider retry or a long shell
+  build is never idle. What it catches is silence nothing else bounds: session
+  checkout, the persistence plumbing, or a harness that stopped with no call
+  open.
+- The **wall-clock backstop** is the fixed total ceiling, 3600 s by default
+  (`agent::turn_deadline`, `OPENHUMAN_WEB_TURN_TIMEOUT_SECS`, `0` disables it
+  and the derived deadlines). The harness winds the turn down at 3480 s and
+  writes the grounded close, and its own `max_wall_clock_ms` is clamped to
+  3540 s, so a busy turn still delivers an answer before the backstop drops it.
+
+The backstop used to be 900 s and did both jobs, so a turn that was working
+steadily was wound down at 780 s like a wedged one.
 
 ### The event bus
 

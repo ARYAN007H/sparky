@@ -294,9 +294,12 @@ impl ShellTool {
         let requested_timeout = args.get("timeout_secs").and_then(|v| v.as_u64());
 
         let start = Instant::now();
-        let (allowed, result) = self
-            .run_with_security_in_context(command, requested_timeout, context)
-            .await;
+        let (allowed, result) = crate::sandbox::shell_progress::with_shell_progress(
+            context,
+            crate::sandbox::shell_progress::HEARTBEAT_INTERVAL,
+            self.run_with_security_in_context(command, requested_timeout, context),
+        )
+        .await;
         let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
         // `allowed` = passed the in-tool security checks. `approved` = the command
         // is Prompt-class (required human approval) and thus went through the

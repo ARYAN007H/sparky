@@ -122,6 +122,11 @@ pub(crate) async fn run_chat_task(
         log::debug!("[web-channel] thread working folder applied thread_id={thread_id}");
         config.action_dir = dir.clone();
     }
+    // A guard that stops this turn closes it from this turn's own config and
+    // reply language, not from whatever profile is active when it fires.
+    if let Some(activity) = super::turn_activity::current() {
+        activity.remember_turn(std::sync::Arc::new(config.clone()), locale.clone());
+    }
     let model_override = normalize_model_override(model_override);
     // The cached session (or a cold-boot resumed one) is the thread's single
     // live history; every turn on the thread checks it out through this path.
@@ -151,6 +156,12 @@ pub(crate) async fn run_chat_task(
     // defense-in-depth; extraction of durable state (like a workflow
     // proposal) must not depend on any single progress event surviving.
     let (progress_tx, progress_rx) = tokio::sync::mpsc::channel(256);
+    // Under the web-turn guard, fold every event into the turn's activity
+    // record (the idle guard's input) on its way to the bridge.
+    let progress_rx = match super::turn_activity::current() {
+        Some(activity) => super::turn_activity::tap(activity, progress_rx, 256),
+        None => progress_rx,
+    };
     // The channel is fresh here. Record the user input even if the turn fails
     // before a committed reply can emit its final TurnContent event.
     let _ = progress_tx.try_send(AgentProgress::TurnContent {
@@ -327,6 +338,15 @@ pub(crate) async fn run_chat_task(
             turn_elapsed,
         )
         .await;
+    }
+
+    // Test hook: wedge the turn after its run, as a stuck save would.
+    #[cfg(any(test, debug_assertions))]
+    if super::ops::TEST_PARK_AFTER_RUN.load(std::sync::atomic::Ordering::SeqCst) {
+        log::debug!(
+            "[web-channel][test] parking run_chat_task after the run request_id={request_id}"
+        );
+        std::future::pending::<()>().await;
     }
 
     agent.set_on_progress(None);
