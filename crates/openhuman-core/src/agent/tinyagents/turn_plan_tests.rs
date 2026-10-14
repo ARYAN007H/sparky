@@ -76,6 +76,7 @@ async fn prepare_with(
         tinyagents_harness::config::ToolDispatcher::default(),
         None,
         tool_rules,
+        None,
     );
     let TurnModels {
         primary,

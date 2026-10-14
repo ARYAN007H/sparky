@@ -271,6 +271,7 @@ async fn run_turn_via_tinyagents_body(
             max_output_tokens,
         ),
         run_context.tool_rules.clone(),
+        run_context.tool_call_limit,
     );
     // The turn's crate `ChatModel` set (`turn_models`) and the provider telemetry id are built by
     // the caller via `build_turn_models`: the seam is crate-native and names no `Provider` (#4249,
@@ -324,7 +325,7 @@ async fn run_turn_via_tinyagents_body(
             "openhuman-agent-turn"
         })
         .with_max_model_calls(max_iterations)
-        .with_max_tool_calls(crate::agent::stop_hooks::tool_call_limit(max_iterations))
+        .with_max_tool_calls(run_context.tool_call_limit_for(max_iterations))
         .with_max_depth(super::budget::depth(&run_context))
         .with_tag("openhuman")
         .with_tag(if on_progress.is_some() {
@@ -554,7 +555,7 @@ async fn run_turn_via_tinyagents_body(
             subagent_scope: subagent_scope.clone(),
             context_window,
             context_mw,
-            stop_hooks: run_context.stop_hooks.clone(),
+            host_policy: run_context.harness_host_policy(),
             tool_policy: tool_policy.clone(),
             required_capabilities: routes::turn_required_capabilities(model),
             deterministic_cacheable,

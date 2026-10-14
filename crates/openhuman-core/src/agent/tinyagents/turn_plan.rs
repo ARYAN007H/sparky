@@ -43,9 +43,14 @@ pub(super) fn turn_run_policy(
     tool_dialect: tinyagents_harness::config::ToolDispatcher,
     reasoning: Option<tinyinference_llm::model::ReasoningConfig>,
     tool_rules: Option<Arc<tinyagents_harness::tool::ToolRulePolicy>>,
+    tool_call_cap: Option<usize>,
 ) -> (RunPolicy, bool) {
-    let mut policy =
-        run_policy_for_provider(max_iterations, deterministic_cacheable, local_provider);
+    let mut policy = run_policy_for_provider(
+        max_iterations,
+        deterministic_cacheable,
+        local_provider,
+        tool_call_cap,
+    );
     let route_fallback = routes::route_fallback_policy(model);
     policy.fallback = route_fallback.clone();
     // Tool discovery: the harness advertises its `tool_search` bridge over the

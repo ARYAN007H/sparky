@@ -55,8 +55,9 @@ pub(super) struct TurnMiddlewareInputs {
     pub(super) subagent_scope: Option<SubagentScope>,
     pub(super) context_window: Option<u64>,
     pub(super) context_mw: TurnContextMiddleware,
-    pub(super) stop_hooks:
-        Vec<Arc<dyn tinyagents_harness::middleware::StopHook<tinyagents_harness::cost::TurnCost>>>,
+    /// Stop policies and scoped tool callbacks (registered after the runtime's
+    /// global ones), from the explicit run context.
+    pub(super) host_policy: super::host::HarnessHostPolicy,
     pub(super) tool_policy: Option<ToolPolicyEnforcement>,
     pub(super) required_capabilities: Option<CapabilitySet>,
     pub(super) deterministic_cacheable: bool,
@@ -122,7 +123,7 @@ pub(super) fn install_turn_middleware(
         subagent_scope,
         context_window,
         context_mw,
-        stop_hooks,
+        host_policy,
         tool_policy,
         required_capabilities,
         deterministic_cacheable,
@@ -136,6 +137,11 @@ pub(super) fn install_turn_middleware(
         provider_usage_carry,
         tool_outcome_sink,
     } = inputs;
+    let super::host::HarnessHostPolicy {
+        stop_hooks,
+        tool_hooks: scoped_tool_hooks,
+        ..
+    } = host_policy;
     let model = model.as_str();
     crate::tools::timeout::install_harness_tool_timeouts(harness);
     // Deterministic internal runs (summarizer/triage/memory-scoring style) may
@@ -522,7 +528,8 @@ pub(super) fn install_turn_middleware(
     // observation-only (never mutates the result), so running first in the
     // reverse-order `after_tool` chain is safe — it cannot perturb the
     // summarization/cap or tool-outcome capture layers.
-    let embedder_tool_hooks = crate::agent::hooks::turn_tool_hooks();
+    let mut embedder_tool_hooks = crate::agent::hooks::embedder_tool_hooks();
+    embedder_tool_hooks.extend(scoped_tool_hooks);
     if !embedder_tool_hooks.is_empty() {
         harness.push_middleware(Arc::new(middleware::EmbedderToolHooksMiddleware::new(
             embedder_tool_hooks,
