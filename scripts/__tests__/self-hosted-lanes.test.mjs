@@ -49,6 +49,11 @@ test("EX63 installs script dependencies only after changed areas are detected", 
   const detect = ciLanes.indexOf("- name: Detect changed areas");
   const install = ciLanes.indexOf("- name: Install jq for release-script tests");
   assert.ok(detect >= 0 && install > detect, "filter outputs must exist before they gate jq installation");
+  const nextStep = ciLanes.indexOf("\n      - name:", install + 1);
+  const installBlock = ciLanes.slice(install, nextStep < 0 ? undefined : nextStep);
+  assert.match(installBlock, /import tomllib/, "Python 3.11+ already provides TOML parsing");
+  assert.match(installBlock, /command -v sudo/, "non-root runners may not have sudo");
+  assert.match(installBlock, /cannot install packages/, "the EX63 image may not grant package installation");
 });
 
 const plans = () => [

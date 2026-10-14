@@ -81,10 +81,17 @@ jobs:
       - name: Install jq for release-script tests
         if: steps.filter.outputs.scripts == 'true'
         run: |
-          if command -v jq >/dev/null && python3 -c 'import tomli' 2>/dev/null; then
+          if command -v jq >/dev/null && python3 -c 'import tomllib' 2>/dev/null; then
             exit 0
           fi
-          SUDO=$([ "$(id -u)" -eq 0 ] || echo sudo)
+          if [ "$(id -u)" -eq 0 ]; then
+            SUDO=""
+          elif command -v sudo >/dev/null 2>&1; then
+            SUDO=sudo
+          else
+            echo "::warning::jq/tomli are unavailable and this runner cannot install packages; continuing with the Node-only script tests."
+            exit 0
+          fi
           $SUDO apt-get update
           $SUDO apt-get install -y --no-install-recommends jq python3-tomli
 
