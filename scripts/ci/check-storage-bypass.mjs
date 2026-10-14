@@ -129,7 +129,7 @@ export const ALLOW = new Map(
     [
       "agent/harness/tool_result_artifacts/mod.rs",
       "json-write",
-      "tokio::fs::write(&target, body)",
+      "tokio::fs::write(&target, body).await?;",
       "a derived view of a blob-stored tool-result artifact, written under the workspace's read-only artifacts root so file_read can open the key a pointer hands back; re-derived from the tenant's blob store on every read, which stays the source of truth",
     ],
     [
