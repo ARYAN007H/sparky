@@ -141,7 +141,6 @@ fn desktop_approval_bypass_skips_only_require_approval_channel_verdict() {
             Arc::new(AllowAllToolPolicy),
             session,
             vec![Arc::new(vec![Box::new(RoutingFakeTool(name))])],
-            "sess".to_owned(),
             "web_chat".to_owned(),
         )
     }
