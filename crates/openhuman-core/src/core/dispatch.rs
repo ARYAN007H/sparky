@@ -27,6 +27,7 @@ use serde_json::{json, Map, Value};
 /// A `Result` containing the JSON-formatted response or an error message if
 /// the method is unknown or invocation fails.
 pub async fn dispatch(
+    ctx: crate::core::runtime::DispatchCtx,
     state: AppState,
     method: &str,
     params: serde_json::Value,
@@ -247,7 +248,7 @@ async fn try_registry_dispatch(
     if let Err(err) = crate::core::all::validate_params(&schema, &params_obj) {
         return Some(Err(err));
     }
-    crate::core::all::try_invoke_registered_rpc(method, params_obj).await
+    crate::core::all::try_invoke_registered_rpc(ctx, method, params_obj).await
 }
 
 fn params_to_object(params: Value) -> Result<Map<String, Value>, String> {

@@ -9,7 +9,7 @@ use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
 
 type SchemaBuilder = fn() -> ControllerSchema;
-type ControllerHandler = fn(Map<String, Value>) -> ControllerFuture;
+type ControllerHandler = fn(DispatchCtx, Map<String, Value>) -> ControllerFuture;
 
 struct NotificationControllerDef {
     function: &'static str,

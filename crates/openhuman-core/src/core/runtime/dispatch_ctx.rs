@@ -48,6 +48,17 @@ impl DispatchCtx {
         }
     }
 
+    /// The ambient context of the calling task, or unbound.
+    ///
+    /// Transitional (#7801): for a caller that has no context of its own to
+    /// hand over yet. Every use is a reader still to be moved onto an explicit
+    /// carrier, and the function goes away with the ambient context.
+    pub fn ambient() -> Self {
+        Self {
+            core: CoreContext::current(),
+        }
+    }
+
     /// The context this call runs under, if any.
     pub fn core(&self) -> Option<&Arc<CoreContext>> {
         self.core.as_ref()
