@@ -443,7 +443,7 @@ async fn run_turn_via_tinyagents_body(
             tool_names.clone(),
             failure_map.clone(),
             provider_usage_carry.clone(),
-            bridge_tool_sets,
+            bridge_tool_sets.clone(),
         );
         sink.subscribe(bridge.clone());
         bridge
