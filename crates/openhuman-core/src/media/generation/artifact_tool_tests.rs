@@ -254,7 +254,7 @@ async fn per_call_observer_reports_each_calls_own_job_state() {
         root.path().join("workspace"),
         root.path().join("Files"),
     )
-    .with_per_call_inner(move |observer| PollingTool {
+    .with_per_call_inner(move |observer, _chat| PollingTool {
         observer,
         state: states.lock().unwrap().pop().unwrap(),
     });

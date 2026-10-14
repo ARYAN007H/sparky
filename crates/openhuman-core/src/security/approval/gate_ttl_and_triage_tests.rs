@@ -123,9 +123,10 @@ async fn waiter_future_dropped_mid_park_evicts_waiter_clears_routing_and_denies_
     // `Box::pin` (not `tokio::pin!`) so `drop(fut)` below drops the *future
     // itself* — and thus the `WaiterGuard` saved in its async state — rather
     // than just a `Pin<&mut _>` reference.
+    let turn = ApprovalTurnContext::chat(chat_ctx());
     let mut fut = Box::pin(turn_origin::with_origin(
         web_origin(),
-        g.intercept(&ApprovalTurnContext::chat(chat_ctx()), "shell", "run rm", serde_json::json!({})),
+        g.intercept(&turn, "shell", "run rm", serde_json::json!({})),
     ));
 
     // Poll it just long enough to register the waiter, persist the pending

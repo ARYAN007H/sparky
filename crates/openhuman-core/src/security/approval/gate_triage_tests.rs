@@ -53,10 +53,11 @@ async fn a_remote_triage_escalation_parks_with_an_audit_row_rather_than_an_unkno
 
     // `Box::pin` + a short timeout drives the future into the park without
     // waiting out the TTL; nothing decides it, so it must still be pending.
+    let turn = ApprovalTurnContext::default();
     let mut fut = Box::pin(turn_origin::with_origin(
         remote_trigger_origin(&envelope),
         gate.intercept(
-            &Default::default(),
+            &turn,
             "escalate to orchestrator",
             "triage.escalate",
             serde_json::json!({}),
