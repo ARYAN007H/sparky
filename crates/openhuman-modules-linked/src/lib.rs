@@ -63,7 +63,7 @@ use openhuman_rpc::embed::modules::{register_linked, LinkedFactory};
 pub fn linked_modules() -> Vec<(&'static str, LinkedFactory)> {
     let modules: Vec<(&'static str, LinkedFactory)> = vec![
         #[cfg(feature = "tinybox")]
-        ("tinybox", tinybox_module::linked_module),
+        ("tinybox", tinybox::linked_module),
         #[cfg(feature = "tinychannels")]
         ("tinychannels", tinychannels_module::linked_module),
         #[cfg(feature = "tinycomputer")]
