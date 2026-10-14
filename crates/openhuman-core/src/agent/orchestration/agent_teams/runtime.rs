@@ -32,6 +32,7 @@ use std::sync::Arc;
 use anyhow::{anyhow, Result};
 use serde_json::json;
 
+use crate::agent::harness::ParentExecutionContext;
 use crate::agent::orchestration::parent_context::with_root_parent;
 use crate::config::Config;
 use tinyagents_session::run_ledger::{
