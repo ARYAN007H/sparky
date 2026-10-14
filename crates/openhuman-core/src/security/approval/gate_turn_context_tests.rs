@@ -37,7 +37,9 @@ impl Tool for Effectful {
 fn security_gate_for(run: &OpenHumanRunContext) -> OpenHumanSecurityGate {
     OpenHumanSecurityGate::new(
         std::sync::Arc::new(SecurityPolicy::default()),
-        vec![std::sync::Arc::new(vec![Box::new(Effectful) as Box<dyn Tool>])],
+        vec![std::sync::Arc::new(vec![
+            Box::new(Effectful) as Box<dyn Tool>
+        ])],
     )
     .with_approval(run.approval.clone())
 }

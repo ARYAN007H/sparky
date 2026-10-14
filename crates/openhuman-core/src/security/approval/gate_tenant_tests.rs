@@ -54,14 +54,11 @@ fn park_as(
     let gate = Arc::clone(gate);
     tokio::spawn(CoreContext::scope(
         ctx,
-        turn_origin::with_origin(
-            web_origin(),
-            async move {
- let turn = ApprovalTurnContext::chat(chat_ctx());
-                gate.intercept_audited(&turn, "shell", "run it", serde_json::json!({}))
-                    .await
-            },
-        ),
+        turn_origin::with_origin(web_origin(), async move {
+            let turn = ApprovalTurnContext::chat(chat_ctx());
+            gate.intercept_audited(&turn, "shell", "run it", serde_json::json!({}))
+                .await
+        }),
     ))
 }
 

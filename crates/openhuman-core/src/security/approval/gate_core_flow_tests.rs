@@ -33,7 +33,12 @@ async fn approve_once_returns_allow() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             web_origin(),
-            g.intercept(&ApprovalTurnContext::chat(chat_ctx()), "composio", "send slack", serde_json::json!({})),
+            g.intercept(
+                &ApprovalTurnContext::chat(chat_ctx()),
+                "composio",
+                "send slack",
+                serde_json::json!({}),
+            ),
         )
         .await
     });
@@ -66,7 +71,12 @@ async fn deny_returns_deny_with_reason() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             web_origin(),
-            g.intercept(&ApprovalTurnContext::chat(chat_ctx()), "pushover", "send push", serde_json::json!({})),
+            g.intercept(
+                &ApprovalTurnContext::chat(chat_ctx()),
+                "pushover",
+                "send push",
+                serde_json::json!({}),
+            ),
         )
         .await
     });
@@ -97,7 +107,12 @@ async fn aborting_older_chat_waiter_preserves_newer_thread_route() {
     let old_handle = tokio::spawn(async move {
         turn_origin::with_origin(
             web_origin(),
-            old_gate.intercept(&ApprovalTurnContext::chat(chat_ctx()), "composio", "old action", serde_json::json!({})),
+            old_gate.intercept(
+                &ApprovalTurnContext::chat(chat_ctx()),
+                "composio",
+                "old action",
+                serde_json::json!({}),
+            ),
         )
         .await
     });
@@ -116,7 +131,12 @@ async fn aborting_older_chat_waiter_preserves_newer_thread_route() {
     let new_handle = tokio::spawn(async move {
         turn_origin::with_origin(
             web_origin(),
-            new_gate.intercept(&ApprovalTurnContext::chat(chat_ctx()), "composio", "new action", serde_json::json!({})),
+            new_gate.intercept(
+                &ApprovalTurnContext::chat(chat_ctx()),
+                "composio",
+                "new action",
+                serde_json::json!({}),
+            ),
         )
         .await
     });
@@ -181,7 +201,13 @@ async fn auto_approve_tool_skips_prompt() {
     // without persisting a pending row. The shortcut runs regardless of
     // origin (it's the user's persisted "Always allow" allowlist), so we
     // do not need to scope an origin for this case.
-    let outcome = gate.intercept(&ApprovalTurnContext::chat(chat_ctx()), tool, "noop", serde_json::json!({}))
+    let outcome = gate
+        .intercept(
+            &ApprovalTurnContext::chat(chat_ctx()),
+            tool,
+            "noop",
+            serde_json::json!({}),
+        )
         .await;
     assert!(matches!(outcome, GateOutcome::Allow));
     assert!(
@@ -212,7 +238,12 @@ async fn auto_approve_all_resolves_allow() {
 
     let outcome = turn_origin::with_origin(
         web_origin(),
-        gate.intercept(&ApprovalTurnContext::default(), "openhuman_test_aaa_webchat", "noop", serde_json::json!({})),
+        gate.intercept(
+            &ApprovalTurnContext::default(),
+            "openhuman_test_aaa_webchat",
+            "noop",
+            serde_json::json!({}),
+        ),
     )
     .await;
 
@@ -245,7 +276,12 @@ async fn auto_approve_all_off_still_parks() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             web_origin(),
-            g.intercept(&ApprovalTurnContext::chat(chat_ctx()), "openhuman_test_aaa_off", "noop", serde_json::json!({})),
+            g.intercept(
+                &ApprovalTurnContext::chat(chat_ctx()),
+                "openhuman_test_aaa_off",
+                "noop",
+                serde_json::json!({}),
+            ),
         )
         .await
     });
@@ -291,7 +327,12 @@ async fn auto_approve_all_does_not_override_unknown() {
     // No `with_origin` scope at all — mirrors an unlabelled call site,
     // which `turn_origin::current()` maps to `AgentTurnOrigin::Unknown`.
     let outcome = gate
-        .intercept(&ApprovalTurnContext::default(), "openhuman_test_aaa_unknown", "noop", serde_json::json!({}))
+        .intercept(
+            &ApprovalTurnContext::default(),
+            "openhuman_test_aaa_unknown",
+            "noop",
+            serde_json::json!({}),
+        )
         .await;
 
     match outcome {
@@ -333,7 +374,12 @@ async fn auto_approve_all_overrides_require_approval_workflow() {
     };
     let outcome = turn_origin::with_origin(
         origin,
-        gate.intercept(&ApprovalTurnContext::default(), "openhuman_test_aaa_workflow", "noop", serde_json::json!({})),
+        gate.intercept(
+            &ApprovalTurnContext::default(),
+            "openhuman_test_aaa_workflow",
+            "noop",
+            serde_json::json!({}),
+        ),
     )
     .await;
 
@@ -389,7 +435,8 @@ async fn auto_approve_all_allows_a_remote_triage_dispatch_without_an_audit_row()
 
     let outcome = turn_origin::with_origin(
         remote_trigger_origin(&envelope),
-        gate.intercept(&ApprovalTurnContext::default(), 
+        gate.intercept(
+            &ApprovalTurnContext::default(),
             "triage.escalate",
             "escalate to orchestrator",
             serde_json::json!({}),
@@ -415,7 +462,12 @@ async fn timeout_returns_deny() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             web_origin(),
-            g.intercept(&ApprovalTurnContext::chat(chat_ctx()), "composio", "timed out", serde_json::json!({})),
+            g.intercept(
+                &ApprovalTurnContext::chat(chat_ctx()),
+                "composio",
+                "timed out",
+                serde_json::json!({}),
+            ),
         )
         .await
     });
@@ -450,11 +502,12 @@ async fn cancel_flow_run_parks_for_approval_when_a_gate_is_present() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             web_origin(),
-            g.intercept(&ApprovalTurnContext::chat(chat_ctx()), 
-                    "cancel_flow_run",
-                    "cancel run r-1 of flow f-1",
-                    serde_json::json!({ "flow_id": "f-1", "run_id": "r-1" }),
-                ),
+            g.intercept(
+                &ApprovalTurnContext::chat(chat_ctx()),
+                "cancel_flow_run",
+                "cancel run r-1 of flow f-1",
+                serde_json::json!({ "flow_id": "f-1", "run_id": "r-1" }),
+            ),
         )
         .await
     });

@@ -10,10 +10,10 @@ async fn forced_approval_parks_with_autonomy_disabled_and_releases_exact_request
         turn_origin::with_origin(
             web_origin(),
             worker.intercept_forced(
-                    "browser",
-                    "Click Submit on checkout",
-                    serde_json::json!({"action": "click", "target": "Submit"}),
-                ),
+                "browser",
+                "Click Submit on checkout",
+                serde_json::json!({"action": "click", "target": "Submit"}),
+            ),
         )
         .await
     });
@@ -40,7 +40,8 @@ async fn forced_approval_parks_with_autonomy_disabled_and_releases_exact_request
 #[tokio::test]
 async fn forced_approval_denies_without_routable_web_chat_origin() {
     let (gate, _dir) = test_gate();
-    let outcome = gate.intercept_forced("browser", "click", serde_json::json!({}))
+    let outcome = gate
+        .intercept_forced("browser", "click", serde_json::json!({}))
         .await;
     assert!(matches!(outcome, GateOutcome::Deny { .. }));
     assert!(gate.list_pending().unwrap().is_empty());
