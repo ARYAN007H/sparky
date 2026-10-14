@@ -161,12 +161,11 @@ fn a_legacy_session_file_is_imported_once_and_left_byte_identical() {
     );
     assert!(!legacy.join("subagent_sessions.json.migrated").exists());
     assert_eq!(store.load().unwrap().len(), 1);
-    // The marker, not the file, stops a second import: a session saved after
-    // the first import and then removed from the store is not resurrected.
-    store.save(&[]).unwrap();
-    assert_eq!(store.load().unwrap().len(), 1);
-    assert_eq!(
-        std::fs::read_to_string(legacy.join("subagent_sessions.json")).unwrap(),
-        original
-    );
+    // The marker, not the file, stops a second import: a file that changed
+    // afterwards is not imported again.
+    let changed = serde_json::to_string(&vec![session("legacy-2")]).unwrap();
+    std::fs::write(legacy.join("subagent_sessions.json"), &changed).unwrap();
+    let again = store.load().unwrap();
+    assert_eq!(again.len(), 1);
+    assert_eq!(again[0].subagent_session_id, "legacy-1");
 }
