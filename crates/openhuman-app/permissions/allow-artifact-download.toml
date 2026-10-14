@@ -6,6 +6,8 @@ description = "Allow copying agent-generated artifacts from the workspace artifa
 
 allow = [
     "download_artifact_to_downloads",
+    "read_artifact_body",
+    "save_artifact_body",
 ]
 
 deny = []
