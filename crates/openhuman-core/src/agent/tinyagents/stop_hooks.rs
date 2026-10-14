@@ -19,15 +19,15 @@ pub(super) fn install(
             StopHookMiddleware::new(model, hooks)
                 .with_metrics_seed(crate::agent::cost::turn_cost())
                 .with_stop_observer(move |report| {
-                tracing::warn!(
-                    target: "stop_hooks",
-                    hook = %report.hook,
-                    iteration = report.iteration,
-                    model = %report.model,
-                    "[stop_hooks] hook voted to stop the turn — pausing run: {}", report.reason
-                );
-                record_halt_summary(&halt_summary, report);
-            }),
+                    tracing::warn!(
+                        target: "stop_hooks",
+                        hook = %report.hook,
+                        iteration = report.iteration,
+                        model = %report.model,
+                        "[stop_hooks] hook voted to stop the turn — pausing run: {}", report.reason
+                    );
+                    record_halt_summary(&halt_summary, report);
+                }),
         ));
     }
 }

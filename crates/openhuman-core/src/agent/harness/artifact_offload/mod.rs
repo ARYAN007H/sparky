@@ -51,7 +51,7 @@ pub mod policy;
 use std::path::Path;
 use std::sync::Arc;
 
-use tinyagents_harness::artifacts::ArtifactOffload;
+use tinyagents_harness::artifacts::{ArtifactKind, ArtifactOffload};
 use tinystoragedrivers::BlobStore;
 
 use crate::security::SecurityPolicy;
@@ -90,8 +90,8 @@ pub fn new_artifact_offload(
     agent_id: impl Into<String>,
     task_id: impl Into<String>,
 ) -> ArtifactOffload {
-    let offload = ArtifactOffload::new(blobs, agent_id, task_id)
-        .with_redactor(Arc::new(SanitizingRedactor));
+    let offload =
+        ArtifactOffload::new(blobs, agent_id, task_id).with_redactor(Arc::new(SanitizingRedactor));
     match policy {
         Some(policy) => offload.with_path_policy(Arc::new(WorkspaceGuard::new(policy))),
         // No policy means the workspace checks are skipped; traversal and
@@ -116,7 +116,25 @@ pub async fn offload_oversized_result(
     offload: &ArtifactOffload,
     threshold_bytes: usize,
     materialize_root: &Path,
+    policy: Option<&SecurityPolicy>,
 ) -> (String, Option<OffloadedArtifact>) {
+    // The blob key is relative, so the crate's path policy cannot see where the
+    // reader's copy will land. Refuse here, before anything is stored, a target
+    // that would reach the core's internal state.
+    if let Some(policy) = policy {
+        if let Ok(key) = offload.resolve(ArtifactKind::Output, &offload.default_result_name()) {
+            let target = materialize_root.join(&key);
+            if policy.is_workspace_internal_path(&target)
+                || target.starts_with(&policy.workspace_dir)
+            {
+                tracing::warn!(
+                    path = %key,
+                    "[artifact] materialized target reaches workspace state; keeping the inline result"
+                );
+                return (output, None);
+            }
+        }
+    }
     let (pointer, artifact) = tinyagents_harness::artifacts::offload_oversized_result(
         output.clone(),
         offload,

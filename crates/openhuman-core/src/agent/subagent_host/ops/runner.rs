@@ -501,12 +501,13 @@ async fn offload_outcome_artifacts(
         );
         return;
     };
-    let offload = new_artifact_offload(blobs, policy, outcome.agent_id.clone(), task_id);
+    let offload = new_artifact_offload(blobs, policy.clone(), outcome.agent_id.clone(), task_id);
     let (output, _artifact) = offload_oversized_result(
         std::mem::take(&mut outcome.output),
         &offload,
         threshold,
         &materialize_root,
+        policy.as_deref(),
     )
     .await;
     outcome.output = output;

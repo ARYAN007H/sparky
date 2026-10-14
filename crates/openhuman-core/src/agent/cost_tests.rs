@@ -71,7 +71,11 @@ fn an_estimate_carried_on_the_usage_is_not_taken_for_a_charge() {
 #[test]
 fn a_turn_with_any_unknown_call_has_no_total() {
     let mut turn = turn_cost();
-    record(&mut turn, UNCATALOGUED, &counts(10, 1, 0).with_charged_usd(0.5));
+    record(
+        &mut turn,
+        UNCATALOGUED,
+        &counts(10, 1, 0).with_charged_usd(0.5),
+    );
     assert_eq!(turn.total_usd(), Some(0.5));
     assert_eq!(turn.cost.source, CostSource::Charged);
 
