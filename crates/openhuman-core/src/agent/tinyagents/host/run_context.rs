@@ -408,6 +408,24 @@ pub(crate) struct HarnessHostPolicy {
 pub(crate) struct HostOperationContext {
     pub(crate) origin: Option<AgentTurnOrigin>,
     pub(crate) sandbox_mode: Option<SandboxMode>,
+    /// The agent definition the run's parent execution context belongs to, for
+    /// tools that act on behalf of the spawning agent when no memory identity
+    /// is scoped (see `memory::tools::CallFacts::gather`).
+    pub(crate) parent_agent_id: Option<String>,
+}
+
+/// Reads the spawning agent's definition id from the explicit tool carrier.
+/// Direct tool dispatch has no parent.
+pub(crate) fn parent_agent_id_for_tool(
+    context: Option<&dyn tinytools::ToolRunContext>,
+) -> Option<String> {
+    context
+        .and_then(tinytools::ToolRunContext::host_extension)
+        .and_then(|extension| {
+            extension.downcast_ref::<tinyagents_harness::tool::ToolExecutionContext>()
+        })
+        .and_then(|context| context.state::<HostOperationContext>())
+        .and_then(|host| host.parent_agent_id.clone())
 }
 
 /// Reads the calling agent's sandbox policy from the explicit tool carrier.
@@ -679,6 +697,10 @@ impl OpenHumanRunContext {
         let host_operations = Arc::new(HostOperationContext {
             origin: self.origin.clone(),
             sandbox_mode: self.sandbox_mode,
+            parent_agent_id: self
+                .parent
+                .as_ref()
+                .map(|parent| parent.agent_definition_id.clone()),
         });
         let context = tinyagents_harness::context::RunContext::new(config, self)
             .with_cancellation(cancellation)
