@@ -148,4 +148,3 @@ async fn shared_adapter_scopes_tool_execution_to_the_run_origin() {
     })
     .await;
 }
-

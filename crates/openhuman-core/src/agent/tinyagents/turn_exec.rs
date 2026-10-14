@@ -338,7 +338,13 @@ async fn run_turn_via_tinyagents_body(
     let registry_diagnostics: Arc<std::sync::Mutex<Vec<tinyagents_registry::RegistryDiagnostic>>> =
         Arc::default();
     let planner = OpenHumanTurnPlanner {
-        models: turn_models_for_plan(model, primary, tier_routes, &error_slot, hosted_security_gate),
+        models: turn_models_for_plan(
+            model,
+            primary,
+            tier_routes,
+            &error_slot,
+            hosted_security_gate,
+        ),
         policy,
         tool_sets: tool_sets.clone(),
         allowed: allowed.clone(),
@@ -527,7 +533,8 @@ async fn run_turn_via_tinyagents_body(
     // delivery/requeue observability events and the metadata on any requeued
     // steer: a sub-agent uses its task id; the interactive/channel parent turn
     // reads the turn origin.
-    let steer_thread_label = steering_forwarder::thread_label(subagent_scope.as_ref(), run_context.origin.as_ref());
+    let steer_thread_label =
+        steering_forwarder::thread_label(subagent_scope.as_ref(), run_context.origin.as_ref());
     let controls = TurnControls {
         max_iterations: Some(max_iterations),
         pause_at_cap,
@@ -580,11 +587,10 @@ async fn run_turn_via_tinyagents_body(
         tracing::error!(error = %failure.error, "[tinyagents] turn driver could not prepare the turn");
         anyhow::anyhow!("{}", failure.error)
     })?;
-    let steering = prepared
-        .run_context
-        .steering
-        .clone()
-        .ok_or_else(|| anyhow::anyhow!("turn driver prepared a run without a steering handle"))?;
+    let steering =
+        prepared.run_context.steering.clone().ok_or_else(|| {
+            anyhow::anyhow!("turn driver prepared a run without a steering handle")
+        })?;
     let tool_count = prepared.tools().registered.len();
 
     let candidate_names = prepared.tools().plan.candidates.clone();
@@ -645,7 +651,11 @@ async fn run_turn_via_tinyagents_body(
         let _ = prepared.split().1.finish(None);
         return Err(error);
     }
-    tracing::debug!(model, tools = tool_count, "[tinyagents] turn harness assembled");
+    tracing::debug!(
+        model,
+        tools = tool_count,
+        "[tinyagents] turn harness assembled"
+    );
 
     // Heap-allocate the harness drive future. It is large (it owns the whole run
     // context, middleware stack, and loop state), and a sub-agent turn runs

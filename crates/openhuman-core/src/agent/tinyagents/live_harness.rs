@@ -28,9 +28,9 @@ use tinyagents_harness::middleware::{
 };
 use tinyagents_harness::runtime::AgentHarness;
 
-use super::tool_registration::{capability_diagnostics, host_tool_set_builder, turn_admission};
 use super::host::OpenHumanRunContext;
 use super::middleware;
+use super::tool_registration::{capability_diagnostics, host_tool_set_builder, turn_admission};
 use super::turn_policy::run_policy_for;
 use super::ToolPolicyEnforcement;
 

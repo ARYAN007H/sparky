@@ -108,9 +108,11 @@ impl ToolExecScope for TurnOriginScope {
             .and_then(|context| context.state::<HostOperationContext>())
             .and_then(|context| context.origin.clone());
         match (origin, CoreContext::current()) {
-            (Some(origin), Some(core_context)) => Box::pin(
-                CoreContext::scope_with_turn_origin(core_context, Some(origin), execution),
-            ),
+            (Some(origin), Some(core_context)) => Box::pin(CoreContext::scope_with_turn_origin(
+                core_context,
+                Some(origin),
+                execution,
+            )),
             _ => execution,
         }
     }

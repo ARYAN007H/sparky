@@ -97,8 +97,33 @@ impl SteeringRegistrar for SharedSteeringRegistrar {
 
     fn deregister(&self, task_id: &str) {
         shared_steering_registry().deregister(&TaskId::new(task_id));
-        tracing::debug!(task_id, "[tinyagents] deregistered subagent steering handle");
+        tracing::debug!(
+            task_id,
+            "[tinyagents] deregistered subagent steering handle"
+        );
     }
+}
+
+/// Best-effort thread label for the delivery/requeue observability events and
+/// the metadata on any requeued steer: a sub-agent uses its task id; the
+/// interactive/channel parent turn reads the turn origin.
+pub(super) fn thread_label(
+    subagent_scope: Option<&crate::agent::tinyagents::observability::SubagentScope>,
+    origin: Option<&crate::agent::turn_origin::AgentTurnOrigin>,
+) -> String {
+    subagent_scope
+        .map(|s| s.task_id.clone())
+        .or_else(|| match origin {
+            Some(crate::agent::turn_origin::AgentTurnOrigin::WebChat { thread_id, .. }) => {
+                Some(thread_id.clone())
+            }
+            Some(crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel {
+                reply_target,
+                ..
+            }) => Some(reply_target.clone()),
+            _ => None,
+        })
+        .unwrap_or_default()
 }
 
 #[cfg(test)]

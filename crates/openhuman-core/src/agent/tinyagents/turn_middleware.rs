@@ -15,14 +15,14 @@ use std::sync::Arc;
 
 use tinyagents_harness::cache::InMemoryResponseCache;
 use tinyagents_harness::middleware::{
+    install_unmet_deliverable, is_repeat_call_exempt, tool_sets_lookup, ResearchBudgetMiddleware,
+    ShellTurnBudget, TurnClockMiddleware, DIRECT_WEB_READ_LIMIT,
+};
+use tinyagents_harness::middleware::{
     plan_mode_middleware, ApprovalGateMiddleware, ArgRecoveryMiddleware, BudgetLimits,
     BudgetMiddleware, BudgetParityObserver, ContextCompressionMiddleware,
     PromptCacheGuardMiddleware, RepeatProgressMiddleware, RunModeHandle,
     ToolPolicyMiddleware as TaToolPolicyMiddleware,
-};
-use tinyagents_harness::middleware::{
-    install_unmet_deliverable, is_repeat_call_exempt, tool_sets_lookup, ResearchBudgetMiddleware,
-    ShellTurnBudget, TurnClockMiddleware, DIRECT_WEB_READ_LIMIT,
 };
 use tinyagents_harness::runtime::AgentHarness;
 use tinyagents_harness::steering::SteeringHandle;
@@ -55,9 +55,8 @@ pub(super) struct TurnMiddlewareInputs {
     pub(super) subagent_scope: Option<SubagentScope>,
     pub(super) context_window: Option<u64>,
     pub(super) context_mw: TurnContextMiddleware,
-    pub(super) stop_hooks: Vec<
-        Arc<dyn tinyagents_harness::middleware::StopHook<tinyagents_harness::cost::TurnCost>>,
-    >,
+    pub(super) stop_hooks:
+        Vec<Arc<dyn tinyagents_harness::middleware::StopHook<tinyagents_harness::cost::TurnCost>>>,
     pub(super) tool_policy: Option<ToolPolicyEnforcement>,
     pub(super) required_capabilities: Option<CapabilitySet>,
     pub(super) deterministic_cacheable: bool,
@@ -97,7 +96,8 @@ pub(super) struct TurnWiring {
     /// Set by `FinalCallWrapUpMiddleware` when it turned the last permitted
     /// model call into the turn's conclusion (issue #6014). `None` when the
     /// middleware is not installed (a run that does not pause at its cap).
-    pub(super) wrap_up_fired: Option<Arc<tinyagents_harness::middleware::FinalCallWrapUpMiddleware>>,
+    pub(super) wrap_up_fired:
+        Option<Arc<tinyagents_harness::middleware::FinalCallWrapUpMiddleware>>,
     /// The installed compression middleware, drained after the run to surface
     /// each compaction's provenance.
     pub(super) compression_mw: Option<Arc<ContextCompressionMiddleware>>,
@@ -546,7 +546,6 @@ pub(super) fn install_turn_middleware(
     // reduction step and after the transcript snapshot, so it is never
     // compacted, trimmed or persisted (`memory::lifecycle::hooks::pre_turn`).
     harness.push_middleware(Arc::new(middleware::memory_pack_middleware()));
-
 
     TurnWiring {
         halt_summary,

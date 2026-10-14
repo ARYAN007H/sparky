@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use async_trait::async_trait;
 use tinyagents_harness::runtime::RunPolicy;
-use tinyagents_registry::RegistryDiagnostic;
+use tinyagents_registry::{DiagnosticSeverity, RegistryDiagnostic};
 use tinyagents_runtime::turn_driver::{SharedToolSet, TurnPlan, TurnPlanner};
 use tinyagents_runtime::{DriverRequest, RuntimeError};
 use tinyinference_llm::model::ErrorSlotModel;
@@ -142,6 +142,57 @@ impl TurnPlanner<(), OpenHumanRunContext> for OpenHumanTurnPlanner {
     }
 }
 
+/// Enforces the capability registry's diagnostics fail-closed (issue #4249,
+/// Workstream 10 — registry), *before* the first model dispatch: an ambiguous or
+/// broken tool surface (a name shared across native/MCP/Composio/generated
+/// tools, a dangling alias) aborts the turn instead of silently resolving to an
+/// unintended component while a provider call is in flight. Warnings are logged.
+pub(super) fn enforce_registry_diagnostics(
+    slot: &Mutex<Vec<RegistryDiagnostic>>,
+) -> anyhow::Result<()> {
+    let registry_diagnostics =
+        std::mem::take(&mut *slot.lock().unwrap_or_else(PoisonError::into_inner));
+    if !registry_diagnostics.is_empty() {
+        let (errors, warnings): (
+            Vec<&tinyagents_registry::RegistryDiagnostic>,
+            Vec<&tinyagents_registry::RegistryDiagnostic>,
+        ) = registry_diagnostics
+            .iter()
+            .partition(|d| matches!(d.severity, DiagnosticSeverity::Error));
+        for diag in &warnings {
+            tracing::warn!(
+                kind = diag.kind.as_str(),
+                name = %diag.name,
+                "[registry] non-fatal diagnostic: {}",
+                diag.message
+            );
+        }
+        if !errors.is_empty() {
+            let messages: Vec<String> = errors
+                .iter()
+                .map(|d| format!("[{}] {}: {}", d.kind.as_str(), d.name, d.message))
+                .collect();
+            for msg in &messages {
+                tracing::error!("[registry] error-severity diagnostic aborting turn: {msg}");
+            }
+            tracing::error!(
+                error_count = messages.len(),
+                warning_count = warnings.len(),
+                "[registry] aborting turn before model dispatch: capability registry validation failed"
+            );
+            return Err(anyhow::Error::new(
+                tinyagents_harness::agent_error::AgentError::RegistryValidationFailed {
+                    diagnostics: messages,
+                },
+            ));
+        }
+        tracing::debug!(
+            warning_count = warnings.len(),
+            "[registry] registry diagnostics present (warnings only); proceeding with turn"
+        );
+    }
+    Ok(())
+}
 
 #[cfg(test)]
 #[path = "turn_plan_tests.rs"]

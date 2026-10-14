@@ -2,14 +2,14 @@
 //! run policy a turn gets, and the model-call ceilings.
 
 use super::*;
+use crate::agent::tinyagents::turn_models::TurnModels;
 use crate::agent::tinyagents::TurnModelSource;
 use async_trait::async_trait;
-use crate::agent::tinyagents::turn_models::TurnModels;
-use tinyagents_runtime::turn_driver::{SharedToolSet, TurnControls, TurnDriver};
-use tinyagents_runtime::{DriverRequest, ToolSnapshot};
 use tinyagents_harness::turn_policy::{
     DEFAULT_MODEL_CALL_TIMEOUT_SECS, LOCAL_MODEL_CALL_TIMEOUT_SECS,
 };
+use tinyagents_runtime::turn_driver::{SharedToolSet, TurnControls, TurnDriver};
+use tinyagents_runtime::{DriverRequest, ToolSnapshot};
 use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
 use tinytools::{Tool, ToolResult};
 
@@ -128,7 +128,11 @@ async fn prepared_with(
 }
 
 async fn registered_tool_names(has_thread: bool) -> Vec<String> {
-    prepared_with(has_thread, None).await.harness.tools().names()
+    prepared_with(has_thread, None)
+        .await
+        .harness
+        .tools()
+        .names()
 }
 
 #[tokio::test]
@@ -219,7 +223,10 @@ async fn run_slow_first_byte_turn(
         delay: std::time::Duration::from_secs(delay_secs),
         provider,
     });
-    let run = prepare_with(model, Vec::new(), false, None).await.run().await;
+    let run = prepare_with(model, Vec::new(), false, None)
+        .await
+        .run()
+        .await;
     match run.partial.error {
         Some(error) => Err(error.to_string()),
         None => Ok(run.partial.run.text().unwrap_or_default()),
