@@ -24,8 +24,8 @@ used here (not defined here) by [`fork_context.rs`](./fork_context.rs).
   `../subagent_host/`, which implements the TinyAgents sub-agent lifecycle
   traits directly. This module does not export a compatibility runner of its
   own.
-- Carry the task-local plumbing that lets a spawned tool see its parent's
-  runtime context (`fork_context.rs`). Recursion facts come from TinyAgents’
+- Define the parent snapshot a spawned tool receives on its run context
+  (`fork_context.rs`). Recursion facts come from TinyAgents’
   public run context, including depth imported over MCP.
   Sandbox mode is carried explicitly by `OpenHumanRunContext` into the typed
   tool execution context.
@@ -93,7 +93,7 @@ turn lifecycle are in `../session_host/`; `run_subagent`,
 ## Used by
 
 - `../session_host/` and `../subagent_host/` build turns from the
-  definitions, prompt data, and task-local context this module supplies.
+  definitions, prompt data, and parent context types this module supplies.
 - `agent/bus.rs` serves the `agent.run_turn` native request through
   `run_channel_turn_via_graph`; channels reach the harness through that bus.
 - [`channels/runtime/dispatch/routing.rs`](../../channels/runtime/dispatch/routing.rs) consults
@@ -102,8 +102,8 @@ turn lifecycle are in `../session_host/`; `run_subagent`,
   `harness::credentials::scrub_credentials` on every tool result.
 - `agent/orchestration/tools/*` (`spawn_subagent`, `spawn_parallel_agents`,
   `spawn_async_subagent`, `continue_subagent`, `steer_subagent`, and friends)
-  call into `../subagent_host/` and this module's task-local context
-  functions.
+  call into `../subagent_host/` and take this module's parent context
+  explicitly.
 
 ## Tests
 
