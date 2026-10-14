@@ -58,7 +58,7 @@ What `harness/mod.rs` actually re-exports:
   `with_parent_context`, `AgentContextPreparedSource`):
   parent runtime context for spawned tools.
 Sandbox policy lives on the explicit host operation context. Briefing task
-recency belongs to `integrations/composio/task_recency_context.rs`.
+recency belongs to ``OpenHumanRunExt` (agent/tinyagents/host/run_context.rs)`.
 - `artifact_offload::{...}`: reached only via the `artifact_offload::` path
   (see Notes), never flattened into `harness::`.
 

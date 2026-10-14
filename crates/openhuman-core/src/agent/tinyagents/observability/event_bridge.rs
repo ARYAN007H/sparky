@@ -243,14 +243,11 @@ impl OpenhumanEventBridge {
 
     /// Forward a progress event without ever silently dropping it under
     /// backpressure (#4466). The crate `EventListener::on_event` callback is
-    /// **synchronous**, so we cannot `.await` a bounded `send()` inline the way
-    /// the legacy streaming path did. Fast path: `try_send`, which succeeds (and
-    /// stays fully synchronous + ordered) whenever the downstream channel has
-    /// room — the common case. Only when the channel is momentarily **full** do
-    /// we fall back to an awaited `send()` on a spawned task so the delta is
-    /// delivered under backpressure instead of being dropped (the old bug). A
-    /// `Closed` channel means the receiver is gone (turn tore down), where
-    /// dropping is correct.
+    /// **synchronous**, so the harness `OrderedSender` tries `try_send` first and,
+    /// when the channel is full, spills to a bounded FIFO drain task so later
+    /// items never overtake earlier ones. A closed channel means the receiver is
+    /// gone (turn tore down), where dropping is correct. If the bounded overflow
+    /// queue itself is full the delta is dropped and logged below.
     pub(super) fn send(&self, progress: AgentProgress) {
         use tinyagents_harness::events::SendFailure;
         match self.sender.send(progress) {
