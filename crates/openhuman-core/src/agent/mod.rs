@@ -26,7 +26,6 @@ pub mod context;
 pub mod context_breakdown;
 pub(crate) mod cost;
 pub mod debug;
-pub mod error;
 pub mod goals;
 pub mod harness;
 pub mod hooks;
