@@ -15,6 +15,7 @@ impl ApprovalGate {
     #[inline(never)]
     fn intercept_audited_inner<'a>(
         &'a self,
+        turn: &'a ApprovalTurnContext,
         tool_name: &'a str,
         action_summary: &'a str,
         args_redacted: serde_json::Value,
@@ -24,6 +25,7 @@ impl ApprovalGate {
         forced: bool,
     ) -> futures::future::BoxFuture<'a, (GateOutcome, Option<String>)> {
         Box::pin(self.intercept_audited_inner_body(
+            turn,
             tool_name,
             action_summary,
             args_redacted,
@@ -37,6 +39,7 @@ impl ApprovalGate {
     #[allow(clippy::too_many_arguments)]
     async fn intercept_audited_inner_body(
         &self,
+        turn: &ApprovalTurnContext,
         tool_name: &str,
         action_summary: &str,
         args_redacted: serde_json::Value,
@@ -108,7 +111,7 @@ impl ApprovalGate {
                     ..
                 }
             ),
-            chat_context = APPROVAL_CHAT_CONTEXT.try_with(|c| c.clone()).is_ok(),
+            chat_context = turn.chat.is_some(),
             "[approval::gate] evaluating approval request"
         );
 
@@ -262,9 +265,7 @@ impl ApprovalGate {
         // chat turn never completes.
         // Forced approvals route from the validated WebChat origin itself. A
         // stray task-local must not redirect the decision to another thread.
-        let chat_ctx = (!forced)
-            .then(|| APPROVAL_CHAT_CONTEXT.try_with(|c| c.clone()).ok())
-            .flatten();
+        let chat_ctx = (!forced).then(|| turn.chat.clone()).flatten();
         let origin_chat_route = match &origin {
             AgentTurnOrigin::WebChat {
                 thread_id,
@@ -287,7 +288,7 @@ impl ApprovalGate {
         if detached {
             tracing::debug!(
                 tool = tool_name,
-                "[approval::gate] APPROVAL_CHAT_CONTEXT absent on a WebChat turn — routing the \
+                "[approval::gate] no chat context on a WebChat turn — routing the \
                  approval via the origin's thread/client (async-delegated sub-agent path, #5499); \
                  marking the card detached so it survives the parent turn's end"
             );
@@ -310,7 +311,7 @@ impl ApprovalGate {
         // Copilot-streaming context — set by `flows::ops::flows_build` around
         // the streaming `run_single` call. Presence alone clamps the park
         // window to `COPILOT_APPROVAL_TTL`; see that task-local's doc.
-        let copilot_stream = !forced && APPROVAL_COPILOT_STREAM_CONTEXT.try_with(|_| ()).is_ok();
+        let copilot_stream = !forced && turn.copilot_stream;
 
         // Branch by origin. Web chat parks for an in-app approval; external
         // channel persists an audit row and TTL-denies (no routable approval
@@ -475,13 +476,14 @@ impl ApprovalGate {
             AgentTurnOrigin::TrustedAutomation {
                 source: TrustedAutomationSource::Workflow { .. },
                 job_id: flow_id,
-            } => APPROVAL_FLOW_RUN_CONTEXT
-                .try_with(|ctx| ApprovalSourceContext::Flow {
+            } => turn
+                .flow_run
+                .as_ref()
+                .map(|ctx| ApprovalSourceContext::Flow {
                     flow_id: flow_id.clone(),
                     run_id: ctx.run_id.clone(),
                     node_id: None,
-                })
-                .ok(),
+                }),
             _ => None,
         };
 

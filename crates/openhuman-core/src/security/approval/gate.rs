@@ -104,7 +104,7 @@ const DEFAULT_APPROVAL_TTL: Duration = Duration::from_secs(60 * 10);
 /// still re-trigger the run from the Runs rail). Scoped by
 /// [`ApprovalTurnContext::copilot_stream`]. Deliberately NOT applied to
 /// main-chat `WebChat` parks — only `flows::ops::flows_build`'s streaming
-/// branch scopes the task-local below.
+/// branch sets the flag.
 const COPILOT_APPROVAL_TTL: Duration = Duration::from_secs(180);
 
 /// Shorter park window for approvals raised inside a sub-agent run — a
