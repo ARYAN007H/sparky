@@ -51,6 +51,12 @@ pub struct HostTurnEnv {
     ///
     /// [`OpenHumanRunContext::with_host_env`]: crate::agent::tinyagents::host::OpenHumanRunContext
     pub approval: crate::security::approval::ApprovalTurnContext,
+    /// Who the runs this environment starts act as on memory, when the entry
+    /// point knows more than "the host itself": a team member's identity, which
+    /// a turn or sub-agent narrows with `child(<definition id>)`. `None` is the
+    /// root identity. Unlike `approval` it follows delegation, so runs started
+    /// from a parent snapshot keep the parent's team.
+    pub memory_identity: Option<crate::memory::scope::MemoryIdentity>,
 }
 
 impl std::fmt::Debug for HostTurnEnv {
@@ -64,6 +70,7 @@ impl std::fmt::Debug for HostTurnEnv {
             .field("hooks_empty", &self.hooks.is_empty())
             .field("fresh_tool_snapshot", &self.fresh_tool_snapshot)
             .field("approval", &self.approval)
+            .field("memory_identity", &self.memory_identity)
             .finish()
     }
 }

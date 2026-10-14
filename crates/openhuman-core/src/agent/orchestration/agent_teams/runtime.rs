@@ -232,6 +232,8 @@ async fn run_member_loop(
     // The member acts on memory as itself within the team: its node is
     // `team:<team>/agent:<agent>`, so members share the team's node and
     // never read each other's.
+    // The member acts on memory as itself, in its team: it rides the parent's
+    // host environment, so every run started from that parent keeps it.
     let identity = crate::memory::scope::MemoryIdentity::team_member(team_id, agent_id);
     let member_turn = with_root_parent(
         parent_override,
@@ -239,7 +241,8 @@ async fn run_member_loop(
         "agent_team_runtime",
         "team",
         "teamrun",
-        |parent| async {
+        |mut parent| async {
+            parent.host_env.memory_identity = Some(identity);
             drive_member(
                 config,
                 team_id,
@@ -253,7 +256,7 @@ async fn run_member_loop(
             .await
         },
     );
-    let outcome = crate::memory::scope::within(identity, Box::pin(member_turn))
+    let outcome = Box::pin(member_turn)
         .await
         // Flatten: outer Err = root-parent build failure, inner = drive_member result.
         .unwrap_or_else(Err);
