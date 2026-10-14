@@ -7,7 +7,7 @@
 //!   naming the host OS and shell;
 //! - `use_skill` failures are counted per inner skill + tool.
 
-use super::super::call_effect::{
+use tinyagents_harness::middleware::{
     call_effect, dispatch_target, CallEffect, ToolEffectFacts, ToolFactsLookup,
 };
 use super::super::failure_policy::recovery_policy_with_effect;

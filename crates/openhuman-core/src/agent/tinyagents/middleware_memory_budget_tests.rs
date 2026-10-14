@@ -1,4 +1,5 @@
 //! A memory budget refusal is the host's own limit, not the tool failing:
+use tinyagents_harness::middleware::is_repeat_call_exempt;
 //! a parallel batch of memory calls past the cap must not halt the run
 //! (#7717).
 

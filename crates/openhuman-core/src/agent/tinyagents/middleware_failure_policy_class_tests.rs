@@ -10,7 +10,7 @@
 //!   reading alone.
 
 #[cfg(feature = "modules")]
-use super::super::call_effect::{call_effect, tool_sets_lookup, CallEffect};
+use tinyagents_harness::middleware::{call_effect, tool_sets_lookup, CallEffect};
 #[cfg(feature = "modules")]
 use super::super::failure_policy::recovery_policy_with_effect;
 use super::super::repeated_failure::recovery_policy;
