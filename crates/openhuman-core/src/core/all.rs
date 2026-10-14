@@ -12,6 +12,7 @@ use std::{
 
 use serde_json::{Map, Value};
 
+use crate::core::runtime::DispatchCtx;
 use crate::core::ControllerSchema;
 
 /// A pinned, boxed future returned by a controller handler.
@@ -19,8 +20,10 @@ pub type ControllerFuture = Pin<Box<dyn Future<Output = Result<Value, String>> +
 
 /// A function pointer type for controller handlers.
 ///
-/// Handlers take a map of parameters and return a [`ControllerFuture`].
-pub type ControllerHandler = fn(Map<String, Value>) -> ControllerFuture;
+/// Handlers take the call's explicit [`DispatchCtx`] and a map of parameters,
+/// and return a [`ControllerFuture`]. The transport that accepted the call
+/// builds the context; the registry passes it through untouched.
+pub type ControllerHandler = fn(DispatchCtx, Map<String, Value>) -> ControllerFuture;
 
 /// A function pointer type for domain-specific CLI handlers.
 pub type CliHandler = fn(&[String]) -> anyhow::Result<()>;
@@ -1149,6 +1152,7 @@ fn kind(matches: bool, expected: &'static str) -> Result<(), TypeMismatch> {
 ///
 /// Returns `None` if the method is not found in either registry.
 pub async fn try_invoke_registered_rpc(
+    ctx: DispatchCtx,
     method: &str,
     params: Map<String, Value>,
 ) -> Option<Result<Value, String>> {
@@ -1174,21 +1178,26 @@ pub async fn try_invoke_registered_rpc(
 
     let handler = grouped.controller.handler;
 
-    // Establish the ambient CoreContext for the duration of the handler so
-    // `CoreContext::current()` resolves inside handler bodies (Phase 2).
-    // `current()` inherits an already-active scope (so a handler that dispatches
-    // a nested RPC stays in the same tenant context) and otherwise resolves to
-    // the process default. Before any context is built (some unit tests) it is
-    // `None` and the handler runs unscoped.
+    // The handler gets the call's context as an argument. Until every reader
+    // below it has moved off the ambient context (#7801), the same context is
+    // also scoped for the duration of the call, so `CoreContext::current()`
+    // inside the handler resolves to it. A call that arrived without a bound
+    // context inherits the active scope (a handler that dispatches a nested RPC
+    // stays in its tenant) or the process default, as before.
     //
     // The scoped future is re-boxed back into a `ControllerFuture` so the
     // concrete `TaskLocalFuture` type does not escape into this fn's future —
     // without the type erasure the `Send` auto-trait solver overflows on the
     // largest handler futures (E0275).
     use crate::core::runtime::context::CoreContext;
-    let fut = handler(params);
-    let scoped: ControllerFuture = match CoreContext::current() {
-        Some(ctx) => Box::pin(CoreContext::scope(ctx, fut)),
+    let core = ctx.into_core().or_else(CoreContext::current);
+    let ctx = match &core {
+        Some(core) => DispatchCtx::new(core.clone()),
+        None => DispatchCtx::unbound(),
+    };
+    let fut = handler(ctx, params);
+    let scoped: ControllerFuture = match core {
+        Some(core) => Box::pin(CoreContext::scope(core, fut)),
         None => fut,
     };
     Some(scoped.await)
