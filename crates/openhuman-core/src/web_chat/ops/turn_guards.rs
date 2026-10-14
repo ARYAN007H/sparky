@@ -216,8 +216,8 @@ fn turn_host_env(
 /// `run_chat_task` when building `fut`.
 ///
 /// `build_turn` receives the turn's [`HostTurnEnv`] -- its own cancellation
-/// token (fired by a Stop) and the backstop's [`TurnDeadline`] -- and the guard's
-/// [`TurnActivity`] record, and returns
+/// token (fired by a Stop) and the backstop's [`TurnDeadline`] -- the guard's
+/// [`TurnActivity`] record and the turn's [`ApprovalTurnContext`], and returns
 /// the turn future, which hands the env to the session it runs. The env is an
 /// explicit value, so it reaches the turn's whole run tree without any ambient
 /// scope.
@@ -230,7 +230,7 @@ pub(crate) async fn run_turn_under_cancel_and_deadline<B, F>(
     build_turn: B,
 ) -> Option<Result<WebChatTaskResult, String>>
 where
-    B: FnOnce(HostTurnEnv, TurnActivity) -> F,
+    B: FnOnce(HostTurnEnv, TurnActivity, crate::security::approval::ApprovalTurnContext) -> F,
     F: std::future::Future<Output = Result<WebChatTaskResult, String>>,
 {
     let ids = approval_ctx.request_id.clone().map(|request_id| TurnIds {
@@ -249,8 +249,11 @@ where
             |activity| {
                 crate::agent::turn_origin::with_origin(
                     origin,
-                    crate::security::approval::APPROVAL_CHAT_CONTEXT
-                        .scope(approval_ctx, build_turn(env, activity)),
+                    build_turn(
+                        env,
+                        activity,
+                        crate::security::approval::ApprovalTurnContext::chat(approval_ctx),
+                    ),
                 )
             },
         ),
