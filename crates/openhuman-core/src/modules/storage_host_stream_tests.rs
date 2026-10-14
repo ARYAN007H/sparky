@@ -88,7 +88,10 @@ async fn a_streamed_blob_is_decided_like_any_other_call() {
             serde_json::from_value(json!({"key": "elsewhere/a"})).unwrap(),
         )
         .await;
-    assert!(matches!(missing, Err(HostError::Denied("target-not-granted"))));
+    assert!(matches!(
+        missing,
+        Err(HostError::Denied("target-not-granted"))
+    ));
     // Nothing was stored by any of the refusals.
     let scope = rig.env.module_scope("alpha").unwrap();
     assert!(rig

@@ -45,7 +45,10 @@ const RELAY_BUFFER: usize = 256;
 
 impl StorageHost {
     /// The watch invalidations of `sender`, for the bus endpoint to unicast.
-    pub(super) fn watch_signals(&self, sender: &BusName) -> Option<broadcast::Receiver<WatchChanged>> {
+    pub(super) fn watch_signals(
+        &self,
+        sender: &BusName,
+    ) -> Option<broadcast::Receiver<WatchChanged>> {
         let mut relays = self.relays.lock().ok()?;
         if !relays.contains_key(sender) {
             // Callers that never became a module leave an idle relay behind;
@@ -85,7 +88,12 @@ impl StorageHost {
             .fed_by
             .as_ref()
             .is_some_and(|fed| fed.ptr_eq(&Arc::downgrade(binding)));
-        if current && relay.bridge.as_ref().is_some_and(|task| !task.is_finished()) {
+        if current
+            && relay
+                .bridge
+                .as_ref()
+                .is_some_and(|task| !task.is_finished())
+        {
             return;
         }
         if let Some(stale) = relay.bridge.take() {

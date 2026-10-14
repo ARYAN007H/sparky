@@ -58,7 +58,10 @@ async fn a_blob_over_the_bus_frame_round_trips_through_a_peer_bound_stream() {
     assert_eq!(read["ok"]["all_fill"], true, "{read}");
     // A key that is not there is `null`, not an error.
     let missing = rig.member("StreamGet", ("tinyjuice_ccr/absent",)).await;
-    assert!(missing["ok"].is_null() && missing.get("ok").is_some(), "{missing}");
+    assert!(
+        missing["ok"].is_null() && missing.get("ok").is_some(),
+        "{missing}"
+    );
     let trail = rig.trail.0.lock().unwrap().clone();
     assert!(trail
         .iter()
@@ -73,17 +76,26 @@ async fn a_streamed_blob_is_still_bound_by_the_grant_and_the_length() {
     let _turn = TURN.lock().await;
     let rig = rig("tinyjuice").await;
     // Outside the CCR prefix: refused before anything is stored.
-    let outside = rig.member("StreamPut", ("tinyjuice_other/x", 2 * MIB)).await;
+    let outside = rig
+        .member("StreamPut", ("tinyjuice_other/x", 2 * MIB))
+        .await;
     assert!(outside.get("err").is_some(), "{outside}");
     let handle = rig.backend.for_scope(&rig.scope("tinyjuice")).unwrap();
-    assert!(handle.blobs().head("tinyjuice_other/x").await.unwrap().is_none());
+    assert!(handle
+        .blobs()
+        .head("tinyjuice_other/x")
+        .await
+        .unwrap()
+        .is_none());
     let denied_get = rig.member("StreamGet", ("tinyjuice_other/x",)).await;
     assert!(
         denied_get["err"].to_string().contains("target-not-granted"),
         "{denied_get}"
     );
     // The module keeps working after a refusal.
-    let after = rig.member("StreamPut", ("tinyjuice_ccr/after", 3 * MIB)).await;
+    let after = rig
+        .member("StreamPut", ("tinyjuice_ccr/after", 3 * MIB))
+        .await;
     assert_eq!(after["ok"]["len"], 3 * MIB, "{after}");
 }
 
@@ -97,7 +109,10 @@ async fn an_inline_blob_no_frame_can_carry_fails_fast_instead_of_hanging() {
     let big: Value = rig
         .member("PutBlob", ("tinyjuice_ccr/over-frame", 5_000_000usize))
         .await;
-    assert!(big.get("err").is_some(), "an oversized frame must fail: {big}");
+    assert!(
+        big.get("err").is_some(),
+        "an oversized frame must fail: {big}"
+    );
     assert!(
         started.elapsed() < std::time::Duration::from_secs(60),
         "took {:?}",
@@ -110,8 +125,13 @@ async fn an_inline_blob_no_frame_can_carry_fails_fast_instead_of_hanging() {
         .await
         .unwrap()
         .is_none());
-    let after: Value = rig.member("PutBlob", ("tinyjuice_ccr/after", 2048usize)).await;
-    assert!(after.get("ok").is_some(), "the module keeps working: {after}");
+    let after: Value = rig
+        .member("PutBlob", ("tinyjuice_ccr/after", 2048usize))
+        .await;
+    assert!(
+        after.get("ok").is_some(),
+        "the module keeps working: {after}"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -141,7 +161,9 @@ async fn a_second_module_cannot_receive_the_first_modules_watch_signals() {
     // The probe stands for tinymcp; peer 0 stands for tinychannels, which also
     // holds documents.
     let rig = rig_with_peers("tinymcp", &["tinychannels"]).await;
-    let theirs = declared("tinychannels").unwrap().collections[0].name.clone();
+    let theirs = declared("tinychannels").unwrap().collections[0]
+        .name
+        .clone();
     // The second module listens to every watch signal the host sends anyone
     // (any path), and opens a watch of its own as a positive control.
     let mut everything = rig.peers[0]
@@ -166,10 +188,7 @@ async fn a_second_module_cannot_receive_the_first_modules_watch_signals() {
     assert_eq!(first["ok"], "invalidated", "{first}");
     // The second module's own change reaches the second module.
     let _: Value = documents
-        .call(
-            "Put",
-            (put(&theirs, "d", &json!({"v": 1})),),
-        )
+        .call("Put", (put(&theirs, "d", &json!({"v": 1})),))
         .await
         .unwrap();
     let mut ids = Vec::new();
@@ -181,7 +200,10 @@ async fn a_second_module_cannot_receive_the_first_modules_watch_signals() {
             ids.push(message.body[0]["watch_id"].as_str().unwrap().to_string());
         }
     }
-    assert!(ids.contains(&own_id), "its own signal never arrived: {ids:?}");
+    assert!(
+        ids.contains(&own_id),
+        "its own signal never arrived: {ids:?}"
+    );
     // Nothing else did: the first module's watch id is not among them.
     assert!(
         ids.iter().all(|id| *id == own_id),
@@ -223,10 +245,16 @@ async fn a_second_module_cannot_read_or_take_the_first_modules_streams() {
         .peer_proxy(0, "Blobs")
         .call(
             "PutStream",
-            (json!({"key": "tinyjuice_ccr/hijacked", "len": MIB}), reference),
+            (
+                json!({"key": "tinyjuice_ccr/hijacked", "len": MIB}),
+                reference,
+            ),
         )
         .await;
-    assert!(hijack.is_err(), "a peer took another peer's stream: {hijack:?}");
+    assert!(
+        hijack.is_err(),
+        "a peer took another peer's stream: {hijack:?}"
+    );
     let handle = rig.backend.for_scope(&rig.scope("tinyjuice")).unwrap();
     assert!(handle
         .blobs()
@@ -236,7 +264,10 @@ async fn a_second_module_cannot_read_or_take_the_first_modules_streams() {
         .is_none());
     // The refused attempt did not spend the stream: its owner still uses it.
     let used = rig.member("UseStream", ("tinyjuice_ccr/owned", MIB)).await;
-    assert!(used.get("ok").is_some(), "the owner lost its stream: {used}");
+    assert!(
+        used.get("ok").is_some(),
+        "the owner lost its stream: {used}"
+    );
     assert_eq!(
         handle
             .blobs()
@@ -249,9 +280,7 @@ async fn a_second_module_cannot_read_or_take_the_first_modules_streams() {
     );
 
     // A download the host opened toward the probe is not readable by a peer.
-    let reply = rig
-        .member("RawGetStream", ("tinyjuice_ccr/private",))
-        .await;
+    let reply = rig.member("RawGetStream", ("tinyjuice_ccr/private",)).await;
     let download: tinybus::StreamRef = serde_json::from_value(reply["ok"][1].clone())
         .unwrap_or_else(|_| panic!("a download reference: {reply}"));
     assert!(
