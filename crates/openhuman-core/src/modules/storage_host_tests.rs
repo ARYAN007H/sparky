@@ -663,7 +663,7 @@ async fn a_watch_signal_reaches_only_the_callers_own_relay() {
         &alpha(),
         Object::Documents,
         "WatchOpen",
-        json!({"collection": "notes", "filter": {"kind": "all"}, "interval_ms": 20}),
+        json!({"collection": "notes", "filter": {"op": "all"}, "interval_ms": 20}),
     )
     .await
     .unwrap();
@@ -699,7 +699,7 @@ async fn a_watch_signal_reaches_only_the_callers_own_relay() {
             &alpha(),
             Object::Documents,
             "WatchOpen",
-            json!({"collection": "other", "filter": {"kind": "all"}, "interval_ms": 20}),
+            json!({"collection": "other", "filter": {"op": "all"}, "interval_ms": 20}),
         )
         .await,
         denied("target-not-granted")
