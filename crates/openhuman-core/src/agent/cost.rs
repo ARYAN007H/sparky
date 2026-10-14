@@ -17,6 +17,7 @@
 //! $4.25 when the provider billed about $0.30.
 
 use crate::inference::provider::BilledUsage;
+use tinyagents_harness::cost::{CallCost, CallUsage, CostTally};
 
 /// Whether a model names an explicitly free OpenRouter variant.
 pub(crate) fn is_free_model(model: &str) -> bool {
@@ -39,111 +40,26 @@ pub(crate) fn lookup_pricing(model: &str) -> Option<tinyagents_harness::cost::Mo
 
 /// Estimate a call from product list prices when no provider charge was reported.
 pub fn estimate_call_cost_usd(model: &str, usage: &BilledUsage) -> Option<f64> {
-    let pricing = lookup_pricing(model)?;
-    let usage = tinyinference_llm::usage::Usage {
-        input_tokens: usage.input_tokens,
-        output_tokens: usage.output_tokens,
-        cache_read_tokens: usage.cached_input_tokens().min(usage.input_tokens),
-        ..Default::default()
-    };
-    Some(tinyagents_harness::cost::estimate_cost(&pricing, &usage).total_cost)
+    tinyagents_harness::cost::estimate_call_cost_usd(
+        lookup_pricing(model).as_ref(),
+        &call_usage(usage),
+    )
 }
 
-/// Where a cost figure came from. Ordered from most to least certain, so the
-/// cost of several calls takes the least certain of their sources.
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Default,
-    serde::Serialize,
-    serde::Deserialize,
-)]
-#[serde(rename_all = "snake_case")]
-pub enum CostSource {
-    /// Every call reported the amount the provider billed.
-    #[default]
-    Charged,
-    /// At least one call was priced from the catalog's list rates.
-    Estimated,
-    /// At least one call had neither a charge nor a catalogued price, so the
-    /// total is not known.
-    Unknown,
-}
-
-/// The cost of one provider call.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum CallCost {
-    /// Billed by the provider (may be zero).
-    Charged(f64),
-    /// Catalog list-price estimate.
-    Estimated(f64),
-    /// Neither available.
-    Unknown,
-}
-
-impl CallCost {
-    /// The USD figure, or `None` when unknown.
-    pub fn usd(self) -> Option<f64> {
-        match self {
-            Self::Charged(usd) | Self::Estimated(usd) => Some(usd),
-            Self::Unknown => None,
-        }
-    }
-
-    /// The source this cost contributes to a total.
-    pub fn source(self) -> CostSource {
-        match self {
-            Self::Charged(_) => CostSource::Charged,
-            Self::Estimated(_) => CostSource::Estimated,
-            Self::Unknown => CostSource::Unknown,
-        }
+/// The harness accounting view of one billed call.
+pub(crate) fn call_usage(usage: &BilledUsage) -> CallUsage {
+    CallUsage {
+        usage: usage.usage,
+        charged_amount_usd: usage.charged_amount_usd,
+        cost_is_estimate: usage.cost_is_estimate,
+        charge_reported: usage.charge_reported,
     }
 }
 
 /// The cost of one call: the provider's charge when it reported one, else
 /// the catalog estimate, else unknown.
 pub fn call_cost(model: &str, usage: &BilledUsage) -> CallCost {
-    if usage.charge_reported && !usage.cost_is_estimate {
-        return CallCost::Charged(usage.charged_amount_usd);
-    }
-    match estimate_call_cost_usd(model, usage) {
-        Some(usd) => CallCost::Estimated(usd),
-        None => CallCost::Unknown,
-    }
-}
-
-/// A sum of call costs that remembers how certain it is.
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct CostTally {
-    /// Sum of the known call costs. Meaningless on its own once `source` is
-    /// [`CostSource::Unknown`]; read it through [`CostTally::usd`].
-    pub known_usd: f64,
-    /// The least certain source among the calls added.
-    pub source: CostSource,
-}
-
-impl CostTally {
-    /// Fold one call in.
-    pub fn add(&mut self, cost: CallCost) {
-        self.known_usd += cost.usd().unwrap_or(0.0);
-        self.source = self.source.max(cost.source());
-    }
-
-    /// Fold another tally in (a sub-step's or a child's).
-    pub fn merge(&mut self, other: CostTally) {
-        self.known_usd += other.known_usd;
-        self.source = self.source.max(other.source);
-    }
-
-    /// The total, or `None` when any call's cost was unknown.
-    pub fn usd(&self) -> Option<f64> {
-        (self.source != CostSource::Unknown).then_some(self.known_usd)
-    }
+    tinyagents_harness::cost::call_cost(lookup_pricing(model).as_ref(), &call_usage(usage))
 }
 
 /// Running cost / token tally across every provider call inside a

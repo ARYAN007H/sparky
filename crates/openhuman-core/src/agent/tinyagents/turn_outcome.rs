@@ -35,7 +35,7 @@ pub(crate) struct TinyagentsTurnOutcome {
     pub cached_input_tokens: u64,
     /// The turn's cost: each call's reported charge, else its catalog
     /// estimate, else unknown (see [`crate::agent::cost::call_cost`]).
-    pub cost: crate::agent::cost::CostTally,
+    pub cost: tinyagents_harness::cost::CostTally,
     /// Set when an early-exit tool (e.g. `ask_user_clarification`) fired: the
     /// loop paused so the caller can checkpoint and surface the question. When
     /// present, `text` holds the question. Mirrors the legacy `early_exit_tool`.

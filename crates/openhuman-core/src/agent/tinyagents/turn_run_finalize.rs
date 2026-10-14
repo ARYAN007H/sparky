@@ -120,10 +120,10 @@ pub(super) async fn finalize_turn_outcome(
             crate::agent::tinyagents::turn_outcome::record_unobserved_turn_usage(
                 model, input, output, cached, estimate,
             );
-            let mut cost = crate::agent::cost::CostTally::default();
+            let mut cost = tinyagents_harness::cost::CostTally::default();
             cost.add(match estimate {
-                Some(usd) => crate::agent::cost::CallCost::Estimated(usd),
-                None => crate::agent::cost::CallCost::Unknown,
+                Some(usd) => tinyagents_harness::cost::CallCost::Estimated(usd),
+                None => tinyagents_harness::cost::CallCost::Unknown,
             });
             (input, output, cached, cost)
         });

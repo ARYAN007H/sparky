@@ -34,7 +34,7 @@ pub(super) struct RepairUsage {
     pub(super) output_tokens: u64,
     pub(super) cached_input_tokens: u64,
     /// Cost of these calls: reported charge, catalog estimate, or unknown.
-    pub(super) cost: crate::agent::cost::CostTally,
+    pub(super) cost: tinyagents_harness::cost::CostTally,
     /// Model the calls ran on, for pricing a call that reported no charge.
     pub(super) pricing_model: String,
     /// The newest repair call's own input/output: a repair runs after the

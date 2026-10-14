@@ -92,7 +92,7 @@ pub struct LastTurnUsage {
     pub cost_usd: Option<f64>,
     /// Whether `cost_usd` is entirely provider-charged or includes a catalog
     /// estimate (`Unknown` exactly when `cost_usd` is `None`).
-    pub cost_source: crate::agent::cost::CostSource,
+    pub cost_source: tinyagents_harness::cost::CostSource,
     pub context_window: u64,
     /// Tokens the root agent's context held after the turn's final model call
     /// (that call's input plus its reply): the numerator of the context-window
@@ -121,7 +121,7 @@ pub(crate) struct SessionTurnSidecar {
     pub cached_input_tokens: u64,
     /// The turn's own cost (sub-agents excluded): every call's reported
     /// charge, else catalog estimate, else unknown.
-    pub cost: crate::agent::cost::CostTally,
+    pub cost: tinyagents_harness::cost::CostTally,
     /// Input and output tokens of the turn's final model call. The totals
     /// above sum every call of the turn (its spend); these are the context the
     /// model last held, the numerator of the context-window gauge.

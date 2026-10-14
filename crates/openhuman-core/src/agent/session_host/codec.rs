@@ -176,9 +176,9 @@ impl TranscriptCodec<OpenHumanRunContext> for OpenHumanTranscriptCodec {
                 context_window: sidecar.context_window,
                 cost_usd: sidecar.cost.known_usd,
                 cost_source: Some(match sidecar.cost.source {
-                    crate::agent::cost::CostSource::Charged => UsageCostSource::Charged,
-                    crate::agent::cost::CostSource::Estimated => UsageCostSource::Estimated,
-                    crate::agent::cost::CostSource::Unknown => UsageCostSource::Unknown,
+                    tinyagents_harness::cost::CostSource::Charged => UsageCostSource::Charged,
+                    tinyagents_harness::cost::CostSource::Estimated => UsageCostSource::Estimated,
+                    tinyagents_harness::cost::CostSource::Unknown => UsageCostSource::Unknown,
                 }),
                 last_call_input: sidecar.last_call_input_tokens,
                 last_call_output: sidecar.last_call_output_tokens,

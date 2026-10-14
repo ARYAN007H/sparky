@@ -99,7 +99,7 @@ pub(crate) struct TranscriptSnapshot {
     /// Cost of the model calls the provider answered: each call's reported
     /// charge, else its catalog estimate, else unknown (see
     /// [`crate::agent::cost::call_cost`]).
-    pub(crate) cost: crate::agent::cost::CostTally,
+    pub(crate) cost: tinyagents_harness::cost::CostTally,
     /// The last accepted model route. A failed follow-up has no response of
     /// its own, so this remains the route that incurred the snapshot usage.
     pub(crate) resolved_route: Option<ResolvedModelRoute>,
