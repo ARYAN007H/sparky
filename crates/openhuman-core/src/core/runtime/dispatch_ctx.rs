@@ -59,6 +59,28 @@ impl DispatchCtx {
         }
     }
 
+    /// The context readers act under: the bound one, else (outside SaaS) the
+    /// process default, else none.
+    ///
+    /// An unbound context outside SaaS stands for the host's one context, as an
+    /// unscoped task always did, so tests and pre-boot callers that never bound
+    /// one read the default. In SaaS an unbound context stays `None`: work that
+    /// lost its tenant must fail closed rather than act as the operator.
+    pub fn resolved(&self) -> Option<Arc<CoreContext>> {
+        match &self.core {
+            Some(core) => Some(Arc::clone(core)),
+            None if super::is_saas() => None,
+            None => CoreContext::default_context(),
+        }
+    }
+
+    /// The configuration an embedder supplied for the context this call runs
+    /// under, if any. See [`CoreContext::embedder_config`].
+    pub fn embedder_config(&self) -> Option<crate::config::Config> {
+        self.resolved()
+            .and_then(|core| core.embedder_config().cloned())
+    }
+
     /// The context this call runs under, if any.
     pub fn core(&self) -> Option<&Arc<CoreContext>> {
         self.core.as_ref()
