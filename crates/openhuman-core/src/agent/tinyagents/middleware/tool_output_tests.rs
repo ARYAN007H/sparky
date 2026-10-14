@@ -15,7 +15,7 @@ async fn same_tool_calls_persist_artifacts_under_distinct_call_ids() {
         budget_bytes: 8,
         payload_summarizer: None,
         artifact_store: Some(
-            crate::agent::harness::tool_result_artifacts::new_tool_result_store(
+            crate::agent::harness::tool_result_artifacts::in_memory_tool_result_store(
                 temp.path().to_path_buf(),
                 "identity-session",
             ),

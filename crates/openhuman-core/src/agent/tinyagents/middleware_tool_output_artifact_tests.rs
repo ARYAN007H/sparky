@@ -13,7 +13,7 @@ fn artifact_mw(
         budget_bytes: 1_000,
         payload_summarizer: summarizer,
         artifact_store: Some(
-            crate::agent::harness::tool_result_artifacts::new_tool_result_store(
+            crate::agent::harness::tool_result_artifacts::in_memory_tool_result_store(
                 storage_dir.to_path_buf(),
                 "session",
             ),

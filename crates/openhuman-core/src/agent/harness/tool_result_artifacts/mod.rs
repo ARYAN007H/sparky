@@ -147,6 +147,19 @@ fn set_read_path(args: &mut Value, path: &str) {
     }
 }
 
+/// A store over a private in-memory blob store, materialising under
+/// `materialize_root`: the tests' stand-in for a tenant's scoped storage.
+#[cfg(test)]
+pub(crate) fn in_memory_tool_result_store(
+    materialize_root: PathBuf,
+    session_key: impl Into<String>,
+) -> HostArtifactStore {
+    let scope = tinystoragedrivers::Scope::new("local").expect("scope");
+    let blobs = tinystoragedrivers::MemoryStorage::new();
+    let blobs = tinystoragedrivers::StorageBackend::for_scope(&blobs, &scope).expect("scope");
+    new_tool_result_store(Arc::clone(blobs.blobs()), materialize_root, session_key)
+}
+
 /// The artifact a tool call reads, if any — `file_read`, possibly wrapped in
 /// `use_skill` (#6284).
 ///
