@@ -57,3 +57,7 @@ impl std::fmt::Debug for HostTurnEnv {
             .finish()
     }
 }
+
+#[cfg(test)]
+#[path = "turn_env_tests.rs"]
+mod tests;

@@ -113,10 +113,8 @@ fn derived_overlay(
         overlay = overlay.session_agent(agent);
     }
     if let Some(provider) = provider {
-        let overrides = crate::agent::host_overrides::HostOverrides {
-            session_store: Some(provider),
-            ..Default::default()
-        };
+        let mut overrides = crate::agent::host_overrides::HostOverrides::default();
+        overrides.session_store = Some(provider);
         overlay = overlay.host_overrides(Arc::new(overrides));
     }
     CoreContext::for_test(DomainSet::full(), None).derive_with(overlay)
