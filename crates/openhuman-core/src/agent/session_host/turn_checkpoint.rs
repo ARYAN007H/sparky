@@ -140,7 +140,7 @@ pub(crate) struct CheckpointToolResult {
 /// transcript messages do not preserve a tool-result error flag, so this must
 /// use [`ToolCallOutcome`] rather than trying to infer success from prose.
 pub(crate) fn results_from_tool_outcomes(
-    outcomes: &[crate::agent::tinyagents::ToolCallOutcome],
+    outcomes: &[tinyagents_harness::turn_outcome::ToolCallOutcome],
 ) -> Vec<CheckpointToolResult> {
     outcomes
         .iter()

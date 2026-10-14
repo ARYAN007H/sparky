@@ -50,7 +50,7 @@ use tinyinference_llm::failure::is_recoverable_failure_text as is_recoverable_to
 ///   [`PendingNudgeInjector`]) so the model changes strategy *before* the
 ///   same-strategy retry cap trips.
 /// - [`NoProgress::Halt`] — record the crate's root-cause summary into the shared
-///   [`HaltSummarySlot`](crate::agent::tinyagents::HaltSummarySlot) (the turn overrides its final
+///   [`HaltSummarySlot`](tinyagents_harness::turn_outcome::HaltSummarySlot) (the turn overrides its final
 ///   text with it) and pause the run via the shared steering handle (same
 ///   mechanism as the stop-hook / cap pausers), then [`reset`](NoProgressTracker::reset)
 ///   so a resumed run does not immediately re-pause on the latched state.
@@ -109,7 +109,7 @@ impl RepeatedToolFailureMiddleware {
     pub(crate) fn new(
         handle: SteeringHandle,
         identical_threshold: usize,
-        halt_summary: crate::agent::tinyagents::HaltSummarySlot,
+        halt_summary: tinyagents_harness::turn_outcome::HaltSummarySlot,
     ) -> Self {
         Self {
             stop: StopLatch::new(handle, halt_summary),

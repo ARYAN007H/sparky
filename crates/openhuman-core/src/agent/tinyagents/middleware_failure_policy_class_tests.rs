@@ -44,7 +44,7 @@ async fn run_call(
 fn breaker() -> (
     RepeatedToolFailureMiddleware,
     SteeringHandle,
-    crate::agent::tinyagents::HaltSummarySlot,
+    tinyagents_harness::turn_outcome::HaltSummarySlot,
 ) {
     let handle = SteeringHandle::allow_all();
     let slot = std::sync::Arc::new(std::sync::Mutex::new(None));

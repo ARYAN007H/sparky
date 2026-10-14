@@ -9,7 +9,7 @@ const FALLBACK: &str = "deterministic fallback";
 
 #[test]
 fn classified_halt_returns_partial_work_without_provider_usage() {
-    use crate::agent::tinyagents::ToolCallOutcome;
+    use tinyagents_harness::turn_outcome::ToolCallOutcome;
     let outcome = TinyagentsTurnOutcome {
         text: String::new(),
         resolved_route: None,

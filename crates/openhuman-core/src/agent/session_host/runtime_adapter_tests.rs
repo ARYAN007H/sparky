@@ -65,7 +65,7 @@ impl SessionDriver<OpenHumanRunContext> for RecordingDriver {
 fn codec_marks_failed_tool_rows_from_the_explicit_turn_sidecar() {
     let context = OpenHumanRunContext::new();
     context.session_sidecar.lock().unwrap().tool_outcomes.push(
-        crate::agent::tinyagents::ToolCallOutcome {
+        tinyagents_harness::turn_outcome::ToolCallOutcome {
             call_id: "call-1".into(),
             name: "dangerous_tool".into(),
             arguments: serde_json::json!({"path": "secret"}),
@@ -121,7 +121,7 @@ fn codec_attaches_only_this_agents_own_sidecar_usage_to_atomic_append() {
         sidecar.last_call_output_tokens = 2;
         sidecar
             .tool_outcomes
-            .push(crate::agent::tinyagents::ToolCallOutcome {
+            .push(tinyagents_harness::turn_outcome::ToolCallOutcome {
                 call_id: "call-usage".into(),
                 name: "read_file".into(),
                 arguments: serde_json::json!({"path": "Cargo.toml"}),

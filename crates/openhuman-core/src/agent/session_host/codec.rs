@@ -226,7 +226,7 @@ impl TranscriptCodec<OpenHumanRunContext> for OpenHumanTranscriptCodec {
 fn attach_text_dialect_rounds(
     rows: &mut [TranscriptMessage],
     fresh: &[bool],
-    outcomes: &[crate::agent::tinyagents::ToolCallOutcome],
+    outcomes: &[tinyagents_harness::turn_outcome::ToolCallOutcome],
     route: Option<&tinyinference_llm::model::ResolvedModelRoute>,
 ) {
     let mut iteration = 0u32;

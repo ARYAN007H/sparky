@@ -46,7 +46,7 @@ fn stalled_model_stream_reports_completed_evidence_instead_of_its_narration() {
             messages: vec![Message::user("Find information about Jev")],
             accepted_len: 1,
             request_base_len: 1,
-            tool_outcomes: vec![crate::agent::tinyagents::ToolCallOutcome {
+            tool_outcomes: vec![tinyagents_harness::turn_outcome::ToolCallOutcome {
                 call_id: "search-1".into(),
                 name: "web_search_tool".into(),
                 arguments: serde_json::json!({"query": "Jev TypeSafe"}),
@@ -102,7 +102,7 @@ fn graph_failure_copies_snapshot_usage_and_failed_tool_outcome_to_sidecar() {
             )),
             pricing_model: None,
             model_calls: 2,
-            tool_outcomes: vec![crate::agent::tinyagents::ToolCallOutcome {
+            tool_outcomes: vec![tinyagents_harness::turn_outcome::ToolCallOutcome {
                 call_id: "call-1".into(),
                 name: "write_file".into(),
                 arguments: serde_json::json!({"path": "blocked.txt"}),

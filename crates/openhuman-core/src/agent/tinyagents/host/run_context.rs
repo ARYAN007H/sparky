@@ -19,7 +19,7 @@ use tokio::sync::mpsc::Sender;
 use crate::agent::harness::fork_context::{AgentContextPreparedSource, ParentExecutionContext};
 use crate::agent::progress::AgentProgress;
 use crate::agent::subagent_host::SubagentUsage;
-use crate::agent::tinyagents::turn_outcome::ToolOutcomeSink;
+use tinyagents_harness::turn_outcome::ToolOutcomeSink;
 use crate::agent::tinyagents::{
     turn_outcome::ToolCallOutcome, turn_policy::ToolPolicyEnforcement, TurnContextMiddleware,
 };

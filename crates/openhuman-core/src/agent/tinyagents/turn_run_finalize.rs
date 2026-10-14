@@ -256,7 +256,7 @@ pub(super) async fn finalize_turn_outcome(
 
     // #6951: the run finished on a reply that spent the whole output budget
     // reasoning. The closing call names that cause instead of "finished".
-    let truncated = super::turn_outcome::ended_out_of_output_budget(run.final_response.as_ref());
+    let truncated = tinyagents_harness::turn_outcome::ended_out_of_output_budget(run.final_response.as_ref());
     if truncated {
         tracing::warn!(
             model,

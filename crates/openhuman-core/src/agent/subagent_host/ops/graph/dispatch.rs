@@ -587,7 +587,7 @@ fn map_tinyagents_subagent_error(err: anyhow::Error) -> SubagentRunError {
 /// every call succeeded.
 fn build_cap_digest(
     conversation: &[TranscriptEntry],
-    tool_outcomes: &[crate::agent::tinyagents::ToolCallOutcome],
+    tool_outcomes: &[tinyagents_harness::turn_outcome::ToolCallOutcome],
 ) -> String {
     use std::collections::HashMap;
     use std::fmt::Write as _;
