@@ -69,6 +69,7 @@ import {
   fetchAndHydrateTurnState,
   hydrateThreadUsage,
   markThreadSendPending,
+  setPreviewArtifactId,
   type ProcessingTranscriptItem,
   setToolTimelineForThread,
   type ToolTimelineEntry,
@@ -260,7 +261,7 @@ const Conversations = ({
   projectThreadList = false,
 }: ConversationsProps = {}) => {
   const [composerOverride, setComposerOverride] = useState<'mic-cloud' | 'text' | null>(null);
-  const [previewArtifactId, setPreviewArtifactId] = useState<string | null>(null);
+  const previewArtifactId = useAppSelector(s => s.chatRuntime.previewArtifactId);
   const composer = composerOverride ?? composerProp;
   const { t } = useT();
   const dispatch = useAppDispatch();
@@ -2159,7 +2160,14 @@ const Conversations = ({
   // ChatFilesChip count) so the user can open live artifact previews.
   const liveArtifacts = artifactDeckThreadId
     ? (artifactsByThread[artifactDeckThreadId] ?? []).filter(
-        a => !a.toolCallId && (a.status === 'in_progress' || a.status === 'ready')
+        a =>
+          // Cards with a producing turn now render inline inside that
+          // message (MessageArtifactCards); only artifacts without an
+          // owning requestId (older cores / persisted snapshots) fall
+          // back to the end-of-transcript deck.
+          !a.ownerRequestId &&
+          !a.toolCallId &&
+          (a.status === 'in_progress' || a.status === 'ready')
       )
     : [];
   const liveArtifactDeck =
@@ -2174,7 +2182,7 @@ const Conversations = ({
                 console.warn('[artifact] regenerate failed:', err);
               });
             }}
-            onOpenPreview={setPreviewArtifactId}
+            onOpenPreview={id => dispatch(setPreviewArtifactId(id))}
           />
         ))}
       </div>
@@ -2399,7 +2407,7 @@ const Conversations = ({
             {previewArtifactId && (
               <ArtifactPreviewPanel
                 artifactId={previewArtifactId}
-                onClose={() => setPreviewArtifactId(null)}
+                onClose={() => dispatch(setPreviewArtifactId(null))}
               />
             )}
           </div>

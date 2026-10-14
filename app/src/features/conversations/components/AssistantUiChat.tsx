@@ -17,6 +17,7 @@ import { ComposerTriggers } from '../aui/ComposerTriggers';
 import { ContextUsage } from '../aui/ContextUsage';
 import { InterruptedTurnNotice } from '../aui/InterruptedTurnNotice';
 import { ActiveTurnTaskCards, TurnTaskCards, TurnTaskProvider } from '../aui/TurnTaskCards';
+import { MessageArtifactCards } from '../aui/MessageArtifactCards';
 import { ChatSources } from './aui/ChatSources';
 import { ChatToolFallback } from './ChatToolParts';
 
@@ -339,6 +340,9 @@ export function AssistantUiChat({
       // Versioned-artifact cards live in the transcript after the last
       // message (see `AfterMessages` slot in thread.tsx).
       AfterMessages,
+      // Artifact cards render INSIDE the message that produced them
+      // (matched by requestId), not just at the end of the transcript.
+      MessageArtifacts: () => <MessageArtifactCards />,
       // The web pages the turn fetched, grouped from its `source` parts into
       // one collapsed disclosure under the answer.
       SourceGroup: ChatSources,

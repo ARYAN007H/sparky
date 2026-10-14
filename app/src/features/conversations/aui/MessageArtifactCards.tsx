@@ -3,7 +3,8 @@
 import { useAuiState } from '@assistant-ui/react';
 import { useMemo } from 'react';
 
-import { useAppSelector } from '../../../store/hooks';
+import { useAppSelector, useAppDispatch } from '../../../store/hooks';
+import { setPreviewArtifactId } from '../../../store/chatRuntimeSlice';
 import { ArtifactCardAdapter } from './ArtifactCardAdapter';
 
 /**
@@ -19,6 +20,7 @@ import { ArtifactCardAdapter } from './ArtifactCardAdapter';
 export function MessageArtifactCards() {
   const requestId = useAuiState(s => s.message.metadata?.custom?.requestId as string | undefined);
   const threadId = useAppSelector(s => s.thread.selectedThreadId as string | undefined);
+  const dispatch = useAppDispatch();
 
   const artifactsByThread = useAppSelector(s => s.chatRuntime.artifactsByThread);
   const cards = useMemo(() => {
@@ -34,7 +36,11 @@ export function MessageArtifactCards() {
   return (
     <div className="mt-3 flex flex-col gap-2" data-testid="message-artifact-cards">
       {cards.map(artifact => (
-        <ArtifactCardAdapter key={artifact.artifactId} artifact={artifact} />
+        <ArtifactCardAdapter
+          key={artifact.artifactId}
+          artifact={artifact}
+          onOpenPreview={id => dispatch(setPreviewArtifactId(id))}
+        />
       ))}
     </div>
   );

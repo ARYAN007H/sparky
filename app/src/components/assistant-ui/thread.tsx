@@ -150,6 +150,13 @@ export type ThreadComponents = {
    * inline tool-call renderer. Always mounted (not gated on isRunning).
    */
   AfterMessages?: ComponentType | undefined;
+  /**
+   * Host-owned artifact cards rendered inside each assistant message's
+   * content area (matched by requestId). Unlike AfterMessages which
+   * renders once at the end of the transcript, MessageArtifacts renders
+   * per-message so cards appear attached to the message that created them.
+   */
+  MessageArtifacts?: ComponentType | undefined;
   /** Host-owned attachment previews rendered above the editor. */
   ComposerAttachments?: ComponentType | undefined;
   /** Host-owned attachment picker rendered in the action row. */
@@ -347,7 +354,12 @@ const ThreadComponentsContext = createContext<ThreadComponents>(EMPTY_COMPONENTS
 // in a separate context so that change does not invalidate the full transcript.
 type MessageComponents = Pick<
   ThreadComponents,
-  'AssistantMessage' | 'ToolFallback' | 'ActivityGroup' | 'SourceGroup' | 'MessageTasks'
+  | 'AssistantMessage'
+  | 'ToolFallback'
+  | 'ActivityGroup'
+  | 'SourceGroup'
+  | 'MessageTasks'
+  | 'MessageArtifacts'
 >;
 const MessageComponentsContext = createContext<MessageComponents>(EMPTY_COMPONENTS);
 
@@ -409,6 +421,7 @@ export const Thread: FC<ThreadProps> = ({
       ActivityGroup: components.ActivityGroup,
       SourceGroup: components.SourceGroup,
       MessageTasks: components.MessageTasks,
+      MessageArtifacts: components.MessageArtifacts,
     }),
     [
       components.AssistantMessage,
@@ -416,6 +429,7 @@ export const Thread: FC<ThreadProps> = ({
       components.ActivityGroup,
       components.SourceGroup,
       components.MessageTasks,
+      components.MessageArtifacts,
     ]
   );
 
@@ -1168,6 +1182,7 @@ const AssistantMessage: FC = () => {
     ActivityGroup = DefaultActivityGroup,
     SourceGroup,
     MessageTasks,
+    MessageArtifacts,
   } = useContext(MessageComponentsContext);
   const stopped = useAuiState(isStoppedRun);
 
@@ -1273,6 +1288,11 @@ const AssistantMessage: FC = () => {
         {MessageTasks && (
           <div>
             <MessageTasks />
+          </div>
+        )}
+        {MessageArtifacts && (
+          <div className="mt-2">
+            <MessageArtifacts />
           </div>
         )}
       </div>

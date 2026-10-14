@@ -3291,6 +3291,7 @@ export const {
   upsertArtifactFailedForThread,
   clearArtifactsForThread,
   removeArtifactForThread,
+  setPreviewArtifactId,
   setQueueStatusForThread,
   clearQueueStatusForThread,
   beginInferenceTurn,
