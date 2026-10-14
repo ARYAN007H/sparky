@@ -28,7 +28,6 @@ const LEGACY_LIMIT_ENTRIES = [
   // The session-todo integration added transcript metadata construction to
   // this already-exempt composition seam. Keep its allowance exact.
   ["crates/openhuman-core/src/agent/session_host/runtime_session.rs", 1080],
-  // `[components] juice` test constructor (tokenjuice gate tests).
   // Session-host factory still assembles the product's deliberately coupled
   // provider, security, memory, tool and prompt policy.  Generic session
   // state moved to tinyagents-runtime; this remaining composition is split in
