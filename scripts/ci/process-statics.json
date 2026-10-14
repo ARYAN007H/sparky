@@ -90,26 +90,6 @@
     "verification": "modules/ops_tests.rs: status_reports_the_source_that_serves_a_module"
   },
   {
-    "file": "crates/openhuman-core/src/web_chat/turn_activity.rs",
-    "scope": "",
-    "name": "CURRENT_TURN_ACTIVITY",
-    "type": "TurnActivity",
-    "count": 1,
-    "category": "B",
-    "reason": "A tokio task_local, not a process global: `with_turn_activity` scopes one value per web turn on that turn's own task, and `run_chat_task` reads it to tap the same turn's progress. No other task or turn can observe it; the value holds only that turn's activity, its own resolved config and locale.",
-    "verification": "web_chat/turn_activity_tests.rs: task_local_scope_is_visible_inside_only"
-  },
-  {
-    "file": "crates/openhuman-core/src/sandbox/shell_progress.rs",
-    "scope": "",
-    "name": "CURRENT_METER",
-    "type": "ShellOutputMeter",
-    "count": 1,
-    "category": "B",
-    "reason": "A tokio task_local, not a process global: `with_shell_progress` scopes one meter per shell call on that call's task, and `shell_exec::run` reads it before spawning that call's worker. It holds only that call's output byte count and last line; no other call or turn can observe it.",
-    "verification": "sandbox/shell_progress_tests.rs: without_a_context_no_meter_is_scoped, a_long_call_reports_its_output_as_it_runs"
-  },
-  {
     "file": "crates/openhuman-core/src/web_chat/ops/test_hooks.rs",
     "scope": "",
     "name": "TEST_PARK_AFTER_RUN",
