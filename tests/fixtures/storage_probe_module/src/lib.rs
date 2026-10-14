@@ -45,11 +45,16 @@ impl Interface for Probe {
             } else {
                 serde_json::from_value(args)?
             };
-        let proxy = self.connection.proxy(
-            STORAGE,
-            format!("/ai/tinyhumans/tinystorage/{object}"),
-            STORAGE,
-        )?;
+        // Short, so a call the bus drops (an oversized frame) is an answer
+        // here well inside the caller's own timeout.
+        let proxy = self
+            .connection
+            .proxy(
+                STORAGE,
+                format!("/ai/tinyhumans/tinystorage/{object}"),
+                STORAGE,
+            )?
+            .with_timeout(std::time::Duration::from_secs(6));
         let reply: Result<Value> = if confidential {
             proxy.call_confidential(&selector, (request,)).await
         } else {

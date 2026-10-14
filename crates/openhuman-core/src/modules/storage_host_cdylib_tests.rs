@@ -496,6 +496,13 @@ async fn a_blob_over_the_frame_cannot_go_inline() {
         .await
         .unwrap();
     assert!(big.get("err").is_some(), "an oversized inline blob must fail");
+    // The refusal does not take the module's connection down with it.
+    let after: Value = rig
+        .probe
+        .call("PutBlob", ("tinyjuice_ccr/after", 2048usize))
+        .await
+        .unwrap();
+    assert!(after.get("ok").is_some(), "the module keeps working: {after}");
     let handle = rig.backend.for_scope(&rig.scope("tinyjuice")).unwrap();
     assert!(handle.blobs().head(key).await.unwrap().is_none());
     // A blob key outside the CCR prefix is not the module's.
