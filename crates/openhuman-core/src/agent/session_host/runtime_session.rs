@@ -36,10 +36,7 @@ use crate::agent::{
     session_host::{
         driver::OpenHumanSessionDriver, OpenHumanSessionHooks, OpenHumanTranscriptCodec,
     },
-    tinyagents::{
-        host::OpenHumanRunContext,
-        middleware::turn_context::{TranscriptSnapshotSink, TurnContextMiddleware},
-    },
+    tinyagents::{host::OpenHumanRunContext, middleware::turn_context::TurnContextMiddleware},
 };
 
 #[path = "runtime_session_progress.rs"]
@@ -815,7 +812,7 @@ impl OpenHumanSessionHost {
                         + usize::from(view.history.last() != Some(&request.input));
                     Box::pin(async move {
                         let transcript_snapshot =
-                            TranscriptSnapshotSink::default();
+                            crate::agent::tinyagents::middleware::turn_context::TranscriptSnapshotSink::default();
                         transcript_snapshot
                             .lock()
                             .unwrap_or_else(std::sync::PoisonError::into_inner)
