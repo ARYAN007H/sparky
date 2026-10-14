@@ -42,7 +42,6 @@ mod hooks;
 // Tool surface for live voice sessions (`voice::live`).
 #[cfg(feature = "voice")]
 mod live_tools;
-mod managed_tools;
 mod prefix_snapshot;
 mod recorded_tools;
 mod runtime;

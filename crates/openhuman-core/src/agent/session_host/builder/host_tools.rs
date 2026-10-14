@@ -135,7 +135,7 @@ impl HostTurnTools {
             0..0,
             self.tools.into_iter().map(|tool| {
                 if permanent.contains(tool.name()) {
-                    Box::new(super::permanent_tool::PermanentTool(tool)) as Box<dyn Tool>
+                    Box::new(tinyagents_runtime::PermanentTool(tool)) as Box<dyn Tool>
                 } else {
                     tool
                 }
