@@ -158,6 +158,15 @@ const deletedTaskLocalModules = [
   "thread_context",
   "turn_workspace",
 ];
+// The only non-test files still allowed to declare a `task_local!` (#7801): the
+// dispatch-level ambient state that needs an explicit dispatch context before
+// it can go. Any other declaration is a new violation.
+const taskLocalDeclarationAllowlist = [
+  "crates/openhuman-core/src/agent/turn_origin.rs",
+  "crates/openhuman-core/src/core/runtime/context.rs",
+  "crates/openhuman-core/src/memory/scope.rs",
+  "crates/openhuman-core/src/security/approval/gate.rs",
+];
 const taskLocalAccessors = [
   "current_parent",
   "with_parent_context",
@@ -194,6 +203,8 @@ const taskLocalAccessors = [
   "with_fresh_snapshot",
   "with_untrusted_input_turn",
   "dedup_turn_scope",
+  "current_meter",
+  "with_turn_activity",
 ];
 const taskLocalStatics = [
   "PARENT_CONTEXT",
@@ -215,6 +226,9 @@ const taskLocalStatics = [
   "UNTRUSTED_INPUT_TURN",
   "REGENERATE_TARGET_ID",
   "EGRESS_TURN_DEDUP",
+  "JOB_STATE",
+  "CURRENT_TURN_ACTIVITY",
+  "CURRENT_METER",
 ];
 
 async function filesUnder(root, predicate) {
@@ -656,6 +670,9 @@ for (const path of await filesUnder(
         ) ||
         (/\/turn_workspace\.rs$/.test(path) &&
           /\bwith_workspace\s*\(/.test(text));
+      const declaresUnlistedTaskLocal =
+        /\btask_local!/.test(text) &&
+        !taskLocalDeclarationAllowlist.includes(rel);
       const declaresDeletedModule = deletedTaskLocalModules.some((name) =>
         new RegExp(`\\bmod\\s+${escapeRegex(name)}\\s*;`).test(text),
       );
@@ -664,6 +681,7 @@ for (const path of await filesUnder(
         namesTaskLocalAccessor ||
         namesTaskLocalStatic ||
         usesGenericAccessor ||
+        declaresUnlistedTaskLocal ||
         declaresDeletedModule
       )
         add("openhuman-task-local", path, line, raw);

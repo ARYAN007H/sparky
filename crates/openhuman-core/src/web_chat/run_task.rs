@@ -44,6 +44,9 @@ pub(crate) async fn run_chat_task(
     // This turn's host environment (its Stop cancellation, the wall-clock
     // backstop's deadline), handed to the session so the whole run tree sees it.
     host_env: crate::agent::turn_env::HostTurnEnv,
+    // The web-turn guard's activity record for this turn, passed explicitly by
+    // `run_turn_under_cancel_and_deadline`.
+    activity: super::turn_activity::TurnActivity,
 ) -> Result<WebChatTaskResult, String> {
     // One turn at a time per profile: wait behind its relay and cron turns.
     let _turn = crate::profiles::turn_gate::acquire().await;
@@ -124,9 +127,7 @@ pub(crate) async fn run_chat_task(
     }
     // A guard that stops this turn closes it from this turn's own config and
     // reply language, not from whatever profile is active when it fires.
-    if let Some(activity) = super::turn_activity::current() {
-        activity.remember_turn(std::sync::Arc::new(config.clone()), locale.clone());
-    }
+    activity.remember_turn(std::sync::Arc::new(config.clone()), locale.clone());
     let model_override = normalize_model_override(model_override);
     // The cached session (or a cold-boot resumed one) is the thread's single
     // live history; every turn on the thread checks it out through this path.
@@ -158,10 +159,7 @@ pub(crate) async fn run_chat_task(
     let (progress_tx, progress_rx) = tokio::sync::mpsc::channel(256);
     // Under the web-turn guard, fold every event into the turn's activity
     // record (the idle guard's input) on its way to the bridge.
-    let progress_rx = match super::turn_activity::current() {
-        Some(activity) => super::turn_activity::tap(activity, progress_rx, 256),
-        None => progress_rx,
-    };
+    let progress_rx = super::turn_activity::tap(activity, progress_rx, 256);
     // The channel is fresh here. Record the user input even if the turn fails
     // before a committed reply can emit its final TurnContent event.
     let _ = progress_tx.try_send(AgentProgress::TurnContent {
