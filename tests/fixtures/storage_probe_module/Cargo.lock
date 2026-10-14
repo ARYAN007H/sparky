@@ -229,7 +229,7 @@ dependencies = [
 
 [[package]]
 name = "tinybus"
-version = "0.1.3"
+version = "0.1.5"
 dependencies = [
  "async-trait",
  "serde",
@@ -242,7 +242,7 @@ dependencies = [
 
 [[package]]
 name = "tinybus-module"
-version = "0.1.3"
+version = "0.1.5"
 dependencies = [
  "async-trait",
  "serde",

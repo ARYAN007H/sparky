@@ -14,6 +14,7 @@ use crate::modules::linked::register_linked;
 use crate::modules::{ops, runtime};
 use std::sync::Arc;
 use tinybus::module::ModuleClient;
+#[cfg(feature = "e2e-test-support")]
 use tinychannels_bus::methods;
 
 const MODULE_ID: &str = "tinychannels";

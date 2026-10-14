@@ -3,6 +3,7 @@
 use super::*;
 use std::path::Path;
 use std::sync::Mutex as StdMutex;
+#[cfg(feature = "e2e-test-support")]
 use tempfile::tempdir;
 use tinychannels_bus::{ChannelMessage, SendMessage};
 
@@ -53,6 +54,7 @@ fn received(channel: &str, reply_target: &str, thread_ts: Option<&str>, ws: &Pat
     }
 }
 
+#[cfg(feature = "e2e-test-support")]
 fn processed(channel: &str, reply_target: &str, ws: &Path) -> DomainEvent {
     DomainEvent::ChannelMessageProcessed {
         channel: channel.into(),
