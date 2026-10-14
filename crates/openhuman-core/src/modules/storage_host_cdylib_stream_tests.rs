@@ -197,7 +197,7 @@ async fn a_second_module_cannot_receive_the_first_modules_watch_signals() {
         if let Ok(Ok(message)) =
             tokio::time::timeout(std::time::Duration::from_millis(200), everything.recv()).await
         {
-            let id = message.body.first().and_then(|b| b["watch_id"].as_str());
+            let id = message.body.get(0).and_then(|b| b["watch_id"].as_str());
             ids.push(id.map_or_else(
                 || format!("<non-watch: {:?}>", message.body),
                 str::to_string,
