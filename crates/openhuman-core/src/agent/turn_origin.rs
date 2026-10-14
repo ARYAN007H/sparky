@@ -295,11 +295,10 @@ pub async fn with_inherited_origin<F: std::future::Future>(
 /// fresh task where [`current`] is `None`, so every external-effect tool it
 /// calls reaches the approval gate as [`AgentTurnOrigin::Unknown`] and is
 /// refused — even though the parent turn that delegated the work was properly
-/// labelled. That is the same failure mode
-/// [`fork_context::with_parent_context`](crate::agent::harness::fork_context)
-/// and an explicit [`OpenHumanRunContext`](crate::agent::tinyagents::host::OpenHumanRunContext)
-/// already re-install explicitly at those spawn sites; the origin is the third
-/// thing that has to travel with them.
+/// labelled. The parent `ParentExecutionContext` and an explicit
+/// [`OpenHumanRunContext`](crate::agent::tinyagents::host::OpenHumanRunContext)
+/// already travel explicitly to those spawn sites; the origin still has to be
+/// carried with them.
 ///
 /// **Call this on the parent task**, i.e. build the future *before* handing it
 /// to `tokio::spawn` — the origin is read when this function is called, not

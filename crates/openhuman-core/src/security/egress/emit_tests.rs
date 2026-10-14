@@ -103,26 +103,28 @@ async fn attaches_ambient_chat_context() {
     assert_eq!(client_id.as_deref(), Some("client-abc"));
 }
 
-/// Inside a [`dedup_turn_scope`], repeated disclosures of the *same* destination
+/// Inside a [`EgressLedger::per_turn`], repeated disclosures of the *same* destination
 /// (provider/service/reason) collapse to a single event, while a distinct
 /// destination still publishes — the managed-turn fan-out fix (codex P2, #4812).
 #[tokio::test]
-async fn dedup_turn_scope_collapses_repeat_destination() {
+async fn per_turn_ledger_collapses_repeat_destination() {
     crate::core::bus::init().await.expect("bus init");
     let mut rx = crate::core::bus::BUS.get().unwrap().receiver();
 
     let dup = "svc-dedup-dup-test";
     let distinct = "svc-dedup-distinct-test";
     let sentinel = "svc-dedup-sentinel-test";
-    dedup_turn_scope(|| {
-        emit_external_transfer(EgressDescriptor::inference("openhuman", dup, true));
-        // Same destination again — must be suppressed within the turn.
-        emit_external_transfer(EgressDescriptor::inference("openhuman", dup, true));
-        // A distinct destination (different service) still discloses.
-        emit_external_transfer(EgressDescriptor::inference("openhuman", distinct, true));
-        // Sentinel closes the drain window.
-        emit_external_transfer(EgressDescriptor::network_fetch(sentinel));
-    });
+    let ledger = EgressLedger::per_turn();
+    emit_external_transfer_in(&ledger, EgressDescriptor::inference("openhuman", dup, true));
+    // Same destination again — must be suppressed within the turn.
+    emit_external_transfer_in(&ledger, EgressDescriptor::inference("openhuman", dup, true));
+    // A distinct destination (different service) still discloses.
+    emit_external_transfer_in(
+        &ledger,
+        EgressDescriptor::inference("openhuman", distinct, true),
+    );
+    // Sentinel closes the drain window.
+    emit_external_transfer_in(&ledger, EgressDescriptor::network_fetch(sentinel));
 
     let mut dup_count = 0;
     let mut distinct_seen = false;
@@ -153,7 +155,7 @@ async fn dedup_turn_scope_collapses_repeat_destination() {
     );
 }
 
-/// Outside any [`dedup_turn_scope`] (CLI / cron / a single egress site) there is
+/// Outside any [`EgressLedger::per_turn`] (CLI / cron / a single egress site) there is
 /// no ledger, so every `emit_external_transfer` publishes — dedup never leaks
 /// across unrelated calls.
 #[tokio::test]

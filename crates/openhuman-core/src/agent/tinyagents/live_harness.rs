@@ -90,7 +90,7 @@ pub(crate) fn assemble_live_tool_harness(
     ));
     harness.push_tool_middleware(Arc::new(ApprovalGateMiddleware::new(
         "approval_security",
-        Arc::new(middleware::ApprovalSecurityMiddleware::new(
+        Arc::new(middleware::approval::ApprovalSecurityMiddleware::new(
             tool_sets.clone(),
         )),
     )));
@@ -101,26 +101,32 @@ pub(crate) fn assemble_live_tool_harness(
         .as_ref()
         .map(|enforcement| enforcement.session.clone());
     if let Some(enforcement) = tool_policy {
-        harness.push_tool_middleware(Arc::new(middleware::ToolPolicyMiddleware::new(
-            enforcement.policy,
-            enforcement.session,
-            tool_sets.clone(),
-            enforcement.channel,
-        )));
+        harness.push_tool_middleware(Arc::new(
+            middleware::tool_policy::ToolPolicyMiddleware::new(
+                enforcement.policy,
+                enforcement.session,
+                tool_sets.clone(),
+                enforcement.channel,
+            ),
+        ));
     }
-    harness.push_tool_middleware(Arc::new(middleware::credential_scrub_middleware()));
+    harness.push_tool_middleware(Arc::new(
+        middleware::credential_scrub::credential_scrub_middleware(),
+    ));
     harness.push_middleware(Arc::new(ArgRecoveryMiddleware::new(tool_sets.clone())));
     let registered_tools = harness.tools().names();
-    harness.push_middleware(Arc::new(middleware::packed_tool_route_middleware(
-        registered_tools,
-        route_session,
-    )));
+    harness.push_middleware(Arc::new(
+        middleware::packed_tool_route::packed_tool_route_middleware(
+            registered_tools,
+            route_session,
+        ),
+    ));
     let mut embedder_tool_hooks = crate::agent::hooks::embedder_tool_hooks();
     embedder_tool_hooks.extend(tool_hooks);
     if !embedder_tool_hooks.is_empty() {
-        harness.push_middleware(Arc::new(middleware::EmbedderToolHooksMiddleware::new(
-            embedder_tool_hooks,
-        )));
+        harness.push_middleware(Arc::new(
+            middleware::embedder_hooks::EmbedderToolHooksMiddleware::new(embedder_tool_hooks),
+        ));
     }
     harness
 }

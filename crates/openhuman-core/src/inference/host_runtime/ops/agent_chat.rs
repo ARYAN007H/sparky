@@ -639,6 +639,7 @@ pub async fn agent_chat_simple(
                 &default_model,
                 true,
                 thread_id.as_deref(),
+                &crate::security::egress::EgressLedger::none(),
             )
             .map_err(|e| e.to_string())?;
         (backend, resolved_model)
