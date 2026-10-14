@@ -481,21 +481,23 @@ async fn a_peer_that_is_not_a_registry_module_is_refused() {
 async fn a_blob_over_the_frame_cannot_go_inline() {
     let _turn = TURN.lock().await;
     let rig = rig("tinyjuice").await;
-    let key = "tinyjuice_ccr/oversized";
     let small: Value = rig
         .probe
         .call("PutBlob", ("tinyjuice_ccr/small", 1024usize))
         .await
         .unwrap();
     assert!(small.get("ok").is_some(), "a small inline blob works: {small}");
-    // 17 MiB of body cannot be one frame, whatever the grant says. Streams are
-    // the way (#7781); until then it must fail closed and store nothing.
-    let big: Value = rig
-        .probe
-        .call("PutBlob", (key, 17usize * 1024 * 1024))
-        .await
-        .unwrap();
-    assert!(big.get("err").is_some(), "an oversized inline blob must fail");
+    // Past the contract's inline cap (1 MiB) the server refuses the body, and
+    // past the 16 MiB frame (8 MiB of bytes is already more than that as JSON)
+    // the bus never delivers it. Either way it must fail closed and store
+    // nothing; the way for a big body is `PutStream` (#7781).
+    for (len, name) in [(2usize * 1024 * 1024, "over-cap"), (9_000_000, "over-frame")] {
+        let key = format!("tinyjuice_ccr/{name}");
+        let big: Value = rig.probe.call("PutBlob", (key.as_str(), len)).await.unwrap();
+        assert!(big.get("err").is_some(), "{name}: an oversized inline blob must fail: {big}");
+        let handle = rig.backend.for_scope(&rig.scope("tinyjuice")).unwrap();
+        assert!(handle.blobs().head(&key).await.unwrap().is_none(), "{name}");
+    }
     // The refusal does not take the module's connection down with it.
     let after: Value = rig
         .probe
@@ -503,8 +505,6 @@ async fn a_blob_over_the_frame_cannot_go_inline() {
         .await
         .unwrap();
     assert!(after.get("ok").is_some(), "the module keeps working: {after}");
-    let handle = rig.backend.for_scope(&rig.scope("tinyjuice")).unwrap();
-    assert!(handle.blobs().head(key).await.unwrap().is_none());
     // A blob key outside the CCR prefix is not the module's.
     let outside = rig
         .call("Blobs", "Get", json!({"key": "tinyjuice_other/x"}))
