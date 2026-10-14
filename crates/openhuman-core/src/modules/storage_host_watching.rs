@@ -13,7 +13,7 @@ use serde_json::Value;
 use tinystoragedrivers::{
     async_trait, Capabilities, Capability, CollectionSpec, DocumentStore, DocumentWatch, Filter,
     MemoryStorage, Page, Precondition, Query, Result, Scope, ScopedStorage, Sort, StorageBackend,
-    Version, Versioned, WatchNotice, WatchOptions,
+    Version, Versioned, WatchNotice, WatchOptions, WriteOp, WriteResult,
 };
 use tokio::sync::broadcast;
 
@@ -152,5 +152,15 @@ impl DocumentStore for Documents {
 
     async fn drop_collection(&self, c: &str) -> Result<()> {
         self.inner.drop_collection(c).await
+    }
+
+    async fn collections(&self, prefix: &str) -> Result<Vec<String>> {
+        self.inner.collections(prefix).await
+    }
+
+    async fn atomic_batch(&self, ops: Vec<WriteOp>) -> Result<Vec<WriteResult>> {
+        let results = self.inner.atomic_batch(ops).await?;
+        let _ = self.changed.send(());
+        Ok(results)
     }
 }
