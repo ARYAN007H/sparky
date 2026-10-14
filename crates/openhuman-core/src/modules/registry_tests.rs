@@ -21,14 +21,14 @@ fn tinycomputer_registry_matches_bus_contract_and_published_release() {
 
 #[test]
 #[cfg(feature = "web3")]
-fn tinywallet_registry_matches_the_verified_v023_release_manifest() {
+fn tinywallet_registry_matches_the_verified_v0231_release_manifest() {
     let wallet = find("tinywallet").expect("compiled TinyWallet module");
-    assert_eq!(wallet.version, "0.23.0");
+    assert_eq!(wallet.version, "0.23.1");
     #[cfg(feature = "web3")]
     assert_eq!(tinywallet_bus::CONTRACT_VERSION, (1, 14));
     assert_eq!(
         wallet.release_url,
-        "https://github.com/tinyhumansai/tinywallet/releases/tag/v0.23.0"
+        "https://github.com/tinyhumansai/tinywallet/releases/tag/v0.23.1"
     );
 
     let mut actual = wallet
@@ -130,13 +130,13 @@ fn tinywallet_registry_matches_the_verified_v023_release_manifest() {
 }
 
 #[test]
-fn tinybox_registry_matches_the_published_v0130_release_manifest() {
+fn tinybox_registry_matches_the_published_v0131_release_manifest() {
     let record = find("tinybox").expect("compiled TinyBox module");
-    assert_eq!(record.version, "0.1.30");
+    assert_eq!(record.version, "0.1.31");
     assert_eq!(tinybox_bus::CONTRACT_VERSION, (1, 18));
     assert_eq!(
         record.release_url,
-        "https://github.com/tinyhumansai/tinybox/releases/tag/v0.1.30"
+        "https://github.com/tinyhumansai/tinybox/releases/tag/v0.1.31"
     );
 
     let actual = record
@@ -236,13 +236,13 @@ fn tinybox_registry_matches_the_published_v0130_release_manifest() {
     assert_eq!(actual, published);
 }
 #[test]
-fn tinymcp_registry_matches_the_published_v0181_release_manifest() {
+fn tinymcp_registry_matches_the_published_v0182_release_manifest() {
     let record = find("tinymcp").expect("compiled TinyMCP module");
-    assert_eq!(record.version, "0.18.1");
+    assert_eq!(record.version, "0.18.2");
     assert_eq!(tinymcp_bus::CONTRACT_VERSION, (1, 24));
     assert_eq!(
         record.release_url,
-        "https://github.com/tinyhumansai/tinymcp/releases/tag/v0.18.1"
+        "https://github.com/tinyhumansai/tinymcp/releases/tag/v0.18.2"
     );
     let actual = record
         .assets
@@ -552,7 +552,7 @@ fn find_resolves_known_ids_only() {
 #[test]
 fn tinychannels_registry_matches_scoped_runtime_release() {
     let record = find("tinychannels").expect("compiled TinyChannels module");
-    assert_eq!(record.version, "0.1.31");
+    assert_eq!(record.version, "0.1.32");
     assert_eq!(tinychannels_bus::CONTRACT_VERSION, 21);
     assert_eq!(
         tinychannels_bus::module_relay::MODULE_OPERATION_VERSION,
@@ -627,7 +627,7 @@ fn tinychannels_registry_matches_scoped_runtime_release() {
 #[test]
 fn voice_capture_release_pins_summary_contract_and_every_platform_digest() {
     let record = find("tinyvoice").unwrap();
-    assert_eq!(record.version, "0.3.1");
+    assert_eq!(record.version, "0.3.2");
     assert_eq!(tinyvoice_bus::CONTRACT_VERSION, (1, 10));
     let expected = [
         (
