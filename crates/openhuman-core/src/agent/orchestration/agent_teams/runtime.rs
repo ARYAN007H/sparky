@@ -13,9 +13,9 @@
 //!
 //! Like the workflow engine (#3375), the worker is spawned from a controller
 //! background task with no enclosing agent turn, so it builds a root
-//! [`ParentExecutionContext`] (shared [`build_root_parent`]) and runs inside
-//! [`with_parent_context`] — every nested `spawn_agent` then resolves a real
-//! provider / tools / memory.
+//! [`ParentExecutionContext`] (shared [`build_root_parent`]) and passes it to
+//! `spawn_agent` — every spawned worker then inherits a real provider / tools /
+//! memory.
 //!
 //! ## Message delivery boundary
 //!
