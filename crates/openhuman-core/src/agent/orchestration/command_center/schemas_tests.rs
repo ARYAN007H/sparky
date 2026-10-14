@@ -58,9 +58,9 @@ fn params(value: Value) -> Map<String, Value> {
 
 #[tokio::test]
 async fn listing_work_on_an_empty_ledger_answers() {
-    with_scratch_workspace(|| handle_agent_work_list(params(serde_json::json!({ "limit": 5 }))))
+    let v = with_scratch_workspace(|| handle_agent_work_list(params(serde_json::json!({ "limit": 5 }))))
         .await
-        .expect("an empty ledger lists as an empty view");
+        .expect("an empty ledger lists as an empty view");eprintln!("DBG-WORK {v}");
 }
 
 #[tokio::test]

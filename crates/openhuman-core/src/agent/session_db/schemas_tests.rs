@@ -106,7 +106,7 @@ async fn listing_an_empty_ledger_returns_no_runs() {
         .await
         .expect("list answers on an empty ledger");
     let text = value.to_string();
-    assert!(text.contains("runs") || text.contains("items"), "{text}");
+    eprintln!("DBG-LIST {value}");assert!(text.contains("runs") || text.contains("items"), "{text}");
 }
 
 #[tokio::test]
@@ -126,7 +126,7 @@ async fn getting_an_unknown_run_answers_null() {
     })
     .await
     .expect("get answers for an unknown id");
-    assert!(value.to_string().contains("null"), "{value}");
+    eprintln!("DBG-GET {value}");assert!(value.to_string().contains("null"), "{value}");
 }
 
 #[tokio::test]
@@ -143,6 +143,7 @@ async fn events_of_an_unknown_run_are_empty() {
         handle_run_ledger_events(params(serde_json::json!({ "runId": "no-such-run" })))
     })
     .await
+    .map(|v| eprintln!("DBG-EV {v}"))
     .expect("events answer for an unknown run");
 }
 
