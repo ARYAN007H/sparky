@@ -506,5 +506,12 @@ async fn tool_output_honors_a_tools_own_cap() {
     );
 }
 
+/// The shared tool-result byte backstop is a user-visible truncation limit;
+/// moving the ladder into the harness must not change it.
+#[test]
+fn shared_tool_result_byte_budget_stays_16_kib() {
+    assert_eq!(DEFAULT_TOOL_RESULT_BUDGET_BYTES, 16 * 1024);
+}
+
 #[path = "middleware_tool_output_compaction_tests.rs"]
 mod compaction_tests;
