@@ -64,9 +64,9 @@ pub(super) fn assemble_turn_harness(
     context_window: Option<u64>,
     early_exit_tools: &[&str],
     context_mw: TurnContextMiddleware,
-    stop_hooks: Vec<
-        Arc<dyn tinyagents_harness::middleware::StopHook<tinyagents_harness::cost::TurnCost>>,
-    >,
+    // Stop policies, scoped tool callbacks (registered after the runtime's
+    // global ones) and the host's tool-call cap, from the explicit run context.
+    host_policy: super::host::HarnessHostPolicy,
     tool_policy: Option<ToolPolicyEnforcement>,
     required_capabilities: Option<CapabilitySet>,
     deterministic_cacheable: bool,
@@ -106,6 +106,11 @@ pub(super) fn assemble_turn_harness(
     memory_turn: Option<Arc<crate::memory::lifecycle::hooks::MemoryTurn>>,
     tool_rules: Option<Arc<tinyagents_harness::tool::ToolRulePolicy>>, // `OpenHumanRunContext::tool_rules`
 ) -> AssembledTurnHarness {
+    let super::host::HarnessHostPolicy {
+        stop_hooks,
+        tool_hooks: scoped_tool_hooks,
+        tool_call_cap,
+    } = host_policy;
     let mut harness: AgentHarness<(), OpenHumanRunContext> = AgentHarness::new();
     // Cross-route fallback ownership (issue #4249, Workstream 02.2): populate the
     // SDK `RunPolicy.fallback` with the ordered same-family route chain for this
@@ -118,6 +123,7 @@ pub(super) fn assemble_turn_harness(
         max_iterations,
         deterministic_cacheable,
         turn_models.is_local(),
+        tool_call_cap,
     );
     let route_fallback = routes::route_fallback_policy(model);
     policy.fallback = route_fallback.clone();
@@ -625,7 +631,8 @@ pub(super) fn assemble_turn_harness(
     // observation-only (never mutates the result), so running first in the
     // reverse-order `after_tool` chain is safe — it cannot perturb the
     // summarization/cap or tool-outcome capture layers.
-    let embedder_tool_hooks = crate::agent::hooks::turn_tool_hooks();
+    let mut embedder_tool_hooks = crate::agent::hooks::embedder_tool_hooks();
+    embedder_tool_hooks.extend(scoped_tool_hooks);
     if !embedder_tool_hooks.is_empty() {
         harness.push_middleware(Arc::new(middleware::EmbedderToolHooksMiddleware::new(
             embedder_tool_hooks,
