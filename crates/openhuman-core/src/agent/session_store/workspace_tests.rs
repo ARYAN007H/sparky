@@ -65,7 +65,9 @@ fn the_ledger_serves_reads_from_async_and_sync_callers() {
     assert!(require_ledger(ws.path()).is_ok());
 
     let sync = with_ledger(ws.path(), |ledger| async move {
-        ledger.list_agent_runs(&AgentRunListRequest::default()).await
+        ledger
+            .list_agent_runs(&AgentRunListRequest::default())
+            .await
     })
     .expect("the sync bridge lists an empty ledger");
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -74,7 +76,9 @@ fn the_ledger_serves_reads_from_async_and_sync_callers() {
         .unwrap();
     let asynchronous = runtime
         .block_on(with_ledger_async(ws.path(), |ledger| async move {
-            ledger.list_agent_runs(&AgentRunListRequest::default()).await
+            ledger
+                .list_agent_runs(&AgentRunListRequest::default())
+                .await
         }))
         .expect("the async path lists an empty ledger");
     assert_eq!(
@@ -99,8 +103,14 @@ fn an_unusable_workspace_degrades_to_an_in_memory_store() {
         .try_for_agent("degraded")
         .expect("the in-memory fallback opens an agent");
 
-    assert!(artifact_blobs_for(&unusable).is_none() || crate::agent::session_store::installed().is_some());
-    assert!(current_documents_for(&unusable).is_none() || crate::agent::session_store::installed().is_some());
+    assert!(
+        artifact_blobs_for(&unusable).is_none()
+            || crate::agent::session_store::installed().is_some()
+    );
+    assert!(
+        current_documents_for(&unusable).is_none()
+            || crate::agent::session_store::installed().is_some()
+    );
 }
 
 #[test]
