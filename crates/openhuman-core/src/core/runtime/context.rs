@@ -531,13 +531,31 @@ impl CoreContext {
 
     /// Run `fut` with `ctx` as the ambient [`CoreContext::current`]: dispatch wraps
     /// each handler in this, and multi-tenant hosts pass the tenant's context.
+    ///
+    /// A turn's origin survives a change of context: `ctx` without an origin of
+    /// its own, scoped inside a turn that has one (an embedded agent's derived
+    /// context replacing the caller's, say), keeps that turn's origin. Dropping
+    /// it would turn a labelled turn into an unlabelled one the approval gate
+    /// refuses.
     pub async fn scope<F: Future>(ctx: Arc<CoreContext>, fut: F) -> F::Output {
-        CURRENT_CONTEXT.scope(ctx, fut).await
+        CURRENT_CONTEXT.scope(Self::keeping_turn_origin(ctx), fut).await
     }
 
     /// [`scope`](Self::scope) for a synchronous closure.
     pub fn sync_scope<R>(ctx: Arc<CoreContext>, f: impl FnOnce() -> R) -> R {
-        CURRENT_CONTEXT.sync_scope(ctx, f)
+        CURRENT_CONTEXT.sync_scope(Self::keeping_turn_origin(ctx), f)
+    }
+
+    /// `ctx`, carrying the origin of the turn it is being scoped inside when it
+    /// has none of its own.
+    fn keeping_turn_origin(ctx: Arc<CoreContext>) -> Arc<CoreContext> {
+        if ctx.turn_origin.is_some() {
+            return ctx;
+        }
+        match Self::scoped_for_turn().and_then(|outer| outer.turn_origin.clone()) {
+            Some(origin) => ctx.derive_channel_turn(None, Some(origin)),
+            None => ctx,
+        }
     }
 
     /// Capture the current context now and carry it across a subsequently
