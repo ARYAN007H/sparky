@@ -213,7 +213,7 @@ async fn e2e_orchestrator_answers_coding_agent_question_and_resumes_child() {
 
     let first = (async {
         session
-            .spawn_agent(parent.clone().clone(), SpawnAgentRequest {
+            .spawn_agent(parent.clone(), SpawnAgentRequest {
                 agent_id: "task_manager_agent".to_string(),
                 prompt: "Implement RPC wiring for AGENT_ORCH_E2E".to_string(),
                 model: Some("test-model".to_string()),
