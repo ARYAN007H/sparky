@@ -60,7 +60,8 @@ fn a_second_process_skips_while_the_first_is_importing() {
     started_rx.recv().unwrap();
 
     let mut second_ran = false;
-    let second = with_claim(&repo, COLLECTION, "m", || {
+    let now = chrono::Utc::now().timestamp_millis();
+    let second = with_claim_at(&repo, COLLECTION, "m", now, CLAIM_TTL_MS, || {
         second_ran = true;
         Ok("second")
     })
@@ -142,4 +143,46 @@ fn a_stale_claim_is_taken_over() {
     let taken = with_claim_at(&repo, COLLECTION, "m", 1_000 + 200, 100, || Ok(())).unwrap();
     assert_eq!(taken, Some(()));
     assert!(!claim_exists(&repo, "m"));
+}
+
+#[test]
+fn a_waiting_process_runs_once_the_holder_releases() {
+    let repo = repo();
+    let (started_tx, started_rx) = mpsc::channel::<()>();
+    let holder_repo = repo.clone();
+    let holder = std::thread::spawn(move || {
+        with_claim(&holder_repo, COLLECTION, "m", || {
+            started_tx.send(()).unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(400));
+            Ok("first")
+        })
+        .unwrap()
+    });
+    started_rx.recv().unwrap();
+    let began = std::time::Instant::now();
+    let second = with_claim(&repo, COLLECTION, "m", || Ok("second")).unwrap();
+    assert_eq!(second, Some("second"));
+    assert!(began.elapsed() >= std::time::Duration::from_millis(200));
+    assert_eq!(holder.join().unwrap(), Some("first"));
+}
+
+#[test]
+fn a_long_import_keeps_its_claim_alive() {
+    let repo = repo();
+    let now = chrono::Utc::now().timestamp_millis();
+    // 90ms lease, body runs 400ms: without renewal a rival would take over.
+    let rival_repo = repo.clone();
+    let rival_ran = with_claim_at(&repo, COLLECTION, "m", now, 90, || {
+        let mut took_over = false;
+        for _ in 0..8 {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            let at = chrono::Utc::now().timestamp_millis();
+            took_over |= with_claim_at(&rival_repo, COLLECTION, "m", at, 90, || Ok(()))
+                .unwrap()
+                .is_some();
+        }
+        Ok(took_over)
+    })
+    .unwrap();
+    assert_eq!(rival_ran, Some(false));
 }

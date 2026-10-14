@@ -153,34 +153,59 @@ fn a_finished_import_does_not_run_again_or_resurrect_deleted_records() {
 }
 
 #[test]
-fn an_import_claimed_by_another_process_is_skipped_and_leaves_no_marker() {
+fn an_import_claimed_by_another_process_waits_for_it_and_does_not_repeat_it() {
     let (_dir, config) = workspace();
     legacy_device(&config, "chan-a", "Phone", false);
     let backend = backend();
     let source = devices();
 
-    // Another process holds the claim for this domain and workspace.
+    // Another process holds the claim for this domain and workspace, and
+    // finishes (marker written, claim released) shortly after we start.
     let markers = Repo::on(&backend, &Scope::local(), "storage::import", marker_spec).unwrap();
-    let claim =
-        crate::storage::import_claim::claim_id(&marker_id(source.domain, &config.workspace_dir));
-    markers
+    let marker = marker_id(source.domain, &config.workspace_dir);
+    let claim = crate::storage::import_claim::claim_id(&marker);
+    let held_claim = claim.clone();
+    let version = markers
         .run(move |docs| async move {
             docs.put(
                 MARKER_COLLECTION,
-                &claim,
+                &held_claim,
                 json!({ "claimed_at_ms": chrono::Utc::now().timestamp_millis() }),
                 Precondition::Absent,
             )
             .await
-            .map(|_| ())
         })
         .unwrap();
+    let finisher = {
+        let markers = markers.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(400));
+            markers
+                .run(move |docs| async move {
+                    docs.put(
+                        MARKER_COLLECTION,
+                        &marker,
+                        json!({ "version": MARKER_VERSION, "found": 1, "written": 1 }),
+                        Precondition::Absent,
+                    )
+                    .await?;
+                    docs.delete(MARKER_COLLECTION, &claim, Precondition::Version(version))
+                        .await
+                })
+                .unwrap();
+        })
+    };
 
+    let started = std::time::Instant::now();
     assert_eq!(
         outcome(run_with(&backend, &config, &[source])),
-        Outcome::InProgress
+        Outcome::AlreadyDone
     );
-    assert!(!is_done(&backend, &config, &source).unwrap());
+    assert!(
+        started.elapsed() >= std::time::Duration::from_millis(300),
+        "the loser must not proceed while the claim is held"
+    );
+    finisher.join().unwrap();
     assert!(dump(&backend, &source, "paired_devices").is_empty());
 }
 
