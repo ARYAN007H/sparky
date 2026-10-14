@@ -7,6 +7,7 @@
 
 mod common;
 
+use openhuman_core::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use common::{offline_config, runtime, stub_backend};

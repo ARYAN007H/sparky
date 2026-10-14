@@ -1,5 +1,6 @@
 //! Controller schemas + handlers for `http_host`.
 
+use crate::core_host::core::runtime::DispatchCtx;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
