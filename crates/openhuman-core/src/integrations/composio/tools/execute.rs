@@ -133,6 +133,7 @@ impl ComposioExecuteTool {
         args: Value,
         sandbox_mode: Option<SandboxMode>,
         task_recency_window: Option<std::time::Duration>,
+        chat: Option<&crate::security::approval::ApprovalChatContext>,
     ) -> (Box<Config>, anyhow::Result<ToolResult>) {
         let tool = args
             .get("tool")
