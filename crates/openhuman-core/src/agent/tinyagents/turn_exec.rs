@@ -12,7 +12,6 @@ use std::collections::{BTreeSet, HashSet};
 use std::sync::Arc;
 
 use anyhow::Result;
-use futures::future::BoxFuture;
 use tinyagents_harness::runtime::{AgentInvocation, AgentTurnRequest, InvocationRuntime};
 use tinyagents_harness::store::{InMemoryStore as ToolResultArtifactIndexStore, StoreRegistry};
 use tinyagents_harness::turn_policy::effective_max_iterations;
@@ -123,7 +122,7 @@ pub(crate) async fn run_turn_via_tinyagents_shared(
     // `false` and rely on this seam's emit for parity with the legacy engine.
     defer_turn_completed_to_caller: bool,
 ) -> Result<TinyagentsTurnOutcome> {
-    run_turn_via_tinyagents_inner(
+    Box::pin(run_turn_via_tinyagents_body(
         run_context,
         turn_models,
         provider_id,
@@ -143,7 +142,7 @@ pub(crate) async fn run_turn_via_tinyagents_shared(
         deterministic_cacheable,
         defer_turn_completed_to_caller,
         None,
-    )
+    ))
     .await
 }
 
@@ -174,7 +173,7 @@ pub(crate) async fn run_root_turn_via_hosted_agent(
     tool_policy: Option<ToolPolicyEnforcement>,
     defer_turn_completed_to_caller: bool,
 ) -> Result<TinyagentsTurnOutcome> {
-    run_turn_via_tinyagents_inner(
+    Box::pin(run_turn_via_tinyagents_body(
         run_context,
         turn_models,
         provider_id,
@@ -194,61 +193,8 @@ pub(crate) async fn run_root_turn_via_hosted_agent(
         false,
         defer_turn_completed_to_caller,
         Some((hosted_base, agent_id)),
-    )
-    .await
-}
-
-/// Returned boxed and `#[inline(never)]` on purpose: an `async fn` body is
-/// otherwise re-instantiated inside every crate / codegen unit that awaits it,
-/// and this state machine is large. Boxing here keeps one copy, compiled in
-/// this crate.
-#[allow(clippy::too_many_arguments)]
-#[inline(never)]
-fn run_turn_via_tinyagents_inner<'a>(
-    run_context: OpenHumanRunContext,
-    turn_models: TurnModels,
-    provider_id: String,
-    model: &'a str,
-    history: Vec<TranscriptMessage>,
-    tool_sets: Vec<Arc<Vec<Box<dyn tinytools::Tool>>>>,
-    allowed: Option<HashSet<String>>,
-    max_iterations: usize,
-    subagent_scope: Option<SubagentScope>,
-    context_window: Option<u64>,
-    run_queue: Option<Arc<RunQueue<crate::agent::queued_turn::QueuedTurn>>>,
-    early_exit_tools: &'a [&'a str],
-    pause_at_cap: bool,
-    max_output_tokens: Option<u32>,
-    context_mw: TurnContextMiddleware,
-    tool_policy: Option<ToolPolicyEnforcement>,
-    deterministic_cacheable: bool,
-    defer_turn_completed_to_caller: bool,
-    hosted_root: Option<(
-        Arc<crate::agent::tinyagents::host::OpenHumanHostBase>,
-        String,
-    )>,
-) -> BoxFuture<'a, Result<TinyagentsTurnOutcome>> {
-    Box::pin(run_turn_via_tinyagents_body(
-        run_context,
-        turn_models,
-        provider_id,
-        model,
-        history,
-        tool_sets,
-        allowed,
-        max_iterations,
-        subagent_scope,
-        context_window,
-        run_queue,
-        early_exit_tools,
-        pause_at_cap,
-        max_output_tokens,
-        context_mw,
-        tool_policy,
-        deterministic_cacheable,
-        defer_turn_completed_to_caller,
-        hosted_root,
     ))
+    .await
 }
 
 #[allow(clippy::too_many_arguments)]
