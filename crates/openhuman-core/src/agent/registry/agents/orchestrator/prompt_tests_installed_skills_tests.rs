@@ -122,6 +122,3 @@ fn render_installed_skills_flattens_and_caps_long_descriptions() {
     assert!(!line.contains("<|im_start|>"), "fences must be stripped");
     assert!(!out.contains("line one\nline two"), "newlines flattened");
 }
-
-/// Throwaway workspace for prompt tests.
-///

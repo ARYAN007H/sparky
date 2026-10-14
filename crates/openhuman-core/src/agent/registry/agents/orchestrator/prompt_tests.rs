@@ -2,6 +2,8 @@ use super::*;
 use std::collections::HashSet;
 use tinytools_agent::dialect::ToolCallFormat;
 
+/// Throwaway workspace for prompt tests.
+///
 /// `build` renders the identity block, and that path *writes* — it seeds
 /// SOUL.md / IDENTITY.md / ROLE.md into
 /// whatever directory it is handed. This used to be `Path::new(".")`,
