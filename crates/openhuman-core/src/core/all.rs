@@ -1144,65 +1144,6 @@ fn kind(matches: bool, expected: &'static str) -> Result<(), TypeMismatch> {
     matches.then_some(()).ok_or(TypeMismatch::Kind(expected))
 }
 
-/// Attempts to invoke a registered RPC method by name.
-///
-/// Checks both the agent-facing controller registry and the internal-only registry,
-/// so internal-only write paths (e.g. the MCP write-audit list) are routable
-/// even though they are not included in agent tool listings.
-///
-/// Returns `None` if the method is not found in either registry.
-pub async fn try_invoke_registered_rpc(
-    ctx: DispatchCtx,
-    method: &str,
-    params: Map<String, Value>,
-) -> Option<Result<Value, String>> {
-    let view = registry_view();
-    let grouped = view
-        .iter()
-        .chain(internal_registry().iter())
-        .find(|g| g.controller.rpc_method_name() == method)?;
-
-    // DomainSet gate (#4796): a method whose group is disabled under the ambient
-    // context reports as an unknown method (`None`) — the same result a caller
-    // gets for a genuinely-unregistered method, so a gated domain's controllers
-    // are indistinguishable from absent. Enforced HERE (dispatch), not in
-    // schema/validation lookups, to avoid a validate/dispatch split.
-    if !visible(grouped) {
-        log::debug!(
-            "[rpc][domain-gate] method '{method}' suppressed — group {:?} disabled or method \
-             outside the user surface in the active scope",
-            grouped.group
-        );
-        return None;
-    }
-
-    let handler = grouped.controller.handler;
-
-    // The handler gets the call's context as an argument. Until every reader
-    // below it has moved off the ambient context (#7801), the same context is
-    // also scoped for the duration of the call, so `CoreContext::current()`
-    // inside the handler resolves to it. A call that arrived without a bound
-    // context inherits the active scope (a handler that dispatches a nested RPC
-    // stays in its tenant) or the process default, as before.
-    //
-    // The scoped future is re-boxed back into a `ControllerFuture` so the
-    // concrete `TaskLocalFuture` type does not escape into this fn's future —
-    // without the type erasure the `Send` auto-trait solver overflows on the
-    // largest handler futures (E0275).
-    use crate::core::runtime::context::CoreContext;
-    let core = ctx.into_core().or_else(CoreContext::current);
-    let ctx = match &core {
-        Some(core) => DispatchCtx::new(core.clone()),
-        None => DispatchCtx::unbound(),
-    };
-    let fut = handler(ctx, params);
-    let scoped: ControllerFuture = match core {
-        Some(core) => Box::pin(CoreContext::scope(core, fut)),
-        None => fut,
-    };
-    Some(scoped.await)
-}
-
 #[derive(Debug, Clone)]
 pub struct HttpMethodSchemaDefinition {
     pub method: String,
@@ -1279,6 +1220,10 @@ pub(crate) fn assert_schema_controller_parity(
         "expected a `{known_function}` controller schema to be registered",
     );
 }
+
+#[path = "all_invoke.rs"]
+mod invoke_registered;
+pub use invoke_registered::try_invoke_registered_rpc;
 
 #[cfg(test)]
 #[path = "all_tests.rs"]

@@ -10,7 +10,7 @@ use serde_json::Value;
 
 use super::session_expiry::{is_session_expired_error, is_unconfirmed_unauthorized_error};
 use crate::core::all;
-use crate::core::runtime::DispatchCtx;
+use crate::core::runtime::{CoreContext, DispatchCtx};
 use crate::core::types::AppState;
 
 /// Invokes a JSON-RPC method by name.
@@ -34,7 +34,7 @@ pub async fn invoke_method(
     method: &str,
     params: Value,
 ) -> Result<Value, String> {
-    let mut result = invoke_method_inner(ctx, state, method, params).await;
+    let mut result = invoke_scoped(ctx, state, method, params).await;
 
     // Session auto-cleanup: if the OpenHuman auth session is explicitly
     // expired, publish a `SessionExpired` event. The credentials subscriber
@@ -84,6 +84,25 @@ pub async fn invoke_method(
     }
 
     result
+}
+
+/// [`invoke_method_inner`] with `ctx` also scoped onto the task, so the schema
+/// lookup, parameter validation and fallback dispatch that precede the handler
+/// read the context the caller named. Transitional (#7801): goes away with the
+/// ambient context once those readers take the context explicitly.
+async fn invoke_scoped(
+    ctx: DispatchCtx,
+    state: AppState,
+    method: &str,
+    params: Value,
+) -> Result<Value, String> {
+    let core = ctx.core().cloned();
+    let call: std::pin::Pin<Box<dyn std::future::Future<Output = Result<Value, String>> + Send + '_>> =
+        Box::pin(invoke_method_inner(ctx, state, method, params));
+    match core {
+        Some(core) => CoreContext::scope(core, call).await,
+        None => call.await,
+    }
 }
 
 fn should_publish_session_expired(msg: &str, credential_is_local: bool) -> bool {

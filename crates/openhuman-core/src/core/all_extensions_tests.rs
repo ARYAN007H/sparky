@@ -3,14 +3,6 @@ use serde_json::Map;
 
 use super::*;
 
-/// Dispatches under the calling task's ambient context.
-pub(super) async fn ambient_rpc(
-    method: &str,
-    params: Map<String, serde_json::Value>,
-) -> Option<Result<serde_json::Value, String>> {
-    try_invoke_registered_rpc(DispatchCtx::ambient(), method, params).await
-}
-
 // ── Controller extensions (crates above the core) ──────────────────────────
 
 fn ext_controller(namespace: &'static str, function: &'static str) -> RegisteredController {
@@ -48,13 +40,13 @@ async fn registry_extension_is_visible_to_every_lookup_and_dispatches() {
     );
 
     let result = try_invoke_registered_rpc(
-        DispatchCtx::ambient(),
+        DispatchCtx::unbound(),
         "openhuman.ext_probe_ping",
         Map::new(),
     )
     .await
-    .expect("extension method is dispatchable")
-    .expect("handler succeeds");
+        .expect("extension method is dispatchable")
+        .expect("handler succeeds");
     assert_eq!(result, serde_json::json!({"ext": true}));
 }
 
@@ -109,13 +101,9 @@ async fn registry_extension_is_gated_by_its_domain_group() {
     let ctx = CoreContext::for_test(domains, None);
     let hidden = CoreContext::scope(ctx, async {
         (
-            try_invoke_registered_rpc(
-                DispatchCtx::ambient(),
-                "openhuman.ext_gate_ping",
-                Map::new(),
-            )
-            .await
-            .is_none(),
+            try_invoke_registered_rpc("openhuman.ext_gate_ping", Map::new())
+                .await
+                .is_none(),
             schema_for_rpc_method("openhuman.ext_gate_ping").is_none(),
         )
     })
