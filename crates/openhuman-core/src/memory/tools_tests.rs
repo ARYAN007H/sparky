@@ -691,6 +691,12 @@ async fn memory_activity_carries_the_calling_turns_chat() {
             },
         ),
     );
+    let learned_id = |result: &ToolResult| {
+        serde_json::from_str::<Value>(&text(result)).unwrap()["id"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    };
     let routed = tool
         .execute_with_context(
             json!({"action": "learn", "text": "routed marker fact"}),
@@ -706,19 +712,27 @@ async fn memory_activity_carries_the_calling_turns_chat() {
         .unwrap();
     assert!(!unrouted.is_error, "{}", text(&unrouted));
     super::super::tool_writes::drain(&config).await;
+    let (routed_id, unrouted_id) = (learned_id(&routed), learned_id(&unrouted));
 
-    let mut seen = Vec::new();
-    while seen.len() < 2 {
+    // The bus is process-wide: match our own events by the id the tool returned.
+    let mut by_id = std::collections::HashMap::new();
+    while by_id.len() < 2 {
         match tokio::time::timeout(std::time::Duration::from_secs(5), rx.recv()).await {
             Ok(Some(DomainEvent::MemoryStored {
+                key,
                 thread_id,
                 client_id,
                 ..
-            })) => seen.push((thread_id, client_id)),
+            })) if key == routed_id || key == unrouted_id => {
+                by_id.insert(key, (thread_id, client_id));
+            }
             Ok(Some(_)) => continue,
-            other => panic!("expected two MemoryStored events, got {other:?}"),
+            other => panic!("expected both MemoryStored events, got {other:?}"),
         }
     }
-    assert!(seen.contains(&(Some("thread-activity".into()), Some("client-activity".into()))));
-    assert!(seen.contains(&(None, None)));
+    assert_eq!(
+        by_id[&routed_id],
+        (Some("thread-activity".into()), Some("client-activity".into()))
+    );
+    assert_eq!(by_id[&unrouted_id], (None, None));
 }
