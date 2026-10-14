@@ -50,7 +50,7 @@ async fn pending_for_thread_tracks_request_under_chat_context_and_clears() {
 
 /// Regression for #5499: an async-delegated sub-agent carries the `WebChat`
 /// origin across the `tokio::spawn` boundary (`spawn_async_subagent` calls
-/// `turn_origin::propagate`) but NOT the `APPROVAL_CHAT_CONTEXT` task-local.
+/// `turn_origin::propagate`) but NOT the chat approval context.
 /// Before the origin-routing fallback the gate parked with `thread_id:
 /// None`, the web-channel surface dropped the `ApprovalRequested` event
 /// ("thread/client absent — NOT surfacing"), and the park silently
@@ -64,7 +64,7 @@ async fn webchat_origin_routes_park_when_approval_chat_context_absent() {
     let (gate, _dir) = test_gate();
     let gate = Arc::new(gate);
 
-    // WebChat origin scoped, but NO `APPROVAL_CHAT_CONTEXT` — exactly the
+    // WebChat origin scoped, but NO chat approval context — exactly the
     // async sub-agent spawn state (origin propagated, approval context not).
     let g = gate.clone();
     let origin = AgentTurnOrigin::WebChat {
@@ -93,7 +93,7 @@ async fn webchat_origin_routes_park_when_approval_chat_context_absent() {
         assert!(
             tries < 50,
             "park must be routable via the WebChat origin's thread when \
-             APPROVAL_CHAT_CONTEXT is absent (#5499)"
+             the chat approval context is absent (#5499)"
         );
         tokio::time::sleep(Duration::from_millis(10)).await;
     };
@@ -349,8 +349,8 @@ mod resolve_park_ttl_tests {
 /// persists the clamped TTL when the copilot-streaming context is scoped.
 /// Builds a gate with the full `DEFAULT_APPROVAL_TTL` boot TTL (unlike
 /// `test_gate()` before this suite stopped hard-coding a 2s window, which
-/// would make this assertion vacuous), scopes
-/// `APPROVAL_COPILOT_STREAM_CONTEXT` alongside the chat context + WebChat
+/// would make this assertion vacuous), sets
+/// the copilot flag alongside the chat context + WebChat
 /// origin the way `flows::ops::flows_build` does in production, and
 /// inspects the persisted `expires_at` on the pending row.
 #[tokio::test]
