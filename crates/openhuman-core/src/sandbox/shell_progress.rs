@@ -71,7 +71,7 @@ impl ShellOutputMeter {
         }
     }
 
-    fn snapshot(&self) -> (u64, Option<String>) {
+    pub(crate) fn snapshot(&self) -> (u64, Option<String>) {
         let meter = self.0.lock().unwrap_or_else(|p| p.into_inner());
         (meter.bytes, meter.last_line.clone())
     }
