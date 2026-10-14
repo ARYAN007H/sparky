@@ -192,7 +192,8 @@ async fn rig_with_peers(module_id: &'static str, others: &[&'static str]) -> Rig
     let stranger = Connection::connect(transport.connect().await.unwrap())
         .await
         .unwrap();
-    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::new());
+    let backend: Arc<dyn StorageBackend> =
+        Arc::new(crate::modules::storage_host_watching::WatchingStorage::new());
     let trail = Arc::new(Trail::default());
     let mut peers = Vec::new();
     let mut named = vec![(PROBE, module_id)];

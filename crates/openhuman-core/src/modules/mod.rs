@@ -107,6 +107,8 @@ pub mod storage_grants;
 pub(crate) mod storage_host;
 #[cfg(feature = "modules")]
 mod storage_host_linked;
+#[cfg(test)]
+mod storage_host_watching;
 #[cfg(feature = "modules")]
 mod storage_import_support;
 #[cfg(feature = "modules")]

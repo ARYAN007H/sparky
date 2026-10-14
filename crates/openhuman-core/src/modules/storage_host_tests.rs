@@ -100,7 +100,7 @@ struct Rig {
 }
 
 fn rig() -> Rig {
-    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::new());
+    let backend: Arc<dyn StorageBackend> = Arc::new(super::super::storage_host_watching::WatchingStorage::new());
     let env = Arc::new(Env {
         backend: Mutex::new(Some(Arc::clone(&backend))),
         profile: Mutex::new(None),
