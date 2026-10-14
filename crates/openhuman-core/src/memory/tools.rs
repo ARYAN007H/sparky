@@ -129,6 +129,9 @@ pub struct CallFacts {
     pub agent_id: Option<String>,
     /// The provider-assigned tool-call id.
     pub tool_call_id: Option<String>,
+    /// The chat the call's turn is surfaced in, so the memory activity it
+    /// raises reaches that chat. `None` outside a chat turn.
+    pub chat: Option<crate::security::approval::ApprovalChatContext>,
     /// Where the agent's learnings go: its layout's learnings node.
     pub namespace: Namespace,
     /// What the agent may read and forget: its whole layout.
@@ -158,6 +161,7 @@ impl CallFacts {
                 .and_then(ToolRunContext::thread_id)
                 .map(str::to_string),
             tool_call_id: crate::tools::host_extensions::tool_call_id(context),
+            chat: crate::agent::tinyagents::host::run_context::approval_for_tool(context).chat,
             ..Self::of(config, &identity)
         }
     }
@@ -231,6 +235,8 @@ pub async fn run_action(config: &Config, args: &Value, facts: &CallFacts) -> Too
                         BUS.publish(DomainEvent::MemoryRecalled {
                             query: question,
                             hit_count: view.citations.len(),
+                            thread_id: facts.chat.as_ref().map(|chat| chat.thread_id.clone()),
+                            client_id: facts.chat.as_ref().map(|chat| chat.client_id.clone()),
                         });
                         json!(view)
                     })
@@ -266,6 +272,8 @@ pub async fn run_action(config: &Config, args: &Value, facts: &CallFacts) -> Too
                         key: view.id.clone(),
                         category: kind.as_str().to_string(),
                         namespace: "learnings".to_string(),
+                        thread_id: facts.chat.as_ref().map(|chat| chat.thread_id.clone()),
+                        client_id: facts.chat.as_ref().map(|chat| chat.client_id.clone()),
                     });
                     json!({"id": view.id, "status": LEARN_STATUS})
                 })

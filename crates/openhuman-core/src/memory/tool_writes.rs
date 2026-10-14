@@ -542,6 +542,9 @@ impl WriteExecutor for Executor<'_> {
                         key: receipt.id.0,
                         category: category.to_string(),
                         namespace: "learnings".to_string(),
+                        // A queued write runs off the turn: no chat to show it in.
+                        thread_id: None,
+                        client_id: None,
                     });
                     Ok(())
                 }

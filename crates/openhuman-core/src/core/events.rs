@@ -280,9 +280,22 @@ pub enum DomainEvent {
         key: String,
         category: String,
         namespace: String,
+        /// Chat thread of the turn whose tool call stored the entry; `None`
+        /// outside a chat turn (CLI, cron, queued background writes).
+        thread_id: Option<String>,
+        /// Client of that turn, for the web channel to fan the activity to.
+        client_id: Option<String>,
     },
     /// A memory recall query completed.
-    MemoryRecalled { query: String, hit_count: usize },
+    MemoryRecalled {
+        query: String,
+        hit_count: usize,
+        /// Chat thread of the turn whose tool call recalled; `None` outside a
+        /// chat turn.
+        thread_id: Option<String>,
+        /// Client of that turn.
+        client_id: Option<String>,
+    },
 
     // ── Channels ────────────────────────────────────────────────────────
     /// An inbound channel message from the transport layer, ready for processing.
