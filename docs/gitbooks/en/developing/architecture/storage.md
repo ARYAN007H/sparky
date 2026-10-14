@@ -148,7 +148,9 @@ cargo test -p openhuman-cli --features storage-sqlite,storage-file --test storag
 For MongoDB, start a single-node replica set and set the URL (a replica set is what lets the driver report and exercise transactions):
 
 ```bash
-# start-mongo-replset.sh is in the tinystoragedrivers repo, .github/scripts/ (tag v0.11.0)
+# the script lives in the tinystoragedrivers repo (tag v0.11.0); fetch the pinned copy first
+curl -fsSL -o start-mongo-replset.sh \
+  https://raw.githubusercontent.com/tinyhumansai/tinystoragedrivers/9eeef54aea403ac07461a612189bdf4982782823/.github/scripts/start-mongo-replset.sh
 bash start-mongo-replset.sh 27017
 export TSD_MONGO_URL='mongodb://127.0.0.1:27017/tsd_test?directConnection=true'
 cargo test -p openhuman-cli --features storage-mongodb --test storage_approvals_e2e

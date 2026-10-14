@@ -11,6 +11,8 @@
 #
 # MongoDB: start one with tinystoragedrivers' .github/scripts/start-mongo-replset.sh
 # (https://github.com/tinyhumansai/tinystoragedrivers, tag v0.11.0) as
+#   curl -fsSL -o start-mongo-replset.sh \
+#     https://raw.githubusercontent.com/tinyhumansai/tinystoragedrivers/9eeef54aea403ac07461a612189bdf4982782823/.github/scripts/start-mongo-replset.sh
 #   bash start-mongo-replset.sh 27017
 # and export TSD_MONGO_URL=mongodb://127.0.0.1:27017/tsd_test?directConnection=true
 # (the storage-mongodb workflow does exactly this). The URL must be loopback:
