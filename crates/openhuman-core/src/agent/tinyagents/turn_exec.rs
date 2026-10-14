@@ -16,7 +16,6 @@ use futures::future::BoxFuture;
 use tinyagents_harness::runtime::{AgentInvocation, AgentTurnRequest, InvocationRuntime};
 use tinyagents_harness::store::{InMemoryStore as ToolResultArtifactIndexStore, StoreRegistry};
 use tinyagents_harness::turn_policy::effective_max_iterations;
-use tinyagents_registry::DiagnosticSeverity;
 use tinyagents_runtime::turn_driver::{
     SubagentScope as DriverSubagentScope, TurnControls, TurnDriver, TurnScope,
 };
@@ -32,7 +31,7 @@ use crate::agent::tinyagents::turn_middleware::{
 use crate::agent::tinyagents::turn_models::TurnModels;
 use crate::agent::tinyagents::turn_outcome::TinyagentsTurnOutcome;
 use crate::agent::tinyagents::turn_plan::{
-    turn_models_for_plan, turn_run_policy, OpenHumanTurnPlanner,
+    enforce_registry_diagnostics, turn_models_for_plan, turn_run_policy, OpenHumanTurnPlanner,
 };
 use crate::agent::tinyagents::turn_run_error::map_turn_run_error;
 use crate::agent::tinyagents::turn_run_finalize::finalize_turn_outcome;
@@ -528,20 +527,7 @@ async fn run_turn_via_tinyagents_body(
     // delivery/requeue observability events and the metadata on any requeued
     // steer: a sub-agent uses its task id; the interactive/channel parent turn
     // reads the turn origin.
-    let steer_thread_label = subagent_scope
-        .as_ref()
-        .map(|s| s.task_id.clone())
-        .or_else(|| match run_context.origin.as_ref() {
-            Some(crate::agent::turn_origin::AgentTurnOrigin::WebChat { thread_id, .. }) => {
-                Some(thread_id.clone())
-            }
-            Some(crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel {
-                reply_target,
-                ..
-            }) => Some(reply_target.clone()),
-            _ => None,
-        })
-        .unwrap_or_default();
+    let steer_thread_label = steering_forwarder::thread_label(subagent_scope.as_ref(), run_context.origin.as_ref());
     let controls = TurnControls {
         max_iterations: Some(max_iterations),
         pause_at_cap,
@@ -654,51 +640,10 @@ async fn run_turn_via_tinyagents_body(
     // an ambiguous/broken tool surface (duplicate name across native/MCP/Composio/
     // generated tools, dangling alias, etc.) aborts the turn instead of silently
     // resolving to an unintended component while a provider call is in flight.
-    let registry_diagnostics = std::mem::take(
-        &mut *registry_diagnostics
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner),
-    );
-    if !registry_diagnostics.is_empty() {
-        let (errors, warnings): (
-            Vec<&tinyagents_registry::RegistryDiagnostic>,
-            Vec<&tinyagents_registry::RegistryDiagnostic>,
-        ) = registry_diagnostics
-            .iter()
-            .partition(|d| matches!(d.severity, DiagnosticSeverity::Error));
-        for diag in &warnings {
-            tracing::warn!(
-                kind = diag.kind.as_str(),
-                name = %diag.name,
-                "[registry] non-fatal diagnostic: {}",
-                diag.message
-            );
-        }
-        if !errors.is_empty() {
-            let messages: Vec<String> = errors
-                .iter()
-                .map(|d| format!("[{}] {}: {}", d.kind.as_str(), d.name, d.message))
-                .collect();
-            for msg in &messages {
-                tracing::error!("[registry] error-severity diagnostic aborting turn: {msg}");
-            }
-            tracing::error!(
-                error_count = messages.len(),
-                warning_count = warnings.len(),
-                "[registry] aborting turn before model dispatch: capability registry validation failed"
-            );
-            // Settle the driver's steering registration before the turn aborts.
-            let _ = prepared.split().1.finish(None);
-            return Err(anyhow::Error::new(
-                tinyagents_harness::agent_error::AgentError::RegistryValidationFailed {
-                    diagnostics: messages,
-                },
-            ));
-        }
-        tracing::debug!(
-            warning_count = warnings.len(),
-            "[registry] registry diagnostics present (warnings only); proceeding with turn"
-        );
+    if let Err(error) = enforce_registry_diagnostics(&registry_diagnostics) {
+        // Settle the driver's steering registration before the turn aborts.
+        let _ = prepared.split().1.finish(None);
+        return Err(error);
     }
     tracing::debug!(model, tools = tool_count, "[tinyagents] turn harness assembled");
 
