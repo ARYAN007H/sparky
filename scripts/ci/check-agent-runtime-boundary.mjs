@@ -162,7 +162,6 @@ const deletedTaskLocalModules = [
 // dispatch-level ambient state that needs an explicit dispatch context before
 // it can go. Any other declaration is a new violation.
 const taskLocalDeclarationAllowlist = [
-  "crates/openhuman-core/src/agent/turn_origin.rs",
   "crates/openhuman-core/src/core/runtime/context.rs",
   "crates/openhuman-core/src/memory/scope.rs",
   "crates/openhuman-core/src/security/approval/gate.rs",
