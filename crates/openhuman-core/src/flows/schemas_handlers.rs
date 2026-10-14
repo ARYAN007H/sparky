@@ -1,7 +1,7 @@
 use crate::core::runtime::DispatchCtx;
-fn handle_create(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_create(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let name = read_required::<String>(&params, "name")?;
         let graph = read_required::<Value>(&params, "graph")?;
         let require_approval = params
@@ -44,39 +44,39 @@ fn handle_import(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFut
     })
 }
 
-fn handle_duplicate(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_duplicate(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
         to_json(ops::flows_duplicate(&config, id.trim()).await?)
     })
 }
 
-fn handle_get(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_get(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
         to_json(ops::flows_get(&config, id.trim()).await?)
     })
 }
 
-fn handle_list(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_list(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_json(ops::flows_list(&config).await?)
     })
 }
 
-fn handle_list_connections(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_list_connections(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_json(ops::flows_list_connections(&config).await?)
     })
 }
 
-fn handle_update(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_update(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
         let name = params
             .get("name")
@@ -116,17 +116,17 @@ fn handle_update(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFut
     })
 }
 
-fn handle_delete(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_delete(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
         to_json(ops::flows_delete(&config, id.trim()).await?)
     })
 }
 
-fn handle_set_enabled(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_set_enabled(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
         let enabled = params
             .get("enabled")
@@ -136,9 +136,9 @@ fn handle_set_enabled(_ctx: DispatchCtx, params: Map<String, Value>) -> Controll
     })
 }
 
-fn handle_run(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_run(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
         let input = params.get("input").cloned().unwrap_or(Value::Null);
         let inputs = read_declared_inputs(&params)?;
@@ -155,9 +155,9 @@ fn handle_run(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture
     })
 }
 
-fn handle_run_detached(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_run_detached(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
         let input = params.get("input").cloned().unwrap_or(Value::Null);
         let inputs = read_declared_inputs(&params)?;
@@ -198,9 +198,9 @@ fn read_declared_inputs(params: &Map<String, Value>) -> Result<Map<String, Value
     }
 }
 
-fn handle_resume(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_resume(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
         let thread_id = read_required::<String>(&params, "thread_id")?;
         let approvals: Vec<String> = params
@@ -225,17 +225,17 @@ fn handle_resume(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFut
     })
 }
 
-fn handle_cancel_run(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_cancel_run(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let run_id = read_required::<String>(&params, "run_id")?;
         to_json(ops::flows_cancel_run(&config, run_id.trim()).await?)
     })
 }
 
-fn handle_list_runs(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_list_runs(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
         let limit = params
             .get("limit")
@@ -246,9 +246,9 @@ fn handle_list_runs(_ctx: DispatchCtx, params: Map<String, Value>) -> Controller
     })
 }
 
-fn handle_list_all_runs(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_list_all_runs(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let limit = params
             .get("limit")
             .and_then(Value::as_u64)
@@ -258,25 +258,25 @@ fn handle_list_all_runs(_ctx: DispatchCtx, params: Map<String, Value>) -> Contro
     })
 }
 
-fn handle_get_run(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_get_run(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let run_id = read_required::<String>(&params, "run_id")?;
         to_json(ops::flows_get_run(&config, run_id.trim()).await?)
     })
 }
 
-fn handle_prune_runs(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_prune_runs(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
         to_json(ops::flows_prune_runs(&config, id.trim()).await?)
     })
 }
 
-fn handle_build(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_build(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         // Optional streaming target: when the copilot passes its chat `thread_id`
         // the builder turn streams live text/tool/proposal events into that
         // thread (Phase B). Read + strip the transport-only keys before the rest
@@ -303,9 +303,9 @@ fn handle_build_cancel(_ctx: DispatchCtx, params: Map<String, Value>) -> Control
     })
 }
 
-fn handle_discover(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_discover(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         // Optional streaming target for the Flow Scout run (Phase B) — same
         // `thread_id`/`request_id` convention as `flows.build`.
         let stream = read_flow_stream_target(&params);
@@ -329,9 +329,9 @@ fn read_flow_stream_target(params: &Map<String, Value>) -> Option<ops::FlowStrea
     ops::FlowStreamTarget::from_params(thread_id, request_id)
 }
 
-fn handle_list_suggestions(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_list_suggestions(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let status = params
             .get("status")
             .and_then(Value::as_str)
@@ -342,33 +342,33 @@ fn handle_list_suggestions(_ctx: DispatchCtx, params: Map<String, Value>) -> Con
     })
 }
 
-fn handle_dismiss_suggestion(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_dismiss_suggestion(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
         to_json(ops::flows_dismiss_suggestion(&config, id.trim()).await?)
     })
 }
 
-fn handle_mark_suggestion_built(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_mark_suggestion_built(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
         to_json(ops::flows_mark_suggestion_built(&config, id.trim()).await?)
     })
 }
 
-fn handle_required_connections(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_required_connections(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let graph = read_required::<Value>(&params, "graph")?;
         to_json(ops::flows_required_connections(&config, graph).await?)
     })
 }
 
-fn handle_approval_manifest(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_approval_manifest(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let id = params
             .get("id")
             .and_then(Value::as_str)
@@ -379,9 +379,9 @@ fn handle_approval_manifest(_ctx: DispatchCtx, params: Map<String, Value>) -> Co
     })
 }
 
-fn handle_search_tool_catalog(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_search_tool_catalog(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let query = read_required::<String>(&params, "query")?;
         let toolkit = params
             .get("toolkit")
@@ -396,17 +396,17 @@ fn handle_search_tool_catalog(_ctx: DispatchCtx, params: Map<String, Value>) -> 
     })
 }
 
-fn handle_get_tool_contract(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_get_tool_contract(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let slug = read_required::<String>(&params, "slug")?;
         to_json(ops::flows_get_tool_contract(&config, slug.trim()).await?)
     })
 }
 
-fn handle_get_history(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_get_history(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
         let limit = params
             .get("limit")
@@ -417,9 +417,9 @@ fn handle_get_history(_ctx: DispatchCtx, params: Map<String, Value>) -> Controll
     })
 }
 
-fn handle_rollback(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_rollback(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
         let revision_id = read_required::<String>(&params, "revision_id")?;
         let expected_version = params
@@ -433,9 +433,9 @@ fn handle_rollback(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerF
     })
 }
 
-fn handle_draft_create(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_draft_create(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let name = read_required::<String>(&params, "name")?;
         let graph = read_required::<Value>(&params, "graph")?;
         let flow_id = params
@@ -454,17 +454,17 @@ fn handle_draft_create(_ctx: DispatchCtx, params: Map<String, Value>) -> Control
     })
 }
 
-fn handle_draft_get(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_draft_get(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
         to_json(ops::flows_draft_get(&config, id.trim())?)
     })
 }
 
-fn handle_draft_update(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_draft_update(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
         let name = params
             .get("name")
@@ -485,24 +485,24 @@ fn handle_draft_update(_ctx: DispatchCtx, params: Map<String, Value>) -> Control
     })
 }
 
-fn handle_draft_list(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_draft_list(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_json(ops::flows_draft_list(&config)?)
     })
 }
 
-fn handle_draft_delete(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_draft_delete(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
         to_json(ops::flows_draft_delete(&config, id.trim())?)
     })
 }
 
-fn handle_draft_promote(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_draft_promote(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
         let require_approval = params.get("require_approval").and_then(Value::as_bool);
         to_json(ops::flows_draft_promote(&config, id.trim(), require_approval).await?)

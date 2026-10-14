@@ -118,34 +118,34 @@ struct TestParams {
     provider: String,
 }
 
-fn handle_live_providers(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_live_providers(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_value(ops::live_providers(&config).value)
     })
 }
 
-fn handle_live_settings_get(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_live_settings_get(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_value(ops::live_settings_get(&config).value)
     })
 }
 
-fn handle_live_settings_set(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_live_settings_set(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let patch: LiveSettingsPatch = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("invalid params: {e}"))?;
-        let mut config = config_rpc::load_config_with_timeout().await?;
+        let mut config = ctx.load_config().await?;
         to_value(ops::live_settings_set(&mut config, patch).await?.value)
     })
 }
 
-fn handle_live_test_provider(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_live_test_provider(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params: TestParams = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("invalid params: {e}"))?;
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_value(
             ops::live_test_provider(&config, &params.provider)
                 .await

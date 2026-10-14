@@ -369,10 +369,10 @@ fn handle_retrieve(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerF
     })
 }
 
-fn handle_settings_get(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_settings_get(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         gate()?;
-        let config = crate::config::rpc::load_config_with_timeout()
+        let config = ctx.load_config()
             .await
             .map_err(|e| format!("load config: {e}"))?;
         let settings = serde_json::to_value(&config.tokenjuice)
@@ -381,7 +381,7 @@ fn handle_settings_get(_ctx: DispatchCtx, _params: Map<String, Value>) -> Contro
     })
 }
 
-fn handle_settings_update(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_settings_update(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         gate()?;
         // Accept either {"patch": {...}} or a bare object of fields.
@@ -392,7 +392,7 @@ fn handle_settings_update(_ctx: DispatchCtx, params: Map<String, Value>) -> Cont
         let patch: super::config_patch::TokenjuiceSettingsPatch =
             serde_json::from_value(patch).map_err(|e| format!("invalid patch: {e}"))?;
 
-        let mut config = crate::config::rpc::load_config_with_timeout()
+        let mut config = ctx.load_config()
             .await
             .map_err(|e| format!("load config: {e}"))?;
         patch.apply(&mut config.tokenjuice);
@@ -410,11 +410,11 @@ fn handle_settings_update(_ctx: DispatchCtx, params: Map<String, Value>) -> Cont
     })
 }
 
-fn handle_savings_stats(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_savings_stats(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         gate()?;
         let cache = super::cache_stats().await?;
-        let config = crate::config::rpc::load_config_with_timeout()
+        let config = ctx.load_config()
             .await
             .map_err(|e| e.to_string())?;
         super::install_from_config(&config).await?;
@@ -429,10 +429,10 @@ fn handle_savings_stats(_ctx: DispatchCtx, _params: Map<String, Value>) -> Contr
     })
 }
 
-fn handle_savings_reset(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_savings_reset(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         gate()?;
-        let config = crate::config::rpc::load_config_with_timeout()
+        let config = ctx.load_config()
             .await
             .map_err(|e| e.to_string())?;
         super::install_from_config(&config).await?;

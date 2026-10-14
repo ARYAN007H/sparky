@@ -81,6 +81,14 @@ impl DispatchCtx {
             .and_then(|core| core.embedder_config().cloned())
     }
 
+    /// Loads the config this call runs against: the bound context's embedder
+    /// config when it has one, else the persisted config. Fails closed in
+    /// SaaS when no context is bound. See
+    /// [`load_config_in`](crate::config::ops::load_config_in).
+    pub async fn load_config(&self) -> Result<crate::config::Config, String> {
+        crate::config::ops::load_config_in(self).await
+    }
+
     /// The context this call runs under, if any.
     pub fn core(&self) -> Option<&Arc<CoreContext>> {
         self.core.as_ref()

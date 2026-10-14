@@ -43,7 +43,7 @@ pub(super) fn handle_get_voice_server_settings(
 }
 
 pub(super) fn handle_update_voice_server_settings(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
@@ -65,7 +65,7 @@ pub(super) fn handle_update_voice_server_settings(
         // Settings switch takes effect without a restart. Don't fail the RPC if
         // the reload hiccups, but DO surface it — otherwise the saved setting
         // silently wouldn't apply until the next launch.
-        match config_rpc::load_config_with_timeout().await {
+        match ctx.load_config().await {
             Ok(config) => {
                 log::info!("[config][rpc] voice settings saved; applying live always-on state");
                 crate::voice::always_on::start_if_enabled(&config).await;
