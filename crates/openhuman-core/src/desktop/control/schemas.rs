@@ -77,7 +77,7 @@ fn schema(function: &'static str) -> ControllerSchema {
 }
 
 fn status(ctx: DispatchCtx, _: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async {
+    Box::pin(async move {
         let config = ctx.load_config()
             .await
             .map_err(|error| format!("config unavailable: {error}"))?;
@@ -102,7 +102,7 @@ fn set_enabled(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture
 }
 
 fn probe(ctx: DispatchCtx, _: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async {
+    Box::pin(async move {
         let config = ctx.load_config()
             .await
             .map_err(|error| format!("config unavailable: {error}"))?;
@@ -112,7 +112,7 @@ fn probe(ctx: DispatchCtx, _: Map<String, Value>) -> ControllerFuture {
 }
 
 fn pending(ctx: DispatchCtx, _: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async {
+    Box::pin(async move {
         let config = ctx.load_config()
             .await
             .map_err(|error| format!("config unavailable: {error}"))?;

@@ -72,7 +72,7 @@ pub(super) fn handle_get_user_timezone(
     ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
-    Box::pin(async {
+    Box::pin(async move {
         let config = ctx.load_config().await?;
         to_json(crate::core::Outcome::single_log(
             config_rpc::user_timezone_json(&config),
@@ -85,7 +85,7 @@ pub(super) fn handle_get_analytics_settings(
     ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
-    Box::pin(async {
+    Box::pin(async move {
         use crate::core::Outcome;
         let config = ctx.load_config().await?;
         let result = serde_json::json!({
