@@ -77,12 +77,12 @@ fn meter_treats_a_carriage_return_as_a_line_end() {
 }
 
 /// A 40s command that writes output reports twice, with the output it has
-/// written so far, through the meter scoped on its task.
+/// written so far, through the meter handed to the call.
 #[tokio::test(start_paused = true)]
 async fn a_long_call_reports_its_output_as_it_runs() {
     let recorder = Recorder::default();
-    let work = async {
-        let meter = current_meter().expect("meter scoped on the call");
+    let work = |meter: Option<ShellOutputMeter>| async move {
+        let meter = meter.expect("meter handed to the call");
         meter.record(b"Compiling a\n");
         tokio::time::sleep(Duration::from_secs(20)).await;
         meter.record(b"Compiling b\n");
@@ -104,13 +104,13 @@ async fn a_long_call_reports_its_output_as_it_runs() {
 #[tokio::test(start_paused = true)]
 async fn a_short_call_reports_nothing() {
     let recorder = Recorder::default();
-    let output = with_shell_progress(Some(&recorder), HEARTBEAT_INTERVAL, async { 7 }).await;
+    let output = with_shell_progress(Some(&recorder), HEARTBEAT_INTERVAL, |_| async { 7 }).await;
     assert_eq!(output, 7);
     assert!(recorder.updates.lock().unwrap().is_empty());
 }
 
 #[tokio::test]
-async fn without_a_context_no_meter_is_scoped() {
-    let seen = with_shell_progress(None, HEARTBEAT_INTERVAL, async { current_meter() }).await;
+async fn without_a_context_no_meter_is_handed_out() {
+    let seen = with_shell_progress(None, HEARTBEAT_INTERVAL, |meter| async move { meter }).await;
     assert!(seen.is_none());
 }

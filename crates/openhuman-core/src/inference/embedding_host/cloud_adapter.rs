@@ -77,7 +77,7 @@ impl OpenHumanCloudEmbeddingModel {
             let egress = crate::security::egress::EgressDescriptor::embedding("cloud", model);
             crate::security::egress::enforce_egress(&egress)
                 .map_err(|error| tinyinference_embeddings::Error::Embedding(error.to_string()))?;
-            crate::security::egress::emit_external_transfer(egress);
+            crate::security::egress::emit_external_transfer(None, egress);
             Ok(())
         });
         Self {

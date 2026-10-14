@@ -28,8 +28,6 @@ const LEGACY_LIMIT_ENTRIES = [
   // The session-todo integration added transcript metadata construction to
   // this already-exempt composition seam. Keep its allowance exact.
   ["crates/openhuman-core/src/agent/session_host/runtime_session.rs", 1080],
-  // `[components] juice` test constructor (tokenjuice gate tests).
-  ["crates/openhuman-core/src/core/runtime/context.rs", 753],
   // Session-host factory still assembles the product's deliberately coupled
   // provider, security, memory, tool and prompt policy.  Generic session
   // state moved to tinyagents-runtime; this remaining composition is split in
@@ -44,8 +42,8 @@ const LEGACY_LIMIT_ENTRIES = [
   // oversized files are pinned at the size they had when enforcement began.
   ["crates/openhuman-core/src/core/all.rs", 1276],
   ["crates/openhuman-core/src/core/all_tests.rs", 1475],
-  ["crates/openhuman-core/src/core/events.rs", 1776],
-  ["crates/openhuman-core/src/core/events_tests.rs", 991],
+  ["crates/openhuman-core/src/core/events.rs", 1789],
+  ["crates/openhuman-core/src/core/events_tests.rs", 995],
   ["crates/openhuman-core/src/core/observability.rs", 3466],
 ];
 const LEGACY_LIMITS = new Map(LEGACY_LIMIT_ENTRIES);

@@ -212,19 +212,15 @@ async fn test_subagent_has_current_date_context() -> Result<()> {
     // `subagent_runner::ops::tests::resolve_subagent_provider_*`.
     def.model = tinyagents_definition::ModelSpec::Inherit;
 
-    let mut run_data = openhuman_core::agent::tinyagents::host::OpenHumanRunContext::new();
-    run_data.parent = Some(parent);
-    let run_context = tinyagents_harness::context::RunContext::new(
-        tinyagents_harness::context::RunConfig::new("calendar-grounding-parent"),
-        run_data,
-    );
-    let _ = openhuman_core::agent::subagent_host::run_subagent_with_parent(
-        &run_context,
-        def,
+    // The parent is an explicit value on the run options, not ambient state.
+    let mut options = openhuman_core::agent::subagent_host::SubagentRunOptions::default();
+    options.run_context.parent = Some(parent);
+    let _ = openhuman_core::agent::subagent_host::run_subagent(
+        &def,
         "list my calendar events for today",
-        openhuman_core::agent::subagent_host::SubagentRunOptions::default(),
+        options,
     )
-    .await?;
+    .await;
 
     let messages = captured_messages.lock();
     // Use substring search on all user messages

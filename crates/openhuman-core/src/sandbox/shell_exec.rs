@@ -42,6 +42,8 @@ pub(crate) struct NativeShellRun {
     pub(crate) hide_window: bool,
     /// Whether the resource keeps default network isolation; `false` is open.
     pub(crate) isolate_network: bool,
+    /// Receives the command's output as it streams, for progress reporting.
+    pub(crate) meter: Option<super::shell_progress::ShellOutputMeter>,
     /// Native confinement; `None` is ordinary local execution.
     #[cfg(feature = "modules")]
     pub(crate) jail: Option<contract::NativeJailConfig>,
@@ -66,6 +68,7 @@ impl NativeShellRun {
             python_utf8: false,
             hide_window: false,
             isolate_network: false,
+            meter: None,
             #[cfg(feature = "modules")]
             jail: None,
         }
@@ -94,7 +97,10 @@ pub(crate) static USE_FIXTURE: std::sync::atomic::AtomicBool =
 /// Run `run` through the module and collect its output.
 ///
 /// A worker owns cancellation and resource cleanup if the caller drops its wait.
-pub(crate) async fn run(config: &Config, run: NativeShellRun) -> anyhow::Result<SandboxExecResult> {
+pub(crate) async fn run(
+    config: &Config,
+    mut run: NativeShellRun,
+) -> anyhow::Result<SandboxExecResult> {
     #[cfg(test)]
     if !run.is_jailed() && USE_FIXTURE.load(std::sync::atomic::Ordering::SeqCst) {
         let _ = config;
@@ -103,8 +109,8 @@ pub(crate) async fn run(config: &Config, run: NativeShellRun) -> anyhow::Result<
     #[cfg(feature = "modules")]
     {
         let config = config.clone();
-        // Read before the spawn: the caller's progress meter is task-local.
-        let meter = super::shell_progress::current_meter();
+        // Taken before the spawn: the worker task owns the meter.
+        let meter = run.meter.take();
         tracing::debug!(
             jailed = run.jail.is_some(),
             timeout_ms = run.timeout.as_millis() as u64,
@@ -321,8 +327,10 @@ pub(crate) async fn run_host(
     env: BTreeMap<String, String>,
     timeout: Duration,
     preserve_pipeline_status: bool,
+    meter: Option<super::shell_progress::ShellOutputMeter>,
 ) -> anyhow::Result<SandboxExecResult> {
     let mut shell = NativeShellRun::new(command, cwd, state_dir, timeout);
+    shell.meter = meter;
     shell.env = env;
     shell.preserve_pipeline_status = preserve_pipeline_status;
     run(config, shell).await

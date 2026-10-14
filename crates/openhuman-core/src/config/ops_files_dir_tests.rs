@@ -201,11 +201,12 @@ async fn files_made_before_a_folder_change_keep_resolving() {
         ArtifactKind::Document,
         "Plan",
         "docx",
+        None,
     )
     .await
     .unwrap();
     std::fs::write(&path, b"plan").unwrap();
-    finalize_artifact(&cfg.workspace_dir, &meta.id, 4)
+    finalize_artifact(&cfg.workspace_dir, &meta.id, 4, None)
         .await
         .unwrap();
     assert!(path.starts_with(&first));

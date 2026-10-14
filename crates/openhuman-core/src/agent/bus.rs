@@ -130,19 +130,24 @@ pub struct AgentTurnRequest {
     /// status updates for this turn.
     pub on_progress: Option<mpsc::Sender<AgentProgress>>,
 
-    /// Trust/routing label for this turn. The bus handler scopes
-    /// [`AGENT_TURN_ORIGIN`](crate::agent::turn_origin::AGENT_TURN_ORIGIN)
+    /// Trust/routing label for this turn. The bus handler scopes the origin
     /// around the tool loop so the approval gate (and any other
     /// origin-aware policy) sees the same value the caller intended.
     ///
-    /// Native-bus dispatch crosses a `tokio::spawn` boundary inside the
-    /// registry, so callers cannot rely on `AGENT_TURN_ORIGIN` propagating
-    /// implicitly — the origin must travel as an owned field.
+    /// The origin travels as an owned field, so the handler does not depend on
+    /// the caller's ambient scope.
     ///
     /// Defaults to [`AgentTurnOrigin::Unknown`] so any caller that fails
     /// to populate this fails closed at the gate rather than silently
     /// inheriting trusted-automation semantics.
     pub origin: AgentTurnOrigin,
+
+    /// Where this turn's parked approvals surface (the channel's chat thread
+    /// and client), handed to the turn's run context so the gate routes a
+    /// `Prompt`-class tool call back to the channel instead of letting it
+    /// through unprompted. Default (no chat) for channels without an approval
+    /// surface and for non-channel callers such as triage.
+    pub approval: crate::security::approval::ApprovalTurnContext,
 }
 
 /// Final response from an agentic turn.
@@ -201,6 +206,7 @@ async fn handle_agent_run_turn(req: AgentTurnRequest) -> Result<AgentTurnRespons
         extra_tools,
         on_progress,
         origin,
+        approval,
     } = req;
 
     tracing::debug!(
@@ -322,6 +328,7 @@ async fn handle_agent_run_turn(req: AgentTurnRequest) -> Result<AgentTurnRespons
                     on_progress,
                     Some(graph_origin),
                     sandbox_mode,
+                    approval,
                 )
                 .await
             }),

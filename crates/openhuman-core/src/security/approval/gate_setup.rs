@@ -129,13 +129,14 @@ impl ApprovalGate {
     /// rows when both sides report in. See #2135.
     pub async fn intercept(
         &self,
+        turn: &ApprovalTurnContext,
         tool_name: &str,
         action_summary: &str,
         args_redacted: serde_json::Value,
     ) -> GateOutcome {
         // Drop the request_id; callers using the legacy entry point
         // don't record execution.
-        self.intercept_audited(tool_name, action_summary, args_redacted)
+        self.intercept_audited(turn, tool_name, action_summary, args_redacted)
             .await
             .0
     }
@@ -150,7 +151,11 @@ impl ApprovalGate {
         args_redacted: serde_json::Value,
     ) -> GateOutcome {
         let mut _park_bound_elapsed = false;
+        // A forced approval routes from the validated WebChat origin alone and
+        // never reads a chat context, a copilot flag or a flow run, so it takes
+        // none.
         self.intercept_audited_inner(
+            &ApprovalTurnContext::default(),
             tool_name,
             action_summary,
             args_redacted,
@@ -178,11 +183,12 @@ impl ApprovalGate {
     /// whether to invoke `record_execution`.
     pub async fn intercept_audited(
         &self,
+        turn: &ApprovalTurnContext,
         tool_name: &str,
         action_summary: &str,
         args_redacted: serde_json::Value,
     ) -> (GateOutcome, Option<String>) {
-        self.intercept_audited_for_call(tool_name, action_summary, args_redacted, None)
+        self.intercept_audited_for_call(turn, tool_name, action_summary, args_redacted, None)
             .await
     }
 
@@ -194,6 +200,7 @@ impl ApprovalGate {
     /// not driven through the tinyagents harness).
     pub async fn intercept_audited_for_call(
         &self,
+        turn: &ApprovalTurnContext,
         tool_name: &str,
         action_summary: &str,
         args_redacted: serde_json::Value,
@@ -204,6 +211,7 @@ impl ApprovalGate {
         // path, so the out-flag stays `false` and is discarded here.
         let mut _park_bound_elapsed = false;
         self.intercept_audited_inner(
+            turn,
             tool_name,
             action_summary,
             args_redacted,
@@ -234,6 +242,7 @@ impl ApprovalGate {
     /// [`Self::intercept_audited`] and always returns `Some`.
     pub async fn intercept_audited_bounded(
         &self,
+        turn: &ApprovalTurnContext,
         tool_name: &str,
         action_summary: &str,
         args_redacted: serde_json::Value,
@@ -242,6 +251,7 @@ impl ApprovalGate {
         let mut park_bound_elapsed = false;
         let resolved = self
             .intercept_audited_inner(
+                turn,
                 tool_name,
                 action_summary,
                 args_redacted,

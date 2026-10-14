@@ -20,6 +20,8 @@ pub(super) fn handle_composio_execute(params: Map<String, Value>) -> ControllerF
         // user's personal direct tenant, #1710); this only supplies the config.
         let resp = crate::integrations::composio::execute_dispatch::execute_composio_action(
             &config,
+            // An RPC call is not a chat turn: no chat to route the disclosure to.
+            None,
             &action,
             action_args,
             None,

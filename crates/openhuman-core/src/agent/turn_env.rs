@@ -42,6 +42,15 @@ pub struct HostTurnEnv {
     /// The host's tool belt for this turn is authoritative: tool declarations
     /// recorded in a restored transcript must not bring a revoked tool back.
     pub fresh_tool_snapshot: bool,
+    /// The approval context of the turn an entry point starts here (chat
+    /// surface, copilot flag, flow run), for the entry points that hand the
+    /// turn its environment as one value (the embed facade, `agent_chat`). The
+    /// session reads it once, for the root turn; it is never copied to
+    /// children ([`OpenHumanRunContext::with_host_env`] leaves it out), which
+    /// take theirs from their parent's run context.
+    ///
+    /// [`OpenHumanRunContext::with_host_env`]: crate::agent::tinyagents::host::OpenHumanRunContext
+    pub approval: crate::security::approval::ApprovalTurnContext,
 }
 
 impl std::fmt::Debug for HostTurnEnv {
@@ -54,6 +63,7 @@ impl std::fmt::Debug for HostTurnEnv {
             .field("tool_call_limit", &self.tool_call_limit)
             .field("hooks_empty", &self.hooks.is_empty())
             .field("fresh_tool_snapshot", &self.fresh_tool_snapshot)
+            .field("approval", &self.approval)
             .finish()
     }
 }

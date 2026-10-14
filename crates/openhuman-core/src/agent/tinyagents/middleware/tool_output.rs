@@ -16,13 +16,12 @@ use tinyinference_llm::tool::ToolCall as TaToolCall;
 use tinytools::{ToolPolicy as TaToolPolicy, ToolResult as TaToolResult};
 
 use crate::agent::harness::tool_result_artifacts::{
-    artifact_read_target, page_artifact_read, TINYAGENTS_TOOL_RESULT_ARTIFACT_STORE,
+    artifact_read_target, page_artifact_read, HostArtifactStore,
+    TINYAGENTS_TOOL_RESULT_ARTIFACT_STORE,
 };
 use crate::agent::tinyagents::payload_summarizer::DynPayloadSummarizer;
 use crate::inference::tokenjuice::generate::GenerateTicket;
-use tinyagents_harness::artifacts::tool_results::{
-    ArtifactRead, ToolResultArtifactOutcome, ToolResultArtifactStore,
-};
+use tinyagents_harness::artifacts::tool_results::{ArtifactRead, ToolResultArtifactOutcome};
 use tinyagents_harness::middleware::library::{
     plan_output_stages, run_output_ladder, CompactedOutput, OutputCapPolicy, OutputLadderInput,
     OutputProcessor,
@@ -183,7 +182,7 @@ pub(crate) struct ToolOutputMiddleware {
     /// The model behind TinyJuice's summary stage. `None` means this agent's
     /// results are never summarized.
     pub(crate) payload_summarizer: Option<Arc<DynPayloadSummarizer>>,
-    pub(crate) artifact_store: Option<ToolResultArtifactStore>,
+    pub(crate) artifact_store: Option<HostArtifactStore>,
     pub(crate) tokenjuice_compaction_enabled: bool,
     pub(crate) tokenjuice_compression: AgentTokenjuiceCompression,
     /// Config resolved when the turn was constructed; avoids a disk reload from
@@ -446,7 +445,7 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext> for Too
             }
         }
         if let Some(read) =
-            artifact_read_target(self.artifact_store.as_ref(), &call.name, &call.arguments)
+            artifact_read_target(self.artifact_store.as_deref(), &call.name, &call.arguments)
         {
             tracing::debug!(
                 tool = %call.name,
@@ -455,6 +454,10 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext> for Too
                 offset = read.offset,
                 "[tinyagents::mw] call reads a persisted tool-result artifact"
             );
+            // `file_read` opens the filesystem; the body lives on the blob store.
+            if let Some(store) = self.artifact_store.as_ref() {
+                store.resolve_read(&mut call.arguments, &read).await;
+            }
             if let Ok(mut reads) = self.artifact_reads.lock() {
                 reads.insert(call.id.clone(), read);
             }
@@ -600,7 +603,7 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext> for Too
                 content,
                 focus,
                 wants_compaction: wants_tinyjuice && !raw_fetch && !verbatim_file_read,
-                store: self.artifact_store.as_ref(),
+                store: self.artifact_store.as_deref(),
                 summary_label: "openhuman",
             },
         )

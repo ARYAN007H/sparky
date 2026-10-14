@@ -32,7 +32,7 @@ subscriber all listen to.
              v
         tokio::spawn( run_turn_under_cancel_and_deadline(        )
                         cancel token + wall-clock backstop
-                        + WebChat origin + APPROVAL_CHAT_CONTEXT
+                        + WebChat origin + chat approval context
                         run_chat_task (run_task.rs) )
              |
              |   checkout_session_agent (session.rs)
@@ -80,8 +80,8 @@ subscriber all listen to.
    `run_task::run_chat_task` through `run_turn_under_cancel_and_deadline`
    ([`ops/turn_guards.rs`](./ops/turn_guards.rs)). That wrapper puts four things around the same
    future: a cooperative `CancellationToken`, the wall-clock backstop, the
-   `AgentTurnOrigin::WebChat` scope, and the `APPROVAL_CHAT_CONTEXT`
-   task-local.
+   `AgentTurnOrigin::WebChat` scope, and the turn's `ApprovalTurnContext`
+   (handed to `run_chat_task`, which gives it to the session turn).
 
 5. `run_chat_task` checks the session agent out of the per-thread cache
    (`session::checkout_session_agent`). The entry is removed from
@@ -313,7 +313,7 @@ because the in-app chat is core product surface (#5002).
   This module only produces events.
 - External provider adapters (Telegram, Slack, ...) live in `channels/`.
 - Prompt-injection policy is `security::prompt_injection`; the approval gate
-  and `APPROVAL_CHAT_CONTEXT` are `security::approval`.
+  and `ApprovalTurnContext` are `security::approval`.
 - Failure copy per error class is `inference/failure_copy/`; provider
   resolution is `inference::provider`.
 - Turn-state storage is `threads::turn_state`; the conversation store that the
@@ -321,11 +321,13 @@ because the in-app chat is core product surface (#5002).
 
 ## Gotchas
 
-- `APPROVAL_CHAT_CONTEXT` is a task-local scoped around the `run_chat_task`
-  future. The wallet quote-owner gate
-  (`web3::wallet::execution::current_owner()`) relies on it staying in scope
-  through the inline `.await` chain. Moving the tool loop onto a fresh
-  `tokio::spawn` without re-scoping it would silently disable that gate.
+- The chat approval context is an explicit value on the turn
+  (`ApprovalTurnContext`, carried by the turn's run context to the gate and to
+  the tools that read it). A detached sub-agent deliberately starts without it
+  (`OpenHumanRunContext::detached_child`), so its parks route through the
+  origin and are marked detached (#5499). The wallet quote owner is taken from
+  that context by the wallet and Web3 tools; a tool dispatched without a run
+  context has none and cannot prepare or execute an owned quote.
 - Approval-reply routing runs before the `beforeSubmitPrompt` hook on
   purpose. Reordering them lets a hook strand a turn waiting on an approval.
 - Attachment staging must stay ahead of prompt scanning and persistence.
