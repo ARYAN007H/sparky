@@ -78,7 +78,8 @@ fn schema(function: &'static str) -> ControllerSchema {
 
 fn status(ctx: DispatchCtx, _: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = ctx.load_config()
+        let config = ctx
+            .load_config()
             .await
             .map_err(|error| format!("config unavailable: {error}"))?;
         crate::core::runtime::components::require_config(&config, "computer")?;
@@ -92,7 +93,8 @@ fn set_enabled(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture
             .get("enabled")
             .and_then(Value::as_bool)
             .ok_or_else(|| "enabled must be a boolean".to_owned())?;
-        let config = ctx.load_config()
+        let config = ctx
+            .load_config()
             .await
             .map_err(|error| format!("config unavailable: {error}"))?;
         crate::core::runtime::components::require_config(&config, "computer")?;
@@ -103,7 +105,8 @@ fn set_enabled(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture
 
 fn probe(ctx: DispatchCtx, _: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = ctx.load_config()
+        let config = ctx
+            .load_config()
             .await
             .map_err(|error| format!("config unavailable: {error}"))?;
         crate::core::runtime::components::require_config(&config, "computer")?;
@@ -113,7 +116,8 @@ fn probe(ctx: DispatchCtx, _: Map<String, Value>) -> ControllerFuture {
 
 fn pending(ctx: DispatchCtx, _: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = ctx.load_config()
+        let config = ctx
+            .load_config()
             .await
             .map_err(|error| format!("config unavailable: {error}"))?;
         crate::core::runtime::components::require_config(&config, "computer")?;
@@ -132,7 +136,8 @@ fn confirm(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
             .get("approve")
             .and_then(Value::as_bool)
             .ok_or_else(|| "approve must be a boolean".to_owned())?;
-        let config = ctx.load_config()
+        let config = ctx
+            .load_config()
             .await
             .map_err(|error| format!("config unavailable: {error}"))?;
         crate::core::runtime::components::require_config(&config, "computer")?;

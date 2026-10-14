@@ -242,10 +242,7 @@ fn handle_cost_get_dashboard(ctx: DispatchCtx, _params: Map<String, Value>) -> C
     })
 }
 
-fn handle_cost_get_daily_history(
-    ctx: DispatchCtx,
-    params: Map<String, Value>,
-) -> ControllerFuture {
+fn handle_cost_get_daily_history(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "cost_rpc", "[cost_rpc][{cid}] cost_get_daily_history.entry");

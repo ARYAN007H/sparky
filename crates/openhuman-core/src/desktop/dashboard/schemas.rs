@@ -169,12 +169,10 @@ fn handle_dashboard_model_health(
 ) -> ControllerFuture {
     Box::pin(async move {
         log::debug!("[dashboard] model_health request received");
-        let cfg = ctx.load_config()
-            .await
-            .map_err(|err| {
-                log::warn!("[dashboard] model_health failed to load config: {err}");
-                format!("config unavailable: {err}")
-            })?;
+        let cfg = ctx.load_config().await.map_err(|err| {
+            log::warn!("[dashboard] model_health failed to load config: {err}");
+            format!("config unavailable: {err}")
+        })?;
         let outcome: Outcome<ModelHealthResponse> = ops::model_health(&cfg)?;
         outcome.into_cli_compatible_json()
     })

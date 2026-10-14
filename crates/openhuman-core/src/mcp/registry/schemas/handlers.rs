@@ -71,10 +71,7 @@ pub(super) fn handle_uninstall(ctx: DispatchCtx, params: Map<String, Value>) -> 
     })
 }
 
-pub(super) fn handle_detect_auth(
-    ctx: DispatchCtx,
-    params: Map<String, Value>,
-) -> ControllerFuture {
+pub(super) fn handle_detect_auth(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let server_id = read_required::<String>(&params, "server_id")?;
@@ -82,10 +79,7 @@ pub(super) fn handle_detect_auth(
     })
 }
 
-pub(super) fn handle_oauth_begin(
-    ctx: DispatchCtx,
-    params: Map<String, Value>,
-) -> ControllerFuture {
+pub(super) fn handle_oauth_begin(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let server_id = read_required::<String>(&params, "server_id")?;
@@ -109,10 +103,7 @@ pub(super) fn handle_disconnect(ctx: DispatchCtx, params: Map<String, Value>) ->
     })
 }
 
-pub(super) fn handle_set_enabled(
-    ctx: DispatchCtx,
-    params: Map<String, Value>,
-) -> ControllerFuture {
+pub(super) fn handle_set_enabled(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let server_id = read_required::<String>(&params, "server_id")?;

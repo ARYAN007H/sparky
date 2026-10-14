@@ -111,7 +111,8 @@ pub fn schemas(function: &str) -> ControllerSchema {
 
 fn handle_get_summary(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = ctx.load_config()
+        let config = ctx
+            .load_config()
             .await
             .map_err(|error| format!("x402 get_summary: {error}"))?;
         let summary = crate::modules::x402_service::summary(&config)
@@ -133,7 +134,8 @@ fn handle_list_payments(ctx: DispatchCtx, params: Map<String, Value>) -> Control
         let p: ListPaymentsParams = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("x402 list_payments params: {e}"))?;
 
-        let config = ctx.load_config()
+        let config = ctx
+            .load_config()
             .await
             .map_err(|error| format!("x402 list_payments: {error}"))?;
         let limit = p.limit.unwrap_or(50).min(500);
@@ -164,7 +166,8 @@ fn handle_update_budget(ctx: DispatchCtx, params: Map<String, Value>) -> Control
         let p: UpdateBudgetParams = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("x402 update_budget params: {e}"))?;
 
-        let config = ctx.load_config()
+        let config = ctx
+            .load_config()
             .await
             .map_err(|error| format!("x402 update_budget: {error}"))?;
         let summary = crate::modules::x402_service::update_budget(

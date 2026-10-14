@@ -80,10 +80,7 @@ pub(super) fn handle_get_mode(ctx: DispatchCtx, _params: Map<String, Value>) -> 
     })
 }
 
-pub(super) fn handle_set_api_key(
-    ctx: DispatchCtx,
-    params: Map<String, Value>,
-) -> ControllerFuture {
+pub(super) fn handle_set_api_key(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         tracing::debug!("[composio-direct] rpc set_api_key entry");
         let config = ctx.load_config().await?;
