@@ -1,4 +1,6 @@
-//! Wall-clock deadline of one top-level agent turn.
+//! Host side of the wall-clock deadline of one top-level agent turn: the env
+//! override. The deadline itself (`close_budget`
+//! included) is `tinyagents_harness::turn_deadline::TurnDeadline`.
 //!
 //! A web-chat turn runs under an outer backstop (`web_chat::ops::turn_guards`)
 //! that drops the turn future when it elapses. Dropping it discards
@@ -10,7 +12,7 @@
 //!
 //! The deadline value (`tinyagents_harness::turn_deadline::TurnDeadline`)
 //! owns the two points the harness derives from the backstop; this module
-//! keeps the host side (env override, task-local scope):
+//! keeps the host side (the env override):
 //!
 //! * **wind-down** (`backstop - min(120s, backstop/5)`, 3480s by default): the
 //!   harness pauses the run at the next safe point, after a model call or a
@@ -22,7 +24,7 @@
 //!   typed `Timeout` before the backstop drops the turn.
 //!
 //! For every positive backstop, `wind_down < hard_stop < backstop`
-//! (see the harness `turn_deadline_tests.rs`).
+//! (see `turn_backstop_tests.rs`).
 //!
 //! The web backstop defaults to [`DEFAULT_WEB_TURN_BACKSTOP_SECS`] (3600s, the
 //! harness turn ceiling), not the harness default of 900s. It bounds a turn
@@ -32,33 +34,16 @@
 //! the backstop did both jobs, so a turn that was working steadily was wound
 //! down at 780s like a wedged one.
 //!
-//! The web-turn guard scopes the deadline on a task-local
-//! ([`with_turn_deadline`]). The top-level session turn
+//! The web-turn guard builds the deadline and hands it to the session it runs
+//! (`HostTurnEnv::turn_deadline`). The top-level session turn
 //! (`OpenHumanSessionHost::turn_with_origin`) copies it onto its explicit run
 //! context. Turns with no backstop, such as other channels or the CLI, carry
 //! `None` and keep their previous behaviour.
 
-use std::future::Future;
 use std::time::Duration;
-
-use tinyagents_harness::turn_deadline::TurnDeadline;
 
 /// Environment override for the backstop, in seconds; `0` disables it.
 pub const TURN_BACKSTOP_ENV: &str = "OPENHUMAN_WEB_TURN_TIMEOUT_SECS";
-
-/// Time kept back from the post-loop grounded close so the turn can commit and
-/// emit its reply before the backstop drops it.
-const CLOSE_RESERVE: Duration = Duration::from_secs(10);
-
-/// How long the post-loop grounded close may run as of `now`: the backstop
-/// remainder minus [`CLOSE_RESERVE`], zero once that has passed (#7716).
-/// Host-side until the harness `TurnDeadline` grows the same accessor.
-pub fn close_budget(deadline: &TurnDeadline, now: std::time::Instant) -> Duration {
-    deadline
-        .backstop()
-        .saturating_sub(deadline.elapsed_at(now))
-        .saturating_sub(CLOSE_RESERVE)
-}
 
 /// Default web-turn backstop, in seconds: the harness's own default turn
 /// ceiling (`DEFAULT_AGENT_TURN_TIMEOUT_SECS`). The harness default
@@ -81,23 +66,6 @@ pub fn configured_backstop() -> Option<Duration> {
     parse_web_backstop(std::env::var(TURN_BACKSTOP_ENV).ok().as_deref())
 }
 
-tokio::task_local! {
-    static CURRENT_TURN_DEADLINE: TurnDeadline;
-}
-
-/// The deadline scoped on the current task, if any.
-pub fn current() -> Option<TurnDeadline> {
-    CURRENT_TURN_DEADLINE.try_with(|deadline| *deadline).ok()
-}
-
-/// Run `future` with `deadline` scoped on the task (a no-op scope for `None`).
-pub async fn with_turn_deadline<F: Future>(deadline: Option<TurnDeadline>, future: F) -> F::Output {
-    match deadline {
-        Some(deadline) => CURRENT_TURN_DEADLINE.scope(deadline, future).await,
-        None => future.await,
-    }
-}
-
 #[cfg(test)]
-#[path = "turn_deadline_tests.rs"]
+#[path = "turn_backstop_tests.rs"]
 mod tests;
