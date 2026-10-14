@@ -220,7 +220,7 @@ async fn oversized_result_is_offloaded_and_the_parent_gets_a_readable_pointer() 
         "pointer must name the host read tool: {text}"
     );
     // And the path it quotes must be the one a parent can actually extract.
-    assert_eq!(extract_artifact_paths(&text), vec![artifact.relative_path]);
+    assert_eq!(extract_artifact_paths(&text), vec![artifact.relative_path.clone()]);
 
     // The pointer's path is openable by `file_read` against the action root.
     let on_disk = tokio::fs::read_to_string(action_dir.join(&artifact.relative_path))

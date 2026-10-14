@@ -143,7 +143,6 @@ fn desktop_approval_bypass_skips_only_require_approval_channel_verdict() {
             vec![Arc::new(vec![Box::new(RoutingFakeTool(name))])],
             "sess".to_owned(),
             "web_chat".to_owned(),
-            "orchestrator".to_owned(),
         )
     }
     let approval_middleware = middleware(ToolPolicyAction::RequireApproval);
