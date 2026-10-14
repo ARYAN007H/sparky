@@ -37,6 +37,8 @@ use serde_json::{json, Value};
 use crate::agent::artifacts::{
     create_artifact, fail_artifact, finalize_artifact, read_artifact_bytes, ArtifactKind,
 };
+use crate::agent::artifacts::tiny_store::FsArtifactStore;
+use tiny_artifacts::{ArtifactAuthor, ArtifactRecord, ArtifactStore, ArtifactVersion};
 use crate::security::SecurityPolicy;
 use tinytools::{PermissionLevel, Tool, ToolResult};
 
@@ -244,6 +246,10 @@ impl Tool for PresentationTool {
                     "description": "Deck title. Surfaced on the title slide and used as the artifact's human-readable name. Required, non-empty.",
                     "maxLength": types::MAX_TEXT_CHARS,
                 },
+                "artifact_id": {
+                    "type": "string",
+                    "description": "Optional artifact id to update. Pass an id from a prior generate_presentation call to save this deck as a new version of that artifact instead of creating a new one.",
+                },
                 "author": {
                     "type": "string",
                     "description": "Optional author byline shown on the title slide.",
@@ -409,6 +415,83 @@ impl Tool for PresentationTool {
             slide_count = input.slides.len(),
             "[presentation] generation complete"
         );
+
+        // Phase 2d: mirror the finished deck into the versioned artifact
+        // store (tiny-artifacts crate). When the caller passed an
+        // `artifact_id`, the deck is saved as a new version of that existing
+        // artifact; otherwise a fresh record is created. The body is the
+        // workspace path — the deck is a binary file, and the shared model
+        // stores a reference, not bytes.
+        let versioned_store = FsArtifactStore::new(&self.workspace_dir);
+        let versioned_result = (|| async {
+            let body = output_path.display().to_string();
+            let now = tiny_artifacts::now_millis();
+            match &input.artifact_id {
+                Some(existing_id) => {
+                    match versioned_store.get(existing_id).await? {
+                        Some(mut record) => {
+                            let v = ArtifactVersion::new(
+                                0,
+                                body,
+                                ArtifactAuthor::Agent,
+                                "agent",
+                                now,
+                            );
+                            record.push_version(v);
+                            versioned_store.upsert(&record).await?;
+                            tracing::info!(
+                                target: "presentation",
+                                artifact_id = existing_id,
+                                "[presentation] versioned artifact updated"
+                            );
+                        }
+                        None => {
+                            let record = ArtifactRecord::new(
+                                existing_id,
+                                &input.title,
+                                tiny_artifacts::ArtifactKind::File,
+                                body,
+                                "agent",
+                                now,
+                            );
+                            versioned_store.upsert(&record).await?;
+                            tracing::info!(
+                                target: "presentation",
+                                artifact_id = existing_id,
+                                "[presentation] versioned artifact created from update target"
+                            );
+                        }
+                    }
+                }
+                None => {
+                    let record = ArtifactRecord::new(
+                        &meta.id,
+                        &input.title,
+                        tiny_artifacts::ArtifactKind::File,
+                        body,
+                        "agent",
+                        now,
+                    );
+                    versioned_store.upsert(&record).await?;
+                    tracing::info!(
+                        target: "presentation",
+                        artifact_id = %meta.id,
+                        "[presentation] versioned artifact created"
+                    );
+                }
+            }
+            Ok::<(), anyhow::Error>(())
+        })()
+        .await;
+        if let Err(err) = versioned_result {
+            // The legacy meta.json flow already succeeded; a versioned-store
+            // write failure must not abort the reply.
+            tracing::warn!(
+                target: "presentation",
+                err = %err,
+                "[presentation] failed to mirror artifact into versioned store"
+            );
+        }
 
         let out = GeneratePresentationOutput {
             artifact_id: updated.id.clone(),

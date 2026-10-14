@@ -39,6 +39,8 @@ use tinytools::{
 use crate::agent::artifacts::{
     create_artifact_for_call, fail_artifact, finalize_artifact, ArtifactKind,
 };
+use crate::agent::artifacts::tiny_store::FsArtifactStore;
+use tiny_artifacts::{ArtifactRecord, ArtifactStore};
 use crate::tools::host_extensions::tool_call_id;
 
 /// Maximum characters of the prompt kept in a generated artifact's title.
@@ -167,6 +169,32 @@ impl<T: Tool> MediaArtifactTool<T> {
                     Ok(updated) => {
                         if let Some(obj) = entry.as_object_mut() {
                             obj.insert("artifact_id".into(), json!(updated.id));
+                        }
+                        // Phase 2d: mirror into the versioned artifact store
+                        // (tiny-artifacts crate). Each generated file becomes
+                        // a fresh versioned record – the shared model stores
+                        // a workspace-path reference, not bytes. Best-effort:
+                        // a failure here must not fail the filed artifact.
+                        let versioned = FsArtifactStore::new(&self.workspace_dir);
+                        let kind = match self.kind {
+                            ArtifactKind::Image => tiny_artifacts::ArtifactKind::Image,
+                            _ => tiny_artifacts::ArtifactKind::File,
+                        };
+                        let record = ArtifactRecord::new(
+                            &updated.id,
+                            &title,
+                            kind,
+                            dest.display().to_string(),
+                            "agent",
+                            tiny_artifacts::now_millis(),
+                        );
+                        if let Err(err) = versioned.upsert(&record).await {
+                            tracing::warn!(
+                                target: "media_generation",
+                                err = %err,
+                                artifact_id = %updated.id,
+                                "[media_generation] failed to mirror artifact into versioned store"
+                            );
                         }
                     }
                     Err(err) => {

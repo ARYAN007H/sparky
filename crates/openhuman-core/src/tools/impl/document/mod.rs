@@ -33,8 +33,10 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 
 use crate::agent::artifacts::{create_artifact, fail_artifact, finalize_artifact, ArtifactKind};
+use crate::agent::artifacts::tiny_store::FsArtifactStore;
 use crate::security::SecurityPolicy;
 use tinytools::{PermissionLevel, Tool, ToolResult};
+use tiny_artifacts::{ArtifactAuthor, ArtifactRecord, ArtifactStore, ArtifactVersion};
 
 mod engine;
 /// The document wire contract, shared with the `tinydocs` module.
@@ -172,6 +174,10 @@ impl Tool for DocumentTool {
                     "description": "Optional author byline, rendered italic beneath the title.",
                     "maxLength": types::MAX_TEXT_CHARS,
                 },
+                "artifact_id": {
+                    "type": "string",
+                    "description": "Optional artifact id to update. Pass an id from a prior generate_document call to save this document as a new version of that artifact instead of creating a new one.",
+                },
                 "sections": {
                     "type": "array",
                     "minItems": 1,
@@ -194,7 +200,21 @@ impl Tool for DocumentTool {
     }
 
     async fn execute(&self, args: Value) -> anyhow::Result<ToolResult> {
-        let input: GenerateDocumentInput = match serde_json::from_value(args.clone()) {
+        // The document wire contract is `deny_unknown_fields`, so the optional
+        // `artifact_id` is read here (and stripped from the args before
+        // deserialisation) rather than deserialised into
+        // `GenerateDocumentInput` (Phase 2d).
+        let artifact_id = args
+            .get("artifact_id")
+            .and_then(serde_json::Value::as_str)
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string);
+        let mut spec_args = args.clone();
+        if let Some(obj) = spec_args.as_object_mut() {
+            obj.remove("artifact_id");
+        }
+        let input: GenerateDocumentInput = match serde_json::from_value(spec_args) {
             Ok(v) => v,
             Err(err) => {
                 let msg = format!("invalid generate_document arguments: {err}");
@@ -307,6 +327,83 @@ impl Tool for DocumentTool {
             section_count = input.sections.len(),
             "[document] generation complete"
         );
+
+        // Phase 2d: mirror the finished document into the versioned artifact
+        // store (tiny-artifacts crate). With an `artifact_id` arg the document
+        // is saved as a new version of that existing artifact, otherwise a
+        // fresh record is created. The body is the workspace path — the
+        // document is a binary file, and the shared model stores a reference,
+        // not bytes.
+        let versioned_store = FsArtifactStore::new(&self.workspace_dir);
+        let versioned_result = (|| async {
+            let body = output_path.display().to_string();
+            let now = tiny_artifacts::now_millis();
+            match &artifact_id {
+                Some(existing_id) => {
+                    match versioned_store.get(existing_id).await? {
+                        Some(mut record) => {
+                            let v = ArtifactVersion::new(
+                                0,
+                                body,
+                                ArtifactAuthor::Agent,
+                                "agent",
+                                now,
+                            );
+                            record.push_version(v);
+                            versioned_store.upsert(&record).await?;
+                            tracing::info!(
+                                target: "document",
+                                artifact_id = existing_id,
+                                "[document] versioned artifact updated"
+                            );
+                        }
+                        None => {
+                            let record = ArtifactRecord::new(
+                                existing_id,
+                                &input.title,
+                                tiny_artifacts::ArtifactKind::File,
+                                body,
+                                "agent",
+                                now,
+                            );
+                            versioned_store.upsert(&record).await?;
+                            tracing::info!(
+                                target: "document",
+                                artifact_id = existing_id,
+                                "[document] versioned artifact created from update target"
+                            );
+                        }
+                    }
+                }
+                None => {
+                    let record = ArtifactRecord::new(
+                        &meta.id,
+                        &input.title,
+                        tiny_artifacts::ArtifactKind::File,
+                        body,
+                        "agent",
+                        now,
+                    );
+                    versioned_store.upsert(&record).await?;
+                    tracing::info!(
+                        target: "document",
+                        artifact_id = %meta.id,
+                        "[document] versioned artifact created"
+                    );
+                }
+            }
+            Ok::<(), anyhow::Error>(())
+        })()
+        .await;
+        if let Err(err) = versioned_result {
+            // The legacy meta.json flow already succeeded; a versioned-store
+            // write failure must not abort the reply.
+            tracing::warn!(
+                target: "document",
+                err = %err,
+                "[document] failed to mirror artifact into versioned store"
+            );
+        }
 
         let out = GenerateDocumentOutput {
             artifact_id: updated.id.clone(),
