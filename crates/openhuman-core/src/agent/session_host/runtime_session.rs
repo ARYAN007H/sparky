@@ -1046,7 +1046,7 @@ impl OpenHumanSessionHost {
             .codec(Arc::new(OpenHumanTranscriptCodec))
             .hooks(hooks)
             .retain_recorded_tools(
-                !self.host_only && crate::agent::tool_snapshot_scope::retain_recorded_tools(),
+                !self.host_only && !self.host_env.fresh_tool_snapshot,
             );
         let meta = self.runtime_transcript_meta();
         builder = match self.session.clone() {

@@ -292,6 +292,9 @@ pub struct OpenHumanSessionHost {
     /// Autonomous skill-run iteration cap handed to every turn's run context
     /// (lifts sub-agent iteration caps); `None` for ordinary agents.
     pub(super) autonomous_iter_cap: Option<usize>,
+    /// Per-turn host environment (budget, cancellation, deadline, hooks, ...)
+    /// handed in by the entry point; copied onto every turn's run context.
+    pub(super) host_env: crate::agent::turn_env::HostTurnEnv,
     /// Backend/session thread explicitly owned by this agent run. It is kept
     /// separate from event identity: CLI and worker event sessions are not
     /// necessarily user conversation threads.
