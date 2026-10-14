@@ -93,20 +93,22 @@ enum Stop {
 /// The idle guard fires first for a turn that stopped emitting progress with
 /// nothing in flight; the backstop bounds a turn that stays busy past the
 /// harness wind-down. `run_chat_task` taps the turn's progress stream into the
-/// [`TurnActivity`] scoped here.
-async fn drive_turn_with_deadline<F>(
+/// [`TurnActivity`] built here and handed to the turn.
+async fn drive_turn_with_deadline<B, F>(
     deadline: Option<Duration>,
     idle_window: Option<Duration>,
     ids: Option<TurnIds>,
-    fut: F,
+    build: B,
 ) -> Result<WebChatTaskResult, String>
 where
+    B: FnOnce(TurnActivity) -> F,
     F: std::future::Future<Output = Result<WebChatTaskResult, String>>,
 {
     let activity = TurnActivity::new();
     // The turn future is boxed: it is very large, and the scope wrappers would
-    // otherwise hold it inline again and overflow the worker stack.
-    let turn = turn_activity::with_turn_activity(activity.clone(), Box::pin(fut));
+    // otherwise hold it inline again and overflow the worker stack. It receives
+    // the activity record explicitly.
+    let turn = Box::pin(build(activity.clone()));
     let bounded_turn = async move {
         let Some(d) = deadline else {
             return Ok(turn.await);
@@ -214,7 +216,8 @@ fn turn_host_env(
 /// `run_chat_task` when building `fut`.
 ///
 /// `build_turn` receives the turn's [`HostTurnEnv`] -- its own cancellation
-/// token (fired by a Stop) and the backstop's [`TurnDeadline`] -- and returns
+/// token (fired by a Stop) and the backstop's [`TurnDeadline`] -- and the guard's
+/// [`TurnActivity`] record, and returns
 /// the turn future, which hands the env to the session it runs. The env is an
 /// explicit value, so it reaches the turn's whole run tree without any ambient
 /// scope.
@@ -227,7 +230,7 @@ pub(crate) async fn run_turn_under_cancel_and_deadline<B, F>(
     build_turn: B,
 ) -> Option<Result<WebChatTaskResult, String>>
 where
-    B: FnOnce(HostTurnEnv) -> F,
+    B: FnOnce(HostTurnEnv, TurnActivity) -> F,
     F: std::future::Future<Output = Result<WebChatTaskResult, String>>,
 {
     let ids = approval_ctx.request_id.clone().map(|request_id| TurnIds {
@@ -236,7 +239,6 @@ where
     });
     let deadline = resolve_web_turn_deadline().await;
     let (env, turn_cancellation) = turn_host_env(deadline);
-    let fut = build_turn(env);
     run_until_stopped(
         cancel_token,
         turn_cancellation,
@@ -244,10 +246,13 @@ where
             deadline,
             turn_activity::configured_idle_window(),
             ids,
-            crate::agent::turn_origin::with_origin(
-                origin,
-                crate::security::approval::APPROVAL_CHAT_CONTEXT.scope(approval_ctx, fut),
-            ),
+            |activity| {
+                crate::agent::turn_origin::with_origin(
+                    origin,
+                    crate::security::approval::APPROVAL_CHAT_CONTEXT
+                        .scope(approval_ctx, build_turn(env, activity)),
+                )
+            },
         ),
     )
     .await
