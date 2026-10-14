@@ -190,7 +190,6 @@ impl OpenHumanTurnPrelude {
         Arc<Vec<Box<dyn tinytools::Tool>>>,
         tinytools::ToolPolicySession,
         String,
-        String,
     ) {
         let surface = self
             .tool_surface
@@ -200,7 +199,6 @@ impl OpenHumanTurnPrelude {
             surface.tools.clone(),
             surface.synthesized_tools.clone(),
             surface.tool_policy_session.clone(),
-            surface.event_session_id.clone(),
             surface.event_channel.clone(),
         )
     }
@@ -938,7 +936,6 @@ impl OpenHumanSessionHost {
                             mut current_tools,
                             mut current_synthesized_tools,
                             policy_session,
-                            policy_session_id,
                             policy_channel,
                         ) = prelude.current_tool_source();
                         if turn.overrides.suppress_tools {
