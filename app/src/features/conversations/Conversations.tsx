@@ -11,6 +11,7 @@ import WorkflowProposalCard from '../../components/chat/WorkflowProposalCard';
 import { ConfirmationModal } from '../../components/intelligence/ConfirmationModal';
 import { SidebarContent } from '../../components/layout/shell/SidebarSlot';
 import { ArtifactCardAdapter } from '../../features/conversations/aui/ArtifactCardAdapter';
+import { ArtifactPreviewPanel } from '../../features/conversations/aui/ArtifactPreviewPanel';
 import { ContextUsage } from '../../features/conversations/aui/ContextUsage';
 import { PlanReviewCardCore } from '../../features/conversations/aui/PlanReviewPart';
 import { useRunMode } from '../../features/conversations/aui/useRunMode';
@@ -259,6 +260,7 @@ const Conversations = ({
   projectThreadList = false,
 }: ConversationsProps = {}) => {
   const [composerOverride, setComposerOverride] = useState<'mic-cloud' | 'text' | null>(null);
+  const [previewArtifactId, setPreviewArtifactId] = useState<string | null>(null);
   const composer = composerOverride ?? composerProp;
   const { t } = useT();
   const dispatch = useAppDispatch();
@@ -2153,9 +2155,11 @@ const Conversations = ({
   // Only artifacts with NO owning tool call belong in the header deck — one
   // with a `toolCallId` renders inline through its own tool-call card
   // (`MediaAndDocumentCalls.tsx`) instead, per the `ArtifactCardAdapter` doc.
+  // We ALSO keep ready artifacts visible as clickable cards (not just the
+  // ChatFilesChip count) so the user can open live artifact previews.
   const liveArtifacts = artifactDeckThreadId
     ? (artifactsByThread[artifactDeckThreadId] ?? []).filter(
-        a => a.status !== 'ready' && !a.toolCallId
+        a => !a.toolCallId && (a.status === 'in_progress' || a.status === 'ready')
       )
     : [];
   const liveArtifactDeck =
@@ -2170,6 +2174,7 @@ const Conversations = ({
                 console.warn('[artifact] regenerate failed:', err);
               });
             }}
+            onOpenPreview={setPreviewArtifactId}
           />
         ))}
       </div>
@@ -2212,6 +2217,12 @@ const Conversations = ({
       {stallWarningBanner}
       {sendAdvisoryBanner}
       {liveArtifactDeck}
+      {previewArtifactId && (
+        <ArtifactPreviewPanel
+          artifactId={previewArtifactId}
+          onClose={() => setPreviewArtifactId(null)}
+        />
+      )}
       {/* The core's run queue for this thread; renders nothing while empty. */}
       <ComposerMessageQueue />
       {/* Where this conversation works. Last, so it sits directly on the

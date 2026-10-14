@@ -37,20 +37,32 @@ export interface ArtifactCardAdapterProps {
   artifact: ArtifactSnapshot;
   /** When provided, render a Retry affordance on the `failed` state. */
   onRetry?: (artifactId: string) => void;
+  /** When provided, clicking a ready artifact opens the preview panel. */
+  onOpenPreview?: (artifactId: string) => void;
 }
 
-export function ArtifactCardAdapter({ artifact, onRetry }: ArtifactCardAdapterProps) {
+export function ArtifactCardAdapter({ artifact, onRetry, onOpenPreview }: ArtifactCardAdapterProps) {
   const { t } = useT();
   const generating = artifact.status === 'in_progress';
+  const isReady = artifact.status === 'ready';
   const meta =
-    artifact.status === 'ready' && artifact.sizeBytes != null
+    isReady && artifact.sizeBytes != null
       ? `${t('chat.artifact.ready')} · ${formatFileSize(artifact.sizeBytes)}`
       : artifact.status === 'failed'
         ? t('chat.artifact.failed')
         : '';
 
+  const handleClick = () => {
+    if (isReady && onOpenPreview) {
+      onOpenPreview(artifact.artifactId);
+    }
+  };
+
   return (
-    <div className="flex flex-col items-start gap-1.5" data-testid="artifact-card-adapter">
+    <div
+      className={'flex flex-col items-start gap-1.5' + (isReady ? ' cursor-pointer' : '')}
+      data-testid="artifact-card-adapter"
+    >
       <ArtifactCard
         title={artifact.title}
         meta={meta}
@@ -58,6 +70,7 @@ export function ArtifactCardAdapter({ artifact, onRetry }: ArtifactCardAdapterPr
         words={0}
         writingLabel={t('conversations.tools.working')}
         icon={KIND_ICONS[artifact.kind]}
+        onOpen={isReady && onOpenPreview ? () => onOpenPreview(artifact.artifactId) : undefined}
       />
       {artifact.status === 'failed' && onRetry ? (
         <Button
