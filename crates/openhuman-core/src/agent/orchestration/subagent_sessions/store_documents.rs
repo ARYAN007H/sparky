@@ -10,6 +10,7 @@
 //! | Collection | Document id | Holds |
 //! | --- | --- | --- |
 //! | `subagent_sessions` | the session id | one [`DurableSubagentSession`] plus `created_at` for ordering |
+//! | `subagent_sessions_import` | `subagent_sessions.json` | marker: the legacy file was imported (it is left byte-identical) |
 //!
 //! The callers in `ops.rs` load and save the whole list. `save` writes each session as
 //! its own document, so a session's history stays well under any document-size
@@ -27,10 +28,14 @@ use crate::storage::documents::Repo;
 use crate::storage::DocumentStoreExt;
 
 const SESSIONS: &str = "subagent_sessions";
+/// Holds the marker document that records the one-time legacy file import, in
+/// a collection of its own so `load` never sees it as a session.
+const IMPORTED: &str = "subagent_sessions_import";
+const LEGACY_MARKER: &str = "subagent_sessions.json";
 const DOMAIN: &str = "subagent_sessions::store";
 
 fn collections() -> Vec<CollectionSpec> {
-    vec![CollectionSpec::new(SESSIONS)]
+    vec![CollectionSpec::new(SESSIONS), CollectionSpec::new(IMPORTED)]
 }
 
 /// The document store for this call: the installed backend, else the
@@ -82,6 +87,35 @@ impl Docs {
             .into_iter()
             .map(|item| Ok(serde_json::from_value(item.doc)?))
             .collect()
+    }
+
+    /// Whether the one-time legacy file import finished in this scope.
+    pub(super) fn legacy_imported(&self) -> Result<bool> {
+        let found = self
+            .0
+            .run(|docs| async move { docs.get(IMPORTED, LEGACY_MARKER).await })?;
+        Ok(found.is_some())
+    }
+
+    /// Imports `sessions` read from the legacy file (a stored newer copy
+    /// wins), then records the import in a marker document.
+    pub(super) fn import_legacy(&self, sessions: &[DurableSubagentSession]) -> Result<()> {
+        self.save(sessions)?;
+        self.0.run(|docs| async move {
+            match docs
+                .put(
+                    IMPORTED,
+                    LEGACY_MARKER,
+                    serde_json::json!({ "imported": true }),
+                    Precondition::Absent,
+                )
+                .await
+            {
+                Ok(_) => Ok(()),
+                Err(error) if error.kind() == tinystoragedrivers::ErrorKind::Conflict => Ok(()),
+                Err(error) => Err(error),
+            }
+        })
     }
 
     pub(super) fn save(&self, sessions: &[DurableSubagentSession]) -> Result<()> {
