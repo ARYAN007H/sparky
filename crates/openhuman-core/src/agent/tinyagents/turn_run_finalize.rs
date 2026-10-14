@@ -39,7 +39,7 @@ pub(super) async fn finalize_turn_outcome(
     prompt_cache_guard: &PromptCacheGuardMiddleware,
     turn_completed_sink: Option<Sender<AgentProgress>>,
     bridge: Option<Arc<OpenhumanEventBridge>>,
-    early_exit: Option<tinyagents_runtime::turn_driver::EarlyExit>,
+    early_exit: Option<tinyagents_harness::tool::EarlyExit>,
     halt_summary: &HaltSummarySlot,
     wrap_up_fired: &Option<Arc<tinyagents_harness::middleware::FinalCallWrapUpMiddleware>>,
     run_instance_id: u64,

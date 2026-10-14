@@ -371,7 +371,7 @@ fn handle_retrieve(params: Map<String, Value>) -> ControllerFuture {
 fn handle_settings_get(_params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         gate()?;
-        let config = crate::config::Config::load_or_init()
+        let config = crate::config::rpc::load_config_with_timeout()
             .await
             .map_err(|e| format!("load config: {e}"))?;
         let settings = serde_json::to_value(&config.tokenjuice)
@@ -391,7 +391,7 @@ fn handle_settings_update(params: Map<String, Value>) -> ControllerFuture {
         let patch: super::config_patch::TokenjuiceSettingsPatch =
             serde_json::from_value(patch).map_err(|e| format!("invalid patch: {e}"))?;
 
-        let mut config = crate::config::Config::load_or_init()
+        let mut config = crate::config::rpc::load_config_with_timeout()
             .await
             .map_err(|e| format!("load config: {e}"))?;
         patch.apply(&mut config.tokenjuice);
@@ -413,7 +413,7 @@ fn handle_savings_stats(_params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         gate()?;
         let cache = super::cache_stats().await?;
-        let config = crate::config::Config::load_or_init()
+        let config = crate::config::rpc::load_config_with_timeout()
             .await
             .map_err(|e| e.to_string())?;
         super::install_from_config(&config).await?;
@@ -431,7 +431,7 @@ fn handle_savings_stats(_params: Map<String, Value>) -> ControllerFuture {
 fn handle_savings_reset(_params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         gate()?;
-        let config = crate::config::Config::load_or_init()
+        let config = crate::config::rpc::load_config_with_timeout()
             .await
             .map_err(|e| e.to_string())?;
         super::install_from_config(&config).await?;

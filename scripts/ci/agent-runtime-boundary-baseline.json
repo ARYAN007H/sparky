@@ -658,13 +658,6 @@
     "occurrence": 1
   },
   {
-    "rule": "tinyagents-moved-symbol-alias",
-    "path": "vendor/tinyagents/crates/tinyagents-harness/src/tool/shared/mod_tests.rs",
-    "line": 384,
-    "text": "struct ExposureProbe(tinytools::ToolExposure);",
-    "occurrence": 1
-  },
-  {
     "rule": "tinyagents-tool-calling-facade",
     "path": "vendor/tinyagents/crates/tinyagents-harness/src/agent_loop/dialect.rs",
     "line": 23,
@@ -802,13 +795,6 @@
     "path": "vendor/tinyagents/crates/tinyagents-runtime/src/lib.rs",
     "line": 33,
     "text": "pub use tinyagents_session::transcript::TranscriptPartial;",
-    "occurrence": 1
-  },
-  {
-    "rule": "tinyagents-upstream-reexport",
-    "path": "vendor/tinyagents/crates/tinyagents-runtime/src/turn_driver/types.rs",
-    "line": 11,
-    "text": "pub use tinyagents_harness::tool::EarlyExit;",
     "occurrence": 1
   },
   {
