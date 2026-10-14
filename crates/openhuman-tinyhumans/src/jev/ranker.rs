@@ -13,7 +13,7 @@ use openhuman_embed::__host::agent::tinyagents::discovery::{
     embedding_provider_is_usable, embedding_tool_ranker_in,
 };
 use openhuman_embed::__host::config::Config;
-use openhuman_embed::__host::inference::embedding_host::EmbeddingModel;
+use openhuman_embed::__host::inference::embedding_host::SharedEmbeddingModel;
 use openhuman_embed::__host::security::approval::ApprovalChatContext;
 use tinyjevclient::Client;
 use tinytools::{RankCandidate, RankContext, RankError, RankHit, ToolRanker};
@@ -33,7 +33,7 @@ pub type ConfigLoader =
 /// its egress disclosure there. The default is the core's configured provider;
 /// a test hands in one that records the chat.
 pub type EmbedderFactory =
-    Arc<dyn Fn(&Config, Option<ApprovalChatContext>) -> Arc<dyn EmbeddingModel> + Send + Sync>;
+    Arc<dyn Fn(&Config, Option<ApprovalChatContext>) -> SharedEmbeddingModel + Send + Sync>;
 
 /// The core's configured embedding provider, routed to the chat when there is one.
 fn default_embedder() -> EmbedderFactory {
