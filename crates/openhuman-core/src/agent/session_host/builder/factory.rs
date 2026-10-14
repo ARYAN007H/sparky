@@ -16,7 +16,7 @@ use std::sync::Arc;
 use tinyagents_definition::{PromptSource, ToolScope};
 use tinytools::Tool;
 use tinytools_agent::dialect::{
-    CodeDialect, NativeDialect, PFormatDialect, ToolCallFormat, ToolDialect, XmlDialect,
+    CodeDialect, CodeStyle, NativeDialect, PFormatDialect, ToolCallFormat, ToolDialect, XmlDialect,
 };
 
 #[path = "factory_workflows.rs"]
@@ -645,14 +645,12 @@ impl OpenHumanSessionHost {
             ToolCallFormat::Native => Box::new(NativeDialect),
             ToolCallFormat::Json => Box::new(XmlDialect),
             ToolCallFormat::PFormat => Box::new(PFormatDialect::new(pformat_registry.clone())),
-            ToolCallFormat::Python => Box::new(CodeDialect::new(
-                tinytools_agent::dialect::CodeStyle::Python,
-                pformat_registry.clone(),
-            )),
-            ToolCallFormat::TypeScript => Box::new(CodeDialect::new(
-                tinytools_agent::dialect::CodeStyle::TypeScript,
-                pformat_registry.clone(),
-            )),
+            ToolCallFormat::Python => {
+                Box::new(CodeDialect::new(CodeStyle::Python, pformat_registry.clone()))
+            }
+            ToolCallFormat::TypeScript => {
+                Box::new(CodeDialect::new(CodeStyle::TypeScript, pformat_registry.clone()))
+            }
         };
 
         log::debug!(
