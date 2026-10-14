@@ -163,28 +163,29 @@ async fn budget_stop_hook_pauses_the_hosted_turn_inner() {
         reason: Arc::clone(&stop_reason),
     }));
 
-    let outcome = run_root_turn_via_hosted_agent(
-        context,
-        hosted_base(),
-        "main".to_string(),
-        models,
-        "test".to_string(),
-        "claude-sonnet-4-6",
-        root_messages("budget-stop"),
-        vec![Arc::new(vec![
+    let outcome = TurnSpec {
+        run_context: context,
+        turn_models: models,
+        provider_id: "test".to_string(),
+        model: "claude-sonnet-4-6",
+        history: root_messages("budget-stop"),
+        tool_sets: vec![Arc::new(vec![
             Box::new(LimitedTool(tool_calls.clone())) as Box<dyn Tool>
         ])],
-        None,
-        3,
-        None,
-        None,
-        &[],
-        false,
-        None,
-        TurnContextMiddleware::default(),
-        None,
-        true,
-    )
+        allowed: None,
+        max_iterations: 3,
+        context_window: None,
+        run_queue: None,
+        early_exit_tools: &[],
+        pause_at_cap: false,
+        max_output_tokens: None,
+        context_mw: TurnContextMiddleware::default(),
+        tool_policy: None,
+        defer_turn_completed_to_caller: true,
+        subagent_scope: None,
+        deterministic_cacheable: false,
+    }
+    .run_hosted(hosted_base(), "main".to_string())
     .await
     .expect("budget pause returns the partial turn");
 
@@ -234,28 +235,29 @@ async fn deadline_wind_down_pauses_the_hosted_turn_inner() {
         std::time::Duration::from_secs(900),
     ));
 
-    let outcome = run_root_turn_via_hosted_agent(
-        context,
-        hosted_base(),
-        "main".to_string(),
-        models,
-        "test".to_string(),
-        "claude-sonnet-4-6",
-        root_messages("deadline-wind-down"),
-        vec![Arc::new(vec![
+    let outcome = TurnSpec {
+        run_context: context,
+        turn_models: models,
+        provider_id: "test".to_string(),
+        model: "claude-sonnet-4-6",
+        history: root_messages("deadline-wind-down"),
+        tool_sets: vec![Arc::new(vec![
             Box::new(LimitedTool(tool_calls.clone())) as Box<dyn Tool>
         ])],
-        None,
-        50,
-        None,
-        None,
-        &[],
-        true,
-        None,
-        TurnContextMiddleware::default(),
-        None,
-        true,
-    )
+        allowed: None,
+        max_iterations: 50,
+        context_window: None,
+        run_queue: None,
+        early_exit_tools: &[],
+        pause_at_cap: true,
+        max_output_tokens: None,
+        context_mw: TurnContextMiddleware::default(),
+        tool_policy: None,
+        defer_turn_completed_to_caller: true,
+        subagent_scope: None,
+        deterministic_cacheable: false,
+    }
+    .run_hosted(hosted_base(), "main".to_string())
     .await
     .expect("a wound-down turn returns its partial work, not an error");
 
@@ -305,28 +307,29 @@ fn a_turn_before_its_wind_down_point_runs_to_its_final_answer() {
                             std::time::Duration::from_secs(900),
                         ),
                     );
-                    let outcome = run_root_turn_via_hosted_agent(
-                        context,
-                        hosted_base(),
-                        "main".to_string(),
-                        models,
-                        "test".to_string(),
-                        "claude-sonnet-4-6",
-                        root_messages("deadline-fresh"),
-                        vec![Arc::new(vec![
+                    let outcome = TurnSpec {
+                        run_context: context,
+                        turn_models: models,
+                        provider_id: "test".to_string(),
+                        model: "claude-sonnet-4-6",
+                        history: root_messages("deadline-fresh"),
+                        tool_sets: vec![Arc::new(vec![
                             Box::new(LimitedTool(tool_calls.clone())) as Box<dyn Tool>
                         ])],
-                        None,
-                        50,
-                        None,
-                        None,
-                        &[],
-                        true,
-                        None,
-                        TurnContextMiddleware::default(),
-                        None,
-                        true,
-                    )
+                        allowed: None,
+                        max_iterations: 50,
+                        context_window: None,
+                        run_queue: None,
+                        early_exit_tools: &[],
+                        pause_at_cap: true,
+                        max_output_tokens: None,
+                        context_mw: TurnContextMiddleware::default(),
+                        tool_policy: None,
+                        defer_turn_completed_to_caller: true,
+                        subagent_scope: None,
+                        deterministic_cacheable: false,
+                    }
+                    .run_hosted(hosted_base(), "main".to_string())
                     .await
                     .expect("turn completes");
                     assert_eq!(model_calls.load(std::sync::atomic::Ordering::SeqCst), 2);
@@ -371,28 +374,29 @@ async fn golden_turn(label: &str, stop: GoldenStop) -> serde_json::Value {
         }
     }
     let sidecar = context.session_sidecar.clone();
-    let outcome = run_root_turn_via_hosted_agent(
-        context,
-        hosted_base(),
-        "main".to_string(),
-        models,
-        "test".to_string(),
-        "claude-sonnet-4-6",
-        root_messages(label),
-        vec![Arc::new(vec![
+    let outcome = TurnSpec {
+        run_context: context,
+        turn_models: models,
+        provider_id: "test".to_string(),
+        model: "claude-sonnet-4-6",
+        history: root_messages(label),
+        tool_sets: vec![Arc::new(vec![
             Box::new(LimitedTool(tool_calls.clone())) as Box<dyn Tool>
         ])],
-        None,
-        50,
-        None,
-        None,
-        &[],
-        matches!(stop, GoldenStop::Finishes | GoldenStop::DeadlineWindDown),
-        None,
-        TurnContextMiddleware::default(),
-        None,
-        true,
-    )
+        allowed: None,
+        max_iterations: 50,
+        context_window: None,
+        run_queue: None,
+        early_exit_tools: &[],
+        pause_at_cap: matches!(stop, GoldenStop::Finishes | GoldenStop::DeadlineWindDown),
+        max_output_tokens: None,
+        context_mw: TurnContextMiddleware::default(),
+        tool_policy: None,
+        defer_turn_completed_to_caller: true,
+        subagent_scope: None,
+        deterministic_cacheable: false,
+    }
+    .run_hosted(hosted_base(), "main".to_string())
     .await
     .expect("scripted turn returns its outcome");
     let wind_down = sidecar

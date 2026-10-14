@@ -237,7 +237,7 @@ async fn run_queue_steer_lands_in_subagent_history() {
     // End-to-end proof that flipping the subagent loop's run-queue arg from
     // `None` to `Some(queue)` wires steering all the way through: a message
     // pushed to the queue before the run is drained by the steering forwarder
-    // in the child's turn (`run_turn_via_tinyagents_shared`) and appears as a
+    // in the child's turn (`TurnSpec::run`) and appears as a
     // `[User steering message]:` user turn in the exact request sent to the
     // provider. This is the mechanism behind the `steer_subagent` tool.
     let provider = ScriptedProvider::new(vec![text_response("acknowledged")]);

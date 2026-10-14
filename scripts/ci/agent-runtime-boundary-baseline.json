@@ -1,47 +1,5 @@
 [
   {
-    "rule": "openhuman-runtime-bridge",
-    "path": "crates/openhuman-core/src/agent/harness/graph.rs",
-    "line": 36,
-    "text": "use crate::agent::tinyagents::run_turn_via_tinyagents_shared;",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-runtime-bridge",
-    "path": "crates/openhuman-core/src/agent/harness/graph.rs",
-    "line": 149,
-    "text": "let outcome = run_turn_via_tinyagents_shared(",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-runtime-bridge",
-    "path": "crates/openhuman-core/src/agent/subagent_host/ops/graph/dispatch.rs",
-    "line": 11,
-    "text": "use crate::agent::tinyagents::{run_turn_via_tinyagents_shared, SubagentScope};",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-runtime-bridge",
-    "path": "crates/openhuman-core/src/agent/subagent_host/ops/graph/dispatch.rs",
-    "line": 199,
-    "text": "let run_result = Box::pin(run_turn_via_tinyagents_shared(",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-runtime-bridge",
-    "path": "crates/openhuman-core/src/agent/tinyagents/mod.rs",
-    "line": 91,
-    "text": "pub(crate) use turn_exec::{run_root_turn_via_hosted_agent, run_turn_via_tinyagents_shared};",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-runtime-bridge",
-    "path": "crates/openhuman-core/src/agent/tinyagents/turn_exec.rs",
-    "line": 98,
-    "text": "pub(crate) async fn run_turn_via_tinyagents_shared(",
-    "occurrence": 1
-  },
-  {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/agent/bus.rs",
     "line": 298,

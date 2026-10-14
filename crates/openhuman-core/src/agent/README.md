@@ -31,7 +31,7 @@ is adapters that hand TinyAgents the things only OpenHuman knows.
      v                                   v
   +-----------------------------------------------------------------+
   | agent/tinyagents/   the adapter seam                            |
-  |   run_root_turn_via_hosted_agent / run_turn_via_tinyagents_shared|
+  |   TurnSpec::run_hosted / TurnSpec::run|
   |   TurnModelSource, middleware stack, host/ capability adapters, |
   |   OpenhumanEventBridge, journal                                 |
   +-----------------------------------------------------------------+
@@ -79,7 +79,7 @@ the bus path because they keep their own history.
    |     v
    |   run_chat_turn_graph                    session_host/turn/graph.rs
    |     v
-   |   run_root_turn_via_hosted_agent         tinyagents/turn_exec.rs
+   |   TurnSpec::run_hosted         tinyagents/turn_exec.rs
    |     | TurnDriver::prepare: models + tools; install_turn_middleware
    |     v
    |   AgentHarness loop  <---------------------------------+
@@ -122,7 +122,7 @@ In order:
    history and the tool snapshot. The driver builds this turn's tiered
    `ChatModel` set from `TurnModelSource`, resolves the context window, and
    calls `run_chat_turn_graph`, which calls
-   `run_root_turn_via_hosted_agent`.
+   `TurnSpec::run_hosted`.
 6. `TurnDriver::prepare` plans the turn ([`tinyagents/turn_plan.rs`](./tinyagents/turn_plan.rs)) and `install_turn_middleware` ([`tinyagents/turn_middleware.rs`](./tinyagents/turn_middleware.rs)) registers the
    models, the tools (through `CanonicalSharedToolAdapter`) and the
    middleware stack: approval and security gating, tool policy, cost
@@ -151,7 +151,7 @@ In order:
 
 The bus path is shorter. `bus.rs` scopes the origin, sandbox mode and file
 state agent id, then calls `harness::run_channel_turn_via_graph`
-([`harness/graph.rs`](./harness/graph.rs)), which calls `run_turn_via_tinyagents_shared`. There is
+([`harness/graph.rs`](./harness/graph.rs)), which calls `TurnSpec::run`. There is
 no TinyAgents `Session`: the caller owns the history vector, and
 `ask_user_clarification` is an early-exit tool whose question becomes the
 reply.
@@ -195,7 +195,7 @@ target `AgentDefinition` and call `subagent_host::run_subagent_with_parent`.
    v
  tinyagents-orchestration::subagent lifecycle
    v
- run_turn_via_tinyagents_shared   (subagent_host/ops/graph/dispatch.rs)
+ TurnSpec::run   (subagent_host/ops/graph/dispatch.rs)
    | child events -> Subagent* AgentProgress variants on parent channel
    v
  one compact tool_result back to the parent
@@ -333,7 +333,7 @@ Persistence, setup and RPC:
   `register_agent_handlers` installs it at startup.
 - `TurnModelSource` ([`tinyagents/turn_models.rs`](./tinyagents/turn_models.rs)): builds a turn's primary,
   tier-routed and summarizer `ChatModel`s from `(role, config)`.
-- `run_turn_via_tinyagents_shared` and `run_root_turn_via_hosted_agent`
+- `TurnSpec::run` and `TurnSpec::run_hosted`
   ([`tinyagents/turn_exec.rs`](./tinyagents/turn_exec.rs)): the only places a harness is invoked.
 - `OpenHumanRunContext` (`tinyagents/host/run_context.rs`): the explicit
   per-turn carrier (origin, progress, thread, workspace, cancellation, stop
