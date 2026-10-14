@@ -109,7 +109,15 @@ impl StorageHost {
                         // No receiver just means the bus forwarder is gone.
                         let _ = tx.send(signal);
                     }
-                    Err(broadcast::error::RecvError::Lagged(_)) => {}
+                    Err(broadcast::error::RecvError::Lagged(missed)) => {
+                        // The watch ids in the skipped batch are gone; the
+                        // signal carries no reset form, so record the loss.
+                        tracing::warn!(
+                            target: "storage_host",
+                            missed,
+                            "[storage-host] watch relay lagged; dropped watch signals"
+                        );
+                    }
                     Err(broadcast::error::RecvError::Closed) => return,
                 }
             }
