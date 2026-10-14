@@ -304,7 +304,7 @@ pub fn all_tools_with_runtime(
     // + `security` still gate which hosts are reachable; there is no
     // enable flag because every session needs basic HTTP as a baseline
     // capability.
-    tools.push(Box::new(http_request_tool(
+    tools.push(Box::new(routed_http_request_tool(
         security.clone(),
         http_config.allowed_domains.clone(),
         http_config.max_response_size,
@@ -327,7 +327,7 @@ pub fn all_tools_with_runtime(
     // GET-and-read primitive that reuses the same allowed-domains gate
     // as `http_request`. Use this for docs/READMEs; reach for
     // `http_request` only when you need richer HTTP semantics.
-    tools.push(Box::new(web_fetch_tool(
+    tools.push(Box::new(routed_web_fetch_tool(
         security.clone(),
         http_config.allowed_domains.clone(),
         Some(http_config.max_response_size),
@@ -337,14 +337,25 @@ pub fn all_tools_with_runtime(
     // curl — always registered. Shares `http_request.allowed_domains`,
     // adds streaming-to-disk with a hard byte ceiling. Writes land
     // under `<workspace>/<curl.dest_subdir>`.
-    tools.push(Box::new(CurlTool::new(
-        security.clone(),
-        http_config.allowed_domains.clone(),
-        action_dir.to_path_buf(),
-        root_config.curl.dest_subdir.clone(),
-        root_config.curl.max_download_bytes,
-        root_config.curl.timeout_secs,
-    )));
+    tools.push(Box::new(PerCallTool::new({
+        let security = security.clone();
+        let allowed_domains = http_config.allowed_domains.clone();
+        let action_dir = action_dir.to_path_buf();
+        let dest_subdir = root_config.curl.dest_subdir.clone();
+        let max_download_bytes = root_config.curl.max_download_bytes;
+        let timeout_secs = root_config.curl.timeout_secs;
+        // Built per call so the disclosure reaches that call's chat.
+        move |chat| {
+            CurlTool::new(
+                Arc::new(RoutedGate::new(security.clone(), chat)),
+                allowed_domains.clone(),
+                action_dir.clone(),
+                dest_subdir.clone(),
+                max_download_bytes,
+                timeout_secs,
+            )
+        }
+    })));
 
     // gitbooks — answers questions about OpenHuman by calling the
     // GitBook MCP server. Two tools mirroring the upstream MCP tools.
