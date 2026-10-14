@@ -104,6 +104,14 @@ fn workspace_guard_defers_to_the_security_policy_for_internal_state() {
     }
 }
 
+fn memory_blobs() -> Arc<dyn tinystoragedrivers::BlobStore> {
+    use tinystoragedrivers::StorageBackend as _;
+    let scoped = tinystoragedrivers::MemoryStorage::new()
+        .for_scope(&tinystoragedrivers::Scope::local())
+        .expect("the memory backend binds the local scope");
+    Arc::clone(scoped.blobs())
+}
+
 // ── Wiring (the point of `new_artifact_offload`) ──────────────────────────────
 
 #[tokio::test]
@@ -118,7 +126,7 @@ async fn a_wired_writer_refuses_a_target_inside_workspace_dir() {
     std::fs::create_dir_all(&action_dir).expect("action dir");
 
     let offload = new_artifact_offload(
-        action_dir,
+        memory_blobs(),
         Some(policy_with(
             dir.path().join("action"),
             workspace_dir.clone(),
@@ -151,7 +159,7 @@ async fn a_wired_writer_redacts_before_the_bytes_reach_disk() {
     std::fs::create_dir_all(&workspace_dir).expect("workspace dir");
 
     let offload = new_artifact_offload(
-        action_dir,
+        memory_blobs(),
         Some(policy_with(dir.path().join("action"), workspace_dir)),
         "agent",
         "task",
@@ -163,16 +171,18 @@ async fn a_wired_writer_redacts_before_the_bytes_reach_disk() {
         .await
         .expect("write");
 
-    let on_disk = tokio::fs::read_to_string(&artifact.absolute_path)
+    let on_disk = offload
+        .read(&artifact.relative_path)
         .await
-        .expect("read back");
+        .expect("read back")
+        .expect("stored");
     // Whether this particular shape trips `sanitize_text` is that function's
     // business; what this pins is that the two agree. A redactor reported as
     // having fired must have actually rewritten the stored bytes.
     assert_eq!(
         artifact.redacted,
         on_disk != secret,
-        "the redacted flag must match what actually reached disk"
+        "the redacted flag must match what actually reached the blob store"
     );
 }
 
@@ -185,7 +195,7 @@ async fn oversized_result_is_offloaded_and_the_parent_gets_a_readable_pointer() 
     std::fs::create_dir_all(&workspace_dir).expect("workspace dir");
 
     let offload = new_artifact_offload(
-        action_dir,
+        memory_blobs(),
         Some(policy_with(dir.path().join("action"), workspace_dir)),
         "worker",
         "task-1",
@@ -193,7 +203,13 @@ async fn oversized_result_is_offloaded_and_the_parent_gets_a_readable_pointer() 
     let big = "x".repeat(10_000);
 
     let (text, artifact) =
-        offload_oversized_result(big.clone(), &offload, DEFAULT_OFFLOAD_THRESHOLD_BYTES).await;
+        offload_oversized_result(
+            big.clone(),
+            &offload,
+            DEFAULT_OFFLOAD_THRESHOLD_BYTES,
+            &action_dir,
+        )
+        .await;
     let artifact = artifact.expect("an artifact was written");
 
     assert!(text.starts_with(ARTIFACT_POINTER_PREFIX));
@@ -206,7 +222,8 @@ async fn oversized_result_is_offloaded_and_the_parent_gets_a_readable_pointer() 
     // And the path it quotes must be the one a parent can actually extract.
     assert_eq!(extract_artifact_paths(&text), vec![artifact.relative_path]);
 
-    let on_disk = tokio::fs::read_to_string(&artifact.absolute_path)
+    // The pointer's path is openable by `file_read` against the action root.
+    let on_disk = tokio::fs::read_to_string(action_dir.join(&artifact.relative_path))
         .await
         .expect("read back");
     assert_eq!(on_disk, big, "full fidelity is preserved on disk");

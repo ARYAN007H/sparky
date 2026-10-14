@@ -48,10 +48,11 @@
 
 pub mod policy;
 
-use std::path::PathBuf;
+use std::path::Path;
 use std::sync::Arc;
 
 use tinyagents_harness::artifacts::ArtifactOffload;
+use tinystoragedrivers::BlobStore;
 
 use crate::security::SecurityPolicy;
 
@@ -77,18 +78,19 @@ use tinyagents_harness::artifacts::OffloadedArtifact;
 /// its agent actually holds, and the reader and the writer are different agents.
 pub const READ_TOOL: &str = "file_read";
 
-/// Build a writer for one sub-agent run, wired to OpenHuman's policies.
+/// Build a writer for one sub-agent run over `blobs`, wired to OpenHuman's
+/// policies.
 ///
 /// Supplies both host policies every time, so no call site can accidentally
 /// construct an unguarded or unredacted writer — the crate permits `None` for
 /// each, and OpenHuman never wants either.
 pub fn new_artifact_offload(
-    action_dir: PathBuf,
+    blobs: Arc<dyn BlobStore>,
     policy: Option<Arc<SecurityPolicy>>,
     agent_id: impl Into<String>,
     task_id: impl Into<String>,
 ) -> ArtifactOffload {
-    let offload = ArtifactOffload::new(action_dir, agent_id, task_id)
+    let offload = ArtifactOffload::new(blobs, agent_id, task_id)
         .with_redactor(Arc::new(SanitizingRedactor));
     match policy {
         Some(policy) => offload.with_path_policy(Arc::new(WorkspaceGuard::new(policy))),
@@ -102,21 +104,66 @@ pub fn new_artifact_offload(
 /// Offload `output` when it exceeds `threshold_bytes`, returning the text the
 /// parent should receive plus the artifact when one was written.
 ///
-/// Thin wrapper over the crate's function that pins OpenHuman's [`READ_TOOL`].
-/// Every failure mode is soft: the caller gets the original payload back and
-/// the summarizer detour and tool-result budget stay in charge as the fallback.
+/// The artifact lives on the blob store, but the parent opens it with
+/// [`READ_TOOL`], which reads the filesystem. So the stored body is also
+/// materialised at `materialize_root/<key>` (the parent's action root), which
+/// is the path the pointer quotes. Every failure mode is soft: the caller gets
+/// the original payload back and the summarizer detour and tool-result budget
+/// stay in charge as the fallback. A pointer is never returned for a file that
+/// could not be written.
 pub async fn offload_oversized_result(
     output: String,
     offload: &ArtifactOffload,
     threshold_bytes: usize,
+    materialize_root: &Path,
 ) -> (String, Option<OffloadedArtifact>) {
-    tinyagents_harness::artifacts::offload_oversized_result(
-        output,
+    let (pointer, artifact) = tinyagents_harness::artifacts::offload_oversized_result(
+        output.clone(),
         offload,
         threshold_bytes,
         READ_TOOL,
     )
-    .await
+    .await;
+    let Some(artifact) = artifact else {
+        return (output, None);
+    };
+    match materialize(offload, &artifact, materialize_root).await {
+        Ok(()) => (pointer, Some(artifact)),
+        Err(error) => {
+            tracing::warn!(
+                path = %artifact.relative_path,
+                error = %error,
+                "[artifact] could not materialize the stored artifact; keeping the inline result"
+            );
+            (output, None)
+        }
+    }
+}
+
+/// Write the stored (redacted) body of `artifact` to `root/<key>`.
+async fn materialize(
+    offload: &ArtifactOffload,
+    artifact: &OffloadedArtifact,
+    root: &Path,
+) -> Result<(), String> {
+    let body = offload
+        .read(&artifact.relative_path)
+        .await
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| "the artifact vanished from the blob store".to_string())?;
+    // `read` re-ran the fail-closed key checks (no absolute names, `..`, or
+    // control characters), so the join cannot leave `root`.
+    let target = root.join(&artifact.relative_path);
+    if let Some(parent) = target.parent() {
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|error| error.to_string())?;
+    }
+    tokio::fs::write(&target, body)
+        .await
+        .map_err(|error| error.to_string())?;
+    tracing::debug!(path = %artifact.relative_path, "[artifact] materialized for file_read");
+    Ok(())
 }
 
 #[cfg(test)]

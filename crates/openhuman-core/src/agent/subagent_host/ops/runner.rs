@@ -474,19 +474,41 @@ async fn offload_outcome_artifacts(
     let threshold =
         effective_offload_threshold(DEFAULT_OFFLOAD_THRESHOLD_BYTES, definition.max_result_chars);
 
-    // Worktree-isolated workers write inside their own checkout, but the parent
-    // that receives the pointer resolves relative paths against ITS action root.
-    // Render against that root so the handed-back path is one the parent can
-    // actually open (relative when the worktree nests inside it, absolute when
-    // it does not) rather than a bare `outputs/…` that silently misses.
-    let render_root = policy
+    // The parent that receives the pointer resolves relative paths against ITS
+    // action root, so the stored artifact is materialised there (also for a
+    // worktree-isolated worker) and the handed-back `outputs/…` path opens.
+    let materialize_root = policy
         .as_ref()
         .map(|p| p.action_dir.clone())
         .unwrap_or_else(|| action_dir.clone());
-    let offload = new_artifact_offload(action_dir, policy, outcome.agent_id.clone(), task_id)
-        .with_render_root(render_root);
-    let (output, _artifact) =
-        offload_oversized_result(std::mem::take(&mut outcome.output), &offload, threshold).await;
+    let workspace_dir = policy
+        .as_ref()
+        .map(|p| p.workspace_dir.clone())
+        .unwrap_or_else(|| action_dir.clone());
+    let blobs = crate::agent::session_store::artifact_blobs_for(&workspace_dir);
+    let Some(blobs) = blobs else {
+        tracing::debug!(
+            task_id = %task_id,
+            agent_id = %outcome.agent_id,
+            "[artifact] no blob store for the acting tenant — skipping offload (summarizer/truncation backstop applies)"
+        );
+        outcome.artifact_paths = paths;
+        note_artifact_handoff(
+            HANDOFF_STAGE_RECORDED,
+            &outcome.agent_id,
+            task_id,
+            &outcome.artifact_paths,
+        );
+        return;
+    };
+    let offload = new_artifact_offload(blobs, policy, outcome.agent_id.clone(), task_id);
+    let (output, _artifact) = offload_oversized_result(
+        std::mem::take(&mut outcome.output),
+        &offload,
+        threshold,
+        &materialize_root,
+    )
+    .await;
     outcome.output = output;
 
     // Merge: the harness pointer (if it fired) plus any worker-authored pointer
