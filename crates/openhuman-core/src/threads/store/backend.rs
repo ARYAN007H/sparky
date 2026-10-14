@@ -19,13 +19,14 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use tinyagents_session::threads::{
-    ConversationPersistence, ConversationResult, ConversationThread, CreateConversationThread,
+    ConversationError, ConversationPersistence, ConversationResult, ConversationThread, CreateConversationThread,
     CrossThreadHit, DriverConversationStore, ThreadMessage, ThreadMessagePatch,
 };
 pub use tinyagents_session::threads::ConversationPurgeStats;
 
 use crate::storage::documents::Repo;
 use crate::storage::{self, Scope, StorageError};
+use tinystoragedrivers::ErrorKind;
 
 const DOMAIN: &str = "threads::store";
 const LOG_PREFIX: &str = "[conversations]";
@@ -40,6 +41,52 @@ fn conversation_scope() -> Result<Scope, String> {
         crate::core::runtime::mode::is_saas(),
     )
     .map_err(|e| e.to_string())
+}
+
+/// What an operation addresses, to word a not-found error as the file store did.
+#[derive(Clone, Copy)]
+struct Subject<'a> {
+    thread: Option<&'a str>,
+    message: Option<&'a str>,
+}
+
+const NONE: Subject<'static> = Subject {
+    thread: None,
+    message: None,
+};
+
+const fn thread(id: &str) -> Subject<'_> {
+    Subject {
+        thread: Some(id),
+        message: None,
+    }
+}
+
+const fn message<'a>(thread: &'a str, message: &'a str) -> Subject<'a> {
+    Subject {
+        thread: Some(thread),
+        message: Some(message),
+    }
+}
+
+/// The error text callers match on: a missing thread or message reads
+/// `thread <id> not found` / `message <id> not found in thread <id>` (the
+/// wording the file store used and `threads::ops` maps to a typed error);
+/// anything else is the driver's own message.
+fn describe(error: &ConversationError, subject: Subject<'_>) -> String {
+    if let ConversationError::Driver(inner) = error {
+        if inner.kind() == ErrorKind::NotFound {
+            let text = inner.to_string();
+            match (subject.thread, subject.message) {
+                (Some(t), Some(m)) if text.contains("message") => {
+                    return format!("message {m} not found in thread {t}")
+                }
+                (Some(t), _) => return format!("thread {t} not found"),
+                _ => {}
+            }
+        }
+    }
+    error.to_string()
 }
 
 /// A conversation store bound to one workspace's storage backend.
@@ -80,7 +127,12 @@ impl ConversationStore {
         Ok(store)
     }
 
-    fn run<T, F, Fut>(&self, operation: &'static str, f: F) -> Result<T, String>
+    fn run<T, F, Fut>(
+        &self,
+        operation: &'static str,
+        subject: Subject<'_>,
+        f: F,
+    ) -> Result<T, String>
     where
         F: FnOnce(DriverConversationStore) -> Fut,
         Fut: std::future::Future<Output = ConversationResult<T>> + Send + 'static,
@@ -92,7 +144,7 @@ impl ConversationStore {
             .map_err(|e: StorageError| format!("{LOG_PREFIX} {operation}: {e}"))?;
         outcome.map_err(|e| {
             log::debug!("{LOG_PREFIX} {operation} failed: {e}");
-            e.to_string()
+            describe(&e, subject)
         })
     }
 
@@ -101,20 +153,20 @@ impl ConversationStore {
         &self,
         request: CreateConversationThread,
     ) -> Result<ConversationThread, String> {
-        self.run("ensure_thread", |s| async move {
+        self.run("ensure_thread", NONE, |s| async move {
             s.ensure_thread(request).await
         })
     }
 
     /// Every live thread, newest first.
     pub fn list_threads(&self) -> Result<Vec<ConversationThread>, String> {
-        self.run("list_threads", |s| async move { s.list_threads().await })
+        self.run("list_threads", NONE, |s| async move { s.list_threads().await })
     }
 
     /// A thread's messages in append order; empty for an unknown thread.
     pub fn get_messages(&self, thread_id: &str) -> Result<Vec<ThreadMessage>, String> {
         let id = thread_id.to_string();
-        self.run("get_messages", |s| async move {
+        self.run("get_messages", thread(thread_id), |s| async move {
             if s.get_thread(&id).await?.is_none() {
                 return Ok(Vec::new());
             }
@@ -131,7 +183,7 @@ impl ConversationStore {
     ) -> Result<Vec<CrossThreadHit>, String> {
         let query = query.to_string();
         let exclude = exclude_thread_id.map(str::to_string);
-        self.run("search_cross_thread_messages", |s| async move {
+        self.run("search_cross_thread_messages", NONE, |s| async move {
             s.search_cross_thread_messages(&query, limit, exclude.as_deref())
                 .await
         })
@@ -144,7 +196,7 @@ impl ConversationStore {
         message: ThreadMessage,
     ) -> Result<ThreadMessage, String> {
         let id = thread_id.to_string();
-        self.run("append_message", |s| async move {
+        self.run("append_message", thread(thread_id), |s| async move {
             s.append_message(&id, message).await
         })
     }
@@ -157,7 +209,7 @@ impl ConversationStore {
         updated_at: &str,
     ) -> Result<ConversationThread, String> {
         let (id, title, at) = (thread_id.to_string(), title.to_string(), updated_at.to_string());
-        self.run("update_thread_title", |s| async move {
+        self.run("update_thread_title", thread(thread_id), |s| async move {
             s.update_thread_title(&id, &title, &at).await
         })
     }
@@ -170,7 +222,7 @@ impl ConversationStore {
         updated_at: &str,
     ) -> Result<ConversationThread, String> {
         let (id, at) = (thread_id.to_string(), updated_at.to_string());
-        self.run("update_thread_working_dir", |s| async move {
+        self.run("update_thread_working_dir", thread(thread_id), |s| async move {
             s.update_thread_working_dir(&id, working_dir, &at).await
         })
     }
@@ -183,7 +235,7 @@ impl ConversationStore {
         updated_at: &str,
     ) -> Result<ConversationThread, String> {
         let (id, at) = (thread_id.to_string(), updated_at.to_string());
-        self.run("update_thread_labels", |s| async move {
+        self.run("update_thread_labels", thread(thread_id), |s| async move {
             s.update_thread_labels(&id, labels, &at).await
         })
     }
@@ -196,7 +248,7 @@ impl ConversationStore {
         patch: ThreadMessagePatch,
     ) -> Result<ThreadMessage, String> {
         let (id, mid) = (thread_id.to_string(), message_id.to_string());
-        self.run("update_message", |s| async move {
+        self.run("update_message", message(thread_id, message_id), |s| async move {
             s.update_message(&id, &mid, patch).await
         })
     }
@@ -208,7 +260,7 @@ impl ConversationStore {
         message_id: &str,
     ) -> Result<Option<usize>, String> {
         let (id, mid) = (thread_id.to_string(), message_id.to_string());
-        self.run("delete_messages_from", |s| async move {
+        self.run("delete_messages_from", message(thread_id, message_id), |s| async move {
             s.delete_messages_from(&id, &mid).await
         })
     }
@@ -216,14 +268,14 @@ impl ConversationStore {
     /// Soft-deletes a thread; whether it existed.
     pub fn delete_thread(&self, thread_id: &str, deleted_at: &str) -> Result<bool, String> {
         let (id, at) = (thread_id.to_string(), deleted_at.to_string());
-        self.run("delete_thread", |s| async move {
+        self.run("delete_thread", thread(thread_id), |s| async move {
             s.delete_thread(&id, &at).await
         })
     }
 
     /// Removes every thread.
     pub fn purge_threads(&self) -> Result<ConversationPurgeStats, String> {
-        self.run("purge_threads", |s| async move { s.purge_threads().await })
+        self.run("purge_threads", NONE, |s| async move { s.purge_threads().await })
     }
 }
 
