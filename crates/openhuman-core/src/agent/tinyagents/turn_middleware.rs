@@ -169,7 +169,6 @@ pub(super) fn install_turn_middleware(
     // cap / stop-hook pauses, the repeated-tool-failure breaker also pauses
     // through it, and it wants to fire on every path.
     let handle = Some(steering.clone());
-    let route_fallback_present = has_route_fallback;
 
     // Cost usage capture (issue #4249, Phase 5): feed the event bridge's usage
     // carry from a wrap-model middleware that reads the full `BilledUsage` off each
@@ -205,7 +204,7 @@ pub(super) fn install_turn_middleware(
     // visible on the OpenHuman progress/observability bridge (and grep-logged under
     // `[fallback]`). Installed only when a fallback chain exists; it never re-issues
     // the call, so it adds no provider dispatch (no double-fallback).
-    if route_fallback_present {
+    if has_route_fallback {
         harness.push_model_middleware(Arc::new(routes::FallbackObserverMiddleware::new(model)));
     }
 
@@ -215,10 +214,6 @@ pub(super) fn install_turn_middleware(
     // Captured for the same reason `autocompact_enabled` is — `install` consumes
     // `context_mw` — and used to site microcompact below, after compression.
     let microcompact_keep_recent = context_mw.microcompact_keep_recent;
-    let tool_result_artifact_index = context_mw
-        .artifact_store
-        .as_ref()
-        .map(|_| Arc::new(ToolResultArtifactIndexStore::new()));
 
     // Shared by the two breakers below: whichever halts writes the root cause here.
     let halt_summary: HaltSummarySlot = std::sync::Arc::new(std::sync::Mutex::new(None));
@@ -348,8 +343,6 @@ pub(super) fn install_turn_middleware(
     // made its `after_tool` run first and record the full raw payload of every
     // call, bloating the per-turn sink and feeding failure classification /
     // `ToolCallRecord.output_summary` pre-cap content.
-    let tool_outcome_sink: ToolOutcomeSink = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
-    let failure_map: ToolFailureMap = Arc::default();
     harness.push_middleware(Arc::new(middleware::ToolOutcomeCaptureMiddleware::new(
         tool_outcome_sink.clone(),
         failure_map.clone(),
