@@ -43,8 +43,8 @@ Contribute & Star us on GitHub: https://github.com/tinyhumansai/openhuman
 ///
 /// Returns an error if the command fails, parameters are invalid, or if
 /// the subcommand/namespace is unknown.
-pub fn run_from_cli_args(ctx: &DispatchCtx, args: &[String]) -> Result<()> {
-    run_from_cli_args_with(&ctx, args, None)
+pub fn run_from_cli_args(args: &[String]) -> Result<()> {
+    run_from_cli_args_with(args, None)
 }
 
 /// Whether the parsed invocation only asks the CLI to print help.
@@ -78,7 +78,7 @@ pub(crate) fn is_help_only(args: &[String]) -> bool {
 
 /// [`run_from_cli_args`] with a host-supplied boot description for `run` /
 /// `serve`; see [`crate::run_core_from_args_with`].
-pub fn run_from_cli_args_with(ctx: &DispatchCtx, 
+pub fn run_from_cli_args_with(
     args: &[String],
     host_boot: Option<crate::core::server_launcher::HostBoot>,
 ) -> Result<()> {
