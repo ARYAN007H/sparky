@@ -8,7 +8,7 @@
 //! **adapter seam**: it bridges openhuman's `Provider`, `Tool`, and `TranscriptMessage`
 //! types onto the crate's `ChatModel`, `Tool`, and `Message` traits, then drives
 //! a turn through [`AgentHarness::invoke`]. The chat / channel / sub-agent
-//! routes call [`run_turn_via_tinyagents_shared`] (default ON in production).
+//! routes drive a turn through [`TurnSpec`].
 //!
 //! The chat route is at functional parity with the legacy `run_turn_engine`:
 //! the [`OpenhumanEventBridge`] mirrors the harness event stream onto
@@ -88,7 +88,7 @@ pub(crate) use turn_policy::{
     agent_turn_wall_clock_ms_for, chat_provider_is_local, local_web_turn_backstop_secs,
     ToolPolicyEnforcement,
 };
-pub(crate) use turn_exec::{run_root_turn_via_hosted_agent, run_turn_via_tinyagents_shared};
+pub(crate) use turn_exec::TurnSpec;
 
 // Test-only glue so `tinyagents_tests.rs`'s `use super::*;` sees the
 // lower-level policy helpers it exercises directly (they otherwise stay

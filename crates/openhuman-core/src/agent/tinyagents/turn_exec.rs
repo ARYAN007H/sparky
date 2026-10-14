@@ -1,8 +1,8 @@
 //! Drive an openhuman agent turn through the `tinyagents` runtime turn driver.
 //!
 //! [`TurnSpec::run`] is the entry point the channel and sub-agent routes use and
-//! [`TurnSpec::run_hosted`] the one for hosted root turns. Both plan the turn with [`OpenHumanTurnPlanner`], let
-//! `tinyagents_runtime::turn_driver::TurnDriver` assemble and wire the harness
+//! [`TurnSpec::run_hosted`] the one for hosted root turns. Both plan the turn
+//! with [`OpenHumanTurnPlanner`], let `tinyagents_runtime::turn_driver::TurnDriver` assemble and wire the harness
 //! (models, run policy, tools, steering, early exit, the cap pause), then install
 //! the host middleware stack ([`turn_middleware`](super::turn_middleware)) and
 //! finalize the run into a [`TinyagentsTurnOutcome`].
