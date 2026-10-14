@@ -558,6 +558,12 @@ impl OpenHumanRunContext {
         self.parent.insert(parent)
     }
 
+    /// The real tool invocation budget for a turn of `max_iterations`: the
+    /// product default, narrowed by the host's explicit cap.
+    pub(crate) fn tool_call_limit_for(&self, max_iterations: usize) -> usize {
+        crate::agent::stop_hooks::tool_call_limit(max_iterations, self.tool_call_limit)
+    }
+
     /// Applies the host environment an entry point handed to the session:
     /// shared budget, delegation depth, cancellation, deadline and hooks.
     #[must_use]

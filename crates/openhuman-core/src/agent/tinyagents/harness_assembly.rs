@@ -68,10 +68,12 @@ pub(super) fn assemble_turn_harness(
         Arc<dyn tinyagents_harness::middleware::StopHook<crate::agent::cost::TurnCost>>,
     >,
     // The turn's agent/turn tool callbacks (`OpenHumanRunContext::tool_hooks`),
-    // registered after the runtime's global ones.
-    scoped_tool_hooks: Vec<Arc<dyn crate::agent::hooks::ToolHook>>,
-    // The host's cap on real tool invocations (`OpenHumanRunContext::tool_call_limit`).
-    tool_call_cap: Option<usize>,
+    // registered after the runtime's global ones, and the host's cap on real
+    // tool invocations (`OpenHumanRunContext::tool_call_limit`).
+    (scoped_tool_hooks, tool_call_cap): (
+        Vec<Arc<dyn crate::agent::hooks::ToolHook>>,
+        Option<usize>,
+    ),
     tool_policy: Option<ToolPolicyEnforcement>,
     required_capabilities: Option<CapabilitySet>,
     deterministic_cacheable: bool,

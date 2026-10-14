@@ -277,8 +277,7 @@ pub(super) async fn run_turn_via_tinyagents_body(
         early_exit_tools,
         context_mw,
         run_context.stop_hooks.clone(),
-        run_context.tool_hooks.clone(),
-        run_context.tool_call_limit,
+        (run_context.tool_hooks.clone(), run_context.tool_call_limit),
         tool_policy.clone(),
         routes::turn_required_capabilities(model),
         deterministic_cacheable,
@@ -360,10 +359,7 @@ pub(super) async fn run_turn_via_tinyagents_body(
             "openhuman-agent-turn"
         })
         .with_max_model_calls(max_iterations)
-        .with_max_tool_calls(crate::agent::stop_hooks::tool_call_limit(
-            max_iterations,
-            run_context.tool_call_limit,
-        ))
+        .with_max_tool_calls(run_context.tool_call_limit_for(max_iterations))
         .with_max_depth(super::budget::depth(&run_context))
         .with_tag("openhuman")
         .with_tag(if subagent_scope.is_some() {
