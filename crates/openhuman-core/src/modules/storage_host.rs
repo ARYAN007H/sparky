@@ -206,7 +206,34 @@ pub(crate) struct StorageHost {
     environment: Arc<dyn Environment>,
     audit: Arc<dyn AuditSink>,
     bindings: tokio::sync::Mutex<HashMap<(String, String), Arc<Binding>>>,
+    relays: std::sync::Mutex<HashMap<BusName, Relay>>,
 }
+
+/// Where one caller's watch invalidations are collected for the bus endpoint.
+///
+/// The endpoint asks for a caller's signals synchronously and before the
+/// caller's first `WatchOpen` reaches the host, when the host has not yet
+/// resolved which module the caller is. So the relay exists per caller from
+/// the first ask, and [`StorageHost::handle`] feeds it from the caller's bound
+/// server as soon as the caller is a known module (before the call is
+/// forwarded, so no signal is missed).
+struct Relay {
+    tx: broadcast::Sender<WatchChanged>,
+    /// The binding currently feeding `tx`, so a rebind starts a new bridge.
+    fed_by: Option<std::sync::Weak<Binding>>,
+    bridge: Option<tokio::task::JoinHandle<()>>,
+}
+
+impl Drop for Relay {
+    fn drop(&mut self) {
+        if let Some(bridge) = self.bridge.take() {
+            bridge.abort();
+        }
+    }
+}
+
+/// Signals buffered per caller before the slowest reader loses the oldest.
+const RELAY_BUFFER: usize = 256;
 
 impl StorageHost {
     pub(crate) fn new(
@@ -219,22 +246,83 @@ impl StorageHost {
             environment,
             audit,
             bindings: tokio::sync::Mutex::new(HashMap::new()),
+            relays: std::sync::Mutex::new(HashMap::new()),
         }
     }
 
-    /// Decides and answers one call.
-    ///
-    /// `sender` is the authenticated sender the bus delivered, never anything
-    /// from the request. `admission` is `Confidential` only for a call the bus
-    /// delivered on a confidential route.
-    pub(crate) async fn handle(
+    /// The watch invalidations of `sender`, for the bus endpoint to unicast.
+    fn watch_signals(&self, sender: &BusName) -> Option<broadcast::Receiver<WatchChanged>> {
+        let mut relays = self.relays.lock().ok()?;
+        if !relays.contains_key(sender) {
+            // Callers that never became a module leave an idle relay behind;
+            // keep those bounded.
+            if relays.len() >= MAX_IDLE_RELAYS {
+                relays.retain(|_, relay| relay.bridge.is_some() || relay.tx.receiver_count() > 0);
+            }
+            if relays.len() >= MAX_IDLE_RELAYS {
+                return None;
+            }
+            let (tx, _) = broadcast::channel(RELAY_BUFFER);
+            relays.insert(
+                sender.clone(),
+                Relay {
+                    tx,
+                    fed_by: None,
+                    bridge: None,
+                },
+            );
+        }
+        relays.get(sender).map(|relay| relay.tx.subscribe())
+    }
+
+    /// Starts feeding `sender`'s relay from `binding`'s server, replacing a
+    /// bridge from an earlier binding. The bridge subscribes before it is
+    /// spawned, so nothing the server signals afterwards is lost.
+    fn feed_relay(&self, sender: &BusName, binding: &Arc<Binding>) {
+        let Ok(mut relays) = self.relays.lock() else {
+            return;
+        };
+        let Some(relay) = relays.get_mut(sender) else {
+            // Nobody asked for this caller's signals (it never opened a watch
+            // through the bus), so there is nothing to feed.
+            return;
+        };
+        let current = relay
+            .fed_by
+            .as_ref()
+            .is_some_and(|fed| fed.ptr_eq(&Arc::downgrade(binding)));
+        if current && relay.bridge.as_ref().is_some_and(|task| !task.is_finished()) {
+            return;
+        }
+        if let Some(stale) = relay.bridge.take() {
+            stale.abort();
+        }
+        let mut signals = binding.server.signals();
+        let tx = relay.tx.clone();
+        relay.fed_by = Some(Arc::downgrade(binding));
+        relay.bridge = Some(tokio::spawn(async move {
+            loop {
+                match signals.recv().await {
+                    Ok(signal) => {
+                        // No receiver just means the bus forwarder is gone.
+                        let _ = tx.send(signal);
+                    }
+                    Err(broadcast::error::RecvError::Lagged(_)) => {}
+                    Err(broadcast::error::RecvError::Closed) => return,
+                }
+            }
+        }));
+    }
+
+    /// Resolves who is calling and decides the call: caller, scope, binding and
+    /// grant. Everything a forwarded call needs, or the refusal.
+    async fn admit(
         &self,
         object: Object,
         selector: &str,
-        request: Value,
+        request: &Value,
         sender: Option<&BusName>,
-        admission: Admission,
-    ) -> Result<Value, HostError> {
+    ) -> Result<Admitted, HostError> {
         let Some(sender) = sender else {
             tracing::warn!(
                 target: "openhuman::storage_host",
@@ -254,77 +342,157 @@ impl StorageHost {
             return Err(HostError::Denied("unknown-caller"));
         };
         let scope = self.environment.module_scope(&module);
-        let scope_text = scope
-            .as_ref()
-            .map_or_else(|_| "-".to_string(), |scope| scope.as_str().to_string());
-        let audit = |target: &str, outcome: &'static str| {
-            self.audit.record(&AuditRecord {
-                module: module.clone(),
-                scope: scope_text.clone(),
-                object: object.as_str(),
-                op: selector.to_string(),
-                target: target.to_string(),
-                outcome,
-            });
+        let mut call = AuditedCall {
+            audit: Arc::clone(&self.audit),
+            module,
+            scope: scope
+                .as_ref()
+                .map_or_else(|_| "-".to_string(), |scope| scope.as_str().to_string()),
+            object,
+            op: selector.to_string(),
         };
-
         let scope = match scope {
             Ok(scope) => scope,
             Err(_) => {
-                audit("", "no-scope");
+                call.record("", "no-scope");
                 return Err(HostError::Denied("no-scope"));
             }
         };
-        let binding_scope = scope.clone();
-        let binding = match self.bind(&module, scope).await {
+        let binding = match self.bind(&call.module, scope.clone()).await {
             Ok(binding) => binding,
             Err(error) => {
-                audit("", error.label());
+                call.record("", error.label());
                 return Err(error.into_host());
             }
         };
-        let plan = match authorize(&binding.grant, object, selector, &request) {
+        // Before the call reaches the server: a watch it opens must find the
+        // caller's relay already listening.
+        self.feed_relay(sender, &binding);
+        let plan = match authorize(&binding.grant, object, selector, request) {
             Ok(plan) => plan,
             Err(denied) => {
-                audit("", denied.label());
+                call.record("", denied.label());
                 return Err(HostError::Denied(denied.label()));
             }
         };
-        match plan {
+        Ok(Admitted {
+            call,
+            scope,
+            binding,
+            plan,
+        })
+    }
+
+    /// Consults the write fence when the plan writes. `Err` is already audited.
+    async fn fence(&self, admitted: &Admitted, target: &str, write: bool) -> Result<(), HostError> {
+        if !write {
+            return Ok(());
+        }
+        if let Err(refused) = self.environment.admit_write(&admitted.scope).await {
+            let kind = if crate::storage::fence::fence_error(&refused).is_some() {
+                StorageKind::Fenced
+            } else {
+                StorageKind::Backend
+            };
+            admitted.call.record(target, "fenced");
+            return Err(failure(kind));
+        }
+        Ok(())
+    }
+
+    /// Decides and answers one call.
+    ///
+    /// `sender` is the authenticated sender the bus delivered, never anything
+    /// from the request. `admission` is `Confidential` only for a call the bus
+    /// delivered on a confidential route.
+    pub(crate) async fn handle(
+        &self,
+        object: Object,
+        selector: &str,
+        request: Value,
+        sender: Option<&BusName>,
+        admission: Admission,
+    ) -> Result<Value, HostError> {
+        let admitted = self.admit(object, selector, &request, sender).await?;
+        match &admitted.plan {
             Plan::Answer(reply) => {
-                audit("", "answered-by-host");
-                Ok(reply)
+                admitted.call.record("", "answered-by-host");
+                Ok(reply.clone())
             }
             Plan::Forward {
                 target,
                 filter,
                 write,
             } => {
-                if write {
-                    if let Err(refused) = self.environment.admit_write(&binding_scope).await {
-                        let kind = if crate::storage::fence::fence_error(&refused).is_some() {
-                            StorageKind::Fenced
-                        } else {
-                            StorageKind::Backend
-                        };
-                        audit(&target, "fenced");
-                        return Err(failure(kind));
-                    }
-                }
-                match binding
+                self.fence(&admitted, target, *write).await?;
+                match admitted
+                    .binding
                     .server
                     .handle(admission, object.as_str(), selector, request)
                     .await
                 {
                     Ok(reply) => {
-                        audit(&target, "ok");
-                        Ok(filter_reply(&binding.grant, filter, reply))
+                        admitted.call.record(target, "ok");
+                        Ok(filter_reply(&admitted.binding.grant, *filter, reply))
                     }
                     Err(failed) => {
-                        audit(&target, "storage-error");
+                        admitted.call.record(target, "storage-error");
                         Err(HostError::Storage(failed))
                     }
                 }
+            }
+        }
+    }
+
+    /// `Blobs.PutStream`: stores `body`, which the bus delivered from a stream
+    /// the authenticated caller opened, as exactly `head.len` bytes.
+    pub(crate) async fn put_blob_stream(
+        &self,
+        sender: Option<&BusName>,
+        head: PutBlobStreamRequest,
+        body: BlobReader,
+    ) -> Result<Value, HostError> {
+        let request = serde_json::to_value(&head).map_err(|_| HostError::Denied("malformed-request"))?;
+        let admitted = self.admit(Object::Blobs, "PutStream", &request, sender).await?;
+        let Plan::Forward { target, write, .. } = &admitted.plan else {
+            return Err(HostError::Denied("malformed-request"));
+        };
+        if head.len > MAX_STREAMED_BLOB_BYTES {
+            admitted.call.record(target, "blob-too-large");
+            return Err(HostError::Denied("blob-too-large"));
+        }
+        self.fence(&admitted, target, *write).await?;
+        match admitted.binding.server.put_blob_stream(head, body).await {
+            Ok(info) => {
+                admitted.call.record(target, "ok");
+                serde_json::to_value(info).map_err(|_| HostError::Denied("encode-failed"))
+            }
+            Err(failed) => {
+                admitted.call.record(target, "storage-error");
+                Err(HostError::Storage(failed))
+            }
+        }
+    }
+
+    /// `Blobs.GetStream`: the blob's metadata and body, or `None`.
+    pub(crate) async fn get_blob_stream(
+        &self,
+        sender: Option<&BusName>,
+        request: BlobKeyRequest,
+    ) -> Result<Option<(BlobStreamHead, BlobReader)>, HostError> {
+        let wire = serde_json::to_value(&request).map_err(|_| HostError::Denied("malformed-request"))?;
+        let admitted = self.admit(Object::Blobs, "GetStream", &wire, sender).await?;
+        let Plan::Forward { target, .. } = &admitted.plan else {
+            return Err(HostError::Denied("malformed-request"));
+        };
+        match admitted.binding.server.get_blob_stream(request).await {
+            Ok(found) => {
+                admitted.call.record(target, "ok");
+                Ok(found)
+            }
+            Err(failed) => {
+                admitted.call.record(target, "storage-error");
+                Err(HostError::Storage(failed))
             }
         }
     }
@@ -384,6 +552,36 @@ impl StorageHost {
     }
 }
 
+/// A call that passed identification, with what answering it needs.
+struct Admitted {
+    call: AuditedCall,
+    scope: Scope,
+    binding: Arc<Binding>,
+    plan: Plan,
+}
+
+/// The audit line of one call, minus its target and outcome.
+struct AuditedCall {
+    audit: Arc<dyn AuditSink>,
+    module: String,
+    scope: String,
+    object: Object,
+    op: String,
+}
+
+impl AuditedCall {
+    fn record(&self, target: &str, outcome: &'static str) {
+        self.audit.record(&AuditRecord {
+            module: self.module.clone(),
+            scope: self.scope.clone(),
+            object: self.object.as_str(),
+            op: self.op.clone(),
+            target: target.to_string(),
+            outcome,
+        });
+    }
+}
+
 enum BindError {
     NoBackend,
     NoGrant,
@@ -411,95 +609,78 @@ impl BindError {
     }
 }
 
-/// One storage object on the bus.
-pub(super) struct ObjectService {
-    pub(super) object: Object,
-    pub(super) host: Arc<StorageHost>,
-    /// Where the work runs when the object is served from a linked module's own
-    /// runtime: the host's, which the backend handles were opened on.
-    pub(super) runtime: Option<tokio::runtime::Handle>,
+/// The host as the bus endpoint `tinystoragedrivers-busproxy` serves the four
+/// objects from. The proxy owns the wire (positional arguments, the peer-bound
+/// stream accept and open, unicast watch signals); every decision stays in
+/// [`StorageHost`].
+pub(super) struct HostEndpoint {
+    host: Arc<StorageHost>,
+    /// Where the work runs when the objects are served from a linked module's
+    /// own runtime: the host's, which the backend handles were opened on.
+    runtime: Option<tokio::runtime::Handle>,
 }
 
-fn selectors(object: Object) -> &'static [&'static str] {
-    use tinystoragedrivers_bus as wire;
-    match object {
-        Object::Documents => &wire::DOCUMENTS_SELECTORS,
-        Object::Streams => &wire::STREAMS_SELECTORS,
-        Object::Blobs => &wire::BLOBS_SELECTORS,
-        Object::Secrets => &wire::SECRETS_SELECTORS,
+impl HostEndpoint {
+    pub(super) fn new(host: Arc<StorageHost>, runtime: Option<tokio::runtime::Handle>) -> Self {
+        Self { host, runtime }
     }
-}
 
-/// The request out of positional bus arguments: none is `null`, one is itself.
-fn request_of(args: Value) -> tinybus::Result<Value> {
-    match args {
-        Value::Array(mut items) if items.len() <= 1 => Ok(items.pop().unwrap_or(Value::Null)),
-        Value::Null => Ok(Value::Null),
-        _ => Err(tinybus::Error::failed(
-            "a storage call takes one request argument",
-        )),
+    /// Runs `work` on the host's runtime when one was given.
+    async fn on_host<T, F>(&self, work: F) -> Result<T, HostFailure>
+    where
+        T: Send + 'static,
+        F: std::future::Future<Output = Result<T, HostError>> + Send + 'static,
+    {
+        match &self.runtime {
+            None => work.await.map_err(Into::into),
+            Some(runtime) => runtime
+                .spawn(work)
+                .await
+                .map_err(|_| HostFailure::Denied("call-cancelled"))?
+                .map_err(Into::into),
+        }
     }
 }
 
 #[async_trait]
-impl tinybus::Interface for ObjectService {
-    fn name(&self) -> InterfaceName {
-        InterfaceName::new(STORAGE_INTERFACE).unwrap_or_else(|_| unreachable!("a fixed name"))
-    }
-
-    fn members(&self) -> Vec<MemberName> {
-        selectors(self.object)
-            .iter()
-            .filter_map(|selector| MemberName::new(*selector).ok())
-            .collect()
-    }
-
-    fn requires_confidential(&self, _member: &MemberName) -> bool {
-        self.object == Object::Secrets
-    }
-
-    async fn call(&self, _member: &MemberName, _args: Value) -> tinybus::Result<Value> {
-        // Without the broker's context there is no caller to authorize.
-        Err(HostError::Denied("unauthenticated-caller").into())
-    }
-
-    async fn call_with_context(
-        &self,
-        member: &MemberName,
-        args: Value,
-        context: &CallContext,
-    ) -> tinybus::Result<Value> {
-        let admission = if self.object == Object::Secrets {
-            Admission::Confidential
-        } else {
-            Admission::Private
-        };
-        let request = request_of(args)?;
-        let sender = context.authenticated_sender().cloned();
-        let Some(runtime) = &self.runtime else {
-            return self
-                .host
-                .handle(
-                    self.object,
-                    member.as_str(),
-                    request,
-                    sender.as_ref(),
-                    admission,
-                )
-                .await
-                .map_err(Into::into);
-        };
+impl StorageEndpoint for HostEndpoint {
+    async fn call(&self, call: StorageCall<'_>) -> Result<Value, HostFailure> {
         let host = Arc::clone(&self.host);
-        let object = self.object;
-        let selector = member.as_str().to_string();
-        runtime
-            .spawn(async move {
-                host.handle(object, &selector, request, sender.as_ref(), admission)
-                    .await
-            })
+        let (object, request, admission) = (call.object, call.request, call.admission);
+        let selector = call.selector.to_string();
+        let sender = call.sender.cloned();
+        self.on_host(async move {
+            host.handle(object, &selector, request, sender.as_ref(), admission)
+                .await
+        })
+        .await
+    }
+
+    async fn put_blob_stream(
+        &self,
+        sender: Option<&BusName>,
+        head: PutBlobStreamRequest,
+        body: BlobReader,
+    ) -> Result<Value, HostFailure> {
+        let host = Arc::clone(&self.host);
+        let sender = sender.cloned();
+        self.on_host(async move { host.put_blob_stream(sender.as_ref(), head, body).await })
             .await
-            .map_err(|_| tinybus::Error::failed("storage call was cancelled"))?
-            .map_err(Into::into)
+    }
+
+    async fn get_blob_stream(
+        &self,
+        sender: Option<&BusName>,
+        request: BlobKeyRequest,
+    ) -> Result<Option<(BlobStreamHead, BlobReader)>, HostFailure> {
+        let host = Arc::clone(&self.host);
+        let sender = sender.cloned();
+        self.on_host(async move { host.get_blob_stream(sender.as_ref(), request).await })
+            .await
+    }
+
+    fn watch_signals(&self, sender: &BusName) -> Option<broadcast::Receiver<WatchChanged>> {
+        self.host.watch_signals(sender)
     }
 }
 
@@ -579,26 +760,12 @@ pub(super) async fn serve_objects(
     connection: &tinybus::Connection,
     host: &Arc<StorageHost>,
     runtime: Option<tokio::runtime::Handle>,
-) -> tinybus::Result<()> {
-    for object in [
-        Object::Documents,
-        Object::Streams,
-        Object::Blobs,
-        Object::Secrets,
-    ] {
-        let path = ObjectPath::new(format!("{OBJECT_ROOT}/{}", object.as_str()))?;
-        connection
-            .serve_at(
-                path,
-                ObjectService {
-                    object,
-                    host: Arc::clone(host),
-                    runtime: runtime.clone(),
-                },
-            )
-            .await?;
-    }
-    connection.request_name(STORAGE_INTERFACE).await
+) -> tinybus::Result<tinystoragedrivers_busproxy::ServedStorage> {
+    tinystoragedrivers_busproxy::serve(
+        connection,
+        Arc::new(HostEndpoint::new(Arc::clone(host), runtime)),
+    )
+    .await
 }
 
 /// Serves storage to modules.
@@ -626,7 +793,10 @@ pub(super) async fn install(
                 %error,
                 "[storage_host] linked storage module unavailable; module secrets are refused"
             );
-            serve_objects(connection, &host, None).await
+            serve_objects(connection, &host, None).await.map(|served| {
+                // The objects stay registered for the life of the connection.
+                drop(served);
+            })
         }
     }
 }
