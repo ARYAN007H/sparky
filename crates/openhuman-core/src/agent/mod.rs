@@ -83,7 +83,6 @@ pub mod tools;
 pub mod triage;
 /// Wall-clock deadline of one top-level turn: the outer backstop and the
 /// harness wind-down / hard-stop points derived from it.
-pub mod turn_deadline;
 /// Turn-origin task-local — explicit trust/routing label scoped by every
 /// entry point that invokes the agent (web chat, channel runtime, cron,
 /// background jobs, CLI). Read by the approval gate to make
