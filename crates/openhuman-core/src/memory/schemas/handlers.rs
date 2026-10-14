@@ -11,6 +11,7 @@ use crate::core::Outcome;
 use crate::memory::error::{MemoryError, MemoryResult};
 use crate::memory::explore::{ExploreParams, ItemsGetParams};
 use crate::memory::lifecycle::views::{self, JobsRunParams, PackPreviewParams, PolicySetParams};
+use crate::memory::scope::MemoryIdentity;
 use crate::memory::types::{
     EmptyParams, EngineSetParams, EraseAllParams, FetchParams, ForgetParams, ImportStartParams,
     ImportStateView, ItemsListParams, LearnParams, RecallParams, SourceAddedView,
@@ -75,28 +76,28 @@ pub(super) fn engine_set(params: Map<String, Value>) -> ControllerFuture {
 pub(super) fn recall(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<RecallParams>(params)?;
-        finish(confine::recall(&load().await?, params).await)
+        finish(confine::recall(&load().await?, &MemoryIdentity::root(), params).await)
     })
 }
 
 pub(super) fn fetch(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<FetchParams>(params)?;
-        finish(confine::fetch(&load().await?, params).await)
+        finish(confine::fetch(&load().await?, &MemoryIdentity::root(), params).await)
     })
 }
 
 pub(super) fn learn(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<LearnParams>(params)?;
-        finish(confine::learn(&load().await?, params).await)
+        finish(confine::learn(&load().await?, &MemoryIdentity::root(), params).await)
     })
 }
 
 pub(super) fn forget(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<ForgetParams>(params)?;
-        finish(confine::forget(&load().await?, params).await)
+        finish(confine::forget(&load().await?, &MemoryIdentity::root(), params).await)
     })
 }
 
@@ -110,21 +111,21 @@ pub(super) fn erase_all(params: Map<String, Value>) -> ControllerFuture {
 pub(super) fn items_list(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<ItemsListParams>(params)?;
-        finish(confine::items_list(&load().await?, params).await)
+        finish(confine::items_list(&load().await?, &MemoryIdentity::root(), params).await)
     })
 }
 
 pub(super) fn explore(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<ExploreParams>(params)?;
-        finish(confine::explore(&load().await?, params).await)
+        finish(confine::explore(&load().await?, &MemoryIdentity::root(), params).await)
     })
 }
 
 pub(super) fn items_get(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<ItemsGetParams>(params)?;
-        finish(confine::items_get(&load().await?, params).await)
+        finish(confine::items_get(&load().await?, &MemoryIdentity::root(), params).await)
     })
 }
 
@@ -148,14 +149,14 @@ pub(super) fn policy_set(params: Map<String, Value>) -> ControllerFuture {
 pub(super) fn pack_preview(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<PackPreviewParams>(params)?;
-        finish(views::pack_preview(&load().await?, params).await)
+        finish(views::pack_preview(&load().await?, &MemoryIdentity::root(), params).await)
     })
 }
 
 pub(super) fn agents_list(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         parse::<EmptyParams>(params)?;
-        finish(views::agents_list(&load().await?).await)
+        finish(views::agents_list(&load().await?, &MemoryIdentity::root()).await)
     })
 }
 
@@ -176,28 +177,28 @@ pub(super) fn conversations_backfill_start(params: Map<String, Value>) -> Contro
 pub(super) fn brain_sources(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         parse::<EmptyParams>(params)?;
-        finish(brain::sources(&load().await?).await)
+        finish(brain::sources(&load().await?, &MemoryIdentity::root()).await)
     })
 }
 
 pub(super) fn brain_search(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<brain::BrainSearchParams>(params)?;
-        finish(brain::search(&load().await?, params).await)
+        finish(brain::search(&load().await?, &MemoryIdentity::root(), params).await)
     })
 }
 
 pub(super) fn brain_ingest(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<brain::BrainIngestParams>(params)?;
-        finish(brain::ingest(&load().await?, params).await)
+        finish(brain::ingest(&load().await?, &MemoryIdentity::root(), params).await)
     })
 }
 
 pub(super) fn brain_forget(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<brain::BrainForgetParams>(params)?;
-        finish(brain::forget(&load().await?, params).await)
+        finish(brain::forget(&load().await?, &MemoryIdentity::root(), params).await)
     })
 }
 

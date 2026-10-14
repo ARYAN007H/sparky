@@ -23,7 +23,8 @@ pub use cloud::{
     OpenHumanCloudEmbeddingModel, DEFAULT_CLOUD_EMBEDDING_DIMENSIONS, DEFAULT_CLOUD_EMBEDDING_MODEL,
 };
 pub use factory::{
-    create_embedding_provider_with_config, create_embedding_provider_with_credentials,
+    create_embedding_provider_for_chat, create_embedding_provider_with_config,
+    create_embedding_provider_with_credentials, default_embedding_provider_for_chat,
     default_embedding_provider_with_config,
 };
 pub use rpc::provider_from_config;

@@ -307,6 +307,8 @@ pub struct OpenHumanRunContext {
     pub parent: Option<ParentExecutionContext>,
     /// Context-preparation sources already consumed in this turn.
     pub prepared_context_sources: Arc<Vec<AgentContextPreparedSource>>,
+    /// Who the run acts as on memory; `None` is the root identity.
+    pub memory_identity: Option<crate::memory::scope::MemoryIdentity>,
     /// File-state identity used to detect stale parent reads after child writes.
     pub file_state_agent_id: Option<String>,
     /// Host-owned artifact index for tool-result references.
@@ -410,7 +412,8 @@ pub(crate) struct HarnessHostPolicy {
 #[cfg(test)]
 pub(crate) use super::operation_context::tool_context_with_approval;
 pub(crate) use super::operation_context::{
-    approval_for_tool, parent_agent_id_for_tool, sandbox_mode_for_tool, HostOperationContext,
+    approval_for_tool, memory_identity_for_tool, parent_agent_id_for_tool, sandbox_mode_for_tool,
+    HostOperationContext,
 };
 
 /// OpenHuman product values that tools read from the run through
@@ -468,6 +471,7 @@ impl OpenHumanRunContext {
             turn_deadline: None,
             parent: None,
             prepared_context_sources: Arc::new(Vec::new()),
+            memory_identity: None,
             file_state_agent_id: None,
             tool_result_artifact_index: None,
             attachment_placeholders: Arc::new(Vec::new()),
@@ -588,6 +592,7 @@ impl OpenHumanRunContext {
         }
         self.turn_deadline = env.turn_deadline.or(self.turn_deadline);
         self.tool_call_limit = env.tool_call_limit.or(self.tool_call_limit);
+        self.memory_identity = env.memory_identity.clone().or(self.memory_identity);
         self.stop_hooks
             .extend(env.hooks.stop_hooks().iter().cloned());
         self.tool_hooks
@@ -678,6 +683,7 @@ impl OpenHumanRunContext {
                 .parent
                 .as_ref()
                 .map(|parent| parent.agent_definition_id.clone()),
+            memory_identity: self.memory_identity.clone(),
         });
         let context = tinyagents_harness::context::RunContext::new(config, self)
             .with_cancellation(cancellation)

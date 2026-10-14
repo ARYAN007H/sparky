@@ -106,6 +106,17 @@ impl OpenHumanSessionHost {
                 .unwrap_or_default(),
         );
         let agent_id = self.agent_definition_id.clone();
+        // The turn acts on memory as this agent, under whatever team the
+        // caller already set on the run (a team member's turn).
+        options.run_context.data.memory_identity = Some(
+            options
+                .run_context
+                .data
+                .memory_identity
+                .clone()
+                .unwrap_or_default()
+                .child(&agent_id),
+        );
         let turn = self
             .runtime_session
             .as_mut()
@@ -114,7 +125,7 @@ impl OpenHumanSessionHost {
                 SessionTurnRequest::new(user_message_from_text(staged.as_str())),
                 options,
             );
-        let outcome = crate::memory::scope::within_agent(&agent_id, Box::pin(turn))
+        let outcome = Box::pin(turn)
             .await
             .map_err(|error| anyhow::anyhow!(error.to_string()))?;
         Ok(outcome.output.unwrap_or_default())
