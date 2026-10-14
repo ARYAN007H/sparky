@@ -112,26 +112,31 @@ impl Docs {
         sessions: &[DurableSubagentSession],
     ) -> Result<()> {
         let id = marker_id(source);
-        let claimed = crate::storage::import_claim::with_claim(&self.0, IMPORTED, &id.clone(), || {
-            self.save(sessions)?;
-            self.0.run(|docs| async move {
-                match docs
-                    .put(
-                        IMPORTED,
-                        &id,
-                        serde_json::json!({ "imported": true }),
-                        Precondition::Absent,
-                    )
-                    .await
-                {
-                    Ok(_) => Ok(()),
-                    Err(error) if error.kind() == tinystoragedrivers::ErrorKind::Conflict => Ok(()),
-                    Err(error) => Err(error),
-                }
-            })
-        })?;
+        let claimed =
+            crate::storage::import_claim::with_claim(&self.0, IMPORTED, &id.clone(), || {
+                self.save(sessions)?;
+                self.0.run(|docs| async move {
+                    match docs
+                        .put(
+                            IMPORTED,
+                            &id,
+                            serde_json::json!({ "imported": true }),
+                            Precondition::Absent,
+                        )
+                        .await
+                    {
+                        Ok(_) => Ok(()),
+                        Err(error) if error.kind() == tinystoragedrivers::ErrorKind::Conflict => {
+                            Ok(())
+                        }
+                        Err(error) => Err(error),
+                    }
+                })
+            })?;
         if claimed.is_none() {
-            log::debug!("[subagent_sessions] another process is importing the legacy file; skipped");
+            log::debug!(
+                "[subagent_sessions] another process is importing the legacy file; skipped"
+            );
         }
         Ok(())
     }

@@ -67,46 +67,51 @@ pub(super) fn marked(
     if done {
         return Ok(Outcome::AlreadyDone);
     }
-    let claimed = super::super::import_claim::with_claim(&markers, MARKER_COLLECTION, &marker.clone(), || {
-        let again = marker.clone();
-        let done = markers
-            .run(move |docs| async move { docs.get(MARKER_COLLECTION, &again).await })?
-            .is_some();
-        if done {
-            return Ok(Outcome::AlreadyDone);
-        }
-    let Some((found, written, skipped)) = body()? else {
-        return Ok(Outcome::NoSource);
-    };
-    if skipped > 0 {
-        tracing::warn!(
-            target: "openhuman::storage_import",
-            domain,
-            skipped,
-            "[storage::import] legacy records were skipped; the import stays open for retry"
-        );
-        return Ok(Outcome::Imported { found, written });
-    }
-    let body = json!({
-        "version": MARKER_VERSION,
-        "domain": domain,
-        "found": found,
-        "written": written,
-        "at": chrono::Utc::now().to_rfc3339(),
-    });
-    markers.run(move |docs| async move {
-        match docs
-            .put(MARKER_COLLECTION, &marker, body, Precondition::Absent)
-            .await
-        {
-            Ok(_) => Ok(()),
-            // Another process finished first.
-            Err(error) if error.kind() == ErrorKind::Conflict => Ok(()),
-            Err(error) => Err(error),
-        }
-    })?;
-    Ok(Outcome::Imported { found, written })
-    })?;
+    let claimed = super::super::import_claim::with_claim(
+        &markers,
+        MARKER_COLLECTION,
+        &marker.clone(),
+        || {
+            let again = marker.clone();
+            let done = markers
+                .run(move |docs| async move { docs.get(MARKER_COLLECTION, &again).await })?
+                .is_some();
+            if done {
+                return Ok(Outcome::AlreadyDone);
+            }
+            let Some((found, written, skipped)) = body()? else {
+                return Ok(Outcome::NoSource);
+            };
+            if skipped > 0 {
+                tracing::warn!(
+                    target: "openhuman::storage_import",
+                    domain,
+                    skipped,
+                    "[storage::import] legacy records were skipped; the import stays open for retry"
+                );
+                return Ok(Outcome::Imported { found, written });
+            }
+            let body = json!({
+                "version": MARKER_VERSION,
+                "domain": domain,
+                "found": found,
+                "written": written,
+                "at": chrono::Utc::now().to_rfc3339(),
+            });
+            markers.run(move |docs| async move {
+                match docs
+                    .put(MARKER_COLLECTION, &marker, body, Precondition::Absent)
+                    .await
+                {
+                    Ok(_) => Ok(()),
+                    // Another process finished first.
+                    Err(error) if error.kind() == ErrorKind::Conflict => Ok(()),
+                    Err(error) => Err(error),
+                }
+            })?;
+            Ok(Outcome::Imported { found, written })
+        },
+    )?;
     Ok(claimed.unwrap_or(Outcome::InProgress))
 }
 

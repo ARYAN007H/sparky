@@ -153,6 +153,78 @@ fn a_finished_import_does_not_run_again_or_resurrect_deleted_records() {
 }
 
 #[test]
+fn an_import_claimed_by_another_process_is_skipped_and_leaves_no_marker() {
+    let (_dir, config) = workspace();
+    legacy_device(&config, "chan-a", "Phone", false);
+    let backend = backend();
+    let source = devices();
+
+    // Another process holds the claim for this domain and workspace.
+    let markers = Repo::on(&backend, &Scope::local(), "storage::import", marker_spec).unwrap();
+    let claim =
+        crate::storage::import_claim::claim_id(&marker_id(source.domain, &config.workspace_dir));
+    markers
+        .run(move |docs| async move {
+            docs.put(
+                MARKER_COLLECTION,
+                &claim,
+                json!({ "claimed_at_ms": chrono::Utc::now().timestamp_millis() }),
+                Precondition::Absent,
+            )
+            .await
+            .map(|_| ())
+        })
+        .unwrap();
+
+    assert_eq!(
+        outcome(run_with(&backend, &config, &[source])),
+        Outcome::InProgress
+    );
+    assert!(!is_done(&backend, &config, &source).unwrap());
+    assert!(dump(&backend, &source, "paired_devices").is_empty());
+}
+
+#[test]
+fn processes_importing_one_workspace_at_once_import_it_once() {
+    let (_dir, config) = workspace();
+    for n in 0..20 {
+        legacy_device(&config, &format!("chan-{n}"), "Phone", false);
+    }
+    let backend = backend();
+    let source = devices();
+    let barrier = Arc::new(std::sync::Barrier::new(6));
+    let handles: Vec<_> = (0..6)
+        .map(|_| {
+            let (backend, config, barrier) =
+                (Arc::clone(&backend), config.clone(), Arc::clone(&barrier));
+            std::thread::spawn(move || {
+                barrier.wait();
+                outcome(run_with(&backend, &config, &[source]))
+            })
+        })
+        .collect();
+    let outcomes: Vec<Outcome> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+
+    let imports = outcomes
+        .iter()
+        .filter(|o| matches!(o, Outcome::Imported { .. }))
+        .count();
+    assert_eq!(imports, 1, "exactly one process imports: {outcomes:?}");
+    assert!(outcomes
+        .iter()
+        .all(|o| !matches!(o, Outcome::Imported { .. })
+            || matches!(
+                o,
+                Outcome::Imported {
+                    found: 20,
+                    written: 20
+                }
+            )));
+    assert!(is_done(&backend, &config, &source).unwrap());
+    assert_eq!(dump(&backend, &source, "paired_devices").len(), 20);
+}
+
+#[test]
 fn an_existing_record_is_never_overwritten() {
     let (_dir, config) = workspace();
     legacy_device(&config, "chan-a", "Phone", false);
