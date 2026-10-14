@@ -1,4 +1,5 @@
 use super::*;
+use crate::core::runtime::DispatchCtx;
 
 #[test]
 fn registered_controllers_match_schemas() {
@@ -59,7 +60,10 @@ fn params(value: Value) -> Map<String, Value> {
 #[tokio::test]
 async fn listing_work_on_an_empty_ledger_answers() {
     let v = with_scratch_workspace(|| {
-        handle_agent_work_list(params(serde_json::json!({ "limit": 5 })))
+        handle_agent_work_list(
+            DispatchCtx::process_default(),
+            params(serde_json::json!({ "limit": 5 })),
+        )
     })
     .await
     .expect("an empty ledger lists as an empty view");
@@ -76,12 +80,17 @@ async fn listing_work_on_an_empty_ledger_answers() {
 
 #[tokio::test]
 async fn control_requires_a_run_id_and_action() {
-    let err = with_scratch_workspace(|| handle_agent_work_control(Map::new()))
-        .await
-        .unwrap_err();
+    let err = with_scratch_workspace(|| {
+        handle_agent_work_control(DispatchCtx::process_default(), Map::new())
+    })
+    .await
+    .unwrap_err();
     assert_eq!(err, "missing required param: runId");
     let err = with_scratch_workspace(|| {
-        handle_agent_work_control(params(serde_json::json!({ "runId": "r1" })))
+        handle_agent_work_control(
+            DispatchCtx::process_default(),
+            params(serde_json::json!({ "runId": "r1" })),
+        )
     })
     .await
     .unwrap_err();
@@ -91,9 +100,10 @@ async fn control_requires_a_run_id_and_action() {
 #[tokio::test]
 async fn control_refuses_an_unknown_action() {
     let err = with_scratch_workspace(|| {
-        handle_agent_work_control(params(
-            serde_json::json!({ "runId": "r1", "action": "explode" }),
-        ))
+        handle_agent_work_control(
+            DispatchCtx::process_default(),
+            params(serde_json::json!({ "runId": "r1", "action": "explode" })),
+        )
     })
     .await
     .unwrap_err();
@@ -103,9 +113,12 @@ async fn control_refuses_an_unknown_action() {
 #[tokio::test]
 async fn control_of_an_unknown_run_is_an_error_not_a_panic() {
     let err = with_scratch_workspace(|| {
-        handle_agent_work_control(params(
-            serde_json::json!({ "runId": "no-such-run", "action": "stop", "reason": "test" }),
-        ))
+        handle_agent_work_control(
+            DispatchCtx::process_default(),
+            params(
+                serde_json::json!({ "runId": "no-such-run", "action": "stop", "reason": "test" }),
+            ),
+        )
     })
     .await
     .unwrap_err();

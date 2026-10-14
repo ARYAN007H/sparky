@@ -2,6 +2,7 @@
 //!
 //! Follows the exact pattern from `cron/schemas.rs`.
 
+use crate::core::runtime::DispatchCtx;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
@@ -149,7 +150,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
 // Handler bridges
 // ---------------------------------------------------------------------------
 
-fn handle_create_pairing(params: Map<String, Value>) -> ControllerFuture {
+fn handle_create_pairing(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let label = read_optional_string(&params, "label")?;
@@ -157,14 +158,14 @@ fn handle_create_pairing(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_list(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_list(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(crate::security::devices::rpc::devices_list(&config).await?)
     })
 }
 
-fn handle_revoke(params: Map<String, Value>) -> ControllerFuture {
+fn handle_revoke(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let channel_id = read_required::<String>(&params, "channel_id")?;

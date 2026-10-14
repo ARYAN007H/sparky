@@ -3,6 +3,7 @@
 //! Wires `x402_get_summary`, `x402_list_payments`, and `x402_update_budget`
 //! into the global registry consumed by `crates/openhuman-core/src/core/all.rs`.
 
+use crate::core::runtime::DispatchCtx;
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 
@@ -108,7 +109,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_get_summary(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_get_summary(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = crate::config::rpc::load_config_with_timeout()
             .await
@@ -127,7 +128,7 @@ struct ListPaymentsParams {
     limit: Option<u64>,
 }
 
-fn handle_list_payments(params: Map<String, Value>) -> ControllerFuture {
+fn handle_list_payments(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p: ListPaymentsParams = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("x402 list_payments params: {e}"))?;
@@ -158,7 +159,7 @@ struct UpdateBudgetParams {
     monthly_max: Option<u64>,
 }
 
-fn handle_update_budget(params: Map<String, Value>) -> ControllerFuture {
+fn handle_update_budget(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p: UpdateBudgetParams = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("x402 update_budget params: {e}"))?;

@@ -1,5 +1,6 @@
 //! `mcp_ui` controller schemas and handlers.
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use serde_json::{Map, Value};
@@ -89,7 +90,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_resource_read(params: Map<String, Value>) -> ControllerFuture {
+fn handle_resource_read(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let server_id = read_optional::<String>(&params, "server_id")?;
         let uri = read_optional::<String>(&params, "uri")?;
@@ -101,7 +102,7 @@ fn handle_resource_read(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_tool_call(params: Map<String, Value>) -> ControllerFuture {
+fn handle_tool_call(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let server_id = read_optional::<String>(&params, "server_id")?;
         let tool_name = read_optional::<String>(&params, "tool_name")?;

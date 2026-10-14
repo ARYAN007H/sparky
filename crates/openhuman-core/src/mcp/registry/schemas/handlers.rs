@@ -1,6 +1,7 @@
 //! `mcp_clients` handler implementations — deserialise params and delegate
 //! to `ops.rs`.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::config::rpc as config_rpc;
@@ -12,7 +13,10 @@ use super::params::{
 
 // ── Handler implementations ──────────────────────────────────────────────────
 
-pub(super) fn handle_registry_search(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_registry_search(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let query = read_optional_string(&params, "query")?;
@@ -28,7 +32,10 @@ pub(super) fn handle_registry_search(params: Map<String, Value>) -> ControllerFu
     })
 }
 
-pub(super) fn handle_registry_get(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_registry_get(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let qualified_name = read_required::<String>(&params, "qualified_name")?;
@@ -36,7 +43,10 @@ pub(super) fn handle_registry_get(params: Map<String, Value>) -> ControllerFutur
     })
 }
 
-pub(super) fn handle_installed_list(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_installed_list(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let _ = params;
         let config = config_rpc::load_config_with_timeout().await?;
@@ -44,7 +54,7 @@ pub(super) fn handle_installed_list(params: Map<String, Value>) -> ControllerFut
     })
 }
 
-pub(super) fn handle_update_env(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_update_env(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let server_id = read_required::<String>(&params, "server_id")?;
@@ -53,7 +63,7 @@ pub(super) fn handle_update_env(params: Map<String, Value>) -> ControllerFuture 
     })
 }
 
-pub(super) fn handle_uninstall(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_uninstall(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let server_id = read_required::<String>(&params, "server_id")?;
@@ -61,7 +71,10 @@ pub(super) fn handle_uninstall(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-pub(super) fn handle_detect_auth(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_detect_auth(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let server_id = read_required::<String>(&params, "server_id")?;
@@ -69,7 +82,10 @@ pub(super) fn handle_detect_auth(params: Map<String, Value>) -> ControllerFuture
     })
 }
 
-pub(super) fn handle_oauth_begin(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_oauth_begin(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let server_id = read_required::<String>(&params, "server_id")?;
@@ -77,7 +93,7 @@ pub(super) fn handle_oauth_begin(params: Map<String, Value>) -> ControllerFuture
     })
 }
 
-pub(super) fn handle_connect(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_connect(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let server_id = read_required::<String>(&params, "server_id")?;
@@ -85,7 +101,7 @@ pub(super) fn handle_connect(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-pub(super) fn handle_disconnect(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_disconnect(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let server_id = read_required::<String>(&params, "server_id")?;
@@ -93,7 +109,10 @@ pub(super) fn handle_disconnect(params: Map<String, Value>) -> ControllerFuture 
     })
 }
 
-pub(super) fn handle_set_enabled(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_set_enabled(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let server_id = read_required::<String>(&params, "server_id")?;
@@ -104,7 +123,7 @@ pub(super) fn handle_set_enabled(params: Map<String, Value>) -> ControllerFuture
     })
 }
 
-pub(super) fn handle_status(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_status(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let _ = params;
         let config = config_rpc::load_config_with_timeout().await?;
@@ -112,7 +131,7 @@ pub(super) fn handle_status(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-pub(super) fn handle_list_tools(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_list_tools(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let server_id = read_required::<String>(&params, "server_id")?;
@@ -127,7 +146,7 @@ pub(super) fn handle_list_tools(params: Map<String, Value>) -> ControllerFuture 
     })
 }
 
-pub(super) fn handle_tool_call(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_tool_call(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let server_id = read_required::<String>(&params, "server_id")?;
         let tool_name = read_required::<String>(&params, "tool_name")?;
@@ -145,7 +164,7 @@ pub(super) fn handle_tool_call(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-pub(super) fn handle_config_get(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_config_get(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let _ = params;
         let config = config_rpc::load_config_with_timeout().await?;
@@ -153,7 +172,7 @@ pub(super) fn handle_config_get(params: Map<String, Value>) -> ControllerFuture 
     })
 }
 
-pub(super) fn handle_config_set(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_config_set(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         // The whole document is the parameter set: `{ "mcpServers": { … } }`
@@ -164,7 +183,10 @@ pub(super) fn handle_config_set(params: Map<String, Value>) -> ControllerFuture 
     })
 }
 
-pub(super) fn handle_registry_settings_get(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_registry_settings_get(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let _ = params;
         let config = config_rpc::load_config_with_timeout().await?;
@@ -172,7 +194,10 @@ pub(super) fn handle_registry_settings_get(params: Map<String, Value>) -> Contro
     })
 }
 
-pub(super) fn handle_registry_settings_set(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_registry_settings_set(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let smithery_api_key = read_optional::<String>(&params, "smithery_api_key")?;
         let mcp_official_base = read_optional::<String>(&params, "mcp_official_base")?;

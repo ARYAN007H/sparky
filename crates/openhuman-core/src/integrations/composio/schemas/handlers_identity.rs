@@ -2,6 +2,7 @@
 //! `get_user_profile`, `refresh_all_identities`, `sync`, `get_user_scopes`,
 //! `set_user_scopes`.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::config::rpc as config_rpc;
@@ -10,7 +11,10 @@ use crate::integrations::composio::{contract, ops};
 
 use super::util::{read_required, read_required_non_empty, to_json};
 
-pub(super) fn handle_get_user_profile(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_get_user_profile(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let connection_id = read_required_non_empty(&params, "connection_id")?;
@@ -18,14 +22,20 @@ pub(super) fn handle_get_user_profile(params: Map<String, Value>) -> ControllerF
     })
 }
 
-pub(super) fn handle_refresh_all_identities(_params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_refresh_all_identities(
+    _ctx: DispatchCtx,
+    _params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(ops::composio_refresh_all_identities(&config).await?)
     })
 }
 
-pub(super) fn handle_get_user_scopes(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_get_user_scopes(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let toolkit = match read_required_non_empty(&params, "toolkit") {
             Ok(v) => v,
@@ -77,7 +87,10 @@ pub(super) fn handle_get_user_scopes(params: Map<String, Value>) -> ControllerFu
     })
 }
 
-pub(super) fn handle_set_user_scopes(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_set_user_scopes(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let toolkit = match read_required_non_empty(&params, "toolkit") {
             Ok(v) => v,

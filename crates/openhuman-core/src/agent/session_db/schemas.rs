@@ -1,5 +1,6 @@
 //! Controller schemas and JSON-RPC dispatchers for the durable run ledger.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::config::rpc as config_rpc;
@@ -94,7 +95,7 @@ fn new_correlation_id() -> String {
     uuid::Uuid::new_v4().simple().to_string()[..8].to_string()
 }
 
-fn handle_run_ledger_list(params: Map<String, Value>) -> ControllerFuture {
+fn handle_run_ledger_list(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "run_ledger_rpc", "[run_ledger_rpc][{cid}] list.entry");
@@ -124,7 +125,7 @@ fn handle_run_ledger_list(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_run_ledger_get(params: Map<String, Value>) -> ControllerFuture {
+fn handle_run_ledger_get(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "run_ledger_rpc", "[run_ledger_rpc][{cid}] get.entry");
@@ -148,7 +149,7 @@ fn handle_run_ledger_get(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_run_ledger_events(params: Map<String, Value>) -> ControllerFuture {
+fn handle_run_ledger_events(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "run_ledger_rpc", "[run_ledger_rpc][{cid}] events.entry");

@@ -5,6 +5,7 @@
 //! [`super::engine`] phase scheduler. Namespace `workflow_run` — distinct from
 //! the existing `workflows` domain (SKILL.md/WORKFLOW.md discovery).
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::config::rpc as config_rpc;
@@ -132,7 +133,7 @@ fn schema_for(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_list_definitions(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_list_definitions(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "workflow_run_rpc", "[workflow_run_rpc][{cid}] list_definitions.entry");
@@ -142,7 +143,7 @@ fn handle_list_definitions(_params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_list(params: Map<String, Value>) -> ControllerFuture {
+fn handle_list(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "workflow_run_rpc", "[workflow_run_rpc][{cid}] list.entry");
@@ -170,7 +171,7 @@ fn handle_list(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_get(params: Map<String, Value>) -> ControllerFuture {
+fn handle_get(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "workflow_run_rpc", "[workflow_run_rpc][{cid}] get.entry");
@@ -192,7 +193,7 @@ fn handle_get(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_start(params: Map<String, Value>) -> ControllerFuture {
+fn handle_start(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "workflow_run_rpc", "[workflow_run_rpc][{cid}] start.entry");
@@ -227,7 +228,7 @@ fn handle_start(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_stop(params: Map<String, Value>) -> ControllerFuture {
+fn handle_stop(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "workflow_run_rpc", "[workflow_run_rpc][{cid}] stop.entry");
@@ -249,7 +250,7 @@ fn handle_stop(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_resume(params: Map<String, Value>) -> ControllerFuture {
+fn handle_resume(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "workflow_run_rpc", "[workflow_run_rpc][{cid}] resume.entry");
