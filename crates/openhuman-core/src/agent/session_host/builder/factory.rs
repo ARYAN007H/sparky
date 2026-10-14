@@ -97,8 +97,12 @@ impl OpenHumanSessionHost {
                     ToolScope::Wildcard => "wildcard".to_string(),
                 })
                 .unwrap_or_else(|| "legacy".to_string()),
-            target_def.as_ref().is_some_and(|d| d.extensions.omit_identity),
-            target_def.as_ref().is_some_and(|d| d.extensions.omit_memory_context),
+            target_def
+                .as_ref()
+                .is_some_and(|d| d.extensions.omit_identity),
+            target_def
+                .as_ref()
+                .is_some_and(|d| d.extensions.omit_memory_context),
             target_def
                 .as_ref()
                 .map(|d| d.temperature)

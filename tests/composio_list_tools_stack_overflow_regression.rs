@@ -110,7 +110,6 @@
 use async_trait::async_trait;
 use openhuman_core::agent::harness::host_definition::AgentDefinitionRegistry;
 use openhuman_core::agent::harness::{with_parent_context, ParentExecutionContext};
-use tinytools_agent::dialect::ToolCallFormat;
 use openhuman_core::agent::subagent_host::{run_subagent, SubagentRunOptions};
 use openhuman_core::config::AgentConfig;
 use parking_lot::Mutex;
@@ -121,6 +120,7 @@ use tinyagents_definition::ModelSpec;
 use tinyinference_llm::message::AssistantMessage;
 use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
 use tinyinference_llm::tool::ToolCall;
+use tinytools_agent::dialect::ToolCallFormat;
 
 /// Worker stack for this guard: 3 MiB, deliberately far below the production
 /// `AGENT_WORKER_STACK_BYTES` (16 MiB, which stays the real budget).

@@ -4,13 +4,13 @@
 //! [`SystemPromptBuilder::for_subagent`](crate::agent::prompts::builder::SystemPromptBuilder::for_subagent)
 //! for callers that only hold indices into the parent's tool vec.
 
-use tinytools_agent::dialect::ToolCallFormat;
 use super::super::builder::GLOBAL_STYLE_SUFFIX;
 use super::super::sections::GROUNDING_BODY;
 use super::super::types::*;
 use super::workspace_files::{inject_workspace_file, write_agents_md_blocks};
 use std::fmt::Write;
 use std::path::Path;
+use tinytools_agent::dialect::ToolCallFormat;
 use tinytools_agent::dialect::{CodeDialect, NativeDialect, PFormatDialect, ToolDialect};
 
 // ─────────────────────────────────────────────────────────────────────────────

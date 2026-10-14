@@ -1,5 +1,5 @@
-use tinytools_agent::dialect::ToolCallFormat;
 use super::*;
+use tinytools_agent::dialect::ToolCallFormat;
 
 #[test]
 fn all_builtins_parse() {

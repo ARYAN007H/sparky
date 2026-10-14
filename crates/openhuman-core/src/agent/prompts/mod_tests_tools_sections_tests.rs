@@ -1,5 +1,5 @@
-use tinytools_agent::dialect::ToolCallFormat;
 use super::*;
+use tinytools_agent::dialect::ToolCallFormat;
 
 #[test]
 fn rendered_subagent_system_prompt_is_byte_stable_across_repeat_calls() {

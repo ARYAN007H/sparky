@@ -60,9 +60,9 @@
 //! host files into the prompt (and thence to the inference provider); this
 //! adapter goes through it rather than reading the files itself.
 
-use tinytools_agent::dialect::ToolCallFormat;
 use std::collections::HashSet;
 use std::sync::Arc;
+use tinytools_agent::dialect::ToolCallFormat;
 
 use async_trait::async_trait;
 use tinyagents_harness::error::{Result as TinyAgentsResult, TinyAgentsError};
@@ -71,7 +71,8 @@ use tinyinference_llm::message::Message;
 
 use crate::agent::prompts::{
     load_agents_md_layers, render_connected_identities, AgentsMdContent, ConnectedIntegration,
-    PromptContext, PromptTool, SystemPromptBuilder, };
+    PromptContext, PromptTool, SystemPromptBuilder,
+};
 use crate::config::{Config, DEFAULT_MODEL};
 use tinyskills::Skill as Workflow;
 

@@ -5,8 +5,6 @@ use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::orchestration::spawn_parallel::{
     prepare_spawn_parallel_tasks_from_defs, ParallelTaskRejectionKind, SpawnParallelTaskPreflight,
 };
-use tinyagents_orchestration::parallel::WorkerDispatchMode;
-use tinytools_agent::dialect::ToolCallFormat;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent::OpenHumanSessionHost;
 use crate::config::AgentConfig;
@@ -22,12 +20,14 @@ use tinyagents_definition::{
     AgentTier, DefinitionSource, ModelSpec, PromptSource, SandboxMode, ToolScope,
 };
 use tinyagents_harness::tool::ToolDispatch;
+use tinyagents_orchestration::parallel::WorkerDispatchMode;
 use tinyinference_llm::message::{AssistantMessage, Message};
 use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
 use tinyinference_llm::tool::ToolCall;
 use tinytools::ToolTimeout;
 use tinytools::{PermissionLevel, Tool, ToolResult};
 use tinytools_agent::dialect::NativeDialect;
+use tinytools_agent::dialect::ToolCallFormat;
 use tinytools_agent::dialect::TranscriptEntry;
 use tokio::time::{sleep, timeout, Duration};
 

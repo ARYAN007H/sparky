@@ -141,7 +141,9 @@ pub fn build_system_prompt_with_identity(
 
     // ── 1. Tooling ──────────────────────────────────────────────
     if !tools.is_empty() {
-        prompt.push_str(&tinyagents_harness::catalog::render_description_catalogue(tools));
+        prompt.push_str(&tinyagents_harness::catalog::render_description_catalogue(
+            tools,
+        ));
     }
 
     // ── 1b. Action instruction (avoid meta-summary) ───────────────

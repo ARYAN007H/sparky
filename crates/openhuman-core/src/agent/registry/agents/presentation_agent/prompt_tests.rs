@@ -1,6 +1,6 @@
 use super::*;
-use tinytools_agent::dialect::ToolCallFormat;
 use std::collections::HashSet;
+use tinytools_agent::dialect::ToolCallFormat;
 
 #[test]
 fn build_returns_grounding_contract() {

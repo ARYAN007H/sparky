@@ -1,6 +1,6 @@
 use super::*;
-use tinytools_agent::dialect::ToolCallFormat;
 use std::collections::HashSet;
+use tinytools_agent::dialect::ToolCallFormat;
 
 fn ctx() -> PromptContext<'static> {
     static VISIBLE: std::sync::OnceLock<HashSet<String>> = std::sync::OnceLock::new();

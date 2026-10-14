@@ -5,13 +5,13 @@
 //! [`super::render_helpers`] for workspace-file injection and
 //! sub-agent plumbing.
 
-use tinytools_agent::dialect::ToolCallFormat;
 use super::render_helpers::{inject_workspace_file, sync_workspace_file};
 use super::types::*;
 use anyhow::Result;
 use std::fmt::Write;
 use tinytools::ToolSpec;
 use tinytools_agent::dialect::render_pformat_catalogue;
+use tinytools_agent::dialect::ToolCallFormat;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Special sections (archetype, dynamic)

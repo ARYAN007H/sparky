@@ -1,7 +1,6 @@
 use super::*;
 use crate::agent::harness::fork_context::{with_parent_context, ParentExecutionContext};
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
-use tinytools_agent::dialect::ToolCallFormat;
 use crate::config::AgentConfig;
 use async_trait::async_trait;
 use parking_lot::Mutex;
@@ -13,6 +12,7 @@ use std::sync::{
 use tinyagents_tasks::OrchestrationTaskStatus;
 use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
 use tinytools::Tool;
+use tinytools_agent::dialect::ToolCallFormat;
 use tokio::time::Duration;
 
 fn parent_context(model: Arc<dyn ChatModel<()>>) -> ParentExecutionContext {

@@ -1,12 +1,12 @@
 use super::*;
 use crate::agent::harness::fork_context::{with_parent_context, ParentExecutionContext};
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
-use tinytools_agent::dialect::ToolCallFormat;
 use crate::config::AgentConfig;
 use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Arc;
 use tinytools::{ToolCallOptions, ToolRunContext};
+use tinytools_agent::dialect::ToolCallFormat;
 
 struct ThreadContext(&'static str);
 

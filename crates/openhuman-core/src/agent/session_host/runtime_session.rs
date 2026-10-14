@@ -503,7 +503,9 @@ impl OpenHumanTurnPrelude {
         // the prompt was composed for, so a text dialect keeps its schemas off
         // the wire and renders the catalogue itself (`ToolsSection` no longer
         // does), and a code call is recovered against the positional registry.
-        run_context.tool_dialect = tinyagents_harness::dialect::dispatcher_for_format(self.tool_dispatcher.tool_call_format());
+        run_context.tool_dialect = tinyagents_harness::dialect::dispatcher_for_format(
+            self.tool_dispatcher.tool_call_format(),
+        );
         format!("{}\n\n{enriched}", turn.preamble())
     }
 
