@@ -326,17 +326,21 @@ async fn current_returns_inner_origin_on_nested_scope() {
 #[tokio::test]
 async fn origin_is_carried_by_the_scoped_core_context_only() {
     assert!(crate::core::runtime::CoreContext::scoped().is_none());
-    let (via_module, via_context, scoped_during) = with_origin(AgentTurnOrigin::DirectChat, async {
-        (
-            current(),
-            crate::core::runtime::CoreContext::current_turn_origin(),
-            crate::core::runtime::CoreContext::scoped().is_some(),
-        )
-    })
-    .await;
+    let (via_module, via_context, scoped_during) =
+        with_origin(AgentTurnOrigin::DirectChat, async {
+            (
+                current(),
+                crate::core::runtime::CoreContext::current_turn_origin(),
+                crate::core::runtime::CoreContext::scoped().is_some(),
+            )
+        })
+        .await;
     assert!(matches!(via_module, Some(AgentTurnOrigin::DirectChat)));
     assert!(matches!(via_context, Some(AgentTurnOrigin::DirectChat)));
-    assert!(scoped_during, "with_origin must scope a context, bare if none was booted");
+    assert!(
+        scoped_during,
+        "with_origin must scope a context, bare if none was booted"
+    );
     assert!(crate::core::runtime::CoreContext::scoped().is_none());
 }
 
