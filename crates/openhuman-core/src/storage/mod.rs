@@ -50,7 +50,8 @@ use std::sync::{Arc, LazyLock, Mutex, OnceLock, RwLock};
 /// foreign file, and its `run_blocking` hands the closure a `rusqlite`
 /// connection anyway. The core has no `rusqlite` dependency of its own,
 /// tinystoragedrivers owns the one copy; the re-export goes when the importers
-/// do (the one-time legacy import window closes).
+/// do (the one-time legacy import window closes). Re-checked for #7768: both
+/// consumers are still present, so it stays.
 pub use tinystoragedrivers::sqlite::rusqlite;
 pub use tinystoragedrivers::{
     Blocking, CollectionSpec, DocumentStore, DocumentStoreExt, MemoryStorage, Precondition, Scope,
