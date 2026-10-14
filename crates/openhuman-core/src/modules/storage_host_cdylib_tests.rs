@@ -284,7 +284,7 @@ async fn a_loaded_module_cannot_reach_another_modules_collections() {
         .put(
             &theirs,
             "session",
-            "{\"marker\":\"OTHER-MODULES-SECRET\"}",
+            json!({"marker": "OTHER-MODULES-SECRET"}),
             Default::default(),
         )
         .await
@@ -310,11 +310,12 @@ async fn a_loaded_module_cannot_reach_another_modules_collections() {
     let after = victim.documents().get(&theirs, "session").await.unwrap();
     assert!(after
         .expect("the other module's document survives")
-        .document_json()
+        .doc
+        .to_string()
         .contains("OTHER-MODULES-SECRET"));
     // And its own scope never got the collection.
     let own = rig.backend.for_scope(&rig.scope("tinymcp")).unwrap();
-    assert!(!own.documents().collections().await.unwrap().contains(&theirs));
+    assert!(!own.documents().collections("").await.unwrap().contains(&theirs));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -337,7 +338,7 @@ async fn a_loaded_module_cannot_name_or_reach_another_scope() {
             .put(
                 "mcp_servers",
                 "victim",
-                "{\"marker\":\"OTHER-SCOPE-SECRET\"}",
+                json!({"marker": "OTHER-SCOPE-SECRET"}),
                 Default::default(),
             )
             .await
@@ -415,7 +416,7 @@ async fn a_loaded_module_cannot_use_a_collection_it_never_declared() {
         .await;
     assert!(denied(&dropped, "schema-is-host-only"), "{dropped}");
     let own = rig.backend.for_scope(&rig.scope("tinymcp")).unwrap();
-    let listed = own.documents().collections().await.unwrap();
+    let listed = own.documents().collections("").await.unwrap();
     assert!(!listed.contains(&"never_declared".to_string()), "{listed:?}");
     // The module's listing shows its own names only.
     let seen = rig.call("Documents", "Collections", json!({})).await;
