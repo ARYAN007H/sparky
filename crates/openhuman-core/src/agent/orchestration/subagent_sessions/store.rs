@@ -20,7 +20,7 @@ impl SubagentSessionStore {
     /// so it stays byte-identical. A missing file is the common case and a
     /// no-op.
     fn import_legacy(&self, docs: &super::store_documents::Docs) -> Result<(), String> {
-        if docs.legacy_imported().map_err(|err| format!("{err:#}"))? {
+        if docs.legacy_imported(&self.workspace_dir).map_err(|err| format!("{err:#}"))? {
             return Ok(());
         }
         let path = self.legacy_path();
@@ -31,7 +31,7 @@ impl SubagentSessionStore {
         };
         let sessions: Vec<DurableSubagentSession> = serde_json::from_str(&raw)
             .map_err(|err| format!("failed to parse legacy subagent sessions: {err}"))?;
-        docs.import_legacy(&sessions)
+        docs.import_legacy(&self.workspace_dir, &sessions)
             .map_err(|err| format!("{err:#}"))?;
         log::debug!(
             "[subagent_sessions] imported legacy sessions count={}",

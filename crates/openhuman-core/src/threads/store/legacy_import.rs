@@ -22,7 +22,7 @@ use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition};
 use crate::storage::documents::Repo;
 
 const MARKERS: &str = "threads_import";
-const MARKER_ID: &str = "legacy-conversations";
+const MARKER_PREFIX: &str = "legacy-conversations";
 const LOG_PREFIX: &str = "[conversations:import]";
 
 /// The collection that holds the completion marker.
@@ -147,11 +147,21 @@ pub(super) fn import_once(
     store: &DriverConversationStore,
 ) -> Result<()> {
     let root = super::backend::legacy_root(workspace_dir);
-    repo.once_per_backend("legacy-import", || {
-        if !root.join("threads.jsonl").is_file() {
-            return Ok(());
+    let source = crate::storage::source_key(&root);
+    let marker_id = format!("{MARKER_PREFIX}:{source}");
+    repo.once_per_backend(&format!("legacy-import:{source}"), || {
+        match std::fs::metadata(root.join("threads.jsonl")) {
+            Ok(meta) if meta.is_file() => {}
+            Ok(_) => return Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => {
+                return Err(anyhow::Error::new(error).context("stat the legacy threads log"))
+            }
         }
-        let marked = repo.run(|docs| async move { docs.get(MARKERS, MARKER_ID).await })?;
+        let marked = repo.run(|docs| {
+            let marker_id = marker_id.clone();
+            async move { docs.get(MARKERS, &marker_id).await }
+        })?;
         if marked.is_some() {
             log::debug!("{LOG_PREFIX} already imported");
             return Ok(());
@@ -170,7 +180,7 @@ pub(super) fn import_once(
             match docs
                 .put(
                     MARKERS,
-                    MARKER_ID,
+                    &marker_id,
                     serde_json::json!({ "threads": threads_n, "messages": messages_n }),
                     Precondition::Absent,
                 )

@@ -10,7 +10,7 @@
 //! | Collection | Document id | Holds |
 //! | --- | --- | --- |
 //! | `subagent_sessions` | the session id | one [`DurableSubagentSession`] plus `created_at` for ordering |
-//! | `subagent_sessions_import` | `subagent_sessions.json` | marker: the legacy file was imported (it is left byte-identical) |
+//! | `subagent_sessions_import` | `subagent_sessions.json:<workspace key>` | marker: the legacy file was imported (it is left byte-identical) |
 //!
 //! The callers in `ops.rs` load and save the whole list. `save` writes each session as
 //! its own document, so a session's history stays well under any document-size
@@ -32,6 +32,12 @@ const SESSIONS: &str = "subagent_sessions";
 /// a collection of its own so `load` never sees it as a session.
 const IMPORTED: &str = "subagent_sessions_import";
 const LEGACY_MARKER: &str = "subagent_sessions.json";
+
+/// The marker id for one workspace's legacy file, so workspaces sharing a
+/// backend each import their own.
+fn marker_id(source: &std::path::Path) -> String {
+    format!("{LEGACY_MARKER}:{}", crate::storage::source_key(source))
+}
 const DOMAIN: &str = "subagent_sessions::store";
 
 fn collections() -> Vec<CollectionSpec> {
@@ -90,22 +96,28 @@ impl Docs {
     }
 
     /// Whether the one-time legacy file import finished in this scope.
-    pub(super) fn legacy_imported(&self) -> Result<bool> {
+    pub(super) fn legacy_imported(&self, source: &std::path::Path) -> Result<bool> {
+        let id = marker_id(source);
         let found = self
             .0
-            .run(|docs| async move { docs.get(IMPORTED, LEGACY_MARKER).await })?;
+            .run(|docs| async move { docs.get(IMPORTED, &id).await })?;
         Ok(found.is_some())
     }
 
     /// Imports `sessions` read from the legacy file (a stored newer copy
     /// wins), then records the import in a marker document.
-    pub(super) fn import_legacy(&self, sessions: &[DurableSubagentSession]) -> Result<()> {
+    pub(super) fn import_legacy(
+        &self,
+        source: &std::path::Path,
+        sessions: &[DurableSubagentSession],
+    ) -> Result<()> {
         self.save(sessions)?;
+        let id = marker_id(source);
         self.0.run(|docs| async move {
             match docs
                 .put(
                     IMPORTED,
-                    LEGACY_MARKER,
+                    &id,
                     serde_json::json!({ "imported": true }),
                     Precondition::Absent,
                 )
