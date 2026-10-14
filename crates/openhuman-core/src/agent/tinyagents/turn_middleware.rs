@@ -257,7 +257,7 @@ pub(super) fn install_turn_middleware(
     }
 
     stop_hooks::install(
-        &mut harness,
+        harness,
         handle.as_ref(),
         model,
         stop_hooks,
@@ -344,7 +344,7 @@ pub(super) fn install_turn_middleware(
         })
         .map(|schema| schema.name)
         .collect();
-    context_mw.install(&mut harness, tool_policies, summary_focus_tools);
+    context_mw.install(harness, tool_policies, summary_focus_tools);
 
     // Plan mode (issue: plan-mode approvals). `run_mode` is `Some` only for a
     // turn with a thread identity (chat, not a sub-agent child); the
@@ -400,7 +400,7 @@ pub(super) fn install_turn_middleware(
     let agent_id = tool_policy.as_ref().map(|p| p.agent_definition_id.as_str());
     let turn_wall_clock_ms = harness.policy().limits.max_wall_clock_ms;
     verify_before_finish::install(
-        &mut harness,
+        harness,
         is_subagent,
         agent_id,
         &wrap_up_fired,
@@ -409,7 +409,7 @@ pub(super) fn install_turn_middleware(
     // The rungs above all *tell* the turn to produce its deliverable; this one
     // looks, on the same scope as the requirements check.
     if verify_before_finish::applies(is_subagent, agent_id) {
-        install_unmet_deliverable(&mut harness);
+        install_unmet_deliverable(harness);
     } else {
         tracing::debug!(
             is_subagent,
