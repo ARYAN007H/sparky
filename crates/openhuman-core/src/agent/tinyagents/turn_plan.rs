@@ -142,3 +142,7 @@ impl TurnPlanner<(), OpenHumanRunContext> for OpenHumanTurnPlanner {
     }
 }
 
+
+#[cfg(test)]
+#[path = "turn_plan_tests.rs"]
+mod tests;
