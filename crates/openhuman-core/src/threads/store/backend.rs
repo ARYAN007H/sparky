@@ -18,10 +18,11 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use super::ConversationPurgeStats;
 use tinyagents_session::threads::{
-    ConversationError, ConversationPersistence, ConversationPurgeStats, ConversationResult,
-    ConversationThread, CreateConversationThread, CrossThreadHit, DriverConversationStore,
-    ThreadMessage, ThreadMessagePatch,
+    ConversationError, ConversationPersistence, ConversationResult, ConversationThread,
+    CreateConversationThread, CrossThreadHit, DriverConversationStore, ThreadMessage,
+    ThreadMessagePatch,
 };
 
 use crate::storage::documents::Repo;
@@ -289,11 +290,9 @@ impl ConversationStore {
 
     /// Removes every thread.
     pub fn purge_threads(&self) -> Result<ConversationPurgeStats, String> {
-        self.run(
-            "purge_threads",
-            NONE,
-            |s| async move { s.purge_threads().await },
-        )
+        self.run("purge_threads", NONE, |s| async move {
+            s.purge_threads().await.map(ConversationPurgeStats::from)
+        })
     }
 }
 
