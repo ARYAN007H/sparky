@@ -76,19 +76,12 @@ where
     F: std::future::Future<Output = Result<WebChatTaskResult, String>>,
 {
     match deadline {
-        // Scope the deadline on the task so the session turn hands it to the
-        // harness (`agent::turn_deadline`), which winds down before `d`. The
-        // turn future is boxed: it is very large, and the scope wrapper would
-        // otherwise hold it inline a second time and overflow the worker stack.
-        Some(d) => match tokio::time::timeout(
-            d,
-            crate::agent::turn_deadline::with_turn_deadline(
-                Some(tinyagents_harness::turn_deadline::TurnDeadline::starting_now(d)),
-                Box::pin(fut),
-            ),
-        )
-        .await
-        {
+        // The session turn carries the matching `TurnDeadline` on its explicit
+        // host environment (`run_turn_under_cancel_and_deadline`), so the
+        // harness (`agent::turn_deadline`) winds down before `d`. The turn
+        // future is boxed: it is very large and would otherwise be held inline
+        // by the timeout wrapper and overflow the worker stack.
+        Some(d) => match tokio::time::timeout(d, Box::pin(fut)).await {
             Ok(res) => res,
             Err(_elapsed) => {
                 log::warn!(
@@ -118,18 +111,35 @@ where
 /// of this wiring and can't drift apart (issue #4746 review); the only per-site
 /// differences are the `fork` flag and run-queue handle passed to
 /// `run_chat_task` when building `fut`.
-pub(crate) async fn run_turn_under_cancel_and_deadline<F>(
+///
+/// `build_turn` receives the turn's [`HostTurnEnv`] -- its own cancellation
+/// token (fired by a Stop) and the backstop's [`TurnDeadline`] -- and returns
+/// the turn future, which hands the env to the session it runs. The env is an
+/// explicit value, so it reaches the turn's whole run tree without any ambient
+/// scope.
+///
+/// [`TurnDeadline`]: tinyagents_harness::turn_deadline::TurnDeadline
+pub(crate) async fn run_turn_under_cancel_and_deadline<B, F>(
     cancel_token: CancellationToken,
     origin: crate::agent::turn_origin::AgentTurnOrigin,
     approval_ctx: crate::security::approval::ApprovalChatContext,
-    fut: F,
+    build_turn: B,
 ) -> Option<Result<WebChatTaskResult, String>>
 where
+    B: FnOnce(HostTurnEnv) -> F,
     F: std::future::Future<Output = Result<WebChatTaskResult, String>>,
 {
     let deadline = resolve_web_turn_deadline().await;
+    let turn_cancellation = tinyagents_harness::cancel::CancellationToken::new();
+    let env = HostTurnEnv {
+        cancellation: Some(turn_cancellation.clone()),
+        turn_deadline: deadline.map(tinyagents_harness::turn_deadline::TurnDeadline::starting_now),
+        ..HostTurnEnv::default()
+    };
+    let fut = build_turn(env);
     run_until_stopped(
         cancel_token,
+        turn_cancellation,
         drive_turn_with_deadline(
             deadline,
             crate::agent::turn_origin::with_origin(
@@ -143,22 +153,19 @@ where
 
 /// Drive `turn` until it finishes or `cancel_token` fires.
 ///
-/// The turn runs under its own session cancellation, which its run tree reads
-/// through `host_overrides::current_cancellation`. A Stop fires it rather than
+/// The turn runs under its own session cancellation (`turn_cancellation`,
+/// which the turn's host environment hands to its run tree). A Stop fires it rather than
 /// only dropping the turn, so the session driver can hand back the rounds it
 /// already completed and the runtime persists them (#7715). The turn then gets
 /// [`STOPPED_TURN_PERSIST_GRACE`] to finish before it is dropped; its result is
 /// discarded either way.
 async fn run_until_stopped<T>(
     cancel_token: CancellationToken,
+    turn_cancellation: tinyagents_harness::cancel::CancellationToken,
     turn: impl std::future::Future<Output = T>,
 ) -> Option<T> {
-    let turn_cancellation = tinyagents_harness::cancel::CancellationToken::new();
     // Boxed rather than stack-pinned: a chat turn's future is very large.
-    let mut turn = Box::pin(crate::agent::host_overrides::with_cancellation(
-        turn_cancellation.clone(),
-        turn,
-    ));
+    let mut turn = Box::pin(turn);
     tokio::select! {
         biased;
         _ = cancel_token.cancelled() => {
