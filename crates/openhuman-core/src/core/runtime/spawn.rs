@@ -38,28 +38,22 @@ fn captured() -> Option<std::sync::Arc<CoreContext>> {
     }
 }
 
-/// `fut`, wrapped to run under the caller's context and memory identity
-/// wherever it is eventually polled.
+/// `fut`, wrapped to run under the caller's context wherever it is eventually
+/// polled. The memory identity is not ambient and so is not carried: work that
+/// acts on memory takes it explicitly (the run context, `MemoryIdentity`).
 pub fn scoped<F>(fut: F) -> impl Future<Output = F::Output> + Send
 where
     F: Future + Send,
     F::Output: Send,
 {
-    let identity = crate::memory::scope::current();
     let ctx = captured();
-    // Box before either task-local wrapper. Their branching async states
-    // otherwise multiply a large task's inline size before Tokio can box it,
+    // Box before the task-local wrapper. Its branching async state otherwise
+    // multiplies a large task's inline size before Tokio can box it,
     // overflowing the spawning thread (including the CLI's main stack).
     let fut = Box::pin(fut);
-    let fut = async move {
+    async move {
         match ctx {
             Some(ctx) => CoreContext::scope(ctx, fut).await,
-            None => fut.await,
-        }
-    };
-    async move {
-        match identity {
-            Some(identity) => crate::memory::scope::within(identity, fut).await,
             None => fut.await,
         }
     }
@@ -70,47 +64,30 @@ where
 ///
 /// Single-user processes carry [`CoreContext::current`]. In SaaS only the
 /// caller's own task scope is carried (an unscoped caller's future runs with
-/// no context and so fails closed). Both carry the memory identity, exactly
-/// as [`scoped`] does — but without requiring
-/// the future to be `Send`.
+/// no context and so fails closed), exactly as [`scoped`] does — but without
+/// requiring the future to be `Send`.
 pub(crate) fn carry<F: Future>(fut: F) -> impl Future<Output = F::Output> {
     let ctx = captured();
-    let identity = crate::memory::scope::current();
     async move {
-        let fut = async move {
-            match ctx {
-                Some(ctx) => CoreContext::scope(ctx, fut).await,
-                None => fut.await,
-            }
-        };
-        match identity {
-            Some(identity) => crate::memory::scope::within(identity, fut).await,
+        match ctx {
+            Some(ctx) => CoreContext::scope(ctx, fut).await,
             None => fut.await,
         }
     }
 }
 
 /// Like `tokio::task::spawn_blocking`, but the closure runs under the caller's
-/// [`CoreContext`] and memory identity.
+/// [`CoreContext`].
 pub fn spawn_blocking_scoped<F, R>(f: F) -> JoinHandle<R>
 where
     F: FnOnce() -> R + Send + 'static,
     R: Send + 'static,
 {
     let ctx = captured();
-    let identity = crate::memory::scope::current();
     let handle = tokio::runtime::Handle::current();
-    tokio::task::spawn_blocking(move || {
-        let run = async move {
-            match identity {
-                Some(identity) => crate::memory::scope::within(identity, async move { f() }).await,
-                None => f(),
-            }
-        };
-        match ctx {
-            Some(ctx) => handle.block_on(CoreContext::scope(ctx, run)),
-            None => handle.block_on(run),
-        }
+    tokio::task::spawn_blocking(move || match ctx {
+        Some(ctx) => handle.block_on(CoreContext::scope(ctx, async move { f() })),
+        None => f(),
     })
 }
 
