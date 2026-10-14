@@ -297,6 +297,7 @@ async fn items_get_and_forget_leave_another_roots_items_alone() {
     other.memory.root = Some("team:other".to_string());
     let still = items_get(
         &other,
+        &MemoryIdentity::root(),
         ItemsGetParams {
             ids: vec![theirs.clone()],
             reach: None,
