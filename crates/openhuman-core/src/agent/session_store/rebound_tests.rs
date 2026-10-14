@@ -73,13 +73,20 @@ fn the_provider_surface_forwards_to_the_current_backend() {
     assert!(rendered.contains("ReboundSessionStores"), "{rendered}");
     assert!(rendered.contains("destination"), "{rendered}");
 
-    // `for_agent` and `try_for_agent` open the same agent scope.
+    // `for_agent` and `try_for_agent` open the same agent scope: a turn state
+    // written through one is read back through the other.
     let infallible = stores.for_agent("forwarded");
     let fallible = stores.try_for_agent("forwarded").unwrap();
-    assert_eq!(
-        infallible.transcripts.destination_key(),
-        fallible.transcripts.destination_key()
-    );
+    infallible
+        .turn_states
+        .put(&tinyagents_session::turn_state::TurnState::started(
+            "t-fwd",
+            "r",
+            4,
+            "2026-01-01T00:00:00Z",
+        ))
+        .unwrap();
+    assert!(fallible.turn_states.get("t-fwd").unwrap().is_some());
 
     assert!(stores.recover().is_ok());
     assert_eq!(

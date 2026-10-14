@@ -9,10 +9,16 @@ fn scratch() -> tempfile::TempDir {
 fn the_calling_tenants_stores_open_on_the_workspace_default() {
     let ws = scratch();
     let stores = stores_for(ws.path()).expect("the operator has a tenant");
+    let state = tinyagents_session::turn_state::TurnState::started(
+        "thread-s",
+        "req-s",
+        4,
+        "2026-10-09T00:00:00Z",
+    );
+    stores.turn_states.put(&state).unwrap();
     let again = stores_or_ephemeral(ws.path());
-    assert_eq!(
-        stores.transcripts.destination_key(),
-        again.transcripts.destination_key(),
+    assert!(
+        again.turn_states.get("thread-s").unwrap().is_some(),
         "both resolve the same workspace default"
     );
 }
