@@ -532,7 +532,8 @@ fn build_subagent_context_mw(
     tokenjuice_compression: AgentTokenjuiceCompression,
     config: Option<&crate::config::Config>,
 ) -> crate::agent::tinyagents::middleware::turn_context::TurnContextMiddleware {
-    let mut mw = crate::agent::tinyagents::middleware::turn_context::TurnContextMiddleware::defaults();
+    let mut mw =
+        crate::agent::tinyagents::middleware::turn_context::TurnContextMiddleware::defaults();
     // Always thread the agent's compression profile — even on the config-default
     // path — so the definition's TokenJuice choice is honored.
     mw.tokenjuice_compression = tokenjuice_compression;

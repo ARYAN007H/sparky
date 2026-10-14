@@ -33,7 +33,9 @@ pub(super) fn failed_run_history(
     );
     (
         recovered,
-        crate::agent::tinyagents::middleware::turn_context::render_unanswered_steps(&snapshot.messages[end..]),
+        crate::agent::tinyagents::middleware::turn_context::render_unanswered_steps(
+            &snapshot.messages[end..],
+        ),
     )
 }
 

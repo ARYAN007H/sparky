@@ -21,7 +21,11 @@ use crate::agent::tinyagents::budget::MAX_SPAWN_DEPTH;
 /// paths, which carry their own gating).
 #[derive(Clone)]
 pub(crate) struct ToolPolicyEnforcement {
-    pub policy: std::sync::Arc<dyn tinyagents_harness::middleware::ToolCallPolicy<crate::agent::tinyagents::host::OpenHumanRunContext>>,
+    pub policy: std::sync::Arc<
+        dyn tinyagents_harness::middleware::ToolCallPolicy<
+            crate::agent::tinyagents::host::OpenHumanRunContext,
+        >,
+    >,
     /// The session's channel-permission snapshot — enforces the per-channel
     /// permission ceiling (deny + per-call permission-level gate) the in-house
     /// engine ran in `agent_tool_exec`.
