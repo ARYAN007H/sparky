@@ -569,3 +569,38 @@ async fn the_approval_context_survives_await_points_and_a_move_between_tasks() {
         Some("t-await")
     );
 }
+
+/// The memory identity is explicit on the run: a child inherits it (the
+/// sub-agent runner then narrows it with `child(<definition id>)`), and a host
+/// environment that carries one — the team runtime's member — applies it, while
+/// an environment without one leaves the run's own alone.
+#[test]
+fn the_memory_identity_rides_the_run_and_its_children() {
+    use crate::memory::scope::MemoryIdentity;
+
+    let mut context = OpenHumanRunContext::new();
+    assert_eq!(context.memory_identity, None);
+
+    let env = crate::agent::turn_env::HostTurnEnv {
+        memory_identity: Some(MemoryIdentity::team_member("acme", "lead")),
+        ..Default::default()
+    };
+    context = context.with_host_env(&env);
+    assert_eq!(
+        context.memory_identity,
+        Some(MemoryIdentity::team_member("acme", "lead"))
+    );
+
+    let child = context.child();
+    assert_eq!(child.memory_identity, context.memory_identity);
+    assert_eq!(
+        child.memory_identity.unwrap().child("scout"),
+        MemoryIdentity::team_member("acme", "scout")
+    );
+
+    let unchanged = context.with_host_env(&crate::agent::turn_env::HostTurnEnv::default());
+    assert_eq!(
+        unchanged.memory_identity,
+        Some(MemoryIdentity::team_member("acme", "lead"))
+    );
+}
