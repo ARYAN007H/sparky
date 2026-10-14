@@ -4,8 +4,9 @@
 //! right before the transfer leaves the device. It:
 //!
 //! 1. drops local-only transfers (nothing leaves → nothing to disclose),
-//! 2. attaches best-effort chat routing (thread/client) from the ambient
-//!    [`APPROVAL_CHAT_CONTEXT`](crate::security::approval::APPROVAL_CHAT_CONTEXT)
+//! 2. attaches best-effort chat routing (thread/client) from the turn's
+//!    [`ApprovalChatContext`](crate::security::approval::ApprovalChatContext),
+//!    handed in explicitly (on the [`EgressLedger`], or as the `chat` argument),
 //!    so the web bridge can surface the descriptor to the originating chat, and
 //! 3. publishes [`DomainEvent::ExternalTransferPending`] on the global bus.
 //!
@@ -21,6 +22,7 @@ use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 
 use super::types::EgressDescriptor;
+use crate::security::approval::ApprovalChatContext;
 
 /// Per-turn dedup ledger for external-transfer disclosures, passed explicitly
 /// down the provider factory chain by the managed-turn model build
@@ -39,25 +41,43 @@ use super::types::EgressDescriptor;
 /// inherent to emitting at build time rather than at request dispatch (the
 /// crate owns dispatch); dedup bounds the noise to one event per distinct
 /// destination per turn.
+///
+/// The ledger also carries the turn's chat routing (see [`Self::routed_to`]), so
+/// a disclosure raised anywhere down the chain reaches the chat that triggered
+/// it without an ambient scope.
 #[derive(Clone, Debug, Default)]
-pub struct EgressLedger(Option<Arc<Mutex<HashSet<String>>>>);
+pub struct EgressLedger {
+    seen: Option<Arc<Mutex<HashSet<String>>>>,
+    chat: Option<ApprovalChatContext>,
+}
 
 impl EgressLedger {
     /// No ledger: every disclosure publishes.
     pub fn none() -> Self {
-        Self(None)
+        Self::default()
     }
 
     /// A fresh ledger that collapses repeat disclosures of one destination.
     pub fn per_turn() -> Self {
-        Self(Some(Arc::new(Mutex::new(HashSet::new()))))
+        Self {
+            seen: Some(Arc::new(Mutex::new(HashSet::new()))),
+            chat: None,
+        }
+    }
+
+    /// Routes this ledger's disclosures to `chat` (the turn's thread and
+    /// client). `None` leaves them unrouted: the web bridge drops a disclosure
+    /// with no chat to show it in.
+    pub fn routed_to(mut self, chat: Option<ApprovalChatContext>) -> Self {
+        self.chat = chat;
+        self
     }
 
     /// Returns `true` when `descriptor` was already disclosed through this
     /// ledger. Records it as seen on first sight. Always `false` for
     /// [`EgressLedger::none`] (no ledger, nothing suppressed).
     fn already_disclosed(&self, descriptor: &EgressDescriptor) -> bool {
-        match &self.0 {
+        match &self.seen {
             Some(seen) => !seen
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -76,30 +96,16 @@ fn dedup_key(descriptor: &EgressDescriptor) -> String {
     )
 }
 
-/// Best-effort ambient chat routing for the current turn, mirroring
-/// `artifacts::store::current_chat_context`. Returns
-/// `(thread_id, client_id, request_id)`, each `None` outside a chat-scoped
-/// task (CLI / cron / background sync); `request_id` is additionally `None`
-/// for a chat-scoped caller that had no turn id in scope.
-fn current_chat_context() -> (Option<String>, Option<String>, Option<String>) {
-    crate::security::approval::APPROVAL_CHAT_CONTEXT
-        .try_with(|ctx| {
-            (
-                Some(ctx.thread_id.clone()),
-                Some(ctx.client_id.clone()),
-                ctx.request_id.clone(),
-            )
-        })
-        .unwrap_or((None, None, None))
-}
-
 /// Publish an [`DomainEvent::ExternalTransferPending`] for `descriptor` when the
 /// transfer is external. No-op (trace log only) for local-only transfers.
 ///
 /// Fire-and-forget: [`publish_global`] never blocks and never fails the caller,
 /// so an egress site can call this unconditionally on its hot path.
-pub fn emit_external_transfer(descriptor: EgressDescriptor) {
-    emit_external_transfer_in(&EgressLedger::none(), descriptor);
+///
+/// `chat` is the turn's chat routing (`None` outside a chat turn: CLI, cron,
+/// background sync).
+pub fn emit_external_transfer(chat: Option<&ApprovalChatContext>, descriptor: EgressDescriptor) {
+    emit_external_transfer_in(&EgressLedger::none().routed_to(chat.cloned()), descriptor);
 }
 
 /// [`emit_external_transfer`] through an explicit per-turn [`EgressLedger`]:
@@ -125,7 +131,14 @@ pub fn emit_external_transfer_in(ledger: &EgressLedger, descriptor: EgressDescri
         return;
     }
 
-    let (thread_id, client_id, request_id) = current_chat_context();
+    let (thread_id, client_id, request_id) = match &ledger.chat {
+        Some(chat) => (
+            Some(chat.thread_id.clone()),
+            Some(chat.client_id.clone()),
+            chat.request_id.clone(),
+        ),
+        None => (None, None, None),
+    };
     log::debug!(
         "[privacy][egress] ExternalTransferPending provider={} service={} reason={:?} data_kinds={:?} risk={:?} chat_routed={} request_id={:?}",
         descriptor.provider_slug,
