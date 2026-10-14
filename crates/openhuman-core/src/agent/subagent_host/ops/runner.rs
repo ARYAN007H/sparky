@@ -234,6 +234,16 @@ pub(crate) async fn run_subagent_direct(
                 max_depth,
             })?;
         options.run_context.spawn_depth = attempted_depth;
+        // The sub-agent acts on memory as a child of its parent: same team,
+        // its own definition. Explicit on the run, never an ambient scope.
+        options.run_context.memory_identity = Some(
+            options
+                .run_context
+                .memory_identity
+                .clone()
+                .unwrap_or_default()
+                .child(&definition.id),
+        );
 
         // Runtime spawn-hierarchy (tier) gate — defense-in-depth alongside the
         // depth gate above. The loader validates *declared* `subagents` pairs
@@ -320,7 +330,7 @@ pub(crate) async fn run_subagent_direct(
             );
         }
         let run_result = Box::pin(with_run_depth(RunDepth { depth: attempted_depth, max_depth }, async {
-            crate::memory::scope::within_agent(&definition.id, with_file_state_agent_id(task_id.clone(), async {
+            with_file_state_agent_id(task_id.clone(), async {
                 async {
                     Box::pin(run_typed_mode(
                         definition,
@@ -333,7 +343,7 @@ pub(crate) async fn run_subagent_direct(
                     .await
                 }
                 .await
-            }))
+            })
             .await
         }))
         .await;
