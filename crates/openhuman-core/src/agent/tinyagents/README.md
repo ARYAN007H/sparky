@@ -10,7 +10,7 @@ The adapter seam between OpenHuman and the vendored [`tinyagents`](../../../../.
 - Route workloads to model tiers and record the resolved provider/model for audit ([`routes.rs`](./routes.rs), canonical TinyInference response metadata).
 - Let TinyAgents stop repetitive visible model streams in its agent loop; the OpenHuman session driver turns `GenerationStalled` into a bounded partial containing completed tool evidence.
 - Make turns durable and replayable: a JSONL event journal plus status store ([`journal.rs`](./journal.rs)), a startup sweep for orphaned runs ([`reaper.rs`](./reaper.rs)), and a read-only RPC surface over both (`replay/`).
-- Provide graph-layer helpers for multi-stage sub-agent orchestration (`orchestration.rs`, `delegation.rs`) and expose graph structure for debugging ([`topology.rs`](./topology.rs)).
+- Provide graph-layer helpers for multi-stage sub-agent orchestration (`orchestration.rs`, `delegation.rs`) (graph structure export lives in `tinyagents_orchestration::topology`).
 - Pick which tools a turn even considers: `discovery/` holds the process-wide tool-search ranker slot (see [Tool search](#tool-search) below).
 - Host adapters (`host/`) for the crate's ten host-capability traits. Not yet wired into the live turn path; see [Host adapters](#host-adapters) below.
 
@@ -37,8 +37,7 @@ The adapter seam between OpenHuman and the vendored [`tinyagents`](../../../../.
 | `model.rs` | Helpers and wrappers over native crate `ChatModel` values: message/response translation, usage merging, stream-delta forwarding, `MaxTokensModel`, `ProfileOverrideModel`. |
 | [`tools.rs`](./tools.rs) | `CanonicalSharedToolAdapter`: resolves an OpenHuman shared tool registry and forwards the canonical `tinytools::Tool` contract; `EarlyExitHook` pauses successful `ask_user_clarification`-style calls. |
 | `routes.rs` | the workload router projected from the upstream `WORKLOAD_ROUTES` table, `RequiredCapabilitiesMiddleware`, `FallbackObserverMiddleware`, `UsageCarryMiddleware`, and the per-model fallback policy. |
-| `topology.rs` | `all_graph_topologies`: behaviour-free `GraphTopology` exports of every custom OpenHuman graph for debug/inspection. |
-| [`observability.rs`](./observability.rs) + `observability/` | `event_bridge.rs`: `OpenhumanEventBridge`, translating crate `AgentEvent`s into `AgentProgress` and feeding per-call usage into `crate::platform::cost`. `event_projection.rs`: its `EventListener` impl. `bridge_types.rs`: `SubagentScope` and the shared bridge carries (the cap pauser itself is `tinyagents_harness::events::CapPauser`). `graph_tracing.rs`: `GraphTracingSink`. |
+| [`observability.rs`](./observability.rs) + `observability/` | `event_bridge.rs`: `OpenhumanEventBridge`, translating crate `AgentEvent`s into `AgentProgress` and feeding per-call usage into `crate::platform::cost`. `event_projection.rs`: its `EventListener` impl. `bridge_types.rs`: `SubagentScope` and the shared bridge carries (the cap pauser itself is `tinyagents_harness::events::CapPauser`). |
 | [`host/steering.rs`](./host/steering.rs) | OpenHuman's steering allowlist and the shared `SteeringRegistry` for detached sub-agents. Task primitives are imported directly from `tinyagents_graph::orchestration`. |
 | [`host/delegation.rs`](./host/delegation.rs) | Explicit tracing-bound execution helpers over `tinyagents_graph::delegation`'s plan, execute, review, finalize graph. |
 | [`payload_summarizer.rs`](./payload_summarizer.rs) | `PayloadSummarizer` trait, `SummarizeOutcome`/`UnavailableReason`, and the default `SubagentPayloadSummarizer` that compresses oversized tool results through the `summarizer` sub-agent instead of hard-truncating them. |

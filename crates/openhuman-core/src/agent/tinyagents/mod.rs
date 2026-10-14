@@ -59,7 +59,6 @@ mod steering_forwarder;
 pub(crate) mod stop_hooks;
 pub mod todos;
 pub(crate) mod tools;
-mod topology;
 mod turn_models;
 mod turn_outcome;
 mod turn_policy;
@@ -81,7 +80,6 @@ pub(crate) use middleware::{
 };
 pub(crate) use observability::SubagentScope;
 pub(crate) use reasoning::{apply_requested_effort, parse_reasoning_effort};
-pub(crate) use topology::all_graph_topologies;
 pub use turn_models::TurnModelSource;
 pub(crate) use turn_models::TurnModels;
 pub(crate) use turn_outcome::TinyagentsTurnOutcome;
@@ -107,6 +105,9 @@ mod nested_calls_tests;
 #[cfg(test)]
 #[path = "prompt_cache_golden_tests.rs"]
 mod prompt_cache_golden_tests;
+#[cfg(test)]
+#[path = "topology_collision_tests.rs"]
+mod topology_collision_tests;
 #[cfg(test)]
 #[path = "tinyagents_tests.rs"]
 mod tests;

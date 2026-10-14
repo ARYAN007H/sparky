@@ -204,7 +204,7 @@ pub(super) fn register_turn_tools_and_agents(
         }
     }
     let tool_count = registered.len();
-    for report in crate::agent::tinyagents::topology::all_graph_topologies() {
+    for report in tinyagents_orchestration::topology::all_graph_topologies() {
         let _ = capability_registry.register_descriptor(ComponentKind::Graph, report.name);
     }
 

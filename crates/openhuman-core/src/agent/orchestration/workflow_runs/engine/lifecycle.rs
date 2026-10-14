@@ -291,7 +291,7 @@ pub(crate) async fn run_engine_loop(
         )),
     )
     .with_event_sink(Arc::new(
-        crate::agent::tinyagents::observability::GraphTracingSink::new(format!(
+        tinyagents_graph::GraphTracingSink::new(format!(
             "workflow:{run_id}"
         )),
     ));
