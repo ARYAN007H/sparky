@@ -439,10 +439,9 @@ impl OpenHumanTurnPrelude {
             }
         }
         // Build the roster from this turn's *effective* visible tool set
-        // (snapshotted under the tool-surface lock, then released) rather
-        // than the parent definition's static scope alone: a hide or named
-        // restriction can narrow what this turn can actually call below the
-        // definition's baseline, and the roster must not advertise a fleet
+        // (snapshotted under the tool-surface lock, then released), not the
+        // definition's static scope: a hide or named restriction can narrow
+        // what this turn can call, and the roster must not advertise a fleet
         // control the turn cannot invoke.
         let turn_fleet = {
             let visible = self
