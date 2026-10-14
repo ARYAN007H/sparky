@@ -3,12 +3,12 @@
 use super::*;
 
 impl OpenHumanTurnPrelude {
-    /// `inherited_workspace` is the workspace descriptor of the parent this
-    /// turn itself runs under (`run_context.parent`), when the turn is a
-    /// sub-agent's; it takes precedence over the session's own descriptor.
+    /// `inherited` is the parent this turn itself runs under
+    /// (`run_context.parent`), when the turn is a sub-agent's; its workspace
+    /// descriptor takes precedence over the session's own.
     pub(in crate::agent::session_host) fn parent_context(
         &self,
-        inherited_workspace: Option<tinytools::WorkspaceDescriptor>,
+        inherited: Option<&crate::agent::harness::ParentExecutionContext>,
     ) -> crate::agent::harness::ParentExecutionContext {
         let surface = self
             .tool_surface
