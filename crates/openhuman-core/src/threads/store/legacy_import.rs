@@ -100,7 +100,8 @@ fn fold_threads(root: &Path) -> Result<Vec<CreateConversationThread>> {
             } => match live.get_mut(&thread_id) {
                 Some(existing) => {
                     existing.title = title;
-                    existing.parent_thread_id = parent_thread_id.or(existing.parent_thread_id.take());
+                    existing.parent_thread_id =
+                        parent_thread_id.or(existing.parent_thread_id.take());
                     existing.labels = labels.or(existing.labels.take());
                     existing.personality_id = personality_id.or(existing.personality_id.take());
                     existing.working_dir = match working_dir {
@@ -158,12 +159,13 @@ pub(super) fn import_once(
         let threads = fold_threads(&root)?;
         let mut messages = Vec::with_capacity(threads.len());
         for thread in &threads {
-            messages.push(read_jsonl::<ThreadMessage>(&messages_path(&root, &thread.id))?);
+            messages.push(read_jsonl::<ThreadMessage>(&messages_path(
+                &root, &thread.id,
+            ))?);
         }
         let store = store.clone();
-        let (threads_n, messages_n) = crate::storage::block_on_anyhow(async move {
-            copy(&store, threads, messages).await
-        })?;
+        let (threads_n, messages_n) =
+            crate::storage::block_on_anyhow(async move { copy(&store, threads, messages).await })?;
         repo.run(|docs| async move {
             match docs
                 .put(

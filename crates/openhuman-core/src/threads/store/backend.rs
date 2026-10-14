@@ -18,11 +18,12 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use tinyagents_session::threads::{
-    ConversationError, ConversationPersistence, ConversationResult, ConversationThread, CreateConversationThread,
-    CrossThreadHit, DriverConversationStore, ThreadMessage, ThreadMessagePatch,
-};
 pub use tinyagents_session::threads::ConversationPurgeStats;
+use tinyagents_session::threads::{
+    ConversationError, ConversationPersistence, ConversationResult, ConversationThread,
+    CreateConversationThread, CrossThreadHit, DriverConversationStore, ThreadMessage,
+    ThreadMessagePatch,
+};
 
 use crate::storage::documents::Repo;
 use crate::storage::{self, Scope, StorageError};
@@ -160,7 +161,11 @@ impl ConversationStore {
 
     /// Every live thread, newest first.
     pub fn list_threads(&self) -> Result<Vec<ConversationThread>, String> {
-        self.run("list_threads", NONE, |s| async move { s.list_threads().await })
+        self.run(
+            "list_threads",
+            NONE,
+            |s| async move { s.list_threads().await },
+        )
     }
 
     /// A thread's messages in append order; empty for an unknown thread.
@@ -208,7 +213,11 @@ impl ConversationStore {
         title: &str,
         updated_at: &str,
     ) -> Result<ConversationThread, String> {
-        let (id, title, at) = (thread_id.to_string(), title.to_string(), updated_at.to_string());
+        let (id, title, at) = (
+            thread_id.to_string(),
+            title.to_string(),
+            updated_at.to_string(),
+        );
         self.run("update_thread_title", thread(thread_id), |s| async move {
             s.update_thread_title(&id, &title, &at).await
         })
@@ -222,9 +231,11 @@ impl ConversationStore {
         updated_at: &str,
     ) -> Result<ConversationThread, String> {
         let (id, at) = (thread_id.to_string(), updated_at.to_string());
-        self.run("update_thread_working_dir", thread(thread_id), |s| async move {
-            s.update_thread_working_dir(&id, working_dir, &at).await
-        })
+        self.run(
+            "update_thread_working_dir",
+            thread(thread_id),
+            |s| async move { s.update_thread_working_dir(&id, working_dir, &at).await },
+        )
     }
 
     /// Replaces a thread's labels.
@@ -248,9 +259,11 @@ impl ConversationStore {
         patch: ThreadMessagePatch,
     ) -> Result<ThreadMessage, String> {
         let (id, mid) = (thread_id.to_string(), message_id.to_string());
-        self.run("update_message", message(thread_id, message_id), |s| async move {
-            s.update_message(&id, &mid, patch).await
-        })
+        self.run(
+            "update_message",
+            message(thread_id, message_id),
+            |s| async move { s.update_message(&id, &mid, patch).await },
+        )
     }
 
     /// Removes a message and everything after it; `None` for an unknown id.
@@ -260,9 +273,11 @@ impl ConversationStore {
         message_id: &str,
     ) -> Result<Option<usize>, String> {
         let (id, mid) = (thread_id.to_string(), message_id.to_string());
-        self.run("delete_messages_from", message(thread_id, message_id), |s| async move {
-            s.delete_messages_from(&id, &mid).await
-        })
+        self.run(
+            "delete_messages_from",
+            message(thread_id, message_id),
+            |s| async move { s.delete_messages_from(&id, &mid).await },
+        )
     }
 
     /// Soft-deletes a thread; whether it existed.
@@ -275,7 +290,11 @@ impl ConversationStore {
 
     /// Removes every thread.
     pub fn purge_threads(&self) -> Result<ConversationPurgeStats, String> {
-        self.run("purge_threads", NONE, |s| async move { s.purge_threads().await })
+        self.run(
+            "purge_threads",
+            NONE,
+            |s| async move { s.purge_threads().await },
+        )
     }
 }
 

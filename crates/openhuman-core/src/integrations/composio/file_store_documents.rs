@@ -148,7 +148,12 @@ impl Docs {
                 Err(error) => return Err(error),
             };
             match docs
-                .put(IMPORTED, &id, json!({ "imported": true }), Precondition::Absent)
+                .put(
+                    IMPORTED,
+                    &id,
+                    json!({ "imported": true }),
+                    Precondition::Absent,
+                )
                 .await
             {
                 Ok(_) => {}

@@ -30,10 +30,13 @@ async fn import_legacy(
     name: &'static str,
 ) -> Result<(), String> {
     let marker_docs = docs.clone();
-    let done = crate::core::runtime::spawn_blocking_scoped(move || marker_docs.legacy_imported(name))
-        .await
-        .map_err(|error| format!("[composio:store] checking legacy {name} failed: {error}"))?
-        .map_err(|error| format!("[composio:store] checking legacy {name} failed: {error:#}"))?;
+    let done =
+        crate::core::runtime::spawn_blocking_scoped(move || marker_docs.legacy_imported(name))
+            .await
+            .map_err(|error| format!("[composio:store] checking legacy {name} failed: {error}"))?
+            .map_err(|error| {
+                format!("[composio:store] checking legacy {name} failed: {error:#}")
+            })?;
     if done {
         return Ok(());
     }
