@@ -1,3 +1,5 @@
+use tinyagents_harness::middleware::wrap_harness_instruction;
+
 /// Instruction appended (as a synthetic user turn) to the provider
 /// messages when a turn hits the tool-call iteration cap. Asks the model
 /// to wrap up with a resumable checkpoint instead of letting the turn die.
