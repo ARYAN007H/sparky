@@ -216,5 +216,8 @@ async fn linked_tinywallet_accepts_confidential_delivery() {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     }
     broker_task.abort();
-    assert!(delivered, "linked tinywallet must accept confidential delivery");
+    assert!(
+        delivered,
+        "linked tinywallet must accept confidential delivery"
+    );
 }
