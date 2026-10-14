@@ -2,13 +2,17 @@ use super::*;
 
 #[tokio::test]
 async fn per_turn_tool_limit_reaches_the_execution_policy() {
-    crate::agent::stop_hooks::with_tool_call_limit(Some(2), async {
-        let policy = run_policy_for(10, false);
-        assert_eq!(policy.limits.max_tool_calls, 2);
-        assert_eq!(policy.limits.max_model_calls, 10);
-    })
-    .await;
+    let policy = run_policy_for_provider(10, false, false, Some(2));
+    assert_eq!(policy.limits.max_tool_calls, 2);
+    assert_eq!(policy.limits.max_model_calls, 10);
     assert_eq!(run_policy_for(10, false).limits.max_tool_calls, 80);
+    // A host cap can only narrow the product default, never widen it.
+    assert_eq!(
+        run_policy_for_provider(10, false, false, Some(1_000))
+            .limits
+            .max_tool_calls,
+        80
+    );
 }
 
 /// #6953: the model reads how long each tool call took, so it can budget the
@@ -20,8 +24,8 @@ fn tool_results_carry_their_duration() {
 
 #[test]
 fn local_providers_get_longer_ceilings_than_hosted_ones() {
-    let hosted = run_policy_for_provider(10, false, false);
-    let local = run_policy_for_provider(10, false, true);
+    let hosted = run_policy_for_provider(10, false, false, None);
+    let local = run_policy_for_provider(10, false, true, None);
     // Env overrides win over both defaults, so compare only without one.
     if std::env::var_os("OPENHUMAN_MODEL_CALL_TIMEOUT_SECS").is_none()
         && std::env::var_os("OPENHUMAN_AGENT_TURN_TIMEOUT_SECS").is_none()
@@ -97,7 +101,7 @@ fn hosted_openai_keeps_the_hosted_ceilings_in_the_policy() {
         return;
     }
     let local = provider_is_self_hosted("openai", Some("https://api.openai.com/v1"));
-    let policy = run_policy_for_provider(10, false, local);
+    let policy = run_policy_for_provider(10, false, local, None);
     assert_eq!(policy.limits.max_model_call_ms, Some(900_000));
     assert_eq!(policy.limits.max_wall_clock_ms, Some(3_600_000));
 }
