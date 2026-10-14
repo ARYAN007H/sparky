@@ -149,7 +149,7 @@ pub(crate) struct SessionTurnSidecar {
     /// How the turn was stopped early, if it was (breaker, wind-down,
     /// iteration cap). The driver classifies it; `after_commit` carries it on
     /// `TurnCompleted` so the trace shows a stopped turn at `WARNING`.
-    pub stop: Option<crate::agent::turn_stop::TurnStop>,
+    pub stop: Option<tinyagents_harness::turn_stop::TurnStop>,
 }
 
 /// Immutable inputs to the host's pre-dispatch policy.

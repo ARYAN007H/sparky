@@ -14,7 +14,7 @@ pub fn stop_fallback_class(note: &str) -> &'static str {
 
 /// [`TurnStop::breaker`] with the OpenHuman stop-reason fallback.
 pub fn breaker_stop(note: &str) -> TurnStop {
-    TurnStop::breaker(note, stop_fallback_class)
+    crate::agent::turn_projection::breaker_stop(note, stop_fallback_class)
 }
 
 /// [`TurnStop::classify`] with the OpenHuman stop-reason fallback.
@@ -28,7 +28,7 @@ pub fn classify_stop(
 
 /// [`TurnStop::from_incomplete_reason`] with the OpenHuman stop-reason fallback.
 pub fn stop_from_incomplete(reason: &str) -> TurnStop {
-    TurnStop::from_incomplete_reason(reason, stop_fallback_class)
+    crate::agent::turn_projection::stop_from_incomplete(reason, stop_fallback_class)
 }
 
 #[cfg(test)]

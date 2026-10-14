@@ -468,7 +468,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             observed.wrap_up_injected = outcome.wrap_up_injected;
             // How the harness stopped the turn, if it did. The wind-down
             // middleware marked the sidecar during the run.
-            observed.stop = crate::agent::turn_stop::TurnStop::classify(
+            observed.stop = crate::agent::turn_projection::classify_stop(
                 outcome.breaker_halt.as_deref(),
                 observed.wind_down,
                 outcome.hit_cap,
