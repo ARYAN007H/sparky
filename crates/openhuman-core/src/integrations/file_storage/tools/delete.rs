@@ -96,7 +96,7 @@ impl StorageDeleteFileTool {
         tracing::debug!("[file_storage] deleting file_id={file_id}");
         match self
             .client
-            .delete::<DeleteResponse>(&file_path(&file_id, ""))
+            .delete::<DeleteResponse>(approval, &file_path(&file_id, ""))
             .await
         {
             Ok(resp) if resp.deleted => Ok(ToolResult::success_with_markdown(

@@ -174,7 +174,7 @@ impl GooglePlacesSearchTool {
 
         match self
             .client
-            .post::<SearchResponse>("/agent-integrations/google-places/search", &body)
+            .post::<SearchResponse>(approval, "/agent-integrations/google-places/search", &body)
             .await
         {
             Ok(resp) => {
@@ -289,7 +289,7 @@ impl GooglePlacesDetailsTool {
 
         match self
             .client
-            .post::<DetailsResponse>("/agent-integrations/google-places/details", &body)
+            .post::<DetailsResponse>(approval, "/agent-integrations/google-places/details", &body)
             .await
         {
             Ok(resp) => {

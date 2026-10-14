@@ -103,7 +103,7 @@ impl StorageGetLinkTool {
         tracing::debug!("[file_storage] generating link for file_id={file_id}");
         match self
             .client
-            .post::<LinkResponse>(&file_path(&file_id, "/link"), &body)
+            .post::<LinkResponse>(approval, &file_path(&file_id, "/link"), &body)
             .await
         {
             Ok(resp) => Ok(ToolResult::success_with_markdown(

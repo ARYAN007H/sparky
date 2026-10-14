@@ -209,7 +209,7 @@ impl StockQuoteTool {
         tracing::info!("[stock_quote] symbol={}", symbol);
 
         let body = json!({ "symbol": symbol });
-        match self.client.post::<QuoteResponse>(PATH_QUOTE, &body).await {
+        match self.client.post::<QuoteResponse>(approval, PATH_QUOTE, &body).await {
             Ok(resp) => {
                 let q = &resp.quote;
                 let mut out = format!(
@@ -326,7 +326,7 @@ impl StockExchangeRateTool {
         let body = json!({ "fromCurrency": from, "toCurrency": to });
         match self
             .client
-            .post::<ExchangeRateResponse>(PATH_EXCHANGE_RATE, &body)
+            .post::<ExchangeRateResponse>(approval, PATH_EXCHANGE_RATE, &body)
             .await
         {
             Ok(resp) => {
@@ -442,7 +442,7 @@ impl StockOptionsTool {
         let body = json!({ "symbol": symbol, "requireGreeks": require_greeks });
         match self
             .client
-            .post::<OptionsResponse>(PATH_OPTIONS, &body)
+            .post::<OptionsResponse>(approval, PATH_OPTIONS, &body)
             .await
         {
             Ok(resp) => {
@@ -570,7 +570,7 @@ impl StockCryptoSeriesTool {
 
         match self
             .client
-            .post::<CryptoSeriesResponse>(PATH_CRYPTO_SERIES, &body)
+            .post::<CryptoSeriesResponse>(approval, PATH_CRYPTO_SERIES, &body)
             .await
         {
             Ok(resp) => {
@@ -698,7 +698,7 @@ impl StockCommodityTool {
 
         match self
             .client
-            .post::<CommodityResponse>(PATH_COMMODITY, &body)
+            .post::<CommodityResponse>(approval, PATH_COMMODITY, &body)
             .await
         {
             Ok(resp) => {
