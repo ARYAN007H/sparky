@@ -149,3 +149,32 @@ fn threads_round_trip_through_the_backend_store() {
     assert!(store.delete_thread("t", "2026-01-02T00:00:00Z").unwrap());
     assert!(store.list_threads().unwrap().is_empty());
 }
+
+#[test]
+fn legacy_import_marker_is_per_source_workspace() {
+    let a = crate::storage::source_key(Path::new("/ws/a"));
+    let b = crate::storage::source_key(Path::new("/ws/b"));
+    assert_ne!(a, b);
+    assert_eq!(a, crate::storage::source_key(Path::new("/ws/a")));
+}
+
+#[cfg(unix)]
+#[test]
+fn an_unreadable_legacy_log_is_an_error_not_an_empty_store() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().unwrap();
+    let root = backend::legacy_root(dir.path());
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(root.join("threads.jsonl"), "").unwrap();
+    std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o000)).unwrap();
+    // Root bypasses permission bits; only assert when the stat truly fails.
+    let blocked = std::fs::metadata(root.join("threads.jsonl")).is_err();
+    let result = ConversationStore::new(dir.path().to_path_buf()).list_threads();
+    std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o755)).unwrap();
+    if blocked {
+        assert!(
+            result.is_err(),
+            "a stat failure must surface so a retry can import"
+        );
+    }
+}

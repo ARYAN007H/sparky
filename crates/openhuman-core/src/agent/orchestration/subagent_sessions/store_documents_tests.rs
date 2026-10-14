@@ -169,3 +169,21 @@ fn a_legacy_session_file_is_imported_once_and_left_byte_identical() {
     assert_eq!(again.len(), 1);
     assert_eq!(again[0].subagent_session_id, "legacy-1");
 }
+
+#[test]
+fn workspaces_sharing_a_backend_each_import_their_own_legacy_file() {
+    let docs = docs_in(&MemoryStorage::new(), "local");
+    let (one, two) = (
+        std::path::Path::new("/ws/one"),
+        std::path::Path::new("/ws/two"),
+    );
+    assert!(!docs.legacy_imported(one).unwrap());
+    docs.import_legacy(one, &[session("from-one")]).unwrap();
+    assert!(docs.legacy_imported(one).unwrap());
+    assert!(
+        !docs.legacy_imported(two).unwrap(),
+        "importing one workspace must not suppress another's import"
+    );
+    docs.import_legacy(two, &[session("from-two")]).unwrap();
+    assert_eq!(docs.load().unwrap().len(), 2);
+}

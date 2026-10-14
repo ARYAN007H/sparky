@@ -20,7 +20,10 @@ impl SubagentSessionStore {
     /// so it stays byte-identical. A missing file is the common case and a
     /// no-op.
     fn import_legacy(&self, docs: &super::store_documents::Docs) -> Result<(), String> {
-        if docs.legacy_imported(&self.workspace_dir).map_err(|err| format!("{err:#}"))? {
+        if docs
+            .legacy_imported(&self.workspace_dir)
+            .map_err(|err| format!("{err:#}"))?
+        {
             return Ok(());
         }
         let path = self.legacy_path();
