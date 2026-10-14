@@ -304,36 +304,34 @@ async fn handle_agent_run_turn(req: AgentTurnRequest) -> Result<AgentTurnRespons
     let graph_origin = origin.clone();
     let outcome = turn_origin::with_origin(
         origin,
-        {
-            with_file_state_agent_id(file_state_id, async {
-                // Channel/CLI turns run through the tinyagents harness
-                // (issue #4249); the legacy `run_tool_call_loop` is removed.
-                // `on_progress` mirrors the harness event stream (tool
-                // timeline, text deltas, cost footer) — production channel
-                // dispatch always supplies it and now expects it live.
-                // `on_delta` (raw Sender<String>) is superseded by
-                // `on_progress` text deltas, so it's intentionally unused.
-                let _ = (&provider_name, silent, &channel_name, on_delta);
-                run_channel_turn_via_graph(
-                    turn_model_source.clone(),
-                    &mut history,
-                    tools_registry.clone(),
-                    extra_tools,
-                    visible_tool_names.as_ref(),
-                    &model,
-                    temperature,
-                    max_tool_iterations,
-                    multimodal.clone(),
-                    multimodal_files.clone(),
-                    on_progress,
-                    Some(graph_origin),
-                    sandbox_mode,
-                    approval,
-                    memory_identity,
-                )
-                .await
-            })
-        },
+        with_file_state_agent_id(file_state_id, async {
+            // Channel/CLI turns run through the tinyagents harness
+            // (issue #4249); the legacy `run_tool_call_loop` is removed.
+            // `on_progress` mirrors the harness event stream (tool
+            // timeline, text deltas, cost footer) — production channel
+            // dispatch always supplies it and now expects it live.
+            // `on_delta` (raw Sender<String>) is superseded by
+            // `on_progress` text deltas, so it's intentionally unused.
+            let _ = (&provider_name, silent, &channel_name, on_delta);
+            run_channel_turn_via_graph(
+                turn_model_source.clone(),
+                &mut history,
+                tools_registry.clone(),
+                extra_tools,
+                visible_tool_names.as_ref(),
+                &model,
+                temperature,
+                max_tool_iterations,
+                multimodal.clone(),
+                multimodal_files.clone(),
+                on_progress,
+                Some(graph_origin),
+                sandbox_mode,
+                approval,
+                memory_identity,
+            )
+            .await
+        }),
     )
     .await
     .map_err(|e| e.to_string())?;
