@@ -11,7 +11,7 @@
 //! `<workspace>/artifacts/tool-results` on read; that directory is a cache the
 //! sweep below keeps bounded.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 use crate::agent::harness::tool_result_artifacts::{new_tool_result_store, HostArtifactStore};
