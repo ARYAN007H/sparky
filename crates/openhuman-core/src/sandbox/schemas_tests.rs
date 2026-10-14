@@ -209,15 +209,16 @@ async fn every_sandbox_method_answers_component_disabled_when_sandbox_is_off() {
     let mut set = crate::core::runtime::ComponentSet::all();
     set.sandbox = false;
     let ctx = crate::core::runtime::context::CoreContext::for_test_with_components(set);
-    let handlers: [fn(Map<String, Value>) -> ControllerFuture; 4] = [
+    let handlers: [fn(DispatchCtx, Map<String, Value>) -> ControllerFuture; 4] = [
         handle_status,
         handle_resolve_policy,
         handle_cleanup_orphans,
         handle_validate_policy,
     ];
+    let dispatch = DispatchCtx::new(ctx.clone());
     crate::core::runtime::context::CoreContext::scope(ctx, async {
         for handler in handlers {
-            let err = handler(Map::new()).await.unwrap_err();
+            let err = handler(dispatch.clone(), Map::new()).await.unwrap_err();
             let decoded = crate::core::StructuredRpcError::decode(&err).expect("typed error");
             assert_eq!(decoded.message, "COMPONENT_DISABLED:sandbox");
         }
