@@ -360,6 +360,7 @@ async fn a_loaded_module_cannot_name_or_reach_another_scope() {
     let read = rig
         .call("Documents", "Get", get("mcp_servers", "victim"))
         .await;
+    assert!(read["ok"].is_null(), "{read}");
     assert!(!read.to_string().contains("OTHER-SCOPE-SECRET"), "{read}");
     // A scope smuggled into the request is not a selector the wire knows.
     for field in ["scope", "agent", "module", "profile"] {

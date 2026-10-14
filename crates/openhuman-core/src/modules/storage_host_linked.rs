@@ -34,6 +34,13 @@ static PENDING: Mutex<Option<(Arc<StorageHost>, tokio::runtime::Handle)>> = Mute
 #[cfg(test)]
 pub(super) static TEST_TURN: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
+/// Held by [`attach`] from publishing `PENDING` until the module serves, so two
+/// concurrent attachments (any test that starts a runtime, not only the ones
+/// taking `TEST_TURN`) cannot overwrite each other's slot before `setup`
+/// reads it.
+#[cfg(test)]
+static ATTACH_GUARD: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 /// How long [`attach`] waits for the module to claim the interface name.
 const READY_DEADLINE: Duration = Duration::from_secs(5);
 
@@ -69,6 +76,8 @@ pub(super) async fn attach(
     connection: &tinybus::Connection,
     host: Arc<StorageHost>,
 ) -> tinybus::Result<()> {
+    #[cfg(test)]
+    let _attaching = ATTACH_GUARD.lock().await;
     *PENDING.lock().unwrap_or_else(|poison| poison.into_inner()) =
         Some((host, tokio::runtime::Handle::current()));
     modules.attach_linked_with_config(export::linked_module()?, serde_json::json!({}))?;
