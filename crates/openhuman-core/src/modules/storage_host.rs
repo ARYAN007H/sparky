@@ -48,8 +48,7 @@ use tinybus::BusName;
 use tinystoragedrivers::secrets::{DocumentSecrets, KeyProvider};
 use tinystoragedrivers::BlobReader;
 use tinystoragedrivers_bus::{
-    BlobKeyRequest, BlobStreamHead, PutBlobStreamRequest, StorageFailure, StorageKind,
-    WatchChanged,
+    BlobKeyRequest, BlobStreamHead, PutBlobStreamRequest, StorageFailure, StorageKind, WatchChanged,
 };
 use tinystoragedrivers_busproxy::{HostFailure, StorageCall, StorageEndpoint};
 use tokio::sync::broadcast;
@@ -208,7 +207,6 @@ pub(crate) struct StorageHost {
     relays: std::sync::Mutex<HashMap<BusName, endpoint::Relay>>,
 }
 
-
 impl StorageHost {
     pub(crate) fn new(
         directory: Arc<dyn CallerDirectory>,
@@ -362,8 +360,11 @@ impl StorageHost {
         head: PutBlobStreamRequest,
         body: BlobReader,
     ) -> Result<Value, HostError> {
-        let request = serde_json::to_value(&head).map_err(|_| HostError::Denied("malformed-request"))?;
-        let admitted = self.admit(Object::Blobs, "PutStream", &request, sender).await?;
+        let request =
+            serde_json::to_value(&head).map_err(|_| HostError::Denied("malformed-request"))?;
+        let admitted = self
+            .admit(Object::Blobs, "PutStream", &request, sender)
+            .await?;
         let Plan::Forward { target, write, .. } = &admitted.plan else {
             return Err(HostError::Denied("malformed-request"));
         };
@@ -390,8 +391,11 @@ impl StorageHost {
         sender: Option<&BusName>,
         request: BlobKeyRequest,
     ) -> Result<Option<(BlobStreamHead, BlobReader)>, HostError> {
-        let wire = serde_json::to_value(&request).map_err(|_| HostError::Denied("malformed-request"))?;
-        let admitted = self.admit(Object::Blobs, "GetStream", &wire, sender).await?;
+        let wire =
+            serde_json::to_value(&request).map_err(|_| HostError::Denied("malformed-request"))?;
+        let admitted = self
+            .admit(Object::Blobs, "GetStream", &wire, sender)
+            .await?;
         let Plan::Forward { target, .. } = &admitted.plan else {
             return Err(HostError::Denied("malformed-request"));
         };
