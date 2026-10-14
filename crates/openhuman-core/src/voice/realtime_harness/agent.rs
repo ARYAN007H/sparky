@@ -83,7 +83,7 @@ pub(super) async fn run_voice_turn(ctx: &DispatchCtx,
     // is forwarded to the relay socket by `forward_reply_deltas`.
     agent.set_on_progress(Some(progress_tx));
 
-    let outcome = run_single_with_timeout(&mut agent, correlation_id, prompt).await;
+    let outcome = run_single_with_timeout(&ctx, &mut agent, correlation_id, prompt).await;
 
     // Detach the sink so the forwarder's channel closes the moment the turn ends,
     // deterministically rather than waiting on `agent`'s drop.

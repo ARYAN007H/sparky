@@ -38,7 +38,7 @@ use super::events;
 /// 3. If the action is `React` or `Escalate`, dispatching the appropriate
 ///    sub-agent (`trigger_reactor` or `orchestrator`).
 /// 4. Publishing `TriggerEscalated` or `TriggerEscalationFailed` events.
-pub async fn apply_decision(run: TriageRun, envelope: &TriggerEnvelope) -> anyhow::Result<()> {
+pub async fn apply_decision(ctx: &DispatchCtx, run: TriageRun, envelope: &TriggerEnvelope) -> anyhow::Result<()> {
     // Always publish `TriggerEvaluated` — it's the single source of
     // truth for dashboards, counts every trigger regardless of action.
     events::publish_evaluated(
@@ -161,7 +161,7 @@ pub async fn apply_decision(run: TriageRun, envelope: &TriggerEnvelope) -> anyho
                 }
             }
 
-            let dispatch_result = dispatch_target_agent(target, prompt).await;
+            let dispatch_result = dispatch_target_agent(&ctx, target, prompt).await;
             // Record terminal status on the approval audit row
             // (#2135). Best-effort: write errors are logged inside
             // record_execution and never propagate to the caller.

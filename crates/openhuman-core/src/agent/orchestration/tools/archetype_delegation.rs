@@ -118,7 +118,7 @@ impl Tool for ArchetypeDelegationTool {
         run_context.thread_id = tool_context
             .and_then(ToolRunContext::thread_id)
             .map(ToOwned::to_owned);
-        execute_archetype_delegation(
+        execute_archetype_delegation(&DispatchCtx::ambient(), 
             &self.agent_id.0,
             &self.tool_name,
             args,
@@ -130,14 +130,14 @@ impl Tool for ArchetypeDelegationTool {
 }
 
 /// Execute an archetype hand-off with an explicit child run carrier.
-pub(crate) async fn execute_archetype_delegation(
+pub(crate) async fn execute_archetype_delegation(ctx: &DispatchCtx, 
     agent_id: &str,
     tool_name: &str,
     args: serde_json::Value,
     tool_context: Option<&dyn ToolRunContext>,
     run_context: crate::agent::tinyagents::host::OpenHumanRunContext,
 ) -> anyhow::Result<ToolResult> {
-    execute_archetype_delegation_with_live_parent(
+    execute_archetype_delegation_with_live_parent(&ctx, 
         agent_id,
         tool_name,
         args,
@@ -216,7 +216,7 @@ pub(crate) async fn execute_archetype_delegation_with_live_parent(ctx: &Dispatch
         super::dispatch::DispatchMode::PreferAsync
     };
 
-    super::dispatch::dispatch_subagent_with_live_parent(
+    super::dispatch::dispatch_subagent_with_live_parent(&ctx, 
         agent_id,
         tool_name,
         &prompt,

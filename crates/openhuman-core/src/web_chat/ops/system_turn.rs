@@ -85,7 +85,7 @@ pub async fn run_system_turn_on_thread(ctx: &DispatchCtx,
     agent.set_run_queue(Some(Arc::new(RunQueue::new())));
     agent.set_thread_id(Some(thread_id));
 
-    let result = with_origin(origin, agent.run_single(prompt))
+    let result = with_origin(origin, agent.run_single(&ctx, prompt))
         .await
         .map_err(|error| format!("{error:#}"));
 

@@ -2,6 +2,7 @@
 //! and the ping-deadline diagnostics. Sibling of `ws_loop_reconnect_tests.rs`,
 //! which sits at the layout gate's line limit.
 
+use crate::core::runtime::DispatchCtx;
 use super::*;
 
 use crate::platform::socket::types::ConnectionStatus;
@@ -87,7 +88,7 @@ async fn ws_loop_reports_reconnecting_between_attempts() {
 
     let loop_shared = Arc::clone(&shared);
     let handle = tokio::spawn(async move {
-        ws_loop(
+        ws_loop(&DispatchCtx::process_default(), 
             http_base_for(addr),
             static_token_provider("backoff-token".to_string()),
             loop_shared,
@@ -156,7 +157,7 @@ async fn ws_loop_marks_a_terminal_stop_as_failure() {
 
     let loop_shared = Arc::clone(&shared);
     let handle = tokio::spawn(async move {
-        ws_loop(
+        ws_loop(&DispatchCtx::process_default(), 
             http_base_for(addr),
             static_token_provider("dead-token".to_string()),
             loop_shared,
@@ -256,7 +257,7 @@ async fn ws_loop_reconnects_after_ping_deadline_on_a_silent_server() {
 
     let loop_shared = Arc::clone(&shared);
     let handle = tokio::spawn(async move {
-        ws_loop(
+        ws_loop(&DispatchCtx::process_default(), 
             http_base_for(addr),
             static_token_provider("deadline-token".to_string()),
             loop_shared,

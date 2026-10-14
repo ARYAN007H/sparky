@@ -8,6 +8,7 @@
 //! local provider) is returned `retryable: false`, and the final failure is
 //! reported once through [`JobExecutor::failed`].
 
+use crate::core::runtime::DispatchCtx;
 use super::agent_run::run_agent_job_for_run;
 use super::failure_classification::{
     is_api_key_unset_failure, is_budget_exhausted_failure, is_insufficient_credits_failure,
@@ -98,7 +99,7 @@ impl HostExecutor {
         runs.entry(run_id.to_string()).or_default().halt = halt;
     }
 
-    async fn attempt(&self, job: &CronJob, run_id: &str) -> Attempt {
+    async fn attempt(&self, ctx: &DispatchCtx, job: &CronJob, run_id: &str) -> Attempt {
         let config = self.binding.config();
         if self.begin(run_id) {
             warn_if_high_frequency_agent_job(job);
@@ -124,7 +125,7 @@ impl HostExecutor {
                     run_job_command(&config, self.binding.security.as_ref(), job).await;
                 (success, output, None)
             }
-            JobType::Agent => run_agent_job_for_run(&config, job, run_id).await,
+            JobType::Agent => run_agent_job_for_run(&ctx, &config, job, run_id).await,
             JobType::Flow => (
                 false,
                 "flow jobs run through the trigger sink, not the executor".to_string(),
@@ -211,7 +212,7 @@ impl HostExecutor {
 #[async_trait]
 impl JobExecutor for HostExecutor {
     async fn execute(&self, job: &CronJob, run_id: &str) -> Result<Attempt> {
-        Ok(self.binding.within(self.attempt(job, run_id)).await)
+        Ok(self.binding.within(self.attempt(&DispatchCtx::ambient(), job, run_id)).await)
     }
 
     /// The retries-exhausted (or permanent) report, once per failed run.

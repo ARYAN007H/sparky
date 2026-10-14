@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::agent::harness::fork_context::ParentExecutionContext;
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
@@ -494,7 +495,7 @@ async fn errors_clearly_when_no_parent_thread_for_delivery() {
     let workspace = tempfile::TempDir::new().expect("workspace");
 
     let result = SpawnAsyncSubagentTool::new()
-        .execute_under_parent(
+        .execute_under_parent(&DispatchCtx::process_default(), 
             json!({
                 "agent_id": "task_manager_agent",
                 "prompt": "investigate x",
@@ -540,7 +541,7 @@ async fn guard_does_not_fire_when_parent_thread_is_bound() {
 
     let thread = ThreadContext("t-parent");
     let result = SpawnAsyncSubagentTool::new()
-        .execute_under_parent(
+        .execute_under_parent(&DispatchCtx::process_default(), 
             json!({
                 "agent_id": "task_manager_agent",
                 "prompt": "investigate x",

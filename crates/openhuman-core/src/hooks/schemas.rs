@@ -112,7 +112,7 @@ fn handle_list(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFutu
 fn handle_reload(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout(&ctx).await?;
-        super::ops::init(&config).await;
+        super::ops::init(&ctx, &config).await;
         Ok(describe(super::host::engine().snapshot().await.as_ref()))
     })
 }

@@ -204,7 +204,7 @@ impl AgentRunner for OpenHumanAgentRunner {
                     "[flows] agent_runner: HOST AGENT path — running the host-registered agent \
                      with its own tools in its own context"
                 );
-                self.run_via_harness(agent_ref, request, conn, None, host)
+                self.run_via_harness(&DispatchCtx::ambient(), agent_ref, request, conn, None, host)
                     .await
             }
             AgentRoute::Harness => {
@@ -216,7 +216,7 @@ impl AgentRunner for OpenHumanAgentRunner {
                 // A shipped/TOML harness definition has no `entry.model` — the
                 // definition's own `ModelSpec` (already applied by the session
                 // builder) is the only model pin in play here.
-                self.run_via_harness(agent_ref, request, conn, None, None)
+                self.run_via_harness(&DispatchCtx::ambient(), agent_ref, request, conn, None, None)
                     .await
             }
             AgentRoute::RegistryFallback => {
@@ -257,7 +257,7 @@ impl AgentRunner for OpenHumanAgentRunner {
                         // comment on this PR: this previously regressed to the
                         // default chat model for a custom flow agent with no
                         // per-node override).
-                        self.run_via_harness(agent_ref, request, conn, entry_model.as_deref(), None)
+                        self.run_via_harness(&DispatchCtx::ambient(), agent_ref, request, conn, entry_model.as_deref(), None)
                             .await
                     }
                     AgentRoute::RegistryFallback => {

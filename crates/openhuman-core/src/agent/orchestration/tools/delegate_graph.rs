@@ -69,7 +69,7 @@ impl ToolDispatch<(), crate::agent::tinyagents::host::OpenHumanRunContext>
             )
             .map_err(|error| anyhow::anyhow!(error.to_string()))?;
         DelegateGraphTool::new()
-            .execute_with_live_parent_context(
+            .execute_with_live_parent_context(&DispatchCtx::ambient(), 
                 arguments,
                 Some(&context),
                 parent.data.child(),

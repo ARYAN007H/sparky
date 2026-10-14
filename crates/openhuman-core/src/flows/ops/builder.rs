@@ -132,7 +132,7 @@ pub(crate) async fn flows_build_with_extra_hidden_tools(ctx: &DispatchCtx,
     // `propose_workflow` tool result the frontend renders as a proposal card.
     // Best-effort — with no target the run stays headless (CLI / tests).
     if let Some(target) = &stream {
-        attach_flow_progress_bridge(&mut agent, target, "flows_build", config);
+        attach_flow_progress_bridge(&ctx, &mut agent, target, "flows_build", config);
     }
 
     // Run to completion, bounded by a wall-clock timeout. PR3
@@ -249,7 +249,7 @@ pub(crate) async fn flows_build_with_extra_hidden_tools(ctx: &DispatchCtx,
                 "[flows] flows_build: headless/CLI turn — Cli origin, approval gate \
                  auto-allows external_effect tools (run-advancing tools stay hidden)"
             );
-            let run = with_origin(AgentTurnOrigin::Cli, agent.run_single(&prompt));
+            let run = with_origin(AgentTurnOrigin::Cli, agent.run_single(&ctx, &prompt));
             match tokio::time::timeout(std::time::Duration::from_secs(FLOW_BUILD_TIMEOUT_SECS), run)
                 .await
             {

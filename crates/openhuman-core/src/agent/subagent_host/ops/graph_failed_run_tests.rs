@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 use tinytools::Tool;
 
@@ -47,7 +48,7 @@ async fn failed_subagent_run_keeps_its_unanswered_round_out_of_history() {
     let workspace = tempfile::TempDir::new().expect("temp workspace");
     let stem = "root-session__failed_run";
 
-    let result = run_subagent_via_graph(
+    let result = run_subagent_via_graph(&DispatchCtx::process_default(), 
         crate::agent::tinyagents::TurnModelSource::from_model(provider),
         "mock-model",
         0.0,

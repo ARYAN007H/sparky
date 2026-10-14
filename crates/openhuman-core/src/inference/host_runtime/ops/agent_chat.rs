@@ -50,7 +50,7 @@ use super::turn_guards::{
 /// clone below, so a turn that is both rooted and routed gets both — and is
 /// never persisted. See
 /// [`ephemeral_route`](crate::config::schema::ephemeral_route).
-pub async fn agent_chat(
+pub async fn agent_chat(ctx: &DispatchCtx, 
     config: &mut Config,
     message: &str,
     model_override: Option<String>,
@@ -59,7 +59,7 @@ pub async fn agent_chat(
     cwd: Option<String>,
     route: Option<crate::config::schema::EphemeralRoute>,
 ) -> Result<Outcome<String>, String> {
-    agent_chat_for(
+    agent_chat_for(&ctx, 
         config,
         AgentChatTarget::Orchestrator,
         message,
@@ -313,7 +313,7 @@ fn build_turn_agent(
 /// keeps one copy, compiled in this crate.
 #[allow(clippy::too_many_arguments)]
 #[inline(never)]
-pub fn agent_chat_for<'a>(
+pub fn agent_chat_for<'a>(ctx: &DispatchCtx, 
     config: &'a mut Config,
     target: AgentChatTarget<'a>,
     message: &'a str,
@@ -324,7 +324,7 @@ pub fn agent_chat_for<'a>(
     route: Option<crate::config::schema::EphemeralRoute>,
     env: AgentChatEnv,
 ) -> futures::future::BoxFuture<'a, Result<Outcome<String>, String>> {
-    Box::pin(agent_chat_for_inner(
+    Box::pin(agent_chat_for_inner(&ctx, 
         config,
         target,
         message,
@@ -338,7 +338,7 @@ pub fn agent_chat_for<'a>(
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn agent_chat_for_inner(
+async fn agent_chat_for_inner(ctx: &DispatchCtx, 
     config: &mut Config,
     target: AgentChatTarget<'_>,
     message: &str,
@@ -349,7 +349,7 @@ async fn agent_chat_for_inner(
     route: Option<crate::config::schema::EphemeralRoute>,
     env: AgentChatEnv,
 ) -> Result<Outcome<String>, String> {
-    agent_chat_reply_for(
+    agent_chat_reply_for(&ctx, 
         config,
         target,
         message,

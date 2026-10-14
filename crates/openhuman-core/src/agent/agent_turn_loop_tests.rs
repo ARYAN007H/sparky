@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -10,7 +11,7 @@ async fn turn_returns_text_when_no_tools_called() {
     let (mut agent, _tmp) =
         build_agent_with(provider, vec![Box::new(EchoTool)], Box::new(NativeDialect));
 
-    let response = agent.turn("hi").await.unwrap();
+    let response = agent.turn(&DispatchCtx::process_default(), "hi").await.unwrap();
     assert!(
         !response.is_empty(),
         "Expected non-empty text response from provider"
@@ -36,7 +37,7 @@ async fn turn_executes_single_tool_then_returns() {
     let (mut agent, _tmp) =
         build_agent_with(provider, vec![Box::new(EchoTool)], Box::new(NativeDialect));
 
-    let response = agent.turn("run echo").await.unwrap();
+    let response = agent.turn(&DispatchCtx::process_default(), "run echo").await.unwrap();
     assert!(
         !response.is_empty(),
         "Expected non-empty response after tool execution"
@@ -79,7 +80,7 @@ async fn turn_handles_multi_step_tool_chain() {
         Box::new(NativeDialect),
     );
 
-    let response = agent.turn("count 3 times").await.unwrap();
+    let response = agent.turn(&DispatchCtx::process_default(), "count 3 times").await.unwrap();
     assert!(
         !response.is_empty(),
         "Expected non-empty response after multi-step chain"
@@ -124,7 +125,7 @@ async fn turn_emits_checkpoint_at_max_iterations() {
     let (mut agent, _tmp) = build_agent_with_config(provider, vec![Box::new(EchoTool)], config);
 
     let reply = agent
-        .turn("infinite loop")
+        .turn(&DispatchCtx::process_default(), "infinite loop")
         .await
         .expect("hitting the iteration cap should return a checkpoint, not error");
     assert!(
@@ -163,7 +164,7 @@ async fn turn_handles_unknown_tool_gracefully() {
     let (mut agent, _tmp) =
         build_agent_with(provider, vec![Box::new(EchoTool)], Box::new(NativeDialect));
 
-    let response = agent.turn("use nonexistent").await.unwrap();
+    let response = agent.turn(&DispatchCtx::process_default(), "use nonexistent").await.unwrap();
     assert!(
         !response.is_empty(),
         "Expected non-empty response after unknown tool recovery"
@@ -212,7 +213,7 @@ async fn turn_recovers_from_tool_failure_and_tool_error() {
         ]));
         let (mut agent, _tmp) = build_agent_with(provider, vec![tool], Box::new(NativeDialect));
 
-        let response = agent.turn("try the tool").await.unwrap();
+        let response = agent.turn(&DispatchCtx::process_default(), "try the tool").await.unwrap();
         assert!(
             !response.is_empty(),
             "Expected non-empty response after {tool_name} recovery"
@@ -229,7 +230,7 @@ async fn turn_propagates_provider_error() {
     let (mut agent, _tmp) =
         build_agent_with(Arc::new(FailingProvider), vec![], Box::new(NativeDialect));
 
-    let result = agent.turn("hello").await;
+    let result = agent.turn(&DispatchCtx::process_default(), "hello").await;
     assert!(result.is_err(), "Expected provider error to propagate");
 }
 
@@ -297,7 +298,7 @@ async fn xml_dispatcher_parses_and_loops() {
     let (mut agent, _tmp) =
         build_agent_with(provider, vec![Box::new(EchoTool)], Box::new(XmlDialect));
 
-    let response = agent.turn("test xml").await.unwrap();
+    let response = agent.turn(&DispatchCtx::process_default(), "test xml").await.unwrap();
     assert!(
         !response.is_empty(),
         "Expected non-empty response from XML dispatcher"
@@ -310,7 +311,7 @@ async fn native_dispatcher_sends_tool_specs() {
     let (mut agent, _tmp) =
         build_agent_with(provider, vec![Box::new(EchoTool)], Box::new(NativeDialect));
 
-    let _ = agent.turn("hi").await.unwrap();
+    let _ = agent.turn(&DispatchCtx::process_default(), "hi").await.unwrap();
 
     // NativeDialect.should_send_tool_specs() returns true
     let dispatcher = NativeDialect;
@@ -346,7 +347,7 @@ async fn turn_errors_on_empty_or_null_text_response() {
         let (mut agent, _tmp) = build_agent_with(provider, vec![], Box::new(NativeDialect));
 
         let reply = agent
-            .turn("hi")
+            .turn(&DispatchCtx::process_default(), "hi")
             .await
             .expect_err("an empty provider response must error");
         assert_eq!(
@@ -385,7 +386,7 @@ async fn turn_preserves_text_alongside_tool_calls() {
     let (mut agent, _tmp) =
         build_agent_with(provider, vec![Box::new(EchoTool)], Box::new(NativeDialect));
 
-    let response = agent.turn("check something").await.unwrap();
+    let response = agent.turn(&DispatchCtx::process_default(), "check something").await.unwrap();
     assert!(
         !response.is_empty(),
         "Expected non-empty final response after mixed text+tool"
@@ -445,7 +446,7 @@ async fn turn_handles_multiple_tools_in_one_response() {
         Box::new(NativeDialect),
     );
 
-    let response = agent.turn("batch").await.unwrap();
+    let response = agent.turn(&DispatchCtx::process_default(), "batch").await.unwrap();
     assert!(
         !response.is_empty(),
         "Expected non-empty response after multi-tool batch"
@@ -475,7 +476,7 @@ async fn e2e_native_loop_executes_text_fallback_tool_calls_and_persists_history(
     let (mut agent, _tmp) =
         build_agent_with(provider, vec![Box::new(EchoTool)], Box::new(NativeDialect));
 
-    let response = agent.turn("please use a tool").await.unwrap();
+    let response = agent.turn(&DispatchCtx::process_default(), "please use a tool").await.unwrap();
     assert_eq!(response, "Completed via tool");
 
     let history = agent.history();
@@ -520,7 +521,7 @@ async fn system_prompt_injected_on_first_turn() {
 
     assert!(agent.history().is_empty(), "History should start empty");
 
-    let _ = agent.turn("hi").await.unwrap();
+    let _ = agent.turn(&DispatchCtx::process_default(), "hi").await.unwrap();
 
     // First message should be the system prompt
     let first = &agent.history()[0];

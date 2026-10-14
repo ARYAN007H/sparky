@@ -99,7 +99,7 @@ impl EventHandler<DomainEvent> for DeviceTunnelSubscriber {
                     Ok(owner) => {
                         let handled = crate::storage::agents::within_agent(
                             owner.as_deref(),
-                            handle_tunnel_frame(channel_id, payload_b64),
+                            handle_tunnel_frame(&DispatchCtx::ambient(), channel_id, payload_b64),
                         )
                         .await;
                         // Fail closed: no context can act for the owner.

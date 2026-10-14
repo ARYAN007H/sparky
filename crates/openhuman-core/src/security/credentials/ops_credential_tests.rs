@@ -154,7 +154,7 @@ async fn set_credential_requires_a_user_id_for_a_session() {
         .await
         .unwrap_err();
     assert!(err.contains("userId required"), "{err}");
-    let err = store_session(
+    let err = store_session(&DispatchCtx::process_default(), 
         &config,
         "opaque-token",
         None,
@@ -179,7 +179,7 @@ async fn set_credential_installs_a_session_without_touching_the_backend() {
     let exp = chrono::Utc::now() + chrono::Duration::hours(1);
     let token = jwt_with_payload(json!({ "sub": "user-42", "exp": exp.timestamp() }));
 
-    let result = store_session(
+    let result = store_session(&DispatchCtx::process_default(), 
         &config,
         &token,
         None,
@@ -233,7 +233,7 @@ async fn set_credential_derives_the_user_id_from_the_jwt_subject() {
     assert_eq!(state.user_id.as_deref(), Some("from-claims"));
     // Explicit userId wins over the claim; the user payload's id wins over
     // the claim too.
-    let state = store_session(&config, &token, Some("explicit".into()), None)
+    let state = store_session(&DispatchCtx::process_default(), &config, &token, Some("explicit".into()), None)
         .await
         .unwrap()
         .value;
@@ -251,7 +251,7 @@ async fn set_credential_with_the_same_token_and_user_is_a_cheap_refresh() {
         "sub": "user-7",
         "exp": (chrono::Utc::now() + chrono::Duration::hours(1)).timestamp()
     }));
-    let first = store_session(
+    let first = store_session(&DispatchCtx::process_default(), 
         &config,
         &token,
         None,
@@ -263,7 +263,7 @@ async fn set_credential_with_the_same_token_and_user_is_a_cheap_refresh() {
 
     // The host's `/auth/me` answer arrives: same token, same user.
     let user_config = crate::config::load_config_with_timeout(&DispatchCtx::process_default()).await.unwrap();
-    let second = store_session(
+    let second = store_session(&DispatchCtx::process_default(), 
         &user_config,
         &token,
         None,
@@ -378,7 +378,7 @@ async fn clearing_the_session_preserves_a_coexisting_api_key() {
     // Install the session first: this activates the user-scoped directory.
     let exp = chrono::Utc::now() + chrono::Duration::hours(1);
     let token = jwt_with_payload(json!({ "sub": "user-42", "exp": exp.timestamp() }));
-    store_session(&config, &token, None, Some(json!({ "id": "user-42" })))
+    store_session(&DispatchCtx::process_default(), &config, &token, None, Some(json!({ "id": "user-42" })))
         .await
         .unwrap();
 
@@ -476,7 +476,7 @@ async fn clearing_the_session_preserves_the_active_key_over_a_stale_destination_
     // from the pre-login one key A lives beside.
     let exp = chrono::Utc::now() + chrono::Duration::hours(1);
     let token = jwt_with_payload(json!({ "sub": "user-99", "exp": exp.timestamp() }));
-    store_session(&pre_login, &token, None, Some(json!({ "id": "user-99" })))
+    store_session(&DispatchCtx::process_default(), &pre_login, &token, None, Some(json!({ "id": "user-99" })))
         .await
         .unwrap();
 
@@ -529,7 +529,7 @@ async fn clearing_without_a_kind_removes_a_user_scoped_api_key_at_its_source() {
 
     let exp = chrono::Utc::now() + chrono::Duration::hours(1);
     let token = jwt_with_payload(json!({ "sub": "user-77", "exp": exp.timestamp() }));
-    store_session(&config, &token, None, Some(json!({ "id": "user-77" })))
+    store_session(&DispatchCtx::process_default(), &config, &token, None, Some(json!({ "id": "user-77" })))
         .await
         .unwrap();
 
@@ -642,7 +642,7 @@ async fn store_session_local_token_succeeds_without_network_and_forces_local_use
         "email": "local@openhuman.local"
     });
     // Pass a different user_id to verify it is overridden.
-    let result = store_session(
+    let result = store_session(&DispatchCtx::process_default(), 
         &config,
         local_token,
         Some("should-be-overridden".to_string()),

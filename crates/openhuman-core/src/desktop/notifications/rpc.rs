@@ -184,7 +184,7 @@ pub async fn handle_ingest(ctx: &DispatchCtx, params: Map<String, Value>) -> Res
                         // (#5634).
                         let origin = local_trigger_origin();
                         if let Err(e) =
-                            with_origin(origin, apply_decision(triage_run, &envelope)).await
+                            with_origin(origin, apply_decision(&ctx, triage_run, &envelope)).await
                         {
                             tracing::warn!(
                                 id = %id_for_triage,

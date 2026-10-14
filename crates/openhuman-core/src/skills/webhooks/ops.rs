@@ -171,7 +171,7 @@ pub async fn trigger_agent(ctx: &DispatchCtx,
                 std::time::Duration::from_secs(60),
                 crate::agent::turn_origin::with_origin(
                     origin,
-                    crate::agent::triage::apply_decision(run.clone(), &envelope),
+                    crate::agent::triage::apply_decision(&ctx, run.clone(), &envelope),
                 ),
             )
             .await

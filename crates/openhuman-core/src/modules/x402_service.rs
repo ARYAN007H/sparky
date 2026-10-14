@@ -243,12 +243,12 @@ where
 }
 
 /// Read the module-owned spending totals and budgets.
-pub(crate) async fn summary(
+pub(crate) async fn summary(ctx: &DispatchCtx, 
     config: &Config,
 ) -> Result<X402DetailedSpendingSummary, WalletCallError> {
     let config = config.clone();
     let operation_config = config.clone();
-    with_service(&config, move |service| async move {
+    with_service(&ctx, &config, move |service| async move {
         wallet::call(
             &operation_config,
             methods::X402_SPENDING_SUMMARY_DETAILED,
@@ -260,13 +260,13 @@ pub(crate) async fn summary(
 }
 
 /// Read recent module-owned payment records.
-pub(crate) async fn list_payments(
+pub(crate) async fn list_payments(ctx: &DispatchCtx, 
     config: &Config,
     limit: u64,
 ) -> Result<X402ListPaymentsResponse, WalletCallError> {
     let config = config.clone();
     let operation_config = config.clone();
-    with_service(&config, move |service| async move {
+    with_service(&ctx, &config, move |service| async move {
         wallet::call(
             &operation_config,
             methods::X402_LIST_PAYMENTS,

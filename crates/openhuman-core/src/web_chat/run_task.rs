@@ -190,7 +190,7 @@ pub(crate) async fn run_chat_task(ctx: &DispatchCtx,
     {
         bridge_metadata.hold_text_stream = crate::tinymemes::holds_text_stream(&config, thread_id);
     }
-    let bridge = spawn_progress_bridge(
+    let bridge = spawn_progress_bridge(&ctx, 
         progress_rx,
         client_id.to_string(),
         thread_id.to_string(),

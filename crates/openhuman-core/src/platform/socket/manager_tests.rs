@@ -6,7 +6,7 @@ use serde_json::json;
 async fn connection_rejects_plaintext_remote_socket_before_starting_loop() {
     let manager = SocketManager::new();
     let error = manager
-        .connect("http://example.com", "session-token")
+        .connect(&DispatchCtx::process_default(), "http://example.com", "session-token")
         .await
         .unwrap_err();
     assert!(error.contains("requires WSS or a loopback WS endpoint"));
@@ -478,7 +478,7 @@ async fn connect_rejects_empty_token_and_returns_err() {
     let mgr = SocketManager::new();
 
     // Bare empty string.
-    let err = mgr.connect("http://localhost:1", "").await.unwrap_err();
+    let err = mgr.connect(&DispatchCtx::process_default(), "http://localhost:1", "").await.unwrap_err();
     assert!(
         err.contains("empty session token"),
         "expected 'empty session token' in error, got: {err}"
@@ -486,7 +486,7 @@ async fn connect_rejects_empty_token_and_returns_err() {
     assert_eq!(mgr.get_state().status, ConnectionStatus::Disconnected);
 
     // Whitespace-only string (trim check).
-    let err = mgr.connect("http://localhost:1", "   ").await.unwrap_err();
+    let err = mgr.connect(&DispatchCtx::process_default(), "http://localhost:1", "   ").await.unwrap_err();
     assert!(err.contains("empty session token"), "{err}");
     assert_eq!(mgr.get_state().status, ConnectionStatus::Disconnected);
 }

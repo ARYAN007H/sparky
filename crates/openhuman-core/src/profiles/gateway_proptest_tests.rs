@@ -220,7 +220,7 @@ proptest! {
     ) {
         let host = host(mode);
         let header = build_sig(&sig, &user);
-        match block(resolve_user_on(host, &user, header.as_deref(), SECRET, NOW)) {
+        match block(resolve_user_on(&ctx, host, &user, header.as_deref(), SECRET, NOW)) {
             Ok(profile) => {
                 let expected = ProfileId::for_user(&user, mode).unwrap();
                 prop_assert_eq!(&profile.id, &expected, "{:?} landed on another profile", user);
@@ -251,8 +251,8 @@ proptest! {
         {
             return Ok(());
         }
-        let a = block(resolve_user_on(host, known, known_header.as_deref(), SECRET, NOW)).unwrap_err();
-        let b = block(resolve_user_on(host, unknown, unknown_header.as_deref(), SECRET, NOW)).unwrap_err();
+        let a = block(resolve_user_on(&ctx, host, known, known_header.as_deref(), SECRET, NOW)).unwrap_err();
+        let b = block(resolve_user_on(&ctx, host, unknown, unknown_header.as_deref(), SECRET, NOW)).unwrap_err();
         prop_assert_eq!(a.status, 401);
         prop_assert_eq!(a, b);
     }

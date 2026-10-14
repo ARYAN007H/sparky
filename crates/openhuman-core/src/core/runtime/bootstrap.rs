@@ -88,7 +88,7 @@ pub(crate) async fn bootstrap_core_runtime(ctx: &DispatchCtx,
     // meant to gate the first tool call of the first turn has to be loaded
     // before any session exists, and the alternative — loading lazily on the
     // first event — would let that first call through while the file is read.
-    crate::hooks::init(&cfg).await;
+    crate::hooks::init(&ctx, &cfg).await;
 
     // --- Turn-state recovery -------------------------------------------
     // Any per-thread turn snapshots left on disk from a previous process
@@ -164,7 +164,7 @@ pub(crate) async fn bootstrap_core_runtime(ctx: &DispatchCtx,
         // completion log (`<workspace>/.openhuman/background_completions.jsonl`).
         // Schedule its delivery turn through the normal idle-gated path.
         let redelivering =
-            crate::agent::orchestration::background_delivery::recover_on_boot(&workspace_dir);
+            crate::agent::orchestration::background_delivery::recover_on_boot(&ctx, &workspace_dir);
         if redelivering > 0 {
             log::info!(
                 "[runtime] scheduled redelivery of undelivered background completions for \
@@ -384,7 +384,7 @@ pub(crate) async fn bootstrap_core_runtime(ctx: &DispatchCtx,
 /// `CoreBuilder::build()` only to use in-process RPC, and a failed listener bind
 /// must not leave pollers, one-shot jobs, MCP processes, or socket reconnect work
 /// running without a live runtime.
-pub(crate) async fn start_core_runtime_services(
+pub(crate) async fn start_core_runtime_services(ctx: &DispatchCtx, 
     services: crate::core::runtime::ServiceSet,
     config: Option<&crate::config::Config>,
 ) {
@@ -404,7 +404,7 @@ pub(crate) async fn start_core_runtime_services(
 
     match crate::platform::socket::global_socket_manager() {
         Some(socket_mgr) => {
-            crate::core::runtime::services::spawn_socket_auto_connect(services, socket_mgr.clone());
+            crate::core::runtime::services::spawn_socket_auto_connect(&ctx, services, socket_mgr.clone());
         }
         None => {
             log::warn!(

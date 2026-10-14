@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 
 use tinyflows_schedule::schedule::TooFrequent;
@@ -73,7 +74,7 @@ async fn cron_agent_job_short_loopback_send_error_stays_retryable() {
     job.job_type = JobType::Agent;
     job.prompt = Some("Say hello".into());
 
-    let (success, output, raw) = run_agent_job(&config, &job).await;
+    let (success, output, raw) = run_agent_job(&DispatchCtx::process_default(), &config, &job).await;
     assert!(
         !success,
         "a cron agent job against an offline local provider must fail"

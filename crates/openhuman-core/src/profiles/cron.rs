@@ -23,6 +23,7 @@
 //! after [`CLAIM_LEASE_MS`](crate::cron::claims::CLAIM_LEASE_MS), after which
 //! another node may run the interrupted occurrence again.
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -43,7 +44,7 @@ pub struct SweepReport {
 }
 
 /// Sweep every provisioned profile for due agent jobs as of `now`.
-pub async fn sweep(host: &ProfileHost, now: DateTime<Utc>) -> SweepReport {
+pub async fn sweep(ctx: &DispatchCtx, host: &ProfileHost, now: DateTime<Utc>) -> SweepReport {
     let mut report = SweepReport::default();
     let Some(backend) = crate::storage::installed() else {
         log::debug!("[profiles][cron] no shared storage backend; nothing to sweep");
@@ -84,7 +85,7 @@ pub async fn sweep(host: &ProfileHost, now: DateTime<Utc>) -> SweepReport {
         if due.is_empty() {
             continue;
         }
-        let profile = match host.open(&id).await {
+        let profile = match host.open(&ctx, &id).await {
             Ok(profile) => profile,
             Err(error) => {
                 log::debug!("[profiles][cron] profile={id} not opened: {error}");

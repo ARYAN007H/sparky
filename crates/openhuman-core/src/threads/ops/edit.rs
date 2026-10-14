@@ -38,6 +38,7 @@
 //!   tail is truncated in that case, and the edit still lands as a fresh
 //!   turn.
 
+use crate::core::runtime::DispatchCtx;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -80,12 +81,12 @@ pub struct EditOrRegenerateResponse {
 /// Edit a past user message: cancel the in-flight turn (if any), fork the
 /// session transcript and message log to drop that message and everything
 /// after it, then restart the turn with `content` in its place.
-pub async fn edit_message(request: EditMessageRequest) -> Result<Outcome<Value>, ThreadsError> {
+pub async fn edit_message(ctx: &DispatchCtx, request: EditMessageRequest) -> Result<Outcome<Value>, ThreadsError> {
     let client_id = request.client_id.unwrap_or_else(|| "system".to_string());
     let thread_id = request.thread_id;
     let dir = workspace_dir().await.map_err(ThreadsError::Message)?;
 
-    crate::web_chat::cancel_chat_scoped(&client_id, &thread_id, None)
+    crate::web_chat::cancel_chat_scoped(&ctx, &client_id, &thread_id, None)
         .await
         .map_err(ThreadsError::Message)?;
 
@@ -119,7 +120,7 @@ pub async fn edit_message(request: EditMessageRequest) -> Result<Outcome<Value>,
 
     crate::web_chat::invalidate_thread_sessions(&thread_id).await;
 
-    let new_request_id = crate::web_chat::start_chat(
+    let new_request_id = crate::web_chat::start_chat(&ctx, 
         &client_id,
         &thread_id,
         &request.content,
@@ -144,12 +145,12 @@ pub async fn edit_message(request: EditMessageRequest) -> Result<Outcome<Value>,
 /// last turn): cancel the in-flight turn (if any), fork the session
 /// transcript and message log to drop the answer and everything after it,
 /// then restart the turn with the same user prompt that produced it.
-pub async fn regenerate(request: RegenerateRequest) -> Result<Outcome<Value>, ThreadsError> {
+pub async fn regenerate(ctx: &DispatchCtx, request: RegenerateRequest) -> Result<Outcome<Value>, ThreadsError> {
     let client_id = request.client_id.unwrap_or_else(|| "system".to_string());
     let thread_id = request.thread_id;
     let dir = workspace_dir().await.map_err(ThreadsError::Message)?;
 
-    crate::web_chat::cancel_chat_scoped(&client_id, &thread_id, None)
+    crate::web_chat::cancel_chat_scoped(&ctx, &client_id, &thread_id, None)
         .await
         .map_err(ThreadsError::Message)?;
 
@@ -186,7 +187,7 @@ pub async fn regenerate(request: RegenerateRequest) -> Result<Outcome<Value>, Th
 
     crate::web_chat::invalidate_thread_sessions(&thread_id).await;
 
-    let new_request_id = crate::web_chat::start_chat(
+    let new_request_id = crate::web_chat::start_chat(&ctx, 
         &client_id,
         &thread_id,
         &prompt,

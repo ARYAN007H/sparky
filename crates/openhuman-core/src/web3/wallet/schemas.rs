@@ -465,14 +465,14 @@ fn handle_supported_assets(ctx: DispatchCtx, _params: Map<String, Value>) -> Con
     Box::pin(async move { supported_assets(&ctx).await?.into_cli_compatible_json() })
 }
 
-fn handle_encode_erc20_transfer(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_encode_erc20_transfer(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let parsed: EncodeErc20TransferParams = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("invalid params: {e}"))?;
         if parsed.chain != WalletChain::Evm {
             return Err("encode_erc20_transfer only supports the evm chain".to_string());
         }
-        serde_json::to_value(encode_erc20_transfer(&parsed.to_address, &parsed.amount_raw).await?)
+        serde_json::to_value(encode_erc20_transfer(&ctx, &parsed.to_address, &parsed.amount_raw).await?)
             .map_err(|e| format!("failed to encode ERC20 transfer output: {e}"))
     })
 }

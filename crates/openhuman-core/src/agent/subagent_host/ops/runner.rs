@@ -915,7 +915,7 @@ async fn run_typed_mode(ctx: &DispatchCtx,
     }
 
     let (output, iterations, agg_usage, early_exit_tool, hit_cap, breaker_halt) =
-        super::graph::run_subagent_via_graph(
+        super::graph::run_subagent_via_graph(&ctx, 
             subagent_source.clone(),
             &model,
             temperature,

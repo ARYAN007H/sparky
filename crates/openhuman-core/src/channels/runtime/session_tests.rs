@@ -25,7 +25,7 @@ async fn invalidated_startup_never_polls_workspace_or_listeners() {
     .unwrap();
     assert!(!polled.load(Ordering::SeqCst));
     // Exercise the production entry point, not only the generic select helper.
-    crate::channels::start_channels_with_session(crate::config::Config::default(), session)
+    crate::channels::start_channels_with_session(&DispatchCtx::process_default(), crate::config::Config::default(), session)
         .await
         .unwrap();
 }

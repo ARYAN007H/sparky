@@ -5,6 +5,7 @@
 //! `await_run_outcome` lets the model poll a spawned run's log file for a
 //! terminal result without busy-waiting.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::Value;
 
 use crate::agent::session_host::OpenHumanSessionHost;
@@ -37,7 +38,7 @@ pub struct WorkflowRunStarted {
 /// background until DONE / STOPPED / DEGENERATE / FAILED. Errors (unknown skill,
 /// missing required inputs) surface as `Err(String)` *before* the spawn so
 /// callers can reject malformed invocations synchronously.
-pub async fn spawn_workflow_run_background(
+pub async fn spawn_workflow_run_background(ctx: &DispatchCtx, 
     skill_id_param: String,
     inputs_param: Option<Value>,
 ) -> Result<WorkflowRunStarted, String> {
@@ -238,7 +239,7 @@ pub async fn spawn_workflow_run_background(
                 _ = cancel_token.cancelled() => None,
                 r = crate::agent::turn_origin::with_origin(
                     inherited_origin,
-                    agent.run_single(&task_prompt),
+                    agent.run_single(&ctx, &task_prompt),
                 ) => Some(r),
             };
             agent.set_on_progress(None);

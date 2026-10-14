@@ -416,7 +416,7 @@ async fn ws_loop_completes_handshake_and_shuts_down_cleanly() {
 
     let loop_shared = Arc::clone(&shared);
     let handle = tokio::spawn(async move {
-        ws_loop(
+        ws_loop(&DispatchCtx::process_default(), 
             http_base_for(addr),
             static_token_provider("test-token".to_string()),
             loop_shared,
@@ -475,7 +475,7 @@ async fn ws_loop_handles_connect_error_and_shutdown() {
 
     let loop_shared = Arc::clone(&shared);
     let handle = tokio::spawn(async move {
-        ws_loop(
+        ws_loop(&DispatchCtx::process_default(), 
             http_base_for(addr),
             static_token_provider("t".to_string()),
             loop_shared,
@@ -510,7 +510,7 @@ async fn ws_loop_handles_bad_eio_open_and_shutdown() {
 
     let loop_shared = Arc::clone(&shared);
     let handle = tokio::spawn(async move {
-        ws_loop(
+        ws_loop(&DispatchCtx::process_default(), 
             http_base_for(addr),
             static_token_provider("t".to_string()),
             loop_shared,

@@ -233,7 +233,7 @@ fn handle_agent_chat(ctx: DispatchCtx, params: Map<String, Value>) -> Controller
             }
             _ => crate::inference::host_runtime::ops::AgentChatTarget::Orchestrator,
         };
-        crate::inference::host_runtime::ops::agent_chat_reply_for(
+        crate::inference::host_runtime::ops::agent_chat_reply_for(&ctx, 
             &mut config,
             target,
             &p.message,

@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 
 // #6276: bare calls to withheld packed tools, driven through a whole `OpenHumanSessionHost::turn`.
@@ -56,7 +57,7 @@ async fn turn_routes_a_bare_packed_tool_call_through_use_skill() {
         "precondition: the tool is withheld behind its pack"
     );
 
-    agent.turn("find a code review skill").await.unwrap();
+    agent.turn(&DispatchCtx::process_default(), "find a code review skill").await.unwrap();
 
     assert_eq!(
         ran.lock().unwrap().clone(),
@@ -141,7 +142,7 @@ async fn turn_does_not_route_a_bare_call_the_session_would_refuse() {
     };
 
     let (mut agent, _tmp) = build_agent_with_config(provider, tools, config);
-    agent.turn("install a code review skill").await.unwrap();
+    agent.turn(&DispatchCtx::process_default(), "install a code review skill").await.unwrap();
 
     assert!(
         !*ran.lock().unwrap(),

@@ -179,7 +179,7 @@ fn an_old_session_continued_by_this_binary_reloads_identically() {
         let legacy_bytes = std::fs::read(&path).expect("legacy bytes");
 
         assert!(first.resume_bound_session(&DispatchCtx::process_default()).await.expect("resume"));
-        first.turn("keep going").await.expect("continued turn");
+        first.turn(&DispatchCtx::process_default(), "keep going").await.expect("continued turn");
         let continued_history = serde_json::to_value(
             first
                 .runtime_session
@@ -302,13 +302,13 @@ fn a_live_image_turn_persists_typed_image_parts_and_resumes_identically() {
 
 /// What the provider is sent for a live image turn on a vision-capable model:
 /// the user message's content blocks of the request the model actually saw.
-async fn live_image_request_blocks() -> Vec<ContentBlock> {
+async fn live_image_request_blocks(ctx: &DispatchCtx, ) -> Vec<ContentBlock> {
     use tinyinference_llm::message::Message;
 
     let root = tempfile::tempdir().expect("tempdir");
     let vision = live_image_model("saw it");
     let mut host = build_live_image_host(root.path(), vision.clone(), &thread_id("vision"));
-    host.turn("look [IMAGE:data:image/png;base64,iVBORw0KGgo=] please")
+    host.turn(&ctx, "look [IMAGE:data:image/png;base64,iVBORw0KGgo=] please")
         .await
         .expect("turn");
     let request = vision
@@ -335,7 +335,7 @@ async fn live_image_request_blocks() -> Vec<ContentBlock> {
 #[test]
 fn live_image_turn_request_carries_a_real_image_block() {
     run_async(async {
-        let blocks = live_image_request_blocks().await;
+        let blocks = live_image_request_blocks(&DispatchCtx::process_default()).await;
         assert!(
             blocks.iter().any(|block| matches!(
                 block,

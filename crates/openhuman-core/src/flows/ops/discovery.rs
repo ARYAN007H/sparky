@@ -65,7 +65,7 @@ pub async fn flows_discover(ctx: &DispatchCtx,
     // an interactive turn (see `FlowStreamTarget`). Best-effort — with no target
     // the run stays headless, exactly as before.
     if let Some(target) = &stream {
-        attach_flow_progress_bridge(&mut agent, target, "flows_discover", config);
+        attach_flow_progress_bridge(&ctx, &mut agent, target, "flows_discover", config);
         agent.set_thread_id(Some(target.thread_id.as_str()));
     }
 
@@ -74,7 +74,7 @@ pub async fn flows_discover(ctx: &DispatchCtx,
     // timeout so a hung provider call can't wedge the RPC. When streaming, the
     // run is wrapped in the thread-id scope so descendant turns tag their trace
     // and socket events with this thread.
-    let run = with_origin(AgentTurnOrigin::Cli, agent.run_single(FLOW_DISCOVER_PROMPT));
+    let run = with_origin(AgentTurnOrigin::Cli, agent.run_single(&ctx, FLOW_DISCOVER_PROMPT));
     let run = tokio::time::timeout(
         std::time::Duration::from_secs(FLOW_DISCOVER_TIMEOUT_SECS),
         run,

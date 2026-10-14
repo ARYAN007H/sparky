@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::agent::harness::fork_context::ParentExecutionContext;
 use crate::agent::harness::host_definition::AgentDefinition;
@@ -478,7 +479,7 @@ fn tool_response(name: &str, arguments: serde_json::Value) -> ModelResponse {
     }
 }
 
-async fn agent_turn_runs_long_parallel_subagent_flow_with_many_nested_tool_calls_inner() {
+async fn agent_turn_runs_long_parallel_subagent_flow_with_many_nested_tool_calls_inner(ctx: &DispatchCtx, ) {
     // `create_memory` below needs the global embedding host. This test never
     // installed it, so it only passed when some other test file in the same
     // binary happened to run first — and failed outright under any filter
@@ -507,7 +508,7 @@ async fn agent_turn_runs_long_parallel_subagent_flow_with_many_nested_tool_calls
         .unwrap();
 
     let response = agent
-        .turn("Run a long parallel delegation pass. parallel-fanout-e2e-canary")
+        .turn(&ctx, "Run a long parallel delegation pass. parallel-fanout-e2e-canary")
         .await
         .unwrap_or_else(|err| {
             panic!(

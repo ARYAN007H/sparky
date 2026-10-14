@@ -55,7 +55,7 @@ impl FlowStreamTarget {
 /// on reopen). The bridge task lives until the agent drops its progress sender
 /// (turn end). `source` is a short trace-attribution label (e.g.
 /// `"flows_build"`).
-pub(super) fn attach_flow_progress_bridge(
+pub(super) fn attach_flow_progress_bridge(ctx: &DispatchCtx, 
     agent: &mut crate::agent::OpenHumanSessionHost,
     target: &FlowStreamTarget,
     source: &str,
@@ -70,7 +70,7 @@ pub(super) fn attach_flow_progress_bridge(
         source = %source,
         "[flows] progress bridge: attaching (streaming copilot/scout turn)"
     );
-    crate::web_chat::spawn_progress_bridge(
+    crate::web_chat::spawn_progress_bridge(&ctx, 
         progress_rx,
         "system".to_string(),
         target.thread_id.clone(),
@@ -98,7 +98,7 @@ pub(super) async fn finalize_flow_stream(ctx: &DispatchCtx,
 ) {
     match result {
         Ok(text) => {
-            crate::web_chat::presentation::deliver_response(
+            crate::web_chat::presentation::deliver_response(&ctx, 
                 "system",
                 &target.thread_id,
                 &target.request_id,

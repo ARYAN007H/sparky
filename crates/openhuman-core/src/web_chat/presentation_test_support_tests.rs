@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use crate::memory::types::TurnCitation;
 
 pub async fn deliver_response_for_test(
@@ -23,7 +24,7 @@ pub async fn deliver_response_for_test(
 /// `deliver_response` with an explicit `timing` snapshot and usage, so a
 /// test can assert `chat_done.timing` (and its `tokens_per_second`
 /// derivation) reaches the wire event.
-pub(crate) async fn deliver_response_with_timing_for_test(
+pub(crate) async fn deliver_response_with_timing_for_test(ctx: &DispatchCtx, 
     client_id: &str,
     thread_id: &str,
     request_id: &str,
@@ -32,7 +33,7 @@ pub(crate) async fn deliver_response_with_timing_for_test(
     usage: Option<&super::LastTurnUsage>,
     timing: Option<super::super::turn_timing::TurnTimingSnapshot>,
 ) {
-    super::deliver_response(
+    super::deliver_response(&ctx, 
         client_id,
         thread_id,
         request_id,

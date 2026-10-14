@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -172,7 +173,7 @@ async fn an_open_racing_an_archive_on_another_node_does_not_resurrect_the_profil
     pausing.armed.store(true, Ordering::SeqCst);
     let opening = tokio::spawn({
         let (a, id) = (Arc::clone(&a), id.clone());
-        async move { a.open(&id).await.map(|_| ()) }
+        async move { a.open(&DispatchCtx::process_default(), &id).await.map(|_| ()) }
     });
     pausing.entered.notified().await;
     // ...while node b archives the profile.
@@ -202,7 +203,7 @@ async fn a_failed_archive_gives_the_lease_back() {
 
     a.deprovision(&id).await.unwrap_err();
     assert!(a.summary(&id).await.unwrap().is_some(), "still provisioned");
-    let opened = b.open(&id).await;
+    let opened = b.open(&DispatchCtx::process_default(), &id).await;
     assert!(opened.is_ok(), "the lease was given back: {opened:?}");
 }
 

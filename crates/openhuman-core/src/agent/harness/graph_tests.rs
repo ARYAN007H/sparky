@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 use async_trait::async_trait;
 use tinyagents_harness::testkit::ScriptedModel;
@@ -50,7 +51,7 @@ async fn channel_turn_runs_through_the_graph() {
     let mut profile = ModelProfile::default();
     profile.tool_calling = true;
     profile.parallel_tool_calls = true;
-    let text = run_channel_turn_via_graph(
+    let text = run_channel_turn_via_graph(&DispatchCtx::process_default(), 
         TurnModelSource::from_model_with_profile(scripted, profile),
         &mut history,
         registry,
@@ -114,7 +115,7 @@ async fn channel_turn_pauses_on_ask_user_clarification() {
     let mut profile = ModelProfile::default();
     profile.tool_calling = true;
     profile.parallel_tool_calls = true;
-    let text = run_channel_turn_via_graph(
+    let text = run_channel_turn_via_graph(&DispatchCtx::process_default(), 
         TurnModelSource::from_model_with_profile(scripted, profile),
         &mut history,
         registry,

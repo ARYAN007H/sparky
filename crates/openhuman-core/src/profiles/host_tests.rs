@@ -33,7 +33,7 @@ async fn provisioning_creates_the_layout_once() {
 async fn only_provisioned_profiles_open() {
     let tmp = tempfile::tempdir().unwrap();
     let host = host(&tmp, 4, 60);
-    let err = host.open(&profile("nobody")).await.unwrap_err();
+    let err = host.open(&DispatchCtx::process_default(), &profile("nobody")).await.unwrap_err();
     assert_eq!(err, OpenError::NotProvisioned(profile("nobody")));
 }
 
@@ -44,8 +44,8 @@ async fn an_open_profile_runs_under_its_own_scope() {
     let (a, b) = (profile("alice"), profile("bob"));
     host.provision(&a).await.unwrap();
     host.provision(&b).await.unwrap();
-    let state_a = host.open(&a).await.unwrap();
-    let state_b = host.open(&b).await.unwrap();
+    let state_a = host.open(&DispatchCtx::process_default(), &a).await.unwrap();
+    let state_b = host.open(&DispatchCtx::process_default(), &b).await.unwrap();
 
     // A profile's default agent runs as the desktop's does: no agent id, the
     // profile is the tenant key.
@@ -61,7 +61,7 @@ async fn an_open_profile_runs_under_its_own_scope() {
     assert!(!state_a.context().user_skill_roots());
 
     // Re-opening hands back the same state.
-    assert!(Arc::ptr_eq(&state_a, &host.open(&a).await.unwrap()));
+    assert!(Arc::ptr_eq(&state_a, &host.open(&DispatchCtx::process_default(), &a).await.unwrap()));
     assert_eq!(host.open_count(), 2);
 }
 
@@ -73,9 +73,9 @@ async fn a_full_host_evicts_the_least_recently_used_idle_profile() {
     for id in &ids {
         host.provision(id).await.unwrap();
     }
-    drop(host.open(&ids[0]).await.unwrap());
-    drop(host.open(&ids[1]).await.unwrap());
-    drop(host.open(&ids[2]).await.unwrap());
+    drop(host.open(&DispatchCtx::process_default(), &ids[0]).await.unwrap());
+    drop(host.open(&DispatchCtx::process_default(), &ids[1]).await.unwrap());
+    drop(host.open(&DispatchCtx::process_default(), &ids[2]).await.unwrap());
     assert_eq!(host.open_count(), 2);
     assert!(!host.is_open(&ids[0]), "the oldest idle agent made room");
     assert!(host.is_open(&ids[1]) && host.is_open(&ids[2]));
@@ -88,13 +88,13 @@ async fn an_profile_in_use_is_never_evicted() {
     let (a, b) = (profile("a"), profile("b"));
     host.provision(&a).await.unwrap();
     host.provision(&b).await.unwrap();
-    let held = host.open(&a).await.unwrap();
+    let held = host.open(&DispatchCtx::process_default(), &a).await.unwrap();
     host.evict_idle().await;
     assert!(host.is_open(&a), "held agents survive an idle sweep");
-    let err = host.open(&b).await.unwrap_err();
+    let err = host.open(&DispatchCtx::process_default(), &b).await.unwrap_err();
     assert!(matches!(err, OpenError::Full { max: 1 }), "{err}");
     drop(held);
-    host.open(&b).await.unwrap();
+    host.open(&DispatchCtx::process_default(), &b).await.unwrap();
 }
 
 #[tokio::test]
@@ -103,7 +103,7 @@ async fn idle_profiles_are_swept() {
     let host = host(&tmp, 4, 0);
     let id = profile("a");
     host.provision(&id).await.unwrap();
-    drop(host.open(&id).await.unwrap());
+    drop(host.open(&DispatchCtx::process_default(), &id).await.unwrap());
     host.evict_idle().await;
     assert_eq!(host.open_count(), 0);
 }
@@ -114,7 +114,7 @@ async fn deprovisioning_archives_and_closes() {
     let host = host(&tmp, 4, 60);
     let id = profile("a");
     host.provision(&id).await.unwrap();
-    drop(host.open(&id).await.unwrap());
+    drop(host.open(&DispatchCtx::process_default(), &id).await.unwrap());
     assert!(host.deprovision(&id).await.unwrap());
     assert!(!host.is_open(&id));
     assert!(host.summary(&id).await.unwrap().is_none());
@@ -135,7 +135,7 @@ async fn list_reports_provisioned_profiles_only() {
     host.provision(&a).await.unwrap();
     host.provision(&b).await.unwrap();
     std::fs::create_dir_all(layout::users_dir(tmp.path()).join("not-an-agent")).unwrap();
-    let _held = host.open(&b).await.unwrap();
+    let _held = host.open(&DispatchCtx::process_default(), &b).await.unwrap();
     let listed = host.list().await.unwrap();
     assert_eq!(listed.len(), 2);
     let open: Vec<_> = listed
@@ -152,7 +152,7 @@ async fn a_reprovisioned_profile_does_not_inherit_the_old_credential() {
     let host = host(&tmp, 4, 60);
     let id = profile(&format!("returning-{}", uuid::Uuid::new_v4()));
     host.provision(&id).await.unwrap();
-    let config = host.open(&id).await.unwrap().config.clone();
+    let config = host.open(&DispatchCtx::process_default(), &id).await.unwrap().config.clone();
     super::super::credentials::store(
         &config,
         super::super::credentials::UserCredentialKind::Session,
@@ -196,12 +196,12 @@ async fn a_clean_reopen_does_not_recover_but_a_takeover_does() {
     };
 
     // The first holder ever: nothing to recover.
-    drop(host.open(&id).await.unwrap());
+    drop(host.open(&DispatchCtx::process_default(), &id).await.unwrap());
     in_flight("t1");
     // An eviction releases the lease cleanly; re-opening must not mark a
     // turn this process may still own as interrupted.
     host.evict_idle().await;
-    drop(host.open(&id).await.unwrap());
+    drop(host.open(&DispatchCtx::process_default(), &id).await.unwrap());
     assert_eq!(
         lifecycle("t1"),
         tinyagents_session::turn_state::TurnLifecycle::Started
@@ -211,10 +211,10 @@ async fn a_clean_reopen_does_not_recover_but_a_takeover_does() {
     // never released once the first is gone, and recovers.
     let holder = host;
     let second = self::host(&tmp, 4, 0);
-    let refused = second.open(&id).await.unwrap_err();
+    let refused = second.open(&DispatchCtx::process_default(), &id).await.unwrap_err();
     assert!(matches!(refused, OpenError::HeldElsewhere(_)), "{refused}");
     drop(holder);
-    drop(second.open(&id).await.unwrap());
+    drop(second.open(&DispatchCtx::process_default(), &id).await.unwrap());
     assert_eq!(
         lifecycle("t1"),
         tinyagents_session::turn_state::TurnLifecycle::Interrupted
@@ -234,7 +234,7 @@ async fn an_profile_in_use_is_not_archived_from_under_it() {
     let host = host(&tmp, 4, 60);
     let id = profile("alice");
     host.provision(&id).await.unwrap();
-    let state = host.open(&id).await.unwrap();
+    let state = host.open(&DispatchCtx::process_default(), &id).await.unwrap();
     let err = host.deprovision(&id).await.unwrap_err();
     assert!(err.contains("in use"), "{err}");
     assert!(host.is_open(&id), "a refused deprovision leaves it open");
@@ -266,10 +266,10 @@ async fn opening_an_open_profile_sweeps_the_idle_ones() {
     let (a, b) = (profile("alice"), profile("bob"));
     host.provision(&a).await.unwrap();
     host.provision(&b).await.unwrap();
-    drop(host.open(&a).await.unwrap());
-    let held = host.open(&b).await.unwrap();
+    drop(host.open(&DispatchCtx::process_default(), &a).await.unwrap());
+    let held = host.open(&DispatchCtx::process_default(), &b).await.unwrap();
     // Re-opening bob (already open) closes idle alice.
-    let again = host.open(&b).await.unwrap();
+    let again = host.open(&DispatchCtx::process_default(), &b).await.unwrap();
     assert!(!host.is_open(&a), "alice was idle and is closed");
     assert!(host.is_open(&b), "bob is in use and stays");
     drop((held, again));
@@ -295,8 +295,8 @@ async fn a_provisioned_config_needs_no_profile_slot() {
     let (a, b) = (profile("alice"), profile("bob"));
     host.provision(&a).await.unwrap();
     host.provision(&b).await.unwrap();
-    let _held = host.open(&a).await.unwrap();
-    assert!(host.open(&b).await.is_err(), "the only slot is taken");
+    let _held = host.open(&DispatchCtx::process_default(), &a).await.unwrap();
+    assert!(host.open(&DispatchCtx::process_default(), &b).await.is_err(), "the only slot is taken");
     assert!(host.provisioned_config(&b).await.is_ok());
     assert!(host.provisioned_config(&profile("nobody")).await.is_err());
 }
@@ -307,7 +307,7 @@ async fn an_open_profile_is_gated_by_its_own_policy_not_the_operators() {
     let host = host(&tmp, 4, 60);
     let id = profile("alice");
     host.provision(&id).await.unwrap();
-    let state = host.open(&id).await.unwrap();
+    let state = host.open(&DispatchCtx::process_default(), &id).await.unwrap();
     assert_eq!(state.context().profile(), Some(id.as_str()));
 
     let own = state
@@ -336,7 +336,7 @@ async fn a_profile_with_a_live_turn_is_not_evicted() {
     host.provision(&b).await.unwrap();
     // The request that started the turn has answered and let go of the
     // state; the turn keeps running on a context derived from the profile's.
-    let context = Arc::clone(host.open(&a).await.unwrap().context());
+    let context = Arc::clone(host.open(&DispatchCtx::process_default(), &a).await.unwrap().context());
     let (release, released) = tokio::sync::oneshot::channel::<()>();
     let turn = tokio::spawn(CoreContext::scope_with_turn_origin(context, None, async {
         let _ = released.await;
@@ -345,7 +345,7 @@ async fn a_profile_with_a_live_turn_is_not_evicted() {
 
     host.evict_idle().await;
     assert!(host.is_open(&a), "a live turn keeps its profile open");
-    let err = host.open(&b).await.unwrap_err();
+    let err = host.open(&DispatchCtx::process_default(), &b).await.unwrap_err();
     assert!(matches!(err, OpenError::Full { max: 1 }), "{err}");
     assert!(host.deprovision(&a).await.unwrap_err().contains("in use"));
 
@@ -353,7 +353,7 @@ async fn a_profile_with_a_live_turn_is_not_evicted() {
     turn.await.unwrap();
     host.evict_idle().await;
     assert!(!host.is_open(&a), "evicted once the turn ended");
-    host.open(&b).await.unwrap();
+    host.open(&DispatchCtx::process_default(), &b).await.unwrap();
 }
 
 #[tokio::test]
@@ -371,7 +371,7 @@ async fn the_operators_iteration_cap_binds_every_profile_whatever_its_config_say
     )
     .unwrap();
     let forced = host.provisioned_config(&id).await.unwrap();
-    let opened = host.open(&id).await.unwrap();
+    let opened = host.open(&DispatchCtx::process_default(), &id).await.unwrap();
     assert_eq!(forced.agent.max_tool_iterations_override, Some(4));
     assert_eq!(opened.config.agent.max_tool_iterations_override, Some(4));
 }
@@ -394,7 +394,7 @@ async fn the_operators_cron_limits_bind_every_profile_whatever_its_config_says()
     )
     .unwrap();
     let forced = host.provisioned_config(&id).await.unwrap();
-    let opened = host.open(&id).await.unwrap();
+    let opened = host.open(&DispatchCtx::process_default(), &id).await.unwrap();
     let loaded = CoreContext::scope(Arc::clone(opened.context()), async {
         crate::config::ops::load_current_or_init(&DispatchCtx::process_default()).await.unwrap()
     })

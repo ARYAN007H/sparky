@@ -39,7 +39,7 @@ pub fn run_agent_command(ctx: &DispatchCtx, args: &[String]) -> Result<()> {
 
     match args[0].as_str() {
         "dump-prompt" => run_dump_prompt(&ctx, &args[1..]),
-        "dump-all" => run_dump_all(&args[1..]),
+        "dump-all" => run_dump_all(&ctx, &args[1..]),
         "prompt-size" => run_prompt_size(&ctx, &args[1..]),
         "list" => run_list(&args[1..]),
         other => Err(anyhow!(
@@ -181,7 +181,7 @@ fn run_prompt_size(ctx: &DispatchCtx, args: &[String]) -> Result<()> {
         }
         None => {
             let dumps: Vec<DumpedPrompt> = rt.block_on(async {
-                dump_all_agent_prompts(
+                dump_all_agent_prompts(&ctx, 
                     flags.workspace.clone(),
                     config_path.clone(),
                     flags.model.clone(),
@@ -312,7 +312,7 @@ fn parse_dump_all_flags(args: &[String]) -> Result<DumpAllFlags> {
     })
 }
 
-fn run_dump_all(args: &[String]) -> Result<()> {
+fn run_dump_all(ctx: &DispatchCtx, args: &[String]) -> Result<()> {
     let flags = parse_dump_all_flags(args)?;
     init_quiet_logging(flags.verbose);
 
@@ -330,7 +330,7 @@ fn run_dump_all(args: &[String]) -> Result<()> {
         .build()?;
     log::debug!("[agent-cli] run_dump_all: calling dump_all_agent_prompts");
     let dumps = rt.block_on(async {
-        dump_all_agent_prompts(flags.workspace.clone(), None, flags.model.clone()).await
+        dump_all_agent_prompts(&ctx, flags.workspace.clone(), None, flags.model.clone()).await
     })?;
     log::debug!(
         "[agent-cli] run_dump_all: dump_all_agent_prompts returned {} prompt(s)",

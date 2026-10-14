@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 
 use tinyflows_schedule::types::JobType;
@@ -310,7 +311,7 @@ async fn run_agent_job_returns_error_without_provider_key() {
     job.job_type = JobType::Agent;
     job.prompt = Some("Say hello".into());
 
-    let (success, output, raw_error) = run_agent_job(&config, &job).await;
+    let (success, output, raw_error) = run_agent_job(&DispatchCtx::process_default(), &config, &job).await;
     assert!(!success, "Agent job without provider key should fail");
     assert!(output.contains("Something went wrong. Please try again."));
     assert!(!output.contains("<openhuman-link"));

@@ -411,7 +411,7 @@ pub(crate) async fn execute_collapsed_delegation_with_live_parent(ctx: &Dispatch
     // `target.tool_name`, not `DELEGATE_TO_TOOL_NAME`: the dispatch name rides
     // into run records and the UI, and reporting every hand-off as
     // `delegate` would erase which specialist was chosen from every trace.
-    super::dispatch::dispatch_subagent_with_live_parent(
+    super::dispatch::dispatch_subagent_with_live_parent(&ctx, 
         &target.agent_id,
         &target.tool_name,
         &prompt,

@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 
 #[test]
@@ -210,7 +211,7 @@ async fn start_chat_runs_distinct_threads_concurrently() {
     let thread_a = "concurrent-thread-a";
     let thread_b = "concurrent-thread-b";
 
-    start_chat(
+    start_chat(&DispatchCtx::process_default(), 
         "client-a",
         thread_a,
         "hello a",
@@ -222,7 +223,7 @@ async fn start_chat_runs_distinct_threads_concurrently() {
     )
     .await
     .expect("thread A should start");
-    start_chat(
+    start_chat(&DispatchCtx::process_default(), 
         "client-b",
         thread_b,
         "hello b",
@@ -247,8 +248,8 @@ async fn start_chat_runs_distinct_threads_concurrently() {
     );
 
     // Cleanup: cancel both and clear the test hook.
-    let _ = cancel_chat_scoped("client-a", thread_a, None).await;
-    let _ = cancel_chat_scoped("client-b", thread_b, None).await;
+    let _ = cancel_chat_scoped(&DispatchCtx::process_default(), "client-a", thread_a, None).await;
+    let _ = cancel_chat_scoped(&DispatchCtx::process_default(), "client-b", thread_b, None).await;
     set_test_run_chat_task_block(None).await;
 }
 
@@ -262,7 +263,7 @@ async fn cancel_chat_cooperatively_stops_in_flight_turn() {
     set_test_run_chat_task_block(Some(block.clone())).await;
 
     let thread_id = "cancel-coop-thread";
-    let request_id = start_chat(
+    let request_id = start_chat(&DispatchCtx::process_default(), 
         "cancel-client",
         thread_id,
         "park me",
@@ -283,7 +284,7 @@ async fn cancel_chat_cooperatively_stops_in_flight_turn() {
         "turn should still be parked, not yet dropped"
     );
 
-    let cancelled = cancel_chat_scoped("cancel-client", thread_id, None)
+    let cancelled = cancel_chat_scoped(&DispatchCtx::process_default(), "cancel-client", thread_id, None)
         .await
         .expect("cancel_chat should succeed");
     assert_eq!(
@@ -324,7 +325,7 @@ async fn wedged_turn_hits_wall_clock_backstop_and_emits_turn_timeout_chat_error(
     set_test_run_chat_task_block(Some(block.clone())).await;
 
     let mut rx = subscribe_web_channel_events();
-    let request_id = start_chat(
+    let request_id = start_chat(&DispatchCtx::process_default(), 
         "backstop-client",
         "backstop-thread",
         "park me until the wall-clock backstop fires",
@@ -367,7 +368,7 @@ async fn silent_turn_hits_idle_guard_and_emits_turn_timeout_chat_error() {
     set_test_run_chat_task_block(Some(block.clone())).await;
 
     let mut rx = subscribe_web_channel_events();
-    let request_id = start_chat(
+    let request_id = start_chat(&DispatchCtx::process_default(), 
         "idle-client",
         "idle-thread",
         "park me until the idle guard fires",
@@ -403,7 +404,7 @@ async fn parallel_turn_runs_concurrently_with_primary_on_same_thread() {
     let thread_id = "parallel-same-thread";
 
     // Primary turn (default interrupt mode) parks in IN_FLIGHT.
-    start_chat(
+    start_chat(&DispatchCtx::process_default(), 
         "pp-client",
         thread_id,
         "primary",
@@ -419,7 +420,7 @@ async fn parallel_turn_runs_concurrently_with_primary_on_same_thread() {
 
     // Parallel turn on the SAME thread must NOT interrupt the primary — it
     // lives in the parallel lane while the primary stays in-flight.
-    start_chat(
+    start_chat(&DispatchCtx::process_default(), 
         "pp-client",
         thread_id,
         "branch",
@@ -443,7 +444,7 @@ async fn parallel_turn_runs_concurrently_with_primary_on_same_thread() {
     );
 
     // A thread-level cancel tears down BOTH the primary and the parallel turn.
-    cancel_chat_scoped("pp-client", thread_id, None)
+    cancel_chat_scoped(&DispatchCtx::process_default(), "pp-client", thread_id, None)
         .await
         .expect("cancel should succeed");
     wait_for_in_flight(|e| !e.iter().any(|(k, _)| k == thread_id)).await;
@@ -605,7 +606,7 @@ async fn unscoped_cancel_stops_the_threads_detached_subagents() {
     .expect("fixture registration admitted");
 
     // A scoped cancel for some other request is not a Stop: the child lives.
-    let scoped = channel_web_cancel("stop-client", thread_id, Some("req-unrelated"))
+    let scoped = channel_web_cancel(&DispatchCtx::process_default(), "stop-client", thread_id, Some("req-unrelated"))
         .await
         .expect("scoped cancel");
     assert_eq!(scoped.value["cancelled"], serde_json::json!(false));
@@ -616,7 +617,7 @@ async fn unscoped_cancel_stops_the_threads_detached_subagents() {
     );
 
     // The Stop button: no turn in flight, but the detached child is stopped.
-    let stop = channel_web_cancel("stop-client", thread_id, None)
+    let stop = channel_web_cancel(&DispatchCtx::process_default(), "stop-client", thread_id, None)
         .await
         .expect("stop");
     assert_eq!(stop.value["cancelled"], serde_json::json!(true));

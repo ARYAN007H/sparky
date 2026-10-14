@@ -103,7 +103,7 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
                 }
             };
 
-        let request_id = match crate::web_chat::start_chat(
+        let request_id = match crate::web_chat::start_chat(&DispatchCtx::ambient(), 
             &client_id,
             &thread_id,
             message,

@@ -22,17 +22,17 @@ impl OpenHumanSessionHost {
     /// This is the primary high-level method for programmatic interaction with the agent.
     /// It wraps the core `turn` logic with telemetry events (`AgentTurnStarted`,
     /// `AgentTurnCompleted`) and error sanitization.
-    pub async fn run_single(&mut self, message: &str) -> Result<String> {
-        self.run_single_with_origin(message, None).await
+    pub async fn run_single(&mut self, ctx: &DispatchCtx, message: &str) -> Result<String> {
+        self.run_single_with_origin(&ctx, message, None).await
     }
 
     /// Runs a single turn with authority supplied explicitly by its entry point.
     pub async fn run_single_with_origin(
-        &mut self,
+        &mut self, ctx: &DispatchCtx,
         message: &str,
         origin: Option<crate::agent::turn_origin::AgentTurnOrigin>,
     ) -> Result<String> {
-        self.run_single_with_approval(message, origin, Default::default())
+        self.run_single_with_approval(&ctx, message, origin, Default::default())
             .await
     }
 

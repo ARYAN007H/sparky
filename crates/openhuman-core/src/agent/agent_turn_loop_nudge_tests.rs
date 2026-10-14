@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 use tinyinference_llm::message::Message;
 
@@ -97,15 +98,15 @@ fn nudge_count(messages: &[Message]) -> usize {
         .count()
 }
 
-async fn run_turn(
+async fn run_turn(ctx: &DispatchCtx, 
     script: Vec<ChatResponse>,
     tools: Vec<Box<dyn Tool>>,
 ) -> (Vec<Vec<Message>>, Vec<TranscriptEntry>) {
-    let (requests, history, _tmp) = run_turn_failing_from(script, tools, None).await;
+    let (requests, history, _tmp) = run_turn_failing_from(&ctx, script, tools, None).await;
     (requests, history)
 }
 
-async fn run_turn_failing_from(
+async fn run_turn_failing_from(ctx: &DispatchCtx, 
     script: Vec<ChatResponse>,
     tools: Vec<Box<dyn Tool>>,
     fail_from_call: Option<usize>,
@@ -116,7 +117,7 @@ async fn run_turn_failing_from(
         fail_from_call,
     });
     let (mut agent, tmp) = build_agent_with(provider.clone(), tools, Box::new(NativeDialect));
-    let outcome = agent.turn("do the thing").await;
+    let outcome = agent.turn(&ctx, "do the thing").await;
     assert_eq!(
         outcome.is_err(),
         fail_from_call.is_some(),
@@ -142,7 +143,7 @@ fn committed_system_rows_past_prefix(history: &[TranscriptEntry]) -> Vec<String>
 
 #[tokio::test]
 async fn validation_nudge_reaches_the_retry_but_is_not_committed() {
-    let (requests, history) = run_turn(
+    let (requests, history) = run_turn(&DispatchCtx::process_default(), 
         vec![call("tc1", "fail_a"), text_response("recovered")],
         vec![Box::new(ValidationFailingTool("fail_a"))],
     )
@@ -181,7 +182,7 @@ async fn a_second_validation_failure_rearms_the_nudge() {
     // Validation has a budget of one per (tool, scope): the same tool failing
     // again halts the run. A different tool's first failure is a fresh blocker
     // and must nudge again, even though the first nudge was already consumed.
-    let (requests, history) = run_turn(
+    let (requests, history) = run_turn(&DispatchCtx::process_default(), 
         vec![
             call("tc1", "fail_a"),
             call("tc2", "fail_b"),
@@ -244,7 +245,7 @@ async fn a_failed_nudged_request_does_not_persist_the_nudge() {
     // failure record that renders the request's unanswered tail as text
     // (#6281). The injector runs after the snapshot middleware, so that tail
     // never holds the nudge.
-    let (requests, _history, tmp) = run_turn_failing_from(
+    let (requests, _history, tmp) = run_turn_failing_from(&DispatchCtx::process_default(), 
         vec![call("tc1", "fail_a")],
         vec![Box::new(ValidationFailingTool("fail_a"))],
         Some(1),

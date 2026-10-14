@@ -436,7 +436,7 @@ fn handle_triage_evaluate(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                     let origin = crate::agent::triage::local_trigger_origin();
                     crate::agent::turn_origin::with_origin(
                         origin,
-                        crate::agent::triage::apply_decision(run.clone(), &envelope),
+                        crate::agent::triage::apply_decision(&ctx, run.clone(), &envelope),
                     )
                     .await
                     .map_err(|e| format!("apply_decision failed: {e}"))?;

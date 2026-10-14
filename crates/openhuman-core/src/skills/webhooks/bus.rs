@@ -317,7 +317,7 @@ async fn run_agent_trigger(ctx: &DispatchCtx,
             let origin = crate::agent::triage::remote_trigger_origin(envelope);
             crate::agent::turn_origin::with_origin(
                 origin,
-                crate::agent::triage::apply_decision(run.clone(), envelope),
+                crate::agent::triage::apply_decision(&ctx, run.clone(), envelope),
             )
             .await
             .map_err(|e| format!("apply_decision failed: {e}"))?;

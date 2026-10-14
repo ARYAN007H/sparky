@@ -314,7 +314,7 @@ pub(super) async fn snapshot_with(ctx: &DispatchCtx, scenario: &'static Scenario
         .map(|snapshot| snapshot.to_json())
         .unwrap_or(Value::Null);
 
-    host.turn("next message").await.expect("next turn");
+    host.turn(&ctx, "next message").await.expect("next turn");
     let request = next
         .requests()
         .last()
@@ -384,7 +384,7 @@ fn legacy_meta(thread: &str, agent: &str, created: &str) -> TranscriptMeta {
     }
 }
 
-async fn capture_turns(name: &str, native: bool, responses: Vec<ModelResponse>, turns: &[&str]) {
+async fn capture_turns(ctx: &DispatchCtx, name: &str, native: bool, responses: Vec<ModelResponse>, turns: &[&str]) {
     let root = tempfile::tempdir().expect("tempdir");
     let mut host = build_host(
         root.path(),
@@ -394,7 +394,7 @@ async fn capture_turns(name: &str, native: bool, responses: Vec<ModelResponse>, 
     );
     let stem = host.session_id().expect("session id");
     for turn in turns {
-        host.turn(turn).await.expect("capture turn");
+        host.turn(&ctx, turn).await.expect("capture turn");
     }
     drop(host);
     copy_session(root.path(), &stem, &fixture(&format!("{name}.jsonl")));
@@ -404,7 +404,7 @@ async fn capture_all(ctx: &DispatchCtx, ) {
     std::fs::create_dir_all(FIXTURE_DIR).expect("fixture dir");
     let text = |s: &str| response(vec![ContentBlock::Text(s.into())], Vec::new());
 
-    capture_turns(
+    capture_turns(&ctx, 
         "plain",
         true,
         vec![text("alpha"), text("beta")],
@@ -412,7 +412,7 @@ async fn capture_all(ctx: &DispatchCtx, ) {
     )
     .await;
 
-    capture_turns(
+    capture_turns(&ctx, 
         "native_tools",
         true,
         vec![
@@ -436,7 +436,7 @@ async fn capture_all(ctx: &DispatchCtx, ) {
     )
     .await;
 
-    capture_turns(
+    capture_turns(&ctx, 
         "image_user",
         true,
         vec![text("saw it")],
@@ -444,7 +444,7 @@ async fn capture_all(ctx: &DispatchCtx, ) {
     )
     .await;
 
-    capture_turns(
+    capture_turns(&ctx, 
         "xml_tools",
         false,
         vec![
@@ -468,7 +468,7 @@ async fn capture_all(ctx: &DispatchCtx, ) {
         );
         let stem = host.session_id().expect("session id");
         for turn in ["one", "two", "three"] {
-            host.turn(turn).await.expect("capture turn");
+            host.turn(&ctx, turn).await.expect("capture turn");
         }
         drop(host);
         let path = stem_path(root.path(), &stem);
@@ -503,7 +503,7 @@ async fn capture_all(ctx: &DispatchCtx, ) {
         );
         let stem = host.session_id().expect("session id");
         for turn in ["one", "two"] {
-            host.turn(turn).await.expect("capture turn");
+            host.turn(&ctx, turn).await.expect("capture turn");
         }
         drop(host);
         let path = stem_path(root.path(), &stem);
@@ -634,7 +634,7 @@ fn assert_retired_tool_replay(ctx: &DispatchCtx, identity_bound: bool) {
             .expect("archive host");
         first.set_thread_id(Some("retired-audio-thread"));
         first
-            .turn("save this old conversation")
+            .turn(&ctx, "save this old conversation")
             .await
             .expect("archive turn");
         let transcript_path = stem_path(root.path(), &first.session_id().expect("session id"));
@@ -691,7 +691,7 @@ fn assert_retired_tool_replay(ctx: &DispatchCtx, identity_bound: bool) {
             archived_bytes
         );
         let output = resumed
-            .turn("continue this conversation")
+            .turn(&ctx, "continue this conversation")
             .await
             .expect("usable resumed turn");
         assert_eq!(output, "continued without the retired tool");

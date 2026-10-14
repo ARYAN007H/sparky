@@ -610,8 +610,8 @@ impl OpenHumanSessionHost {
     }
 
     /// Dispatch one public OpenHuman turn through the neutral runtime.
-    pub async fn turn(&mut self, user_message: &str) -> Result<String> {
-        self.turn_with_origin(user_message, None).await
+    pub async fn turn(&mut self, ctx: &DispatchCtx, user_message: &str) -> Result<String> {
+        self.turn_with_origin(&ctx, user_message, None).await
     }
 
     pub(in crate::agent::session_host) fn ensure_runtime_session(&mut self, ctx: &DispatchCtx) -> Result<()> {

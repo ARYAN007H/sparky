@@ -53,14 +53,14 @@ struct Worker {
 }
 
 impl Worker {
-    fn register(workspace: &std::path::Path) -> Self {
+    fn register(ctx: &DispatchCtx, workspace: &std::path::Path) -> Self {
         let task = uuid::Uuid::new_v4().to_string();
         let session = uuid::Uuid::new_v4().to_string();
         let queue = run_queue();
         let (tx, rx) = status_channel();
         let task_handle = tokio::spawn(std::future::pending::<()>());
         let abort = task_handle.abort_handle();
-        register(
+        register(&ctx, 
             task.clone(),
             "researcher".into(),
             PARENT.into(),
@@ -100,13 +100,13 @@ struct Pair {
 }
 
 impl Pair {
-    fn new() -> Self {
+    fn new(ctx: &DispatchCtx, ) -> Self {
         let a_dir = tempfile::tempdir().unwrap();
         let b_dir = tempfile::tempdir().unwrap();
         let alice = profile("detached-alice", a_dir.path());
         let bob = profile("detached-bob", b_dir.path());
-        let a = CoreContext::sync_scope(alice.clone(), || Worker::register(a_dir.path()));
-        let b = CoreContext::sync_scope(bob.clone(), || Worker::register(b_dir.path()));
+        let a = CoreContext::sync_scope(alice.clone(), || Worker::register(&ctx, a_dir.path()));
+        let b = CoreContext::sync_scope(bob.clone(), || Worker::register(&ctx, b_dir.path()));
         Self {
             _a_dir: a_dir,
             _b_dir: b_dir,
@@ -163,7 +163,7 @@ async fn saas_dispatch_exposes_only_the_callers_detached_worker_controls() {
     ) {
         return;
     }
-    let mut pair = Pair::new();
+    let mut pair = Pair::new(&DispatchCtx::process_default());
     let admitted = |name: &str, workspace: &std::path::Path| {
         CoreContext::for_test(DomainSet::saas(), None).derive_with(
             ContextOverlay::new(
@@ -337,7 +337,7 @@ async fn same_parent_rosters_are_profile_isolated() {
     if !child("same_parent_rosters_are_profile_isolated", Mode::Saas) {
         return;
     }
-    let pair = Pair::new();
+    let pair = Pair::new(&DispatchCtx::process_default());
     for (ctx, own) in [(&pair.alice, &pair.a), (&pair.bob, &pair.b)] {
         let tasks = CoreContext::sync_scope(ctx.clone(), || snapshot_for_parent(PARENT));
         assert_eq!(
@@ -355,7 +355,7 @@ async fn same_parent_resolution_and_wait_refuse_foreign_workers() {
     ) {
         return;
     }
-    let pair = Pair::new();
+    let pair = Pair::new(&DispatchCtx::process_default());
     CoreContext::scope(pair.bob.clone(), async {
         assert!(matches!(
             task_id_for_session(&pair.a.session, PARENT),
@@ -385,7 +385,7 @@ async fn same_parent_agent_steering_refuses_foreign_worker() {
     ) {
         return;
     }
-    let pair = Pair::new();
+    let pair = Pair::new(&DispatchCtx::process_default());
     CoreContext::scope(pair.bob.clone(), async {
         assert_eq!(
             steer(&pair.a.task, PARENT, "foreign".into(), QueueLane::Steer).await,
@@ -405,7 +405,7 @@ async fn public_steering_refuses_another_profiles_task() {
     if !child("public_steering_refuses_another_profiles_task", Mode::Saas) {
         return;
     }
-    let pair = Pair::new();
+    let pair = Pair::new(&DispatchCtx::process_default());
     CoreContext::scope(pair.bob.clone(), async {
         assert_eq!(
             field(&control("steer", &pair.a.task).await, "steered"),
@@ -429,7 +429,7 @@ async fn public_cancellation_refuses_another_profiles_task() {
     ) {
         return;
     }
-    let pair = Pair::new();
+    let pair = Pair::new(&DispatchCtx::process_default());
     CoreContext::scope(pair.bob.clone(), async {
         assert_eq!(
             field(&control("cancel", &pair.a.task).await, "cancelled"),
@@ -459,7 +459,7 @@ async fn missing_saas_scope_cannot_observe_or_control_workers() {
     ) {
         return;
     }
-    let pair = Pair::new();
+    let pair = Pair::new(&DispatchCtx::process_default());
     assert!(CoreContext::scoped().is_none());
     assert!(snapshot_for_parent(PARENT).is_empty());
     assert!(matches!(
@@ -510,7 +510,7 @@ async fn desktop_public_controls_remain_available_without_parent_scope() {
         return;
     }
     let directory = tempfile::tempdir().unwrap();
-    let worker = Worker::register(directory.path());
+    let worker = Worker::register(&DispatchCtx::process_default(), directory.path());
     assert_eq!(snapshot_for_parent(PARENT).len(), 1);
     assert_eq!(
         field(&control("steer", &worker.task).await, "steered"),

@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 use async_trait::async_trait;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -153,7 +154,7 @@ async fn explicit_worker_thread_replaces_parent_for_model_run_and_transcript() {
     parent.thread_id = Some("parent-thread".to_owned());
     let mut history = vec![TranscriptMessage::user("finish this")];
 
-    run_subagent_via_graph(
+    run_subagent_via_graph(&DispatchCtx::process_default(), 
         crate::agent::tinyagents::TurnModelSource::from_model(Arc::new(TwoStepProvider {
             calls: AtomicUsize::new(1),
         })),
@@ -206,7 +207,7 @@ async fn subagent_runs_through_the_graph_engine_with_real_tools() {
     allowed.insert("echo".to_string());
     let mut history = vec![TranscriptMessage::user("please echo hi")];
 
-    let (output, iterations, usage, early_exit, hit_cap, _breaker) = run_subagent_via_graph(
+    let (output, iterations, usage, early_exit, hit_cap, _breaker) = run_subagent_via_graph(&DispatchCtx::process_default(), 
         crate::agent::tinyagents::TurnModelSource::from_model(provider),
         "mock-model",
         0.0,
@@ -292,7 +293,7 @@ async fn child_text_and_thinking_deltas_are_scoped_to_the_subagent() {
     let parent_tools: Arc<Vec<Box<dyn Tool>>> = Arc::new(vec![]);
     let mut history = vec![TranscriptMessage::user("hi")];
 
-    let (output, _iters, _usage, _early, _hit_cap, _breaker) = run_subagent_via_graph(
+    let (output, _iters, _usage, _early, _hit_cap, _breaker) = run_subagent_via_graph(&DispatchCtx::process_default(), 
         crate::agent::tinyagents::TurnModelSource::from_model(Arc::new(ThinkingStreamProvider)),
         "mock-model",
         0.0,
@@ -428,7 +429,7 @@ async fn ask_user_clarification_pauses_and_surfaces_the_question() {
     allowed.insert("ask_user_clarification".to_string());
     let mut history = vec![TranscriptMessage::user("help me")];
 
-    let (output, iterations, _usage, early_exit, _hit_cap, _breaker) = run_subagent_via_graph(
+    let (output, iterations, _usage, early_exit, _hit_cap, _breaker) = run_subagent_via_graph(&DispatchCtx::process_default(), 
         crate::agent::tinyagents::TurnModelSource::from_model(provider.clone()),
         "mock-model",
         0.0,
@@ -520,7 +521,7 @@ async fn cap_hit_summarizes_a_resumable_checkpoint() {
     allowed.insert("noop".to_string());
     let mut history = vec![TranscriptMessage::user("do a big task")];
 
-    let (output, iterations, _usage, early_exit, hit_cap, _breaker) = run_subagent_via_graph(
+    let (output, iterations, _usage, early_exit, hit_cap, _breaker) = run_subagent_via_graph(&DispatchCtx::process_default(), 
         crate::agent::tinyagents::TurnModelSource::from_model(Arc::new(LoopForeverProvider)),
         "mock-model",
         0.0,

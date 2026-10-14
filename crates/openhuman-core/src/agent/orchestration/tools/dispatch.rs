@@ -97,7 +97,7 @@ impl ToolDispatch<(), crate::agent::tinyagents::host::OpenHumanRunContext> for D
                         )));
                     }
                 };
-                super::collapsed_delegation::execute_collapsed_delegation_with_live_parent(
+                super::collapsed_delegation::execute_collapsed_delegation_with_live_parent(&DispatchCtx::ambient(), 
                     targets,
                     arguments,
                     Some(&tool_context),
@@ -121,7 +121,7 @@ impl ToolDispatch<(), crate::agent::tinyagents::host::OpenHumanRunContext> for D
                         self.tool.name()
                     )));
                 };
-                super::archetype_delegation::execute_archetype_delegation_with_live_parent(
+                super::archetype_delegation::execute_archetype_delegation_with_live_parent(&DispatchCtx::ambient(), 
                     &agent_id,
                     self.tool.name(),
                     arguments,
@@ -325,7 +325,7 @@ pub(crate) async fn dispatch_subagent_with_live_parent(ctx: &DispatchCtx,
                     .map_err(|error| anyhow::anyhow!(error.to_string()))?
                     .with_cancellation(detached_cancellation);
                 super::spawn_async_subagent::SpawnAsyncSubagentTool::new()
-                    .execute_with_live_parent_context(
+                    .execute_with_live_parent_context(&ctx, 
                         async_args,
                         tool_context,
                         run_context,

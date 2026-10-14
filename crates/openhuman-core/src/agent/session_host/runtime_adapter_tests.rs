@@ -524,14 +524,14 @@ fn a_cold_resumed_thread_can_send_again() {
                 .enable_all()
                 .build()
                 .expect("test runtime")
-                .block_on(cold_resumed_thread_can_send_again());
+                .block_on(cold_resumed_thread_can_send_again(&DispatchCtx::process_default()));
         })
         .expect("test thread")
         .join()
         .expect("test thread panicked");
 }
 
-async fn cold_resumed_thread_can_send_again() {
+async fn cold_resumed_thread_can_send_again(ctx: &DispatchCtx, ) {
     let root = tempfile::tempdir().expect("tempdir");
     let model: Arc<dyn tinyinference_llm::model::ChatModel<()>> =
         Arc::new(tinyagents_harness::testkit::ScriptedModel::new(vec![
@@ -551,11 +551,11 @@ async fn cold_resumed_thread_can_send_again() {
     let mut host = new_host();
     host.set_thread_id(Some("thread-resume-regression"));
 
-    assert_eq!(host.turn("first message").await.unwrap(), "first reply");
+    assert_eq!(host.turn(&ctx, "first message").await.unwrap(), "first reply");
     drop(host);
     let mut host = new_host();
     host.set_thread_id(Some("thread-resume-regression"));
-    assert_eq!(host.turn("second message").await.unwrap(), "second reply");
+    assert_eq!(host.turn(&ctx, "second message").await.unwrap(), "second reply");
 }
 
 /// The PRODUCTION turn path must wire an artifact store, rooted outside the
@@ -675,14 +675,14 @@ fn reply_language_directive_rides_each_user_message_until_cleared() {
                 .enable_all()
                 .build()
                 .expect("test runtime")
-                .block_on(reply_language_directive_rides_each_user_message_until_cleared_body());
+                .block_on(reply_language_directive_rides_each_user_message_until_cleared_body(&DispatchCtx::process_default()));
         })
         .expect("test thread")
         .join()
         .expect("test thread panicked");
 }
 
-async fn reply_language_directive_rides_each_user_message_until_cleared_body() {
+async fn reply_language_directive_rides_each_user_message_until_cleared_body(ctx: &DispatchCtx, ) {
     const DIRECTIVE: &str = "User language: respond in Spanish (test directive).";
     let root = tempfile::tempdir().expect("tempdir");
     let model = Arc::new(tinyagents_harness::testkit::ScriptedModel::new(vec![
@@ -710,9 +710,9 @@ async fn reply_language_directive_rides_each_user_message_until_cleared_body() {
 
     host.set_reply_language_directive(Some(DIRECTIVE.to_string()));
     host.set_time_zone(Some("Pacific/Chatham".to_string()));
-    assert_eq!(host.turn("¿qué tal?").await.unwrap(), "hola");
+    assert_eq!(host.turn(&ctx, "¿qué tal?").await.unwrap(), "hola");
     host.set_reply_language_directive(None);
-    assert_eq!(host.turn("and now?").await.unwrap(), "hello");
+    assert_eq!(host.turn(&ctx, "and now?").await.unwrap(), "hello");
 
     let requests = model.requests();
     assert_eq!(requests.len(), 2, "one model call per turn");

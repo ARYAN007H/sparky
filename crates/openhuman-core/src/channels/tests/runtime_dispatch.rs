@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::super::context::{ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS};
 use super::super::runtime::test_support::{run_dispatch_harness, DispatchHarnessOptions};
 use super::super::runtime::{
@@ -184,7 +185,7 @@ async fn message_dispatch_processes_messages_in_parallel() {
 
 #[tokio::test]
 async fn process_channel_message_cancels_scoped_typing_task() {
-    let _bus_guard = use_real_agent_handler().await;
+    let _bus_guard = use_real_agent_handler(&DispatchCtx::process_default()).await;
     let channel_impl = Arc::new(RecordingChannel::default());
     let channel: Arc<dyn Channel> = channel_impl.clone();
 

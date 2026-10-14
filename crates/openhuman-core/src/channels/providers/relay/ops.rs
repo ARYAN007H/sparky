@@ -239,7 +239,7 @@ pub(crate) async fn run_relay_turn(
     // Idle again: deliver anything that finished while the turn ran. No
     // `AgentTurnCompleted` maps to this thread, so nothing else would.
     drop(busy);
-    crate::agent::orchestration::background_delivery::kick_delivery(&thread_id);
+    crate::agent::orchestration::background_delivery::kick_delivery(&ctx, &thread_id);
     tracing::info!(
         channel = %params.channel,
         thread_id = %thread_id,

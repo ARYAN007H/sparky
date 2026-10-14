@@ -10,11 +10,11 @@ use crate::agent::{
 impl OpenHumanSessionHost {
     /// Dispatch a turn with authority supplied by its owning entry point.
     pub async fn turn_with_origin(
-        &mut self,
+        &mut self, ctx: &DispatchCtx,
         user_message: &str,
         origin: Option<&crate::agent::turn_origin::AgentTurnOrigin>,
     ) -> Result<String> {
-        self.turn_with_approval(user_message, origin, Default::default())
+        self.turn_with_approval(&ctx, user_message, origin, Default::default())
             .await
     }
 

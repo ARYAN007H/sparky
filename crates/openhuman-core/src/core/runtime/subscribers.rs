@@ -423,7 +423,7 @@ pub(super) fn register_domain_subscribers(ctx: &DispatchCtx,
             // Native request handlers — the agent `agent.run_turn` handler is
             // what channel dispatch calls instead of importing
             // `run_tool_call_loop` directly.
-            crate::agent::bus::register_agent_handlers();
+            crate::agent::bus::register_agent_handlers(&ctx);
             // Background-completion delivery: when a detached sub-agent
             // (spawn_async_subagent) finishes, surface its result back into the
             // originating chat as an idle-gated, batched, system-injected turn.

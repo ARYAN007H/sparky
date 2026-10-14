@@ -78,7 +78,7 @@ struct RawSuggestion {
 /// the turn's tracing/Sentry context without holding up the caller. Intended
 /// to be called immediately after the turn's terminal `chat_done` has been
 /// published — see module docs for why this never delays that event.
-pub(crate) fn spawn_follow_up_suggestions(
+pub(crate) fn spawn_follow_up_suggestions(ctx: &DispatchCtx, 
     client_id: String,
     thread_id: String,
     request_id: String,
@@ -87,7 +87,7 @@ pub(crate) fn spawn_follow_up_suggestions(
 ) {
     tokio::spawn(crate::core::runtime::context::CoreContext::propagate(
         async move {
-            generate_and_emit(
+            generate_and_emit(&ctx, 
                 &client_id,
                 &thread_id,
                 &request_id,

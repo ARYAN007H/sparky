@@ -9,6 +9,7 @@
 //! - Connection state logging for observability
 //! - Automatic reconnection with exponential backoff
 
+use crate::core::runtime::DispatchCtx;
 use std::collections::HashMap;
 use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
@@ -323,7 +324,7 @@ impl SocketManager {
     /// producing exactly the kind of retry-storm noise this module is designed to
     /// suppress. Callers receive an actionable error and the RPC response reflects
     /// the actual outcome rather than optimistically reporting `{"status":"Connecting"}`.
-    pub async fn connect(&self, url: &str, token: &str) -> Result<(), String> {
+    pub async fn connect(&self, ctx: &DispatchCtx, url: &str, token: &str) -> Result<(), String> {
         if token.trim().is_empty() {
             log::error!("[socket] connect: refusing to start — empty session token");
             return Err("empty session token — authenticate first".to_string());
@@ -334,7 +335,7 @@ impl SocketManager {
         // live-session refresh, callers should use `connect_with_session` which
         // builds a provider via `token_provider_from_config`.
         let provider = static_token_provider(token.to_string());
-        self.spawn_loop(url, provider, token.to_string()).await
+        self.spawn_loop(&ctx, url, provider, token.to_string()).await
     }
 
     /// Connect using a **live-refresh token provider**.
@@ -349,7 +350,7 @@ impl SocketManager {
     /// before the background task is spawned — callers receive an actionable
     /// `Err` if no token is stored rather than spawning a doomed retry loop.
     pub async fn connect_with_provider(
-        &self,
+        &self, ctx: &DispatchCtx,
         url: &str,
         token_provider: TokenProvider,
     ) -> Result<(), String> {
@@ -371,7 +372,7 @@ impl SocketManager {
                 return Err(e);
             }
         };
-        self.spawn_loop(url, token_provider, token).await
+        self.spawn_loop(&ctx, url, token_provider, token).await
     }
 
     /// Shared spawn path used by both [`connect`] and [`connect_with_provider`].
@@ -384,7 +385,7 @@ impl SocketManager {
     /// sent, so `is_live_for` compares against the credential this connection was
     /// actually started with.
     async fn spawn_loop(
-        &self,
+        &self, ctx: &DispatchCtx,
         url: &str,
         provider: TokenProvider,
         token: String,
@@ -442,7 +443,7 @@ impl SocketManager {
             .store(false, Ordering::Release);
 
         let handle = tokio::spawn(async move {
-            ws_loop(
+            ws_loop(&ctx, 
                 url,
                 provider,
                 shared,

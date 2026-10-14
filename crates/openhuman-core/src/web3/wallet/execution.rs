@@ -22,7 +22,7 @@ use super::ops::WalletChain;
 /// Default row for every supported network, with the host's endpoints.
 pub async fn network_defaults(ctx: &DispatchCtx, ) -> Result<Outcome<Vec<WalletNetworkDefaults>>, String> {
     let config = config_rpc::load_config_with_timeout(&ctx).await?;
-    let result = wallet_service::with_native_wallet(&config, |service| async {
+    let result = wallet_service::with_native_wallet(&ctx, &config, |service| async {
         wallet_module::call(
             &config,
             methods::NATIVE_WALLET_NETWORK_DEFAULTS,
@@ -41,7 +41,7 @@ pub async fn network_defaults(ctx: &DispatchCtx, ) -> Result<Outcome<Vec<WalletN
 /// Every asset the wallet catalogues.
 pub async fn supported_assets(ctx: &DispatchCtx, ) -> Result<Outcome<Vec<SupportedAsset>>, String> {
     let config = config_rpc::load_config_with_timeout(&ctx).await?;
-    let result = wallet_service::with_native_wallet(&config, |service| async {
+    let result = wallet_service::with_native_wallet(&ctx, &config, |service| async {
         wallet_module::call(
             &config,
             methods::NATIVE_WALLET_SUPPORTED_ASSETS,
@@ -60,7 +60,7 @@ pub async fn supported_assets(ctx: &DispatchCtx, ) -> Result<Outcome<Vec<Support
 /// Which chains have an account and a provider.
 pub async fn chain_status(ctx: &DispatchCtx, ) -> Result<Outcome<Vec<ChainStatus>>, String> {
     let config = config_rpc::load_config_with_timeout(&ctx).await?;
-    let result = wallet_service::with_native_wallet(&config, |service| async {
+    let result = wallet_service::with_native_wallet(&ctx, &config, |service| async {
         wallet_module::call(
             &config,
             methods::NATIVE_WALLET_CHAIN_STATUS,
@@ -79,7 +79,7 @@ pub async fn chain_status(ctx: &DispatchCtx, ) -> Result<Outcome<Vec<ChainStatus
 /// Live native balances.
 pub async fn balances(ctx: &DispatchCtx, ) -> Result<Outcome<Vec<BalanceInfo>>, String> {
     let config = config_rpc::load_config_with_timeout(&ctx).await?;
-    let result = wallet_service::with_native_wallet(&config, |service| async {
+    let result = wallet_service::with_native_wallet(&ctx, &config, |service| async {
         wallet_module::call(
             &config,
             methods::NATIVE_WALLET_BALANCES,
@@ -132,7 +132,7 @@ pub async fn tx_status(ctx: &DispatchCtx,
     hash: &str,
 ) -> Result<Outcome<TxStatusInfo>, String> {
     let config = config_rpc::load_config_with_timeout(&ctx).await?;
-    let result = wallet_service::with_native_wallet(&config, |service| async {
+    let result = wallet_service::with_native_wallet(&ctx, &config, |service| async {
         wallet_module::call(
             &config,
             methods::NATIVE_WALLET_TX_STATUS,
@@ -160,7 +160,7 @@ pub async fn tx_receipt(ctx: &DispatchCtx,
     hash: &str,
 ) -> Result<Outcome<TxReceiptInfo>, String> {
     let config = config_rpc::load_config_with_timeout(&ctx).await?;
-    let result = wallet_service::with_native_wallet(&config, |service| async {
+    let result = wallet_service::with_native_wallet(&ctx, &config, |service| async {
         wallet_module::call(
             &config,
             methods::NATIVE_WALLET_TX_RECEIPT,
@@ -188,7 +188,7 @@ pub async fn lookup_tx(ctx: &DispatchCtx,
     hash: &str,
 ) -> Result<Outcome<TxLookupInfo>, String> {
     let config = config_rpc::load_config_with_timeout(&ctx).await?;
-    let result = wallet_service::with_native_wallet(&config, |service| async {
+    let result = wallet_service::with_native_wallet(&ctx, &config, |service| async {
         wallet_module::call(
             &config,
             methods::NATIVE_WALLET_LOOKUP_TX,

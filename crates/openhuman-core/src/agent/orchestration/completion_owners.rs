@@ -16,6 +16,7 @@
 //!
 //! [`record_outcome`]: super::background_completions::record_outcome
 
+use crate::core::runtime::DispatchCtx;
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
@@ -81,9 +82,9 @@ pub(crate) fn profiles_of(id: &str) -> Vec<String> {
 /// The context to act for `profile` under, off-task: the SaaS agent host's
 /// agent for it, reopened if it was evicted. `None` outside SaaS or for a
 /// profile the host does not know.
-pub(crate) async fn context_for_profile(profile: &str) -> Option<Arc<CoreContext>> {
+pub(crate) async fn context_for_profile(ctx: &DispatchCtx, profile: &str) -> Option<Arc<CoreContext>> {
     let id = crate::profiles::ProfileId::parse(profile).ok()?;
-    match crate::profiles::host::host()?.open(&id).await {
+    match crate::profiles::host::host()?.open(&ctx, &id).await {
         Ok(state) => Some(Arc::clone(state.context())),
         Err(error) => {
             log::warn!("[completion_owners] cannot open the owning agent: {error}");

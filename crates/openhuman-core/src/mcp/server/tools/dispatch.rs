@@ -49,7 +49,7 @@ pub async fn call_tool(ctx: &DispatchCtx,
         Ok(params) => params,
         Err(err) => {
             if write_dispatch::is_write_tool(spec.name) {
-                write_dispatch::audit_write_rejection_without_config(
+                write_dispatch::audit_write_rejection_without_config(&ctx, 
                     spec.name,
                     &audit_arguments,
                     client_info,
@@ -371,7 +371,7 @@ async fn run_subagent_tool(ctx: &DispatchCtx, params: &Map<String, Value>) -> Re
     // `handle_json_value` dispatch above it) keeps a small stack frame.
     let response = Box::pin(subagent_depth::scope(
         child_depth,
-        crate::agent::turn_origin::with_origin(origin, agent.run_single(prompt)),
+        crate::agent::turn_origin::with_origin(origin, agent.run_single(&ctx, prompt)),
     ))
     .await
     .map_err(|err| ToolCallError::Internal(format!("subagent `{agent_id}` failed: {err}")))?;
