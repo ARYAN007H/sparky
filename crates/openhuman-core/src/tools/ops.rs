@@ -173,6 +173,7 @@ pub fn all_tools_with_runtime(
     ));
     tools.extend(crate::agent::artifacts::tiny_store::registered_tools(
         &config.workspace_dir,
+        crate::agent::artifacts::FileRoots::from_config(&config),
     ));
     tools.extend(crate::integrations::task_sources::tools::registered_tools(
         config.clone(),

@@ -175,7 +175,7 @@ impl<T: Tool> MediaArtifactTool<T> {
                         // a fresh versioned record – the shared model stores
                         // a workspace-path reference, not bytes. Best-effort:
                         // a failure here must not fail the filed artifact.
-                        let versioned = FsArtifactStore::new(&self.workspace_dir);
+                        let versioned = FsArtifactStore::new(&self.workspace_dir, self.files_dir.clone());
                         let kind = match self.kind {
                             ArtifactKind::Image => tiny_artifacts::ArtifactKind::Image,
                             _ => tiny_artifacts::ArtifactKind::File,
