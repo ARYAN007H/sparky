@@ -102,7 +102,7 @@ const DEFAULT_APPROVAL_TTL: Duration = Duration::from_secs(60 * 10);
 /// to leave a live Slack/Gmail/HTTP node waiting; if nobody approves within
 /// three minutes, deny and let the authoring turn continue (the user can
 /// still re-trigger the run from the Runs rail). Scoped by
-/// [`APPROVAL_COPILOT_STREAM_CONTEXT`]. Deliberately NOT applied to
+/// [`ApprovalTurnContext::copilot_stream`]. Deliberately NOT applied to
 /// main-chat `WebChat` parks — only `flows::ops::flows_build`'s streaming
 /// branch scopes the task-local below.
 const COPILOT_APPROVAL_TTL: Duration = Duration::from_secs(180);
@@ -141,12 +141,10 @@ pub fn is_unanswered_approval_reason(reason: &str) -> bool {
 }
 
 /// Per-turn chat context for routing a parked approval's yes/no reply back to
-/// the originating thread. The web channel scopes this task-local around the
-/// agent run (`web_chat`); because the `run_turn` handler, the
-/// tool loop, and `intercept` all run inline (`.await`) within that spawned
-/// task, it propagates down to `intercept` with no signature plumbing. Absent
-/// for non-chat callers (CLI, sub-agents) — their approvals are simply not
-/// chat-routable.
+/// the originating thread. The web channel hands it to the turn it starts
+/// (inside an [`ApprovalTurnContext`]); the turn's run context carries it to
+/// the gate and to the tools that read it. Absent for non-chat callers (CLI,
+/// detached sub-agents) — their approvals are simply not chat-routable.
 #[derive(Clone, Debug)]
 pub struct ApprovalChatContext {
     pub thread_id: String,
@@ -160,7 +158,7 @@ pub struct ApprovalChatContext {
 
 /// Per-run flow context (flow-approval-surface, PR2 of the tinyflows
 /// approval-surfacing design). `flows::ops::flows_run` / `flows_resume`
-/// scope this around the engine invocation, alongside the existing
+/// hand it to the engine's capabilities, alongside the existing
 /// `Workflow` [`AgentTurnOrigin`](crate::agent::turn_origin::AgentTurnOrigin),
 /// so a tool call parked from that run can correlate
 /// [`PendingApproval::source_context`](super::types::PendingApproval) back to
@@ -171,6 +169,62 @@ pub struct ApprovalChatContext {
 pub struct FlowRunContext {
     pub flow_id: String,
     pub run_id: String,
+}
+
+/// What the approval gate needs to know about the turn that owns a gated call,
+/// beyond the turn origin: where to route the yes/no reply, whether the turn is
+/// the Flow Canvas copilot, and which flow run it belongs to.
+///
+/// This is an explicit value, handed from the entry point that starts the turn
+/// to the gate check (and to the tools that route their own prompts) through
+/// the turn's run context. It used to be three ambient task-locals, which meant
+/// "no chat context" was indistinguishable from "this task lost its scope".
+///
+/// Deliberately **not** carried across a detached spawn: a detached sub-agent
+/// (`OpenHumanRunContext::detached_child`) starts with the default value, so
+/// its parks route via the origin as `detached` and survive the parent turn
+/// (#5499). Inline children clone their parent's value.
+#[derive(Clone, Debug, Default)]
+pub struct ApprovalTurnContext {
+    /// Thread/client to surface a parked approval to. `None` for non-chat
+    /// callers (CLI, cron, background, detached sub-agents).
+    pub chat: Option<ApprovalChatContext>,
+    /// The turn is the Flow Canvas copilot's streaming `flows_build` path: the
+    /// park window is clamped to [`COPILOT_APPROVAL_TTL`] instead of the gate's
+    /// own (possibly env-overridden) TTL. Plain main-chat `WebChat` turns leave
+    /// it `false` and keep the full [`DEFAULT_APPROVAL_TTL`].
+    pub copilot_stream: bool,
+    /// The flow run the turn belongs to, so a park stamps its
+    /// `PendingApproval::source_context` with the exact flow and run. `None`
+    /// for every non-flow caller.
+    pub flow_run: Option<FlowRunContext>,
+}
+
+impl ApprovalTurnContext {
+    /// A chat-routed turn.
+    pub fn chat(chat: ApprovalChatContext) -> Self {
+        Self {
+            chat: Some(chat),
+            ..Self::default()
+        }
+    }
+
+    /// Marks the turn as the Flow Canvas copilot's streaming build.
+    pub fn with_copilot_stream(mut self) -> Self {
+        self.copilot_stream = true;
+        self
+    }
+
+    /// Binds the turn to one flow run.
+    pub fn with_flow_run(mut self, flow_run: FlowRunContext) -> Self {
+        self.flow_run = Some(flow_run);
+        self
+    }
+
+    /// Whether the turn is interactive: a chat surface is attached to it.
+    pub fn is_interactive(&self) -> bool {
+        self.chat.is_some()
+    }
 }
 
 /// Parse a chat reply to a parked approval into a binary decision (v1). Only an
