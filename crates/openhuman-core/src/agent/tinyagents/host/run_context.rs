@@ -20,7 +20,7 @@ use crate::agent::harness::fork_context::{AgentContextPreparedSource, ParentExec
 use crate::agent::progress::AgentProgress;
 use crate::agent::subagent_host::SubagentUsage;
 use crate::agent::tinyagents::{
-    middleware::TurnContextMiddleware, turn_policy::ToolPolicyEnforcement,
+    middleware::turn_context::TurnContextMiddleware, turn_policy::ToolPolicyEnforcement,
 };
 use crate::agent::turn_origin::AgentTurnOrigin;
 use tinyagents_definition::SandboxMode;
