@@ -7,6 +7,7 @@ use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 
 use super::super::types::WebChatTaskResult;
+use crate::agent::turn_env::HostTurnEnv;
 
 /// Resolve the per-turn wall-clock backstop. Returns `None` when disabled
 /// (env `OPENHUMAN_WEB_TURN_TIMEOUT_SECS=0`).
