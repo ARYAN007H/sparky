@@ -24,7 +24,7 @@
 //!   typed `Timeout` before the backstop drops the turn.
 //!
 //! For every positive backstop, `wind_down < hard_stop < backstop`
-//! (see `turn_deadline_tests.rs`).
+//! (see `turn_backstop_tests.rs`).
 //!
 //! The web-turn guard scopes the deadline on a task-local
 //! ([`with_turn_deadline`]). The top-level session turn
