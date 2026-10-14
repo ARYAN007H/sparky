@@ -418,7 +418,9 @@ pub(crate) use super::operation_context::{
     approval_for_tool, memory_identity_for_tool, parent_agent_id_for_tool, sandbox_mode_for_tool, HostOperationContext,
 };
 #[cfg(test)]
-pub(crate) use super::operation_context::tool_context_with_approval;
+pub(crate) use super::operation_context::{
+    tool_context_with_approval, tool_context_with_memory_identity,
+};
 
 /// OpenHuman product values that tools read from the run through
 /// `ToolExecutionContext::host::<OpenHumanRunExt>()`, installed by

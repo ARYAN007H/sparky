@@ -95,3 +95,18 @@ pub(crate) fn tool_context_with_approval(
         tinyagents_harness::ids::CallId::new("approval-test-call"),
     )
 }
+
+/// A tool execution context for a run that acts on memory as `identity`: what
+/// the harness hands a tool dispatched inside that run.
+#[cfg(test)]
+pub(crate) fn tool_context_with_memory_identity(
+    identity: crate::memory::scope::MemoryIdentity,
+) -> tinyagents_harness::tool::ToolExecutionContext {
+    let mut host = super::OpenHumanRunContext::new();
+    host.memory_identity = Some(identity);
+    let run = host.into_tinyagents(tinyagents_harness::context::RunConfig::new("memory-identity-test"));
+    tinyagents_harness::tool::ToolExecutionContext::from_run_context(
+        &run,
+        tinyagents_harness::ids::CallId::new("memory-identity-test-call"),
+    )
+}
