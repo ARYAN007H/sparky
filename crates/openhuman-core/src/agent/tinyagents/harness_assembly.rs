@@ -514,9 +514,7 @@ pub(super) fn assemble_turn_harness(
     // it keeps enforcing exactly as before, but ALSO compares its per-run token
     // accounting against the observe-only crate `BudgetMiddleware` above at end of
     // run and logs `[budget_shadow]` parity/divergence.
-    harness.push_middleware(Arc::new(middleware::CostBudgetMiddleware::with_shadow(
-        shadow_budget_tracker,
-    )));
+    harness.push_middleware(Arc::new(BudgetParityObserver::new(shadow_budget_tracker)));
     // The context ladder (compression, microcompact, final-call wrap-up,
     // artifact contents list, trim), registered here so each step keeps its
     // place in the middleware order. See `context_wiring.rs`.
