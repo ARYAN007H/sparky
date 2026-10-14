@@ -62,3 +62,19 @@ pub(crate) fn approval_for_tool(
         .map(|host| host.approval.clone())
         .unwrap_or_default()
 }
+
+/// A tool execution context for a run whose approval context is `approval`: what
+/// the harness hands a tool that is dispatched inside that run. Tests drive a
+/// tool through it to prove the turn's approval context reaches the tool.
+#[cfg(test)]
+pub(crate) fn tool_context_with_approval(
+    approval: crate::security::approval::ApprovalTurnContext,
+) -> tinyagents_harness::tool::ToolExecutionContext {
+    let mut host = super::OpenHumanRunContext::new();
+    host.approval = approval;
+    let run = host.into_tinyagents(tinyagents_harness::context::RunConfig::new("approval-test"));
+    tinyagents_harness::tool::ToolExecutionContext::from_run_context(
+        &run,
+        tinyagents_harness::ids::CallId::new("approval-test-call"),
+    )
+}
