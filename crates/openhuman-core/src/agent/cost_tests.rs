@@ -5,6 +5,22 @@ fn counts(input: u64, output: u64, cached: u64) -> BilledUsage {
     BilledUsage::from_counts(input, output).with_cached_input_tokens(cached)
 }
 
+/// Fold one call into `turn` the way the live stop-hook chain does: as a
+/// harness `ModelResponse` (the host's wire form, charge in `raw`) recorded by
+/// the harness `StopHookMetrics` impl, priced through the catalog lookup.
+fn record(turn: &mut tinyagents_harness::cost::TurnCost, model: &str, usage: &BilledUsage) {
+    use tinyagents_harness::middleware::StopHookMetrics as _;
+    let response = crate::agent::tinyagents::model::native_model_response_for_request(
+        &crate::inference::provider::ChatResponse {
+            text: Some("ok".into()),
+            usage: Some(usage.clone()),
+            ..Default::default()
+        },
+        &tinyinference_llm::model::ModelRequest::default(),
+    );
+    turn.record_model(model, &response);
+}
+
 /// The thread that exposed the guess: glm-5.3-flash is not catalogued, and a
 /// $3 / $0.30 / $15 per-MTok default priced its 72-call turn at $3.02 when the
 /// provider billed about $0.22.
@@ -54,16 +70,16 @@ fn an_estimate_carried_on_the_usage_is_not_taken_for_a_charge() {
 
 #[test]
 fn a_turn_with_any_unknown_call_has_no_total() {
-    let mut turn = TurnCost::new();
-    turn.add_call(UNCATALOGUED, &counts(10, 1, 0).with_charged_usd(0.5));
+    let mut turn = turn_cost();
+    record(&mut turn, UNCATALOGUED, &counts(10, 1, 0).with_charged_usd(0.5));
     assert_eq!(turn.total_usd(), Some(0.5));
     assert_eq!(turn.cost.source, CostSource::Charged);
 
-    turn.add_call(CATALOGUED, &counts(1_000_000, 0, 0));
+    record(&mut turn, CATALOGUED, &counts(1_000_000, 0, 0));
     assert_eq!(turn.cost.source, CostSource::Estimated);
     assert!((turn.total_usd().unwrap() - 3.5).abs() < 1e-9);
 
-    turn.add_call(UNCATALOGUED, &counts(10, 1, 0));
+    record(&mut turn, UNCATALOGUED, &counts(10, 1, 0));
     assert_eq!(turn.cost.source, CostSource::Unknown);
     assert_eq!(turn.total_usd(), None, "an unknown call voids the total");
     assert_eq!(turn.call_count, 3);
@@ -128,9 +144,9 @@ fn a_scripted_multi_call_turn_totals_are_unchanged() {
         (CATALOGUED, counts(2_000_000, 1_000_000, 1_000_000)),
         ("vendor/model:free", counts(900, 50, 0)),
     ];
-    let mut turn = TurnCost::new();
+    let mut turn = turn_cost();
     for (model, usage) in &calls {
-        turn.add_call(model, usage);
+        record(&mut turn, model, usage);
     }
     assert_eq!(turn.call_count, 4);
     assert_eq!(turn.input_tokens, 2_009_400);
