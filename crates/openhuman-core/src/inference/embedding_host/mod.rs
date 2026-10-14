@@ -28,6 +28,8 @@ pub use factory::{
     default_embedding_provider_with_config,
 };
 pub use rpc::provider_from_config;
+/// The trait a provider built here implements, for hosts that hold one.
+pub use tinyinference_embeddings::EmbeddingModel;
 pub use schemas::{
     all_controller_schemas as all_embeddings_controller_schemas,
     all_registered_controllers as all_embeddings_registered_controllers,

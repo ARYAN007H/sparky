@@ -14,7 +14,7 @@ use openhuman_embed::__host::agent::tinyagents::discovery::{
 };
 use openhuman_embed::__host::config::Config;
 use openhuman_embed::__host::security::approval::ApprovalChatContext;
-use tinyinference_embeddings::EmbeddingModel;
+use openhuman_embed::__host::inference::embedding_host::EmbeddingModel;
 use tinyjevclient::Client;
 use tinytools::{RankCandidate, RankContext, RankError, RankHit, ToolRanker};
 use tinytools_jev::{JevRanker, JevRankerConfig, JevStrategy};
@@ -34,6 +34,15 @@ pub type ConfigLoader =
 /// a test hands in one that records the chat.
 pub type EmbedderFactory =
     Arc<dyn Fn(&Config, Option<ApprovalChatContext>) -> Arc<dyn EmbeddingModel> + Send + Sync>;
+
+/// The core's configured embedding provider, routed to the chat when there is one.
+fn default_embedder() -> EmbedderFactory {
+    Arc::new(|config, chat| {
+        openhuman_embed::__host::inference::embedding_host::default_embedding_provider_for_chat(
+            config, chat,
+        )
+    })
+}
 
 /// Where the ranker reads the two env-provided Jev keys. The default is the
 /// process environment; a test hands in a fixed table.
@@ -101,11 +110,7 @@ impl TinyHumansJevRanker {
                 Box::pin(openhuman_embed::__host::config::ops::load_config_with_timeout())
             }),
             env: Arc::new(route::process_env),
-            embedder: Arc::new(|config, chat| {
-                openhuman_embed::__host::inference::embedding_host::default_embedding_provider_for_chat(
-                    config, chat,
-                )
-            }),
+            embedder: default_embedder(),
             deadline: DEFAULT_DEADLINE,
             cached: Mutex::new(None),
         }
