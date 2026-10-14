@@ -24,8 +24,6 @@ mod context_wiring;
 mod deadline_wind_down;
 pub mod discovery;
 mod embeddings;
-mod harness_assembly;
-pub(crate) mod harness_tool_registration;
 pub mod host;
 pub(crate) mod hosted_error;
 pub(crate) mod journal;
@@ -58,14 +56,15 @@ mod routes;
 mod steering_forwarder;
 pub(crate) mod stop_hooks;
 pub mod todos;
-pub(crate) mod tools;
+pub(crate) mod tool_registration;
 mod turn_models;
 mod turn_outcome;
 mod turn_policy;
 mod turn_run_error;
 mod turn_run_finalize;
-mod turn_runner;
-mod turn_runner_boxed;
+mod turn_exec;
+mod turn_middleware;
+mod turn_plan;
 mod use_skill_dispatch;
 mod verify_before_finish;
 
@@ -89,7 +88,7 @@ pub(crate) use turn_policy::{
     agent_turn_wall_clock_ms_for, chat_provider_is_local, local_web_turn_backstop_secs,
     ToolPolicyEnforcement,
 };
-pub(crate) use turn_runner::{run_root_turn_via_hosted_agent, run_turn_via_tinyagents_shared};
+pub(crate) use turn_exec::{run_root_turn_via_hosted_agent, run_turn_via_tinyagents_shared};
 
 // Test-only glue so `tinyagents_tests.rs`'s `use super::*;` sees the
 // lower-level policy helpers it exercises directly (they otherwise stay

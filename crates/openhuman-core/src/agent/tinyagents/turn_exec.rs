@@ -635,7 +635,6 @@ async fn run_turn_via_tinyagents_body(
             failure_map: failure_map.clone(),
             provider_usage_carry: provider_usage_carry.clone(),
             tool_outcome_sink: tool_outcome_sink.clone(),
-            tool_result_artifact_index,
         },
     );
     if let Some(scope) = run_context.response_shape.clone() {

@@ -26,7 +26,6 @@ use tinyagents_harness::middleware::{
 };
 use tinyagents_harness::runtime::AgentHarness;
 use tinyagents_harness::steering::SteeringHandle;
-use tinyagents_harness::store::InMemoryStore as ToolResultArtifactIndexStore;
 use tinyagents_harness::turn_outcome::{HaltSummarySlot, ToolOutcomeSink};
 use tinyagents_harness::turn_policy::REPEATED_TOOL_FAILURE_THRESHOLD;
 use tinyinference_llm::model::CapabilitySet;
@@ -97,9 +96,6 @@ pub(super) struct TurnMiddlewareInputs {
     pub(super) provider_usage_carry: ProviderUsageCarry,
     /// Per-call tool success/content capture for honest `ToolCallRecord`s.
     pub(super) tool_outcome_sink: ToolOutcomeSink,
-    /// Store index for action-dir tool-result artifacts (`Some` exactly when the
-    /// context middleware has an artifact store).
-    pub(super) tool_result_artifact_index: Option<Arc<ToolResultArtifactIndexStore>>,
 }
 
 /// The handles the run loop reads after the drive returns.
@@ -149,7 +145,6 @@ pub(super) fn install_turn_middleware(
         failure_map,
         provider_usage_carry,
         tool_outcome_sink,
-        tool_result_artifact_index,
     } = inputs;
     let model = model.as_str();
     crate::tools::timeout::install_harness_tool_timeouts(harness);
