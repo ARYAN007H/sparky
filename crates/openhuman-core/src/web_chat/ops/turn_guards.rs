@@ -100,6 +100,21 @@ where
     }
 }
 
+/// The host environment a guarded turn runs with: its own session cancellation
+/// (returned too, so a Stop can fire it) and the `TurnDeadline` derived from the
+/// backstop, `None` when the backstop is disabled.
+fn turn_host_env(
+    backstop: Option<Duration>,
+) -> (HostTurnEnv, tinyagents_harness::cancel::CancellationToken) {
+    let turn_cancellation = tinyagents_harness::cancel::CancellationToken::new();
+    let env = HostTurnEnv {
+        cancellation: Some(turn_cancellation.clone()),
+        turn_deadline: backstop.map(tinyagents_harness::turn_deadline::TurnDeadline::starting_now),
+        ..HostTurnEnv::default()
+    };
+    (env, turn_cancellation)
+}
+
 /// Run a chat-turn future under the two standard web-channel guards, inside the
 /// shared origin + approval-context scope: the cooperative cancel token
 /// (interrupt/cancel paths tear the turn down at its next await point) and the
@@ -131,12 +146,7 @@ where
     F: std::future::Future<Output = Result<WebChatTaskResult, String>>,
 {
     let deadline = resolve_web_turn_deadline().await;
-    let turn_cancellation = tinyagents_harness::cancel::CancellationToken::new();
-    let env = HostTurnEnv {
-        cancellation: Some(turn_cancellation.clone()),
-        turn_deadline: deadline.map(tinyagents_harness::turn_deadline::TurnDeadline::starting_now),
-        ..HostTurnEnv::default()
-    };
+    let (env, turn_cancellation) = turn_host_env(deadline);
     let fut = build_turn(env);
     run_until_stopped(
         cancel_token,
