@@ -33,15 +33,24 @@ async fn attachment_policy_does_not_replace_original_host_authority() {
         ],
     };
     assert!(matches!(
-        { let (ctx, call) = request("hivemind_message"); policy.check(&ctx, &call).await },
+        {
+            let (ctx, call) = request("hivemind_message");
+            policy.check(&ctx, &call).await
+        },
         PolicyDecision::Allow
     ));
     assert!(matches!(
-        { let (ctx, call) = request("host_original"); policy.check(&ctx, &call).await },
+        {
+            let (ctx, call) = request("host_original");
+            policy.check(&ctx, &call).await
+        },
         PolicyDecision::Deny { .. }
     ));
     assert!(matches!(
-        { let (ctx, call) = request("hivemind_create"); policy.check(&ctx, &call).await },
+        {
+            let (ctx, call) = request("hivemind_create");
+            policy.check(&ctx, &call).await
+        },
         PolicyDecision::Deny { .. }
     ));
 }
