@@ -20,6 +20,7 @@ import { Button } from '../../../components/ui';
 import { useT } from '../../../lib/i18n/I18nContext';
 import { useAppSelector } from '../../../store/hooks';
 import type { ArtifactSnapshot } from '../../../store/chatRuntimeSlice';
+import { invoke } from '@tauri-apps/api/core';
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -217,10 +218,12 @@ function ArtifactToolbar({
 function ArtifactContent({ artifact }: { artifact: ArtifactSnapshot }) {
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [artifactKind, setArtifactKind] = useState<string>(artifact.kind);
+  const [version, setVersion] = useState(1);
 
-  // Fetch content from the file path when possible
+  // Fetch artifact body from versioned store via Tauri IPC
   useEffect(() => {
-    if (!artifact.path && !artifact.artifactId) {
+    if (!artifact.artifactId) {
       setLoading(false);
       return;
     }
@@ -228,29 +231,27 @@ function ArtifactContent({ artifact }: { artifact: ArtifactSnapshot }) {
     let cancelled = false;
     setLoading(true);
 
-    // Try to read the file content via the core's workspace file API
-    const fetchContent = async () => {
+    const fetchBody = async () => {
       try {
-        // Use the artifact's path to fetch content
-        // In dev mode the core serves workspace files
-        const url = `http://localhost:7799/workspace/files/${encodeURIComponent(artifact.path || '')}`;
-        const res = await fetch(url);
-        if (res.ok) {
-          const text = await res.text();
-          if (!cancelled) setContent(text);
-        } else {
-          // Fallback: show the file path
-          if (!cancelled) setContent(`// Content from: ${artifact.path}\n// (use ai.get_artifact to read the file)`);
-        }
-      } catch {
-        if (!cancelled) setContent(`// Could not load: ${artifact.path}`);
+        const result = await invoke<{ kind: string; title: string; version: number; body: string }>(
+          'read_artifact_body',
+          { artifactId: artifact.artifactId },
+        );
+        if (cancelled) return;
+        setContent(result.body);
+        setArtifactKind(result.kind);
+        setVersion(result.version);
+      } catch (err) {
+        // Fallback: show a placeholder
+        if (cancelled) return;
+        setContent(`# ${artifact.title}\n\n*Kind: ${artifact.kind}\nPath: ${artifact.path || '—'}*`);
       }
       if (!cancelled) setLoading(false);
     };
 
-    fetchContent();
+    fetchBody();
     return () => { cancelled = true; };
-  }, [artifact.path, artifact.artifactId]);
+  }, [artifact.artifactId, artifact.title, artifact.kind, artifact.path]);
 
   if (loading) {
     return (
@@ -260,14 +261,16 @@ function ArtifactContent({ artifact }: { artifact: ArtifactSnapshot }) {
     );
   }
 
-  switch (artifact.kind) {
+  const kind = artifactKind || artifact.kind;
+
+  switch (kind) {
     case 'html':
       return <HtmlViewer content={content || ''} />;
     case 'markdown':
     case 'text':
     case 'document':
     default:
-      return <TextViewer content={content || `// ${artifact.title}\n// Kind: ${artifact.kind}\n// Path: ${artifact.path}`} language={artifact.kind} />;
+      return <TextViewer content={content || `# ${artifact.title}\n\n*Kind: ${artifact.kind}\nPath: ${artifact.path}*`} language={kind} />;
   }
 }
 

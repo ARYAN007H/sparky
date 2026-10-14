@@ -26,6 +26,7 @@
 //! written outside the Downloads directory.
 
 use std::path::{Path, PathBuf};
+use serde::Serialize;
 
 /// Resolve an artifact id to the file the core's artifact store vouches for,
 /// in the given workspace. Isolated from config loading for unit testing.
@@ -47,6 +48,41 @@ async fn copy_to_path(source: &Path, dest: &Path) -> Result<u64, String> {
     tokio::fs::copy(source, dest)
         .await
         .map_err(|e| format!("failed to copy artifact to {:?}: {e}", dest))
+}
+
+#[derive(Serialize)]
+pub struct ArtifactBodyResult {
+    pub kind: String,
+    pub title: String,
+    pub version: u32,
+    pub body: String,
+}
+
+#[tauri::command]
+pub async fn read_artifact_body(artifact_id: String) -> Result<ArtifactBodyResult, String> {
+    let config = openhuman_rpc::embed::config::load_config_with_timeout().await?;
+    let path = config.workspace_dir
+        .join("artifacts/versioned")
+        .join(&artifact_id)
+        .with_extension("json");
+    let json = tokio::fs::read_to_string(&path)
+        .await
+        .map_err(|e| format!("artifact {artifact_id} not found: {e}"))?;
+    let record: serde_json::Value = serde_json::from_str(&json)
+        .map_err(|e| format!("artifact {artifact_id} parse error: {e}"))?;
+    let kind = record["kind"].as_str().unwrap_or("text").to_string();
+    let title = record["title"].as_str().unwrap_or("artifact").to_string();
+    let versions = record["versions"]
+        .as_array()
+        .map(|v| v.len() as u32)
+        .unwrap_or(0);
+    let body = record["versions"]
+        .as_array()
+        .and_then(|v| v.last())
+        .and_then(|v| v["body"].as_str())
+        .unwrap_or("")
+        .to_string();
+    Ok(ArtifactBodyResult { kind, title, version: versions, body })
 }
 
 /// Maximum number of `(N)` suffixes we'll append when picking a
