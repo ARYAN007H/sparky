@@ -69,8 +69,7 @@ impl HostAgent {
             host_tools = self.host_tools.is_some(),
             "[host_agents] building session for host agent"
         );
-        self.hooks.clone().sync_scope(|| {
-            CoreContext::sync_scope(Arc::clone(&self.context), || {
+        let mut session = CoreContext::sync_scope(Arc::clone(&self.context), || {
                 if crate::profiles::capabilities::ProfileCapabilities::current().is_some() {
                     return OpenHumanSessionHost::from_config_host_only(
                         config,
