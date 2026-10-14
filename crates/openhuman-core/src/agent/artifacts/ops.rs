@@ -11,7 +11,6 @@ use crate::security::approval::ApprovalChatContext;
 use crate::security::SecurityPolicy;
 #[cfg(feature = "documents")]
 use crate::tools::PresentationTool;
-#[cfg(feature = "documents")]
 
 use super::store;
 use super::types::ArtifactKind;
