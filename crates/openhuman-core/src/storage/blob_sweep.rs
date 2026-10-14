@@ -23,10 +23,37 @@ pub const SWEEP_INTERVAL: Duration = Duration::from_secs(60 * 60);
 /// Delay before the first sweep, so boot work is not competing with it.
 pub const FIRST_SWEEP_DELAY: Duration = Duration::from_secs(5 * 60);
 
+/// The longest one scope's sweep may run. The drivers' sweeps carry no
+/// deadline of their own (a remote backend can stall on a query), and scopes
+/// are swept one after another, so a hung scope would starve every later one
+/// and the next tick. A timed-out scope counts as a failed sweep and is
+/// retried on the next tick.
+pub const SCOPE_SWEEP_TIMEOUT: Duration = Duration::from_secs(5 * 60);
+
 /// Reclaims the lapsed blobs of `scope`, returning how many went. A failure
-/// is logged and counts as zero.
+/// or a sweep past [`SCOPE_SWEEP_TIMEOUT`] is logged and counts as zero.
 pub async fn sweep_scope(backend: &dyn StorageBackend, scope: &Scope) -> u64 {
-    match backend.sweep_expired_blobs(scope).await {
+    sweep_scope_within(backend, scope, SCOPE_SWEEP_TIMEOUT).await
+}
+
+/// [`sweep_scope`] with an explicit deadline.
+pub(crate) async fn sweep_scope_within(
+    backend: &dyn StorageBackend,
+    scope: &Scope,
+    limit: Duration,
+) -> u64 {
+    let outcome = match tokio::time::timeout(limit, backend.sweep_expired_blobs(scope)).await {
+        Ok(outcome) => outcome,
+        Err(_) => {
+            tracing::warn!(
+                scope = scope.as_str(),
+                limit_secs = limit.as_secs_f32(),
+                "[storage::blob_sweep] sweep timed out; retrying on the next tick"
+            );
+            return 0;
+        }
+    };
+    match outcome {
         Ok(removed) => {
             if removed > 0 {
                 tracing::debug!(
@@ -48,11 +75,32 @@ pub async fn sweep_scope(backend: &dyn StorageBackend, scope: &Scope) -> u64 {
     }
 }
 
-/// One pass over every scope background work covers (`local` outside SaaS
-/// mode, then each known agent), against `backend`. Returns the total number
-/// of blobs reclaimed.
+/// Reclaims the lapsed blobs of each SaaS profile in `profile_ids`: the
+/// profile's own scope (`profile:<id>`) and the scopes the blob-owning modules
+/// keep for it. Returns the total reclaimed.
+pub(crate) async fn sweep_profiles(backend: &dyn StorageBackend, profile_ids: &[String]) -> u64 {
+    let mut removed = 0;
+    for id in profile_ids {
+        let scope = super::scope_for_profile(id);
+        removed += sweep_scope(backend, &scope).await;
+        for module_scope in crate::modules::expiring_blob_module_scopes_for(id, &scope) {
+            if module_scope != scope {
+                removed += sweep_scope(backend, &module_scope).await;
+            }
+        }
+    }
+    removed
+}
+
+/// One pass over every scope background work covers, against `backend`:
+/// `local` outside SaaS mode, each known agent, and each provisioned SaaS
+/// profile (`profile:<id>`, which [`super::agents::for_each_scope`] does not
+/// visit). Returns the total number of blobs reclaimed.
+///
+/// Agent scopes are enumerated from the installed backend (the only caller,
+/// [`sweep_installed`], passes that one).
 pub async fn sweep_all(backend: Arc<dyn StorageBackend>) -> u64 {
-    super::agents::for_each_scope("blob sweep", || {
+    let scoped: u64 = super::agents::for_each_scope("blob sweep", || {
         let backend = Arc::clone(&backend);
         async move {
             match super::current_scope() {
@@ -77,7 +125,23 @@ pub async fn sweep_all(backend: Arc<dyn StorageBackend>) -> u64 {
     .await
     .into_iter()
     .map(|(_, removed)| removed)
-    .sum()
+    .sum();
+    scoped + sweep_host_profiles(backend.as_ref()).await
+}
+
+/// [`sweep_profiles`] over the profiles the process's profile host has
+/// provisioned; zero outside SaaS mode (no host installed).
+async fn sweep_host_profiles(backend: &dyn StorageBackend) -> u64 {
+    let Some(host) = crate::profiles::host::host() else {
+        return 0;
+    };
+    match host.ids().await {
+        Ok(ids) => sweep_profiles(backend, &ids).await,
+        Err(error) => {
+            tracing::warn!(%error, "[storage::blob_sweep] could not list profiles; skipped");
+            0
+        }
+    }
 }
 
 /// [`sweep_all`] against the installed backend; zero when none is installed.
