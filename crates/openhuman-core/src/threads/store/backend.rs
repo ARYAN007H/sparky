@@ -18,11 +18,10 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-pub use tinyagents_session::threads::ConversationPurgeStats;
 use tinyagents_session::threads::{
-    ConversationError, ConversationPersistence, ConversationResult, ConversationThread,
-    CreateConversationThread, CrossThreadHit, DriverConversationStore, ThreadMessage,
-    ThreadMessagePatch,
+    ConversationError, ConversationPersistence, ConversationPurgeStats, ConversationResult,
+    ConversationThread, CreateConversationThread, CrossThreadHit, DriverConversationStore,
+    ThreadMessage, ThreadMessagePatch,
 };
 
 use crate::storage::documents::Repo;
