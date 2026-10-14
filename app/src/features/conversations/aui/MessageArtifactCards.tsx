@@ -18,7 +18,14 @@ import { ArtifactCardAdapter } from './ArtifactCardAdapter';
  * tool call via `MediaAndDocumentCalls`.
  */
 export function MessageArtifactCards() {
-  const requestId = useAuiState(s => s.message.metadata?.custom?.requestId as string | undefined);
+  // requestId lives at different paths for live vs settled messages:
+  // - live streaming message: metadata.custom.requestId
+  // - settled message: metadata.custom.extraMetadata.requestId
+  const meta = useAuiState(s => s.message.metadata?.custom as Record<string, unknown> | undefined);
+  const requestId = typeof meta?.requestId === 'string' ? meta.requestId
+    : typeof (meta?.extraMetadata as Record<string, unknown> | undefined)?.requestId === 'string'
+      ? (meta?.extraMetadata as Record<string, unknown> | undefined)?.requestId as string
+      : undefined;
   const threadId = useAppSelector(s => s.thread.selectedThreadId as string | undefined);
   const dispatch = useAppDispatch();
 

@@ -166,7 +166,7 @@ export function ArtifactPreviewPanel({ artifactId, onClose }: ArtifactPreviewPan
                   <span className="truncate max-w-[110px]">{a.title}</span>
                 </button>
                 <button
-                  onClick={() => handleCloseTab(a.artifactId)}
+                  onClick={(e) => { e.stopPropagation(); handleCloseTab(a.artifactId); }}
                   className="ml-0.5 rounded p-0.5 text-muted-foreground/50 hover:bg-accent hover:text-foreground shrink-0"
                   title="Close artifact"
                 >
