@@ -89,9 +89,7 @@ async fn prepare_with(
         tool_sets,
         allowed: None,
         has_thread,
-        is_subagent: false,
         session_deferred: Arc::new(HashSet::new()),
-        diagnostics: Arc::default(),
     };
     let request = DriverRequest {
         history: vec![tinyinference_llm::message::Message::user("hi")],

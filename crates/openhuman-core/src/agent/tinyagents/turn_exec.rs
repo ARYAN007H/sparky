@@ -24,6 +24,7 @@ use crate::agent::harness::tool_result_artifacts::TINYAGENTS_TOOL_RESULT_ARTIFAC
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent::tinyagents::middleware::TurnContextMiddleware;
 use crate::agent::tinyagents::observability::{OpenhumanEventBridge, SubagentScope};
+use crate::agent::tinyagents::tool_registration::capability_diagnostics;
 use crate::agent::tinyagents::turn_middleware::{
     install_turn_middleware, TurnMiddlewareInputs, TurnWiring,
 };
@@ -282,12 +283,14 @@ async fn run_turn_via_tinyagents_body(
         ..
     } = turn_models;
     let plan_models = turn_models_for_plan(
-            model,
-            primary,
-            tier_routes,
-            &error_slot,
-            hosted_security_gate,
-        ),
+        model,
+        primary,
+        tier_routes,
+        &error_slot,
+        hosted_security_gate,
+    );
+    let planner = OpenHumanTurnPlanner {
+        models: plan_models.clone(),
         policy,
         tool_sets: tool_sets.clone(),
         allowed: allowed.clone(),
@@ -587,6 +590,11 @@ async fn run_turn_via_tinyagents_body(
     // an ambiguous/broken tool surface (duplicate name across native/MCP/Composio/
     // generated tools, dangling alias, etc.) aborts the turn instead of silently
     // resolving to an unintended component while a provider call is in flight.
+    let registry_diagnostics = capability_diagnostics(
+        &plan_models,
+        &bridge_tool_sets,
+        &prepared.tools().plan.admitted,
+    );
     if let Err(error) = enforce_registry_diagnostics(&registry_diagnostics) {
         // Settle the driver's steering registration before the turn aborts.
         let _ = prepared.split().1.finish(None);
