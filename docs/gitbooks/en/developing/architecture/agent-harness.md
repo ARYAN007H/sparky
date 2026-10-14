@@ -312,7 +312,7 @@ once (`session_rule_set`); each turn evaluates them in its own context
 Long tool-calling chains can blow past the context window. Two layers handle that:
 
 - Tool-result budget: every tool result is checked against a per-call byte budget, enforced as tinyagents tool middleware. Anything over is hard-truncated with an explanatory marker so the model knows it didn't see the full output.
-- Microcompact / autocompact: when total history is creeping toward the context window, tinyagents middleware (message trimming + the compression hooks installed in `tinyagents/middleware.rs` and `tinyagents/harness_context_ladder.rs`) compacts older turns into summaries before the next provider call. The compacted history keeps the system prompt and the most recent turns intact (KV-cache stability) and rewrites the middle.
+- Microcompact / autocompact: when total history is creeping toward the context window, tinyagents middleware (message trimming + the compression hooks installed in `tinyagents/middleware.rs` and `tinyagents/context_wiring.rs`, with ladder order and sizing owned by `tinyagents-harness` `ContextLadder`) compacts older turns into summaries before the next provider call. The compacted history keeps the system prompt and the most recent turns intact (KV-cache stability) and rewrites the middle.
 
 ### Oversized tool results: the summarizer detour
 
