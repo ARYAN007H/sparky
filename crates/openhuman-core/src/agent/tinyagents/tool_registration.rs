@@ -133,17 +133,17 @@ pub(crate) fn shared_tool_adapter(
     )
 }
 
+type DispatchSelector = Arc<
+    dyn Fn(&str, Arc<dyn tinytools::Tool>) -> Option<Arc<dyn ToolDispatch<(), OpenHumanRunContext>>>
+        + Send
+        + Sync,
+>;
+
 /// Chooses the typed dispatch for a registered tool: `use_skill` gets its own
 /// (it is the proxy every packed archetype delegation is reached through and
 /// must resolve the SAME live parent a natively advertised delegate tool does,
 /// regression R3), everything else goes through [`typed_dispatch_for`].
-fn dispatch_selector(
-    tool_sets: Vec<SharedToolSet>,
-) -> Arc<
-    dyn Fn(&str, Arc<dyn tinytools::Tool>) -> Option<Arc<dyn ToolDispatch<(), OpenHumanRunContext>>>
-        + Send
-        + Sync,
-> {
+fn dispatch_selector(tool_sets: Vec<SharedToolSet>) -> DispatchSelector {
     Arc::new(move |name, adapter| {
         if name != USE_SKILL {
             return typed_dispatch_for(name, adapter);
