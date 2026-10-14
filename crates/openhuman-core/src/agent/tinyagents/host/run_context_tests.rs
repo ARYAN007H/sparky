@@ -268,6 +268,7 @@ fn stale_parent_snapshot() -> ParentExecutionContext {
         run_queue: None,
         host_env: Default::default(),
     }
+}
 
 /// Round-trips one real `SubagentSpawned` through `sink` and asserts it lands
 /// on `rx`, the receiver belonging to the run whose sink the bind was supposed

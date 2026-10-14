@@ -588,6 +588,7 @@ fn parent_context(workspace_dir: &Path) -> ParentExecutionContext {
         run_queue: None,
         host_env: Default::default(),
     }
+}
 
 /// The session builder swaps in a scoped instance so the WIRE schema (read
 /// from the registered tool on native tool calling) carries only the ids the

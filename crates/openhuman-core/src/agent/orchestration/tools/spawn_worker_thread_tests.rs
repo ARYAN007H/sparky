@@ -39,6 +39,7 @@ fn test_parent_ctx(workspace_dir: PathBuf) -> ParentExecutionContext {
         tool_call_format: tinytools_agent::dialect::ToolCallFormat::Native,
         host_env: Default::default(),
     }
+}
 
 #[tokio::test]
 async fn rejects_if_already_worker_thread() {
