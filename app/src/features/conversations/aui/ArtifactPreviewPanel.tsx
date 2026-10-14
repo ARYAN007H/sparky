@@ -116,17 +116,17 @@ export function ArtifactPreviewPanel({ artifactId, onClose }: ArtifactPreviewPan
       next.add(id);
       return next;
     });
-    // If closing the active tab, switch to the next one.
     setActiveId(prev => {
       if (prev !== id) return prev;
-      const remaining = visibleTabs.filter(a => a.artifactId !== id);
-      return remaining.length > 0 ? remaining[0].artifactId : prev;
+      // Compute the next active tab excluding the one being closed
+      // (allArtifacts is always current from the memo)
+      const nextTab = allArtifacts.find(a => a.artifactId !== id);
+      return nextTab ? nextTab.artifactId : '';
     });
-    // If all tabs closed, close the panel
-    if (visibleTabs.length <= 1) {
+    if (allArtifacts.length <= 1) {
       onClose();
     }
-  }, [visibleTabs, onClose]);
+  }, [allArtifacts, onClose]);
 
   const showTabs = visibleTabs.length > 1;
 
