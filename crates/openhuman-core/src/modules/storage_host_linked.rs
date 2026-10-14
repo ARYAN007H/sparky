@@ -15,7 +15,7 @@
 //! a request.
 //!
 //! The module runs on its own runtime, so each call is handed back to the
-//! host's runtime (`ObjectService::runtime`), where the backend was opened.
+//! host's runtime (`HostEndpoint`'s runtime), where the backend was opened.
 
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -50,7 +50,11 @@ async fn setup(connection: tinybus::Connection) -> tinybus::Result<()> {
         .unwrap_or_else(|poison| poison.into_inner())
         .clone()
         .ok_or_else(|| tinybus::Error::failed("storage host has nothing to serve"))?;
-    serve_objects(&connection, &host, Some(runtime)).await
+    // Dropping the handle leaves the objects registered for the life of the
+    // module's connection.
+    serve_objects(&connection, &host, Some(runtime))
+        .await
+        .map(drop)
 }
 
 mod export {
