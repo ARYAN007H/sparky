@@ -237,6 +237,11 @@ fn flow_surfaces_correlate_decisions_and_closed_instances_never_publish() {
                     .send()
                     .await
             });
+            tokio::time::sleep(Duration::from_secs(3)).await;
+            if turn.is_finished() {
+                eprintln!("TURN FINISHED EARLY: {:?}", turn.await);
+                panic!("early");
+            }
             let request = common::eventually("flow tool to park", || {
                 agent.approvals().pending().ok()?.into_iter().next()
             })
