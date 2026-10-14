@@ -344,32 +344,39 @@ async fn dispatch_routes_through_agent_run_turn_bus_handler() {
     // that expects the real path sees a consistent registry.
 }
 
-/// Wait for the `ChannelMessageProcessed` event of `message_id`, skipping the
-/// events other tests publish on the shared process-wide bus.
+/// Start draining the bus for the `ChannelMessageProcessed` event of
+/// `message_id` and hand it back through the returned handle.
 ///
-/// The scan is bounded by wall-clock time, never by a count of foreign
-/// events: the full lib suite runs hundreds of tests in parallel on the same
-/// bus, so any fixed event budget is eventually spent on unrelated traffic
-/// before ours arrives.
-async fn wait_for_channel_processed(
-    events: &mut tinybus::EventReceiver<DomainEvent>,
-    message_id: &str,
-) -> DomainEvent {
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
-    loop {
-        let event = tokio::time::timeout_at(deadline, events.recv())
-            .await
-            .unwrap_or_else(|_| {
-                panic!("did not observe ChannelMessageProcessed for {message_id}")
-            })
-            .expect("the bus closed before the expected event arrived");
-        if matches!(
-            &event,
-            DomainEvent::ChannelMessageProcessed { message_id: id, .. } if id == message_id
-        ) {
-            return event;
+/// The drain must run *while* the message is processed, not after: the
+/// process-wide bus is a bounded broadcast ring (`SIGNAL_BUFFER`), the full
+/// lib suite publishes from hundreds of parallel tests, and a receiver that
+/// is only polled once `process_channel_message` returns has its target event
+/// overwritten by then (the receiver reports `Lagged` and skips it). A fixed
+/// event-count budget on the scan has the same failure. Only wall-clock time
+/// bounds the wait.
+fn watch_for_channel_processed(message_id: &str) -> tokio::task::JoinHandle<DomainEvent> {
+    let mut events = crate::core::bus::BUS
+        .get()
+        .expect("event bus should be initialized")
+        .receiver();
+    let message_id = message_id.to_string();
+    tokio::spawn(async move {
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
+        loop {
+            let event = tokio::time::timeout_at(deadline, events.recv())
+                .await
+                .unwrap_or_else(|_| {
+                    panic!("did not observe ChannelMessageProcessed for {message_id}")
+                })
+                .expect("the bus closed before the expected event arrived");
+            if matches!(
+                &event,
+                DomainEvent::ChannelMessageProcessed { message_id: id, .. } if *id == message_id
+            ) {
+                return event;
+            }
         }
-    }
+    })
 }
 
 fn unrelated_processed_event(n: usize) -> DomainEvent {
@@ -422,12 +429,9 @@ async fn resolved_route_ctx() -> Arc<ChannelRuntimeContext> {
     })
 }
 
-async fn run_resolved_route_message(message_id: &str, noise_events: usize) {
+async fn run_resolved_route_message(message_id: &str, noise_after: usize) {
     crate::core::bus::init().await.expect("bus init");
-    let mut events = crate::core::bus::BUS
-        .get()
-        .expect("event bus should be initialized")
-        .receiver();
+    let watcher = watch_for_channel_processed(message_id);
 
     let _bus_guard = mock_agent_run_turn(move |_req| async move {
         Ok(AgentTurnResponse::with_resolved_route(
@@ -437,11 +441,6 @@ async fn run_resolved_route_message(message_id: &str, noise_events: usize) {
         ))
     })
     .await;
-
-    // Other tests share this bus: model their traffic ahead of our event.
-    for n in 0..noise_events {
-        crate::core::bus::BUS.publish(unrelated_processed_event(n));
-    }
 
     process_channel_message(
         resolved_route_ctx().await,
@@ -458,7 +457,14 @@ async fn run_resolved_route_message(message_id: &str, noise_events: usize) {
     )
     .await;
 
-    let event = wait_for_channel_processed(&mut events, message_id).await;
+    // Other tests share this bus: model a burst of their traffic landing
+    // right after our event, more than the ring holds.
+    tokio::task::yield_now().await;
+    for n in 0..noise_after {
+        crate::core::bus::BUS.publish(unrelated_processed_event(n));
+    }
+
+    let event = watcher.await.expect("watcher task");
     let DomainEvent::ChannelMessageProcessed {
         provider,
         model,
@@ -480,12 +486,12 @@ async fn channel_processed_event_records_resolved_agent_route() {
     run_resolved_route_message("resolved-route-msg", 0).await;
 }
 
-/// Regression: the scan used to give up after 50 foreign events, so under the
-/// full parallel suite (other tests flooding the shared bus) the target event
-/// was missed and the test failed only there.
+/// Regression: the event used to be read only after the message finished, by
+/// which time a burst of other tests' events had overwritten it in the bounded
+/// bus ring, so the test failed only in the full parallel suite.
 #[tokio::test]
 async fn channel_processed_event_is_found_behind_a_flood_of_unrelated_events() {
-    run_resolved_route_message("resolved-route-flood-msg", 400).await;
+    run_resolved_route_message("resolved-route-flood-msg", 600).await;
 }
 
 /// Security regression for the `[FILE:…]` smuggling vector: a remote
