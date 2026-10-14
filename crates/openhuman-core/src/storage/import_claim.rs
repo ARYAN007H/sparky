@@ -53,12 +53,16 @@ pub fn with_claim<T>(
     repo: &Repo,
     collection: &'static str,
     marker: &str,
-    mut body: impl FnMut() -> Result<T>,
+    body: impl FnOnce() -> Result<T>,
 ) -> Result<Option<T>> {
+    // `with_claim_at` only runs the closure once it holds the claim.
+    let mut body = Some(body);
     let started = std::time::Instant::now();
     loop {
         let now = chrono::Utc::now().timestamp_millis();
-        if let Some(ran) = with_claim_at(repo, collection, marker, now, CLAIM_TTL_MS, &mut body)? {
+        if let Some(ran) = with_claim_at(repo, collection, marker, now, CLAIM_TTL_MS, || {
+            (body.take().expect("import body runs once"))()
+        })? {
             return Ok(Some(ran));
         }
         if started.elapsed().as_millis() as i64 >= CLAIM_TTL_MS {
