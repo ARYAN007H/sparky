@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::core::runtime::{CoreContext, DomainSet, SaasConfig};
 use crate::memory::lifecycle::jobs::enqueue;
@@ -23,14 +24,14 @@ fn build_job() -> BackgroundJob {
 async fn nothing_to_do_does_nothing() {
     let tmp = tempfile::tempdir().unwrap();
     let host = host(&tmp, 3600);
-    assert_eq!(tick(&host).await, TickReport::default());
+    assert_eq!(tick(&DispatchCtx::process_default()patchCtx::process_default(), &host).await, TickReport::default());
     let id = ProfileId::for_user(
         &format!("idle-{}", uuid::Uuid::new_v4()),
         crate::profiles::ProfileIdMode::Raw,
     )
     .unwrap();
-    host.provision(&id).await.unwrap();
-    assert_eq!(tick(&host).await, TickReport::default());
+    host.provision(&id).await.unwrDispatchCtx::process_default());
+    assert_eq!(tick(&DispatchCtx::process_default(), &host).await, TickReport::default());
     assert!(
         !host.is_open(&id),
         "an agent with no queued work is not opened"
@@ -57,9 +58,9 @@ async fn only_profiles_with_queued_memory_jobs_are_run() {
     let config = profile_config(&host.layout_of(&busy), &busy);
     crate::memory::test_fixtures::bind_reference(&config);
     enqueue(&config, &Namespace::ROOT, vec![build_job()]).await;
-    assert!(jobs::has_pending(&config.workspace_dir));
+    assert!(jobs::has_penDispatchCtx::process_default()g(&config.workspace_dir));
 
-    let report = tick(&host).await;
+    let report = tick(&DispatchCtx::process_default(), &host).await;
     assert_eq!(report.ran, 1, "{report:?}");
     assert!(
         host.is_open(&busy),
@@ -78,8 +79,8 @@ async fn a_tick_sweeps_idle_profiles() {
     )
     .unwrap();
     host.provision(&id).await.unwrap();
-    drop(host.open(&id).await.unwrap());
+    drop(host.open(&DispatchCtx::prDispatchCtx::process_default()ss_default(), &id).await.unwrap());
     assert!(host.is_open(&id));
-    tick(&host).await;
+    tick(&DispatchCtx::process_default(), &host).await;
     assert!(!host.is_open(&id));
 }

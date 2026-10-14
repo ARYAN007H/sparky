@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -54,7 +55,7 @@ impl FlowStreamTarget {
 /// on reopen). The bridge task lives until the agent drops its progress sender
 /// (turn end). `source` is a short trace-attribution label (e.g.
 /// `"flows_build"`).
-pub(super) fn attach_flow_progress_bridge(
+pub(super) fn attach_flow_progress_bridge(ctx: &DispatchCtx, 
     agent: &mut crate::agent::OpenHumanSessionHost,
     target: &FlowStreamTarget,
     source: &str,
@@ -70,10 +71,11 @@ pub(super) fn attach_flow_progress_bridge(
         "[flows] progress bridge: attaching (streaming copilot/scout turn)"
     );
     crate::web_chat::spawn_progress_bridge(
+        &ctx,
         progress_rx,
-        "system".to_string(),
         target.thread_id.clone(),
         target.request_id.clone(),
+        "system".to_string(),
         crate::agent::session_store::turn_states_for(&config.workspace_dir),
         crate::web_chat::ChatRequestMetadata {
             source: Some(source.to_string()),
@@ -90,7 +92,7 @@ pub(super) fn attach_flow_progress_bridge(
 /// path, so segmentation/reaction match a normal turn), a failure publishes a
 /// `chat_error`. Broadcast as `"system"` so any viewer of the thread receives
 /// it (frontend keys by `thread_id`).
-pub(super) async fn finalize_flow_stream(
+pub(super) async fn finalize_flow_stream(ctx: &DispatchCtx, 
     target: &FlowStreamTarget,
     result: &Result<String, String>,
     prompt: &str,
@@ -98,25 +100,16 @@ pub(super) async fn finalize_flow_stream(
     match result {
         Ok(text) => {
             crate::web_chat::presentation::deliver_response(
-                "system",
+                &ctx,
                 &target.thread_id,
                 &target.request_id,
                 text,
                 prompt,
+                "system",
                 &[],
-                // Builder/scout turns don't surface in the chat footer; their
-                // token/cost spend is still captured by the global cost tracker.
                 None,
-                // No workspace in scope on this path, so the viewing client
-                // stays the only persister of a flow turn's reply — unchanged
-                // from before #6034, which covered the chat surfaces.
                 None,
-                // `attach_flow_progress_bridge` discards its
-                // `ProgressBridgeHandle`, so there is no timing snapshot to
-                // forward here.
                 None,
-                // Flow Canvas copilot streaming is not the interactive chat
-                // surface follow-up suggestions are for (C5).
                 false,
             )
             .await;
@@ -140,7 +133,7 @@ pub(super) async fn finalize_flow_stream(
     // left non-terminal makes `threads_turn_state_get` report the turn as still
     // running, so re-entering the thread paints a permanent "Thinking..."
     // indicator under a reply that already landed.
-    if let Ok(config) = crate::config::rpc::load_config_with_timeout().await {
+    if let Ok(config) = crate::config::rpc::load_config_with_timeout(&ctx).await {
         let lifecycle = if result.is_ok() {
             tinyagents_session::turn_state::TurnLifecycle::Completed
         } else {

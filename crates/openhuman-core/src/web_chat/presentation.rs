@@ -1,6 +1,7 @@
 //! Presentation layer for web-channel chat responses: store a finished reply,
 //! then announce it to the client as one unmodified `chat_done` message.
 
+use crate::core::runtime::DispatchCtx;
 use crate::agent::tinyagents::host::LastTurnUsage;
 use crate::web_chat::{SubagentUsagePayload, TurnUsagePayload, WebChannelEvent};
 
@@ -46,7 +47,7 @@ fn usage_payload(usage: Option<&LastTurnUsage>) -> Option<TurnUsagePayload> {
 /// append — is not the difference between the answer existing and not existing
 /// (#6034). Pass `None` from a caller that has no workspace in scope; delivery
 /// then behaves exactly as it did when the renderer was the only writer.
-pub(crate) async fn deliver_response(
+pub(crate) async fn deliver_response(ctx: &DispatchCtx, 
     client_id: &str,
     thread_id: &str,
     request_id: &str,
@@ -67,11 +68,12 @@ pub(crate) async fn deliver_response(
     )
     .await;
     announce_reply(
-        client_id,
+        &ctx,
         thread_id,
         request_id,
         full_response,
         user_message,
+        client_id,
         citations,
         usage,
         timing,
@@ -135,7 +137,7 @@ pub(crate) async fn persist_reply(
 /// Announces a reply already stored by [`persist_reply`]: the terminal
 /// `chat_done`, then (for the main chat turn) the follow-up suggestions.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn announce_reply(
+pub(crate) fn announce_reply(ctx: &DispatchCtx, 
     client_id: &str,
     thread_id: &str,
     request_id: &str,
@@ -160,11 +162,12 @@ pub(crate) fn announce_reply(
     );
     if suggest_follow_ups {
         super::suggestions::spawn_follow_up_suggestions(
-            client_id.to_string(),
+            &ctx,
             thread_id.to_string(),
             request_id.to_string(),
             user_message.to_string(),
             full_response.to_string(),
+            client_id.to_string(),
         );
     }
 }

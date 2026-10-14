@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::config::schema::{EphemeralRoute, EPHEMERAL_ROUTE_SLUG};
 use crate::core::runtime::{context::CoreContext, DomainSet};
@@ -21,7 +22,7 @@ async fn a_context_route_follows_every_load_of_the_context_config() {
         headers: Vec::new(),
     });
 
-    let loaded = CoreContext::scope(context_with(config), load_current_or_init())
+    let loaded = CoreContext::scope(context_with(config), load_current_or_init(&DispatchCtx::process_default()))
         .await
         .expect("context config loads");
 
@@ -40,7 +41,7 @@ async fn a_context_route_follows_every_load_of_the_context_config() {
 
 #[tokio::test]
 async fn a_context_without_a_route_loads_unchanged_providers() {
-    let loaded = CoreContext::scope(context_with(base_config()), load_current_or_init())
+    let loaded = CoreContext::scope(context_with(base_config()), load_current_or_init(&DispatchCtx::process_default()))
         .await
         .expect("context config loads");
 

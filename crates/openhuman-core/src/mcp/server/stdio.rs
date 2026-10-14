@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use anyhow::{bail, Result};
 // `SocketAddr` + the `http` transport are only reached by the `--transport http`
 // arm, which is axum-only and gated with `http-server` (#5048). The stdio arm
@@ -17,7 +18,7 @@ enum McpTransport {
     Http,
 }
 
-pub fn run_stdio_from_cli(args: &[String]) -> Result<()> {
+pub fn run_stdio_from_cli(ctx: &DispatchCtx, args: &[String]) -> Result<()> {
     let mut verbose = false;
     let mut transport = McpTransport::Stdio;
     let mut bind_host = "127.0.0.1".to_string();
@@ -85,7 +86,7 @@ pub fn run_stdio_from_cli(args: &[String]) -> Result<()> {
     match transport {
         McpTransport::Stdio => {
             log::debug!("[mcp_server] starting stdio MCP server");
-            rt.block_on(run_stdio_module())?;
+            rt.block_on(run_stdio_module(&ctx))?;
         }
         McpTransport::Http => {
             #[cfg(feature = "http-server")]
@@ -115,13 +116,13 @@ pub fn run_stdio_from_cli(args: &[String]) -> Result<()> {
     Ok(())
 }
 
-async fn run_stdio_module() -> Result<()> {
+async fn run_stdio_module(ctx: &DispatchCtx, ) -> Result<()> {
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 
-    let config = crate::config::rpc::load_config_with_timeout()
+    let config = crate::config::rpc::load_config_with_timeout(&ctx)
         .await
         .map_err(anyhow::Error::msg)?;
-    let session = ServerSession::open(&config).await?;
+    let session = ServerSession::open(&ctx, &config).await?;
     let cancellation = tokio_util::sync::CancellationToken::new();
     let result = async {
         let mut input = tokio::io::BufReader::new(tokio::io::stdin()).lines();

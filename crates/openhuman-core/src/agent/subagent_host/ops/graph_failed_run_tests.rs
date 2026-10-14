@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 use tinytools::Tool;
 
@@ -48,6 +49,7 @@ async fn failed_subagent_run_keeps_its_unanswered_round_out_of_history() {
     let stem = "root-session__failed_run";
 
     let result = run_subagent_via_graph(
+        &DispatchCtx::process_default(),
         crate::agent::tinyagents::TurnModelSource::from_model(provider),
         "mock-model",
         0.0,
@@ -59,8 +61,8 @@ async fn failed_subagent_run_keeps_its_unanswered_round_out_of_history() {
         10,
         None,
         None,
-        "researcher",
         "task-failed",
+        "researcher",
         false,
         None,
         crate::agent::tinyagents::host::OpenHumanRunContext::new(),
@@ -69,8 +71,8 @@ async fn failed_subagent_run_keeps_its_unanswered_round_out_of_history() {
         None,
         1024,
         false,
-        stem,
         "mock-channel",
+        stem,
         AgentTokenjuiceCompression::Off,
         None,
     )

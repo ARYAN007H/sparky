@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 use tinytools_agent::dialect::TranscriptEntry;
 #[derive(Clone, Default)]
@@ -102,7 +103,7 @@ const REFUSAL: &str = "refused spawn tool on sub-agent";
 /// Runs one sub-agent turn whose parent surface carries `spawn_subagent`, with
 /// `allowed` deciding whether the allowlist readmits it. Returns
 /// (spawn tool executed?, refusal warnings emitted).
-async fn run_with_spawn_tool_in_parent_surface(allowed: HashSet<String>) -> (bool, Vec<String>) {
+async fn run_with_spawn_tool_in_parent_surface(ctx: &DispatchCtx, allowed: HashSet<String>) -> (bool, Vec<String>) {
     use tracing_subscriber::layer::SubscriberExt;
 
     let executed = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -120,6 +121,7 @@ async fn run_with_spawn_tool_in_parent_surface(allowed: HashSet<String>) -> (boo
     let mut history = vec![TranscriptMessage::user("spawn a helper")];
 
     run_subagent_via_graph(
+        &ctx,
         crate::agent::tinyagents::TurnModelSource::from_model(provider),
         "mock-model",
         0.0,
@@ -131,8 +133,8 @@ async fn run_with_spawn_tool_in_parent_surface(allowed: HashSet<String>) -> (boo
         10,
         None,
         None,
-        "researcher",
         "task-6157",
+        "researcher",
         false,
         None,
         crate::agent::tinyagents::host::OpenHumanRunContext::new(),
@@ -141,8 +143,8 @@ async fn run_with_spawn_tool_in_parent_surface(allowed: HashSet<String>) -> (boo
         None,
         1024,
         false,
-        "root-session__spawn_refusal",
         "mock-channel",
+        "root-session__spawn_refusal",
         AgentTokenjuiceCompression::Off,
         None,
     )
@@ -159,7 +161,7 @@ async fn run_with_spawn_tool_in_parent_surface(allowed: HashSet<String>) -> (boo
 #[tokio::test]
 async fn a_sub_agent_cannot_reach_a_spawn_tool_and_the_healthy_run_is_quiet() {
     let allowed = HashSet::from(["echo".to_string()]);
-    let (executed, warnings) = run_with_spawn_tool_in_parent_surface(allowed).await;
+    let (executed, warnings) = run_with_spawn_tool_in_parent_surface(&DispatchCtx::process_default(), allowed).await;
 
     assert!(
         !executed,
@@ -177,7 +179,7 @@ async fn a_sub_agent_cannot_reach_a_spawn_tool_and_the_healthy_run_is_quiet() {
 #[tokio::test]
 async fn an_allowlist_that_readmits_a_spawn_tool_is_refused_loudly() {
     let allowed = HashSet::from(["echo".to_string(), "spawn_subagent".to_string()]);
-    let (executed, warnings) = run_with_spawn_tool_in_parent_surface(allowed).await;
+    let (executed, warnings) = run_with_spawn_tool_in_parent_surface(&DispatchCtx::process_default(), allowed).await;
 
     assert!(
         !executed,

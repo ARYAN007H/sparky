@@ -42,23 +42,23 @@ pub(super) struct InferenceAnalyzeSentimentParams {
 }
 
 pub(super) fn handle_inference_summarize(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<InferenceSummarizeParams>(params)?;
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
         to_json(crate::inference::rpc::inference_summarize(&config, &p.text, p.max_tokens).await?)
     })
 }
 
 pub(super) fn handle_inference_prompt(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<InferencePromptParams>(params)?;
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
         to_json(
             crate::inference::rpc::inference_prompt(&config, &p.prompt, p.max_tokens, p.no_think)
                 .await?,
@@ -67,12 +67,12 @@ pub(super) fn handle_inference_prompt(
 }
 
 pub(super) fn handle_inference_vision_prompt(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<InferenceVisionPromptParams>(params)?;
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
         to_json(
             crate::inference::rpc::inference_vision_prompt(
                 &config,
@@ -86,12 +86,12 @@ pub(super) fn handle_inference_vision_prompt(
 }
 
 pub(super) fn handle_inference_test_provider_model(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<InferenceTestChatModelParams>(params)?;
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
         to_json(
             crate::inference::rpc::inference_test_provider_model(
                 &config,
@@ -105,12 +105,12 @@ pub(super) fn handle_inference_test_provider_model(
 }
 
 pub(super) fn handle_inference_analyze_sentiment(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<InferenceAnalyzeSentimentParams>(params)?;
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
         to_json(crate::inference::rpc::inference_analyze_sentiment(&config, &p.message).await?)
     })
 }

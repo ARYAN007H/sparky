@@ -11,6 +11,7 @@
 //! model route, or tool config invalidates the cache instead of serving a
 //! stale breakdown.
 
+use crate::core::runtime::DispatchCtx;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
@@ -90,7 +91,7 @@ static REPORT_CACHE: Lazy<Mutex<HashMap<String, (u64, PromptSizeReport)>>> =
 /// Builds (or reuses a cached) [`PromptSizeReport`] for `agent_id` under the
 /// given config, invalidating the cache entry when the config fingerprint
 /// changed since the last build.
-async fn cached_report(agent_id: &str, config: &Config) -> Result<PromptSizeReport, String> {
+async fn cached_report(ctx: &DispatchCtx, agent_id: &str, config: &Config) -> Result<PromptSizeReport, String> {
     let fingerprint = config_fingerprint(config);
     if let Some((cached_fingerprint, report)) = REPORT_CACHE
         .lock()
@@ -115,7 +116,7 @@ async fn cached_report(agent_id: &str, config: &Config) -> Result<PromptSizeRepo
         config_path_override: Some(config.config_path.clone()),
         model_override: None,
     };
-    let report = PromptSizeReport::build(options)
+    let report = PromptSizeReport::build(&ctx, options)
         .await
         .map_err(|e| format!("failed to build prompt-size report for {agent_id}: {e}"))?;
 
@@ -178,10 +179,10 @@ fn tools_section(tools: &[ToolSize]) -> ContextSection {
 /// Builds the `agent.context_breakdown` response: the agent's rendered
 /// prompt sections, one rolled-up `tools` section, and (when `thread_id` is
 /// given) a `history` section.
-pub async fn context_breakdown(
+pub async fn context_breakdown(ctx: &DispatchCtx, 
     params: ContextBreakdownParams,
 ) -> Result<Outcome<ContextBreakdownResponse>, String> {
-    let config = crate::config::rpc::load_config_with_timeout().await?;
+    let config = crate::config::rpc::load_config_with_timeout(&ctx).await?;
     let agent_id = params
         .agent_id
         .as_deref()
@@ -190,7 +191,7 @@ pub async fn context_breakdown(
         .unwrap_or(DEFAULT_AGENT_ID)
         .to_string();
 
-    let report = cached_report(&agent_id, &config).await?;
+    let report = cached_report(&ctx, &agent_id, &config).await?;
 
     let mut sections: Vec<ContextSection> =
         report.sections.iter().map(section_from_prompt).collect();

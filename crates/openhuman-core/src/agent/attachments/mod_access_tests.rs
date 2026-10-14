@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 
 const UPLOAD: &str = "caption [FILE:data:text/plain;name=note.txt;base64,YQ==]";
@@ -77,10 +78,11 @@ async fn direct_upload_requires_runtime_authority_and_external_input_cannot_crea
 async fn delegation_rejects_malformed_explicit_paths_and_external_reads_before_configuration() {
     assert_eq!(
         delegation_prompt(
+            &DispatchCtx::process_default(),
             "mention picture.png in prose",
             &serde_json::json!({}),
             None,
-            None
+            None,
         )
         .await
         .unwrap(),
@@ -94,19 +96,21 @@ async fn delegation_rejects_malformed_explicit_paths_and_external_reads_before_c
         serde_json::json!(["picture\u{0}.png"]),
     ] {
         assert!(delegation_prompt(
+            &DispatchCtx::process_default(),
             "task",
             &serde_json::json!({"image_paths": image_paths}),
             None,
-            None
+            None,
         )
         .await
         .is_err());
     }
     let error = delegation_prompt(
+        &DispatchCtx::process_default(),
         "task",
         &serde_json::json!({"image_paths": ["picture.png"]}),
-        None,
         Some(&external_origin()),
+        None,
     )
     .await
     .unwrap_err();

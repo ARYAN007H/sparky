@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::config::test_env::EnvVarGuard;
 use crate::config::TEST_ENV_LOCK;
@@ -102,8 +103,9 @@ fn validate_asset_name_rejects_unprefixed_asset() {
 async fn update_apply_rejects_non_github_url_before_network_call() {
     let _guard = TEST_ENV_LOCK.lock().await;
     let outcome = update_apply(
-        "https://evil.example.com/asset".to_string(),
+        &DispatchCtx::process_default(),
         "openhuman-core-x86_64.tar.gz".to_string(),
+        "https://evil.example.com/asset".to_string(),
         None,
     )
     .await;
@@ -118,8 +120,9 @@ async fn update_apply_rejects_non_github_url_before_network_call() {
 async fn update_apply_rejects_unsafe_asset_name() {
     let _guard = TEST_ENV_LOCK.lock().await;
     let outcome = update_apply(
-        "https://github.com/owner/repo/releases/download/v1/x".to_string(),
+        &DispatchCtx::process_default(),
         "../etc/passwd".to_string(),
+        "https://github.com/owner/repo/releases/download/v1/x".to_string(),
         None,
     )
     .await;
@@ -145,8 +148,9 @@ async fn update_apply_rejects_when_rpc_mutations_disabled() {
     .await;
 
     let outcome = update_apply(
-        "https://github.com/owner/repo/releases/download/v1/x".to_string(),
+        &DispatchCtx::process_default(),
         "openhuman-core-x86_64.tar.gz".to_string(),
+        "https://github.com/owner/repo/releases/download/v1/x".to_string(),
         None,
     )
     .await;

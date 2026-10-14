@@ -15,6 +15,7 @@
 //! crate journals no sub-agent events at all, so every delegating turn loses
 //! that subtree on replay.
 
+use crate::core::runtime::DispatchCtx;
 fn span_projection_signature(
     spans: &[tinyagents_harness::observability::trace_export::TraceSpan],
 ) -> Vec<String> {
@@ -99,7 +100,7 @@ fn describe_signature_divergence(live: &[String], projected: &[String]) -> Strin
     )
 }
 
-pub(super) async fn shadow_compare_journal_projection(
+pub(super) async fn shadow_compare_journal_projection(ctx: &DispatchCtx, 
     request_id: &str,
     trace_ctx: tinyagents_harness::observability::trace_export::TraceContext,
     max_iterations: u32,
@@ -115,7 +116,7 @@ pub(super) async fn shadow_compare_journal_projection(
         return None;
     };
 
-    let observations = match crate::agent::tinyagents::journal::read_run_events(&journal_run_id, 0)
+    let observations = match crate::agent::tinyagents::journal::read_run_events(&ctx, &journal_run_id, 0)
         .await
     {
         Ok(observations) => observations,

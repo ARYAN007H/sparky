@@ -1,5 +1,6 @@
 //! Session/auth helpers used by RPC and [`crate::core_server::helpers`].
 
+use crate::core::runtime::DispatchCtx;
 use crate::config::Config;
 
 use super::profiles::{AuthProfile, AuthProfileKind, TokenSet};
@@ -65,8 +66,8 @@ pub fn is_local_session_token(token: &str) -> bool {
 /// credential. A backend-only route may report a missing session or 401 while
 /// this credential remains valid; those errors must not broadcast sign-out.
 /// A failed lookup leaves the ordinary session-expiry path in place.
-pub async fn current_session_is_local() -> bool {
-    let Ok(config) = crate::config::rpc::load_config_with_timeout().await else {
+pub async fn current_session_is_local(ctx: &DispatchCtx, ) -> bool {
+    let Ok(config) = crate::config::rpc::load_config_with_timeout(&ctx).await else {
         return false;
     };
     get_session_token(&config)

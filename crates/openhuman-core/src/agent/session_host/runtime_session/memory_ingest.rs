@@ -15,6 +15,7 @@
 //! The committed turn is also published as
 //! `DomainEvent::ConversationTurnCommitted` for observers.
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use chrono::Utc;
@@ -72,11 +73,11 @@ pub(super) fn in_prompt_window(
 impl OpenHumanTurnPrelude {
     /// The config memory runs under: the session's own, else the
     /// workspace's on disk.
-    async fn memory_config(&self) -> Option<Arc<crate::config::Config>> {
+    async fn memory_config(&self, ctx: &DispatchCtx) -> Option<Arc<crate::config::Config>> {
         if let Some(config) = &self.runtime_config {
             return Some(config.clone());
         }
-        crate::config::rpc::load_config_for_workspace_with_timeout(&self.workspace_dir)
+        crate::config::rpc::load_config_for_workspace_with_timeout(&ctx, &self.workspace_dir)
             .await
             .map(Arc::new)
             .map_err(|error| {
@@ -93,7 +94,7 @@ impl OpenHumanTurnPrelude {
     /// logged as observed from its sender
     /// ([`crate::memory::lifecycle::sender::channel_actor`]).
     pub(super) async fn memory_pre_turn(
-        &self,
+        &self, ctx: &DispatchCtx,
         history: &[Message],
         committed_turns: usize,
         current: Option<&Message>,
@@ -106,7 +107,7 @@ impl OpenHumanTurnPrelude {
             .pending_user_text
             .clone()?;
         let thread_id = self.thread_id.clone()?;
-        let config = self.memory_config().await?;
+        let config = self.memory_config(&ctx).await?;
         // The identity the turn's run context carries: the host environment's
         // (a team member's), narrowed to this agent.
         let acting = self.host_env.memory_identity.clone().unwrap_or_default();
@@ -154,7 +155,7 @@ impl OpenHumanTurnPrelude {
 
     /// Logs the committed reply (spawned; never delays the commit) and
     /// publishes `ConversationTurnCommitted`.
-    pub(super) fn memory_post_turn(&self, receipt: &CommitReceipt<OpenHumanRunContext>) {
+    pub(super) fn memory_post_turn(&self, ctx: &DispatchCtx, receipt: &CommitReceipt<OpenHumanRunContext>) {
         let (user_text, pending) = {
             let mut mutable = self
                 .mutable
@@ -199,7 +200,7 @@ impl OpenHumanTurnPrelude {
         let prelude = self.clone();
         let profile_context = pending.profile_context.clone();
         let work = async move {
-            let Some(config) = prelude.memory_config().await else {
+            let Some(config) = prelude.memory_config(&ctx).await else {
                 return;
             };
             hooks::post_turn(

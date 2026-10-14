@@ -438,6 +438,7 @@ pub(crate) async fn process_channel_runtime_message(
         Box<dyn std::future::Future<Output = anyhow::Result<AgentTurnResponse>> + Send + '_>,
     > = match bound_agent {
         Some(host) => Box::pin(run_host_agent_turn(
+            &ctx,
             *host,
             HostChannelTurn {
                 relay_thread: ctx.relay_thread.clone(),

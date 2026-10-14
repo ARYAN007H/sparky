@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
 use crate::skills::webhooks::{
     WebhookDebugLogListResult, WebhookDebugLogsClearedResult, WebhookDebugRegistrationsResult,
@@ -128,7 +129,7 @@ pub async fn register_agent(
 
 /// Trigger the triage/agent pipeline directly via RPC without requiring
 /// an incoming webhook request. Useful for testing and manual escalation.
-pub async fn trigger_agent(
+pub async fn trigger_agent(ctx: &DispatchCtx, 
     source: &str,
     caller_id: &str,
     reason: &str,
@@ -155,7 +156,7 @@ pub async fn trigger_agent(
 
     let outcome = tokio::time::timeout(
         std::time::Duration::from_secs(60),
-        crate::agent::triage::run_triage(&envelope),
+        crate::agent::triage::run_triage(&ctx, &envelope),
     )
     .await
     .map_err(|_| "triage timed out after 60s".to_string())?
@@ -170,7 +171,7 @@ pub async fn trigger_agent(
                 std::time::Duration::from_secs(60),
                 crate::agent::turn_origin::with_origin(
                     origin,
-                    crate::agent::triage::apply_decision(run.clone(), &envelope),
+                    crate::agent::triage::apply_decision(&ctx, run.clone(), &envelope),
                 ),
             )
             .await

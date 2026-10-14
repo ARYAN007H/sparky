@@ -1,6 +1,7 @@
+use crate::core::runtime::DispatchCtx;
 impl SpawnAsyncSubagentTool {
     async fn execute_with_context_inner(
-        &self,
+        &self, ctx: &DispatchCtx,
         args: serde_json::Value,
         _options: ToolCallOptions,
         tool_context: Option<&dyn ToolRunContext>,
@@ -716,11 +717,12 @@ impl SpawnAsyncSubagentTool {
         // Register *after* spawn so the AbortHandle is available. The task owns
         // `status_tx`; this side holds `status_rx` for `wait_subagent`.
         let registration = running_subagents::register(
-            task_id.clone(),
+            &ctx,
             definition.id.clone(),
             parent_session.clone(),
-            parent.session_parent_prefix.clone(),
+            task_id.clone(),
             Some(durable_session.subagent_session_id.clone()),
+            parent.session_parent_prefix.clone(),
             parent.workspace_dir.clone(),
             register_parent_thread_id,
             steer_queue,

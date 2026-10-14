@@ -21,6 +21,7 @@
 //! `409`: the refusal carries the holder ([`HeldBy`]) so the gateway can
 //! route the user there, or retry after the lease runs out.
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use hmac::{Hmac, KeyInit, Mac};
@@ -156,7 +157,7 @@ pub enum GatewayScope {
 /// Pick the scope for a request that already presented the service bearer.
 ///
 /// `secret` is the service bearer; `now` is unix seconds.
-pub async fn resolve_scope(
+pub async fn resolve_scope(ctx: &DispatchCtx, ctx: &DispatchCtx, 
     user_id: Option<&str>,
     signature: Option<&str>,
     secret: &str,
@@ -166,7 +167,7 @@ pub async fn resolve_scope(
         return Ok(GatewayScope::Operator);
     };
     let host = host::host().ok_or_else(|| GatewayRefusal::new(503, "this core serves no users"))?;
-    resolve_user_on(&host, user_id, signature, secret, now)
+    resolve_user_on(&ctx, &host, user_id, signature, secret, now)
         .await
         .map(GatewayScope::User)
 }
@@ -174,7 +175,7 @@ pub async fn resolve_scope(
 /// [`resolve_scope`] for a request that names `user_id`, on an explicit
 /// `host` rather than the process's: the profile that serves that user, or
 /// the refusal.
-pub async fn resolve_user_on(
+pub async fn resolve_user_on(ctx: &DispatchCtx, 
     host: &ProfileHost,
     user_id: &str,
     signature: Option<&str>,
@@ -191,7 +192,7 @@ pub async fn resolve_user_on(
             GatewayRefusal::new(401, e)
         })?;
     }
-    match host.open(&profile).await {
+    match host.open(&ctx, &profile).await {
         Ok(state) => {
             log::debug!("[profiles][gateway] scoped request to an open profile");
             Ok(state)

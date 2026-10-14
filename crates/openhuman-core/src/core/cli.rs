@@ -43,8 +43,8 @@ Contribute & Star us on GitHub: https://github.com/tinyhumansai/openhuman
 ///
 /// Returns an error if the command fails, parameters are invalid, or if
 /// the subcommand/namespace is unknown.
-pub fn run_from_cli_args(args: &[String]) -> Result<()> {
-    run_from_cli_args_with(args, None)
+pub fn run_from_cli_args(ctx: &DispatchCtx, args: &[String]) -> Result<()> {
+    run_from_cli_args_with(&ctx, args, None)
 }
 
 /// Whether the parsed invocation only asks the CLI to print help.
@@ -78,7 +78,7 @@ pub(crate) fn is_help_only(args: &[String]) -> bool {
 
 /// [`run_from_cli_args`] with a host-supplied boot description for `run` /
 /// `serve`; see [`crate::run_core_from_args_with`].
-pub fn run_from_cli_args_with(
+pub fn run_from_cli_args_with(ctx: &DispatchCtx, 
     args: &[String],
     host_boot: Option<crate::core::server_launcher::HostBoot>,
 ) -> Result<()> {
@@ -108,7 +108,7 @@ pub fn run_from_cli_args_with(
     // Match on the first argument to determine the subcommand.
     match args[0].as_str() {
         "run" | "serve" => super::cli_serve::run_server_command(&args[1..], host_boot),
-        "mcp" | "mcp-server" => crate::mcp::server::run_stdio_from_cli(&args[1..]),
+        "mcp" | "mcp-server" => crate::mcp::server::run_stdio_from_cli(&ctx, &args[1..]),
         // Keep the historical names as a migration diagnostic now that the
         // terminal frontend is its own workspace crate and executable.
         "tui" | "chat" => run_moved_tui_diagnostic(),
@@ -118,7 +118,7 @@ pub fn run_from_cli_args_with(
                 "[cli] dispatching to agent subcommand, args={:?}",
                 &args[1..]
             );
-            crate::core::agent_cli::run_agent_command(&args[1..])
+            crate::core::agent_cli::run_agent_command(&ctx, &args[1..])
         }
         "sentry-test" => run_sentry_test_command(&args[1..]),
         // Generic namespace dispatcher: `openhuman <namespace> <function> ...`

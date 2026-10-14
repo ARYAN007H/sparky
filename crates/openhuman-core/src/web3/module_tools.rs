@@ -1,5 +1,6 @@
 //! Agent tool adapters that route Web3 operations through the TinyWallet bus.
 
+use crate::core::runtime::DispatchCtx;
 use async_trait::async_trait;
 use serde_json::Value;
 use tinytools::{Tool, ToolCallOptions, ToolExposure, ToolResult};
@@ -35,7 +36,7 @@ impl Tool for Web3ModuleTool {
     }
 
     async fn execute(&self, args: Value) -> anyhow::Result<ToolResult> {
-        self.run(args, None).await
+        self.run(&DispatchCtx::ambient(), args, None).await
     }
 
     async fn execute_with_context(
@@ -45,7 +46,7 @@ impl Tool for Web3ModuleTool {
         context: Option<&dyn tinytools::ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
         let approval = crate::agent::tinyagents::host::run_context::approval_for_tool(context);
-        self.run(args, approval.chat.as_ref()).await
+        self.run(&DispatchCtx::ambient(), args, approval.chat.as_ref()).await
     }
 
     async fn execute_with_options(
@@ -60,17 +61,18 @@ impl Tool for Web3ModuleTool {
 impl Web3ModuleTool {
     /// Runs the tool for a turn whose approval context is `chat`.
     pub(crate) async fn run(
-        &self,
+        &self, ctx: &DispatchCtx,
         args: Value,
         chat: Option<&crate::security::approval::ApprovalChatContext>,
     ) -> anyhow::Result<ToolResult> {
         let owner = crate::modules::web3_service::owner_of(chat);
-        let config = match crate::config::rpc::load_config_with_timeout().await {
+        let config = match crate::config::rpc::load_config_with_timeout(&ctx).await {
             Ok(config) => config,
             Err(error) => return Ok(ToolResult::error(error)),
         };
         let result: anyhow::Result<Value> = match self.name() {
             "web3_swap_quote" => crate::modules::web3_service::quote(
+                &ctx,
                 &config,
                 owner.clone(),
                 tinywallet_bus::names::methods::WEB3_SWAP_QUOTE,
@@ -80,6 +82,7 @@ impl Web3ModuleTool {
             .map_err(|error| anyhow::anyhow!(error.to_string()))
             .and_then(|value| serde_json::to_value(value).map_err(Into::into)),
             "web3_bridge_quote" => crate::modules::web3_service::quote(
+                &ctx,
                 &config,
                 owner.clone(),
                 tinywallet_bus::names::methods::WEB3_BRIDGE_QUOTE,
@@ -89,6 +92,7 @@ impl Web3ModuleTool {
             .map_err(|error| anyhow::anyhow!(error.to_string()))
             .and_then(|value| serde_json::to_value(value).map_err(Into::into)),
             "web3_dapp_call" => crate::modules::web3_service::quote(
+                &ctx,
                 &config,
                 owner.clone(),
                 tinywallet_bus::names::methods::WEB3_DAPP_QUOTE,
@@ -97,12 +101,13 @@ impl Web3ModuleTool {
             .await
             .map_err(|error| anyhow::anyhow!(error.to_string()))
             .and_then(|value| serde_json::to_value(value).map_err(Into::into)),
-            "web3_swap_routes" => crate::modules::web3_service::routes(&config)
+            "web3_swap_routes" => crate::modules::web3_service::routes(&ctx, &config)
                 .await
                 .map_err(|error| anyhow::anyhow!(error.to_string())),
             "web3_swap_execute" | "web3_bridge_execute" | "web3_dapp_execute" => {
                 match serde_json::from_value::<crate::modules::web3_service::ExecuteParams>(args) {
                     Ok(params) => crate::modules::web3_service::execute(
+                        &ctx,
                         &config,
                         owner,
                         params.quote_id,

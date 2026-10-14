@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::integrations::task_sources::types::{FilterSpec, SourceTarget};
 use serde_json::json;
@@ -39,9 +40,9 @@ async fn a_new_connection_fires_the_matching_sources_of_the_scope() {
         )
         .unwrap();
     }
-    fire_for_connection(&config, ProviderSlug::Github, "github", "conn-1").await;
+    fire_for_connection(&DispatchCtx::process_default(), &config, ProviderSlug::Github, "conn-1", "github").await;
     // A toolkit with no sources fires nothing.
-    fire_for_connection(&config, ProviderSlug::Notion, "notion", "conn-1").await;
+    fire_for_connection(&DispatchCtx::process_default(), &config, ProviderSlug::Notion, "conn-1", "notion").await;
     assert_eq!(store::list_sources(&config).unwrap().len(), 2);
 }
 
@@ -57,7 +58,7 @@ async fn an_unreadable_scope_is_skipped() {
         action_dir: blocked,
         ..crate::config::Config::default()
     };
-    fire_for_connection(&config, ProviderSlug::Github, "github", "conn-1").await;
+    fire_for_connection(&DispatchCtx::process_default(), &config, ProviderSlug::Github, "conn-1", "github").await;
 }
 
 /// Smoke test: the subscriber handles connection events through the scope's
@@ -90,5 +91,5 @@ async fn a_connection_event_is_handled_per_scope() {
             connection_id: "conn-1".to_string(),
         })
         .await;
-    fire_in_scope(ProviderSlug::Github, "github", "conn-1").await;
+    fire_in_scope(&DispatchCtx::process_default(), ProviderSlug::Github, "conn-1", "github").await;
 }

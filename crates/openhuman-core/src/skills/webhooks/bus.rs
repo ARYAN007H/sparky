@@ -5,6 +5,7 @@
 //! echo target), waits for the response, and emits it back through the socket.
 //! This decouples the socket module from webhook routing logic.
 
+use crate::core::runtime::DispatchCtx;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 use crate::platform::socket::global_socket_manager;
@@ -130,7 +131,7 @@ impl EventHandler<DomainEvent> for WebhookRequestSubscriber {
                     tokio::spawn(async move {
                         let result =
                             tokio::time::timeout(std::time::Duration::from_secs(60), async {
-                                run_agent_trigger(&envelope).await
+                                run_agent_trigger(&DispatchCtx::ambient(), &envelope).await
                             })
                             .await;
                         let (resp, err) = match result {
@@ -301,10 +302,10 @@ fn decode_webhook_body(base64_body: &str) -> Result<serde_json::Value, String> {
 
 /// Run the triage pipeline for a trigger envelope and return the
 /// human-readable decision summary on success.
-async fn run_agent_trigger(
+async fn run_agent_trigger(ctx: &DispatchCtx, 
     envelope: &crate::agent::triage::TriggerEnvelope,
 ) -> Result<String, String> {
-    let outcome = crate::agent::triage::run_triage(envelope)
+    let outcome = crate::agent::triage::run_triage(&ctx, envelope)
         .await
         .map_err(|e| format!("triage evaluation failed: {e}"))?;
 
@@ -316,7 +317,7 @@ async fn run_agent_trigger(
             let origin = crate::agent::triage::remote_trigger_origin(envelope);
             crate::agent::turn_origin::with_origin(
                 origin,
-                crate::agent::triage::apply_decision(run.clone(), envelope),
+                crate::agent::triage::apply_decision(&ctx, run.clone(), envelope),
             )
             .await
             .map_err(|e| format!("apply_decision failed: {e}"))?;

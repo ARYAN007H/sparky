@@ -3,6 +3,7 @@
 //! run-queue dispatch, and the spawned turn body that delivers a response or
 //! classifies and reports a failure.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::json;
 use std::sync::Arc;
 use tinyagents_harness::run_queue::{QueueLane, RunQueue};
@@ -137,7 +138,7 @@ fn prompt_guard_user_message(action: PromptEnforcementAction) -> &'static str {
 /// keeps one copy, compiled in this crate.
 #[allow(clippy::too_many_arguments)]
 #[inline(never)]
-pub fn start_chat<'a>(
+pub fn start_chat<'a>(ctx: &DispatchCtx, 
     client_id: &'a str,
     thread_id: &'a str,
     message: &'a str,
@@ -148,19 +149,20 @@ pub fn start_chat<'a>(
     metadata: ChatRequestMetadata,
 ) -> futures::future::BoxFuture<'a, Result<String, StartChatError>> {
     Box::pin(start_chat_inner(
-        client_id,
+        &ctx,
         thread_id,
         message,
+        client_id,
         model_override,
         temperature,
-        locale,
         queue_mode,
+        locale,
         metadata,
     ))
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn start_chat_inner(
+async fn start_chat_inner(ctx: &DispatchCtx, 
     client_id: &str,
     thread_id: &str,
     message: &str,
@@ -190,7 +192,7 @@ async fn start_chat_inner(
     // Save originals before scanning, history, memory, or queue persistence.
     // A missing config/root cannot safely accept an upload.
     let mut message = if message.contains("[FILE:") || message.contains("[IMAGE:") {
-        let config = crate::config::rpc::load_config_with_timeout()
+        let config = crate::config::rpc::load_config_with_timeout(&ctx)
             .await
             .map_err(|error| {
                 StartChatError::Other(format!("upload configuration unavailable: {error}"))
@@ -368,8 +370,9 @@ async fn start_chat_inner(
             request_id
         );
         spawn_parallel_turn(
-            &client_id,
+            &ctx,
             &thread_id,
+            &client_id,
             request_id.clone(),
             &message,
             model_override,
@@ -507,22 +510,24 @@ async fn start_chat_inner(
             // result; the interrupting/cancelling side already emitted the
             // user-facing `chat_error`, so we just unwind quietly here.
             let result = run_turn_under_cancel_and_deadline(
+                &ctx,
                 task_cancel_token,
                 origin.clone(),
                 approval_ctx,
                 |host_env, activity, approval| {
                     run_chat_task(
-                        &client_id_task,
+                        &ctx,
                         &thread_id_task,
                         &request_id_task,
                         &user_message,
+                        &client_id_task,
                         model_override,
                         temperature,
                         locale,
                         turn_run_queue_task,
                         metadata,
                         origin.clone(),
-                        /* fork */ false,
+                        false,
                         host_env,
                         activity,
                         approval,
@@ -659,16 +664,15 @@ async fn start_chat_inner(
             // once on another task.
             if let Some(chat_result) = deferred_done {
                 crate::web_chat::presentation::announce_reply(
-                    &client_id_task,
+                    &ctx,
                     &thread_id_task,
                     &request_id_task,
                     &chat_result.full_response,
                     &user_message,
+                    &client_id_task,
                     &chat_result.citations,
                     chat_result.usage.as_ref(),
                     chat_result.timing,
-                    // The main single-user turn is the only surface with a
-                    // human waiting on a next-message suggestion (C5).
                     true,
                 );
             }
@@ -694,7 +698,7 @@ async fn start_chat_inner(
                             .map(|f| crate::agent::queued_turn::text_preview(&f.text)),
                     },
                 );
-                dispatch_followups(followups);
+                dispatch_followups(&ctx, followups);
             }
         },
     ));
@@ -716,18 +720,19 @@ async fn start_chat_inner(
     Ok(request_id)
 }
 
-fn dispatch_followups(followups: Vec<crate::agent::queued_turn::QueuedTurn>) {
+fn dispatch_followups(ctx: &DispatchCtx, followups: Vec<crate::agent::queued_turn::QueuedTurn>) {
     for fup in followups {
         tokio::spawn(crate::core::runtime::context::CoreContext::propagate(
             async move {
                 if let Err(err) = start_chat(
-                    &fup.client_id,
+                    &ctx,
                     &fup.thread_id,
                     &fup.text,
+                    &fup.client_id,
                     fup.model_override,
                     fup.temperature,
-                    fup.locale,
                     Some("followup".to_string()),
+                    fup.locale,
                     ChatRequestMetadata::default(),
                 )
                 .await

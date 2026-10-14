@@ -28,6 +28,7 @@
 //! [`EST_BYTES_PER_TOKEN`] into a claim of accuracy — it is a divisor, not a
 //! tokenizer.
 
+use crate::core::runtime::DispatchCtx;
 use anyhow::Result;
 
 use super::{dump_agent_prompt, DumpPromptOptions, DumpedPrompt};
@@ -86,8 +87,8 @@ pub struct PromptSizeReport {
 
 impl PromptSizeReport {
     /// Build the report for one agent by rendering its real turn-1 prompt.
-    pub async fn build(options: DumpPromptOptions) -> Result<Self> {
-        let dumped = dump_agent_prompt(options).await?;
+    pub async fn build(ctx: &DispatchCtx, options: DumpPromptOptions) -> Result<Self> {
+        let dumped = dump_agent_prompt(&ctx, options).await?;
         Ok(Self::from_dump(&dumped))
     }
 

@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -123,11 +124,12 @@ async fn emits_chat_suggestions_for_a_well_formed_reply() {
 
     let thread_id = "sugg-thread-ok";
     generate_and_emit(
-        "client-1",
+        &DispatchCtx::process_default(),
         thread_id,
         "req-1",
         "How do I deploy this?",
         "Run `pnpm build` then `pnpm deploy`.",
+        "client-1",
     )
     .await;
 
@@ -150,11 +152,12 @@ async fn drops_silently_when_the_model_returns_garbage() {
 
     let thread_id = "sugg-thread-garbage";
     generate_and_emit(
-        "client-1",
+        &DispatchCtx::process_default(),
         thread_id,
         "req-2",
         "How do I deploy this?",
         "Run `pnpm build` then `pnpm deploy`.",
+        "client-1",
     )
     .await;
 
@@ -173,11 +176,12 @@ async fn skips_when_the_user_message_is_too_short() {
     }));
 
     generate_and_emit(
-        "client-1",
+        &DispatchCtx::process_default(),
         "sugg-thread-short",
         "req-3",
         "ok",
         "Sure thing!",
+        "client-1",
     )
     .await;
 

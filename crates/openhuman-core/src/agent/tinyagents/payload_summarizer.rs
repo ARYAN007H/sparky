@@ -20,6 +20,7 @@
 //! `agent_id == "orchestrator"`); every other agent's results are compacted
 //! without a summary.
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
@@ -115,7 +116,7 @@ impl HarnessPayloadSummarizer<OpenHumanRunContext> for SubagentPayloadSummarizer
 
         Ok(Box::new(move |request: GenerateRequest| {
             Box::pin(async move {
-                let config_loaded = crate::config::ops::load_current_or_init().await;
+                let config_loaded = crate::config::ops::load_current_or_init(&DispatchCtx::ambient()).await;
                 let (source, model) = subagent_host::resolve_subagent_source(
                     &definition.model,
                     &definition.id,

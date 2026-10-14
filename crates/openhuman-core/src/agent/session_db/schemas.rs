@@ -95,11 +95,11 @@ fn new_correlation_id() -> String {
     uuid::Uuid::new_v4().simple().to_string()[..8].to_string()
 }
 
-fn handle_run_ledger_list(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_run_ledger_list(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "run_ledger_rpc", "[run_ledger_rpc][{cid}] list.entry");
-        let config = config_rpc::load_config_with_timeout().await.inspect_err(|err| {
+        let config = config_rpc::load_config_with_timeout(&ctx).await.inspect_err(|err| {
             log::warn!(target: "run_ledger_rpc", "[run_ledger_rpc][{cid}] list.config_failed err={err}");
         })?;
         let request: AgentRunListRequest = if params.is_empty() {
@@ -125,11 +125,11 @@ fn handle_run_ledger_list(_ctx: DispatchCtx, params: Map<String, Value>) -> Cont
     })
 }
 
-fn handle_run_ledger_get(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_run_ledger_get(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "run_ledger_rpc", "[run_ledger_rpc][{cid}] get.entry");
-        let config = config_rpc::load_config_with_timeout().await.inspect_err(|err| {
+        let config = config_rpc::load_config_with_timeout(&ctx).await.inspect_err(|err| {
             log::warn!(target: "run_ledger_rpc", "[run_ledger_rpc][{cid}] get.config_failed err={err}");
         })?;
         let id = params
@@ -149,11 +149,11 @@ fn handle_run_ledger_get(_ctx: DispatchCtx, params: Map<String, Value>) -> Contr
     })
 }
 
-fn handle_run_ledger_events(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_run_ledger_events(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "run_ledger_rpc", "[run_ledger_rpc][{cid}] events.entry");
-        let config = config_rpc::load_config_with_timeout().await.inspect_err(|err| {
+        let config = config_rpc::load_config_with_timeout(&ctx).await.inspect_err(|err| {
             log::warn!(target: "run_ledger_rpc", "[run_ledger_rpc][{cid}] events.config_failed err={err}");
         })?;
         let request: RunEventListRequest =

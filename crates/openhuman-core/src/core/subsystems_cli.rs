@@ -13,11 +13,12 @@
 //! openhuman subsystems status    # JSON
 //! ```
 
+use crate::core::runtime::DispatchCtx;
 use anyhow::Result;
 
 use crate::core::subsystem::{subsystems_status, SubsystemStatus};
 
-pub fn run_subsystems_command(args: &[String]) -> Result<()> {
+pub fn run_subsystems_command(ctx: &DispatchCtx, args: &[String]) -> Result<()> {
     if args.iter().any(|a| a == "-h" || a == "--help") {
         print_help();
         return Ok(());
@@ -29,7 +30,7 @@ pub fn run_subsystems_command(args: &[String]) -> Result<()> {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;
-    let rows = rt.block_on(cli_subsystems_status());
+    let rows = rt.block_on(cli_subsystems_status(&ctx));
 
     println!(
         "{:<10} {:<14} {:<9} {:<9} {:<9} CAPABILITIES",
@@ -65,8 +66,8 @@ pub fn run_subsystems_command(args: &[String]) -> Result<()> {
 
 /// The slot table for a standalone CLI invocation: the same rows the
 /// `subsystems status` RPC returns, resolved from the on-disk config.
-async fn cli_subsystems_status() -> Vec<SubsystemStatus> {
-    subsystems_status().await
+async fn cli_subsystems_status(ctx: &DispatchCtx, ) -> Vec<SubsystemStatus> {
+    subsystems_status(&ctx).await
 }
 
 fn print_help() {

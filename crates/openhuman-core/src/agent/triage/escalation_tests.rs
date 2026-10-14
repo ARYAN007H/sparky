@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::core::events::DomainEvent;
@@ -124,7 +125,7 @@ async fn apply_decision_drop_only_publishes_evaluated() {
         })
     }));
 
-    apply_decision(run(TriageAction::Drop), &envelope)
+    apply_decision(&DispatchCtx::process_default(), run(TriageAction::Drop), &envelope)
         .await
         .expect("drop should not fail");
 
@@ -163,7 +164,7 @@ async fn apply_decision_acknowledge_only_publishes_evaluated() {
         })
     }));
 
-    apply_decision(run(TriageAction::Acknowledge), &envelope)
+    apply_decision(&DispatchCtx::process_default(), run(TriageAction::Acknowledge), &envelope)
         .await
         .expect("acknowledge should not fail");
 
@@ -211,6 +212,7 @@ async fn apply_decision_react_failure_publishes_failed_event() {
     }));
 
     let result = apply_decision(
+        &DispatchCtx::process_default(),
         run_with_target(TriageAction::React, &missing_target, "handle this"),
         &envelope,
     )
@@ -265,6 +267,7 @@ async fn apply_decision_escalate_failure_publishes_failed_event() {
     ));
 
     let result = apply_decision(
+        &DispatchCtx::process_default(),
         run_with_target(TriageAction::Escalate, &missing_target, "escalate this"),
         &envelope,
     )

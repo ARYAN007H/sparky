@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 use async_trait::async_trait;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -154,6 +155,7 @@ async fn explicit_worker_thread_replaces_parent_for_model_run_and_transcript() {
     let mut history = vec![TranscriptMessage::user("finish this")];
 
     run_subagent_via_graph(
+        &DispatchCtx::process_default(),
         crate::agent::tinyagents::TurnModelSource::from_model(Arc::new(TwoStepProvider {
             calls: AtomicUsize::new(1),
         })),
@@ -167,8 +169,8 @@ async fn explicit_worker_thread_replaces_parent_for_model_run_and_transcript() {
         2,
         None,
         None,
-        "researcher",
         "worker-task",
+        "researcher",
         false,
         Some("worker-thread".to_owned()),
         parent,
@@ -177,8 +179,8 @@ async fn explicit_worker_thread_replaces_parent_for_model_run_and_transcript() {
         None,
         1024,
         false,
-        "root__worker-thread",
         "test",
+        "root__worker-thread",
         AgentTokenjuiceCompression::Off,
         None,
     )
@@ -207,6 +209,7 @@ async fn subagent_runs_through_the_graph_engine_with_real_tools() {
     let mut history = vec![TranscriptMessage::user("please echo hi")];
 
     let (output, iterations, usage, early_exit, hit_cap, _breaker) = run_subagent_via_graph(
+        &DispatchCtx::process_default(),
         crate::agent::tinyagents::TurnModelSource::from_model(provider),
         "mock-model",
         0.0,
@@ -218,8 +221,8 @@ async fn subagent_runs_through_the_graph_engine_with_real_tools() {
         10,
         None,
         None,
-        "researcher",
         "task-1",
+        "researcher",
         false,
         None,
         crate::agent::tinyagents::host::OpenHumanRunContext::new(),
@@ -228,12 +231,9 @@ async fn subagent_runs_through_the_graph_engine_with_real_tools() {
         None,
         1024,
         false,
-        "root-session__real_tools",
         "mock-channel",
+        "root-session__real_tools",
         AgentTokenjuiceCompression::Off,
-        // No host config in tests: the graph takes byte-cap-only
-        // context defaults instead of reading the developer machine's
-        // real config.toml, which is what the old in-graph load did.
         None,
     )
     .await
@@ -293,6 +293,7 @@ async fn child_text_and_thinking_deltas_are_scoped_to_the_subagent() {
     let mut history = vec![TranscriptMessage::user("hi")];
 
     let (output, _iters, _usage, _early, _hit_cap, _breaker) = run_subagent_via_graph(
+        &DispatchCtx::process_default(),
         crate::agent::tinyagents::TurnModelSource::from_model(Arc::new(ThinkingStreamProvider)),
         "mock-model",
         0.0,
@@ -302,10 +303,10 @@ async fn child_text_and_thinking_deltas_are_scoped_to_the_subagent() {
         vec![],
         HashSet::new(),
         4,
-        None,
         Some(tx),
-        "researcher",
+        None,
         "task-7",
+        "researcher",
         false,
         None,
         crate::agent::tinyagents::host::OpenHumanRunContext::new(),
@@ -314,12 +315,9 @@ async fn child_text_and_thinking_deltas_are_scoped_to_the_subagent() {
         None,
         1024,
         false,
-        "root-session__scoped_deltas",
         "mock-channel",
+        "root-session__scoped_deltas",
         AgentTokenjuiceCompression::Off,
-        // No host config in tests: the graph takes byte-cap-only
-        // context defaults instead of reading the developer machine's
-        // real config.toml, which is what the old in-graph load did.
         None,
     )
     .await
@@ -429,6 +427,7 @@ async fn ask_user_clarification_pauses_and_surfaces_the_question() {
     let mut history = vec![TranscriptMessage::user("help me")];
 
     let (output, iterations, _usage, early_exit, _hit_cap, _breaker) = run_subagent_via_graph(
+        &DispatchCtx::process_default(),
         crate::agent::tinyagents::TurnModelSource::from_model(provider.clone()),
         "mock-model",
         0.0,
@@ -440,8 +439,8 @@ async fn ask_user_clarification_pauses_and_surfaces_the_question() {
         10,
         None,
         None,
-        "researcher",
         "task-9",
+        "researcher",
         false,
         None,
         crate::agent::tinyagents::host::OpenHumanRunContext::new(),
@@ -450,12 +449,9 @@ async fn ask_user_clarification_pauses_and_surfaces_the_question() {
         None,
         1024,
         false,
-        "root-session__clarification",
         "mock-channel",
+        "root-session__clarification",
         AgentTokenjuiceCompression::Off,
-        // No host config in tests: the graph takes byte-cap-only
-        // context defaults instead of reading the developer machine's
-        // real config.toml, which is what the old in-graph load did.
         None,
     )
     .await
@@ -521,6 +517,7 @@ async fn cap_hit_summarizes_a_resumable_checkpoint() {
     let mut history = vec![TranscriptMessage::user("do a big task")];
 
     let (output, iterations, _usage, early_exit, hit_cap, _breaker) = run_subagent_via_graph(
+        &DispatchCtx::process_default(),
         crate::agent::tinyagents::TurnModelSource::from_model(Arc::new(LoopForeverProvider)),
         "mock-model",
         0.0,
@@ -532,8 +529,8 @@ async fn cap_hit_summarizes_a_resumable_checkpoint() {
         2,
         None,
         None,
-        "researcher",
         "task-cap",
+        "researcher",
         false,
         None,
         crate::agent::tinyagents::host::OpenHumanRunContext::new(),
@@ -542,12 +539,9 @@ async fn cap_hit_summarizes_a_resumable_checkpoint() {
         None,
         1024,
         false,
-        "root-session__cap_hit",
         "mock-channel",
+        "root-session__cap_hit",
         AgentTokenjuiceCompression::Off,
-        // No host config in tests: the graph takes byte-cap-only
-        // context defaults instead of reading the developer machine's
-        // real config.toml, which is what the old in-graph load did.
         None,
     )
     .await

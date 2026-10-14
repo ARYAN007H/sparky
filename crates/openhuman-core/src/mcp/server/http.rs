@@ -1,5 +1,6 @@
 //! OpenHuman's thin Streamable HTTP adapter over TinyMCP's server contract.
 
+use crate::core::runtime::DispatchCtx;
 use std::{collections::HashMap, convert::Infallible, net::SocketAddr, sync::Arc, time::Duration};
 
 use axum::{
@@ -69,7 +70,7 @@ fn router(state: HttpState) -> Router {
         .with_state(state)
 }
 
-async fn handle_post(State(state): State<HttpState>, headers: HeaderMap, body: Bytes) -> Response {
+async fn handle_post(ctx: &DispatchCtx, State(state): State<HttpState>, headers: HeaderMap, body: Bytes) -> Response {
     if let Some(response) = check_auth(&state, &headers) {
         return response;
     }
@@ -92,6 +93,7 @@ async fn handle_post(State(state): State<HttpState>, headers: HeaderMap, body: B
     let session = match session {
         Some(session) => session,
         None => match ServerSession::open_http(
+            &ctx,
             Arc::clone(&state.port),
             requested_session_id.clone(),
             false,

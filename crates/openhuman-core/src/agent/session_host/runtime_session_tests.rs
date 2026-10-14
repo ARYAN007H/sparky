@@ -1,5 +1,6 @@
 //! Tests for the turn prelude's tool surface across a resumed thread.
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use tinyagents_runtime::ToolSnapshot;
@@ -117,7 +118,7 @@ fn clearing_progress_releases_warm_prelude_sender() {
     let mut host =
         crate::agent::OpenHumanSessionHost::from_config_for_agent(&config, "orchestrator")
             .expect("orchestrator");
-    host.ensure_runtime_session().expect("warm runtime");
+    host.ensure_runtime_session(&DispatchCtx::process_default()).expect("warm runtime");
 
     let (tx, mut rx) = tokio::sync::mpsc::channel(1);
     host.set_on_progress(Some(tx));
@@ -205,7 +206,7 @@ fn connected_mcp_actions_enter_search_and_leave_on_disconnect() {
     let mut host =
         crate::agent::OpenHumanSessionHost::from_config_for_agent(&config, "orchestrator")
             .expect("orchestrator");
-    host.ensure_runtime_session().expect("runtime session");
+    host.ensure_runtime_session(&DispatchCtx::process_default()).expect("runtime session");
     let prelude = host
         .runtime_state
         .lock()
@@ -271,7 +272,7 @@ async fn resumed_mcp_snapshot_survives_a_cold_catalog_and_keeps_its_frozen_spec(
     let mut host =
         crate::agent::OpenHumanSessionHost::from_config_for_agent(&config, "orchestrator")
             .expect("orchestrator");
-    host.ensure_runtime_session().expect("runtime session");
+    host.ensure_runtime_session(&DispatchCtx::process_default()).expect("runtime session");
     let prelude = host
         .runtime_state
         .lock()
@@ -291,7 +292,7 @@ async fn resumed_mcp_snapshot_survives_a_cold_catalog_and_keeps_its_frozen_spec(
         .expect("cold refresh");
 
     let cold = prelude
-        .prepare(false)
+        .prepare(&DispatchCtx::process_default(), false)
         .await
         .expect("prepared cold surface")
         .tools
@@ -330,7 +331,7 @@ async fn resumed_mcp_snapshot_survives_a_cold_catalog_and_keeps_its_frozen_spec(
         .refresh_delegation_tool_surface()
         .expect("refresh from recovered catalog");
     let recovered = prelude
-        .prepare(false)
+        .prepare(&DispatchCtx::process_default(), false)
         .await
         .expect("prepared recovered surface")
         .tools
@@ -378,7 +379,7 @@ async fn desktop_browser_setting_keeps_deferred_tools_in_fresh_and_resumed_surfa
             .iter()
             .any(|spec| spec.name == name));
     }
-    host.ensure_runtime_session().expect("runtime session");
+    host.ensure_runtime_session(&DispatchCtx::process_default()).expect("runtime session");
     let prelude = host
         .runtime_state
         .lock()
@@ -386,14 +387,14 @@ async fn desktop_browser_setting_keeps_deferred_tools_in_fresh_and_resumed_surfa
         .prelude
         .clone()
         .expect("prelude");
-    let fresh = prelude.prepare(true).await.expect("fresh tool surface");
+    let fresh = prelude.prepare(&DispatchCtx::process_default(), true).await.expect("fresh tool surface");
     let fresh = fresh.tools.expect("fresh tools");
     for name in ["browser", "browser_open"] {
         assert!(fresh.specs().iter().any(|spec| spec.name == name), "{name}");
     }
     prelude.adopt_recorded_tools(Some(&fresh));
     prelude.refresh_delegation_tool_surface().unwrap();
-    let resumed = prelude.prepare(false).await.expect("resumed tool surface");
+    let resumed = prelude.prepare(&DispatchCtx::process_default(), false).await.expect("resumed tool surface");
     for name in ["browser", "browser_open"] {
         assert!(
             resumed
@@ -439,7 +440,7 @@ async fn a_resumed_orchestrator_keeps_the_integration_actions_it_was_sent() {
         .agent_definition_name("orchestrator")
         .build()
         .expect("session build");
-    host.ensure_runtime_session().expect("runtime session");
+    host.ensure_runtime_session(&DispatchCtx::process_default()).expect("runtime session");
 
     let state = host
         .runtime_state
@@ -527,7 +528,7 @@ const SURFACED_GOAL_TOOL: &str = "goal_complete";
 
 /// A text-dialect (XML) session over the real per-thread goal tools, optionally
 /// bound to a chat thread, with its runtime session already initialised.
-fn text_dialect_host(
+fn text_dialect_host(ctx: &DispatchCtx, 
     thread_id: Option<&str>,
 ) -> (crate::agent::OpenHumanSessionHost, tempfile::TempDir) {
     let _ = crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins();
@@ -544,12 +545,12 @@ fn text_dialect_host(
         .build()
         .expect("session build");
     host.set_thread_id(thread_id);
-    host.ensure_runtime_session().expect("runtime session");
+    host.ensure_runtime_session(&ctx).expect("runtime session");
     (host, action_dir)
 }
 
 /// Render the first-turn system prompt and declared tool list of `host`.
-async fn prompt_and_declared_tools(
+async fn prompt_and_declared_tools(ctx: &DispatchCtx, 
     host: &crate::agent::OpenHumanSessionHost,
 ) -> (String, ToolSnapshot) {
     let prelude = host
@@ -559,9 +560,9 @@ async fn prompt_and_declared_tools(
         .prelude
         .clone()
         .expect("prelude");
-    let tiered = prelude.build_system_prompt_tiered().expect("system prompt");
+    let tiered = prelude.build_system_prompt_tiered(&ctx).expect("system prompt");
     let snapshot = prelude
-        .prepare(true)
+        .prepare(&ctx, true)
         .await
         .expect("tool surface")
         .tools
@@ -584,15 +585,15 @@ fn assert_no_goal_tools(prompt: &str, snapshot: &ToolSnapshot) {
 /// answer "unregistered tool" when called.
 #[tokio::test]
 async fn text_dialect_prompt_omits_thread_goal_tools_without_a_thread() {
-    let (host, _dir) = text_dialect_host(None);
-    let (prompt, snapshot) = prompt_and_declared_tools(&host).await;
+    let (host, _dir) = text_dialect_host(&DispatchCtx::process_default(), None);
+    let (prompt, snapshot) = prompt_and_declared_tools(&DispatchCtx::process_default(), &host).await;
     assert_no_goal_tools(&prompt, &snapshot);
 }
 
 #[tokio::test]
 async fn text_dialect_prompt_lists_thread_goal_tools_on_a_thread() {
-    let (host, _dir) = text_dialect_host(Some("thread-goals"));
-    let (prompt, snapshot) = prompt_and_declared_tools(&host).await;
+    let (host, _dir) = text_dialect_host(&DispatchCtx::process_default(), Some("thread-goals"));
+    let (prompt, snapshot) = prompt_and_declared_tools(&DispatchCtx::process_default(), &host).await;
     assert!(
         prompt.contains(SURFACED_GOAL_TOOL),
         "{SURFACED_GOAL_TOOL} missing from the prompt"
@@ -611,20 +612,20 @@ async fn text_dialect_prompt_lists_thread_goal_tools_on_a_thread() {
 /// surface (no goal tools) must not be contradicted by a later thread id.
 #[tokio::test]
 async fn a_thread_bound_after_session_init_is_refused_and_keeps_goal_tools_out() {
-    let (mut host, _dir) = text_dialect_host(None);
+    let (mut host, _dir) = text_dialect_host(&DispatchCtx::process_default(), None);
     host.set_thread_id(Some("late-thread"));
     assert_eq!(host.thread_id(), None, "late thread id must be refused");
     assert_eq!(host.session_id(), None, "no durable identity was minted");
-    let (prompt, snapshot) = prompt_and_declared_tools(&host).await;
+    let (prompt, snapshot) = prompt_and_declared_tools(&DispatchCtx::process_default(), &host).await;
     assert_no_goal_tools(&prompt, &snapshot);
 }
 
 #[tokio::test]
 async fn rebinding_the_same_thread_after_session_init_is_a_no_op() {
-    let (mut host, _dir) = text_dialect_host(Some("same-thread"));
+    let (mut host, _dir) = text_dialect_host(&DispatchCtx::process_default(), Some("same-thread"));
     host.set_thread_id(Some("same-thread"));
     assert_eq!(host.thread_id(), Some("same-thread"));
-    let (prompt, _snapshot) = prompt_and_declared_tools(&host).await;
+    let (prompt, _snapshot) = prompt_and_declared_tools(&DispatchCtx::process_default(), &host).await;
     assert!(prompt.contains(SURFACED_GOAL_TOOL));
 }
 
@@ -661,7 +662,7 @@ async fn newly_connected_action_cannot_shadow_a_permanent_source() {
         .agent_definition_name("orchestrator")
         .build()
         .unwrap();
-    host.ensure_runtime_session().unwrap();
+    host.ensure_runtime_session(&DispatchCtx::process_default()).unwrap();
     let prelude = host.runtime_state.lock().unwrap().prelude.clone().unwrap();
     prelude.refresh_delegation_tool_surface().unwrap();
     let before = prelude

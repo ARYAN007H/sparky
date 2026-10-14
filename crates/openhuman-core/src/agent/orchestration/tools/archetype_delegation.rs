@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use async_trait::async_trait;
 use serde_json::json;
 use serde_json::Value;
@@ -118,8 +119,9 @@ impl Tool for ArchetypeDelegationTool {
             .and_then(ToolRunContext::thread_id)
             .map(ToOwned::to_owned);
         execute_archetype_delegation(
-            &self.agent_id.0,
+            &DispatchCtx::ambient(),
             &self.tool_name,
+            &self.agent_id.0,
             args,
             tool_context,
             run_context,
@@ -129,7 +131,7 @@ impl Tool for ArchetypeDelegationTool {
 }
 
 /// Execute an archetype hand-off with an explicit child run carrier.
-pub(crate) async fn execute_archetype_delegation(
+pub(crate) async fn execute_archetype_delegation(ctx: &DispatchCtx, 
     agent_id: &str,
     tool_name: &str,
     args: serde_json::Value,
@@ -137,8 +139,9 @@ pub(crate) async fn execute_archetype_delegation(
     run_context: crate::agent::tinyagents::host::OpenHumanRunContext,
 ) -> anyhow::Result<ToolResult> {
     execute_archetype_delegation_with_live_parent(
-        agent_id,
+        &ctx,
         tool_name,
+        agent_id,
         args,
         tool_context,
         run_context,
@@ -149,7 +152,7 @@ pub(crate) async fn execute_archetype_delegation(
 
 /// Typed-harness counterpart that preserves a live parent for the blocking
 /// archetype child.
-pub(crate) async fn execute_archetype_delegation_with_live_parent(
+pub(crate) async fn execute_archetype_delegation_with_live_parent(ctx: &DispatchCtx, 
     agent_id: &str,
     tool_name: &str,
     args: serde_json::Value,
@@ -176,6 +179,7 @@ pub(crate) async fn execute_archetype_delegation_with_live_parent(
     }
     let prompt = render_structured_handoff(&raw_prompt, &args);
     let prompt = match crate::agent::attachments::delegation_prompt(
+        &ctx,
         &prompt,
         &args,
         tool_context
@@ -215,9 +219,10 @@ pub(crate) async fn execute_archetype_delegation_with_live_parent(
     };
 
     super::dispatch::dispatch_subagent_with_live_parent(
-        agent_id,
+        &ctx,
         tool_name,
         &prompt,
+        agent_id,
         model_override,
         tool_context,
         mode,

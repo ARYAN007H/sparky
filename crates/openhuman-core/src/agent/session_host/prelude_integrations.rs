@@ -3,6 +3,7 @@
 //! revokes between turns, and adopting the integration actions the tinyagents
 //! session restored for a resumed thread.
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use tinyagents_runtime::ToolSnapshot;
@@ -173,20 +174,20 @@ impl OpenHumanTurnPrelude {
         rebuilt
     }
 
-    pub(super) async fn refresh_turn_boundary(&self, cold: bool) -> anyhow::Result<()> {
+    pub(super) async fn refresh_turn_boundary(&self, ctx: &DispatchCtx, cold: bool) -> anyhow::Result<()> {
         // Hydrate on the first turn of *this session instance*, not only on a
         // brand-new thread. A resumed thread is never `cold`, and a session
         // rebuilt after a restart is seeded from an empty cache — gating the fetch on
         // `cold` left it with zero integrations, no deferred Composio
         // actions, and no `tool_search` bridge for the whole thread.
         // `refresh_cold_integrations` is a no-op once hydrated.
-        self.refresh_cold_integrations().await;
+        self.refresh_cold_integrations(&ctx).await;
         #[cfg(feature = "mcp")]
         self.refresh_connected_mcp_tools().await;
         #[cfg(feature = "mcp")]
         self.refresh_configured_mcp_tools().await;
         if !cold {
-            self.refresh_dynamic_announcements().await;
+            self.refresh_dynamic_announcements(&ctx).await;
         }
         // Integration changes are authority changes, not only display
         // announcements. Refresh the delegation executable set and rebuild
@@ -350,7 +351,7 @@ impl OpenHumanTurnPrelude {
         )
     }
 
-    pub(super) async fn refresh_cold_integrations(&self) {
+    pub(super) async fn refresh_cold_integrations(&self, ctx: &DispatchCtx) {
         let should_fetch = !self
             .mutable
             .lock()
@@ -361,7 +362,7 @@ impl OpenHumanTurnPrelude {
         }
         let config = match self.runtime_config.clone() {
             Some(config) => Some(config),
-            None => crate::config::ops::load_current_or_init()
+            None => crate::config::ops::load_current_or_init(&ctx)
                 .await
                 .ok()
                 .map(Arc::new),
@@ -395,11 +396,11 @@ impl OpenHumanTurnPrelude {
         apply_cold_hydration(&mut mutable, connected, authoritative, mcp_servers);
     }
 
-    pub(super) async fn refresh_dynamic_announcements(&self) {
+    pub(super) async fn refresh_dynamic_announcements(&self, ctx: &DispatchCtx) {
         let skills_changed = self.drain_host_events();
         let config = match self.runtime_config.clone() {
             Some(config) => Some(config),
-            None => crate::config::ops::load_current_or_init()
+            None => crate::config::ops::load_current_or_init(&ctx)
                 .await
                 .ok()
                 .map(Arc::new),

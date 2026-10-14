@@ -6,6 +6,7 @@
 //! cold-boot resume preferred over the real conversation. Routing it through
 //! this checkout is what keeps one live history per thread.
 
+use crate::core::runtime::DispatchCtx;
 use std::path::Path;
 
 use tinyagents_session::transcript::{write_transcript, TranscriptMeta};
@@ -86,9 +87,10 @@ fn prose(history: &[TranscriptEntry]) -> Vec<String> {
         .collect()
 }
 
-pub(super) fn host_seeded_with(config: &Config, marker: &str) -> OpenHumanSessionHost {
+pub(super) fn host_seeded_with(ctx: &DispatchCtx, config: &Config, marker: &str) -> OpenHumanSessionHost {
     let mut host = OpenHumanSessionHost::from_config_for_agent(config, "orchestrator").unwrap();
     host.seed_resume_from_messages(
+        &ctx,
         vec![
             ("user".to_string(), marker.to_string()),
             ("agent".to_string(), "ok".to_string()),
@@ -140,7 +142,7 @@ async fn checkout_cold_boots_from_the_thread_transcript_and_checkin_keeps_it_war
     // when the session resumes, which every turn does for itself. The
     // conversation the transcript holds must come back either way.
     assert!(
-        agent.resume_bound_session().await.unwrap(),
+        agent.resume_bound_session(&DispatchCtx::process_default()).await.unwrap(),
         "a thread with a transcript must resume"
     );
     let history = prose(&agent.history());
@@ -193,11 +195,11 @@ async fn checkin_if_vacant_yields_to_a_turn_that_re_cached_meanwhile() {
 
     // A user turn finished while the system turn was running and cached its
     // agent unconditionally.
-    let user_turn_agent = host_seeded_with(&config, "user-turn-history");
+    let user_turn_agent = host_seeded_with(&DispatchCtx::process_default(), &config, "user-turn-history");
     checkin_session_agent(&thread_id, user_turn_agent, fingerprint(&config)).await;
 
     // The system turn must not clobber it.
-    let system_turn_agent = host_seeded_with(&config, "system-turn-history");
+    let system_turn_agent = host_seeded_with(&DispatchCtx::process_default(), &config, "system-turn-history");
     assert!(
         !checkin_session_agent_if_vacant(&thread_id, system_turn_agent, fingerprint(&config)).await
     );
@@ -215,7 +217,7 @@ async fn checkin_if_vacant_yields_to_a_turn_that_re_cached_meanwhile() {
     assert_eq!(prose(&agent.history()), vec!["user-turn-history", "ok"]);
 
     // Into a vacant slot it goes in.
-    let system_turn_agent = host_seeded_with(&config, "system-turn-history");
+    let system_turn_agent = host_seeded_with(&DispatchCtx::process_default(), &config, "system-turn-history");
     assert!(
         checkin_session_agent_if_vacant(&thread_id, system_turn_agent, fingerprint(&config)).await
     );
@@ -243,7 +245,7 @@ async fn a_fork_never_takes_or_returns_the_cached_agent() {
         super::build_session_fingerprint(&config, None, None, "orchestrator".into(), "chat");
     checkin_session_agent(
         &thread_id,
-        host_seeded_with(&config, "primary-history"),
+        host_seeded_with(&DispatchCtx::process_default(), &config, "primary-history"),
         fingerprint,
     )
     .await;
@@ -280,7 +282,7 @@ async fn a_system_turn_adopts_the_cached_agent_and_its_fingerprint() {
         super::build_session_fingerprint(&config, None, Some(0.2), "orchestrator".into(), "chat");
     checkin_session_agent(
         &thread_id,
-        host_seeded_with(&config, "pinned-history"),
+        host_seeded_with(&DispatchCtx::process_default(), &config, "pinned-history"),
         pinned.clone(),
     )
     .await;
@@ -566,7 +568,7 @@ async fn a_system_turn_never_adopts_an_agent_from_another_workspace() {
         super::build_session_fingerprint(&config_a, None, None, "orchestrator".into(), "chat");
     checkin_session_agent(
         &thread_id,
-        host_seeded_with(&config_a, "user-a-history"),
+        host_seeded_with(&DispatchCtx::process_default(), &config_a, "user-a-history"),
         built_for_a,
     )
     .await;

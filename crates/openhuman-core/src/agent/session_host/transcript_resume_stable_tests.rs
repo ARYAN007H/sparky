@@ -2,6 +2,7 @@
 //! committed fixture neither renames, rewrites nor re-adopts anything, so the
 //! transcript stems and bytes on disk are exactly what the old binary left.
 
+use crate::core::runtime::DispatchCtx;
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -44,7 +45,7 @@ fn resuming_a_committed_workspace_leaves_every_stem_and_byte_untouched() {
             let before = raw_tree(root.path());
             assert!(!before.is_empty(), "{}: fixture placed", scenario.name);
 
-            assert!(host.resume_bound_session().await.expect("resume"));
+            assert!(host.resume_bound_session(&DispatchCtx::process_default()).await.expect("resume"));
 
             assert_eq!(
                 before,
@@ -73,7 +74,7 @@ fn a_legacy_workspace_is_adopted_once_and_the_next_process_resumes_in_place() {
             let stem = host.session_id().expect("bound session id");
             place_fixture(root.path(), scenario, &stem, "");
             legacy_only = raw_tree(root.path());
-            assert!(host.resume_bound_session().await.expect("first resume"));
+            assert!(host.resume_bound_session(&DispatchCtx::process_default()).await.expect("first resume"));
             after_first = raw_tree(root.path());
         }
         // Adoption writes the session's own file and modifies no legacy file.
@@ -92,7 +93,7 @@ fn a_legacy_workspace_is_adopted_once_and_the_next_process_resumes_in_place() {
         // A fresh process over the same workspace resumes without adopting again.
         let next = model(vec![ModelResponse::assistant("unused")], scenario.native);
         let mut host = build_host(root.path(), next, scenario.native, &thread);
-        assert!(host.resume_bound_session().await.expect("second resume"));
+        assert!(host.resume_bound_session(&DispatchCtx::process_default()).await.expect("second resume"));
         assert_eq!(
             after_first,
             raw_tree(root.path()),

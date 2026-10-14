@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use anyhow::Result;
 use tinyagents_runtime::{ResumeMode, SessionTurnRequest, TurnOptions};
 
@@ -22,12 +23,12 @@ impl OpenHumanSessionHost {
     /// flow run it belongs to. It rides this turn's run context only, so it is
     /// never left behind on the session for a later turn to inherit.
     pub async fn turn_with_approval(
-        &mut self,
+        &mut self, ctx: &DispatchCtx,
         user_message: &str,
         origin: Option<&crate::agent::turn_origin::AgentTurnOrigin>,
         approval: crate::security::approval::ApprovalTurnContext,
     ) -> Result<String> {
-        self.ensure_runtime_session()?;
+        self.ensure_runtime_session(&ctx)?;
         let staged = super::attachment_input::stage_turn(self, user_message, origin).await?;
         let mut context = OpenHumanRunContext::new().with_host_env(&self.host_env);
         context.untrusted_input_turn = self.untrusted_input;

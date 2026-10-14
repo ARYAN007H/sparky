@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 
 /// A running tool's status line reaches the socket as `tool_progress`, tied to
@@ -6,7 +7,7 @@ use super::*;
 async fn forwards_tool_progress_for_the_running_call() {
     let mut events = super::super::super::event_bus::subscribe_web_channel_events();
     let thread_id = "thread-tool-progress";
-    let tx = spawn_test_bridge(thread_id, "req-tool-progress");
+    let tx = spawn_test_bridge(&DispatchCtx::process_default(), "req-tool-progress", thread_id);
 
     tx.send(AgentProgress::ToolCallProgress {
         call_id: "call-1".into(),

@@ -1,6 +1,7 @@
 //! Loading persisted config with a timeout, anchored reloads, and the
 //! in-memory normalization that runs on every load.
 
+use crate::core::runtime::DispatchCtx;
 use std::path::Path;
 
 use crate::config::Config;
@@ -72,7 +73,9 @@ pub async fn load_current_or_init(
         .map_err(anyhow::Error::msg)?;
     if let Some(route) = config.ephemeral_route.clone() {
         tracing::trace!(
-            agent = crate::core::runtime::agent_scope::current_agent_id()
+            agent = ctx
+                .resolved()
+                .and_then(|core| core.session_agent().map(str::to_owned))
                 .as_deref()
                 .unwrap_or(""),
             "[config] applying the context's inference route"

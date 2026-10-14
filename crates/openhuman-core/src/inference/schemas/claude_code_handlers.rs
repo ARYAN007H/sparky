@@ -46,12 +46,12 @@ pub(super) fn handle_inference_claude_code_auth_status(
 }
 
 pub(super) fn handle_inference_claude_code_settings(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
     use tinyagents_harness::providers::claude_code::settings;
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
         let workspace = config.config_path.parent().unwrap_or(&config.workspace_dir);
         let settings = settings::load(workspace);
         log::debug!(
@@ -63,13 +63,13 @@ pub(super) fn handle_inference_claude_code_settings(
 }
 
 pub(super) fn handle_inference_claude_code_set_full_access(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     use tinyagents_harness::providers::claude_code::settings;
     Box::pin(async move {
         let p = deserialize_params::<InferenceClaudeCodeSetFullAccessParams>(params)?;
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = config_rpc::load_config_with_timeout(&ctx).await?;
         let workspace = config.config_path.parent().unwrap_or(&config.workspace_dir);
         let settings = settings::ClaudeCodeSettings {
             full_access: p.enabled,

@@ -1,6 +1,7 @@
 //! Create, read, update, and delete operations for conversation threads and
 //! their messages.
 
+use crate::core::runtime::DispatchCtx;
 use super::support::{
     counts, envelope, message_to_record, record_to_message, run_to_completion, thread_to_summary,
     workspace_dir,
@@ -151,11 +152,11 @@ pub async fn transcript_search(
 }
 
 /// Appends a message to a conversation thread.
-pub async fn message_append(
+pub async fn message_append(ctx: &DispatchCtx, 
     request: AppendConversationMessageRequest,
 ) -> Result<Outcome<ApiEnvelope<ConversationMessageRecord>>, ThreadsError> {
     let origin = crate::core::runtime::CoreContext::current_turn_origin();
-    let config = crate::config::rpc::load_config_with_timeout()
+    let config = crate::config::rpc::load_config_with_timeout(&ctx)
         .await
         .map_err(|error| ThreadsError::Message(format!("load config: {error}")))?;
     let persistence_dir = workspace_dir().await.map_err(ThreadsError::Message)?;
@@ -404,10 +405,10 @@ pub async fn delete_after(
 /// [`run_to_completion`] task, so a caller that disconnects mid-delete cannot
 /// leave the thread gone from the store with its sessions, sub-agents and turn
 /// snapshot still live.
-pub async fn thread_delete(
+pub async fn thread_delete(ctx: &DispatchCtx, 
     request: DeleteConversationThreadRequest,
 ) -> Result<Outcome<ApiEnvelope<DeleteConversationThreadResponse>>, String> {
-    let config = crate::config::rpc::load_config_with_timeout()
+    let config = crate::config::rpc::load_config_with_timeout(&ctx)
         .await
         .map_err(|e| format!("load config: {e}"))?;
     run_to_completion("thread_delete", thread_delete_inner(config, request)).await

@@ -123,7 +123,7 @@ impl LiveAgentSchedulers {
         for (agent_id, ctx) in live {
             let scheduler = &mut self.by_agent;
             crate::core::runtime::CoreContext::scope(ctx, async move {
-                let config = match crate::config::ops::load_current_or_init().await {
+                let config = match crate::config::ops::load_current_or_init(&ctx).await {
                     Ok(config) => config,
                     Err(error) => {
                         tracing::debug!(agent = %agent_id, %error, "[cron:scheduler] agent config unavailable");
