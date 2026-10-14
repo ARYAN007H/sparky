@@ -96,6 +96,7 @@ struct OpenHumanTurnPrelude {
     on_progress: Option<tokio::sync::mpsc::Sender<crate::agent::progress::AgentProgress>>,
     run_queue:
         Option<Arc<tinyagents_harness::run_queue::RunQueue<crate::agent::queued_turn::QueuedTurn>>>,
+    host_env: crate::agent::turn_env::HostTurnEnv,
     allowed_subagent_ids: std::collections::HashSet<String>,
     sandbox_mode: tinyagents_definition::SandboxMode,
     definition: Option<Arc<crate::agent::harness::host_definition::AgentDefinition>>,
@@ -775,6 +776,7 @@ impl OpenHumanSessionHost {
                 session_parent_prefix: self.session_parent_prefix.clone(),
                 on_progress: self.on_progress.clone(),
                 run_queue: self.run_queue.clone(),
+                host_env: self.host_env.clone(),
                 allowed_subagent_ids: self
                     .resolved_definition()
                     .map(|definition| definition.allowed_subagent_ids().into_iter().collect())
