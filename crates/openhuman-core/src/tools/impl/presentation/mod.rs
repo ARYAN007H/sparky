@@ -35,7 +35,7 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 
 use crate::agent::artifacts::{
-    create_artifact, fail_artifact, finalize_artifact, read_artifact_bytes, ArtifactKind,
+    create_artifact_regenerating, fail_artifact, finalize_artifact, read_artifact_bytes, ArtifactKind,
 };
 use crate::security::SecurityPolicy;
 use tinytools::{PermissionLevel, Tool, ToolResult};
