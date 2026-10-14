@@ -14,11 +14,11 @@ use super::params::{
 // ── Handler implementations ──────────────────────────────────────────────────
 
 pub(super) fn handle_registry_search(
-    ctx: DispatchCtx,
+    _ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         let query = read_optional_string(&params, "query")?;
         let transport = read_optional_string(&params, "transport")?;
         let page = read_optional_u32(&params, "page")?;
@@ -33,88 +33,88 @@ pub(super) fn handle_registry_search(
 }
 
 pub(super) fn handle_registry_get(
-    ctx: DispatchCtx,
+    _ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         let qualified_name = read_required::<String>(&params, "qualified_name")?;
         to_json(crate::mcp::registry::ops::mcp_clients_registry_get(&config, qualified_name).await?)
     })
 }
 
 pub(super) fn handle_installed_list(
-    ctx: DispatchCtx,
+    _ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
         let _ = params;
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         to_json(crate::mcp::registry::ops::mcp_clients_installed_list(&config).await?)
     })
 }
 
-pub(super) fn handle_update_env(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_update_env(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         let server_id = read_required::<String>(&params, "server_id")?;
         let env = read_required::<std::collections::HashMap<String, String>>(&params, "env")?;
         to_json(crate::mcp::registry::ops::mcp_clients_update_env(&config, server_id, env).await?)
     })
 }
 
-pub(super) fn handle_uninstall(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_uninstall(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         let server_id = read_required::<String>(&params, "server_id")?;
         to_json(crate::mcp::registry::ops::mcp_clients_uninstall(&config, server_id).await?)
     })
 }
 
 pub(super) fn handle_detect_auth(
-    ctx: DispatchCtx,
+    _ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         let server_id = read_required::<String>(&params, "server_id")?;
         to_json(crate::mcp::registry::ops::mcp_clients_detect_auth(&config, server_id).await?)
     })
 }
 
 pub(super) fn handle_oauth_begin(
-    ctx: DispatchCtx,
+    _ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         let server_id = read_required::<String>(&params, "server_id")?;
         to_json(crate::mcp::registry::ops::mcp_clients_oauth_begin(&config, server_id).await?)
     })
 }
 
-pub(super) fn handle_connect(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_connect(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         let server_id = read_required::<String>(&params, "server_id")?;
         to_json(crate::mcp::registry::ops::mcp_clients_connect(&config, server_id).await?)
     })
 }
 
-pub(super) fn handle_disconnect(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_disconnect(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         let server_id = read_required::<String>(&params, "server_id")?;
         to_json(crate::mcp::registry::ops::mcp_clients_disconnect(&config, server_id).await?)
     })
 }
 
 pub(super) fn handle_set_enabled(
-    ctx: DispatchCtx,
+    _ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         let server_id = read_required::<String>(&params, "server_id")?;
         let enabled = read_required::<bool>(&params, "enabled")?;
         to_json(
@@ -123,17 +123,17 @@ pub(super) fn handle_set_enabled(
     })
 }
 
-pub(super) fn handle_status(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_status(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let _ = params;
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         to_json(crate::mcp::registry::ops::mcp_clients_status(&config).await?)
     })
 }
 
-pub(super) fn handle_list_tools(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_list_tools(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         let server_id = read_required::<String>(&params, "server_id")?;
         to_json(
             crate::mcp::registry::ops::mcp_clients_list_tools(
@@ -146,7 +146,7 @@ pub(super) fn handle_list_tools(ctx: DispatchCtx, params: Map<String, Value>) ->
     })
 }
 
-pub(super) fn handle_tool_call(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_tool_call(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let server_id = read_required::<String>(&params, "server_id")?;
         let tool_name = read_required::<String>(&params, "tool_name")?;
@@ -154,7 +154,7 @@ pub(super) fn handle_tool_call(ctx: DispatchCtx, params: Map<String, Value>) -> 
             .get("arguments")
             .cloned()
             .unwrap_or(Value::Object(Map::new()));
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         to_json(
             crate::mcp::registry::ops::mcp_clients_tool_call(
                 &config, server_id, tool_name, arguments,
@@ -164,17 +164,17 @@ pub(super) fn handle_tool_call(ctx: DispatchCtx, params: Map<String, Value>) -> 
     })
 }
 
-pub(super) fn handle_config_get(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_config_get(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let _ = params;
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         to_json(crate::mcp::registry::config_ops::mcp_clients_config_get(&config).await?)
     })
 }
 
-pub(super) fn handle_config_set(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_config_set(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         // The whole document is the parameter set: `{ "mcpServers": { … } }`
         // is what a user pastes, and wrapping it in another key would make the
         // wire shape differ from the file shape for no reason.
@@ -184,25 +184,25 @@ pub(super) fn handle_config_set(ctx: DispatchCtx, params: Map<String, Value>) ->
 }
 
 pub(super) fn handle_registry_settings_get(
-    ctx: DispatchCtx,
+    _ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
         let _ = params;
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         to_json(crate::mcp::registry::ops::mcp_clients_registry_settings_get(&config).await?)
     })
 }
 
 pub(super) fn handle_registry_settings_set(
-    ctx: DispatchCtx,
+    _ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
         let smithery_api_key = read_optional::<String>(&params, "smithery_api_key")?;
         let mcp_official_base = read_optional::<String>(&params, "mcp_official_base")?;
         let mcp_official_token = read_optional::<String>(&params, "mcp_official_token")?;
-        let mut config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let mut config = config_rpc::load_config_with_timeout().await?;
         to_json(
             crate::mcp::registry::ops::mcp_clients_registry_settings_set(
                 &mut config,

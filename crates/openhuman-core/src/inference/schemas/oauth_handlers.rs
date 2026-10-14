@@ -16,21 +16,21 @@ pub(super) struct InferenceOpenAiOAuthCompleteParams {
 }
 
 pub(super) fn handle_inference_openai_oauth_start(
-    ctx: DispatchCtx,
+    _ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         to_json(crate::inference::rpc::inference_openai_oauth_start(&config).await?)
     })
 }
 
 pub(super) fn handle_inference_openai_oauth_complete(
-    ctx: DispatchCtx,
+    _ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         let payload = deserialize_params::<InferenceOpenAiOAuthCompleteParams>(params)?;
         to_json(
             crate::inference::rpc::inference_openai_oauth_complete(
@@ -43,31 +43,31 @@ pub(super) fn handle_inference_openai_oauth_complete(
 }
 
 pub(super) fn handle_inference_openai_oauth_import_codex_cli(
-    ctx: DispatchCtx,
+    _ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         to_json(crate::inference::rpc::inference_openai_oauth_import_codex_cli(&config).await?)
     })
 }
 
 pub(super) fn handle_inference_openai_oauth_status(
-    ctx: DispatchCtx,
+    _ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         to_json(crate::inference::rpc::inference_openai_oauth_status(&config).await?)
     })
 }
 
 pub(super) fn handle_inference_openai_oauth_disconnect(
-    ctx: DispatchCtx,
+    _ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         to_json(crate::inference::rpc::inference_openai_oauth_disconnect(&config).await?)
     })
 }

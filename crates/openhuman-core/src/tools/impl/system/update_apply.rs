@@ -19,7 +19,6 @@
 //! high impact (replaces a binary on disk, optionally restarts the core
 //! process) and must not happen silently.
 
-use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -117,7 +116,7 @@ impl Tool for UpdateApplyTool {
             return Ok(blocked);
         }
 
-        let outcome = update::rpc::update_run(&DispatchCtx::ambient()).await;
+        let outcome = update::rpc::update_run().await;
         for log in &outcome.logs {
             tracing::debug!(target: "update_apply", "{log}");
         }

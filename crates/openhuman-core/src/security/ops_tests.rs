@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::config::test_env::EnvVarGuard;
 
@@ -89,7 +88,7 @@ async fn load_and_get_security_policy_info_reflects_env_overlay() {
         let _workspace_guard = EnvVarGuard::set("OPENHUMAN_WORKSPACE", workspace.path());
         let _budget_guard = EnvVarGuard::set("OPENHUMAN_MAX_ACTIONS_PER_HOUR", budget.to_string());
 
-        let outcome = load_and_get_security_policy_info(&DispatchCtx::process_default())
+        let outcome = load_and_get_security_policy_info()
             .await
             .expect("load_and_get_security_policy_info should succeed");
 

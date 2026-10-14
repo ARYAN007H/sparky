@@ -11,7 +11,6 @@
 //! a fresh install and is otherwise ignored, so rotating it means clearing the
 //! stored one first (`openhuman-core auth clear_credential`).
 
-use crate::core::runtime::DispatchCtx;
 use crate::config::Config;
 use crate::security::credentials::api_key;
 use crate::security::credentials::session_support::{get_session_token, CredentialKind};
@@ -50,7 +49,7 @@ pub fn seed_api_key_from_env(config: &Config) {
 /// Install the session JWT from `OPENHUMAN_BACKEND_SESSION_TOKEN` when no
 /// session is stored. Runs the full `set_credential` path (user-dir
 /// activation, gated services, scheduler gate), so it is async.
-pub async fn seed_session_from_env(ctx: &DispatchCtx, config: &Config) {
+pub async fn seed_session_from_env(config: &Config) {
     let Some(token) = env_secret(BACKEND_SESSION_TOKEN_ENV) else {
         return;
     };
@@ -65,7 +64,7 @@ pub async fn seed_session_from_env(ctx: &DispatchCtx, config: &Config) {
         user: None,
         issuing_backend: None,
     };
-    match set_credential(&ctx, config, request).await {
+    match set_credential(config, request).await {
         Ok(outcome) => log::info!(
             "[auth][boot] session installed from {BACKEND_SESSION_TOKEN_ENV} (user_id={})",
             outcome.value.user_id.as_deref().unwrap_or("?")

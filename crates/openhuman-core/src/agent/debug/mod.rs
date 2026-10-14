@@ -12,7 +12,6 @@
 //! * [`dump_agent_prompt`] — dump a single agent by id.
 //! * [`dump_all_agent_prompts`] — dump every registered agent in one call.
 
-use crate::core::runtime::DispatchCtx;
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Context, Result};
@@ -88,7 +87,7 @@ pub struct DumpedPrompt {
 
 /// Render and return the system prompt for a single agent via the
 /// real [`OpenHumanSessionHost::from_config_for_agent`] construction path.
-pub async fn dump_agent_prompt(ctx: &DispatchCtx, options: DumpPromptOptions) -> Result<DumpedPrompt> {
+pub async fn dump_agent_prompt(options: DumpPromptOptions) -> Result<DumpedPrompt> {
     let config = load_dump_config(
         options.workspace_dir_override.clone(),
         options.config_path_override.clone(),
@@ -102,14 +101,14 @@ pub async fn dump_agent_prompt(ctx: &DispatchCtx, options: DumpPromptOptions) ->
     AgentDefinitionRegistry::init_global(&config.workspace_dir)
         .context("initialising AgentDefinitionRegistry for prompt dump")?;
 
-    render_via_session(&ctx, &config, &options.agent_id).await
+    render_via_session(&config, &options.agent_id).await
 }
 
 /// Dump every registered agent's system prompt in one shot.
 ///
 /// The synthetic `fork` archetype is skipped (byte-stable replay, no
 /// standalone prompt). Order follows [`AgentDefinitionRegistry::list`].
-pub async fn dump_all_agent_prompts(ctx: &DispatchCtx, 
+pub async fn dump_all_agent_prompts(
     workspace_dir_override: Option<PathBuf>,
     config_path_override: Option<PathBuf>,
     model_override: Option<String>,
@@ -132,7 +131,7 @@ pub async fn dump_all_agent_prompts(ctx: &DispatchCtx,
 
     let mut results = Vec::with_capacity(ids.len());
     for id in ids {
-        let dumped = render_via_session(&ctx, &config, &id)
+        let dumped = render_via_session(&config, &id)
             .await
             .with_context(|| format!("rendering prompt for agent `{id}`"))?;
         results.push(dumped);
@@ -175,7 +174,7 @@ async fn load_dump_config(
 
 /// Build a real [`Agent`] via `from_config_for_agent`, populate live
 /// connected integrations, and render the turn-1 system prompt.
-async fn render_via_session(ctx: &DispatchCtx, config: &Config, agent_id: &str) -> Result<DumpedPrompt> {
+async fn render_via_session(config: &Config, agent_id: &str) -> Result<DumpedPrompt> {
     let mut agent = OpenHumanSessionHost::from_config_for_agent(config, agent_id)
         .with_context(|| format!("building session agent for `{agent_id}`"))?;
 
@@ -189,7 +188,7 @@ async fn render_via_session(ctx: &DispatchCtx, config: &Config, agent_id: &str) 
     agent.refresh_delegation_tools();
 
     let text = agent
-        .build_system_prompt(&ctx)
+        .build_system_prompt()
         .with_context(|| format!("rendering system prompt for `{agent_id}`"))?;
 
     Ok(session_dump(&agent, agent_id, text))

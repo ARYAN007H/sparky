@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 
 // ── Op-level validation / error paths (no hardware) ───────────
@@ -315,7 +314,6 @@ async fn agent_chat_for_rejects_an_unknown_agent_id() {
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
 
     let err = agent_chat_for(
-        &DispatchCtx::process_default(),
         &mut config,
         AgentChatTarget::AgentId("no-such-agent-xyz"),
         "hello",

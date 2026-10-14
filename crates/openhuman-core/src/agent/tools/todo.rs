@@ -17,7 +17,6 @@
 //! (see [`current_scope`] / [`legacy_session_key`]) so an in-flight list isn't
 //! dropped by the rekey.
 
-use crate::core::runtime::DispatchCtx;
 use crate::agent::harness::fork_context::ParentExecutionContext;
 use crate::agent::todos::ops::{self, TodoScope};
 use async_trait::async_trait;
@@ -60,7 +59,7 @@ impl ToolDispatch<(), crate::agent::tinyagents::host::OpenHumanRunContext> for T
         let context = ToolExecutionContext::from_run_context(parent, call_id);
         let workspace_dir = match parent.data.parent.as_ref() {
             Some(parent_ctx) => parent_ctx.workspace_dir.clone(),
-            None => crate::config::ops::load_current_or_init(&DispatchCtx::ambient())
+            None => crate::config::ops::load_current_or_init()
                 .await
                 .map(|c| c.workspace_dir)
                 .map_err(|e| anyhow::anyhow!("[tool][todo] load config: {e}"))?,

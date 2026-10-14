@@ -2,7 +2,6 @@
 //! that wrap [`OpenHumanSessionHost::turn`] with prompt-injection enforcement, telemetry
 //! events, and error sanitisation.
 
-use crate::core::runtime::DispatchCtx;
 use super::super::types::OpenHumanSessionHost;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
@@ -40,7 +39,7 @@ impl OpenHumanSessionHost {
     /// context (chat surface, copilot flag, flow run). The context is handed to
     /// this turn alone.
     pub async fn run_single_with_approval(
-        &mut self, ctx: &DispatchCtx,
+        &mut self,
         message: &str,
         origin: Option<crate::agent::turn_origin::AgentTurnOrigin>,
         approval: crate::security::approval::ApprovalTurnContext,
@@ -100,7 +99,7 @@ impl OpenHumanSessionHost {
         });
 
         match self
-            .turn_with_approval(&ctx, message, origin.as_ref(), approval)
+            .turn_with_approval(message, origin.as_ref(), approval)
             .await
         {
             Ok(response) => {

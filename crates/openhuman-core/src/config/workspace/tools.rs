@@ -8,7 +8,6 @@
 //! identity/scaffold, so they ship default-OFF via `tools/user_filter.rs`
 //! (`workspace_manage` toggle).
 
-use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -171,7 +170,7 @@ impl Tool for WorkspaceInitTool {
     async fn execute(&self, args: serde_json::Value) -> anyhow::Result<ToolResult> {
         log::debug!("[tool][workspace] init invoked");
         let force = args.get("force").and_then(Value::as_bool).unwrap_or(false);
-        let value = ops::init_workspace(&DispatchCtx::ambient(), force)
+        let value = ops::init_workspace(force)
             .await
             .map_err(|e| anyhow::anyhow!("workspace_init: {e}"))?;
         Ok(ToolResult::success(serde_json::to_string(&value)?))

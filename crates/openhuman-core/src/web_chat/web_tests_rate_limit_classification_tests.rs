@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 
 #[test]
@@ -186,10 +185,9 @@ async fn start_chat_chat_error_event_serializes_structured_fields_to_json_wire()
 
     let mut rx = subscribe_web_channel_events();
     let request_id = start_chat(
-        &DispatchCtx::process_default(),
+        "wire-shape-client",
         "wire-shape-thread",
         "Please summarize this in one line.",
-        "wire-shape-client",
         None,
         None,
         None,
@@ -281,10 +279,9 @@ async fn start_chat_emits_structured_rate_limit_metadata_on_chat_error_event() {
 
     let mut rx = subscribe_web_channel_events();
     let request_id = start_chat(
-        &DispatchCtx::process_default(),
+        "rate-limit-client",
         "rate-limit-thread",
         "Please summarize this in one line.",
-        "rate-limit-client",
         None,
         None,
         None,

@@ -1,7 +1,6 @@
 //! [`ApprovalSecurityMiddleware`]: route external-effect tool calls through
 //! OpenHuman's human-in-the-loop approval gate at the tool boundary.
 
-use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -76,7 +75,7 @@ impl ApprovalSecurityMiddleware {
             .unwrap_or(false)
     }
 
-    pub(crate) async fn requires_approval(&self, ctx: &DispatchCtx, name: &str, args: &serde_json::Value) -> bool {
+    pub(crate) async fn requires_approval(&self, name: &str, args: &serde_json::Value) -> bool {
         #[cfg(feature = "modules")]
         let desktop_approval_disabled = match self
             .tool_sets
@@ -84,7 +83,7 @@ impl ApprovalSecurityMiddleware {
             .flat_map(|set| set.iter())
             .find(|tool| tool.name() == name)
         {
-            Some(tool) => crate::desktop::control::approvals_disabled_for(&ctx, tool.as_ref()).await,
+            Some(tool) => crate::desktop::control::approvals_disabled_for(tool.as_ref()).await,
             None => false,
         };
         #[cfg(not(feature = "modules"))]
@@ -107,7 +106,7 @@ impl ApprovalResolver<crate::agent::tinyagents::host::OpenHumanRunContext>
     ) -> bool {
         // Resolve external-effect up front so no tool borrow is held across the
         // approval await.
-        let has_ext = self.requires_approval(&DispatchCtx::ambient(), &call.name, &call.arguments).await;
+        let has_ext = self.requires_approval(&call.name, &call.arguments).await;
         tracing::debug!(
             tool = %call.name,
             has_external_effect = has_ext,

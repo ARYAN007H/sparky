@@ -53,7 +53,7 @@ struct Worker {
 }
 
 impl Worker {
-    fn register(ctx: &DispatchCtx, workspace: &std::path::Path) -> Self {
+    fn register(workspace: &std::path::Path) -> Self {
         let task = uuid::Uuid::new_v4().to_string();
         let session = uuid::Uuid::new_v4().to_string();
         let queue = run_queue();
@@ -61,12 +61,11 @@ impl Worker {
         let task_handle = tokio::spawn(std::future::pending::<()>());
         let abort = task_handle.abort_handle();
         register(
-            &ctx,
+            task.clone(),
             "researcher".into(),
             PARENT.into(),
-            task.clone(),
-            Some(session.clone()),
             None,
+            Some(session.clone()),
             workspace.to_path_buf(),
             None,
             queue.clone(),
@@ -101,13 +100,13 @@ struct Pair {
 }
 
 impl Pair {
-    fn new(ctx: &DispatchCtx, ctx: &DispatchCtx, ) -> Self {
+    fn new() -> Self {
         let a_dir = tempfile::tempdir().unwrap();
         let b_dir = tempfile::tempdir().unwrap();
         let alice = profile("detached-alice", a_dir.path());
         let bob = profile("detached-bob", b_dir.path());
-        let a = CoreContext::sync_scope(alice.clone(), || Worker::register(&ctx, a_dir.path()));
-        let b = CoreContext::sync_scope(bob.clone(), || Worker::register(&ctx, b_dir.path()));
+        let a = CoreContext::sync_scope(alice.clone(), || Worker::register(a_dir.path()));
+        let b = CoreContext::sync_scope(bob.clone(), || Worker::register(b_dir.path()));
         Self {
             _a_dir: a_dir,
             _b_dir: b_dir,
@@ -511,7 +510,7 @@ async fn desktop_public_controls_remain_available_without_parent_scope() {
         return;
     }
     let directory = tempfile::tempdir().unwrap();
-    let worker =DispatchCtx::process_default()rker::register(&DispatchCtx::process_default(), directory.path());
+    let worker = Worker::register(directory.path());
     assert_eq!(snapshot_for_parent(PARENT).len(), 1);
     assert_eq!(
         field(&control("steer", &worker.task).await, "steered"),

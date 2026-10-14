@@ -7,7 +7,6 @@
 mod state;
 mod types;
 
-use crate::core::runtime::DispatchCtx;
 use types::StoredWalletState;
 pub(crate) use types::WalletSecretMaterial;
 pub use types::{
@@ -38,11 +37,11 @@ fn supported_word_counts() -> String {
 }
 
 /// Generate recovery material through the attested wallet module.
-pub async fn generate_recovery_phrase(ctx: &DispatchCtx, 
+pub async fn generate_recovery_phrase(
     word_count: u8,
 ) -> Result<Outcome<GeneratedRecoveryPhrase>, String> {
     tinywallet_bus::validate_mnemonic_word_count(word_count).map_err(|error| error.to_string())?;
-    let config = config_rpc::load_config_with_timeout(&ctx).await?;
+    let config = config_rpc::load_config_with_timeout().await?;
     let generated = crate::modules::wallet::generate_mnemonic(&config, word_count)
         .await
         .map_err(|error| error.to_string())?;
@@ -60,7 +59,7 @@ pub async fn generate_recovery_phrase(ctx: &DispatchCtx,
 /// The returned BIP-39 seed is used only for OpenHuman's existing generic
 /// storage-key KDF; mnemonic parsing and all chain derivation remain in the
 /// confidential module operation.
-pub async fn derive_recovery_material(ctx: &DispatchCtx, 
+pub async fn derive_recovery_material(
     mnemonic: String,
 ) -> Result<Outcome<WalletRecoveryMaterial>, String> {
     let word_count = mnemonic.split_whitespace().count();
@@ -71,7 +70,7 @@ pub async fn derive_recovery_material(ctx: &DispatchCtx,
         ));
     }
 
-    let config = config_rpc::load_config_with_timeout(&ctx).await?;
+    let config = config_rpc::load_config_with_timeout().await?;
     let mnemonic = Zeroizing::new(mnemonic);
     let mnemonic = Zeroizing::new(mnemonic.split_whitespace().collect::<Vec<_>>().join(" "));
     let seed = crate::modules::wallet::derive_mnemonic_seed(&config, mnemonic.to_string())
@@ -115,12 +114,12 @@ pub async fn derive_recovery_material(ctx: &DispatchCtx,
 }
 
 /// Check whether a phrase is valid BIP-39 input without deriving account data.
-pub async fn validate_recovery_phrase(ctx: &DispatchCtx, 
+pub async fn validate_recovery_phrase(
     mnemonic: String,
 ) -> Result<Outcome<RecoveryPhraseValidation>, String> {
     use crate::modules::wallet::WalletCallError;
 
-    let config = config_rpc::load_config_with_timeout(&ctx).await?;
+    let config = config_rpc::load_config_with_timeout().await?;
     let valid = match crate::modules::wallet::derive_mnemonic_seed(&config, mnemonic).await {
         Ok(mut response) => {
             if response.seed.len() != 64 {
@@ -201,8 +200,8 @@ fn validate_setup(params: &WalletSetupParams) -> Result<Vec<WalletAccount>, Stri
     Ok(normalized)
 }
 
-pub async fn status(ctx: &DispatchCtx, ) -> Result<Outcome<WalletStatus>, String> {
-    let config = config_rpc::load_config_with_timeout(&ctx).await?;
+pub async fn status() -> Result<Outcome<WalletStatus>, String> {
+    let config = config_rpc::load_config_with_timeout().await?;
     let _guard = WALLET_STATE_FILE_LOCK.lock();
     let status = to_status(&config, load_stored_wallet_state_unlocked(&config)?);
 
@@ -219,8 +218,8 @@ pub async fn status(ctx: &DispatchCtx, ) -> Result<Outcome<WalletStatus>, String
     ))
 }
 
-pub async fn setup(ctx: &DispatchCtx, params: WalletSetupParams) -> Result<Outcome<WalletStatus>, String> {
-    let config = config_rpc::load_config_with_timeout(&ctx).await?;
+pub async fn setup(params: WalletSetupParams) -> Result<Outcome<WalletStatus>, String> {
+    let config = config_rpc::load_config_with_timeout().await?;
     let accounts = validate_setup(&params)?;
     let encrypted_mnemonic = params
         .encrypted_mnemonic
@@ -271,10 +270,10 @@ pub async fn setup(ctx: &DispatchCtx, params: WalletSetupParams) -> Result<Outco
 /// This is a read-only operation — it never writes to disk or the keychain.
 /// The plaintext phrase is returned only in the RPC response and must be kept
 /// in transient React state on the frontend; it must never be logged or persisted.
-pub async fn reveal_recovery_phrase(ctx: &DispatchCtx, ) -> Result<Outcome<RevealRecoveryPhraseResult>, String> {
+pub async fn reveal_recovery_phrase() -> Result<Outcome<RevealRecoveryPhraseResult>, String> {
     debug!("{LOG_PREFIX} reveal_recovery_phrase ENTRY");
 
-    let config = config_rpc::load_config_with_timeout(&ctx).await.map_err(|e| {
+    let config = config_rpc::load_config_with_timeout().await.map_err(|e| {
         log::warn!("{LOG_PREFIX} reveal_recovery_phrase config load failed: {e}");
         e
     })?;
@@ -349,12 +348,12 @@ pub async fn reveal_recovery_phrase(ctx: &DispatchCtx, ) -> Result<Outcome<Revea
     ))
 }
 
-pub(crate) async fn secret_material(ctx: &DispatchCtx, chain: WalletChain) -> Result<WalletSecretMaterial, String> {
+pub(crate) async fn secret_material(chain: WalletChain) -> Result<WalletSecretMaterial, String> {
     debug!(
         "{LOG_PREFIX} secret_material loading config chain={}",
         chain.as_str()
     );
-    let config = config_rpc::load_config_with_timeout(&ctx).await?;
+    let config = config_rpc::load_config_with_timeout().await?;
     debug!(
         "{LOG_PREFIX} secret_material acquiring state lock chain={}",
         chain.as_str()

@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::agent::orchestration::background_completions::{
     forget_workspace_for_test, pending_for, record_completion, router_for_workspace, TestWorkspace,
@@ -659,13 +658,13 @@ async fn boot_recovery_schedules_a_delivery_for_every_thread_with_undelivered_re
     forget_workspace_for_test(w);
     scheduled_for_test().lock().expect("scheduled").clear();
 
-    assert_eq!(recover_on_boot(&DispatchCtx::process_default(), w), 1);
+    assert_eq!(recover_on_boot(w), 1);
     assert!(scheduled_for_test()
         .lock()
         .expect("scheduled")
         .contains(&("thread-boot-sched".to_string(), RECOVERY_DELAY)));
     assert_eq!(
-        recover_on_boot(&DispatchCtx::process_default(), w),
+        recover_on_boot(w),
         0,
         "a workspace is scanned once per process"
     );
@@ -678,10 +677,10 @@ async fn recover_on_open_rescans_a_workspace_already_recovered() {
     let w = ws.path();
     record(w, "bd-open", "sub-1", "left pending", "thread-open-resc").await;
     forget_workspace_for_test(w);
-    assert_eq!(recover_on_boot(&DispatchCtx::process_default(), w), 1);
-    assert_eq!(recover_on_boot(&DispatchCtx::process_default(), w), 0, "boot recovery claims once");
+    assert_eq!(recover_on_boot(w), 1);
+    assert_eq!(recover_on_boot(w), 0, "boot recovery claims once");
     assert_eq!(
-        recover_on_open(&DispatchCtx::process_default(), w, DrainFence::none()),
+        recover_on_open(w, DrainFence::none()),
         1,
         "a re-open scans again"
     );

@@ -2,7 +2,6 @@
 //! already in flight on a thread, and the request- or thread-scoped
 //! cancellation paths that tear them down.
 
-use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -27,7 +26,7 @@ use super::turn_guards::{
 /// Emits the same per-`request_id` stream events as a primary turn, so the UI
 /// can render it as an interleaved branch.
 #[allow(clippy::too_many_arguments)]
-pub(crate) async fn spawn_parallel_turn(ctx: &DispatchCtx, 
+pub(crate) async fn spawn_parallel_turn(
     client_id: &str,
     thread_id: &str,
     request_id: String,
@@ -65,24 +64,22 @@ pub(crate) async fn spawn_parallel_turn(ctx: &DispatchCtx,
                 request_id: Some(request_id_task.clone()),
             };
             let result = run_turn_under_cancel_and_deadline(
-                &ctx,
                 task_cancel_token,
                 origin.clone(),
                 approval_ctx,
                 |host_env, activity, approval| {
                     run_chat_task(
-                        &ctx,
+                        &client_id_task,
                         &thread_id_task,
                         &request_id_task,
                         &user_message,
-                        &client_id_task,
                         model_override,
                         temperature,
                         locale,
                         run_queue,
                         metadata,
                         origin.clone(),
-                        true,
+                        /* fork */ true,
                         host_env,
                         activity,
                         approval,

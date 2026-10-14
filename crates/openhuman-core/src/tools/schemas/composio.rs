@@ -8,7 +8,7 @@ use crate::core::all::ControllerFuture;
 use crate::core::Outcome;
 
 pub(super) fn handle_composio_execute(
-    ctx: DispatchCtx,
+    _ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
@@ -19,7 +19,7 @@ pub(super) fn handle_composio_execute(
             .ok_or_else(|| "missing required `action`".to_string())?;
         let action_args = params.get("params").cloned();
 
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         // The connector module owns the mode split (backend proxy vs. the
         // user's personal direct tenant, #1710); this only supplies the config.
         let resp = crate::integrations::composio::execute_dispatch::execute_composio_action(

@@ -1,6 +1,5 @@
 //! TinyMCP server-protocol adapter over the published bus contract.
 
-use crate::core::runtime::DispatchCtx;
 use std::{
     future::Future,
     pin::Pin,
@@ -206,12 +205,12 @@ impl ServerSession {
         });
     }
 
-    pub(super) async fn open(ctx: &DispatchCtx, config: &Config) -> Result<Self, ServerError> {
-        Self::open_with_port(&ctx, Self::port_for_config(config)).await
+    pub(super) async fn open(config: &Config) -> Result<Self, ServerError> {
+        Self::open_with_port(Self::port_for_config(config)).await
     }
 
-    async fn open_with_port(ctx: &DispatchCtx, port: Arc<dyn ServerPort>) -> Result<Self, ServerError> {
-        Self::open_with_port_and_dispatch(port, |call| Box::pin(handler::dispatch(&ctx, call))).await
+    async fn open_with_port(port: Arc<dyn ServerPort>) -> Result<Self, ServerError> {
+        Self::open_with_port_and_dispatch(port, |call| Box::pin(handler::dispatch(call))).await
     }
 
     pub(super) async fn open_with_port_and_dispatch<F, Fut>(
@@ -247,7 +246,7 @@ impl ServerSession {
         })
     }
 
-    pub(super) async fn open_http(ctx: &DispatchCtx, 
+    pub(super) async fn open_http(
         port: Arc<dyn ServerPort>,
         requested_session_id: Option<String>,
         known_session: bool,
@@ -271,7 +270,7 @@ impl ServerSession {
             .map_err(ServerError::Module)?;
         Ok(Self {
             port,
-            callback_dispatch: Arc::new(|call| Box::pin(handler::dispatch(&ctx, call))),
+            callback_dispatch: Arc::new(|call| Box::pin(handler::dispatch(call))),
             id,
             next_operation: AtomicU64::new(1),
             operation: tokio::sync::Mutex::new(()),

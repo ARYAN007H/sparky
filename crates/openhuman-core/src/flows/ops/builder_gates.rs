@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 
 /// The single canonical definition of the builder hard-gate stack: the
@@ -131,7 +130,7 @@ impl tinyflows::gates::BuilderGateHost for OpenHumanBuilderGateHost<'_> {
         use tinyflows::gates::HostGateStage;
         Ok(match stage {
             HostGateStage::ToolPolicy => validate_upload_paths(graph),
-            HostGateStage::AgentReferences => validate_agent_refs(&DispatchCtx::ambient(), self.config, graph).await,
+            HostGateStage::AgentReferences => validate_agent_refs(self.config, graph).await,
             HostGateStage::Connections => validate_connection_refs(self.config, graph).await,
             HostGateStage::ToolContracts => validate_tool_contracts(self.config, graph).await,
         })
@@ -341,7 +340,7 @@ pub(crate) async fn build_builder_proposal(
 /// non-harness `agent_ref`s previously triggered one `config_rpc::
 /// load_config_with_timeout` per node; an all-`Harness`/no-custom-ref graph
 /// still never reads it at all.
-pub(crate) async fn validate_agent_refs(ctx: &DispatchCtx, config: &Config, graph: &WorkflowGraph) -> Vec<String> {
+pub(crate) async fn validate_agent_refs(config: &Config, graph: &WorkflowGraph) -> Vec<String> {
     use crate::agent::harness::host_definition::AgentDefinitionRegistry;
     use crate::agent::registry::AgentRegistryEntry;
     use crate::flows::tinyflows::caps::{route_for_agent_ref, AgentRoute};
@@ -385,7 +384,7 @@ pub(crate) async fn validate_agent_refs(ctx: &DispatchCtx, config: &Config, grap
             }
             AgentRoute::RegistryFallback => {
                 if custom_registry.is_none() {
-                    custom_registry = Some(crate::agent::registry::list_agents(&ctx, true).await);
+                    custom_registry = Some(crate::agent::registry::list_agents(true).await);
                 }
                 match custom_registry.as_ref().expect("just populated") {
                     Ok(entries) => match entries.iter().find(|entry| entry.id == agent_ref) {

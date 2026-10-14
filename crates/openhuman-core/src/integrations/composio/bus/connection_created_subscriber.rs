@@ -3,7 +3,6 @@
 //! onboarding) fetches the account profile for toolkits with a native
 //! identity provider.
 
-use crate::core::runtime::DispatchCtx;
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -90,12 +89,12 @@ impl EventHandler<DomainEvent> for ComposioConnectionCreatedSubscriber {
         // The cache refresh runs for every toolkit; only the profile fetch is gated on a native provider.
         let toolkit = toolkit.clone();
         let connection_id = connection_id.clone();
-        tokio::spawn(async move { on_connection_created(&DispatchCtx::ambient(), connection_id, toolkit).await });
+        tokio::spawn(async move { on_connection_created(toolkit, connection_id).await });
     }
 }
 
-async fn on_connection_created(ctx: &DispatchCtx, toolkit: String, connection_id: String) {
-    let config = match config_rpc::load_config_with_timeout(&ctx).await {
+async fn on_connection_created(toolkit: String, connection_id: String) {
+    let config = match config_rpc::load_config_with_timeout().await {
         Ok(c) => c,
         Err(e) => {
             tracing::warn!(

@@ -1,14 +1,12 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 
 use serde_json::json;
 
-async fn start_parked_turn(ctx: &DispatchCtx, thread_id: &str, block: &TestRunChatTaskBlock) -> String {
+async fn start_parked_turn(thread_id: &str, block: &TestRunChatTaskBlock) -> String {
     let request_id = start_chat(
-        &ctx,
+        "queue-test-client",
         thread_id,
         "primary turn",
-        "queue-test-client",
         None,
         None,
         None,
@@ -22,16 +20,15 @@ async fn start_parked_turn(ctx: &DispatchCtx, thread_id: &str, block: &TestRunCh
     request_id
 }
 
-async fn queue_message(ctx: &DispatchCtx, thread_id: &str, text: &str, mode: &str) -> serde_json::Value {
+async fn queue_message(thread_id: &str, text: &str, mode: &str) -> serde_json::Value {
     let response = start_chat(
-        &ctx,
+        "queue-test-client",
         thread_id,
         text,
-        "queue-test-client",
+        Some("model-override".to_string()),
         Some(0.7),
         Some("ar".to_string()),
         Some(mode.to_string()),
-        Some("model-override".to_string()),
         ChatRequestMetadata::default(),
     )
     .await
@@ -39,8 +36,8 @@ async fn queue_message(ctx: &DispatchCtx, thread_id: &str, text: &str, mode: &st
     serde_json::from_str(&response).expect("queued result should be JSON")
 }
 
-async fn cancel_parked_turn(ctx: &DispatchCtx, ctx: &DispatchCtx, thread_id: &str, block: &TestRunChatTaskBlock) {
-    cancel_chat_scoped(&ctx, thread_id, "queue-test-client", None)
+async fn cancel_parked_turn(thread_id: &str, block: &TestRunChatTaskBlock) {
+    cancel_chat_scoped("queue-test-client", thread_id, None)
         .await
         .expect("parked turn should cancel");
     wait_for_in_flight(|entries| !entries.iter().any(|(key, _)| key == thread_id)).await;
@@ -54,9 +51,9 @@ async fn web_queue_retains_typed_queued_turn_metadata() {
     let block = make_block();
     set_test_run_chat_task_block(Some(block.clone())).await;
     let thread_id = "queue-typed-retention";
-    start_parked_turn(&DispatchCtx::process_default(), thread_id, &block).await;
+    start_parked_turn(thread_id, &block).await;
 
-    let accepted = queue_message(&DispatchCtx::process_default(), "defer this exact payload", "followup", thread_id).await;
+    let accepted = queue_message(thread_id, "defer this exact payload", "followup").await;
     assert_eq!(accepted["queued"], true);
     assert_eq!(accepted["queue_mode"], "followup");
 
@@ -82,17 +79,16 @@ async fn interrupt_and_parallel_bypass_the_active_turn_queue() {
     let block = make_block();
     set_test_run_chat_task_block(Some(block.clone())).await;
     let thread_id = "queue-disposition-bypass";
-    let initial_request_id = start_parked_turn(&DispatchCtx::process_default(), thread_id, &block).await;
+    let initial_request_id = start_parked_turn(thread_id, &block).await;
 
     let replacement_request_id = start_chat(
-        &DispatchCtx::process_default(),
+        "queue-test-client",
         thread_id,
         "replace the active turn",
-        "queue-test-client",
+        None,
         None,
         None,
         Some("interrupt".to_string()),
-        None,
         ChatRequestMetadata::default(),
     )
     .await
@@ -106,14 +102,13 @@ async fn interrupt_and_parallel_bypass_the_active_turn_queue() {
     .await;
 
     start_chat(
-        &DispatchCtx::process_default(),
+        "queue-test-client",
         thread_id,
         "run alongside the replacement",
-        "queue-test-client",
+        None,
         None,
         None,
         Some("parallel".to_string()),
-        None,
         ChatRequestMetadata::default(),
     )
     .await
@@ -139,8 +134,8 @@ async fn terminal_turn_dispatches_followup_as_a_fresh_host_turn() {
     let block = make_block();
     set_test_run_chat_task_block(Some(block.clone())).await;
     let thread_id = "queue-followup-terminal";
-    let primary_request_id = start_parked_turn(&DispatchCtx::process_default(), thread_id, &block).await;
-    let accepted = queue_message(&DispatchCtx::process_default(), "start after terminal", "followup", thread_id).await;
+    let primary_request_id = start_parked_turn(thread_id, &block).await;
+    let accepted = queue_message(thread_id, "start after terminal", "followup").await;
     assert_eq!(accepted["queued"], true);
 
     // End the primary normally from the host test seam. The queue's follow-up
@@ -166,7 +161,7 @@ async fn cancellation_discards_pending_lanes_before_a_replacement_turn() {
     let cancelled_block = make_block();
     set_test_run_chat_task_block(Some(cancelled_block.clone())).await;
     let thread_id = "queue-cancelled-lanes";
-    let cancelled_request_id = start_parked_turn(&DispatchCtx::process_default(), thread_id, &cancelled_block).await;
+    let cancelled_request_id = start_parked_turn(thread_id, &cancelled_block).await;
 
     // Queue every lane against the active turn. In particular, do not clear
     // these lanes: this test verifies that the real cancellation cleanup owns
@@ -176,7 +171,7 @@ async fn cancellation_discards_pending_lanes_before_a_replacement_turn() {
         ("steer must not survive", "steer"),
         ("collect must not survive", "collect"),
     ] {
-        assert_eq!(queue_message(&DispatchCtx::process_default(), text, mode, thread_id).await["queued"], true);
+        assert_eq!(queue_message(thread_id, text, mode).await["queued"], true);
     }
     assert_eq!(
         channel_web_queue_status(thread_id)
@@ -206,7 +201,7 @@ async fn cancellation_discards_pending_lanes_before_a_replacement_turn() {
     set_test_run_chat_task_block(None).await;
     let replacement_block = make_block();
     set_test_run_chat_task_block(Some(replacement_block.clone())).await;
-    let replacement_request_id = start_parked_turn(&DispatchCtx::process_default(), thread_id, &replacement_block).await;
+    let replacement_request_id = start_parked_turn(thread_id, &replacement_block).await;
     assert_ne!(replacement_request_id, cancelled_request_id);
     let replacement = channel_web_queue_status(thread_id)
         .await
@@ -231,14 +226,14 @@ async fn web_queue_status_wire_shape_and_clear_cleanup_remain_stable() {
     let block = make_block();
     set_test_run_chat_task_block(Some(block.clone())).await;
     let thread_id = "queue-wire-and-clear";
-    let request_id = start_parked_turn(&DispatchCtx::process_default(), thread_id, &block).await;
+    let request_id = start_parked_turn(thread_id, &block).await;
 
     for (text, mode) in [
         ("steer payload", "steer"),
         ("followup payload", "followup"),
         ("collect payload", "collect"),
     ] {
-        assert_eq!(queue_message(&DispatchCtx::process_default(), text, mode, thread_id).await["queued"], true);
+        assert_eq!(queue_message(thread_id, text, mode).await["queued"], true);
     }
 
     let active = channel_web_queue_status(thread_id)
@@ -350,14 +345,14 @@ async fn web_queue_remove_retracts_one_item_and_emits_event() {
     let block = make_block();
     set_test_run_chat_task_block(Some(block.clone())).await;
     let thread_id = "queue-remove-one-item";
-    start_parked_turn(&DispatchCtx::process_default(), thread_id, &block).await;
+    start_parked_turn(thread_id, &block).await;
 
     assert_eq!(
-        queue_message(&DispatchCtx::process_default(), "keep me", "followup", thread_id).await["queued"],
+        queue_message(thread_id, "keep me", "followup").await["queued"],
         true
     );
     assert_eq!(
-        queue_message(&DispatchCtx::process_default(), "remove me", "steer", thread_id).await["queued"],
+        queue_message(thread_id, "remove me", "steer").await["queued"],
         true
     );
 
@@ -429,7 +424,7 @@ async fn chat_done_is_published_only_after_the_in_flight_slot_is_released() {
     };
     set_test_run_chat_task_block(Some(block.clone())).await;
     let thread_id = "chat-done-after-slot-release";
-    let request_id = start_parked_turn(&DispatchCtx::process_default(), thread_id, &block).await;
+    let request_id = start_parked_turn(thread_id, &block).await;
     let mut events = crate::web_chat::subscribe_web_channel_events();
     let is_done = |event: &crate::web_chat::WebChannelEvent| {
         event.event == "chat_done" && event.request_id == request_id

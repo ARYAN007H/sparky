@@ -1,7 +1,6 @@
 //! Drops and eagerly re-warms the integrations cache when the user flips
 //! Composio between backend and direct mode.
 
-use crate::core::runtime::DispatchCtx;
 use async_trait::async_trait;
 use tinybus::EventHandler;
 
@@ -63,7 +62,7 @@ impl EventHandler<DomainEvent> for ComposioConfigChangedSubscriber {
         ops::invalidate_connected_integrations_cache();
 
         tokio::spawn(async move {
-            let config = match config_rpc::load_config_with_timeout(&DispatchCtx::ambient()).await {
+            let config = match config_rpc::load_config_with_timeout().await {
                 Ok(config) => config,
                 Err(error) => {
                     tracing::debug!(

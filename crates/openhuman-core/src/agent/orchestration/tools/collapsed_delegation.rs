@@ -55,7 +55,6 @@
 //! [`ArchetypeDelegationTool`]: super::ArchetypeDelegationTool
 //! [`ToolExposure::Hidden`]: tinytools::ToolExposure::Hidden
 
-use crate::core::runtime::DispatchCtx;
 use async_trait::async_trait;
 use serde_json::{json, Value};
 
@@ -243,7 +242,7 @@ impl Tool for CollapsedDelegationTool {
         run_context.thread_id = tool_context
             .and_then(ToolRunContext::thread_id)
             .map(ToOwned::to_owned);
-        execute_collapsed_delegation(&DispatchCtx::ambient(), &self.targets, args, tool_context, run_context).await
+        execute_collapsed_delegation(&self.targets, args, tool_context, run_context).await
     }
 }
 
@@ -314,19 +313,19 @@ pub(crate) fn dispatch_targets_from_schema(schema: &Value) -> Result<Vec<Delegat
 }
 
 /// Execute a collapsed hand-off with an explicit child run carrier.
-pub(crate) async fn execute_collapsed_delegation(ctx: &DispatchCtx, 
+pub(crate) async fn execute_collapsed_delegation(
     targets: &[DelegateTarget],
     args: Value,
     tool_context: Option<&dyn ToolRunContext>,
     run_context: crate::agent::tinyagents::host::OpenHumanRunContext,
 ) -> anyhow::Result<ToolResult> {
-    execute_collapsed_delegation_with_live_parent(&ctx, targets, args, tool_context, run_context, None)
+    execute_collapsed_delegation_with_live_parent(targets, args, tool_context, run_context, None)
         .await
 }
 
 /// Typed-harness counterpart that preserves the exact parent run for a
 /// blocking child rather than recreating a synthetic root from host data.
-pub(crate) async fn execute_collapsed_delegation_with_live_parent(ctx: &DispatchCtx, 
+pub(crate) async fn execute_collapsed_delegation_with_live_parent(
     targets: &[DelegateTarget],
     args: Value,
     tool_context: Option<&dyn ToolRunContext>,
@@ -365,7 +364,6 @@ pub(crate) async fn execute_collapsed_delegation_with_live_parent(ctx: &Dispatch
     }
     let prompt = render_structured_handoff(&raw_prompt, &args);
     let prompt = match crate::agent::attachments::delegation_prompt(
-        &ctx,
         &prompt,
         &args,
         tool_context
@@ -412,10 +410,9 @@ pub(crate) async fn execute_collapsed_delegation_with_live_parent(ctx: &Dispatch
     // into run records and the UI, and reporting every hand-off as
     // `delegate` would erase which specialist was chosen from every trace.
     super::dispatch::dispatch_subagent_with_live_parent(
-        &ctx,
+        &target.agent_id,
         &target.tool_name,
         &prompt,
-        &target.agent_id,
         model_override,
         tool_context,
         mode,

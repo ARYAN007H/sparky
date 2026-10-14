@@ -14,7 +14,6 @@
 //! well. That board was rendered nowhere and the `todo` tool is now the
 //! session's own list, so the mirror is gone; the ledger is the surface.
 
-use crate::core::runtime::DispatchCtx;
 use serde_json::json;
 
 use crate::agent::triage::{
@@ -28,7 +27,7 @@ use super::types::{EnrichedTask, SourceTarget, TaskSource};
 
 /// Route an enriched task: for proactive sources dispatch a triage turn;
 /// collect-only sources stop at the ledger the caller already wrote.
-pub async fn route_enriched(ctx: &DispatchCtx, 
+pub async fn route_enriched(
     _config: &Config,
     source: &TaskSource,
     enriched: &EnrichedTask,
@@ -42,14 +41,14 @@ pub async fn route_enriched(ctx: &DispatchCtx,
             );
             Ok(())
         }
-        SourceTarget::AgentTodoProactive => dispatch_triage(&ctx, source, enriched).await,
+        SourceTarget::AgentTodoProactive => dispatch_triage(source, enriched).await,
     }
 }
 
 /// Dispatch a triage turn for a proactive task, gated by scheduler
 /// capacity. A gated-off or deferred turn is non-fatal — the task is already
 /// in the ledger.
-async fn dispatch_triage(ctx: &DispatchCtx, source: &TaskSource, enriched: &EnrichedTask) -> Result<(), String> {
+async fn dispatch_triage(source: &TaskSource, enriched: &EnrichedTask) -> Result<(), String> {
     // Respect background-AI throttling. When the gate denies capacity
     // (Off / paused), we keep the card but skip the proactive turn.
     let Some(_permit) = scheduler_gate::wait_for_capacity().await else {
@@ -77,7 +76,7 @@ async fn dispatch_triage(ctx: &DispatchCtx, source: &TaskSource, enriched: &Enri
         payload,
     );
 
-    let outcome = run_triage(&ctx, &envelope)
+    let outcome = run_triage(&envelope)
         .await
         .map_err(|e| format!("[task_sources:route] triage evaluation failed: {e}"))?;
 
@@ -86,7 +85,7 @@ async fn dispatch_triage(ctx: &DispatchCtx, source: &TaskSource, enriched: &Enri
             // Remote payload: the task arrived from an external board, so the
             // dispatch parks rather than running on a trust root (#5634).
             let origin = remote_trigger_origin(&envelope);
-            with_origin(origin, apply_decision(&ctx, run, &envelope))
+            with_origin(origin, apply_decision(run, &envelope))
                 .await
                 .map_err(|e| format!("[task_sources:route] apply_decision failed: {e}"))?;
             tracing::debug!(

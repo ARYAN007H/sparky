@@ -5,7 +5,6 @@
 //! live `SecurityPolicy` so the inference chokepoint enforces the change
 //! immediately, without a core restart.
 
-use crate::core::runtime::DispatchCtx;
 use crate::config::{Config, PrivacyMode};
 use crate::core::Outcome;
 
@@ -42,8 +41,8 @@ fn privacy_mode_value(mode: PrivacyMode) -> serde_json::Value {
 }
 
 /// Returns the current `[privacy]` mode as `{ "mode": "<snake_case>" }`.
-pub async fn get_privacy_mode(ctx: &DispatchCtx, ) -> Result<Outcome<serde_json::Value>, String> {
-    let config = load_config_with_timeout(&ctx).await?;
+pub async fn get_privacy_mode() -> Result<Outcome<serde_json::Value>, String> {
+    let config = load_config_with_timeout().await?;
     log::debug!(
         "[privacy][rpc] get_privacy_mode -> {:?}",
         config.privacy.mode
@@ -96,10 +95,10 @@ pub async fn apply_privacy_settings(
 }
 
 /// Loads the configuration, applies the privacy-mode update, and saves it.
-pub async fn load_and_apply_privacy_settings(ctx: &DispatchCtx, 
+pub async fn load_and_apply_privacy_settings(
     update: PrivacySettingsPatch,
 ) -> Result<Outcome<serde_json::Value>, String> {
-    let mut config = load_config_with_timeout(&ctx).await?;
+    let mut config = load_config_with_timeout().await?;
     apply_privacy_settings(&mut config, update).await
 }
 

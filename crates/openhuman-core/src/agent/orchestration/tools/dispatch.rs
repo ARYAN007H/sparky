@@ -1,6 +1,5 @@
 //! Subagent dispatch logic shared by all agent delegation tools.
 
-use crate::core::runtime::DispatchCtx;
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::progress::AgentProgress;
 use crate::agent::subagent_host::{
@@ -155,7 +154,7 @@ pub(crate) enum DispatchMode {
 /// Dispatch one inline child against the caller's actual TinyAgents parent
 /// when the typed tool boundary has one. Standalone callers retain the
 /// explicit-carrier fallback above because no live parent exists for them.
-pub(crate) async fn dispatch_subagent_with_live_parent(ctx: &DispatchCtx, 
+pub(crate) async fn dispatch_subagent_with_live_parent(
     agent_id: &str,
     tool_name: &str,
     prompt: &str,
@@ -252,7 +251,6 @@ pub(crate) async fn dispatch_subagent_with_live_parent(ctx: &DispatchCtx,
 
     if agent_id == "vision_agent" {
         match crate::agent::attachments::has_resolvable_image(
-            &ctx,
             prompt,
             parent_workspace_descriptor.as_ref(),
             run_context.origin.as_ref(),

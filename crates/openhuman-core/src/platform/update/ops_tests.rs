@@ -10,7 +10,6 @@
 //! - `build_run_result_from_staged_update` sets `restart_requested = false`
 //!   under the `Supervisor` strategy.
 
-use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::config::UpdateRestartStrategy;
 use crate::platform::update::types::{UpdateApplyResult, UpdateInfo};
@@ -236,7 +235,7 @@ async fn update_run_rejected_when_rpc_mutations_disabled() {
     cfg.save().await.expect("save config");
     std::env::set_var("OPENHUMAN_WORKSPACE", tmp.path());
 
-    let outcome = update_run(&DispatchCtx::process_default()).await;
+    let outcome = update_run().await;
 
     std::env::remove_var("OPENHUMAN_WORKSPACE");
 

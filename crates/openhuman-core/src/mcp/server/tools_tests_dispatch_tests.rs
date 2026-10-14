@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 
 #[tokio::test]
@@ -8,11 +7,11 @@ async fn call_tool_records_write_argument_rejection() {
     unsafe {
         std::env::set_var("OPENHUMAN_WORKSPACE", tmp.path());
     }
-    let config = config_rpc::load_config_with_timeout(&DispatchCtx::process_default())
+    let config = config_rpc::load_config_with_timeout()
         .await
         .expect("config");
 
-    let err = call_tool(&DispatchCtx::process_default(), "memory.learn", json!({ "kind": "fact" }), "mcp:test")
+    let err = call_tool("memory.learn", json!({ "kind": "fact" }), "mcp:test")
         .await
         .expect_err("missing text should reject");
     assert!(
@@ -54,7 +53,7 @@ async fn call_tool_records_write_argument_rejection() {
 #[tokio::test]
 async fn call_tool_rejects_v1_memory_tools_as_unknown() {
     for name in ["memory.search", "memory.store", "memory.note", "tree.tag"] {
-        let err = call_tool(&DispatchCtx::process_default(), name, json!({}), "mcp:test")
+        let err = call_tool(name, json!({}), "mcp:test")
             .await
             .expect_err("removed tool");
         assert!(err.message().contains("unknown MCP tool"), "{name}");
@@ -72,12 +71,11 @@ async fn call_tool_validates_memory_arguments_before_dispatch() {
     unsafe {
         std::env::set_var("OPENHUMAN_WORKSPACE", tmp.path());
     }
-    let err = call_tool(&DispatchCtx::process_default(), "memory.forget", json!({ "ids": [] }), "mcp:test")
+    let err = call_tool("memory.forget", json!({ "ids": [] }), "mcp:test")
         .await
         .expect_err("empty ids rejected before any RPC");
     assert!(err.message().contains("`ids`"), "got: {}", err.message());
     let err = call_tool(
-        &DispatchCtx::process_default(),
         "memory.recall",
         json!({ "question": "q", "filter": { "x": 1 } }),
         "mcp:test",

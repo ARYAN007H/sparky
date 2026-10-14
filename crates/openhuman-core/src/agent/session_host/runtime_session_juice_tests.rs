@@ -1,6 +1,5 @@
 //! Frozen Juice declarations and executors survive configuration changes.
 
-use crate::core::runtime::DispatchCtx;
 use super::*;
 
 #[tokio::test]
@@ -59,7 +58,7 @@ async fn a_resumed_thread_keeps_recorded_juice_specs_and_executors_when_repl_is_
     let mut host =
         crate::agent::OpenHumanSessionHost::from_config_for_agent(&current_config, "summarizer")
             .expect("summarizer session");
-    host.ensure_runtime_session(&DispatchCtx::process_default()).expect("runtime session");
+    host.ensure_runtime_session().expect("runtime session");
     let prelude = host
         .runtime_state
         .lock()
@@ -78,7 +77,7 @@ async fn a_resumed_thread_keeps_recorded_juice_specs_and_executors_when_repl_is_
             .len(),
         recorded_specs.len()
     );
-    prelude.refresh_turn_boundary(&DispatchCtx::process_default(), false).await.expect("refresh");
+    prelude.refresh_turn_boundary(false).await.expect("refresh");
     let surface_names = {
         let surface = prelude.tool_surface.lock().expect("tool surface");
         (
@@ -100,7 +99,7 @@ async fn a_resumed_thread_keeps_recorded_juice_specs_and_executors_when_repl_is_
             surface.visible_tool_names.clone(),
         )
     };
-    let prepared = prelude.prepare(&DispatchCtx::process_default(), false).await.expect("prepared surface");
+    let prepared = prelude.prepare(false).await.expect("prepared surface");
     let prepared = prepared.tools.expect("prepared tool snapshot");
 
     for recorded_spec in &recorded_specs {
@@ -180,7 +179,7 @@ async fn resumed_juice_snapshot_does_not_add_live_repl_declarations() {
 
     let mut host = crate::agent::OpenHumanSessionHost::from_config_for_agent(&config, "summarizer")
         .expect("summarizer session");
-    host.ensure_runtime_session(&DispatchCtx::process_default()).expect("runtime session");
+    host.ensure_runtime_session().expect("runtime session");
     let prelude = host
         .runtime_state
         .lock()
@@ -189,9 +188,9 @@ async fn resumed_juice_snapshot_does_not_add_live_repl_declarations() {
         .clone()
         .expect("prelude");
     prelude.adopt_recorded_tools(Some(&recorded));
-    prelude.refresh_turn_boundary(&DispatchCtx::process_default(), false).await.expect("refresh");
+    prelude.refresh_turn_boundary(false).await.expect("refresh");
     let prepared = prelude
-        .prepare(&DispatchCtx::process_default(), false)
+        .prepare(false)
         .await
         .expect("prepared surface")
         .tools
@@ -215,11 +214,11 @@ async fn resumed_juice_snapshot_does_not_add_live_repl_declarations() {
     let empty = ToolSnapshot::new(Vec::new()).expect("empty recorded snapshot");
     prelude.adopt_recorded_tools(Some(&empty));
     prelude
-        .refresh_turn_boundary(&DispatchCtx::process_default(), false)
+        .refresh_turn_boundary(false)
         .await
         .expect("refresh empty");
     let prepared = prelude
-        .prepare(&DispatchCtx::process_default(), false)
+        .prepare(false)
         .await
         .expect("prepared empty snapshot")
         .tools
@@ -264,7 +263,7 @@ async fn juice_off_turn_loads_no_module_and_passes_tool_output_through() {
 
     let mut host = crate::agent::OpenHumanSessionHost::from_config_for_agent(&config, "summarizer")
         .expect("summarizer session");
-    host.ensure_runtime_session(&DispatchCtx::process_default()).expect("runtime session");
+    host.ensure_runtime_session().expect("runtime session");
     let context_mw = host
         .runtime_state
         .lock()

@@ -28,7 +28,6 @@
 //!   (`agent::orchestration::background_delivery`), none of which have a
 //!   human waiting on suggestions for their next message.
 
-use crate::core::runtime::DispatchCtx;
 use std::time::Duration;
 
 use serde::Deserialize;
@@ -78,7 +77,7 @@ struct RawSuggestion {
 /// the turn's tracing/Sentry context without holding up the caller. Intended
 /// to be called immediately after the turn's terminal `chat_done` has been
 /// published — see module docs for why this never delays that event.
-pub(crate) fn spawn_follow_up_suggestions(ctx: &DispatchCtx, 
+pub(crate) fn spawn_follow_up_suggestions(
     client_id: String,
     thread_id: String,
     request_id: String,
@@ -88,19 +87,18 @@ pub(crate) fn spawn_follow_up_suggestions(ctx: &DispatchCtx,
     tokio::spawn(crate::core::runtime::context::CoreContext::propagate(
         async move {
             generate_and_emit(
-                &ctx,
+                &client_id,
                 &thread_id,
                 &request_id,
                 &user_message,
                 &assistant_message,
-                &client_id,
             )
             .await;
         },
     ));
 }
 
-async fn generate_and_emit(ctx: &DispatchCtx, 
+async fn generate_and_emit(
     client_id: &str,
     thread_id: &str,
     request_id: &str,
@@ -117,7 +115,7 @@ async fn generate_and_emit(ctx: &DispatchCtx,
         return;
     }
 
-    let config = match config_rpc::load_config_with_timeout(&ctx).await {
+    let config = match config_rpc::load_config_with_timeout().await {
         Ok(c) => c,
         Err(err) => {
             log::debug!(

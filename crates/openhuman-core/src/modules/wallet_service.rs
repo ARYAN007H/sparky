@@ -1,6 +1,5 @@
 //! Serialized, user-scoped access to the module-owned native wallet service.
 
-use crate::core::runtime::DispatchCtx;
 use std::collections::HashMap;
 use std::future::Future;
 use std::path::PathBuf;
@@ -38,7 +37,7 @@ fn native_wallet_service() -> &'static tokio::sync::Mutex<Option<NativeWalletSer
 /// Run one operation under the current user's module service. The lock spans
 /// the complete bus operation so a user or endpoint change cannot replace the
 /// module's quote store while an earlier request is still using it.
-pub(crate) async fn with_native_wallet<R, F, Fut>(ctx: &DispatchCtx, 
+pub(crate) async fn with_native_wallet<R, F, Fut>(
     config: &Config,
     operation: F,
 ) -> Result<R, WalletCallError>
@@ -49,7 +48,7 @@ where
 {
     let mut active = native_wallet_service().lock().await;
     register_native_wallet_shutdown_hook();
-    let accounts = super::wallet_host::wallet_accounts_snapshot(&ctx)
+    let accounts = super::wallet_host::wallet_accounts_snapshot()
         .await
         .map_err(WalletCallError::Failed)?;
     let configuration = native_wallet_config_request();
@@ -120,14 +119,14 @@ async fn ensure_native_wallet(
 
 /// Prepare a native transfer through the module and retain its exact quote so
 /// the host can bind approval and signer selection to the same immutable facts.
-pub(crate) async fn prepare_native_transfer(ctx: &DispatchCtx, 
+pub(crate) async fn prepare_native_transfer(
     config: &Config,
     owner: Option<tinywallet_bus::wire::QuoteOwner>,
     params: tinywallet_bus::wire::PrepareTransferParams,
 ) -> Result<tinywallet_bus::wire::PreparedTransaction, WalletCallError> {
     let mut active = native_wallet_service().lock().await;
     register_native_wallet_shutdown_hook();
-    let accounts = super::wallet_host::wallet_accounts_snapshot(&ctx)
+    let accounts = super::wallet_host::wallet_accounts_snapshot()
         .await
         .map_err(WalletCallError::Failed)?;
     ensure_native_wallet(
@@ -164,7 +163,7 @@ pub(crate) async fn prepare_native_transfer(ctx: &DispatchCtx,
 /// Execute one explicitly confirmed native quote. The host retrieves only the
 /// matching account secret and delivers it over the attested confidential bus
 /// call; the module owns quote validation, approval facts, signing and broadcast.
-pub(crate) async fn execute_native_transfer(ctx: &DispatchCtx, 
+pub(crate) async fn execute_native_transfer(
     config: &Config,
     owner: Option<tinywallet_bus::wire::QuoteOwner>,
     params: tinywallet_bus::wire::ExecutePreparedParams,
@@ -177,7 +176,7 @@ pub(crate) async fn execute_native_transfer(ctx: &DispatchCtx,
 
     let mut active = native_wallet_service().lock().await;
     register_native_wallet_shutdown_hook();
-    let accounts = super::wallet_host::wallet_accounts_snapshot(&ctx)
+    let accounts = super::wallet_host::wallet_accounts_snapshot()
         .await
         .map_err(WalletCallError::Failed)?;
     ensure_native_wallet(
@@ -199,7 +198,7 @@ pub(crate) async fn execute_native_transfer(ctx: &DispatchCtx,
         .ok_or_else(|| {
             WalletCallError::InvalidInput("prepared wallet quote is unavailable".into())
         })?;
-    let secret = signing_secret(&ctx, config, quote.chain).await?;
+    let secret = signing_secret(config, quote.chain).await?;
     let mut request = tinywallet_bus::wire::NativeWalletExecuteRequest {
         service: service.response.service.clone(),
         owner,
@@ -222,7 +221,7 @@ pub(crate) async fn execute_native_transfer(ctx: &DispatchCtx,
     result
 }
 
-async fn signing_secret(ctx: &DispatchCtx, 
+async fn signing_secret(
     config: &Config,
     chain: tinywallet_bus::wire::WalletChain,
 ) -> Result<tinywallet_bus::wire::SecretMaterial, WalletCallError> {
@@ -232,7 +231,7 @@ async fn signing_secret(ctx: &DispatchCtx,
         tinywallet_bus::wire::WalletChain::Solana => crate::web3::wallet::WalletChain::Solana,
         tinywallet_bus::wire::WalletChain::Tron => crate::web3::wallet::WalletChain::Tron,
     };
-    let stored = crate::web3::wallet::secret_material(&ctx, local_chain)
+    let stored = crate::web3::wallet::secret_material(local_chain)
         .await
         .map_err(WalletCallError::Failed)?;
     let mnemonic =

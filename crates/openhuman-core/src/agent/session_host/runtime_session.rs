@@ -16,7 +16,6 @@ mod transcript;
 mod turn;
 pub(super) use turn::begin_turn_resume;
 
-use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -222,7 +221,7 @@ impl OpenHumanTurnPrelude {
             .unwrap_or_else(std::sync::PoisonError::into_inner) = surface;
     }
 
-    async fn prepare(&self, ctx: &DispatchCtx, cold: bool) -> Result<TurnPreparation> {
+    async fn prepare(&self, cold: bool) -> Result<TurnPreparation> {
         let tools = {
             let surface = self
                 .tool_surface
@@ -255,7 +254,7 @@ impl OpenHumanTurnPrelude {
             .map_err(|error| anyhow::anyhow!(error.to_string()))?
         };
         let prefix = if cold {
-            let tiered = self.build_system_prompt_tiered(&ctx)?;
+            let tiered = self.build_system_prompt_tiered()?;
             Some(super::prefix_snapshot::tiered_prefix_snapshot(&tiered))
         } else {
             None
@@ -266,7 +265,7 @@ impl OpenHumanTurnPrelude {
         })
     }
 
-    fn build_system_prompt_tiered(&self, ctx: &DispatchCtx) -> Result<crate::agent::prompts::TieredPrompt> {
+    fn build_system_prompt_tiered(&self) -> Result<crate::agent::prompts::TieredPrompt> {
         use crate::agent::prompts::{PromptContext, PromptTool};
         let surface = self
             .tool_surface
@@ -333,7 +332,7 @@ impl OpenHumanTurnPrelude {
             visible_tool_names: &visible_tool_names,
             tool_call_format: self.tool_dispatcher.tool_call_format(),
             connected_integrations: &mutable.connected_integrations,
-            connected_identities_md: crate::agent::prompts::render_connected_identities(&ctx),
+            connected_identities_md: crate::agent::prompts::render_connected_identities(),
             user_identity: crate::security::credentials::identity::peek_credential_user_identity(),
             personality_roster: vec![],
             agents_md_global: agents_md.global,
@@ -529,8 +528,8 @@ impl OpenHumanTurnPrelude {
         }
     }
 
-    async fn finalize_after_durable_commit(&self, ctx: &DispatchCtx, receipt: &CommitReceipt<OpenHumanRunContext>) {
-        self.memory_post_turn(&ctx, receipt);
+    async fn finalize_after_durable_commit(&self, receipt: &CommitReceipt<OpenHumanRunContext>) {
+        self.memory_post_turn(receipt);
     }
 }
 
@@ -578,7 +577,7 @@ impl OpenHumanSessionHost {
     /// intentionally has no raw transcript rows because its source is a
     /// role/content log rather than an authoritative transcript.
     pub fn seed_resume_from_messages(
-        &mut self, ctx: &DispatchCtx,
+        &mut self,
         mut messages: Vec<(String, String)>,
         current_user_message: &str,
     ) -> Result<()> {
@@ -593,7 +592,7 @@ impl OpenHumanSessionHost {
         if messages.is_empty() {
             return Ok(());
         }
-        self.ensure_runtime_session(&ctx)?;
+        self.ensure_runtime_session()?;
         let history = messages
             .into_iter()
             .map(|(role, text)| match role.as_str() {
@@ -614,7 +613,7 @@ impl OpenHumanSessionHost {
         self.turn_with_origin(user_message, None).await
     }
 
-    pub(in crate::agent::session_host) fn ensure_runtime_session(&mut self, ctx: &DispatchCtx) -> Result<()> {
+    pub(in crate::agent::session_host) fn ensure_runtime_session(&mut self) -> Result<()> {
         if self.runtime_session.is_some() {
             return Ok(());
         }
@@ -838,7 +837,7 @@ impl OpenHumanSessionHost {
                         post_commit::await_pending(pending_post_commit).await;
                         let new_session = !view.resumed && view.history.is_empty();
                         prelude
-                            .refresh_turn_boundary(&ctx, new_session)
+                            .refresh_turn_boundary(new_session)
                             .await
                             .map_err(|error| {
                                 tinyagents_runtime::RuntimeError::Driver(error.to_string())
@@ -872,7 +871,6 @@ impl OpenHumanSessionHost {
                             // calls) would otherwise be inlined into this
                             // already-large hook future.
                             Box::pin(prelude.memory_pre_turn(
-                                &ctx,
                                 view.history,
                                 view.committed_turns,
                                 view.history.last().filter(|last| **last == request.input),
@@ -882,7 +880,7 @@ impl OpenHumanSessionHost {
                         options.run_context.data.memory_turn = memory_turn;
                         request.input = user_message_from_text(&enriched);
                         let mut preparation =
-                            prelude.prepare(&ctx, new_session).await.map_err(|error| {
+                            prelude.prepare(new_session).await.map_err(|error| {
                                 tinyagents_runtime::RuntimeError::Driver(error.to_string())
                             })?;
                         prelude.refresh_permanent_prefix(&mut preparation, view.prefix);
@@ -966,7 +964,6 @@ impl OpenHumanSessionHost {
                     let channel = channel.clone();
                     Box::pin(async move {
                         post_commit::finalize_committed_turn(
-                            &ctx,
                             &state,
                             &post_turn_hooks,
                             post_commit::TurnIdentity {

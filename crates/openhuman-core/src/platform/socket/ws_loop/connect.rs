@@ -2,7 +2,6 @@
 //! Engine.IO/Socket.IO handshake reads, and a single connection's full
 //! event loop ([`run_connection`]).
 
-use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
@@ -81,7 +80,7 @@ pub(super) struct ReconnectContext {
 /// during the upgrade (see `connect_with_redirects`) is pinned for the next
 /// reconnect attempt — we don't want to re-hit the redirect every time the
 /// loop backs off and retries.
-pub(super) async fn run_connection(ctx: &DispatchCtx, 
+pub(super) async fn run_connection(
     ws_url: &mut String,
     token: &str,
     shared: &Arc<SharedState>,
@@ -235,7 +234,7 @@ pub(super) async fn run_connection(ctx: &DispatchCtx,
                         if frame.starts_with('2') {
                             pings_received = pings_received.saturating_add(1);
                         }
-                        handle_eio_message(&ctx, frame, internal_tx, shared);
+                        handle_eio_message(frame, internal_tx, shared);
                     }
                     Some(Ok(WsMessage::Ping(data))) => {
                         sent_since_last_frame = 0;

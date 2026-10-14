@@ -4,7 +4,6 @@
 //! accepted. Completion/failure is reported through normal sub-agent lifecycle
 //! events and, when possible, persisted in the child worker thread.
 
-use crate::core::runtime::DispatchCtx;
 use super::subagent_abort_report::AbortReport;
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::orchestration::fleet_tools::FleetToolSet;
@@ -240,8 +239,7 @@ impl Tool for SpawnAsyncSubagentTool {
         options: ToolCallOptions,
         tool_context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
-        self.exDispatchCtx::ambient()te_with_context_inner(
-            &DispatchCtx::ambient(),
+        self.execute_with_context_inner(
             args,
             options,
             tool_context,
@@ -258,7 +256,7 @@ impl SpawnAsyncSubagentTool {
     /// through [`SpawnAsyncSubagentDispatch`] with their own carrier.
     #[cfg(test)]
     pub(crate) async fn execute_under_parent(
-        &self, ctx: &DispatchCtx, ctx: &DispatchCtx,
+        &self,
         args: serde_json::Value,
         options: ToolCallOptions,
         tool_context: Option<&dyn ToolRunContext>,
@@ -275,7 +273,6 @@ impl SpawnAsyncSubagentTool {
             .map_err(|error| anyhow::anyhow!(error.to_string()))?
             .with_cancellation(detached_cancellation);
         self.execute_with_context_inner(
-            &ctx,
             args,
             options,
             tool_context,
@@ -286,14 +283,13 @@ impl SpawnAsyncSubagentTool {
     }
 
     pub(crate) async fn execute_with_live_parent_context(
-        &self, ctx: &DispatchCtx, ctx: &DispatchCtx,
+        &self,
         args: serde_json::Value,
         tool_context: Option<&dyn ToolRunContext>,
         run_context: crate::agent::tinyagents::host::OpenHumanRunContext,
         detached_parent: RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
     ) -> anyhow::Result<ToolResult> {
         self.execute_with_context_inner(
-            &ctx,
             args,
             ToolCallOptions::default(),
             tool_context,

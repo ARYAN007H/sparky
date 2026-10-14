@@ -75,17 +75,17 @@ pub fn schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_encrypt_secret(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_encrypt_secret(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         let plaintext = read_required::<String>(&params, "plaintext")?;
         to_json(crate::security::encryption::rpc::encrypt_secret(&config, &plaintext).await?)
     })
 }
 
-fn handle_decrypt_secret(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_decrypt_secret(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         let ciphertext = read_required::<String>(&params, "ciphertext")?;
         to_json(crate::security::encryption::rpc::decrypt_secret(&config, &ciphertext).await?)
     })

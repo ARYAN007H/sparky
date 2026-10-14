@@ -49,7 +49,7 @@ macro_rules! read_tool {
             }
             async fn execute(&self, _args: serde_json::Value) -> anyhow::Result<ToolResult> {
                 log::debug!(concat!("[tool][config] ", $name, " invoked"));
-                emit!(ops::$fn(&ctx).await, $name)
+                emit!(ops::$fn().await, $name)
             }
             fn is_concurrency_safe(&self, _args: &serde_json::Value) -> bool {
                 true

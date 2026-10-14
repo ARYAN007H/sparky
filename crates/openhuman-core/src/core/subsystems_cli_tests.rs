@@ -1,15 +1,14 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 
 #[test]
 fn help_flag_short_circuits_without_probing_a_driver() {
-    run_subsystems_command(&DispatchCtx::process_default(), &["--help".to_string()]).expect("help succeeds");
-    run_subsystems_command(&DispatchCtx::process_default(), &["-h".to_string()]).expect("short help succeeds");
+    run_subsystems_command(&["--help".to_string()]).expect("help succeeds");
+    run_subsystems_command(&["-h".to_string()]).expect("short help succeeds");
 }
 
 #[test]
 fn bare_invocation_renders_the_table() {
-    run_subsystems_command(&DispatchCtx::process_default(), &[]).expect("table renders");
+    run_subsystems_command(&[]).expect("table renders");
 }
 
 #[test]

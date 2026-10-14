@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::integrations::task_sources::types::{FilterSpec, ProviderSlug};
 use crate::integrations::task_sources::NormalizedTask;
@@ -56,7 +55,7 @@ async fn collect_only_target_routes_without_side_effects() {
     let config = Config::default();
     let src = github_source(SourceTarget::TodoOnly);
 
-    route_enriched(&DispatchCtx::process_default(), &config, &src, &enriched("123"))
+    route_enriched(&config, &src, &enriched("123"))
         .await
         .expect("collect-only routing is a no-op");
 }

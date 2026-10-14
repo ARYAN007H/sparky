@@ -75,7 +75,6 @@
 //! permission returns [`GateDecision::Deny`], including an unrecognised tool
 //! name.
 
-use crate::core::runtime::DispatchCtx;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -387,7 +386,7 @@ impl OpenHumanSecurityGate {
         decision_for_outcome(&call.tool_name, outcome)
     }
     async fn authorize_tool_with_facts(
-        &self, ctx: &DispatchCtx,
+        &self,
         call: &ToolCallRequest,
         authorization_context: Option<&serde_json::Value>,
     ) -> TaResult<GateDecision> {
@@ -414,7 +413,7 @@ impl OpenHumanSecurityGate {
         let policy = self.effective_policy();
         #[cfg(feature = "modules")]
         let desktop_approval_disabled = match self.resolve_tool(&call.tool_name) {
-            Some(tool) => crate::desktop::control::approvals_disabled_for(&ctx, tool).await,
+            Some(tool) => crate::desktop::control::approvals_disabled_for(tool).await,
             None => false,
         };
         #[cfg(not(feature = "modules"))]

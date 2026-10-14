@@ -1,6 +1,5 @@
 //! Direct mode (BYO API key) ops.
 
-use crate::core::runtime::DispatchCtx;
 use crate::config::Config;
 use crate::core::Outcome;
 
@@ -72,7 +71,7 @@ pub async fn composio_get_mode(config: &Config) -> OpResult<Outcome<serde_json::
 /// (optionally) flip `config.composio.mode` over to `"direct"`.
 ///
 /// **Logging redacts the key** — only its length and presence are recorded.
-pub async fn composio_set_api_key(ctx: &DispatchCtx, 
+pub async fn composio_set_api_key(
     config: &Config,
     api_key: &str,
     activate_direct: bool,
@@ -93,7 +92,7 @@ pub async fn composio_set_api_key(ctx: &DispatchCtx,
         .map_err(|e| format!("[composio-direct] store_composio_api_key failed: {e}"))?;
 
     let mode_log = if activate_direct {
-        let mut cfg_mut = crate::config::rpc::load_config_with_timeout(&ctx)
+        let mut cfg_mut = crate::config::rpc::load_config_with_timeout()
             .await
             .map_err(|e| format!("[composio-direct] reload config failed: {e}"))?;
         cfg_mut.composio.mode = crate::config::schema::COMPOSIO_MODE_DIRECT.into();
@@ -132,13 +131,13 @@ pub async fn composio_set_api_key(ctx: &DispatchCtx,
 
 /// Clear the stored direct-mode API key and reset
 /// `config.composio.mode` back to `"backend"`.
-pub async fn composio_clear_api_key(ctx: &DispatchCtx, config: &Config) -> OpResult<Outcome<serde_json::Value>> {
+pub async fn composio_clear_api_key(config: &Config) -> OpResult<Outcome<serde_json::Value>> {
     tracing::debug!("[composio-direct] clear_api_key");
     crate::security::credentials::clear_composio_api_key(config)
         .await
         .map_err(|e| format!("[composio-direct] clear_composio_api_key failed: {e}"))?;
 
-    let mut cfg_mut = crate::config::rpc::load_config_with_timeout(&ctx)
+    let mut cfg_mut = crate::config::rpc::load_config_with_timeout()
         .await
         .map_err(|e| format!("[composio-direct] reload config failed: {e}"))?;
     cfg_mut.composio.mode = crate::config::schema::COMPOSIO_MODE_BACKEND.into();

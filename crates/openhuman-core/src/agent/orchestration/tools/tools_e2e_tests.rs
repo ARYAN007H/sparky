@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::{ArchetypeDelegationTool, DelegationTarget, SpawnSubagentTool, SpawnWorkerThreadTool};
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::harness::ParentExecutionContext;
@@ -132,9 +131,8 @@ async fn archetype_delegation_tool_runs_child_agent_e2e() {
         parent_context(workspace.path(), provider.clone(), vec![]),
     );
     let result = super::archetype_delegation::execute_archetype_delegation_with_live_parent(
-        &DispatchCtx::process_default(),
-        &tool.tool_name,
         &tool.agent_id.0,
+        &tool.tool_name,
         json!({
             "prompt": format!("Research {ARCHETYPE_DELEGATION_CANARY}"),
             "model": "test-model"
@@ -190,9 +188,8 @@ async fn archetype_delegation_defaults_to_async_with_durable_session_e2e() {
         .with_parent(ctx.clone())
         .into_tinyagents(RunConfig::new("archetype-async-e2e").with_thread("thread-async-parent"));
     let result = super::archetype_delegation::execute_archetype_delegation_with_live_parent(
-        &ctx,
-        &tool.tool_name,
         &tool.agent_id.0,
+        &tool.tool_name,
         json!({
             "prompt": format!("Research {ARCHETYPE_DELEGATION_CANARY} in the background"),
             "model": "test-model"

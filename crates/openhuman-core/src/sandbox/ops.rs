@@ -1,7 +1,6 @@
 //! Sandbox backend operations — policy resolution, backend creation, and
 //! routed execution.
 
-use crate::core::runtime::DispatchCtx;
 use super::docker;
 use super::types::{
     ElevatedOp, SandboxBackendHandle, SandboxBackendKind, SandboxExecRequest, SandboxExecResult,
@@ -46,7 +45,7 @@ pub fn sandbox_off_value(value: Option<&str>) -> bool {
 /// Whether a command tool must use the sandbox execution path. An explicit
 /// backend in the active config is an operator requirement even when the
 /// agent definition uses the usual `SandboxMode::None` default.
-pub async fn command_requires_sandbox(ctx: &DispatchCtx, sandbox_mode: Option<SandboxMode>) -> Result<bool, String> {
+pub async fn command_requires_sandbox(sandbox_mode: Option<SandboxMode>) -> Result<bool, String> {
     if crate::core::runtime::is_saas() {
         // Every SaaS command must enter the per-user container path, including
         // language tools whose agent definition does not request a sandbox.
@@ -58,7 +57,7 @@ pub async fn command_requires_sandbox(ctx: &DispatchCtx, sandbox_mode: Option<Sa
     if matches!(sandbox_mode, Some(SandboxMode::Sandboxed)) {
         return Ok(true);
     }
-    let config = crate::config::ops::load_config_with_timeout(&ctx).await?;
+    let config = crate::config::ops::load_config_with_timeout().await?;
     if config_disables_sandbox(&config) {
         return Ok(false);
     }
@@ -74,14 +73,14 @@ pub async fn command_requires_sandbox(ctx: &DispatchCtx, sandbox_mode: Option<Sa
 /// Resolve the policy for a command tool before building its command line.
 /// SaaS always uses the user's container; other hosts apply the operator's
 /// backend selection while retaining an agent-level sandbox requirement.
-pub(crate) async fn resolve_command_policy(ctx: &DispatchCtx, 
+pub(crate) async fn resolve_command_policy(
     action_dir: &Path,
     state_dir: &Path,
 ) -> Result<SandboxPolicy, String> {
     if crate::core::runtime::is_saas() {
         return crate::profiles::tools::sandbox_policy(action_dir, state_dir);
     }
-    let config = crate::config::ops::load_config_with_timeout(&ctx)
+    let config = crate::config::ops::load_config_with_timeout()
         .await
         .map_err(|error| format!("Cannot read sandbox configuration: {error}"))?;
     let mut policy = resolve_sandbox_policy(
@@ -223,7 +222,7 @@ pub(crate) fn local_status_for_jail(
     }
 }
 
-pub async fn create_sandbox_backend(ctx: &DispatchCtx, policy: &SandboxPolicy) -> SandboxBackendHandle {
+pub async fn create_sandbox_backend(policy: &SandboxPolicy) -> SandboxBackendHandle {
     if policy.backend != SandboxBackendKind::Docker {
         return create_sandbox_backend_with_config(policy, &crate::config::Config::default())
             .await
@@ -233,7 +232,7 @@ pub async fn create_sandbox_backend(ctx: &DispatchCtx, policy: &SandboxPolicy) -
                 backend_id: None,
             });
     }
-    let config = match crate::config::ops::load_config_with_timeout(&ctx).await {
+    let config = match crate::config::ops::load_config_with_timeout().await {
         Ok(config) => config,
         Err(_) if policy.backend == SandboxBackendKind::Docker => {
             return docker_error_handle();
@@ -286,20 +285,20 @@ fn docker_error_handle() -> SandboxBackendHandle {
 ///
 /// Returns the sandboxed execution result. The caller (typically the
 /// shell tool) is responsible for converting this into a `ToolResult`.
-pub async fn execute_in_sandbox(ctx: &DispatchCtx, 
+pub async fn execute_in_sandbox(
     policy: &SandboxPolicy,
     command: &str,
     working_dir: &Path,
     extra_env: HashMap<OsString, OsString>,
     timeout: Duration,
 ) -> anyhow::Result<SandboxExecResult> {
-    execute_in_sandbox_metered(&ctx, policy, command, working_dir, extra_env, timeout, None).await
+    execute_in_sandbox_metered(policy, command, working_dir, extra_env, timeout, None).await
 }
 
 /// [`execute_in_sandbox`] that feeds `meter` with the command's output as it
 /// streams (the native backends; Docker reports elapsed time only), for the
 /// shell tool's progress line.
-pub(crate) async fn execute_in_sandbox_metered(ctx: &DispatchCtx, 
+pub(crate) async fn execute_in_sandbox_metered(
     policy: &SandboxPolicy,
     command: &str,
     working_dir: &Path,
@@ -318,7 +317,7 @@ pub(crate) async fn execute_in_sandbox_metered(ctx: &DispatchCtx,
     let explicitly_requested = if crate::core::runtime::is_saas() || sandbox_disabled_by_host() {
         false
     } else {
-        let config = crate::config::ops::load_config_with_timeout(&ctx)
+        let config = crate::config::ops::load_config_with_timeout()
             .await
             .map_err(|e| anyhow::anyhow!("Cannot read sandbox configuration: {e}"))?;
         module_config = Some(config.clone());
@@ -350,7 +349,7 @@ pub(crate) async fn execute_in_sandbox_metered(ctx: &DispatchCtx,
             crate::config::ensure_usable_cwd(working_dir)?;
             let config = match module_config {
                 Some(config) => config,
-                None => crate::config::ops::load_config_with_timeout(&ctx)
+                None => crate::config::ops::load_config_with_timeout()
                     .await
                     .map_err(|error| {
                         anyhow::anyhow!("Cannot read module configuration: {error}")
@@ -371,7 +370,7 @@ pub(crate) async fn execute_in_sandbox_metered(ctx: &DispatchCtx,
             crate::config::ensure_usable_cwd(working_dir)?;
             let config = match module_config {
                 Some(config) => config,
-                None => crate::config::ops::load_config_with_timeout(&ctx)
+                None => crate::config::ops::load_config_with_timeout()
                     .await
                     .map_err(|error| {
                         anyhow::anyhow!("Cannot read module configuration: {error}")
@@ -400,7 +399,7 @@ pub(crate) async fn execute_in_sandbox_metered(ctx: &DispatchCtx,
             };
             let config = match module_config {
                 Some(config) => config,
-                None => crate::config::ops::load_config_with_timeout(&ctx)
+                None => crate::config::ops::load_config_with_timeout()
                     .await
                     .map_err(|error| {
                         anyhow::anyhow!("Cannot read module configuration: {error}")

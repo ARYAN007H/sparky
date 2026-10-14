@@ -21,7 +21,6 @@
 //!
 //! Each step is timed under the `[session-runtime] post-commit` log prefix.
 
-use crate::core::runtime::DispatchCtx;
 use std::future::Future;
 use std::time::{Duration, Instant};
 
@@ -126,7 +125,7 @@ pub(super) struct TurnIdentity {
 /// The session's `after_commit` hook body, in the order described in the
 /// module docs: caller-visible state, then `TurnCompleted`, then the cheap
 /// finalize steps, with goal accounting deferred to a fenced background task.
-pub(super) async fn finalize_committed_turn(ctx: &DispatchCtx, 
+pub(super) async fn finalize_committed_turn(
     state: &std::sync::Mutex<super::OpenHumanSessionState>,
     post_turn_hooks: &[std::sync::Arc<dyn crate::agent::hooks::PostTurnHook>],
     identity: TurnIdentity,
@@ -218,7 +217,7 @@ pub(super) async fn finalize_committed_turn(ctx: &DispatchCtx,
     .await;
     if let Some(prelude) = prelude {
         let started = std::time::Instant::now();
-        prelude.finalize_after_durable_commit(&ctx, &receipt).await;
+        prelude.finalize_after_durable_commit(&receipt).await;
         tracing::debug!(
             elapsed_ms = elapsed_ms(started),
             "[session-runtime] post-commit: finalize hooks done"

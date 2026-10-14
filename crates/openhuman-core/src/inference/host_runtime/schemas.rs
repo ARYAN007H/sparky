@@ -223,10 +223,10 @@ pub fn schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_agent_chat(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_agent_chat(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<AgentChatParams>(params)?;
-        let mut config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let mut config = config_rpc::load_config_with_timeout().await?;
         let target = match p.agent_id.as_deref().map(str::trim) {
             Some(id) if !id.is_empty() => {
                 crate::inference::host_runtime::ops::AgentChatTarget::AgentId(id)
@@ -234,14 +234,13 @@ fn handle_agent_chat(ctx: DispatchCtx, params: Map<String, Value>) -> Controller
             _ => crate::inference::host_runtime::ops::AgentChatTarget::Orchestrator,
         };
         crate::inference::host_runtime::ops::agent_chat_reply_for(
-            &ctx,
             &mut config,
             target,
             &p.message,
             p.model_override,
             p.temperature,
-            p.cwd,
             p.thread_id,
+            p.cwd,
             crate::config::schema::EphemeralRoute::from_params(p.inference_url, p.api_key)
                 .map(|route| route.with_headers(p.inference_headers)),
             crate::inference::host_runtime::ops::AgentChatEnv::default(),
@@ -251,10 +250,10 @@ fn handle_agent_chat(ctx: DispatchCtx, params: Map<String, Value>) -> Controller
     })
 }
 
-fn handle_agent_chat_simple(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_agent_chat_simple(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<AgentChatParams>(params)?;
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         to_json(
             crate::inference::host_runtime::ops::agent_chat_simple(
                 &config,
@@ -268,10 +267,10 @@ fn handle_agent_chat_simple(ctx: DispatchCtx, params: Map<String, Value>) -> Con
     })
 }
 
-fn handle_local_ai_transcribe(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_local_ai_transcribe(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<LocalAiTranscribeParams>(params)?;
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         to_json(
             crate::inference::host_runtime::ops::local_ai_transcribe(&config, p.audio_path.trim())
                 .await?,
@@ -280,12 +279,12 @@ fn handle_local_ai_transcribe(ctx: DispatchCtx, params: Map<String, Value>) -> C
 }
 
 fn handle_local_ai_transcribe_bytes(
-    ctx: DispatchCtx,
+    _ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<LocalAiTranscribeBytesParams>(params)?;
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         to_json(
             crate::inference::host_runtime::ops::local_ai_transcribe_bytes(
                 &config,
@@ -297,10 +296,10 @@ fn handle_local_ai_transcribe_bytes(
     })
 }
 
-fn handle_local_ai_tts(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_local_ai_tts(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<LocalAiTtsParams>(params)?;
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         to_json(
             crate::inference::host_runtime::ops::local_ai_tts(
                 &config,

@@ -1,7 +1,6 @@
 //! The reconnect loop: [`ws_loop`], its failure-escalation logging, the
 //! invalid-token retry decision, and the emit-queue drain used on shutdown.
 
-use crate::core::runtime::DispatchCtx;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
@@ -58,7 +57,7 @@ impl Drop for LoopActiveGuard<'_> {
 /// fails with "Invalid token") the loop escalates immediately — it does
 /// **not** waste the remaining back-off attempts on a provably dead token.
 /// This is the fix for TAURI-RUST-9C (#2892).
-pub(crate) async fn ws_loop(ctx: &DispatchCtx, 
+pub(crate) async fn ws_loop(
     url: String,
     token_provider: TokenProvider,
     shared: Arc<SharedState>,
@@ -172,7 +171,6 @@ pub(crate) async fn ws_loop(ctx: &DispatchCtx,
         // from the `Connected after …` line (Codex review on #6270).
         let attempt_started = Instant::now();
         let outcome = run_connection(
-            &ctx,
             &mut ws_url,
             &token,
             &shared,

@@ -6,7 +6,6 @@
 //! [`CoreRuntime::start_services`](super::CoreRuntime::start_services)
 //! once a transport has bound, or directly when there is none.
 
-use crate::core::runtime::DispatchCtx;
 /// Initializes long-lived socket/event-bus infrastructure.
 ///
 /// `host_kind` identifies the embedding process (Tauri desktop shell vs
@@ -15,7 +14,7 @@ use crate::core::runtime::DispatchCtx;
 /// env override is ignored and a domain event is published so the UI can
 /// surface a banner; under CLI / Docker the override is honored (with a
 /// noisy log + a domain event so any connected dashboard can flag it).
-pub(crate) async fn bootstrap_core_runtime(ctx: &DispatchCtx, 
+pub(crate) async fn bootstrap_core_runtime(
     host_kind: crate::core::types::HostKind,
     config: Option<crate::config::Config>,
     domains: crate::core::runtime::DomainSet,
@@ -70,7 +69,6 @@ pub(crate) async fn bootstrap_core_runtime(ctx: &DispatchCtx,
     // bootstrap_core_runtime() cannot double-subscribe (and a later, wider
     // DomainSet still installs its newly-enabled groups).
     super::subscribers::register_domain_subscribers(
-        &ctx,
         workspace_dir.clone(),
         cfg.clone(),
         embedded_core,
@@ -88,7 +86,7 @@ pub(crate) async fn bootstrap_core_runtime(ctx: &DispatchCtx,
     // meant to gate the first tool call of the first turn has to be loaded
     // before any session exists, and the alternative — loading lazily on the
     // first event — would let that first call through while the file is read.
-    crate::hooks::init(&ctx, &cfg).await;
+    crate::hooks::init(&cfg).await;
 
     // --- Turn-state recovery -------------------------------------------
     // Any per-thread turn snapshots left on disk from a previous process
@@ -164,7 +162,7 @@ pub(crate) async fn bootstrap_core_runtime(ctx: &DispatchCtx,
         // completion log (`<workspace>/.openhuman/background_completions.jsonl`).
         // Schedule its delivery turn through the normal idle-gated path.
         let redelivering =
-            crate::agent::orchestration::background_delivery::recover_on_boot(&ctx, &workspace_dir);
+            crate::agent::orchestration::background_delivery::recover_on_boot(&workspace_dir);
         if redelivering > 0 {
             log::info!(
                 "[runtime] scheduled redelivery of undelivered background completions for \

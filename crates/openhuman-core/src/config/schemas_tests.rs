@@ -298,10 +298,12 @@ async fn handle_get_autonomy_settings_returns_current_value() {
         std::env::set_var("OPENHUMAN_WORKSPACE", tmp.path());
     }
     // Seed a known value before reading.
-    let _ = crate::config::ops::load_and_apply_autonomy_settings(&DispatchCtx::process_default(), crate::config::ops::AutonomySettingsPatch {
+    let _ = crate::config::ops::load_and_apply_autonomy_settings(
+        crate::config::ops::AutonomySettingsPatch {
             max_actions_per_hour: Some(123),
             ..Default::default()
-        })
+        },
+    )
     .await
     .expect("seed");
 

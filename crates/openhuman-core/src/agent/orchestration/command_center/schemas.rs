@@ -86,11 +86,11 @@ fn schema_for(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_agent_work_list(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_agent_work_list(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "command_center_rpc", "[command_center_rpc][{cid}] list.entry");
-        let config = config_rpc::load_config_with_timeout(&ctx)
+        let config = config_rpc::load_config_with_timeout()
             .await
             .inspect_err(|err| {
                 log::warn!(target: "command_center_rpc", "[command_center_rpc][{cid}] list.config_failed err={err}");
@@ -112,11 +112,11 @@ fn handle_agent_work_list(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
     })
 }
 
-fn handle_agent_work_control(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_agent_work_control(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "command_center_rpc", "[command_center_rpc][{cid}] control.entry");
-        let config = config_rpc::load_config_with_timeout(&ctx)
+        let config = config_rpc::load_config_with_timeout()
             .await
             .inspect_err(|err| {
                 log::warn!(target: "command_center_rpc", "[command_center_rpc][{cid}] control.config_failed err={err}");

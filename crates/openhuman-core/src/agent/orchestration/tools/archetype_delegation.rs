@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use async_trait::async_trait;
 use serde_json::json;
 use serde_json::Value;
@@ -119,9 +118,8 @@ impl Tool for ArchetypeDelegationTool {
             .and_then(ToolRunContext::thread_id)
             .map(ToOwned::to_owned);
         execute_archetype_delegation(
-            &DispatchCtx::ambient(),
-            &self.tool_name,
             &self.agent_id.0,
+            &self.tool_name,
             args,
             tool_context,
             run_context,
@@ -131,7 +129,7 @@ impl Tool for ArchetypeDelegationTool {
 }
 
 /// Execute an archetype hand-off with an explicit child run carrier.
-pub(crate) async fn execute_archetype_delegation(ctx: &DispatchCtx, 
+pub(crate) async fn execute_archetype_delegation(
     agent_id: &str,
     tool_name: &str,
     args: serde_json::Value,
@@ -139,9 +137,8 @@ pub(crate) async fn execute_archetype_delegation(ctx: &DispatchCtx,
     run_context: crate::agent::tinyagents::host::OpenHumanRunContext,
 ) -> anyhow::Result<ToolResult> {
     execute_archetype_delegation_with_live_parent(
-        &ctx,
-        tool_name,
         agent_id,
+        tool_name,
         args,
         tool_context,
         run_context,
@@ -152,7 +149,7 @@ pub(crate) async fn execute_archetype_delegation(ctx: &DispatchCtx,
 
 /// Typed-harness counterpart that preserves a live parent for the blocking
 /// archetype child.
-pub(crate) async fn execute_archetype_delegation_with_live_parent(ctx: &DispatchCtx, 
+pub(crate) async fn execute_archetype_delegation_with_live_parent(
     agent_id: &str,
     tool_name: &str,
     args: serde_json::Value,
@@ -179,7 +176,6 @@ pub(crate) async fn execute_archetype_delegation_with_live_parent(ctx: &Dispatch
     }
     let prompt = render_structured_handoff(&raw_prompt, &args);
     let prompt = match crate::agent::attachments::delegation_prompt(
-        &ctx,
         &prompt,
         &args,
         tool_context
@@ -219,10 +215,9 @@ pub(crate) async fn execute_archetype_delegation_with_live_parent(ctx: &Dispatch
     };
 
     super::dispatch::dispatch_subagent_with_live_parent(
-        &ctx,
+        agent_id,
         tool_name,
         &prompt,
-        agent_id,
         model_override,
         tool_context,
         mode,

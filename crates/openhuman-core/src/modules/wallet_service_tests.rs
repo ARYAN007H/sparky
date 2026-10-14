@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -196,7 +195,6 @@ fn native_service_reuses_its_handle_for_identical_user_state() {
 #[tokio::test]
 async fn unconfirmed_execution_is_rejected_before_wallet_service_or_secret_access() {
     let error = execute_native_transfer(
-        &DispatchCtx::process_default(),
         &crate::config::Config::default(),
         None,
         tinywallet_bus::wire::ExecutePreparedParams {

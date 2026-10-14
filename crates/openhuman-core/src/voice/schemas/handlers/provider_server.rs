@@ -20,12 +20,12 @@ use crate::voice::schemas::params::{
 // ---------------------------------------------------------------------------
 
 pub(crate) fn handle_voice_set_providers(
-    ctx: DispatchCtx,
+    _ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<SetProvidersParams>(params)?;
-        let mut config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let mut config = config_rpc::load_config_with_timeout().await?;
 
         if let Some(stt) = p
             .stt_provider
@@ -83,7 +83,7 @@ pub(crate) fn handle_voice_set_providers(
 }
 
 pub(crate) fn handle_voice_update_provider_settings(
-    ctx: DispatchCtx,
+    _ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
@@ -94,7 +94,7 @@ pub(crate) fn handle_voice_update_provider_settings(
         use tinyinference_voice::external_tts::TtsApiStyle;
 
         let p = deserialize_params::<VoiceUpdateProviderSettingsParams>(params)?;
-        let mut config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let mut config = config_rpc::load_config_with_timeout().await?;
 
         if let Some(providers) = p.voice_providers {
             let mut new_entries = Vec::with_capacity(providers.len());
@@ -238,12 +238,12 @@ pub(crate) fn handle_voice_update_provider_settings(
 }
 
 pub(crate) fn handle_voice_list_models(
-    ctx: DispatchCtx,
+    _ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<VoiceListModelsParams>(params)?;
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         let provider_id = p.provider_id.trim();
         let capability = p.capability.as_deref().unwrap_or("both");
 
@@ -306,12 +306,12 @@ pub(crate) fn handle_voice_list_models(
 }
 
 pub(crate) fn handle_voice_test_provider(
-    ctx: DispatchCtx,
+    _ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<VoiceTestProviderParams>(params)?;
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
         let start = std::time::Instant::now();
 
         log::debug!(
@@ -425,14 +425,14 @@ pub(crate) fn handle_voice_test_provider(
 // ---------------------------------------------------------------------------
 
 pub(crate) fn handle_voice_server_start(
-    ctx: DispatchCtx,
+    _ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
         use crate::voice::server::{global_server, VoiceServerConfig};
         use tinyvoice_bus::hotkey::ActivationMode;
 
-        let config = config_rpc::load_config_with_timeout(&ctx).await?;
+        let config = config_rpc::load_config_with_timeout().await?;
 
         let hotkey = params
             .get("hotkey")
