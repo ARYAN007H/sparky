@@ -927,9 +927,9 @@ async fn run_typed_mode(
             filtered_specs.clone(),
             allowed_names,
             subagent_iter_cap_with_autonomous_lift(
-            options.run_context.autonomous_iter_cap,
-            definition.effective_max_iterations(),
-        ),
+                options.run_context.autonomous_iter_cap,
+                definition.effective_max_iterations(),
+            ),
             options.run_queue.clone(),
             parent.on_progress.clone(),
             &definition.id,
