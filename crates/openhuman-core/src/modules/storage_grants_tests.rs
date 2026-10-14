@@ -471,6 +471,7 @@ fn the_write_selectors_track_the_contract_selector_sets() {
             "Blobs.Delete",
             "Blobs.PresignPut",
             "Blobs.Put",
+            "Blobs.PutStream",
             "Documents.AtomicBatch",
             "Documents.AtomicBatchChecked",
             "Documents.Claim",
