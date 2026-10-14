@@ -596,20 +596,6 @@
   },
   {
     "rule": "openhuman-upstream-reexport",
-    "path": "crates/openhuman-core/src/core/observability.rs",
-    "line": 3096,
-    "text": "pub use tinyinference_llm::failure::body_indicates_quota_exhausted as is_quota_exhausted_message;",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-upstream-reexport",
-    "path": "crates/openhuman-core/src/threads/store/backend.rs",
-    "line": 21,
-    "text": "pub use tinyagents_session::threads::ConversationPurgeStats;",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-upstream-reexport",
     "path": "crates/openhuman-core/src/tools/registry/mod.rs",
     "line": 18,
     "text": "pub use tinytools::{",

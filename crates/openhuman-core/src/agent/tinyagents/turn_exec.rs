@@ -21,7 +21,7 @@ use tinyagents_runtime::{DriverRequest, ToolSnapshot};
 
 use crate::agent::harness::tool_result_artifacts::TINYAGENTS_TOOL_RESULT_ARTIFACT_STORE;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
-use crate::agent::tinyagents::middleware::TurnContextMiddleware;
+use crate::agent::tinyagents::middleware::turn_context::TurnContextMiddleware;
 use crate::agent::tinyagents::observability::{OpenhumanEventBridge, SubagentScope};
 use crate::agent::tinyagents::tool_registration::capability_diagnostics;
 use crate::agent::tinyagents::turn_middleware::{
