@@ -13,11 +13,26 @@ impl OpenHumanSessionHost {
         user_message: &str,
         origin: Option<&crate::agent::turn_origin::AgentTurnOrigin>,
     ) -> Result<String> {
+        self.turn_with_approval(user_message, origin, Default::default())
+            .await
+    }
+
+    /// [`Self::turn_with_origin`] with the approval context of the turn: where
+    /// its parked approvals surface, whether it is the flow copilot and which
+    /// flow run it belongs to. It rides this turn's run context only, so it is
+    /// never left behind on the session for a later turn to inherit.
+    pub async fn turn_with_approval(
+        &mut self,
+        user_message: &str,
+        origin: Option<&crate::agent::turn_origin::AgentTurnOrigin>,
+        approval: crate::security::approval::ApprovalTurnContext,
+    ) -> Result<String> {
         self.ensure_runtime_session()?;
         let staged = super::attachment_input::stage_turn(self, user_message, origin).await?;
         let mut context = OpenHumanRunContext::new().with_host_env(&self.host_env);
         context.untrusted_input_turn = self.untrusted_input;
         context.origin = origin.cloned();
+        context.approval = approval;
         context.progress = self.on_progress.clone();
         context.thread_id = self.thread_id.clone();
         context.task_recency_window = self.task_recency_window;

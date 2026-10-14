@@ -166,7 +166,8 @@ impl OpenHumanHostBundleFactory {
         // An untrusted-input turn is read from its own explicit run context:
         // a screen may run on another task, so no ambient scope is consulted.
         let mut security = OpenHumanSecurityGate::new(inputs.security_policy, inputs.tool_sets)
-            .with_input_screening(!turn.untrusted_input_turn);
+            .with_input_screening(!turn.untrusted_input_turn)
+            .with_approval(turn.approval.clone());
         if let Some(policy) = inputs.tool_policy {
             security = security.with_tool_policy(policy);
         }

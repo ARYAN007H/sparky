@@ -281,6 +281,11 @@ pub struct OpenHumanRunContext {
     pub max_spawn_depth: Option<usize>,
     /// Trust/routing source used by OpenHuman approval and attribution policy.
     pub origin: Option<AgentTurnOrigin>,
+    /// Where this turn's approvals are surfaced (chat thread/client), whether
+    /// it is the flow copilot, and which flow run it belongs to. Inline
+    /// children inherit it through [`Self::child`]; a detached child starts
+    /// without it ([`Self::detached_child`]).
+    pub approval: crate::security::approval::ApprovalTurnContext,
     /// UI/event progress receiver for this turn tree.
     pub progress: Option<Sender<AgentProgress>>,
     /// Stop policies evaluated after each model call.
@@ -403,8 +408,10 @@ pub(crate) struct HarnessHostPolicy {
 }
 
 pub(crate) use super::operation_context::{
-    parent_agent_id_for_tool, sandbox_mode_for_tool, HostOperationContext,
+    approval_for_tool, parent_agent_id_for_tool, sandbox_mode_for_tool, HostOperationContext,
 };
+#[cfg(test)]
+pub(crate) use super::operation_context::tool_context_with_approval;
 
 /// OpenHuman product values that tools read from the run through
 /// `ToolExecutionContext::host::<OpenHumanRunExt>()`, installed by
@@ -452,6 +459,7 @@ impl OpenHumanRunContext {
             response_shape: None,
             max_spawn_depth: None,
             origin: None,
+            approval: Default::default(),
             progress: None,
             stop_hooks: Vec::new(),
             tool_hooks: Vec::new(),
@@ -624,6 +632,10 @@ impl OpenHumanRunContext {
     /// request that only stopped the interactive turn.
     pub fn detached_child(&self) -> Self {
         let mut child = self.child();
+        // The chat surface belongs to the turn that started it. A detached
+        // child's parks route through the origin and are marked detached, so
+        // their cards survive the parent turn's end (#5499).
+        child.approval = Default::default();
         child.dispatch = None;
         child.subagent_usage = Arc::new(Mutex::new(Vec::new()));
         child.parent_subagent_usage = None;
@@ -660,6 +672,7 @@ impl OpenHumanRunContext {
         };
         let host_operations = Arc::new(HostOperationContext {
             origin: self.origin.clone(),
+            approval: self.approval.clone(),
             sandbox_mode: self.sandbox_mode,
             parent_agent_id: self
                 .parent

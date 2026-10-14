@@ -94,7 +94,7 @@ pub fn schema(function: &str) -> ControllerSchema {
 fn handle_quote(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
-        let quote = web3_service::quote(&config, methods::WEB3_BRIDGE_QUOTE, Value::Object(params))
+        let quote = web3_service::quote(&config, None, methods::WEB3_BRIDGE_QUOTE, Value::Object(params))
             .await
             .map_err(|error| error.to_string())?;
         Outcome::new(quote, vec!["web3 bridge prepared".to_string()]).into_cli_compatible_json()
@@ -106,7 +106,7 @@ fn handle_execute(params: Map<String, Value>) -> ControllerFuture {
         let parsed: web3_service::ExecuteParams = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("invalid params: {e}"))?;
         let config = config_rpc::load_config_with_timeout().await?;
-        let result = web3_service::execute(&config, parsed.quote_id, parsed.confirmed)
+        let result = web3_service::execute(&config, None, parsed.quote_id, parsed.confirmed)
             .await
             .map_err(|error| error.to_string())?;
         Outcome::new(result, vec!["web3 transaction broadcast".to_string()])

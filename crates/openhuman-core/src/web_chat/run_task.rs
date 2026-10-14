@@ -47,6 +47,8 @@ pub(crate) async fn run_chat_task(
     // The web-turn guard's activity record for this turn, passed explicitly by
     // `run_turn_under_cancel_and_deadline`.
     activity: super::turn_activity::TurnActivity,
+    // Where this turn's parked approvals surface, handed to the turn itself.
+    approval: crate::security::approval::ApprovalTurnContext,
 ) -> Result<WebChatTaskResult, String> {
     // One turn at a time per profile: wait behind its relay and cron turns.
     let _turn = crate::profiles::turn_gate::acquire().await;
@@ -203,7 +205,7 @@ pub(crate) async fn run_chat_task(
     // default test-thread stack — see the channels web-turn coverage tests).
     #[cfg(feature = "tinymemes")]
     let turn_started = std::time::Instant::now();
-    let turn = Box::pin(agent.run_single_with_origin(message, Some(origin)));
+    let turn = Box::pin(agent.run_single_with_approval(message, Some(origin), approval));
     let mut result = match turn.await {
         Ok(response) => {
             // A successful turn proves the thread's balance is usable, so drop

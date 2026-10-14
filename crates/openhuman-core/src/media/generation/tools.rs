@@ -73,36 +73,63 @@ pub fn media_tools_from(
     video_wait: WaitPolicy,
 ) -> Vec<Box<dyn Tool>> {
     let files = files_dir.into();
-    let MediaGenerators { image, video } = generators;
+    let generators = Arc::new(generators);
     let output = MediaOutput::new(action_dir)
         .with_reference_policy(reference_policy(action_dir, workspace_dir));
+    let image_tool = |image: &Arc<dyn ImageGenerator>| {
+        GenerateImageTool::new(Arc::clone(image), output.clone())
+            .with_name(IMAGE_TOOL_NAME)
+            .with_description(IMAGE_DESCRIPTION)
+            .with_permission_level(PermissionLevel::Execute)
+            .with_category(ToolCategory::Workflow)
+    };
     let tools: Vec<Box<dyn Tool>> = vec![
-        Box::new(MediaArtifactTool::new(
-            GenerateImageTool::new(Arc::clone(&image), output.clone())
-                .with_name(IMAGE_TOOL_NAME)
-                .with_description(IMAGE_DESCRIPTION)
-                .with_permission_level(PermissionLevel::Execute)
-                .with_category(ToolCategory::Workflow),
-            ArtifactKind::Image,
-            workspace_dir.to_path_buf(),
-            files.clone(),
-        )),
         Box::new(
             MediaArtifactTool::new(
-                video_tool(&video, &output, video_wait.clone()),
+                image_tool(&generators.image),
+                ArtifactKind::Image,
+                workspace_dir.to_path_buf(),
+                files.clone(),
+            )
+            // A tool per call, around generators that disclose to that call's
+            // chat.
+            .with_per_call_inner({
+                let generators = Arc::clone(&generators);
+                let output = output.clone();
+                move |_observer, chat| {
+                    let routed = generators.routed(chat);
+                    GenerateImageTool::new(routed.image, output.clone())
+                        .with_name(IMAGE_TOOL_NAME)
+                        .with_description(IMAGE_DESCRIPTION)
+                        .with_permission_level(PermissionLevel::Execute)
+                        .with_category(ToolCategory::Workflow)
+                }
+            }),
+        ),
+        Box::new(
+            MediaArtifactTool::new(
+                video_tool(&generators.video, &output, video_wait.clone()),
                 ArtifactKind::Video,
                 workspace_dir.to_path_buf(),
                 files,
             )
             .with_per_call_inner({
-                let video = Arc::clone(&video);
+                let generators = Arc::clone(&generators);
                 let output = output.clone();
-                move |observer| {
-                    video_tool(&video, &output, video_wait.clone().with_progress(observer))
+                move |observer, chat| {
+                    let routed = generators.routed(chat);
+                    video_tool(
+                        &routed.video,
+                        &output,
+                        video_wait.clone().with_progress(observer),
+                    )
                 }
             }),
         ),
-        Box::new(MediaListModelsTool { image, video }),
+        Box::new(MediaListModelsTool {
+            image: Arc::clone(&generators.image),
+            video: Arc::clone(&generators.video),
+        }),
     ];
     tracing::debug!("[media_generation] registered {} media tools", tools.len());
     tools

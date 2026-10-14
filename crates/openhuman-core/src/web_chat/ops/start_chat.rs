@@ -510,7 +510,7 @@ async fn start_chat_inner(
                 task_cancel_token,
                 origin.clone(),
                 approval_ctx,
-                |host_env, activity| {
+                |host_env, activity, approval| {
                     run_chat_task(
                         &client_id_task,
                         &thread_id_task,
@@ -525,6 +525,7 @@ async fn start_chat_inner(
                         /* fork */ false,
                         host_env,
                         activity,
+                        approval,
                     )
                 },
             )

@@ -117,7 +117,7 @@ impl ApprovalResolver<crate::agent::tinyagents::host::OpenHumanRunContext>
 
     async fn resolve(
         &self,
-        _ctx: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+        ctx: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
         call: &TaToolCall,
     ) -> ApprovalResolution {
         let Some(gate) = ApprovalGate::try_global() else {
@@ -136,7 +136,7 @@ impl ApprovalResolver<crate::agent::tinyagents::host::OpenHumanRunContext>
         let summary = summarize_action(&call.name, &call.arguments);
         let redacted = redact_args(&call.arguments);
         let (outcome, request_id) = gate
-            .intercept_audited(approval_name.as_ref(), &summary, redacted)
+            .intercept_audited(&ctx.data.approval, approval_name.as_ref(), &summary, redacted)
             .await;
         match outcome {
             GateOutcome::Deny { reason } => {

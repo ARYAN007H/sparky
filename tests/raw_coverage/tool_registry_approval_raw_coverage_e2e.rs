@@ -22,7 +22,7 @@ use openhuman_core::core::auth::{init_rpc_token, CORE_TOKEN_ENV_VAR};
 use openhuman_core::mcp::registry::connections;
 use openhuman_core::mcp::registry::types::{CommandKind, InstalledServer, Transport};
 use openhuman_core::security::approval::gate::{
-    ApprovalChatContext, ApprovalGate, APPROVAL_CHAT_CONTEXT,
+    ApprovalChatContext, ApprovalGate, ApprovalTurnContext,
 };
 use openhuman_core::security::approval::{
     all_approval_controller_schemas, all_approval_registered_controllers, ExecutionOutcome,
@@ -692,28 +692,27 @@ async fn approval_rpc_decision_paths_persist_always_allow_and_recent_audit() {
                 client_id: "approval-raw-client".to_string(),
                 request_id: None,
             },
-            APPROVAL_CHAT_CONTEXT.scope(
-                ApprovalChatContext {
+            async move {
+                let turn = ApprovalTurnContext::chat(ApprovalChatContext {
                     thread_id: "approval-raw-thread".to_string(),
                     client_id: "approval-raw-client".to_string(),
                     // No turn in scope in this fixture; the field is documented as
                     // carried only when the caller has one (`gate.rs:91-95`).
                     request_id: None,
-                },
-                async move {
-                    gate_for_task
-                        .intercept_audited(
-                            "tools.composio_execute",
-                            "tools.composio_execute(action=execute, 123 bytes)",
-                            json!({
-                                "action": "execute",
-                                "tool_slug": "GMAIL_SEND_EMAIL",
-                                "body": "<redacted: string (500 chars)>"
-                            }),
-                        )
-                        .await
-                },
-            ),
+                });
+                gate_for_task
+                    .intercept_audited(
+                        &turn,
+                        "tools.composio_execute",
+                        "tools.composio_execute(action=execute, 123 bytes)",
+                        json!({
+                            "action": "execute",
+                            "tool_slug": "GMAIL_SEND_EMAIL",
+                            "body": "<redacted: string (500 chars)>"
+                        }),
+                    )
+                    .await
+            },
         )
         .await
     });
@@ -836,6 +835,7 @@ async fn approval_rpc_decision_paths_persist_always_allow_and_recent_audit() {
     // caller that forgot to scope a label.
     let no_chat = gate
         .intercept_audited(
+            &Default::default(),
             "tools.web_search",
             "tools.web_search(query=coverage)",
             json!({ "query": "coverage" }),
@@ -856,6 +856,7 @@ async fn approval_rpc_decision_paths_persist_always_allow_and_recent_audit() {
     );
     assert!(matches!(
         gate.intercept(
+            &Default::default(),
             "tools.web_search",
             "tools.web_search(query=legacy)",
             json!({ "query": "legacy" }),
@@ -885,6 +886,7 @@ async fn approval_rpc_decision_paths_persist_always_allow_and_recent_audit() {
             request_id: None,
         },
         gate.intercept_audited(
+            &Default::default(),
             "tools.composio_execute",
             "tools.composio_execute(action=execute)",
             json!({ "action": "execute" }),
@@ -909,20 +911,18 @@ async fn approval_rpc_decision_paths_persist_always_allow_and_recent_audit() {
         config.workspace_dir.clone(),
         config.workspace_dir.clone(),
     );
-    let live_policy_auto_approved = APPROVAL_CHAT_CONTEXT
-        .scope(
-            ApprovalChatContext {
+    let live_policy_auto_approved = gate
+        .intercept_audited(
+            &ApprovalTurnContext::chat(ApprovalChatContext {
                 thread_id: "approval-live-policy-thread".to_string(),
                 client_id: "approval-live-policy-client".to_string(),
                 // No turn in scope in this fixture; the field is documented as
                 // carried only when the caller has one (`gate.rs:91-95`).
                 request_id: None,
-            },
-            gate.intercept_audited(
-                "tools.live_policy_allowed",
-                "tools.live_policy_allowed(action=coverage)",
-                json!({ "action": "coverage" }),
-            ),
+            }),
+            "tools.live_policy_allowed",
+            "tools.live_policy_allowed(action=coverage)",
+            json!({ "action": "coverage" }),
         )
         .await;
     assert!(matches!(live_policy_auto_approved.0, GateOutcome::Allow));
@@ -939,24 +939,23 @@ async fn approval_rpc_decision_paths_persist_always_allow_and_recent_audit() {
                 client_id: "approval-deny-client".to_string(),
                 request_id: None,
             },
-            APPROVAL_CHAT_CONTEXT.scope(
-                ApprovalChatContext {
+            async move {
+                let turn = ApprovalTurnContext::chat(ApprovalChatContext {
                     thread_id: "approval-deny-thread".to_string(),
                     client_id: "approval-deny-client".to_string(),
                     // No turn in scope in this fixture; the field is documented as
                     // carried only when the caller has one (`gate.rs:91-95`).
                     request_id: None,
-                },
-                async move {
-                    gate_for_deny_task
-                        .intercept_audited(
-                            "tools.web_search",
-                            "tools.web_search(query=deny)",
-                            json!({ "query": "deny" }),
-                        )
-                        .await
-                },
-            ),
+                });
+                gate_for_deny_task
+                    .intercept_audited(
+                        &turn,
+                        "tools.web_search",
+                        "tools.web_search(query=deny)",
+                        json!({ "query": "deny" }),
+                    )
+                    .await
+            },
         )
         .await
     });
@@ -1065,19 +1064,17 @@ async fn approval_rpc_decision_paths_persist_always_allow_and_recent_audit() {
             client_id: "approval-persist-failure-client".to_string(),
             request_id: None,
         },
-        APPROVAL_CHAT_CONTEXT.scope(
-            ApprovalChatContext {
+        gate.intercept_audited(
+            &ApprovalTurnContext::chat(ApprovalChatContext {
                 thread_id: "approval-persist-failure-thread".to_string(),
                 client_id: "approval-persist-failure-client".to_string(),
                 // No turn in scope in this fixture; the field is documented as
                 // carried only when the caller has one (`gate.rs:91-95`).
                 request_id: None,
-            },
-            gate.intercept_audited(
-                "tools.persistence_failure",
-                "tools.persistence_failure(action=coverage)",
-                json!({ "action": "coverage" }),
-            ),
+            }),
+            "tools.persistence_failure",
+            "tools.persistence_failure(action=coverage)",
+            json!({ "action": "coverage" }),
         ),
     )
     .await;

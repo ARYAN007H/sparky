@@ -25,8 +25,8 @@ plus the `LocalOnly` enforcement chokepoint built on top of it.
   `::network_fetch`, rather than the struct literal.
 - `emit_external_transfer(descriptor)`: the one call every external-egress
   point makes right before a transfer leaves the device. It drops non-external
-  transfers, attaches best-effort chat routing from
-  `security::approval::APPROVAL_CHAT_CONTEXT`, and fire-and-forget publishes
+  transfers, attaches best-effort chat routing from the
+  turn's `ApprovalChatContext` (an argument, or carried by the `EgressLedger`), and fire-and-forget publishes
   `DomainEvent::ExternalTransferPending` on `crate::core::bus::BUS`. This
   never blocks or fails the caller.
 - `EgressLedger::per_turn()` / `emit_external_transfer_in(&ledger, d)`: an explicit per-turn dedup ledger, passed down the provider factory chain, so a single

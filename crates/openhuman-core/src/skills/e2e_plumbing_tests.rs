@@ -210,6 +210,7 @@ async fn mock_llm_orchestrator_lists_and_runs_workflows_through_the_loop() {
         None,
         None,
         tinyagents_definition::SandboxMode::None,
+        Default::default(),
     )
     .await
     .expect("tool loop should run to completion");

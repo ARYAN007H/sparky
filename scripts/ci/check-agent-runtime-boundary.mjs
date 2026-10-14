@@ -164,7 +164,6 @@ const deletedTaskLocalModules = [
 const taskLocalDeclarationAllowlist = [
   "crates/openhuman-core/src/core/runtime/context.rs",
   "crates/openhuman-core/src/memory/scope.rs",
-  "crates/openhuman-core/src/security/approval/gate.rs",
 ];
 const taskLocalAccessors = [
   "current_parent",
@@ -228,6 +227,9 @@ const taskLocalStatics = [
   "JOB_STATE",
   "CURRENT_TURN_ACTIVITY",
   "CURRENT_METER",
+  "APPROVAL_CHAT_CONTEXT",
+  "APPROVAL_COPILOT_STREAM_CONTEXT",
+  "APPROVAL_FLOW_RUN_CONTEXT",
 ];
 
 async function filesUnder(root, predicate) {
