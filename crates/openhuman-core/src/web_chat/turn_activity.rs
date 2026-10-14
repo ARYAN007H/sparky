@@ -31,7 +31,6 @@
 
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::future::Future;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
