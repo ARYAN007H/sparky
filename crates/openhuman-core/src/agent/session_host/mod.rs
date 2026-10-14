@@ -56,6 +56,7 @@ mod turn;
 // harness-assembly site has to name it. It stays the one definition — the whole
 // point is that the in-loop conclusion and the out-of-band fallback ask for the
 // same thing.
+pub(crate) mod turn_backstop;
 pub(crate) mod turn_checkpoint;
 mod types;
 

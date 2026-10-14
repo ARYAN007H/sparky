@@ -90,7 +90,7 @@ fn response_with(calls: &[TaToolCall]) -> tinyinference_llm::model::ModelRespons
 
 /// The write churn #7293 capped (one save re-issued round after round) no
 /// longer spends the memory budget, so the repeat guard installed by
-/// `harness_assembly` is what stops it: identical learns acknowledge
+/// `turn_middleware` is what stops it: identical learns acknowledge
 /// identically, and the guard halts the run.
 #[tokio::test]
 async fn an_identical_learn_loop_is_halted_by_the_repeat_guard() {

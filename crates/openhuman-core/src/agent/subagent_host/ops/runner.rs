@@ -9,7 +9,7 @@
 use std::collections::HashSet;
 use std::time::Instant;
 
-use crate::agent::harness::artifact_offload::{new_artifact_offload, offload_oversized_result};
+use crate::agent::harness::artifact_offload::offload_run_result;
 use crate::agent::harness::fork_context::ParentExecutionContext;
 use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::agent::prompts::{
@@ -121,7 +121,7 @@ pub(crate) async fn run_subagent_direct(
     // every caller doesn't have to carry this future's state inline.
     // Tools that delegate run inside the parent agent's already-deep
     // turn poll (the boxed tinyagents harness drive future in
-    // `run_turn_via_tinyagents_shared`), so the parent's stack would
+    // `TurnSpec::run`), so the parent's stack would
     // otherwise pile (parent turn state + dispatch_subagent state +
     // run_subagent's wrapper state + run_typed_mode state + child turn
     // state) onto tokio's 2 MiB worker stack and abort with "thread
@@ -299,7 +299,7 @@ pub(crate) async fn run_subagent_direct(
         // When the worker opted into git-worktree isolation, its isolated
         // checkout is carried on the `WorkspaceDescriptor` prepared below and
         // threaded onto the run's tinyagents `RunContext`
-        // (`run_turn_via_tinyagents_shared` → `RunContext::with_workspace`).
+        // (`TurnSpec::run` → `RunContext::with_workspace`).
         // Every tool call then receives it via
         // `ToolExecutionContext::from_run_context`, so acting tools (shell, git)
         // resolve their CWD to that worktree (`effective_action_dir_for_context`)
@@ -474,19 +474,18 @@ async fn offload_outcome_artifacts(
     let threshold =
         effective_offload_threshold(DEFAULT_OFFLOAD_THRESHOLD_BYTES, definition.max_result_chars);
 
-    // Worktree-isolated workers write inside their own checkout, but the parent
-    // that receives the pointer resolves relative paths against ITS action root.
-    // Render against that root so the handed-back path is one the parent can
-    // actually open (relative when the worktree nests inside it, absolute when
-    // it does not) rather than a bare `outputs/…` that silently misses.
-    let render_root = policy
-        .as_ref()
-        .map(|p| p.action_dir.clone())
-        .unwrap_or_else(|| action_dir.clone());
-    let offload = new_artifact_offload(action_dir, policy, outcome.agent_id.clone(), task_id)
-        .with_render_root(render_root);
-    let (output, _artifact) =
-        offload_oversized_result(std::mem::take(&mut outcome.output), &offload, threshold).await;
+    // The parent that receives the pointer resolves relative paths against ITS
+    // action root, so the stored artifact is materialised there (also for a
+    // worktree-isolated worker) and the handed-back `outputs/…` path opens.
+    let (output, _artifact) = offload_run_result(
+        std::mem::take(&mut outcome.output),
+        policy,
+        action_dir,
+        outcome.agent_id.clone(),
+        task_id,
+        threshold,
+    )
+    .await;
     outcome.output = output;
 
     // Merge: the harness pointer (if it fired) plus any worker-authored pointer

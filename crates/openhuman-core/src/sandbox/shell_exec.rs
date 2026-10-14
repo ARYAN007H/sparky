@@ -103,6 +103,8 @@ pub(crate) async fn run(config: &Config, run: NativeShellRun) -> anyhow::Result<
     #[cfg(feature = "modules")]
     {
         let config = config.clone();
+        // Read before the spawn: the caller's progress meter is task-local.
+        let meter = super::shell_progress::current_meter();
         tracing::debug!(
             jailed = run.jail.is_some(),
             timeout_ms = run.timeout.as_millis() as u64,
@@ -116,7 +118,7 @@ pub(crate) async fn run(config: &Config, run: NativeShellRun) -> anyhow::Result<
         let (_caller, abandoned) = tokio::sync::oneshot::channel::<std::convert::Infallible>();
         crate::core::runtime::spawn_scoped(async move {
             let _hold = hold;
-            run_owned(&config, run, abandoned).await
+            run_owned(&config, run, abandoned, meter).await
         })
         .await
         .map_err(|_| anyhow::anyhow!("TinyBox shell worker did not finish"))?
@@ -133,6 +135,7 @@ async fn run_owned(
     config: &Config,
     run: NativeShellRun,
     abandoned: tokio::sync::oneshot::Receiver<std::convert::Infallible>,
+    meter: Option<super::shell_progress::ShellOutputMeter>,
 ) -> anyhow::Result<SandboxExecResult> {
     let resource = tinybox::reserve(config, contract::ReserveRequest::Resource)
         .await
@@ -168,7 +171,7 @@ async fn run_owned(
         let process = tinybox::start_native_shell_exec(config, request)
             .await
             .map_err(|_| anyhow::anyhow!("TinyBox could not start the command process"))?;
-        collect_process(config, process, timeout, abandoned).await
+        collect_process(config, process, timeout, abandoned, meter).await
     }
     .await;
     let close = tinybox::close(config, resource).await;
@@ -218,6 +221,7 @@ async fn collect_process(
     process: contract::ProcessRef,
     timeout: Duration,
     mut abandoned: tokio::sync::oneshot::Receiver<std::convert::Infallible>,
+    meter: Option<super::shell_progress::ShellOutputMeter>,
 ) -> anyhow::Result<SandboxExecResult> {
     use contract::{ExecutionFailure, ExecutionState, OutputStream};
     use tokio::sync::oneshot::error::TryRecvError;
@@ -249,6 +253,9 @@ async fn collect_process(
         let has_chunks = !batch.chunks.is_empty();
         let state = batch.state;
         for chunk in batch.chunks {
+            if let Some(meter) = &meter {
+                meter.record(&chunk.bytes);
+            }
             match chunk.stream {
                 OutputStream::Stdout => stdout.extend_from_slice(&chunk.bytes),
                 OutputStream::Stderr => stderr.extend_from_slice(&chunk.bytes),
