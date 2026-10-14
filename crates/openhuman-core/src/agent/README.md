@@ -187,7 +187,7 @@ target `AgentDefinition` and call `subagent_host::run_subagent_with_parent`.
    | tool call: spawn_subagent { agent_id, prompt }
    v
  orchestration/tools/spawn_subagent.rs
-   | read ParentExecutionContext (task-local, harness/fork_context.rs)
+   | read ParentExecutionContext (run context `parent`, harness/fork_context.rs)
    v
  subagent_host::run_subagent_with_parent
    | resolve definition, model, narrowed tools, narrowed prompt,
@@ -342,8 +342,8 @@ Persistence, setup and RPC:
   deltas, cost updates and the `Subagent*` family.
 - `AgentDefinition`, `AgentDefinitionRegistry`, `ToolScope`, `SandboxMode`
   (`harness/host_definition.rs` + `tinyagents-definition`): what an agent is.
-- `ParentExecutionContext` ([`harness/fork_context.rs`](./harness/fork_context.rs)): task-local parent
-  state a sub-agent reads; `orchestration::parent_context::build_root_parent`
+- `ParentExecutionContext` ([`harness/fork_context.rs`](./harness/fork_context.rs)): explicit parent
+  state a sub-agent reads from the run context (`parent`); `orchestration::parent_context::build_root_parent`
   builds one for runs with no parent turn.
 - `run_subagent`, `run_subagent_with_parent`, `SubagentRunOptions`
   ([`subagent_host/lifecycle.rs`](./subagent_host/lifecycle.rs), [`subagent_host/types.rs`](./subagent_host/types.rs)).
