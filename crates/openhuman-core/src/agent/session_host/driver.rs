@@ -122,7 +122,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
         }
         let sidecar = request.run_context.data.session_sidecar.clone();
         let started = Instant::now();
-        let user_message = crate::agent::tinyagents::last_user_message(&request.history)
+        let user_message = tinyagents_harness::summarization::last_user_message(&request.history)
             .map(crate::agent::message_convert::user_text_with_markers)
             .unwrap_or_default();
         let context_window = self

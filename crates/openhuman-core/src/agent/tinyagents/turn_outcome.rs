@@ -80,7 +80,7 @@ pub(crate) struct TinyagentsTurnOutcome {
     /// The run's context compaction, when it compacted: re-applied by the
     /// session driver to the history it persists, so the next turn starts
     /// from the checkpoint. `None` when the run did not compact.
-    pub compaction: Option<super::CompactionCarry>,
+    pub compaction: Option<tinyagents_harness::summarization::CompactionCarry>,
 }
 
 /// Whether a run's final response is a reply that ran out of output tokens

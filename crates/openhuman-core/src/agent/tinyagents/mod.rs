@@ -75,7 +75,6 @@ pub(crate) use crate::agent::message_convert::chat_message_to_message;
 #[cfg(feature = "flows")]
 pub(crate) use crate::agent::message_convert::ta_call_to_oh_call;
 
-pub(crate) use tinyagents_harness::summarization::{last_user_message, CompactionCarry};
 #[allow(unused_imports)] // Wired into the recall/retrieval facade in workstream 09.2.
 pub(crate) use embeddings::ProviderEmbeddingModel;
 pub(crate) use middleware::{

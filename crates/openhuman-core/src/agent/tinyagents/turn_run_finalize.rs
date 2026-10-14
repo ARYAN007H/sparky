@@ -310,7 +310,7 @@ pub(super) async fn finalize_turn_outcome(
     let compaction = run
         .compacted_history
         .as_deref()
-        .and_then(crate::agent::tinyagents::CompactionCarry::from_compacted_history);
+        .and_then(tinyagents_harness::summarization::CompactionCarry::from_compacted_history);
     if let Some(carry) = &compaction {
         tracing::info!(
             model,
