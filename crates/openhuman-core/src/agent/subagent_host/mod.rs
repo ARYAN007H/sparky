@@ -3,8 +3,9 @@
 //! Given an [`crate::agent::harness::host_definition::AgentDefinition`] and a task prompt, the
 //! runner:
 //!
-//! 1. Reads the [`super::fork_context::ParentExecutionContext`] task-local
-//!    set by the parent [`crate::agent::OpenHumanSessionHost::turn`].
+//! 1. Reads the [`super::fork_context::ParentExecutionContext`] the parent
+//!    [`crate::agent::OpenHumanSessionHost::turn`] attached to the run context
+//!    (`OpenHumanRunContext::parent`).
 //! 2. Resolves the sub-agent's model name (inherit / hint / exact).
 //! 3. Filters the parent's tool registry per `definition.tools`,
 //!    `disallowed_tools`, and `skill_filter` (or, in `fork` mode,

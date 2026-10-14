@@ -402,27 +402,9 @@ pub(crate) struct HarnessHostPolicy {
     pub(crate) tool_call_cap: Option<usize>,
 }
 
-/// Minimal immutable authority view exposed to shared tools through the
-/// harness's typed state-view seam.
-#[derive(Clone, Debug, Default)]
-pub(crate) struct HostOperationContext {
-    pub(crate) origin: Option<AgentTurnOrigin>,
-    pub(crate) sandbox_mode: Option<SandboxMode>,
-}
-
-/// Reads the calling agent's sandbox policy from the explicit tool carrier.
-/// Direct tool dispatch has no agent-specific mode.
-pub(crate) fn sandbox_mode_for_tool(
-    context: Option<&dyn tinytools::ToolRunContext>,
-) -> Option<SandboxMode> {
-    context
-        .and_then(tinytools::ToolRunContext::host_extension)
-        .and_then(|extension| {
-            extension.downcast_ref::<tinyagents_harness::tool::ToolExecutionContext>()
-        })
-        .and_then(|context| context.state::<HostOperationContext>())
-        .and_then(|host| host.sandbox_mode)
-}
+pub(crate) use super::operation_context::{
+    parent_agent_id_for_tool, sandbox_mode_for_tool, HostOperationContext,
+};
 
 /// OpenHuman product values that tools read from the run through
 /// `ToolExecutionContext::host::<OpenHumanRunExt>()`, installed by
@@ -679,6 +661,10 @@ impl OpenHumanRunContext {
         let host_operations = Arc::new(HostOperationContext {
             origin: self.origin.clone(),
             sandbox_mode: self.sandbox_mode,
+            parent_agent_id: self
+                .parent
+                .as_ref()
+                .map(|parent| parent.agent_definition_id.clone()),
         });
         let context = tinyagents_harness::context::RunContext::new(config, self)
             .with_cancellation(cancellation)
