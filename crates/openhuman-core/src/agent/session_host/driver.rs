@@ -1,9 +1,8 @@
 //! OpenHuman's model-and-harness implementation of the neutral session driver.
 //!
 //! This adapter deliberately has no transcript, prefix, or generic history
-//! state.  `tinyagents_runtime::Session` owns those concerns and gives this
-//! type the complete immutable model history and tool declaration snapshot for
-//! one invocation.
+//! state. `tinyagents_runtime::Session` owns those and hands this type the
+//! complete immutable model history and tool declaration snapshot per call.
 
 mod grounded_close;
 
