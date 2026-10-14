@@ -75,6 +75,7 @@ async fn sweeping_through_the_fenced_backend_reaches_the_driver() {
     assert_eq!(sweep_scope(fenced.as_ref(), &scope).await, 1);
 }
 
+#[cfg(feature = "modules")]
 #[tokio::test]
 async fn module_blob_scopes_are_swept_alongside_the_acting_scope() {
     let (now, backend) = backend_with_clock();
@@ -83,4 +84,10 @@ async fn module_blob_scopes_are_swept_alongside_the_acting_scope() {
     put_expiring(&backend, &module_scopes[0], "tinyjuice_ccr/t", 10).await;
     now.store(2_000, Ordering::SeqCst);
     assert_eq!(sweep_all(backend).await, 1);
+}
+
+#[cfg(not(feature = "modules"))]
+#[test]
+fn no_module_blob_scopes_without_the_modules_feature() {
+    assert!(crate::modules::expiring_blob_module_scopes().is_empty());
 }
