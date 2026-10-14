@@ -82,3 +82,6 @@ mod runtime_adapter_tests;
 mod transcript_compat_tests;
 #[cfg(test)]
 mod typed_transcript_compat_tests;
+#[cfg(test)]
+#[path = "transcript_resume_stable_tests.rs"]
+mod transcript_resume_stable_tests;
