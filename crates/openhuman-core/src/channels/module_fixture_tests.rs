@@ -37,6 +37,7 @@ pub(crate) async fn client() -> ModuleClient {
 }
 
 #[tokio::test]
+#[ignore = "blocked on the linked tinychannels-module fixture (tinybus epic, #7739)"]
 async fn linked_module_prepares_runtime_limits_over_confidential_bus_call() {
     use tinychannels_bus::module_control::{ChannelControlRequest, ChannelControlResult};
 
@@ -63,6 +64,7 @@ async fn linked_module_prepares_runtime_limits_over_confidential_bus_call() {
 }
 
 #[tokio::test]
+#[ignore = "blocked on the linked tinychannels-module fixture (tinybus epic, #7739)"]
 async fn linked_module_prepares_legacy_inbound_facts_over_confidential_bus_call() {
     use tinychannels_bus::module_inbound::{
         ChannelInboundSource, PrepareChannelInboundRequest, PreparedChannelInbound,

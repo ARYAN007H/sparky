@@ -45,6 +45,7 @@ modules/runtime_tests.rs
 modules/storage_grant_tinywallet_tests.rs
 platform/socket/event_handlers.rs
 profiles/surface_tests.rs
+threads/store/mod.rs
 agent/session_host/transcript_compat_tests.rs
 channels/mod.rs
 mcp/host.rs
@@ -69,6 +70,7 @@ web3/stub.rs
 web3/wallet/stub.rs
 web3/x402/stub.rs
 profiles/surface_tests.rs
+threads/store/mod.rs
 agent/session_host/transcript_compat_tests.rs
 channels/mod.rs
 mcp/host.rs

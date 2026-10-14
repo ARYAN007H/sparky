@@ -924,13 +924,6 @@
     "occurrence": 1
   },
   {
-    "rule": "bare-spawn",
-    "path": "crates/openhuman-core/src/sandbox/native_jail.rs",
-    "line": 108,
-    "text": "tokio::spawn(async move {",
-    "occurrence": 2
-  },
-  {
     "rule": "ambient-context",
     "path": "crates/openhuman-core/src/sandbox/ops.rs",
     "line": 116,
