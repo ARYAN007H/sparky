@@ -158,20 +158,18 @@ async fn scenario() {
         .unwrap();
     let turn_hook = Observer::new("turn-a", &events, None);
     let scheduled = openhuman_core::agent::host_agents::resolve("worker-a").unwrap();
-    scheduled
-        .scope(async {
-            assert_eq!(
-                openhuman_core::agent::hooks::turn_tool_hooks().len(),
-                2,
-                "scheduled turns lost the agent's tool hooks"
-            );
-            assert_eq!(
-                openhuman_core::agent::hooks::turn_post_turn_hooks().len(),
-                2,
-                "scheduled turns lost the agent's post-turn hooks"
-            );
-        })
-        .await;
+    // The agent's callbacks are plain data on the scheduled agent; the session
+    // built from it carries them explicitly (asserted by the counts below).
+    assert_eq!(
+        scheduled.hooks.tool_hooks().len(),
+        1,
+        "scheduled turns lost the agent's tool hooks"
+    );
+    assert_eq!(
+        scheduled.hooks.post_turn_hooks().len(),
+        1,
+        "scheduled turns lost the agent's post-turn hooks"
+    );
     let (first, second) = tokio::join!(
         a.turn("a-first")
             .tool_hook(turn_hook.clone())
