@@ -10,7 +10,7 @@
 //!
 //! The deadline value (`tinyagents_harness::turn_deadline::TurnDeadline`)
 //! owns the two points the harness derives from the backstop; this module
-//! keeps the host side (env override, task-local scope):
+//! keeps the host side (the env override):
 //!
 //! * **wind-down** (`backstop - min(120s, backstop/5)`, 780s by default): the
 //!   harness pauses the run at the next safe point, after a model call or a
@@ -30,7 +30,6 @@
 //! context. Turns with no backstop, such as other channels or the CLI, carry
 //! `None` and keep their previous behaviour.
 
-use std::future::Future;
 use std::time::Duration;
 
 use tinyagents_harness::turn_deadline::{parse_backstop, TurnDeadline};
@@ -55,23 +54,6 @@ pub fn close_budget(deadline: &TurnDeadline, now: std::time::Instant) -> Duratio
 /// The backstop in force for this process (env [`TURN_BACKSTOP_ENV`]).
 pub fn configured_backstop() -> Option<Duration> {
     parse_backstop(std::env::var(TURN_BACKSTOP_ENV).ok().as_deref())
-}
-
-tokio::task_local! {
-    static CURRENT_TURN_DEADLINE: TurnDeadline;
-}
-
-/// The deadline scoped on the current task, if any.
-pub fn current() -> Option<TurnDeadline> {
-    CURRENT_TURN_DEADLINE.try_with(|deadline| *deadline).ok()
-}
-
-/// Run `future` with `deadline` scoped on the task (a no-op scope for `None`).
-pub async fn with_turn_deadline<F: Future>(deadline: Option<TurnDeadline>, future: F) -> F::Output {
-    match deadline {
-        Some(deadline) => CURRENT_TURN_DEADLINE.scope(deadline, future).await,
-        None => future.await,
-    }
 }
 
 #[cfg(test)]
