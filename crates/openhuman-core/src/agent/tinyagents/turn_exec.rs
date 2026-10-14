@@ -1,8 +1,7 @@
 //! Drive an openhuman agent turn through the `tinyagents` runtime turn driver.
 //!
-//! [`run_turn_via_tinyagents_shared`] is the entry point the channel/session/
-//! sub-agent routes use and [`run_root_turn_via_hosted_agent`] the one for hosted
-//! root turns. Both plan the turn with [`OpenHumanTurnPlanner`], let
+//! [`TurnSpec::run`] is the entry point the channel and sub-agent routes use and
+//! [`TurnSpec::run_hosted`] the one for hosted root turns. Both plan the turn with [`OpenHumanTurnPlanner`], let
 //! `tinyagents_runtime::turn_driver::TurnDriver` assemble and wire the harness
 //! (models, run policy, tools, steering, early exit, the cap pause), then install
 //! the host middleware stack ([`turn_middleware`](super::turn_middleware)) and
@@ -61,70 +60,83 @@ mod tests;
 #[path = "budget_stop_turn_tests.rs"]
 mod budget_stop_tests;
 
-/// Drive a turn through the tinyagents harness over the routes' **shared**,
-/// `Arc`-owned tool registry sets (`Arc<Vec<Box<dyn Tool>>>`), advertising
-/// exactly `specs` (already filtered/deduped by the caller's visibility rules).
+/// Everything one tinyagents turn needs, named.
 ///
-/// This is the entry point the channel/sub-agent routes use to retire the
-/// in-house `live` turn machine: it registers a canonical shared-tool adapter
-/// per advertised spec so the same `Arc`-shared tools the legacy loop runs are
-/// reused without cloning.
+/// Replaces the two positional entry functions this module used to export (one
+/// took twenty arguments, two of them adjacent `bool`s): a call site now names
+/// each field, so a reordering is visible in the expression.
 ///
-/// `allowed` is the callable tool-name whitelist. Its semantics are
-/// **fail-closed** (issue #4452): `None` means "no filter supplied" → every tool
-/// visible in `tool_sets` is registered; `Some(set)` registers *exactly* the
-/// named tools, so `Some(empty)` is an explicit **deny-all** (zero tools). This
-/// distinction is what stops a tool-less sub-agent (`ToolScope::Named([])`, a
-/// zero-match `skill_filter`, or a `named` list that resolves to nothing) from
-/// silently inheriting the parent's full tool surface (shell/file-write/spawn).
-/// Each registered tool is advertised via its own `spec()`.
+/// `tool_sets` are the routes' **shared**, `Arc`-owned tool registry sets,
+/// consulted in order. `allowed` is the callable tool-name whitelist with
+/// **fail-closed** semantics (issue #4452): `None` means "no filter supplied"
+/// so every tool visible in `tool_sets` is registered; `Some(set)` registers
+/// *exactly* the named tools, so `Some(empty)` is an explicit deny-all. That
+/// stops a tool-less sub-agent from inheriting the parent's full tool surface.
 ///
-/// When `on_progress` is `Some`, the run streams (`invoke_stream_in_context`)
-/// and a [`OpenhumanEventBridge`] mirrors the harness event stream onto
-/// `AgentProgress` (live tool timeline, text deltas, cost/token footer) and the
-/// global cost tracker — restoring the seams the legacy `run_turn_engine`
-/// produced. Pass `None` for fire-and-forget turns (channel/sub-agent) that
-/// only need the final text.
+/// `run_queue` forwards mid-flight steer messages into the run;
+/// `subagent_scope` re-scopes progress to the `Subagent*` variants (child
+/// runs); `early_exit_tools` name the tools that pause the loop (for example
+/// `ask_user_clarification`) and surface the question via
+/// [`TinyagentsTurnOutcome::early_exit_tool`]. `max_iterations == 0` means
+/// "unset". When `context_window` is known the context middleware keeps history
+/// under budget.
 ///
-/// When `context_window` is known, an
-/// [`ImageAwareMessageTrimMiddleware`](super::middleware::ImageAwareMessageTrimMiddleware)
-/// keeps history under budget (autocompaction parity).
-///
-/// `run_queue` forwards mid-flight steer messages into the run; `subagent_scope`
-/// re-scopes progress to the `Subagent*` variants (child runs); `early_exit_tools`
-/// name the tools that pause the loop (e.g. `ask_user_clarification`) and surface
-/// the question via [`TinyagentsTurnOutcome::early_exit_tool`].
-#[allow(clippy::too_many_arguments)]
-pub(crate) async fn run_turn_via_tinyagents_shared(
-    run_context: OpenHumanRunContext,
-    turn_models: TurnModels,
-    provider_id: String,
-    model: &str,
-    history: Vec<TranscriptMessage>,
-    tool_sets: Vec<Arc<Vec<Box<dyn tinytools::Tool>>>>,
-    allowed: Option<HashSet<String>>,
-    max_iterations: usize,
-    subagent_scope: Option<SubagentScope>,
-    context_window: Option<u64>,
-    run_queue: Option<Arc<RunQueue<crate::agent::queued_turn::QueuedTurn>>>,
-    early_exit_tools: &[&str],
-    pause_at_cap: bool,
-    max_output_tokens: Option<u32>,
-    context_mw: TurnContextMiddleware,
-    tool_policy: Option<ToolPolicyEnforcement>,
-    deterministic_cacheable: bool,
-    // #4457 (defect C): when `true`, the seam does NOT emit the terminal
-    // `TurnCompleted` — the caller emits it itself *after* its post-run wrap-up
-    // (e.g. the chat/session path streams a cap/#4093 checkpoint via
-    // `summarize_turn_wrapup` after this seam returns, so a seam-level emit here
-    // would land `turn_active = false` before that checkpoint finishes
-    // streaming, and the web bridge would record two ledger events + two
-    // Completed upserts). Callers with no post-run streaming (channel/CLI) pass
-    // `false` and rely on this seam's emit for parity with the legacy engine.
-    defer_turn_completed_to_caller: bool,
+/// `defer_turn_completed_to_caller` (#4457): when `true`, the turn does not emit
+/// the terminal `TurnCompleted`; the caller emits it after its post-run wrap-up
+/// (the chat path streams a cap checkpoint first).
+pub(crate) struct TurnSpec<'a> {
+    pub run_context: OpenHumanRunContext,
+    pub turn_models: TurnModels,
+    pub provider_id: String,
+    pub model: &'a str,
+    pub history: Vec<TranscriptMessage>,
+    pub tool_sets: Vec<Arc<Vec<Box<dyn tinytools::Tool>>>>,
+    pub allowed: Option<HashSet<String>>,
+    pub max_iterations: usize,
+    pub subagent_scope: Option<SubagentScope>,
+    pub context_window: Option<u64>,
+    pub run_queue: Option<Arc<RunQueue<crate::agent::queued_turn::QueuedTurn>>>,
+    pub early_exit_tools: &'a [&'a str],
+    pub pause_at_cap: bool,
+    pub max_output_tokens: Option<u32>,
+    pub context_mw: TurnContextMiddleware,
+    pub tool_policy: Option<ToolPolicyEnforcement>,
+    pub deterministic_cacheable: bool,
+    pub defer_turn_completed_to_caller: bool,
+}
+
+impl TurnSpec<'_> {
+    /// Plan the turn with [`OpenHumanTurnPlanner`] and drive it on the runtime
+    /// `TurnDriver` (channel/CLI and sub-agent routes).
+    pub(crate) async fn run(self) -> Result<TinyagentsTurnOutcome> {
+        Box::pin(drive_turn(self, None)).await
+    }
+
+    /// Drive a hosted root turn: the same plan, executed through
+    /// `AgentInvocation` with durable host authority attached for each root so
+    /// concurrent sessions cannot replace one another's security or workspace
+    /// state on a shared harness. A root is never a sub-agent and never serves
+    /// a cached response, so those two fields are ignored.
+    pub(crate) async fn run_hosted(
+        mut self,
+        hosted_base: Arc<crate::agent::tinyagents::host::OpenHumanHostBase>,
+        agent_id: String,
+    ) -> Result<TinyagentsTurnOutcome> {
+        self.subagent_scope = None;
+        self.deterministic_cacheable = false;
+        Box::pin(drive_turn(self, Some((hosted_base, agent_id)))).await
+    }
+}
+
+async fn drive_turn(
+    spec: TurnSpec<'_>,
+    hosted_root: Option<(
+        Arc<crate::agent::tinyagents::host::OpenHumanHostBase>,
+        String,
+    )>,
 ) -> Result<TinyagentsTurnOutcome> {
-    Box::pin(run_turn_via_tinyagents_body(
-        run_context,
+    let TurnSpec {
+        mut run_context,
         turn_models,
         provider_id,
         model,
@@ -142,90 +154,7 @@ pub(crate) async fn run_turn_via_tinyagents_shared(
         tool_policy,
         deterministic_cacheable,
         defer_turn_completed_to_caller,
-        None,
-    ))
-    .await
-}
-
-/// Hosted root-turn entry point.
-///
-/// Channel and sub-agent callers deliberately remain on
-/// [`run_turn_via_tinyagents_shared`] until their own cutovers.  A root cannot
-/// reach that legacy entry: it supplies durable host authority here and this
-/// function drives the process-shared harness through `AgentInvocation`.
-#[allow(clippy::too_many_arguments)]
-pub(crate) async fn run_root_turn_via_hosted_agent(
-    run_context: OpenHumanRunContext,
-    hosted_base: Arc<crate::agent::tinyagents::host::OpenHumanHostBase>,
-    agent_id: String,
-    turn_models: TurnModels,
-    provider_id: String,
-    model: &str,
-    history: Vec<TranscriptMessage>,
-    tool_sets: Vec<Arc<Vec<Box<dyn tinytools::Tool>>>>,
-    allowed: Option<HashSet<String>>,
-    max_iterations: usize,
-    context_window: Option<u64>,
-    run_queue: Option<Arc<RunQueue<crate::agent::queued_turn::QueuedTurn>>>,
-    early_exit_tools: &[&str],
-    pause_at_cap: bool,
-    max_output_tokens: Option<u32>,
-    context_mw: TurnContextMiddleware,
-    tool_policy: Option<ToolPolicyEnforcement>,
-    defer_turn_completed_to_caller: bool,
-) -> Result<TinyagentsTurnOutcome> {
-    Box::pin(run_turn_via_tinyagents_body(
-        run_context,
-        turn_models,
-        provider_id,
-        model,
-        history,
-        tool_sets,
-        allowed,
-        max_iterations,
-        None,
-        context_window,
-        run_queue,
-        early_exit_tools,
-        pause_at_cap,
-        max_output_tokens,
-        context_mw,
-        tool_policy,
-        false,
-        defer_turn_completed_to_caller,
-        Some((hosted_base, agent_id)),
-    ))
-    .await
-}
-
-#[allow(clippy::too_many_arguments)]
-async fn run_turn_via_tinyagents_body(
-    mut run_context: OpenHumanRunContext,
-    turn_models: TurnModels,
-    provider_id: String,
-    model: &str,
-    history: Vec<TranscriptMessage>,
-    tool_sets: Vec<Arc<Vec<Box<dyn tinytools::Tool>>>>,
-    allowed: Option<HashSet<String>>,
-    max_iterations: usize,
-    subagent_scope: Option<SubagentScope>,
-    context_window: Option<u64>,
-    run_queue: Option<Arc<RunQueue<crate::agent::queued_turn::QueuedTurn>>>,
-    early_exit_tools: &[&str],
-    pause_at_cap: bool,
-    max_output_tokens: Option<u32>,
-    context_mw: TurnContextMiddleware,
-    tool_policy: Option<ToolPolicyEnforcement>,
-    deterministic_cacheable: bool,
-    // Kept for the call-site contract: the driver never fires the completion
-    // sink here (the host emits `TurnCompleted` in `finalize_turn_outcome`),
-    // so this only decides whether that emission happens.
-    defer_turn_completed_to_caller: bool,
-    hosted_root: Option<(
-        Arc<crate::agent::tinyagents::host::OpenHumanHostBase>,
-        String,
-    )>,
-) -> Result<TinyagentsTurnOutcome> {
+    } = spec;
     // The host context is the sole turn carrier. Pulling the sender into this
     // local keeps the event bridge API compact without creating a second
     // parameter path for progress.
