@@ -622,8 +622,9 @@ fn driver_error_with_snapshot(
     }
     let accepted_end = guard.accepted_end();
     let history = guard.messages[..accepted_end].to_vec();
-    let unanswered =
-        crate::agent::tinyagents::middleware::render_unanswered_steps(&guard.messages[accepted_end..]);
+    let unanswered = crate::agent::tinyagents::middleware::render_unanswered_steps(
+        &guard.messages[accepted_end..],
+    );
     let display = if stalled {
         // The model's streamed narration was stopped before it could repeat
         // indefinitely. Preserve the completed tools as a useful, bounded
