@@ -482,7 +482,11 @@ impl OpenHumanTurnPrelude {
             mutable.last_memory_context = (!context.is_empty()).then_some(context);
         }
         run_context.response_shape = turn.response_shape.clone();
-        run_context.attach_parent(self.parent_context());
+        let inherited_workspace = run_context
+            .parent
+            .as_ref()
+            .and_then(|parent| parent.workspace_descriptor.clone());
+        run_context.attach_parent(self.parent_context(inherited_workspace));
         self.apply_pending_announcements(&mut enriched);
         run_context.attachment_placeholders = Arc::new(
             crate::agent::multimodal::extract_image_placeholders_in_text(original_user_message),

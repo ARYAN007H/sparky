@@ -3,8 +3,12 @@
 use super::*;
 
 impl OpenHumanTurnPrelude {
+    /// `inherited_workspace` is the workspace descriptor of the parent this
+    /// turn itself runs under (`run_context.parent`), when the turn is a
+    /// sub-agent's; it takes precedence over the session's own descriptor.
     pub(in crate::agent::session_host) fn parent_context(
         &self,
+        inherited_workspace: Option<tinytools::WorkspaceDescriptor>,
     ) -> crate::agent::harness::ParentExecutionContext {
         let surface = self
             .tool_surface
@@ -33,8 +37,7 @@ impl OpenHumanTurnPrelude {
             model_name: self.model_name.clone(),
             temperature: self.temperature,
             workspace_dir: self.workspace_dir.clone(),
-            workspace_descriptor: crate::agent::harness::current_parent()
-                .and_then(|parent| parent.workspace_descriptor)
+            workspace_descriptor: inherited_workspace
                 .or_else(|| self.workspace_descriptor.clone()),
             agent_config: self.config.clone(),
             workflows: Arc::new(workflows),
