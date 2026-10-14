@@ -78,13 +78,11 @@ struct Feed(broadcast::Receiver<()>);
 #[async_trait]
 impl DocumentWatch for Feed {
     async fn next(&mut self) -> Result<Option<WatchNotice>> {
-        loop {
-            match self.0.recv().await {
-                Ok(()) | Err(broadcast::error::RecvError::Lagged(_)) => {
-                    return Ok(Some(WatchNotice::Invalidated { cursor: None }));
-                }
-                Err(broadcast::error::RecvError::Closed) => return Ok(None),
+        match self.0.recv().await {
+            Ok(()) | Err(broadcast::error::RecvError::Lagged(_)) => {
+                Ok(Some(WatchNotice::Invalidated { cursor: None }))
             }
+            Err(broadcast::error::RecvError::Closed) => Ok(None),
         }
     }
 }
