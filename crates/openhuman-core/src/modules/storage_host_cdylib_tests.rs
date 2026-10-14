@@ -39,7 +39,11 @@ use crate::modules::storage_host::{
     module_scope, AuditRecord, AuditSink, CallerDirectory, Environment, StorageHost,
 };
 use crate::modules::storage_host_linked::attach;
-use crate::modules::storage_host::{async_trait_reexport_placeholder};
+use crate::storage::{Scope, StorageBackend, StorageError};
+use async_trait::async_trait;
+use std::sync::Arc;
+use tinybus::BusName;
+use tinystoragedrivers_bus::STORAGE_INTERFACE;
 
 const PROBE: &str = "ai.tinyhumans.test.StorageProbe";
 
