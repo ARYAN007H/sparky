@@ -35,17 +35,22 @@ async fn interactive_turn_parks_until_resolved() {
         tinyagents_harness::middleware::RunMode::Plan,
     );
     let tool = RequestPlanReviewTool::new();
+    let context = chat_tool_context(ApprovalChatContext {
+        thread_id: "t-int".into(),
+        client_id: "c-int".into(),
+        request_id: Some("req-int".into()),
+    });
     let fut = with_origin(
         AgentTurnOrigin::WebChat {
             thread_id: "t-int".into(),
             client_id: "c-int".into(),
             request_id: Some("req-int".into()),
         },
-        tool.execute_with_context(json!({ "summary": "plan", "steps": ["one"] }), tinytools::ToolCallOptions::default(), Some(&chat_tool_context(ApprovalChatContext {
-                thread_id: "t-int".into(),
-                client_id: "c-int".into(),
-                request_id: Some("req-int".into()),
-            }))),
+        tool.execute_with_context(
+            json!({ "summary": "plan", "steps": ["one"] }),
+            tinytools::ToolCallOptions::default(),
+            Some(&context),
+        ),
     );
     // The web channel supplies the origin and the chat context. One poll reaches the gate
     // and must remain pending; no wall-clock timeout is needed to prove park.
