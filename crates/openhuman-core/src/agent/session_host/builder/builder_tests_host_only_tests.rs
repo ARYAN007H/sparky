@@ -232,13 +232,19 @@ async fn a_host_only_session_enforces_the_deny_by_default_gate() {
 
     assert_eq!(agent.tool_policy.name(), "host_only");
     assert_eq!(
-        agent.tool_{ let (ctx, call) = request("read_file"); policy.check(&ctx, &call).await },
+        {
+            let (ctx, call) = request("read_file");
+            agent.tool_policy.check(&ctx, &call).await
+        },
         PolicyDecision::Allow
     );
     for built_in in ["shell", "write_file", "spawn_subagent", "tool_search"] {
         assert!(
             matches!(
-                agent.tool_{ let (ctx, call) = request(built_in); policy.check(&ctx, &call).await },
+                {
+                    let (ctx, call) = request(built_in);
+                    agent.tool_policy.check(&ctx, &call).await
+                },
                 PolicyDecision::Deny { .. }
             ),
             "{built_in} must be refused by the session's gate"
