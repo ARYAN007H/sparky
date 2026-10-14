@@ -599,7 +599,7 @@ async fn run_turn_via_tinyagents_body(
         .steering
         .clone()
         .ok_or_else(|| anyhow::anyhow!("turn driver prepared a run without a steering handle"))?;
-    let tool_count = prepared.tail_tools_registered();
+    let tool_count = prepared.tools().registered.len();
 
     let TurnWiring {
         halt_summary,
@@ -613,7 +613,7 @@ async fn run_turn_via_tinyagents_body(
             model: model.to_string(),
             tool_sets,
             allowed,
-            candidate_names: prepared.tail_candidates(),
+            candidate_names: prepared.tools().plan.candidates.clone(),
             subagent_scope: subagent_scope.clone(),
             context_window,
             context_mw,

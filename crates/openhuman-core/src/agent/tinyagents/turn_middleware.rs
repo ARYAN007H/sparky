@@ -82,10 +82,6 @@ pub(super) struct TurnMiddlewareInputs {
     pub(super) memory_turn: Option<Arc<crate::memory::lifecycle::hooks::MemoryTurn>>,
     /// The context-window summarizer's model.
     pub(super) summarizer_model: TurnChatModel,
-}
-
-/// The shared slots and handles the run loop reads after the drive returns.
-pub(super) struct TurnWiring {
     /// Shared 1-based model-call cursor (event bridge advances, model adapter
     /// reads for out-of-band thinking attribution).
     pub(super) cursor: tinyagents_harness::events::IterationCursor,
@@ -99,16 +95,21 @@ pub(super) struct TurnWiring {
     /// Shared FIFO carry of per-call provider `BilledUsage`; the event bridge
     /// reads it when recording usage to preserve charged-USD precedence (#4467).
     pub(super) provider_usage_carry: ProviderUsageCarry,
-    /// Root-cause summary recorded by the repeated-tool-failure breaker.
-    pub(super) halt_summary: HaltSummarySlot,
     /// Per-call tool success/content capture for honest `ToolCallRecord`s.
     pub(super) tool_outcome_sink: ToolOutcomeSink,
+    /// Store index for action-dir tool-result artifacts (`Some` exactly when the
+    /// context middleware has an artifact store).
+    pub(super) tool_result_artifact_index: Option<Arc<ToolResultArtifactIndexStore>>,
+}
+
+/// The handles the run loop reads after the drive returns.
+pub(super) struct TurnWiring {
+    /// Root-cause summary recorded by the repeated-tool-failure breaker.
+    pub(super) halt_summary: HaltSummarySlot,
     /// Set by `FinalCallWrapUpMiddleware` when it turned the last permitted
     /// model call into the turn's conclusion (issue #6014). `None` when the
     /// middleware is not installed (a run that does not pause at its cap).
     pub(super) wrap_up_fired: Option<Arc<tinyagents_harness::middleware::FinalCallWrapUpMiddleware>>,
-    /// Store index for action-dir tool-result artifacts.
-    pub(super) tool_result_artifact_index: Option<Arc<ToolResultArtifactIndexStore>>,
     /// The installed compression middleware, drained after the run to surface
     /// each compaction's provenance.
     pub(super) compression_mw: Option<Arc<ContextCompressionMiddleware>>,
@@ -143,6 +144,12 @@ pub(super) fn install_turn_middleware(
         run_mode,
         memory_turn,
         summarizer_model,
+        cursor,
+        tool_names,
+        failure_map,
+        provider_usage_carry,
+        tool_outcome_sink,
+        tool_result_artifact_index,
     } = inputs;
     let model = model.as_str();
     crate::tools::timeout::install_harness_tool_timeouts(harness);
@@ -158,16 +165,6 @@ pub(super) fn install_turn_middleware(
             "[cache] response cache attached (deterministic internal run)"
         );
     }
-    let cursor: tinyagents_harness::events::IterationCursor = Arc::default();
-    // Shared `call_id -> tool_name` map: the forwarder records the name on
-    // tool-call start (the crate `ToolDelta` carries none), the bridge reads it
-    // to label the argument fragments now streamed via `MessageDelta.tool_call`.
-    let tool_names: ToolNameMap = Arc::default();
-    // Shared FIFO carry of per-call provider `BilledUsage`: `UsageCarryMiddleware`
-    // pushes each response's usage (charged USD + context window +
-    // cache-creation/reasoning tokens, read off the response via G1), the event
-    // bridge pops it when recording that call's usage (#4467, item 1).
-    let provider_usage_carry: ProviderUsageCarry = Arc::default();
     // The run's own steering handle: besides run-queue steering, the early-exit /
     // cap / stop-hook pauses, the repeated-tool-failure breaker also pauses
     // through it, and it wants to fire on every path.
@@ -574,14 +571,8 @@ pub(super) fn install_turn_middleware(
 
 
     TurnWiring {
-        cursor,
-        tool_names,
-        failure_map,
-        provider_usage_carry,
         halt_summary,
-        tool_outcome_sink,
         wrap_up_fired,
-        tool_result_artifact_index,
         compression_mw,
         prompt_cache_guard,
     }
