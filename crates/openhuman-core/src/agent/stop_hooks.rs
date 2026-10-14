@@ -21,7 +21,6 @@
 
 pub use crate::agent::cost::TurnCost;
 use async_trait::async_trait;
-use std::sync::Arc;
 
 use tinyagents_harness::middleware::{StopDecision, StopHook, TurnState};
 
