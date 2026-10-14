@@ -45,6 +45,7 @@
 //! serialization mechanism, the same reasoning as `tests/agent_harness_e2e.rs:8-12`.
 #![allow(clippy::await_holding_lock)]
 
+use openhuman::core::runtime::DispatchCtx;
 use crate::env_guard::EnvVarGuard;
 use std::path::{Path, PathBuf};
 use std::sync::{OnceLock};
@@ -94,7 +95,7 @@ fn controller<'a>(
 
 async fn call(controller: &RegisteredController, params: Value) -> Result<Value, String> {
     let params = params.as_object().cloned().unwrap_or_default();
-    (controller.handler)(params).await
+    (controller.handler)(DispatchCtx::process_default(), params).await
 }
 
 /// A config rooted in `tmp/.openhuman`, matching what `OPENHUMAN_WORKSPACE`

@@ -5,6 +5,7 @@
 //! direct public API calls cover persistence/redaction/provider branches that
 //! are otherwise only indirectly reachable from the controllers.
 
+use openhuman::core::runtime::DispatchCtx;
 use crate::env_guard::EnvVarGuard;
 use crate::rpc_harness::{error_message, payload};
 use std::path::Path;
@@ -549,7 +550,7 @@ async fn approval_schema_handlers_validate_params_and_surface_empty_gate_state()
         .find(|controller| controller.schema.function == "list_pending")
         .expect("list pending controller")
         .handler;
-    let list_value = list_handler(Map::new()).await.expect("list pending value");
+    let list_value = list_handler(DispatchCtx::process_default(), Map::new()).await.expect("list pending value");
     assert!(list_value
         .get("result")
         .or(Some(&list_value))
@@ -563,27 +564,27 @@ async fn approval_schema_handlers_validate_params_and_surface_empty_gate_state()
         .handler;
     let mut invalid_limit = Map::new();
     invalid_limit.insert("limit".to_string(), json!("ten"));
-    assert!(recent_handler(invalid_limit)
+    assert!(recent_handler(DispatchCtx::process_default(), invalid_limit)
         .await
         .expect_err("string limit")
         .contains("expected unsigned integer"));
     for invalid in [json!(true), json!([]), json!({ "limit": 10 })] {
         let mut invalid_limit = Map::new();
         invalid_limit.insert("limit".to_string(), invalid);
-        assert!(recent_handler(invalid_limit)
+        assert!(recent_handler(DispatchCtx::process_default(), invalid_limit)
             .await
             .expect_err("non-numeric limit")
             .contains("expected unsigned integer"));
     }
     let mut negative_limit = Map::new();
     negative_limit.insert("limit".to_string(), json!(-1));
-    assert!(recent_handler(negative_limit)
+    assert!(recent_handler(DispatchCtx::process_default(), negative_limit)
         .await
         .expect_err("negative limit")
         .contains("expected unsigned integer"));
     let mut null_limit = Map::new();
     null_limit.insert("limit".to_string(), Value::Null);
-    let recent_value = recent_handler(null_limit)
+    let recent_value = recent_handler(DispatchCtx::process_default(), null_limit)
         .await
         .expect("null limit should use default");
     assert!(recent_value
@@ -597,14 +598,14 @@ async fn approval_schema_handlers_validate_params_and_surface_empty_gate_state()
         .find(|controller| controller.schema.function == "decide")
         .expect("decide controller")
         .handler;
-    assert!(decide_handler(Map::new())
+    assert!(decide_handler(DispatchCtx::process_default(), Map::new())
         .await
         .expect_err("missing request id")
         .contains("missing required param 'request_id'"));
     let mut numeric_request = Map::new();
     numeric_request.insert("request_id".to_string(), json!(42));
     numeric_request.insert("decision".to_string(), json!("deny"));
-    assert!(decide_handler(numeric_request)
+    assert!(decide_handler(DispatchCtx::process_default(), numeric_request)
         .await
         .expect_err("numeric request id")
         .contains("expected string"));
@@ -617,7 +618,7 @@ async fn approval_schema_handlers_validate_params_and_surface_empty_gate_state()
         let mut invalid_request = Map::new();
         invalid_request.insert("request_id".to_string(), invalid);
         invalid_request.insert("decision".to_string(), json!("deny"));
-        assert!(decide_handler(invalid_request)
+        assert!(decide_handler(DispatchCtx::process_default(), invalid_request)
             .await
             .expect_err("non-string request id")
             .contains("expected string"));
@@ -625,14 +626,14 @@ async fn approval_schema_handlers_validate_params_and_surface_empty_gate_state()
     let mut numeric_decision = Map::new();
     numeric_decision.insert("request_id".to_string(), json!("missing"));
     numeric_decision.insert("decision".to_string(), json!(42));
-    assert!(decide_handler(numeric_decision)
+    assert!(decide_handler(DispatchCtx::process_default(), numeric_decision)
         .await
         .expect_err("numeric decision")
         .contains("expected string"));
     let mut invalid_decision = Map::new();
     invalid_decision.insert("request_id".to_string(), json!("missing"));
     invalid_decision.insert("decision".to_string(), json!("maybe"));
-    assert!(decide_handler(invalid_decision)
+    assert!(decide_handler(DispatchCtx::process_default(), invalid_decision)
         .await
         .expect_err("invalid decision")
         .contains("approve_once|approve_always_for_tool|approve_always_for_flow|deny"));
@@ -642,27 +643,27 @@ async fn approval_schema_handlers_validate_params_and_surface_empty_gate_state()
         .find(|controller| controller.schema.function == "preauthorize_flow")
         .expect("preauthorize flow controller")
         .handler;
-    assert!(preauthorize_handler(Map::new())
+    assert!(preauthorize_handler(DispatchCtx::process_default(), Map::new())
         .await
         .expect_err("missing flow id")
         .contains("missing required param 'flow_id'"));
     let mut missing_tools = Map::new();
     missing_tools.insert("flow_id".to_string(), json!("flow-1"));
-    assert!(preauthorize_handler(missing_tools)
+    assert!(preauthorize_handler(DispatchCtx::process_default(), missing_tools)
         .await
         .expect_err("missing tool names")
         .contains("missing required param 'tool_names'"));
     let mut non_array_tools = Map::new();
     non_array_tools.insert("flow_id".to_string(), json!("flow-1"));
     non_array_tools.insert("tool_names".to_string(), json!("slack_post"));
-    assert!(preauthorize_handler(non_array_tools)
+    assert!(preauthorize_handler(DispatchCtx::process_default(), non_array_tools)
         .await
         .expect_err("non-array tool names")
         .contains("expected array of strings"));
     let mut mixed_tools = Map::new();
     mixed_tools.insert("flow_id".to_string(), json!("flow-1"));
     mixed_tools.insert("tool_names".to_string(), json!(["ok", 42]));
-    assert!(preauthorize_handler(mixed_tools)
+    assert!(preauthorize_handler(DispatchCtx::process_default(), mixed_tools)
         .await
         .expect_err("non-string tool name entry")
         .contains("expected string"));
