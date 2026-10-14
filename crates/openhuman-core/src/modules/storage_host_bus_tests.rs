@@ -1,5 +1,8 @@
 use super::*;
 use serde_json::json;
+use tinybus::ObjectPath;
+use tinystoragedrivers_bus::STORAGE_INTERFACE;
+use tinystoragedrivers_busproxy::{ERROR_DENIED, OBJECT_ROOT};
 
 #[test]
 fn module_scopes_are_distinct_per_module_and_per_tenant() {
