@@ -323,10 +323,18 @@ pub async fn import_legacy_tinybox(workspace_dir: &std::path::Path) {
 /// modules (today TinyJuice's CCR originals), for the blob sweeper. A module
 /// whose scope cannot be resolved here is skipped.
 pub(crate) fn expiring_blob_module_scopes() -> Vec<crate::storage::Scope> {
-    [storage_grant_tinyjuice::MODULE_ID]
-        .into_iter()
-        .filter_map(|id| storage_host::current_module_scope(id).ok())
-        .collect()
+    #[cfg(feature = "modules")]
+    {
+        [storage_grant_tinyjuice::MODULE_ID]
+            .into_iter()
+            .filter_map(|id| storage_host::current_module_scope(id).ok())
+            .collect()
+    }
+    // Without the loader no module holds blobs.
+    #[cfg(not(feature = "modules"))]
+    {
+        Vec::new()
+    }
 }
 
 pub async fn import_legacy_tinyjuice(root: &std::path::Path, ttl: Option<std::time::Duration>) {
