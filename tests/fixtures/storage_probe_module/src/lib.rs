@@ -277,11 +277,13 @@ impl Interface for Probe {
                 STORAGE,
             )?
             .with_timeout(std::time::Duration::from_secs(6));
+        let t0 = std::time::Instant::now();
         let reply: Result<Value> = if confidential {
             proxy.call_confidential(&selector, (request,)).await
         } else {
             proxy.call(&selector, (request,)).await
         };
+        eprintln!("PROBE-TIMING call took {:?} -> {:?}", t0.elapsed(), reply.as_ref().map(|_| ()).map_err(|e| e.to_string()));
         Ok(match reply {
             Ok(value) => json!({ "ok": value }),
             Err(Error::MethodFailed { name, message }) => {
