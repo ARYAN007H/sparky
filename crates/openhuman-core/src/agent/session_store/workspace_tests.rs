@@ -49,7 +49,7 @@ fn an_attachment_stash_and_artifact_blobs_bind_the_tenant_scope() {
     assert!(documents.is_some());
     // The blob half is usable: an unknown key reads as absent.
     let found = crate::storage::block_on(async move { Ok(blobs.get("outputs/none").await) });
-    assert!(matches!(found, Ok(Ok(None)) | Ok(Err(_))), "{found:?}");
+    assert!(matches!(found, Ok(Ok(None))), "{found:?}");
 }
 
 #[test]
@@ -116,10 +116,12 @@ fn an_unusable_workspace_degrades_to_an_in_memory_store() {
 #[test]
 fn releasing_defaults_lets_the_next_call_open_afresh() {
     let ws = scratch();
-    let before = fallback_provider(ws.path()).destination_key();
+    let before = fallback_provider(ws.path());
+    let cached = fallback_provider(ws.path());
+    assert!(Arc::ptr_eq(&before, &cached), "a repeat call reuses the provider");
     release_workspace_defaults();
-    let after = fallback_provider(ws.path()).destination_key();
-    assert_eq!(before.is_some(), after.is_some());
+    let after = fallback_provider(ws.path());
+    assert!(!Arc::ptr_eq(&before, &after), "release drops the cached provider");
 }
 
 #[test]
