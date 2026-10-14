@@ -2,12 +2,14 @@
 //! ([`recovery_policy_with_effect`]), split out of `repeated_failure.rs` so the breaker
 //! stays readable: the ladder driver lives there, the classification here.
 
+use super::fetched_site::fetched_site_policy;
 use tinyagents_harness::middleware::{call_effect, CallEffect};
-pub(super) use tinyagents_harness::no_progress::{is_command_exit_report, ARGUMENT_SCHEMA_RECOVERY};
 use tinyagents_harness::no_progress::{
     is_argument_rejection, is_pre_execution_failure, json_error_recovery,
 };
-use super::fetched_site::fetched_site_policy;
+pub(super) use tinyagents_harness::no_progress::{
+    is_command_exit_report, ARGUMENT_SCHEMA_RECOVERY,
+};
 use tinyinference_llm::failure::is_recoverable_failure_text as is_recoverable_tool_failure;
 
 /// Explicit recovery policy. Only recognised failures enter the classified

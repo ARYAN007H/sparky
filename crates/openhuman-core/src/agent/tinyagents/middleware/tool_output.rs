@@ -19,12 +19,12 @@ use crate::agent::harness::tool_result_artifacts::{
     artifact_read_target, page_artifact_read, TINYAGENTS_TOOL_RESULT_ARTIFACT_STORE,
 };
 use crate::agent::tinyagents::payload_summarizer::DynPayloadSummarizer;
-use tinyagents_harness::middleware::library::{
-    disclose, plan_output_stages, should_compact, OutputCapPolicy,
-};
 use crate::inference::tokenjuice::generate::GenerateTicket;
 use tinyagents_harness::artifacts::tool_results::{
     apply_per_result_persistence, ArtifactRead, ToolResultArtifactStore,
+};
+use tinyagents_harness::middleware::library::{
+    disclose, plan_output_stages, should_compact, OutputCapPolicy,
 };
 use tinyjuice_bus::types::AgentTokenjuiceCompression;
 

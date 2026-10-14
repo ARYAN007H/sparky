@@ -9,8 +9,8 @@ use async_trait::async_trait;
 use tinyagents_harness::context::RunContext;
 use tinyagents_harness::error::Result as TaResult;
 use tinyagents_harness::middleware::{
-    call_effect, dispatch_target, is_repeat_call_exempt, repeat_guard_marker, CallEffect, Middleware,
-    StopLatch, ToolFactsLookup, ToolInvocationIdentity,
+    call_effect, dispatch_target, is_repeat_call_exempt, repeat_guard_marker, CallEffect,
+    Middleware, StopLatch, ToolFactsLookup, ToolInvocationIdentity,
 };
 use tinyagents_harness::no_progress::{
     classified_step, clear_recovered, ClassifiedFailureTracker, ClassifiedStep, FailurePolicy,
@@ -146,7 +146,6 @@ impl RepeatedToolFailureMiddleware {
     pub(crate) fn take_pending_nudges(&self) -> Vec<String> {
         self.pending_nudges.drain_all()
     }
-
 }
 
 /// The halt wording for the recoverable ladder: OpenHuman's own copy.
@@ -538,7 +537,10 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
             if is_repeat_call_exempt(tool_name) {
                 return Ok(());
             }
-            if let Some(summary) = self.recoverable.record(&HaltCopy, tool_name, &arg_fp, &failure_text) {
+            if let Some(summary) =
+                self.recoverable
+                    .record(&HaltCopy, tool_name, &arg_fp, &failure_text)
+            {
                 tracing::warn!(
                     tool = tool_name,
                     "[tinyagents::mw] recoverable-failure headroom exhausted — halting run so the root cause surfaces"
@@ -648,3 +650,7 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "repeated_failure_tests.rs"]
+mod tests;
