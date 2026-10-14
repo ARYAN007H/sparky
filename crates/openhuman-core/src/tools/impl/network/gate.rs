@@ -56,7 +56,7 @@ impl NetGate for SecurityPolicy {
     }
 
     fn disclose(&self, host: &str, has_body: bool, has_headers: bool) {
-        emit_external_transfer(network_egress_descriptor(host, has_body, has_headers));
+        emit_external_transfer(None, network_egress_descriptor(host, has_body, has_headers));
     }
 
     fn prepare_client(
