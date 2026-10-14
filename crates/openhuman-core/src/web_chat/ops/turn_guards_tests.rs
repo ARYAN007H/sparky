@@ -43,7 +43,7 @@ fn guarded_turn_env_shares_its_cancellation_with_the_stop_handle() {
 /// error, which is classified to user-facing copy, not silence.
 #[tokio::test(start_paused = true)]
 async fn backstop_firing_yields_a_classified_turn_timeout_error() {
-    let err = drive_turn_with_deadline(Some(Duration::from_secs(900)), None, None, async {
+    let err = drive_turn_with_deadline(Some(Duration::from_secs(900)), None, None, |_| async {
         std::future::pending::<()>().await;
         Ok(result("never"))
     })
