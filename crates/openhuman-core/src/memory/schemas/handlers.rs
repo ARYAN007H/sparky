@@ -75,28 +75,28 @@ pub(super) fn engine_set(params: Map<String, Value>) -> ControllerFuture {
 pub(super) fn recall(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<RecallParams>(params)?;
-        finish(confine::recall(&load().await?, params).await)
+        finish(confine::recall(&load().await?, &MemoryIdentity::root(), params).await)
     })
 }
 
 pub(super) fn fetch(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<FetchParams>(params)?;
-        finish(confine::fetch(&load().await?, params).await)
+        finish(confine::fetch(&load().await?, &MemoryIdentity::root(), params).await)
     })
 }
 
 pub(super) fn learn(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<LearnParams>(params)?;
-        finish(confine::learn(&load().await?, params).await)
+        finish(confine::learn(&load().await?, &MemoryIdentity::root(), params).await)
     })
 }
 
 pub(super) fn forget(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<ForgetParams>(params)?;
-        finish(confine::forget(&load().await?, params).await)
+        finish(confine::forget(&load().await?, &MemoryIdentity::root(), params).await)
     })
 }
 
@@ -110,21 +110,21 @@ pub(super) fn erase_all(params: Map<String, Value>) -> ControllerFuture {
 pub(super) fn items_list(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<ItemsListParams>(params)?;
-        finish(confine::items_list(&load().await?, params).await)
+        finish(confine::items_list(&load().await?, &MemoryIdentity::root(), params).await)
     })
 }
 
 pub(super) fn explore(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<ExploreParams>(params)?;
-        finish(confine::explore(&load().await?, params).await)
+        finish(confine::explore(&load().await?, &MemoryIdentity::root(), params).await)
     })
 }
 
 pub(super) fn items_get(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<ItemsGetParams>(params)?;
-        finish(confine::items_get(&load().await?, params).await)
+        finish(confine::items_get(&load().await?, &MemoryIdentity::root(), params).await)
     })
 }
 
