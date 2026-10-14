@@ -2,6 +2,7 @@
 //!
 //! Follows the exact pattern from `cron/schemas.rs`.
 
+use crate::core::runtime::DispatchCtx;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
