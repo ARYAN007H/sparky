@@ -670,9 +670,10 @@ async fn learning_is_durably_queued_even_when_the_backend_refuses_writes() {
 }
 
 /// The memory activity a tool call raises reaches the chat its own turn is in:
-/// the event carries the turn's thread and client, taken from the run context
-/// the tool was dispatched with, and a call outside a chat turn raises it
-/// unrouted.
+/// the `MemoryRecalled` event carries the turn's thread and client, taken from
+/// the run context the tool was dispatched with, and a call outside a chat turn
+/// raises it unrouted. (A `learn` is queued and published off the turn, so it
+/// is never routed.)
 #[tokio::test]
 async fn memory_activity_carries_the_calling_turns_chat() {
     crate::core::bus::init().await.expect("bus init");
@@ -691,15 +692,9 @@ async fn memory_activity_carries_the_calling_turns_chat() {
             },
         ),
     );
-    let learned_id = |result: &ToolResult| {
-        serde_json::from_str::<Value>(&text(result)).unwrap()["id"]
-            .as_str()
-            .unwrap()
-            .to_string()
-    };
     let routed = tool
         .execute_with_context(
-            json!({"action": "learn", "text": "routed marker fact"}),
+            json!({"action": "recall", "question": "routed marker question"}),
             ToolCallOptions::default(),
             Some(&context),
         )
@@ -707,52 +702,33 @@ async fn memory_activity_carries_the_calling_turns_chat() {
         .unwrap();
     assert!(!routed.is_error, "{}", text(&routed));
     let unrouted = tool
-        .execute(json!({"action": "learn", "text": "unrouted marker fact"}))
+        .execute(json!({"action": "recall", "question": "unrouted marker question"}))
         .await
         .unwrap();
     assert!(!unrouted.is_error, "{}", text(&unrouted));
-    super::super::tool_writes::drain(&config).await;
-    let (routed_id, unrouted_id) = (learned_id(&routed), learned_id(&unrouted));
 
-    // The bus is process-wide: match our own events by the id the tool returned.
-    // A learn raises one event from the tool call (routed) and one from the
-    // queued write that persists it (off the turn, unrouted), so collect all.
-    let mut routed_seen = std::collections::HashSet::new();
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
-    while std::time::Instant::now() < deadline {
-        match tokio::time::timeout(std::time::Duration::from_millis(200), rx.recv()).await {
-            Ok(Some(DomainEvent::MemoryStored {
-                key,
+    // The bus is process-wide: match our own events by the question text.
+    let mut seen = std::collections::HashMap::new();
+    while seen.len() < 2 {
+        match tokio::time::timeout(std::time::Duration::from_secs(5), rx.recv()).await {
+            Ok(Some(DomainEvent::MemoryRecalled {
+                query,
                 thread_id,
                 client_id,
                 ..
-            })) if key == routed_id || key == unrouted_id => {
-                routed_seen.insert((key, thread_id, client_id));
+            })) if query.contains("marker question") => {
+                seen.insert(query, (thread_id, client_id));
             }
             Ok(Some(_)) => continue,
-            _ => {}
+            other => panic!("expected both MemoryRecalled events, got {other:?}"),
         }
     }
-    let routing = |key: &str| -> Vec<(Option<String>, Option<String>)> {
-        routed_seen
-            .iter()
-            .filter(|(k, _, _)| k == key)
-            .map(|(_, t, c)| (t.clone(), c.clone()))
-            .collect()
-    };
-    assert!(
-        routing(&routed_id).contains(&(
+    assert_eq!(
+        seen["routed marker question"],
+        (
             Some("thread-activity".into()),
             Some("client-activity".into())
-        )),
-        "the tool call's event must carry the turn's chat: {:?}",
-        routing(&routed_id)
+        )
     );
-    assert!(
-        routing(&unrouted_id)
-            .iter()
-            .all(|route| *route == (None, None)),
-        "a call outside a chat turn must never be routed: {:?}",
-        routing(&unrouted_id)
-    );
+    assert_eq!(seen["unrouted marker question"], (None, None));
 }
