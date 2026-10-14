@@ -17,7 +17,7 @@ fn schema(
     }
 }
 
-fn noop_handler(_params: Map<String, Value>) -> ControllerFuture {
+fn noop_handler(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async { Ok(Value::Null) })
 }
 

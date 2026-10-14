@@ -43,7 +43,7 @@ pub fn announcements_schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_announcements_get_latest(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_announcements_get_latest(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(crate::hosted::announcements::get_latest_announcement(&config).await?)

@@ -5,7 +5,7 @@ use super::*;
 // ── Controller extensions (crates above the core) ──────────────────────────
 
 fn ext_controller(namespace: &'static str, function: &'static str) -> RegisteredController {
-    fn handler(_params: Map<String, serde_json::Value>) -> ControllerFuture {
+    fn handler(_ctx: DispatchCtx, _params: Map<String, serde_json::Value>) -> ControllerFuture {
         Box::pin(async { Ok(serde_json::json!({"ext": true})) })
     }
     RegisteredController {

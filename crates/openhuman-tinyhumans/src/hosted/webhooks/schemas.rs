@@ -178,14 +178,14 @@ pub fn webhooks_schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_list_tunnels(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_list_tunnels(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(crate::hosted::webhooks::list_tunnels(&config).await?)
     })
 }
 
-fn handle_create_tunnel(params: Map<String, Value>) -> ControllerFuture {
+fn handle_create_tunnel(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let payload = deserialize_params::<WebhookCreateTunnelParams>(params)?;
@@ -200,7 +200,7 @@ fn handle_create_tunnel(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_delete_tunnel(params: Map<String, Value>) -> ControllerFuture {
+fn handle_delete_tunnel(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let payload = deserialize_params::<WebhookTunnelIdParams>(params)?;
@@ -208,7 +208,7 @@ fn handle_delete_tunnel(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_get_tunnel(params: Map<String, Value>) -> ControllerFuture {
+fn handle_get_tunnel(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let payload = deserialize_params::<WebhookTunnelIdParams>(params)?;
@@ -216,7 +216,7 @@ fn handle_get_tunnel(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_update_tunnel(params: Map<String, Value>) -> ControllerFuture {
+fn handle_update_tunnel(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let payload = deserialize_params::<WebhookUpdateTunnelParams>(params)?;
@@ -229,7 +229,7 @@ fn handle_update_tunnel(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_get_bandwidth(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_get_bandwidth(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(crate::hosted::webhooks::get_bandwidth(&config).await?)
