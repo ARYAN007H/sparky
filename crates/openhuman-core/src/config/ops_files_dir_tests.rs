@@ -147,6 +147,7 @@ async fn boot_migrates_legacy_files_into_the_chosen_folder() {
         tool_call_id: None,
     };
     save_artifact_meta(&cfg.workspace_dir, &meta).await.unwrap();
+    std::fs::create_dir_all(cfg.workspace_dir.join("artifacts/legacy")).unwrap();
     std::fs::write(
         cfg.workspace_dir.join("artifacts/legacy/plan.docx"),
         b"plan",

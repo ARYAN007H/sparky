@@ -164,7 +164,6 @@ fn files(dir: &Path) -> Vec<String> {
 }
 
 #[test]
-#[ignore = "requires a TinyMCP library: stage the release (scripts/test-rust-e2e.sh) or node scripts/modules/build.mjs tinymcp"]
 fn a_server_added_through_the_released_module_survives_a_restart_in_the_storage_backend() {
     let artifact = openhuman_core::modules::local_artifact("tinymcp")
         .expect("build or stage tinymcp (OPENHUMAN_MODULE_SOURCE_DIR / OPENHUMAN_MODULE_PATH)");

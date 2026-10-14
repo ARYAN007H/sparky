@@ -329,6 +329,9 @@ run_full_suite() {
       run_in_process_modules "$@"
     elif [ "$target" = "json_rpc_e2e" ]; then
       run_json_rpc_e2e "$@"
+    elif [ "$target" = "tinymcp_storage_smoke_e2e" ]; then
+      OPENHUMAN_MODULE_PATH="$tinymcp_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}" \
+        cargo_test --test "$target" -- "$@"
     elif [ "$target" = "mcp_registry_e2e" ]; then
       # The TinyMCP module owns process-level directory transitions; this
       # binary exercises several workspaces against that shared module object.
@@ -384,6 +387,13 @@ elif [ "$#" -ge 2 ] && [ "$1" = "--test" ] && [ "$2" = "mcp_registry_e2e" ]; the
   fi
   OPENHUMAN_MODULE_PATH="$connectors_module_path" \
     cargo_test --test mcp_registry_e2e -- --ignored --test-threads=1 "$@"
+elif [ "$#" -ge 2 ] && [ "$1" = "--test" ] && [ "$2" = "tinymcp_storage_smoke_e2e" ]; then
+  shift 2
+  if [ "${1:-}" = "--" ]; then
+    shift
+  fi
+  OPENHUMAN_MODULE_PATH="$tinymcp_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}" \
+    cargo_test --test tinymcp_storage_smoke_e2e -- "$@"
 elif [ "$#" -ge 2 ] && [ "$1" = "--test" ] && [ "$2" = "mcp_registry_multi_server" ]; then
   shift 2
   if [ "${1:-}" = "--" ]; then

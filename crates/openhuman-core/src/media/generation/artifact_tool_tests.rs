@@ -3,7 +3,7 @@ use serde_json::{json, Value};
 use tinytools::{PermissionLevel, Tool, ToolCategory, ToolContent, ToolResult};
 
 use super::MediaArtifactTool;
-use crate::agent::artifacts::ArtifactKind;
+use crate::agent::artifacts::{ArtifactKind, ArtifactStatus};
 
 /// A minimal stand-in for `GenerateImageTool` / `GenerateVideoTool`: writes
 /// a fixed number of files under `<action_dir>/generated-media/` and reports
@@ -96,11 +96,16 @@ async fn files_a_single_generated_artifact() {
 
     // Original staged file is gone (moved).
     assert!(!staging.join("stub-0.png").exists());
-    // Artifact metadata + file both landed under the artifacts root.
-    let artifact_dir = workspace.join("artifacts").join(artifact_id);
-    assert!(artifact_dir.join("meta.json").exists());
-    let meta_raw = std::fs::read_to_string(artifact_dir.join("meta.json")).unwrap();
-    assert!(meta_raw.contains("\"image\""));
+    // Metadata may live in the configured storage backend; resolve it through
+    // the artifact store and verify the user-facing file it records.
+    let meta = crate::agent::artifacts::store::get_artifact(&workspace, artifact_id)
+        .await
+        .expect("artifact metadata is persisted");
+    assert_eq!(meta.kind, ArtifactKind::Image);
+    assert_eq!(meta.status, ArtifactStatus::Ready);
+    let file = meta.file.expect("artifact points at its visible file");
+    assert!(std::path::Path::new(&file).exists(), "{file}");
+    assert_eq!(std::fs::read(file).unwrap(), b"bytes-0");
 }
 
 #[tokio::test]
@@ -130,11 +135,14 @@ async fn files_every_artifact_when_n_greater_than_one() {
     for entry in artifacts {
         let id = entry["artifact_id"].as_str().expect("artifact_id set");
         assert!(ids.insert(id.to_string()), "artifact ids must be unique");
-        assert!(workspace
-            .join("artifacts")
-            .join(id)
-            .join("meta.json")
-            .exists());
+        let meta = crate::agent::artifacts::store::get_artifact(&workspace, id)
+            .await
+            .expect("artifact metadata is persisted");
+        assert_eq!(meta.status, ArtifactStatus::Ready);
+        assert!(meta
+            .file
+            .as_deref()
+            .is_some_and(|file| std::path::Path::new(file).exists()));
     }
 }
 
