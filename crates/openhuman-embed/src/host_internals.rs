@@ -237,7 +237,7 @@ pub mod security {
         }
     }
     pub mod approval {
-        pub use openhuman_core::security::approval::ApprovalGate;
+        pub use openhuman_core::security::approval::{ApprovalChatContext, ApprovalGate};
     }
     pub mod pairing {
         pub use openhuman_core::security::pairing::is_public_bind;
