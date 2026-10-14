@@ -151,7 +151,7 @@ pub async fn serve(
             move |req: axum::extract::Request, next: axum::middleware::Next| {
                 let ctx = Arc::clone(&ctx);
                 async move {
-                    crate::core_host::core::runtime::CoreContext::scope(ctx, next.run(req)).await
+                    super::saas_gateway::dispatch_in(ctx, req, next).await
                 }
             },
         ))
