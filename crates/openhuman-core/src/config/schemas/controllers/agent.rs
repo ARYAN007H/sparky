@@ -11,11 +11,11 @@ use super::super::helpers::{
     SetBrowserAllowAllParams,
 };
 
-pub(crate) fn handle_get_autonomy_settings(_params: Map<String, Value>) -> ControllerFuture {
+pub(crate) fn handle_get_autonomy_settings(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move { to_json(config_rpc::get_autonomy_settings().await?) })
 }
 
-pub(crate) fn handle_update_autonomy_settings(params: Map<String, Value>) -> ControllerFuture {
+pub(crate) fn handle_update_autonomy_settings(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let update = deserialize_params::<AutonomySettingsUpdate>(params)?;
         let patch = config_rpc::AutonomySettingsPatch {
@@ -34,11 +34,11 @@ pub(crate) fn handle_update_autonomy_settings(params: Map<String, Value>) -> Con
     })
 }
 
-pub(super) fn handle_get_privacy_mode(_params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_get_privacy_mode(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move { to_json(config_rpc::get_privacy_mode().await?) })
 }
 
-pub(super) fn handle_set_privacy_mode(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_set_privacy_mode(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let update = deserialize_params::<PrivacyModeUpdate>(params)?;
         let patch = config_rpc::PrivacySettingsPatch { mode: update.mode };
@@ -46,7 +46,7 @@ pub(super) fn handle_set_privacy_mode(params: Map<String, Value>) -> ControllerF
     })
 }
 
-pub(super) fn handle_get_agent_settings(_params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_get_agent_settings(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async {
         log::debug!("[config][rpc] get_agent_settings enter");
         match config_rpc::get_agent_settings().await {
@@ -62,7 +62,7 @@ pub(super) fn handle_get_agent_settings(_params: Map<String, Value>) -> Controll
     })
 }
 
-pub(super) fn handle_update_agent_settings(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_update_agent_settings(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         log::debug!("[config][rpc] update_agent_settings enter");
         let update = match deserialize_params::<AgentSettingsUpdate>(params) {
@@ -90,7 +90,7 @@ pub(super) fn handle_update_agent_settings(params: Map<String, Value>) -> Contro
     })
 }
 
-pub(super) fn handle_update_browser_settings(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_update_browser_settings(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let update = deserialize_params::<BrowserSettingsUpdate>(params)?;
         let patch = config_rpc::BrowserSettingsPatch {
@@ -111,7 +111,7 @@ pub(super) fn handle_update_browser_settings(params: Map<String, Value>) -> Cont
     })
 }
 
-pub(super) fn handle_update_computer_settings(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_update_computer_settings(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let update = deserialize_params::<ComputerSettingsUpdate>(params)?;
         let patch = config_rpc::ComputerSettingsPatch {
@@ -125,18 +125,18 @@ pub(super) fn handle_update_computer_settings(params: Map<String, Value>) -> Con
     })
 }
 
-pub(super) fn handle_set_browser_allow_all(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_set_browser_allow_all(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let payload = deserialize_params::<SetBrowserAllowAllParams>(params)?;
         to_json(config_rpc::set_browser_allow_all(payload.enabled)?)
     })
 }
 
-pub(super) fn handle_get_sandbox_settings(_params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_get_sandbox_settings(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move { to_json(config_rpc::get_sandbox_settings().await?) })
 }
 
-pub(super) fn handle_update_sandbox_settings(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_update_sandbox_settings(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let update = deserialize_params::<SandboxSettingsUpdate>(params)?;
         let patch = config_rpc::SandboxSettingsPatch {

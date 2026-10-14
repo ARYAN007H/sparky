@@ -85,7 +85,7 @@ fn schema_for(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_agent_work_list(params: Map<String, Value>) -> ControllerFuture {
+fn handle_agent_work_list(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "command_center_rpc", "[command_center_rpc][{cid}] list.entry");
@@ -111,7 +111,7 @@ fn handle_agent_work_list(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_agent_work_control(params: Map<String, Value>) -> ControllerFuture {
+fn handle_agent_work_control(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "command_center_rpc", "[command_center_rpc][{cid}] control.entry");

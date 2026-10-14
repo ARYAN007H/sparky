@@ -170,14 +170,14 @@ struct TestConnectionParams {
 
 // ── Handlers ───────────────────────────────────────────────
 
-fn handle_get_settings(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_get_settings(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(super::rpc::get_settings(&config).await?)
     })
 }
 
-fn handle_update_settings(params: Map<String, Value>) -> ControllerFuture {
+fn handle_update_settings(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<UpdateSettingsParams>(params)?;
         to_json(
@@ -193,7 +193,7 @@ fn handle_update_settings(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_set_api_key(params: Map<String, Value>) -> ControllerFuture {
+fn handle_set_api_key(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<SetApiKeyParams>(params)?;
         let config = config_rpc::load_config_with_timeout().await?;
@@ -201,7 +201,7 @@ fn handle_set_api_key(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_clear_api_key(params: Map<String, Value>) -> ControllerFuture {
+fn handle_clear_api_key(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<ClearApiKeyParams>(params)?;
         let config = config_rpc::load_config_with_timeout().await?;
@@ -209,7 +209,7 @@ fn handle_clear_api_key(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_embed(params: Map<String, Value>) -> ControllerFuture {
+fn handle_embed(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<EmbedParams>(params)?;
         let config = config_rpc::load_config_with_timeout().await?;
@@ -217,7 +217,7 @@ fn handle_embed(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_test_connection(params: Map<String, Value>) -> ControllerFuture {
+fn handle_test_connection(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<TestConnectionParams>(params)?;
         let config = config_rpc::load_config_with_timeout().await?;

@@ -263,7 +263,7 @@ pub fn skill_runtime_schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_run(params: Map<String, Value>) -> ControllerFuture {
+fn handle_run(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let payload = deserialize_params::<RunParams>(params)?;
         tracing::info!(skill_id = %payload.skill_id, "[skill_runtime][rpc] run");
@@ -286,7 +286,7 @@ fn handle_run(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_cancel(params: Map<String, Value>) -> ControllerFuture {
+fn handle_cancel(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let payload = deserialize_params::<CancelParams>(params)?;
         let cancelled = run_log::cancel_run(&payload.run_id);
@@ -298,7 +298,7 @@ fn handle_cancel(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_recent_runs(params: Map<String, Value>) -> ControllerFuture {
+fn handle_recent_runs(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let payload = deserialize_params::<RecentRunsParams>(params)?;
         let limit = payload.limit.unwrap_or(20).min(100) as usize;
@@ -317,7 +317,7 @@ fn handle_recent_runs(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_read_run_log(params: Map<String, Value>) -> ControllerFuture {
+fn handle_read_run_log(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let payload = deserialize_params::<ReadRunLogParams>(params)?;
         let workspace = resolve_workspace_dir().await;
@@ -335,7 +335,7 @@ fn handle_read_run_log(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_resolve_runtimes(params: Map<String, Value>) -> ControllerFuture {
+fn handle_resolve_runtimes(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let payload = deserialize_params::<ResolveRuntimesParams>(params)?;
         let requirement = RuntimeRequirement::from_optional(payload.runtime.as_deref())?;
@@ -347,7 +347,7 @@ fn handle_resolve_runtimes(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_schemas(params: Map<String, Value>) -> ControllerFuture {
+fn handle_schemas(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let _ = params;
         to_json(Outcome::new(

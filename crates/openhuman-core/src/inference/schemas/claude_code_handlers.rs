@@ -16,7 +16,7 @@ pub(super) struct InferenceClaudeCodeSetFullAccessParams {
     enabled: bool,
 }
 
-pub(super) fn handle_inference_claude_code_status(_params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_inference_claude_code_status(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let status = tokio::task::spawn_blocking(
             tinyagents_harness::providers::claude_code::version_check::probe,
@@ -27,7 +27,7 @@ pub(super) fn handle_inference_claude_code_status(_params: Map<String, Value>) -
     })
 }
 
-pub(super) fn handle_inference_claude_code_auth_status(
+pub(super) fn handle_inference_claude_code_auth_status(_ctx: DispatchCtx, 
     _params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
@@ -40,7 +40,7 @@ pub(super) fn handle_inference_claude_code_auth_status(
     })
 }
 
-pub(super) fn handle_inference_claude_code_settings(
+pub(super) fn handle_inference_claude_code_settings(_ctx: DispatchCtx, 
     _params: Map<String, Value>,
 ) -> ControllerFuture {
     use tinyagents_harness::providers::claude_code::settings;
@@ -56,7 +56,7 @@ pub(super) fn handle_inference_claude_code_settings(
     })
 }
 
-pub(super) fn handle_inference_claude_code_set_full_access(
+pub(super) fn handle_inference_claude_code_set_full_access(_ctx: DispatchCtx, 
     params: Map<String, Value>,
 ) -> ControllerFuture {
     use tinyagents_harness::providers::claude_code::settings;

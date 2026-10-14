@@ -192,7 +192,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_auth_set_credential(params: Map<String, Value>) -> ControllerFuture {
+fn handle_auth_set_credential(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let payload =
@@ -201,7 +201,7 @@ fn handle_auth_set_credential(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_auth_clear_credential(params: Map<String, Value>) -> ControllerFuture {
+fn handle_auth_clear_credential(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let payload = deserialize_params::<AuthClearCredentialParams>(params)?;
@@ -221,21 +221,21 @@ fn handle_auth_clear_credential(params: Map<String, Value>) -> ControllerFuture 
     })
 }
 
-fn handle_auth_get_state(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_auth_get_state(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(crate::security::credentials::rpc::auth_get_state(&config).await?)
     })
 }
 
-fn handle_auth_get_session_token(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_auth_get_session_token(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(crate::security::credentials::rpc::auth_get_session_token_json(&config).await?)
     })
 }
 
-fn handle_auth_store_provider_credentials(params: Map<String, Value>) -> ControllerFuture {
+fn handle_auth_store_provider_credentials(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let payload = deserialize_params::<AuthStoreProviderCredentialsParams>(params)?;
@@ -253,7 +253,7 @@ fn handle_auth_store_provider_credentials(params: Map<String, Value>) -> Control
     })
 }
 
-fn handle_auth_remove_provider_credentials(params: Map<String, Value>) -> ControllerFuture {
+fn handle_auth_remove_provider_credentials(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let payload = deserialize_params::<AuthRemoveProviderCredentialsParams>(params)?;
@@ -268,7 +268,7 @@ fn handle_auth_remove_provider_credentials(params: Map<String, Value>) -> Contro
     })
 }
 
-fn handle_auth_list_provider_credentials(params: Map<String, Value>) -> ControllerFuture {
+fn handle_auth_list_provider_credentials(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let payload = if params.is_empty() {

@@ -81,7 +81,7 @@ pub async fn subsystems_status() -> Vec<SubsystemStatus> {
     }
 }
 
-fn handle_status(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_status(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let rows = subsystems_status().await;
         log::debug!("[subsystem] status requested: {} slot(s)", rows.len());

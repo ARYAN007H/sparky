@@ -40,7 +40,7 @@ pub(super) struct InferenceAnalyzeSentimentParams {
     message: String,
 }
 
-pub(super) fn handle_inference_summarize(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_inference_summarize(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<InferenceSummarizeParams>(params)?;
         let config = config_rpc::load_config_with_timeout().await?;
@@ -48,7 +48,7 @@ pub(super) fn handle_inference_summarize(params: Map<String, Value>) -> Controll
     })
 }
 
-pub(super) fn handle_inference_prompt(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_inference_prompt(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<InferencePromptParams>(params)?;
         let config = config_rpc::load_config_with_timeout().await?;
@@ -59,7 +59,7 @@ pub(super) fn handle_inference_prompt(params: Map<String, Value>) -> ControllerF
     })
 }
 
-pub(super) fn handle_inference_vision_prompt(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_inference_vision_prompt(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<InferenceVisionPromptParams>(params)?;
         let config = config_rpc::load_config_with_timeout().await?;
@@ -75,7 +75,7 @@ pub(super) fn handle_inference_vision_prompt(params: Map<String, Value>) -> Cont
     })
 }
 
-pub(super) fn handle_inference_test_provider_model(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_inference_test_provider_model(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<InferenceTestChatModelParams>(params)?;
         let config = config_rpc::load_config_with_timeout().await?;
@@ -91,7 +91,7 @@ pub(super) fn handle_inference_test_provider_model(params: Map<String, Value>) -
     })
 }
 
-pub(super) fn handle_inference_analyze_sentiment(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_inference_analyze_sentiment(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<InferenceAnalyzeSentimentParams>(params)?;
         let config = config_rpc::load_config_with_timeout().await?;

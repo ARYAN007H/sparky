@@ -195,7 +195,7 @@ struct ThreadIdParams {
     thread_id: String,
 }
 
-fn handle_set_run_mode(params: Map<String, Value>) -> ControllerFuture {
+fn handle_set_run_mode(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = parse::<ThreadModeParams>(params)?;
         let Some(mode) = parse_mode_label(&p.mode) else {
@@ -211,7 +211,7 @@ fn handle_set_run_mode(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_get_run_mode(params: Map<String, Value>) -> ControllerFuture {
+fn handle_get_run_mode(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = parse::<ThreadIdParams>(params)?;
         let mode = get_mode(&p.thread_id);

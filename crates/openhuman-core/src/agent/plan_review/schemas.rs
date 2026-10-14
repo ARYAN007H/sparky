@@ -81,7 +81,7 @@ struct DecideParams {
     feedback: Option<String>,
 }
 
-fn handle_decide(params: Map<String, Value>) -> ControllerFuture {
+fn handle_decide(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = parse::<DecideParams>(params)?;
         let resolution = match p.decision.trim().to_ascii_lowercase().as_str() {

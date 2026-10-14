@@ -54,7 +54,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_diag(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_diag(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move { super::rpc::diag().await?.into_cli_compatible_json() })
 }
 

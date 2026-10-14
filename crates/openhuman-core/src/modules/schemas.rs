@@ -199,7 +199,7 @@ fn readiness_error(detail: &str) -> String {
     }
 }
 
-fn handle_browser_check_readiness(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_browser_check_readiness(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let mut config = config_rpc::load_config_with_timeout().await?;
         crate::core::runtime::components::require_config(&config, "computer")?;
@@ -238,7 +238,7 @@ fn handle_browser_check_readiness(_params: Map<String, Value>) -> ControllerFutu
     })
 }
 
-fn handle_browser_forget_sites(params: Map<String, Value>) -> ControllerFuture {
+fn handle_browser_forget_sites(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         // A blank or non-text site must not read as "every site".
         let site = match params.get("site") {
@@ -265,7 +265,7 @@ fn handle_browser_forget_sites(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_computer_status(params: Map<String, Value>) -> ControllerFuture {
+fn handle_computer_status(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let load = params.get("load").and_then(Value::as_bool).unwrap_or(false);
         let config = config_rpc::load_config_with_timeout().await?;
@@ -278,14 +278,14 @@ fn controller_value(value: impl serde::Serialize) -> Result<Value, String> {
     serde_json::to_value(value).map_err(|error| error.to_string())
 }
 
-fn handle_list(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_list(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         Ok(serde_json::json!({ "modules": ops::list(&config) }))
     })
 }
 
-fn handle_status(params: Map<String, Value>) -> ControllerFuture {
+fn handle_status(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let id = string_param(&params, "id").ok_or("`id` is required")?;
         let config = config_rpc::load_config_with_timeout().await?;
@@ -296,7 +296,7 @@ fn handle_status(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_load(params: Map<String, Value>) -> ControllerFuture {
+fn handle_load(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let id = string_param(&params, "id").ok_or("`id` is required")?;
         let config = config_rpc::load_config_with_timeout().await?;

@@ -115,7 +115,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_file_read(params: Map<String, Value>) -> ControllerFuture {
+fn handle_file_read(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let filename = read_required::<String>(&params, "filename")?;
@@ -129,7 +129,7 @@ fn handle_file_read(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_file_write(params: Map<String, Value>) -> ControllerFuture {
+fn handle_file_write(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let filename = read_required::<String>(&params, "filename")?;
@@ -148,7 +148,7 @@ fn handle_file_write(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_file_reset(params: Map<String, Value>) -> ControllerFuture {
+fn handle_file_reset(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let filename = read_required::<String>(&params, "filename")?;

@@ -281,7 +281,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_add(params: Map<String, Value>) -> ControllerFuture {
+fn handle_add(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
 
@@ -402,14 +402,14 @@ fn handle_add(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_list(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_list(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(crate::cron::rpc::cron_list(&config).await?)
     })
 }
 
-fn handle_update(params: Map<String, Value>) -> ControllerFuture {
+fn handle_update(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let job_id = read_required::<String>(&params, "job_id")?;
@@ -418,7 +418,7 @@ fn handle_update(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_remove(params: Map<String, Value>) -> ControllerFuture {
+fn handle_remove(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let job_id = read_required::<String>(&params, "job_id")?;
@@ -426,7 +426,7 @@ fn handle_remove(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_run(params: Map<String, Value>) -> ControllerFuture {
+fn handle_run(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let job_id = read_required::<String>(&params, "job_id")?;
@@ -434,7 +434,7 @@ fn handle_run(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_runs(params: Map<String, Value>) -> ControllerFuture {
+fn handle_runs(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let job_id = read_required::<String>(&params, "job_id")?;

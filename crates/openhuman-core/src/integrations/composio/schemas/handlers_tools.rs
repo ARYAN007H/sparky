@@ -8,7 +8,7 @@ use crate::integrations::composio::ops;
 
 use super::util::{read_optional, read_required_non_empty, to_json};
 
-pub(super) fn handle_list_tools(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_list_tools(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let toolkits = read_optional::<Vec<String>>(&params, "toolkits")?;
@@ -17,7 +17,7 @@ pub(super) fn handle_list_tools(params: Map<String, Value>) -> ControllerFuture 
     })
 }
 
-pub(super) fn handle_execute(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_execute(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let tool = read_required_non_empty(&params, "tool")?;

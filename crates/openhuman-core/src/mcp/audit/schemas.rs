@@ -80,7 +80,7 @@ fn schema() -> ControllerSchema {
     }
 }
 
-fn handle_list(params: Map<String, Value>) -> ControllerFuture {
+fn handle_list(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         log::debug!("[mcp_audit] handle_list enter params={params:?}");
         log::trace!("[mcp_audit] handle_list loading config");

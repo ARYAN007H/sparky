@@ -89,11 +89,11 @@ pub fn schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_snapshot(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_snapshot(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async { to_json(crate::platform::health::rpc::health_snapshot()) })
 }
 
-fn handle_system_info(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_system_info(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async { to_json(crate::platform::health::rpc::system_info()) })
 }
 

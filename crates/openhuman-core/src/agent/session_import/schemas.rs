@@ -70,7 +70,7 @@ pub fn session_import_schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_session_import_run(params: Map<String, Value>) -> ControllerFuture {
+fn handle_session_import_run(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let payload: SessionImportRunParams = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("invalid params: {e}"))?;

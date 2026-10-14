@@ -88,7 +88,7 @@ fn keyring_consent_schema(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_status(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_status(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         super::ops::keyring_status()
             .await?
@@ -96,7 +96,7 @@ fn handle_status(_params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_decide(params: Map<String, Value>) -> ControllerFuture {
+fn handle_decide(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let mode = params
             .get("mode")
@@ -109,7 +109,7 @@ fn handle_decide(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_retry_probe(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_retry_probe(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         super::ops::keyring_retry_probe()
             .await?

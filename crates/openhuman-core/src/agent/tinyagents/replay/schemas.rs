@@ -227,7 +227,7 @@ async fn configured_workspace() -> Result<std::path::PathBuf, String> {
     Ok(config.workspace_dir)
 }
 
-fn handle_run_events(params: Map<String, Value>) -> ControllerFuture {
+fn handle_run_events(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let payload: RunEventsParams = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("invalid params: {e}"))?;
@@ -261,7 +261,7 @@ fn handle_run_events(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_run_status(params: Map<String, Value>) -> ControllerFuture {
+fn handle_run_status(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let payload: RunStatusParams = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("invalid params: {e}"))?;
@@ -282,7 +282,7 @@ fn handle_run_status(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_runs_active(params: Map<String, Value>) -> ControllerFuture {
+fn handle_runs_active(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let payload: RunsActiveParams = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("invalid params: {e}"))?;

@@ -11,35 +11,35 @@ use crate::integrations::composio::ops;
 
 use super::util::{read_optional, read_required_non_empty, to_json};
 
-pub(super) fn handle_list_toolkits(_params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_list_toolkits(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(ops::composio_list_toolkits(&config).await?)
     })
 }
 
-pub(super) fn handle_list_capabilities(_params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_list_capabilities(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(ops::composio_list_capabilities(&config).await?)
     })
 }
 
-pub(super) fn handle_list_agent_ready_toolkits(_params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_list_agent_ready_toolkits(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(ops::composio_list_agent_ready_toolkits(&config).await?)
     })
 }
 
-pub(super) fn handle_list_connections(_params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_list_connections(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(ops::composio_list_connections(&config).await?)
     })
 }
 
-pub(super) fn handle_authorize(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_authorize(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let toolkit = read_required_non_empty(&params, "toolkit")?;
@@ -48,7 +48,7 @@ pub(super) fn handle_authorize(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-pub(super) fn handle_delete_connection(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_delete_connection(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let connection_id = read_required_non_empty(&params, "connection_id")?;
@@ -56,7 +56,7 @@ pub(super) fn handle_delete_connection(params: Map<String, Value>) -> Controller
     })
 }
 
-pub(super) fn handle_get_mode(_params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_get_mode(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         tracing::debug!("[composio-direct] rpc get_mode entry");
         let config = config_rpc::load_config_with_timeout().await?;
@@ -64,7 +64,7 @@ pub(super) fn handle_get_mode(_params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-pub(super) fn handle_set_api_key(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_set_api_key(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         tracing::debug!("[composio-direct] rpc set_api_key entry");
         let config = config_rpc::load_config_with_timeout().await?;
@@ -74,7 +74,7 @@ pub(super) fn handle_set_api_key(params: Map<String, Value>) -> ControllerFuture
     })
 }
 
-pub(super) fn handle_clear_api_key(_params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_clear_api_key(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         tracing::debug!("[composio-direct] rpc clear_api_key entry");
         let config = config_rpc::load_config_with_timeout().await?;

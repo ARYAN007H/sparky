@@ -44,7 +44,7 @@ async fn save(config: &Config) -> MemoryResult<()> {
         .map_err(|error| MemoryError::Engine(format!("saving config failed: {error:#}")))
 }
 
-pub(super) fn engines_list(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn engines_list(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         parse::<EmptyParams>(params)?;
         to_json(ops::engines_list(&load().await?))

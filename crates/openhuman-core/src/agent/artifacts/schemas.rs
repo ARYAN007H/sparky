@@ -252,7 +252,7 @@ fn artifact_id_input(comment: &'static str) -> FieldSchema {
     }
 }
 
-fn handle_list_artifacts(params: Map<String, Value>) -> ControllerFuture {
+fn handle_list_artifacts(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let offset = read_optional_u64(&params, "offset")?
@@ -276,7 +276,7 @@ fn handle_list_artifacts(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_get_artifact(params: Map<String, Value>) -> ControllerFuture {
+fn handle_get_artifact(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let artifact_id = read_required::<String>(&params, "artifact_id")?;
@@ -284,7 +284,7 @@ fn handle_get_artifact(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_delete_artifact(params: Map<String, Value>) -> ControllerFuture {
+fn handle_delete_artifact(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let artifact_id = read_required::<String>(&params, "artifact_id")?;
@@ -294,7 +294,7 @@ fn handle_delete_artifact(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_regenerate(params: Map<String, Value>) -> ControllerFuture {
+fn handle_regenerate(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let artifact_id = read_required::<String>(&params, "artifact_id")?;

@@ -281,7 +281,7 @@ fn str_param(params: &Map<String, Value>, key: &str) -> Option<String> {
     params.get(key).and_then(Value::as_str).map(str::to_string)
 }
 
-fn handle_detect(params: Map<String, Value>) -> ControllerFuture {
+fn handle_detect(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         gate()?;
         let content = str_param(&params, "content").ok_or("missing 'content'")?;
@@ -330,7 +330,7 @@ fn compress_hint_from_params(params: &Map<String, Value>) -> Result<ContentHint,
     })
 }
 
-fn handle_compress(params: Map<String, Value>) -> ControllerFuture {
+fn handle_compress(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         gate()?;
         let content = str_param(&params, "content").ok_or("missing 'content'")?;
@@ -349,7 +349,7 @@ fn handle_compress(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_cache_stats(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_cache_stats(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         gate()?;
         let stats = super::cache_stats().await?;
@@ -357,7 +357,7 @@ fn handle_cache_stats(_params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_retrieve(params: Map<String, Value>) -> ControllerFuture {
+fn handle_retrieve(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         gate()?;
         let token = str_param(&params, "token").ok_or("missing 'token'")?;
@@ -368,7 +368,7 @@ fn handle_retrieve(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_settings_get(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_settings_get(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         gate()?;
         let config = crate::config::rpc::load_config_with_timeout()
@@ -380,7 +380,7 @@ fn handle_settings_get(_params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_settings_update(params: Map<String, Value>) -> ControllerFuture {
+fn handle_settings_update(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         gate()?;
         // Accept either {"patch": {...}} or a bare object of fields.
@@ -409,7 +409,7 @@ fn handle_settings_update(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_savings_stats(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_savings_stats(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         gate()?;
         let cache = super::cache_stats().await?;
@@ -428,7 +428,7 @@ fn handle_savings_stats(_params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_savings_reset(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_savings_reset(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         gate()?;
         let config = crate::config::rpc::load_config_with_timeout()

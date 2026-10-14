@@ -91,7 +91,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_relay_inbound(params: Map<String, Value>) -> ControllerFuture {
+fn handle_relay_inbound(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params: RelayInboundParams = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("invalid params: {e}"))?;

@@ -223,7 +223,7 @@ fn new_correlation_id() -> String {
     uuid::Uuid::new_v4().simple().to_string()[..8].to_string()
 }
 
-fn handle_cost_get_dashboard(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_cost_get_dashboard(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "cost_rpc", "[cost_rpc][{cid}] cost_get_dashboard.entry");
@@ -241,7 +241,7 @@ fn handle_cost_get_dashboard(_params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_cost_get_daily_history(params: Map<String, Value>) -> ControllerFuture {
+fn handle_cost_get_daily_history(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "cost_rpc", "[cost_rpc][{cid}] cost_get_daily_history.entry");
@@ -273,7 +273,7 @@ fn handle_cost_get_daily_history(params: Map<String, Value>) -> ControllerFuture
     })
 }
 
-fn handle_cost_get_summary(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_cost_get_summary(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "cost_rpc", "[cost_rpc][{cid}] cost_get_summary.entry");
@@ -291,7 +291,7 @@ fn handle_cost_get_summary(_params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_cost_get_usage_log(params: Map<String, Value>) -> ControllerFuture {
+fn handle_cost_get_usage_log(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "cost_rpc", "[cost_rpc][{cid}] cost_get_usage_log.entry");
@@ -336,7 +336,7 @@ fn parse_report_params<T: serde::de::DeserializeOwned + Default>(
     serde_json::from_value(Value::Object(params)).map_err(|e| format!("invalid params: {e}"))
 }
 
-fn handle_cost_report(params: Map<String, Value>) -> ControllerFuture {
+fn handle_cost_report(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "cost_rpc", "[cost_rpc][{cid}] cost_report.entry");
@@ -349,7 +349,7 @@ fn handle_cost_report(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_cost_cache_report(params: Map<String, Value>) -> ControllerFuture {
+fn handle_cost_cache_report(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "cost_rpc", "[cost_rpc][{cid}] cost_cache_report.entry");

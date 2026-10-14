@@ -80,7 +80,7 @@ pub(super) struct InferenceListModelsParams {
     provider_id: String,
 }
 
-pub(super) fn handle_inference_resolve_model(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_inference_resolve_model(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<InferenceResolveModelParams>(params)?;
         let config = config_rpc::load_config_with_timeout().await?;
@@ -100,18 +100,18 @@ pub(super) fn handle_inference_resolve_model(params: Map<String, Value>) -> Cont
     })
 }
 
-pub(super) fn handle_inference_status(_params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_inference_status(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(crate::inference::rpc::inference_status(&config).await?)
     })
 }
 
-pub(super) fn handle_inference_get_client_config(_params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_inference_get_client_config(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move { to_json(crate::inference::rpc::inference_get_client_config().await?) })
 }
 
-pub(super) fn handle_inference_update_model_settings(
+pub(super) fn handle_inference_update_model_settings(_ctx: DispatchCtx, 
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
@@ -248,7 +248,7 @@ pub(super) fn handle_inference_update_model_settings(
     })
 }
 
-pub(super) fn handle_inference_update_local_settings(
+pub(super) fn handle_inference_update_local_settings(_ctx: DispatchCtx, 
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
@@ -273,20 +273,20 @@ pub(super) fn handle_inference_update_local_settings(
     })
 }
 
-pub(super) fn handle_inference_list_models(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_inference_list_models(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let request = deserialize_params::<InferenceListModelsParams>(params)?;
         to_json(crate::inference::rpc::inference_list_models(&request.provider_id).await?)
     })
 }
 
-pub(super) fn handle_inference_provider_auth_errors(
+pub(super) fn handle_inference_provider_auth_errors(_ctx: DispatchCtx, 
     _params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move { to_json(crate::inference::rpc::inference_provider_auth_errors().await?) })
 }
 
-pub(super) fn handle_inference_diagnostics(_params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_inference_diagnostics(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(crate::inference::rpc::inference_diagnostics(&config).await?)
