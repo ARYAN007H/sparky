@@ -152,6 +152,7 @@ const deletedTaskLocalModules = [
   "resolved_route",
   "run_cancellation_context",
   "thread_context",
+  "turn_workspace",
 ];
 const taskLocalAccessors = [
   "current_parent",
@@ -182,6 +183,12 @@ const taskLocalAccessors = [
   "with_origin",
   "with_inherited_origin",
   "current_request_id",
+  "with_turn_deadline",
+  "with_stop_hooks",
+  "current_stop_hooks",
+  "with_tool_call_limit",
+  "with_fresh_snapshot",
+  "with_untrusted_input_turn",
 ];
 const taskLocalStatics = [
   "PARENT_CONTEXT",
@@ -194,6 +201,14 @@ const taskLocalStatics = [
   "THREAD_ID",
   "AGENT_TURN_ORIGIN",
   "AGENT_TURN_WORKSPACE",
+  "CURRENT_TURN_DEADLINE",
+  "TURN_CANCELLATION",
+  "MODEL_BUDGET",
+  "SPAWN_DEPTH_LIMIT",
+  "CURRENT_STOP_HOOKS",
+  "CURRENT_TOOL_CALL_LIMIT",
+  "UNTRUSTED_INPUT_TURN",
+  "REGENERATE_TARGET_ID",
 ];
 
 async function filesUnder(root, predicate) {
