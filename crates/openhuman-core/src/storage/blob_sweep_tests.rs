@@ -132,20 +132,27 @@ async fn sweep_profiles_reaches_the_modules_scopes_for_that_profile() {
 }
 
 /// A backend whose sweep never completes.
+#[derive(Debug)]
 struct HungSweep(Arc<dyn StorageBackend>);
 
 #[async_trait::async_trait]
-impl tinystoragedrivers::StorageBackend for HungSweep {
+impl StorageBackend for HungSweep {
+    fn driver(&self) -> &'static str {
+        self.0.driver()
+    }
+    fn capabilities(&self) -> tinystoragedrivers::Capabilities {
+        self.0.capabilities()
+    }
     fn for_scope(
         &self,
         scope: &Scope,
-    ) -> Result<tinystoragedrivers::ScopedStorage, tinystoragedrivers::StorageError> {
+    ) -> tinystoragedrivers::Result<tinystoragedrivers::ScopedStorage> {
         self.0.for_scope(scope)
     }
-    async fn sweep_expired_blobs(
-        &self,
-        _scope: &Scope,
-    ) -> Result<u64, tinystoragedrivers::StorageError> {
+    fn database(&self, name: &str) -> tinystoragedrivers::Result<Arc<dyn StorageBackend>> {
+        self.0.database(name)
+    }
+    async fn sweep_expired_blobs(&self, _scope: &Scope) -> tinystoragedrivers::Result<u64> {
         std::future::pending().await
     }
 }
