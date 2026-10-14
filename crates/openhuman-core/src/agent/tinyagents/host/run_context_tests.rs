@@ -458,3 +458,16 @@ fn a_response_shape_belongs_to_the_root_turn_and_is_not_inherited() {
     assert!(root.child().response_shape.is_none());
     assert!(root.response_shape.is_some());
 }
+
+#[test]
+fn autonomous_iter_cap_is_inherited_by_children_and_lifts_subagent_caps() {
+    use crate::agent::subagent_host::subagent_iter_cap_with_autonomous_lift as lift;
+    let mut parent = OpenHumanRunContext::new();
+    assert_eq!(parent.child().autonomous_iter_cap, None);
+    assert_eq!(lift(parent.autonomous_iter_cap, 10), 10);
+    parent.autonomous_iter_cap = Some(200);
+    let grandchild = parent.child().child();
+    assert_eq!(grandchild.autonomous_iter_cap, Some(200));
+    assert_eq!(lift(grandchild.autonomous_iter_cap, 10), 200);
+    assert_eq!(lift(Some(5), 10), 10, "a cap below the base never lowers it");
+}

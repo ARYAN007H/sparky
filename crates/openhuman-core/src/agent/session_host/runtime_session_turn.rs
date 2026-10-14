@@ -20,6 +20,7 @@ impl OpenHumanSessionHost {
         context.progress = self.on_progress.clone();
         context.thread_id = self.thread_id.clone();
         context.task_recency_window = self.task_recency_window;
+        context.autonomous_iter_cap = self.autonomous_iter_cap;
         context.workspace = self.workspace_descriptor.clone();
         // The web backstop's deadline, when this turn runs under one: the
         // harness winds down before it instead of being dropped by it.
