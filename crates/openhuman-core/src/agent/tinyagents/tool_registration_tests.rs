@@ -1,33 +1,24 @@
-//! Coverage for [`register_turn_tools_and_agents`]'s thread-scoped filtering.
+//! Coverage for the host's tool registration over the runtime builder.
 
 use super::*;
+use tinyagents_harness::runtime::AgentHarness;
 
 /// Register the real goal tools on a fresh harness and return the candidate
-/// names handed on to the shadow tool-exposure layer.
+/// names handed on to the exposure layer.
 fn candidate_names(has_thread: bool) -> Vec<String> {
     let workspace = tempfile::TempDir::new().expect("workspace");
     let tools = crate::agent::goals::goal_tools(workspace.path());
     let mut harness: AgentHarness<(), OpenHumanRunContext> = AgentHarness::new();
-    let mut registry: CapabilityRegistry<()> = CapabilityRegistry::new();
 
-    let (tool_count, candidates, _, _) = register_turn_tools_and_agents(
-        &mut harness,
-        &mut registry,
-        &[Arc::new(tools)],
-        &None,
-        &HashSet::new(),
-        None,
-        false,
-        has_thread,
-        &HashSet::new(),
-    );
-    assert_eq!(tool_count, harness.tools().names().len());
-    candidates
+    let report = host_tool_set_builder(&[Arc::new(tools)], &None, has_thread, &HashSet::new())
+        .register(&mut harness, None);
+    assert_eq!(report.registered.len(), harness.tools().names().len());
+    report.plan.candidates
 }
 
 #[test]
 fn thread_less_turn_drops_goal_tools_from_the_exposure_candidates() {
-    // The shadow exposure layer diffs these against the registered tools; a
+    // The exposure layer diffs these against the registered tools; a
     // candidate that is never registered would log a false divergence warn.
     let candidates = candidate_names(false);
 
@@ -60,7 +51,7 @@ async fn registered_memory_dispatch_enforces_one_budget_across_distinct_calls() 
     let tools: Arc<Vec<Box<dyn tinytools::Tool>>> = Arc::new(vec![Box::new(
         crate::memory::tools::MemoryTool::new(Arc::new(config.clone())),
     )]);
-    let adapter = CanonicalSharedToolAdapter::for_name(vec![tools], "memory").unwrap();
+    let adapter = shared_tool_adapter(vec![tools], "memory").unwrap();
     let dispatch = typed_dispatch_for("memory", Arc::new(adapter))
         .expect("memory registration must preserve the harness run context");
     let parent = OpenHumanRunContext::new().into_tinyagents(RunConfig::new("memory-dispatch"));
