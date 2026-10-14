@@ -2,7 +2,7 @@
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/agent/bus.rs",
-    "line": 304,
+    "line": 305,
     "text": "let outcome = turn_origin::with_origin(",
     "occurrence": 1
   },
@@ -107,14 +107,14 @@
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/agent/turn_origin.rs",
-    "line": 266,
+    "line": 268,
     "text": "Some(origin) => with_origin(origin, fut).await,",
     "occurrence": 1
   },
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/agent/turn_origin.rs",
-    "line": 362,
+    "line": 364,
     "text": "pub fn current_request_id() -> Option<String> {",
     "occurrence": 1
   },
