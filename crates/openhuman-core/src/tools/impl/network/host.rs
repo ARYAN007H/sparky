@@ -10,7 +10,7 @@ use std::sync::Arc;
 #[cfg(feature = "web3")]
 use tinytools::{PermissionLevel, Tool, ToolResult};
 use tinytools_std::network::{
-    AsyncHtmlExtractor, HttpLimits, HttpRequestTool, NetGate, WebFetchTool,
+    AsyncHtmlExtractor, CurlTool, HttpLimits, HttpRequestTool, NetGate, WebFetchTool,
 };
 
 use super::gate::RoutedGate;
@@ -174,6 +174,28 @@ impl Tool for X402RequestTool {
     async fn execute(&self, args: serde_json::Value) -> anyhow::Result<ToolResult> {
         self.inner.execute(args).await
     }
+}
+
+/// `curl` for chat turns: built for each call around that call's chat, so its
+/// egress disclosure reaches that chat.
+pub fn routed_curl_tool(
+    policy: Arc<SecurityPolicy>,
+    allowed_domains: Vec<String>,
+    action_dir: std::path::PathBuf,
+    dest_subdir: String,
+    max_download_bytes: u64,
+    timeout_secs: u64,
+) -> PerCallTool<CurlTool> {
+    PerCallTool::new(move |chat| {
+        CurlTool::new(
+            Arc::new(RoutedGate::new(Arc::clone(&policy), chat)),
+            allowed_domains.clone(),
+            action_dir.clone(),
+            dest_subdir.clone(),
+            max_download_bytes,
+            timeout_secs,
+        )
+    })
 }
 
 /// `web_fetch` for chat turns: built for each call around that call's chat, so

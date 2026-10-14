@@ -337,25 +337,14 @@ pub fn all_tools_with_runtime(
     // curl — always registered. Shares `http_request.allowed_domains`,
     // adds streaming-to-disk with a hard byte ceiling. Writes land
     // under `<workspace>/<curl.dest_subdir>`.
-    tools.push(Box::new(PerCallTool::new({
-        let security = security.clone();
-        let allowed_domains = http_config.allowed_domains.clone();
-        let action_dir = action_dir.to_path_buf();
-        let dest_subdir = root_config.curl.dest_subdir.clone();
-        let max_download_bytes = root_config.curl.max_download_bytes;
-        let timeout_secs = root_config.curl.timeout_secs;
-        // Built per call so the disclosure reaches that call's chat.
-        move |chat| {
-            CurlTool::new(
-                Arc::new(RoutedGate::new(security.clone(), chat)),
-                allowed_domains.clone(),
-                action_dir.clone(),
-                dest_subdir.clone(),
-                max_download_bytes,
-                timeout_secs,
-            )
-        }
-    })));
+    tools.push(Box::new(routed_curl_tool(
+        security.clone(),
+        http_config.allowed_domains.clone(),
+        action_dir.to_path_buf(),
+        root_config.curl.dest_subdir.clone(),
+        root_config.curl.max_download_bytes,
+        root_config.curl.timeout_secs,
+    )));
 
     // gitbooks — answers questions about OpenHuman by calling the
     // GitBook MCP server. Two tools mirroring the upstream MCP tools.
