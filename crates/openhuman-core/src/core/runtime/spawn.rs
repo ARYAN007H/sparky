@@ -1,14 +1,16 @@
 //! Spawning tasks without dropping who they work for.
 //!
-//! The ambient [`CoreContext`] and the memory identity are tokio task-locals,
-//! so a bare `tokio::spawn` starts its task with neither: the child falls back
-//! to the process default context and the root memory identity. In a
-//! single-user process that default is the right user by accident. In a SaaS
+//! The ambient [`CoreContext`] is a tokio task-local, so a bare `tokio::spawn`
+//! starts its task without it: the child falls back to the process default
+//! context. In a single-user process that default is the right user by
+//! accident. In a SaaS
 //! process it is the operator, so a dropped scope writes one user's work
 //! somewhere it does not belong — or, with the SaaS config redirect, fails.
 //!
-//! [`spawn_scoped`] captures both at the call site and re-enters them in the
-//! child. New code in the core spawns through it; `scripts/ci/check-saas-ambient.mjs`
+//! [`spawn_scoped`] captures it at the call site and re-enters it in the
+//! child. The memory identity is not ambient any more: spawned work that acts
+//! on memory is handed its `MemoryIdentity` explicitly.
+//! New code in the core spawns through it; `scripts/ci/check-saas-ambient.mjs`
 //! ratchets the bare spawns that remain.
 
 use std::future::Future;
@@ -17,8 +19,7 @@ use tokio::task::JoinHandle;
 
 use super::CoreContext;
 
-/// Like `tokio::spawn`, but the task keeps the caller's [`CoreContext`] and
-/// memory identity.
+/// Like `tokio::spawn`, but the task keeps the caller's [`CoreContext`].
 pub fn spawn_scoped<F>(fut: F) -> JoinHandle<F::Output>
 where
     F: Future + Send + 'static,
