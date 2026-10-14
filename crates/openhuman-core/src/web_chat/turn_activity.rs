@@ -301,20 +301,6 @@ pub(crate) fn tap(
     bridge_rx
 }
 
-tokio::task_local! {
-    static CURRENT_TURN_ACTIVITY: TurnActivity;
-}
-
-/// The activity record scoped on the current task, if any.
-pub(crate) fn current() -> Option<TurnActivity> {
-    CURRENT_TURN_ACTIVITY.try_with(Clone::clone).ok()
-}
-
-/// Run `future` with `activity` scoped on the task.
-pub(crate) async fn with_turn_activity<F: Future>(activity: TurnActivity, future: F) -> F::Output {
-    CURRENT_TURN_ACTIVITY.scope(activity, future).await
-}
-
 #[cfg(test)]
 #[path = "turn_activity_tests.rs"]
 mod tests;
