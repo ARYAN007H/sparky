@@ -12,7 +12,6 @@ use crate::security::SecurityPolicy;
 #[cfg(feature = "documents")]
 use crate::tools::PresentationTool;
 #[cfg(feature = "documents")]
-use tinytools::Tool;
 
 use super::store;
 use super::types::ArtifactKind;
