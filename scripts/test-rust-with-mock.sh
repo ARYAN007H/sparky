@@ -309,7 +309,7 @@ run_tinychannels_linked_fixture_tests() {
   # processes so process-wide module-loader state cannot leak into the unit
   # suite. The linked source is explicit and never falls back to downloading.
   OPENHUMAN_MODULE_PATH="$tinychannels_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}" \
-    cargo_test --lib channels::module_fixture:: \
+    cargo_test --features e2e-test-support --lib channels::module_fixture:: \
       -- --test-threads=1 "$@"
   OPENHUMAN_MODULE_PATH="$tinychannels_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}" \
     cargo_test --features e2e-test-support --lib \

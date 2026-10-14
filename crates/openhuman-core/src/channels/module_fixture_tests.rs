@@ -22,6 +22,7 @@ const MODULE_ID: &str = "tinychannels";
 pub(crate) async fn client() -> ModuleClient {
     register_linked(MODULE_ID, tinychannels_module::linked_module);
     let mut config = Config::default();
+    config.modules.allow_download = false;
     config.modules.source = ModuleSourceMode::Linked;
     ops::ensure_loaded(&config, MODULE_ID)
         .await

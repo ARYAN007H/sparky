@@ -147,8 +147,7 @@ impl ModuleProgressiveReply {
         session: tokio_util::sync::CancellationToken,
     ) -> anyhow::Result<Self> {
         let callback = ManagedTransport::capture(&config, channel.clone(), session)?;
-        let runtime =
-            ChannelRuntimeLease::open(crate::modules::client(config), callback).await?;
+        let runtime = ChannelRuntimeLease::open(crate::modules::client(config), callback).await?;
         let result: ProgressiveResult = runtime
             .object()
             .call_confidential(

@@ -9,8 +9,7 @@
 //! `loader_disabled` reason.
 
 use tinybus::module::{
-    AccessFuture, FailureReporter, ModuleAccess, ModuleClient, ProxyFailure, Reason,
-    ReleaseRecord,
+    AccessFuture, FailureReporter, ModuleAccess, ModuleClient, ProxyFailure, Reason, ReleaseRecord,
 };
 use tinybus::Proxy;
 
