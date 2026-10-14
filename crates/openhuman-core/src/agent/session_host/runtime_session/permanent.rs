@@ -56,3 +56,7 @@ impl OpenHumanTurnPrelude {
         .or(preparation.prefix.take());
     }
 }
+
+#[cfg(test)]
+#[path = "permanent_tests.rs"]
+mod tests;
