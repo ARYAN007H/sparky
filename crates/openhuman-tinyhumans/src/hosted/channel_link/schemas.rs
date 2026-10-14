@@ -101,7 +101,10 @@ pub fn channel_link_schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_auth_create_channel_link_token(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_auth_create_channel_link_token(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let payload = deserialize_params::<AuthCreateChannelLinkTokenParams>(params)?;

@@ -116,7 +116,8 @@ async fn invoke_method_inner(
         let params_obj = crate::core::params::params_to_object(params.clone())?;
         // Validate inputs against the schema before calling the handler.
         all::validate_params(&schema, &params_obj)?;
-        if let Some(result) = all::try_invoke_registered_rpc(ctx.clone(), method, params_obj).await {
+        if let Some(result) = all::try_invoke_registered_rpc(ctx.clone(), method, params_obj).await
+        {
             return result;
         }
         log::debug!(

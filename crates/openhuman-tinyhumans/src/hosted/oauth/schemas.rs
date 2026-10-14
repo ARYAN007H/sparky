@@ -157,14 +157,20 @@ fn handle_auth_oauth_connect(_ctx: DispatchCtx, params: Map<String, Value>) -> C
     })
 }
 
-fn handle_auth_oauth_list_integrations(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_auth_oauth_list_integrations(
+    _ctx: DispatchCtx,
+    _params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(crate::hosted::oauth::oauth_list_integrations(&config).await?)
     })
 }
 
-fn handle_auth_oauth_fetch_integration_tokens(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_auth_oauth_fetch_integration_tokens(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let payload = deserialize_params::<AuthOauthIntegrationTokensParams>(params)?;
@@ -179,7 +185,10 @@ fn handle_auth_oauth_fetch_integration_tokens(_ctx: DispatchCtx, params: Map<Str
     })
 }
 
-fn handle_auth_oauth_revoke_integration(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_auth_oauth_revoke_integration(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let payload = deserialize_params::<AuthOauthRevokeParams>(params)?;
@@ -190,7 +199,10 @@ fn handle_auth_oauth_revoke_integration(_ctx: DispatchCtx, params: Map<String, V
     })
 }
 
-fn handle_auth_oauth_fetch_client_key(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_auth_oauth_fetch_client_key(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let payload = deserialize_params::<AuthOauthClientKeyParams>(params)?;

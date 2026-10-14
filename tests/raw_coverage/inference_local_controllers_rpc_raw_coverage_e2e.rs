@@ -45,10 +45,10 @@
 //! serialization mechanism, the same reasoning as `tests/agent_harness_e2e.rs:8-12`.
 #![allow(clippy::await_holding_lock)]
 
-use openhuman_core::core::runtime::DispatchCtx;
 use crate::env_guard::EnvVarGuard;
+use openhuman_core::core::runtime::DispatchCtx;
 use std::path::{Path, PathBuf};
-use std::sync::{OnceLock};
+use std::sync::OnceLock;
 
 use openhuman_core::config::Config;
 use openhuman_core::core::all::RegisteredController;
@@ -67,7 +67,8 @@ fn env_lock() -> tokio::sync::MutexGuard<'static, ()> {
 async fn env_lock_async() -> tokio::sync::MutexGuard<'static, ()> {
     ENV_LOCK
         .get_or_init(|| tokio::sync::Mutex::new(()))
-        .lock().await
+        .lock()
+        .await
 }
 
 /// Point the Ollama health probe at a closed loopback port and clear the

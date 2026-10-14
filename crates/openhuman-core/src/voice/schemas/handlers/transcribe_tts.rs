@@ -14,7 +14,10 @@ use crate::voice::schemas::params::{
     TranscribeParams, TtsDispatchParams, TtsParams,
 };
 
-pub(crate) fn handle_voice_status(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+pub(crate) fn handle_voice_status(
+    _ctx: DispatchCtx,
+    _params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(crate::voice::voice_status(&config).await?)
@@ -23,14 +26,20 @@ pub(crate) fn handle_voice_status(_ctx: DispatchCtx, _params: Map<String, Value>
 
 /// Mint a realtime voice-agent signed WebSocket URL (#5399). Takes no params —
 /// the agent is server-configured; the desktop only asks for a fresh signed URL.
-pub(crate) fn handle_voice_agent_signed_url(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+pub(crate) fn handle_voice_agent_signed_url(
+    _ctx: DispatchCtx,
+    _params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(crate::voice::realtime::mint_voice_agent_signed_url(&config).await?)
     })
 }
 
-pub(crate) fn handle_voice_transcribe(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(crate) fn handle_voice_transcribe(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let p = deserialize_params::<TranscribeParams>(params)?;
@@ -46,7 +55,10 @@ pub(crate) fn handle_voice_transcribe(_ctx: DispatchCtx, params: Map<String, Val
     })
 }
 
-pub(crate) fn handle_voice_transcribe_bytes(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(crate) fn handle_voice_transcribe_bytes(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let p = deserialize_params::<TranscribeBytesParams>(params)?;
@@ -71,7 +83,10 @@ pub(crate) fn handle_voice_tts(_ctx: DispatchCtx, params: Map<String, Value>) ->
     })
 }
 
-pub(crate) fn handle_voice_reply_synthesize(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(crate) fn handle_voice_reply_synthesize(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let p = deserialize_params::<ReplySynthesizeParams>(params)?;
@@ -116,7 +131,10 @@ pub(crate) fn handle_voice_reply_synthesize(_ctx: DispatchCtx, params: Map<Strin
     })
 }
 
-pub(crate) fn handle_voice_cloud_transcribe(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(crate) fn handle_voice_cloud_transcribe(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let p = deserialize_params::<CloudTranscribeParams>(params)?;
@@ -133,7 +151,10 @@ pub(crate) fn handle_voice_cloud_transcribe(_ctx: DispatchCtx, params: Map<Strin
     })
 }
 
-pub(crate) fn handle_voice_stt_dispatch(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(crate) fn handle_voice_stt_dispatch(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let p = deserialize_params::<SttDispatchParams>(params)?;
@@ -174,7 +195,10 @@ pub(crate) fn handle_voice_stt_dispatch(_ctx: DispatchCtx, params: Map<String, V
     })
 }
 
-pub(crate) fn handle_voice_tts_dispatch(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(crate) fn handle_voice_tts_dispatch(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let p = deserialize_params::<TtsDispatchParams>(params)?;

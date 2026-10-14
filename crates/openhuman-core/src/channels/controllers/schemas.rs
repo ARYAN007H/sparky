@@ -353,7 +353,10 @@ fn handle_discord_list_channels(_ctx: DispatchCtx, params: Map<String, Value>) -
     })
 }
 
-fn handle_discord_check_permissions(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_discord_check_permissions(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let p = deserialize_params::<DiscordCheckPermissionsParams>(params)?;

@@ -278,7 +278,10 @@ fn handle_local_ai_transcribe(_ctx: DispatchCtx, params: Map<String, Value>) -> 
     })
 }
 
-fn handle_local_ai_transcribe_bytes(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_local_ai_transcribe_bytes(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<LocalAiTranscribeBytesParams>(params)?;
         let config = config_rpc::load_config_with_timeout().await?;
@@ -308,7 +311,10 @@ fn handle_local_ai_tts(_ctx: DispatchCtx, params: Map<String, Value>) -> Control
     })
 }
 
-fn handle_local_ai_test_connection(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_local_ai_test_connection(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<LocalAiTestConnectionParams>(params)?;
         let result = tinyinference_local::service::test_ollama_connection(&p.url).await?;

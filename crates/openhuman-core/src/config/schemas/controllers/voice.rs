@@ -10,11 +10,17 @@ use super::super::helpers::{
     deserialize_params, to_json, DictationSettingsUpdate, VoiceServerSettingsUpdate,
 };
 
-pub(super) fn handle_get_dictation_settings(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_get_dictation_settings(
+    _ctx: DispatchCtx,
+    _params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async { to_json(config_rpc::get_dictation_settings().await?) })
 }
 
-pub(super) fn handle_update_dictation_settings(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_update_dictation_settings(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let update = deserialize_params::<DictationSettingsUpdate>(params)?;
         let patch = config_rpc::DictationSettingsPatch {
@@ -29,11 +35,17 @@ pub(super) fn handle_update_dictation_settings(_ctx: DispatchCtx, params: Map<St
     })
 }
 
-pub(super) fn handle_get_voice_server_settings(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_get_voice_server_settings(
+    _ctx: DispatchCtx,
+    _params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async { to_json(config_rpc::get_voice_server_settings().await?) })
 }
 
-pub(super) fn handle_update_voice_server_settings(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_update_voice_server_settings(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let update = deserialize_params::<VoiceServerSettingsUpdate>(params)?;
         let patch = config_rpc::VoiceServerSettingsPatch {

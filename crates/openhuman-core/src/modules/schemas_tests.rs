@@ -1,8 +1,8 @@
-use crate::core::runtime::DispatchCtx;
 use super::{
     all_controller_schemas, all_registered_controllers, controller_value, schemas, string_param,
 };
 use crate::core::runtime::context::CoreContext;
+use crate::core::runtime::DispatchCtx;
 use crate::core::runtime::DomainSet;
 use serde_json::{Map, Value};
 
@@ -88,7 +88,10 @@ async fn forgetting_sites_reports_how_many_went() {
             Value::String("https://www.shop.test/cart".to_string()),
         );
         let one = super::handle_browser_forget_sites(DispatchCtx::process_default(), one).await;
-        (one, super::handle_browser_forget_sites(DispatchCtx::process_default(), Map::new()).await)
+        (
+            one,
+            super::handle_browser_forget_sites(DispatchCtx::process_default(), Map::new()).await,
+        )
     })
     .await;
 

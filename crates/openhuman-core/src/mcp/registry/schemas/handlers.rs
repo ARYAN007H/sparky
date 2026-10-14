@@ -13,7 +13,10 @@ use super::params::{
 
 // ── Handler implementations ──────────────────────────────────────────────────
 
-pub(super) fn handle_registry_search(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_registry_search(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let query = read_optional_string(&params, "query")?;
@@ -29,7 +32,10 @@ pub(super) fn handle_registry_search(_ctx: DispatchCtx, params: Map<String, Valu
     })
 }
 
-pub(super) fn handle_registry_get(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_registry_get(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let qualified_name = read_required::<String>(&params, "qualified_name")?;
@@ -37,7 +43,10 @@ pub(super) fn handle_registry_get(_ctx: DispatchCtx, params: Map<String, Value>)
     })
 }
 
-pub(super) fn handle_installed_list(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_installed_list(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let _ = params;
         let config = config_rpc::load_config_with_timeout().await?;
@@ -62,7 +71,10 @@ pub(super) fn handle_uninstall(_ctx: DispatchCtx, params: Map<String, Value>) ->
     })
 }
 
-pub(super) fn handle_detect_auth(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_detect_auth(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let server_id = read_required::<String>(&params, "server_id")?;
@@ -70,7 +82,10 @@ pub(super) fn handle_detect_auth(_ctx: DispatchCtx, params: Map<String, Value>) 
     })
 }
 
-pub(super) fn handle_oauth_begin(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_oauth_begin(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let server_id = read_required::<String>(&params, "server_id")?;
@@ -94,7 +109,10 @@ pub(super) fn handle_disconnect(_ctx: DispatchCtx, params: Map<String, Value>) -
     })
 }
 
-pub(super) fn handle_set_enabled(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_set_enabled(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let server_id = read_required::<String>(&params, "server_id")?;
@@ -165,7 +183,10 @@ pub(super) fn handle_config_set(_ctx: DispatchCtx, params: Map<String, Value>) -
     })
 }
 
-pub(super) fn handle_registry_settings_get(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_registry_settings_get(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let _ = params;
         let config = config_rpc::load_config_with_timeout().await?;
@@ -173,7 +194,10 @@ pub(super) fn handle_registry_settings_get(_ctx: DispatchCtx, params: Map<String
     })
 }
 
-pub(super) fn handle_registry_settings_set(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_registry_settings_set(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let smithery_api_key = read_optional::<String>(&params, "smithery_api_key")?;
         let mcp_official_base = read_optional::<String>(&params, "mcp_official_base")?;

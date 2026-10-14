@@ -15,14 +15,18 @@ pub(super) struct InferenceOpenAiOAuthCompleteParams {
     callback_url: String,
 }
 
-pub(super) fn handle_inference_openai_oauth_start(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_inference_openai_oauth_start(
+    _ctx: DispatchCtx,
+    _params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(crate::inference::rpc::inference_openai_oauth_start(&config).await?)
     })
 }
 
-pub(super) fn handle_inference_openai_oauth_complete(_ctx: DispatchCtx, 
+pub(super) fn handle_inference_openai_oauth_complete(
+    _ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
@@ -38,7 +42,8 @@ pub(super) fn handle_inference_openai_oauth_complete(_ctx: DispatchCtx,
     })
 }
 
-pub(super) fn handle_inference_openai_oauth_import_codex_cli(_ctx: DispatchCtx, 
+pub(super) fn handle_inference_openai_oauth_import_codex_cli(
+    _ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
@@ -47,7 +52,8 @@ pub(super) fn handle_inference_openai_oauth_import_codex_cli(_ctx: DispatchCtx,
     })
 }
 
-pub(super) fn handle_inference_openai_oauth_status(_ctx: DispatchCtx, 
+pub(super) fn handle_inference_openai_oauth_status(
+    _ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
@@ -56,7 +62,8 @@ pub(super) fn handle_inference_openai_oauth_status(_ctx: DispatchCtx,
     })
 }
 
-pub(super) fn handle_inference_openai_oauth_disconnect(_ctx: DispatchCtx, 
+pub(super) fn handle_inference_openai_oauth_disconnect(
+    _ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {

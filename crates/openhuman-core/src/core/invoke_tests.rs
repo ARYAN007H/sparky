@@ -8,17 +8,27 @@ use super::{
 
 #[tokio::test]
 async fn invoke_health_snapshot_via_registry() {
-    let result = invoke_method(DispatchCtx::ambient(), default_state(), "openhuman.health_snapshot", json!({}))
-        .await
-        .expect("health snapshot should succeed");
+    let result = invoke_method(
+        DispatchCtx::ambient(),
+        default_state(),
+        "openhuman.health_snapshot",
+        json!({}),
+    )
+    .await
+    .expect("health snapshot should succeed");
     assert!(result.get("result").is_some());
 }
 
 #[tokio::test]
 async fn invoke_encrypt_secret_missing_required_param_fails_validation() {
-    let err = invoke_method(DispatchCtx::ambient(), default_state(), "openhuman.encrypt_secret", json!({}))
-        .await
-        .expect_err("missing plaintext should fail");
+    let err = invoke_method(
+        DispatchCtx::ambient(),
+        default_state(),
+        "openhuman.encrypt_secret",
+        json!({}),
+    )
+    .await
+    .expect_err("missing plaintext should fail");
     assert!(err.contains("missing required param 'plaintext'"));
 }
 
@@ -60,7 +70,12 @@ async fn gated_method_is_unknown_at_transport_even_with_malformed_params() {
         let ctx = CoreContext::for_test(DomainSet::harness(), None);
         let err = CoreContext::scope(
             ctx,
-            invoke_method(DispatchCtx::ambient(), default_state(), &gated_method, params.clone()),
+            invoke_method(
+                DispatchCtx::ambient(),
+                default_state(),
+                &gated_method,
+                params.clone(),
+            ),
         )
         .await
         .expect_err("gated flows method must error under harness()");
@@ -90,9 +105,14 @@ async fn invoke_config_get_runtime_flags_via_registry() {
 
 #[tokio::test]
 async fn invoke_auth_store_session_missing_token_fails_validation() {
-    let err = invoke_method(DispatchCtx::ambient(), default_state(), "openhuman.auth_store_session", json!({}))
-        .await
-        .expect_err("missing token should fail");
+    let err = invoke_method(
+        DispatchCtx::ambient(),
+        default_state(),
+        "openhuman.auth_store_session",
+        json!({}),
+    )
+    .await
+    .expect_err("missing token should fail");
     assert!(err.contains("missing required param 'token'"));
 }
 
@@ -114,7 +134,13 @@ async fn invoke_memory_init_accepts_empty_params() {
     // jwt_token is optional (accepted for backward compat but ignored).
     // The call may still fail for workspace reasons in test, but must NOT
     // fail with a missing-param error for jwt_token.
-    let result = invoke_method(DispatchCtx::ambient(), default_state(), "openhuman.memory_init", json!({})).await;
+    let result = invoke_method(
+        DispatchCtx::ambient(),
+        default_state(),
+        "openhuman.memory_init",
+        json!({}),
+    )
+    .await;
     if let Err(ref e) = result {
         assert!(
             !e.contains("missing required param") || !e.contains("jwt_token"),
@@ -205,9 +231,14 @@ async fn invoke_method_rejects_array_params_for_registered_method() {
 
 #[tokio::test]
 async fn invoke_method_rejects_string_params_for_registered_method() {
-    let err = invoke_method(DispatchCtx::ambient(), default_state(), "openhuman.health_snapshot", json!("oops"))
-        .await
-        .expect_err("string params should be rejected");
+    let err = invoke_method(
+        DispatchCtx::ambient(),
+        default_state(),
+        "openhuman.health_snapshot",
+        json!("oops"),
+    )
+    .await
+    .expect_err("string params should be rejected");
     assert!(err.contains("invalid params"));
     assert!(err.contains("string"));
 }
@@ -215,7 +246,13 @@ async fn invoke_method_rejects_string_params_for_registered_method() {
 #[tokio::test]
 async fn invoke_method_accepts_null_params_for_registered_method() {
     // JSON-RPC 2.0 allows omitting params; null must be treated like {}.
-    let result = invoke_method(DispatchCtx::ambient(), default_state(), "openhuman.health_snapshot", json!(null)).await;
+    let result = invoke_method(
+        DispatchCtx::ambient(),
+        default_state(),
+        "openhuman.health_snapshot",
+        json!(null),
+    )
+    .await;
     // Call should succeed or fail for domain reasons — but must NOT
     // fail with the "invalid params" shape error.
     if let Err(e) = result {
@@ -228,18 +265,28 @@ async fn invoke_method_accepts_null_params_for_registered_method() {
 
 #[tokio::test]
 async fn invoke_method_unknown_method_returns_unknown_error() {
-    let err = invoke_method(DispatchCtx::ambient(), default_state(), "openhuman.totally_made_up_xyz", json!({}))
-        .await
-        .expect_err("unknown methods must error");
+    let err = invoke_method(
+        DispatchCtx::ambient(),
+        default_state(),
+        "openhuman.totally_made_up_xyz",
+        json!({}),
+    )
+    .await
+    .expect_err("unknown methods must error");
     assert!(err.contains("unknown method"));
 }
 
 #[tokio::test]
 async fn invoke_method_core_ping_via_tier1() {
     // core.* methods aren't in the registry; they route through tier 1.
-    let result = invoke_method(DispatchCtx::ambient(), default_state(), "core.ping", json!({}))
-        .await
-        .expect("core.ping should succeed via tier 1");
+    let result = invoke_method(
+        DispatchCtx::ambient(),
+        default_state(),
+        "core.ping",
+        json!({}),
+    )
+    .await
+    .expect("core.ping should succeed via tier 1");
     assert_eq!(result, json!({ "ok": true }));
 }
 

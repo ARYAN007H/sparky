@@ -1,6 +1,6 @@
-use crate::core::runtime::DispatchCtx;
 use super::schema_defs::schemas;
 use super::*;
+use crate::core::runtime::DispatchCtx;
 
 #[test]
 fn all_schemas_use_config_namespace_and_have_descriptions() {
@@ -307,9 +307,10 @@ async fn handle_get_autonomy_settings_returns_current_value() {
     .await
     .expect("seed");
 
-    let out = super::handle_get_autonomy_settings(DispatchCtx::process_default(), serde_json::Map::new())
-        .await
-        .expect("handler");
+    let out =
+        super::handle_get_autonomy_settings(DispatchCtx::process_default(), serde_json::Map::new())
+            .await
+            .expect("handler");
     // into_cli_compatible_json wraps data under "result" when logs are present.
     let inner = out.get("result").unwrap_or(&out);
     let value = inner.get("max_actions_per_hour").and_then(|v| v.as_u64());

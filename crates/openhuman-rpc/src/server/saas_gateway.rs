@@ -131,7 +131,8 @@ fn bearer(req: &Request) -> Option<&str> {
 /// `rpc_handler` hands to the dispatcher, and (until every reader has moved off
 /// the ambient context, #7801) scopes the same context onto the request task.
 pub(crate) async fn dispatch_in(ctx: Arc<CoreContext>, mut req: Request, next: Next) -> Response {
-    req.extensions_mut().insert(DispatchCtx::new(Arc::clone(&ctx)));
+    req.extensions_mut()
+        .insert(DispatchCtx::new(Arc::clone(&ctx)));
     CoreContext::scope(ctx, next.run(req)).await
 }
 

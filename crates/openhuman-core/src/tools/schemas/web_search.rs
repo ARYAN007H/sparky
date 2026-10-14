@@ -158,7 +158,10 @@ pub(super) fn handle_web_search(_ctx: DispatchCtx, params: Map<String, Value>) -
     })
 }
 
-pub(super) fn handle_searxng_search(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_searxng_search(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let arguments = search_arguments(&params, Some("searxng"))?;
         run_role_tool(
@@ -191,7 +194,10 @@ pub(super) fn handle_web_answer(_ctx: DispatchCtx, params: Map<String, Value>) -
     })
 }
 
-pub(super) fn handle_web_contents(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_web_contents(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let urls = optional_string_array(&params, "urls")?;
         if urls.is_empty() {

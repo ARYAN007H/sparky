@@ -485,7 +485,9 @@ fn handle_prepare_transfer(_ctx: DispatchCtx, params: Map<String, Value>) -> Con
     Box::pin(async move {
         let parsed: PrepareTransferParams = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("invalid params: {e}"))?;
-        prepare_transfer(parsed, None).await?.into_cli_compatible_json()
+        prepare_transfer(parsed, None)
+            .await?
+            .into_cli_compatible_json()
     })
 }
 
@@ -493,7 +495,9 @@ fn handle_execute_prepared(_ctx: DispatchCtx, params: Map<String, Value>) -> Con
     Box::pin(async move {
         let parsed: ExecutePreparedParams = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("invalid params: {e}"))?;
-        execute_prepared(parsed, None).await?.into_cli_compatible_json()
+        execute_prepared(parsed, None)
+            .await?
+            .into_cli_compatible_json()
     })
 }
 
@@ -527,7 +531,10 @@ fn handle_lookup_tx(_ctx: DispatchCtx, params: Map<String, Value>) -> Controller
     })
 }
 
-fn handle_reveal_recovery_phrase(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_reveal_recovery_phrase(
+    _ctx: DispatchCtx,
+    _params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         crate::web3::wallet::reveal_recovery_phrase()
             .await?
@@ -555,7 +562,10 @@ fn handle_validate_mnemonic(_ctx: DispatchCtx, params: Map<String, Value>) -> Co
     })
 }
 
-fn handle_derive_recovery_material(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_derive_recovery_material(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let parsed: RecoveryPhraseParams = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("invalid params: {e}"))?;

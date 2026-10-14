@@ -11,11 +11,17 @@ use super::super::helpers::{
     RuntimeSettingsUpdate,
 };
 
-pub(super) fn handle_get_config(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_get_config(
+    _ctx: DispatchCtx,
+    _params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async { to_json(config_rpc::load_and_get_config_snapshot().await?) })
 }
 
-pub(super) fn handle_get_client_config(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_get_client_config(
+    _ctx: DispatchCtx,
+    _params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         log::debug!("[config][rpc] get_client_config enter");
         match config_rpc::load_and_get_client_config_snapshot().await {
@@ -28,7 +34,10 @@ pub(super) fn handle_get_client_config(_ctx: DispatchCtx, _params: Map<String, V
     })
 }
 
-pub(super) fn handle_update_model_settings(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_update_model_settings(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let update = deserialize_params::<ModelSettingsUpdate>(params)?;
         let cloud_provider_ca_certs = update
@@ -168,7 +177,10 @@ pub(super) fn handle_update_model_settings(_ctx: DispatchCtx, params: Map<String
     })
 }
 
-pub(super) fn handle_update_memory_settings(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_update_memory_settings(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let update = deserialize_params::<MemorySettingsUpdate>(params)?;
         let patch = config_rpc::MemorySettingsPatch {
@@ -180,7 +192,10 @@ pub(super) fn handle_update_memory_settings(_ctx: DispatchCtx, params: Map<Strin
     })
 }
 
-pub(super) fn handle_update_runtime_settings(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_update_runtime_settings(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let update = deserialize_params::<RuntimeSettingsUpdate>(params)?;
         let patch = config_rpc::RuntimeSettingsPatch {
@@ -193,7 +208,10 @@ pub(super) fn handle_update_runtime_settings(_ctx: DispatchCtx, params: Map<Stri
     })
 }
 
-pub(super) fn handle_update_local_ai_settings(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_update_local_ai_settings(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let update = deserialize_params::<LocalAiSettingsUpdate>(params)?;
         let base_url = match update.base_url {
@@ -216,10 +234,16 @@ pub(super) fn handle_update_local_ai_settings(_ctx: DispatchCtx, params: Map<Str
     })
 }
 
-pub(super) fn handle_resolve_api_url(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_resolve_api_url(
+    _ctx: DispatchCtx,
+    _params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async { to_json(config_rpc::load_and_resolve_api_url().await?) })
 }
 
-pub(super) fn handle_get_runtime_flags(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_get_runtime_flags(
+    _ctx: DispatchCtx,
+    _params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async { to_json(config_rpc::get_runtime_flags()) })
 }

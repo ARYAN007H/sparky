@@ -401,7 +401,10 @@ fn handle_billing_get_summary(_ctx: DispatchCtx, _params: Map<String, Value>) ->
     })
 }
 
-fn handle_billing_get_current_plan(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_billing_get_current_plan(
+    _ctx: DispatchCtx,
+    _params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(crate::hosted::billing::get_current_plan(&config).await?)
@@ -423,7 +426,10 @@ fn handle_billing_purchase_plan(_ctx: DispatchCtx, params: Map<String, Value>) -
     })
 }
 
-fn handle_billing_create_portal_session(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_billing_create_portal_session(
+    _ctx: DispatchCtx,
+    _params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(crate::hosted::billing::create_portal_session(&config).await?)
@@ -441,7 +447,10 @@ fn handle_billing_top_up(_ctx: DispatchCtx, params: Map<String, Value>) -> Contr
     })
 }
 
-fn handle_billing_create_coinbase_charge(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_billing_create_coinbase_charge(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let payload = deserialize_params::<CoinbaseChargeParams>(params)?;
@@ -456,7 +465,10 @@ fn handle_billing_create_coinbase_charge(_ctx: DispatchCtx, params: Map<String, 
     })
 }
 
-fn handle_billing_get_transactions(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_billing_get_transactions(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let payload = if params.is_empty() {
@@ -471,14 +483,20 @@ fn handle_billing_get_transactions(_ctx: DispatchCtx, params: Map<String, Value>
     })
 }
 
-fn handle_billing_get_auto_recharge(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_billing_get_auto_recharge(
+    _ctx: DispatchCtx,
+    _params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(crate::hosted::billing::get_auto_recharge(&config).await?)
     })
 }
 
-fn handle_billing_update_auto_recharge(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_billing_update_auto_recharge(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let payload = deserialize_params::<JsonValueParams>(params)?;
@@ -493,7 +511,10 @@ fn handle_billing_get_cards(_ctx: DispatchCtx, _params: Map<String, Value>) -> C
     })
 }
 
-fn handle_billing_create_setup_intent(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_billing_create_setup_intent(
+    _ctx: DispatchCtx,
+    _params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(crate::hosted::billing::create_setup_intent(&config).await?)

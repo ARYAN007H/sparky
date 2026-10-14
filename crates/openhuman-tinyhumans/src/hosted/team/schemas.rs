@@ -448,7 +448,10 @@ fn handle_team_remove_member(_ctx: DispatchCtx, params: Map<String, Value>) -> C
     })
 }
 
-fn handle_team_change_member_role(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_team_change_member_role(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let payload = deserialize_params::<ChangeRoleParams>(params)?;

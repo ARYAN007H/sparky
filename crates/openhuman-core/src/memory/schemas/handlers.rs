@@ -161,14 +161,20 @@ pub(super) fn agents_list(_ctx: DispatchCtx, params: Map<String, Value>) -> Cont
     })
 }
 
-pub(super) fn conversations_backfill_status(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn conversations_backfill_status(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         parse::<EmptyParams>(params)?;
         finish(backfill::status(&load().await?).await)
     })
 }
 
-pub(super) fn conversations_backfill_start(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn conversations_backfill_start(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<backfill::BackfillStartParams>(params)?;
         finish(backfill::start(&load().await?, params).await)
@@ -294,7 +300,10 @@ pub(super) fn import_status(_ctx: DispatchCtx, params: Map<String, Value>) -> Co
     })
 }
 
-pub(super) fn import_retry_failed(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn import_retry_failed(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         parse::<EmptyParams>(params)?;
         let config = load().await?;

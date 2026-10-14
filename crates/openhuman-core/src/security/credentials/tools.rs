@@ -29,7 +29,8 @@ async fn invoke_hosted(
     method: &str,
     params: serde_json::Map<String, Value>,
 ) -> anyhow::Result<Value> {
-    match crate::core::all::try_invoke_registered_rpc(DispatchCtx::ambient(), method, params).await {
+    match crate::core::all::try_invoke_registered_rpc(DispatchCtx::ambient(), method, params).await
+    {
         Some(Ok(value)) => Ok(strip_log_envelope(value)),
         Some(Err(err)) => Err(anyhow::anyhow!("{err}")),
         None => {

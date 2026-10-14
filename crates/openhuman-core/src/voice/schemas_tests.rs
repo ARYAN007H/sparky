@@ -1,5 +1,5 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
+use crate::core::runtime::DispatchCtx;
 use serde_json::json;
 
 #[test]
@@ -240,7 +240,9 @@ async fn overlay_notify_cancelled_publishes_released() {
     use crate::voice::dictation_listener::subscribe_dictation_events;
     let mut rx = subscribe_dictation_events();
     let params = Map::from_iter([("state".to_string(), json!("cancelled"))]);
-    let result = handle_overlay_stt_notify(DispatchCtx::process_default(), params).await.expect("ok");
+    let result = handle_overlay_stt_notify(DispatchCtx::process_default(), params)
+        .await
+        .expect("ok");
     assert_eq!(result["ok"], true);
     let mut saw_release = false;
     while let Ok(evt) = rx.try_recv() {
@@ -255,7 +257,9 @@ async fn overlay_notify_cancelled_publishes_released() {
 #[tokio::test]
 async fn overlay_notify_unknown_state_errors() {
     let params = Map::from_iter([("state".to_string(), json!("mystery"))]);
-    let err = handle_overlay_stt_notify(DispatchCtx::process_default(), params).await.unwrap_err();
+    let err = handle_overlay_stt_notify(DispatchCtx::process_default(), params)
+        .await
+        .unwrap_err();
     // The deserialize layer rejects the unknown variant with a detailed
     // enum message — just assert an error surfaced.
     assert!(!err.is_empty());
@@ -263,7 +267,9 @@ async fn overlay_notify_unknown_state_errors() {
 
 #[tokio::test]
 async fn overlay_notify_missing_state_errors() {
-    let err = handle_overlay_stt_notify(DispatchCtx::process_default(), Map::new()).await.unwrap_err();
+    let err = handle_overlay_stt_notify(DispatchCtx::process_default(), Map::new())
+        .await
+        .unwrap_err();
     assert!(!err.is_empty());
 }
 

@@ -1,5 +1,5 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
+use crate::core::runtime::DispatchCtx;
 
 #[test]
 fn controller_schema_inventory_is_stable() {
@@ -23,7 +23,9 @@ async fn handler_runs_dry_against_explicit_workspace() {
         Value::String(tmp.path().to_string_lossy().to_string()),
     );
 
-    let result = handle_session_import_run(DispatchCtx::process_default(), params).await.expect("handler ok");
+    let result = handle_session_import_run(DispatchCtx::process_default(), params)
+        .await
+        .expect("handler ok");
     assert_eq!(result["dry_run"], Value::Bool(true));
     assert_eq!(result["sources"]["sessions_db"], Value::Bool(false));
     assert_eq!(result["imports"], json!([]));
@@ -40,7 +42,9 @@ async fn dry_run_reports_the_legacy_sources_a_workspace_holds() {
         Value::String(tmp.path().to_string_lossy().to_string()),
     );
 
-    let result = handle_session_import_run(DispatchCtx::process_default(), params).await.expect("handler ok");
+    let result = handle_session_import_run(DispatchCtx::process_default(), params)
+        .await
+        .expect("handler ok");
     assert_eq!(result["sources"]["session_raw"], Value::Bool(true));
     assert_eq!(result["sources"]["turn_states"], Value::Bool(false));
 }
@@ -49,7 +53,9 @@ async fn dry_run_reports_the_legacy_sources_a_workspace_holds() {
 async fn handler_rejects_invalid_params() {
     let mut params = Map::new();
     params.insert("dry_run".into(), Value::String("yes".into())); // wrong type
-    let err = handle_session_import_run(DispatchCtx::process_default(), params).await.unwrap_err();
+    let err = handle_session_import_run(DispatchCtx::process_default(), params)
+        .await
+        .unwrap_err();
     assert!(err.contains("invalid params"), "{err}");
 }
 

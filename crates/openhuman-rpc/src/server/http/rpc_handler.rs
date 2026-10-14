@@ -1,9 +1,9 @@
 //! `POST /rpc`: the JSON-RPC 2.0 endpoint.
 
 use axum::extract::State;
-use axum::Extension;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
+use axum::Extension;
 use axum::Json;
 
 use crate::core_host::core::invoke::invoke_method;

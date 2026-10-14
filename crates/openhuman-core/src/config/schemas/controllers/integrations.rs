@@ -8,7 +8,10 @@ use crate::core::all::ControllerFuture;
 
 use super::super::helpers::{deserialize_params, to_json, ComposioTriggerSettingsUpdate};
 
-pub(super) fn handle_update_search_settings(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_update_search_settings(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         log::debug!("[config][rpc] update_search_settings enter");
         let patch = match deserialize_params::<config_rpc::SearchSettingsPatch>(params) {
@@ -31,7 +34,10 @@ pub(super) fn handle_update_search_settings(_ctx: DispatchCtx, params: Map<Strin
     })
 }
 
-pub(super) fn handle_get_search_settings(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_get_search_settings(
+    _ctx: DispatchCtx,
+    _params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async {
         log::debug!("[config][rpc] get_search_settings enter");
         match config_rpc::get_search_settings().await {
@@ -47,7 +53,8 @@ pub(super) fn handle_get_search_settings(_ctx: DispatchCtx, _params: Map<String,
     })
 }
 
-pub(super) fn handle_update_composio_trigger_settings(_ctx: DispatchCtx, 
+pub(super) fn handle_update_composio_trigger_settings(
+    _ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
@@ -76,7 +83,8 @@ pub(super) fn handle_update_composio_trigger_settings(_ctx: DispatchCtx,
     })
 }
 
-pub(super) fn handle_get_composio_trigger_settings(_ctx: DispatchCtx, 
+pub(super) fn handle_get_composio_trigger_settings(
+    _ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async {

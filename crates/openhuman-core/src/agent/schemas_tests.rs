@@ -1,5 +1,5 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
+use crate::core::runtime::DispatchCtx;
 use crate::core::TypeSchema;
 use serde_json::json;
 
@@ -143,10 +143,13 @@ async fn reload_and_definition_handlers_cover_missing_registry_paths() {
         Err(err) => assert!(err.contains("AgentDefinitionRegistry not initialised")),
     }
 
-    let get_err = handle_get_definition(DispatchCtx::process_default(), Map::from_iter([(
-        "id".into(),
-        Value::String("__definitely_missing_definition__".into()),
-    )]))
+    let get_err = handle_get_definition(
+        DispatchCtx::process_default(),
+        Map::from_iter([(
+            "id".into(),
+            Value::String("__definitely_missing_definition__".into()),
+        )]),
+    )
     .await
     .expect_err("missing or unknown definition should error");
     assert!(
@@ -157,11 +160,14 @@ async fn reload_and_definition_handlers_cover_missing_registry_paths() {
 
 #[tokio::test]
 async fn triage_handler_rejects_unknown_source_and_to_json_maps_outcome() {
-    let err = handle_triage_evaluate(DispatchCtx::process_default(), Map::from_iter([
-        ("source".into(), Value::String("__unknown_source__".into())),
-        ("display_label".into(), Value::String("lbl".into())),
-        ("payload".into(), json!({})),
-    ]))
+    let err = handle_triage_evaluate(
+        DispatchCtx::process_default(),
+        Map::from_iter([
+            ("source".into(), Value::String("__unknown_source__".into())),
+            ("display_label".into(), Value::String("lbl".into())),
+            ("payload".into(), json!({})),
+        ]),
+    )
     .await
     .expect_err("unsupported source should fail before runtime dispatch");
     assert!(err.contains("unsupported trigger source"));

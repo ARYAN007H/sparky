@@ -45,9 +45,14 @@ async fn missing_required_param_is_refused_with_the_schema_comment() {
         .expect("`id` input")
         .comment;
 
-    let err = dispatch(DispatchCtx::process_default(), state(), "openhuman.run_ledger_get", json!({}))
-        .await
-        .expect_err("`id` is required");
+    let err = dispatch(
+        DispatchCtx::process_default(),
+        state(),
+        "openhuman.run_ledger_get",
+        json!({}),
+    )
+    .await
+    .expect_err("`id` is required");
 
     assert_eq!(err, format!("missing required param 'id': {comment}"));
 
@@ -71,7 +76,10 @@ async fn unknown_param_is_refused_by_the_gate_alone() {
     .await
     .expect_err("unknown params are refused");
 
-    assert_eq!(err, "unknown param 'nonsense_param' for memory.engines_list");
+    assert_eq!(
+        err,
+        "unknown param 'nonsense_param' for memory.engines_list"
+    );
 }
 
 /// Declared types are enforced at the same gate, so a handler's own
@@ -100,9 +108,14 @@ async fn mistyped_param_is_refused_with_the_declared_type() {
 /// directory call controllers.
 #[tokio::test]
 async fn handler_refusal_differs_from_the_dispatcher_refusal_for_an_absent_param() {
-    let dispatched = dispatch(DispatchCtx::process_default(), state(), "openhuman.memory_recall", json!({}))
-        .await
-        .expect_err("`question` is required");
+    let dispatched = dispatch(
+        DispatchCtx::process_default(),
+        state(),
+        "openhuman.memory_recall",
+        json!({}),
+    )
+    .await
+    .expect_err("`question` is required");
     assert!(
         dispatched.starts_with("missing required param 'question': "),
         "got: {dispatched}"

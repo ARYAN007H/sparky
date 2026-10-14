@@ -200,7 +200,10 @@ fn readiness_error(detail: &str) -> String {
     }
 }
 
-fn handle_browser_check_readiness(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_browser_check_readiness(
+    _ctx: DispatchCtx,
+    _params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let mut config = config_rpc::load_config_with_timeout().await?;
         crate::core::runtime::components::require_config(&config, "computer")?;
