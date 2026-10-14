@@ -32,8 +32,9 @@ const MAX_AGE: Duration = Duration::from_secs(15 * 60);
 /// The workspace one remix runs for, and who it runs for.
 ///
 /// Callbacks arrive on the module bus, outside the task that asked for the
-/// remix, so the caller's context and memory identity are captured when the
-/// remix is registered and re-entered for each callback ([`Session::enter`]).
+/// remix, so the caller's context is captured when the remix is registered and
+/// re-entered for each callback ([`Session::enter`]). A remix acts for the
+/// host, never for an agent, so there is no memory identity to carry.
 /// Only the caller's own scope counts, so in SaaS an unscoped caller's
 /// callbacks fail closed instead of acting as the operator.
 pub(super) struct Session {
@@ -57,14 +58,8 @@ impl Session {
     /// Run `fut` as the registering caller.
     pub(super) async fn enter<F: Future>(&self, fut: F) -> F::Output {
         let fut = Box::pin(fut);
-        let fut = async {
-            match self.context.clone() {
-                Some(context) => CoreContext::scope(context, fut).await,
-                None => fut.await,
-            }
-        };
-        match self.identity.clone() {
-            Some(identity) => crate::memory::scope::within(identity, fut).await,
+        match self.context.clone() {
+            Some(context) => CoreContext::scope(context, fut).await,
             None => fut.await,
         }
     }
