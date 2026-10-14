@@ -193,6 +193,7 @@ const taskLocalAccessors = [
   "with_tool_call_limit",
   "with_fresh_snapshot",
   "with_untrusted_input_turn",
+  "dedup_turn_scope",
 ];
 const taskLocalStatics = [
   "PARENT_CONTEXT",
@@ -213,6 +214,7 @@ const taskLocalStatics = [
   "CURRENT_TOOL_CALL_LIMIT",
   "UNTRUSTED_INPUT_TURN",
   "REGENERATE_TARGET_ID",
+  "EGRESS_TURN_DEDUP",
 ];
 
 async function filesUnder(root, predicate) {

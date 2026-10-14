@@ -29,7 +29,7 @@ plus the `LocalOnly` enforcement chokepoint built on top of it.
   `security::approval::APPROVAL_CHAT_CONTEXT`, and fire-and-forget publishes
   `DomainEvent::ExternalTransferPending` on `crate::core::bus::BUS`. This
   never blocks or fails the caller.
-- `dedup_turn_scope(f)`: runs `f` with a per-turn dedup ledger so a single
+- `EgressLedger::per_turn()` / `emit_external_transfer_in(&ledger, d)`: an explicit per-turn dedup ledger, passed down the provider factory chain, so a single
   managed chat turn's multi-model fan-out (primary + workload-tier + summarizer
   builds) collapses repeated disclosures of the same destination into one
   event; every other call path emits unconditionally.
