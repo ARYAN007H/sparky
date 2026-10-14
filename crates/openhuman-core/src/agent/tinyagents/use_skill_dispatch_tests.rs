@@ -16,7 +16,7 @@
 use super::*;
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::harness::ParentExecutionContext;
-use crate::agent::tinyagents::tools::CanonicalSharedToolAdapter;
+use crate::agent::tinyagents::tool_registration::shared_tool_adapter;
 use async_trait::async_trait;
 use serde_json::json;
 use std::path::Path;
