@@ -163,7 +163,6 @@ const deletedTaskLocalModules = [
 // it can go. Any other declaration is a new violation.
 const taskLocalDeclarationAllowlist = [
   "crates/openhuman-core/src/core/runtime/context.rs",
-  "crates/openhuman-core/src/memory/scope.rs",
 ];
 const taskLocalAccessors = [
   "current_parent",
@@ -203,6 +202,9 @@ const taskLocalAccessors = [
   "dedup_turn_scope",
   "current_meter",
   "with_turn_activity",
+  // `memory::scope` (the acting memory identity) is explicit now: a run's
+  // `OpenHumanRunContext::memory_identity`, or a `&MemoryIdentity` argument.
+  "resolve_current",
 ];
 const taskLocalStatics = [
   "PARENT_CONTEXT",
@@ -230,6 +232,8 @@ const taskLocalStatics = [
   "APPROVAL_CHAT_CONTEXT",
   "APPROVAL_COPILOT_STREAM_CONTEXT",
   "APPROVAL_FLOW_RUN_CONTEXT",
+  // `memory/scope.rs`: the ambient memory identity.
+  "CURRENT",
 ];
 
 async function filesUnder(root, predicate) {
@@ -669,6 +673,7 @@ for (const path of await filesUnder(
         /\b(?:turn_origin|turn_workspace|turn_dispatch_guard)::(?:current|capture|propagate|spawn|spawn_unlabelled|check|record_subagent_elapsed|with_workspace)\b/.test(
           compact,
         ) ||
+        /\bmemory::scope::(?:current|within|within_agent)\b/.test(compact) ||
         (/\/turn_workspace\.rs$/.test(path) &&
           /\bwith_workspace\s*\(/.test(text));
       const declaresUnlistedTaskLocal =
