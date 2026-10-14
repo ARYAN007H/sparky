@@ -519,6 +519,11 @@ async fn drive_turn(
             failure_map: failure_map.clone(),
             provider_usage_carry: provider_usage_carry.clone(),
             tool_outcome_sink: tool_outcome_sink.clone(),
+            // The store the `todo` tool resolves from the same parent context.
+            todo_store: run_context
+                .parent
+                .as_ref()
+                .map(|parent| crate::agent::todos::ops::store(&parent.workspace_dir)),
         },
     );
     if let Some(scope) = run_context.response_shape.clone() {

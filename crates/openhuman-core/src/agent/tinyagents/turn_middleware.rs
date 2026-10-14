@@ -89,6 +89,9 @@ pub(super) struct TurnMiddlewareInputs {
     pub(super) provider_usage_carry: ProviderUsageCarry,
     /// Per-call tool success/content capture for honest `ToolCallRecord`s.
     pub(super) tool_outcome_sink: ToolOutcomeSink,
+    /// The store the `todo` tool writes this turn's plan to; `Some` lets the
+    /// plan-order middleware read it. `None` for a turn with no workspace.
+    pub(super) todo_store: Option<Arc<dyn tinyagents_harness::store::Store>>,
 }
 
 /// The handles the run loop reads after the drive returns.
@@ -137,6 +140,7 @@ pub(super) fn install_turn_middleware(
         failure_map,
         provider_usage_carry,
         tool_outcome_sink,
+        todo_store,
     } = inputs;
     let super::host::HarnessHostPolicy {
         stop_hooks,
@@ -429,6 +433,22 @@ pub(super) fn install_turn_middleware(
             agent = agent_id.unwrap_or("<none>"),
             "[unmet_deliverable] not installed for this turn"
         );
+    }
+    // Plan steps run in order: no work while no step is in progress, a final
+    // answer is held once while steps are open, a step stuck in progress gets
+    // one reminder. Same scope as the requirements check, and registered after
+    // it so its `after_model` runs first and the plan check comes first.
+    match todo_store {
+        Some(store) if verify_before_finish::applies(is_subagent, agent_id) => {
+            harness.push_middleware(Arc::new(
+                tinyagents_graph::todos::TodoSequenceMiddleware::new(store),
+            ));
+        }
+        _ => tracing::debug!(
+            is_subagent,
+            agent = agent_id.unwrap_or("<none>"),
+            "[todo_sequence] not installed for this turn"
+        ),
     }
 
     // Direct web lookup is bounded. Once enough search/fetch results have
