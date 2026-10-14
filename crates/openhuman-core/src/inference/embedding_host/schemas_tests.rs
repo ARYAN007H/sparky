@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 
 #[test]
@@ -32,7 +31,7 @@ async fn all_handlers_accept_empty_params_without_panic() {
         // The handler is an async fn pointer; calling it with empty params
         // must not panic. We don't assert Ok because mandatory-param
         // handlers legitimately return Err("invalid params: ...").
-        let _result = (ctrl.handler)(DispatchCtx::process_default(), params).await;
+        let _result = (ctrl.handler)(params).await;
         // If we reach here the handler did not panic.
     }
 }

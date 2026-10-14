@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 
 #[test]
@@ -103,7 +102,7 @@ fn params(value: Value) -> Map<String, Value> {
 
 #[tokio::test]
 async fn listing_an_empty_ledger_returns_no_runs() {
-    let value = with_scratch_workspace(|| handle_run_ledger_list(DispatchCtx::process_default(), Map::new()))
+    let value = with_scratch_workspace(|| handle_run_ledger_list(Map::new()))
         .await
         .expect("list answers on an empty ledger");
     let text = value.to_string();
@@ -114,7 +113,7 @@ async fn listing_an_empty_ledger_returns_no_runs() {
 #[tokio::test]
 async fn listing_rejects_malformed_params() {
     let err = with_scratch_workspace(|| {
-        handle_run_ledger_list(DispatchCtx::process_default(), params(serde_json::json!({ "limit": "many" })))
+        handle_run_ledger_list(params(serde_json::json!({ "limit": "many" })))
     })
     .await
     .expect_err("a non-numeric limit is refused");
@@ -124,7 +123,7 @@ async fn listing_rejects_malformed_params() {
 #[tokio::test]
 async fn getting_an_unknown_run_answers_null() {
     let value = with_scratch_workspace(|| {
-        handle_run_ledger_get(DispatchCtx::process_default(), params(serde_json::json!({ "id": "no-such-run" })))
+        handle_run_ledger_get(params(serde_json::json!({ "id": "no-such-run" })))
     })
     .await
     .expect("get answers for an unknown id");
@@ -133,7 +132,7 @@ async fn getting_an_unknown_run_answers_null() {
 
 #[tokio::test]
 async fn getting_a_run_requires_an_id() {
-    let err = with_scratch_workspace(|| handle_run_ledger_get(DispatchCtx::process_default(), Map::new()))
+    let err = with_scratch_workspace(|| handle_run_ledger_get(Map::new()))
         .await
         .expect_err("id is required");
     assert!(err.contains("missing required param: id"), "{err}");
@@ -142,7 +141,7 @@ async fn getting_a_run_requires_an_id() {
 #[tokio::test]
 async fn events_of_an_unknown_run_are_empty() {
     let value = with_scratch_workspace(|| {
-        handle_run_ledger_events(DispatchCtx::process_default(), params(serde_json::json!({ "runId": "no-such-run" })))
+        handle_run_ledger_events(params(serde_json::json!({ "runId": "no-such-run" })))
     })
     .await
     .expect("events answer for an unknown run");
@@ -152,7 +151,7 @@ async fn events_of_an_unknown_run_are_empty() {
 
 #[tokio::test]
 async fn events_reject_malformed_params() {
-    let err = with_scratch_workspace(|| handle_run_ledger_events(DispatchCtx::process_default(), Map::new()))
+    let err = with_scratch_workspace(|| handle_run_ledger_events(Map::new()))
         .await
         .expect_err("runId is required");
     assert!(err.contains("invalid run ledger events params"), "{err}");

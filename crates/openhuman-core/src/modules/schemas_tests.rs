@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::{
     all_controller_schemas, all_registered_controllers, controller_value, schemas, string_param,
 };
@@ -61,7 +60,7 @@ async fn computer_status_handler_returns_serialized_status() {
         CoreContext::for_test_with_config(DomainSet::full(), crate::config::Config::default());
 
     let status = CoreContext::scope(ctx, async {
-        super::handle_computer_status(DispatchCtx::process_default(), Map::new()).await
+        super::handle_computer_status(Map::new()).await
     })
     .await
     .expect("computer status should serialize");
@@ -87,8 +86,8 @@ async fn forgetting_sites_reports_how_many_went() {
             "site".to_string(),
             Value::String("https://www.shop.test/cart".to_string()),
         );
-        let one = super::handle_browser_forget_sites(DispatchCtx::process_default(), one).await;
-        (one, super::handle_browser_forget_sites(DispatchCtx::process_default(), Map::new()).await)
+        let one = super::handle_browser_forget_sites(one).await;
+        (one, super::handle_browser_forget_sites(Map::new()).await)
     })
     .await;
 
@@ -127,7 +126,7 @@ async fn a_blank_or_unreadable_site_forgets_nothing() {
     for site in [Value::String("  ".to_string()), Value::from(7)] {
         let mut params = Map::new();
         params.insert("site".to_string(), site);
-        let error = super::handle_browser_forget_sites(DispatchCtx::process_default(), params)
+        let error = super::handle_browser_forget_sites(params)
             .await
             .unwrap_err();
         assert!(error.contains("must name a site"), "{error}");

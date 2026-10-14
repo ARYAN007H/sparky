@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 
 #[test]
@@ -24,7 +23,7 @@ fn list_schema_has_no_required_inputs() {
 async fn handle_list_returns_every_builtin() {
     use serde_json::Map;
 
-    let value = handle_list(DispatchCtx::process_default(), Map::new())
+    let value = handle_list(Map::new())
         .await
         .expect("handler must not fail");
     // Bare (no logs) or wrapped ({"result": ...}) — read through both.

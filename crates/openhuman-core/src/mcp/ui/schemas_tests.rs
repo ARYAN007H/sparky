@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 
 #[test]
@@ -36,7 +35,7 @@ fn params(value: Value) -> Map<String, Value> {
 
 #[tokio::test]
 async fn resource_read_handler_rejects_a_missing_server() {
-    let error = with_workspace(handle_resource_read(DispatchCtx::process_default(), params(serde_json::json!({}))))
+    let error = with_workspace(handle_resource_read(params(serde_json::json!({}))))
         .await
         .unwrap_err();
     assert!(error.contains("server_id"));
@@ -44,7 +43,7 @@ async fn resource_read_handler_rejects_a_missing_server() {
 
 #[tokio::test]
 async fn resource_read_handler_rejects_an_unknown_inline_id() {
-    let error = with_workspace(handle_resource_read(DispatchCtx::process_default(), params(
+    let error = with_workspace(handle_resource_read(params(
         serde_json::json!({"inline_id": "absent"}),
     )))
     .await
@@ -54,7 +53,7 @@ async fn resource_read_handler_rejects_an_unknown_inline_id() {
 
 #[tokio::test]
 async fn tool_call_handler_rejects_a_missing_server() {
-    let error = with_workspace(handle_tool_call(DispatchCtx::process_default(), params(serde_json::json!({}))))
+    let error = with_workspace(handle_tool_call(params(serde_json::json!({}))))
         .await
         .unwrap_err();
     assert!(error.contains("server_id"));
@@ -62,7 +61,7 @@ async fn tool_call_handler_rejects_a_missing_server() {
 
 #[tokio::test]
 async fn tool_call_handler_refuses_an_unavailable_server() {
-    let result = with_workspace(handle_tool_call(DispatchCtx::process_default(), params(
+    let result = with_workspace(handle_tool_call(params(
         serde_json::json!({"server_id": "nowhere", "tool_name": "order"}),
     )))
     .await;

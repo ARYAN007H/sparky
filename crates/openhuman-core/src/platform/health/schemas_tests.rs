@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 
 #[test]
@@ -42,14 +41,14 @@ fn schemas_and_controllers_match() {
 
 #[tokio::test]
 async fn handle_snapshot_returns_json_object() {
-    let result = handle_snapshot(DispatchCtx::process_default(), Map::new()).await;
+    let result = handle_snapshot(Map::new()).await;
     assert!(result.is_ok());
     assert!(result.unwrap().is_object());
 }
 
 #[tokio::test]
 async fn handle_system_info_returns_json_object() {
-    let result = handle_system_info(DispatchCtx::process_default(), Map::new()).await;
+    let result = handle_system_info(Map::new()).await;
     assert!(result.is_ok());
     let json = result.unwrap();
     assert!(json.is_object());
@@ -77,7 +76,7 @@ fn to_json_helper() {
 #[tokio::test]
 async fn system_info_declared_output_types_match_emitted_json() {
     let schema = schemas("system_info");
-    let json = handle_system_info(DispatchCtx::process_default(), Map::new())
+    let json = handle_system_info(Map::new())
         .await
         .expect("system_info handler succeeds");
 

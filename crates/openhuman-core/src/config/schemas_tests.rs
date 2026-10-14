@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::schema_defs::schemas;
 use super::*;
 
@@ -307,7 +306,7 @@ async fn handle_get_autonomy_settings_returns_current_value() {
     .await
     .expect("seed");
 
-    let out = super::handle_get_autonomy_settings(DispatchCtx::process_default(), serde_json::Map::new())
+    let out = super::handle_get_autonomy_settings(serde_json::Map::new())
         .await
         .expect("handler");
     // into_cli_compatible_json wraps data under "result" when logs are present.
@@ -330,7 +329,7 @@ async fn handle_update_autonomy_settings_rejects_invalid_value() {
     let mut params = serde_json::Map::new();
     params.insert("max_actions_per_hour".into(), serde_json::json!(0));
 
-    let err = super::handle_update_autonomy_settings(DispatchCtx::process_default(), params)
+    let err = super::handle_update_autonomy_settings(params)
         .await
         .unwrap_err();
     assert!(err.contains("at least 1"), "got: {err}");
@@ -366,7 +365,7 @@ async fn handle_get_agent_paths_returns_action_workspace_and_projects() {
         std::env::set_var("OPENHUMAN_WORKSPACE", tmp.path());
     }
 
-    let out = super::handle_get_agent_paths(DispatchCtx::process_default(), serde_json::Map::new())
+    let out = super::handle_get_agent_paths(serde_json::Map::new())
         .await
         .expect("get_agent_paths handler must succeed");
     // into_cli_compatible_json wraps data under "result" when logs are present.
@@ -419,7 +418,7 @@ async fn handle_get_agent_paths_reflects_openhuman_action_dir_env_override() {
         std::env::set_var("OPENHUMAN_ACTION_DIR", &custom_actions);
     }
 
-    let out = super::handle_get_agent_paths(DispatchCtx::process_default(), serde_json::Map::new())
+    let out = super::handle_get_agent_paths(serde_json::Map::new())
         .await
         .expect("get_agent_paths handler must succeed");
     let inner = out.get("result").unwrap_or(&out);
