@@ -269,6 +269,7 @@ async fn create_artifact_publishes_artifact_pending_event() {
         ArtifactKind::Presentation,
         "Q3 Deck",
         "pptx",
+        None,
     )
     .await
     .expect("create_artifact succeeds");
@@ -366,10 +367,11 @@ async fn artifact_events_fill_request_id_from_chat_context() {
                 ArtifactKind::Document,
                 "Report",
                 "pdf",
+                None,
             )
             .await
             .expect("create_artifact succeeds");
-            finalize_artifact(tmp.path(), &meta.id, 42)
+            finalize_artifact(tmp.path(), &meta.id, 42, None)
                 .await
                 .expect("finalize_artifact succeeds");
             (meta, ())
@@ -446,10 +448,11 @@ async fn fail_artifact_fills_request_id_from_chat_context() {
                 ArtifactKind::Document,
                 "Report",
                 "pdf",
+                None,
             )
             .await
             .expect("create_artifact succeeds");
-            fail_artifact(tmp.path(), tmp.path(), &meta.id, "boom")
+            fail_artifact(tmp.path(), tmp.path(), &meta.id, "boom", None)
                 .await
                 .expect("fail_artifact succeeds");
             meta
@@ -521,6 +524,7 @@ async fn create_artifact_mints_fresh_id_without_scope() {
         ArtifactKind::Presentation,
         "Q3 Deck",
         "pptx",
+        None,
     )
     .await
     .unwrap();
@@ -541,6 +545,7 @@ async fn create_artifact_reuses_id_for_an_explicit_regenerate_target() {
         "pptx",
         None,
         Some("reused-id"),
+        None,
     )
     .await
     .unwrap();
@@ -563,6 +568,7 @@ async fn regenerate_preserves_original_created_at() {
         ArtifactKind::Presentation,
         "Deck",
         "pptx",
+        None,
     )
     .await
     .unwrap();
@@ -580,6 +586,7 @@ async fn regenerate_preserves_original_created_at() {
         "pptx",
         None,
         Some(id.as_str()),
+        None,
     )
     .await
     .unwrap();

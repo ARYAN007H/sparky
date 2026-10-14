@@ -36,7 +36,7 @@ async fn external_transfer_publishes_pending_event() {
     let mut rx = crate::core::bus::BUS.get().unwrap().receiver();
 
     let marker = "svc-external-emit-test";
-    emit_external_transfer(EgressDescriptor::inference("openai", marker, true));
+    emit_external_transfer(None, EgressDescriptor::inference("openai", marker, true));
 
     let (descriptor, thread_id, client_id) = find_pending(&mut rx, marker).await;
     assert_eq!(descriptor.provider_slug, "openai");
@@ -58,8 +58,8 @@ async fn local_transfer_does_not_publish() {
     // A local (non-external) transfer must NOT emit; a following external one
     // must. If we reach the sentinel without having seen the local marker, the
     // local transfer was correctly suppressed.
-    emit_external_transfer(EgressDescriptor::inference("ollama", local_marker, false));
-    emit_external_transfer(EgressDescriptor::network_fetch(sentinel_marker));
+    emit_external_transfer(None, EgressDescriptor::inference("ollama", local_marker, false));
+    emit_external_transfer(None, EgressDescriptor::network_fetch(sentinel_marker));
 
     loop {
         match rx.recv().await {
@@ -92,7 +92,7 @@ async fn attaches_ambient_chat_context() {
                 request_id: None,
             },
             async {
-                emit_external_transfer(EgressDescriptor::composio(marker));
+                emit_external_transfer(None, EgressDescriptor::composio(marker));
             },
         )
         .await;
@@ -165,9 +165,9 @@ async fn dedup_absent_outside_scope_publishes_each_time() {
 
     let marker = "svc-nodedup-test";
     let sentinel = "svc-nodedup-sentinel-test";
-    emit_external_transfer(EgressDescriptor::inference("openhuman", marker, true));
-    emit_external_transfer(EgressDescriptor::inference("openhuman", marker, true));
-    emit_external_transfer(EgressDescriptor::network_fetch(sentinel));
+    emit_external_transfer(None, EgressDescriptor::inference("openhuman", marker, true));
+    emit_external_transfer(None, EgressDescriptor::inference("openhuman", marker, true));
+    emit_external_transfer(None, EgressDescriptor::network_fetch(sentinel));
 
     let mut count = 0;
     loop {

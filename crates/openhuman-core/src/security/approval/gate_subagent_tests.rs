@@ -81,7 +81,7 @@ async fn an_async_subagent_park_reaches_the_parent_thread_detached_with_a_short_
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             async_subagent_origin("thread-parent"),
-            g.intercept(tool, "generate an image", serde_json::json!({})),
+            g.intercept(&Default::default(), "generate an image", tool, serde_json::json!({})),
         )
         .await
     });
@@ -208,8 +208,9 @@ async fn an_expired_park_tells_the_model_nobody_answered() {
         turn_origin::with_origin(
             async_subagent_origin("thread-expiry"),
             g.intercept(
-                "media_generate_video",
+                &Default::default(),
                 "generate a clip",
+                "media_generate_video",
                 serde_json::json!({}),
             ),
         )
@@ -249,7 +250,7 @@ async fn every_detached_park_on_a_thread_stays_recoverable() {
         handles.push(tokio::spawn(async move {
             turn_origin::with_origin(
                 async_subagent_origin("thread-multi"),
-                g.intercept(tool, "generate media", serde_json::json!({})),
+                g.intercept(&Default::default(), "generate media", tool, serde_json::json!({})),
             )
             .await
         }));

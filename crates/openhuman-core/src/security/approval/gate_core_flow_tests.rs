@@ -212,7 +212,7 @@ async fn auto_approve_all_resolves_allow() {
 
     let outcome = turn_origin::with_origin(
         web_origin(),
-        gate.intercept("openhuman_test_aaa_webchat", "noop", serde_json::json!({})),
+        gate.intercept(&Default::default(), "noop", "openhuman_test_aaa_webchat", serde_json::json!({})),
     )
     .await;
 
@@ -291,7 +291,7 @@ async fn auto_approve_all_does_not_override_unknown() {
     // No `with_origin` scope at all — mirrors an unlabelled call site,
     // which `turn_origin::current()` maps to `AgentTurnOrigin::Unknown`.
     let outcome = gate
-        .intercept("openhuman_test_aaa_unknown", "noop", serde_json::json!({}))
+        .intercept(&Default::default(), "noop", "openhuman_test_aaa_unknown", serde_json::json!({}))
         .await;
 
     match outcome {
@@ -333,7 +333,7 @@ async fn auto_approve_all_overrides_require_approval_workflow() {
     };
     let outcome = turn_origin::with_origin(
         origin,
-        gate.intercept("openhuman_test_aaa_workflow", "noop", serde_json::json!({})),
+        gate.intercept(&Default::default(), "noop", "openhuman_test_aaa_workflow", serde_json::json!({})),
     )
     .await;
 
@@ -390,8 +390,9 @@ async fn auto_approve_all_allows_a_remote_triage_dispatch_without_an_audit_row()
     let outcome = turn_origin::with_origin(
         remote_trigger_origin(&envelope),
         gate.intercept(
-            "triage.escalate",
+            &Default::default(),
             "escalate to orchestrator",
+            "triage.escalate",
             serde_json::json!({}),
         ),
     )

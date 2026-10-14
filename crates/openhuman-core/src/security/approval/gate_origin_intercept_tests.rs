@@ -11,7 +11,7 @@ async fn intercept_with_trusted_background_origin_allows_without_prompt() {
     };
     let outcome = turn_origin::with_origin(
         origin,
-        gate.intercept("shell", "run ls", serde_json::json!({})),
+        gate.intercept(&Default::default(), "run ls", "shell", serde_json::json!({})),
     )
     .await;
     assert!(matches!(outcome, GateOutcome::Allow));
@@ -26,7 +26,7 @@ async fn intercept_with_cli_origin_allows_without_prompt() {
     let (gate, _dir) = test_gate();
     let outcome = turn_origin::with_origin(
         AgentTurnOrigin::Cli,
-        gate.intercept("shell", "run ls", serde_json::json!({})),
+        gate.intercept(&Default::default(), "run ls", "shell", serde_json::json!({})),
     )
     .await;
     assert!(matches!(outcome, GateOutcome::Allow));
@@ -43,7 +43,7 @@ async fn intercept_with_direct_chat_origin_allows_without_prompt() {
     let (gate, _dir) = test_gate();
     let outcome = turn_origin::with_origin(
         AgentTurnOrigin::DirectChat,
-        gate.intercept("shell", "run ls", serde_json::json!({})),
+        gate.intercept(&Default::default(), "run ls", "shell", serde_json::json!({})),
     )
     .await;
     assert!(
@@ -78,7 +78,7 @@ async fn cron_add_on_a_turnless_spawn_resolves_to_a_real_origin_not_unknown_deni
     // `Unknown`, and the scheduling tool is refused as "no origin label".
     let g = gate.clone();
     let denied = tokio::spawn(async move {
-        g.intercept("cron_add", "schedule a job", serde_json::json!({}))
+        g.intercept(&Default::default(), "schedule a job", "cron_add", serde_json::json!({}))
             .await
     })
     .await
@@ -96,7 +96,7 @@ async fn cron_add_on_a_turnless_spawn_resolves_to_a_real_origin_not_unknown_deni
     // Master-chat gate) instead of being denied as unlabelled.
     let g = gate.clone();
     let allowed = tokio::spawn(turn_origin::with_origin(AgentTurnOrigin::Cli, async move {
-        g.intercept("cron_add", "schedule a job", serde_json::json!({}))
+        g.intercept(&Default::default(), "schedule a job", "cron_add", serde_json::json!({}))
             .await
     }))
     .await
@@ -128,7 +128,7 @@ async fn intercept_with_external_channel_origin_persists_and_ttl_denies() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             origin,
-            g.intercept("shell", "run ls", serde_json::json!({})),
+            g.intercept(&Default::default(), "run ls", "shell", serde_json::json!({})),
         )
         .await
     });

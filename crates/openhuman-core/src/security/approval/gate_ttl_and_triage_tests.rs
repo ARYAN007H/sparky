@@ -75,7 +75,7 @@ async fn webchat_origin_routes_park_when_approval_chat_context_absent() {
     let handle = tokio::spawn(async move {
         turn_origin::with_origin(
             origin,
-            g.intercept("cron_add", "schedule daily reminder", serde_json::json!({})),
+            g.intercept(&Default::default(), "schedule daily reminder", "cron_add", serde_json::json!({})),
         )
         .await
     });
