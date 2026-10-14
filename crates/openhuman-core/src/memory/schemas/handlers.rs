@@ -149,14 +149,14 @@ pub(super) fn policy_set(params: Map<String, Value>) -> ControllerFuture {
 pub(super) fn pack_preview(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<PackPreviewParams>(params)?;
-        finish(views::pack_preview(&load().await?, params).await)
+        finish(views::pack_preview(&load().await?, &MemoryIdentity::root(), params).await)
     })
 }
 
 pub(super) fn agents_list(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         parse::<EmptyParams>(params)?;
-        finish(views::agents_list(&load().await?).await)
+        finish(views::agents_list(&load().await?, &MemoryIdentity::root()).await)
     })
 }
 
