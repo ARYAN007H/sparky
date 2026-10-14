@@ -10,7 +10,7 @@
 //! lineage.
 //!
 //! [`DynPayloadSummarizer`] is that seam. `ToolOutputMiddleware` asks it to
-//! [`prepare`](PayloadSummarizer::prepare) a call bound to the current turn,
+//! [`prepare`](tinyagents_harness::summarization::payload_summarizer::PayloadSummarizer::prepare) a call bound to the current turn,
 //! registers it with [`crate::inference::tokenjuice::generate`], and sends the
 //! ticket's token with the result. TinyJuice calls back through
 //! `MlHost.Generate` only if it decides to summarize.
