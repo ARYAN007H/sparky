@@ -24,8 +24,8 @@
 //! For every positive backstop, `wind_down < hard_stop < backstop`
 //! (see `turn_deadline_tests.rs`).
 //!
-//! The web-turn guard scopes the deadline on a task-local
-//! ([`with_turn_deadline`]). The top-level session turn
+//! The web-turn guard builds the deadline and hands it to the session it runs
+//! (`HostTurnEnv::turn_deadline`). The top-level session turn
 //! (`OpenHumanSessionHost::turn_with_origin`) copies it onto its explicit run
 //! context. Turns with no backstop, such as other channels or the CLI, carry
 //! `None` and keep their previous behaviour.
