@@ -345,7 +345,16 @@ impl OpenHumanSecurityGate {
             );
             return GateDecision::Allow;
         };
+        self.park_for_approval_on(&gate, call).await
+    }
 
+    /// [`Self::park_for_approval`] against an explicit gate, with this turn's
+    /// approval context.
+    pub(crate) async fn park_for_approval_on(
+        &self,
+        gate: &ApprovalGate,
+        call: &ToolCallRequest,
+    ) -> GateDecision {
         let summary = summarize_action(&call.tool_name, &call.arguments);
         let redacted = redact_args(&call.arguments);
         tracing::debug!(
