@@ -34,9 +34,7 @@ use crate::agent::tinyagents::context_wiring::install_context_ladder;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent::tinyagents::middleware::{self, TurnContextMiddleware};
 use crate::agent::tinyagents::model::TurnChatModel;
-use crate::agent::tinyagents::observability::{
-    ProviderUsageCarry, SubagentScope, ToolFailureMap, ToolNameMap,
-};
+use crate::agent::tinyagents::observability::{ProviderUsageCarry, SubagentScope, ToolFailureMap};
 use crate::agent::tinyagents::routes;
 use crate::agent::tinyagents::stop_hooks;
 use crate::agent::tinyagents::verify_before_finish;
@@ -81,12 +79,6 @@ pub(super) struct TurnMiddlewareInputs {
     pub(super) memory_turn: Option<Arc<crate::memory::lifecycle::hooks::MemoryTurn>>,
     /// The context-window summarizer's model.
     pub(super) summarizer_model: TurnChatModel,
-    /// Shared 1-based model-call cursor (event bridge advances, model adapter
-    /// reads for out-of-band thinking attribution).
-    pub(super) cursor: tinyagents_harness::events::IterationCursor,
-    /// Shared `call_id -> tool_name` map used by the event bridge to label
-    /// tool-argument fragments projected off the crate stream.
-    pub(super) tool_names: ToolNameMap,
     /// Shared `call_id -> (success, failure, elapsed_ms, output_chars)` side
     /// channel: middleware records each outcome for the bridge's
     /// `ToolCallCompleted`.
@@ -140,8 +132,6 @@ pub(super) fn install_turn_middleware(
         run_mode,
         memory_turn,
         summarizer_model,
-        cursor,
-        tool_names,
         failure_map,
         provider_usage_carry,
         tool_outcome_sink,
@@ -394,7 +384,7 @@ pub(super) fn install_turn_middleware(
     // artifact contents list, trim), registered here so each step keeps its
     // place in the middleware order. See `context_wiring.rs`.
     let (compression_mw, wrap_up_fired) = install_context_ladder(
-        &mut harness,
+        harness,
         model,
         context_window,
         autocompact_enabled,
