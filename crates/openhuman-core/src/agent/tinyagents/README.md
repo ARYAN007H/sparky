@@ -19,12 +19,12 @@ The adapter seam between OpenHuman and the vendored [`tinyagents`](../../../../.
 | File / group | Role |
 | --- | --- |
 | [`mod.rs`](./mod.rs) | Module root: declares submodules and re-exports (`TurnContextMiddleware`, `TranscriptSnapshotSink`, `SubagentScope`, `ToolPolicyEnforcement`, `TinyagentsTurnOutcome`, `TurnModelSource`/`TurnModels`, `run_turn_via_tinyagents_shared`). |
-| [`turn_policy.rs`](./turn_policy.rs) | `ToolPolicyEnforcement`, run-policy construction, and wall-clock-ceiling helpers (`agent_turn_wall_clock_ms` and friends). |
+| [`turn_policy.rs`](./turn_policy.rs) | `ToolPolicyEnforcement`, provider locality and the `OPENHUMAN_*` overrides feeding `tinyagents_harness::turn_policy::run_policy`. |
 | `turn_runner.rs` | `run_turn_via_tinyagents_shared`, the single entry point every production caller uses, plus the `#[cfg(test)]`-only `run_turn_via_tinyagents`. |
 | `turn_models.rs` | `TurnModels` (primary + tier routes + summarizer) and `TurnModelSource`, whose `build`/`build_summarizer` construct crate-native models from `(role, config)` via `build_turn_models_crate`. |
 | `harness_assembly.rs` | `assemble_turn_harness`, which registers models, tools, and middleware in order. |
 | [`harness_tool_registration.rs`](./harness_tool_registration.rs) | Tool + agent capability-registry projection consumed by `assemble_turn_harness`. |
-| [`turn_outcome.rs`](./turn_outcome.rs) | `TinyagentsTurnOutcome`, `HaltSummarySlot`, `ToolOutcomeSink`, and `record_unobserved_turn_usage`, the cost-tracker fallback for turns with no `on_progress` observer. |
+| [`turn_outcome.rs`](./turn_outcome.rs) | `TinyagentsTurnOutcome` and `record_unobserved_turn_usage` (the `HaltSummarySlot`, `ToolOutcomeSink` and `ToolCallOutcome` types are `tinyagents_harness::turn_outcome`'s), the cost-tracker fallback for turns with no `on_progress` observer. |
 | [`turn_run_error.rs`](./turn_run_error.rs) | Maps a failed harness run onto the typed OpenHuman error `run_turn_via_tinyagents_shared` returns. |
 | [`turn_run_finalize.rs`](./turn_run_finalize.rs) | Turns a completed harness run into a `TinyagentsTurnOutcome` on the success path (journal completion, compaction diagnostics, the terminal `TurnCompleted` event). |
 | `discovery/` | `install_tool_ranker` / `installed_tool_ranker`: the process-wide slot for the host's `ToolRanker` (a decision model such as Jev, installed by `openhuman-tinyhumans`; the core itself installs none), and `discovery_policy`, which turns the installed ranker plus `agent.tool_search` config into the `ToolDiscoveryPolicy` every turn harness runs with. A ranker that fails at search time falls back to BM25 in the harness. |
