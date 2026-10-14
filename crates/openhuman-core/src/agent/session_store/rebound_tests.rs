@@ -60,3 +60,47 @@ fn dropped_stores_are_not_rebound() {
     let rebound = rebind_all(&backend);
     assert!(rebound <= live_before);
 }
+
+#[test]
+fn the_provider_surface_forwards_to_the_current_backend() {
+    use tinyagents_harness::store::SchemaAdmission;
+
+    let backend: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::new());
+    let stores = ReboundSessionStores::new(Arc::clone(&backend), false).unwrap();
+
+    // Debug names the live destination rather than the wrapper's internals.
+    let rendered = format!("{stores:?}");
+    assert!(rendered.contains("ReboundSessionStores"), "{rendered}");
+    assert!(rendered.contains("destination"), "{rendered}");
+
+    // `for_agent` and `try_for_agent` open the same agent scope.
+    let infallible = stores.for_agent("forwarded");
+    let fallible = stores.try_for_agent("forwarded").unwrap();
+    assert_eq!(
+        infallible.transcripts.destination_key(),
+        fallible.transcripts.destination_key()
+    );
+
+    assert!(stores.recover().is_ok());
+    assert_eq!(
+        stores.destination_key(),
+        stores.current().destination_key(),
+        "the destination is the current inner provider's"
+    );
+    stores
+        .run_ledger_for_agent("forwarded")
+        .expect("the ledger lookup does not fail on a fresh memory backend");
+    stores
+        .conversations_for_agent("forwarded")
+        .expect("the conversation lookup does not fail on a fresh memory backend");
+
+    // Binding an actor goes through the inner provider, with and without an
+    // explicit schema admission mode; both agree on whether it binds.
+    let other: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::new());
+    let plain = stores.bind_actor(Arc::clone(&other)).unwrap().is_some();
+    let admitted = stores
+        .bind_actor_with_schema_admission(other, SchemaAdmission::Declare)
+        .unwrap()
+        .is_some();
+    assert_eq!(plain, admitted);
+}
