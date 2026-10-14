@@ -205,6 +205,7 @@ impl std::fmt::Debug for AgentChatTarget<'_> {
                 host_only,
                 untrusted_input,
                 shape,
+                observer,
                 attachments,
             } => f
                 .debug_struct("Definition")
@@ -216,6 +217,7 @@ impl std::fmt::Debug for AgentChatTarget<'_> {
                 .field("untrusted_input", untrusted_input)
                 .field("attachments", &attachments.len())
                 .field("shaped", &shape.is_some())
+                .field("observed", &observer.is_some())
                 .finish(),
         }
     }
