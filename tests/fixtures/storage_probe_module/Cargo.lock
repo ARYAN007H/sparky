@@ -500,7 +500,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-bus"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -509,7 +509,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-busproxy"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "async-trait",
  "serde",
@@ -523,7 +523,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-client"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "async-trait",
  "serde",
@@ -536,7 +536,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-core"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "async-trait",
  "serde",
@@ -547,7 +547,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-secrets"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "async-trait",
  "atomicwrites",
