@@ -30,7 +30,7 @@ use tokio::sync::mpsc::Sender;
 
 use crate::agent::progress::AgentProgress;
 use crate::agent::tinyagents::{
-    run_root_turn_via_hosted_agent, TinyagentsTurnOutcome, TurnContextMiddleware,
+    TinyagentsTurnOutcome, TurnContextMiddleware,
 };
 use crate::inference::provider::AGENT_TURN_MAX_OUTPUT_TOKENS;
 use tinyagents_definition::SandboxMode;

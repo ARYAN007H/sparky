@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use crate::agent::progress::AgentProgress;
 use crate::agent::subagent_host::types::SubagentRunError;
-use crate::agent::tinyagents::{run_turn_via_tinyagents_shared, SubagentScope};
+use crate::agent::tinyagents::{SubagentScope, TurnSpec};
 use tinyagents_harness::run_queue::RunQueue;
 use tinyagents_session::transcript::TranscriptMessage;
 use tinyjuice_bus::types::AgentTokenjuiceCompression;
@@ -247,7 +247,8 @@ pub(in super::super) async fn run_subagent_via_graph(
         // `subagent_scope`, so the seam never emits a top-level `TurnCompleted`
         // (they report via `Subagent*` events). Pass `false` for clarity.
         defer_turn_completed_to_caller: false,
-    }.run())
+    }
+    .run()
     .await;
 
     if let Some(config) = config.filter(|config| config.observability.share_usage_data) {

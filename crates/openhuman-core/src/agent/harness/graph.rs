@@ -3,7 +3,7 @@
 //! Per the per-folder `graph.rs` convention, this is the harness's top-level
 //! (channel/CLI) graph definition, its available tools, and its summarization
 //! step — all thin over the shared tinyagents seam
-//! ([`run_turn_via_tinyagents_shared`]).
+//! ([`TurnSpec::run`]).
 //!
 //! **Graph.** A single agent-loop turn driven by the tinyagents harness (the
 //! canonical channel/CLI path; the legacy `run_tool_call_loop` is removed),
@@ -33,7 +33,7 @@ use anyhow::Result;
 use tokio::sync::mpsc::Sender;
 
 use crate::agent::progress::AgentProgress;
-use crate::agent::tinyagents::run_turn_via_tinyagents_shared;
+use crate::agent::tinyagents::TurnSpec;
 use crate::agent::tinyagents::TurnModelSource;
 use crate::config::{MultimodalConfig, MultimodalFileConfig};
 use tinyagents_session::transcript::TranscriptMessage;
