@@ -140,10 +140,10 @@ async fn scoped_tool_limit_is_honored_by_the_hosted_runner_inner() {
             context_mw: TurnContextMiddleware::default(),
             tool_policy: None,
             defer_turn_completed_to_caller: true,
-        subagent_scope: None,
-        deterministic_cacheable: false,
-    }
-    .run_hosted(hosted_base(), "main".to_string())
+            subagent_scope: None,
+            deterministic_cacheable: false,
+        }
+        .run_hosted(hosted_base(), "main".to_string())
         .await
     }
     .await;
@@ -203,10 +203,10 @@ async fn positive_scoped_tool_limit_caps_hosted_runner_inner() {
             context_mw: TurnContextMiddleware::default(),
             tool_policy: None,
             defer_turn_completed_to_caller: true,
-        subagent_scope: None,
-        deterministic_cacheable: false,
-    }
-    .run_hosted(hosted_base(), "main".to_string())
+            subagent_scope: None,
+            deterministic_cacheable: false,
+        }
+        .run_hosted(hosted_base(), "main".to_string())
         .await
     }
     .await;

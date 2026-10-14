@@ -33,8 +33,8 @@ use anyhow::Result;
 use tokio::sync::mpsc::Sender;
 
 use crate::agent::progress::AgentProgress;
-use crate::agent::tinyagents::TurnSpec;
 use crate::agent::tinyagents::TurnModelSource;
+use crate::agent::tinyagents::TurnSpec;
 use crate::config::{MultimodalConfig, MultimodalFileConfig};
 use tinyagents_session::transcript::TranscriptMessage;
 use tinytools::Tool;
@@ -174,7 +174,7 @@ pub(crate) async fn run_channel_turn_via_graph(
         max_output_tokens: Some(crate::inference::provider::AGENT_TURN_MAX_OUTPUT_TOKENS),
         // Context middlewares: cache-align + default tool-result byte cap (the
         // channel path has no session `ContextManager` to source config from).
-        context_mw: crate::agent::tinyagents::TurnContextMiddleware::defaults(),
+        context_mw: crate::agent::tinyagents::middleware::TurnContextMiddleware::defaults(),
         // Channel/CLI path carries its own gating; no session `.tool_policy()`.
         tool_policy: None,
         // Interactive channel/CLI turn — never serve a cached model response.
@@ -183,7 +183,8 @@ pub(crate) async fn run_channel_turn_via_graph(
         // NOT emit `TurnCompleted` itself, so let the seam emit the single
         // terminal event (legacy-engine parity).
         defer_turn_completed_to_caller: false,
-    }.run();
+    }
+    .run();
     let outcome = match (turn_origin, crate::core::runtime::CoreContext::current()) {
         (Some(origin), Some(context)) => {
             crate::core::runtime::CoreContext::scope_with_turn_origin(

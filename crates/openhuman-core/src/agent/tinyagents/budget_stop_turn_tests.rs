@@ -326,10 +326,10 @@ fn a_turn_before_its_wind_down_point_runs_to_its_final_answer() {
                         context_mw: TurnContextMiddleware::default(),
                         tool_policy: None,
                         defer_turn_completed_to_caller: true,
-        subagent_scope: None,
-        deterministic_cacheable: false,
-    }
-    .run_hosted(hosted_base(), "main".to_string())
+                        subagent_scope: None,
+                        deterministic_cacheable: false,
+                    }
+                    .run_hosted(hosted_base(), "main".to_string())
                     .await
                     .expect("turn completes");
                     assert_eq!(model_calls.load(std::sync::atomic::Ordering::SeqCst), 2);

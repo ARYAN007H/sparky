@@ -167,7 +167,8 @@ pub(in super::super) async fn run_subagent_via_graph(
     // worker thread. Attach a snapshot middleware that mirrors each `before_model`
     // request's transcript here, so the error path below can still persist the
     // rounds that completed before the failure.
-    let transcript_snapshot = crate::agent::tinyagents::TranscriptSnapshotSink::default();
+    let transcript_snapshot =
+        crate::agent::tinyagents::middleware::TranscriptSnapshotSink::default();
     // The seeded history is always kept; only rounds past it are split into
     // accepted and unanswered on failure (#6281).
     transcript_snapshot
@@ -530,8 +531,8 @@ pub(crate) fn inherited_thread_id(
 fn build_subagent_context_mw(
     tokenjuice_compression: AgentTokenjuiceCompression,
     config: Option<&crate::config::Config>,
-) -> crate::agent::tinyagents::TurnContextMiddleware {
-    let mut mw = crate::agent::tinyagents::TurnContextMiddleware::defaults();
+) -> crate::agent::tinyagents::middleware::TurnContextMiddleware {
+    let mut mw = crate::agent::tinyagents::middleware::TurnContextMiddleware::defaults();
     // Always thread the agent's compression profile — even on the config-default
     // path — so the definition's TokenJuice choice is honored.
     mw.tokenjuice_compression = tokenjuice_compression;
