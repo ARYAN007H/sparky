@@ -109,7 +109,11 @@ async fn code_adapter_javascript_runs_when_isolated_and_refuses_when_isolation_i
         &config.workspace_dir,
         &config.action_dir,
     ));
-    let runner = OpenHumanCode { config, security };
+    let runner = OpenHumanCode {
+        config,
+        security,
+        approval: Default::default(),
+    };
 
     let input = json!([{ "json": { "n": 7 } }]);
     match runner
