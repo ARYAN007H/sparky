@@ -116,7 +116,10 @@ pub async fn recall(
     identity: &MemoryIdentity,
     mut params: RecallParams,
 ) -> MemoryResult<RecallView> {
-    params.filter = Some(confine_filter(params.filter, &allowed_reach(config, identity))?);
+    params.filter = Some(confine_filter(
+        params.filter,
+        &allowed_reach(config, identity),
+    )?);
     ops::recall(config, params).await
 }
 
@@ -130,7 +133,10 @@ pub async fn fetch(
     identity: &MemoryIdentity,
     mut params: FetchParams,
 ) -> MemoryResult<FetchView> {
-    params.filter = Some(confine_filter(params.filter, &allowed_reach(config, identity))?);
+    params.filter = Some(confine_filter(
+        params.filter,
+        &allowed_reach(config, identity),
+    )?);
     ops::fetch(config, params).await
 }
 
@@ -159,7 +165,10 @@ pub async fn forget(
     identity: &MemoryIdentity,
     mut params: ForgetParams,
 ) -> MemoryResult<ForgetView> {
-    params.reach = Some(confine_reach(params.reach, &allowed_reach(config, identity))?);
+    params.reach = Some(confine_reach(
+        params.reach,
+        &allowed_reach(config, identity),
+    )?);
     ops::forget(config, params).await
 }
 
@@ -176,7 +185,10 @@ pub async fn items_list(
     mut params: ItemsListParams,
 ) -> MemoryResult<ItemsListView> {
     let narrowed = explore::narrowed(params.filter.take(), &params.path)?;
-    params.filter = Some(confine_filter(Some(narrowed), &allowed_reach(config, identity))?);
+    params.filter = Some(confine_filter(
+        Some(narrowed),
+        &allowed_reach(config, identity),
+    )?);
     params.path = Vec::new();
     ops::items_list(config, params).await
 }
@@ -193,7 +205,10 @@ pub async fn explore(
     mut params: ExploreParams,
 ) -> MemoryResult<ExplorePage> {
     let narrowed = explore::narrowed(params.filter.take(), &params.path)?;
-    params.filter = Some(confine_filter(Some(narrowed), &allowed_reach(config, identity))?);
+    params.filter = Some(confine_filter(
+        Some(narrowed),
+        &allowed_reach(config, identity),
+    )?);
     params.path = Vec::new();
     explore::explore(config, params).await
 }
@@ -210,7 +225,10 @@ pub async fn items_get(
     identity: &MemoryIdentity,
     mut params: ItemsGetParams,
 ) -> MemoryResult<ItemsGetView> {
-    params.reach = Some(confine_reach(params.reach, &allowed_reach(config, identity))?);
+    params.reach = Some(confine_reach(
+        params.reach,
+        &allowed_reach(config, identity),
+    )?);
     explore::items_get(config, params).await
 }
 

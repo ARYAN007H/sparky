@@ -103,9 +103,13 @@ async fn the_preview_reads_without_logging_and_agents_are_listed() {
     assert_eq!(turn.agent_id, "writer");
     assert!(turn.pack.markdown.contains("1st"));
 
-    let session = pack_preview(&config,&MemoryIdentity::root(), PackPreviewParams::default())
-        .await
-        .unwrap();
+    let session = pack_preview(
+        &config,
+        &MemoryIdentity::root(),
+        PackPreviewParams::default(),
+    )
+    .await
+    .unwrap();
     assert_eq!(session.mode, "session");
 
     let agents = agents_list(&config, &MemoryIdentity::root()).await.unwrap();

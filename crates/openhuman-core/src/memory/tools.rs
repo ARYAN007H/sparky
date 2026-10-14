@@ -149,15 +149,14 @@ impl CallFacts {
             .unwrap_or_else(|| config.action_dir.clone());
         // The acting identity is the run's own; direct dispatch (CLI, tests)
         // has no run, and falls back to the spawning agent, else the root.
-        let identity = crate::agent::tinyagents::host::run_context::memory_identity_for_tool(
-            context,
-        )
-        .unwrap_or_else(|| {
-            crate::agent::tinyagents::host::run_context::parent_agent_id_for_tool(context)
-                .map_or_else(super::scope::MemoryIdentity::root, |parent_agent_id| {
-                    super::scope::MemoryIdentity::agent(&parent_agent_id)
-                })
-        });
+        let identity =
+            crate::agent::tinyagents::host::run_context::memory_identity_for_tool(context)
+                .unwrap_or_else(|| {
+                    crate::agent::tinyagents::host::run_context::parent_agent_id_for_tool(context)
+                        .map_or_else(super::scope::MemoryIdentity::root, |parent_agent_id| {
+                            super::scope::MemoryIdentity::agent(&parent_agent_id)
+                        })
+                });
         Self {
             workspace: Some(workspace.display().to_string()),
             thread_id: context

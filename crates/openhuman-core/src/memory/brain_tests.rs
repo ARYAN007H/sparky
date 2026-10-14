@@ -188,7 +188,7 @@ async fn ingest_refuses_bad_input() {
         },
     ] {
         assert!(matches!(
-            ingest(&config,&MemoryIdentity::root(), params).await,
+            ingest(&config, &MemoryIdentity::root(), params).await,
             Err(MemoryError::InvalidRequest(_))
         ));
     }
@@ -289,7 +289,7 @@ async fn ingest_refuses_a_credential_store_a_system_root_traversal_and_null_byte
         format!("{}/../guide.md", notes.display()),
         format!("{}\0.md", tmp.path().join("guide").display()),
     ] {
-        let result = ingest(&config,&MemoryIdentity::root(), path_params(path.clone())).await;
+        let result = ingest(&config, &MemoryIdentity::root(), path_params(path.clone())).await;
         assert!(
             matches!(result, Err(MemoryError::InvalidRequest(_))),
             "{path:?}: {result:?}"
@@ -310,7 +310,12 @@ async fn ingest_refuses_a_symlink_into_a_credential_store() {
     let link = tmp.path().join("innocent.md");
     std::os::unix::fs::symlink(aws.join("credentials"), &link).unwrap();
 
-    let result = ingest(&config,&MemoryIdentity::root(), path_params(link.display().to_string())).await;
+    let result = ingest(
+        &config,
+        &MemoryIdentity::root(),
+        path_params(link.display().to_string()),
+    )
+    .await;
     assert!(
         matches!(result, Err(MemoryError::InvalidRequest(_))),
         "{result:?}"

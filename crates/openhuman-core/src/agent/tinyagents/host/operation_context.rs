@@ -104,7 +104,9 @@ pub(crate) fn tool_context_with_memory_identity(
 ) -> tinyagents_harness::tool::ToolExecutionContext {
     let mut host = super::OpenHumanRunContext::new();
     host.memory_identity = Some(identity);
-    let run = host.into_tinyagents(tinyagents_harness::context::RunConfig::new("memory-identity-test"));
+    let run = host.into_tinyagents(tinyagents_harness::context::RunConfig::new(
+        "memory-identity-test",
+    ));
     tinyagents_harness::tool::ToolExecutionContext::from_run_context(
         &run,
         tinyagents_harness::ids::CallId::new("memory-identity-test-call"),

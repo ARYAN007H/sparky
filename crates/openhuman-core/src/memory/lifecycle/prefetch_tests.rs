@@ -348,28 +348,25 @@ async fn queued_work_keeps_the_callers_core_context() {
         crate::core::runtime::DomainSet::full(),
         Some(config.workspace_dir.clone()),
     );
-    crate::core::runtime::CoreContext::scope(
-        ctx.clone(),
-        async {
-            let identity = MemoryIdentity::agent("scoped-agent").resolve(&config);
-            let key = Key::new(&config, &identity, "t", false);
-            let cache = cache();
-            let expected = ctx.clone();
-            enqueue(
-                cache.clone(),
-                key.clone(),
-                Box::pin(crate::core::runtime::spawn::scoped(async move {
-                    assert!(Arc::ptr_eq(
-                        &crate::core::runtime::CoreContext::scoped().unwrap(),
-                        &expected
-                    ));
-                    Some(pack("scoped"))
-                })),
-            );
-            drain(&cache, &key).await;
-            assert_eq!(completed(&cache, &key).unwrap().markdown, "scoped");
-        },
-    )
+    crate::core::runtime::CoreContext::scope(ctx.clone(), async {
+        let identity = MemoryIdentity::agent("scoped-agent").resolve(&config);
+        let key = Key::new(&config, &identity, "t", false);
+        let cache = cache();
+        let expected = ctx.clone();
+        enqueue(
+            cache.clone(),
+            key.clone(),
+            Box::pin(crate::core::runtime::spawn::scoped(async move {
+                assert!(Arc::ptr_eq(
+                    &crate::core::runtime::CoreContext::scoped().unwrap(),
+                    &expected
+                ));
+                Some(pack("scoped"))
+            })),
+        );
+        drain(&cache, &key).await;
+        assert_eq!(completed(&cache, &key).unwrap().markdown, "scoped");
+    })
     .await;
 }
 

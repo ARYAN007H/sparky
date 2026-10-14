@@ -92,10 +92,7 @@ pub struct BrainSourcesView {
 }
 
 /// `memory_brain_sources`: the brain's sources and their sizes.
-pub async fn sources(
-    config: &Config,
-    identity: &MemoryIdentity,
-) -> MemoryResult<BrainSourcesView> {
+pub async fn sources(config: &Config, identity: &MemoryIdentity) -> MemoryResult<BrainSourcesView> {
     let bound = engine::resolve(config).engine()?;
     let layout = layout(config, identity);
     let page = bound
@@ -166,7 +163,9 @@ pub async fn search(
     }
     let source = params.source.as_deref().map(parse_source).transpose()?;
     let limit = super::types::clamp_limit(params.limit);
-    let hits = brain(config, identity)?.search(query, source.as_ref(), limit).await?;
+    let hits = brain(config, identity)?
+        .search(query, source.as_ref(), limit)
+        .await?;
     tracing::debug!(hits = hits.len(), "[memory:brain] search");
     Ok(BrainSearchView { hits })
 }

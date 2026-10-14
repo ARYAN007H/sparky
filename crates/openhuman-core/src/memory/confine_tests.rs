@@ -75,11 +75,15 @@ fn an_unset_reach_becomes_the_allowed_one_and_a_wider_one_is_refused() {
 fn the_allowed_reach_is_the_identity_roots_subtree() {
     let tmp = tempfile::tempdir().unwrap();
     let mut config = config_in(&tmp);
-    assert_eq!(allowed_reach(&config, &MemoryIdentity::root()),
-        Reach::subtree(Namespace::ROOT));
+    assert_eq!(
+        allowed_reach(&config, &MemoryIdentity::root()),
+        Reach::subtree(Namespace::ROOT)
+    );
     config.memory.root = Some("project:q4".to_string());
-    assert_eq!(allowed_reach(&config, &MemoryIdentity::root()),
-        Reach::subtree(ns("project:q4")));
+    assert_eq!(
+        allowed_reach(&config, &MemoryIdentity::root()),
+        Reach::subtree(ns("project:q4"))
+    );
 }
 
 #[test]
@@ -95,7 +99,7 @@ async fn list_fetch_and_recall_never_read_another_root() {
     let tmp = tempfile::tempdir().unwrap();
     let (config, mine, theirs) = two_roots(&tmp).await;
 
-    let listed = items_list(&config,&MemoryIdentity::root(), ItemsListParams::default())
+    let listed = items_list(&config, &MemoryIdentity::root(), ItemsListParams::default())
         .await
         .unwrap();
     assert_eq!(ids(&listed.items), std::slice::from_ref(&mine));
