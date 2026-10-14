@@ -88,60 +88,91 @@ fn quiet_config(tmp: &tempfile::TempDir) -> Config {
     }
 }
 
-/// An embedder that records the chat each provider was built for and embeds
-/// nothing (the `none` provider), so a search stops at "no usable embedding
-/// provider" after the retriever was requested.
+/// An embedder that records the chat each provider was built for, then builds
+/// the configured provider as usual.
 fn recording_embedder(
     seen: Arc<std::sync::Mutex<Vec<Option<ApprovalChatContext>>>>,
 ) -> EmbedderFactory {
     Arc::new(move |config, chat| {
         seen.lock().unwrap().push(chat.clone());
-        let mut quiet = config.clone();
-        quiet.memory.embedding_provider = "none".into();
         openhuman_embed::__host::inference::embedding_host::default_embedding_provider_for_chat(
-            &quiet, chat,
+            config, chat,
         )
     })
 }
 
-/// The Jev retriever's cloud-embedding disclosure goes to the chat the search
-/// runs for: the chat in the `RankContext` reaches the embedding provider
-/// factory, and a search with no chat builds an unrouted provider.
-#[tokio::test]
-async fn the_chat_of_the_search_reaches_the_embedding_provider() {
-    let tmp = tempfile::tempdir().expect("tempdir");
-    let config = quiet_config(&tmp);
-    let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
-    let ranker = TinyHumansJevRanker::new()
-        .with_embedder_factory(recording_embedder(seen.clone()))
+fn ranker_recording(
+    config: Config,
+    seen: Arc<std::sync::Mutex<Vec<Option<ApprovalChatContext>>>>,
+) -> TinyHumansJevRanker {
+    TinyHumansJevRanker::new()
+        .with_embedder_factory(recording_embedder(seen))
         .with_env_loader(Arc::new(|key| {
             (key == "OPENROUTER_API_KEY").then(|| "sk-test".to_owned())
         }))
         .with_config_loader(Arc::new(move || {
             let config = config.clone();
             Box::pin(async move { Ok(config) })
-        }));
-    let candidates = [RankCandidate::new("a", "a send a message")];
+        }))
+}
 
-    let chat = tinytools::RankChat::new("thread-9", "client-4").with_request_id("req-2");
-    let routed = RankContext::empty().with_chat(chat);
-    let _ = ranker.rank("send a message", &routed, &candidates, 3).await;
-    let _ = ranker
-        .rank("send a message", &RankContext::empty(), &candidates, 3)
-        .await;
+fn chat(thread: &str) -> ApprovalChatContext {
+    ApprovalChatContext {
+        thread_id: thread.to_owned(),
+        client_id: "client-4".to_owned(),
+        request_id: Some("req-2".to_owned()),
+    }
+}
 
-    let seen = seen.lock().unwrap().clone();
+/// The Jev retriever's cloud-embedding disclosure goes to the chat the search
+/// runs for: a search made in a chat builds its embedding provider for that
+/// chat, even when an unrouted retriever is already cached, and a search with
+/// no chat builds none.
+#[tokio::test]
+async fn a_search_in_a_chat_embeds_through_a_provider_routed_to_it() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let ranker = ranker_recording(quiet_config(&tmp), seen.clone());
+
+    ranker.current(None).await.expect("unrouted search builds");
+    assert_eq!(seen.lock().unwrap().clone(), vec![None]);
+
+    ranker
+        .current(Some(chat("thread-9")))
+        .await
+        .expect("routed search builds");
+    ranker
+        .current(Some(chat("thread-10")))
+        .await
+        .expect("a second chat builds its own");
     assert_eq!(
-        seen.first().cloned().flatten(),
-        Some(ApprovalChatContext {
-            thread_id: "thread-9".to_owned(),
-            client_id: "client-4".to_owned(),
-            request_id: Some("req-2".to_owned()),
-        }),
-        "the first search ran in a chat: {seen:?}"
+        seen.lock().unwrap().clone(),
+        vec![None, Some(chat("thread-9")), Some(chat("thread-10"))],
+        "each chat gets a provider routed to it; the cached retriever is not reused for them"
     );
-    assert!(
-        seen.iter().skip(1).all(Option::is_none),
-        "a search with no chat builds an unrouted provider: {seen:?}"
+}
+
+/// The chat in the `RankContext` is the one the provider is routed to.
+#[tokio::test]
+async fn the_rank_context_chat_is_the_one_the_provider_discloses_to() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let ranker = ranker_recording(quiet_config(&tmp), seen.clone());
+    // The evaluator would reach the network; a zero deadline turns it into a
+    // timeout before any request is made.
+    let ranker = ranker.with_deadline(Duration::ZERO);
+    let context = RankContext::empty()
+        .with_chat(tinytools::RankChat::new("thread-9", "client-4").with_request_id("req-2"));
+    let _ = ranker
+        .rank(
+            "send a message",
+            &context,
+            &[RankCandidate::new("a", "a send a message")],
+            3,
+        )
+        .await;
+    assert_eq!(
+        seen.lock().unwrap().last().cloned().flatten(),
+        Some(chat("thread-9"))
     );
 }
