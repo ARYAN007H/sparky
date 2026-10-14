@@ -9,7 +9,6 @@ fn spec(name: &str) -> Arc<ToolSpec> {
         name: name.into(),
         description: "d".into(),
         parameters: serde_json::json!({"type": "object"}),
-        ..Default::default()
     })
 }
 
