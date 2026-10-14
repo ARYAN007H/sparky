@@ -16,7 +16,6 @@
 // the engine's `queue::start`. That call left with the in-process engine
 // (openhuman#5560 — see `start_bootstrap_jobs`); every remaining `config.…` in
 // this file is plain field access on OpenHuman's own `Config`.
-use crate::core::runtime::DispatchCtx;
 use crate::config::Config;
 use crate::core::runtime::ServiceSet;
 
@@ -107,7 +106,7 @@ pub(crate) async fn start_selected_services(
         return;
     }
     log::debug!("[core-runtime] start_services services={services:?}");
-    super::bootstrap::start_core_runtime_services(&ctx, services, config).await;
+    super::bootstrap::start_core_runtime_services(services, config).await;
     if services.login_gated {
         tasks.track(
             "login_gated",
@@ -140,7 +139,7 @@ pub(crate) async fn start_selected_services(
         spawn_flows_boot_reconcile();
     }
     if services.channels {
-        if let Some(handle) = spawn_channels_service(&ctx) {
+        if let Some(handle) = spawn_channels_service() {
             tasks.track("channels", handle);
         }
     }
@@ -257,7 +256,7 @@ pub fn spawn_cron_service(
     ctx: std::sync::Arc<crate::core::runtime::CoreContext>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(crate::core::runtime::CoreContext::scope(ctx, async {
-        match crate::config::ops::load_config_with_timeout(&ctx).await {
+        match crate::config::ops::load_config_with_timeout().await {
             Ok(config) => {
                 if !config.cron.enabled {
                     log::info!("[cron] scheduler disabled via config; skipping");
@@ -294,7 +293,7 @@ pub fn spawn_cron_service(
 /// messages are never polled. Skipped entirely when
 /// `OPENHUMAN_DISABLE_CHANNEL_LISTENERS` is set to `1`/`true`, and returns early
 /// when no channel integrations are configured.
-pub fn spawn_channels_service(ctx: &DispatchCtx, ) -> Option<tokio::task::JoinHandle<()>> {
+pub fn spawn_channels_service() -> Option<tokio::task::JoinHandle<()>> {
     // Compile-time `channels` gate: the body names `channels::start_channels`,
     // so the whole thing is `#[cfg]`-gated. With the feature off there are no
     // realtime listeners to spawn.
@@ -322,7 +321,7 @@ pub fn spawn_channels_service(ctx: &DispatchCtx, ) -> Option<tokio::task::JoinHa
                     log::info!(
                         "[channels] spawning in-process realtime listeners (Telegram, Discord, …)"
                     );
-                    crate::channels::start_channels_with_session(&ctx, config, channel_session).await
+                    crate::channels::start_channels_with_session(config, channel_session).await
                 },
             ),
         );
@@ -472,7 +471,7 @@ pub(crate) async fn run_legacy_migrations(config: &Config) {
 }
 
 /// Auto-connect Socket.IO to the backend when enabled by the service selection.
-pub fn spawn_socket_auto_connect(ctx: &DispatchCtx, 
+pub fn spawn_socket_auto_connect(
     services: ServiceSet,
     socket_mgr: std::sync::Arc<crate::platform::socket::SocketManager>,
 ) {
@@ -534,7 +533,7 @@ pub fn spawn_socket_auto_connect(ctx: &DispatchCtx,
             }
             let provider =
                 crate::platform::socket::token_provider::token_provider_from_config(config);
-            if let Err(e) = socket_mgr.connect_with_provider(&ctx, &api_url, provider).await {
+            if let Err(e) = socket_mgr.connect_with_provider(&api_url, provider).await {
                 // Signing out between the token check above and the provider's
                 // read leaves no token (Sentry 35911). That is a user-state
                 // race, not a fault: warn so it stays a breadcrumb.

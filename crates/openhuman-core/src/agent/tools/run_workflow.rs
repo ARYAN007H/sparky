@@ -30,7 +30,6 @@
 //! bounds still stop the realistic failure modes (fan-out bomb, tight
 //! self-loop) without it.
 
-use crate::core::runtime::DispatchCtx;
 use async_trait::async_trait;
 use serde_json::json;
 
@@ -332,7 +331,7 @@ impl Tool for RunWorkflowTool {
         // Fire-and-forget: only the spawn backstop applies — no await, so no
         // re-entrancy/nesting slot to take.
         if wait_seconds == 0 {
-            return match spawn_workflow_run_background(&DispatchCtx::ambient(), workflow_id.clone(), inputs).await {
+            return match spawn_workflow_run_background(workflow_id.clone(), inputs).await {
                 // Count only spawns that actually start against the backstop —
                 // unknown-workflow / bad-input rejections (the Err arm) must not
                 // burn the budget, or rejected calls accumulate and trip the
@@ -366,7 +365,7 @@ impl Tool for RunWorkflowTool {
             Err(e) => return Ok(ToolResult::error(format!("run_workflow: {e}"))),
         };
 
-        let started = match spawn_workflow_run_background(&DispatchCtx::ambient(), workflow_id.clone(), inputs).await {
+        let started = match spawn_workflow_run_background(workflow_id.clone(), inputs).await {
             Ok(s) => {
                 if let Err(e) = guard::account_spawn() {
                     return Ok(ToolResult::error(format!("run_workflow: {e}")));

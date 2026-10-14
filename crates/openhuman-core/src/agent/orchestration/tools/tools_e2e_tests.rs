@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::{ArchetypeDelegationTool, DelegationTarget, SpawnSubagentTool, SpawnWorkerThreadTool};
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::harness::ParentExecutionContext;
@@ -131,7 +130,7 @@ async fn archetype_delegation_tool_runs_child_agent_e2e() {
         "archetype-delegation-e2e",
         parent_context(workspace.path(), provider.clone(), vec![]),
     );
-    let result = super::archetype_delegation::execute_archetype_delegation_with_live_parent(&DispatchCtx::process_default(), 
+    let result = super::archetype_delegation::execute_archetype_delegation_with_live_parent(
         &tool.agent_id.0,
         &tool.tool_name,
         json!({
@@ -188,7 +187,7 @@ async fn archetype_delegation_defaults_to_async_with_durable_session_e2e() {
     let parent_run = parent_data
         .with_parent(ctx.clone())
         .into_tinyagents(RunConfig::new("archetype-async-e2e").with_thread("thread-async-parent"));
-    let result = super::archetype_delegation::execute_archetype_delegation_with_live_parent(&ctx, 
+    let result = super::archetype_delegation::execute_archetype_delegation_with_live_parent(
         &tool.agent_id.0,
         &tool.tool_name,
         json!({
@@ -334,7 +333,7 @@ async fn continue_subagent_resumes_idle_durable_session_e2e() {
     let (wrong_agent, result) = (async {
         let tool = ContinueSubagentTool::new();
         let wrong_agent = tool
-            .execute_with_live_parent_context(&ctx, 
+            .execute_with_live_parent_context(
                 json!({
                     "task_id": session_id,
                     "agent_id": "unrelated_agent",
@@ -346,7 +345,7 @@ async fn continue_subagent_resumes_idle_durable_session_e2e() {
             )
             .await?;
         let result = tool
-            .execute_with_live_parent_context(&ctx, 
+            .execute_with_live_parent_context(
                 json!({
                     "task_id": session_id,
                     // Production callers sometimes copy the roster's session
@@ -408,7 +407,7 @@ async fn continue_subagent_without_checkpoint_or_durable_session_names_the_roste
     ctx.session_id = "tools-e2e-continue-missing".into();
     let live = super::live_parent_run_context("continue-missing-e2e", ctx);
     let result = ContinueSubagentTool::new()
-        .execute_with_live_parent_context(&ctx, 
+        .execute_with_live_parent_context(
             json!({
                 "task_id": "sub-does-not-exist",
                 "agent_id": "task_manager_agent",

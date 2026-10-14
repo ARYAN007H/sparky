@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 
 // Regression for #4950 ("Clear App Data does nothing"). The GUI clear flow
@@ -100,7 +99,7 @@ async fn load_config_with_timeout_rejects_directory_config() {
     let prev = std::env::var("OPENHUMAN_WORKSPACE").ok();
     std::env::set_var("OPENHUMAN_WORKSPACE", tmp.path().to_str().unwrap());
 
-    let result = load_config_with_timeout(&DispatchCtx::process_default()).await;
+    let result = load_config_with_timeout().await;
 
     match prev {
         Some(v) => std::env::set_var("OPENHUMAN_WORKSPACE", v),

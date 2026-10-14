@@ -8,7 +8,6 @@
 //! resume the same sub-agent from its checkpoint with the user's response
 //! appended to the conversation history.
 
-use crate::core::runtime::DispatchCtx;
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::orchestration::tools::dispatch::{incomplete_stop, stopped_subagent_result};
 use crate::agent::progress::AgentProgress;
@@ -54,7 +53,7 @@ impl ToolDispatch<(), crate::agent::tinyagents::host::OpenHumanRunContext>
     ) -> anyhow::Result<ToolResult> {
         let context = ToolExecutionContext::from_run_context(parent, _call_id.clone());
         ContinueSubagentTool::new()
-            .execute_with_live_parent_context(&ctx, 
+            .execute_with_live_parent_context(
                 arguments,
                 Some(&context),
                 parent.data.child(),
@@ -86,7 +85,7 @@ impl ContinueSubagentTool {
     /// plus the new message, and the finished result is delivered back into
     /// the parent chat as a new turn.
     async fn resume_from_durable_store(
-        &self, ctx: &DispatchCtx,
+        &self,
         parent: &crate::agent::harness::fork_context::ParentExecutionContext,
         task_id: &str,
         agent_id: &str,
@@ -169,7 +168,7 @@ impl ContinueSubagentTool {
             .map_err(|error| anyhow::anyhow!(error.to_string()))?
             .with_cancellation(detached_cancellation);
         super::spawn_async_subagent::SpawnAsyncSubagentTool::new()
-            .execute_with_live_parent_context(&ctx, 
+            .execute_with_live_parent_context(
                 async_args,
                 tool_context,
                 run_context,
@@ -243,12 +242,12 @@ impl ContinueSubagentTool {
         tool_context: Option<&dyn ToolRunContext>,
         run_context: crate::agent::tinyagents::host::OpenHumanRunContext,
     ) -> anyhow::Result<ToolResult> {
-        self.execute_with_live_parent_context(&ctx, args, tool_context, run_context, None)
+        self.execute_with_live_parent_context(args, tool_context, run_context, None)
             .await
     }
 
     pub(crate) async fn execute_with_live_parent_context(
-        &self, ctx: &DispatchCtx,
+        &self,
         args: serde_json::Value,
         tool_context: Option<&dyn ToolRunContext>,
         run_context: crate::agent::tinyagents::host::OpenHumanRunContext,
@@ -336,7 +335,7 @@ impl ContinueSubagentTool {
                 // workflow_builder ("looks good, save it") instead of
                 // re-delegating a fresh, stateless one.
                 return self
-                    .resume_from_durable_store(&ctx, 
+                    .resume_from_durable_store(
                         &parent,
                         &task_id,
                         &agent_id,

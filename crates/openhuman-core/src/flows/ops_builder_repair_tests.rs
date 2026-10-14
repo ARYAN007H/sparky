@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::{
     config::Config,
@@ -65,7 +64,7 @@ fn repair_backend_failure_returns_no_proposal_before_starting_the_builder() {
         };
 
         let outcome =
-            flows_build_with_extra_hidden_tools(&DispatchCtx::process_default(), &Config::default(), req.clone(), None, &[])
+            flows_build_with_extra_hidden_tools(&Config::default(), req.clone(), None, &[])
                 .await
                 .expect("backend failure should short-circuit before the builder starts");
 
@@ -83,7 +82,7 @@ fn repair_backend_failure_returns_no_proposal_before_starting_the_builder() {
         };
         let mut events = crate::web_chat::subscribe_web_channel_events();
 
-        flows_build_with_extra_hidden_tools(&DispatchCtx::process_default(), &Config::default(), req, Some(stream), &[])
+        flows_build_with_extra_hidden_tools(&Config::default(), req, Some(stream), &[])
             .await
             .expect("streamed backend failure should short-circuit before the builder starts");
 

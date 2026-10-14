@@ -23,7 +23,6 @@
 //!      ever reverts to calling `run_tool_call_loop` directly, this test
 //!      starts failing.
 
-use crate::core::runtime::DispatchCtx;
 use super::super::context::{
     conversation_history_key, ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS,
 };
@@ -139,7 +138,7 @@ fn make_discord_ctx(
 /// recipient matching `reply_target`.
 #[tokio::test]
 async fn discord_inbound_dispatches_through_full_pipeline() {
-    let _bus_guard = super::common::use_real_agent_handler(&DispatchCtx::process_default()).await;
+    let _bus_guard = super::common::use_real_agent_handler().await;
     let recorder = Arc::new(DiscordRecordingChannel::default());
     let channel: Arc<dyn Channel> = recorder.clone();
     let provider: Arc<dyn ChatModel<()>> = Arc::new(FixedResponseModel {
@@ -192,7 +191,7 @@ async fn discord_inbound_dispatches_through_full_pipeline() {
 /// Telegram-specific behaviors.
 #[tokio::test]
 async fn discord_threaded_message_does_not_emit_reaction_ack() {
-    let _bus_guard = super::common::use_real_agent_handler(&DispatchCtx::process_default()).await;
+    let _bus_guard = super::common::use_real_agent_handler().await;
     let recorder = Arc::new(DiscordRecordingChannel::default());
     let channel: Arc<dyn Channel> = recorder.clone();
     let provider: Arc<dyn ChatModel<()>> = Arc::new(FixedResponseModel { response: "roger" });
@@ -242,7 +241,7 @@ async fn discord_threaded_message_does_not_emit_reaction_ack() {
 /// isolation.
 #[tokio::test]
 async fn discord_thread_ts_splits_conversation_history_end_to_end() {
-    let _bus_guard = super::common::use_real_agent_handler(&DispatchCtx::process_default()).await;
+    let _bus_guard = super::common::use_real_agent_handler().await;
     let recorder = Arc::new(DiscordRecordingChannel::default());
     let channel: Arc<dyn Channel> = recorder.clone();
     let provider_impl = Arc::new(HistoryCaptureModel::default());

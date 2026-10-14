@@ -1,7 +1,6 @@
 //! Execution of `JobType::Agent` and `JobType::Flow` jobs: agent construction
 //! (definition selection) and the single scheduled turn.
 
-use crate::core::runtime::DispatchCtx;
 use super::delivery::is_morning_briefing_job;
 use super::failure_classification::classify_agent_anyhow_for_user;
 use super::origin_context::build_run_prompt;
@@ -16,15 +15,15 @@ pub(super) const MORNING_BRIEFING_TASK_RECENCY_SECS: u64 = 24 * 60 * 60;
 
 /// [`run_agent_job_for_run`] under a fresh run id.
 #[cfg(test)]
-pub(super) async fn run_agent_job(ctx: &DispatchCtx, 
+pub(super) async fn run_agent_job(
     config: &Config,
     job: &CronJob,
 ) -> (bool, String, Option<String>) {
     let run_id = uuid::Uuid::new_v4().to_string();
-    run_agent_job_for_run(&ctx, config, job, &run_id).await
+    run_agent_job_for_run(config, job, &run_id).await
 }
 
-pub(super) async fn run_agent_job_for_run(ctx: &DispatchCtx, 
+pub(super) async fn run_agent_job_for_run(
     config: &Config,
     job: &CronJob,
     run_id: &str,
@@ -190,7 +189,7 @@ pub(super) async fn run_agent_job_for_run(ctx: &DispatchCtx,
                     let origin = crate::cron::origin::turn_origin_for_job_run(job, run_id);
                     let turn = crate::agent::turn_origin::with_origin(
                         origin,
-                        agent.run_single(&ctx, &prefixed_prompt),
+                        agent.run_single(&prefixed_prompt),
                     );
                     // A host agent's turn runs in its own context, so every
                     // ambient read (config, domains, tool groups, session

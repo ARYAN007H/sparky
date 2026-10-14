@@ -3,7 +3,6 @@
 //! run-queue dispatch, and the spawned turn body that delivers a response or
 //! classifies and reports a failure.
 
-use crate::core::runtime::DispatchCtx;
 use serde_json::json;
 use std::sync::Arc;
 use tinyagents_harness::run_queue::{QueueLane, RunQueue};
@@ -138,7 +137,7 @@ fn prompt_guard_user_message(action: PromptEnforcementAction) -> &'static str {
 /// keeps one copy, compiled in this crate.
 #[allow(clippy::too_many_arguments)]
 #[inline(never)]
-pub fn start_chat<'a>(ctx: &DispatchCtx, 
+pub fn start_chat<'a>(
     client_id: &'a str,
     thread_id: &'a str,
     message: &'a str,
@@ -148,7 +147,7 @@ pub fn start_chat<'a>(ctx: &DispatchCtx,
     queue_mode: Option<String>,
     metadata: ChatRequestMetadata,
 ) -> futures::future::BoxFuture<'a, Result<String, StartChatError>> {
-    Box::pin(start_chat_inner(&ctx, 
+    Box::pin(start_chat_inner(
         client_id,
         thread_id,
         message,
@@ -161,7 +160,7 @@ pub fn start_chat<'a>(ctx: &DispatchCtx,
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn start_chat_inner(ctx: &DispatchCtx, 
+async fn start_chat_inner(
     client_id: &str,
     thread_id: &str,
     message: &str,
@@ -191,7 +190,7 @@ async fn start_chat_inner(ctx: &DispatchCtx,
     // Save originals before scanning, history, memory, or queue persistence.
     // A missing config/root cannot safely accept an upload.
     let mut message = if message.contains("[FILE:") || message.contains("[IMAGE:") {
-        let config = crate::config::rpc::load_config_with_timeout(&ctx)
+        let config = crate::config::rpc::load_config_with_timeout()
             .await
             .map_err(|error| {
                 StartChatError::Other(format!("upload configuration unavailable: {error}"))
@@ -368,7 +367,7 @@ async fn start_chat_inner(ctx: &DispatchCtx,
             thread_id,
             request_id
         );
-        spawn_parallel_turn(&ctx, 
+        spawn_parallel_turn(
             &client_id,
             &thread_id,
             request_id.clone(),
@@ -507,12 +506,12 @@ async fn start_chat_inner(ctx: &DispatchCtx,
             // `None` => the turn was cancelled cooperatively before producing a
             // result; the interrupting/cancelling side already emitted the
             // user-facing `chat_error`, so we just unwind quietly here.
-            let result = run_turn_under_cancel_and_deadline(&ctx, 
+            let result = run_turn_under_cancel_and_deadline(
                 task_cancel_token,
                 origin.clone(),
                 approval_ctx,
                 |host_env, activity, approval| {
-                    run_chat_task(&ctx, 
+                    run_chat_task(
                         &client_id_task,
                         &thread_id_task,
                         &request_id_task,
@@ -659,7 +658,7 @@ async fn start_chat_inner(ctx: &DispatchCtx,
             // any inference_start from the follow-up, even if it starts at
             // once on another task.
             if let Some(chat_result) = deferred_done {
-                crate::web_chat::presentation::announce_reply(&ctx, 
+                crate::web_chat::presentation::announce_reply(
                     &client_id_task,
                     &thread_id_task,
                     &request_id_task,
@@ -695,7 +694,7 @@ async fn start_chat_inner(ctx: &DispatchCtx,
                             .map(|f| crate::agent::queued_turn::text_preview(&f.text)),
                     },
                 );
-                dispatch_followups(&ctx, followups);
+                dispatch_followups(followups);
             }
         },
     ));
@@ -717,11 +716,11 @@ async fn start_chat_inner(ctx: &DispatchCtx,
     Ok(request_id)
 }
 
-fn dispatch_followups(ctx: &DispatchCtx, followups: Vec<crate::agent::queued_turn::QueuedTurn>) {
+fn dispatch_followups(followups: Vec<crate::agent::queued_turn::QueuedTurn>) {
     for fup in followups {
         tokio::spawn(crate::core::runtime::context::CoreContext::propagate(
             async move {
-                if let Err(err) = start_chat(&ctx, 
+                if let Err(err) = start_chat(
                     &fup.client_id,
                     &fup.thread_id,
                     &fup.text,

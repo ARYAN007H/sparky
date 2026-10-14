@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 
 // ── validate_agent_refs (agent-ref resolvability gate, PR #5114) ───────────
@@ -18,7 +17,7 @@ async fn agent_ref_plain_node_without_ref_is_accepted() {
         ],
         "edges": [ { "from_node": "t", "to_node": "a" } ]
     }));
-    let errors = validate_agent_refs(&DispatchCtx::process_default(), &config, &g).await;
+    let errors = validate_agent_refs(&config, &g).await;
     assert!(errors.is_empty(), "{errors:?}");
 }
 
@@ -36,7 +35,7 @@ async fn agent_ref_blank_string_is_treated_as_absent() {
         ],
         "edges": [ { "from_node": "t", "to_node": "a" } ]
     }));
-    let errors = validate_agent_refs(&DispatchCtx::process_default(), &config, &g).await;
+    let errors = validate_agent_refs(&config, &g).await;
     assert!(errors.is_empty(), "{errors:?}");
 }
 
@@ -62,7 +61,7 @@ async fn agent_ref_resolving_to_a_harness_definition_is_accepted() {
         ],
         "edges": [ { "from_node": "t", "to_node": "a" } ]
     }));
-    let errors = validate_agent_refs(&DispatchCtx::process_default(), &config, &g).await;
+    let errors = validate_agent_refs(&config, &g).await;
     assert!(
         errors.is_empty(),
         "a real harness agent_ref must never be rejected: {errors:?}"
@@ -87,7 +86,7 @@ async fn agent_ref_unknown_is_rejected() {
         ],
         "edges": [ { "from_node": "t", "to_node": "a" } ]
     }));
-    let errors = validate_agent_refs(&DispatchCtx::process_default(), &config, &g).await;
+    let errors = validate_agent_refs(&config, &g).await;
     assert!(!errors.is_empty(), "an unknown agent_ref must be rejected");
     assert!(
         errors.iter().any(|e| e.contains("no_such_agent_xyz")),

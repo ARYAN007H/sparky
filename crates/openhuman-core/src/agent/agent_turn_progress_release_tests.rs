@@ -5,7 +5,6 @@
 //! parent's `on_progress`) kept one bridge task — and in SaaS mode its
 //! profile's turn context — alive per turn.
 
-use crate::core::runtime::DispatchCtx;
 use super::*;
 
 #[tokio::test]
@@ -23,7 +22,7 @@ async fn clearing_progress_after_a_turn_closes_the_receiver() {
         let (tx, mut rx) = tokio::sync::mpsc::channel(256);
         let weak = tx.downgrade();
         agent.set_on_progress(Some(tx));
-        agent.turn(&DispatchCtx::process_default(), message).await.expect("turn");
+        agent.turn(message).await.expect("turn");
         agent.set_on_progress(None);
 
         assert_eq!(

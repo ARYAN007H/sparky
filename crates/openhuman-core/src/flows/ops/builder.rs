@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 
 /// Runs the `workflow_builder` agent for one authoring turn and returns its
@@ -16,12 +15,12 @@ use super::*;
 /// Persistence stays with the agent's tools: `propose`/`revise` never persist;
 /// `save_workflow` (only reachable in `build` mode with a real `flow_id`)
 /// writes onto an existing flow. This op never enables or runs a flow.
-pub async fn flows_build(ctx: &DispatchCtx, 
+pub async fn flows_build(
     config: &Config,
     req: crate::flows::agents::workflow_builder::builder_prompt::BuilderRequest,
     stream: Option<FlowStreamTarget>,
 ) -> Result<Outcome<Value>, String> {
-    flows_build_with_extra_hidden_tools(&ctx, config, req, stream, &[]).await
+    flows_build_with_extra_hidden_tools(config, req, stream, &[]).await
 }
 
 /// [`flows_build`] with caller-specific tools removed in addition to the
@@ -30,7 +29,7 @@ pub async fn flows_build(ctx: &DispatchCtx,
 /// This is intentionally crate-private: product surfaces use [`flows_build`]'s
 /// normal builder belt. Host integrations that add their own persistence
 /// boundary can hide tools that would bypass that boundary.
-pub(crate) async fn flows_build_with_extra_hidden_tools(ctx: &DispatchCtx, 
+pub(crate) async fn flows_build_with_extra_hidden_tools(
     config: &Config,
     req: crate::flows::agents::workflow_builder::builder_prompt::BuilderRequest,
     stream: Option<FlowStreamTarget>,
@@ -50,7 +49,7 @@ pub(crate) async fn flows_build_with_extra_hidden_tools(ctx: &DispatchCtx,
     ) {
         if let Some(assistant_text) = req.error.as_deref().and_then(backend_repair_message) {
             if let Some(target) = &stream {
-                finalize_flow_stream(&ctx, target, &Ok(assistant_text.clone()), &prompt).await;
+                finalize_flow_stream(target, &Ok(assistant_text.clone()), &prompt).await;
             }
             return Ok(Outcome::single_log(
                 json!({
@@ -132,7 +131,7 @@ pub(crate) async fn flows_build_with_extra_hidden_tools(ctx: &DispatchCtx,
     // `propose_workflow` tool result the frontend renders as a proposal card.
     // Best-effort — with no target the run stays headless (CLI / tests).
     if let Some(target) = &stream {
-        attach_flow_progress_bridge(&ctx, &mut agent, target, "flows_build", config);
+        attach_flow_progress_bridge(&mut agent, target, "flows_build", config);
     }
 
     // Run to completion, bounded by a wall-clock timeout. PR3
@@ -201,7 +200,7 @@ pub(crate) async fn flows_build_with_extra_hidden_tools(ctx: &DispatchCtx,
             let approval = ApprovalTurnContext::chat(chat_ctx).with_copilot_stream();
             let run = with_origin(
                 origin.clone(),
-                agent.run_single_with_approval(&ctx, &prompt, Some(origin), approval),
+                agent.run_single_with_approval(&prompt, Some(origin), approval),
             );
             let run =
                 tokio::time::timeout(std::time::Duration::from_secs(FLOW_BUILD_TIMEOUT_SECS), run);
@@ -249,7 +248,7 @@ pub(crate) async fn flows_build_with_extra_hidden_tools(ctx: &DispatchCtx,
                 "[flows] flows_build: headless/CLI turn — Cli origin, approval gate \
                  auto-allows external_effect tools (run-advancing tools stay hidden)"
             );
-            let run = with_origin(AgentTurnOrigin::Cli, agent.run_single(&ctx, &prompt));
+            let run = with_origin(AgentTurnOrigin::Cli, agent.run_single(&prompt));
             match tokio::time::timeout(std::time::Duration::from_secs(FLOW_BUILD_TIMEOUT_SECS), run)
                 .await
             {
@@ -313,7 +312,7 @@ pub(crate) async fn flows_build_with_extra_hidden_tools(ctx: &DispatchCtx,
     if cancelled {
         if let Some(target) = &stream {
             let terminal: Result<String, String> = Ok(assistant_text.clone());
-            finalize_flow_stream(&ctx, target, &terminal, &prompt).await;
+            finalize_flow_stream(target, &terminal, &prompt).await;
         }
         tracing::info!(
             target: "flows",
@@ -339,7 +338,7 @@ pub(crate) async fn flows_build_with_extra_hidden_tools(ctx: &DispatchCtx,
         if let Some(err) = &run_error {
             if let Some(target) = &stream {
                 let terminal: Result<String, String> = Err(err.clone());
-                finalize_flow_stream(&ctx, target, &terminal, &prompt).await;
+                finalize_flow_stream(target, &terminal, &prompt).await;
             }
             return Err(format!("workflow_builder produced no proposal: {err}"));
         }
@@ -396,7 +395,7 @@ pub(crate) async fn flows_build_with_extra_hidden_tools(ctx: &DispatchCtx,
             None => Ok(assistant_text.clone()),
             Some(err) => Err(err.clone()),
         };
-        finalize_flow_stream(&ctx, target, &terminal, &prompt).await;
+        finalize_flow_stream(target, &terminal, &prompt).await;
     }
 
     tracing::info!(

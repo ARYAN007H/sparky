@@ -1,7 +1,6 @@
 //! Handing finished spans to their sink(s): the local NDJSON/log exporter and
 //! the remote Langfuse usage-data push.
 
-use crate::core::runtime::DispatchCtx;
 use crate::config::schema::AgentTracingConfig;
 use crate::config::Config;
 
@@ -133,7 +132,7 @@ pub(crate) async fn export_run_trace_from_journal(
 /// Export one completed child turn as a separate trace in its conversation.
 /// The backend stamps the authenticated user onto the trace, while the child
 /// run's original parent/root ids remain in trace metadata for navigation.
-pub(crate) async fn export_subagent_journal_trace(ctx: &DispatchCtx, 
+pub(crate) async fn export_subagent_journal_trace(
     config: &Config,
     journal_run_id: &str,
     thread_id: Option<&str>,
@@ -152,7 +151,7 @@ pub(crate) async fn export_subagent_journal_trace(ctx: &DispatchCtx,
         );
         return;
     }
-    let observations = match crate::agent::tinyagents::journal::read_run_events(&ctx, journal_run_id, 0)
+    let observations = match crate::agent::tinyagents::journal::read_run_events(journal_run_id, 0)
         .await
     {
         Ok(observations) if !observations.is_empty() => observations,

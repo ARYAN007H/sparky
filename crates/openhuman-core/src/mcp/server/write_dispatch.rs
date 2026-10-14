@@ -15,8 +15,8 @@ use crate::security::{SecurityPolicy, ToolOperation};
 
 use super::tools::{tool_error, tool_success, ToolCallError};
 
-pub(super) async fn load_write_config(ctx: &DispatchCtx, tool_name: &str) -> Result<Config, ToolCallError> {
-    match config_rpc::load_config_with_timeout(&ctx).await {
+pub(super) async fn load_write_config(tool_name: &str) -> Result<Config, ToolCallError> {
+    match config_rpc::load_config_with_timeout().await {
         Ok(config) => Ok(config),
         Err(err) => {
             log::warn!(
@@ -190,7 +190,7 @@ pub(super) fn audit_write_rejection(
     );
 }
 
-pub(super) fn audit_write_rejection_without_config(ctx: &DispatchCtx, 
+pub(super) fn audit_write_rejection_without_config(
     tool_name: &str,
     audit_arguments: &Value,
     client_info: &str,
@@ -210,7 +210,7 @@ pub(super) fn audit_write_rejection_without_config(ctx: &DispatchCtx,
     match tokio::runtime::Handle::try_current() {
         Ok(handle) => {
             std::mem::drop(handle.spawn(async move {
-                match config_rpc::load_config_with_timeout(&ctx).await {
+                match config_rpc::load_config_with_timeout().await {
                     Ok(config) => audit_write(
                         &config,
                         NewMcpWriteRecord {

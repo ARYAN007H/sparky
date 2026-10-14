@@ -14,7 +14,6 @@
 //! seeds the built-in agent definitions and installs the process's
 //! [`ProfileHost`](crate::profiles::ProfileHost).
 
-use crate::core::runtime::DispatchCtx;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -398,19 +397,19 @@ impl DomainSet {
 
 /// Boot a SaaS core: check the deployment, lock the process to SaaS, and
 /// build the operator plane.
-pub async fn build(ctx: &DispatchCtx, 
+pub async fn build(
     config: SaasConfig,
     host: Option<String>,
     port: Option<u16>,
 ) -> anyhow::Result<CoreRuntime> {
-    build_with_profile_capabilities(&ctx, config, host, port, None).await
+    build_with_profile_capabilities(config, host, port, None).await
 }
 
 /// Boot with immutable operator adapters for authenticated profile turns.
 ///
 /// # Errors
 /// As [`build`].
-pub async fn build_with_profile_capabilities(ctx: &DispatchCtx, 
+pub async fn build_with_profile_capabilities(
     mut config: SaasConfig,
     host: Option<String>,
     port: Option<u16>,
@@ -510,7 +509,7 @@ pub async fn build_with_profile_capabilities(ctx: &DispatchCtx,
     // on any surface), so its subscriber plan never registers that handler;
     // register it alone. The request carries the caller's own turn parts, and
     // the handler runs in the caller's (profile's) scope.
-    crate::agent::bus::register_agent_handlers(&ctx);
+    crate::agent::bus::register_agent_handlers();
     log::debug!("[saas] registered the native agent.run_turn handler for relayed channel turns");
     // With a storage backend installed (the host opened the configured URL
     // before boot), the profile registry and leases live in it and every node
@@ -529,8 +528,8 @@ pub async fn build_with_profile_capabilities(ctx: &DispatchCtx,
             .with_capabilities(capabilities),
     );
     crate::profiles::host::install(Arc::clone(&host));
-    crate::profiles::lease::heartbeat(&ctx, Arc::clone(&host), runtime.context().clone());
-    crate::profiles::background::spawn(&ctx, host);
+    crate::profiles::lease::heartbeat(Arc::clone(&host), runtime.context().clone());
+    crate::profiles::background::spawn(host);
     Ok(runtime)
 }
 

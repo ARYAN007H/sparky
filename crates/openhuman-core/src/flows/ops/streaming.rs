@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -55,7 +54,7 @@ impl FlowStreamTarget {
 /// on reopen). The bridge task lives until the agent drops its progress sender
 /// (turn end). `source` is a short trace-attribution label (e.g.
 /// `"flows_build"`).
-pub(super) fn attach_flow_progress_bridge(ctx: &DispatchCtx, 
+pub(super) fn attach_flow_progress_bridge(
     agent: &mut crate::agent::OpenHumanSessionHost,
     target: &FlowStreamTarget,
     source: &str,
@@ -70,7 +69,7 @@ pub(super) fn attach_flow_progress_bridge(ctx: &DispatchCtx,
         source = %source,
         "[flows] progress bridge: attaching (streaming copilot/scout turn)"
     );
-    crate::web_chat::spawn_progress_bridge(&ctx, 
+    crate::web_chat::spawn_progress_bridge(
         progress_rx,
         "system".to_string(),
         target.thread_id.clone(),
@@ -91,14 +90,14 @@ pub(super) fn attach_flow_progress_bridge(ctx: &DispatchCtx,
 /// path, so segmentation/reaction match a normal turn), a failure publishes a
 /// `chat_error`. Broadcast as `"system"` so any viewer of the thread receives
 /// it (frontend keys by `thread_id`).
-pub(super) async fn finalize_flow_stream(ctx: &DispatchCtx, 
+pub(super) async fn finalize_flow_stream(
     target: &FlowStreamTarget,
     result: &Result<String, String>,
     prompt: &str,
 ) {
     match result {
         Ok(text) => {
-            crate::web_chat::presentation::deliver_response(&ctx, 
+            crate::web_chat::presentation::deliver_response(
                 "system",
                 &target.thread_id,
                 &target.request_id,
@@ -141,7 +140,7 @@ pub(super) async fn finalize_flow_stream(ctx: &DispatchCtx,
     // left non-terminal makes `threads_turn_state_get` report the turn as still
     // running, so re-entering the thread paints a permanent "Thinking..."
     // indicator under a reply that already landed.
-    if let Ok(config) = crate::config::rpc::load_config_with_timeout(&ctx).await {
+    if let Ok(config) = crate::config::rpc::load_config_with_timeout().await {
         let lifecycle = if result.is_ok() {
             tinyagents_session::turn_state::TurnLifecycle::Completed
         } else {

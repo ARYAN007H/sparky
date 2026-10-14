@@ -1,6 +1,5 @@
 //! History, context, and system prompt management.
 
-use crate::core::runtime::DispatchCtx;
 use super::super::types::OpenHumanSessionHost;
 use crate::agent::prompts::{PromptContext, PromptTool};
 use tinytools::render_tool_policy_boundary;
@@ -10,7 +9,7 @@ use anyhow::Result;
 impl OpenHumanSessionHost {
     /// Builds the system prompt for the current turn, including tool
     /// instructions.
-    pub fn build_system_prompt(&self, ctx: &DispatchCtx) -> Result<String> {
+    pub fn build_system_prompt(&self) -> Result<String> {
         // `visible_tool_specs` holds shared `Arc<ToolSpec>` leaves. Materialise
         // the canonical dialect input for this prompt build.
         let visible_specs_owned: Vec<tinytools::ToolSpec> = self
@@ -59,7 +58,7 @@ impl OpenHumanSessionHost {
             visible_tool_names: &prompt_visible_tool_names,
             tool_call_format: self.tool_dispatcher.tool_call_format(),
             connected_integrations: &self.connected_integrations,
-            connected_identities_md: crate::agent::prompts::render_connected_identities(&ctx),
+            connected_identities_md: crate::agent::prompts::render_connected_identities(),
             user_identity: crate::security::credentials::identity::peek_credential_user_identity(),
             personality_roster: vec![], // TODO: build_personality_roster(&workspace_dir)
             agents_md_global: agents_md.global,

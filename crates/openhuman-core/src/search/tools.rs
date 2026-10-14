@@ -8,7 +8,6 @@
 //! agent's config carries host-pinned search keys, which make it the config
 //! the call runs under.
 
-use crate::core::runtime::DispatchCtx;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::sync::{Arc, Mutex};
@@ -117,10 +116,10 @@ impl TinySearchTool {
         &self.spec
     }
 
-    async fn live_config(&self, ctx: &DispatchCtx) -> anyhow::Result<Config> {
+    async fn live_config(&self) -> anyhow::Result<Config> {
         match &self.config {
             Some(config) => Ok(config.as_ref().clone()),
-            None => crate::config::rpc::load_config_with_timeout(&ctx)
+            None => crate::config::rpc::load_config_with_timeout()
                 .await
                 .map_err(|error| anyhow::anyhow!(error)),
         }
@@ -245,7 +244,7 @@ impl Tool for TinySearchTool {
         args: Value,
         options: ToolCallOptions,
     ) -> anyhow::Result<ToolResult> {
-        let config = self.live_config(&DispatchCtx::ambient()).await?;
+        let config = self.live_config().await?;
         // Re-read per call, so a key added or a provider switched mid-session
         // clears an earlier refusal instead of outliving it.
         let signature = self.provider_signature(&config);

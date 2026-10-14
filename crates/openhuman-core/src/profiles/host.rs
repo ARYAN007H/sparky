@@ -22,7 +22,6 @@
 //! context is what makes the session store, the config loader and the
 //! per-thread tables resolve that user's state.
 
-use crate::core::runtime::DispatchCtx;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -256,7 +255,7 @@ impl ProfileHost {
 
     /// Profile `id`, opening it — and taking its lease — if it is provisioned
     /// and not open yet.
-    pub async fn open(&self, ctx: &DispatchCtx, id: &ProfileId) -> Result<Arc<Profile>, OpenError> {
+    pub async fn open(&self, id: &ProfileId) -> Result<Arc<Profile>, OpenError> {
         if let Some(state) = self.touch(id) {
             // Every open sweeps profiles idle past `idle_evict_secs`, so they
             // close even when no new user arrives; skipped while another open
@@ -372,7 +371,7 @@ impl ProfileHost {
         // table that routes them is process-local and empty after a restart,
         // so recover them in this profile's scope (on every open): the drains then run as this profile, on its tables alone.
         CoreContext::sync_scope(Arc::clone(&context), || {
-            crate::agent::orchestration::background_delivery::recover_on_open(&ctx, 
+            crate::agent::orchestration::background_delivery::recover_on_open(
                 &layout.workspace_dir,
                 crate::agent::orchestration::delivery_drain::DrainFence::of(Arc::clone(&fence)),
             )
@@ -552,7 +551,7 @@ impl ProfileHost {
     /// This node lost profile `id`: mark it fenced so no new work starts,
     /// close it, and stop the turns it is running. `grant` names the lease
     /// that was lost; a slot re-opened under a newer one is left alone.
-    pub async fn fence(&self, ctx: &DispatchCtx, id: &ProfileId, grant: &LeaseGrant, why: &str) {
+    pub async fn fence(&self, id: &ProfileId, grant: &LeaseGrant, why: &str) {
         let state = {
             let mut open = self.lock();
             match open.get(id) {
@@ -571,7 +570,7 @@ impl ProfileHost {
         );
         let stopped = CoreContext::scope(
             Arc::clone(state.context()),
-            crate::web_chat::cancel_all_turns(&ctx),
+            crate::web_chat::cancel_all_turns(),
         )
         .await;
         log::info!("[profiles] fenced profile={id}: stopped {stopped} thread(s)");

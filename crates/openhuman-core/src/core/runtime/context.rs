@@ -305,7 +305,7 @@ impl CoreContext {
         //    background jobs start later, from CoreRuntime::start_services(), after a transport binds
         //    succeeds.
         let runtime_config = config.clone();
-        super::bootstrap::bootstrap_core_runtime(&ctx, host_kind, config, domains).await;
+        super::bootstrap::bootstrap_core_runtime(host_kind, config, domains).await;
 
         Ok((ctx, has_operator_token, runtime_config))
     }

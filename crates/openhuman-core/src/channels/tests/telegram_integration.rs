@@ -5,7 +5,6 @@
 //! captures every `SendMessage` — including `thread_ts` — so assertions can be made
 //! about exactly what the channel receives, without needing a real Telegram HTTP server.
 
-use crate::core::runtime::DispatchCtx;
 use super::super::context::{
     conversation_history_key, ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS,
 };
@@ -112,7 +111,7 @@ fn make_test_context(
 /// unchanged to channel.send() so Telegram can visibly attach the reply.
 #[tokio::test]
 async fn inbound_thread_ts_is_forwarded_to_channel_send() {
-    let _bus_guard = super::common::use_real_agent_handler(&DispatchCtx::process_default()).await;
+    let _bus_guard = super::common::use_real_agent_handler().await;
     let recorder = Arc::new(FullRecordingChannel::default());
     let channel: Arc<dyn Channel> = recorder.clone();
     let provider: Arc<dyn ChatModel<()>> = Arc::new(FixedResponseModel { response: "pong" });
@@ -150,7 +149,7 @@ async fn inbound_thread_ts_is_forwarded_to_channel_send() {
 /// send must also receive thread_ts = None — no phantom thread attachment.
 #[tokio::test]
 async fn no_thread_ts_on_inbound_message_results_in_none_on_send() {
-    let _bus_guard = super::common::use_real_agent_handler(&DispatchCtx::process_default()).await;
+    let _bus_guard = super::common::use_real_agent_handler().await;
     let recorder = Arc::new(FullRecordingChannel::default());
     let channel: Arc<dyn Channel> = recorder.clone();
     let provider: Arc<dyn ChatModel<()>> = Arc::new(FixedResponseModel { response: "ok" });
@@ -186,7 +185,7 @@ async fn no_thread_ts_on_inbound_message_results_in_none_on_send() {
 /// TelegramChannel can call setMessageReaction against the right message id.
 #[tokio::test]
 async fn reaction_marker_in_llm_response_is_passed_to_channel_send() {
-    let _bus_guard = super::common::use_real_agent_handler(&DispatchCtx::process_default()).await;
+    let _bus_guard = super::common::use_real_agent_handler().await;
     let recorder = Arc::new(FullRecordingChannel::default());
     let channel: Arc<dyn Channel> = recorder.clone();
     let provider: Arc<dyn ChatModel<()>> = Arc::new(FixedResponseModel {
@@ -235,7 +234,7 @@ async fn reaction_marker_in_llm_response_is_passed_to_channel_send() {
 /// in tokio) has time to call start_typing before the cancellation arrives.
 #[tokio::test]
 async fn typing_indicator_starts_and_stops_once_per_message() {
-    let _bus_guard = super::common::use_real_agent_handler(&DispatchCtx::process_default()).await;
+    let _bus_guard = super::common::use_real_agent_handler().await;
     let recorder = Arc::new(FullRecordingChannel::default());
     let channel: Arc<dyn Channel> = recorder.clone();
     // Must be non-zero: the first typing interval fires at t=0 but the
@@ -364,7 +363,7 @@ impl Channel for TelegramReactingChannel {
 /// directions.
 #[tokio::test]
 async fn telegram_threaded_inbound_emits_ack_reaction_then_reply() {
-    let _bus_guard = super::common::use_real_agent_handler(&DispatchCtx::process_default()).await;
+    let _bus_guard = super::common::use_real_agent_handler().await;
     let recorder = Arc::new(TelegramReactingChannel::default());
     let channel: Arc<dyn Channel> = recorder.clone();
     let provider: Arc<dyn ChatModel<()>> = Arc::new(FixedResponseModel { response: "pong" });

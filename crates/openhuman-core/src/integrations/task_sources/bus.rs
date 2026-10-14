@@ -5,7 +5,6 @@
 //! `ConnectionCreated` fetch so freshly-connected work shows up without
 //! waiting for the next periodic tick.
 
-use crate::core::runtime::DispatchCtx;
 use std::sync::{Arc, OnceLock};
 
 use async_trait::async_trait;
@@ -53,7 +52,7 @@ impl EventHandler<DomainEvent> for TaskSourcesConnectionSubscriber {
         // Every scope may hold sources for this toolkit (`crate::storage`):
         // handle each scope as its own agent, with that agent's config.
         crate::storage::agents::for_each_live_scope("task_sources connection", || {
-            fire_in_scope(&DispatchCtx::ambient(), provider, toolkit, connection_id)
+            fire_in_scope(provider, toolkit, connection_id)
         })
         .await;
     }
@@ -63,8 +62,8 @@ impl EventHandler<DomainEvent> for TaskSourcesConnectionSubscriber {
 /// loaded inside it — so an agent whose own config disables task sources is
 /// skipped even when the process config enables them, and the other way
 /// round.
-async fn fire_in_scope(ctx: &DispatchCtx, provider: ProviderSlug, toolkit: &str, connection_id: &str) {
-    let config = match config_rpc::load_config_with_timeout(&ctx).await {
+async fn fire_in_scope(provider: ProviderSlug, toolkit: &str, connection_id: &str) {
+    let config = match config_rpc::load_config_with_timeout().await {
         Ok(config) => config,
         Err(e) => {
             tracing::debug!(error = %e, "[task_sources:bus] load_config failed, skipping scope");
@@ -74,12 +73,12 @@ async fn fire_in_scope(ctx: &DispatchCtx, provider: ProviderSlug, toolkit: &str,
     if !config.task_sources.enabled {
         return;
     }
-    fire_for_connection(&ctx, &config, provider, toolkit, connection_id).await;
+    fire_for_connection(&config, provider, toolkit, connection_id).await;
 }
 
 /// Starts a one-shot fetch for every enabled source of `provider` in the
 /// current storage scope that the new connection serves.
-async fn fire_for_connection(ctx: &DispatchCtx, 
+async fn fire_for_connection(
     config: &crate::config::Config,
     provider: ProviderSlug,
     toolkit: &str,
@@ -116,7 +115,7 @@ async fn fire_for_connection(ctx: &DispatchCtx,
         // Scoped: the fetch keeps the scope's agent context.
         crate::core::runtime::spawn_scoped(async move {
             let _ =
-                pipeline::run_source_once(&ctx, &config, &source, FetchReason::ConnectionCreated).await;
+                pipeline::run_source_once(&config, &source, FetchReason::ConnectionCreated).await;
         });
     }
 }

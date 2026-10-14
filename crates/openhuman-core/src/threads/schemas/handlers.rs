@@ -56,12 +56,12 @@ pub(super) fn handle_messages_list(
 }
 
 pub(super) fn handle_message_append(
-    ctx: DispatchCtx,
+    _ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
         let p = parse::<AppendConversationMessageRequest>(params)?;
-        to_json(ops::message_append(&ctx, p).await?)
+        to_json(ops::message_append(p).await?)
     })
 }
 
@@ -115,10 +115,10 @@ pub(super) fn handle_message_update(
     })
 }
 
-pub(super) fn handle_delete(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_delete(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = parse::<DeleteConversationThreadRequest>(params)?;
-        to_json(ops::thread_delete(&ctx, p).await?)
+        to_json(ops::thread_delete(p).await?)
     })
 }
 
@@ -215,19 +215,19 @@ pub(super) fn handle_search(_ctx: DispatchCtx, params: Map<String, Value>) -> Co
 }
 
 pub(super) fn handle_edit_message(
-    ctx: DispatchCtx,
+    _ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
         let p = parse::<ops::EditMessageRequest>(params)?;
-        to_json(ops::edit_message(&ctx, p).await.map_err(|e| e.to_string())?)
+        to_json(ops::edit_message(p).await.map_err(|e| e.to_string())?)
     })
 }
 
-pub(super) fn handle_regenerate(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_regenerate(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = parse::<ops::RegenerateRequest>(params)?;
-        to_json(ops::regenerate(&ctx, p).await.map_err(|e| e.to_string())?)
+        to_json(ops::regenerate(p).await.map_err(|e| e.to_string())?)
     })
 }
 

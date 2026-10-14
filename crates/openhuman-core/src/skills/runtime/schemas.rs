@@ -264,7 +264,7 @@ pub fn skill_runtime_schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_run(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_run(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let payload = deserialize_params::<RunParams>(params)?;
         tracing::info!(skill_id = %payload.skill_id, "[skill_runtime][rpc] run");
@@ -272,7 +272,7 @@ fn handle_run(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture 
             .unwrap_or(crate::agent::turn_origin::AgentTurnOrigin::Cli);
         let started = crate::agent::turn_origin::with_origin(
             origin,
-            spawn_workflow_run_background(&ctx, payload.skill_id, payload.inputs),
+            spawn_workflow_run_background(payload.skill_id, payload.inputs),
         )
         .await?;
         to_json(Outcome::new(

@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::config::test_env::EnvVarGuard;
 use crate::config::TEST_ENV_LOCK as ENV_LOCK;
@@ -77,7 +76,7 @@ async fn init_workspace_creates_dirs_and_files_in_fresh_workspace() {
     let tmp = tempdir().unwrap();
     let _env = EnvVarGuard::workspace_unlocked(tmp.path());
 
-    let value = init_workspace(&DispatchCtx::process_default(), false)
+    let value = init_workspace(false)
         .await
         .expect("init_workspace on empty temp should succeed");
 
@@ -118,10 +117,10 @@ async fn init_workspace_reports_existing_entries_on_second_call_without_force() 
     let _env = EnvVarGuard::workspace_unlocked(tmp.path());
 
     // First call populates the workspace.
-    init_workspace(&DispatchCtx::process_default(), false).await.expect("first init ok");
+    init_workspace(false).await.expect("first init ok");
     // Second call without force should report everything as existing
     // and nothing as created / overwritten.
-    let value = init_workspace(&DispatchCtx::process_default(), false).await.expect("second init ok");
+    let value = init_workspace(false).await.expect("second init ok");
 
     let created = value["result"]["files"]["created"].as_array().unwrap();
     let overwritten = value["result"]["files"]["overwritten"].as_array().unwrap();
@@ -151,7 +150,7 @@ async fn init_workspace_with_force_overwrites_existing_bootstrap_files() {
     let tmp = tempdir().unwrap();
     let _env = EnvVarGuard::workspace_unlocked(tmp.path());
 
-    let first = init_workspace(&DispatchCtx::process_default(), false).await.expect("initial init");
+    let first = init_workspace(false).await.expect("initial init");
     // The config loader may place the workspace at a subpath of the
     // env override (e.g. `{tmp}/workspace`), so discover the real
     // location from the first result rather than assuming it is
@@ -164,7 +163,7 @@ async fn init_workspace_with_force_overwrites_existing_bootstrap_files() {
     let soul = workspace_dir.join("SOUL.md");
     std::fs::write(&soul, "corrupted").unwrap();
 
-    let value = init_workspace(&DispatchCtx::process_default(), true).await.expect("forced init");
+    let value = init_workspace(true).await.expect("forced init");
 
     let overwritten: Vec<&str> = value["result"]["files"]["overwritten"]
         .as_array()

@@ -23,7 +23,6 @@
 //! `OPENHUMAN-TAURI-1T` (5,414 Sentry events from one user's
 //! cron-driven LLM calls after session expiry).
 
-use crate::core::runtime::DispatchCtx;
 use crate::core::events::DomainEvent;
 use crate::cron::scheduler_gate;
 use async_trait::async_trait;
@@ -56,7 +55,7 @@ impl EventHandler<DomainEvent> for SessionExpiredSubscriber {
     }
 
     async fn handle(&self, event: &DomainEvent) {
-        self.handle_with(&DispatchCtx::ambient(), crate::core::runtime::is_saas(), event)
+        self.handle_with(crate::core::runtime::is_saas(), event)
             .await;
     }
 }
@@ -64,7 +63,7 @@ impl EventHandler<DomainEvent> for SessionExpiredSubscriber {
 impl SessionExpiredSubscriber {
     /// [`EventHandler::handle`] with the process mode passed in, so the SaaS
     /// early return is testable without the process-wide mode lock.
-    pub(crate) async fn handle_with(&self, ctx: &DispatchCtx, saas: bool, event: &DomainEvent) {
+    pub(crate) async fn handle_with(&self, saas: bool, event: &DomainEvent) {
         let DomainEvent::SessionExpired { source, reason } = event else {
             return;
         };
@@ -87,7 +86,7 @@ impl SessionExpiredSubscriber {
         //     turns out to be a local offline session (never truly expired).
         scheduler_gate::set_signed_out(true);
 
-        match crate::config::rpc::load_config_with_timeout(&ctx).await {
+        match crate::config::rpc::load_config_with_timeout().await {
             Ok(config) => {
                 // An API-key runtime has no session to clear: a backend 401 on
                 // the key is a per-call error for the caller, not a sign-out.
@@ -130,7 +129,7 @@ impl SessionExpiredSubscriber {
                 //     loaded config; if the config can't load (rare — disk issue),
                 //     we've at least pinned the scheduler gate so background work
                 //     can't make things worse.
-                if let Err(err) = crate::security::credentials::rpc::clear_session(&ctx, &config).await {
+                if let Err(err) = crate::security::credentials::rpc::clear_session(&config).await {
                     tracing::warn!(
                         source = %source,
                         error = %err,

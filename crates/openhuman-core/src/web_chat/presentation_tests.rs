@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 
 #[test]
@@ -60,7 +59,7 @@ async fn chat_done_carries_timing_when_a_snapshot_is_supplied() {
         total_ms: Some(2000),
     };
 
-    test_support::deliver_response_with_timing_for_test(&DispatchCtx::process_default(), 
+    test_support::deliver_response_with_timing_for_test(
         "system",
         "thread-timing",
         &request_id,
@@ -101,7 +100,7 @@ async fn chat_done_omits_timing_when_no_snapshot_is_supplied() {
     let mut rx = crate::web_chat::subscribe_web_channel_events();
     let request_id = format!("timing-none-{}", uuid::Uuid::new_v4());
 
-    test_support::deliver_response_with_timing_for_test(&DispatchCtx::process_default(), 
+    test_support::deliver_response_with_timing_for_test(
         "system",
         "thread-timing-none",
         &request_id,

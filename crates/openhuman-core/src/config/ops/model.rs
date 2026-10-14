@@ -1,6 +1,5 @@
 //! Model/provider config operations: AI providers, memory, runtime, local AI, Composio.
 
-use crate::core::runtime::DispatchCtx;
 use crate::config::Config;
 use crate::core::Outcome;
 
@@ -440,10 +439,10 @@ pub async fn apply_model_settings(
 }
 
 /// Loads the configuration, applies model settings updates, and saves it.
-pub async fn load_and_apply_model_settings(ctx: &DispatchCtx, 
+pub async fn load_and_apply_model_settings(
     update: ModelSettingsPatch,
 ) -> Result<Outcome<serde_json::Value>, String> {
-    let mut config = load_config_with_timeout(&ctx).await?;
+    let mut config = load_config_with_timeout().await?;
     apply_model_settings(&mut config, update).await
 }
 
@@ -485,10 +484,10 @@ pub async fn apply_memory_settings(
 }
 
 /// Loads the configuration, applies memory settings updates, and saves it.
-pub async fn load_and_apply_memory_settings(ctx: &DispatchCtx, 
+pub async fn load_and_apply_memory_settings(
     update: MemorySettingsPatch,
 ) -> Result<Outcome<serde_json::Value>, String> {
-    let mut config = load_config_with_timeout(&ctx).await?;
+    let mut config = load_config_with_timeout().await?;
     apply_memory_settings(&mut config, update).await
 }
 
@@ -543,10 +542,10 @@ pub async fn apply_runtime_settings(
 }
 
 /// Loads the configuration, applies runtime settings updates, and saves it.
-pub async fn load_and_apply_runtime_settings(ctx: &DispatchCtx, 
+pub async fn load_and_apply_runtime_settings(
     update: RuntimeSettingsPatch,
 ) -> Result<Outcome<serde_json::Value>, String> {
-    let mut config = load_config_with_timeout(&ctx).await?;
+    let mut config = load_config_with_timeout().await?;
     apply_runtime_settings(&mut config, update).await
 }
 
@@ -620,10 +619,10 @@ pub async fn apply_local_ai_settings(
 }
 
 /// Loads the configuration, applies local-AI settings updates, and saves it.
-pub async fn load_and_apply_local_ai_settings(ctx: &DispatchCtx, 
+pub async fn load_and_apply_local_ai_settings(
     update: LocalAiSettingsPatch,
 ) -> Result<Outcome<serde_json::Value>, String> {
-    let mut config = load_config_with_timeout(&ctx).await?;
+    let mut config = load_config_with_timeout().await?;
     apply_local_ai_settings(&mut config, update).await
 }
 
@@ -658,16 +657,16 @@ pub async fn apply_composio_trigger_settings(
 }
 
 /// Loads the configuration, applies composio trigger settings, and saves it.
-pub async fn load_and_apply_composio_trigger_settings(ctx: &DispatchCtx, 
+pub async fn load_and_apply_composio_trigger_settings(
     update: ComposioTriggerSettingsPatch,
 ) -> Result<Outcome<serde_json::Value>, String> {
-    let mut config = load_config_with_timeout(&ctx).await?;
+    let mut config = load_config_with_timeout().await?;
     apply_composio_trigger_settings(&mut config, update).await
 }
 
 /// Reads the current composio trigger-triage settings.
-pub async fn get_composio_trigger_settings(ctx: &DispatchCtx, ) -> Result<Outcome<serde_json::Value>, String> {
-    let config = load_config_with_timeout(&ctx).await?;
+pub async fn get_composio_trigger_settings() -> Result<Outcome<serde_json::Value>, String> {
+    let config = load_config_with_timeout().await?;
     let result = serde_json::json!({
         "triage_disabled": config.composio.triage_disabled,
         "triage_disabled_toolkits": config.composio.triage_disabled_toolkits,
@@ -688,8 +687,8 @@ pub(crate) fn resolve_backend_api_url(config: &Config) -> Option<String> {
 
 /// Resolves the effective backend API URL from configuration or defaults;
 /// `api_url` is `null` when the core has no hosted backend.
-pub async fn load_and_resolve_api_url(ctx: &DispatchCtx, ) -> Result<Outcome<serde_json::Value>, String> {
-    let config = load_config_with_timeout(&ctx).await?;
+pub async fn load_and_resolve_api_url() -> Result<Outcome<serde_json::Value>, String> {
+    let config = load_config_with_timeout().await?;
     let resolved = resolve_backend_api_url(&config);
     Ok(Outcome::new(
         serde_json::json!({ "api_url": resolved }),

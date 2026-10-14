@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 
 const SECRET: &str = "gateway-secret-0123456789abcdef0123456789";
@@ -51,7 +50,7 @@ fn a_tampered_tag_is_refused() {
 #[tokio::test]
 async fn no_user_header_is_the_operator_plane() {
     assert!(matches!(
-        resolve_scope(&DispatchCtx::process_default(), None, None, SECRET, 0).await,
+        resolve_scope(None, None, SECRET, 0).await,
         Ok(GatewayScope::Operator)
     ));
 }

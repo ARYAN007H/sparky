@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 
 #[test]
@@ -331,7 +330,7 @@ fn agent_turn_runs_long_parallel_subagent_flow_with_many_nested_tool_calls() {
                 .build()
                 .expect("build large-stack test runtime")
                 .block_on(
-                    agent_turn_runs_long_parallel_subagent_flow_with_many_nested_tool_calls_inner(&DispatchCtx::process_default()),
+                    agent_turn_runs_long_parallel_subagent_flow_with_many_nested_tool_calls_inner(),
                 );
         })
         .expect("spawn large-stack test thread")

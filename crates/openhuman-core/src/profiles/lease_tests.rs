@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::core::runtime::{CoreContext, DomainSet, SaasConfig};
 use crate::storage::MemoryStorage;
@@ -66,8 +65,8 @@ async fn a_profile_open_on_one_node_is_refused_on_another_naming_the_holder() {
     );
     assert_eq!(b.list().await.unwrap().len(), 1);
 
-    let _held = a.open(&DispatchCtx::process_default(), &alice).await.unwrap();
-    match b.open(&DispatchCtx::process_default(), &alice).await {
+    let _held = a.open(&alice).await.unwrap();
+    match b.open(&alice).await {
         Err(OpenError::HeldElsewhere(record)) => {
             assert_eq!(record.owner, "node-a");
             assert_eq!(
@@ -99,7 +98,7 @@ async fn release_hands_a_profile_to_another_node_at_once() {
     let alice = profile("alice");
     a.provision(&alice).await.unwrap();
 
-    let held = a.open(&DispatchCtx::process_default(), &alice).await.unwrap();
+    let held = a.open(&alice).await.unwrap();
     assert!(
         a.release(&alice).await.unwrap_err().contains("in use"),
         "a profile in use is not released from under its work"
@@ -109,10 +108,10 @@ async fn release_hands_a_profile_to_another_node_at_once() {
     assert!(!a.is_open(&alice));
     assert!(!a.release(&alice).await.unwrap(), "nothing left to release");
 
-    let taken = b.open(&DispatchCtx::process_default(), &alice).await.unwrap();
+    let taken = b.open(&alice).await.unwrap();
     assert_eq!(taken.id, alice);
     assert!(matches!(
-        a.open(&DispatchCtx::process_default(), &alice).await,
+        a.open(&alice).await,
         Err(OpenError::HeldElsewhere(_))
     ));
 }
@@ -134,12 +133,12 @@ async fn eviction_and_shutdown_release_the_lease() {
     a.provision(&alice).await.unwrap();
     a.provision(&bob).await.unwrap();
 
-    drop(a.open(&DispatchCtx::process_default(), &alice).await.unwrap());
+    drop(a.open(&alice).await.unwrap());
     a.evict_idle().await;
     assert!(!a.is_open(&alice));
-    drop(b.open(&DispatchCtx::process_default(), &alice).await.unwrap());
+    drop(b.open(&alice).await.unwrap());
 
-    let busy = a.open(&DispatchCtx::process_default(), &bob).await.unwrap();
+    let busy = a.open(&bob).await.unwrap();
     a.release_idle_on_shutdown().await;
     assert!(
         a.is_open(&bob),
@@ -148,7 +147,7 @@ async fn eviction_and_shutdown_release_the_lease() {
     drop(busy);
     a.release_idle_on_shutdown().await;
     assert!(!a.is_open(&bob));
-    drop(b.open(&DispatchCtx::process_default(), &bob).await.unwrap());
+    drop(b.open(&bob).await.unwrap());
 }
 
 #[tokio::test]
@@ -158,9 +157,9 @@ async fn renewal_keeps_the_lease_and_a_lost_lease_fences_the_profile() {
     let a = node(tmp.path(), "node-a", Some(&backend));
     let alice = profile("alice");
     a.provision(&alice).await.unwrap();
-    let state = a.open(&DispatchCtx::process_default(), &alice).await.unwrap();
+    let state = a.open(&alice).await.unwrap();
 
-    let report = renew_once(&DispatchCtx::process_default(), &a).await;
+    let report = renew_once(&a).await;
     assert_eq!(report.renewed, 1);
     assert!(report.fenced.is_empty());
 
@@ -196,7 +195,7 @@ async fn renewal_keeps_the_lease_and_a_lost_lease_fences_the_profile() {
     assert!(stolen.previous_unclean);
 
     let mut events = crate::web_chat::subscribe_web_channel_events();
-    let report = renew_once(&DispatchCtx::process_default(), &a).await;
+    let report = renew_once(&a).await;
     assert_eq!(report.fenced, vec![alice.clone()]);
     assert!(state.is_fenced(), "the profile is fenced");
     assert!(!a.is_open(&alice), "and closed");
@@ -218,7 +217,7 @@ async fn a_fenced_profile_starts_no_new_work() {
     let a = node(tmp.path(), "node-a", None);
     let alice = profile("alice");
     a.provision(&alice).await.unwrap();
-    let state = a.open(&DispatchCtx::process_default(), &alice).await.unwrap();
+    let state = a.open(&alice).await.unwrap();
     let grant = a.grants().pop().unwrap().1;
 
     // A stale grant (the slot moved on) fences nothing.
@@ -226,10 +225,10 @@ async fn a_fenced_profile_starts_no_new_work() {
         epoch: grant.epoch + 1,
         ..grant.clone()
     };
-    a.fence(&DispatchCtx::process_default(), &alice, &stale, "test").await;
+    a.fence(&alice, &stale, "test").await;
     assert!(a.is_open(&alice) && !state.is_fenced());
 
-    a.fence(&DispatchCtx::process_default(), &alice, &grant, "test").await;
+    a.fence(&alice, &grant, "test").await;
     assert!(state.is_fenced());
     assert!(!a.is_open(&alice));
 }
@@ -243,8 +242,8 @@ async fn file_leases_keep_two_hosts_on_one_root_apart() {
     );
     let alice = profile("alice");
     a.provision(&alice).await.unwrap();
-    let _held = a.open(&DispatchCtx::process_default(), &alice).await.unwrap();
-    match b.open(&DispatchCtx::process_default(), &alice).await {
+    let _held = a.open(&alice).await.unwrap();
+    match b.open(&alice).await {
         Err(OpenError::HeldElsewhere(record)) => {
             assert_eq!(record.owner, "node-a");
             assert_eq!(

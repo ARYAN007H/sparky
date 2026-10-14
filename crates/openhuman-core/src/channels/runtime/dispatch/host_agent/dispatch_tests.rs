@@ -2,7 +2,6 @@
 //! that host agent; a binding nobody answers is refused; an unbound channel
 //! still goes to the orchestrator over the bus.
 
-use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::agent::bus::{mock_agent_run_turn, AgentTurnRequest, AgentTurnResponse};
 use crate::agent::host_agents::{self, HostAgent, HostAgentResolver};
@@ -311,11 +310,11 @@ fn on_agent_runtime(test: impl std::future::Future<Output = ()> + Send + 'static
 fn a_bound_channel_runs_its_host_agent_and_refuses_its_write_tool() {
     // The resolver slot is process-wide; hold it for the whole turn.
     let _slot = host_agents::tests::lock();
-    on_agent_runtime(bound_channel_runs_its_host_agent(&DispatchCtx::process_default()));
+    on_agent_runtime(bound_channel_runs_its_host_agent());
 }
 
-async fn bound_channel_runs_its_host_agent(ctx: &DispatchCtx, ) {
-    let _bus = crate::agent::bus::use_real_agent_handler(&ctx).await;
+async fn bound_channel_runs_its_host_agent() {
+    let _bus = crate::agent::bus::use_real_agent_handler().await;
     let server = provider().await;
     let tmp = tempfile::tempdir().unwrap();
     // Every host boots the definition registry; a session's hosted authority

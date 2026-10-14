@@ -1,7 +1,6 @@
 //! Loading persisted config with a timeout, anchored reloads, and the
 //! in-memory normalization that runs on every load.
 
-use crate::core::runtime::DispatchCtx;
 use std::path::Path;
 
 use crate::config::Config;
@@ -28,18 +27,15 @@ const CONFIG_LOAD_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(
 /// itself would still run against whatever the process-global workspace
 /// resolution found. Normalization still runs, because that is a shaping step
 /// handlers depend on, not a re-read.
-pub async fn load_config_with_timeout(
-    ctx: &crate::core::runtime::DispatchCtx,
-) -> Result<Config, String> {
-    // SaaS reads only the call's own context, as `Config::load_or_init` does, so
-    // work that lost its user context fails rather than getting the operator's.
-    if crate::core::runtime::is_saas() && ctx.core().is_none() {
-        return Err(
-            "[saas] no config in scope: SaaS work must run under a user agent's or the operator's context"
-                .to_owned(),
-        );
-    }
-    if let Some(mut config) = ctx.embedder_config() {
+pub async fn load_config_with_timeout() -> Result<Config, String> {
+    // SaaS reads only the task's own scope, as `Config::load_or_init` does, so
+    // a task that lost its user scope fails rather than getting the operator's.
+    let scoped = if crate::core::runtime::is_saas() {
+        crate::core::runtime::CoreContext::scoped().and_then(|ctx| ctx.embedder_config().cloned())
+    } else {
+        crate::core::runtime::context::CoreContext::current_embedder_config()
+    };
+    if let Some(mut config) = scoped {
         normalize_loaded_config(&mut config).await;
         return Ok(config);
     }
@@ -65,17 +61,13 @@ pub async fn load_config_with_timeout(
 /// The context-aware counterpart of [`Config::load_or_init`] for code that
 /// runs inside a turn: [`load_config_with_timeout`] with the context's
 /// inference route applied.
-pub async fn load_current_or_init(
-    ctx: &crate::core::runtime::DispatchCtx,
-) -> anyhow::Result<Config> {
-    let mut config = load_config_with_timeout(ctx)
+pub async fn load_current_or_init() -> anyhow::Result<Config> {
+    let mut config = load_config_with_timeout()
         .await
         .map_err(anyhow::Error::msg)?;
     if let Some(route) = config.ephemeral_route.clone() {
         tracing::trace!(
-            agent = ctx
-                .resolved()
-                .and_then(|core| core.session_agent().map(str::to_owned))
+            agent = crate::core::runtime::agent_scope::current_agent_id()
                 .as_deref()
                 .unwrap_or(""),
             "[config] applying the context's inference route"
@@ -104,7 +96,6 @@ pub async fn load_current_or_init(
 /// the process-global load with `workspace_dir` re-anchored — the previous
 /// behaviour, and still correct for a single-workspace host.
 pub async fn load_config_for_workspace_with_timeout(
-    ctx: &crate::core::runtime::DispatchCtx,
     workspace_dir: &Path,
 ) -> Result<Config, String> {
     let candidate = [
@@ -142,7 +133,7 @@ pub async fn load_config_for_workspace_with_timeout(
         workspace = %workspace_dir.display(),
         "[config] no config.toml beside workspace; falling back to the process-global load"
     );
-    let mut config = load_config_with_timeout(ctx).await?;
+    let mut config = load_config_with_timeout().await?;
     config.workspace_dir = workspace_dir.to_path_buf();
     Ok(config)
 }

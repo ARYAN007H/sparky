@@ -1,7 +1,6 @@
 //! The channel runtime's entry point: wiring subscribers, providers, the
 //! system prompt, and the message dispatch loop.
 
-use crate::core::runtime::DispatchCtx;
 use super::super::dispatch::run_message_dispatch_loop;
 use super::module_providers::ModuleChannelRuntime;
 use super::turn_parts::{build_channel_turn_parts, runtime_context, PromptToolDescs};
@@ -13,18 +12,18 @@ use anyhow::Result;
 use std::sync::{Arc, OnceLock, Weak};
 use tokio_util::sync::CancellationToken;
 
-pub async fn start_channels(ctx: &DispatchCtx, config: Config) -> Result<()> {
-    start_channels_with_session(&ctx, config, super::super::session::channel_session()).await
+pub async fn start_channels(config: Config) -> Result<()> {
+    start_channels_with_session(config, super::super::session::channel_session()).await
 }
 
-pub(crate) async fn start_channels_with_session(ctx: &DispatchCtx, 
+pub(crate) async fn start_channels_with_session(
     config: Config,
     session: tokio_util::sync::CancellationToken,
 ) -> Result<()> {
-    start_channels_inner(&ctx, config, session).await
+    start_channels_inner(config, session).await
 }
 
-async fn start_channels_inner(ctx: &DispatchCtx, mut config: Config, session: CancellationToken) -> Result<()> {
+async fn start_channels_inner(mut config: Config, session: CancellationToken) -> Result<()> {
     if session.is_cancelled() {
         return Ok(());
     }
@@ -70,7 +69,7 @@ async fn start_channels_inner(ctx: &DispatchCtx, mut config: Config, session: Ca
     // Must happen before `run_message_dispatch_loop` begins, because
     // channel dispatch calls `BUS.native().request("agent.run_turn", …)`
     // for every inbound message.
-    crate::agent::bus::register_agent_handlers(&ctx);
+    crate::agent::bus::register_agent_handlers();
     // The Phase 2/3/4 self-improvement subscribers (email-signature producer,
     // rebuild trigger, ProfileMdRenderer) are registered in
     // core::runtime::subscribers::register_domain_subscribers instead. start_channels is

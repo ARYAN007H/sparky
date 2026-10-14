@@ -5,7 +5,6 @@
 
 #![allow(unused_imports)]
 
-use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -144,7 +143,6 @@ impl CodeRunner for OpenHumanCode {
             );
 
             execute_in_sandbox(
-                &DispatchCtx::ambient(),
                 &policy,
                 &command,
                 &self.config.action_dir,

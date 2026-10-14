@@ -17,7 +17,6 @@
 //! Turns are not ingested from the bus: the session host calls the lifecycle
 //! hooks itself, under the session's own config (`lifecycle::hooks`).
 
-use crate::core::runtime::DispatchCtx;
 use std::sync::{Arc, OnceLock};
 
 use async_trait::async_trait;
@@ -58,7 +57,7 @@ impl EventHandler<DomainEvent> for PendingDeletionsSubscriber {
         if kind == "cleared" {
             return;
         }
-        let config = match crate::config::rpc::load_config_with_timeout(&DispatchCtx::ambient()).await {
+        let config = match crate::config::rpc::load_config_with_timeout().await {
             Ok(config) => config,
             Err(error) => {
                 tracing::debug!(error = %error, "[memory:bus] config unavailable; deletions wait");
@@ -97,7 +96,7 @@ impl EventHandler<DomainEvent> for SystemJobsSubscriber {
         if job != SOURCES_SYNC_JOB && job != BACKGROUND_JOB {
             return;
         }
-        let config = match crate::config::rpc::load_config_with_timeout(&DispatchCtx::ambient()).await {
+        let config = match crate::config::rpc::load_config_with_timeout().await {
             Ok(config) => config,
             Err(error) => {
                 tracing::debug!(error = %error, job = %job, "[memory:bus] config unavailable");
@@ -116,7 +115,7 @@ impl EventHandler<DomainEvent> for SystemJobsSubscriber {
 async fn sync_live_agent_sources() {
     for (agent_id, ctx) in crate::core::runtime::AgentContextRegistry::live() {
         crate::core::runtime::CoreContext::scope(ctx, async {
-            match crate::config::ops::load_current_or_init(&ctx).await {
+            match crate::config::ops::load_current_or_init().await {
                 Ok(config) => {
                     tracing::debug!(agent = %agent_id, "[memory:bus] agent source sync");
                     run_system_job(&config, SOURCES_SYNC_JOB).await;

@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use super::*;
@@ -118,9 +117,9 @@ async fn settle_for_a_second_accept(accepts: &AtomicUsize) {
 }
 
 /// Stand-in for the core's bootstrap auto-connect (`spawn_socket_auto_connect`).
-async fn bootstrap_auto_connect(ctx: &DispatchCtx, manager: &SocketManager, url: &str, token: &str) {
+async fn bootstrap_auto_connect(manager: &SocketManager, url: &str, token: &str) {
     manager
-        .connect_with_provider(&ctx, url, static_token_provider(token.to_string()))
+        .connect_with_provider(url, static_token_provider(token.to_string()))
         .await
         .unwrap();
     wait_for_connected(manager).await;
@@ -136,9 +135,9 @@ async fn a_redundant_session_connect_reuses_the_live_socket() {
     let url = format!("http://{addr}");
     let manager = SocketManager::new();
 
-    bootstrap_auto_connect(&DispatchCtx::process_default(), &manager, &url, TOKEN_A).await;
+    bootstrap_auto_connect(&manager, &url, TOKEN_A).await;
 
-    let state = connect_with_session_using(&DispatchCtx::process_default(), 
+    let state = connect_with_session_using(
         &manager,
         &url,
         TOKEN_A,
@@ -180,7 +179,7 @@ async fn a_token_refreshed_mid_loop_updates_the_recorded_identity() {
         })
     });
 
-    manager.connect_with_provider(&DispatchCtx::process_default(), &url, provider).await.unwrap();
+    manager.connect_with_provider(&url, provider).await.unwrap();
     wait_for_connected(&manager).await;
     assert!(manager.is_live_for(&url, TOKEN_A));
 
@@ -207,9 +206,9 @@ async fn a_session_connect_with_a_different_token_still_rebinds() {
     let url = format!("http://{addr}");
     let manager = SocketManager::new();
 
-    bootstrap_auto_connect(&DispatchCtx::process_default(), &manager, &url, TOKEN_A).await;
+    bootstrap_auto_connect(&manager, &url, TOKEN_A).await;
 
-    connect_with_session_using(&DispatchCtx::process_default(), 
+    connect_with_session_using(
         &manager,
         &url,
         TOKEN_B,
@@ -235,7 +234,7 @@ async fn is_live_for_is_scoped_to_url_and_token_and_cleared_on_disconnect() {
     let url = format!("http://{addr}");
     let manager = SocketManager::new();
 
-    bootstrap_auto_connect(&DispatchCtx::process_default(), &manager, &url, TOKEN_A).await;
+    bootstrap_auto_connect(&manager, &url, TOKEN_A).await;
 
     assert!(manager.is_live_for(&url, TOKEN_A));
     assert!(!manager.is_live_for(&url, TOKEN_B));
@@ -336,13 +335,13 @@ async fn a_session_connect_during_the_boot_handshake_does_not_restart_it() {
 
     // Bootstrap auto-connect, deliberately NOT waiting for `Connected`.
     manager
-        .connect_with_provider(&DispatchCtx::process_default(), &url, static_token_provider(TOKEN_A.to_string()))
+        .connect_with_provider(&url, static_token_provider(TOKEN_A.to_string()))
         .await
         .unwrap();
     wait_for_mid_handshake(&manager, &accepts).await;
 
     // The renderer's RPC lands in that window with the same url+token.
-    connect_with_session_using(&DispatchCtx::process_default(), 
+    connect_with_session_using(
         &manager,
         &url,
         TOKEN_A,

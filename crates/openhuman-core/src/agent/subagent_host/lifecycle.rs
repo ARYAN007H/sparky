@@ -5,7 +5,6 @@
 //! boundary explicit now: TinyAgents owns the lifecycle and OpenHuman owns the
 //! plan, execution details, and translation back to its public DTOs.
 
-use crate::core::runtime::DispatchCtx;
 use std::{
     collections::HashMap,
     fs::OpenOptions,
@@ -521,7 +520,6 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
         options.run_context = execution.prepared.run_context.data.clone();
         options.run_context.cancellation = execution.cancellation.clone();
         match Box::pin(super::ops::run_subagent_direct(
-            &DispatchCtx::ambient(),
             &definition,
             &execution
                 .prepared

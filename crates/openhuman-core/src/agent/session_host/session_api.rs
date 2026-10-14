@@ -7,7 +7,6 @@
 //! identity, [`super::runtime::accessors`]), reading one back, and listing the
 //! generations a long conversation has accumulated.
 
-use crate::core::runtime::DispatchCtx;
 use anyhow::Result;
 use tinyagents_runtime::{ResumeMode, TurnOptions};
 
@@ -25,11 +24,11 @@ impl OpenHumanSessionHost {
     /// Returns whether history was loaded. `false` means the session has no
     /// durable identity bound (no thread), has nothing persisted yet, or has
     /// already run a turn.
-    pub async fn resume_bound_session(&mut self, ctx: &DispatchCtx) -> Result<bool> {
+    pub async fn resume_bound_session(&mut self) -> Result<bool> {
         let Some(session) = self.session.clone() else {
             return Ok(false);
         };
-        self.ensure_runtime_session(&ctx)?;
+        self.ensure_runtime_session()?;
 
         let mut context = OpenHumanRunContext::new();
         context.thread_id = self.thread_id.clone();

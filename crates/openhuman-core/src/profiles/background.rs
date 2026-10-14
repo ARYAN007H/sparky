@@ -20,7 +20,6 @@
 //! further; a single slow user delays the rest of a tick, never another
 //! user's data.
 
-use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -41,7 +40,7 @@ pub struct TickReport {
 }
 
 /// Start the loop. It runs until the process exits.
-pub fn spawn(ctx: &DispatchCtx, host: Arc<ProfileHost>) -> tokio::task::JoinHandle<()> {
+pub fn spawn(host: Arc<ProfileHost>) -> tokio::task::JoinHandle<()> {
     crate::core::runtime::spawn_scoped(async move {
         log::info!(
             "[profiles][background] started (every {}s)",
@@ -51,7 +50,7 @@ pub fn spawn(ctx: &DispatchCtx, host: Arc<ProfileHost>) -> tokio::task::JoinHand
         interval.tick().await;
         loop {
             interval.tick().await;
-            let report = tick(&ctx, &host).await;
+            let report = tick(&host).await;
             if report != TickReport::default() {
                 log::debug!(
                     "[profiles][background] tick ran={} skipped={}",
@@ -64,12 +63,12 @@ pub fn spawn(ctx: &DispatchCtx, host: Arc<ProfileHost>) -> tokio::task::JoinHand
 }
 
 /// One visit to every provisioned profile.
-pub async fn tick(ctx: &DispatchCtx, host: &ProfileHost) -> TickReport {
+pub async fn tick(host: &ProfileHost) -> TickReport {
     host.evict_idle().await;
     let mut report = TickReport::default();
     // Due agent jobs, when a host delivery is installed to route their replies.
     if crate::cron::host_delivery::installed().is_some() {
-        let swept = super::cron::sweep(&ctx, host, chrono::Utc::now()).await;
+        let swept = super::cron::sweep(host, chrono::Utc::now()).await;
         if swept != super::cron::SweepReport::default() {
             log::debug!(
                 "[profiles][background] cron ran={} skipped={}",
@@ -90,7 +89,7 @@ pub async fn tick(ctx: &DispatchCtx, host: &ProfileHost) -> TickReport {
         if !jobs::has_pending(&host.layout_of(&id).workspace_dir) {
             continue;
         }
-        let state = match host.open(&ctx, &id).await {
+        let state = match host.open(&id).await {
             Ok(state) => state,
             Err(error) => {
                 log::debug!("[profiles][background] profile={id} not opened: {error}");

@@ -8,7 +8,6 @@ pub mod savings;
 pub mod schemas;
 pub mod tools;
 
-use crate::core::runtime::DispatchCtx;
 use tinyjuice_bus::names::methods;
 use tinyjuice_bus::types::{AgentTokenjuiceCompression, CompressorKind};
 
@@ -440,10 +439,10 @@ pub(crate) mod module_stub;
 mod repl_module_tests;
 
 /// Run a typed query inside TinyJuice; cached originals stay inside the module.
-pub async fn query(ctx: &DispatchCtx, 
+pub async fn query(
     request: tinyjuice_bus::wire::QueryRequest,
 ) -> Result<tinyjuice_bus::wire::QueryResponse, String> {
-    let config = crate::config::ops::load_config_with_timeout(&ctx).await?;
+    let config = crate::config::ops::load_config_with_timeout().await?;
     query_for_config(&config, request).await
 }
 
@@ -459,8 +458,8 @@ pub(crate) async fn query_for_config(
 }
 
 /// Extract HTML through the compiled module independently of compression settings.
-pub async fn extract_html(ctx: &DispatchCtx, html: String) -> Result<String, String> {
-    let config = crate::config::ops::load_config_with_timeout(&ctx).await?;
+pub async fn extract_html(html: String) -> Result<String, String> {
+    let config = crate::config::ops::load_config_with_timeout().await?;
     let response: tinyjuice_bus::wire::HtmlResponse = client(&config)
         .call("tinyjuice", methods::EXTRACT_HTML, (html,))
         .await

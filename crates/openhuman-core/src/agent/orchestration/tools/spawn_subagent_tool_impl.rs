@@ -60,7 +60,7 @@ impl SpawnSubagentTool {
     }
 
     pub(crate) async fn execute_with_live_parent_context(
-        &self, ctx: &DispatchCtx,
+        &self,
         args: serde_json::Value,
         tool_context: Option<&dyn ToolRunContext>,
         run_context: crate::agent::tinyagents::host::OpenHumanRunContext,
@@ -227,7 +227,7 @@ impl SpawnSubagentTool {
                 .map_err(|error| anyhow::anyhow!(error.to_string()))?
                 .with_cancellation(detached_cancellation);
             return super::spawn_async_subagent::SpawnAsyncSubagentTool::new()
-                .execute_with_live_parent_context(&ctx, 
+                .execute_with_live_parent_context(
                     async_args,
                     tool_context,
                     run_context,

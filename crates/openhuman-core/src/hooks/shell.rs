@@ -7,7 +7,6 @@
 //! command into that selection. A selection that never resolved yields a command
 //! that fails to spawn, so a hook never silently runs under a different shell.
 
-use crate::core::runtime::DispatchCtx;
 use std::sync::{OnceLock, RwLock};
 
 use tinybox_bus::ShellInvocation;
@@ -27,10 +26,10 @@ fn slot() -> &'static RwLock<Option<ShellInvocation>> {
 /// Ask TinyBox which shell it selects and remember it for [`command`].
 ///
 /// A failure is logged and leaves any earlier selection in place.
-pub(super) async fn resolve(ctx: &DispatchCtx, ) {
+pub(super) async fn resolve() {
     #[cfg(feature = "modules")]
     {
-        let config = match crate::config::ops::load_config_with_timeout(&ctx).await {
+        let config = match crate::config::ops::load_config_with_timeout().await {
             Ok(config) => config,
             Err(error) => {
                 log::warn!("[hooks] cannot read config to select the hook shell: {error}");

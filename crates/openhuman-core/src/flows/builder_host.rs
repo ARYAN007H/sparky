@@ -8,7 +8,6 @@
 //! [`OverlayNodeKinds`] is the node-kind catalog with this host's caveats
 //! appended.
 
-use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -223,7 +222,7 @@ impl BuilderGates for FlowsHost {
 #[async_trait]
 impl AgentDirectory for FlowsHost {
     async fn list(&self) -> PortResult<Vec<AgentDefinition>> {
-        let agents = crate::agent::registry::list_agents(&DispatchCtx::ambient(), false)
+        let agents = crate::agent::registry::list_agents(false)
             .await
             .map_err(|e| e.to_string())?;
         Ok(agents

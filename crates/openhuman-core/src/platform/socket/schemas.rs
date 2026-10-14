@@ -184,7 +184,7 @@ fn status_slug(status: ConnectionStatus) -> String {
         .unwrap_or_else(|| format!("{status:?}").to_lowercase())
 }
 
-fn handle_connect(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_connect(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let mgr = require_manager()?;
         let url = params
@@ -196,7 +196,7 @@ fn handle_connect(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFut
             .and_then(|v| v.as_str())
             .ok_or("missing required param 'token'")?;
 
-        let state = super::ops::connect_static(&ctx, mgr, url, token).await?;
+        let state = super::ops::connect_static(mgr, url, token).await?;
         Ok(status_payload(&state))
     })
 }
@@ -233,10 +233,10 @@ fn handle_emit(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFutur
     })
 }
 
-fn handle_connect_with_session(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_connect_with_session(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let mgr = require_manager()?;
-        let state = super::ops::connect_with_session(&ctx, mgr).await?;
+        let state = super::ops::connect_with_session(mgr).await?;
         Ok(status_payload(&state))
     })
 }

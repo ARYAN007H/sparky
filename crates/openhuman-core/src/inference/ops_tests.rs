@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::security::credentials::openai_oauth::{OPENAI_OAUTH_PROFILE_NAME, OPENAI_PROVIDER_KEY};
 use crate::security::credentials::profiles::{AuthProfile, AuthProfilesStore, TokenSet};
@@ -138,7 +137,7 @@ async fn inference_get_client_config_returns_safe_snapshot() {
     let (config, _tmp) = disabled_config();
     config.save().await.expect("save config");
 
-    let outcome = inference_get_client_config(&DispatchCtx::process_default())
+    let outcome = inference_get_client_config()
         .await
         .expect("client config snapshot");
     assert!(outcome.value.get("cloud_providers").is_some());

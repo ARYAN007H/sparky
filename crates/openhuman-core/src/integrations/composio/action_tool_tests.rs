@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::config::test_env::EnvVarGuard;
 
@@ -497,7 +496,7 @@ fn deferred_instance_returns_live_config_for_redaction() {
 
         // Boxed exactly like `Tool::execute` does.
         let (live_config, outcome) =
-            Box::pin(t.execute_unredacted(&DispatchCtx::process_default(), serde_json::json!({}), None)).await;
+            Box::pin(t.execute_unredacted(serde_json::json!({}), None)).await;
         let first = outcome.expect("contract-gate surface is Ok(error result)");
         assert!(
             first.is_error && error_text(&first).contains("Input JSON schema"),
@@ -549,7 +548,7 @@ fn configured_instance_resolves_live_config_not_the_stale_snapshot() {
             None,
         );
 
-        let live_config = Box::pin(t.live_config(&DispatchCtx::process_default()))
+        let live_config = Box::pin(t.live_config())
             .await
             .expect("reload from a valid on-disk config must succeed");
         assert_eq!(

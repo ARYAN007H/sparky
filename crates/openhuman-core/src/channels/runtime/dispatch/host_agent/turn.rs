@@ -1,6 +1,5 @@
 //! Running one channel turn as a host agent.
 
-use crate::core::runtime::DispatchCtx;
 use tokio::sync::mpsc;
 
 use super::posture;
@@ -36,7 +35,7 @@ pub(crate) struct HostChannelTurn {
 
 /// Run `turn` as `host`: its definition and host tools, inside its context,
 /// under `turn.origin` and the posture that origin calls for.
-pub(crate) async fn run_host_agent_turn(ctx: &DispatchCtx, 
+pub(crate) async fn run_host_agent_turn(
     mut host: HostAgent,
     turn: HostChannelTurn,
 ) -> anyhow::Result<AgentTurnResponse> {
@@ -90,7 +89,7 @@ pub(crate) async fn run_host_agent_turn(ctx: &DispatchCtx,
     // The chat's history is the channel's, so the session holds exactly that
     // and never resumes a transcript of its own.
     session.clear_history();
-    session.seed_resume_from_messages(&ctx, prior_turns, &message)?;
+    session.seed_resume_from_messages(prior_turns, &message)?;
     session.set_next_turn_overrides(crate::agent::TurnOverrides {
         suppress_transcript_autoload: true,
         ..Default::default()
@@ -98,7 +97,7 @@ pub(crate) async fn run_host_agent_turn(ctx: &DispatchCtx,
     session.set_on_progress(progress);
 
     let text = host
-        .scope(session.run_single_with_approval(&ctx, &message, Some(origin), approval))
+        .scope(session.run_single_with_approval(&message, Some(origin), approval))
         .await?;
     Ok(AgentTurnResponse::with_resolved_route(
         text,

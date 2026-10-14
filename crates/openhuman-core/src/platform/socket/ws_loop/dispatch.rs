@@ -1,7 +1,6 @@
 //! Incoming-message dispatch: Engine.IO framing and Socket.IO packet/ack
 //! parsing.
 
-use crate::core::runtime::DispatchCtx;
 use crate::platform::socket::manager::emit_state_change;
 use crate::platform::socket::types::ConnectionStatus;
 use std::sync::Arc;
@@ -14,7 +13,7 @@ use crate::platform::socket::event_handlers::{handle_sio_event, parse_sio_event}
 use crate::platform::socket::manager::SharedState;
 
 /// Handle an incoming Engine.IO text message by its type prefix.
-pub(super) fn handle_eio_message(ctx: &DispatchCtx, 
+pub(super) fn handle_eio_message(
     text: &str,
     emit_tx: &mpsc::UnboundedSender<String>,
     shared: &Arc<SharedState>,
@@ -34,7 +33,7 @@ pub(super) fn handle_eio_message(ctx: &DispatchCtx,
         b'4' => {
             // Engine.IO MESSAGE → contains Socket.IO packet
             if text.len() > 1 {
-                handle_sio_packet(&ctx, &text[1..], emit_tx, shared);
+                handle_sio_packet(&text[1..], emit_tx, shared);
             }
         }
         b'1' => {
@@ -53,7 +52,7 @@ pub(super) fn handle_eio_message(ctx: &DispatchCtx,
 }
 
 /// Handle a Socket.IO packet (after stripping the Engine.IO '4' prefix).
-pub(super) fn handle_sio_packet(ctx: &DispatchCtx, 
+pub(super) fn handle_sio_packet(
     text: &str,
     emit_tx: &mpsc::UnboundedSender<String>,
     shared: &Arc<SharedState>,
@@ -66,7 +65,7 @@ pub(super) fn handle_sio_packet(ctx: &DispatchCtx,
         b'2' => {
             // Socket.IO EVENT: 2["eventName", data]
             if let Some((event_name, data)) = parse_sio_event(&text[1..]) {
-                handle_sio_event(&ctx, &event_name, data, emit_tx, shared);
+                handle_sio_event(&event_name, data, emit_tx, shared);
             } else {
                 log::warn!(
                     "[socket] Failed to parse SIO EVENT: {}",

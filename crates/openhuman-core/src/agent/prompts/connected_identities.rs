@@ -4,7 +4,6 @@
 //! export-focused while the runtime fetch logic lives in a small,
 //! testable unit.
 
-use crate::core::runtime::DispatchCtx;
 /// Render persisted provider identities (if available) as a compact
 /// `## Connected Identities` section.
 ///
@@ -18,18 +17,18 @@ use crate::core::runtime::DispatchCtx;
 /// `block_in_place` + current-runtime-handle bridge. Best-effort: no runtime, a
 /// single-threaded runtime, or a config-load/driver failure all render an
 /// empty section rather than panicking or blocking a prompt on a memory read.
-pub fn render_connected_identities(ctx: &DispatchCtx, ) -> String {
+pub fn render_connected_identities() -> String {
     let Ok(handle) = tokio::runtime::Handle::try_current() else {
         return String::new();
     };
     if handle.runtime_flavor() != tokio::runtime::RuntimeFlavor::MultiThread {
         return String::new();
     }
-    tokio::task::block_in_place(|| handle.block_on(render_section(&ctx)))
+    tokio::task::block_in_place(|| handle.block_on(render_section()))
 }
 
-async fn render_section(ctx: &DispatchCtx, ) -> String {
-    let config = match crate::config::rpc::load_config_with_timeout(&ctx).await {
+async fn render_section() -> String {
+    let config = match crate::config::rpc::load_config_with_timeout().await {
         Ok(config) => config,
         Err(error) => {
             tracing::debug!(%error, "[prompts] render_connected_identities: config load failed");

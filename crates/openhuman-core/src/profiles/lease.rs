@@ -16,7 +16,6 @@
 //! storage write to the profile's scopes is checked against the grant
 //! itself ([`super::fence`]).
 
-use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -140,7 +139,7 @@ pub struct HeartbeatReport {
 
 /// Renews the lease of every open profile once; fences the ones whose lease
 /// is gone (see the module docs).
-pub async fn renew_once(ctx: &DispatchCtx, host: &ProfileHost) -> HeartbeatReport {
+pub async fn renew_once(host: &ProfileHost) -> HeartbeatReport {
     let mut report = HeartbeatReport::default();
     for (id, grant) in host.grants() {
         let now = now_ms();
@@ -151,14 +150,14 @@ pub async fn renew_once(ctx: &DispatchCtx, host: &ProfileHost) -> HeartbeatRepor
             }
             Err(LeaseError::Lost) => {
                 log::warn!("[profiles][lease] lease of profile={id} was lost; fencing it");
-                host.fence(&ctx, &id, &grant, "lease lost").await;
+                host.fence(&id, &grant, "lease lost").await;
                 report.fenced.push(id);
             }
             Err(error) if now >= grant.expires_at_ms => {
                 log::warn!(
                     "[profiles][lease] could not renew profile={id} before it expired ({error}); fencing it"
                 );
-                host.fence(&ctx, &id, &grant, "lease expired").await;
+                host.fence(&id, &grant, "lease expired").await;
                 report.fenced.push(id);
             }
             Err(error) => {
@@ -171,7 +170,7 @@ pub async fn renew_once(ctx: &DispatchCtx, host: &ProfileHost) -> HeartbeatRepor
 
 /// Start renewing `host`'s leases every [`renew_interval`] of its TTL, under
 /// the operator context. Runs until the process exits.
-pub fn heartbeat(ctx: &DispatchCtx, host: Arc<ProfileHost>, operator: Arc<crate::core::runtime::CoreContext>) {
+pub fn heartbeat(host: Arc<ProfileHost>, operator: Arc<crate::core::runtime::CoreContext>) {
     let every = renew_interval(host.saas().lease_ttl());
     let renewals = crate::core::runtime::CoreContext::scope(operator, async move {
         log::info!(
@@ -182,7 +181,7 @@ pub fn heartbeat(ctx: &DispatchCtx, host: Arc<ProfileHost>, operator: Arc<crate:
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         loop {
             interval.tick().await;
-            let report = renew_once(&ctx, &host).await;
+            let report = renew_once(&host).await;
             if !report.fenced.is_empty() {
                 log::info!(
                     "[profiles][lease] heartbeat renewed={} fenced={}",

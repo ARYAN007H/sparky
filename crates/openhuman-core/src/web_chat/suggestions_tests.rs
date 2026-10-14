@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -123,7 +122,7 @@ async fn emits_chat_suggestions_for_a_well_formed_reply() {
     let mut rx = subscribe_web_channel_events();
 
     let thread_id = "sugg-thread-ok";
-    generate_and_emit(&DispatchCtx::process_default(), 
+    generate_and_emit(
         "client-1",
         thread_id,
         "req-1",
@@ -150,7 +149,7 @@ async fn drops_silently_when_the_model_returns_garbage() {
     let mut rx = subscribe_web_channel_events();
 
     let thread_id = "sugg-thread-garbage";
-    generate_and_emit(&DispatchCtx::process_default(), 
+    generate_and_emit(
         "client-1",
         thread_id,
         "req-2",
@@ -173,7 +172,7 @@ async fn skips_when_the_user_message_is_too_short() {
         calls: calls.clone(),
     }));
 
-    generate_and_emit(&DispatchCtx::process_default(), 
+    generate_and_emit(
         "client-1",
         "sugg-thread-short",
         "req-3",

@@ -155,7 +155,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_chat(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_chat(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<WebChatParams>(params)?;
         // Recorded before the turn starts so it reads the new choice.
@@ -164,7 +164,7 @@ fn handle_chat(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture
             p.reasoning_effort.as_deref(),
         )?;
         to_json(
-            channel_web_chat(&ctx, 
+            channel_web_chat(
                 &p.client_id,
                 &p.thread_id,
                 &p.message,
@@ -211,10 +211,10 @@ fn handle_queue_remove(_ctx: DispatchCtx, params: Map<String, Value>) -> Control
     })
 }
 
-fn handle_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_cancel(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<WebCancelParams>(params)?;
-        to_json(channel_web_cancel(&ctx, &p.client_id, &p.thread_id, p.request_id.as_deref()).await?)
+        to_json(channel_web_cancel(&p.client_id, &p.thread_id, p.request_id.as_deref()).await?)
     })
 }
 

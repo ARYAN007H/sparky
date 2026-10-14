@@ -1,7 +1,6 @@
 //! TinyComputer model settings: the decision model and the planner and
 //! rescue models the module runs a task with.
 
-use crate::core::runtime::DispatchCtx;
 use crate::config::{ComputerConfig, Config, DecisionModel};
 use crate::core::Outcome;
 
@@ -94,10 +93,10 @@ pub async fn apply_computer_settings(
 }
 
 /// Load the configuration, update `[computer]`, and save it.
-pub async fn load_and_apply_computer_settings(ctx: &DispatchCtx, 
+pub async fn load_and_apply_computer_settings(
     update: ComputerSettingsPatch,
 ) -> Result<Outcome<serde_json::Value>, String> {
-    let mut config = load_config_with_timeout(&ctx).await?;
+    let mut config = load_config_with_timeout().await?;
     apply_computer_settings(&mut config, update).await
 }
 

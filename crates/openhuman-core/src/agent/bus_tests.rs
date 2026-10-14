@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 use tinybus::NativeRegistry;
 
@@ -107,7 +106,7 @@ async fn register_agent_handlers_exposes_run_turn_on_global_registry() {
     // NOT dispatch — dispatching from this test would race with any
     // other test that installs a handler override (e.g. the channel
     // dispatch integration tests in `runtime_dispatch.rs`).
-    register_agent_handlers(&DispatchCtx::process_default());
+    register_agent_handlers();
     let registry = crate::core::bus::BUS.native();
     assert!(
         registry.is_registered(AGENT_RUN_TURN_METHOD),

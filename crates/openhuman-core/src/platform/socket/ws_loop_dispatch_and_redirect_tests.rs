@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 
 use crate::platform::socket::types::ConnectionStatus;
@@ -120,7 +119,7 @@ fn redirect_warning_is_recorded_once_and_pinned_to_first_hop() {
 fn handle_eio_message_ping_sends_pong() {
     let shared = make_shared();
     let (tx, mut rx) = mpsc::unbounded_channel::<String>();
-    handle_eio_message(&DispatchCtx::process_default(), "2", &tx, &shared);
+    handle_eio_message("2", &tx, &shared);
     let msg = rx.try_recv().expect("pong should be sent");
     assert_eq!(msg, "3");
 }
@@ -129,7 +128,7 @@ fn handle_eio_message_ping_sends_pong() {
 fn handle_eio_message_pong_is_ignored() {
     let shared = make_shared();
     let (tx, mut rx) = mpsc::unbounded_channel::<String>();
-    handle_eio_message(&DispatchCtx::process_default(), "3", &tx, &shared);
+    handle_eio_message("3", &tx, &shared);
     assert!(rx.try_recv().is_err(), "pong must not trigger a reply");
 }
 
@@ -137,7 +136,7 @@ fn handle_eio_message_pong_is_ignored() {
 fn handle_eio_message_empty_is_noop() {
     let shared = make_shared();
     let (tx, mut rx) = mpsc::unbounded_channel::<String>();
-    handle_eio_message(&DispatchCtx::process_default(), "", &tx, &shared);
+    handle_eio_message("", &tx, &shared);
     assert!(rx.try_recv().is_err());
 }
 
@@ -148,7 +147,7 @@ fn handle_eio_message_message_routes_to_sio_packet() {
     // `4` + `1` = Engine.IO MESSAGE + SIO DISCONNECT — should flip state.
     *shared.status.write() = ConnectionStatus::Connected;
     *shared.socket_id.write() = Some("old-sid".into());
-    handle_eio_message(&DispatchCtx::process_default(), "41", &tx, &shared);
+    handle_eio_message("41", &tx, &shared);
     assert_eq!(*shared.status.read(), ConnectionStatus::Disconnected);
     assert!(shared.socket_id.read().is_none());
 }
@@ -157,9 +156,9 @@ fn handle_eio_message_message_routes_to_sio_packet() {
 fn handle_eio_message_close_and_noop_do_not_panic() {
     let shared = make_shared();
     let (tx, _rx) = mpsc::unbounded_channel::<String>();
-    handle_eio_message(&DispatchCtx::process_default(), "1", &tx, &shared); // CLOSE from server
-    handle_eio_message(&DispatchCtx::process_default(), "6", &tx, &shared); // NOOP
-    handle_eio_message(&DispatchCtx::process_default(), "9", &tx, &shared); // unknown
+    handle_eio_message("1", &tx, &shared); // CLOSE from server
+    handle_eio_message("6", &tx, &shared); // NOOP
+    handle_eio_message("9", &tx, &shared); // unknown
 }
 
 #[test]
@@ -171,7 +170,7 @@ fn handle_eio_message_unknown_packet_is_utf8_safe_at_preview_boundary() {
     let packet = format!("9{}{}", "a".repeat(28), "魔");
     assert!(!packet.is_char_boundary(30));
 
-    handle_eio_message(&DispatchCtx::process_default(), &packet, &tx, &shared);
+    handle_eio_message(&packet, &tx, &shared);
     log::set_max_level(previous_max_level);
 }
 
@@ -183,7 +182,7 @@ fn handle_sio_packet_event_dispatches_to_event_handler() {
     let (tx, _rx) = mpsc::unbounded_channel::<String>();
     *shared.status.write() = ConnectionStatus::Disconnected;
     // `2` = SIO EVENT, payload is a "ready" event → should flip to Connected.
-    handle_sio_packet(&DispatchCtx::process_default(), r#"2["ready",{}]"#, &tx, &shared);
+    handle_sio_packet(r#"2["ready",{}]"#, &tx, &shared);
     assert_eq!(*shared.status.read(), ConnectionStatus::Connected);
 }
 
@@ -212,7 +211,7 @@ fn handle_sio_packet_event_with_unparseable_payload_is_logged_only() {
     let shared = make_shared();
     let (tx, _rx) = mpsc::unbounded_channel::<String>();
     *shared.status.write() = ConnectionStatus::Disconnected;
-    handle_sio_packet(&DispatchCtx::process_default(), "2not-json", &tx, &shared);
+    handle_sio_packet("2not-json", &tx, &shared);
     // Unparseable SIO events must not change status.
     assert_eq!(*shared.status.read(), ConnectionStatus::Disconnected);
 }
@@ -226,7 +225,7 @@ fn handle_sio_packet_unparseable_event_is_utf8_safe_at_preview_boundary() {
     let packet = format!("2{}{}", "a".repeat(78), "魔");
     assert!(!packet.is_char_boundary(80));
 
-    handle_sio_packet(&DispatchCtx::process_default(), &packet, &tx, &shared);
+    handle_sio_packet(&packet, &tx, &shared);
     log::set_max_level(previous_max_level);
 }
 
@@ -239,7 +238,7 @@ fn handle_sio_packet_unknown_type_is_utf8_safe_at_preview_boundary() {
     let packet = format!("9{}{}", "a".repeat(28), "魔");
     assert!(!packet.is_char_boundary(30));
 
-    handle_sio_packet(&DispatchCtx::process_default(), &packet, &tx, &shared);
+    handle_sio_packet(&packet, &tx, &shared);
     log::set_max_level(previous_max_level);
 }
 
@@ -248,7 +247,7 @@ fn handle_sio_packet_connect_reack_updates_sid() {
     let shared = make_shared();
     let (tx, _rx) = mpsc::unbounded_channel::<String>();
     assert!(shared.socket_id.read().is_none());
-    handle_sio_packet(&DispatchCtx::process_default(), r#"0{"sid":"new-sid-123"}"#, &tx, &shared);
+    handle_sio_packet(r#"0{"sid":"new-sid-123"}"#, &tx, &shared);
     assert_eq!(shared.socket_id.read().as_deref(), Some("new-sid-123"));
 }
 
@@ -256,7 +255,7 @@ fn handle_sio_packet_connect_reack_updates_sid() {
 fn handle_sio_packet_connect_reack_missing_sid_is_noop() {
     let shared = make_shared();
     let (tx, _rx) = mpsc::unbounded_channel::<String>();
-    handle_sio_packet(&DispatchCtx::process_default(), "0", &tx, &shared);
+    handle_sio_packet("0", &tx, &shared);
     assert!(shared.socket_id.read().is_none());
 }
 
@@ -266,7 +265,7 @@ fn handle_sio_packet_disconnect_flips_status_and_clears_sid() {
     let (tx, _rx) = mpsc::unbounded_channel::<String>();
     *shared.status.write() = ConnectionStatus::Connected;
     *shared.socket_id.write() = Some("sid-x".into());
-    handle_sio_packet(&DispatchCtx::process_default(), "1", &tx, &shared);
+    handle_sio_packet("1", &tx, &shared);
     assert_eq!(*shared.status.read(), ConnectionStatus::Disconnected);
     assert!(shared.socket_id.read().is_none());
 }
@@ -275,15 +274,15 @@ fn handle_sio_packet_disconnect_flips_status_and_clears_sid() {
 fn handle_sio_packet_connect_error_does_not_panic() {
     let shared = make_shared();
     let (tx, _rx) = mpsc::unbounded_channel::<String>();
-    handle_sio_packet(&DispatchCtx::process_default(), "4", &tx, &shared);
-    handle_sio_packet(&DispatchCtx::process_default(), r#"4{"message":"nope"}"#, &tx, &shared);
+    handle_sio_packet("4", &tx, &shared);
+    handle_sio_packet(r#"4{"message":"nope"}"#, &tx, &shared);
 }
 
 #[test]
 fn handle_sio_packet_empty_is_noop() {
     let shared = make_shared();
     let (tx, _rx) = mpsc::unbounded_channel::<String>();
-    handle_sio_packet(&DispatchCtx::process_default(), "", &tx, &shared);
+    handle_sio_packet("", &tx, &shared);
     assert_eq!(*shared.status.read(), ConnectionStatus::Connected);
 }
 
@@ -292,7 +291,7 @@ fn handle_sio_packet_unknown_type_is_noop() {
     let shared = make_shared();
     let (tx, _rx) = mpsc::unbounded_channel::<String>();
     *shared.status.write() = ConnectionStatus::Connected;
-    handle_sio_packet(&DispatchCtx::process_default(), "9abc", &tx, &shared);
+    handle_sio_packet("9abc", &tx, &shared);
     assert_eq!(*shared.status.read(), ConnectionStatus::Connected);
 }
 
@@ -416,7 +415,7 @@ async fn ws_loop_completes_handshake_and_shuts_down_cleanly() {
 
     let loop_shared = Arc::clone(&shared);
     let handle = tokio::spawn(async move {
-        ws_loop(&DispatchCtx::process_default(), 
+        ws_loop(
             http_base_for(addr),
             static_token_provider("test-token".to_string()),
             loop_shared,
@@ -475,7 +474,7 @@ async fn ws_loop_handles_connect_error_and_shutdown() {
 
     let loop_shared = Arc::clone(&shared);
     let handle = tokio::spawn(async move {
-        ws_loop(&DispatchCtx::process_default(), 
+        ws_loop(
             http_base_for(addr),
             static_token_provider("t".to_string()),
             loop_shared,
@@ -510,7 +509,7 @@ async fn ws_loop_handles_bad_eio_open_and_shutdown() {
 
     let loop_shared = Arc::clone(&shared);
     let handle = tokio::spawn(async move {
-        ws_loop(&DispatchCtx::process_default(), 
+        ws_loop(
             http_base_for(addr),
             static_token_provider("t".to_string()),
             loop_shared,

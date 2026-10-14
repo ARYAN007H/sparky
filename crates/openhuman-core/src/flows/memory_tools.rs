@@ -22,7 +22,6 @@
 //! [`FlowMemoryRecallTool`] only ever reads with a flow tag filter
 //! (`flow:<id>` or `flows`), so it never reaches the user's own memory.
 
-use crate::core::runtime::DispatchCtx;
 use crate::tools::schema_cache::static_schema;
 use std::sync::Arc;
 
@@ -336,7 +335,7 @@ impl Tool for FlowMemoryRecallTool {
             .and_then(serde_json::Value::as_u64)
             .map_or(5, |v| v as usize);
 
-        let config = match crate::config::rpc::load_config_with_timeout(&DispatchCtx::ambient()).await {
+        let config = match crate::config::rpc::load_config_with_timeout().await {
             Ok(config) => config,
             Err(error) => {
                 return Ok(ToolResult::error(format!(
@@ -473,7 +472,7 @@ impl Tool for FlowMemoryRememberTool {
             ));
         }
 
-        let config = match crate::config::rpc::load_config_with_timeout(&DispatchCtx::ambient()).await {
+        let config = match crate::config::rpc::load_config_with_timeout().await {
             Ok(config) => config,
             Err(error) => {
                 return Ok(ToolResult::error(format!(

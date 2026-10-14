@@ -2,7 +2,6 @@
 //! cancelling in-flight turns (primary and parallel, scoped or unscoped), and
 //! inspecting/clearing a thread's run queue.
 
-use crate::core::runtime::DispatchCtx;
 use serde_json::{json, Value};
 
 use crate::core::Outcome;
@@ -22,12 +21,12 @@ use super::state::{cancel_in_flight_gracefully, cancel_should_target, in_flight,
 /// newer turn that replaced it (#4760). When `request_id` is `None`, it stops
 /// whatever is running on the thread (primary + every parallel) — the "stop
 /// everything" behaviour used by session teardown / a Stop button.
-pub async fn cancel_chat_scoped(ctx: &DispatchCtx, 
+pub async fn cancel_chat_scoped(
     client_id: &str,
     thread_id: &str,
     request_id: Option<&str>,
 ) -> Result<Option<String>, String> {
-    Ok(cancel_chat_inner(&ctx, client_id, thread_id, request_id, false)
+    Ok(cancel_chat_inner(client_id, thread_id, request_id, false)
         .await?
         .request_id)
 }
@@ -40,11 +39,11 @@ const FENCE_CLIENT_ID: &str = "profile-fence";
 /// lease was lost does before it closes. Each thread is torn down as an
 /// unscoped stop would (primary, parallel turns and detached sub-agents).
 /// Returns how many threads had something to stop.
-pub async fn cancel_all_turns(ctx: &DispatchCtx, ) -> usize {
+pub async fn cancel_all_turns() -> usize {
     let threads = super::state::live_thread_ids().await;
     let mut stopped = 0;
     for thread_id in &threads {
-        match cancel_chat_inner(&ctx, FENCE_CLIENT_ID, thread_id, None, true).await {
+        match cancel_chat_inner(FENCE_CLIENT_ID, thread_id, None, true).await {
             Ok(outcome) if outcome.request_id.is_some() => stopped += 1,
             Ok(_) => {}
             Err(error) => {
@@ -67,7 +66,7 @@ struct CancelOutcome {
     subagents_cancelled: usize,
 }
 
-async fn cancel_chat_inner(ctx: &DispatchCtx, 
+async fn cancel_chat_inner(
     client_id: &str,
     thread_id: &str,
     request_id: Option<&str>,
@@ -149,7 +148,7 @@ async fn cancel_chat_inner(ctx: &DispatchCtx,
         crate::agent::orchestration::busy_guard::clear_busy_for_thread(thread_id);
         // A drain that fired while the cancelled turn counted as busy returned
         // without claiming anything; ask for another.
-        crate::agent::orchestration::background_delivery::kick_delivery(&ctx, thread_id);
+        crate::agent::orchestration::background_delivery::kick_delivery(thread_id);
     }
     let subagents_cancelled = if request_id.is_none() {
         // Gate completion recording before aborting: Tokio abort is
@@ -230,7 +229,7 @@ async fn thread_has_live_turn(thread_id: &str, map_key: &str) -> bool {
         .any(|entry| entry.thread_id == thread_id)
 }
 
-pub async fn channel_web_chat(ctx: &DispatchCtx, 
+pub async fn channel_web_chat(
     client_id: &str,
     thread_id: &str,
     message: &str,
@@ -261,7 +260,7 @@ pub async fn channel_web_chat(ctx: &DispatchCtx,
         }
     }
 
-    let result = start_chat(&ctx, 
+    let result = start_chat(
         client_id,
         thread_id,
         message,
@@ -429,12 +428,12 @@ pub async fn channel_web_queue_clear(thread_id: &str) -> Result<Outcome<Value>, 
     }
 }
 
-pub async fn channel_web_cancel(ctx: &DispatchCtx, 
+pub async fn channel_web_cancel(
     client_id: &str,
     thread_id: &str,
     request_id: Option<&str>,
 ) -> Result<Outcome<Value>, String> {
-    let outcome = cancel_chat_inner(&ctx, client_id, thread_id, request_id, false).await?;
+    let outcome = cancel_chat_inner(client_id, thread_id, request_id, false).await?;
 
     // `request_id` is set only when a turn was torn down, and only then does a
     // `cancelled` chat_error follow. A client that sees `request_id: null` knows

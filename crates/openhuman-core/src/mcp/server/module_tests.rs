@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 use std::sync::Mutex;
 use tinymcp_bus::ServerHostCall;
@@ -131,7 +130,7 @@ impl ServerPort for FixturePort {
 #[tokio::test]
 async fn server_session_completes_host_resource_callback() {
     let port = Arc::new(FixturePort(Mutex::new(PortState::default())));
-    let session = ServerSession::open_with_port(&DispatchCtx::process_default(), port.clone()).await.unwrap();
+    let session = ServerSession::open_with_port(port.clone()).await.unwrap();
     assert!(!Uuid::parse_str(session.id()).unwrap().is_nil());
 
     let snapshot = session
@@ -163,7 +162,7 @@ async fn retry_after_lost_callback_reply_reuses_operation_and_host_reply() {
         lose_first_complete_reply: true,
         ..PortState::default()
     })));
-    let session = ServerSession::open_with_port(&DispatchCtx::process_default(), port.clone()).await.unwrap();
+    let session = ServerSession::open_with_port(port.clone()).await.unwrap();
     let line = r#"{"jsonrpc":"2.0","id":1,"method":"resources/read","params":{"uri":"openhuman://prompts/identity"}}"#;
 
     let first = session
@@ -197,7 +196,7 @@ async fn retry_after_lost_callback_reply_reuses_operation_and_host_reply() {
 #[tokio::test]
 async fn server_session_cancellation_reaches_module_owner() {
     let port = Arc::new(FixturePort(Mutex::new(PortState::default())));
-    let session = ServerSession::open_with_port(&DispatchCtx::process_default(), port.clone()).await.unwrap();
+    let session = ServerSession::open_with_port(port.clone()).await.unwrap();
     let cancellation = CancellationToken::new();
     cancellation.cancel();
 
@@ -273,7 +272,7 @@ async fn server_session_fails_closed_when_module_is_unavailable() {
         ..PortState::default()
     })));
 
-    let error = match ServerSession::open_with_port(&DispatchCtx::process_default(), port).await {
+    let error = match ServerSession::open_with_port(port).await {
         Ok(_) => panic!("unavailable module unexpectedly opened"),
         Err(error) => error,
     };

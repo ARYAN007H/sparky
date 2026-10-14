@@ -30,7 +30,7 @@ async fn handle_list_returns_persisted_audit_records() {
         std::env::set_var("OPENHUMAN_WORKSPACE", tmp.path());
     }
 
-    let config = config_rpc::load_config_with_timeout(&DispatchCtx::process_default())
+    let config = config_rpc::load_config_with_timeout()
         .await
         .expect("config");
     crate::mcp::audit::record_write(

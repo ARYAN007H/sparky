@@ -332,7 +332,7 @@ impl ToolMiddleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         // level), mirroring the engine order in `agent_tool_exec`.
         #[cfg(feature = "modules")]
         let desktop_approval_disabled = match self.resolve_tool(&call.name) {
-            Some(tool) => crate::desktop::control::approvals_disabled_for(&ctx, tool.as_ref()).await,
+            Some(tool) => crate::desktop::control::approvals_disabled_for(tool.as_ref()).await,
             None => false,
         };
         #[cfg(not(feature = "modules"))]

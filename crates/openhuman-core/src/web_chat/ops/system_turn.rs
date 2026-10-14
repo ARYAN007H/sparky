@@ -14,7 +14,6 @@
 //!   that one — three rows — over the real history, so after a restart the
 //!   agent had forgotten everything but the delivery notice.
 
-use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 use tinyagents_harness::run_queue::RunQueue;
 
@@ -43,13 +42,13 @@ pub const SESSION_CHECKOUT_FAILURE: &str = "session checkout failed: ";
 /// The turn is not registered in `IN_FLIGHT`: it is not interruptible by a
 /// newer user message and does not interrupt one. Callers gate on idleness
 /// themselves (background delivery defers while a user turn is in flight).
-pub async fn run_system_turn_on_thread(ctx: &DispatchCtx, 
+pub async fn run_system_turn_on_thread(
     thread_id: &str,
     run_id: &str,
     prompt: &str,
     origin: AgentTurnOrigin,
 ) -> Result<String, String> {
-    let config = config_rpc::load_config_with_timeout(&ctx)
+    let config = config_rpc::load_config_with_timeout()
         .await
         .map_err(|error| format!("{SESSION_CHECKOUT_FAILURE}{error}"))?;
     let CheckedOutSession {
@@ -85,7 +84,7 @@ pub async fn run_system_turn_on_thread(ctx: &DispatchCtx,
     agent.set_run_queue(Some(Arc::new(RunQueue::new())));
     agent.set_thread_id(Some(thread_id));
 
-    let result = with_origin(origin, agent.run_single(&ctx, prompt))
+    let result = with_origin(origin, agent.run_single(prompt))
         .await
         .map_err(|error| format!("{error:#}"));
 

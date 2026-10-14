@@ -40,10 +40,10 @@ pub fn schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_policy_info(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async move {
+fn handle_policy_info(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+    Box::pin(async {
         log::debug!("[security][rpc] policy_info enter");
-        match crate::security::rpc::load_and_get_security_policy_info(&ctx).await {
+        match crate::security::rpc::load_and_get_security_policy_info().await {
             Ok(outcome) => {
                 log::debug!("[security][rpc] policy_info ok");
                 to_json(outcome)

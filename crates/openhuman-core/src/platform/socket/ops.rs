@@ -1,26 +1,25 @@
-use crate::core::runtime::DispatchCtx;
 use crate::platform::socket::models::SocketState;
 
 use super::SocketManager;
 
-async fn connect_static_using(ctx: &DispatchCtx, 
+async fn connect_static_using(
     manager: &SocketManager,
     url: &str,
     token: &str,
 ) -> Result<SocketState, String> {
     let _rebind = manager.lock_identity_rebind().await;
     manager.disconnect().await?;
-    manager.connect(&ctx, url, token).await?;
+    manager.connect(url, token).await?;
     Ok(manager.get_state())
 }
 
-pub async fn connect_static(ctx: &DispatchCtx, 
+pub async fn connect_static(
     manager: &SocketManager,
     url: &str,
     token: &str,
 ) -> Result<SocketState, String> {
     log::info!("[socket:rpc] connect");
-    connect_static_using(&ctx, manager, url, token).await
+    connect_static_using(manager, url, token).await
 }
 
 pub async fn disconnect(manager: &SocketManager) -> Result<SocketState, String> {
@@ -32,7 +31,7 @@ pub async fn disconnect(manager: &SocketManager) -> Result<SocketState, String> 
 
 /// Connect with a session token, reusing a live socket for the same identity.
 /// The identity lock serializes concurrent bootstrap and RPC connections.
-async fn connect_with_session_using(ctx: &DispatchCtx, 
+async fn connect_with_session_using(
     manager: &SocketManager,
     url: &str,
     token: &str,
@@ -46,13 +45,13 @@ async fn connect_with_session_using(ctx: &DispatchCtx,
         return Ok(manager.get_state());
     }
     manager.disconnect().await?;
-    manager.connect_with_provider(&ctx, url, provider).await?;
+    manager.connect_with_provider(url, provider).await?;
     Ok(manager.get_state())
 }
 
-pub async fn connect_with_session(ctx: &DispatchCtx, manager: &SocketManager) -> Result<SocketState, String> {
+pub async fn connect_with_session(manager: &SocketManager) -> Result<SocketState, String> {
     log::info!("[socket:rpc] connect_with_session — resolving credentials");
-    let config = std::sync::Arc::new(crate::config::rpc::load_config_with_timeout(&ctx).await?);
+    let config = std::sync::Arc::new(crate::config::rpc::load_config_with_timeout().await?);
     let api_url = crate::backend::require_base_url(&config.api_url)?;
     let token = crate::security::credentials::session_support::get_session_token(&config)
         .map_err(|e| format!("failed to read session token: {e}"))?
@@ -63,7 +62,7 @@ pub async fn connect_with_session(ctx: &DispatchCtx, manager: &SocketManager) ->
 
     let provider =
         super::token_provider::token_provider_from_config(std::sync::Arc::clone(&config));
-    connect_with_session_using(&ctx, manager, &api_url, &token, provider).await
+    connect_with_session_using(manager, &api_url, &token, provider).await
 }
 
 #[cfg(test)]

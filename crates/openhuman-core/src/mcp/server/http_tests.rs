@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 use async_trait::async_trait;
 use axum::body::to_bytes;
@@ -178,7 +177,6 @@ async fn rejected_http_delete_keeps_session_usable() {
     assert!(state.sessions.lock().await.contains_key("wire-session"));
 
     let usable = handle_post(
-        &DispatchCtx::process_default(),
         State(state.clone()),
         http_test_headers("wire-session", "2025-11-25"),
         Bytes::from_static(br#"{"jsonrpc":"2.0","id":1,"method":"ping"}"#),
@@ -229,7 +227,6 @@ async fn successful_http_delete_joins_blocked_callback_before_removing_session()
     let post_state = State(state.clone());
     let post = tokio::spawn(async move {
         handle_post(
-            &DispatchCtx::process_default(),
             post_state,
             http_test_headers("wire-session", "2025-11-25"),
             Bytes::from_static(br#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#),

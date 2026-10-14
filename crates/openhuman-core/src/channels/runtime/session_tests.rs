@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -25,7 +24,7 @@ async fn invalidated_startup_never_polls_workspace_or_listeners() {
     .unwrap();
     assert!(!polled.load(Ordering::SeqCst));
     // Exercise the production entry point, not only the generic select helper.
-    crate::channels::start_channels_with_session(&DispatchCtx::process_default(), crate::config::Config::default(), session)
+    crate::channels::start_channels_with_session(crate::config::Config::default(), session)
         .await
         .unwrap();
 }
@@ -87,7 +86,7 @@ async fn clear_session_invalidates_old_channels_and_opens_a_fresh_generation() {
     };
     let _signed_out = crate::cron::scheduler_gate::SignedOutTestGuard::set(false);
     let old_session = channel_session();
-    crate::security::credentials::ops::clear_session(&DispatchCtx::process_default(), &config)
+    crate::security::credentials::ops::clear_session(&config)
         .await
         .unwrap();
     assert!(old_session.is_cancelled());

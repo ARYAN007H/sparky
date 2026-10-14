@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 
 use crate::platform::socket::token_provider::TokenProvider;
@@ -146,7 +145,7 @@ async fn ws_loop_calls_provider_before_each_attempt() {
 
     let loop_shared = Arc::clone(&shared);
     let handle = tokio::spawn(async move {
-        ws_loop(&DispatchCtx::process_default(), 
+        ws_loop(
             http_base_for(addr),
             Arc::new(move || {
                 call_count_clone.fetch_add(1, Ordering::Relaxed);
@@ -201,7 +200,7 @@ async fn ws_loop_escalates_immediately_on_invalid_token_no_refresh() {
 
     let loop_shared = Arc::clone(&shared);
     let handle = tokio::spawn(async move {
-        ws_loop(&DispatchCtx::process_default(), 
+        ws_loop(
             http_base_for(addr),
             // Provider always returns the same (stale) token.
             Arc::new(move || {
@@ -267,7 +266,7 @@ async fn ws_loop_retries_with_fresh_token_on_invalid_token() {
 
     let loop_shared = Arc::clone(&shared);
     let handle = tokio::spawn(async move {
-        ws_loop(&DispatchCtx::process_default(), 
+        ws_loop(
             http_base_for(addr),
             // First call returns "token-a", second and beyond return "token-b".
             Arc::new(move || {
@@ -357,7 +356,7 @@ async fn ws_loop_bounds_fresh_token_retries_with_rotating_provider() {
 
     let loop_shared = Arc::clone(&shared);
     let handle = tokio::spawn(async move {
-        ws_loop(&DispatchCtx::process_default(), 
+        ws_loop(
             http_base_for(addr),
             // Each provider call returns a fresh, distinct, non-empty token.
             // This is the pathological provider the CodeRabbit Major calls

@@ -6,7 +6,6 @@
 //! [`DomainGroup`](crate::core::all::DomainGroup) registers the first time a
 //! boot enables it.
 
-use crate::core::runtime::DispatchCtx;
 /// Per-`DomainGroup` gating decision for each event-bus subscriber that
 /// [`register_domain_subscribers`] conditionally registers. Extracted as a
 /// pure value so the subscriber→group mapping has a single source of truth
@@ -105,7 +104,7 @@ fn group_first_time(group: crate::core::all::DomainGroup) -> bool {
 /// it is enabled after the event bus is ready, so widening the ambient
 /// `DomainSet` on a later call (`harness()` → `full()`) still installs the
 /// newly-enabled groups without double-subscribing the ones already registered.
-pub(super) fn register_domain_subscribers(ctx: &DispatchCtx, 
+pub(super) fn register_domain_subscribers(
     workspace_dir: std::path::PathBuf,
     config: crate::config::Config,
     embedded_core: bool,
@@ -175,7 +174,7 @@ pub(super) fn register_domain_subscribers(ctx: &DispatchCtx,
         if std::env::var_os(crate::security::credentials::BACKEND_SESSION_TOKEN_ENV).is_some() {
             let config = config.clone();
             tokio::spawn(async move {
-                crate::security::credentials::seed_session_from_env(&ctx, &config).await;
+                crate::security::credentials::seed_session_from_env(&config).await;
             });
         }
 
@@ -423,7 +422,7 @@ pub(super) fn register_domain_subscribers(ctx: &DispatchCtx,
             // Native request handlers — the agent `agent.run_turn` handler is
             // what channel dispatch calls instead of importing
             // `run_tool_call_loop` directly.
-            crate::agent::bus::register_agent_handlers(&ctx);
+            crate::agent::bus::register_agent_handlers();
             // Background-completion delivery: when a detached sub-agent
             // (spawn_async_subagent) finishes, surface its result back into the
             // originating chat as an idle-gated, batched, system-injected turn.

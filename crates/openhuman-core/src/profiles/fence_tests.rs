@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::core::runtime::{CoreContext, DomainSet, SaasConfig};
 use crate::profiles::lease::{now_ms, renew_once};
@@ -83,7 +82,7 @@ async fn a_takeover_fences_the_old_holders_writes_before_its_heartbeat_runs() {
     let (a, a_storage) = node(tmp.path(), "node-a", &backend);
     let alice = profile("alice");
     a.provision(&alice).await.unwrap();
-    let state = a.open(&DispatchCtx::process_default(), &alice).await.unwrap();
+    let state = a.open(&alice).await.unwrap();
     write(&a_storage, "profile:alice").await.unwrap();
     write(&a_storage, "alice~default").await.unwrap();
 
@@ -113,7 +112,7 @@ async fn a_takeover_fences_the_old_holders_writes_before_its_heartbeat_runs() {
 
     // The heartbeat closes it; the latched fence stays registered (refusing
     // writes) while the profile's state is still held.
-    let report = renew_once(&DispatchCtx::process_default(), &a).await;
+    let report = renew_once(&a).await;
     assert_eq!(report.fenced, vec![alice.clone()]);
     assert!(write(&a_storage, "profile:alice").await.is_err());
     drop(state);
@@ -128,13 +127,13 @@ async fn a_clean_release_retires_the_fence_and_a_reopen_registers_a_new_one() {
     let (a, _) = node(tmp.path(), "node-a", &backend);
     let alice = profile("alice");
     a.provision(&alice).await.unwrap();
-    let first = a.open(&DispatchCtx::process_default(), &alice).await.unwrap().lease_fence().epoch();
+    let first = a.open(&alice).await.unwrap().lease_fence().epoch();
     assert_eq!(a.fences().lookup("profile:alice").unwrap().epoch(), first);
 
     assert!(a.release(&alice).await.unwrap());
     assert!(a.fences().lookup("profile:alice").is_none());
 
-    let second = a.open(&DispatchCtx::process_default(), &alice).await.unwrap();
+    let second = a.open(&alice).await.unwrap();
     assert!(second.lease_fence().epoch() > first);
     assert!(Arc::ptr_eq(
         &a.fences().lookup("alice~default").unwrap(),
@@ -142,7 +141,7 @@ async fn a_clean_release_retires_the_fence_and_a_reopen_registers_a_new_one() {
     ));
 
     // A renewal reaches the fence.
-    assert_eq!(renew_once(&DispatchCtx::process_default(), &a).await.renewed, 1);
+    assert_eq!(renew_once(&a).await.renewed, 1);
     assert!(second.lease_fence().check_local(now_ms()).is_ok());
 }
 
@@ -153,7 +152,7 @@ async fn background_jobs_are_not_started_for_a_superseded_profile() {
     let (a, _) = node(tmp.path(), "node-a", &backend);
     let alice = profile("alice");
     a.provision(&alice).await.unwrap();
-    let state = a.open(&DispatchCtx::process_default(), &alice).await.unwrap();
+    let state = a.open(&alice).await.unwrap();
     DocumentLeases::cluster(
         backend.as_ref(),
         "node-b",

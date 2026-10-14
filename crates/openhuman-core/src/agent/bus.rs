@@ -15,7 +15,6 @@
 //! See [`crate::channels::runtime::dispatch`] for the primary
 //! caller.
 
-use crate::core::runtime::DispatchCtx;
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -188,7 +187,7 @@ impl AgentTurnResponse {
     }
 }
 
-async fn handle_agent_run_turn(ctx: &DispatchCtx, req: AgentTurnRequest) -> Result<AgentTurnResponse, String> {
+async fn handle_agent_run_turn(req: AgentTurnRequest) -> Result<AgentTurnResponse, String> {
     let AgentTurnRequest {
         turn_model_source,
         mut history,
@@ -314,7 +313,7 @@ async fn handle_agent_run_turn(ctx: &DispatchCtx, req: AgentTurnRequest) -> Resu
             // `on_delta` (raw Sender<String>) is superseded by
             // `on_progress` text deltas, so it's intentionally unused.
             let _ = (&provider_name, silent, &channel_name, on_delta);
-            run_channel_turn_via_graph(&ctx, 
+            run_channel_turn_via_graph(
                 turn_model_source.clone(),
                 &mut history,
                 tools_registry.clone(),
@@ -353,7 +352,7 @@ async fn handle_agent_run_turn(ctx: &DispatchCtx, req: AgentTurnRequest) -> Resu
 }
 
 #[cfg(test)]
-async fn handle_agent_run_turn_on_large_stack(ctx: &DispatchCtx, 
+async fn handle_agent_run_turn_on_large_stack(
     req: AgentTurnRequest,
 ) -> Result<AgentTurnResponse, String> {
     let (tx, rx) = tokio::sync::oneshot::channel();
@@ -367,7 +366,7 @@ async fn handle_agent_run_turn_on_large_stack(ctx: &DispatchCtx,
                 .enable_all()
                 .build()
                 .expect("build agent run_turn test runtime");
-            let result = runtime.block_on(handle_agent_run_turn(&ctx, req));
+            let result = runtime.block_on(handle_agent_run_turn(req));
             let _ = tx.send(result);
         })
         .map_err(|error| format!("failed to spawn large-stack agent handler: {error}"))?;
@@ -385,12 +384,12 @@ async fn handle_agent_run_turn_on_large_stack(ctx: &DispatchCtx,
 /// This function wires the `agent.run_turn` method into the core event bus,
 /// allowing any part of the system to request an agentic turn without
 /// depending directly on the agent harness.
-pub fn register_agent_handlers(ctx: &DispatchCtx, ) {
+pub fn register_agent_handlers() {
     BUS.native()
         .register::<AgentTurnRequest, AgentTurnResponse, _, _>(AGENT_RUN_TURN_METHOD, |req| {
             #[cfg(test)]
             {
-                handle_agent_run_turn_on_large_stack(&ctx, req)
+                handle_agent_run_turn_on_large_stack(req)
             }
             #[cfg(not(test))]
             {
@@ -467,9 +466,9 @@ where
 /// the **real** agent turn path. For tests that want to override the
 /// handler with a stub, use [`mock_agent_run_turn`] instead.
 #[cfg(test)]
-pub async fn use_real_agent_handler(ctx: &DispatchCtx, ) -> tokio::sync::MutexGuard<'static, ()> {
+pub async fn use_real_agent_handler() -> tokio::sync::MutexGuard<'static, ()> {
     let guard = crate::core::bus_testing::BUS_HANDLER_LOCK.lock().await;
-    register_agent_handlers(&ctx);
+    register_agent_handlers();
     guard
 }
 

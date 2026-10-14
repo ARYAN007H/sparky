@@ -16,7 +16,6 @@
 //! Regenerate the `.typed` files only when deliberately re-deriving them:
 //! `OH_REGEN_SESSION_COMPAT=1 cargo test -p openhuman --lib regenerate_typed_session_compat -- --ignored`.
 
-use crate::core::runtime::DispatchCtx;
 use serde_json::{json, Value};
 use tinyagents_session::transcript::{append_tools_record, read_transcript, write_transcript};
 use tinyinference_llm::message::ContentBlock;
@@ -112,7 +111,7 @@ fn message_lines(raw: &str) -> Vec<Value> {
 fn typed_rewrites_of_the_corpus_resume_to_the_legacy_goldens() {
     for name in TYPED_SCENARIOS {
         run_async(async move {
-            let got = snapshot_with(&DispatchCtx::process_default(), scenario(name), ".typed").await;
+            let got = snapshot_with(scenario(name), ".typed").await;
             assert_eq!(
                 got,
                 golden(name),
@@ -178,8 +177,8 @@ fn an_old_session_continued_by_this_binary_reloads_identically() {
         std::fs::copy(fixture("native_tools.jsonl"), &path).expect("place legacy file");
         let legacy_bytes = std::fs::read(&path).expect("legacy bytes");
 
-        assert!(first.resume_bound_session(&DispatchCtx::process_default()).await.expect("resume"));
-        first.turn(&DispatchCtx::process_default(), "keep going").await.expect("continued turn");
+        assert!(first.resume_bound_session().await.expect("resume"));
+        first.turn("keep going").await.expect("continued turn");
         let continued_history = serde_json::to_value(
             first
                 .runtime_session
@@ -214,7 +213,7 @@ fn an_old_session_continued_by_this_binary_reloads_identically() {
                 true,
                 &thread,
             );
-            assert!(host.resume_bound_session(&DispatchCtx::process_default()).await.expect("second resume"));
+            assert!(host.resume_bound_session().await.expect("second resume"));
             host
         };
         let runtime = second.runtime_session.as_ref().expect("runtime session");
@@ -285,7 +284,7 @@ fn a_live_image_turn_persists_typed_image_parts_and_resumes_identically() {
             .contains(png));
 
         let mut second = build_live_image_host(root.path(), live_image_model("unused"), &thread);
-        assert!(second.resume_bound_session(&DispatchCtx::process_default()).await.expect("resume"));
+        assert!(second.resume_bound_session().await.expect("resume"));
         assert_eq!(
             serde_json::to_value(
                 second
@@ -302,13 +301,13 @@ fn a_live_image_turn_persists_typed_image_parts_and_resumes_identically() {
 
 /// What the provider is sent for a live image turn on a vision-capable model:
 /// the user message's content blocks of the request the model actually saw.
-async fn live_image_request_blocks(ctx: &DispatchCtx, ) -> Vec<ContentBlock> {
+async fn live_image_request_blocks() -> Vec<ContentBlock> {
     use tinyinference_llm::message::Message;
 
     let root = tempfile::tempdir().expect("tempdir");
     let vision = live_image_model("saw it");
     let mut host = build_live_image_host(root.path(), vision.clone(), &thread_id("vision"));
-    host.turn(&ctx, "look [IMAGE:data:image/png;base64,iVBORw0KGgo=] please")
+    host.turn("look [IMAGE:data:image/png;base64,iVBORw0KGgo=] please")
         .await
         .expect("turn");
     let request = vision
@@ -335,7 +334,7 @@ async fn live_image_request_blocks(ctx: &DispatchCtx, ) -> Vec<ContentBlock> {
 #[test]
 fn live_image_turn_request_carries_a_real_image_block() {
     run_async(async {
-        let blocks = live_image_request_blocks(&DispatchCtx::process_default()).await;
+        let blocks = live_image_request_blocks().await;
         assert!(
             blocks.iter().any(|block| matches!(
                 block,

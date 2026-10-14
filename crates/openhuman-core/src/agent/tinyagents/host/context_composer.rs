@@ -60,7 +60,6 @@
 //! host files into the prompt (and thence to the inference provider); this
 //! adapter goes through it rather than reading the files itself.
 
-use crate::core::runtime::DispatchCtx;
 use std::collections::HashSet;
 use std::sync::Arc;
 use tinytools_agent::dialect::ToolCallFormat;
@@ -205,7 +204,7 @@ impl ContextComposer for OpenHumanContextComposer {
             visible_tool_names: &visible_tool_names,
             tool_call_format: self.tool_call_format,
             connected_integrations: &self.connected_integrations,
-            connected_identities_md: render_connected_identities(&DispatchCtx::ambient()),
+            connected_identities_md: render_connected_identities(),
             user_identity: crate::security::credentials::identity::peek_credential_user_identity(),
             // TODO(phase4): the master agent's personality roster is built
             // from the profiles domain (`crate::profiles`); the

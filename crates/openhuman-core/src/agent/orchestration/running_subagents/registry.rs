@@ -21,7 +21,6 @@
 //! and parent session;
 //! terminal entries are pruned on `wait` and swept at the registry soft cap.
 
-use crate::core::runtime::DispatchCtx;
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 
@@ -162,7 +161,7 @@ pub(crate) fn status_channel() -> (
 /// table passes [`REGISTRY_SOFT_CAP`], registration sweeps already-terminal
 /// entries so it stays bounded even if a parent never calls `wait_subagent`.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn register(ctx: &DispatchCtx, 
+pub(crate) fn register(
     task_id: String,
     agent_id: String,
     parent_session: String,
@@ -207,7 +206,7 @@ pub(crate) fn register(ctx: &DispatchCtx,
         }
         // First spawn in a workspace this process has not scanned: redeliver any
         // completions a previous process finished there but never delivered.
-        crate::agent::orchestration::background_delivery::recover_on_boot(&ctx, &workspace_dir);
+        crate::agent::orchestration::background_delivery::recover_on_boot(&workspace_dir);
     }
 
     let metadata = RunningSubagentMetadata {

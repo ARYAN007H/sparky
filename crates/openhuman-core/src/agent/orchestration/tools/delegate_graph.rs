@@ -10,7 +10,6 @@
 //! Use it for non-trivial sub-tasks that benefit from a self-review/revision
 //! loop; use `spawn_subagent` for a single focused hand-off.
 
-use crate::core::runtime::DispatchCtx;
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::orchestration::delegation::run_subagent_delegation_with_parent_context;
 use async_trait::async_trait;
@@ -69,7 +68,7 @@ impl ToolDispatch<(), crate::agent::tinyagents::host::OpenHumanRunContext>
             )
             .map_err(|error| anyhow::anyhow!(error.to_string()))?;
         DelegateGraphTool::new()
-            .execute_with_live_parent_context(&DispatchCtx::ambient(), 
+            .execute_with_live_parent_context(
                 arguments,
                 Some(&context),
                 parent.data.child(),
@@ -166,7 +165,7 @@ impl Tool for DelegateGraphTool {
         run_context.thread_id = tool_context
             .and_then(ToolRunContext::thread_id)
             .map(ToOwned::to_owned);
-        self.execute_with_parent_context(&DispatchCtx::ambient(), args, tool_context, run_context)
+        self.execute_with_parent_context(args, tool_context, run_context)
             .await
     }
 }
@@ -174,12 +173,12 @@ impl Tool for DelegateGraphTool {
 impl DelegateGraphTool {
     /// Execute the concrete durable graph with an explicit child carrier.
     pub(crate) async fn execute_with_parent_context(
-        &self, ctx: &DispatchCtx,
+        &self,
         args: serde_json::Value,
         tool_context: Option<&dyn ToolRunContext>,
         run_context: crate::agent::tinyagents::host::OpenHumanRunContext,
     ) -> anyhow::Result<ToolResult> {
-        self.execute_with_live_parent_context(&ctx, args, tool_context, run_context, None)
+        self.execute_with_live_parent_context(args, tool_context, run_context, None)
             .await
     }
 
@@ -187,7 +186,7 @@ impl DelegateGraphTool {
     /// path. The graph's static stage callback then derives direct children
     /// from it without dropping lineage.
     pub(crate) async fn execute_with_live_parent_context(
-        &self, ctx: &DispatchCtx,
+        &self,
         args: serde_json::Value,
         tool_context: Option<&dyn ToolRunContext>,
         run_context: crate::agent::tinyagents::host::OpenHumanRunContext,
@@ -229,7 +228,7 @@ impl DelegateGraphTool {
             }
         };
 
-        let config = match crate::config::ops::load_current_or_init(&ctx).await {
+        let config = match crate::config::ops::load_current_or_init().await {
             Ok(cfg) => Arc::new(cfg),
             Err(e) => {
                 return Ok(ToolResult::error(format!(

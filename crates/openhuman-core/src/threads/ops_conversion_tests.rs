@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 
 // NOTE: the title_log_fingerprint / collapse_whitespace copies were removed
@@ -186,7 +185,7 @@ async fn message_append_returns_typed_not_found_for_stale_thread() {
     let _workspace_guard = EnvVarGuard::set("OPENHUMAN_WORKSPACE", workspace.path());
     let thread_id = "thread-missing";
 
-    let err = message_append(&DispatchCtx::process_default(), AppendConversationMessageRequest {
+    let err = message_append(AppendConversationMessageRequest {
         thread_id: thread_id.to_string(),
         message: ConversationMessageRecord {
             id: "msg-1".to_string(),
@@ -362,7 +361,7 @@ async fn thread_delete_removes_persisted_turn_state_snapshot() {
     .await;
     assert_eq!(bg::pending_for(&dir, thread_id).len(), 1);
 
-    thread_delete(&DispatchCtx::process_default(), DeleteConversationThreadRequest {
+    thread_delete(DeleteConversationThreadRequest {
         thread_id: thread_id.to_string(),
         deleted_at: "2026-01-01T00:02:00Z".into(),
     })
@@ -492,7 +491,7 @@ async fn thread_delete_forgets_its_conversation_memory_or_queues_it() {
         .expect("load config")
         .workspace_dir;
 
-    thread_delete(&DispatchCtx::process_default(), DeleteConversationThreadRequest {
+    thread_delete(DeleteConversationThreadRequest {
         thread_id: thread_id.to_string(),
         deleted_at: "2026-01-01T00:02:00Z".into(),
     })

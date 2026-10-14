@@ -1,7 +1,6 @@
 //! #6721: a thread whose persisted head opens on orphaned `tool` rows heals on
 //! its next turn. Split from `runtime_adapter_tests.rs` for the layout gate.
 
-use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use tinyinference_llm::message::Message;
@@ -19,14 +18,14 @@ fn a_resumed_orphaned_tool_head_is_repaired_before_the_request() {
                 .enable_all()
                 .build()
                 .expect("test runtime")
-                .block_on(resumed_orphaned_tool_head_is_repaired_before_the_request(&DispatchCtx::process_default()));
+                .block_on(resumed_orphaned_tool_head_is_repaired_before_the_request());
         })
         .expect("test thread")
         .join()
         .expect("test thread panicked");
 }
 
-async fn resumed_orphaned_tool_head_is_repaired_before_the_request(ctx: &DispatchCtx, ) {
+async fn resumed_orphaned_tool_head_is_repaired_before_the_request() {
     const NUDGE: &str = "The last call failed validation. Fix the arguments and retry.";
     // Run the production path: the app always installs the builtin agent
     // definitions (core/jsonrpc.rs), which routes a root turn through the
@@ -57,7 +56,7 @@ async fn resumed_orphaned_tool_head_is_repaired_before_the_request(ctx: &Dispatc
     };
     let mut host = new_host();
     host.set_thread_id(Some("thread-orphaned-head"));
-    assert_eq!(host.turn(&ctx, "first message").await.unwrap(), "first reply");
+    assert_eq!(host.turn("first message").await.unwrap(), "first reply");
     drop(host);
 
     // Splice the stuck head into the transcript the real writer produced.
@@ -118,7 +117,7 @@ async fn resumed_orphaned_tool_head_is_repaired_before_the_request(ctx: &Dispatc
             .collect::<Vec<_>>(),
         ["call_orphan_a", "call_orphan_b"],
     );
-    assert!(host.resume_bound_session(&ctx).await.unwrap());
+    assert!(host.resume_bound_session().await.unwrap());
     let decoded = host
         .runtime_session
         .as_ref()
@@ -132,11 +131,11 @@ async fn resumed_orphaned_tool_head_is_repaired_before_the_request(ctx: &Dispatc
         spliced.join("\n") + "\n",
         "adoption must not rewrite the durable source merely on resume",
     );
-    assert_eq!(host.turn(&ctx, "second message").await.unwrap(), "second reply");
+    assert_eq!(host.turn("second message").await.unwrap(), "second reply");
     let committed_history = host.runtime_session.as_ref().unwrap().history().to_vec();
     let mut resumed_again = new_host();
     resumed_again.set_thread_id(Some("thread-orphaned-head"));
-    assert!(resumed_again.resume_bound_session(&ctx).await.unwrap());
+    assert!(resumed_again.resume_bound_session().await.unwrap());
     assert_eq!(
         resumed_again.runtime_session.as_ref().unwrap().history(),
         committed_history.as_slice(),

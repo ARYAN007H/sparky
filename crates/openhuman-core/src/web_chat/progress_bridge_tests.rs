@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::interim_narration_text;
 use super::session_profile_user_attribution;
 
@@ -108,7 +107,7 @@ async fn tool_call_completed_forwards_real_output_on_tool_result() {
         as std::sync::Arc<dyn tinyagents_session::port::TurnStates>;
     let (tx, rx) = tokio::sync::mpsc::channel(16);
     let mut bus = super::super::event_bus::subscribe_web_channel_events();
-    spawn_progress_bridge(&DispatchCtx::process_default(), 
+    spawn_progress_bridge(
         rx,
         "client-out".into(),
         "thread-out".into(),
@@ -209,7 +208,7 @@ async fn recv_for_thread(
     }
 }
 
-fn spawn_test_bridge(ctx: &DispatchCtx, 
+fn spawn_test_bridge(
     thread_id: &str,
     request_id: &str,
 ) -> tokio::sync::mpsc::Sender<AgentProgress> {
@@ -220,7 +219,7 @@ fn spawn_test_bridge(ctx: &DispatchCtx,
     // Keep the tempdir alive for the bridge task's lifetime by leaking it —
     // a test-only allocation; the OS reclaims it on process exit.
     std::mem::forget(dir);
-    spawn_progress_bridge(&ctx, 
+    spawn_progress_bridge(
         rx,
         "client-hb-4270".to_string(),
         thread_id.to_string(),
@@ -241,7 +240,7 @@ async fn emits_inference_heartbeat_while_turn_in_flight() {
     let mut events = super::super::event_bus::subscribe_web_channel_events();
     let thread_id = "thread-hb-emit-4270";
     let request_id = "req-hb-emit-4270";
-    let tx = spawn_test_bridge(&DispatchCtx::process_default(), thread_id, request_id);
+    let tx = spawn_test_bridge(thread_id, request_id);
 
     // Turn begins — arms the liveness beat.
     tx.send(AgentProgress::TurnStarted).await.unwrap();
@@ -267,7 +266,7 @@ async fn emits_inference_heartbeat_while_turn_in_flight() {
 async fn stops_heartbeat_after_turn_completed() {
     let mut events = super::super::event_bus::subscribe_web_channel_events();
     let thread_id = "thread-hb-stop-4270";
-    let tx = spawn_test_bridge(&DispatchCtx::process_default(), thread_id, "req-hb-stop-4270");
+    let tx = spawn_test_bridge(thread_id, "req-hb-stop-4270");
 
     tx.send(AgentProgress::TurnStarted).await.unwrap();
     // Drain through the first heartbeat to prove the turn was beating.
@@ -311,7 +310,7 @@ async fn stops_heartbeat_after_turn_completed() {
 async fn no_heartbeat_before_turn_started() {
     let mut events = super::super::event_bus::subscribe_web_channel_events();
     let thread_id = "thread-hb-gate-4270";
-    let tx = spawn_test_bridge(&DispatchCtx::process_default(), thread_id, "req-hb-gate-4270");
+    let tx = spawn_test_bridge(thread_id, "req-hb-gate-4270");
 
     // Advance well past several heartbeat intervals with no TurnStarted.
     tokio::time::advance(Duration::from_secs(INFERENCE_HEARTBEAT_SECS * 4)).await;
@@ -346,7 +345,7 @@ async fn stamps_monotonic_seq_on_emitted_events() {
     let mut events = super::super::event_bus::subscribe_web_channel_events();
     let thread_id = "thread-seq-stamp";
     let request_id = "req-seq-stamp";
-    let tx = spawn_test_bridge(&DispatchCtx::process_default(), thread_id, request_id);
+    let tx = spawn_test_bridge(thread_id, request_id);
 
     // Each of these emits exactly one web-channel event: inference_start,
     // tool_call, tool_result (the fast test never trips the 20s heartbeat).
@@ -415,7 +414,7 @@ async fn wait_drained_returns_after_queued_events_are_forwarded() {
         as std::sync::Arc<dyn tinyagents_session::port::TurnStates>;
     let (tx, rx) = tokio::sync::mpsc::channel(16);
     let mut bus = super::super::event_bus::subscribe_web_channel_events();
-    let handle = spawn_progress_bridge(&DispatchCtx::process_default(), 
+    let handle = spawn_progress_bridge(
         rx,
         "client-drain".into(),
         "thread-drain".into(),
@@ -472,7 +471,7 @@ async fn wait_drained_is_bounded_when_the_turn_never_completes() {
     let store = std::sync::Arc::new(tinyagents_session::port::InMemoryTurnStates::default())
         as std::sync::Arc<dyn tinyagents_session::port::TurnStates>;
     let (tx, rx) = tokio::sync::mpsc::channel::<AgentProgress>(16);
-    let handle = spawn_progress_bridge(&DispatchCtx::process_default(), 
+    let handle = spawn_progress_bridge(
         rx,
         "client-drain-timeout".into(),
         "thread-drain-timeout".into(),
@@ -497,7 +496,7 @@ async fn short_narration_is_flushed_on_the_rounds_first_tool_call() {
         as std::sync::Arc<dyn tinyagents_session::port::TurnStates>;
     let (tx, rx) = tokio::sync::mpsc::channel(16);
     let mut bus = super::super::event_bus::subscribe_web_channel_events();
-    let _handle = spawn_progress_bridge(&DispatchCtx::process_default(), 
+    let _handle = spawn_progress_bridge(
         rx,
         "client-short".into(),
         "thread-short-narration".into(),
@@ -567,7 +566,7 @@ fn cap_wire_args_truncates_oversized_payload_to_a_marker_string() {
 async fn subagent_spawned_forwards_parent_call_id() {
     let mut events = super::super::event_bus::subscribe_web_channel_events();
     let thread_id = "thread-c1-spawned";
-    let tx = spawn_test_bridge(&DispatchCtx::process_default(), thread_id, "req-c1-spawned");
+    let tx = spawn_test_bridge(thread_id, "req-c1-spawned");
 
     tx.send(AgentProgress::SubagentSpawned {
         agent_id: "researcher".into(),
@@ -597,7 +596,7 @@ async fn subagent_spawned_forwards_parent_call_id() {
 async fn subagent_completed_carries_parent_call_id_and_capped_output() {
     let mut events = super::super::event_bus::subscribe_web_channel_events();
     let thread_id = "thread-c1-completed";
-    let tx = spawn_test_bridge(&DispatchCtx::process_default(), thread_id, "req-c1-completed");
+    let tx = spawn_test_bridge(thread_id, "req-c1-completed");
 
     tx.send(AgentProgress::SubagentSpawned {
         agent_id: "researcher".into(),
@@ -642,7 +641,7 @@ async fn subagent_completed_carries_parent_call_id_and_capped_output() {
 async fn subagent_failed_carries_parent_call_id() {
     let mut events = super::super::event_bus::subscribe_web_channel_events();
     let thread_id = "thread-c1-failed";
-    let tx = spawn_test_bridge(&DispatchCtx::process_default(), thread_id, "req-c1-failed");
+    let tx = spawn_test_bridge(thread_id, "req-c1-failed");
 
     tx.send(AgentProgress::SubagentSpawned {
         agent_id: "researcher".into(),
@@ -690,7 +689,7 @@ async fn hold_text_stream_suppresses_text_delta_but_keeps_interim() {
         as std::sync::Arc<dyn tinyagents_session::port::TurnStates>;
     let (tx, rx) = tokio::sync::mpsc::channel(16);
     let mut bus = super::super::event_bus::subscribe_web_channel_events();
-    spawn_progress_bridge(&DispatchCtx::process_default(), 
+    spawn_progress_bridge(
         rx,
         "client-hold".into(),
         "thread-hold".into(),

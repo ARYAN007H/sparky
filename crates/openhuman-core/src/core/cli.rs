@@ -83,8 +83,6 @@ pub fn run_from_cli_args_with(
     host_boot: Option<crate::core::server_launcher::HostBoot>,
 ) -> Result<()> {
     load_dotenv_for_cli()?;
-    // The CLI is the host: its commands run under the one process context.
-    let ctx = DispatchCtx::process_default();
 
     let launch = parse_launch_options(args)?;
     crate::config::set_cli_inference_overrides(launch.provider.as_deref(), launch.model.as_deref());
@@ -110,7 +108,7 @@ pub fn run_from_cli_args_with(
     // Match on the first argument to determine the subcommand.
     match args[0].as_str() {
         "run" | "serve" => super::cli_serve::run_server_command(&args[1..], host_boot),
-        "mcp" | "mcp-server" => crate::mcp::server::run_stdio_from_cli(&ctx, &args[1..]),
+        "mcp" | "mcp-server" => crate::mcp::server::run_stdio_from_cli(&args[1..]),
         // Keep the historical names as a migration diagnostic now that the
         // terminal frontend is its own workspace crate and executable.
         "tui" | "chat" => run_moved_tui_diagnostic(),
@@ -120,7 +118,7 @@ pub fn run_from_cli_args_with(
                 "[cli] dispatching to agent subcommand, args={:?}",
                 &args[1..]
             );
-            crate::core::agent_cli::run_agent_command(&ctx, &args[1..])
+            crate::core::agent_cli::run_agent_command(&args[1..])
         }
         "sentry-test" => run_sentry_test_command(&args[1..]),
         // Generic namespace dispatcher: `openhuman <namespace> <function> ...`

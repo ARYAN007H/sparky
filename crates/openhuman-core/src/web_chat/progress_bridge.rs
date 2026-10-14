@@ -3,7 +3,6 @@
 //! `inference_heartbeat` liveness beat (see [`INFERENCE_HEARTBEAT_SECS`])
 //! so a long silent prefill can't trip the frontend's ~120s silence timeout.
 
-use crate::core::runtime::DispatchCtx;
 use serde_json::json;
 
 use crate::threads::turn_state::mirror::ObserveProgress;
@@ -272,7 +271,7 @@ fn session_profile_user_attribution(config: &crate::config::Config) -> Option<St
 /// agent turn loop and translates them into [`WebChannelEvent`]s tagged
 /// with the correct client/thread/request IDs. The task runs until the
 /// sender is dropped (i.e. when the agent turn finishes).
-pub(crate) fn spawn_progress_bridge(ctx: &DispatchCtx, 
+pub(crate) fn spawn_progress_bridge(
     mut rx: tokio::sync::mpsc::Receiver<crate::agent::progress::AgentProgress>,
     client_id: String,
     thread_id: String,
@@ -1165,7 +1164,6 @@ pub(crate) fn spawn_progress_bridge(ctx: &DispatchCtx,
             let live_spans = collector.spans().to_vec();
             let journal_export = if let Some(trace_ctx) = journal_trace_ctx.take() {
                 super::journal_shadow::shadow_compare_journal_projection(
-                    &ctx,
                     &request_id,
                     trace_ctx.clone(),
                     parent_max_iterations,

@@ -1,4 +1,3 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 
 use tinyagents_harness::summarization::{checkpoint_message, SummaryPlacement};
@@ -90,7 +89,7 @@ async fn deferred_memory_commit_survives_the_turn_scope_without_pinning_the_prof
     .with_capabilities(Some(capabilities));
     let id = ProfileId::parse("deferred-memory").unwrap();
     host.provision(&id).await.unwrap();
-    let profile = host.open(&DispatchCtx::process_default(), &id).await.unwrap();
+    let profile = host.open(&id).await.unwrap();
     let captured = CoreContext::scope_with_turn_origin(profile.context().clone(), None, async {
         capture_profile_context(Some(&host))
     })

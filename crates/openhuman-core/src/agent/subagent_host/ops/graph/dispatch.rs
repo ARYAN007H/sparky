@@ -2,7 +2,6 @@
 //! tinyagents seam, building its context middleware, and folding a cap-hit
 //! checkpoint summary back into the result.
 
-use crate::core::runtime::DispatchCtx;
 use crate::agent::subagent_host::ops::checkpoint;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -35,7 +34,7 @@ pub(in super::super) struct AggregatedUsage {
 /// is `true` when the run stopped at the model-call cap with work still pending
 /// (the caller surfaces this as `SubagentRunStatus::Incomplete`, #4096).
 #[allow(clippy::too_many_arguments)]
-pub(in super::super) async fn run_subagent_via_graph(ctx: &DispatchCtx, 
+pub(in super::super) async fn run_subagent_via_graph(
     source: crate::agent::tinyagents::TurnModelSource,
     model: &str,
     temperature: f64,
@@ -264,7 +263,7 @@ pub(in super::super) async fn run_subagent_via_graph(ctx: &DispatchCtx,
             let agent_id = agent_id.to_string();
             let task_id = task_id.to_string();
             tokio::spawn(async move {
-                crate::agent::progress_tracing::export_subagent_journal_trace(&ctx, 
+                crate::agent::progress_tracing::export_subagent_journal_trace(
                     &config,
                     &journal_run_id,
                     thread_id.as_deref(),

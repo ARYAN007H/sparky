@@ -4,7 +4,6 @@
 //! to the event bus for domain-specific handling. Webhook routing lives in
 //! `webhooks::bus`, channel inbound processing lives in `channels::bus`.
 
-use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use serde_json::json;
@@ -22,7 +21,7 @@ use super::manager::{emit_server_event, emit_state_change, SharedState};
 // ---------------------------------------------------------------------------
 
 /// Route a Socket.IO event to the appropriate handler based on its name.
-pub(super) fn handle_sio_event(ctx: &DispatchCtx, 
+pub(super) fn handle_sio_event(
     event_name: &str,
     data: serde_json::Value,
     _emit_tx: &mpsc::UnboundedSender<String>,
@@ -247,7 +246,6 @@ pub(super) fn handle_sio_event(ctx: &DispatchCtx,
             } else {
                 #[cfg(feature = "voice")]
                 tokio::spawn(crate::voice::realtime_harness::handle_voice_harness_turn(
-                    &ctx,
                     correlation_id,
                     messages,
                 ));
