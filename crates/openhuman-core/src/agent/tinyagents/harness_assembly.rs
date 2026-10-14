@@ -67,6 +67,9 @@ pub(super) fn assemble_turn_harness(
     stop_hooks: Vec<
         Arc<dyn tinyagents_harness::middleware::StopHook<crate::agent::cost::TurnCost>>,
     >,
+    // The turn's agent/turn tool callbacks (`OpenHumanRunContext::tool_hooks`),
+    // registered after the runtime's global ones.
+    scoped_tool_hooks: Vec<Arc<dyn crate::agent::hooks::ToolHook>>,
     tool_policy: Option<ToolPolicyEnforcement>,
     required_capabilities: Option<CapabilitySet>,
     deterministic_cacheable: bool,
@@ -627,7 +630,8 @@ pub(super) fn assemble_turn_harness(
     // observation-only (never mutates the result), so running first in the
     // reverse-order `after_tool` chain is safe — it cannot perturb the
     // summarization/cap or tool-outcome capture layers.
-    let embedder_tool_hooks = crate::agent::hooks::turn_tool_hooks();
+    let mut embedder_tool_hooks = crate::agent::hooks::embedder_tool_hooks();
+    embedder_tool_hooks.extend(scoped_tool_hooks);
     if !embedder_tool_hooks.is_empty() {
         harness.push_middleware(Arc::new(middleware::EmbedderToolHooksMiddleware::new(
             embedder_tool_hooks,

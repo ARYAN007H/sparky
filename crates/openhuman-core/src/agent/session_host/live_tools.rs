@@ -24,6 +24,7 @@ impl OpenHumanSessionHost {
             .cloned()
             .collect();
         LiveToolSurface {
+            tool_hooks: self.host_env.hooks.tool_hooks().to_vec(),
             tool_sets: vec![Arc::clone(&self.tools)],
             allowed,
             tool_policy: Some(ToolPolicyEnforcement {

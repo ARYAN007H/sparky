@@ -277,6 +277,7 @@ pub(super) async fn run_turn_via_tinyagents_body(
         early_exit_tools,
         context_mw,
         run_context.stop_hooks.clone(),
+        run_context.tool_hooks.clone(),
         tool_policy.clone(),
         routes::turn_required_capabilities(model),
         deterministic_cacheable,
