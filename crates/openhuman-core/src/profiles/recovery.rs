@@ -77,3 +77,7 @@ pub(crate) fn recover_session_store(id: &ProfileId, context: &Arc<CoreContext>) 
         Err(error) => log::warn!("[profiles] profile={id} run ledger unavailable: {error}"),
     }
 }
+
+#[cfg(test)]
+#[path = "recovery_tests.rs"]
+mod tests;
