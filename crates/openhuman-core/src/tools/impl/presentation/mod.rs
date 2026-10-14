@@ -422,7 +422,7 @@ impl Tool for PresentationTool {
         // artifact; otherwise a fresh record is created. The body is the
         // workspace path — the deck is a binary file, and the shared model
         // stores a reference, not bytes.
-        let versioned_store = FsArtifactStore::new(&self.workspace_dir);
+        let versioned_store = FsArtifactStore::new(&self.workspace_dir, self.files_dir.clone());
         let versioned_result = (|| async {
             let body = output_path.display().to_string();
             let now = tiny_artifacts::now_millis();
