@@ -31,9 +31,8 @@ use crate::agent::tinyagents::stop_hooks;
 use crate::agent::tinyagents::tools::EarlyExitHook;
 use crate::agent::tinyagents::turn_models::TurnModels;
 use tinyagents_harness::turn_outcome::{HaltSummarySlot, ToolOutcomeSink};
-use crate::agent::tinyagents::turn_policy::{
-    run_policy_for_provider, REPEATED_TOOL_FAILURE_THRESHOLD,
-};
+use crate::agent::tinyagents::turn_policy::run_policy_for_provider;
+use tinyagents_harness::turn_policy::REPEATED_TOOL_FAILURE_THRESHOLD;
 use crate::agent::tinyagents::verify_before_finish;
 use tinyagents_harness::middleware::{
     install_unmet_deliverable, is_repeat_call_exempt, tool_sets_lookup, ResearchBudgetMiddleware,
