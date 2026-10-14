@@ -136,8 +136,6 @@ impl TurnPlanner<(), OpenHumanRunContext> for OpenHumanTurnPlanner {
 pub(super) fn enforce_registry_diagnostics(
     registry_diagnostics: &[RegistryDiagnostic],
 ) -> anyhow::Result<()> {
-    let registry_diagnostics =
-        std::mem::take(&mut *slot.lock().unwrap_or_else(PoisonError::into_inner));
     if !registry_diagnostics.is_empty() {
         let (errors, warnings): (
             Vec<&tinyagents_registry::RegistryDiagnostic>,

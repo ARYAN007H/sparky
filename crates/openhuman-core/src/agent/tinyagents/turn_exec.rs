@@ -281,8 +281,7 @@ async fn run_turn_via_tinyagents_body(
         error_slot,
         ..
     } = turn_models;
-    let planner = OpenHumanTurnPlanner {
-        models: turn_models_for_plan(
+    let plan_models = turn_models_for_plan(
             model,
             primary,
             tier_routes,
