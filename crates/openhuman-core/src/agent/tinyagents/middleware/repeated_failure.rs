@@ -14,7 +14,7 @@ use tinyagents_harness::middleware::{
 };
 use tinyagents_harness::no_progress::{
     classified_step, clear_recovered, ClassifiedFailureTracker, ClassifiedStep, FailurePolicy,
-    NoProgress, NoProgressTracker, RecoverableFailureLadder, ToolAttempt, RECOVERY_CLASSES,
+    NoProgress, NoProgressTracker, RecoverableFailureLadder, ToolAttempt,
 };
 use tinyagents_harness::steering::SteeringHandle;
 use tinyinference_llm::tool::ToolCall as TaToolCall;
@@ -166,9 +166,11 @@ impl FailurePolicy for HaltCopy {
 /// first: the line is read by the model and persisted with the session in a
 /// halt summary, and a command can print a token or a user's own words on stderr.
 fn first_error_line(text: &str) -> String {
-    tinyagents_harness::no_progress::first_error_line(
-        &crate::security::scrub::sanitize_text(text).value,
-    )
+    tinyagents_harness::no_progress::first_error_line(&sanitized_failure(text))
+}
+
+fn sanitized_failure(text: &str) -> String {
+    crate::security::scrub::sanitize_text(text).value
 }
 
 /// A stable, bounded fingerprint of a tool call's arguments for the identical-
