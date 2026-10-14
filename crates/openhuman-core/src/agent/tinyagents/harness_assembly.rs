@@ -7,8 +7,9 @@ use std::sync::Arc;
 use tinyagents_harness::cache::InMemoryResponseCache;
 use tinyagents_harness::middleware::{
     plan_mode_middleware, ApprovalGateMiddleware, ArgRecoveryMiddleware, BudgetLimits,
-    BudgetMiddleware, ContextCompressionMiddleware, PromptCacheGuardMiddleware,
-    RepeatProgressMiddleware, RunModeHandle, ToolPolicyMiddleware as TaToolPolicyMiddleware,
+    BudgetMiddleware, BudgetParityObserver, ContextCompressionMiddleware,
+    PromptCacheGuardMiddleware, RepeatProgressMiddleware, RunModeHandle,
+    ToolPolicyMiddleware as TaToolPolicyMiddleware,
 };
 use tinyagents_harness::runtime::AgentHarness;
 use tinyagents_harness::steering::SteeringHandle;
@@ -472,51 +473,16 @@ pub(super) fn assemble_turn_harness(
         ));
     }
 
-    // Observe-only crate `BudgetMiddleware` (W2-budget-dedupe / workstream 06).
-    // Installed with empty `BudgetLimits` so it NEVER enforces or halts: its
-    // `before_model` preflight has no configured limit to trip, and its
-    // `after_model` only folds each call's usage into its shared `BudgetTracker`.
-    // It also re-emits `AgentEvent::UsageRecorded` per call (on top of the
-    // runtime's own emit); the event bridge dedupes those by model-call iteration
-    // so the global cost tracker still records each call exactly once (see
-    // `observability::OpenhumanEventBridge::record_usage`). Enforcement STAYS with
-    // the local `CostBudgetMiddleware` below (authoritative: reads the global
-    // daily/monthly `CostTracker`).
-    //
-    // FLIP CRITERIA — what must hold before the crate `BudgetMiddleware` becomes
-    // the enforcing owner and the local `CostBudgetMiddleware` + the
-    // `OpenHumanRunContext` explicit carrier owns the per-turn roll-up (deletion
-    // ledger row: "crate-internal CostBudgetMiddleware + explicit run context
-    // task-local", `docs/tinyagents-full-migration-plan/99-deletion-ledger.md`):
-    //   1. ≥ 500 production turns across BOTH parent and sub-agent runs with
-    //      ZERO `[budget_shadow]` divergence log lines — proving the crate
-    //      tracker's per-run token accounting matches the authoritative runtime
-    //      `AgentRun.usage` on every model call.
-    //   2. A pricing table wired via `BudgetMiddleware::with_pricing(..)` at
-    //      parity with `tinyagents_registry::pricing::estimate_cost_usd`, so the crate can own
-    //      MONEY (USD) budgets. Today the shadow compares TOKENS only (the
-    //      observe-only crate middleware has no pricing, so its cost stays $0)
-    //      and the local gate is the sole money-budget authority.
-    //   3. Run-tree rollup wired: the same shared `BudgetTracker` handed to every
-    //      sub-agent harness so a parent budget halts a recursive run pre-spend —
-    //      replacing the former task-local parent-turn rollup (06-cost step 3
-    //      / 07.2 TaskStore rollup).
-    // Until all three hold, this middleware is observe-only and the local gate
-    // enforces.
+    // Observe-only crate `BudgetMiddleware`, installed with empty limits so it
+    // never enforces: it only folds each call's usage into a shared tracker.
+    // The spend cap is gone; `BudgetParityObserver` below compares that tracker
+    // against the authoritative `AgentRun.usage` at end of run and logs
+    // `[budget_parity]` parity or divergence.
     let shadow_budget = Arc::new(BudgetMiddleware::new(BudgetLimits::default()));
     let shadow_budget_tracker = shadow_budget.tracker();
     harness.push_middleware(shadow_budget);
 
-    // Pre-call cost budget gate (issue #4249, Phase 5) — AUTHORITATIVE
-    // enforcement: fail before a model call when OpenHuman's daily/monthly cost
-    // budget is already exceeded. Self-gating — a no-op unless cost budgets are
-    // configured. Demoted to a divergence-logging shadow owner (W2-budget-dedupe):
-    // it keeps enforcing exactly as before, but ALSO compares its per-run token
-    // accounting against the observe-only crate `BudgetMiddleware` above at end of
-    // run and logs `[budget_shadow]` parity/divergence.
-    harness.push_middleware(Arc::new(middleware::CostBudgetMiddleware::with_shadow(
-        shadow_budget_tracker,
-    )));
+    harness.push_middleware(Arc::new(BudgetParityObserver::new(shadow_budget_tracker)));
     // The context ladder (compression, microcompact, final-call wrap-up,
     // artifact contents list, trim), registered here so each step keeps its
     // place in the middleware order. See `context_wiring.rs`.
@@ -647,7 +613,7 @@ pub(super) fn assemble_turn_harness(
     // `ArgRecoveryMiddleware` so it wraps recovered arguments; before the
     // embedder hooks so they observe the call that actually runs.
     let registered_tools = harness.tools().names();
-    harness.push_middleware(Arc::new(middleware::PackedToolRouteMiddleware::new(
+    harness.push_middleware(Arc::new(middleware::packed_tool_route_middleware(
         registered_tools,
         route_session,
     )));
@@ -684,7 +650,7 @@ pub(super) fn assemble_turn_harness(
     // The turn's memory pack rides every request of the turn, after every
     // reduction step and after the transcript snapshot, so it is never
     // compacted, trimmed or persisted (`memory::lifecycle::hooks::pre_turn`).
-    harness.push_middleware(Arc::new(middleware::MemoryPackMiddleware));
+    harness.push_middleware(Arc::new(middleware::memory_pack_middleware()));
 
     AssembledTurnHarness {
         harness,
