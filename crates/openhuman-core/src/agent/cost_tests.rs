@@ -1,3 +1,4 @@
+use tinyagents_harness::cost::CostSource;
 use super::*;
 
 fn counts(input: u64, output: u64, cached: u64) -> BilledUsage {
