@@ -239,18 +239,14 @@ fn close_request(turn: &StoppedTurn<'_>, evidence: &Evidence) -> ModelRequest {
     )
 }
 
-/// Tests run offline: the closing model call is skipped and the plain reply
-/// is used.
-#[cfg(test)]
-static PLAIN_ONLY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
-
 async fn model_reply(
     config: &crate::config::Config,
     turn: &StoppedTurn<'_>,
     evidence: &Evidence,
 ) -> Option<String> {
-    #[cfg(test)]
-    if PLAIN_ONLY.load(std::sync::atomic::Ordering::SeqCst) {
+    // Tests run offline: the closing model call is skipped and the plain
+    // reply is used.
+    if cfg!(test) {
         return None;
     }
     let request_id = turn.request_id;
