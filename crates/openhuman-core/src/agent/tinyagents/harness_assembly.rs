@@ -647,7 +647,7 @@ pub(super) fn assemble_turn_harness(
     // `ArgRecoveryMiddleware` so it wraps recovered arguments; before the
     // embedder hooks so they observe the call that actually runs.
     let registered_tools = harness.tools().names();
-    harness.push_middleware(Arc::new(middleware::PackedToolRouteMiddleware::new(
+    harness.push_middleware(Arc::new(middleware::packed_tool_route_middleware(
         registered_tools,
         route_session,
     )));
@@ -684,7 +684,7 @@ pub(super) fn assemble_turn_harness(
     // The turn's memory pack rides every request of the turn, after every
     // reduction step and after the transcript snapshot, so it is never
     // compacted, trimmed or persisted (`memory::lifecycle::hooks::pre_turn`).
-    harness.push_middleware(Arc::new(middleware::MemoryPackMiddleware));
+    harness.push_middleware(Arc::new(middleware::memory_pack_middleware()));
 
     AssembledTurnHarness {
         harness,

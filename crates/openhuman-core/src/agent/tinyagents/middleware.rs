@@ -26,7 +26,6 @@
 
 mod approval;
 mod cli_rpc_only;
-mod cost_budget;
 mod credential_scrub;
 mod embedder_hooks;
 mod failure_policy;
@@ -42,11 +41,10 @@ mod turn_context;
 
 pub(crate) use approval::ApprovalSecurityMiddleware;
 pub(crate) use cli_rpc_only::CliRpcOnlyMiddleware;
-pub(crate) use cost_budget::CostBudgetMiddleware;
 pub(crate) use credential_scrub::credential_scrub_middleware;
 pub(crate) use embedder_hooks::EmbedderToolHooksMiddleware;
-pub(crate) use memory_pack::MemoryPackMiddleware;
-pub(crate) use packed_tool_route::PackedToolRouteMiddleware;
+pub(crate) use memory_pack::memory_pack_middleware;
+pub(crate) use packed_tool_route::packed_tool_route_middleware;
 pub(crate) use repeated_failure::RepeatedToolFailureMiddleware;
 pub(crate) use tool_exposure::OpenHumanToolExposureShadowMiddleware;
 pub(crate) use tool_outcome_capture::ToolOutcomeCaptureMiddleware;
