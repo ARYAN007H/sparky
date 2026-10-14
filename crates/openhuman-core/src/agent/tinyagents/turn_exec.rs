@@ -188,7 +188,7 @@ async fn drive_turn(
     // Thread-scoped tools (`goal_*`) are only registered when it is `Some`.
     let has_thread = run_context.thread_id.is_some();
     let is_subagent = subagent_scope.is_some();
-    let (policy, has_route_fallback) = turn_run_policy(
+    let (mut policy, has_route_fallback) = turn_run_policy(
         model,
         max_iterations,
         deterministic_cacheable,
@@ -202,6 +202,10 @@ async fn drive_turn(
         run_context.tool_rules.clone(),
         run_context.tool_call_limit,
     );
+    // A `tool_search` of this turn tells its ranker which chat it runs in, so a
+    // cloud embedder's disclosure reaches that chat.
+    policy.discovery.rank_context =
+        crate::agent::tinyagents::discovery::rank_context_for(run_context.approval.chat.as_ref());
     // The turn's crate `ChatModel` set (`turn_models`) and the provider telemetry id are built by
     // the caller via `build_turn_models`: the seam is crate-native and names no `Provider` (#4249,
     // Phase 5). The telemetry id (`{provider_id}.{model}` in Langfuse) rides in as a param.
