@@ -38,6 +38,7 @@ interface ArtifactBodyResponse {
   title: string;
   version: number;
   body: string;
+  is_text: boolean;
 }
 
 // ─── Constants ──────────────────────────────────────────────────
@@ -167,6 +168,12 @@ export function ArtifactPreviewPanel({ artifactId, onClose }: ArtifactPreviewPan
 
 function ArtifactContentPanel({ artifact }: { artifact: ArtifactSnapshot }) {
   const [bodyResult, setBodyResult] = useState<ArtifactBodyResponse | null>(null);
+  useEffect(() => {
+    // Clear when switching artifacts
+    setBodyResult(null);
+    setLoading(true);
+    setError(null);
+  }, [artifact.artifactId]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -206,9 +213,22 @@ function ArtifactContentPanel({ artifact }: { artifact: ArtifactSnapshot }) {
   const kind = bodyResult?.kind || artifact.kind;
   const body = bodyResult?.body || '';
   const version = bodyResult?.version || 1;
+  const isText = bodyResult?.is_text ?? false;
 
-  // Binary / file-reference kinds → FileViewer (metadata + download)
+  // File kind whose body is actual readable text → editable viewer.
+  // Truly binary files (body stays a path) → FileViewer (metadata + download).
   if (kind === 'file' || kind === 'image') {
+    if (isText) {
+      return (
+        <EditableTextViewer
+          artifact={artifact}
+          body={body}
+          version={version}
+          kind={kind}
+          error={error}
+        />
+      );
+    }
     return <FileViewer artifact={artifact} body={body} version={version} error={error} />;
   }
 

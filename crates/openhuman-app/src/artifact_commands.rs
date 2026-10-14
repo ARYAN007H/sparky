@@ -56,6 +56,7 @@ pub struct ArtifactBodyResult {
     pub title: String,
     pub version: u32,
     pub body: String,
+    pub is_text: bool,
 }
 
 #[tauri::command]
@@ -76,13 +77,37 @@ pub async fn read_artifact_body(artifact_id: String) -> Result<ArtifactBodyResul
         .as_array()
         .map(|v| v.len() as u32)
         .unwrap_or(0);
-    let body = record["versions"]
+    let mut body = record["versions"]
         .as_array()
         .and_then(|v| v.last())
         .and_then(|v| v["body"].as_str())
         .unwrap_or("")
         .to_string();
-    Ok(ArtifactBodyResult { kind, title, version: versions, body })
+    let mut is_text = kind != "file" && kind != "image";
+
+    // For file-kind artifacts the body is a path to a real file. Try to read
+    // its text content so the panel can render it (md/txt/html/etc).
+    // Truly binary files stay as paths — the panel shows metadata + download.
+    if kind == "file" && !body.is_empty() {
+        let file_path = PathBuf::from(&body);
+        match tokio::fs::read(&file_path).await {
+            Ok(bytes) => {
+                // Heuristic: treat as text if it decodes as UTF-8 and has no
+                // NUL bytes in the first 8 KiB (binary signatures).
+                let probe = &bytes[..bytes.len().min(8192)];
+                let looks_text = !probe.contains(&0)
+                    && std::str::from_utf8(probe).is_ok();
+                if looks_text {
+                    if let Ok(text) = String::from_utf8(bytes) {
+                        body = text;
+                        is_text = true;
+                    }
+                }
+            }
+            Err(_) => { /* leave the path as the body */ }
+        }
+    }
+    Ok(ArtifactBodyResult { kind, title, version: versions, body, is_text })
 }
 
 #[derive(Deserialize)]
