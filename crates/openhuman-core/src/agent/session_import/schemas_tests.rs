@@ -51,3 +51,61 @@ async fn handler_rejects_invalid_params() {
     let err = handle_session_import_run(params).await.unwrap_err();
     assert!(err.contains("invalid params"), "{err}");
 }
+
+#[test]
+fn an_unknown_function_gets_the_error_schema() {
+    let schema = schemas("no_such_function");
+    assert_eq!(schema.namespace, "session_import");
+    assert_eq!(schema.function, "unknown");
+    assert_eq!(schema.outputs.len(), 1);
+    assert_eq!(schema.outputs[0].name, "error");
+}
+
+/// Runs the import against `workspace` (or the configured one when `None`)
+/// with the configured workspace pointed at a scratch directory, so nothing
+/// touches the operator's home.
+async fn run_import(workspace: Option<&std::path::Path>) -> Value {
+    let _env_lock = crate::config::TEST_ENV_LOCK.lock().await;
+    let configured = tempfile::TempDir::new().unwrap();
+    // SAFETY: serialised by `TEST_ENV_LOCK`.
+    unsafe {
+        std::env::set_var("OPENHUMAN_WORKSPACE", configured.path());
+    }
+    let mut params = Map::new();
+    if let Some(workspace) = workspace {
+        params.insert(
+            "workspace".into(),
+            Value::String(workspace.to_string_lossy().to_string()),
+        );
+    }
+    let result = handle_session_import_run(params).await;
+    // SAFETY: serialised by `TEST_ENV_LOCK`.
+    unsafe {
+        std::env::remove_var("OPENHUMAN_WORKSPACE");
+    }
+    result.expect("the import handler answers even with nothing to import")
+}
+
+#[tokio::test]
+async fn a_real_run_on_an_empty_configured_workspace_reports_each_domain() {
+    let result = run_import(None).await;
+    assert_eq!(result["dry_run"], Value::Bool(false));
+    assert!(result["imports"].is_array());
+    assert!(result["sources"].is_object());
+}
+
+#[tokio::test]
+async fn a_real_run_on_an_overridden_workspace_opens_that_workspaces_backend() {
+    let other = tempfile::TempDir::new().unwrap();
+    let result = run_import(Some(other.path())).await;
+    assert_eq!(result["dry_run"], Value::Bool(false));
+    assert_eq!(
+        result["workspace"],
+        Value::String(other.path().to_string_lossy().to_string())
+    );
+    let imports = result["imports"].as_array().expect("imports array");
+    assert!(
+        imports.iter().all(|import| import.get("domain").is_some()),
+        "{imports:?}"
+    );
+}
