@@ -41,7 +41,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
 }
 
 fn handle_policy_info(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async {
+    Box::pin(async move {
         log::debug!("[security][rpc] policy_info enter");
         match crate::security::rpc::load_and_get_security_policy_info(&ctx).await {
             Ok(outcome) => {

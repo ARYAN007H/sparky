@@ -131,7 +131,7 @@ fn handle_check(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFut
 }
 
 fn handle_run(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async { to_json(crate::platform::update::rpc::update_run(&ctx).await) })
+    Box::pin(async move { to_json(crate::platform::update::rpc::update_run(&ctx).await) })
 }
 
 fn handle_apply(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {

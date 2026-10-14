@@ -14,7 +14,7 @@ pub(super) fn handle_get_dictation_settings(
     ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
-    Box::pin(async { to_json(config_rpc::get_dictation_settings(&ctx).await?) })
+    Box::pin(async move { to_json(config_rpc::get_dictation_settings(&ctx).await?) })
 }
 
 pub(super) fn handle_update_dictation_settings(
@@ -39,7 +39,7 @@ pub(super) fn handle_get_voice_server_settings(
     ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
-    Box::pin(async { to_json(config_rpc::get_voice_server_settings(&ctx).await?) })
+    Box::pin(async move { to_json(config_rpc::get_voice_server_settings(&ctx).await?) })
 }
 
 pub(super) fn handle_update_voice_server_settings(

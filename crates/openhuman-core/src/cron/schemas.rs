@@ -404,7 +404,7 @@ fn handle_add(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture 
 }
 
 fn handle_list(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async {
+    Box::pin(async move {
         let config = config_rpc::load_config_with_timeout(&ctx).await?;
         to_json(crate::cron::rpc::cron_list(&config).await?)
     })

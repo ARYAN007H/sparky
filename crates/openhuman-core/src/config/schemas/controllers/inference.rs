@@ -15,7 +15,7 @@ pub(super) fn handle_get_config(
     ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
-    Box::pin(async { to_json(config_rpc::load_and_get_config_snapshot(&ctx).await?) })
+    Box::pin(async move { to_json(config_rpc::load_and_get_config_snapshot(&ctx).await?) })
 }
 
 pub(super) fn handle_get_client_config(
@@ -238,7 +238,7 @@ pub(super) fn handle_resolve_api_url(
     ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
-    Box::pin(async { to_json(config_rpc::load_and_resolve_api_url(&ctx).await?) })
+    Box::pin(async move { to_json(config_rpc::load_and_resolve_api_url(&ctx).await?) })
 }
 
 pub(super) fn handle_get_runtime_flags(

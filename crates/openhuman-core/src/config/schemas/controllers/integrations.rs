@@ -38,7 +38,7 @@ pub(super) fn handle_get_search_settings(
     ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
-    Box::pin(async {
+    Box::pin(async move {
         log::debug!("[config][rpc] get_search_settings enter");
         match config_rpc::get_search_settings(&ctx).await {
             Ok(outcome) => {
@@ -87,7 +87,7 @@ pub(super) fn handle_get_composio_trigger_settings(
     ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
-    Box::pin(async {
+    Box::pin(async move {
         log::debug!("[config][rpc] get_composio_trigger_settings enter");
         match config_rpc::get_composio_trigger_settings(&ctx).await {
             Ok(outcome) => {

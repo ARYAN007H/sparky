@@ -285,7 +285,7 @@ fn handle_resolve_policy(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
 }
 
 fn handle_cleanup_orphans(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async {
+    Box::pin(async move {
         gate()?;
         let config = match crate::config::ops::load_config_with_timeout(&ctx).await {
             Ok(config) => config,

@@ -63,7 +63,7 @@ pub(super) fn handle_get_agent_settings(
     ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
-    Box::pin(async {
+    Box::pin(async move {
         log::debug!("[config][rpc] get_agent_settings enter");
         match config_rpc::get_agent_settings(&ctx).await {
             Ok(outcome) => {

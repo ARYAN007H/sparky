@@ -305,7 +305,7 @@ fn handle_server_status(_ctx: DispatchCtx, _params: Map<String, Value>) -> Contr
 }
 
 fn handle_list_definitions(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async {
+    Box::pin(async move {
         let defs = crate::agent::library::list_definition_metadata(&ctx).await?;
         Ok(serde_json::json!({ "definitions": defs }))
     })
@@ -578,7 +578,7 @@ fn local_catalog_models_from_config(
 }
 
 fn handle_registry_snapshot(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async {
+    Box::pin(async move {
         use tinyagents_registry::{ComponentKind, ComponentMetadata, RegistrySnapshot};
 
         let mut components: Vec<ComponentMetadata> = Vec::new();

@@ -408,7 +408,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
 }
 
 fn handle_list(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async {
+    Box::pin(async move {
         let config = config_rpc::load_config_with_timeout(&ctx).await?;
         to_json(ops::list(&config).await?)
     })
@@ -516,7 +516,7 @@ fn handle_list_databases(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
 }
 
 fn handle_status(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async {
+    Box::pin(async move {
         let config = config_rpc::load_config_with_timeout(&ctx).await?;
         to_json(ops::status(&config).await?)
     })

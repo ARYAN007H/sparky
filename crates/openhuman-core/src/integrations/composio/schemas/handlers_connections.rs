@@ -16,7 +16,7 @@ pub(super) fn handle_list_toolkits(
     ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
-    Box::pin(async {
+    Box::pin(async move {
         let config = config_rpc::load_config_with_timeout(&ctx).await?;
         to_json(ops::composio_list_toolkits(&config).await?)
     })
@@ -26,7 +26,7 @@ pub(super) fn handle_list_capabilities(
     ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
-    Box::pin(async {
+    Box::pin(async move {
         let config = config_rpc::load_config_with_timeout(&ctx).await?;
         to_json(ops::composio_list_capabilities(&config).await?)
     })
@@ -36,7 +36,7 @@ pub(super) fn handle_list_agent_ready_toolkits(
     ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
-    Box::pin(async {
+    Box::pin(async move {
         let config = config_rpc::load_config_with_timeout(&ctx).await?;
         to_json(ops::composio_list_agent_ready_toolkits(&config).await?)
     })
@@ -46,7 +46,7 @@ pub(super) fn handle_list_connections(
     ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
-    Box::pin(async {
+    Box::pin(async move {
         let config = config_rpc::load_config_with_timeout(&ctx).await?;
         to_json(ops::composio_list_connections(&config).await?)
     })

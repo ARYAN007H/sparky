@@ -133,7 +133,7 @@ fn register_shutdown_hook(ctx: &DispatchCtx, ) {
     if WEB3_SHUTDOWN_HOOK_REGISTERED.swap(true, Ordering::AcqRel) {
         return;
     }
-    crate::core::shutdown::register(|| async {
+    crate::core::shutdown::register(move || async {
         WEB3_SHUTDOWN_HOOK_REGISTERED.store(false, Ordering::Release);
         let mut active = service().lock().await;
         let Some(current) = active.as_ref() else {

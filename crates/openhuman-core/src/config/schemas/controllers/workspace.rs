@@ -74,7 +74,7 @@ pub(super) fn handle_get_user_timezone(
     ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
-    Box::pin(async {
+    Box::pin(async move {
         let config = config_rpc::load_config_with_timeout(&ctx).await?;
         to_json(crate::core::Outcome::single_log(
             config_rpc::user_timezone_json(&config),
@@ -87,7 +87,7 @@ pub(super) fn handle_get_analytics_settings(
     ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
-    Box::pin(async {
+    Box::pin(async move {
         use crate::core::Outcome;
         let config = config_rpc::load_config_with_timeout(&ctx).await?;
         let result = serde_json::json!({
@@ -104,7 +104,7 @@ pub(super) fn handle_get_dashboard_settings(
     ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
-    Box::pin(async { to_json(config_rpc::get_dashboard_settings(&ctx).await?) })
+    Box::pin(async move { to_json(config_rpc::get_dashboard_settings(&ctx).await?) })
 }
 
 pub(super) fn handle_agent_server_status(
@@ -118,7 +118,7 @@ pub(super) fn handle_reset_local_data(
     ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
-    Box::pin(async { to_json(config_rpc::reset_local_data(&ctx).await?) })
+    Box::pin(async move { to_json(config_rpc::reset_local_data(&ctx).await?) })
 }
 
 pub(crate) fn handle_get_data_paths(
@@ -169,7 +169,7 @@ pub(crate) fn handle_get_agent_paths(
     ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
-    Box::pin(async {
+    Box::pin(async move {
         log::debug!("[config][rpc] get_agent_paths enter");
         match config_rpc::get_agent_paths(&ctx).await {
             Ok(outcome) => {
@@ -218,7 +218,7 @@ pub(super) fn handle_get_onboarding_completed(
     ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
-    Box::pin(async { to_json(config_rpc::get_onboarding_completed(&ctx).await?) })
+    Box::pin(async move { to_json(config_rpc::get_onboarding_completed(&ctx).await?) })
 }
 
 pub(super) fn handle_set_onboarding_completed(
