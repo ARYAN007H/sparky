@@ -302,6 +302,9 @@ pub struct OpenHumanRunContext {
     pub dispatch: Option<Arc<TurnDispatchState>>,
     /// Optional task recency restriction for integration tools.
     pub task_recency_window: Option<Duration>,
+    /// Autonomous skill-run iteration cap lifted onto every sub-agent in the
+    /// tree (inherited by `child()` through the clone); `None` for ordinary turns.
+    pub autonomous_iter_cap: Option<usize>,
     /// Sandbox mode of the agent definition executing this turn.
     pub sandbox_mode: Option<SandboxMode>,
     /// Zero-based OpenHuman subagent depth (the root is zero).
@@ -455,6 +458,7 @@ impl OpenHumanRunContext {
             attachment_placeholders: Arc::new(Vec::new()),
             dispatch: None,
             task_recency_window: None,
+            autonomous_iter_cap: None,
             sandbox_mode: None,
             spawn_depth: 0,
             subagent_usage: Arc::new(Mutex::new(Vec::new())),

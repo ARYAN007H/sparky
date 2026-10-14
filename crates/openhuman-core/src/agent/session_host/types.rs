@@ -289,6 +289,9 @@ pub struct OpenHumanSessionHost {
     /// task-fetch tools only see recently touched tasks (cron morning
     /// briefing). `None` leaves them unbounded.
     pub(super) task_recency_window: Option<std::time::Duration>,
+    /// Autonomous skill-run iteration cap handed to every turn's run context
+    /// (lifts sub-agent iteration caps); `None` for ordinary agents.
+    pub(super) autonomous_iter_cap: Option<usize>,
     /// Backend/session thread explicitly owned by this agent run. It is kept
     /// separate from event identity: CLI and worker event sessions are not
     /// necessarily user conversation threads.

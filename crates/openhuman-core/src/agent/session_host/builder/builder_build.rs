@@ -441,6 +441,7 @@ impl SessionHostBuilder {
             event_session_id,
             event_channel,
             task_recency_window: None,
+            autonomous_iter_cap: None,
             thread_id: None,
             agent_definition_name: agent_definition_name.clone(),
             // Canonical registry id — captured here at build time
