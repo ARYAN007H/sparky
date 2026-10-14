@@ -34,12 +34,12 @@ use tinystoragedrivers::secrets::{DerivedKeys, KeyProvider};
 use tinystoragedrivers::MemoryStorage;
 use zeroize::Zeroizing;
 
-use super::super::storage_grants::{declared, StorageGrant};
-use super::super::storage_host::{
+use crate::modules::storage_grants::{declared, StorageGrant};
+use crate::modules::storage_host::{
     module_scope, AuditRecord, AuditSink, CallerDirectory, Environment, StorageHost,
 };
-use super::super::storage_host_linked::attach;
-use super::{async_trait, Arc, BusName, Scope, StorageBackend, StorageError, STORAGE_INTERFACE};
+use crate::modules::storage_host_linked::attach;
+use crate::modules::storage_host::{async_trait_reexport_placeholder};
 
 const PROBE: &str = "ai.tinyhumans.test.StorageProbe";
 
@@ -261,7 +261,7 @@ async fn a_loaded_module_cannot_reach_another_modules_collections() {
     let _turn = TURN.lock().await;
     let rig = rig("tinymcp").await;
     // Another module's collection, seeded in that module's own scope.
-    let theirs = super::super::storage_grants::declared("tinychannels")
+    let theirs = crate::modules::storage_grants::declared("tinychannels")
         .expect("tinychannels declares storage")
         .collections[0]
         .name
@@ -517,7 +517,7 @@ async fn streams_and_watches_are_refused_until_tinybus_binds_them() {
         .call("Blobs", "GetStream", json!({"key": "tinyjuice_ccr/streamed"}))
         .await;
     assert!(denied(&get_stream, "unsupported-selector"), "{get_stream}");
-    let mcp = super::super::storage_grants::declared("tinymcp").unwrap();
+    let mcp = crate::modules::storage_grants::declared("tinymcp").unwrap();
     assert!(!mcp.collections.is_empty());
     // Watches belong to a document grant; tinyjuice has none, so the object is
     // refused first. The unsupported label is pinned for a documented grant by
