@@ -342,7 +342,7 @@ impl StorageHost {
             return Err(HostError::Denied("unknown-caller"));
         };
         let scope = self.environment.module_scope(&module);
-        let mut call = AuditedCall {
+        let call = AuditedCall {
             audit: Arc::clone(&self.audit),
             module,
             scope: scope
