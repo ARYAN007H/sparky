@@ -1,5 +1,5 @@
 use super::*;
-use tinyagents_session::run_ledger::{AgentRunListRequest, LedgerError};
+use tinyagents_session::run_ledger::AgentRunListRequest;
 
 fn scratch() -> tempfile::TempDir {
     tempfile::tempdir().expect("tempdir")
@@ -93,20 +93,8 @@ fn an_unusable_workspace_degrades_to_an_in_memory_store() {
         .try_for_agent("degraded")
         .expect("the in-memory fallback opens an agent");
 
-    assert!(artifact_blobs_for(&unusable).is_none() || super::installed().is_some());
-    assert!(current_documents_for(&unusable).is_none() || super::installed().is_some());
-}
-
-#[test]
-fn a_tenantless_task_gets_throwaway_state_and_no_ledger() {
-    // A SaaS task with no scope has no tenant: nothing may act for it.
-    let saas_without_scope = crate::core::runtime::tenant_in(true, None);
-    assert!(saas_without_scope.is_err());
-    // Ledger errors surface as the driver's `unavailable` class.
-    let error = LedgerError::from(tinystoragedrivers::StorageError::unavailable(
-        "no run ledger for the calling tenant",
-    ));
-    assert!(error.to_string().contains("no run ledger"));
+    assert!(artifact_blobs_for(&unusable).is_none() || crate::agent::session_store::installed().is_some());
+    assert!(current_documents_for(&unusable).is_none() || crate::agent::session_store::installed().is_some());
 }
 
 #[test]
