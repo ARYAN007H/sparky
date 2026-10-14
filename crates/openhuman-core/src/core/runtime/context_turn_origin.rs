@@ -21,6 +21,37 @@ impl CoreContext {
         DEFAULT_CONTEXT.get().cloned()
     }
 
+    /// A minimal context for a caller that needs to carry per-turn authority
+    /// but runs where no core was booted (a unit test, a library caller that
+    /// never built a runtime). It has no workspace, no embedder config and the
+    /// full domain set, which is what every reader already assumes when no
+    /// context is scoped at all, so scoping it changes no answer except the
+    /// one it exists to carry (the turn origin).
+    pub(crate) fn bare() -> Arc<CoreContext> {
+        Arc::new(CoreContext {
+            host_kind: HostKind::Cli,
+            workspace_binding: RwLock::new(Arc::new(RwLock::new(WorkspaceBinding {
+                workspace_dir: None,
+            }))),
+            domains: crate::core::runtime::DomainSet::full(),
+            tool_groups: Default::default(),
+            components: Default::default(),
+            embedder_config: None,
+            user_skill_roots: true,
+            backend_transport: None,
+            turn_origin: None,
+            channel_thread: None,
+            session_agent: None,
+            profile: None,
+            agent: Default::default(),
+        })
+    }
+
+    /// The turn origin bound to this context, if its entry point supplied one.
+    pub(crate) fn turn_origin(&self) -> Option<&crate::agent::turn_origin::AgentTurnOrigin> {
+        self.turn_origin.as_ref()
+    }
+
     /// Typed origin bound to this immutable per-turn context, if supplied by
     /// its entrypoint. Missing authority retains library/CLI behavior.
     pub fn current_turn_origin() -> Option<crate::agent::turn_origin::AgentTurnOrigin> {

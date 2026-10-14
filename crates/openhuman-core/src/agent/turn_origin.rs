@@ -180,53 +180,35 @@ pub fn current_is_user_authored() -> bool {
     current().is_some_and(|origin| origin.is_user_authored())
 }
 
-tokio::task_local! {
-    /// Per-turn agent origin. Scoped by entry points (web channel, channel
-    /// runtime dispatch, cron scheduler, background jobs, CLI) around the
-    /// `run_turn` invocation. Read by the approval gate to make
-    /// origin-aware decisions.
-    pub static AGENT_TURN_ORIGIN: AgentTurnOrigin;
-}
-
-/// Scope `origin` for the duration of `fut`. Mirrors the existing
-/// [`crate::security::approval::APPROVAL_CHAT_CONTEXT`] scope pattern.
+/// Run `fut` as a turn labelled `origin`.
 ///
-/// The inner future is `Box::pin`-ed before being handed to the task-local
-/// scope so the combined `with_origin(... scope(... run_turn(...)))` future
-/// state machine stays heap-allocated. The agent loop downstream of this
-/// scope can be deep (tool dispatch, recursive sub-agent invocations, LLM
-/// streaming), and stacking two task-local scopes plus the agent loop on a
-/// 2 MiB worker stack reliably blows the test runtime — same shape as the
-/// fix in PR #3151. Box-pinning here is the single-point remediation that
-/// covers every caller (web channel, channel runtime, cron, background
-/// jobs, CLI).
+/// The label rides the [`CoreContext`](crate::core::runtime::CoreContext) the
+/// future runs under: a derived, immutable copy of the active context (or of
+/// the process default, or of a bare one when no core was booted) that carries
+/// `origin`. Nothing else holds it, so there is no second copy to drift from
+/// the context a spawn carries.
+///
+/// The inner future is `Box::pin`-ed before it is handed to the context scope
+/// so the combined `with_origin(... scope(... run_turn(...)))` future state
+/// machine stays heap-allocated. The agent loop downstream of this scope can be
+/// deep (tool dispatch, recursive sub-agent invocations, LLM streaming), and
+/// stacking scopes plus the agent loop on a 2 MiB worker stack reliably blows
+/// the test runtime (same shape as the fix in PR #3151). Boxing here is the
+/// single-point remediation that covers every caller (web channel, channel
+/// runtime, cron, background jobs, CLI).
 pub async fn with_origin<F: std::future::Future>(origin: AgentTurnOrigin, fut: F) -> F::Output {
-    let scoped = scope_origin(origin.clone(), fut);
     let context = crate::core::runtime::CoreContext::current()
-        .or_else(crate::core::runtime::CoreContext::default_context);
-    if let Some(context) = context {
-        crate::core::runtime::CoreContext::scope_with_turn_origin(context, Some(origin), scoped)
-            .await
-    } else {
-        scoped.await
-    }
+        .unwrap_or_else(crate::core::runtime::CoreContext::bare);
+    crate::core::runtime::CoreContext::scope_with_turn_origin(context, Some(origin), Box::pin(fut))
+        .await
 }
 
-async fn scope_origin<F: std::future::Future>(origin: AgentTurnOrigin, fut: F) -> F::Output {
-    AGENT_TURN_ORIGIN.scope(origin, Box::pin(fut)).await
-}
-
-/// Read scoped CoreContext authority before the legacy task-local.
-/// The process default never supplies authority. Returns `None` when no caller scoped one
-/// (legacy callers that haven't been migrated yet — the gate maps this to
-/// [`AgentTurnOrigin::Unknown`] / fail-closed).
+/// The origin of the turn running on this task, read from the scoped
+/// `CoreContext`. The process default never supplies authority. `None` when no
+/// caller scoped one; the gate maps that to [`AgentTurnOrigin::Unknown`]
+/// (fail closed).
 pub fn current() -> Option<AgentTurnOrigin> {
-    if let Some(origin) = crate::core::runtime::CoreContext::scoped()
-        .and_then(|_| crate::core::runtime::CoreContext::current_turn_origin())
-    {
-        return Some(origin);
-    }
-    AGENT_TURN_ORIGIN.try_with(|o| o.clone()).ok()
+    crate::core::runtime::CoreContext::scoped().and_then(|context| context.turn_origin().cloned())
 }
 
 /// Capture the ambient origin so it can be carried across a `tokio::spawn`
