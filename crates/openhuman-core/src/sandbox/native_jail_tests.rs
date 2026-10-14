@@ -243,6 +243,7 @@ async fn released_tinybox_runs_a_native_jail_through_the_pinned_loader() -> anyh
         BTreeMap::new(),
         Duration::from_secs(10),
         true,
+        None,
     )
     .await?;
     assert!(output.success());
@@ -257,6 +258,7 @@ async fn released_tinybox_runs_a_native_jail_through_the_pinned_loader() -> anyh
         BTreeMap::new(),
         Duration::from_secs(10),
         true,
+        None,
     )
     .await?;
     assert!(output.success(), "cron preserves default pipeline status");
@@ -269,6 +271,7 @@ async fn released_tinybox_runs_a_native_jail_through_the_pinned_loader() -> anyh
         BTreeMap::new(),
         Duration::from_millis(50),
         true,
+        None,
     )
     .await?;
     assert!(output.timed_out, "cron timeout is acknowledged by TinyBox");
