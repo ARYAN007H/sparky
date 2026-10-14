@@ -298,7 +298,11 @@ pub(super) async fn run_turn_via_tinyagents_body(
         run_context.memory_turn.clone(),
         run_context.tool_rules.clone(),
     );
-    super::response_shape::install(&mut harness, hosted_root.is_some());
+    if hosted_root.is_some() {
+        if let Some(scope) = run_context.response_shape.clone() {
+            tinyagents_harness::middleware::install_response_shape(&mut harness, scope);
+        }
+    }
     super::budget::install_depth(&mut harness, &run_context);
     super::deadline_wind_down::install(&mut harness, &handle, &run_context, &subagent_scope);
     // Fail-closed registry validation gate (issue #4249, Workstream 10 — registry).

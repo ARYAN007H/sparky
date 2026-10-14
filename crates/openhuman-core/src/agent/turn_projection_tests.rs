@@ -46,3 +46,25 @@ fn an_incomplete_reason_maps_to_cap_or_breaker() {
         Some("web_answer_tool")
     );
 }
+
+#[test]
+fn reported_usage_projects_as_charged_only_with_a_cost() {
+    let charged = failure_usage(&ResponseUsage {
+        input_tokens: 10,
+        output_tokens: 5,
+        cached_tokens: 3,
+        reasoning_tokens: 2,
+        cost_usd: Some(0.007),
+        has_cost_receipt: true,
+    });
+    assert_eq!(charged.cost_source, CostSource::Charged);
+    assert_eq!(charged.cost_usd, Some(0.007));
+    assert_eq!(
+        (charged.input_tokens, charged.output_tokens, charged.cached_input_tokens, charged.reasoning_tokens),
+        (10, 5, 3, 2)
+    );
+    assert_eq!(
+        failure_usage(&ResponseUsage::default()).cost_source,
+        CostSource::Unknown
+    );
+}

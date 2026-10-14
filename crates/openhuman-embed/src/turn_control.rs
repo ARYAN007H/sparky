@@ -336,19 +336,22 @@ impl Turn {
                 }
             })?;
         let options = AgentTurnOptions {
-            shape: openhuman_core::agent::tinyagents::response_shape::ResponseShapeScope::new(
-                openhuman_core::agent::tinyagents::response_shape::ResponseShape {
+            // Captured here, before the dispatch can hop to a core worker that
+            // does not inherit task locals; the core re-establishes it around
+            // the turn.
+            observer: tinyagents_harness::observability::turn_observer::current_scope(),
+            shape: tinyagents_harness::middleware::ResponseShapeScope::new(
+                tinyagents_harness::middleware::ResponseShape {
                     response_format: self
                         .response_format
                         .take()
                         .map(crate::complete::ResponseFormat::into_wire),
                     max_output_tokens: self.max_tokens,
                     top_p: self.top_p,
-                    validator: wants_json.then(|| std::sync::Arc::new(validator) as std::sync::Arc<dyn openhuman_core::agent::tinyagents::response_shape::ResponseValidator>),
+                    validator: wants_json.then(|| std::sync::Arc::new(validator) as std::sync::Arc<dyn tinyagents_harness::middleware::ResponseValidator>),
                     structured_retries: self.structured_retries,
                     provider_options: self.provider_options.clone(),
                     require_tool_call: self.require_tool_call,
-                    observer: tinyagents_harness::observability::turn_observer::current_scope(),
                 },
             ),
             untrusted_input: self.untrusted_input,

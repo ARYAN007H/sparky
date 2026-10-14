@@ -481,7 +481,7 @@ use openhuman_core::agent::tinyagents::host::LastTurnUsage;
 
 use crate::turn_meter::UsageSink;
 
-use openhuman_core::agent::tinyagents::response_shape::{FinalResponse, ResponseShapeScope};
+use tinyagents_harness::middleware::{FinalResponse, ResponseShapeScope};
 
 /// A turn's reply text and, for an agent target, its final-response report.
 type AgentReply = (String, Option<FinalResponse>);
@@ -497,6 +497,7 @@ mod futures_box {
 struct AgentTurnOptions {
     tools: Option<openhuman_core::agent::HostTools>,
     shape: std::sync::Arc<ResponseShapeScope>,
+    observer: Option<std::sync::Arc<tinyagents_harness::observability::turn_observer::ObserverScope>>,
     untrusted_input: bool,
     attachments: Vec<openhuman_core::agent::HostAttachment>,
 }
@@ -580,6 +581,7 @@ async fn dispatch(
                         host_only: inner.host_only,
                         untrusted_input: options.untrusted_input,
                         shape: Some(&options.shape),
+                        observer: options.observer.as_ref(),
                         attachments: &options.attachments,
                     };
                     let outcome = agent_chat_for(
