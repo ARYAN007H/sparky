@@ -87,7 +87,13 @@ impl WalletModuleTool {
                         return Ok(ToolResult::error(format!("invalid arguments: {error}")))
                     }
                 };
-                outcome_value(crate::web3::wallet::prepare_transfer(params).await)
+                outcome_value(
+                    crate::web3::wallet::prepare_transfer(
+                        params,
+                        crate::modules::web3_service::owner_of(chat),
+                    )
+                    .await,
+                )
             }
             "wallet_tx_status" | "wallet_tx_receipt" | "wallet_lookup_tx" => {
                 let query: TxQuery = match serde_json::from_value(args) {
