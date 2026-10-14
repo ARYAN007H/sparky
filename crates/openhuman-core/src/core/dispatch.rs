@@ -79,7 +79,7 @@ pub async fn dispatch(
     }
 
     // Tier 2: Registered domain controllers.
-    if let Some(result) = try_registry_dispatch(method, params).await {
+    if let Some(result) = try_registry_dispatch(ctx, method, params).await {
         log::debug!(
             "[rpc:dispatch] routed method={} subsystem=controller_registry",
             method
@@ -232,6 +232,7 @@ fn handle_events_subscribe_token(params: serde_json::Value) -> Result<Invocation
 }
 
 async fn try_registry_dispatch(
+    ctx: crate::core::runtime::DispatchCtx,
     method: &str,
     params: Value,
 ) -> Option<Result<serde_json::Value, String>> {

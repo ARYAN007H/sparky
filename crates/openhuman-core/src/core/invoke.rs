@@ -126,7 +126,7 @@ async fn invoke_method_inner(
     }
 
     // Phase 2: Fall back to dynamic dispatch (internal core methods or legacy paths).
-    crate::core::dispatch::dispatch(state, method, params).await
+    crate::core::dispatch::dispatch(ctx, state, method, params).await
 }
 
 /// Returns the default application state.

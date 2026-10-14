@@ -441,6 +441,7 @@ impl CoreRuntime {
         CoreContext::scope(
             ctx,
             crate::core::invoke::invoke_method(
+                crate::core::runtime::DispatchCtx::new(ctx),
                 crate::core::invoke::default_state(),
                 method,
                 params,
