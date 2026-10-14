@@ -34,7 +34,7 @@
 
 use std::time::Duration;
 
-use tinyagents_harness::turn_deadline::{parse_backstop, TurnDeadline};
+use tinyagents_harness::turn_deadline::parse_backstop;
 
 /// Environment override for the backstop, in seconds; `0` disables it.
 pub const TURN_BACKSTOP_ENV: &str = "OPENHUMAN_WEB_TURN_TIMEOUT_SECS";

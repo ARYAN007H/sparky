@@ -17,7 +17,7 @@ use std::sync::Arc;
 use super::*;
 use crate::security::{AutonomyLevel, SecurityPolicy, TrustedAccess, TrustedRoot};
 use tinyagents_harness::artifacts::{
-    extract_artifact_paths, ArtifactKind, ArtifactPathPolicy, OffloadError,
+    extract_artifact_paths, ArtifactKind, ArtifactPathPolicy,
     ARTIFACT_POINTER_PREFIX, DEFAULT_OFFLOAD_THRESHOLD_BYTES,
 };
 
