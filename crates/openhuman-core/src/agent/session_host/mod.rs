@@ -75,6 +75,8 @@ mod artifact_wiring;
 #[cfg(test)]
 mod orphaned_head_resume_tests;
 #[cfg(test)]
+mod response_shape_turn_tests;
+#[cfg(test)]
 mod runtime_adapter_tests;
 #[cfg(test)]
 mod transcript_compat_tests;
