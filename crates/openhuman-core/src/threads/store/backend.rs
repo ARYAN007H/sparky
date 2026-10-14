@@ -42,10 +42,6 @@ fn conversation_scope() -> Result<Scope, String> {
     .map_err(|e| e.to_string())
 }
 
-fn no_collections() -> Vec<storage::CollectionSpec> {
-    Vec::new()
-}
-
 /// A conversation store bound to one workspace's storage backend.
 #[derive(Clone)]
 pub struct ConversationStore {
@@ -67,8 +63,9 @@ impl ConversationStore {
         let scoped = backend
             .for_scope(&scope)
             .map_err(|e| format!("{LOG_PREFIX} open the storage scope: {e}"))?;
-        let repo = Repo::on(&backend, &scope, DOMAIN, no_collections)
+        let repo = Repo::on(&backend, &scope, DOMAIN, super::legacy_import::collections)
             .map_err(|e| format!("{LOG_PREFIX} {e:#}"))?;
+        let store = DriverConversationStore::new(scoped.clone());
         repo.once_per_backend("schema", || {
             let docs = Arc::clone(scoped.documents());
             storage::block_on(async move {
@@ -78,7 +75,6 @@ impl ConversationStore {
             .map_err(|e| anyhow::anyhow!("declare the conversation schema: {e}"))
         })
         .map_err(|e| format!("{LOG_PREFIX} {e:#}"))?;
-        let store = DriverConversationStore::new(scoped);
         super::legacy_import::import_once(&self.workspace_dir, &repo, &store)
             .map_err(|e| format!("{LOG_PREFIX} legacy import: {e:#}"))?;
         Ok(store)
