@@ -184,3 +184,88 @@ async fn host_metadata_forwards_to_the_inner_tool() {
     assert_eq!(wrapped.permission_level(), PermissionLevel::ReadOnly);
     assert_eq!(wrapped.category(), ToolCategory::System);
 }
+
+/// A video-like tool whose poll observer is the one its call was built with:
+/// it polls a job state, then waits like a long job.
+struct PollingTool {
+    observer: tinyagents_harness::tinyinference_video::ProgressFn,
+    state: tinyagents_harness::tinyinference_video::JobState,
+}
+
+#[async_trait]
+impl Tool for PollingTool {
+    fn name(&self) -> &str {
+        "polling_generate"
+    }
+    fn description(&self) -> &str {
+        "polling"
+    }
+    fn parameters_schema(&self) -> Value {
+        json!({ "type": "object" })
+    }
+    async fn execute(&self, args: Value) -> anyhow::Result<ToolResult> {
+        self.execute_with_context(args, tinytools::ToolCallOptions::default(), None)
+            .await
+    }
+    async fn execute_with_context(
+        &self,
+        _args: Value,
+        _options: tinytools::ToolCallOptions,
+        _context: Option<&dyn tinytools::ToolRunContext>,
+    ) -> anyhow::Result<ToolResult> {
+        (self.observer)(&tinyagents_harness::tinyinference_video::VideoJobStatus {
+            id: "job".into(),
+            state: self.state.clone(),
+            outputs: 0,
+            output_indices: Vec::new(),
+            cost_usd: None,
+            error: None,
+        });
+        tokio::time::sleep(std::time::Duration::from_secs(20)).await;
+        Ok(ToolResult::error("no files"))
+    }
+}
+
+#[derive(Default)]
+struct Recorder(std::sync::Mutex<Vec<String>>);
+
+impl tinytools::ToolRunContext for Recorder {
+    fn report_progress(&self, update: tinytools::ToolProgress) {
+        self.0
+            .lock()
+            .unwrap()
+            .push(update.message.unwrap_or_default());
+    }
+}
+
+/// The per-call inner tool binds the poll observer to the call it serves, so
+/// two concurrent video calls each report their own job state.
+#[tokio::test(start_paused = true)]
+async fn per_call_observer_reports_each_calls_own_job_state() {
+    use tinyagents_harness::tinyinference_video::JobState;
+    let root = tempfile::tempdir().unwrap();
+    let states = std::sync::Mutex::new(vec![JobState::InProgress, JobState::Pending]);
+    let wrapped = MediaArtifactTool::new(
+        PollingTool {
+            observer: std::sync::Arc::new(|_| {}),
+            state: JobState::Pending,
+        },
+        ArtifactKind::Video,
+        root.path().join("workspace"),
+        root.path().join("Files"),
+    )
+    .with_per_call_inner(move |observer| PollingTool {
+        observer,
+        state: states.lock().unwrap().pop().unwrap(),
+    });
+    let (a, b) = (Recorder::default(), Recorder::default());
+    let (ra, rb) = tokio::join!(
+        wrapped.execute_with_context(json!({}), tinytools::ToolCallOptions::default(), Some(&a)),
+        wrapped.execute_with_context(json!({}), tinytools::ToolCallOptions::default(), Some(&b)),
+    );
+    ra.unwrap();
+    rb.unwrap();
+    let (ma, mb) = (a.0.lock().unwrap().clone(), b.0.lock().unwrap().clone());
+    assert_eq!(ma, vec!["Generating video — 15s elapsed (job pending)"]);
+    assert_eq!(mb, vec!["Generating video — 15s elapsed (job in_progress)"]);
+}
