@@ -12,15 +12,13 @@
 //! * a module cannot reach another module's collections, another scope, or a
 //!   collection its grant never declared;
 //! * a blob over the inline cap (1 MiB) is refused and stores nothing;
-//! * `PutStream`, `GetStream` and `WatchOpen` are refused as unsupported.
-//!
-//! What still waits for tinybus 0.1.5 (#7781): the positive halves of the last
-//! two. Peer-bound streams (`Connection::accept_stream_from`) and unicast watch
-//! signals (`Connection::emit_to`) do not exist in the vendored tinybus 0.1.3
-//! (`vendor/tinybus`), so the host cannot bind `PutStream`/`GetStream`/
-//! `WatchOpen` and answers them `unsupported-selector`. Once #7781 moves the
-//! pin, replace `streams_and_watches_are_refused_until_tinybus_binds_them` with
-//! the >16 MiB `PutStream`/`GetStream` round trip and a watch signal.
+//! * a blob over the 16 MiB bus frame round-trips by `PutStream`/`GetStream`
+//!   on a peer-bound `tinybus.Stream`, and a body no frame could carry is a
+//!   clear error instead of a hung call;
+//! * a watch invalidation reaches the module that opened the watch, and no
+//!   other module sees it;
+//! * a second module can neither read the first module's blobs nor take the
+//!   stream the first opened.
 
 use super::*;
 use std::path::{Path, PathBuf};
@@ -106,19 +104,24 @@ fn stage(directory: &Path) -> PathBuf {
     staged
 }
 
-/// Names the probe's peer after `module_id` and nobody else.
+/// Names each listed peer after the registry module it stands for, and nobody
+/// else: the probe, and any extra peers a test adds.
 struct ProbeDirectory {
     connection: Connection,
-    module_id: &'static str,
+    peers: Vec<(&'static str, &'static str)>,
 }
 
 #[async_trait]
 impl CallerDirectory for ProbeDirectory {
     async fn module_for(&self, sender: &BusName) -> Option<String> {
-        match self.connection.name_owner(PROBE).await {
-            Ok(Some(owner)) if &owner == sender => Some(self.module_id.to_string()),
-            _ => None,
+        for (name, module_id) in &self.peers {
+            if let Ok(Some(owner)) = self.connection.name_owner(*name).await {
+                if &owner == sender {
+                    return Some((*module_id).to_string());
+                }
+            }
         }
+        None
     }
 }
 
@@ -157,6 +160,10 @@ struct Rig {
     trail: Arc<Trail>,
     /// A peer that is not the probe: the host must not know it.
     stranger: Connection,
+    /// Extra peers standing for registry modules, with the host-side bus name
+    /// of the storage interface's owner they talk to.
+    peers: Vec<Connection>,
+    host: BusName,
     probe: Proxy,
     _modules: ModuleHost,
     _staged: tempfile::TempDir,
@@ -164,6 +171,17 @@ struct Rig {
 
 /// The real probe, loaded, standing for registry module `module_id`.
 async fn rig(module_id: &'static str) -> Rig {
+    rig_with_peers(module_id, &[]).await
+}
+
+/// The bus name of the `n`th extra peer.
+fn peer_name(n: usize) -> String {
+    format!("ai.tinyhumans.test.Peer{n}")
+}
+
+/// [`rig`], plus one extra in-process peer per entry of `others`, each
+/// standing for that registry module under the bus name [`peer_name`].
+async fn rig_with_peers(module_id: &'static str, others: &[&'static str]) -> Rig {
     let transport = MemoryBus::new();
     let broker = Broker::new();
     broker.spawn(transport.clone());
@@ -176,10 +194,21 @@ async fn rig(module_id: &'static str) -> Rig {
         .unwrap();
     let backend: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::new());
     let trail = Arc::new(Trail::default());
+    let mut peers = Vec::new();
+    let mut named = vec![(PROBE, module_id)];
+    for (n, other) in others.iter().enumerate() {
+        let connection = Connection::connect(transport.connect().await.unwrap())
+            .await
+            .unwrap();
+        let name: &'static str = Box::leak(peer_name(n).into_boxed_str());
+        connection.request_name(name).await.unwrap();
+        named.push((name, *other));
+        peers.push(connection);
+    }
     let host = Arc::new(StorageHost::new(
         Arc::new(ProbeDirectory {
             connection: host_connection.clone(),
-            module_id,
+            peers: named,
         }),
         Arc::new(Env(Arc::clone(&backend))),
         trail.clone(),
@@ -199,10 +228,17 @@ async fn rig(module_id: &'static str) -> Rig {
         tokio::time::sleep(std::time::Duration::from_millis(20)).await;
     }
     let probe = stranger.proxy(PROBE, "/probe", PROBE).unwrap();
+    let host = stranger
+        .name_owner(STORAGE_INTERFACE)
+        .await
+        .unwrap()
+        .expect("the storage host owns its name");
     Rig {
         backend,
         trail,
         stranger,
+        peers,
+        host,
         probe,
         _modules: modules,
         _staged: staged,
@@ -552,68 +588,265 @@ async fn a_blob_over_the_inline_cap_is_refused_and_stores_nothing() {
     assert!(denied(&outside, "target-not-granted"), "{outside}");
 }
 
+const MIB: u64 = 1024 * 1024;
+
+impl Rig {
+    /// One of the probe's own members.
+    async fn member(&self, member: &str, args: impl serde::Serialize) -> Value {
+        self.probe
+            .call(member, args)
+            .await
+            .expect("the probe answers")
+    }
+
+    fn peer_proxy(&self, n: usize, object: &str) -> Proxy {
+        self.peers[n]
+            .proxy(
+                STORAGE_INTERFACE,
+                format!("/ai/tinyhumans/tinystorage/{object}"),
+                STORAGE_INTERFACE,
+            )
+            .unwrap()
+            .with_timeout(std::time::Duration::from_secs(10))
+    }
+}
+
 #[tokio::test(flavor = "multi_thread")]
-async fn streams_and_watches_are_refused_until_tinybus_binds_them() {
+async fn a_blob_over_the_bus_frame_round_trips_through_a_peer_bound_stream() {
     let _turn = TURN.lock().await;
     let rig = rig("tinyjuice").await;
-    let put_stream = rig
-        .call(
-            "Blobs",
-            "PutStream",
-            json!({"key": "tinyjuice_ccr/streamed", "len": 17 * 1024 * 1024}),
-        )
+    // 20 MiB: over the 16 MiB frame no inline call could carry.
+    let len = 20 * MIB;
+    let stored = rig
+        .member("StreamPut", ("tinyjuice_ccr/streamed", len))
         .await;
-    assert!(denied(&put_stream, "unsupported-selector"), "{put_stream}");
-    let get_stream = rig
-        .call(
-            "Blobs",
-            "GetStream",
-            json!({"key": "tinyjuice_ccr/streamed"}),
-        )
-        .await;
-    assert!(denied(&get_stream, "unsupported-selector"), "{get_stream}");
-    let mcp = crate::modules::storage_grants::declared("tinymcp").unwrap();
-    assert!(!mcp.collections.is_empty());
-    // Watches belong to a document grant; tinyjuice has none, so the object is
-    // refused first. The unsupported label is pinned for a documented grant by
-    // `storage_grants_tests` and below for tinymcp.
-    let watch = rig
-        .call(
-            "Documents",
-            "WatchOpen",
-            json!({"collection": "mcp_servers"}),
-        )
-        .await;
-    assert!(
-        denied(&watch, "object-not-granted") || denied(&watch, "unsupported-selector"),
-        "{watch}"
-    );
-    // Nothing was written by the refused stream.
+    assert_eq!(stored["ok"]["len"], len, "{stored}");
+    // It is in the module's own scope, byte for byte.
     let handle = rig.backend.for_scope(&rig.scope("tinyjuice")).unwrap();
-    assert!(handle
+    let meta = handle
         .blobs()
         .head("tinyjuice_ccr/streamed")
         .await
         .unwrap()
-        .is_none());
+        .expect("the streamed blob is stored");
+    assert_eq!(meta.len, len);
+    let bytes = handle
+        .blobs()
+        .get_range("tinyjuice_ccr/streamed", 0..1024)
+        .await
+        .unwrap()
+        .expect("range");
+    assert!(bytes.iter().all(|byte| *byte == 0xAB));
+    // And it comes back whole by `GetStream`.
+    let read = rig.member("StreamGet", ("tinyjuice_ccr/streamed",)).await;
+    assert_eq!(read["ok"]["len"], len, "{read}");
+    assert_eq!(read["ok"]["meta_len"], len, "{read}");
+    assert_eq!(read["ok"]["all_fill"], true, "{read}");
+    // A key that is not there is `null`, not an error.
+    let missing = rig.member("StreamGet", ("tinyjuice_ccr/absent",)).await;
+    assert!(missing["ok"].is_null() && missing.get("ok").is_some(), "{missing}");
+    let trail = rig.trail.0.lock().unwrap().clone();
+    assert!(trail
+        .iter()
+        .any(|r| r.op == "PutStream" && r.outcome == "ok" && r.module == "tinyjuice"));
+    assert!(trail
+        .iter()
+        .any(|r| r.op == "GetStream" && r.outcome == "ok" && r.module == "tinyjuice"));
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn a_watch_is_unsupported_for_a_module_that_may_use_documents() {
+async fn a_streamed_blob_is_still_bound_by_the_grant_and_the_length() {
+    let _turn = TURN.lock().await;
+    let rig = rig("tinyjuice").await;
+    // Outside the CCR prefix: refused before anything is stored.
+    let outside = rig.member("StreamPut", ("tinyjuice_other/x", 2 * MIB)).await;
+    assert!(outside.get("err").is_some(), "{outside}");
+    let handle = rig.backend.for_scope(&rig.scope("tinyjuice")).unwrap();
+    assert!(handle.blobs().head("tinyjuice_other/x").await.unwrap().is_none());
+    let denied_get = rig.member("StreamGet", ("tinyjuice_other/x",)).await;
+    assert!(
+        denied_get["err"].to_string().contains("target-not-granted"),
+        "{denied_get}"
+    );
+    // The module keeps working after a refusal.
+    let after = rig.member("StreamPut", ("tinyjuice_ccr/after", 3 * MIB)).await;
+    assert_eq!(after["ok"]["len"], 3 * MIB, "{after}");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn an_inline_blob_no_frame_can_carry_fails_fast_instead_of_hanging() {
+    let _turn = TURN.lock().await;
+    let rig = rig("tinyjuice").await;
+    // 17 MiB as a JSON array of numbers is far over the 16 MiB frame. The call
+    // must come back as an error well inside the probe's own 6 s timeout, not
+    // run into the caller's.
+    let started = std::time::Instant::now();
+    let big: Value = rig
+        .member("PutBlob", ("tinyjuice_ccr/over-frame", 17 * MIB as usize))
+        .await;
+    assert!(big.get("err").is_some(), "an oversized frame must fail: {big}");
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(60),
+        "took {:?}",
+        started.elapsed()
+    );
+    let handle = rig.backend.for_scope(&rig.scope("tinyjuice")).unwrap();
+    assert!(handle
+        .blobs()
+        .head("tinyjuice_ccr/over-frame")
+        .await
+        .unwrap()
+        .is_none());
+    let after: Value = rig.member("PutBlob", ("tinyjuice_ccr/after", 2048usize)).await;
+    assert!(after.get("ok").is_some(), "the module keeps working: {after}");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_watch_signal_reaches_the_module_that_opened_the_watch() {
     let _turn = TURN.lock().await;
     let rig = rig("tinymcp").await;
-    let watch = rig
+    let seen = rig.member("WatchPut", ("mcp_servers", "watched")).await;
+    assert_eq!(seen["ok"], "invalidated", "{seen}");
+    // A collection the grant never declared cannot be watched.
+    let refused = rig
         .call(
             "Documents",
             "WatchOpen",
-            json!({"collection": "mcp_servers"}),
+            json!({"collection": "never_declared", "filter": {"op": "all"}, "interval_ms": 50}),
         )
         .await;
-    assert!(denied(&watch, "unsupported-selector"), "{watch}");
-    let close = rig
-        .call("Documents", "WatchClose", json!({"watch": "w1"}))
+    assert!(denied(&refused, "target-not-granted"), "{refused}");
+    let trail = rig.trail.0.lock().unwrap().clone();
+    assert!(trail
+        .iter()
+        .any(|r| r.op == "WatchOpen" && r.outcome == "ok" && r.module == "tinymcp"));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_second_module_cannot_receive_the_first_modules_watch_signals() {
+    let _turn = TURN.lock().await;
+    // The probe stands for tinymcp; peer 0 stands for tinychannels, which also
+    // holds documents.
+    let rig = rig_with_peers("tinymcp", &["tinychannels"]).await;
+    let theirs = declared("tinychannels").unwrap().collections[0].name.clone();
+    // The second module listens to every watch signal the host sends anyone
+    // (any path), and opens a watch of its own as a positive control.
+    let mut everything = rig.peers[0]
+        .add_match(
+            tinybus::MatchRule::new()
+                .signals()
+                .interface(tinybus::InterfaceName::new(STORAGE_INTERFACE).unwrap()),
+        )
+        .await
+        .unwrap();
+    let documents = rig.peer_proxy(0, "Documents");
+    let own: Value = documents
+        .call(
+            "WatchOpen",
+            (json!({"collection": theirs, "filter": {"op": "all"}, "interval_ms": 50}),),
+        )
+        .await
+        .unwrap();
+    let own_id = own["watch_id"].as_str().unwrap().to_string();
+    // The first module opens a watch and changes its document.
+    let first = rig.member("WatchPut", ("mcp_servers", "w1")).await;
+    assert_eq!(first["ok"], "invalidated", "{first}");
+    // The second module's own change reaches the second module.
+    let _: Value = documents
+        .call(
+            "Put",
+            (put(&theirs, "d", &json!({"v": 1})),),
+        )
+        .await
+        .unwrap();
+    let mut ids = Vec::new();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while std::time::Instant::now() < deadline && !ids.contains(&own_id) {
+        if let Ok(Ok(message)) =
+            tokio::time::timeout(std::time::Duration::from_millis(200), everything.recv()).await
+        {
+            ids.push(message.body[0]["watch_id"].as_str().unwrap().to_string());
+        }
+    }
+    assert!(ids.contains(&own_id), "its own signal never arrived: {ids:?}");
+    // Nothing else did: the first module's watch id is not among them.
+    assert!(
+        ids.iter().all(|id| *id == own_id),
+        "a signal for another module's watch leaked: {ids:?}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_second_module_cannot_read_or_take_the_first_modules_streams() {
+    let _turn = TURN.lock().await;
+    // The probe and peer 0 both stand for tinyjuice (same grant, same scope),
+    // so only the peer binding keeps the second out; peer 1 stands for tinymcp,
+    // which has no blobs at all.
+    let rig = rig_with_peers("tinyjuice", &["tinyjuice", "tinymcp"]).await;
+    let stored = rig
+        .member("StreamPut", ("tinyjuice_ccr/private", 2 * MIB))
         .await;
-    assert!(denied(&close, "unsupported-selector"), "{close}");
+    assert_eq!(stored["ok"]["len"], 2 * MIB, "{stored}");
+
+    // A module without blob rights is refused outright.
+    let nosy: tinybus::Result<Value> = rig
+        .peer_proxy(1, "Blobs")
+        .call("GetStream", (json!({"key": "tinyjuice_ccr/private"}),))
+        .await;
+    match nosy {
+        Err(tinybus::Error::MethodFailed { name, message }) => {
+            assert_eq!(name, "ai.tinyhumans.tinystorage.Error.Denied");
+            assert_eq!(message, "object-not-granted");
+        }
+        other => panic!("expected a refusal, got {other:?}"),
+    }
+
+    // Taking a stream the probe opened toward the host: the peer is granted
+    // the key, but the host reads an upload only from the peer that opened it.
+    let opened = rig.member("OpenStream", (MIB,)).await;
+    let reference: tinybus::StreamRef = serde_json::from_value(opened["ok"].clone())
+        .unwrap_or_else(|_| panic!("a stream reference: {opened}"));
+    let hijack: tinybus::Result<Value> = rig
+        .peer_proxy(0, "Blobs")
+        .call(
+            "PutStream",
+            (json!({"key": "tinyjuice_ccr/hijacked", "len": MIB}), reference),
+        )
+        .await;
+    assert!(hijack.is_err(), "a peer took another peer's stream: {hijack:?}");
+    let handle = rig.backend.for_scope(&rig.scope("tinyjuice")).unwrap();
+    assert!(handle
+        .blobs()
+        .head("tinyjuice_ccr/hijacked")
+        .await
+        .unwrap()
+        .is_none());
+    // The refused attempt did not spend the stream: its owner still uses it.
+    let used = rig.member("UseStream", ("tinyjuice_ccr/owned", MIB)).await;
+    assert!(used.get("ok").is_some(), "the owner lost its stream: {used}");
+    assert_eq!(
+        handle
+            .blobs()
+            .head("tinyjuice_ccr/owned")
+            .await
+            .unwrap()
+            .expect("stored by the owner")
+            .len,
+        MIB
+    );
+
+    // A download the host opened toward the probe is not readable by a peer.
+    let reply = rig
+        .member("RawGetStream", ("tinyjuice_ccr/private",))
+        .await;
+    let download: tinybus::StreamRef = serde_json::from_value(reply["ok"][1].clone())
+        .unwrap_or_else(|_| panic!("a download reference: {reply}"));
+    assert!(
+        rig.peers[0]
+            .accept_stream_from(&download, &rig.host)
+            .is_err(),
+        "a peer accepted a stream opened toward another peer"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]

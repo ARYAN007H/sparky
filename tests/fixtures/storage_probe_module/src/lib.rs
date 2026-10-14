@@ -32,9 +32,9 @@ use tinybus::{
 };
 use tinystoragedrivers_busproxy::connect_storage;
 use tinystoragedrivers_core::{
-    BlobReader, BlobStore, DocumentStore, Filter, StorageBackend, WatchNotice, WatchOptions,
+    BlobReader, Filter, StorageBackend, WatchNotice, WatchOptions,
 };
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncReadExt;
 
 const STORAGE: &str = "ai.tinyhumans.tinystorage.Storage";
 const PROBE: &str = "ai.tinyhumans.test.StorageProbe";
