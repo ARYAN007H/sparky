@@ -109,9 +109,7 @@ pub(crate) fn assemble_live_tool_harness(
             enforcement.policy,
             enforcement.session,
             tool_sets.clone(),
-            enforcement.session_id,
             enforcement.channel,
-            enforcement.agent_definition_id,
         )));
     }
     harness.push_tool_middleware(Arc::new(middleware::credential_scrub_middleware()));

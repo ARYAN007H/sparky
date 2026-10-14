@@ -219,7 +219,8 @@ pub mod seams {
     pub use openhuman_core::agent::hooks::{PostTurnHook, ToolHook};
     pub use openhuman_core::agent::hooks::{ToolHookContext, ToolHookDecision, TurnContext};
     pub use openhuman_core::agent::stop_hooks::BudgetStopHook;
-    pub use openhuman_core::agent::stop_hooks::TurnCost;
+    pub use tinyagents_harness::cost::TurnCost;
+    pub use tinyagents_harness::middleware::{PolicyDecision, ToolCallPolicy};
     pub use tinyagents_harness::middleware::{StopDecision, StopHook};
     /// Product cost snapshot passed to harness-owned stop policies.
     pub type TurnState<'a> = tinyagents_harness::middleware::TurnState<'a, TurnCost>;

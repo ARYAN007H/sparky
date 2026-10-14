@@ -74,7 +74,7 @@ struct OpenHumanTurnPrelude {
     /// Host prompt/utilisation state, shared by the runtime hooks. It is not
     /// generic conversation state and the runtime never persists it.
     context: Arc<std::sync::Mutex<crate::agent::context::ContextManager>>,
-    tool_policy: Arc<dyn crate::agent::tool_policy::ToolPolicy>,
+    tool_policy: Arc<dyn tinyagents_harness::middleware::ToolCallPolicy<crate::agent::tinyagents::host::OpenHumanRunContext>>,
     tool_dispatcher: Arc<dyn tinytools_agent::dialect::ToolDialect>,
     workspace_dir: std::path::PathBuf,
     action_dir: std::path::PathBuf,
@@ -190,7 +190,6 @@ impl OpenHumanTurnPrelude {
         Arc<Vec<Box<dyn tinytools::Tool>>>,
         tinytools::ToolPolicySession,
         String,
-        String,
     ) {
         let surface = self
             .tool_surface
@@ -200,7 +199,6 @@ impl OpenHumanTurnPrelude {
             surface.tools.clone(),
             surface.synthesized_tools.clone(),
             surface.tool_policy_session.clone(),
-            surface.event_session_id.clone(),
             surface.event_channel.clone(),
         )
     }
@@ -938,7 +936,6 @@ impl OpenHumanSessionHost {
                             mut current_tools,
                             mut current_synthesized_tools,
                             policy_session,
-                            policy_session_id,
                             policy_channel,
                         ) = prelude.current_tool_source();
                         if turn.overrides.suppress_tools {
@@ -970,7 +967,6 @@ impl OpenHumanSessionHost {
                             Some(crate::agent::tinyagents::ToolPolicyEnforcement {
                                 policy: prelude.tool_policy.clone(),
                                 session: policy_session,
-                                session_id: policy_session_id,
                                 channel: policy_channel,
                                 agent_definition_id: prelude.agent_definition_id.clone(),
                             });

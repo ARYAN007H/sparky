@@ -379,7 +379,7 @@ impl SessionHostBuilder {
     ///
     /// The default policy allows all calls. Custom policies can deny a call
     /// before `Tool::execute_with_options` runs.
-    pub fn tool_policy(mut self, policy: Arc<dyn crate::agent::tool_policy::ToolPolicy>) -> Self {
+    pub fn tool_policy(mut self, policy: Arc<dyn tinyagents_harness::middleware::ToolCallPolicy<crate::agent::tinyagents::host::OpenHumanRunContext>>) -> Self {
         self.tool_policy = Some(policy);
         self
     }

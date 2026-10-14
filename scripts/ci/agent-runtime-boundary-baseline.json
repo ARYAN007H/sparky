@@ -44,7 +44,7 @@
   {
     "rule": "openhuman-runtime-bridge",
     "path": "crates/openhuman-core/src/agent/tinyagents/harness_assembly.rs",
-    "line": 55,
+    "line": 56,
     "text": "pub(super) fn assemble_turn_harness(",
     "occurrence": 1
   },
@@ -289,14 +289,14 @@
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/agent/session_host/builder/host_tools.rs",
-    "line": 367,
+    "line": 366,
     "text": "let root = crate::agent::turn_workspace::current()?;",
     "occurrence": 1
   },
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/agent/session_host/runtime_session.rs",
-    "line": 540,
+    "line": 538,
     "text": "workspace_descriptor: crate::agent::harness::current_parent()",
     "occurrence": 1
   },
@@ -877,8 +877,15 @@
   {
     "rule": "tinyagents-moved-symbol-alias",
     "path": "vendor/tinyagents/crates/tinyagents-harness/src/tool/mod.rs",
-    "line": 207,
+    "line": 209,
     "text": "pub struct ToolRegistry<State: Send + Sync, Ctx: Send + Sync> {",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-moved-symbol-alias",
+    "path": "vendor/tinyagents/crates/tinyagents-harness/src/tool/shared/mod_tests.rs",
+    "line": 384,
+    "text": "struct ExposureProbe(tinytools::ToolExposure);",
     "occurrence": 1
   },
   {
@@ -1017,8 +1024,15 @@
   {
     "rule": "tinyagents-upstream-reexport",
     "path": "vendor/tinyagents/crates/tinyagents-runtime/src/lib.rs",
-    "line": 32,
+    "line": 33,
     "text": "pub use tinyagents_session::transcript::TranscriptPartial;",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-upstream-reexport",
+    "path": "vendor/tinyagents/crates/tinyagents-runtime/src/turn_driver/types.rs",
+    "line": 11,
+    "text": "pub use tinyagents_harness::tool::EarlyExit;",
     "occurrence": 1
   },
   {
