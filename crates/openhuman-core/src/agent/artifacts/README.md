@@ -54,7 +54,7 @@ and trim string params.
 
 `ai.regenerate` only accepts `kind == presentation`, reloads `args.json`,
 and re-runs `PresentationTool::with_regenerate_target(id)` inside
- `APPROVAL_CHAT_CONTEXT.scope({thread_id, client_id}, ..)` so the same id
+`APPROVAL_CHAT_CONTEXT.scope({thread_id, client_id}, ..)` so the same id
 is reused and the Pending/Ready/Failed events route back to the originating
 chat. The RPC result is an ack; the card state comes from the socket events.
 When `thread_id` is given to `list_artifacts`, legacy records with no
