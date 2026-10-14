@@ -55,8 +55,7 @@ pub(super) struct OpenHumanSessionState {
     required_output: Option<tinyagents_harness::config::RequiredOutput>,
     pub(crate) pending_turn_overrides: super::types::TurnOverrides,
     pub(super) active_turn_overrides: super::types::TurnOverrides,
-    pub(crate) pending_response_shape:
-        Option<Arc<tinyagents_harness::middleware::ResponseShapeScope>>,
+    pub(crate) pending_response_shape: super::types::PendingResponseShape,
     pub(super) reply_language_directive: Option<String>,
     pub(super) time_zone: Option<String>,
     prelude: Option<OpenHumanTurnPrelude>,

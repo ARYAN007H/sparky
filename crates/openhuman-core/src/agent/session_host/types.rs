@@ -55,13 +55,17 @@ pub struct TurnOverrides {
     pub suppress_transcript_autoload: bool,
 }
 
+/// The next turn's response shape, consumed at its start.
+pub(crate) type PendingResponseShape =
+    Option<Arc<tinyagents_harness::middleware::ResponseShapeScope>>;
+
 /// What the runtime hook hands one user turn's request enrichment: this
 /// turn's [`TurnOverrides`] (consumed) and the reply-language instruction the
 /// host armed with `set_reply_language_directive` (kept for later turns).
 #[derive(Debug, Default)]
 pub(crate) struct TurnInputs {
     pub(crate) overrides: TurnOverrides,
-    pub(crate) response_shape: Option<Arc<tinyagents_harness::middleware::ResponseShapeScope>>,
+    pub(crate) response_shape: PendingResponseShape,
     pub(crate) reply_language_directive: Option<String>,
     pub(crate) time_zone: Option<String>,
 }
