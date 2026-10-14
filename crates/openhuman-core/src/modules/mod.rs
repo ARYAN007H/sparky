@@ -335,6 +335,28 @@ pub(crate) fn expiring_blob_module_scopes() -> Vec<crate::storage::Scope> {
     }
 }
 
+/// [`expiring_blob_module_scopes`] for SaaS profile `profile`, whose acting
+/// scope is `base`, from outside that profile's task scope.
+#[cfg(feature = "modules")]
+pub(crate) fn expiring_blob_module_scopes_for(
+    profile: &str,
+    base: &crate::storage::Scope,
+) -> Vec<crate::storage::Scope> {
+    [storage_grant_tinyjuice::MODULE_ID]
+        .into_iter()
+        .filter_map(|id| storage_host::module_scope(Some(profile), base, id).ok())
+        .collect()
+}
+
+/// See the `modules` build: with the feature off no module writes blobs.
+#[cfg(not(feature = "modules"))]
+pub(crate) fn expiring_blob_module_scopes_for(
+    _profile: &str,
+    _base: &crate::storage::Scope,
+) -> Vec<crate::storage::Scope> {
+    Vec::new()
+}
+
 /// See the `modules` build: with the feature off no module writes blobs.
 #[cfg(not(feature = "modules"))]
 pub(crate) fn expiring_blob_module_scopes() -> Vec<crate::storage::Scope> {
