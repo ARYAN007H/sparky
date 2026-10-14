@@ -892,6 +892,13 @@ export interface ArtifactSnapshot {
    * with no owning tool call — those keep rendering in the header deck.
    */
   toolCallId?: string;
+  /**
+   * The `request_id` of the chat turn that was live when this artifact's
+   * pending/ready event landed. Lets the transcript render the card inside
+   * the exact assistant message that produced it (MessageArtifactCards
+   * matches message metadata.requestId against this).
+   */
+  ownerRequestId?: string;
 }
 
 /**
@@ -1064,6 +1071,7 @@ interface ChatRuntimeState {
    */
   usageByThread: Record<string, SessionTokenUsage>;
   queueStatusByThread: Record<string, QueueStatus>;
+  previewArtifactId: string | null;
 }
 
 /** Snapshot of the active-run queue depth per lane. */
@@ -1100,6 +1108,7 @@ const initialState: ChatRuntimeState = {
   sessionTokenUsage: emptySessionTokenUsage(),
   usageByThread: {},
   queueStatusByThread: {},
+  previewArtifactId: null,
 };
 
 /**
@@ -2650,6 +2659,7 @@ const chatRuntimeSlice = createSlice({
         status: 'in_progress',
         updatedAt: Date.now(),
         toolCallId: toolCallId ?? existing?.toolCallId,
+        ownerRequestId: state.liveRequestIdByThread[threadId],
       };
       state.artifactsByThread[threadId] = upsertArtifact(
         state.artifactsByThread[threadId],
@@ -2686,6 +2696,7 @@ const chatRuntimeSlice = createSlice({
         sizeBytes,
         updatedAt: Date.now(),
         toolCallId: toolCallId ?? existing?.toolCallId,
+        ownerRequestId: state.liveRequestIdByThread[threadId],
       };
       state.artifactsByThread[threadId] = upsertArtifact(
         state.artifactsByThread[threadId],
@@ -2725,6 +2736,15 @@ const chatRuntimeSlice = createSlice({
         state.artifactsByThread[threadId],
         snapshot
       );
+    },
+    /**
+     * Set the artifact currently shown in the right-side preview panel, or
+     * null to close it. Kept in Redux (not local Conversations state) so
+     * artifact cards rendered inside assistant messages (`MessageArtifactCards`)
+     * can open the panel from anywhere in the thread.
+     */
+    setPreviewArtifactId: (state, action: PayloadAction<string | null>) => {
+      state.previewArtifactId = action.payload;
     },
     clearArtifactsForThread: (state, action: PayloadAction<{ threadId: string }>) => {
       delete state.artifactsByThread[action.payload.threadId];
