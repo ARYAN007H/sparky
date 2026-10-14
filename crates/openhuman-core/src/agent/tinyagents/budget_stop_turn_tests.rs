@@ -435,9 +435,9 @@ fn turn_stop_transcripts_match_golden() {
                         golden_turn("golden-budget", GoldenStop::BudgetCap).await,
                         golden_turn("golden-wind-down", GoldenStop::DeadlineWindDown).await,
                     ];
-                    let actual =
-                        serde_json::to_string_pretty(&serde_json::Value::Array(out)).unwrap()
-                            + "\n";
+                    let actual = serde_json::to_string_pretty(&serde_json::Value::Array(out))
+                        .unwrap()
+                        + "\n";
                     let path = concat!(
                         env!("CARGO_MANIFEST_DIR"),
                         "/src/agent/tinyagents/fixtures/turn_stop_golden.json"
