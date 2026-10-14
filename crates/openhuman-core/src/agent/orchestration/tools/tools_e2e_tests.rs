@@ -12,7 +12,6 @@ use tinyagents_harness::context::RunConfig;
 use tinyagents_session::transcript::TranscriptMessage;
 use tinyinference_llm::message::Message;
 use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
-use tinytools::Tool;
 use tinytools_agent::dialect::ToolCallFormat;
 
 const SPAWN_SUBAGENT_CANARY: &str = "tool-e2e-spawn-subagent-canary";

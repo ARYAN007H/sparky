@@ -119,7 +119,7 @@ async fn rejects_agent_outside_parent_allowlist() {
     let temp = TempDir::new().unwrap();
     let parent = test_parent_ctx(temp.path().to_path_buf());
 
-    let live = super::live_parent_run_context("worker-allowlist-test", parent);
+    let live = crate::agent::orchestration::tools::live_parent_run_context("worker-allowlist-test", parent);
     let tool = SpawnWorkerThreadTool::new();
     let result = tool
         .execute_with_live_parent_context(
