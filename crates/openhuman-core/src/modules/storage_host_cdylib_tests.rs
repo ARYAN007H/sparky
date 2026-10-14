@@ -22,6 +22,7 @@
 //! pin, replace `streams_and_watches_are_refused_until_tinybus_binds_them` with
 //! the >16 MiB `PutStream`/`GetStream` round trip and a watch signal.
 
+use super::*;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
