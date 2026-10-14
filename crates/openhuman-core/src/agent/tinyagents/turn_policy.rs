@@ -124,7 +124,7 @@ pub(crate) fn run_policy_for(max_iterations: usize, response_cache_enabled: bool
 /// providers keep the tight defaults so a wedged call is still caught fast.
 ///
 /// Cross-route fallback (`RunPolicy.fallback`) is orthogonal and populated
-/// per-turn by [`assemble_turn_harness`](super::harness_assembly::assemble_turn_harness).
+/// per-turn by [`turn_run_policy`](super::turn_plan::turn_run_policy).
 pub(crate) fn run_policy_for_provider(
     max_iterations: usize,
     response_cache_enabled: bool,
