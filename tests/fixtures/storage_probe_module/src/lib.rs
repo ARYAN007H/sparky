@@ -3,7 +3,8 @@
 //! real loaded module.
 //!
 //! `Call` takes `[object, selector, request, confidential]` and returns
-//! `{"ok": <reply>}` or `{"err": {"name": .., "message": ..}}`. The request is
+//! `{"ok": <reply>}` or `{"err": {"name": .., "message": ..}}`. `PutBlob`
+//! takes `[key, len]` and sends an inline blob of `len` bytes the same way. The request is
 //! forwarded untouched: the probe adds no scope, no module id and no grant,
 //! because the host must not take any from a request.
 use async_trait::async_trait;
@@ -24,12 +25,26 @@ impl Interface for Probe {
     }
 
     fn members(&self) -> Vec<MemberName> {
-        vec![MemberName::new("Call").expect("a fixed name")]
+        ["Call", "PutBlob"]
+            .map(|member| MemberName::new(member).expect("a fixed name"))
+            .to_vec()
     }
 
-    async fn call(&self, _member: &MemberName, args: Value) -> Result<Value> {
+    async fn call(&self, member: &MemberName, args: Value) -> Result<Value> {
         let (object, selector, request, confidential): (String, String, Value, bool) =
-            serde_json::from_value(args)?;
+            if member.as_str() == "PutBlob" {
+                // `[key, len]`: the body is built here, because a body that
+                // size cannot be sent to the probe over one bus frame either.
+                let (key, len): (String, usize) = serde_json::from_value(args)?;
+                (
+                    "Blobs".into(),
+                    "Put".into(),
+                    json!({ "key": key, "bytes": vec![7u8; len] }),
+                    false,
+                )
+            } else {
+                serde_json::from_value(args)?
+            };
         let proxy = self.connection.proxy(
             STORAGE,
             format!("/ai/tinyhumans/tinystorage/{object}"),
@@ -75,7 +90,7 @@ tinybus_module::module_export! {
     setup = setup,
     worker_threads = 1,
     provides = ["ai.tinyhumans.test.StorageProbe"],
-    methods = ["Call"],
+    methods = ["Call", "PutBlob"],
     signals = [],
     requires = [],
     optional = [],
