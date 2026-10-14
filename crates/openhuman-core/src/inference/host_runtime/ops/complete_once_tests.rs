@@ -114,7 +114,9 @@ async fn surfaces_length_finish_reason() {
         .await;
 
     let request = ModelRequest::new(vec![Message::user("hi")]).with_model("m".to_string());
-    let response = complete_once(&endpoint(&server), request, None).await.unwrap();
+    let response = complete_once(&endpoint(&server), request, None)
+        .await
+        .unwrap();
     assert_eq!(response.finish_reason.as_deref(), Some("length"));
 }
 

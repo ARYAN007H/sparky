@@ -10,7 +10,6 @@ use std::sync::{Arc, RwLock};
 use crate::agent::hooks::{PostTurnHook, ToolHook};
 use tinyinference_llm::model::ChatModel;
 
-
 /// Runtime or agent host adapters, shared by every context derived from it.
 #[derive(Default)]
 pub struct HostOverrides {

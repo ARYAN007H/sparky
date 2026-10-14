@@ -84,7 +84,9 @@ async fn the_env_survives_await_points_and_spawned_tasks() {
 #[test]
 fn detached_children_keep_policy_but_not_the_turns_cancellation() {
     let (env, token) = full_env();
-    let detached = OpenHumanRunContext::new().with_host_env(&env).detached_child();
+    let detached = OpenHumanRunContext::new()
+        .with_host_env(&env)
+        .detached_child();
     assert_eq!(detached.tool_call_limit, Some(5));
     token.cancel();
     assert!(!detached.cancellation.is_cancelled());

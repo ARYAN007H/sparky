@@ -8,7 +8,9 @@ async fn per_turn_tool_limit_reaches_the_execution_policy() {
     assert_eq!(run_policy_for(10, false).limits.max_tool_calls, 80);
     // A host cap can only narrow the product default, never widen it.
     assert_eq!(
-        run_policy_for_provider(10, false, false, Some(1_000)).limits.max_tool_calls,
+        run_policy_for_provider(10, false, false, Some(1_000))
+            .limits
+            .max_tool_calls,
         80
     );
 }

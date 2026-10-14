@@ -470,5 +470,9 @@ fn autonomous_iter_cap_is_inherited_by_children_and_lifts_subagent_caps() {
     let grandchild = parent.child().child();
     assert_eq!(grandchild.autonomous_iter_cap, Some(200));
     assert_eq!(lift(grandchild.autonomous_iter_cap, 10), 200);
-    assert_eq!(lift(Some(5), 10), 10, "a cap below the base never lowers it");
+    assert_eq!(
+        lift(Some(5), 10),
+        10,
+        "a cap below the base never lowers it"
+    );
 }

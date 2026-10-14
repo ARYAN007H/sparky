@@ -413,24 +413,22 @@ impl AgentOrchestrationSession {
         // carried across the same boundary the parent execution context
         // already is. Without the origin the spawned agent's external-effect
         // tools reach the approval gate unlabelled and are refused.
-        let handle = tokio::spawn(crate::agent::turn_origin::propagate(
-            async move {
-                mark_running(&task_status_tx);
-                let result = with_parent_context(parent, async move {
-                    run_subagent(&definition, &prompt, options).await
-                })
+        let handle = tokio::spawn(crate::agent::turn_origin::propagate(async move {
+            mark_running(&task_status_tx);
+            let result = with_parent_context(parent, async move {
+                run_subagent(&definition, &prompt, options).await
+            })
+            .await;
+            session
+                .finish_agent(
+                    &task_id,
+                    &task_agent_id,
+                    &task_status_tx,
+                    progress_sink,
+                    result,
+                )
                 .await;
-                session
-                    .finish_agent(
-                        &task_id,
-                        &task_agent_id,
-                        &task_status_tx,
-                        progress_sink,
-                        result,
-                    )
-                    .await;
-            }
-        ));
+        }));
 
         self.registry
             .register(

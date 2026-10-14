@@ -710,7 +710,7 @@ impl SpawnAsyncSubagentTool {
                     }
                 }
                 abort_report.disarm();
-            }
+            },
         ));
 
         // Register *after* spawn so the AbortHandle is available. The task owns

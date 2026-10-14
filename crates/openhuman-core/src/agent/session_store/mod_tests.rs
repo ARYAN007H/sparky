@@ -8,8 +8,7 @@ async fn scope<F: std::future::Future>(
     provider: Arc<dyn SessionStoreProvider>,
     future: F,
 ) -> F::Output {
-    crate::core::runtime::CoreContext::scope(derived_with_store(None, None, provider), future)
-        .await
+    crate::core::runtime::CoreContext::scope(derived_with_store(None, None, provider), future).await
 }
 
 #[tokio::test]
