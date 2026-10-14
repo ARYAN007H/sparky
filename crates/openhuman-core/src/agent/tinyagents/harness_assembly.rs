@@ -65,7 +65,7 @@ pub(super) fn assemble_turn_harness(
     early_exit_tools: &[&str],
     context_mw: TurnContextMiddleware,
     stop_hooks: Vec<
-        Arc<dyn tinyagents_harness::middleware::StopHook<crate::agent::cost::TurnCost>>,
+        Arc<dyn tinyagents_harness::middleware::StopHook<tinyagents_harness::cost::TurnCost>>,
     >,
     tool_policy: Option<ToolPolicyEnforcement>,
     required_capabilities: Option<CapabilitySet>,

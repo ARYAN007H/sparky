@@ -282,7 +282,7 @@ pub struct OpenHumanRunContext {
     /// UI/event progress receiver for this turn tree.
     pub progress: Option<Sender<AgentProgress>>,
     /// Stop policies evaluated after each model call.
-    pub stop_hooks: Vec<Arc<dyn StopHook<crate::agent::cost::TurnCost>>>,
+    pub stop_hooks: Vec<Arc<dyn StopHook<tinyagents_harness::cost::TurnCost>>>,
     /// Wall-clock deadline of the top-level turn this run belongs to, set
     /// only by the session turn entry point from the web backstop
     /// (`agent::turn_deadline`). The harness winds the run down and clamps

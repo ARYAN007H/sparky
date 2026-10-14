@@ -1,5 +1,5 @@
 use super::*;
-use crate::agent::cost::TurnCost;
+use tinyagents_harness::cost::TurnCost;
 use crate::inference::provider::BilledUsage;
 
 fn cost_with_tokens(input: u64, output: u64) -> TurnCost {

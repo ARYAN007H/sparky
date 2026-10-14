@@ -355,7 +355,7 @@ pub enum AgentProgress {
     /// `total_usd` prefers backend-reported `charged_amount_usd`
     /// (sum of authoritative figures) and falls back to a tier-based
     /// token-rate estimate for calls that didn't carry one — see
-    /// [`crate::agent::cost::TurnCost::total_usd`].
+    /// [`tinyagents_harness::cost::TurnCost::total_usd`].
     TurnCostUpdated {
         /// Last model that contributed to this update.
         model: String,
