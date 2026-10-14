@@ -30,7 +30,7 @@ use tinyagents_harness::runtime::AgentHarness;
 
 use super::host::OpenHumanRunContext;
 use super::middleware;
-use super::tool_registration::{capability_diagnostics, host_tool_set_builder, turn_admission};
+use super::tool_registration::{capability_diagnostics, host_tool_set_builder};
 use super::turn_policy::run_policy_for;
 use super::ToolPolicyEnforcement;
 
@@ -74,11 +74,7 @@ pub(crate) fn assemble_live_tool_harness(
     let report = host_tool_set_builder(&tool_sets, &allowed, has_thread, &HashSet::new())
         .register(&mut harness, None);
     let (tool_count, names) = (report.registered.len(), report.plan.candidates);
-    let diagnostics = capability_diagnostics(
-        &[],
-        &tool_sets,
-        &turn_admission(&tool_sets, &allowed, has_thread),
-    );
+    let diagnostics = capability_diagnostics(&[], &tool_sets, &report.registered);
     for diagnostic in &diagnostics {
         tracing::warn!(
             kind = diagnostic.kind.as_str(),
