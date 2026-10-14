@@ -5,7 +5,6 @@
 
 use crate::core::legacy_aliases::resolve_legacy;
 use crate::core::rpc_log;
-use crate::core::runtime::DispatchCtx;
 use crate::core::types::{AppState, InvocationResult};
 use serde_json::{json, Map, Value};
 

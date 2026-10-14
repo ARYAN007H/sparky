@@ -21,7 +21,6 @@
 //! See the pluggable-core work (`core::runtime`) for how this fits with
 //! [`context`](crate::core::runtime::context) and `services`.
 
-use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use crate::config::Config;

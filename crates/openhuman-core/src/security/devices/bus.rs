@@ -7,7 +7,6 @@
 //! - Persisting the `PairedDevice` record after a successful handshake.
 //! - Publishing `DomainEvent::DevicePaired / DevicePeerOnline / DevicePeerOffline`.
 
-use crate::core::runtime::DispatchCtx;
 use std::sync::{Arc, OnceLock};
 
 use crate::core::bus::BUS;
