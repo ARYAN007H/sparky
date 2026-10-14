@@ -27,7 +27,7 @@ const LEGACY_LIMIT_ENTRIES = [
   // under the general 750 limit, so it needs no exception at all.
   // The session-todo integration added transcript metadata construction to
   // this already-exempt composition seam. Keep its allowance exact.
-  ["crates/openhuman-core/src/agent/session_host/runtime_session.rs", 1128],
+  ["crates/openhuman-core/src/agent/session_host/runtime_session.rs", 1084],
   // `[components] juice` test constructor (tokenjuice gate tests).
   ["crates/openhuman-core/src/core/runtime/context.rs", 753],
   // Session-host factory still assembles the product's deliberately coupled
