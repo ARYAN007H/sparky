@@ -1,13 +1,13 @@
 //! Tests for [`emit_external_transfer`](super::emit_external_transfer) — proves
 //! external transfers publish an [`ExternalTransferPending`] event, local
-//! transfers do not, and ambient chat context is attached (privacy epic S2,
+//! transfers do not, and the turn's chat routing is attached (privacy epic S2,
 //! #4436).
 
 use super::super::{DataKind, EgressDescriptor, EgressReason, IdentificationRisk};
 use super::*;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
-use crate::security::approval::{ApprovalChatContext, APPROVAL_CHAT_CONTEXT};
+use crate::security::approval::ApprovalChatContext;
 
 /// Drain `rx` until an `ExternalTransferPending` whose descriptor `service`
 /// matches `marker` arrives, returning it. Tolerates unrelated events and
@@ -79,23 +79,17 @@ async fn local_transfer_does_not_publish() {
 }
 
 #[tokio::test]
-async fn attaches_ambient_chat_context() {
+async fn attaches_the_chat_it_is_given() {
     crate::core::bus::init().await.expect("bus init");
     let mut rx = crate::core::bus::BUS.get().unwrap().receiver();
 
     let marker = "svc-chat-context-emit-test";
-    APPROVAL_CHAT_CONTEXT
-        .scope(
-            ApprovalChatContext {
-                thread_id: "thread-xyz".to_string(),
-                client_id: "client-abc".to_string(),
-                request_id: None,
-            },
-            async {
-                emit_external_transfer(None, EgressDescriptor::composio(marker));
-            },
-        )
-        .await;
+    let chat = ApprovalChatContext {
+        thread_id: "thread-xyz".to_string(),
+        client_id: "client-abc".to_string(),
+        request_id: None,
+    };
+    emit_external_transfer(Some(&chat), EgressDescriptor::composio(marker));
 
     let (descriptor, thread_id, client_id) = find_pending(&mut rx, marker).await;
     assert_eq!(descriptor.reason, EgressReason::ToolCall);
