@@ -14,38 +14,57 @@
 //! - **S4** adds an approval arm (park the transfer until the user decides).
 //! - **S7** adds enforcement (block the transfer under a restrictive policy).
 
-use std::cell::RefCell;
 use std::collections::HashSet;
+use std::sync::{Arc, Mutex};
 
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 
 use super::types::EgressDescriptor;
 
-tokio::task_local! {
-    /// Per-turn dedup ledger for external-transfer disclosures. Present only
-    /// inside [`dedup_turn_scope`] (the managed-turn model-build fan-out); absent
-    /// on every other egress path, where each `emit_external_transfer` publishes
-    /// unconditionally.
-    static EGRESS_TURN_DEDUP: RefCell<HashSet<String>>;
-}
-
-/// Run `f` with a fresh per-turn egress-dedup ledger in scope. Repeated
-/// disclosures of the *same* destination within `f` collapse to one event.
+/// Per-turn dedup ledger for external-transfer disclosures, passed explicitly
+/// down the provider factory chain by the managed-turn model build
+/// (`build_turn_models_crate`). [`EgressLedger::per_turn`] collapses repeated
+/// disclosures of the *same* destination to one event; [`EgressLedger::none`]
+/// (every other egress path) publishes unconditionally.
 ///
-/// Wraps the turn-model build fan-out (`build_turn_models_crate`): a single
-/// managed chat turn constructs the primary model, one model per workload route
-/// tier, and a summarizer, and each managed construction resolves through the
-/// same `resolve_managed_backend` chokepoint. Without this scope, one user
-/// prompt publishes an `ExternalTransferPending` per construction — many
-/// identical `openhuman` disclosures for a single logical destination (codex
-/// P2, PR #4812). Distinct tier *models* still disclose once each: they are real
-/// candidate destinations. The residual gap — a candidate tier disclosed at
-/// construction but never actually dispatched to — is inherent to emitting at
-/// build time rather than at request dispatch (the crate owns dispatch); dedup
-/// bounds the noise to one event per distinct destination per turn.
-pub fn dedup_turn_scope<T>(f: impl FnOnce() -> T) -> T {
-    EGRESS_TURN_DEDUP.sync_scope(RefCell::new(HashSet::new()), f)
+/// A single managed chat turn constructs the primary model, one model per
+/// workload route tier, and a summarizer, and each managed construction resolves
+/// through the same `resolve_managed_backend` chokepoint. Without a shared
+/// ledger, one user prompt publishes an `ExternalTransferPending` per
+/// construction, many identical `openhuman` disclosures for a single logical
+/// destination (codex P2, PR #4812). Distinct tier *models* still disclose once
+/// each: they are real candidate destinations. The residual gap, a candidate
+/// tier disclosed at construction but never actually dispatched to, is
+/// inherent to emitting at build time rather than at request dispatch (the
+/// crate owns dispatch); dedup bounds the noise to one event per distinct
+/// destination per turn.
+#[derive(Clone, Debug, Default)]
+pub struct EgressLedger(Option<Arc<Mutex<HashSet<String>>>>);
+
+impl EgressLedger {
+    /// No ledger: every disclosure publishes.
+    pub fn none() -> Self {
+        Self(None)
+    }
+
+    /// A fresh ledger that collapses repeat disclosures of one destination.
+    pub fn per_turn() -> Self {
+        Self(Some(Arc::new(Mutex::new(HashSet::new()))))
+    }
+
+    /// Returns `true` when `descriptor` was already disclosed through this
+    /// ledger. Records it as seen on first sight. Always `false` for
+    /// [`EgressLedger::none`] (no ledger, nothing suppressed).
+    fn already_disclosed(&self, descriptor: &EgressDescriptor) -> bool {
+        match &self.0 {
+            Some(seen) => !seen
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .insert(dedup_key(descriptor)),
+            None => false,
+        }
+    }
 }
 
 /// Stable dedup key for a descriptor: destination + reason. Two disclosures with
@@ -55,15 +74,6 @@ fn dedup_key(descriptor: &EgressDescriptor) -> String {
         "{}|{}|{:?}",
         descriptor.provider_slug, descriptor.service, descriptor.reason
     )
-}
-
-/// Returns `true` when `descriptor` was already disclosed earlier in the current
-/// [`dedup_turn_scope`]. Records it as seen on first sight. Always `false`
-/// outside a dedup scope (no ledger → nothing suppressed).
-fn already_disclosed_this_turn(descriptor: &EgressDescriptor) -> bool {
-    EGRESS_TURN_DEDUP
-        .try_with(|seen| !seen.borrow_mut().insert(dedup_key(descriptor)))
-        .unwrap_or(false)
 }
 
 /// Best-effort ambient chat routing for the current turn, mirroring
@@ -89,6 +99,12 @@ fn current_chat_context() -> (Option<String>, Option<String>, Option<String>) {
 /// Fire-and-forget: [`publish_global`] never blocks and never fails the caller,
 /// so an egress site can call this unconditionally on its hot path.
 pub fn emit_external_transfer(descriptor: EgressDescriptor) {
+    emit_external_transfer_in(&EgressLedger::none(), descriptor);
+}
+
+/// [`emit_external_transfer`] through an explicit per-turn [`EgressLedger`]:
+/// repeated disclosures of one destination collapse to a single event.
+pub fn emit_external_transfer_in(ledger: &EgressLedger, descriptor: EgressDescriptor) {
     if !descriptor.is_external {
         log::trace!(
             "[privacy][egress] local transfer provider={} service={} reason={:?} — not external, not emitting",
@@ -99,7 +115,7 @@ pub fn emit_external_transfer(descriptor: EgressDescriptor) {
         return;
     }
 
-    if already_disclosed_this_turn(&descriptor) {
+    if ledger.already_disclosed(&descriptor) {
         log::trace!(
             "[privacy][egress] duplicate transfer provider={} service={} reason={:?} — already disclosed this turn, not re-emitting",
             descriptor.provider_slug,
