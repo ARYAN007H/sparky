@@ -307,6 +307,13 @@ pub struct OpenHumanRunContext {
     pub parent: Option<ParentExecutionContext>,
     /// Context-preparation sources already consumed in this turn.
     pub prepared_context_sources: Arc<Vec<AgentContextPreparedSource>>,
+    /// Who this run acts as on memory: its agent definition and team. Set by
+    /// the entry point that starts the run (`MemoryIdentity::root().child(id)`
+    /// for a top-level turn, `MemoryIdentity::team_member` for a team member)
+    /// and derived with `child(definition id)` for each sub-agent; read by the
+    /// memory tool and the turn's memory hooks. `None` means the host acts for
+    /// itself (the root identity).
+    pub memory_identity: Option<crate::memory::scope::MemoryIdentity>,
     /// File-state identity used to detect stale parent reads after child writes.
     pub file_state_agent_id: Option<String>,
     /// Host-owned artifact index for tool-result references.
@@ -408,7 +415,7 @@ pub(crate) struct HarnessHostPolicy {
 }
 
 pub(crate) use super::operation_context::{
-    approval_for_tool, parent_agent_id_for_tool, sandbox_mode_for_tool, HostOperationContext,
+    approval_for_tool, memory_identity_for_tool, parent_agent_id_for_tool, sandbox_mode_for_tool, HostOperationContext,
 };
 #[cfg(test)]
 pub(crate) use super::operation_context::tool_context_with_approval;
@@ -468,6 +475,7 @@ impl OpenHumanRunContext {
             turn_deadline: None,
             parent: None,
             prepared_context_sources: Arc::new(Vec::new()),
+            memory_identity: None,
             file_state_agent_id: None,
             tool_result_artifact_index: None,
             attachment_placeholders: Arc::new(Vec::new()),
@@ -678,6 +686,7 @@ impl OpenHumanRunContext {
                 .parent
                 .as_ref()
                 .map(|parent| parent.agent_definition_id.clone()),
+            memory_identity: self.memory_identity.clone(),
         });
         let context = tinyagents_harness::context::RunContext::new(config, self)
             .with_cancellation(cancellation)

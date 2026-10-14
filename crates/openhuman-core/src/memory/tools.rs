@@ -139,7 +139,7 @@ pub struct CallFacts {
 }
 
 impl CallFacts {
-    /// Gathers the facts from the run context and the turn's task-locals,
+    /// Gathers the facts from the run context,
     /// falling back to `config.action_dir` for the workspace.
     #[must_use]
     pub fn gather(config: &Config, context: Option<&dyn ToolRunContext>) -> Self {
@@ -147,9 +147,12 @@ impl CallFacts {
             .and_then(ToolRunContext::workspace_root)
             .map(std::path::Path::to_path_buf)
             .unwrap_or_else(|| config.action_dir.clone());
-        let identity = super::scope::current().unwrap_or_else(|| {
-            // Outside a scoped turn (a legacy driver), fall back to the
-            // parent context's agent, else the root.
+        // The acting identity is the run's own; direct dispatch (CLI, tests)
+        // has no run, and falls back to the spawning agent, else the root.
+        let identity = crate::agent::tinyagents::host::run_context::memory_identity_for_tool(
+            context,
+        )
+        .unwrap_or_else(|| {
             crate::agent::tinyagents::host::run_context::parent_agent_id_for_tool(context)
                 .map_or_else(super::scope::MemoryIdentity::root, |parent_agent_id| {
                     super::scope::MemoryIdentity::agent(&parent_agent_id)
@@ -377,6 +380,7 @@ impl Tool for MemoryTool {
         ) {
             let config = self.config.clone();
             let write_args = args.clone();
+            let queued_root = facts.reach.at.clone();
             let queued = crate::core::runtime::spawn_blocking_scoped(move || {
                 super::tool_writes::enqueue(&config, &write_args, &facts)
             })
@@ -388,7 +392,7 @@ impl Tool for MemoryTool {
                     ))
                 }) {
                     Ok(value) => {
-                        super::tool_writes::schedule(self.config.clone());
+                        super::tool_writes::schedule(self.config.clone(), &queued_root);
                         ToolResult::success(value.to_string())
                     }
                     Err(error) => ToolResult::error(render_error(error)),
