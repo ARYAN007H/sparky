@@ -19,7 +19,6 @@ import {
   useState,
 } from 'react';
 
-import { Button } from '../../../components/ui';
 import { useT } from '../../../lib/i18n/I18nContext';
 import { useAppSelector } from '../../../store/hooks';
 import type { ArtifactSnapshot } from '../../../store/chatRuntimeSlice';
@@ -105,7 +104,31 @@ export function ArtifactPreviewPanel({ artifactId, onClose }: ArtifactPreviewPan
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
   }, []);
 
-  const showTabs = allArtifacts.length > 1;
+  // Tab close: remove from local tab list, close panel if last
+  const [closedIds, setClosedIds] = useState<Set<string>>(new Set());
+  const visibleTabs = useMemo(
+    () => allArtifacts.filter(a => !closedIds.has(a.artifactId)),
+    [allArtifacts, closedIds],
+  );
+  const handleCloseTab = useCallback((id: string) => {
+    setClosedIds(prev => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+    // If closing the active tab, switch to the next one.
+    setActiveId(prev => {
+      if (prev !== id) return prev;
+      const remaining = visibleTabs.filter(a => a.artifactId !== id);
+      return remaining.length > 0 ? remaining[0].artifactId : prev;
+    });
+    // If all tabs closed, close the panel
+    if (visibleTabs.length <= 1) {
+      onClose();
+    }
+  }, [visibleTabs, onClose]);
+
+  const showTabs = visibleTabs.length > 1;
 
   return (
     <div
@@ -122,19 +145,34 @@ export function ArtifactPreviewPanel({ artifactId, onClose }: ArtifactPreviewPan
       <div className="flex items-center justify-between border-b shrink-0">
         <div className="flex items-center gap-1 min-w-0 flex-1 overflow-x-auto">
           {showTabs ? (
-            allArtifacts.map(a => (
-              <button
+            visibleTabs.map(a => (
+              <div
                 key={a.artifactId}
-                onClick={() => setActiveId(a.artifactId)}
-                className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium border-b-2 transition-colors shrink-0 ${
+                className={`group flex items-center gap-1 border-b-2 px-2 py-2.5 transition-colors shrink-0 min-w-0 ${
                   a.artifactId === activeId
-                    ? 'border-primary text-foreground'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                    ? 'border-primary'
+                    : 'border-transparent'
                 }`}
               >
-                <FileText className="h-3.5 w-3.5" />
-                <span className="truncate max-w-[120px]">{a.title}</span>
-              </button>
+                <button
+                  onClick={() => setActiveId(a.artifactId)}
+                  className={`flex min-w-0 items-center gap-1.5 text-xs font-medium transition-colors ${
+                    a.artifactId === activeId
+                      ? 'text-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <FileText className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate max-w-[110px]">{a.title}</span>
+                </button>
+                <button
+                  onClick={() => handleCloseTab(a.artifactId)}
+                  className="ml-0.5 rounded p-0.5 text-muted-foreground/50 hover:bg-accent hover:text-foreground shrink-0"
+                  title="Close artifact"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
             ))
           ) : (
             <div className="flex items-center gap-2 px-4 py-2.5 min-w-0">
@@ -145,9 +183,9 @@ export function ArtifactPreviewPanel({ artifactId, onClose }: ArtifactPreviewPan
             </div>
           )}
         </div>
-        <Button variant="ghost" size="xs" onClick={onClose} className="mr-2 shrink-0">
+        <button onClick={onClose} className="mr-2 shrink-0 inline-flex items-center justify-center rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground">
           <X className="h-4 w-4" />
-        </Button>
+        </button>
       </div>
 
       {/* Content */}
@@ -384,10 +422,10 @@ function EditableTextViewer({
             </button>
           </div>
 
-          <Button variant="ghost" size="xs" onClick={handleCopy} title="Copy to clipboard">
+          <button onClick={handleCopy} title="Copy to clipboard" className="inline-flex items-center justify-center rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground">
             {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Clipboard className="h-3.5 w-3.5" />}
-          </Button>
-          <Button variant="ghost" size="xs" onClick={handleSave} disabled={saving} title="Save as new version">
+          </button>
+          <button onClick={handleSave} disabled={saving} title="Save as new version" className="inline-flex items-center justify-center rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50">
             {saving ? (
               <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             ) : saved ? (
@@ -395,7 +433,7 @@ function EditableTextViewer({
             ) : (
               <Save className="h-3.5 w-3.5" />
             )}
-          </Button>
+          </button>
         </div>
       </div>
 

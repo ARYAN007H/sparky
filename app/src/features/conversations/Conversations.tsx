@@ -2164,7 +2164,7 @@ const Conversations = ({
     : [];
   const liveArtifactDeck =
     liveArtifacts.length > 0 && artifactDeckThreadId ? (
-      <div className="mb-2 flex flex-col gap-2">
+      <div className="flex flex-col gap-2">
         {liveArtifacts.map(artifact => (
           <ArtifactCardAdapter
             key={artifact.artifactId}
@@ -2216,7 +2216,6 @@ const Conversations = ({
       {sendErrorBanner}
       {stallWarningBanner}
       {sendAdvisoryBanner}
-      {liveArtifactDeck}
       {/* The core's run queue for this thread; renders nothing while empty. */}
       <ComposerMessageQueue />
       {/* Where this conversation works. Last, so it sits directly on the
@@ -2338,6 +2337,7 @@ const Conversations = ({
         onOpenHumanMode={() => openTinyVoice(chatMascot, navigate)}
         onSwitchToMicCloud={() => setComposerOverride('mic-cloud')}
         onModelChange={applyComposerModel}
+        afterMessages={liveArtifactDeck}
       />
       {/* The transcript-local overlays: background processes and the Agent
           Process Source panel. Mounted beside the Thread (not inside it)

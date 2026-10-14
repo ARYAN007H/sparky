@@ -143,6 +143,13 @@ export type ThreadComponents = {
    * `null` when there is nothing to show.
    */
   TranscriptFooter?: ComponentType | undefined;
+  /**
+   * Host-owned content rendered after the last message, inside the
+   * scrollable transcript — artifact cards from versioned tools that
+   * carry no tool-call id and would otherwise be invisible to the
+   * inline tool-call renderer. Always mounted (not gated on isRunning).
+   */
+  AfterMessages?: ComponentType | undefined;
   /** Host-owned attachment previews rendered above the editor. */
   ComposerAttachments?: ComponentType | undefined;
   /** Host-owned attachment picker rendered in the action row. */
@@ -500,6 +507,7 @@ const ThreadRoot: FC<{
             <ThreadPrimitive.Messages>{() => <ThreadMessage />}</ThreadPrimitive.Messages>
             <RunningStatusSlot />
             <TranscriptFooterSlot />
+            <AfterMessagesSlot />
             {ActiveTasks && <ActiveTasks />}
           </div>
 
@@ -572,6 +580,13 @@ const TranscriptFooterSlot: FC = () => {
       <TranscriptFooter />
     </AuiIf>
   );
+};
+
+/** Host content after the last message; always mounted (not gated). */
+const AfterMessagesSlot: FC = () => {
+  const { AfterMessages } = useContext(ThreadComponentsContext);
+  if (!AfterMessages) return null;
+  return <AfterMessages />;
 };
 
 const ThreadMessage: FC = () => {
