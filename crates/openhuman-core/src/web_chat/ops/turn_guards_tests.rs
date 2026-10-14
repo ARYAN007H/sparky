@@ -18,7 +18,7 @@ async fn guarded_turn_sees_the_backstop_deadline() {
     let seen = std::sync::Arc::new(std::sync::Mutex::new(None));
     let seen_in_turn = seen.clone();
     let res = drive_turn_with_deadline(Some(backstop), async move {
-        *seen_in_turn.lock().unwrap() = crate::agent::turn_deadline::current();
+        *seen_in_turn.lock().unwrap() = crate::agent::session_host::turn_backstop::current();
         Ok(result("answer"))
     })
     .await
@@ -34,7 +34,7 @@ async fn guarded_turn_sees_the_backstop_deadline() {
 #[tokio::test]
 async fn disabled_backstop_scopes_no_deadline() {
     let res = drive_turn_with_deadline(None, async {
-        assert!(crate::agent::turn_deadline::current().is_none());
+        assert!(crate::agent::session_host::turn_backstop::current().is_none());
         Ok(result("ok"))
     })
     .await;

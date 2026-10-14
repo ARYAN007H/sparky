@@ -12,7 +12,7 @@ use super::super::types::WebChatTaskResult;
 /// (env `OPENHUMAN_WEB_TURN_TIMEOUT_SECS=0`).
 ///
 /// This is the OUTER safety net (issue #4746), and the single source of truth
-/// for the turn's deadlines (`agent::turn_deadline`, default 900s). The
+/// for the turn's deadlines (`agent::session_host::turn_backstop`, default 900s). The
 /// harness derives two earlier points from it:
 ///
 /// * **wind-down** at backstop minus `min(120s, backstop/5)`, 780s by default.
@@ -34,7 +34,7 @@ use super::super::types::WebChatTaskResult;
 /// nothing delivered. Override via `OPENHUMAN_WEB_TURN_TIMEOUT_SECS`; set it to
 /// `0` to disable the backstop and the derived deadlines with it.
 fn web_turn_deadline() -> Option<Duration> {
-    crate::agent::turn_deadline::configured_backstop()
+    crate::agent::session_host::turn_backstop::configured_backstop()
 }
 
 /// The backstop for a turn that has to be allowed to run long: one on a local /
@@ -77,12 +77,12 @@ where
 {
     match deadline {
         // Scope the deadline on the task so the session turn hands it to the
-        // harness (`agent::turn_deadline`), which winds down before `d`. The
+        // harness (`agent::session_host::turn_backstop`), which winds down before `d`. The
         // turn future is boxed: it is very large, and the scope wrapper would
         // otherwise hold it inline a second time and overflow the worker stack.
         Some(d) => match tokio::time::timeout(
             d,
-            crate::agent::turn_deadline::with_turn_deadline(
+            crate::agent::session_host::turn_backstop::with_turn_deadline(
                 Some(tinyagents_harness::turn_deadline::TurnDeadline::starting_now(d)),
                 Box::pin(fut),
             ),
