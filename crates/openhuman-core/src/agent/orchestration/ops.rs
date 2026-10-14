@@ -365,7 +365,8 @@ impl AgentOrchestrationSession {
         // only its route/usage observations are isolated by `child()` in the
         // subagent runner.
         let cancellation = CancellationToken::new();
-        let mut run_context = crate::agent::tinyagents::host::OpenHumanRunContext::new();
+        let mut run_context = crate::agent::tinyagents::host::OpenHumanRunContext::new()
+            .with_host_env(&parent.host_env);
         run_context.parent = Some(parent.clone());
         run_context.progress = parent.on_progress.clone().or(run_context.progress);
         run_context.workspace = parent_workspace_descriptor
