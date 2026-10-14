@@ -178,7 +178,7 @@ pub(in super::super) async fn run_subagent_via_graph(
 
     // A sub-agent turn runs *nested inside* the parent agent's turn (parent
     // harness → spawn_subagent tool → here), so the child's full
-    // `run_turn_via_tinyagents_shared` future would otherwise sit on the parent's
+    // `TurnSpec::run` future would otherwise sit on the parent's
     // poll stack. Heap-allocate it (as the legacy `run_inner_loop` did) so the
     // parent+child harness drives don't overflow the stack.
     // Native-tool support drives the durable-history suffix dispatcher; capture it
