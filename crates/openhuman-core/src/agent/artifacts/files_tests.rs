@@ -4,8 +4,8 @@ use tempfile::TempDir;
 
 use super::*;
 use crate::agent::artifacts::store::{
-    create_artifact, delete_artifact, fail_artifact, finalize_artifact, list_artifacts,
-    read_artifact_bytes, save_artifact_meta, REGENERATE_TARGET_ID,
+    create_artifact, create_artifact_regenerating, delete_artifact, fail_artifact,
+    finalize_artifact, list_artifacts, read_artifact_bytes, save_artifact_meta,
 };
 use crate::agent::artifacts::types::ArtifactKind;
 
