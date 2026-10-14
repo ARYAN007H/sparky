@@ -205,7 +205,7 @@ async fn tokenjuice_methods_are_not_gated_when_juice_is_on() {
     );
     crate::core::runtime::context::CoreContext::scope(ctx, async {
         // Gate passes; the handler then fails on its own missing param.
-        let err = handle_detect(Map::new()).await.unwrap_err();
+        let err = handle_detect(DispatchCtx::process_default(), Map::new()).await.unwrap_err();
         assert!(!err.contains("COMPONENT_DISABLED"), "{err}");
     })
     .await;

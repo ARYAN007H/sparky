@@ -91,7 +91,7 @@ async fn handle_list_degrades_for_non_git_action_dir() {
         std::env::set_var("OPENHUMAN_ACTION_DIR", &action_dir);
     }
 
-    let out = handle_list(Map::new())
+    let out = handle_list(DispatchCtx::process_default(), Map::new())
         .await
         .expect("list handler degrades cleanly for a non-git action_dir");
     // `into_cli_compatible_json` returns the bare value when there are no

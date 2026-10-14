@@ -56,7 +56,7 @@ fn object(value: Value) -> Map<String, Value> {
 async fn call(config: &Config, function: &str, params: Value) -> Result<Value, String> {
     let handler = handler_for(function);
     let ctx = CoreContext::for_test_with_config(DomainSet::full(), config.clone());
-    CoreContext::scope(ctx, async move { handler(object(params)).await }).await
+    CoreContext::scope(ctx, async move { handler(DispatchCtx::process_default(), object(params)).await }).await
 }
 
 #[test]

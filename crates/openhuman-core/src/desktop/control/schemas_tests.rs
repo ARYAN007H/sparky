@@ -36,7 +36,7 @@ fn scoped_context(computer: bool) -> (tempfile::TempDir, std::sync::Arc<CoreCont
 async fn pending_lists_actions_while_the_computer_component_is_on() {
     let (_dir, context) = scoped_context(true);
     CoreContext::scope(context, async {
-        let value = (controller("pending").handler)(Map::new()).await.unwrap();
+        let value = (controller("pending").handler)(DispatchCtx::process_default(), Map::new()).await.unwrap();
         assert!(value.is_array());
     })
     .await;
@@ -47,7 +47,7 @@ async fn every_desktop_controller_answers_component_disabled_when_computer_is_of
     let (_dir, context) = scoped_context(false);
     CoreContext::scope(context, async {
         for function in ["status", "probe", "pending"] {
-            let error = (controller(function).handler)(Map::new())
+            let error = (controller(function).handler)(DispatchCtx::process_default(), Map::new())
                 .await
                 .unwrap_err();
             assert!(
@@ -57,14 +57,14 @@ async fn every_desktop_controller_answers_component_disabled_when_computer_is_of
         }
         let mut params = Map::new();
         params.insert("enabled".to_owned(), Value::Bool(true));
-        let error = (controller("set_enabled").handler)(params)
+        let error = (controller("set_enabled").handler)(DispatchCtx::process_default(), params)
             .await
             .unwrap_err();
         assert!(error.contains("COMPONENT_DISABLED:computer"), "{error}");
         let mut params = Map::new();
         params.insert("confirmation_id".to_owned(), Value::String("id".to_owned()));
         params.insert("approve".to_owned(), Value::Bool(true));
-        let error = (controller("confirm").handler)(params).await.unwrap_err();
+        let error = (controller("confirm").handler)(DispatchCtx::process_default(), params).await.unwrap_err();
         assert!(error.contains("COMPONENT_DISABLED:computer"), "{error}");
     })
     .await;
@@ -80,7 +80,7 @@ async fn malformed_controller_inputs_fail_before_loading_config_or_acting() {
         let mut params = Map::new();
         params.insert("enabled".to_owned(), invalid);
         assert_eq!(
-            (controller("set_enabled").handler)(params)
+            (controller("set_enabled").handler)(DispatchCtx::process_default(), params)
                 .await
                 .unwrap_err(),
             "enabled must be a boolean"
@@ -90,14 +90,14 @@ async fn malformed_controller_inputs_fail_before_loading_config_or_acting() {
     params.insert("confirmation_id".to_owned(), Value::String(String::new()));
     params.insert("approve".to_owned(), Value::Bool(true));
     assert_eq!(
-        (controller("confirm").handler)(params).await.unwrap_err(),
+        (controller("confirm").handler)(DispatchCtx::process_default(), params).await.unwrap_err(),
         "confirmation_id is required"
     );
     let mut params = Map::new();
     params.insert("confirmation_id".to_owned(), Value::String("id".to_owned()));
     params.insert("approve".to_owned(), Value::String("yes".to_owned()));
     assert_eq!(
-        (controller("confirm").handler)(params).await.unwrap_err(),
+        (controller("confirm").handler)(DispatchCtx::process_default(), params).await.unwrap_err(),
         "approve must be a boolean"
     );
 }
@@ -111,16 +111,16 @@ async fn controllers_use_scoped_config_for_disabled_desktop_and_reject_unknown_c
     let context = CoreContext::for_test_with_config(DomainSet::full(), config);
 
     CoreContext::scope(context, async {
-        let status = (controller("status").handler)(Map::new()).await.unwrap();
+        let status = (controller("status").handler)(DispatchCtx::process_default(), Map::new()).await.unwrap();
         assert_eq!(status["enabled"], false);
 
-        let probe = (controller("probe").handler)(Map::new()).await.unwrap();
+        let probe = (controller("probe").handler)(DispatchCtx::process_default(), Map::new()).await.unwrap();
         assert_eq!(probe["ok"], false);
         assert!(probe["reason"].as_str().unwrap().contains("disabled"));
 
         let mut params = Map::new();
         params.insert("enabled".to_owned(), Value::Bool(false));
-        let disabled = (controller("set_enabled").handler)(params).await.unwrap();
+        let disabled = (controller("set_enabled").handler)(DispatchCtx::process_default(), params).await.unwrap();
         assert_eq!(disabled["enabled"], false);
 
         let mut params = Map::new();
@@ -129,7 +129,7 @@ async fn controllers_use_scoped_config_for_disabled_desktop_and_reject_unknown_c
             Value::String("missing".to_owned()),
         );
         params.insert("approve".to_owned(), Value::Bool(true));
-        let error = (controller("confirm").handler)(params).await.unwrap_err();
+        let error = (controller("confirm").handler)(DispatchCtx::process_default(), params).await.unwrap_err();
         assert!(error.contains("missing or expired"));
     })
     .await;
