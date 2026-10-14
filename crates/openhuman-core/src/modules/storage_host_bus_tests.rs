@@ -1,6 +1,5 @@
 use super::*;
 use serde_json::json;
-use tinybus::ObjectPath;
 use tinystoragedrivers_bus::STORAGE_INTERFACE;
 use tinystoragedrivers_busproxy::{ERROR_DENIED, OBJECT_ROOT};
 

@@ -30,7 +30,6 @@ use tinybus::module::ModuleHost;
 use tinybus::transport::memory::MemoryBus;
 use tinybus::{Connection, Proxy};
 use tinystoragedrivers::secrets::{DerivedKeys, KeyProvider};
-use tinystoragedrivers::MemoryStorage;
 use zeroize::Zeroizing;
 
 use crate::modules::storage_grants::{declared, StorageGrant};

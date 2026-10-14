@@ -41,6 +41,10 @@ impl StorageBackend for WatchingStorage {
         self.inner.capabilities().with(Capability::Watch)
     }
 
+    fn database(&self, name: &str) -> Result<Arc<dyn StorageBackend>> {
+        self.inner.database(name)
+    }
+
     fn for_scope(&self, scope: &Scope) -> Result<ScopedStorage> {
         let scoped = self.inner.for_scope(scope)?;
         let sender = {
