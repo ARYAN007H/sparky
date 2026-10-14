@@ -6741,7 +6741,7 @@ dependencies = [
 
 [[package]]
 name = "tinybox-bus"
-version = "0.1.30"
+version = "0.1.31"
 dependencies = [
  "serde",
 ]
@@ -6790,7 +6790,7 @@ dependencies = [
 
 [[package]]
 name = "tinychannels-bus"
-version = "0.1.31"
+version = "0.1.32"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6813,7 +6813,7 @@ dependencies = [
 
 [[package]]
 name = "tinyconnectors-bus"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -7116,7 +7116,7 @@ dependencies = [
 
 [[package]]
 name = "tinyjuice-bus"
-version = "0.10.1"
+version = "0.10.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -7143,7 +7143,7 @@ dependencies = [
 
 [[package]]
 name = "tinymcp-bus"
-version = "0.18.1"
+version = "0.18.2"
 dependencies = [
  "schemars 1.2.2",
  "serde",
@@ -7425,7 +7425,7 @@ dependencies = [
 
 [[package]]
 name = "tinywallet-bus"
-version = "0.23.0"
+version = "0.23.1"
 dependencies = [
  "serde",
  "serde_json",
