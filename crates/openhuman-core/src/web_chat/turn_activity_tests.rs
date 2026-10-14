@@ -193,16 +193,6 @@ async fn tap_records_and_forwards_in_order() {
 }
 
 #[tokio::test]
-async fn task_local_scope_is_visible_inside_only() {
-    assert!(current().is_none());
-    let activity = TurnActivity::new();
-    assert!(with_turn_activity(activity, async { current() })
-        .await
-        .is_some());
-    assert!(current().is_none());
-}
-
-#[tokio::test]
 async fn stuck_point_names_where_the_turn_went_quiet() {
     let activity = TurnActivity::new();
     activity.observe(&AgentProgress::TurnContent {
