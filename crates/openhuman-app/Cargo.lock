@@ -6692,7 +6692,6 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.20",
  "tinyagents-harness",
- "tinyagents-registry",
  "tinyagents-session",
  "tinyinference-llm",
  "tinytools",
