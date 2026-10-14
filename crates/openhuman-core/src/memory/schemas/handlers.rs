@@ -17,6 +17,7 @@ use crate::memory::types::{
     SourceRemovedView, SourcesAddParams, SourcesListView, SourcesRemoveParams, SourcesSyncParams,
     SourcesSyncView,
 };
+use crate::memory::scope::MemoryIdentity;
 use crate::memory::{backfill, brain, confine, engine, import, layout_migration, ops, sources};
 
 fn parse<T: DeserializeOwned>(params: Map<String, Value>) -> Result<T, String> {
@@ -176,28 +177,28 @@ pub(super) fn conversations_backfill_start(params: Map<String, Value>) -> Contro
 pub(super) fn brain_sources(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         parse::<EmptyParams>(params)?;
-        finish(brain::sources(&load().await?).await)
+        finish(brain::sources(&load().await?, &MemoryIdentity::root()).await)
     })
 }
 
 pub(super) fn brain_search(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<brain::BrainSearchParams>(params)?;
-        finish(brain::search(&load().await?, params).await)
+        finish(brain::search(&load().await?, &MemoryIdentity::root(), params).await)
     })
 }
 
 pub(super) fn brain_ingest(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<brain::BrainIngestParams>(params)?;
-        finish(brain::ingest(&load().await?, params).await)
+        finish(brain::ingest(&load().await?, &MemoryIdentity::root(), params).await)
     })
 }
 
 pub(super) fn brain_forget(params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<brain::BrainForgetParams>(params)?;
-        finish(brain::forget(&load().await?, params).await)
+        finish(brain::forget(&load().await?, &MemoryIdentity::root(), params).await)
     })
 }
 
