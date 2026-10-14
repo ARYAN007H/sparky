@@ -143,21 +143,30 @@ fn a_stale_snapshot_does_not_revert_a_newer_session() {
 }
 
 #[test]
-fn a_legacy_session_file_is_imported_once_and_retired() {
+fn a_legacy_session_file_is_imported_once_and_left_byte_identical() {
     let dir = tempfile::tempdir().unwrap();
     let legacy = dir.path().join(".openhuman");
     std::fs::create_dir_all(&legacy).unwrap();
-    std::fs::write(
-        legacy.join("subagent_sessions.json"),
-        serde_json::to_string(&vec![session("legacy-1")]).unwrap(),
-    )
-    .unwrap();
+    let original = serde_json::to_string(&vec![session("legacy-1")]).unwrap();
+    std::fs::write(legacy.join("subagent_sessions.json"), &original).unwrap();
     let store = SubagentSessionStore::new(dir.path().to_path_buf());
 
     let loaded = store.load().unwrap();
     assert_eq!(loaded.len(), 1);
     assert_eq!(loaded[0].subagent_session_id, "legacy-1");
-    assert!(!legacy.join("subagent_sessions.json").exists());
-    assert!(legacy.join("subagent_sessions.json.migrated").exists());
+    // The legacy file is read only: same name, same bytes, no `.migrated`.
+    assert_eq!(
+        std::fs::read_to_string(legacy.join("subagent_sessions.json")).unwrap(),
+        original
+    );
+    assert!(!legacy.join("subagent_sessions.json.migrated").exists());
     assert_eq!(store.load().unwrap().len(), 1);
+    // The marker, not the file, stops a second import: a session saved after
+    // the first import and then removed from the store is not resurrected.
+    store.save(&[]).unwrap();
+    assert_eq!(store.load().unwrap().len(), 1);
+    assert_eq!(
+        std::fs::read_to_string(legacy.join("subagent_sessions.json")).unwrap(),
+        original
+    );
 }
