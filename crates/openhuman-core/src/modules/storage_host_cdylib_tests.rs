@@ -188,6 +188,16 @@ async fn rig(module_id: &'static str) -> Rig {
     let staged = tempfile::tempdir().unwrap();
     let artifact = stage(staged.path());
     modules.load_file(&artifact).expect("load the probe cdylib");
+    // `load_file` can return before the module's setup claims its name.
+    let probe_name = BusName::new(PROBE).expect("probe bus name");
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    while !matches!(stranger.name_owner(&probe_name).await, Ok(Some(_))) {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the probe module never claimed {PROBE}"
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
     let probe = stranger.proxy(PROBE, "/probe", PROBE).unwrap();
     Rig {
         backend,
