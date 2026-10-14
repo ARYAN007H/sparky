@@ -488,10 +488,10 @@ async fn a_blob_over_the_frame_cannot_go_inline() {
         .unwrap();
     assert!(small.get("ok").is_some(), "a small inline blob works: {small}");
     // Past the contract's inline cap (1 MiB) the server refuses the body, and
-    // past the 16 MiB frame (8 MiB of bytes is already more than that as JSON)
+    // past the 16 MiB frame (4.5 MB of 0xFF bytes is already 18 MB as JSON)
     // the bus never delivers it. Either way it must fail closed and store
     // nothing; the way for a big body is `PutStream` (#7781).
-    for (len, name) in [(2usize * 1024 * 1024, "over-cap"), (9_000_000, "over-frame")] {
+    for (len, name) in [(2usize * 1024 * 1024, "over-cap"), (4_500_000, "over-frame")] {
         let key = format!("tinyjuice_ccr/{name}");
         eprintln!("[cdylib-test] inline blob {name} ({len} bytes)");
         let started = std::time::Instant::now();

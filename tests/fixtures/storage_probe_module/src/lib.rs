@@ -39,7 +39,7 @@ impl Interface for Probe {
                 (
                     "Blobs".into(),
                     "Put".into(),
-                    json!({ "key": key, "bytes": vec![7u8; len] }),
+                    json!({ "key": key, "bytes": vec![255u8; len] }),
                     false,
                 )
             } else {
