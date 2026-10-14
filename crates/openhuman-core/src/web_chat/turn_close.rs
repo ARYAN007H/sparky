@@ -17,7 +17,7 @@
 use std::time::Duration;
 
 use tinyagents_session::turn_state::types::TranscriptItem;
-use tinyagents_session::turn_state::{ToolTimelineStatus, TurnState, TurnStateStore};
+use tinyagents_session::turn_state::{ToolTimelineStatus, TurnState};
 use tinyinference_llm::message::Message;
 use tinyinference_llm::model::ModelRequest;
 
@@ -280,16 +280,17 @@ async fn model_reply(
     }
 }
 
-/// Read the turn's snapshot off the async worker: it is a synchronous disk
-/// read, and a stalled filesystem must not pin the runtime thread.
+/// Read the turn's snapshot off the async worker: it is a synchronous store
+/// read, and a stalled store must not pin the runtime thread. The scoped spawn
+/// carries the caller's tenant, which selects the store.
 async fn read_snapshot(
     workspace: std::path::PathBuf,
     thread_id: &str,
     request_id: &str,
 ) -> Option<TurnState> {
     let (thread_id, request_id) = (thread_id.to_string(), request_id.to_string());
-    let read = tokio::task::spawn_blocking(move || {
-        TurnStateStore::new(workspace).get_turn(&thread_id, &request_id)
+    let read = crate::core::runtime::spawn_blocking_scoped(move || {
+        crate::agent::session_store::turn_states_for(&workspace).get_turn(&thread_id, &request_id)
     })
     .await;
     match read {

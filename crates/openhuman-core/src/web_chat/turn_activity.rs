@@ -264,7 +264,7 @@ pub(crate) fn tap(
     capacity: usize,
 ) -> mpsc::Receiver<AgentProgress> {
     let (bridge_tx, bridge_rx) = mpsc::channel(capacity);
-    tokio::spawn(async move {
+    crate::core::runtime::spawn_scoped(async move {
         while let Some(event) = agent_rx.recv().await {
             activity.observe(&event);
             if bridge_tx.send(event).await.is_err() {

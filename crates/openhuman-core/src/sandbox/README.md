@@ -47,7 +47,7 @@ backend, execute.
 ### Resolving a policy
 
 `resolve_sandbox_policy` ([`ops.rs`](./ops.rs)) maps the agent's declared
-`SandboxMode` (`agent::harness::definition`) to a `SandboxBackendKind`:
+`SandboxMode` (`tinyagents_definition::SandboxMode`) to a `SandboxBackendKind`:
 
 - `None` and `ReadOnly` resolve to `SandboxBackendKind::None`.
 - `Sandboxed` resolves to `Docker` when `runtime_config.kind == "docker"` or
@@ -198,7 +198,7 @@ The settings surface (`get_sandbox_settings`, `[security.sandbox]` and
   (`SelectShell` / `StartNativeShellExec`); `agent::host_runtime::host_shell_flavor`
   only tells the model which family that is.
 - The agent's `SandboxMode` is declared in its definition
-  (`agent::harness::definition`) and read per call through
+  (`tinyagents_definition::SandboxMode`) and read per call through
   the explicit agent sandbox mode supplied by the tool execution context.
 
 ## Gotchas
@@ -229,6 +229,6 @@ fixture. Run with
 
 ## Further reading
 
-- [Privacy and security](../../../../gitbooks/features/privacy-and-security.md)
-- [Security architecture](../../../../gitbooks/developing/architecture/security.md)
+- [Privacy and security](../../../../docs/gitbooks/en/features/privacy-and-security.md)
+- [Security architecture](../../../../docs/gitbooks/en/developing/architecture/security.md)
 - [tinybox submodule](../../../../vendor/tinybox/README.md)

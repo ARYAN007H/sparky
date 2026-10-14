@@ -3,7 +3,7 @@
 Native TinyAgents `ChatModel` construction plus cloud/local inference policy,
 auth, error taxonomy, and RPC helpers for every chat-model transport OpenHuman
 supports. This is the chat-model half of OpenHuman's pluggable-engine story
-(see [gitbooks/developing/engines.md](../../../../../gitbooks/developing/engines.md)):
+(see [docs/gitbooks/en/developing/engines.md](../../../../../docs/gitbooks/en/developing/engines.md)):
 the model a turn runs on is chosen by config, not by code change. Was
 previously `providers/` (pre-consolidation single-crate layout); see
 [`../README.md`](../README.md) for how this fits into the wider `inference` domain.
@@ -20,7 +20,7 @@ previously `providers/` (pre-consolidation single-crate layout); see
   and applies the BYOK sentinel, Privacy-Mode `LocalOnly`
   (`enforce_local_only_inference`), and managed-session (`verify_session_active`)
   gates before building a model. See
-  [gitbooks/features/model-routing/local-and-byok-models.md](../../../../../gitbooks/features/model-routing/local-and-byok-models.md)
+  [docs/gitbooks/en/features/model-routing/local-and-byok-models.md](../../../../../docs/gitbooks/en/features/model-routing/local-and-byok-models.md)
   for the user-facing side of local and BYOK routing.
 - **Models**: `OpenHumanBackendModel` + `PROVIDER_LABEL`
   ([`openhuman_backend_model.rs`](./openhuman_backend_model.rs)); OpenAI-compatible and Anthropic builders live
@@ -39,7 +39,7 @@ previously `providers/` (pre-consolidation single-crate layout); see
 | Anthropic Messages API (prompt caching) | `tinyinference_llm::providers::anthropic` | `<slug>:<model>` whose endpoint is the first-party Messages API and native tool calling is on |
 | Codex OAuth / Responses API | [`openai_codex.rs`](./openai_codex.rs) host OAuth selection plus `tinyinference_llm::providers::openai::codex` metadata | the `openai` cloud slug once Codex OAuth tokens exist |
 | Claude Agent SDK subprocess | `tinyagents_harness::providers::claude_agent_sdk` | `claude_agent_sdk` / `claude_agent_sdk:<model>` |
-| Claude Code CLI subprocess | `tinyagents_harness::providers::claude_code` (see the [Claude Code provider guide](../../../../../gitbooks/developing/providers/claude-code.md)) | `claude-code:<model>` |
+| Claude Code CLI subprocess | `tinyagents_harness::providers::claude_code` (see the [Claude Code provider guide](../../../../../docs/gitbooks/en/developing/providers/claude-code.md)) | `claude-code:<model>` |
 
 ## Calls into
 
@@ -89,7 +89,7 @@ consumers: the agent harness ([`agent/session_host/builder/factory.rs`](../../ag
   (`list_configured_models`), `provider_factory` (`ProviderRuntimeOptions`,
   `list_providers`).
   Preserves the original `pub use ops::*` contract split out of a single `ops.rs`.
-- Claude Code CLI provider: `tinyagents_harness::providers::claude_code` in [`vendor/tinyagents`](../../../../../vendor/tinyagents/); see the [Claude Code provider guide](../../../../../gitbooks/developing/providers/claude-code.md).
+- Claude Code CLI provider: `tinyagents_harness::providers::claude_code` in [`vendor/tinyagents`](../../../../../vendor/tinyagents/); see the [Claude Code provider guide](../../../../../docs/gitbooks/en/developing/providers/claude-code.md).
 
 ## Tests
 
@@ -119,4 +119,4 @@ session requirement for that agent.
 
 ## Further reading
 
-- [Automatic model routing](../../../../../gitbooks/features/model-routing/README.md)
+- [Automatic model routing](../../../../../docs/gitbooks/en/features/model-routing/README.md)

@@ -225,6 +225,23 @@ path = "../../tests/storage_default_import_e2e.rs"
 required-features = ["storage-sqlite"]
 
 [[test]]
+# Builds a whole pre-storage desktop workspace (every legacy per-domain DB and
+# JSON/JSONL file the importers read), imports it on each driver and checks the
+# result is lossless with the legacy files untouched. Its own binary: it
+# installs a storage backend into the process-wide slot.
+name = "storage_desktop_upgrade_e2e"
+path = "../../tests/storage_desktop_upgrade_e2e.rs"
+required-features = ["storage-sqlite", "modules"]
+
+[[test]]
+# The released TinyMCP cdylib under the real host: add a server, restart the
+# core, list it (#7737). Ignored without a staged module; the Rust e2e runner
+# stages the registry-pinned release and runs it.
+name = "tinymcp_storage_smoke_e2e"
+path = "../../tests/tinymcp_storage_smoke_e2e.rs"
+required-features = ["storage-sqlite", "modules", "mcp"]
+
+[[test]]
 name = "saas_mode_e2e"
 path = "../../tests/saas_mode_e2e.rs"
 
@@ -356,6 +373,7 @@ sha2 = "0.10"
 tar = "0.4"
 tinyagents-graph = { path = "../../vendor/tinyagents/crates/tinyagents-graph", features = ["sqlite", "storage-drivers"] }
 tinyagents-harness = { path = "../../vendor/tinyagents/crates/tinyagents-harness", features = ["sqlite", "multimodal"] }
+tinyagents-definition = { path = "../../vendor/tinyagents/crates/tinyagents-definition" }
 tinyagents-session = { path = "../../vendor/tinyagents/crates/tinyagents-session" }
 tinydocs-bus = { path = "../../vendor/tinydocs/crates/tinydocs-bus" }
 tinysearch-bus = { path = "../../vendor/tinysearch/crates/tinysearch-bus" }

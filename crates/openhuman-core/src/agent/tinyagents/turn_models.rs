@@ -10,21 +10,6 @@ use tinyagents_harness::host::{ModelResolveRequest, ModelResolver};
 use tinyinference_llm::model::{ErrorSlotModel, ProfileOverrideModel};
 use tinyinference_llm::model::{ResolvedModelRoute, RouteRecordingModel};
 
-pub(crate) fn tinyagents_depth_error(
-    err: &tinyagents_harness::TinyAgentsError,
-) -> Option<crate::agent::subagent_host::SubagentRunError> {
-    match err {
-        tinyagents_harness::TinyAgentsError::SubAgentDepth(max_depth)
-        | tinyagents_harness::TinyAgentsError::RecursionLimit(max_depth) => Some(
-            crate::agent::subagent_host::SubagentRunError::SpawnDepthExceeded {
-                attempted_depth: max_depth.saturating_add(1),
-                max_depth: *max_depth,
-            },
-        ),
-        _ => None,
-    }
-}
-
 /// The per-turn crate [`ChatModel`](tinyinference_llm::model::ChatModel) set,
 /// built once from an openhuman [`Provider`] by [`build_turn_models`] — the
 /// single place a turn's `native model adapters are constructed (issue #4249, Phase 5).
@@ -42,7 +27,7 @@ pub(crate) struct TurnModels {
     /// its provider errors don't touch the turn's `error_slot`).
     pub(crate) summarizer: TurnChatModel,
     /// Recovers the primary's original (downcastable) provider error on failure.
-    pub(crate) error_slot: crate::agent::tinyagents::model::ModelErrorSlot,
+    pub(crate) error_slot: tinyinference_llm::model::ModelErrorSlot,
     /// Provider telemetry id (`{provider_id}.{model}` in Langfuse), captured from
     /// the source `Provider` at build time. Carried here (issue #4249, Phase 3 /
     /// Motion A) so the harness turn path no longer reads it off a raw

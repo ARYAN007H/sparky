@@ -14,9 +14,9 @@
 //!   task-local [`with_progress_heartbeat`] scopes around the call (the poll
 //!   loop runs inline on the tool's task), and the next heartbeat includes it.
 //!
-//! The host does not yet project `ToolProgressDetail` onto the web channel, so
-//! these updates reach the harness event stream and its subscribers but not the
-//! chat UI; see the module README.
+//! The host projects `ToolProgressDetail` onto the web channel as a
+//! `tool_progress` event for the parent call
+//! (`agent::tinyagents::observability`); the chat UI does not render it yet.
 
 use std::sync::{Arc, Mutex};
 use std::time::Duration;

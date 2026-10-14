@@ -63,7 +63,7 @@ where
             // execute the full core boot sequence. Hosted turns still need
             // the same built-in definition registry that boot initializes in
             // production, so install it before constructing the router.
-            openhuman_core::agent::harness::definition::AgentDefinitionRegistry::init_global_builtins()
+            openhuman_core::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins()
                 .expect("initialize built-in agent definitions for JSON-RPC E2E");
             let rt = tokio::runtime::Builder::new_multi_thread()
                 .worker_threads(2)
@@ -3491,7 +3491,8 @@ async fn json_rpc_thread_turn_state_lifecycle() {
     state.lifecycle = tinyagents_session::turn_state::TurnLifecycle::Streaming;
     state.iteration = 2;
     state.streaming_text = "partial".into();
-    tinyagents_session::turn_state::store::put(workspace_dir.clone(), &state)
+    openhuman_core::agent::session_store::turn_states_for(&workspace_dir)
+        .put(&state)
         .expect("seed snapshot");
 
     // get → present
@@ -3549,7 +3550,8 @@ async fn json_rpc_thread_turn_state_lifecycle() {
     );
     state2.lifecycle = tinyagents_session::turn_state::TurnLifecycle::Completed;
     state2.updated_at = "2999-01-01T00:00:00Z".into();
-    tinyagents_session::turn_state::store::put(workspace_dir.clone(), &state2)
+    openhuman_core::agent::session_store::turn_states_for(&workspace_dir)
+        .put(&state2)
         .expect("seed snapshot 2");
 
     // history → both turns, newest first.

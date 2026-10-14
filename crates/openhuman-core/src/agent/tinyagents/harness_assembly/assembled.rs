@@ -9,7 +9,7 @@ pub(in crate::agent::tinyagents) struct AssembledTurnHarness {
     pub(in crate::agent::tinyagents) harness: AgentHarness<(), OpenHumanRunContext>,
     /// Shared 1-based model-call cursor (event bridge advances, model adapter
     /// reads for out-of-band thinking attribution).
-    pub(in crate::agent::tinyagents) cursor: IterationCursor,
+    pub(in crate::agent::tinyagents) cursor: tinyagents_harness::events::IterationCursor,
     /// Shared `call_id → tool_name` map used by the event bridge to label
     /// tool-argument fragments projected off the crate stream.
     pub(in crate::agent::tinyagents) tool_names: ToolNameMap,
@@ -20,7 +20,7 @@ pub(in crate::agent::tinyagents) struct AssembledTurnHarness {
     /// reads it when recording usage to preserve charged-USD precedence (#4467).
     pub(in crate::agent::tinyagents) provider_usage_carry: ProviderUsageCarry,
     /// Recovers the original (downcastable) provider error on run failure.
-    pub(in crate::agent::tinyagents) error_slot: crate::agent::tinyagents::model::ModelErrorSlot,
+    pub(in crate::agent::tinyagents) error_slot: tinyinference_llm::model::ModelErrorSlot,
     /// Root-cause summary recorded by the repeated-tool-failure breaker.
     pub(in crate::agent::tinyagents) halt_summary: HaltSummarySlot,
     /// Per-call tool success/content capture for honest `ToolCallRecord`s.

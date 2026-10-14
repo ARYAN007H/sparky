@@ -4683,6 +4683,7 @@ dependencies = [
  "sha2 0.10.9",
  "tar",
  "tempfile",
+ "tinyagents-definition",
  "tinyagents-graph",
  "tinyagents-harness",
  "tinyagents-session",
@@ -4734,6 +4735,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 2.0.20",
+ "tinyagents-definition",
  "tinyagents-graph",
  "tinyagents-harness",
  "tinyagents-session",
@@ -7219,7 +7221,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.5",
  "windows-sys 0.61.2",
@@ -7529,6 +7531,7 @@ dependencies = [
 name = "tinyagents-runtime"
 version = "2.1.4"
 dependencies = [
+ "anyhow",
  "async-trait",
  "chrono",
  "regex",
@@ -7783,7 +7786,7 @@ dependencies = [
 
 [[package]]
 name = "tinyflows"
-version = "0.8.16"
+version = "0.8.17"
 dependencies = [
  "async-trait",
  "futures-timer",
@@ -8214,7 +8217,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers"
-version = "0.8.0"
+version = "0.10.0"
 dependencies = [
  "tinystoragedrivers-core",
  "tinystoragedrivers-file",
@@ -8226,7 +8229,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-bus"
-version = "0.8.0"
+version = "0.10.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -8235,7 +8238,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-client"
-version = "0.8.0"
+version = "0.10.0"
 dependencies = [
  "async-trait",
  "serde",
@@ -8248,7 +8251,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-core"
-version = "0.8.0"
+version = "0.10.0"
 dependencies = [
  "async-trait",
  "serde",
@@ -8259,7 +8262,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-file"
-version = "0.8.0"
+version = "0.10.0"
 dependencies = [
  "async-trait",
  "libc",
@@ -8271,7 +8274,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-mongodb"
-version = "0.8.0"
+version = "0.10.0"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -8285,7 +8288,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-s3"
-version = "0.8.0"
+version = "0.10.0"
 dependencies = [
  "bytes",
  "futures-util",
@@ -8299,7 +8302,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-secrets"
-version = "0.8.0"
+version = "0.10.0"
 dependencies = [
  "async-trait",
  "atomicwrites",
@@ -8322,7 +8325,7 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-sqlite"
-version = "0.8.0"
+version = "0.10.0"
 dependencies = [
  "rusqlite",
  "serde_json",

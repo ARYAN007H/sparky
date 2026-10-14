@@ -325,6 +325,6 @@ shared config take `inference_test_guard()` / `inference_test_guard_async()` fro
 ## Further reading
 
 - [Parent module README](../../README.md)
-- [Automatic model routing](../../../../gitbooks/features/model-routing/README.md)
-- [Local models and bring your own key](../../../../gitbooks/features/model-routing/local-and-byok-models.md)
-- [Pluggable engines](../../../../gitbooks/developing/engines.md)
+- [Automatic model routing](../../../../docs/gitbooks/en/features/model-routing/README.md)
+- [Local models and bring your own key](../../../../docs/gitbooks/en/features/model-routing/local-and-byok-models.md)
+- [Pluggable engines](../../../../docs/gitbooks/en/developing/engines.md)
