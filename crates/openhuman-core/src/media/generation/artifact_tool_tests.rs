@@ -96,11 +96,11 @@ async fn files_a_single_generated_artifact() {
 
     // Original staged file is gone (moved).
     assert!(!staging.join("stub-0.png").exists());
-    // Artifact metadata + file both landed under the artifacts root.
-    let artifact_dir = workspace.join("artifacts").join(artifact_id);
-    assert!(artifact_dir.join("meta.json").exists());
-    let meta_raw = std::fs::read_to_string(artifact_dir.join("meta.json")).unwrap();
-    assert!(meta_raw.contains("\"image\""));
+    // The artifact record lives in the document store (no `meta.json`).
+    let meta = crate::agent::artifacts::store::get_artifact(&workspace, artifact_id)
+        .await
+        .unwrap();
+    assert_eq!(meta.kind, ArtifactKind::Image);
 }
 
 #[tokio::test]
@@ -130,11 +130,12 @@ async fn files_every_artifact_when_n_greater_than_one() {
     for entry in artifacts {
         let id = entry["artifact_id"].as_str().expect("artifact_id set");
         assert!(ids.insert(id.to_string()), "artifact ids must be unique");
-        assert!(workspace
-            .join("artifacts")
-            .join(id)
-            .join("meta.json")
-            .exists());
+        assert!(
+            crate::agent::artifacts::store::get_artifact(&workspace, id)
+                .await
+                .is_ok(),
+            "artifact {id} has a record in the document store"
+        );
     }
 }
 
