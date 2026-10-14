@@ -61,6 +61,7 @@ pub struct TurnOverrides {
 #[derive(Debug, Default)]
 pub(crate) struct TurnInputs {
     pub(crate) overrides: TurnOverrides,
+    pub(crate) response_shape: Option<Arc<tinyagents_harness::middleware::ResponseShapeScope>>,
     pub(crate) reply_language_directive: Option<String>,
     pub(crate) time_zone: Option<String>,
 }
@@ -82,6 +83,7 @@ impl super::runtime_session::OpenHumanSessionState {
     pub(super) fn take_turn_inputs(&mut self) -> TurnInputs {
         TurnInputs {
             overrides: std::mem::take(&mut self.active_turn_overrides),
+            response_shape: self.pending_response_shape.take(),
             reply_language_directive: self.reply_language_directive.clone(),
             time_zone: self.time_zone.clone(),
         }

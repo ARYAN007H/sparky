@@ -55,6 +55,9 @@ pub(super) struct OpenHumanSessionState {
     required_output: Option<tinyagents_harness::config::RequiredOutput>,
     pub(crate) pending_turn_overrides: super::types::TurnOverrides,
     pub(super) active_turn_overrides: super::types::TurnOverrides,
+    /// The next turn's response shape (consumed at its start).
+    pub(crate) pending_response_shape:
+        Option<Arc<tinyagents_harness::middleware::ResponseShapeScope>>,
     pub(super) reply_language_directive: Option<String>,
     pub(super) time_zone: Option<String>,
     prelude: Option<OpenHumanTurnPrelude>,
@@ -482,6 +485,7 @@ impl OpenHumanTurnPrelude {
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             mutable.last_memory_context = (!context.is_empty()).then_some(context);
         }
+        run_context.response_shape = turn.response_shape.clone();
         run_context.attach_parent(self.parent_context());
         self.apply_pending_announcements(&mut enriched);
 

@@ -272,6 +272,11 @@ impl TurnDispatchState {
 pub struct OpenHumanRunContext {
     /// Explicit shared model-call budget inherited by synchronous children.
     pub model_budget: Option<super::super::budget::ModelBudget>,
+    /// The response format and output cap this root turn asks of every model
+    /// call, and the slot its final call is reported into. Carried explicitly
+    /// from the caller (`agent_chat`) through the session; children never
+    /// inherit it.
+    pub response_shape: Option<Arc<tinyagents_harness::middleware::ResponseShapeScope>>,
     /// A host can narrow synchronous delegation depth; children inherit this.
     pub max_spawn_depth: Option<usize>,
     /// Trust/routing source used by OpenHuman approval and attribution policy.
@@ -439,6 +444,7 @@ impl OpenHumanRunContext {
     pub fn new() -> Self {
         Self {
             model_budget: super::super::budget::current(),
+            response_shape: None,
             max_spawn_depth: super::super::budget::spawn_depth_limit(),
             origin: None,
             progress: None,
@@ -563,6 +569,7 @@ impl OpenHumanRunContext {
         child.subagent_usage = Arc::new(Mutex::new(Vec::new()));
         child.resolved_route = Arc::new(Mutex::new(None));
         child.memory_turn = None;
+        child.response_shape = None;
         child
     }
 
