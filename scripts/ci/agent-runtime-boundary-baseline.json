@@ -23,7 +23,7 @@
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/agent/orchestration/ops.rs",
-    "line": 418,
+    "line": 416,
     "text": "let handle = tokio::spawn(crate::agent::turn_origin::propagate(async move {",
     "occurrence": 1
   },
@@ -107,49 +107,14 @@
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/agent/turn_origin.rs",
-    "line": 183,
-    "text": "tokio::task_local! {",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/agent/turn_origin.rs",
-    "line": 188,
-    "text": "pub static AGENT_TURN_ORIGIN: AgentTurnOrigin;",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/agent/turn_origin.rs",
-    "line": 216,
-    "text": "AGENT_TURN_ORIGIN.scope(origin, Box::pin(fut)).await",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/agent/turn_origin.rs",
-    "line": 229,
-    "text": "AGENT_TURN_ORIGIN.try_with(|o| o.clone()).ok()",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/agent/turn_origin.rs",
-    "line": 284,
+    "line": 266,
     "text": "Some(origin) => with_origin(origin, fut).await,",
     "occurrence": 1
   },
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/agent/turn_origin.rs",
-    "line": 321,
-    "text": "Some(origin) => with_origin(origin, fut).await,",
-    "occurrence": 2
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/agent/turn_origin.rs",
-    "line": 384,
+    "line": 362,
     "text": "pub fn current_request_id() -> Option<String> {",
     "occurrence": 1
   },
@@ -303,7 +268,7 @@
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/inference/provider/factory/managed_backend.rs",
-    "line": 38,
+    "line": 40,
     "text": ".with_thread_id(thread_id),",
     "occurrence": 1
   },
@@ -478,7 +443,7 @@
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/web_chat/ops/turn_guards.rs",
-    "line": 247,
+    "line": 250,
     "text": "crate::agent::turn_origin::with_origin(",
     "occurrence": 1
   },
