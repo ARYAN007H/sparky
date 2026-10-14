@@ -715,24 +715,44 @@ async fn memory_activity_carries_the_calling_turns_chat() {
     let (routed_id, unrouted_id) = (learned_id(&routed), learned_id(&unrouted));
 
     // The bus is process-wide: match our own events by the id the tool returned.
-    let mut by_id = std::collections::HashMap::new();
-    while by_id.len() < 2 {
-        match tokio::time::timeout(std::time::Duration::from_secs(5), rx.recv()).await {
+    // A learn raises one event from the tool call (routed) and one from the
+    // queued write that persists it (off the turn, unrouted), so collect all.
+    let mut routed_seen = std::collections::HashSet::new();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while std::time::Instant::now() < deadline {
+        match tokio::time::timeout(std::time::Duration::from_millis(200), rx.recv()).await {
             Ok(Some(DomainEvent::MemoryStored {
                 key,
                 thread_id,
                 client_id,
                 ..
             })) if key == routed_id || key == unrouted_id => {
-                by_id.insert(key, (thread_id, client_id));
+                routed_seen.insert((key, thread_id, client_id));
             }
             Ok(Some(_)) => continue,
-            other => panic!("expected both MemoryStored events, got {other:?}"),
+            _ => {}
         }
     }
-    assert_eq!(
-        by_id[&routed_id],
-        (Some("thread-activity".into()), Some("client-activity".into()))
+    let routing = |key: &str| -> Vec<(Option<String>, Option<String>)> {
+        routed_seen
+            .iter()
+            .filter(|(k, _, _)| k == key)
+            .map(|(_, t, c)| (t.clone(), c.clone()))
+            .collect()
+    };
+    assert!(
+        routing(&routed_id).contains(&(
+            Some("thread-activity".into()),
+            Some("client-activity".into())
+        )),
+        "the tool call's event must carry the turn's chat: {:?}",
+        routing(&routed_id)
     );
-    assert_eq!(by_id[&unrouted_id], (None, None));
+    assert!(
+        routing(&unrouted_id)
+            .iter()
+            .all(|route| *route == (None, None)),
+        "a call outside a chat turn must never be routed: {:?}",
+        routing(&unrouted_id)
+    );
 }
