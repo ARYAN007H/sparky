@@ -285,6 +285,7 @@ pub(crate) async fn run_engine_loop(
             return;
         }
     };
+    let cancel_token = cancel.token.clone();
     let outcome = with_root_parent(
         parent_override,
         config,
@@ -305,7 +306,7 @@ pub(crate) async fn run_engine_loop(
                 "workflow:{run_id}"
             ))));
             engine
-                .drive(run_id, &definition, cancel.token.clone())
+                .drive(run_id, &definition, cancel_token)
                 .await
                 .map_err(anyhow::Error::msg)
         },

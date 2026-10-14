@@ -197,6 +197,7 @@ pub async fn start_member_run(
                 task_for_loop,
                 &rid,
                 model_override,
+                None,
             ),
         )
         .await;
@@ -225,23 +226,32 @@ async fn run_member_loop(
     task: AgentTeamTask,
     run_id: &str,
     model_override: Option<String>,
+    parent_override: Option<ParentExecutionContext>,
 ) {
     // The member acts on memory as itself within the team: its node is
     // `team:<team>/agent:<agent>`, so members share the team's node and
     // never read each other's.
     let identity = crate::memory::scope::MemoryIdentity::team_member(team_id, agent_id);
-    let member_turn = with_root_parent(config, "agent_team_runtime", "team", "teamrun", async {
-        drive_member(
-            config,
-            team_id,
-            member_id,
-            agent_id,
-            &task,
-            run_id,
-            model_override,
-        )
-        .await
-    });
+    let member_turn = with_root_parent(
+        parent_override,
+        config,
+        "agent_team_runtime",
+        "team",
+        "teamrun",
+        |parent| async {
+            drive_member(
+                config,
+                team_id,
+                member_id,
+                agent_id,
+                &task,
+                run_id,
+                model_override,
+                parent,
+            )
+            .await
+        },
+    );
     let outcome = crate::memory::scope::within(identity, Box::pin(member_turn))
         .await
         // Flatten: outer Err = root-parent build failure, inner = drive_member result.
@@ -273,6 +283,7 @@ async fn drive_member(
     task: &AgentTeamTask,
     run_id: &str,
     model_override: Option<String>,
+    parent: ParentExecutionContext,
 ) -> Result<()> {
     let ledger = SessionTeamLedger::new(
         crate::agent::session_store::require_ledger(&config.workspace_dir)
@@ -294,6 +305,7 @@ async fn drive_member(
         let task_id = task.id.clone();
         let run_id = run_id.to_string();
         move || {
+            let parent = parent.clone();
             let session = session.clone();
             let agent_id = agent_id.clone();
             let prompt = prompt.clone();
@@ -304,20 +316,23 @@ async fn drive_member(
             let run_id = run_id.clone();
             async move {
                 let resp = session
-                    .spawn_agent(SpawnAgentRequest {
-                        agent_id,
-                        prompt,
-                        model,
-                        metadata: [
-                            ("teamId".to_string(), team_id),
-                            ("memberId".to_string(), member_id),
-                            ("taskId".to_string(), task_id),
-                            ("teamRunId".to_string(), run_id),
-                        ]
-                        .into_iter()
-                        .collect(),
-                        ..Default::default()
-                    })
+                    .spawn_agent(
+                        parent,
+                        SpawnAgentRequest {
+                            agent_id,
+                            prompt,
+                            model,
+                            metadata: [
+                                ("teamId".to_string(), team_id),
+                                ("memberId".to_string(), member_id),
+                                ("taskId".to_string(), task_id),
+                                ("teamRunId".to_string(), run_id),
+                            ]
+                            .into_iter()
+                            .collect(),
+                            ..Default::default()
+                        },
+                    )
                     .await
                     .map_err(|e| anyhow!("spawn teammate worker failed: {e}"))?;
 
