@@ -3,6 +3,7 @@
 
 use tinyagents_session::transcript::TranscriptMessage;
 use tinyinference_llm::model::ResolvedModelRoute;
+use tinyagents_harness::turn_outcome::ToolCallOutcome;
 use tinytools_agent::dialect::TranscriptEntry;
 
 /// The outcome of a turn driven on the `tinyagents` harness.
@@ -82,48 +83,6 @@ pub(crate) struct TinyagentsTurnOutcome {
     /// from the checkpoint. `None` when the run did not compact.
     pub compaction: Option<tinyagents_harness::summarization::CompactionCarry>,
 }
-
-/// Whether a run's final response is a reply that ran out of output tokens
-/// before producing anything: `finish_reason = length`, no visible text and no
-/// tool call. See [`TinyagentsTurnOutcome::truncated`].
-pub(crate) fn ended_out_of_output_budget(
-    final_response: Option<&tinyinference_llm::model::ModelResponse>,
-) -> bool {
-    final_response.is_some_and(|response| {
-        response.finish_reason.as_deref() == Some("length")
-            && response.message.tool_calls.is_empty()
-            && response.text().trim().is_empty()
-    })
-}
-
-/// One tool call's execution outcome, captured at the tool boundary before the
-/// harness discards the failure flag. `success` mirrors the absence of a
-/// `TaToolResult::error`; `content` is the (possibly summarized/capped) result
-/// text used to derive a sanitized post-turn summary.
-#[derive(Debug, Clone)]
-pub(crate) struct ToolCallOutcome {
-    pub call_id: String,
-    pub name: String,
-    /// The exact structured arguments supplied for this invocation.  They are
-    /// captured at `before_tool`, while the native `ToolCall` is still
-    /// available, so post-commit hooks and transcript usage never have to
-    /// reconstruct arguments from provider prose.
-    pub arguments: serde_json::Value,
-    pub success: bool,
-    pub content: String,
-    /// Measured wall-clock runtime for this concrete tool invocation.
-    pub duration_ms: u64,
-}
-
-/// Shared sink the [`ToolOutcomeCaptureMiddleware`](super::middleware::ToolOutcomeCaptureMiddleware)
-/// appends each tool call's outcome to, drained into the turn outcome.
-pub(crate) type ToolOutcomeSink = std::sync::Arc<std::sync::Mutex<Vec<ToolCallOutcome>>>;
-
-/// Shared slot the repeated-failure breaker writes a root-cause halt summary into
-/// when it trips. The turn overrides its final text with this summary so the
-/// no-progress halt surfaces the cause instead of an empty/last-model reply
-/// (legacy `RepeatFailureGuard` parity).
-pub(crate) type HaltSummarySlot = std::sync::Arc<std::sync::Mutex<Option<String>>>;
 
 /// Feed an **unobserved** turn's aggregate usage into the global cost tracker.
 ///

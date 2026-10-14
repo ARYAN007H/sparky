@@ -16,9 +16,8 @@ use crate::agent::progress::AgentProgress;
 use crate::agent::tinyagents::journal::TurnJournal;
 use crate::agent::tinyagents::observability::{self, OpenhumanEventBridge, SubagentScope};
 use crate::agent::tinyagents::tools::EarlyExitHook;
-use crate::agent::tinyagents::turn_outcome::{
-    HaltSummarySlot, TinyagentsTurnOutcome, ToolOutcomeSink,
-};
+use crate::agent::tinyagents::turn_outcome::TinyagentsTurnOutcome;
+use tinyagents_harness::turn_outcome::{HaltSummarySlot, ToolOutcomeSink};
 
 /// Assemble the [`TinyagentsTurnOutcome`] for a run that returned
 /// successfully: stamp the durable journal's completed status, surface
