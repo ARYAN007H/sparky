@@ -23,7 +23,9 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use serde_json::{json, Value};
-use tinymemory_api::{MemoryMeta, Namespace, Reach, SourceKind, SourceRef, ToolCallRef};
+use tinymemory_api::{
+    MemoryMeta, Namespace, Reach, RecallMode, SourceKind, SourceRef, ThreadWindow, ToolCallRef,
+};
 use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolResult, ToolRunContext};
 
 use crate::config::Config;
@@ -33,7 +35,9 @@ use crate::core::events::DomainEvent;
 use super::error::MemoryError;
 use super::ops;
 pub use super::tool_budget::is_budget_refusal;
-use super::types::{FetchParams, ForgetParams, LearnParams, RecallParams, TurnCitation};
+use super::types::{
+    FetchParams, ForgetParams, LearnParams, RecallParams, RecallView, TurnCitation,
+};
 
 /// Most citations kept per thread between two drains.
 const MAX_TURN_CITATIONS: usize = 20;
@@ -218,17 +222,39 @@ fn parse<T: serde::de::DeserializeOwned>(args: &Value) -> Result<T, String> {
     serde_json::from_value(args.clone()).map_err(|error| format!("invalid arguments: {error}"))
 }
 
+/// The turns a read inside a thread leaves out: the whole calling thread,
+/// whose turns the agent's prompt already holds.
+fn calling_thread(facts: &CallFacts) -> Option<ThreadWindow> {
+    facts.thread_id.as_deref().map(ThreadWindow::whole)
+}
+
+/// What `recall` shows the model: the evidence to answer from and how many
+/// items it holds (their ids are kept as the turn's citations), or a note
+/// when nothing was recalled. The citations' snippets repeat the evidence,
+/// so they are left out.
+fn evidence_json(view: &RecallView) -> Value {
+    if view.answer.trim().is_empty() {
+        json!({ "evidence": "", "note": "Nothing relevant is stored in memory." })
+    } else {
+        json!({ "evidence": view.answer, "items": view.citations.len() })
+    }
+}
+
 /// Runs one action. Errors become a model-visible tool error, never a hard
 /// failure, so the model can adapt (memory off, unsupported mode, …).
 pub async fn run_action(config: &Config, args: &Value, facts: &CallFacts) -> ToolResult {
     let action = arg_str(args, "action").unwrap_or_default();
     tracing::debug!(action = %action, "[memory:tool] dispatch");
     let result: Result<Value, String> = match action.as_str() {
+        // The agent answers from the evidence itself, so recall writes no
+        // answer of its own; and the thread the call runs in is left out of
+        // recall and fetch, since its user turn is logged before the tool
+        // reads and would otherwise come back as a memory.
         "recall" => match parse::<RecallParams>(args) {
             Ok(mut params) => {
                 confine(&mut params.filter, facts);
                 let question = params.question.clone();
-                ops::recall(config, params)
+                ops::recall_with(config, params, RecallMode::Evidence, calling_thread(facts))
                     .await
                     .map(|view| {
                         if let Some(thread_id) = facts.thread_id.as_deref() {
@@ -240,7 +266,7 @@ pub async fn run_action(config: &Config, args: &Value, facts: &CallFacts) -> Too
                             thread_id: facts.chat.as_ref().map(|chat| chat.thread_id.clone()),
                             client_id: facts.chat.as_ref().map(|chat| chat.client_id.clone()),
                         });
-                        json!(view)
+                        evidence_json(&view)
                     })
                     .map_err(render_error)
             }
@@ -249,7 +275,7 @@ pub async fn run_action(config: &Config, args: &Value, facts: &CallFacts) -> Too
         "fetch" => match parse::<FetchParams>(args) {
             Ok(mut params) => {
                 confine(&mut params.filter, facts);
-                ops::fetch(config, params)
+                ops::fetch_with(config, params, calling_thread(facts))
                     .await
                     .map(|view| json!(view))
                     .map_err(render_error)
@@ -320,8 +346,13 @@ impl Tool for MemoryTool {
 
     fn description(&self) -> &str {
         "Long-term memory across conversations, documents and learnings. \
-         `recall` answers a question from memory with citations; `fetch` returns raw \
-         matching items (filter by metadata such as workspace, repo, file_path, kinds); \
+         `recall` searches memory for a question and returns what it holds (facts and \
+         dated conversation lines) for you to answer from; it does not answer for you. \
+         Search matches meaning and wording: if a search misses something, search again \
+         with different words before concluding it is not in memory, and search \
+         separately for each part of a question that combines several things. `fetch` \
+         returns raw matching items (filter by metadata such as workspace, repo, \
+         file_path, kinds); \
          `learn` queues a durable fact, preference, procedure or correction about the \
          user or their work, shared with every agent working alongside you; `forget` \
          queues removal of items by id. Write acknowledgements mean locally queued, \
@@ -420,3 +451,7 @@ mod schema_tests;
 #[cfg(test)]
 #[path = "tools_budget_tests.rs"]
 mod budget_tests;
+
+#[cfg(test)]
+#[path = "tools_read_tests.rs"]
+mod read_tests;
