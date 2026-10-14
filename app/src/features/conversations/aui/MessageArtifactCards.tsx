@@ -4,7 +4,7 @@ import { useAuiState } from '@assistant-ui/react';
 import { useMemo } from 'react';
 
 import { useAppSelector, useAppDispatch } from '../../../store/hooks';
-import { setPreviewArtifactId } from '../../../store/chatRuntimeSlice';
+import { openArtifact } from '../../../store/chatRuntimeSlice';
 import { ArtifactCardAdapter } from './ArtifactCardAdapter';
 
 /**
@@ -46,7 +46,7 @@ export function MessageArtifactCards() {
         <ArtifactCardAdapter
           key={artifact.artifactId}
           artifact={artifact}
-          onOpenPreview={id => dispatch(setPreviewArtifactId(id))}
+          onOpenPreview={id => dispatch(openArtifact(id))}
         />
       ))}
     </div>

@@ -69,7 +69,7 @@ import {
   fetchAndHydrateTurnState,
   hydrateThreadUsage,
   markThreadSendPending,
-  setPreviewArtifactId,
+  openArtifact,
   type ProcessingTranscriptItem,
   setToolTimelineForThread,
   type ToolTimelineEntry,
@@ -261,7 +261,7 @@ const Conversations = ({
   projectThreadList = false,
 }: ConversationsProps = {}) => {
   const [composerOverride, setComposerOverride] = useState<'mic-cloud' | 'text' | null>(null);
-  const previewArtifactId = useAppSelector(s => s.chatRuntime.previewArtifactId);
+  const activeArtifactId = useAppSelector(s => s.chatRuntime.activeArtifactId);
   const composer = composerOverride ?? composerProp;
   const { t } = useT();
   const dispatch = useAppDispatch();
@@ -2182,7 +2182,7 @@ const Conversations = ({
                 console.warn('[artifact] regenerate failed:', err);
               });
             }}
-            onOpenPreview={id => dispatch(setPreviewArtifactId(id))}
+            onOpenPreview={id => dispatch(openArtifact(id))}
           />
         ))}
       </div>
@@ -2404,10 +2404,8 @@ const Conversations = ({
           </SidebarContent>
           <div className="flex h-full w-full min-w-0">
             {mainPanel}
-            {previewArtifactId && (
+            {activeArtifactId && (
               <ArtifactPreviewPanel
-                artifactId={previewArtifactId}
-                onClose={() => dispatch(setPreviewArtifactId(null))}
               />
             )}
           </div>

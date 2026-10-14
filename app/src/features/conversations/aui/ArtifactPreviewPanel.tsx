@@ -20,16 +20,15 @@ import {
 } from 'react';
 
 import { useT } from '../../../lib/i18n/I18nContext';
-import { useAppSelector } from '../../../store/hooks';
+import { useAppDispatch, useAppSelector } from '../../../store/hooks';
 import type { ArtifactSnapshot } from '../../../store/chatRuntimeSlice';
+import { activateArtifactTab, closeArtifactTab } from '../../../store/chatRuntimeSlice';
 import { invoke } from '@tauri-apps/api/core';
 
 // ─── Types ──────────────────────────────────────────────────────
 
 interface ArtifactPreviewPanelProps {
-  /** If set, panel opens scoped to this single artifact. */
-  artifactId: string;
-  onClose: () => void;
+  /** No props: the panel reads openArtifactIds/activeArtifactId from Redux. */
 }
 
 interface ArtifactBodyResponse {
@@ -48,8 +47,9 @@ const DEFAULT_WIDTH = 520;
 
 // ─── Main panel ─────────────────────────────────────────────────
 
-export function ArtifactPreviewPanel({ artifactId, onClose }: ArtifactPreviewPanelProps) {
+export function ArtifactPreviewPanel(_props: ArtifactPreviewPanelProps) {
   const { t } = useT();
+  const dispatch = useAppDispatch();
   const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
   const dragRef = useRef(false);
   const startXRef = useRef(0);
@@ -67,15 +67,13 @@ export function ArtifactPreviewPanel({ artifactId, onClose }: ArtifactPreviewPan
     return list.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
   }, [artifactsByThread]);
 
-  // Active tab — start with the requested artifact, or the first one
-  const [activeId, setActiveId] = useState(artifactId);
+  // Active tab and open-tab list come from Redux — single source of truth.
+  const openArtifactIds = useAppSelector(s => s.chatRuntime.openArtifactIds);
+  const activeId = useAppSelector(s => s.chatRuntime.activeArtifactId);
   const activeArtifact = useMemo(
     () => allArtifacts.find(a => a.artifactId === activeId),
     [allArtifacts, activeId],
   );
-
-  // Keep activeId in sync if the parent passes a new artifactId
-  useEffect(() => { setActiveId(artifactId); }, [artifactId]);
 
   // ── Resize ──
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -104,29 +102,20 @@ export function ArtifactPreviewPanel({ artifactId, onClose }: ArtifactPreviewPan
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
   }, []);
 
-  // Tab close: remove from local tab list, close panel if last
-  const [closedIds, setClosedIds] = useState<Set<string>>(new Set());
+  // Tabs = the artifacts currently open in the panel, in open order.
   const visibleTabs = useMemo(
-    () => allArtifacts.filter(a => !closedIds.has(a.artifactId)),
-    [allArtifacts, closedIds],
+    () =>
+      openArtifactIds
+        .map(id => allArtifacts.find(a => a.artifactId === id))
+        .filter((a): a is ArtifactSnapshot => a !== undefined),
+    [openArtifactIds, allArtifacts],
   );
-  const handleCloseTab = useCallback((id: string) => {
-    setClosedIds(prev => {
-      const next = new Set(prev);
-      next.add(id);
-      return next;
-    });
-    setActiveId(prev => {
-      if (prev !== id) return prev;
-      // Compute the next active tab excluding the one being closed
-      // (allArtifacts is always current from the memo)
-      const nextTab = allArtifacts.find(a => a.artifactId !== id);
-      return nextTab ? nextTab.artifactId : '';
-    });
-    if (allArtifacts.length <= 1) {
-      onClose();
-    }
-  }, [allArtifacts, onClose]);
+  const handleCloseTab = useCallback(
+    (id: string) => {
+      dispatch(closeArtifactTab(id));
+    },
+    [dispatch],
+  );
 
   const showTabs = visibleTabs.length > 1;
 
@@ -155,7 +144,7 @@ export function ArtifactPreviewPanel({ artifactId, onClose }: ArtifactPreviewPan
                 }`}
               >
                 <button
-                  onClick={() => setActiveId(a.artifactId)}
+                  onClick={() => dispatch(activateArtifactTab(a.artifactId))}
                   className={`flex min-w-0 items-center gap-1.5 text-xs font-medium transition-colors ${
                     a.artifactId === activeId
                       ? 'text-foreground'
@@ -183,7 +172,7 @@ export function ArtifactPreviewPanel({ artifactId, onClose }: ArtifactPreviewPan
             </div>
           )}
         </div>
-        <button onClick={onClose} className="mr-2 shrink-0 inline-flex items-center justify-center rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground">
+        <button onClick={() => dispatch(closeArtifactTab(activeId as string))} className="mr-2 shrink-0 inline-flex items-center justify-center rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground">
           <X className="h-4 w-4" />
         </button>
       </div>

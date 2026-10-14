@@ -1071,7 +1071,10 @@ interface ChatRuntimeState {
    */
   usageByThread: Record<string, SessionTokenUsage>;
   queueStatusByThread: Record<string, QueueStatus>;
-  previewArtifactId: string | null;
+  /** Artifacts the user has opened in the right-side preview panel (tab list). */
+  openArtifactIds: string[];
+  /** Which of the open artifacts is the active tab. */
+  activeArtifactId: string | null;
 }
 
 /** Snapshot of the active-run queue depth per lane. */
@@ -1108,7 +1111,8 @@ const initialState: ChatRuntimeState = {
   sessionTokenUsage: emptySessionTokenUsage(),
   usageByThread: {},
   queueStatusByThread: {},
-  previewArtifactId: null,
+  openArtifactIds: [],
+  activeArtifactId: null,
 };
 
 /**
@@ -2738,13 +2742,35 @@ const chatRuntimeSlice = createSlice({
       );
     },
     /**
-     * Set the artifact currently shown in the right-side preview panel, or
-     * null to close it. Kept in Redux (not local Conversations state) so
-     * artifact cards rendered inside assistant messages (`MessageArtifactCards`)
-     * can open the panel from anywhere in the thread.
+     * Open an artifact in the right-side preview panel: append its id to the
+     * tab list (idempotent) and make it the active tab. Clicking a card calls
+     * this — if the artifact is already open it just re-activates it.
      */
-    setPreviewArtifactId: (state, action: PayloadAction<string | null>) => {
-      state.previewArtifactId = action.payload;
+    openArtifact: (state, action: PayloadAction<string>) => {
+      const id = action.payload;
+      if (!state.openArtifactIds.includes(id)) {
+        state.openArtifactIds.push(id);
+      }
+      state.activeArtifactId = id;
+    },
+    /**
+     * Close one artifact tab. Removes it from the tab list; if it was active,
+     * the next remaining tab becomes active, and closing the last tab clears
+     * `activeArtifactId` so the panel unmounts.
+     */
+    closeArtifactTab: (state, action: PayloadAction<string>) => {
+      const id = action.payload;
+      const idx = state.openArtifactIds.indexOf(id);
+      if (idx !== -1) {
+        state.openArtifactIds.splice(idx, 1);
+      }
+      if (state.activeArtifactId === id) {
+        state.activeArtifactId = state.openArtifactIds[0] ?? null;
+      }
+    },
+    /** Set the active tab explicitly (clicking a tab). */
+    activateArtifactTab: (state, action: PayloadAction<string>) => {
+      state.activeArtifactId = action.payload;
     },
     clearArtifactsForThread: (state, action: PayloadAction<{ threadId: string }>) => {
       delete state.artifactsByThread[action.payload.threadId];
@@ -3291,7 +3317,9 @@ export const {
   upsertArtifactFailedForThread,
   clearArtifactsForThread,
   removeArtifactForThread,
-  setPreviewArtifactId,
+  openArtifact,
+  closeArtifactTab,
+  activateArtifactTab,
   setQueueStatusForThread,
   clearQueueStatusForThread,
   beginInferenceTurn,
