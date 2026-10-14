@@ -800,7 +800,12 @@ fn validate_registry_rejects_duplicate_registered_controllers() {
 
 #[tokio::test]
 async fn try_invoke_registered_rpc_returns_none_for_unknown_method() {
-    let out = try_invoke_registered_rpc(DispatchCtx::unbound(), "openhuman.not_a_real_method_xyz_123", Map::new()).await;
+    let out = try_invoke_registered_rpc(
+        DispatchCtx::unbound(),
+        "openhuman.not_a_real_method_xyz_123",
+        Map::new(),
+    )
+    .await;
     assert!(out.is_none(), "unknown methods must return None");
 }
 
@@ -808,31 +813,13 @@ async fn try_invoke_registered_rpc_returns_none_for_unknown_method() {
 async fn try_invoke_registered_rpc_returns_some_for_known_method() {
     // `openhuman.health_snapshot` is registered at startup and takes no
     // required params — it must route and produce Some(_).
-    let out = try_invoke_registered_rpc(DispatchCtx::unbound(), "openhuman.health_snapshot", Map::new()).await;
-    assert!(out.is_some(), "known method must route");
-}
-
-#[tokio::test]
-async fn try_invoke_registered_rpc_routes_security_policy_info() {
-    let workspace = tempfile::TempDir::new().expect("security policy workspace");
-    let mut config = crate::config::Config::default();
-    config.workspace_dir = workspace.path().to_path_buf();
-    config.action_dir = workspace.path().to_path_buf();
-    config.config_path = workspace.path().join("config.toml");
-    let ctx = CoreContext::for_test_with_config(DomainSet::full(), config);
     let out = try_invoke_registered_rpc(
-        DispatchCtx::new(ctx),
-        "openhuman.security_policy_info",
+        DispatchCtx::unbound(),
+        "openhuman.health_snapshot",
         Map::new(),
     )
-    .await
-    .expect("security policy info should be registered")
-    .expect("security policy info should succeed");
-
-    assert!(
-        out.get("result").is_some() || out.get("autonomy").is_some(),
-        "security policy info should return policy payload: {out}"
-    );
+    .await;
+    assert!(out.is_some(), "known method must route");
 }
 
 #[test]
@@ -968,8 +955,7 @@ async fn dispatch_returns_none_for_gated_method() {
         .expect("a flows.* method exists in the full registry");
 
     let ctx = CoreContext::for_test(DomainSet::harness(), None);
-    let out =
-        try_invoke_registered_rpc(DispatchCtx::new(ctx), &gated_method, Map::new()).await;
+    let out = try_invoke_registered_rpc(DispatchCtx::new(ctx), &gated_method, Map::new()).await;
     assert!(
         out.is_none(),
         "gated method `{gated_method}` must dispatch as None under harness()"

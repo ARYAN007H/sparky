@@ -2,7 +2,7 @@
 
 use serde_json::{json, Map, Value};
 
-use crate::core::all::*;
+use super::*;
 use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
 use std::sync::Arc;
 
@@ -107,4 +107,27 @@ async fn explicit_context_overrides_the_calling_tasks_scope() {
     .expect("dispatchable")
     .expect("handler succeeds");
     assert_eq!(value["workspace"], json!("/tmp/ctx-probe-explicit"));
+}
+
+#[tokio::test]
+async fn try_invoke_registered_rpc_routes_security_policy_info() {
+    let workspace = tempfile::TempDir::new().expect("security policy workspace");
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace.path().to_path_buf();
+    config.action_dir = workspace.path().to_path_buf();
+    config.config_path = workspace.path().join("config.toml");
+    let ctx = CoreContext::for_test_with_config(DomainSet::full(), config);
+    let out = try_invoke_registered_rpc(
+        DispatchCtx::new(ctx),
+        "openhuman.security_policy_info",
+        Map::new(),
+    )
+    .await
+    .expect("security policy info should be registered")
+    .expect("security policy info should succeed");
+
+    assert!(
+        out.get("result").is_some() || out.get("autonomy").is_some(),
+        "security policy info should return policy payload: {out}"
+    );
 }
