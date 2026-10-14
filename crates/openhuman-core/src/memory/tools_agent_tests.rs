@@ -72,7 +72,9 @@ fn tool_context_acting_as(
 #[test]
 fn gather_acts_as_the_identity_the_run_carries() {
     let config = Config::default();
-    let context = tool_context_acting_as(crate::memory::scope::MemoryIdentity::team_member("acme", "scout"));
+    let context = tool_context_acting_as(crate::memory::scope::MemoryIdentity::team_member(
+        "acme", "scout",
+    ));
     let facts = CallFacts::gather(&config, Some(&context));
     assert_eq!(facts.agent_id.as_deref(), Some("scout"));
     assert_eq!(facts.reach, Reach::subtree("team:acme".parse().unwrap()));

@@ -307,9 +307,8 @@ pub struct OpenHumanRunContext {
     pub parent: Option<ParentExecutionContext>,
     /// Context-preparation sources already consumed in this turn.
     pub prepared_context_sources: Arc<Vec<AgentContextPreparedSource>>,
-    /// Who this run acts as on memory (agent definition and team): set by the
-    /// entry point, narrowed with `child(id)` per sub-agent, read by the memory
-    /// tool and hooks. `None` is the root identity.
+    /// Who the run acts as on memory (agent and team), narrowed with `child(id)`
+    /// per sub-agent; `None` is the root identity.
     pub memory_identity: Option<crate::memory::scope::MemoryIdentity>,
     /// File-state identity used to detect stale parent reads after child writes.
     pub file_state_agent_id: Option<String>,
