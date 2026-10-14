@@ -71,21 +71,10 @@ impl ShellOutputMeter {
         }
     }
 
-    fn snapshot(&self) -> (u64, Option<String>) {
+    pub(crate) fn snapshot(&self) -> (u64, Option<String>) {
         let meter = self.0.lock().unwrap_or_else(|p| p.into_inner());
         (meter.bytes, meter.last_line.clone())
     }
-}
-
-tokio::task_local! {
-    static CURRENT_METER: ShellOutputMeter;
-}
-
-/// The meter of the shell call running on this task, if it reports progress.
-/// Read it before spawning a worker task: a task-local does not follow
-/// `tokio::spawn`.
-pub(crate) fn current_meter() -> Option<ShellOutputMeter> {
-    CURRENT_METER.try_with(Clone::clone).ok()
 }
 
 /// The status line for a call `elapsed` into its run.
@@ -112,22 +101,29 @@ pub(crate) fn progress_message(elapsed: Duration, bytes: u64, last_line: Option<
     }
 }
 
-/// Run the shell call `fut`, reporting its progress through `context` every
-/// `interval` until it finishes. Without a context there is nowhere to report,
-/// so `fut` runs as is.
-pub(crate) async fn with_shell_progress<F: std::future::Future>(
+/// Run the shell call built by `build`, reporting its progress through
+/// `context` every `interval` until it finishes. `build` receives the call's
+/// [`ShellOutputMeter`] and hands it down to the process runner, which feeds it;
+/// without a context there is nowhere to report, so it receives `None` and the
+/// call runs as is.
+pub(crate) async fn with_shell_progress<B, F>(
     context: Option<&dyn ToolRunContext>,
     interval: Duration,
-    fut: F,
-) -> F::Output {
+    build: B,
+) -> F::Output
+where
+    B: FnOnce(Option<ShellOutputMeter>) -> F,
+    F: std::future::Future,
+{
     let Some(context) = context else {
-        return fut.await;
+        return build(None).await;
     };
     let meter = ShellOutputMeter::default();
+    let fut = build(Some(meter.clone()));
     let started = tokio::time::Instant::now();
     // Boxed: the shell call's future is large, and this wrapper would
     // otherwise hold it inline a second time on the tool's stack.
-    let mut work = Box::pin(CURRENT_METER.scope(meter.clone(), fut));
+    let mut work = Box::pin(fut);
     let mut ticker = tokio::time::interval_at(tokio::time::Instant::now() + interval, interval);
     loop {
         tokio::select! {
