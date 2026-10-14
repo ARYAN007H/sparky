@@ -118,3 +118,6 @@ async fn registry_extension_is_gated_by_its_domain_group() {
         "hosted: false must hide the extension"
     );
 }
+
+#[path = "all_dispatch_ctx_tests.rs"]
+mod dispatch_ctx_tests;
