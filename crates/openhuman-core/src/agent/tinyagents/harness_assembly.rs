@@ -64,16 +64,9 @@ pub(super) fn assemble_turn_harness(
     context_window: Option<u64>,
     early_exit_tools: &[&str],
     context_mw: TurnContextMiddleware,
-    stop_hooks: Vec<
-        Arc<dyn tinyagents_harness::middleware::StopHook<crate::agent::cost::TurnCost>>,
-    >,
-    // The turn's agent/turn tool callbacks (`OpenHumanRunContext::tool_hooks`),
-    // registered after the runtime's global ones, and the host's cap on real
-    // tool invocations (`OpenHumanRunContext::tool_call_limit`).
-    (scoped_tool_hooks, tool_call_cap): (
-        Vec<Arc<dyn crate::agent::hooks::ToolHook>>,
-        Option<usize>,
-    ),
+    // Stop policies, scoped tool callbacks (registered after the runtime's
+    // global ones) and the host's tool-call cap, from the explicit run context.
+    host_policy: super::host::HarnessHostPolicy,
     tool_policy: Option<ToolPolicyEnforcement>,
     required_capabilities: Option<CapabilitySet>,
     deterministic_cacheable: bool,
@@ -113,6 +106,11 @@ pub(super) fn assemble_turn_harness(
     memory_turn: Option<Arc<crate::memory::lifecycle::hooks::MemoryTurn>>,
     tool_rules: Option<Arc<tinyagents_harness::tool::ToolRulePolicy>>, // `OpenHumanRunContext::tool_rules`
 ) -> AssembledTurnHarness {
+    let super::host::HarnessHostPolicy {
+        stop_hooks,
+        tool_hooks: scoped_tool_hooks,
+        tool_call_cap,
+    } = host_policy;
     let mut harness: AgentHarness<(), OpenHumanRunContext> = AgentHarness::new();
     // Cross-route fallback ownership (issue #4249, Workstream 02.2): populate the
     // SDK `RunPolicy.fallback` with the ordered same-family route chain for this

@@ -388,6 +388,18 @@ pub struct OpenHumanRunContext {
     pub(crate) memory_turn: Option<Arc<crate::memory::lifecycle::hooks::MemoryTurn>>,
 }
 
+/// The host callbacks and caps a turn's harness assembly installs, taken from
+/// the explicit run context.
+#[derive(Clone, Default)]
+pub(crate) struct HarnessHostPolicy {
+    /// Stop policies evaluated after each model call.
+    pub(crate) stop_hooks: Vec<Arc<dyn StopHook<crate::agent::cost::TurnCost>>>,
+    /// Agent/turn tool callbacks, registered after the runtime's global ones.
+    pub(crate) tool_hooks: Vec<Arc<dyn crate::agent::hooks::ToolHook>>,
+    /// The host's cap on real tool invocations.
+    pub(crate) tool_call_cap: Option<usize>,
+}
+
 /// Minimal immutable authority view exposed to shared tools through the
 /// harness's typed state-view seam.
 #[derive(Clone, Debug, Default)]
@@ -556,6 +568,15 @@ impl OpenHumanRunContext {
     ) -> &ParentExecutionContext {
         parent.on_progress = self.progress.clone().or(parent.on_progress);
         self.parent.insert(parent)
+    }
+
+    /// The callbacks and caps this turn's harness assembly installs.
+    pub(crate) fn harness_host_policy(&self) -> HarnessHostPolicy {
+        HarnessHostPolicy {
+            stop_hooks: self.stop_hooks.clone(),
+            tool_hooks: self.tool_hooks.clone(),
+            tool_call_cap: self.tool_call_limit,
+        }
     }
 
     /// The real tool invocation budget for a turn of `max_iterations`: the

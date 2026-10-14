@@ -1075,8 +1075,8 @@ mod tool_surface;
 #[path = "runtime_session_juice_tests.rs"]
 mod juice_tests;
 
-#[path = "prelude_integrations.rs"]
 mod parent_snapshot;
+#[path = "prelude_integrations.rs"]
 mod prelude_integrations;
 
 #[cfg(test)]
