@@ -91,3 +91,69 @@ async fn module_blob_scopes_are_swept_alongside_the_acting_scope() {
 fn no_module_blob_scopes_without_the_modules_feature() {
     assert!(crate::modules::expiring_blob_module_scopes().is_empty());
 }
+
+#[tokio::test]
+async fn sweep_profiles_reclaims_each_profiles_own_scope() {
+    let (now, backend) = backend_with_clock();
+    let acme = crate::storage::scope_for_profile("acme");
+    let globex = crate::storage::scope_for_profile("globex");
+    put_expiring(&backend, &acme, "gone", 10).await;
+    put_expiring(&backend, &acme, "kept", 10_000).await;
+    put_expiring(&backend, &globex, "gone", 10).await;
+    now.store(2_000, Ordering::SeqCst);
+
+    let ids = vec!["acme".to_string(), "globex".to_string()];
+    assert_eq!(sweep_profiles(backend.as_ref(), &ids).await, 2);
+    assert_eq!(sweep_profiles(backend.as_ref(), &ids).await, 0, "idempotent");
+    let kept = backend.for_scope(&acme).unwrap().blobs().get("kept").await;
+    assert!(kept.unwrap().is_some(), "an unexpired blob survives");
+}
+
+#[tokio::test]
+async fn sweep_profiles_skips_profiles_not_listed() {
+    let (now, backend) = backend_with_clock();
+    let other = crate::storage::scope_for_profile("not-listed");
+    put_expiring(&backend, &other, "gone", 10).await;
+    now.store(2_000, Ordering::SeqCst);
+    assert_eq!(sweep_profiles(backend.as_ref(), &[]).await, 0);
+    assert_eq!(sweep_scope(backend.as_ref(), &other).await, 1);
+}
+
+#[cfg(feature = "modules")]
+#[tokio::test]
+async fn sweep_profiles_reaches_the_modules_scopes_for_that_profile() {
+    let (now, backend) = backend_with_clock();
+    let base = crate::storage::scope_for_profile("acme");
+    let module_scopes = crate::modules::expiring_blob_module_scopes_for("acme", &base);
+    assert!(!module_scopes.is_empty(), "TinyJuice owns expiring blobs");
+    put_expiring(&backend, &module_scopes[0], "tinyjuice_ccr/t", 10).await;
+    now.store(2_000, Ordering::SeqCst);
+    assert_eq!(sweep_profiles(backend.as_ref(), &["acme".to_string()]).await, 1);
+}
+
+/// A backend whose sweep never completes.
+struct HungSweep(Arc<dyn StorageBackend>);
+
+#[async_trait::async_trait]
+impl tinystoragedrivers::StorageBackend for HungSweep {
+    fn for_scope(
+        &self,
+        scope: &Scope,
+    ) -> Result<tinystoragedrivers::ScopedStorage, tinystoragedrivers::StorageError> {
+        self.0.for_scope(scope)
+    }
+    async fn sweep_expired_blobs(
+        &self,
+        _scope: &Scope,
+    ) -> Result<u64, tinystoragedrivers::StorageError> {
+        std::future::pending().await
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_hung_scope_sweep_times_out_and_counts_as_zero() {
+    let (_now, inner) = backend_with_clock();
+    let hung = HungSweep(inner);
+    let removed = sweep_scope_within(&hung, &Scope::local(), Duration::from_secs(30)).await;
+    assert_eq!(removed, 0);
+}
