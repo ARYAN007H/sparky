@@ -236,7 +236,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
 
         if outcome.text.trim().is_empty() && outcome.tool_outcomes.is_empty() {
             return Err(driver_error(
-                crate::agent::error::AgentError::EmptyProviderResponse {
+                tinyagents_harness::agent_error::AgentError::EmptyProviderResponse {
                     iteration: outcome.model_calls,
                 },
             ));

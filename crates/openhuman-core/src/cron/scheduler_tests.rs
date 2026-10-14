@@ -1,5 +1,5 @@
 use super::*;
-use crate::agent::error::AgentError;
+use tinyagents_harness::agent_error::AgentError;
 use crate::config::Config;
 use crate::security::SecurityPolicy;
 use chrono::{Duration as ChronoDuration, Timelike, Utc};

@@ -212,7 +212,7 @@ const STOPPED_TURN_PERSIST_GRACE: Duration = Duration::from_secs(3);
 /// Kept as a pure predicate over the already-formatted error string so the
 /// suppression policy is unit-testable without a Sentry harness.
 pub(crate) fn sentry_suppression_reason(detailed: &str) -> Option<&'static str> {
-    if crate::agent::error::is_max_iterations_error(detailed) {
+    if tinyagents_harness::agent_error::is_max_iterations_error(detailed) {
         Some("max-iteration cap")
     } else if super::super::web_errors::is_outer_backstop_timeout(detailed) {
         Some("turn wall-clock backstop (no terminal event)")
@@ -234,12 +234,12 @@ pub(crate) fn sentry_suppression_reason(detailed: &str) -> Option<&'static str> 
 ///
 /// The bound is a typed field on the harness's hosted error
 /// (`HostedError::timeout_bound`); the turn runner turns it into a
-/// [`TurnTimeoutBound`](crate::agent::error::TurnTimeoutBound) phrase in the
+/// [`TurnTimeoutBound`](tinyagents_harness::agent_error::TurnTimeoutBound) phrase in the
 /// flattened error, and this function reads that phrase back through the same
 /// type rather than a second spelling. Pure over the formatted error string,
 /// for the same reason its neighbour is.
 pub(crate) fn timeout_bound_tag(detailed: &str) -> &'static str {
-    if let Some(bound) = crate::agent::error::TurnTimeoutBound::from_message(detailed) {
+    if let Some(bound) = tinyagents_harness::agent_error::TurnTimeoutBound::from_message(detailed) {
         bound.tag()
     } else if super::super::web_errors::is_turn_timeout_error(detailed) {
         "unclassified_timeout"

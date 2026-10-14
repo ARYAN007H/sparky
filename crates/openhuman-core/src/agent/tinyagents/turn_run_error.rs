@@ -39,7 +39,7 @@ pub(super) async fn map_turn_run_error(
                 model,
                 "[tinyagents] run hit the model-call cap; mapping to MaxIterationsExceeded (not consulting error_slot) — #4457 defect B"
             );
-            return anyhow::Error::new(crate::agent::error::AgentError::MaxIterationsExceeded {
+            return anyhow::Error::new(tinyagents_harness::agent_error::AgentError::MaxIterationsExceeded {
                 max: max_iterations,
             });
         }

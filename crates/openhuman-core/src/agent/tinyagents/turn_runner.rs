@@ -336,7 +336,7 @@ pub(super) async fn run_turn_via_tinyagents_body(
                 "[registry] aborting turn before model dispatch: capability registry validation failed"
             );
             return Err(anyhow::Error::new(
-                crate::agent::error::AgentError::RegistryValidationFailed {
+                tinyagents_harness::agent_error::AgentError::RegistryValidationFailed {
                     diagnostics: messages,
                 },
             ));

@@ -3,7 +3,7 @@
 //! events, and error sanitisation.
 
 use super::super::types::OpenHumanSessionHost;
-use crate::agent::error::AgentError;
+use tinyagents_harness::agent_error::AgentError;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 use crate::security::prompt_injection::{

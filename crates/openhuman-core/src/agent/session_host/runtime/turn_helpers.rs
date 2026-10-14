@@ -2,7 +2,7 @@
 //! sanitisation, and tool-call id fallback / persistence shaping.
 
 use super::super::types::OpenHumanSessionHost;
-use crate::agent::error::AgentError;
+use tinyagents_harness::agent_error::AgentError;
 use crate::util::truncate_with_ellipsis;
 use tinytools_agent::dialect::TranscriptEntry;
 
