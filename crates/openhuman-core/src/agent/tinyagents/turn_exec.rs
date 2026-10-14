@@ -375,6 +375,12 @@ async fn drive_turn(
             provider_usage_carry.clone(),
             bridge_tool_sets.clone(),
         );
+        bridge.set_definition(
+            run_context
+                .memory_identity
+                .as_ref()
+                .and_then(|identity| identity.agent_id.as_deref()),
+        );
         sink.subscribe(bridge.clone());
         bridge
     };
