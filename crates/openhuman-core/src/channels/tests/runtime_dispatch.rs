@@ -344,30 +344,58 @@ async fn dispatch_routes_through_agent_run_turn_bus_handler() {
     // that expects the real path sees a consistent registry.
 }
 
-#[tokio::test]
-async fn channel_processed_event_records_resolved_agent_route() {
-    crate::core::bus::init().await.expect("bus init");
-    let mut events = crate::core::bus::BUS
-        .get()
-        .expect("event bus should be initialized")
-        .receiver();
+/// Wait for the `ChannelMessageProcessed` event of `message_id`, skipping the
+/// events other tests publish on the shared process-wide bus.
+///
+/// The scan is bounded by wall-clock time, never by a count of foreign
+/// events: the full lib suite runs hundreds of tests in parallel on the same
+/// bus, so any fixed event budget is eventually spent on unrelated traffic
+/// before ours arrives.
+async fn wait_for_channel_processed(
+    events: &mut tinybus::EventReceiver<DomainEvent>,
+    message_id: &str,
+) -> DomainEvent {
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
+    loop {
+        let event = tokio::time::timeout_at(deadline, events.recv())
+            .await
+            .unwrap_or_else(|_| {
+                panic!("did not observe ChannelMessageProcessed for {message_id}")
+            })
+            .expect("the bus closed before the expected event arrived");
+        if matches!(
+            &event,
+            DomainEvent::ChannelMessageProcessed { message_id: id, .. } if id == message_id
+        ) {
+            return event;
+        }
+    }
+}
 
-    let _bus_guard = mock_agent_run_turn(move |_req| async move {
-        Ok(AgentTurnResponse::with_resolved_route(
-            "CANNED_RESPONSE_FROM_RESOLVED_ROUTE",
-            "actual-provider",
-            "actual-model",
-        ))
-    })
-    .await;
+fn unrelated_processed_event(n: usize) -> DomainEvent {
+    DomainEvent::ChannelMessageProcessed {
+        channel: "noise".into(),
+        message_id: format!("noise-{n}"),
+        sender: "noise".into(),
+        reply_target: "noise".into(),
+        content: String::new(),
+        thread_ts: None,
+        response: String::new(),
+        provider: "noise".into(),
+        model: "noise".into(),
+        elapsed_ms: 0,
+        success: true,
+        workspace_dir: std::env::temp_dir(),
+    }
+}
 
+async fn resolved_route_ctx() -> Arc<ChannelRuntimeContext> {
     let channel_impl = Arc::new(RecordingChannel::default());
-    let channel: Arc<dyn Channel> = channel_impl.clone();
-
+    let channel: Arc<dyn Channel> = channel_impl;
     let mut channels_by_name = HashMap::new();
     channels_by_name.insert(channel.name().to_string(), channel);
 
-    let runtime_ctx = Arc::new(ChannelRuntimeContext {
+    Arc::new(ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(channels_by_name),
         turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
@@ -391,12 +419,34 @@ async fn channel_processed_event_records_resolved_agent_route() {
         multimodal: crate::config::MultimodalConfig::default(),
         multimodal_files: crate::config::MultimodalFileConfig::default(),
         config: None,
-    });
+    })
+}
+
+async fn run_resolved_route_message(message_id: &str, noise_events: usize) {
+    crate::core::bus::init().await.expect("bus init");
+    let mut events = crate::core::bus::BUS
+        .get()
+        .expect("event bus should be initialized")
+        .receiver();
+
+    let _bus_guard = mock_agent_run_turn(move |_req| async move {
+        Ok(AgentTurnResponse::with_resolved_route(
+            "CANNED_RESPONSE_FROM_RESOLVED_ROUTE",
+            "actual-provider",
+            "actual-model",
+        ))
+    })
+    .await;
+
+    // Other tests share this bus: model their traffic ahead of our event.
+    for n in 0..noise_events {
+        crate::core::bus::BUS.publish(unrelated_processed_event(n));
+    }
 
     process_channel_message(
-        runtime_ctx,
+        resolved_route_ctx().await,
         traits::ChannelMessage {
-            id: "resolved-route-msg".to_string(),
+            id: message_id.to_string(),
             sender: "alice".to_string(),
             reply_target: "alice".to_string(),
             content: "hello from resolved route test".to_string(),
@@ -408,40 +458,34 @@ async fn channel_processed_event_records_resolved_agent_route() {
     )
     .await;
 
-    // Bound the scan so unrelated global event traffic can't hang the test;
-    // the target event is published by process_channel_message above.
-    let mut matched = false;
-    for _ in 0..50 {
-        let event = tokio::time::timeout(Duration::from_millis(200), events.recv())
-            .await
-            .expect("ChannelMessageProcessed event should be published");
-        let event = event.expect("the bus closed before the expected event arrived");
+    let event = wait_for_channel_processed(&mut events, message_id).await;
+    let DomainEvent::ChannelMessageProcessed {
+        provider,
+        model,
+        response,
+        success,
+        ..
+    } = event
+    else {
+        unreachable!("wait_for_channel_processed returns only ChannelMessageProcessed");
+    };
+    assert!(success);
+    assert_eq!(response, "CANNED_RESPONSE_FROM_RESOLVED_ROUTE");
+    assert_eq!(provider, "actual-provider");
+    assert_eq!(model, "actual-model");
+}
 
-        if let DomainEvent::ChannelMessageProcessed {
-            message_id,
-            provider,
-            model,
-            response,
-            success,
-            ..
-        } = event
-        {
-            if message_id != "resolved-route-msg" {
-                continue;
-            }
+#[tokio::test]
+async fn channel_processed_event_records_resolved_agent_route() {
+    run_resolved_route_message("resolved-route-msg", 0).await;
+}
 
-            assert!(success);
-            assert_eq!(response, "CANNED_RESPONSE_FROM_RESOLVED_ROUTE");
-            assert_eq!(provider, "actual-provider");
-            assert_eq!(model, "actual-model");
-            matched = true;
-            break;
-        }
-    }
-    assert!(
-        matched,
-        "did not observe ChannelMessageProcessed for resolved-route-msg"
-    );
+/// Regression: the scan used to give up after 50 foreign events, so under the
+/// full parallel suite (other tests flooding the shared bus) the target event
+/// was missed and the test failed only there.
+#[tokio::test]
+async fn channel_processed_event_is_found_behind_a_flood_of_unrelated_events() {
+    run_resolved_route_message("resolved-route-flood-msg", 400).await;
 }
 
 /// Security regression for the `[FILE:…]` smuggling vector: a remote
