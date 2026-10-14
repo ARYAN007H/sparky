@@ -186,6 +186,7 @@ pub mod inference {
     pub mod embedding_host {
         pub use openhuman_core::inference::embedding_host::{
             default_embedding_provider_for_chat, default_embedding_provider_with_config,
+            SharedEmbeddingModel,
         };
     }
     pub mod provider {
@@ -237,7 +238,7 @@ pub mod security {
         }
     }
     pub mod approval {
-        pub use openhuman_core::security::approval::ApprovalGate;
+        pub use openhuman_core::security::approval::{ApprovalChatContext, ApprovalGate};
     }
     pub mod pairing {
         pub use openhuman_core::security::pairing::is_public_bind;
