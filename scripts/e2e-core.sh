@@ -102,5 +102,5 @@ export RUST_MIN_STACK="${RUST_MIN_STACK:-16777216}"
 cd "$REPO_ROOT"
 features="$(bash "$SCRIPT_DIR/ci/product-features.sh")$extra_features"
 bash "$SCRIPT_DIR/ci-cancel-aware.sh" cargo test -p openhuman-cli \
-  --features "$features" --test tinymcp_storage_smoke_e2e -- \
-  --ignored --test-threads=1 "$@"
+  --features "$features,e2e-test-support" --test tinymcp_storage_smoke_e2e -- \
+  --test-threads=1 "$@"

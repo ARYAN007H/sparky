@@ -122,7 +122,12 @@ pub use runtime::start_channels;
 #[cfg(feature = "channels")]
 pub(crate) use runtime::{session, start_channels_with_session};
 
-#[cfg(all(test, feature = "channels", feature = "modules"))]
+#[cfg(all(
+    test,
+    feature = "channels",
+    feature = "modules",
+    feature = "e2e-test-support"
+))]
 #[path = "module_fixture_tests.rs"]
 pub(crate) mod module_fixture;
 

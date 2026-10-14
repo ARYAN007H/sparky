@@ -92,6 +92,9 @@ if local_module_source_is_source; then
 else
   for released_id in tinychannels tinyjuice tinysearch; do
     released_dir="$(stage_release_module "$released_id" "$wallet_platform" "$module_ext")"
+    if [ "$released_id" = "tinychannels" ]; then
+      tinychannels_dir="$released_dir"
+    fi
     export OPENHUMAN_MODULE_PATH="$released_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
   done
 fi
@@ -101,6 +104,7 @@ fi
 # module currently requires TinyBus 0.1.4 while this host pins 0.1.3.
 if local_module_source_is_source; then
   released_dir="$(stage_release_module tinychannels "$wallet_platform" "$module_ext")"
+  tinychannels_dir="$released_dir"
   export OPENHUMAN_MODULE_PATH="$released_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
 fi
 
@@ -300,6 +304,15 @@ run_build_only_reaper_test() {
     -- --exact --test-threads=1 "$@"
 }
 
+run_tinychannels_release_fixture_tests() {
+  # These confidential calls require the checksum-pinned release module and
+  # run in a fresh process so module-loader state cannot leak into the unit
+  # suite. The fixture disables downloads; only this staged path may serve it.
+  OPENHUMAN_MODULE_PATH="$tinychannels_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}" \
+    cargo_test --features e2e-test-support --lib channels::module_fixture:: \
+      -- --test-threads=1 "$@"
+}
+
 run_full_suite() {
   # Several unit fixtures mutate process-wide state (provider overrides and
   # temporary executable paths). Keep this aggregate invocation deterministic;
@@ -311,6 +324,7 @@ run_full_suite() {
   # `--workspace --bins` picks them up there (plus the TUI binary).
   cargo_test --bins -- --test-threads=1 "$@"
   run_build_only_reaper_test "$@"
+  run_tinychannels_release_fixture_tests "$@"
   cargo_test --doc -- "$@"
 
   while IFS= read -r target; do
@@ -331,7 +345,7 @@ run_full_suite() {
       run_json_rpc_e2e "$@"
     elif [ "$target" = "tinymcp_storage_smoke_e2e" ]; then
       OPENHUMAN_MODULE_PATH="$tinymcp_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}" \
-        cargo_test --test "$target" -- "$@"
+        cargo_test --features e2e-test-support --test "$target" -- "$@"
     elif [ "$target" = "mcp_registry_e2e" ]; then
       # The TinyMCP module owns process-level directory transitions; this
       # binary exercises several workspaces against that shared module object.
@@ -393,7 +407,7 @@ elif [ "$#" -ge 2 ] && [ "$1" = "--test" ] && [ "$2" = "tinymcp_storage_smoke_e2
     shift
   fi
   OPENHUMAN_MODULE_PATH="$tinymcp_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}" \
-    cargo_test --test tinymcp_storage_smoke_e2e -- "$@"
+    cargo_test --features e2e-test-support --test tinymcp_storage_smoke_e2e -- "$@"
 elif [ "$#" -ge 2 ] && [ "$1" = "--test" ] && [ "$2" = "mcp_registry_multi_server" ]; then
   shift 2
   if [ "${1:-}" = "--" ]; then

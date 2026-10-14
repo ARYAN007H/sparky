@@ -13,6 +13,7 @@ use tinychannels_bus::methods;
 pub(crate) async fn client() -> ModuleClient {
     let mut config = Config::default();
     config.modules.enabled = true;
+    config.modules.allow_download = false;
     ModuleClient::new(config)
 }
 
