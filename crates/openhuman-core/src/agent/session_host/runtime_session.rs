@@ -74,7 +74,7 @@ struct OpenHumanTurnPrelude {
     /// Host prompt/utilisation state, shared by the runtime hooks. It is not
     /// generic conversation state and the runtime never persists it.
     context: Arc<std::sync::Mutex<crate::agent::context::ContextManager>>,
-    tool_policy: Arc<dyn crate::agent::tool_policy::ToolPolicy>,
+    tool_policy: Arc<dyn tinyagents_harness::middleware::ToolCallPolicy<crate::agent::tinyagents::host::OpenHumanRunContext>>,
     tool_dispatcher: Arc<dyn tinytools_agent::dialect::ToolDialect>,
     workspace_dir: std::path::PathBuf,
     action_dir: std::path::PathBuf,

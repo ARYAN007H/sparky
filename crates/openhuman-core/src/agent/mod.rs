@@ -77,7 +77,6 @@ pub mod stop_hooks;
 pub mod subagent_host;
 pub mod tinyagents;
 pub mod todos;
-pub mod tool_policy;
 pub mod tool_snapshot_scope;
 pub mod tools;
 pub mod triage;
