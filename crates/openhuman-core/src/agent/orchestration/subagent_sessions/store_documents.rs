@@ -114,7 +114,12 @@ impl Docs {
         let id = marker_id(source);
         let claimed =
             crate::storage::import_claim::with_claim(&self.0, IMPORTED, &id.clone(), || {
+                // The process that held the claim before us may have finished.
+                if self.legacy_imported(source)? {
+                    return Ok(());
+                }
                 self.save(sessions)?;
+                let id = id.clone();
                 self.0.run(|docs| async move {
                     match docs
                         .put(
