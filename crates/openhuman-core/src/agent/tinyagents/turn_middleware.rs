@@ -296,13 +296,11 @@ pub(super) fn install_turn_middleware(
         }
         tags
     };
-    harness.push_middleware(Arc::new(
-        middleware::OpenHumanToolExposureShadowMiddleware::new(
-            &candidate_names,
-            allowed.as_ref(),
-            exposure_tags,
-        ),
-    ));
+    harness.push_middleware(Arc::new(middleware::ToolExposureShadowMiddleware::new(
+        &candidate_names,
+        allowed.as_ref(),
+        exposure_tags,
+    )));
 
     // Prompt-cache prefix protection (issue #4249, 03.2). The vendor loop owns
     // the stable-prefix layout (`PromptSegment`s built from the session's frozen
