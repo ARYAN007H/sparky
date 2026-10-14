@@ -141,6 +141,9 @@ pub enum Outcome {
     NoSource,
     /// A marker says the import already finished.
     AlreadyDone,
+    /// Another process holds the import claim and is importing this domain;
+    /// this process skips it (the other writes the marker).
+    InProgress,
     /// The import ran.
     Imported {
         /// Records found in the legacy file (both shapes).
@@ -233,6 +236,11 @@ pub fn run_with(
                     domain = source.domain,
                     "[storage::import] already imported"
                 ),
+                Ok(Outcome::InProgress) => tracing::debug!(
+                    target: "openhuman::storage_import",
+                    domain = source.domain,
+                    "[storage::import] another process is importing; skipped"
+                ),
                 Ok(Outcome::NoSource) => tracing::debug!(
                     target: "openhuman::storage_import",
                     domain = source.domain,
@@ -287,6 +295,15 @@ fn import_one(
         return Ok(Outcome::NoSource);
     }
 
+    let claimed = super::import_claim::with_claim(&markers, MARKER_COLLECTION, &marker.clone(), || {
+        // Another process may have finished between our check and the claim.
+        let again = marker.clone();
+        let done = markers
+            .run(move |docs| async move { docs.get(MARKER_COLLECTION, &again).await })?
+            .is_some();
+        if done {
+            return Ok(Outcome::AlreadyDone);
+        }
     let snapshot = Snapshot::of(&legacy, source.db)
         .with_context(|| format!("[{domain}] copy the legacy file for reading"))?;
     let scratch = Config {
@@ -352,6 +369,8 @@ fn import_one(
         found: total,
         written,
     })
+    })?;
+    Ok(claimed.unwrap_or(Outcome::InProgress))
 }
 
 /// Whether the marker for `source` exists (test and diagnostics helper).
