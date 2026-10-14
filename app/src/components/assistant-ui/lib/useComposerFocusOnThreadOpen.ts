@@ -52,8 +52,14 @@ export function useComposerFocusOnThreadOpen(inputWrapperRef: RefObject<HTMLElem
       }
 
       textbox.focus({ preventScroll: true });
-      // Caret after any restored draft, not before it.
-      const selection = window.getSelection();
+      // Caret after a restored draft, not before it. An empty composer needs no
+      // caret placement, and an explicit DOM selection there is not inert:
+      // Lexical resolves its selection from the DOM on `compositionstart`, and
+      // a range on the empty paragraph makes it insert its composition-start
+      // character, which `SyncPlugin` writes to the store past the bridge's
+      // IME gate. Where `beforeinput` is missing (jsdom), that store write
+      // surfaced as a phantom draft mid-composition.
+      const selection = textbox.textContent ? window.getSelection() : null;
       if (selection) {
         selection.selectAllChildren(textbox);
         selection.collapseToEnd();
