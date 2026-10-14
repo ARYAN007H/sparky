@@ -552,9 +552,8 @@ async fn a_blob_over_the_inline_cap_is_refused_and_stores_nothing() {
     );
     // Past the contract's inline cap (1 MiB) the server refuses the body and
     // stores nothing; a body that size or bigger goes by `PutStream`, which
-    // waits for the tinybus move (#7781). (The 16 MiB frame itself is the
-    // bus's to enforce and is not exercised here: an inline body big enough to
-    // hit it takes the probe longer to build than a unit test should wait.)
+    // the tests below cover. (A body past the 16 MiB frame is covered by
+    // `an_inline_blob_no_frame_can_carry_fails_fast_instead_of_hanging`.)
     let big: Value = rig
         .probe
         .call("PutBlob", ("tinyjuice_ccr/over-cap", 2usize * 1024 * 1024))
