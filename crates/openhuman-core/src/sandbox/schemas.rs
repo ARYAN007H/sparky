@@ -1,5 +1,6 @@
 //! Sandbox domain controller schemas and RPC handlers.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::config::rpc as config_rpc;
@@ -167,7 +168,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
 /// requested name — so `backend:"docker"` on a native-config host reports Local,
 /// matching what a real session on that host would run. Reporting the requested
 /// backend instead was the conflation fixed in #6081.
-fn handle_status(params: Map<String, Value>) -> ControllerFuture {
+fn handle_status(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         gate()?;
         let backend_str = params
@@ -224,7 +225,7 @@ fn handle_status(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_resolve_policy(params: Map<String, Value>) -> ControllerFuture {
+fn handle_resolve_policy(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         gate()?;
         let mode_str = params
@@ -283,7 +284,7 @@ fn handle_resolve_policy(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_cleanup_orphans(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_cleanup_orphans(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async {
         gate()?;
         let config = match crate::config::ops::load_config_with_timeout().await {
@@ -300,7 +301,7 @@ fn handle_cleanup_orphans(_params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_validate_policy(params: Map<String, Value>) -> ControllerFuture {
+fn handle_validate_policy(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         gate()?;
         let policy_val = params.get("policy").cloned().unwrap_or(Value::Null);

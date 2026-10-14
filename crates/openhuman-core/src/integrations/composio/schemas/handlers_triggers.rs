@@ -2,6 +2,7 @@
 //! `create_trigger`, `list_trigger_history`, `list_available_triggers`,
 //! `list_triggers`, `enable_trigger`, `disable_trigger`.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::config::rpc as config_rpc;
@@ -14,7 +15,10 @@ use super::params::{
 };
 use super::util::{read_required_non_empty, to_json};
 
-pub(super) fn handle_list_github_repos(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_list_github_repos(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let payload: ListGithubReposParams = serde_json::from_value(Value::Object(params))
@@ -23,7 +27,10 @@ pub(super) fn handle_list_github_repos(params: Map<String, Value>) -> Controller
     })
 }
 
-pub(super) fn handle_create_trigger(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_create_trigger(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let payload: CreateTriggerParams = serde_json::from_value(Value::Object(params))
@@ -44,7 +51,10 @@ pub(super) fn handle_create_trigger(params: Map<String, Value>) -> ControllerFut
     })
 }
 
-pub(super) fn handle_list_trigger_history(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_list_trigger_history(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let payload: TriggerHistoryParams = serde_json::from_value(Value::Object(params))
@@ -53,7 +63,10 @@ pub(super) fn handle_list_trigger_history(params: Map<String, Value>) -> Control
     })
 }
 
-pub(super) fn handle_list_available_triggers(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_list_available_triggers(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let payload: ListAvailableTriggersParams = serde_json::from_value(Value::Object(params))
@@ -68,7 +81,10 @@ pub(super) fn handle_list_available_triggers(params: Map<String, Value>) -> Cont
     })
 }
 
-pub(super) fn handle_list_triggers(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_list_triggers(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let payload: ListTriggersParams = serde_json::from_value(Value::Object(params))
@@ -77,7 +93,10 @@ pub(super) fn handle_list_triggers(params: Map<String, Value>) -> ControllerFutu
     })
 }
 
-pub(super) fn handle_enable_trigger(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_enable_trigger(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let payload: EnableTriggerParams = serde_json::from_value(Value::Object(params))
@@ -97,7 +116,10 @@ pub(super) fn handle_enable_trigger(params: Map<String, Value>) -> ControllerFut
     })
 }
 
-pub(super) fn handle_disable_trigger(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_disable_trigger(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let trigger_id = read_required_non_empty(&params, "trigger_id")?;

@@ -1,12 +1,16 @@
 //! Handler for the `tools_composio_execute` controller schema.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{json, Map, Value};
 
 use crate::config::rpc as config_rpc;
 use crate::core::all::ControllerFuture;
 use crate::core::Outcome;
 
-pub(super) fn handle_composio_execute(params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_composio_execute(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let action = params
             .get("action")

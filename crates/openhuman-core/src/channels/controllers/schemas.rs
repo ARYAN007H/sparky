@@ -1,5 +1,6 @@
 //! RPC controller schemas and handlers for the channels domain.
 
+use crate::core::runtime::DispatchCtx;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_json::{Map, Value};
@@ -219,7 +220,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
 // Handlers
 // ---------------------------------------------------------------------------
 
-fn handle_list(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_list(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         to_json(Outcome::new(
             tinychannels_bus::controllers::all_channel_definitions(),
@@ -228,7 +229,7 @@ fn handle_list(_params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_describe(params: Map<String, Value>) -> ControllerFuture {
+fn handle_describe(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<DescribeParams>(params)?;
         let channel = p.channel.trim();
@@ -238,7 +239,7 @@ fn handle_describe(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_connect(params: Map<String, Value>) -> ControllerFuture {
+fn handle_connect(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let p = deserialize_params::<ConnectParams>(params)?;
@@ -258,7 +259,7 @@ async fn connect_with_config(config: &Config, p: ConnectParams) -> Result<Value,
     to_json(Outcome::new(outcome.value, logs))
 }
 
-fn handle_disconnect(params: Map<String, Value>) -> ControllerFuture {
+fn handle_disconnect(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let p = deserialize_params::<DisconnectParams>(params)?;
@@ -282,7 +283,7 @@ fn handle_disconnect(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_status(params: Map<String, Value>) -> ControllerFuture {
+fn handle_status(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let p = if params.is_empty() {
@@ -304,7 +305,7 @@ fn handle_status(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_set_default(params: Map<String, Value>) -> ControllerFuture {
+fn handle_set_default(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let mut config = config_rpc::load_config_with_timeout().await?;
         let p = deserialize_params::<SetDefaultParams>(params)?;
@@ -312,14 +313,14 @@ fn handle_set_default(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_get_default(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_get_default(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(super::ops::get_default_channel(&config)?)
     })
 }
 
-fn handle_test(params: Map<String, Value>) -> ControllerFuture {
+fn handle_test(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let p = deserialize_params::<TestParams>(params)?;
@@ -337,14 +338,14 @@ async fn test_with_config(config: &Config, params: TestParams) -> Result<Value, 
     )
 }
 
-fn handle_discord_list_guilds(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_discord_list_guilds(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(super::ops::discord_list_guilds(&config).await?)
     })
 }
 
-fn handle_discord_list_channels(params: Map<String, Value>) -> ControllerFuture {
+fn handle_discord_list_channels(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let p = deserialize_params::<DiscordListChannelsParams>(params)?;
@@ -352,7 +353,10 @@ fn handle_discord_list_channels(params: Map<String, Value>) -> ControllerFuture 
     })
 }
 
-fn handle_discord_check_permissions(params: Map<String, Value>) -> ControllerFuture {
+fn handle_discord_check_permissions(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let p = deserialize_params::<DiscordCheckPermissionsParams>(params)?;
@@ -363,7 +367,7 @@ fn handle_discord_check_permissions(params: Map<String, Value>) -> ControllerFut
     })
 }
 
-fn handle_send_message(params: Map<String, Value>) -> ControllerFuture {
+fn handle_send_message(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let p = deserialize_params::<SendMessageParams>(params)?;
@@ -389,7 +393,7 @@ async fn send_with_config(config: &Config, p: SendMessageParams) -> Result<Value
     ))
 }
 
-fn handle_send_reaction(params: Map<String, Value>) -> ControllerFuture {
+fn handle_send_reaction(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let p = deserialize_params::<SendReactionParams>(params)?;
@@ -405,7 +409,7 @@ fn handle_send_reaction(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_create_thread(params: Map<String, Value>) -> ControllerFuture {
+fn handle_create_thread(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let p = deserialize_params::<CreateThreadParams>(params)?;
@@ -421,7 +425,7 @@ fn handle_create_thread(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_update_thread(params: Map<String, Value>) -> ControllerFuture {
+fn handle_update_thread(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let p = deserialize_params::<UpdateThreadParams>(params)?;
@@ -442,7 +446,7 @@ fn handle_update_thread(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_list_threads(params: Map<String, Value>) -> ControllerFuture {
+fn handle_list_threads(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let p = deserialize_params::<ListThreadsParams>(params)?;

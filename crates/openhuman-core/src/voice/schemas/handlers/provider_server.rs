@@ -1,5 +1,6 @@
 //! Handlers for provider settings, model listing, provider testing, and server lifecycle.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::config::rpc as config_rpc;
@@ -18,7 +19,10 @@ use crate::voice::schemas::params::{
 // Provider configuration handlers
 // ---------------------------------------------------------------------------
 
-pub(crate) fn handle_voice_set_providers(params: Map<String, Value>) -> ControllerFuture {
+pub(crate) fn handle_voice_set_providers(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<SetProvidersParams>(params)?;
         let mut config = config_rpc::load_config_with_timeout().await?;
@@ -79,6 +83,7 @@ pub(crate) fn handle_voice_set_providers(params: Map<String, Value>) -> Controll
 }
 
 pub(crate) fn handle_voice_update_provider_settings(
+    _ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
@@ -232,7 +237,10 @@ pub(crate) fn handle_voice_update_provider_settings(
     })
 }
 
-pub(crate) fn handle_voice_list_models(params: Map<String, Value>) -> ControllerFuture {
+pub(crate) fn handle_voice_list_models(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<VoiceListModelsParams>(params)?;
         let config = config_rpc::load_config_with_timeout().await?;
@@ -297,7 +305,10 @@ pub(crate) fn handle_voice_list_models(params: Map<String, Value>) -> Controller
     })
 }
 
-pub(crate) fn handle_voice_test_provider(params: Map<String, Value>) -> ControllerFuture {
+pub(crate) fn handle_voice_test_provider(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<VoiceTestProviderParams>(params)?;
         let config = config_rpc::load_config_with_timeout().await?;
@@ -413,7 +424,10 @@ pub(crate) fn handle_voice_test_provider(params: Map<String, Value>) -> Controll
 // Voice server lifecycle handlers
 // ---------------------------------------------------------------------------
 
-pub(crate) fn handle_voice_server_start(params: Map<String, Value>) -> ControllerFuture {
+pub(crate) fn handle_voice_server_start(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         use crate::voice::server::{global_server, VoiceServerConfig};
         use tinyvoice_bus::hotkey::ActivationMode;
@@ -499,7 +513,10 @@ pub(crate) fn handle_voice_server_start(params: Map<String, Value>) -> Controlle
     })
 }
 
-pub(crate) fn handle_voice_server_stop(_params: Map<String, Value>) -> ControllerFuture {
+pub(crate) fn handle_voice_server_stop(
+    _ctx: DispatchCtx,
+    _params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         if let Some(server) = crate::voice::server::try_global_server() {
             server.stop().await;
@@ -520,7 +537,10 @@ pub(crate) fn handle_voice_server_stop(_params: Map<String, Value>) -> Controlle
     })
 }
 
-pub(crate) fn handle_voice_server_status(_params: Map<String, Value>) -> ControllerFuture {
+pub(crate) fn handle_voice_server_status(
+    _ctx: DispatchCtx,
+    _params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         if let Some(server) = crate::voice::server::try_global_server() {
             let status = server.status().await;
@@ -542,7 +562,10 @@ pub(crate) fn handle_voice_server_status(_params: Map<String, Value>) -> Control
 // Overlay STT notify handler
 // ---------------------------------------------------------------------------
 
-pub(crate) fn handle_overlay_stt_notify(params: Map<String, Value>) -> ControllerFuture {
+pub(crate) fn handle_overlay_stt_notify(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<OverlaySttNotifyParams>(params)?;
         log::debug!(

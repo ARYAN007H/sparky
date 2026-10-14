@@ -1,5 +1,6 @@
 //! RPC controllers for the local desktop connection.
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::core::all::{ControllerFuture, RegisteredController};
@@ -75,7 +76,7 @@ fn schema(function: &'static str) -> ControllerSchema {
     }
 }
 
-fn status(_: Map<String, Value>) -> ControllerFuture {
+fn status(_ctx: DispatchCtx, _: Map<String, Value>) -> ControllerFuture {
     Box::pin(async {
         let config = crate::config::rpc::load_config_with_timeout()
             .await
@@ -85,7 +86,7 @@ fn status(_: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn set_enabled(params: Map<String, Value>) -> ControllerFuture {
+fn set_enabled(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let value = params
             .get("enabled")
@@ -100,7 +101,7 @@ fn set_enabled(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn probe(_: Map<String, Value>) -> ControllerFuture {
+fn probe(_ctx: DispatchCtx, _: Map<String, Value>) -> ControllerFuture {
     Box::pin(async {
         let config = crate::config::rpc::load_config_with_timeout()
             .await
@@ -110,7 +111,7 @@ fn probe(_: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn pending(_: Map<String, Value>) -> ControllerFuture {
+fn pending(_ctx: DispatchCtx, _: Map<String, Value>) -> ControllerFuture {
     Box::pin(async {
         let config = crate::config::rpc::load_config_with_timeout()
             .await
@@ -120,7 +121,7 @@ fn pending(_: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn confirm(params: Map<String, Value>) -> ControllerFuture {
+fn confirm(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let id = params
             .get("confirmation_id")

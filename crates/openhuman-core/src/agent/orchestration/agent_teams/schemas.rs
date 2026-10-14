@@ -7,6 +7,7 @@
 //! close a team, and — via `start_member` — spawn a live worker that claims and
 //! runs a task to completion (see [`super::runtime`]).
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::config::rpc as config_rpc;
@@ -252,7 +253,7 @@ fn schema_for(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_create(params: Map<String, Value>) -> ControllerFuture {
+fn handle_create(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "agent_team_rpc", "[agent_team_rpc][{cid}] create.entry");
@@ -277,7 +278,7 @@ fn handle_create(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_list(params: Map<String, Value>) -> ControllerFuture {
+fn handle_list(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "agent_team_rpc", "[agent_team_rpc][{cid}] list.entry");
@@ -303,7 +304,7 @@ fn handle_list(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_get(params: Map<String, Value>) -> ControllerFuture {
+fn handle_get(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "agent_team_rpc", "[agent_team_rpc][{cid}] get.entry");
@@ -319,7 +320,7 @@ fn handle_get(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_assign_task(params: Map<String, Value>) -> ControllerFuture {
+fn handle_assign_task(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "agent_team_rpc", "[agent_team_rpc][{cid}] assign_task.entry");
@@ -346,7 +347,7 @@ fn handle_assign_task(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_claim_task(params: Map<String, Value>) -> ControllerFuture {
+fn handle_claim_task(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "agent_team_rpc", "[agent_team_rpc][{cid}] claim_task.entry");
@@ -365,7 +366,7 @@ fn handle_claim_task(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_message_member(params: Map<String, Value>) -> ControllerFuture {
+fn handle_message_member(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "agent_team_rpc", "[agent_team_rpc][{cid}] message_member.entry");
@@ -393,7 +394,7 @@ fn handle_message_member(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_list_messages(params: Map<String, Value>) -> ControllerFuture {
+fn handle_list_messages(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "agent_team_rpc", "[agent_team_rpc][{cid}] list_messages.entry");
@@ -413,7 +414,7 @@ fn handle_list_messages(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_complete_task(params: Map<String, Value>) -> ControllerFuture {
+fn handle_complete_task(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "agent_team_rpc", "[agent_team_rpc][{cid}] complete_task.entry");
@@ -437,7 +438,7 @@ fn handle_complete_task(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_shutdown_member(params: Map<String, Value>) -> ControllerFuture {
+fn handle_shutdown_member(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "agent_team_rpc", "[agent_team_rpc][{cid}] shutdown_member.entry");
@@ -454,7 +455,7 @@ fn handle_shutdown_member(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_close(params: Map<String, Value>) -> ControllerFuture {
+fn handle_close(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "agent_team_rpc", "[agent_team_rpc][{cid}] close.entry");
@@ -471,7 +472,7 @@ fn handle_close(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_start_member(params: Map<String, Value>) -> ControllerFuture {
+fn handle_start_member(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "agent_team_rpc", "[agent_team_rpc][{cid}] start_member.entry");

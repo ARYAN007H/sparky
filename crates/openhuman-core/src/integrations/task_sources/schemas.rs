@@ -5,6 +5,7 @@
 //! `all_*` registry pair, and thin handlers that parse params and
 //! delegate to [`super::ops`].
 
+use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
 use crate::config::rpc as config_rpc;
@@ -406,14 +407,14 @@ pub fn schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_list(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_list(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(ops::list(&config).await?)
     })
 }
 
-fn handle_get(params: Map<String, Value>) -> ControllerFuture {
+fn handle_get(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let id = read_required::<String>(&params, "id")?;
@@ -421,7 +422,7 @@ fn handle_get(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_add(params: Map<String, Value>) -> ControllerFuture {
+fn handle_add(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let provider = read_provider(&params)?;
@@ -447,7 +448,7 @@ fn handle_add(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_update(params: Map<String, Value>) -> ControllerFuture {
+fn handle_update(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let id = read_required::<String>(&params, "id")?;
@@ -456,7 +457,7 @@ fn handle_update(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_remove(params: Map<String, Value>) -> ControllerFuture {
+fn handle_remove(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let id = read_required::<String>(&params, "id")?;
@@ -464,7 +465,7 @@ fn handle_remove(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_fetch(params: Map<String, Value>) -> ControllerFuture {
+fn handle_fetch(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let id = read_required::<String>(&params, "id")?;
@@ -472,14 +473,14 @@ fn handle_fetch(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_sync(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_sync(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(ops::sync(&config).await?)
     })
 }
 
-fn handle_list_tasks(params: Map<String, Value>) -> ControllerFuture {
+fn handle_list_tasks(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let id = read_required::<String>(&params, "id")?;
@@ -494,7 +495,7 @@ fn handle_list_tasks(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_preview_filter(params: Map<String, Value>) -> ControllerFuture {
+fn handle_preview_filter(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let provider = read_provider(&params)?;
@@ -505,7 +506,7 @@ fn handle_preview_filter(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_list_databases(params: Map<String, Value>) -> ControllerFuture {
+fn handle_list_databases(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = config_rpc::load_config_with_timeout().await?;
         let provider = read_provider(&params)?;
@@ -514,7 +515,7 @@ fn handle_list_databases(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_status(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_status(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async {
         let config = config_rpc::load_config_with_timeout().await?;
         to_json(ops::status(&config).await?)
