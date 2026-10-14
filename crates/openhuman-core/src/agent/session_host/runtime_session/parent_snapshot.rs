@@ -3,7 +3,9 @@
 use super::*;
 
 impl OpenHumanTurnPrelude {
-    pub(in crate::agent::session_host) fn parent_context(&self) -> crate::agent::harness::ParentExecutionContext {
+    pub(in crate::agent::session_host) fn parent_context(
+        &self,
+    ) -> crate::agent::harness::ParentExecutionContext {
         let surface = self
             .tool_surface
             .lock()
