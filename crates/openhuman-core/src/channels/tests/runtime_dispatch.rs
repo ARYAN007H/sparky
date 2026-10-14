@@ -460,8 +460,13 @@ async fn run_resolved_route_message(message_id: &str, noise_after: usize) {
     // Other tests share this bus: model a burst of their traffic landing
     // right after our event, more than the ring holds.
     tokio::task::yield_now().await;
+    // Paced in small bursts so other tests' receivers on the shared bus keep
+    // draining while this one floods it.
     for n in 0..noise_after {
         crate::core::bus::BUS.publish(unrelated_processed_event(n));
+        if n % 16 == 15 {
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
     }
 
     let event = watcher.await.expect("watcher task");

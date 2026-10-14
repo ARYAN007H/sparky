@@ -65,12 +65,8 @@ fn an_unknown_function_gets_the_error_schema() {
 /// with the configured workspace pointed at a scratch directory, so nothing
 /// touches the operator's home.
 async fn run_import(workspace: Option<&std::path::Path>) -> Value {
-    let _env_lock = crate::config::TEST_ENV_LOCK.lock().await;
     let configured = tempfile::TempDir::new().unwrap();
-    // SAFETY: serialised by `TEST_ENV_LOCK`.
-    unsafe {
-        std::env::set_var("OPENHUMAN_WORKSPACE", configured.path());
-    }
+    let _env = crate::config::test_env::EnvVarGuard::workspace_async(configured.path()).await;
     let mut params = Map::new();
     if let Some(workspace) = workspace {
         params.insert(
@@ -79,10 +75,6 @@ async fn run_import(workspace: Option<&std::path::Path>) -> Value {
         );
     }
     let result = handle_session_import_run(params).await;
-    // SAFETY: serialised by `TEST_ENV_LOCK`.
-    unsafe {
-        std::env::remove_var("OPENHUMAN_WORKSPACE");
-    }
     result.expect("the import handler answers even with nothing to import")
 }
 

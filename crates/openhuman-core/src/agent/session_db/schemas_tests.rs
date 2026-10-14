@@ -91,18 +91,9 @@ where
     F: FnOnce() -> Fut,
     Fut: std::future::Future<Output = Result<Value, String>>,
 {
-    let _env_lock = crate::config::TEST_ENV_LOCK.lock().await;
     let tmp = tempfile::tempdir().expect("tempdir");
-    // SAFETY: serialised by `TEST_ENV_LOCK`.
-    unsafe {
-        std::env::set_var("OPENHUMAN_WORKSPACE", tmp.path());
-    }
-    let result = handler().await;
-    // SAFETY: serialised by `TEST_ENV_LOCK`.
-    unsafe {
-        std::env::remove_var("OPENHUMAN_WORKSPACE");
-    }
-    result
+    let _env = crate::config::test_env::EnvVarGuard::workspace_async(tmp.path()).await;
+    handler().await
 }
 
 fn params(value: Value) -> Map<String, Value> {
