@@ -5,8 +5,8 @@
 //! mapping of a stop note without a failure class to its stop-reason key
 //! ([`StopReasonKind`](crate::agent::session_host::stop_summary::StopReasonKind)).
 
-use tinyagents_harness::cost::CostSource;
 use crate::agent::tinyagents::host::LastTurnUsage;
+use tinyagents_harness::cost::CostSource;
 use tinyagents_harness::middleware::ResponseUsage;
 use tinyagents_harness::turn_stop::TurnStop;
 

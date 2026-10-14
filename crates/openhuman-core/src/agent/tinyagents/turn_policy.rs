@@ -85,7 +85,10 @@ pub(crate) fn local_openai_endpoint(config: &crate::config::Config) -> Option<St
 /// local provider when `local`. `OPENHUMAN_AGENT_TURN_TIMEOUT_SECS` still wins;
 /// `0` means "no ceiling" and yields `None`.
 pub(crate) fn agent_turn_wall_clock_ms_for(local: bool) -> Option<u64> {
-    turn_wall_clock_ms(env_str("OPENHUMAN_AGENT_TURN_TIMEOUT_SECS").as_deref(), local)
+    turn_wall_clock_ms(
+        env_str("OPENHUMAN_AGENT_TURN_TIMEOUT_SECS").as_deref(),
+        local,
+    )
 }
 
 /// Outer web-turn backstop for a turn on a local provider (#6042): the local

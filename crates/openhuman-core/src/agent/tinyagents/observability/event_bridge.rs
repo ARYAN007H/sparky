@@ -383,7 +383,9 @@ impl OpenhumanEventBridge {
             .with_reasoning_tokens(reasoning_tokens);
         let usage_info = match cost {
             tinyagents_harness::cost::CallCost::Charged(usd) => usage_info.with_charged_usd(usd),
-            tinyagents_harness::cost::CallCost::Estimated(usd) => usage_info.with_estimated_usd(usd),
+            tinyagents_harness::cost::CallCost::Estimated(usd) => {
+                usage_info.with_estimated_usd(usd)
+            }
             tinyagents_harness::cost::CallCost::Unknown => usage_info,
         };
         if reasoning_tokens > 0 || cache_creation_tokens > 0 {

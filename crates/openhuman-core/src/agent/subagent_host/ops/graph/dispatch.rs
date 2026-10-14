@@ -405,7 +405,9 @@ pub(in super::super) async fn run_subagent_via_graph(
                     .with_cache_creation_tokens(u.cache_creation_tokens)
                     .with_reasoning_tokens(u.reasoning_tokens);
                     let billed = match call_cost {
-                        tinyagents_harness::cost::CallCost::Charged(usd) => billed.with_charged_usd(usd),
+                        tinyagents_harness::cost::CallCost::Charged(usd) => {
+                            billed.with_charged_usd(usd)
+                        }
                         tinyagents_harness::cost::CallCost::Estimated(usd) => {
                             billed.with_estimated_usd(usd)
                         }

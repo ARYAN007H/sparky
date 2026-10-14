@@ -16,7 +16,9 @@ fn a_classified_breaker_note_keeps_its_class_and_drops_its_scope() {
 
 #[test]
 fn an_unclassified_breaker_note_falls_back_to_its_stop_reason_kind() {
-    let stop = breaker_stop("The last 6 tool calls in a row failed. Last error: token sk-live-123 rejected");
+    let stop = breaker_stop(
+        "The last 6 tool calls in a row failed. Last error: token sk-live-123 rejected",
+    );
     assert_eq!(stop.kind, TurnStopKind::Breaker);
     assert_eq!(stop.failure_class.as_deref(), Some("varied_failures"));
     assert_eq!(stop.status_message(), "stopped: breaker varied_failures");
@@ -60,7 +62,12 @@ fn reported_usage_projects_as_charged_only_with_a_cost() {
     assert_eq!(charged.cost_source, CostSource::Charged);
     assert_eq!(charged.cost_usd, Some(0.007));
     assert_eq!(
-        (charged.input_tokens, charged.output_tokens, charged.cached_input_tokens, charged.reasoning_tokens),
+        (
+            charged.input_tokens,
+            charged.output_tokens,
+            charged.cached_input_tokens,
+            charged.reasoning_tokens
+        ),
         (10, 5, 3, 2)
     );
     assert_eq!(

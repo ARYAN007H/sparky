@@ -117,7 +117,9 @@ pub(crate) async fn project_spawn_parallel_result(
                         // An incomplete worker was stopped early (breaker /
                         // cap); its span closes at WARNING with that stop.
                         stop: matches!(result.status, ParallelAgentStatus::Incomplete).then(|| {
-                            crate::agent::turn_projection::stop_from_incomplete(error.as_deref().unwrap_or(""))
+                            crate::agent::turn_projection::stop_from_incomplete(
+                                error.as_deref().unwrap_or(""),
+                            )
                         }),
                     })
                     .await

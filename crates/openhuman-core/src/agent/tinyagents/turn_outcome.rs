@@ -1,9 +1,9 @@
 //! The outcome type a `tinyagents`-driven turn produces, plus the shared
 //! sinks middleware write into to build it.
 
+use tinyagents_harness::turn_outcome::ToolCallOutcome;
 use tinyagents_session::transcript::TranscriptMessage;
 use tinyinference_llm::model::ResolvedModelRoute;
-use tinyagents_harness::turn_outcome::ToolCallOutcome;
 use tinytools_agent::dialect::TranscriptEntry;
 
 /// The outcome of a turn driven on the `tinyagents` harness.

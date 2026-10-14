@@ -10,11 +10,11 @@
 //!   reading alone.
 
 #[cfg(feature = "modules")]
-use tinyagents_harness::middleware::{call_effect, tool_sets_lookup, CallEffect};
-#[cfg(feature = "modules")]
 use super::super::failure_policy::recovery_policy_with_effect;
 use super::super::repeated_failure::recovery_policy;
 use super::*;
+#[cfg(feature = "modules")]
+use tinyagents_harness::middleware::{call_effect, tool_sets_lookup, CallEffect};
 
 /// The shape of a production refusal: the gate's marker, then its reason.
 const SHELL_BLOCK: &str =

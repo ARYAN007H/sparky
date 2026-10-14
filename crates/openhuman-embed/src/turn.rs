@@ -497,7 +497,8 @@ mod futures_box {
 struct AgentTurnOptions {
     tools: Option<openhuman_core::agent::HostTools>,
     shape: std::sync::Arc<ResponseShapeScope>,
-    observer: Option<std::sync::Arc<tinyagents_harness::observability::turn_observer::ObserverScope>>,
+    observer:
+        Option<std::sync::Arc<tinyagents_harness::observability::turn_observer::ObserverScope>>,
     untrusted_input: bool,
     attachments: Vec<openhuman_core::agent::HostAttachment>,
 }

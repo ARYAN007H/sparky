@@ -3,13 +3,13 @@
 //! events, and error sanitisation.
 
 use super::super::types::OpenHumanSessionHost;
-use tinyagents_harness::agent_error::AgentError;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 use crate::security::prompt_injection::{
     enforce_prompt_input, PromptEnforcementAction, PromptEnforcementContext,
 };
 use anyhow::Result;
+use tinyagents_harness::agent_error::AgentError;
 
 impl OpenHumanSessionHost {
     // ─────────────────────────────────────────────────────────────────

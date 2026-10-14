@@ -30,15 +30,15 @@ use crate::agent::tinyagents::routes;
 use crate::agent::tinyagents::stop_hooks;
 use crate::agent::tinyagents::tools::EarlyExitHook;
 use crate::agent::tinyagents::turn_models::TurnModels;
-use tinyagents_harness::turn_outcome::{HaltSummarySlot, ToolOutcomeSink};
 use crate::agent::tinyagents::turn_policy::run_policy_for_provider;
-use tinyagents_harness::turn_policy::REPEATED_TOOL_FAILURE_THRESHOLD;
 use crate::agent::tinyagents::verify_before_finish;
 use tinyagents_harness::middleware::{
     install_unmet_deliverable, is_repeat_call_exempt, tool_sets_lookup, ResearchBudgetMiddleware,
     ShellTurnBudget, TurnClockMiddleware, DIRECT_WEB_READ_LIMIT,
 };
 use tinyagents_harness::store::InMemoryStore as ToolResultArtifactIndexStore;
+use tinyagents_harness::turn_outcome::{HaltSummarySlot, ToolOutcomeSink};
+use tinyagents_harness::turn_policy::REPEATED_TOOL_FAILURE_THRESHOLD;
 use tinyinference_llm::model::ErrorSlotModel;
 
 use super::ToolPolicyEnforcement;
@@ -560,7 +560,9 @@ pub(super) fn assemble_turn_harness(
     // has; a run with nothing but web tools answers instead. Sub-agent runs
     // keep their own budgets and are not narrowed here.
     if subagent_scope.is_none() {
-        harness.push_middleware(Arc::new(ResearchBudgetMiddleware::with_limit(DIRECT_WEB_READ_LIMIT)));
+        harness.push_middleware(Arc::new(ResearchBudgetMiddleware::with_limit(
+            DIRECT_WEB_READ_LIMIT,
+        )));
     }
     // SDK-owned tool-policy projection (issue #4249 / tinyagents-full-migration
     // 01.1). Keep this narrow for now: enforce sandbox requirements declared by

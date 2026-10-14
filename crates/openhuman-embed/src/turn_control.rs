@@ -348,7 +348,10 @@ impl Turn {
                         .map(crate::complete::ResponseFormat::into_wire),
                     max_output_tokens: self.max_tokens,
                     top_p: self.top_p,
-                    validator: wants_json.then(|| std::sync::Arc::new(validator) as std::sync::Arc<dyn tinyagents_harness::middleware::ResponseValidator>),
+                    validator: wants_json.then(|| {
+                        std::sync::Arc::new(validator)
+                            as std::sync::Arc<dyn tinyagents_harness::middleware::ResponseValidator>
+                    }),
                     structured_retries: self.structured_retries,
                     provider_options: self.provider_options.clone(),
                     require_tool_call: self.require_tool_call,

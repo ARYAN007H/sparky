@@ -10,9 +10,9 @@ use std::sync::Arc;
 use anyhow::Result;
 use futures::StreamExt;
 use tinyagents_harness::agent_loop::AgentStreamItem;
-use tinyagents_harness::turn_policy::effective_max_iterations;
 use tinyagents_harness::runtime::{AgentInvocation, AgentTurnRequest, InvocationRuntime};
 use tinyagents_harness::store::StoreRegistry;
+use tinyagents_harness::turn_policy::effective_max_iterations;
 use tinyagents_registry::DiagnosticSeverity;
 
 use crate::agent::harness::tool_result_artifacts::TINYAGENTS_TOOL_RESULT_ARTIFACT_STORE;

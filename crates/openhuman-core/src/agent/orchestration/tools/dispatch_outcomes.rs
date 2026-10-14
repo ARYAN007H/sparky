@@ -78,9 +78,7 @@ pub(crate) fn incomplete_envelope(
 /// How a sub-agent handed back as `Incomplete { reason }` was stopped
 /// (iteration cap or failure breaker), for its `SubagentCompleted` event.
 pub(crate) fn incomplete_stop(reason: &str) -> Option<tinyagents_harness::turn_stop::TurnStop> {
-    Some(crate::agent::turn_projection::stop_from_incomplete(
-        reason,
-    ))
+    Some(crate::agent::turn_projection::stop_from_incomplete(reason))
 }
 
 /// The parent's tool result for a sub-agent the harness stopped early: a
