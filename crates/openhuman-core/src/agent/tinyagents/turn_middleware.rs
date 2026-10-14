@@ -302,7 +302,7 @@ pub(super) fn install_turn_middleware(
         tags
     };
     harness.push_middleware(Arc::new(
-        middleware::tool_exposure::OpenHumanToolExposureShadowMiddleware::new(
+        tinyagents_harness::middleware::ToolExposureShadowMiddleware::new(
             &candidate_names,
             allowed.as_ref(),
             exposure_tags,
@@ -469,7 +469,7 @@ pub(super) fn install_turn_middleware(
     // must not run from the model loop. Intrinsic to the tool, so installed on
     // every path (channel/session/sub-agent).
     harness.push_tool_middleware(Arc::new(
-        middleware::cli_rpc_only::CliRpcOnlyMiddleware::new(tool_sets.clone()),
+        tinyagents_harness::middleware::CliRpcOnlyMiddleware::new(tool_sets.clone()),
     ));
 
     // Builder-configured tool policy (`.tool_policy()`), enforced at the tool
