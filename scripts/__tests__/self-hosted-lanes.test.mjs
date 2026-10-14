@@ -51,6 +51,16 @@ test("EX63 installs script dependencies only after changed areas are detected", 
   assert.ok(detect >= 0 && install > detect, "filter outputs must exist before they gate jq installation");
 });
 
+test("EX63 provides jq without root and before the lanes start", () => {
+  const install = ciLanes.indexOf("- name: Install jq for release-script tests");
+  const end = ciLanes.indexOf("\n      - name:", install + 1);
+  const step = ciLanes.slice(install, end);
+  assert.doesNotMatch(step, /\bsudo\b|apt-get/);
+  assert.match(step, /sha256sum -c/);
+  assert.match(step, /GITHUB_PATH/);
+  assert.ok(install < ciLanes.indexOf("- name: Start lanes"), "jq must be on PATH before the lanes spawn");
+});
+
 const plans = () => [
   buildPlan({ profile: "ex63", areas: ALL, env: EX63_ENV }),
   buildPlan({ profile: "hosted", areas: ALL }),
