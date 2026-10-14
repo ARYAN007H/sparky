@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use super::files::{self, FileRoots};
 use super::store_documents::{self, documents, on_docs, page_of};
 use super::types::{ArtifactMeta, ArtifactStatus};
+use crate::security::approval::ApprovalChatContext;
 
 const ARTIFACTS_SUBDIR: &str = "artifacts";
 const META_FILENAME: &str = "meta.json";
