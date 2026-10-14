@@ -91,7 +91,7 @@ pub async fn sweep_installed() -> u64 {
 /// Spawns the sweeper: after `first_delay`, then every `interval`, until the
 /// task is aborted. Missed ticks are skipped, not replayed.
 pub fn spawn(first_delay: Duration, interval: Duration) -> tokio::task::JoinHandle<()> {
-    tokio::spawn(async move {
+    crate::core::runtime::spawn_scoped(async move {
         tracing::debug!(
             first_delay_secs = first_delay.as_secs(),
             interval_secs = interval.as_secs(),
