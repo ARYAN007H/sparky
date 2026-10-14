@@ -9,11 +9,11 @@ use std::sync::Arc;
 use tinyagents_graph::goals::GoalToolKind;
 use tinyagents_harness::runtime::AgentHarness;
 use tinyagents_harness::tool::ToolDispatch;
-use tinyagents_runtime::{
-    project_descriptors, register_admitted_projected, ToolAdmission, ToolRegistration,
-};
 use tinyagents_registry::{
     CapabilityRegistry, ComponentKind, RegistryDiagnostic, RegistrySnapshot,
+};
+use tinyagents_runtime::{
+    project_descriptors, register_admitted_projected, ToolAdmission, ToolRegistration,
 };
 
 use crate::agent::orchestration::tools::{
@@ -145,12 +145,8 @@ pub(super) fn register_turn_tools_and_agents(
         .flat_map(|set| set.iter())
         .map(|tool| tool.name().to_string())
         .collect();
-    let (tool_count, plan) = register_admitted_projected(
-        harness,
-        capability_registry,
-        names,
-        &admission,
-        |name| {
+    let (tool_count, plan) =
+        register_admitted_projected(harness, capability_registry, names, &admission, |name| {
             let mut adapter = CanonicalSharedToolAdapter::for_name(tool_sets.to_vec(), name)?;
             if early_exit_set.contains(name) {
                 if let Some(hook) = early_exit_hook {
@@ -178,9 +174,9 @@ pub(super) fn register_turn_tools_and_agents(
                     })
                     .cloned();
                 match handle {
-                    Some(handle) => ToolRegistration::Dispatch(Arc::new(UseSkillDispatch::new(
-                        adapter, handle,
-                    ))),
+                    Some(handle) => {
+                        ToolRegistration::Dispatch(Arc::new(UseSkillDispatch::new(adapter, handle)))
+                    }
                     None => ToolRegistration::Tool(adapter),
                 }
             } else if let Some(dispatch) = typed_dispatch_for(name, adapter.clone()) {
@@ -189,8 +185,7 @@ pub(super) fn register_turn_tools_and_agents(
                 ToolRegistration::Tool(adapter)
             };
             Some((view, registration))
-        },
-    );
+        });
     let candidate_names = plan.candidates;
     project_descriptors(
         capability_registry,
@@ -223,41 +218,29 @@ pub(super) fn register_turn_tools_and_agents(
     // only the ids are projected. The runtime-registry → executable-agent
     // projection (so `register_agent`/`.rag` sub-agent resolution can bind these)
     // remains the deferred follow-up.
-    let mut registered_agents: HashSet<String> = HashSet::new();
-    let mut runtime_agent_count = 0usize;
-    if let Some(runtime) =
+    // Runtime registry first: it wins, carrying the override-aware definitions.
+    let runtime_ids: Vec<String> =
         crate::agent::harness::host_definition::AgentDefinitionRegistry::current()
-    {
-        for def in runtime.list() {
-            if registered_agents.insert(def.id.clone()) {
-                let _ =
-                    capability_registry.register_descriptor(ComponentKind::Agent, def.id.clone());
-                runtime_agent_count += 1;
-            }
-        }
-    }
-    // agent_registry built-ins as a supplement/fallback (deduped by id). When the
-    // runtime global is uninitialised this is the sole source; otherwise it only
-    // contributes ids the runtime registry did not already cover.
-    let mut builtin_supplement_count = 0usize;
-    match crate::agent::registry::agents::load_builtins() {
-        Ok(builtins) => {
-            for def in builtins {
-                if registered_agents.insert(def.id.clone()) {
-                    let _ = capability_registry
-                        .register_descriptor(ComponentKind::Agent, def.id.clone());
-                    builtin_supplement_count += 1;
-                }
-            }
-        }
+            .map(|runtime| runtime.list().iter().map(|def| def.id.clone()).collect())
+            .unwrap_or_default();
+    let runtime_agent_count =
+        project_descriptors(capability_registry, ComponentKind::Agent, runtime_ids);
+    // agent_registry built-ins as a supplement/fallback (deduped by id).
+    let builtin_supplement_count = match crate::agent::registry::agents::load_builtins() {
+        Ok(builtins) => project_descriptors(
+            capability_registry,
+            ComponentKind::Agent,
+            builtins.into_iter().map(|def| def.id),
+        ),
         Err(err) => {
             tracing::debug!(
                 %err,
                 "[registry] agent_registry builtin load failed; \
                  registered runtime-registry agents only"
             );
+            0
         }
-    }
+    };
 
     let registry_diagnostics = capability_registry.diagnostics();
     let registry_snapshot = capability_registry.snapshot();
@@ -279,7 +262,7 @@ pub(super) fn register_turn_tools_and_agents(
         models = projected_models.names().len(),
         tools = projected_tools.names().len(),
         graphs = capability_registry.names(ComponentKind::Graph).len(),
-        agents = registered_agents.len(),
+        agents = runtime_agent_count + builtin_supplement_count,
         runtime_agents = runtime_agent_count,
         builtin_supplement_agents = builtin_supplement_count,
         diagnostics = registry_diagnostics.len(),
