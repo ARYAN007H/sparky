@@ -120,7 +120,7 @@ fn parent_execution_context(workspace_dir: &Path) -> ParentExecutionContext {
 }
 
 /// Builds the `use_skill` registration exactly as
-/// `register_turn_tools_and_agents` does: a durable registry containing the
+/// `host_tool_set_builder` does: a durable registry containing the
 /// real `UseSkillTool` plus one packed archetype-delegate stub, a
 /// `PackRegistryHandle` bound to it, and the `CanonicalSharedToolAdapter`
 /// wrapping `use_skill` that the harness would have registered.
@@ -134,7 +134,7 @@ fn build_use_skill_dispatch_with_handle() -> (UseSkillDispatch, PackRegistryHand
     let durable: Arc<Vec<Box<dyn Tool>>> = Arc::new(vec![use_skill_tool, create_image_tool]);
     handle.bind(Arc::downgrade(&durable));
 
-    let adapter = CanonicalSharedToolAdapter::for_name(
+    let adapter = shared_tool_adapter(
         vec![durable],
         tinyagents_harness::tool::packs::USE_SKILL,
     )
