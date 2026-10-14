@@ -10,8 +10,6 @@ use std::sync::Arc;
 use anyhow::Result;
 use futures::StreamExt;
 use tinyagents_harness::agent_loop::AgentStreamItem;
-use tinyagents_harness::events::EventSink;
-use tinyagents_harness::middleware::install_response_shape;
 use tinyagents_harness::turn_policy::effective_max_iterations;
 use tinyagents_harness::runtime::{AgentInvocation, AgentTurnRequest, InvocationRuntime};
 use tinyagents_harness::store::StoreRegistry;
@@ -28,7 +26,7 @@ use crate::agent::tinyagents::turn_outcome::TinyagentsTurnOutcome;
 use crate::agent::tinyagents::turn_run_error::map_turn_run_error;
 use crate::agent::tinyagents::turn_run_finalize::finalize_turn_outcome;
 use crate::agent::tinyagents::{journal, routes, steering_forwarder};
-use tinyagents_harness::events::{CapPauser, PauseRecorder};
+use tinyagents_harness::events::{CapPauser, EventSink, PauseRecorder};
 use tinyagents_harness::ids::TaskId;
 use tinyagents_harness::observability::turn_observer;
 use tinyagents_harness::run_queue::RunQueue;
@@ -300,7 +298,7 @@ pub(super) async fn run_turn_via_tinyagents_body(
         run_context.tool_rules.clone(),
     );
     if let Some(scope) = run_context.response_shape.clone() {
-        install_response_shape(&mut harness, scope);
+        tinyagents_harness::middleware::install_response_shape(&mut harness, scope);
     }
     super::budget::install_depth(&mut harness, &run_context);
     super::deadline_wind_down::install(&mut harness, &handle, &run_context, &subagent_scope);

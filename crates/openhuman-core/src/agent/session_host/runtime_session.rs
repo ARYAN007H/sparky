@@ -55,7 +55,8 @@ pub(super) struct OpenHumanSessionState {
     required_output: Option<tinyagents_harness::config::RequiredOutput>,
     pub(crate) pending_turn_overrides: super::types::TurnOverrides,
     pub(super) active_turn_overrides: super::types::TurnOverrides,
-    pub(crate) pending_response_shape: Option<Arc<tinyagents_harness::middleware::ResponseShapeScope>>,
+    pub(crate) pending_response_shape:
+        Option<Arc<tinyagents_harness::middleware::ResponseShapeScope>>,
     pub(super) reply_language_directive: Option<String>,
     pub(super) time_zone: Option<String>,
     prelude: Option<OpenHumanTurnPrelude>,
@@ -486,7 +487,6 @@ impl OpenHumanTurnPrelude {
         run_context.response_shape = turn.response_shape.clone();
         run_context.attach_parent(self.parent_context());
         self.apply_pending_announcements(&mut enriched);
-
         run_context.attachment_placeholders = Arc::new(
             crate::agent::multimodal::extract_image_placeholders_in_text(original_user_message),
         );
