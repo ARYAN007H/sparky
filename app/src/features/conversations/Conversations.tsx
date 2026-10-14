@@ -2217,12 +2217,6 @@ const Conversations = ({
       {stallWarningBanner}
       {sendAdvisoryBanner}
       {liveArtifactDeck}
-      {previewArtifactId && (
-        <ArtifactPreviewPanel
-          artifactId={previewArtifactId}
-          onClose={() => setPreviewArtifactId(null)}
-        />
-      )}
       {/* The core's run queue for this thread; renders nothing while empty. */}
       <ComposerMessageQueue />
       {/* Where this conversation works. Last, so it sits directly on the
@@ -2400,7 +2394,15 @@ const Conversations = ({
               {threadSidebar}
             </div>
           </SidebarContent>
-          <div className="flex h-full w-full">{mainPanel}</div>
+          <div className="flex h-full w-full min-w-0">
+            <div className="flex-1 min-w-0">{mainPanel}</div>
+            {previewArtifactId && (
+              <ArtifactPreviewPanel
+                artifactId={previewArtifactId}
+                onClose={() => setPreviewArtifactId(null)}
+              />
+            )}
+          </div>
         </>
       )}
       <ConfirmationModal
