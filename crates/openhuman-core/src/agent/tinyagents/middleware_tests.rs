@@ -5,6 +5,9 @@ use super::tool_output::{
 };
 use super::turn_context::DEFAULT_TOOL_RESULT_BUDGET_BYTES;
 use super::*;
+use crate::agent::tinyagents::middleware::embedder_hooks::EmbedderToolHooksMiddleware;
+use crate::agent::tinyagents::middleware::repeated_failure::RepeatedToolFailureMiddleware;
+use crate::agent::tinyagents::middleware::tool_outcome_capture::ToolOutcomeCaptureMiddleware;
 use crate::agent::tinyagents::middleware::tool_output::ToolOutputMiddleware;
 use serde_json::json;
 use std::collections::HashMap;

@@ -3,6 +3,8 @@ use crate::agent::tinyagents::middleware::tool_output::ToolOutputMiddleware;
 // production install site moved to `install_turn_middleware` (which names it
 // fully-qualified), so the module itself no longer references the type.
 use super::*;
+use crate::agent::tinyagents::middleware::tool_policy::ToolPolicyMiddleware;
+use crate::agent::tinyagents::middleware::turn_context::TurnContextMiddleware;
 use tinyagents_harness::middleware::MicrocompactMiddleware;
 use tinytools::{ToolRuntime, ToolTimeout};
 

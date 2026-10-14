@@ -3,6 +3,7 @@
 //! `middleware_tool_output_tests.rs` to keep each file under the layout limit.
 
 use super::*;
+use crate::agent::tinyagents::middleware::tool_output::ToolOutputMiddleware;
 
 fn artifact_mw(
     summarizer: Option<Arc<DynPayloadSummarizer>>,
