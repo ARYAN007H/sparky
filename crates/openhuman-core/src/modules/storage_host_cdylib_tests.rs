@@ -22,7 +22,6 @@
 //! pin, replace `streams_and_watches_are_refused_until_tinybus_binds_them` with
 //! the >16 MiB `PutStream`/`GetStream` round trip and a watch signal.
 
-use super::*;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
@@ -185,7 +184,10 @@ async fn rig(module_id: &'static str) -> Rig {
         trail.clone(),
     ));
     attach(&modules, &host_connection, host).await.unwrap();
-    let staged = tempfile::tempdir().unwrap();
+    let temp_root = std::env::temp_dir()
+        .canonicalize()
+        .expect("canonical temporary directory");
+    let staged = tempfile::tempdir_in(temp_root).unwrap();
     let artifact = stage(staged.path());
     modules.load_file(&artifact).expect("load the probe cdylib");
     // `load_file` can return before the module's setup claims its name.

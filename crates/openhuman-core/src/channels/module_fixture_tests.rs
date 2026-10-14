@@ -7,6 +7,7 @@
 
 use crate::config::Config;
 use crate::modules::client::ModuleClient;
+#[cfg(feature = "e2e-test-support")]
 use tinychannels_bus::methods;
 
 /// Return a client for the checksum-pinned TinyChannels test module.
