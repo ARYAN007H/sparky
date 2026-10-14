@@ -239,6 +239,7 @@ fn flow_surfaces_correlate_decisions_and_closed_instances_never_publish() {
             });
             tokio::time::sleep(Duration::from_secs(3)).await;
             if turn.is_finished() {
+                for r in common::chat_requests(&provider).await { eprintln!("TOOLRES: {}", common::tool_results(&r)); }
                 eprintln!("TURN FINISHED EARLY: {:?}", turn.await);
                 panic!("early");
             }
