@@ -5,12 +5,12 @@
 //! `tools/impl/presentation/mod.rs` use for their own producers
 //! (`create_artifact` → write bytes → `finalize_artifact`/`fail_artifact`).
 //!
-//! The inner tool already writes bytes under
-//! `<action_dir>/generated-media/...` (see [`super::tools::media_tools_from`])
-//! and reports each saved file in its JSON result's `artifacts` array
+//! The inner tool writes bytes to its `MediaOutput` blob store and reports
+//! each blob key in its JSON result's `artifacts` array
 //! (`{"type": "image"|"video", "path", "media_type"|"format", "bytes"}`, see
-//! `tinyagents_harness::media::{GenerateImageTool, GenerateVideoTool}`). This
-//! wrapper runs the inner tool unchanged, then for every reported file:
+//! `tinyagents_harness::media::{GenerateImageTool, GenerateVideoTool}`). Host
+//! adapters may also report absolute file paths. This wrapper runs the inner
+//! tool unchanged, then for every reported output:
 //! reserves an artifact via `create_artifact_for_call` (recording the
 //! provider-assigned tool-call id so `ArtifactPending`/`Ready`/`Failed`
 //! correlate with the tool-call bubble, #C5), moves the file into the
@@ -28,6 +28,7 @@
 //! producer.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::{json, Value};
@@ -35,6 +36,7 @@ use tinytools::{
     PermissionLevel, Tool, ToolCallOptions, ToolCategory, ToolContent, ToolPolicy, ToolResult,
     ToolRunContext, ToolScope, ToolTimeout,
 };
+use tokio::io::AsyncWriteExt;
 
 use crate::agent::artifacts::{
     create_artifact_for_call, fail_artifact, finalize_artifact, ArtifactKind,
@@ -52,6 +54,7 @@ pub struct MediaArtifactTool<T: Tool> {
     workspace_dir: PathBuf,
     /// Visible folder each generated file is moved into (#5505).
     files_dir: crate::agent::artifacts::FileRoots,
+    blobs: Option<Arc<dyn tinystoragedrivers::BlobStore>>,
 }
 
 impl<T: Tool> MediaArtifactTool<T> {
@@ -70,7 +73,17 @@ impl<T: Tool> MediaArtifactTool<T> {
             kind,
             workspace_dir: workspace_dir.into(),
             files_dir: files_dir.into(),
+            blobs: None,
         }
+    }
+
+    /// Reads generated outputs addressed by blob key from the media tool's
+    /// backing store. This keeps TinyAgents' blob-backed output contract
+    /// separate from the host's visible Files-folder artifact store.
+    #[must_use]
+    pub fn with_blobs(mut self, blobs: Arc<dyn tinystoragedrivers::BlobStore>) -> Self {
+        self.blobs = Some(blobs);
+        self
     }
 
     /// Derives a human-readable artifact title from the call's `prompt`
@@ -161,7 +174,12 @@ impl<T: Tool> MediaArtifactTool<T> {
                 return;
             }
         };
-        match move_or_copy(src, &dest).await {
+        let stored = if src.is_absolute() {
+            move_or_copy(src, &dest).await
+        } else {
+            self.file_blob(src, &dest).await
+        };
+        match stored {
             Ok(size_bytes) => {
                 match finalize_artifact(&self.workspace_dir, &meta.id, size_bytes).await {
                     Ok(updated) => {
@@ -187,6 +205,49 @@ impl<T: Tool> MediaArtifactTool<T> {
                 set_artifact_error(entry, &err);
             }
         }
+    }
+
+    async fn file_blob(&self, key: &Path, dest: &Path) -> Result<u64, String> {
+        let key = key
+            .to_str()
+            .ok_or_else(|| "generated media blob key is not valid UTF-8".to_string())?;
+        let blobs = self.blobs.as_ref().ok_or_else(|| {
+            format!("generated media returned blob key {key:?} without a blob store")
+        })?;
+        let mut blob = blobs
+            .get_stream(key)
+            .await
+            .map_err(|error| format!("failed to read generated media blob {key:?}: {error}"))?
+            .ok_or_else(|| format!("generated media blob {key:?} was not found"))?;
+        let mut file = tokio::fs::OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .open(dest)
+            .await
+            .map_err(|error| {
+                format!(
+                    "failed to open artifact destination {}: {error}",
+                    dest.display()
+                )
+            })?;
+        let size = tokio::io::copy(&mut blob.reader, &mut file)
+            .await
+            .map_err(|error| format!("failed to copy generated media blob {key:?}: {error}"))?;
+        file.flush().await.map_err(|error| {
+            format!(
+                "failed to flush artifact destination {}: {error}",
+                dest.display()
+            )
+        })?;
+        if let Err(error) = blobs.delete(key).await {
+            tracing::warn!(
+                target: "media_generation",
+                %error,
+                blob_key = key,
+                "[media_generation] filed media but could not discard its source blob"
+            );
+        }
+        Ok(size)
     }
 }
 

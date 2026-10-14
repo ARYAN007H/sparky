@@ -1,5 +1,8 @@
 use async_trait::async_trait;
 use serde_json::{json, Value};
+use std::sync::Arc;
+use tinyagents_harness::media::MediaOutput;
+use tinystoragedrivers::BlobStore;
 use tinytools::{PermissionLevel, Tool, ToolCategory, ToolContent, ToolResult};
 
 use super::MediaArtifactTool;
@@ -55,6 +58,44 @@ impl Tool for StubMediaTool {
     }
 }
 
+/// TinyAgents' production media output is a blob key, not a filesystem path.
+struct BlobBackedMediaTool {
+    blobs: Arc<dyn BlobStore>,
+}
+
+#[async_trait]
+impl Tool for BlobBackedMediaTool {
+    fn name(&self) -> &str {
+        "blob_generate"
+    }
+
+    fn description(&self) -> &str {
+        "blob-backed media stub"
+    }
+
+    fn parameters_schema(&self) -> Value {
+        json!({ "type": "object" })
+    }
+
+    async fn execute(&self, _args: Value) -> anyhow::Result<ToolResult> {
+        let key = "generated-media/stub-0.png";
+        self.blobs
+            .put(key, b"blob-media-bytes".to_vec(), Some("image/png"))
+            .await?;
+        Ok(ToolResult::success_with_markdown(
+            json!({
+                "artifacts": [{
+                    "type": "image",
+                    "path": key,
+                    "media_type": "image/png",
+                    "bytes": 16
+                }]
+            }),
+            "generated blob-backed media",
+        ))
+    }
+}
+
 fn json_payload(result: &ToolResult) -> Value {
     result
         .content
@@ -64,6 +105,41 @@ fn json_payload(result: &ToolResult) -> Value {
             _ => None,
         })
         .expect("json content block")
+}
+
+#[tokio::test]
+async fn files_a_blob_backed_generated_artifact() {
+    let root = tempfile::tempdir().unwrap();
+    let workspace = root.path().join("workspace");
+    let files_dir = root.path().join("Files");
+    let blobs = MediaOutput::new(root.path()).blobs.clone();
+    let wrapped = MediaArtifactTool::new(
+        BlobBackedMediaTool {
+            blobs: Arc::clone(&blobs),
+        },
+        ArtifactKind::Image,
+        workspace.clone(),
+        files_dir.clone(),
+    )
+    .with_blobs(Arc::clone(&blobs));
+
+    let result = wrapped.execute(json!({})).await.unwrap();
+    assert!(!result.is_error, "{result:?}");
+    let payload = json_payload(&result);
+    let artifact = &payload["artifacts"][0];
+    let artifact_id = artifact["artifact_id"]
+        .as_str()
+        .unwrap_or_else(|| panic!("blob-backed media was not filed: {artifact:?}"));
+    let record = crate::agent::artifacts::store::get_artifact(&workspace, artifact_id)
+        .await
+        .expect("artifact record");
+    let file = record.file.expect("visible file");
+    assert_eq!(std::fs::read(file).unwrap(), b"blob-media-bytes");
+    assert!(blobs
+        .get("generated-media/stub-0.png")
+        .await
+        .unwrap()
+        .is_none());
 }
 
 #[tokio::test]
