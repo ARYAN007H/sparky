@@ -7,7 +7,7 @@ use std::time::Duration;
 use openhuman_core::agent::turn_origin::{self, TrustedAutomationSource};
 use openhuman_core::core::events::DomainEvent;
 use openhuman_core::core::runtime::{AgentContextRegistry, CoreContext};
-use openhuman_core::security::approval::gate::{FlowRunContext, APPROVAL_FLOW_RUN_CONTEXT};
+use openhuman_core::security::approval::{ApprovalTurnContext, FlowRunContext};
 use openhuman_core::security::approval::{ApprovalGate, ApprovalSourceContext, GateOutcome};
 use openhuman_embed::{
     Access, AgentDefinitionSpec, AgentSpec, AgentTurnOrigin, ApprovalDecision, Runtime,
@@ -92,17 +92,17 @@ fn flow_surfaces_correlate_decisions_and_closed_instances_never_publish() {
             let park = tokio::spawn(CoreContext::scope(
                 context,
                 turn_origin::with_origin(origin("flow-live"), async move {
-                    APPROVAL_FLOW_RUN_CONTEXT
-                        .scope(run_context("flow-live", "run-direct"), async move {
+                    async move {
+ let turn = ApprovalTurnContext::default().with_flow_run(run_context("flow-live", "run-direct"));
                             parking_gate
-                                .intercept_audited_for_call(
+                                .intercept_audited_for_call(&turn, 
                                     "shell",
                                     "flow action",
                                     serde_json::json!({"command": "redacted"}),
                                     Some("flow-call"),
                                 )
                                 .await
-                        })
+                        }
                         .await
                 }),
             ));
@@ -229,11 +229,7 @@ fn flow_surfaces_correlate_decisions_and_closed_instances_never_publish() {
             // must produce a denied tool result and never create the marker.
             let turn_agent = agent.clone();
             let turn = tokio::spawn(async move {
-                APPROVAL_FLOW_RUN_CONTEXT
-                    .scope(
-                        run_context("flow-live", "run-tool"),
-                        turn_agent.turn("write the marker").send(),
-                    )
+                turn_agent.turn("write the marker").send()
                     .await
             });
             let request = common::eventually("flow tool to park", || {
@@ -273,14 +269,11 @@ fn flow_surfaces_correlate_decisions_and_closed_instances_never_publish() {
                     old_context,
                     turn_origin::with_origin(
                         origin("flow-closed"),
-                        APPROVAL_FLOW_RUN_CONTEXT.scope(
-                            run_context("flow-closed", "run-closed"),
-                            gate.intercept_audited(
+                        gate.intercept_audited(&ApprovalTurnContext::default().with_flow_run(run_context("flow-closed", "run-closed")), 
                                 "shell",
                                 "late flow action",
                                 serde_json::json!({}),
                             ),
-                        ),
                     ),
                 ),
             )
