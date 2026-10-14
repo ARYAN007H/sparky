@@ -1,38 +1,48 @@
-//! Drive an openhuman agent turn through the `tinyagents` agent-loop harness.
+//! Drive an openhuman agent turn through the `tinyagents` runtime turn driver.
 //!
 //! [`run_turn_via_tinyagents_shared`] is the entry point the channel/session/
-//! sub-agent routes use; [`run_turn_via_tinyagents`] is a thin test-only
-//! variant with no middleware stack.
+//! sub-agent routes use and [`run_root_turn_via_hosted_agent`] the one for hosted
+//! root turns. Both plan the turn with [`OpenHumanTurnPlanner`], let
+//! `tinyagents_runtime::turn_driver::TurnDriver` assemble and wire the harness
+//! (models, run policy, tools, steering, early exit, the cap pause), then install
+//! the host middleware stack ([`turn_middleware`](super::turn_middleware)) and
+//! finalize the run into a [`TinyagentsTurnOutcome`].
 
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use std::sync::Arc;
 
 use anyhow::Result;
-use futures::StreamExt;
-use tinyagents_harness::agent_loop::AgentStreamItem;
+use futures::future::BoxFuture;
 use tinyagents_harness::runtime::{AgentInvocation, AgentTurnRequest, InvocationRuntime};
-use tinyagents_harness::store::StoreRegistry;
+use tinyagents_harness::store::{InMemoryStore as ToolResultArtifactIndexStore, StoreRegistry};
 use tinyagents_harness::turn_policy::effective_max_iterations;
 use tinyagents_registry::DiagnosticSeverity;
+use tinyagents_runtime::turn_driver::{
+    SubagentScope as DriverSubagentScope, TurnControls, TurnDriver, TurnScope,
+};
+use tinyagents_runtime::{DriverRequest, ToolSnapshot};
 
 use crate::agent::harness::tool_result_artifacts::TINYAGENTS_TOOL_RESULT_ARTIFACT_STORE;
-use crate::agent::tinyagents::harness_assembly::{assemble_turn_harness, AssembledTurnHarness};
-use crate::agent::tinyagents::host::steering::shared_steering_registry;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent::tinyagents::middleware::TurnContextMiddleware;
 use crate::agent::tinyagents::observability::{OpenhumanEventBridge, SubagentScope};
+use crate::agent::tinyagents::turn_middleware::{
+    install_turn_middleware, TurnMiddlewareInputs, TurnWiring,
+};
 use crate::agent::tinyagents::turn_models::TurnModels;
 use crate::agent::tinyagents::turn_outcome::TinyagentsTurnOutcome;
+use crate::agent::tinyagents::turn_plan::{
+    turn_models_for_plan, turn_run_policy, OpenHumanTurnPlanner,
+};
 use crate::agent::tinyagents::turn_run_error::map_turn_run_error;
 use crate::agent::tinyagents::turn_run_finalize::finalize_turn_outcome;
 use crate::agent::tinyagents::{journal, routes, steering_forwarder};
-use tinyagents_harness::events::{CapPauser, EventSink, PauseRecorder};
-use tinyagents_harness::ids::TaskId;
+use tinyagents_harness::events::EventSink;
 use tinyagents_harness::observability::turn_observer;
 use tinyagents_harness::run_queue::RunQueue;
+use tinyagents_harness::turn_outcome::ToolOutcomeSink;
 use tinyagents_session::transcript::TranscriptMessage;
 
-use super::turn_runner_boxed::run_turn_via_tinyagents_inner;
 use super::ToolPolicyEnforcement;
 
 /// The durable root entry point for hosted turns.  It intentionally carries no
@@ -40,12 +50,12 @@ use super::ToolPolicyEnforcement;
 /// are attached through an [`InvocationRuntime`] and [`AgentInvocation`] for
 /// each root.  That prevents concurrent sessions from replacing one another's
 /// security or workspace state on a shared harness.
-#[path = "turn_runner_hosted.rs"]
-mod turn_runner_hosted;
-use turn_runner_hosted::{root_hosted_harness, PrecomposedRootContext};
+#[path = "turn_exec_hosted.rs"]
+mod turn_exec_hosted;
+use turn_exec_hosted::{root_hosted_harness, PrecomposedRootContext};
 
 #[cfg(test)]
-#[path = "turn_runner_tests.rs"]
+#[path = "turn_exec_tests.rs"]
 mod tests;
 
 #[cfg(test)]
