@@ -90,9 +90,7 @@ fn parent_context_with_tools(
 ) -> ParentExecutionContext {
     let mut parent = parent_context(max_parallel_tools);
     parent.all_tools = Arc::new(tools);
-    parent,
-        host_env: Default::default(),
-    }
+    parent
 
 /// The live harness does not recover ambient cancellation. Its typed
 /// dispatch receives the parent `RunContext`, so an already-cancelled parent
@@ -640,9 +638,7 @@ async fn agent_turn_runs_long_parallel_subagent_flow_with_many_nested_tool_calls
 fn parent_admitting(ids: &[&str], tools: Vec<Box<dyn Tool>>) -> ParentExecutionContext {
     let mut parent = parent_context_with_tools(8, tools);
     parent.allowed_subagent_ids = ids.iter().map(|id| id.to_string()).collect();
-    parent,
-        host_env: Default::default(),
-    }
+    parent
 
 /// Helper: the single write-capable tool the dispatch fixtures share.
 fn write_fixture_tools() -> Vec<Box<dyn Tool>> {

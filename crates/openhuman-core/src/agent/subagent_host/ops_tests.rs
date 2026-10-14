@@ -280,7 +280,6 @@ fn make_parent(
         session_parent_prefix: None,
         on_progress: None,
         run_queue: None,
-    },
         host_env: Default::default(),
     }
 
