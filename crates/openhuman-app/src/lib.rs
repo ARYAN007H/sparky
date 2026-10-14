@@ -69,6 +69,7 @@ mod app_update;
 // Artifact export command (#2779) — cross-platform Downloads copy. The `rfd`
 // Save-As dialog that used to sit in front of it was removed with the crate.
 mod artifact_commands;
+mod docx;
 mod claude_code;
 mod core_process;
 mod core_rpc;

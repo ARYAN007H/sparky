@@ -90,21 +90,27 @@ pub async fn read_artifact_body(artifact_id: String) -> Result<ArtifactBodyResul
     // Truly binary files stay as paths — the panel shows metadata + download.
     if kind == "file" && !body.is_empty() {
         let file_path = PathBuf::from(&body);
+        // First pass: try the native UTF-8 read (text files like .md, .txt)
         match tokio::fs::read(&file_path).await {
             Ok(bytes) => {
-                // Heuristic: treat as text if it decodes as UTF-8 and has no
-                // NUL bytes in the first 8 KiB (binary signatures).
                 let probe = &bytes[..bytes.len().min(8192)];
-                let looks_text = !probe.contains(&0)
-                    && std::str::from_utf8(probe).is_ok();
-                if looks_text {
+                if !probe.contains(&0) && std::str::from_utf8(probe).is_ok() {
                     if let Ok(text) = String::from_utf8(bytes) {
                         body = text;
                         is_text = true;
                     }
                 }
             }
-            Err(_) => { /* leave the path as the body */ }
+            Err(_) => {}
+        }
+        // If still no text and it's a .docx, try to extract text via Python
+        if !is_text && file_path.extension().and_then(|e| e.to_str()) == Some("docx") {
+            if let Ok(text) = crate::docx::extract_text(&file_path) {
+                if !text.is_empty() {
+                    body = text;
+                    is_text = true;
+                }
+            }
         }
     }
     Ok(ArtifactBodyResult { kind, title, version: versions, body, is_text })
