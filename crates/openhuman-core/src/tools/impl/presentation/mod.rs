@@ -115,6 +115,9 @@ pub struct PresentationTool {
     /// `validate_path` checks (allowed-location, symlink-escape, forbidden
     /// dirs) as any other file-read operation.
     security: Arc<SecurityPolicy>,
+    /// The artifact id a Retry re-dispatches this generation under
+    /// (`artifacts::ops::ai_regenerate`); `None` mints a fresh artifact.
+    regenerate_target: Option<String>,
 }
 
 impl PresentationTool {
@@ -132,6 +135,7 @@ impl PresentationTool {
             files_dir: files_dir.into(),
             config: None,
             security,
+            regenerate_target: None,
         }
     }
 
@@ -158,7 +162,15 @@ impl PresentationTool {
             files_dir: files_dir.into(),
             config: Some(config),
             security,
+            regenerate_target: None,
         }
+    }
+
+    /// Re-dispatch this generation under an existing artifact id, so the
+    /// failed card is replaced in place (#3162).
+    pub(crate) fn with_regenerate_target(mut self, artifact_id: impl Into<String>) -> Self {
+        self.regenerate_target = Some(artifact_id.into());
+        self
     }
 }
 
@@ -310,12 +322,14 @@ impl Tool for PresentationTool {
             );
         }
 
-        let (meta, output_path) = create_artifact(
+        let (meta, output_path) = create_artifact_regenerating(
             &self.workspace_dir,
             &self.files_dir,
             ArtifactKind::Presentation,
             &input.title,
             "pptx",
+            None,
+            self.regenerate_target.as_deref(),
         )
         .await
         .map_err(anyhow::Error::msg)?;
