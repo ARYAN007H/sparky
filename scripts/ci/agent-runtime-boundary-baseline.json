@@ -37,7 +37,7 @@
   {
     "rule": "openhuman-runtime-bridge",
     "path": "crates/openhuman-core/src/agent/tinyagents/harness_assembly_tests.rs",
-    "line": 197,
+    "line": 195,
     "text": "let assembled = assemble_turn_harness(",
     "occurrence": 1
   },
@@ -150,13 +150,13 @@
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/agent/orchestration/ops.rs",
     "line": 416,
-    "text": "let handle = tokio::spawn(crate::agent::turn_origin::propagate(",
+    "text": "let handle = tokio::spawn(crate::agent::turn_origin::propagate(async move {",
     "occurrence": 1
   },
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/agent/orchestration/ops.rs",
-    "line": 419,
+    "line": 418,
     "text": "let result = with_parent_context(parent, async move {",
     "occurrence": 1
   },
@@ -239,8 +239,8 @@
   },
   {
     "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/agent/session_host/runtime_session.rs",
-    "line": 541,
+    "path": "crates/openhuman-core/src/agent/session_host/runtime_session/parent_snapshot.rs",
+    "line": 34,
     "text": "workspace_descriptor: crate::agent::harness::current_parent()",
     "occurrence": 1
   },
