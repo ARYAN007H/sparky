@@ -19,7 +19,6 @@
 //! `ask_user_clarification` early-exit pause are all re-wired onto the
 //! tinyagents harness.
 
-mod compaction_carry;
 pub mod config;
 mod context_wiring;
 mod deadline_wind_down;
@@ -50,7 +49,6 @@ pub mod run_mode;
 // multi-tenancy), so "bring your own summarizer" is the case this seam exists
 // for rather than an exotic one.
 pub mod budget;
-mod budget_charge;
 pub mod payload_summarizer;
 mod policy_denial;
 pub(crate) mod reaper;
@@ -77,7 +75,7 @@ pub(crate) use crate::agent::message_convert::chat_message_to_message;
 #[cfg(feature = "flows")]
 pub(crate) use crate::agent::message_convert::ta_call_to_oh_call;
 
-pub(crate) use compaction_carry::{last_user_message, CompactionCarry};
+pub(crate) use tinyagents_harness::summarization::{last_user_message, CompactionCarry};
 #[allow(unused_imports)] // Wired into the recall/retrieval facade in workstream 09.2.
 pub(crate) use embeddings::ProviderEmbeddingModel;
 pub(crate) use middleware::{

@@ -35,6 +35,10 @@ use crate::agent::tinyagents::turn_policy::{
     run_policy_for_provider, REPEATED_TOOL_FAILURE_THRESHOLD,
 };
 use crate::agent::tinyagents::verify_before_finish;
+use tinyagents_harness::middleware::{
+    install_unmet_deliverable, is_repeat_call_exempt, tool_sets_lookup, ResearchBudgetMiddleware,
+    ShellTurnBudget, TurnClockMiddleware, DIRECT_WEB_READ_LIMIT,
+};
 use tinyagents_harness::store::InMemoryStore as ToolResultArtifactIndexStore;
 use tinyinference_llm::model::ErrorSlotModel;
 
@@ -301,14 +305,22 @@ pub(super) fn assemble_turn_harness(
             RepeatProgressMiddleware::new(
                 handle.clone(),
                 halt_summary.clone(),
-                Arc::new(middleware::is_repeat_call_exempt),
+                Arc::new(is_repeat_call_exempt),
             )
             .with_read_only(Arc::new(move |name: &str| read_only_tools.contains(name)))
             .with_cleared_placeholder(crate::agent::context::CLEARED_PLACEHOLDER),
         )
     });
     // Time awareness (#6953); before the repeat guard so its notes land last.
-    let shell_turn_budget = middleware::install_time_notes(&mut harness);
+    let turn_budget = harness
+        .policy()
+        .limits
+        .max_wall_clock_ms
+        .map(std::time::Duration::from_millis);
+    harness.push_middleware(Arc::new(TurnClockMiddleware::new(turn_budget)));
+    let shell_turn_budget =
+        ShellTurnBudget::with_max_timeout(turn_budget, tinytools_std::timeout::MAX_TIMEOUT_SECS);
+    harness.push_middleware(Arc::new(shell_turn_budget.notes()));
     if let Some(mw) = &repeat_progress {
         harness.push_middleware(mw.clone());
     }
@@ -317,7 +329,7 @@ pub(super) fn assemble_turn_harness(
     let repeated_failure = handle.as_ref().map(|handle| {
         let (t, halt) = (REPEATED_TOOL_FAILURE_THRESHOLD, halt_summary.clone());
         let mw = middleware::RepeatedToolFailureMiddleware::new(handle.clone(), t, halt);
-        Arc::new(mw.with_tool_facts(middleware::tool_sets_lookup(tool_sets.clone())))
+        Arc::new(mw.with_tool_facts(tool_sets_lookup(tool_sets.clone())))
     });
     if let Some(mw) = &repeated_failure {
         harness.push_middleware(mw.clone());
@@ -534,14 +546,22 @@ pub(super) fn assemble_turn_harness(
     );
     // The rungs above all *tell* the turn to produce its deliverable; this one
     // looks, on the same scope as the requirements check.
-    middleware::install_unmet_deliverable(&mut harness, is_subagent, agent_id);
+    if verify_before_finish::applies(is_subagent, agent_id) {
+        install_unmet_deliverable(&mut harness);
+    } else {
+        tracing::debug!(
+            is_subagent,
+            agent = agent_id.unwrap_or("<none>"),
+            "[unmet_deliverable] not installed for this turn"
+        );
+    }
 
     // Direct web lookup is bounded. Once enough search/fetch results have
     // returned, the web tools leave the request so the run works with what it
     // has; a run with nothing but web tools answers instead. Sub-agent runs
     // keep their own budgets and are not narrowed here.
     if subagent_scope.is_none() {
-        harness.push_middleware(Arc::new(middleware::ResearchBudgetMiddleware::new()));
+        harness.push_middleware(Arc::new(ResearchBudgetMiddleware::with_limit(DIRECT_WEB_READ_LIMIT)));
     }
     // SDK-owned tool-policy projection (issue #4249 / tinyagents-full-migration
     // 01.1). Keep this narrow for now: enforce sandbox requirements declared by
