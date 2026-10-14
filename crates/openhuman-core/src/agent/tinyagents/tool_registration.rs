@@ -13,7 +13,7 @@ use tinyagents_harness::tool::{
 };
 use tinyagents_registry::{CapabilityRegistry, ComponentKind, RegistryDiagnostic};
 use tinyagents_runtime::turn_driver::{SharedToolSet, ToolSetBuilder};
-use tinyagents_runtime::{plan_registration, project_descriptors, ToolAdmission};
+use tinyagents_runtime::{project_descriptors, ToolAdmission};
 use tinyinference_llm::model::ChatModel;
 use tinytools::ToolRunContext;
 
@@ -201,7 +201,7 @@ pub(crate) fn host_tool_set_builder(
         .exec_scope(Arc::new(TurnOriginScope))
 }
 
-/// Projects the turn's models, admitted tools, graph topologies and visible
+/// Projects the turn's models, the `admitted` tools, graph topologies and visible
 /// agents into a [`CapabilityRegistry`] and returns its health diagnostics.
 ///
 /// The turn path enforces them fail-closed before the first model dispatch, so
@@ -212,19 +212,13 @@ pub(crate) fn host_tool_set_builder(
 pub(crate) fn capability_diagnostics(
     models: &[(String, Arc<dyn ChatModel<()>>)],
     tool_sets: &[SharedToolSet],
-    admission: &ToolAdmission,
+    admitted: &[String],
 ) -> Vec<RegistryDiagnostic> {
     let mut registry: CapabilityRegistry<()> = CapabilityRegistry::new();
     for (name, model) in models {
         registry.replace_model(name.as_str(), model.clone());
     }
-    let names: Vec<String> = tool_sets
-        .iter()
-        .flat_map(|set| set.iter())
-        .map(|tool| tool.name().to_string())
-        .collect();
-    let plan = plan_registration(names, admission);
-    for name in &plan.admitted {
+    for name in admitted {
         if let Some(adapter) = shared_tool_adapter(tool_sets.to_vec(), name) {
             registry.replace_tool(Arc::new(adapter));
         }

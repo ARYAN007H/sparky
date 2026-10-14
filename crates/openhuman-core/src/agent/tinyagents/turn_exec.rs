@@ -281,8 +281,6 @@ async fn run_turn_via_tinyagents_body(
         error_slot,
         ..
     } = turn_models;
-    let registry_diagnostics: Arc<std::sync::Mutex<Vec<tinyagents_registry::RegistryDiagnostic>>> =
-        Arc::default();
     let planner = OpenHumanTurnPlanner {
         models: turn_models_for_plan(
             model,
@@ -295,9 +293,7 @@ async fn run_turn_via_tinyagents_body(
         tool_sets: tool_sets.clone(),
         allowed: allowed.clone(),
         has_thread,
-        is_subagent,
         session_deferred: Arc::clone(&run_context.deferred_tool_names),
-        diagnostics: Arc::clone(&registry_diagnostics),
     };
     let driver = TurnDriver::<(), OpenHumanRunContext>::new(Arc::new(planner), Arc::new(()));
 

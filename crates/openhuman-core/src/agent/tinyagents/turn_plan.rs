@@ -10,7 +10,7 @@
 //! the prepared harness by [`turn_middleware`](super::turn_middleware).
 
 use std::collections::HashSet;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use tinyagents_harness::runtime::RunPolicy;
@@ -22,9 +22,7 @@ use tinyinference_llm::model::ErrorSlotModel;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent::tinyagents::model::TurnChatModel;
 use crate::agent::tinyagents::routes;
-use crate::agent::tinyagents::tool_registration::{
-    capability_diagnostics, host_tool_set_builder, turn_admission,
-};
+use crate::agent::tinyagents::tool_registration::host_tool_set_builder;
 use crate::agent::tinyagents::turn_policy::run_policy_for_provider;
 
 /// The run policy for one turn, and whether it carries a cross-route fallback.
@@ -106,11 +104,7 @@ pub(super) struct OpenHumanTurnPlanner {
     pub(super) tool_sets: Vec<SharedToolSet>,
     pub(super) allowed: Option<HashSet<String>>,
     pub(super) has_thread: bool,
-    pub(super) is_subagent: bool,
     pub(super) session_deferred: Arc<HashSet<String>>,
-    /// Receives the capability registry's health diagnostics; the turn path
-    /// aborts on an error-severity one before the first model dispatch.
-    pub(super) diagnostics: Arc<Mutex<Vec<RegistryDiagnostic>>>,
 }
 
 #[async_trait]
@@ -119,14 +113,6 @@ impl TurnPlanner<(), OpenHumanRunContext> for OpenHumanTurnPlanner {
         &self,
         _request: &DriverRequest<OpenHumanRunContext>,
     ) -> Result<TurnPlan<(), OpenHumanRunContext>, RuntimeError> {
-        let mut admission = turn_admission(&self.tool_sets, &self.allowed, self.has_thread);
-        admission.is_subagent_run = self.is_subagent;
-        *self
-            .diagnostics
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) =
-            capability_diagnostics(&self.models, &self.tool_sets, &admission);
-
         let mut plan = TurnPlan::new(self.models.clone());
         plan.policy = self.policy.clone();
         plan.tools = host_tool_set_builder(
@@ -148,7 +134,7 @@ impl TurnPlanner<(), OpenHumanRunContext> for OpenHumanTurnPlanner {
 /// tools, a dangling alias) aborts the turn instead of silently resolving to an
 /// unintended component while a provider call is in flight. Warnings are logged.
 pub(super) fn enforce_registry_diagnostics(
-    slot: &Mutex<Vec<RegistryDiagnostic>>,
+    registry_diagnostics: &[RegistryDiagnostic],
 ) -> anyhow::Result<()> {
     let registry_diagnostics =
         std::mem::take(&mut *slot.lock().unwrap_or_else(PoisonError::into_inner));
