@@ -319,3 +319,55 @@ async fn current_returns_inner_origin_on_nested_scope() {
         other => panic!("expected inner TrustedAutomation, got {other:?}"),
     }
 }
+
+/// The origin has one home: the scoped `CoreContext`. A reader that asks the
+/// context (`current_turn_origin`) and one that asks this module (`current`)
+/// must see the same label, so there is no second copy to drift.
+#[tokio::test]
+async fn origin_is_carried_by_the_scoped_core_context_only() {
+    assert!(crate::core::runtime::CoreContext::scoped().is_none());
+    let (via_module, via_context, scoped_during) = with_origin(AgentTurnOrigin::DirectChat, async {
+        (
+            current(),
+            crate::core::runtime::CoreContext::current_turn_origin(),
+            crate::core::runtime::CoreContext::scoped().is_some(),
+        )
+    })
+    .await;
+    assert!(matches!(via_module, Some(AgentTurnOrigin::DirectChat)));
+    assert!(matches!(via_context, Some(AgentTurnOrigin::DirectChat)));
+    assert!(scoped_during, "with_origin must scope a context, bare if none was booted");
+    assert!(crate::core::runtime::CoreContext::scoped().is_none());
+}
+
+/// The label survives await points that move the turn between worker threads.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn origin_survives_await_points_on_a_multi_thread_runtime() {
+    let observed = with_origin(AgentTurnOrigin::Cli, async {
+        let mut seen = Vec::new();
+        for _ in 0..8 {
+            tokio::task::yield_now().await;
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            seen.push(current().map(|origin| origin.class()));
+        }
+        seen
+    })
+    .await;
+    assert!(observed.iter().all(|class| class.as_deref() == Some("Cli")));
+}
+
+/// Two concurrent turns each read their own label.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn concurrent_turns_do_not_share_an_origin() {
+    let cli = with_origin(AgentTurnOrigin::Cli, async {
+        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+        current().map(|origin| origin.class())
+    });
+    let direct = with_origin(AgentTurnOrigin::DirectChat, async {
+        tokio::task::yield_now().await;
+        current().map(|origin| origin.class())
+    });
+    let (cli, direct) = tokio::join!(cli, direct);
+    assert_eq!(cli.as_deref(), Some("Cli"));
+    assert_eq!(direct.as_deref(), Some("DirectChat"));
+}
