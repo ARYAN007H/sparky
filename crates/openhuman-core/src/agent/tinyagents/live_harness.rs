@@ -5,7 +5,7 @@
 //! typed chat turn's calls do. This module assembles an `AgentHarness` with
 //! the session's exact tool surface and the **tool-boundary** part of the turn
 //! harness's middleware stack, in the same order as
-//! [`assemble_turn_harness`](super::harness_assembly):
+//! [`install_turn_middleware`](super::turn_middleware):
 //!
 //! 1. the SDK tool-policy projection (`require_sandbox`),
 //! 2. human-in-the-loop approval (`ApprovalSecurityMiddleware` through the
@@ -27,9 +27,8 @@ use tinyagents_harness::middleware::{
     ApprovalGateMiddleware, ArgRecoveryMiddleware, ToolPolicyMiddleware as TaToolPolicyMiddleware,
 };
 use tinyagents_harness::runtime::AgentHarness;
-use tinyagents_registry::CapabilityRegistry;
 
-use super::harness_tool_registration::register_turn_tools_and_agents;
+use super::tool_registration::{capability_diagnostics, host_tool_set_builder, turn_admission};
 use super::host::OpenHumanRunContext;
 use super::middleware;
 use super::turn_policy::run_policy_for;
@@ -67,17 +66,14 @@ pub(crate) fn assemble_live_tool_harness(
     harness.with_policy(run_policy_for(LIVE_MAX_TOOL_CALLS, false));
     crate::tools::timeout::install_harness_tool_timeouts(&mut harness);
 
-    let mut capability_registry: CapabilityRegistry<()> = CapabilityRegistry::new();
-    let (tool_count, names, diagnostics, _snapshot) = register_turn_tools_and_agents(
-        &mut harness,
-        &mut capability_registry,
+    let allowed = Some(allowed);
+    let report = host_tool_set_builder(&tool_sets, &allowed, has_thread, &HashSet::new())
+        .register(&mut harness, None);
+    let (tool_count, names) = (report.registered.len(), report.plan.candidates);
+    let diagnostics = capability_diagnostics(
+        &[],
         &tool_sets,
-        &Some(allowed),
-        &HashSet::new(),
-        None,
-        false,
-        has_thread,
-        &HashSet::new(),
+        &turn_admission(&tool_sets, &allowed, has_thread),
     );
     for diagnostic in &diagnostics {
         tracing::warn!(
