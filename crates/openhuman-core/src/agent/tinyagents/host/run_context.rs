@@ -21,7 +21,7 @@ use crate::agent::progress::AgentProgress;
 use crate::agent::subagent_host::SubagentUsage;
 use tinyagents_harness::turn_outcome::ToolOutcomeSink;
 use crate::agent::tinyagents::{
-    turn_outcome::ToolCallOutcome, turn_policy::ToolPolicyEnforcement, TurnContextMiddleware,
+    turn_policy::ToolPolicyEnforcement, TurnContextMiddleware,
 };
 use crate::agent::turn_origin::AgentTurnOrigin;
 use tinyagents_definition::SandboxMode;

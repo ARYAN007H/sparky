@@ -30,7 +30,7 @@ use crate::agent::tinyagents::routes;
 use crate::agent::tinyagents::stop_hooks;
 use crate::agent::tinyagents::tools::EarlyExitHook;
 use crate::agent::tinyagents::turn_models::TurnModels;
-use crate::agent::tinyagents::turn_outcome::{HaltSummarySlot, ToolOutcomeSink};
+use tinyagents_harness::turn_outcome::{HaltSummarySlot, ToolOutcomeSink};
 use crate::agent::tinyagents::turn_policy::{
     run_policy_for_provider, REPEATED_TOOL_FAILURE_THRESHOLD,
 };
