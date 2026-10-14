@@ -37,7 +37,13 @@ fn transcript_stem_for_a_thread_and_agent_is_stable_and_timestamp_free() {
     let a = session_stem(&SessionRef::scoped("thread-1", "orchestrator"));
     let b = session_stem(&SessionRef::scoped("thread-1", "orchestrator"));
     assert_eq!(a, b);
-    assert_ne!(a, session_stem(&SessionRef::scoped("thread-2", "orchestrator")));
+    assert_ne!(
+        a,
+        session_stem(&SessionRef::scoped("thread-2", "orchestrator"))
+    );
     assert!(!a.chars().any(|c| c == '/' || c == '\\'));
-    println!("STEM={a}");
+    assert_eq!(
+        a,
+        "thread-1-2c9d1afa3c382fdf440b08a5f1f46fef.orchestrator-57c4fd2d66355aa9fd1aea283ce94119"
+    );
 }
