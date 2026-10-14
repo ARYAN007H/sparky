@@ -40,6 +40,7 @@ impl OpenHumanSessionHost {
             resume: self.turn_resume_mode(),
             cancellation,
             run_context: context.into_tinyagents(root_config),
+            controls: Default::default(),
         };
         // Load persisted state before the normal turn lifecycle so the host
         // can read native recorded declarations for both bound sessions and
