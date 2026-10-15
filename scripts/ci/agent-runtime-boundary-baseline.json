@@ -37,28 +37,28 @@
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/agent/orchestration/workflow_runs/engine/lifecycle.rs",
-    "line": 70,
+    "line": 71,
     "text": "let inherited_origin = crate::agent::turn_origin::capture();",
     "occurrence": 1
   },
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/agent/orchestration/workflow_runs/engine/lifecycle.rs",
-    "line": 74,
+    "line": 76,
     "text": "crate::agent::turn_origin::with_inherited_origin(",
     "occurrence": 1
   },
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/agent/orchestration/workflow_runs/engine/lifecycle.rs",
-    "line": 209,
+    "line": 211,
     "text": "let inherited_origin = crate::agent::turn_origin::capture();",
     "occurrence": 2
   },
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/agent/orchestration/workflow_runs/engine/lifecycle.rs",
-    "line": 213,
+    "line": 216,
     "text": "crate::agent::turn_origin::with_inherited_origin(",
     "occurrence": 2
   },
@@ -86,7 +86,7 @@
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/agent/tinyagents/host/security_gate.rs",
-    "line": 516,
+    "line": 530,
     "text": "crate::agent::turn_origin::current(),",
     "occurrence": 1
   },
@@ -156,8 +156,8 @@
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/desktop/notifications/rpc.rs",
-    "line": 187,
-    "text": "with_origin(origin, apply_decision(triage_run, &envelope)).await",
+    "line": 188,
+    "text": "with_origin(origin, apply_decision(&ctx, triage_run, &envelope)).await",
     "occurrence": 1
   },
   {
@@ -311,7 +311,7 @@
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/integrations/composio/bus/trigger_subscriber.rs",
     "line": 195,
-    "text": "if let Err(e) = with_origin(origin, apply_decision(run, &envelope)).await {",
+    "text": "if let Err(e) = with_origin(origin, apply_decision(&crate::core::runtime::DispatchCtx::ambient(), run, &envelope)).await {",
     "occurrence": 1
   },
   {
@@ -324,8 +324,8 @@
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/integrations/task_sources/route.rs",
-    "line": 88,
-    "text": "with_origin(origin, apply_decision(run, &envelope))",
+    "line": 90,
+    "text": "with_origin(origin, apply_decision(&ctx, run, &envelope))",
     "occurrence": 1
   },
   {
@@ -401,7 +401,7 @@
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/skills/webhooks/ops.rs",
-    "line": 171,
+    "line": 172,
     "text": "crate::agent::turn_origin::with_origin(",
     "occurrence": 1
   },
