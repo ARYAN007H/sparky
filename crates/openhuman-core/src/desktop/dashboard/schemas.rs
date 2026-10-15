@@ -164,17 +164,15 @@ fn model_health_config_fields() -> Vec<FieldSchema> {
 }
 
 fn handle_dashboard_model_health(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
         log::debug!("[dashboard] model_health request received");
-        let cfg = crate::config::rpc::load_config_with_timeout()
-            .await
-            .map_err(|err| {
-                log::warn!("[dashboard] model_health failed to load config: {err}");
-                format!("config unavailable: {err}")
-            })?;
+        let cfg = ctx.load_config().await.map_err(|err| {
+            log::warn!("[dashboard] model_health failed to load config: {err}");
+            format!("config unavailable: {err}")
+        })?;
         let outcome: Outcome<ModelHealthResponse> = ops::model_health(&cfg)?;
         outcome.into_cli_compatible_json()
     })

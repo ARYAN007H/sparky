@@ -175,17 +175,17 @@ pub fn schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_install(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_install(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_json(crate::platform::service::rpc::service_install(&config).await?)
     })
 }
 
 /// Service controller for `service.start`.
-fn handle_start(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_start(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_json(crate::platform::service::rpc::service_start(&config).await?)
     })
 }
@@ -227,25 +227,25 @@ fn handle_shutdown(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerF
 }
 
 /// Service controller for `service.stop`.
-fn handle_stop(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_stop(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_json(crate::platform::service::rpc::service_stop(&config).await?)
     })
 }
 
 /// Service controller for `service.status`.
-fn handle_status(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_status(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_json(crate::platform::service::rpc::service_status(&config).await?)
     })
 }
 
 /// Service controller for `service.uninstall`.
-fn handle_uninstall(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_uninstall(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_json(crate::platform::service::rpc::service_uninstall(&config).await?)
     })
 }
@@ -256,19 +256,19 @@ struct DaemonHostSetParams {
 }
 
 /// Service controller for `service.daemon_host_get`.
-fn handle_daemon_host_get(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_daemon_host_get(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_json(crate::platform::service::rpc::daemon_host_get(&config).await?)
     })
 }
 
 /// Service controller for `service.daemon_host_set`.
-fn handle_daemon_host_set(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_daemon_host_set(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let payload: DaemonHostSetParams =
             serde_json::from_value(Value::Object(params)).map_err(|e| e.to_string())?;
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_json(crate::platform::service::rpc::daemon_host_set(&config, payload.show_tray).await?)
     })
 }

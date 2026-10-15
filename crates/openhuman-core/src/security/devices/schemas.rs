@@ -150,24 +150,24 @@ pub fn schemas(function: &str) -> ControllerSchema {
 // Handler bridges
 // ---------------------------------------------------------------------------
 
-fn handle_create_pairing(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_create_pairing(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let label = read_optional_string(&params, "label")?;
         to_json(crate::security::devices::rpc::devices_create_pairing(&config, label).await?)
     })
 }
 
-fn handle_list(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_list(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_json(crate::security::devices::rpc::devices_list(&config).await?)
     })
 }
 
-fn handle_revoke(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_revoke(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let channel_id = read_required::<String>(&params, "channel_id")?;
         to_json(crate::security::devices::rpc::devices_revoke(&config, channel_id).await?)
     })
