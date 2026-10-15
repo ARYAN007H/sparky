@@ -88,16 +88,16 @@ pub fn referral_schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_referral_get_stats(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_referral_get_stats(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_json(crate::hosted::referral::get_stats(&config).await?)
     })
 }
 
-fn handle_referral_claim(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_referral_claim(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let payload = deserialize_params::<ReferralClaimParams>(params)?;
         let fp = payload
             .device_fingerprint
