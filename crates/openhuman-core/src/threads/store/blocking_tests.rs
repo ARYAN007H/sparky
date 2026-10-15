@@ -40,22 +40,22 @@ async fn create_append_read_round_trips_through_the_blocking_pool() {
     let tmp = TempDir::new().unwrap();
     let dir = tmp.path().to_path_buf();
 
-    let thread = ensure_thread(dir.clone(), create("thread-a"))
+    let thread = ensure_thread(crate::core::runtime::DispatchCtx::ambient(), dir.clone(), create("thread-a"))
         .await
         .expect("ensure_thread");
     assert_eq!(thread.id, "thread-a");
 
-    append_message(dir.clone(), "thread-a".to_string(), message("m1", "hello"))
+    append_message(crate::core::runtime::DispatchCtx::ambient(), dir.clone(), "thread-a".to_string(), message("m1", "hello"))
         .await
         .expect("append_message");
 
-    let messages = get_messages(dir.clone(), "thread-a".to_string())
+    let messages = get_messages(crate::core::runtime::DispatchCtx::ambient(), dir.clone(), "thread-a".to_string())
         .await
         .expect("get_messages");
     assert_eq!(messages.len(), 1);
     assert_eq!(messages[0].content, "hello");
 
-    let threads = list_threads(dir.clone()).await.expect("list_threads");
+    let threads = list_threads(crate::core::runtime::DispatchCtx::ambient(), dir.clone()).await.expect("list_threads");
     assert_eq!(threads.len(), 1);
     assert_eq!(threads[0].message_count, 1);
 }
@@ -68,7 +68,7 @@ async fn store_errors_surface_unchanged() {
     // Appending to a thread that was never created is the store's own error,
     // not a join failure — the wrapper must pass it through verbatim so the
     // RPC layer's thread-scoped error mapping still recognises it.
-    let error = append_message(dir, "missing".to_string(), message("m1", "hello"))
+    let error = append_message(crate::core::runtime::DispatchCtx::ambient(), dir, "missing".to_string(), message("m1", "hello"))
         .await
         .expect_err("append to a missing thread must fail");
     assert!(
@@ -167,10 +167,11 @@ async fn concurrent_operations_complete_without_stalling_the_single_async_worker
     for idx in 0..8 {
         let dir = dir.clone();
         handles.push(tokio::spawn(async move {
-            let thread = ensure_thread(dir.clone(), create(&format!("thread-{idx}")))
+            let thread = ensure_thread(crate::core::runtime::DispatchCtx::ambient(), dir.clone(), create(&format!("thread-{idx}")))
                 .await
                 .expect("ensure_thread");
             append_message(
+        crate::core::runtime::DispatchCtx::ambient(),
                 dir,
                 thread.id.clone(),
                 message(&format!("m{idx}"), "concurrent"),
@@ -211,7 +212,7 @@ async fn concurrent_operations_complete_without_stalling_the_single_async_worker
         "every concurrent create must land its own thread"
     );
 
-    let threads = list_threads(dir).await.expect("list_threads");
+    let threads = list_threads(crate::core::runtime::DispatchCtx::ambient(), dir).await.expect("list_threads");
     assert_eq!(threads.len(), 8);
     assert!(threads.iter().all(|thread| thread.message_count == 1));
 }
@@ -220,11 +221,12 @@ async fn concurrent_operations_complete_without_stalling_the_single_async_worker
 async fn title_labels_delete_and_purge_round_trip() {
     let tmp = TempDir::new().unwrap();
     let dir = tmp.path().to_path_buf();
-    ensure_thread(dir.clone(), create("thread-a"))
+    ensure_thread(crate::core::runtime::DispatchCtx::ambient(), dir.clone(), create("thread-a"))
         .await
         .expect("ensure_thread");
 
     let retitled = update_thread_title(
+        crate::core::runtime::DispatchCtx::ambient(),
         dir.clone(),
         "thread-a".to_string(),
         "Renamed".to_string(),
@@ -235,6 +237,7 @@ async fn title_labels_delete_and_purge_round_trip() {
     assert_eq!(retitled.title, "Renamed");
 
     let relabelled = update_thread_labels(
+        crate::core::runtime::DispatchCtx::ambient(),
         dir.clone(),
         "thread-a".to_string(),
         vec!["general".to_string()],
@@ -247,6 +250,7 @@ async fn title_labels_delete_and_purge_round_trip() {
 
     assert!(
         delete_thread(
+        crate::core::runtime::DispatchCtx::ambient(),
             dir.clone(),
             "thread-a".to_string(),
             "2026-07-30T00:03:00Z".to_string()
@@ -255,23 +259,24 @@ async fn title_labels_delete_and_purge_round_trip() {
         .expect("delete_thread"),
         "deleting a live thread reports true"
     );
-    assert!(list_threads(dir.clone()).await.unwrap().is_empty());
+    assert!(list_threads(crate::core::runtime::DispatchCtx::ambient(), dir.clone()).await.unwrap().is_empty());
 
-    ensure_thread(dir.clone(), create("thread-b"))
+    ensure_thread(crate::core::runtime::DispatchCtx::ambient(), dir.clone(), create("thread-b"))
         .await
         .expect("ensure_thread");
-    purge_threads(dir.clone()).await.expect("purge_threads");
-    assert!(list_threads(dir).await.unwrap().is_empty());
+    purge_threads(crate::core::runtime::DispatchCtx::ambient(), dir.clone()).await.expect("purge_threads");
+    assert!(list_threads(crate::core::runtime::DispatchCtx::ambient(), dir).await.unwrap().is_empty());
 }
 
 #[tokio::test]
 async fn update_message_patches_metadata_and_search_finds_content() {
     let tmp = TempDir::new().unwrap();
     let dir = tmp.path().to_path_buf();
-    ensure_thread(dir.clone(), create("thread-a"))
+    ensure_thread(crate::core::runtime::DispatchCtx::ambient(), dir.clone(), create("thread-a"))
         .await
         .expect("ensure_thread");
     append_message(
+        crate::core::runtime::DispatchCtx::ambient(),
         dir.clone(),
         "thread-a".to_string(),
         message("m1", "quarterly roadmap review"),
@@ -280,6 +285,7 @@ async fn update_message_patches_metadata_and_search_finds_content() {
     .expect("append_message");
 
     let patched = update_message(
+        crate::core::runtime::DispatchCtx::ambient(),
         dir.clone(),
         "thread-a".to_string(),
         "m1".to_string(),
@@ -291,7 +297,7 @@ async fn update_message_patches_metadata_and_search_finds_content() {
     .expect("update_message");
     assert_eq!(patched.extra_metadata, json!({"pinned": true}));
 
-    let hits = search_cross_thread_messages(dir, "roadmap".to_string(), 10, None)
+    let hits = search_cross_thread_messages(crate::core::runtime::DispatchCtx::ambient(), dir, "roadmap".to_string(), 10, None)
         .await
         .expect("search_cross_thread_messages");
     assert!(

@@ -101,6 +101,7 @@ async fn ensure_thread(
         .filter(|t| !t.trim().is_empty())
         .unwrap_or_else(|| format!("voice-{}", uuid::Uuid::new_v4()));
     crate::threads::store::blocking::ensure_thread(
+        crate::core::runtime::DispatchCtx::ambient(),
         config.workspace_dir.clone(),
         CreateConversationThread {
             id: id.clone(),
@@ -139,6 +140,7 @@ pub(crate) async fn start(
     let harness = assemble_live_tool_harness(host.live_tool_surface());
 
     let recent = crate::threads::store::blocking::get_messages(
+        crate::core::runtime::DispatchCtx::ambient(),
         config.workspace_dir.clone(),
         thread_id.clone(),
     )

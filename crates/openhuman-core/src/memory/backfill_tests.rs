@@ -21,6 +21,7 @@ fn message(id: &str, sender: &str, content: &str, at: &str) -> ConversationMessa
 
 async fn seed_thread(workspace: &Path, thread_id: &str, messages: &[(&str, &str)]) {
     threads::ensure_thread(
+        crate::core::runtime::DispatchCtx::ambient(),
         workspace.to_path_buf(),
         CreateConversationThread {
             id: thread_id.to_string(),
@@ -36,6 +37,7 @@ async fn seed_thread(workspace: &Path, thread_id: &str, messages: &[(&str, &str)
     .unwrap();
     for (index, (sender, content)) in messages.iter().enumerate() {
         threads::append_message(
+        crate::core::runtime::DispatchCtx::ambient(),
             workspace.to_path_buf(),
             thread_id.to_string(),
             message(

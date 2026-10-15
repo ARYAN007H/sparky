@@ -127,10 +127,10 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
         let p = params(id, text);
         let thread = p.thread_id();
         assert_eq!(
-            store::record_inbound(&workspace, &p, &thread).await,
+            store::record_inbound(crate::core::runtime::DispatchCtx::ambient(), &workspace, &p, &thread).await,
             Ok(Recorded::New)
         );
-        let replies = run_relay_turn(config.clone(), p, thread, format!("req-{id}")).await;
+        let replies = run_relay_turn(crate::core::runtime::DispatchCtx::ambient(), config.clone(), p, thread, format!("req-{id}")).await;
         assert_eq!(replies.len(), 1, "{replies:?}");
     }
 
@@ -173,7 +173,7 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
     );
 
     let thread = params("m1", "x").thread_id();
-    let messages = crate::threads::store::get_messages(workspace.clone(), &thread).unwrap();
+    let messages = crate::threads::store::get_messages(crate::core::runtime::DispatchCtx::ambient(), workspace.clone(), &thread).unwrap();
     let ids: Vec<&str> = messages.iter().map(|m| m.id.as_str()).collect();
     assert_eq!(
         ids,
@@ -212,7 +212,7 @@ async fn invalid_or_repeated_messages_start_no_turn() {
 
         let p = params("m1", "hello");
         let thread = p.thread_id();
-        store::record_inbound(&workspace, &p, &thread)
+        store::record_inbound(crate::core::runtime::DispatchCtx::ambient(), &workspace, &p, &thread)
             .await
             .unwrap();
         let outcome = channel_relay_inbound(&crate::core::runtime::DispatchCtx::ambient(), p)
