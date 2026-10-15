@@ -665,7 +665,7 @@ async fn run_system_turn_on_thread(
         },
         |result| match result {
             Ok(response) => crate::web_chat::presentation::deliver_response_single_bubble(
-                "system", &thread_id, &run_id, response, None,
+                ctx, "system", &thread_id, &run_id, response, None,
             ),
             Err(error) => {
                 crate::web_chat::publish_web_channel_event(crate::web_chat::WebChannelEvent {

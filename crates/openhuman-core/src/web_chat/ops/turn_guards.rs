@@ -43,9 +43,7 @@ fn web_turn_deadline() -> Option<Duration> {
 /// explicit `OPENHUMAN_WEB_TURN_TIMEOUT_SECS` override still wins; otherwise the
 /// default is the local turn ceiling plus a grace period, never the hosted
 /// backstop, which sits below the local harness ceilings and would pre-empt them.
-async fn resolve_web_turn_deadline(
-    ctx: &crate::core::runtime::DispatchCtx,
-) -> Option<Duration> {
+async fn resolve_web_turn_deadline(ctx: &crate::core::runtime::DispatchCtx) -> Option<Duration> {
     if std::env::var("OPENHUMAN_WEB_TURN_TIMEOUT_SECS").is_ok() {
         return web_turn_deadline();
     }
