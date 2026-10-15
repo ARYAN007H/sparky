@@ -66,7 +66,7 @@ pub async fn flows_discover(
     // an interactive turn (see `FlowStreamTarget`). Best-effort — with no target
     // the run stays headless, exactly as before.
     if let Some(target) = &stream {
-        attach_flow_progress_bridge(&mut agent, target, "flows_discover", config);
+        attach_flow_progress_bridge(ctx, &mut agent, target, "flows_discover", config);
         agent.set_thread_id(Some(target.thread_id.as_str()));
     }
 
