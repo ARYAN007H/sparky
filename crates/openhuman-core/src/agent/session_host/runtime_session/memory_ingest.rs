@@ -24,6 +24,7 @@ use tinyinference_llm::message::Message;
 
 use super::OpenHumanTurnPrelude;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
+use crate::core::runtime::DispatchCtx;
 use crate::memory::lifecycle::hooks::{
     self, MemoryTurn, PostTurnInput, PreTurnInput, ToolCallSummary,
 };
@@ -233,7 +234,8 @@ impl OpenHumanTurnPrelude {
             )
             .await;
         };
-        crate::core::runtime::DispatchCtx::ambient().spawn(deferred_memory_work(profile_context, work));
+        crate::core::runtime::DispatchCtx::ambient()
+            .spawn(deferred_memory_work(profile_context, work));
     }
 }
 
