@@ -132,10 +132,11 @@ pub fn transcripts_for(
 /// `workspace_dir` when no store is in effect — the session host's resolution.
 #[must_use]
 pub fn transcripts_or_files(
+    ctx: &crate::core::runtime::DispatchCtx,
     agent_id: &str,
     workspace_dir: &std::path::Path,
 ) -> Arc<dyn tinyagents_session::transcript::TranscriptLocator> {
-    transcripts_for(agent_id).unwrap_or_else(|| match current_embedded_agent() {
+    transcripts_for(agent_id).unwrap_or_else(|| match current_embedded_agent(ctx) {
         Some(embedded) => {
             log::debug!("[session_store] transcripts under the agent's directory agent={embedded}");
             Arc::new(AgentTranscriptFiles::new(workspace_dir, &embedded))
@@ -150,8 +151,8 @@ pub fn transcripts_or_files(
 /// directory under an embedded agent's context, else `workspace_dir` — which
 /// for a SaaS profile's default agent is that profile's own workspace.
 #[must_use]
-pub fn transcript_root(workspace_dir: &std::path::Path) -> std::path::PathBuf {
-    match current_embedded_agent() {
+pub fn transcript_root(ctx: &crate::core::runtime::DispatchCtx, workspace_dir: &std::path::Path) -> std::path::PathBuf {
+    match current_embedded_agent(ctx) {
         Some(agent) => agent_transcript_root(workspace_dir, &agent),
         None => workspace_dir.to_path_buf(),
     }
@@ -162,8 +163,8 @@ pub fn transcript_root(workspace_dir: &std::path::Path) -> std::path::PathBuf {
 /// no other profile shares. A SaaS task with no scope has none either; the
 /// workspace it was handed is the only one it touches.
 #[must_use]
-pub fn current_embedded_agent() -> Option<String> {
-    crate::core::runtime::current_tenant()
+pub fn current_embedded_agent(ctx: &crate::core::runtime::DispatchCtx) -> Option<String> {
+    ctx.tenant()
         .ok()
         .and_then(|tenant| tenant.agent)
 }
@@ -182,9 +183,9 @@ pub fn current_embedded_agent() -> Option<String> {
 /// [`CoreContext`]: crate::core::runtime::CoreContext
 /// [`CoreContext::session_agent`]: crate::core::runtime::CoreContext::session_agent
 #[must_use]
-pub fn current() -> Option<AgentStores> {
+pub fn current(ctx: &crate::core::runtime::DispatchCtx) -> Option<AgentStores> {
     let provider = installed()?;
-    let tenant = match crate::core::runtime::current_tenant() {
+    let tenant = match ctx.tenant() {
         Ok(tenant) => tenant,
         Err(no_tenant) => {
             log::warn!("[session_store] current: {no_tenant}");
@@ -199,8 +200,8 @@ pub fn current() -> Option<AgentStores> {
 /// serves a SaaS profile, else the context's agent, else `fallback` (the
 /// session's own definition id), as before profiles existed.
 #[must_use]
-pub fn current_agent_key_or(fallback: &str) -> String {
-    let tenant = crate::core::runtime::tenant::current_tenant_or_isolated("session_locator");
+pub fn current_agent_key_or(ctx: &crate::core::runtime::DispatchCtx, fallback: &str) -> String {
+    let tenant = crate::core::runtime::tenant::isolated_unless_tenant(ctx.tenant(), "session_locator");
     if tenant.profile.is_some() {
         return crate::core::runtime::session_key(&tenant);
     }
