@@ -160,6 +160,7 @@ pub(crate) fn pre_turn(
     if let Some(pack) = &pack {
         crate::memory::tools::record_pack_citations(ctx, &input.thread_id, pack.citations.clone());
     }
+    let dispatch = ctx.clone();
     enqueue(
         cache,
         key,
@@ -176,7 +177,7 @@ pub(crate) fn pre_turn(
                         .await;
                     }
                 }
-                hooks::pre_turn_work(&config, &identity, input).await
+                hooks::pre_turn_work(&dispatch, &config, &identity, input).await
             })),
         ),
     );

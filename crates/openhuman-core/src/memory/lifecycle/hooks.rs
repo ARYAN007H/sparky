@@ -209,10 +209,11 @@ pub async fn pre_turn(
     let started = std::time::Instant::now();
     let agent_id = identity.agent_id.clone();
     let config = config.clone();
+    let dispatch = ctx.clone();
     let identity = identity.clone();
     let thread = input.thread_id.clone();
     let task = crate::core::runtime::spawn_scoped(async move {
-        pre_turn_work(&config, &identity, input).await
+        pre_turn_work(&dispatch, &config, &identity, input).await
     });
     let pack = match tokio::time::timeout(timeout, task).await {
         Ok(Ok(pack)) => pack,
@@ -235,6 +236,7 @@ pub async fn pre_turn(
 /// The direct lifecycle operation for bounded background workers. Unlike the
 /// manual timeout wrapper, its future owns all I/O and can be cancelled.
 pub(crate) async fn pre_turn_work(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     identity: &ResolvedIdentity,
     input: PreTurnInput,
@@ -271,12 +273,13 @@ pub(crate) async fn pre_turn_work(
     // the pack is still ranked and returned before the turn stops waiting.
     let date_hint = (recall && logging && config.memory.recall.date_hint).then(|| {
         let config = config.clone();
+        let ctx = ctx.clone();
         let text = input.user_text.clone();
         let deadline =
             tokio::time::Instant::now() + timeout.saturating_sub(Duration::from_millis(100));
         async move {
             let zone = config.time_zone();
-            tokio::time::timeout_at(deadline, super::date_hint::extract(&config, &text, &zone))
+            tokio::time::timeout_at(deadline, super::date_hint::extract(&ctx, &config, &text, &zone))
                 .await
                 .ok()
                 .flatten()
