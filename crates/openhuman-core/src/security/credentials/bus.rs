@@ -56,8 +56,10 @@ impl EventHandler<DomainEvent> for SessionExpiredSubscriber {
     }
 
     async fn handle(&self, event: &DomainEvent) {
+        // A session expiry belongs to the host's own sign-in: outside SaaS the
+        // process default, and in SaaS (which leaves it to the gateway) none.
         self.handle_with(
-            &DispatchCtx::ambient(),
+            &DispatchCtx::host_default(),
             crate::core::runtime::is_saas(),
             event,
         )

@@ -62,6 +62,9 @@ impl EventHandler<DomainEvent> for WebhookRequestSubscriber {
             return;
         };
 
+        // An inbound webhook arrives over the host's socket: its own tenant,
+        // and in SaaS none (the request is then not handled).
+        let ctx = crate::core::runtime::DispatchCtx::host_default();
         let started_at = Instant::now();
 
         let correlation_id = request.correlation_id.clone();
@@ -130,7 +133,7 @@ impl EventHandler<DomainEvent> for WebhookRequestSubscriber {
                     tokio::spawn(async move {
                         let result =
                             tokio::time::timeout(std::time::Duration::from_secs(60), async {
-                                run_agent_trigger(&envelope).await
+                                run_agent_trigger(&ctx, &envelope).await
                             })
                             .await;
                         let (resp, err) = match result {
@@ -302,12 +305,12 @@ fn decode_webhook_body(base64_body: &str) -> Result<serde_json::Value, String> {
 /// Run the triage pipeline for a trigger envelope and return the
 /// human-readable decision summary on success.
 async fn run_agent_trigger(
+    ctx: &crate::core::runtime::DispatchCtx,
     envelope: &crate::agent::triage::TriggerEnvelope,
 ) -> Result<String, String> {
-    let outcome =
-        crate::agent::triage::run_triage(&crate::core::runtime::DispatchCtx::ambient(), envelope)
-            .await
-            .map_err(|e| format!("triage evaluation failed: {e}"))?;
+    let outcome = crate::agent::triage::run_triage(ctx, envelope)
+        .await
+        .map_err(|e| format!("triage evaluation failed: {e}"))?;
 
     match outcome {
         crate::agent::triage::TriageOutcome::Decision(run) => {
@@ -318,7 +321,7 @@ async fn run_agent_trigger(
             crate::agent::turn_origin::with_origin(
                 origin,
                 crate::agent::triage::apply_decision(
-                    &crate::core::runtime::DispatchCtx::ambient(),
+                    ctx,
                     run.clone(),
                     envelope,
                 ),
