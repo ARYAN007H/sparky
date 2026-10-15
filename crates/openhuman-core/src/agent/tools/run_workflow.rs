@@ -56,6 +56,7 @@ mod guard {
     use std::collections::HashSet;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::{Arc, Mutex};
+    use crate::core::runtime::DispatchCtx;
 
     /// Per-agent lifetime backstop against a runaway spawn loop.
     const TOTAL_SPAWN_BACKSTOP: u64 = 500;
