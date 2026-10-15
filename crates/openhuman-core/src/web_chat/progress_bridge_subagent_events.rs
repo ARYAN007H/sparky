@@ -29,6 +29,7 @@ pub(super) struct BridgeCtx<'a> {
     pub(super) thread_id: &'a str,
     pub(super) request_id: &'a str,
     pub(super) config: &'a crate::config::Config,
+    pub(super) dispatch: &'a crate::core::runtime::DispatchCtx,
 }
 
 pub(super) fn on_subagent_spawned(
@@ -101,6 +102,7 @@ pub(super) fn on_subagent_spawned(
         },
     );
     publish_seq_stamped(
+        ctx.dispatch,
         emit_seq,
         WebChannelEvent {
             event: "subagent_spawned".to_string(),
@@ -195,6 +197,7 @@ pub(super) fn on_subagent_completed(
         },
     );
     publish_seq_stamped(
+        ctx.dispatch,
         emit_seq,
         WebChannelEvent {
             event: "subagent_completed".to_string(),
@@ -288,6 +291,7 @@ pub(super) fn on_subagent_failed(
         },
     );
     publish_seq_stamped(
+        ctx.dispatch,
         emit_seq,
         WebChannelEvent {
             event: "subagent_failed".to_string(),
@@ -376,6 +380,7 @@ pub(super) fn on_subagent_awaiting_user(
         },
     );
     publish_seq_stamped(
+        ctx.dispatch,
         emit_seq,
         WebChannelEvent {
             event: "subagent_awaiting_user".to_string(),
@@ -408,6 +413,7 @@ pub(super) fn on_subagent_iteration_started(
     extended_policy: bool,
 ) {
     publish_seq_stamped(
+        ctx.dispatch,
         emit_seq,
         WebChannelEvent {
             event: "subagent_iteration_start".to_string(),
@@ -475,6 +481,7 @@ pub(super) fn on_subagent_tool_call_started(
         },
     );
     publish_seq_stamped(
+        ctx.dispatch,
         emit_seq,
         WebChannelEvent {
             event: "subagent_tool_call".to_string(),
@@ -548,6 +555,7 @@ pub(super) fn on_subagent_tool_call_completed(
         },
     );
     publish_seq_stamped(
+        ctx.dispatch,
         emit_seq,
         WebChannelEvent {
             event: "subagent_tool_result".to_string(),
@@ -593,6 +601,7 @@ pub(super) fn on_subagent_text_delta(
     iteration: u32,
 ) {
     publish_seq_stamped(
+        ctx.dispatch,
         emit_seq,
         WebChannelEvent {
             event: "subagent_text_delta".to_string(),
@@ -624,6 +633,7 @@ pub(super) fn on_subagent_thinking_delta(
     iteration: u32,
 ) {
     publish_seq_stamped(
+        ctx.dispatch,
         emit_seq,
         WebChannelEvent {
             event: "subagent_thinking_delta".to_string(),

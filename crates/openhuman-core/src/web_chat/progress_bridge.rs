@@ -692,6 +692,7 @@ pub(crate) fn spawn_progress_bridge(
                         thread_id: &thread_id,
                         request_id: &request_id,
                         config: &config,
+                        dispatch: &dispatch_ctx,
                     };
                     subagent_events::on_subagent_spawned(
                         &ctx,
@@ -726,6 +727,7 @@ pub(crate) fn spawn_progress_bridge(
                         thread_id: &thread_id,
                         request_id: &request_id,
                         config: &config,
+                        dispatch: &dispatch_ctx,
                     };
                     subagent_events::on_subagent_completed(
                         &ctx,
@@ -755,6 +757,7 @@ pub(crate) fn spawn_progress_bridge(
                         thread_id: &thread_id,
                         request_id: &request_id,
                         config: &config,
+                        dispatch: &dispatch_ctx,
                     };
                     subagent_events::on_subagent_failed(
                         &ctx,
@@ -779,6 +782,7 @@ pub(crate) fn spawn_progress_bridge(
                         thread_id: &thread_id,
                         request_id: &request_id,
                         config: &config,
+                        dispatch: &dispatch_ctx,
                     };
                     subagent_events::on_subagent_awaiting_user(
                         &ctx,
@@ -804,6 +808,7 @@ pub(crate) fn spawn_progress_bridge(
                         thread_id: &thread_id,
                         request_id: &request_id,
                         config: &config,
+                        dispatch: &dispatch_ctx,
                     };
                     subagent_events::on_subagent_iteration_started(
                         &ctx,
@@ -831,6 +836,7 @@ pub(crate) fn spawn_progress_bridge(
                         thread_id: &thread_id,
                         request_id: &request_id,
                         config: &config,
+                        dispatch: &dispatch_ctx,
                     };
                     subagent_events::on_subagent_tool_call_started(
                         &ctx,
@@ -868,6 +874,7 @@ pub(crate) fn spawn_progress_bridge(
                         thread_id: &thread_id,
                         request_id: &request_id,
                         config: &config,
+                        dispatch: &dispatch_ctx,
                     };
                     subagent_events::on_subagent_tool_call_completed(
                         &ctx,
@@ -900,6 +907,7 @@ pub(crate) fn spawn_progress_bridge(
                         thread_id: &thread_id,
                         request_id: &request_id,
                         config: &config,
+                        dispatch: &dispatch_ctx,
                     };
                     subagent_events::on_subagent_text_delta(
                         &ctx,
@@ -922,6 +930,7 @@ pub(crate) fn spawn_progress_bridge(
                         thread_id: &thread_id,
                         request_id: &request_id,
                         config: &config,
+                        dispatch: &dispatch_ctx,
                     };
                     subagent_events::on_subagent_thinking_delta(
                         &ctx,
@@ -940,6 +949,7 @@ pub(crate) fn spawn_progress_bridge(
                     pending_narration.push_str(&delta);
                     if !metadata.hold_text_stream {
                         text_events::publish_text_delta(
+                            &dispatch_ctx,
                             &mut emit_seq,
                             &client_id,
                             &thread_id,
@@ -1111,7 +1121,7 @@ pub(crate) fn spawn_progress_bridge(
                 }
                 AgentProgress::ToolCallProgress { call_id, message } => {
                     let ids = (client_id.as_str(), thread_id.as_str(), request_id.as_str());
-                    tool_progress::publish(&mut emit_seq, ids, call_id, message);
+                    tool_progress::publish(&dispatch_ctx, &mut emit_seq, ids, call_id, message);
                 }
                 AgentProgress::TurnContent { .. } => {
                     // Prompt/reply content is attached to the trace span by the
