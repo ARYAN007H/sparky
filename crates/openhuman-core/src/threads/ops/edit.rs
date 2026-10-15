@@ -42,8 +42,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use tinyagents_session::transcript::{
-    SessionRef, SessionTranscript, TranscriptLocator, TranscriptMessage,
-    TranscriptMeta, TruncateCut,
+    SessionRef, SessionTranscript, TranscriptLocator, TranscriptMessage, TranscriptMeta,
+    TruncateCut,
 };
 
 use crate::core::Outcome;

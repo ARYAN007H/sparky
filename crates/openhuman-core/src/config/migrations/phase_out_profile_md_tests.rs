@@ -165,7 +165,10 @@ fn sanitize_only_touches_first_system_message() {
     write_transcript(&path, &session.messages, &session.meta, None).unwrap();
 
     let stats = run(dir.path()).unwrap();
-    assert_eq!(stats.cleaned, 1, "first system message had a block, must mutate");
+    assert_eq!(
+        stats.cleaned, 1,
+        "first system message had a block, must mutate"
+    );
 
     let session = read_transcript(&path).unwrap();
     assert!(!session.messages[0].content.contains("### PROFILE.md"));

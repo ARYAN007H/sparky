@@ -73,8 +73,8 @@ pub async fn token_usage(
     let locator = transcript_store(ctx).await?.locator();
     let thread_id = request.thread_id.clone();
     let spend = tokio::task::spawn_blocking(move || thread_spend_in(locator.as_ref(), &thread_id))
-    .await
-    .map_err(|e| format!("thread usage task: {e}"))?;
+        .await
+        .map_err(|e| format!("thread usage task: {e}"))?;
 
     if !spend.found_transcript {
         return Ok(envelope(

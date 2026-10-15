@@ -334,7 +334,6 @@ fn is_block_boundary(line: &str) -> bool {
         || trimmed == "<!--/MSG-->"
 }
 
-
 #[cfg(test)]
 #[path = "phase_out_profile_md_tests.rs"]
 mod tests;

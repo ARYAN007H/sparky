@@ -173,10 +173,7 @@ pub(super) fn handle_turn_state_clear(
     })
 }
 
-pub(super) fn handle_token_usage(
-    ctx: DispatchCtx,
-    params: Map<String, Value>,
-) -> ControllerFuture {
+pub(super) fn handle_token_usage(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = parse::<ops::ThreadTokenUsageRequest>(params)?;
         to_json(ops::token_usage(&ctx, p).await?)
@@ -220,7 +217,11 @@ pub(super) fn handle_edit_message(
 ) -> ControllerFuture {
     Box::pin(async move {
         let p = parse::<ops::EditMessageRequest>(params)?;
-        to_json(ops::edit_message(&ctx, p).await.map_err(|e| e.to_string())?)
+        to_json(
+            ops::edit_message(&ctx, p)
+                .await
+                .map_err(|e| e.to_string())?,
+        )
     })
 }
 

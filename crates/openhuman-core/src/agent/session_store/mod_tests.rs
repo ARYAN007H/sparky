@@ -99,10 +99,15 @@ async fn without_a_store_transcripts_come_from_the_workspace_store_not_files() {
         parent_session_id: None,
     };
     let history = locator
-        .open_stem(&tinyagents_session::transcript::session_stem(&session), meta)
+        .open_stem(
+            &tinyagents_session::transcript::session_stem(&session),
+            meta,
+        )
         .expect("open the session's write handle");
     history
-        .append(tinyagents_session::transcript::TranscriptMessage::user("hi"))
+        .append(tinyagents_session::transcript::TranscriptMessage::user(
+            "hi",
+        ))
         .expect("append a message");
     assert!(transcripts_or_files("u1", dir).session_exists(&session));
     assert!(

@@ -52,7 +52,10 @@ impl TranscriptStore {
 pub(crate) async fn transcript_store(
     ctx: &crate::core::runtime::DispatchCtx,
 ) -> Result<TranscriptStore, String> {
-    let config = ctx.load_config().await.map_err(|e| format!("load config: {e}"))?;
+    let config = ctx
+        .load_config()
+        .await
+        .map_err(|e| format!("load config: {e}"))?;
     let tenant = crate::core::runtime::tenant::tenant_in(
         crate::core::runtime::is_saas(),
         ctx.resolved().as_deref(),

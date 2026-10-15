@@ -160,7 +160,10 @@ fn truncate_transcript_before_turn_cuts_head_and_keeps_the_sealed_generation() {
 
     // Head truncated: the new head ends right before turn 2's first row.
     let (head_ref, _, head) = resolve_head_transcript(&store, thread_id).expect("resolve head");
-    assert_eq!(head_ref.generation, 1, "the fork opened the next generation");
+    assert_eq!(
+        head_ref.generation, 1,
+        "the fork opened the next generation"
+    );
     assert!(
         head.messages
             .iter()
@@ -295,8 +298,14 @@ fn a_profile_prefixed_key_round_trips_through_edit_and_regenerate() {
         &crate::web_chat::pick_target_agent_id(&config),
     );
     let store = super::super::support::transcript_store_for(&config, &tenant);
-    assert_eq!(store.key, writer_key, "the reader resolves the writer's key");
-    assert_eq!(store.key, "profile-a~default", "the key keeps the profile prefix");
+    assert_eq!(
+        store.key, writer_key,
+        "the reader resolves the writer's key"
+    );
+    assert_eq!(
+        store.key, "profile-a~default",
+        "the key keeps the profile prefix"
+    );
     assert_eq!(store.workspace_dir, dir.path());
 
     let thread_id = "thread-profile";
@@ -333,7 +342,10 @@ fn transcript_store_for_a_desktop_tenant_uses_the_chat_agent_and_an_embedded_age
     let mut config = crate::config::Config::default();
     config.workspace_dir = dir.path().to_path_buf();
 
-    let desktop = super::super::support::transcript_store_for(&config, &crate::core::runtime::Tenant::default());
+    let desktop = super::super::support::transcript_store_for(
+        &config,
+        &crate::core::runtime::Tenant::default(),
+    );
     assert_eq!(desktop.key, crate::web_chat::pick_target_agent_id(&config));
 
     let embedded = super::super::support::transcript_store_for(

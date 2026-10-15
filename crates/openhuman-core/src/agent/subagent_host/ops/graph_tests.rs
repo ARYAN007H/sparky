@@ -50,7 +50,10 @@ fn a_subagent_writes_to_its_turn_trees_store_else_its_contexts() {
     let mut run_context = crate::agent::tinyagents::host::OpenHumanRunContext::new();
     run_context.transcripts = Some(tree.clone());
     let chosen = super::transcript::subagent_transcripts(&run_context, workspace.path());
-    assert!(Arc::ptr_eq(&chosen, &tree), "the root session's store is used as is");
+    assert!(
+        Arc::ptr_eq(&chosen, &tree),
+        "the root session's store is used as is"
+    );
 
     // No session handed a store over: the default agent's store of the run's
     // (here unbound, desktop) tenant.
@@ -69,7 +72,8 @@ fn a_subagent_writes_to_its_turn_trees_store_else_its_contexts() {
 #[test]
 fn subagent_transcript_keeps_cumulative_spend_separate_from_unknown_last_call() {
     let workspace = tempfile::tempdir().unwrap();
-    let locator = crate::agent::session_store::transcripts_or_files("orchestrator", workspace.path());
+    let locator =
+        crate::agent::session_store::transcripts_or_files("orchestrator", workspace.path());
     let usage = AggregatedUsage {
         input_tokens: 120,
         output_tokens: 30,
@@ -204,7 +208,8 @@ fn parallel_worker_without_thread_keeps_parent_transcript_affinity() {
 #[tokio::test]
 async fn explicit_worker_thread_replaces_parent_for_model_run_and_transcript() {
     let workspace = tempfile::tempdir().expect("workspace");
-    let locator = crate::agent::session_store::transcripts_or_files("orchestrator", workspace.path());
+    let locator =
+        crate::agent::session_store::transcripts_or_files("orchestrator", workspace.path());
     let mut parent = crate::agent::tinyagents::host::OpenHumanRunContext::new();
     parent.thread_id = Some("parent-thread".to_owned());
     parent.transcripts = Some(locator.clone());

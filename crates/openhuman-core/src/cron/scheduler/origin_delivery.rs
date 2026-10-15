@@ -79,7 +79,8 @@ pub(crate) async fn append_to_origin_transcript(
         TranscriptMessage,
     };
     let session = SessionRef::scoped(append.thread_id.to_string(), append.agent_id.to_string());
-    let locator = crate::agent::session_store::transcripts_or_files(append.store_key, workspace_dir);
+    let locator =
+        crate::agent::session_store::transcripts_or_files(append.store_key, workspace_dir);
     let options = BackgroundAppend::new(
         append.idempotency_key,
         serde_json::json!({
