@@ -11,7 +11,7 @@ use futures::future::BoxFuture;
 use tinymemory_tools::prefetch::{Limits, PrefetchRuntime, Prefetcher, WorkerPool};
 
 use crate::config::Config;
-use crate::core::runtime::{slot_for, spawn_scoped, DispatchCtx};
+use crate::core::runtime::{slot_for, DispatchCtx};
 use crate::memory::scope::ResolvedIdentity;
 
 use super::hooks::{self, PreTurnInput, TurnPack};
@@ -28,7 +28,7 @@ struct HostRuntime;
 
 impl PrefetchRuntime for HostRuntime {
     fn spawn(&self, task: BoxFuture<'static, ()>) {
-        drop(spawn_scoped(task));
+        drop(DispatchCtx::ambient().spawn(task));
     }
 
     fn sleep(&self, duration: Duration) -> BoxFuture<'static, ()> {
@@ -166,12 +166,12 @@ pub(crate) fn pre_turn(
         key,
         guard_turn_work(
             &config.clone(),
-            Box::pin(crate::core::runtime::spawn::scoped(async move {
+            Box::pin(dispatch.enter(async move {
                 if config.memory.conversations.enabled {
                     if let Some(channel) = channel {
                         let workspace = config.workspace_dir.clone();
                         let thread = input.thread_id.clone();
-                        let _ = crate::core::runtime::spawn_blocking_scoped(move || {
+                        let _ = tokio::task::spawn_blocking(move || {
                             crate::memory::channels::record(&workspace, &channel, &thread)
                         })
                         .await;
@@ -215,7 +215,7 @@ pub(crate) fn compaction(
     enqueue(
         cache,
         key,
-        Box::pin(crate::core::runtime::spawn::scoped(async move {
+        Box::pin(dispatch.enter(async move {
             hooks::compaction_work(&config, &identity, &thread, dropped).await
         })),
     );

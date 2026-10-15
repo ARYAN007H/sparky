@@ -70,7 +70,7 @@ where
     F: FnOnce() -> Result<T, String> + Send + 'static,
     T: Send + 'static,
 {
-    match crate::core::runtime::spawn_blocking_scoped(f).await {
+    match crate::core::runtime::DispatchCtx::ambient().spawn_blocking(f).await {
         Ok(result) => result,
         Err(error) => {
             tracing::warn!(

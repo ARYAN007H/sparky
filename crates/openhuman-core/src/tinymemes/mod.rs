@@ -196,7 +196,7 @@ async fn load(
     let config = config.clone();
     let thread_id = thread_id.to_owned();
     let ctx = ctx.clone();
-    crate::core::runtime::spawn_blocking_scoped(move || {
+    ctx.spawn_blocking(move || {
         crate::threads::store::get_messages(
             &ctx,
             config.workspace_dir.clone(),
