@@ -549,6 +549,7 @@ pub(crate) fn spawn_progress_bridge(
                     // once it calls a tool — flush it as an interim bubble so it
                     // persists interleaved with the tool activity.
                     flush_interim_narration(
+                        &dispatch_ctx,
                         &mut pending_narration,
                         iteration,
                         &client_id,
@@ -1082,6 +1083,7 @@ pub(crate) fn spawn_progress_bridge(
                     // sub-agent attribution shows up.
                     if turn_cost_throttle.should_emit() {
                         publish_seq_stamped(
+                            &dispatch_ctx,
                             &mut emit_seq,
                             WebChannelEvent {
                                 event: "turn_cost".to_string(),

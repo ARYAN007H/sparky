@@ -94,7 +94,7 @@ impl EventHandler<DomainEvent> for EgressSurfaceSubscriber {
             descriptor.reason,
             request_id,
         );
-        publish_web_channel_event(WebChannelEvent {
+        publish_web_channel_event(&crate::core::runtime::DispatchCtx::ambient(), WebChannelEvent {
             event: "external_transfer_pending".to_string(),
             client_id: client_id.clone(),
             thread_id: thread_id.clone(),
