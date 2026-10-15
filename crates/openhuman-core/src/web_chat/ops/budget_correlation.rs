@@ -11,6 +11,8 @@ use std::time::{Duration, Instant};
 
 use tokio::sync::Mutex;
 
+use crate::core::runtime::DispatchCtx;
+
 use super::state::key_for;
 
 /// A recorded budget-exhausted signal: when it happened, and which provider
