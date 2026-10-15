@@ -28,9 +28,11 @@ pub async fn cancel_chat_scoped(
     thread_id: &str,
     request_id: Option<&str>,
 ) -> Result<Option<String>, String> {
-    Ok(cancel_chat_inner(ctx, client_id, thread_id, request_id, false)
-        .await?
-        .request_id)
+    Ok(
+        cancel_chat_inner(ctx, client_id, thread_id, request_id, false)
+            .await?
+            .request_id,
+    )
 }
 
 /// The placeholder `client_id` a lease-loss teardown logs under. It carries no
@@ -195,23 +197,29 @@ async fn cancel_chat_inner(
             (true, Some(started_by)) => started_by,
             _ => client_id.to_string(),
         };
-        publish_web_channel_event_in(ctx, WebChannelEvent {
-            event: "chat_error".to_string(),
-            client_id: client_id.clone(),
-            thread_id: thread_id.to_string(),
-            request_id: request_id.clone(),
-            message: Some("Cancelled".to_string()),
-            error_type: Some("cancelled".to_string()),
-            ..Default::default()
-        });
-        publish_web_channel_event_in(ctx, WebChannelEvent {
-            event: "chat_cancelled".to_string(),
-            client_id,
-            thread_id: thread_id.to_string(),
-            request_id,
-            cancel_reason: Some("user_stop".to_string()),
-            ..Default::default()
-        });
+        publish_web_channel_event_in(
+            ctx,
+            WebChannelEvent {
+                event: "chat_error".to_string(),
+                client_id: client_id.clone(),
+                thread_id: thread_id.to_string(),
+                request_id: request_id.clone(),
+                message: Some("Cancelled".to_string()),
+                error_type: Some("cancelled".to_string()),
+                ..Default::default()
+            },
+        );
+        publish_web_channel_event_in(
+            ctx,
+            WebChannelEvent {
+                event: "chat_cancelled".to_string(),
+                client_id,
+                thread_id: thread_id.to_string(),
+                request_id,
+                cancel_reason: Some("user_stop".to_string()),
+                ..Default::default()
+            },
+        );
     }
 
     Ok(CancelOutcome {
@@ -307,7 +315,8 @@ fn queue_item_json(
 
 pub async fn channel_web_queue_status(
     ctx: &DispatchCtx,
-    thread_id: &str) -> Result<Outcome<Value>, String> {
+    thread_id: &str,
+) -> Result<Outcome<Value>, String> {
     let map_key = key_for(ctx, thread_id);
     let in_flight = in_flight().lock_owned().await;
     if let Some(entry) = in_flight.get(&map_key) {
@@ -384,17 +393,20 @@ pub async fn channel_web_queue_remove(
     drop(in_flight);
     if removed > 0 {
         log::info!("[web-channel] removed queued item thread_id={thread_id} item_id={item_id}");
-        publish_web_channel_event_in(ctx, WebChannelEvent {
-            event: "queue_item_removed".to_string(),
-            client_id: client_id.to_string(),
-            thread_id: thread_id.to_string(),
-            queue_item: Some(crate::web_chat::QueueItemPayload {
-                id: item_id.to_string(),
-                lane: None,
-                text_preview: None,
-            }),
-            ..Default::default()
-        });
+        publish_web_channel_event_in(
+            ctx,
+            WebChannelEvent {
+                event: "queue_item_removed".to_string(),
+                client_id: client_id.to_string(),
+                thread_id: thread_id.to_string(),
+                queue_item: Some(crate::web_chat::QueueItemPayload {
+                    id: item_id.to_string(),
+                    lane: None,
+                    text_preview: None,
+                }),
+                ..Default::default()
+            },
+        );
     }
     Ok(Outcome::single_log(
         json!({
@@ -408,7 +420,8 @@ pub async fn channel_web_queue_remove(
 
 pub async fn channel_web_queue_clear(
     ctx: &DispatchCtx,
-    thread_id: &str) -> Result<Outcome<Value>, String> {
+    thread_id: &str,
+) -> Result<Outcome<Value>, String> {
     let map_key = key_for(ctx, thread_id);
     let in_flight = in_flight().lock_owned().await;
     if let Some(entry) = in_flight.get(&map_key) {

@@ -189,14 +189,17 @@ async fn generate_and_emit(
          request_id={request_id} count={}",
         suggestions.len()
     );
-    publish_web_channel_event_in(ctx, WebChannelEvent {
-        event: "chat_suggestions".to_string(),
-        client_id: client_id.to_string(),
-        thread_id: thread_id.to_string(),
-        turn_request_id: Some(request_id.to_string()),
-        suggestions: Some(suggestions),
-        ..Default::default()
-    });
+    publish_web_channel_event_in(
+        ctx,
+        WebChannelEvent {
+            event: "chat_suggestions".to_string(),
+            client_id: client_id.to_string(),
+            thread_id: thread_id.to_string(),
+            turn_request_id: Some(request_id.to_string()),
+            suggestions: Some(suggestions),
+            ..Default::default()
+        },
+    );
 }
 
 fn build_suggestions_request(user_message: &str, assistant_message: &str) -> ModelRequest {

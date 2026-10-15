@@ -215,7 +215,9 @@ fn handle_queue_remove(ctx: DispatchCtx, params: Map<String, Value>) -> Controll
 fn handle_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<WebCancelParams>(params)?;
-        to_json(channel_web_cancel(&ctx, &p.client_id, &p.thread_id, p.request_id.as_deref()).await?)
+        to_json(
+            channel_web_cancel(&ctx, &p.client_id, &p.thread_id, p.request_id.as_deref()).await?,
+        )
     })
 }
 

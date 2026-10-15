@@ -89,8 +89,8 @@ async fn a_user_cancel_under_the_fence_placeholder_id_keeps_the_callers_client()
         "fence-thread",
         None,
     )
-        .await
-        .unwrap();
+    .await
+    .unwrap();
 
     assert!(token.is_cancelled());
     let mut seen = None;

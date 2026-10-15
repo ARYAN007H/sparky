@@ -169,22 +169,25 @@ pub(crate) async fn spawn_parallel_turn(
                         );
                     }
 
-                    publish_web_channel_event_in(&ctx_task, WebChannelEvent {
-                        event: "chat_error".to_string(),
-                        client_id: client_id_task.clone(),
-                        thread_id: thread_id_task.clone(),
-                        request_id: request_id_task.clone(),
-                        message: Some(classified.message),
-                        error_type: Some(classified.error_type.to_string()),
-                        error_source: Some(classified.source.to_string()),
-                        error_retryable: Some(classified.retryable),
-                        error_retry_after_ms: classified.retry_after_ms,
-                        error_provider: classified.provider,
-                        error_fallback_available: classified.fallback_available,
-                        copy_key: Some(classified.copy_key.to_string()),
-                        copy_params: classified.copy_params,
-                        ..Default::default()
-                    });
+                    publish_web_channel_event_in(
+                        &ctx_task,
+                        WebChannelEvent {
+                            event: "chat_error".to_string(),
+                            client_id: client_id_task.clone(),
+                            thread_id: thread_id_task.clone(),
+                            request_id: request_id_task.clone(),
+                            message: Some(classified.message),
+                            error_type: Some(classified.error_type.to_string()),
+                            error_source: Some(classified.source.to_string()),
+                            error_retryable: Some(classified.retryable),
+                            error_retry_after_ms: classified.retry_after_ms,
+                            error_provider: classified.provider,
+                            error_fallback_available: classified.fallback_available,
+                            copy_key: Some(classified.copy_key.to_string()),
+                            copy_params: classified.copy_params,
+                            ..Default::default()
+                        },
+                    );
                 }
                 None => {
                     log::info!(
@@ -196,14 +199,17 @@ pub(crate) async fn spawn_parallel_turn(
                     // `chat_error` on this path today — leaving a client
                     // waiting on this request_id with no terminal event.
                     // `chat_cancelled` closes it out.
-                    publish_web_channel_event_in(&ctx_task, WebChannelEvent {
-                        event: "chat_cancelled".to_string(),
-                        client_id: client_id_task.clone(),
-                        thread_id: thread_id_task.clone(),
-                        request_id: request_id_task.clone(),
-                        cancel_reason: Some("user_stop".to_string()),
-                        ..Default::default()
-                    });
+                    publish_web_channel_event_in(
+                        &ctx_task,
+                        WebChannelEvent {
+                            event: "chat_cancelled".to_string(),
+                            client_id: client_id_task.clone(),
+                            thread_id: thread_id_task.clone(),
+                            request_id: request_id_task.clone(),
+                            cancel_reason: Some("user_stop".to_string()),
+                            ..Default::default()
+                        },
+                    );
                 }
             }
 

@@ -65,7 +65,13 @@ async fn record_then_fresh_then_clear() {
 async fn stale_signal_is_not_fresh_and_is_evicted() {
     let thread = "budget-corr-test-stale";
     // Seed a signal older than the TTL.
-    record_budget_signal_aged(&ctx(), thread, BINDING, BUDGET_SIGNAL_TTL + Duration::from_secs(1)).await;
+    record_budget_signal_aged(
+        &ctx(),
+        thread,
+        BINDING,
+        BUDGET_SIGNAL_TTL + Duration::from_secs(1),
+    )
+    .await;
     // Reads as not-fresh and self-evicts.
     assert!(!has_fresh_budget_signal(&ctx(), thread, BINDING).await);
     // Confirm eviction: still not fresh, and a later in-window seed works.
@@ -96,7 +102,8 @@ async fn record_prunes_other_threads_stale_entries() {
     let abandoned = "budget-corr-test-abandoned";
     let active = "budget-corr-test-active";
     // An abandoned thread leaves a stale entry behind...
-    record_budget_signal_aged(&ctx(), 
+    record_budget_signal_aged(
+        &ctx(),
         abandoned,
         BINDING,
         BUDGET_SIGNAL_TTL + Duration::from_secs(1),

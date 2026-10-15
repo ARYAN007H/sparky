@@ -127,7 +127,8 @@ async fn checkout_cold_boots_from_the_thread_transcript_and_checkin_keeps_it_war
         mut agent,
         fingerprint,
     } = checkout_session_agent(
-        &DispatchCtx::ambient(), &config,
+        &DispatchCtx::ambient(),
+        &config,
         super::super::SYSTEM_CLIENT_ID,
         &thread_id,
         None,
@@ -160,7 +161,8 @@ async fn checkout_cold_boots_from_the_thread_transcript_and_checkin_keeps_it_war
 
     // The next checkout — a user turn — reuses the warm agent with that history.
     let CheckedOutSession { agent, .. } = checkout_session_agent(
-        &DispatchCtx::ambient(), &config,
+        &DispatchCtx::ambient(),
+        &config,
         "client-1",
         &thread_id,
         None,
@@ -195,15 +197,28 @@ async fn checkin_if_vacant_yields_to_a_turn_that_re_cached_meanwhile() {
     // A user turn finished while the system turn was running and cached its
     // agent unconditionally.
     let user_turn_agent = host_seeded_with(&config, "user-turn-history");
-    checkin_session_agent(&DispatchCtx::ambient(), &thread_id, user_turn_agent, fingerprint(&config)).await;
+    checkin_session_agent(
+        &DispatchCtx::ambient(),
+        &thread_id,
+        user_turn_agent,
+        fingerprint(&config),
+    )
+    .await;
 
     // The system turn must not clobber it.
     let system_turn_agent = host_seeded_with(&config, "system-turn-history");
     assert!(
-        !checkin_session_agent_if_vacant(&DispatchCtx::ambient(), &thread_id, system_turn_agent, fingerprint(&config)).await
+        !checkin_session_agent_if_vacant(
+            &DispatchCtx::ambient(),
+            &thread_id,
+            system_turn_agent,
+            fingerprint(&config)
+        )
+        .await
     );
     let CheckedOutSession { agent, .. } = checkout_session_agent(
-        &DispatchCtx::ambient(), &config,
+        &DispatchCtx::ambient(),
+        &config,
         "client-1",
         &thread_id,
         None,
@@ -218,10 +233,17 @@ async fn checkin_if_vacant_yields_to_a_turn_that_re_cached_meanwhile() {
     // Into a vacant slot it goes in.
     let system_turn_agent = host_seeded_with(&config, "system-turn-history");
     assert!(
-        checkin_session_agent_if_vacant(&DispatchCtx::ambient(), &thread_id, system_turn_agent, fingerprint(&config)).await
+        checkin_session_agent_if_vacant(
+            &DispatchCtx::ambient(),
+            &thread_id,
+            system_turn_agent,
+            fingerprint(&config)
+        )
+        .await
     );
     let CheckedOutSession { agent, .. } = checkout_session_agent(
-        &DispatchCtx::ambient(), &config,
+        &DispatchCtx::ambient(),
+        &config,
         "client-1",
         &thread_id,
         None,
@@ -243,14 +265,16 @@ async fn a_fork_never_takes_or_returns_the_cached_agent() {
     let fingerprint =
         super::build_session_fingerprint(&config, None, None, "orchestrator".into(), "chat");
     checkin_session_agent(
-        &DispatchCtx::ambient(), &thread_id,
+        &DispatchCtx::ambient(),
+        &thread_id,
         host_seeded_with(&config, "primary-history"),
         fingerprint,
     )
     .await;
 
     let CheckedOutSession { agent, .. } = checkout_session_agent(
-        &DispatchCtx::ambient(), &config,
+        &DispatchCtx::ambient(),
+        &config,
         "client-1",
         &thread_id,
         None,
@@ -280,14 +304,16 @@ async fn a_system_turn_adopts_the_cached_agent_and_its_fingerprint() {
     let pinned =
         super::build_session_fingerprint(&config, None, Some(0.2), "orchestrator".into(), "chat");
     checkin_session_agent(
-        &DispatchCtx::ambient(), &thread_id,
+        &DispatchCtx::ambient(),
+        &thread_id,
         host_seeded_with(&config, "pinned-history"),
         pinned.clone(),
     )
     .await;
 
     let CheckedOutSession { agent, fingerprint } = checkout_session_agent(
-        &DispatchCtx::ambient(), &config,
+        &DispatchCtx::ambient(),
+        &config,
         super::super::SYSTEM_CLIENT_ID,
         &thread_id,
         None,
@@ -303,7 +329,8 @@ async fn a_system_turn_adopts_the_cached_agent_and_its_fingerprint() {
     // An exact user checkout with the same settings then still hits warm.
     checkin_session_agent_if_vacant(&DispatchCtx::ambient(), &thread_id, agent, fingerprint).await;
     let CheckedOutSession { agent, .. } = checkout_session_agent(
-        &DispatchCtx::ambient(), &config,
+        &DispatchCtx::ambient(),
+        &config,
         "client-1",
         &thread_id,
         None,
@@ -327,7 +354,8 @@ async fn a_thread_binds_one_stable_session_across_cold_boots() {
     let thread_id = unique_thread("stable");
 
     let first = checkout_session_agent(
-        &DispatchCtx::ambient(), &config,
+        &DispatchCtx::ambient(),
+        &config,
         "client-1",
         &thread_id,
         None,
@@ -339,7 +367,8 @@ async fn a_thread_binds_one_stable_session_across_cold_boots() {
     .unwrap();
     // Nothing is checked back in, so the next checkout is a genuine cold boot.
     let second = checkout_session_agent(
-        &DispatchCtx::ambient(), &config,
+        &DispatchCtx::ambient(),
+        &config,
         "client-1",
         &thread_id,
         None,
@@ -566,14 +595,16 @@ async fn a_system_turn_never_adopts_an_agent_from_another_workspace() {
     let built_for_a =
         super::build_session_fingerprint(&config_a, None, None, "orchestrator".into(), "chat");
     checkin_session_agent(
-        &DispatchCtx::ambient(), &thread_id,
+        &DispatchCtx::ambient(),
+        &thread_id,
         host_seeded_with(&config_a, "user-a-history"),
         built_for_a,
     )
     .await;
 
     let CheckedOutSession { agent, fingerprint } = checkout_session_agent(
-        &DispatchCtx::ambient(), &config_b,
+        &DispatchCtx::ambient(),
+        &config_b,
         super::super::SYSTEM_CLIENT_ID,
         &thread_id,
         None,
@@ -615,7 +646,8 @@ async fn each_checkout_arms_the_reply_language_from_its_own_locale() {
         let thread_id = thread_id.clone();
         async move {
             checkout_session_agent(
-                &DispatchCtx::ambient(), &config,
+                &DispatchCtx::ambient(),
+                &config,
                 "client-1",
                 &thread_id,
                 None,
@@ -675,7 +707,8 @@ async fn an_english_only_session_and_a_locale_less_turn_carry_no_directive() {
     let thread_id = unique_thread("english");
     for locale in [Some("en"), None] {
         let CheckedOutSession { agent, fingerprint } = checkout_session_agent(
-            &DispatchCtx::ambient(), &config,
+            &DispatchCtx::ambient(),
+            &config,
             "client-1",
             &thread_id,
             None,

@@ -219,50 +219,53 @@ fn publish_chat_done(
     usage_payload: Option<TurnUsagePayload>,
     timing_payload: Option<crate::web_chat::TurnTimingPayload>,
 ) {
-    publish_web_channel_event_in(ctx, WebChannelEvent {
-        event: "chat_done".to_string(),
-        client_id: client_id.to_string(),
-        thread_id: thread_id.to_string(),
-        request_id: request_id.to_string(),
-        full_response: Some(full_response.to_string()),
-        message: None,
-        error_type: None,
-        error_source: None,
-        error_retryable: None,
-        error_retry_after_ms: None,
-        error_provider: None,
-        error_fallback_available: None,
-        copy_key: None,
-        copy_params: None,
-        tool_name: None,
-        skill_id: None,
-        args: None,
-        output: None,
-        success: None,
-        round: None,
-        segment_index: None,
-        segment_total: None,
-        delta: None,
-        delta_kind: None,
-        tool_call_id: None,
-        failure: None,
-        subagent: None,
-        tool_display_label: None,
-        tool_display_detail: None,
-        elapsed_ms: None,
-        structured: None,
-        citations: if citations.is_empty() {
-            None
-        } else {
-            Some(serde_json::json!(citations))
+    publish_web_channel_event_in(
+        ctx,
+        WebChannelEvent {
+            event: "chat_done".to_string(),
+            client_id: client_id.to_string(),
+            thread_id: thread_id.to_string(),
+            request_id: request_id.to_string(),
+            full_response: Some(full_response.to_string()),
+            message: None,
+            error_type: None,
+            error_source: None,
+            error_retryable: None,
+            error_retry_after_ms: None,
+            error_provider: None,
+            error_fallback_available: None,
+            copy_key: None,
+            copy_params: None,
+            tool_name: None,
+            skill_id: None,
+            args: None,
+            output: None,
+            success: None,
+            round: None,
+            segment_index: None,
+            segment_total: None,
+            delta: None,
+            delta_kind: None,
+            tool_call_id: None,
+            failure: None,
+            subagent: None,
+            tool_display_label: None,
+            tool_display_detail: None,
+            elapsed_ms: None,
+            structured: None,
+            citations: if citations.is_empty() {
+                None
+            } else {
+                Some(serde_json::json!(citations))
+            },
+            usage: usage_payload,
+            timing: timing_payload,
+            // Terminal delivery events are emitted outside the seq-stamping
+            // progress bridge; leave `seq` unset (older clients ignore it).
+            seq: None,
+            ..Default::default()
         },
-        usage: usage_payload,
-        timing: timing_payload,
-        // Terminal delivery events are emitted outside the seq-stamping
-        // progress bridge; leave `seq` unset (older clients ignore it).
-        seq: None,
-        ..Default::default()
-    });
+    );
 }
 
 #[cfg(any(test, debug_assertions))]
