@@ -157,7 +157,7 @@ async fn dedup_nodes_are_read_from_the_explicit_contexts_config() {
     for (name, dedup_id) in [("tenant-a", "dedup-a"), ("tenant-b", "dedup-b")] {
         let tmp = tempfile::tempdir().unwrap();
         let config = test_config(&tmp);
-        store::save_flow(&config, &flow_with_dedup_node("shared-flow", dedup_id)).unwrap();
+        store::upsert_flow(&config, &flow_with_dedup_node("shared-flow", dedup_id)).unwrap();
         let ctx = DispatchCtx::new(
             CoreContext::for_test(DomainSet::full(), None).derive_with(
                 ContextOverlay::new((*config).clone(), DomainSet::full(), Default::default())
