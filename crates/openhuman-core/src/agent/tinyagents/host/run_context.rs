@@ -414,12 +414,12 @@ pub(crate) struct HarnessHostPolicy {
     pub(crate) tool_call_cap: Option<usize>,
 }
 
+#[cfg(test)]
+pub(crate) use super::operation_context::tool_context_with_approval;
 pub(crate) use super::operation_context::{
     approval_for_tool, dispatch_ctx_for_tool, memory_identity_for_tool, parent_agent_id_for_tool,
     sandbox_mode_for_tool, task_recency_window_for_tool, HostOperationContext, OpenHumanRunExt,
 };
-#[cfg(test)]
-pub(crate) use super::operation_context::tool_context_with_approval;
 
 impl Default for OpenHumanRunContext {
     fn default() -> Self {
@@ -677,7 +677,10 @@ impl OpenHumanRunContext {
                 .as_ref()
                 .map(|parent| parent.agent_definition_id.clone()),
             memory_identity: self.memory_identity.clone(),
-            dispatch: self.core.clone().map(crate::core::runtime::DispatchCtx::new),
+            dispatch: self
+                .core
+                .clone()
+                .map(crate::core::runtime::DispatchCtx::new),
         });
         let context = tinyagents_harness::context::RunContext::new(config, self)
             .with_cancellation(cancellation)

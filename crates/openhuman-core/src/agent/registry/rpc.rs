@@ -22,7 +22,10 @@ pub struct ListResponse {
     pub agents: Vec<AgentRegistryEntry>,
 }
 
-pub async fn list_rpc(ctx: &DispatchCtx, req: ListRequest) -> Result<Outcome<ListResponse>, String> {
+pub async fn list_rpc(
+    ctx: &DispatchCtx,
+    req: ListRequest,
+) -> Result<Outcome<ListResponse>, String> {
     Ok(Outcome::new(
         ListResponse {
             agents: ops::list_agents(ctx, req.include_disabled).await?,
@@ -118,7 +121,10 @@ impl CreateCustomRequest {
     }
 }
 
-pub async fn create_custom_rpc(ctx: &DispatchCtx, req: CreateCustomRequest) -> Result<Outcome<AgentResponse>, String> {
+pub async fn create_custom_rpc(
+    ctx: &DispatchCtx,
+    req: CreateCustomRequest,
+) -> Result<Outcome<AgentResponse>, String> {
     Ok(Outcome::new(
         AgentResponse {
             agent: ops::upsert_custom_agent(ctx, req.into_entry()).await?,
@@ -137,7 +143,10 @@ pub struct AgentResponse {
     pub agent: AgentRegistryEntry,
 }
 
-pub async fn upsert_custom_rpc(ctx: &DispatchCtx, req: UpsertCustomRequest) -> Result<Outcome<AgentResponse>, String> {
+pub async fn upsert_custom_rpc(
+    ctx: &DispatchCtx,
+    req: UpsertCustomRequest,
+) -> Result<Outcome<AgentResponse>, String> {
     Ok(Outcome::new(
         AgentResponse {
             agent: ops::upsert_custom_agent(ctx, req.agent).await?,
@@ -153,7 +162,10 @@ pub struct UpdateRequest {
     pub patch: AgentRegistryPatch,
 }
 
-pub async fn update_rpc(ctx: &DispatchCtx, req: UpdateRequest) -> Result<Outcome<AgentResponse>, String> {
+pub async fn update_rpc(
+    ctx: &DispatchCtx,
+    req: UpdateRequest,
+) -> Result<Outcome<AgentResponse>, String> {
     Ok(Outcome::new(
         AgentResponse {
             agent: ops::update_agent(ctx, &req.id, req.patch).await?,
@@ -168,7 +180,10 @@ pub struct SetEnabledRequest {
     pub enabled: bool,
 }
 
-pub async fn set_enabled_rpc(ctx: &DispatchCtx, req: SetEnabledRequest) -> Result<Outcome<AgentResponse>, String> {
+pub async fn set_enabled_rpc(
+    ctx: &DispatchCtx,
+    req: SetEnabledRequest,
+) -> Result<Outcome<AgentResponse>, String> {
     Ok(Outcome::new(
         AgentResponse {
             agent: ops::set_agent_enabled(ctx, &req.id, req.enabled).await?,
@@ -187,7 +202,10 @@ pub struct RemoveResponse {
     pub removed: bool,
 }
 
-pub async fn remove_rpc(ctx: &DispatchCtx, req: RemoveRequest) -> Result<Outcome<RemoveResponse>, String> {
+pub async fn remove_rpc(
+    ctx: &DispatchCtx,
+    req: RemoveRequest,
+) -> Result<Outcome<RemoveResponse>, String> {
     Ok(Outcome::new(
         RemoveResponse {
             removed: ops::remove_agent(ctx, &req.id).await?,

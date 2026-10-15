@@ -127,8 +127,10 @@ impl OpenHumanHostBundleFactory {
         inputs: OpenHumanHostBundleInputs,
         turn: &OpenHumanRunContext,
     ) -> OpenHumanHostBundle {
-        let context = Arc::new(OpenHumanContextComposer::new(Arc::clone(&inputs.config))
-            .with_dispatch(turn.dispatch_ctx()));
+        let context = Arc::new(
+            OpenHumanContextComposer::new(Arc::clone(&inputs.config))
+                .with_dispatch(turn.dispatch_ctx()),
+        );
         let registered_tools = Arc::new(
             inputs
                 .tool_sets

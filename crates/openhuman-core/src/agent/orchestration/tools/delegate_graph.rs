@@ -232,14 +232,15 @@ impl DelegateGraphTool {
             }
         };
 
-        let config = match crate::config::ops::load_current_or_init(&run_context.dispatch_ctx()).await {
-            Ok(cfg) => Arc::new(cfg),
-            Err(e) => {
-                return Ok(ToolResult::error(format!(
-                    "delegate: failed to load config: {e}"
-                )));
-            }
-        };
+        let config =
+            match crate::config::ops::load_current_or_init(&run_context.dispatch_ctx()).await {
+                Ok(cfg) => Arc::new(cfg),
+                Err(e) => {
+                    return Ok(ToolResult::error(format!(
+                        "delegate: failed to load config: {e}"
+                    )));
+                }
+            };
 
         match run_subagent_delegation_with_parent_context(
             config,

@@ -304,8 +304,12 @@ impl Tool for PresentationTool {
         context: Option<&dyn tinytools::ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
         let approval = crate::agent::tinyagents::host::run_context::approval_for_tool(context);
-        self.run(args, approval.chat.as_ref(), &dispatch_ctx_for_tool(context))
-            .await
+        self.run(
+            args,
+            approval.chat.as_ref(),
+            &dispatch_ctx_for_tool(context),
+        )
+        .await
     }
 }
 

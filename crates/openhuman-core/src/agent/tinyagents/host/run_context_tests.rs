@@ -605,9 +605,7 @@ fn the_memory_identity_rides_the_run_and_its_children() {
     );
 }
 
-fn tool_context_for(
-    run: OpenHumanRunContext,
-) -> tinyagents_harness::tool::ToolExecutionContext {
+fn tool_context_for(run: OpenHumanRunContext) -> tinyagents_harness::tool::ToolExecutionContext {
     let run = run.into_tinyagents(tinyagents_harness::context::RunConfig::new("core-carrier"));
     tinyagents_harness::tool::ToolExecutionContext::from_run_context(
         &run,

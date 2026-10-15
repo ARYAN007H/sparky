@@ -13,8 +13,8 @@ use crate::agent::harness::artifact_offload::offload_run_result;
 use crate::agent::harness::fork_context::ParentExecutionContext;
 use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::agent::prompts::{
-    render_connected_identities,
-    render_subagent_system_prompt_with_format, PromptContext, SubagentRenderOptions,
+    render_connected_identities, render_subagent_system_prompt_with_format, PromptContext,
+    SubagentRenderOptions,
 };
 use crate::agent::subagent_host::definition_iter_cap;
 use crate::agent::subagent_host::tool_prep::{

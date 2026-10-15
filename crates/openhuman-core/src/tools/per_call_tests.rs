@@ -130,7 +130,8 @@ async fn each_call_is_built_around_its_runs_dispatch_context() {
 
     let core = CoreContext::for_test(DomainSet::full(), None);
     let ambient = CoreContext::for_test(DomainSet::full(), None);
-    let run = crate::agent::tinyagents::host::OpenHumanRunContext::new().with_core(Some(core.clone()));
+    let run =
+        crate::agent::tinyagents::host::OpenHumanRunContext::new().with_core(Some(core.clone()));
     let run = run.into_tinyagents(tinyagents_harness::context::RunConfig::new("per-call-ctx"));
     let context = tinyagents_harness::tool::ToolExecutionContext::from_run_context(
         &run,

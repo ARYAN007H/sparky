@@ -105,10 +105,7 @@ pub(crate) async fn run_channel_turn_via_graph(
                 anyhow::bail!("attachments are disabled for this channel input");
             }
             if attachment_config.is_none() {
-                let mut config = dispatch
-                    .load_config()
-                    .await
-                    .map_err(anyhow::Error::msg)?;
+                let mut config = dispatch.load_config().await.map_err(anyhow::Error::msg)?;
                 config.multimodal = multimodal.clone();
                 config.multimodal_files = multimodal_files.clone();
                 attachment_config = Some(config);
@@ -144,8 +141,8 @@ pub(crate) async fn run_channel_turn_via_graph(
         "[channel:graph] routing channel turn through tinyagents harness"
     );
     let turn_origin = origin.clone();
-    let mut run_context = crate::agent::tinyagents::host::OpenHumanRunContext::new()
-        .with_core(dispatch.into_core());
+    let mut run_context =
+        crate::agent::tinyagents::host::OpenHumanRunContext::new().with_core(dispatch.into_core());
     run_context.origin = origin;
     run_context.approval = approval;
     run_context.memory_identity = Some(memory_identity);

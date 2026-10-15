@@ -104,7 +104,9 @@ async fn resolve_workspace(ctx: &DispatchCtx) -> anyhow::Result<PathBuf> {
 
 /// The journal and run-status stores a turn's events and status go to: the
 /// calling tenant's, in the storage backend.
-async fn journal_stores(ctx: &DispatchCtx) -> anyhow::Result<(Arc<dyn AppendStore>, DriverStatusStore)> {
+async fn journal_stores(
+    ctx: &DispatchCtx,
+) -> anyhow::Result<(Arc<dyn AppendStore>, DriverStatusStore)> {
     let workspace = resolve_workspace(ctx).await?;
     let stores = crate::agent::session_store::stores_or_ephemeral(&workspace);
     let status = crate::agent::session_store::status_store_for(&workspace);

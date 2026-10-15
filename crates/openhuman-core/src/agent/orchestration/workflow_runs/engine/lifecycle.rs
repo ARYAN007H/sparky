@@ -168,7 +168,11 @@ pub async fn stop_workflow_run(config: &Config, id: &str) -> Result<Option<Workf
 /// phase whose dependencies are satisfied. Returns the run row (now `Running`),
 /// or an error if the run is unknown / already terminal-complete / its
 /// definition no longer exists.
-pub async fn resume_workflow_run(ctx: &DispatchCtx, config: &Config, id: &str) -> Result<WorkflowRun> {
+pub async fn resume_workflow_run(
+    ctx: &DispatchCtx,
+    config: &Config,
+    id: &str,
+) -> Result<WorkflowRun> {
     log::debug!(target: LOG_TARGET, "[workflow_run_engine] resume.entry run={id}");
     let run = get_workflow_run(config, id)?.ok_or_else(|| anyhow!("unknown workflow run: {id}"))?;
 

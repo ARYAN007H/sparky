@@ -19,7 +19,9 @@ async fn prepare_messages_handles_mixed_image_and_file_markers() {
         txt_path.display()
     ))];
 
-    let prepared = prepare_messages_for_provider(&DispatchCtx::ambient(), &messages,
+    let prepared = prepare_messages_for_provider(
+        &DispatchCtx::ambient(),
+        &messages,
         &MultimodalConfig::default(),
         &MultimodalFileConfig::default(),
     )
@@ -93,9 +95,14 @@ async fn prepare_messages_rejects_absolute_file_marker_under_untrusted_channel_c
     let messages = vec![TranscriptMessage::user(
         "please summarise [FILE:/etc/passwd]".to_string(),
     )];
-    let err = prepare_messages_for_provider(&DispatchCtx::ambient(), &messages, &MultimodalConfig::default(), &cfg)
-        .await
-        .expect_err("absolute file marker on a channel turn must be rejected");
+    let err = prepare_messages_for_provider(
+        &DispatchCtx::ambient(),
+        &messages,
+        &MultimodalConfig::default(),
+        &cfg,
+    )
+    .await
+    .expect_err("absolute file marker on a channel turn must be rejected");
     assert!(
         err.to_string().contains("multimodal file limit exceeded"),
         "expected TooManyFiles, got {err}"
@@ -111,9 +118,14 @@ async fn prepare_messages_rejects_relative_file_marker_under_untrusted_channel_c
     let messages = vec![TranscriptMessage::user(
         "what does [FILE:./relative.txt] say?".to_string(),
     )];
-    let err = prepare_messages_for_provider(&DispatchCtx::ambient(), &messages, &MultimodalConfig::default(), &cfg)
-        .await
-        .expect_err("relative file marker on a channel turn must be rejected");
+    let err = prepare_messages_for_provider(
+        &DispatchCtx::ambient(),
+        &messages,
+        &MultimodalConfig::default(),
+        &cfg,
+    )
+    .await
+    .expect_err("relative file marker on a channel turn must be rejected");
     assert!(
         err.to_string().contains("multimodal file limit exceeded"),
         "expected TooManyFiles, got {err}"
@@ -127,9 +139,14 @@ async fn prepare_messages_under_untrusted_channel_config_passes_plain_text_throu
     // ordinary channel chatter.
     let cfg = MultimodalFileConfig::for_untrusted_channel_input();
     let messages = vec![TranscriptMessage::user("hello, how are you?".to_string())];
-    let prepared = prepare_messages_for_provider(&DispatchCtx::ambient(), &messages, &MultimodalConfig::default(), &cfg)
-        .await
-        .expect("plain channel text must pass through the hardened config");
+    let prepared = prepare_messages_for_provider(
+        &DispatchCtx::ambient(),
+        &messages,
+        &MultimodalConfig::default(),
+        &cfg,
+    )
+    .await
+    .expect("plain channel text must pass through the hardened config");
     assert!(!prepared.contains_files);
     assert!(!prepared.contains_images);
     assert_eq!(prepared.messages.len(), 1);
@@ -141,7 +158,12 @@ async fn prepare_messages_under_untrusted_channel_config_passes_plain_text_throu
 async fn inline_file_attachments_replaces_marker_with_extracted_text() {
     // base64("hello world") = aGVsbG8gd29ybGQ=
     let msg = "summarize [FILE:data:text/plain;base64,aGVsbG8gd29ybGQ=]";
-    let out = inline_file_attachments(&DispatchCtx::ambient(), msg, &MultimodalFileConfig::default()).await;
+    let out = inline_file_attachments(
+        &DispatchCtx::ambient(),
+        msg,
+        &MultimodalFileConfig::default(),
+    )
+    .await;
     assert!(
         out.contains("[FILE-EXTRACTED"),
         "extracted block present: {out}"
@@ -157,7 +179,12 @@ async fn inline_file_attachments_replaces_marker_with_extracted_text() {
 #[tokio::test]
 async fn inline_file_attachments_noop_without_marker() {
     let msg = "just a normal message";
-    let out = inline_file_attachments(&DispatchCtx::ambient(), msg, &MultimodalFileConfig::default()).await;
+    let out = inline_file_attachments(
+        &DispatchCtx::ambient(),
+        msg,
+        &MultimodalFileConfig::default(),
+    )
+    .await;
     assert_eq!(out, msg);
 }
 
@@ -209,7 +236,9 @@ async fn image_placeholder_rehydrates_to_inline_data_uri_for_provider() {
 
     // Round-trip: the provider prep step re-reads the file back into a data URI,
     // so the model still receives inline image bytes.
-    let prepared = prepare_messages_for_provider(&DispatchCtx::ambient(), &rehydrated,
+    let prepared = prepare_messages_for_provider(
+        &DispatchCtx::ambient(),
+        &rehydrated,
         &MultimodalConfig::default(),
         &MultimodalFileConfig::default(),
     )

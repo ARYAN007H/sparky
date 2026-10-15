@@ -302,7 +302,8 @@ mod x402 {
                 .ok_or_else(|| {
                     "402 response is missing a valid PAYMENT-REQUIRED header".to_string()
                 })?;
-            let config = self.ctx
+            let config = self
+                .ctx
                 .load_config()
                 .await
                 .map_err(|error| format!("x402 payment failed: {error}"))?;

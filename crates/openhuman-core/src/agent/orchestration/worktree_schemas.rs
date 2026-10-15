@@ -115,11 +115,9 @@ fn schema_for(function: &str) -> ControllerSchema {
 /// Resolve the project repo root every worktree op anchors on — the agent's
 /// `action_dir` from the loaded config.
 async fn repo_root(ctx: &DispatchCtx, cid: &str) -> Result<PathBuf, String> {
-    let config = ctx.load_config()
-        .await
-        .inspect_err(|err| {
-            log::warn!(target: "worktree_rpc", "[worktree_rpc][{cid}] config_failed err={err}");
-        })?;
+    let config = ctx.load_config().await.inspect_err(|err| {
+        log::warn!(target: "worktree_rpc", "[worktree_rpc][{cid}] config_failed err={err}");
+    })?;
     Ok(config.action_dir.clone())
 }
 

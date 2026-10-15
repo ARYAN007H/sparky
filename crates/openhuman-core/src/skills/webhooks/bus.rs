@@ -304,9 +304,10 @@ fn decode_webhook_body(base64_body: &str) -> Result<serde_json::Value, String> {
 async fn run_agent_trigger(
     envelope: &crate::agent::triage::TriggerEnvelope,
 ) -> Result<String, String> {
-    let outcome = crate::agent::triage::run_triage(&crate::core::runtime::DispatchCtx::ambient(), envelope)
-        .await
-        .map_err(|e| format!("triage evaluation failed: {e}"))?;
+    let outcome =
+        crate::agent::triage::run_triage(&crate::core::runtime::DispatchCtx::ambient(), envelope)
+            .await
+            .map_err(|e| format!("triage evaluation failed: {e}"))?;
 
     match outcome {
         crate::agent::triage::TriageOutcome::Decision(run) => {

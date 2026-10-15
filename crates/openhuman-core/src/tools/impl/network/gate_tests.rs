@@ -14,7 +14,13 @@ fn policy(autonomy: AutonomyLevel, max_actions_per_hour: u32) -> Arc<SecurityPol
 }
 
 fn http(security: Arc<SecurityPolicy>) -> HttpRequestTool {
-    super::super::host::http_request_tool(&crate::core::runtime::DispatchCtx::ambient(), security, vec!["example.com".into()], 1_000_000, 30)
+    super::super::host::http_request_tool(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        security,
+        vec!["example.com".into()],
+        1_000_000,
+        30,
+    )
 }
 
 // --- the gate answers with the policy's own decisions -----------------------

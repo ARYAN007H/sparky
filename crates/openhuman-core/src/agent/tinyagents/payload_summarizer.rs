@@ -118,8 +118,7 @@ impl HarnessPayloadSummarizer<OpenHumanRunContext> for SubagentPayloadSummarizer
         Ok(Box::new(move |request: GenerateRequest| {
             let dispatch = dispatch.clone();
             Box::pin(async move {
-                let config_loaded =
-                    crate::config::ops::load_current_or_init(&dispatch).await;
+                let config_loaded = crate::config::ops::load_current_or_init(&dispatch).await;
                 let (source, model) = subagent_host::resolve_subagent_source(
                     &definition.model,
                     &definition.id,

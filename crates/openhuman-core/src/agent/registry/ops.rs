@@ -4,15 +4,18 @@ use std::collections::HashMap;
 
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::OpenHumanSessionHost;
-use crate::core::runtime::DispatchCtx;
 use crate::config::Config;
+use crate::core::runtime::DispatchCtx;
 
 use super::defaults::default_agents;
 use super::types::{AgentRegistryEntry, AgentRegistryPatch, AgentRegistrySource, AgentToolInfo};
 
 const ORCHESTRATOR_AGENT_ID: &str = "orchestrator";
 
-pub async fn list_agents(ctx: &DispatchCtx, include_disabled: bool) -> Result<Vec<AgentRegistryEntry>, String> {
+pub async fn list_agents(
+    ctx: &DispatchCtx,
+    include_disabled: bool,
+) -> Result<Vec<AgentRegistryEntry>, String> {
     let config = ctx.load_config().await?;
     Ok(merge_entries(
         &config.agent_registry.entries,
@@ -104,7 +107,11 @@ pub async fn update_agent(
     Ok(updated)
 }
 
-pub async fn set_agent_enabled(ctx: &DispatchCtx, id: &str, enabled: bool) -> Result<AgentRegistryEntry, String> {
+pub async fn set_agent_enabled(
+    ctx: &DispatchCtx,
+    id: &str,
+    enabled: bool,
+) -> Result<AgentRegistryEntry, String> {
     update_agent(
         ctx,
         id,

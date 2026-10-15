@@ -96,20 +96,22 @@ async fn tinyjuice_detects_and_converts_html() {
     assert!(TinyJuiceHtml {
         ctx: crate::core::runtime::DispatchCtx::ambient(),
     }
-    .looks_like_html(page).await.unwrap());
+    .looks_like_html(page)
+    .await
+    .unwrap());
     assert!(!TinyJuiceHtml {
-            ctx: crate::core::runtime::DispatchCtx::ambient(),
-        }
-        .looks_like_html("# Just a README\n\nSome prose.\n")
-        .await
-        .unwrap());
+        ctx: crate::core::runtime::DispatchCtx::ambient(),
+    }
+    .looks_like_html("# Just a README\n\nSome prose.\n")
+    .await
+    .unwrap());
     assert!(TinyJuiceHtml {
-            ctx: crate::core::runtime::DispatchCtx::ambient(),
-        }
-        .to_markdown(page)
-        .await
-        .unwrap()
-        .contains("hi"));
+        ctx: crate::core::runtime::DispatchCtx::ambient(),
+    }
+    .to_markdown(page)
+    .await
+    .unwrap()
+    .contains("hi"));
 }
 
 #[cfg(feature = "web3")]
