@@ -71,6 +71,14 @@ pub(super) fn in_prompt_window(
 }
 
 impl OpenHumanTurnPrelude {
+    /// The context this session's turns run under, from the host environment
+    /// bound at the start of the turn.
+    pub(in crate::agent::session_host) fn dispatch_ctx(&self) -> crate::core::runtime::DispatchCtx {
+        match &self.host_env.core {
+            Some(core) => crate::core::runtime::DispatchCtx::new(Arc::clone(core)),
+            None => crate::core::runtime::DispatchCtx::ambient(),
+        }
+    }
     /// The config memory runs under: the session's own, else the
     /// workspace's on disk.
     async fn memory_config(&self) -> Option<Arc<crate::config::Config>> {

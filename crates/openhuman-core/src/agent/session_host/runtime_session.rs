@@ -183,14 +183,6 @@ struct OpenHumanTurnPreludeMutable {
 }
 
 impl OpenHumanTurnPrelude {
-    /// The context this session's turns run under, from the host environment
-    /// bound at the start of the turn.
-    fn dispatch_ctx(&self) -> crate::core::runtime::DispatchCtx {
-        match &self.host_env.core {
-            Some(core) => crate::core::runtime::DispatchCtx::new(Arc::clone(core)),
-            None => crate::core::runtime::DispatchCtx::ambient(),
-        }
-    }
 
     #[allow(clippy::type_complexity)]
     fn current_tool_source(
