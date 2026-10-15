@@ -17,7 +17,7 @@
 use std::sync::{Arc, LazyLock, PoisonError, RwLock};
 
 use tinyagents_session::port::{AgentStores, SessionStoreProvider};
-use tinyagents_session::transcript::{agent_transcript_root, AgentTranscriptFiles};
+use tinyagents_session::transcript::agent_transcript_root;
 
 pub mod ledger_sync;
 mod rebound;
@@ -128,22 +128,48 @@ pub fn transcripts_for(
     Some(stores.transcripts)
 }
 
-/// [`transcripts_for`] `agent_id`, or the transcript files under
-/// `workspace_dir` when no store is in effect — the session host's resolution.
+/// [`transcripts_for`] `agent_id`, or the workspace's own transcript store
+/// ([`workspace_transcripts`]) when no host store is in effect — the session
+/// host's resolution.
 #[must_use]
 pub fn transcripts_or_files(
     agent_id: &str,
     workspace_dir: &std::path::Path,
 ) -> Arc<dyn tinyagents_session::transcript::TranscriptLocator> {
-    transcripts_for(agent_id).unwrap_or_else(|| match current_embedded_agent() {
-        Some(embedded) => {
-            log::debug!("[session_store] transcripts under the agent's directory agent={embedded}");
-            Arc::new(AgentTranscriptFiles::new(workspace_dir, &embedded))
+    transcripts_for(agent_id).unwrap_or_else(|| workspace_transcripts(agent_id, workspace_dir))
+}
+
+/// `agent_id`'s transcripts for a host that only has a workspace directory:
+/// TinyAgents' `WorkspaceStores` (the driver ports over a SQLite store under
+/// the workspace). It imports the workspace's classic `session_raw/*.jsonl`
+/// files once, read-only, so no file API is involved.
+///
+/// A workspace whose store cannot be opened (read-only disk) degrades to an
+/// in-memory locator for the process rather than failing the turn.
+#[must_use]
+pub fn workspace_transcripts(
+    agent_id: &str,
+    workspace_dir: &std::path::Path,
+) -> Arc<dyn tinyagents_session::transcript::TranscriptLocator> {
+    match tinyagents_session::port::WorkspaceStores::open(workspace_dir, agent_id) {
+        Ok(stores) => {
+            log::debug!(
+                "[session_store] transcripts via the workspace store agent={agent_id} import={:?}",
+                stores.import_outcome()
+            );
+            stores.transcripts()
         }
-        None => Arc::new(tinyagents_session::transcript::FileTranscriptLocator::new(
-            workspace_dir,
-        )),
-    })
+        Err(error) => {
+            log::error!(
+                "[session_store] workspace store unavailable agent={agent_id} workspace={}: {error:#}; \
+                 transcripts are not kept",
+                workspace_dir.display()
+            );
+            tinyagents_session::port::InMemorySessionStores::new()
+                .for_agent(agent_id)
+                .transcripts
+        }
+    }
 }
 
 /// The workspace root transcripts are written under: the agent's own
