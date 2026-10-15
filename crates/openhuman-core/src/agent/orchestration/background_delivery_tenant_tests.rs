@@ -148,3 +148,40 @@ fn an_unknown_session_is_dropped_in_saas() {
     assert_eq!(drains.len(), 1);
     assert!(drains[0].owner.is_none());
 }
+
+/// The busy marks follow the explicit context: with no scope anywhere, one
+/// profile's in-flight turn defers only its own thread, and a Stop clears only
+/// its own marks.
+#[tokio::test]
+async fn busy_marks_are_keyed_by_the_explicit_context() {
+    use super::busy_guard::{clear_busy_for_thread, is_busy, TurnBusy};
+    let _guard = crate::config::TEST_ENV_LOCK.lock().await;
+    let (ws_a, ws_b) = (TestWorkspace::new(), TestWorkspace::new());
+    let alice = DispatchCtx::new(profile(&unique("b-alice"), ws_a.path()));
+    let bob = DispatchCtx::new(profile(&unique("b-bob"), ws_b.path()));
+    let session = unique("busy-session");
+    let thread = unique("busy-thread");
+    note_session_thread(&alice, &session, &thread);
+    note_session_thread(&bob, &session, &thread);
+
+    let held = TurnBusy::start(&alice, &session);
+    // Across an await and on a spawned task, nothing leans on a task scope.
+    tokio::task::yield_now().await;
+    let (a, b) = tokio::spawn({
+        let (alice, bob, thread) = (alice.clone(), bob.clone(), thread.clone());
+        async move { (is_busy(&alice, &thread), is_busy(&bob, &thread)) }
+    })
+    .await
+    .expect("probe ran");
+    assert!(a, "alice's turn is in flight on her thread");
+    assert!(!b, "bob's thread of the same id is idle");
+
+    assert_eq!(clear_busy_for_thread(&bob, &thread), 0);
+    assert!(
+        is_busy(&alice, &thread),
+        "bob's Stop cleared nothing of hers"
+    );
+    assert_eq!(clear_busy_for_thread(&alice, &thread), 1);
+    assert!(!is_busy(&alice, &thread));
+    drop(held);
+}
