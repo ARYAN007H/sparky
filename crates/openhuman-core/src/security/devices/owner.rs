@@ -95,7 +95,7 @@ async fn is_revoked(ctx: &DispatchCtx, channel_id: &str) -> Result<bool, String>
 ///
 /// [`OwnerLookupFailed`] when no scope has the device and at least one
 /// scope's lookup failed.
-pub(super) async fn owner_of(
+pub(super) async fn owner_of(ctx: &DispatchCtx, 
     channel_id: &str,
     pending: Option<&PairingSession>,
 ) -> Result<Option<String>, OwnerLookupFailed> {
@@ -110,7 +110,7 @@ pub(super) async fn owner_of(
             return Ok(session.agent.clone());
         }
         let revoked =
-            crate::storage::agents::within_agent(session.agent.as_deref(), is_revoked(channel_id))
+            crate::storage::agents::within_agent(session.agent.as_deref(), is_revoked(&ctx, channel_id))
                 .await;
         return match revoked {
             Some(Ok(false)) => Ok(session.agent.clone()),
@@ -129,7 +129,7 @@ pub(super) async fn owner_of(
         };
     }
     if let Some(owner) = cached(channel_id) {
-        match crate::storage::agents::within_agent(owner.as_deref(), has_live_device(channel_id))
+        match crate::storage::agents::within_agent(owner.as_deref(), has_live_device(&ctx, channel_id))
             .await
         {
             Some(Ok(true)) => return Ok(owner),
@@ -143,7 +143,7 @@ pub(super) async fn owner_of(
         }
     }
     let lookups =
-        crate::storage::agents::for_each_scope("device owner", || has_live_device(channel_id))
+        crate::storage::agents::for_each_scope("device owner", || has_live_device(&ctx, channel_id))
             .await;
     let owner = decide(lookups)?;
     if let Some(owner) = &owner {

@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 
 fn session(agent: Option<&str>) -> PairingSession {
@@ -15,14 +16,14 @@ fn session(agent: Option<&str>) -> PairingSession {
 async fn a_pending_pairing_names_its_agent() {
     let pending = session(Some("agent-7"));
     assert_eq!(
-        owner_of("owner-test-pending", Some(&pending))
+        owner_of(&DispatchCtx::process_default(), "owner-test-pending", Some(&pending))
             .await
             .unwrap()
             .as_deref(),
         Some("agent-7")
     );
     let local = session(None);
-    assert_eq!(owner_of("owner-test-pending", Some(&local)).await, Ok(None));
+    assert_eq!(owner_of(&DispatchCtx::process_default(), "owner-test-pending", Some(&local)).await, Ok(None));
 }
 
 /// A remembered owner is re-checked in its scope: once that scope no longer
@@ -37,7 +38,7 @@ async fn a_remembered_owner_that_lost_the_device_is_forgotten() {
     );
     remember("owner-test-stale", None);
     let owner =
-        crate::core::runtime::CoreContext::scope(context, owner_of("owner-test-stale", None)).await;
+        crate::core::runtime::CoreContext::scope(context, owner_of(&DispatchCtx::process_default(), "owner-test-stale", None)).await;
     assert_eq!(owner, Ok(None));
     assert_eq!(cached("owner-test-stale"), None, "the stale entry is gone");
 }
@@ -54,7 +55,7 @@ async fn a_revoked_device_is_not_its_agents_any_more() {
         config,
     );
     let owner =
-        crate::core::runtime::CoreContext::scope(context, owner_of("owner-test-revoked", None))
+        crate::core::runtime::CoreContext::scope(context, owner_of(&DispatchCtx::process_default(), "owner-test-revoked", None))
             .await;
     assert_eq!(owner, Ok(None));
     assert_eq!(
@@ -90,7 +91,7 @@ async fn a_device_found_in_the_local_scope_belongs_to_local_and_is_remembered() 
         config,
     );
     let owner =
-        crate::core::runtime::CoreContext::scope(context, owner_of("owner-test-found", None)).await;
+        crate::core::runtime::CoreContext::scope(context, owner_of(&DispatchCtx::process_default(), "owner-test-found", None)).await;
     assert_eq!(owner, Ok(None));
     assert_eq!(cached("owner-test-found"), Some(None));
 }
@@ -103,7 +104,7 @@ async fn a_channel_no_scope_knows_is_local_and_not_remembered() {
         scoped_config(tmp.path()),
     );
     let owner =
-        crate::core::runtime::CoreContext::scope(context, owner_of("owner-test-missing", None))
+        crate::core::runtime::CoreContext::scope(context, owner_of(&DispatchCtx::process_default(), "owner-test-missing", None))
             .await;
     assert_eq!(owner, Ok(None));
     assert_eq!(cached("owner-test-missing"), None);
@@ -153,7 +154,7 @@ async fn a_revoked_device_with_a_live_cipher_is_dropped() {
         )),
     );
     let owner =
-        crate::core::runtime::CoreContext::scope(context, owner_of("owner-test-cipher", None))
+        crate::core::runtime::CoreContext::scope(context, owner_of(&DispatchCtx::process_default(), "owner-test-cipher", None))
             .await;
     super::super::rpc::ACTIVE_CIPHERS
         .lock()
@@ -177,7 +178,7 @@ async fn a_leftover_pairing_session_does_not_outlive_a_revocation() {
     let pending = session(None);
     // Before the handshake the session names the agent.
     assert_eq!(
-        owner_of("owner-test-leftover", Some(&pending)).await,
+        owner_of(&DispatchCtx::process_default(), "owner-test-leftover", Some(&pending)).await,
         Ok(None)
     );
     super::super::rpc::ACTIVE_CIPHERS.lock().unwrap().insert(
@@ -189,7 +190,7 @@ async fn a_leftover_pairing_session_does_not_outlive_a_revocation() {
     // Cipher live, row not persisted yet: still the session's agent.
     let racing = crate::core::runtime::CoreContext::scope(
         std::sync::Arc::clone(&context),
-        owner_of("owner-test-leftover", Some(&pending)),
+        owner_of(&DispatchCtx::process_default(), "owner-test-leftover", Some(&pending)),
     )
     .await;
     assert_eq!(racing, Ok(None));
@@ -199,7 +200,7 @@ async fn a_leftover_pairing_session_does_not_outlive_a_revocation() {
     super::super::store::revoke_device(&config, "owner-test-leftover").unwrap();
     let owner = crate::core::runtime::CoreContext::scope(
         context,
-        owner_of("owner-test-leftover", Some(&pending)),
+        owner_of(&DispatchCtx::process_default(), "owner-test-leftover", Some(&pending)),
     )
     .await;
     super::super::rpc::ACTIVE_CIPHERS

@@ -56,7 +56,7 @@ impl EventHandler<DomainEvent> for SessionExpiredSubscriber {
     }
 
     async fn handle(&self, event: &DomainEvent) {
-        self.handle_with(crate::core::runtime::is_saas(), event)
+        self.handle_with(&DispatchCtx::ambient(), crate::core::runtime::is_saas(), event)
             .await;
     }
 }
@@ -130,7 +130,7 @@ impl SessionExpiredSubscriber {
                 //     loaded config; if the config can't load (rare — disk issue),
                 //     we've at least pinned the scheduler gate so background work
                 //     can't make things worse.
-                if let Err(err) = crate::security::credentials::rpc::clear_session(&config).await {
+                if let Err(err) = crate::security::credentials::rpc::clear_session(&ctx, &config).await {
                     tracing::warn!(
                         source = %source,
                         error = %err,

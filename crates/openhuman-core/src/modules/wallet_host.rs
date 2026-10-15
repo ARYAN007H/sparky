@@ -5,6 +5,7 @@
 //! transport, authenticated wallet-backend transport, and a confirmation
 //! decision bound to an in-flight confirmed execution request.
 
+use crate::core::runtime::DispatchCtx;
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::sync::{Mutex, OnceLock};
@@ -162,7 +163,7 @@ pub(super) fn has_endpoint_reference_for_test(reference: &str) -> bool {
 
 pub(crate) async fn wallet_accounts_snapshot(
 ) -> Result<tinywallet_bus::wire::WalletAccountsResponse, String> {
-    let status = crate::web3::wallet::status()
+    let status = crate::web3::wallet::status(&DispatchCtx::ambient())
         .await
         .map_err(|error| error.to_string())?
         .value;

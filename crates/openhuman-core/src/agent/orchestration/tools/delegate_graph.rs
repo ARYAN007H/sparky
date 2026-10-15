@@ -10,6 +10,7 @@
 //! Use it for non-trivial sub-tasks that benefit from a self-review/revision
 //! loop; use `spawn_subagent` for a single focused hand-off.
 
+use crate::core::runtime::DispatchCtx;
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::orchestration::delegation::run_subagent_delegation_with_parent_context;
 use async_trait::async_trait;
@@ -228,7 +229,7 @@ impl DelegateGraphTool {
             }
         };
 
-        let config = match crate::config::ops::load_current_or_init().await {
+        let config = match crate::config::ops::load_current_or_init(&DispatchCtx::ambient()).await {
             Ok(cfg) => Arc::new(cfg),
             Err(e) => {
                 return Ok(ToolResult::error(format!(

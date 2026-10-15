@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::integrations::task_sources::types::{FilterSpec, SourceTarget};
 use serde_json::json;
@@ -90,5 +91,5 @@ async fn a_connection_event_is_handled_per_scope() {
             connection_id: "conn-1".to_string(),
         })
         .await;
-    fire_in_scope(ProviderSlug::Github, "github", "conn-1").await;
+    fire_in_scope(&DispatchCtx::process_default(), ProviderSlug::Github, "github", "conn-1").await;
 }

@@ -286,14 +286,14 @@ fn docker_error_handle() -> SandboxBackendHandle {
 ///
 /// Returns the sandboxed execution result. The caller (typically the
 /// shell tool) is responsible for converting this into a `ToolResult`.
-pub async fn execute_in_sandbox(
+pub async fn execute_in_sandbox(ctx: &DispatchCtx, 
     policy: &SandboxPolicy,
     command: &str,
     working_dir: &Path,
     extra_env: HashMap<OsString, OsString>,
     timeout: Duration,
 ) -> anyhow::Result<SandboxExecResult> {
-    execute_in_sandbox_metered(policy, command, working_dir, extra_env, timeout, None).await
+    execute_in_sandbox_metered(&ctx, policy, command, working_dir, extra_env, timeout, None).await
 }
 
 /// [`execute_in_sandbox`] that feeds `meter` with the command's output as it

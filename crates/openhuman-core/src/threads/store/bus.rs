@@ -241,7 +241,7 @@ impl EventHandler<DomainEvent> for ConversationPersistenceSubscriber {
                     );
                     return;
                 }
-                if let Err(error) = persist_channel_turn(
+                if let Err(error) = persist_channel_turn(&DispatchCtx::ambient(), 
                     &my_workspace,
                     ChannelTurnDescriptor {
                         channel,
@@ -299,7 +299,7 @@ impl EventHandler<DomainEvent> for ConversationPersistenceSubscriber {
                     );
                     return;
                 }
-                if let Err(error) = persist_channel_turn(
+                if let Err(error) = persist_channel_turn(&DispatchCtx::ambient(), 
                     &my_workspace,
                     ChannelTurnDescriptor {
                         channel,

@@ -48,7 +48,7 @@ impl AsyncHtmlExtractor for TinyJuiceHtml {
     }
 
     async fn to_markdown(&self, html: &str) -> anyhow::Result<String> {
-        crate::inference::tokenjuice::extract_html(html.to_string())
+        crate::inference::tokenjuice::extract_html(&DispatchCtx::ambient(), html.to_string())
             .await
             .map_err(anyhow::Error::msg)
     }

@@ -53,7 +53,7 @@ impl EventHandler<DomainEvent> for TaskSourcesConnectionSubscriber {
         // Every scope may hold sources for this toolkit (`crate::storage`):
         // handle each scope as its own agent, with that agent's config.
         crate::storage::agents::for_each_live_scope("task_sources connection", || {
-            fire_in_scope(provider, toolkit, connection_id)
+            fire_in_scope(&DispatchCtx::ambient(), provider, toolkit, connection_id)
         })
         .await;
     }

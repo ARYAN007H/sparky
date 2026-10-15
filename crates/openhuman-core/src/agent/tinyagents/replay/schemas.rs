@@ -222,7 +222,7 @@ fn replay_schema(function: &str) -> ControllerSchema {
 /// Resolve the configured internal workspace whose `tinyagents_store/` holds the
 /// journal + status stores.
 async fn configured_workspace() -> Result<std::path::PathBuf, String> {
-    let config = crate::config::ops::load_current_or_init()
+    let config = crate::config::ops::load_current_or_init(&DispatchCtx::ambient())
         .await
         .map_err(|e| format!("failed to load config: {e}"))?;
     Ok(config.workspace_dir)

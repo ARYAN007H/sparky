@@ -116,7 +116,7 @@ impl EventHandler<DomainEvent> for SystemJobsSubscriber {
 async fn sync_live_agent_sources() {
     for (agent_id, ctx) in crate::core::runtime::AgentContextRegistry::live() {
         crate::core::runtime::CoreContext::scope(ctx, async {
-            match crate::config::ops::load_current_or_init().await {
+            match crate::config::ops::load_current_or_init(&ctx).await {
                 Ok(config) => {
                     tracing::debug!(agent = %agent_id, "[memory:bus] agent source sync");
                     run_system_job(&config, SOURCES_SYNC_JOB).await;

@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::*;
 
 #[tokio::test]
@@ -23,7 +24,7 @@ async fn composio_set_api_key_rejects_invalid_direct_key_before_persisting() {
     let config = direct_mode_no_key_config(&tmp);
     let _auth_guard = DirectAuthFailureGuard::new("ck_invalid_direct");
 
-    let err = composio_set_api_key(&config, "ck_invalid_direct", false)
+    let err = composio_set_api_key(&DispatchCtx::process_default(), &config, "ck_invalid_direct", false)
         .await
         .expect_err("invalid direct-mode key must be rejected before persistence");
     assert!(
@@ -79,7 +80,7 @@ async fn composio_set_api_key_validates_candidate_key_even_when_stored_key_exist
         .expect("seed old stored composio key");
     let _new_key_guard = DirectAuthFailureGuard::new("ck_new_invalid");
 
-    let err = composio_set_api_key(&config, "ck_new_invalid", false)
+    let err = composio_set_api_key(&DispatchCtx::process_default(), &config, "ck_new_invalid", false)
         .await
         .expect_err("candidate invalid key must be rejected even if old stored key is valid");
     assert!(

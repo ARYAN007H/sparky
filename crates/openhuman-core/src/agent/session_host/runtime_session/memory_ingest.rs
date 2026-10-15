@@ -15,6 +15,7 @@
 //! The committed turn is also published as
 //! `DomainEvent::ConversationTurnCommitted` for observers.
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use chrono::Utc;
@@ -76,7 +77,7 @@ impl OpenHumanTurnPrelude {
         if let Some(config) = &self.runtime_config {
             return Some(config.clone());
         }
-        crate::config::rpc::load_config_for_workspace_with_timeout(&self.workspace_dir)
+        crate::config::rpc::load_config_for_workspace_with_timeout(&DispatchCtx::ambient(), &self.workspace_dir)
             .await
             .map(Arc::new)
             .map_err(|error| {

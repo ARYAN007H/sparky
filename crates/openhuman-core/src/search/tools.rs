@@ -245,7 +245,7 @@ impl Tool for TinySearchTool {
         args: Value,
         options: ToolCallOptions,
     ) -> anyhow::Result<ToolResult> {
-        let config = self.live_config().await?;
+        let config = self.live_config(&DispatchCtx::ambient()).await?;
         // Re-read per call, so a key added or a provider switched mid-session
         // clears an earlier refusal instead of outliving it.
         let signature = self.provider_signature(&config);

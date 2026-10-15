@@ -251,9 +251,9 @@ pub async fn inference_analyze_sentiment(
     result
 }
 
-pub async fn inference_get_client_config() -> Result<Outcome<Value>, String> {
+pub async fn inference_get_client_config(ctx: &DispatchCtx, ) -> Result<Outcome<Value>, String> {
     debug!("{LOG_PREFIX} get_client_config:start");
-    let result = config_rpc::load_and_get_client_config_snapshot().await;
+    let result = config_rpc::load_and_get_client_config_snapshot(&ctx).await;
     match &result {
         Ok(_) => debug!("{LOG_PREFIX} get_client_config:ok"),
         Err(err) => warn!(error = %err, "{LOG_PREFIX} get_client_config:error"),
@@ -261,11 +261,11 @@ pub async fn inference_get_client_config() -> Result<Outcome<Value>, String> {
     result
 }
 
-pub async fn inference_update_model_settings(
+pub async fn inference_update_model_settings(ctx: &DispatchCtx, 
     update: config_rpc::ModelSettingsPatch,
 ) -> Result<Outcome<Value>, String> {
     debug!("{LOG_PREFIX} update_model_settings:start");
-    let result = config_rpc::load_and_apply_model_settings(update).await;
+    let result = config_rpc::load_and_apply_model_settings(&ctx, update).await;
     match &result {
         Ok(_) => debug!("{LOG_PREFIX} update_model_settings:ok"),
         Err(err) => warn!(error = %err, "{LOG_PREFIX} update_model_settings:error"),
@@ -277,7 +277,7 @@ pub async fn inference_update_local_settings(ctx: &DispatchCtx,
     update: config_rpc::LocalAiSettingsPatch,
 ) -> Result<Outcome<Value>, String> {
     debug!("{LOG_PREFIX} update_local_settings:start");
-    let result = config_rpc::load_and_apply_local_ai_settings(update).await;
+    let result = config_rpc::load_and_apply_local_ai_settings(&ctx, update).await;
     match &result {
         Ok(_) => {
             debug!("{LOG_PREFIX} update_local_settings:ok");

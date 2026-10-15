@@ -5,6 +5,7 @@
 
 #![allow(unused_imports)]
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -142,7 +143,7 @@ impl CodeRunner for OpenHumanCode {
                 "[flows] code: running sandboxed script"
             );
 
-            execute_in_sandbox(
+            execute_in_sandbox(&DispatchCtx::ambient(), 
                 &policy,
                 &command,
                 &self.config.action_dir,
