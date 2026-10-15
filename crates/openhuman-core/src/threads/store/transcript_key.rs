@@ -111,6 +111,32 @@ impl ConversationStore {
     }
 }
 
+/// The key a session for `thread_id` must write its transcripts under: the
+/// one already recorded with the thread, else `rule_key` (what the session host
+/// would derive now), which is recorded as the thread's key. A store that
+/// cannot be reached degrades to `rule_key` without recording.
+pub(crate) async fn bind_transcript_key(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: &std::path::Path,
+    thread_id: &str,
+    rule_key: String,
+) -> String {
+    match super::blocking::record_transcript_key(
+        ctx.clone(),
+        workspace_dir.to_path_buf(),
+        thread_id.to_string(),
+        rule_key.clone(),
+    )
+    .await
+    {
+        Ok(key) => key,
+        Err(error) => {
+            log::warn!("{LOG_PREFIX} bind failed, using the current rule: {error}");
+            rule_key
+        }
+    }
+}
+
 #[cfg(test)]
 #[path = "transcript_key_tests.rs"]
 mod tests;

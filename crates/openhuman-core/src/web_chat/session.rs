@@ -471,6 +471,8 @@ pub(crate) async fn checkout_session_agent(
         ),
     };
 
+    bind_transcript_store(ctx, config, thread_id, &fingerprint.target_agent_id, &mut agent).await;
+
     // Every checkout re-arms the reply language from this turn's locale: a
     // reused agent may have been built under a different one, and `None`
     // (English, or no locale sent) must clear a stale instruction.
