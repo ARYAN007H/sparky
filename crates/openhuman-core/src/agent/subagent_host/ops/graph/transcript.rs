@@ -46,33 +46,58 @@ pub(super) fn failed_run_history(
 /// The store a sub-agent's transcript goes to: the turn tree's own
 /// ([`OpenHumanRunContext::transcripts`], set by the root session), so it lands
 /// beside its parent's under the same key. A run no session started falls
-/// back to the store of the run's own context, keyed like the parent
-/// session's (its definition id, or the default agent).
+/// back to the store its own carried context selects, keyed like the parent
+/// session's (its definition id, or the default agent). That context's store
+/// is used explicitly: a detached run is a bare `tokio::spawn` with no ambient
+/// one.
+///
+/// A SaaS process whose carried context is gone has no tenant to scope to, so
+/// the run gets an isolated in-memory store instead of the operator's.
 pub(super) fn subagent_transcripts(
     run_context: &OpenHumanRunContext,
     workspace_dir: &std::path::Path,
 ) -> Arc<dyn TranscriptLocator> {
+    subagent_transcripts_in(run_context, workspace_dir, crate::core::runtime::is_saas())
+}
+
+pub(super) fn subagent_transcripts_in(
+    run_context: &OpenHumanRunContext,
+    workspace_dir: &std::path::Path,
+    saas: bool,
+) -> Arc<dyn TranscriptLocator> {
     if let Some(transcripts) = run_context.transcripts.clone() {
         return transcripts;
     }
-    let tenant = run_context
-        .core
-        .as_ref()
-        .and_then(std::sync::Weak::upgrade)
-        .map(|core| crate::core::runtime::Tenant::of(&core))
-        .unwrap_or_default();
+    let core = run_context.core.as_ref().and_then(std::sync::Weak::upgrade);
     let fallback = run_context
         .parent
         .as_ref()
         .map_or(crate::agent::session_store::DEFAULT_AGENT, |parent| {
             parent.agent_definition_id.as_str()
         });
+    let Some(core) = core else {
+        if saas {
+            tracing::warn!(
+                "[subagent_host:graph] no turn-tree store and no carried context in SaaS mode; \
+                 transcript kept in memory only"
+            );
+            return tinyagents_session::port::InMemorySessionStores::new()
+                .for_agent(fallback)
+                .transcripts;
+        }
+        let key = crate::agent::session_store::agent_key_for(
+            &crate::core::runtime::Tenant::default(),
+            fallback,
+        );
+        return crate::agent::session_store::transcripts_or_files(&key, workspace_dir);
+    };
+    let tenant = crate::core::runtime::Tenant::of(&core);
     let key = crate::agent::session_store::agent_key_for(&tenant, fallback);
     tracing::debug!(
         profile = tenant.profile.is_some(),
-        "[subagent_host:graph] no turn-tree transcript store; using the run context's"
+        "[subagent_host:graph] no turn-tree transcript store; using the carried context's"
     );
-    crate::agent::session_store::transcripts_or_files(&key, workspace_dir)
+    crate::agent::session_store::transcripts_or_files_in(&core, &key, workspace_dir)
 }
 
 /// Persist a sub-agent turn's raw transcript to `transcripts` under

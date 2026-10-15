@@ -139,6 +139,34 @@ pub fn transcripts_or_files(
     transcripts_for(agent_id).unwrap_or_else(|| workspace_transcripts(agent_id, workspace_dir))
 }
 
+/// [`transcripts_or_files`] for the store `core` selects, never the ambient
+/// context's: `core`'s own host-override provider, else the installed one,
+/// else the workspace's store. For work that carries its context explicitly
+/// (a detached sub-agent on a bare `tokio::spawn`, which has no ambient one).
+#[must_use]
+pub fn transcripts_or_files_in(
+    core: &crate::core::runtime::CoreContext,
+    agent_id: &str,
+    workspace_dir: &std::path::Path,
+) -> Arc<dyn tinyagents_session::transcript::TranscriptLocator> {
+    let provider = core
+        .host_overrides()
+        .and_then(|overrides| overrides.session_store.clone())
+        .or_else(|| {
+            PROVIDER
+                .read()
+                .unwrap_or_else(PoisonError::into_inner)
+                .clone()
+        });
+    match provider {
+        Some(provider) => {
+            log::debug!("[session_store] transcripts via the carried context's store agent={agent_id}");
+            provider.for_agent(agent_id).transcripts
+        }
+        None => workspace_transcripts(agent_id, workspace_dir),
+    }
+}
+
 /// The workspace stores this process holds open, so repeat lookups share one
 /// backend ([`release_workspace_stores`] drops them for a data reset).
 static OPEN_WORKSPACE_STORES: LazyLock<
