@@ -25,6 +25,7 @@ use crate::threads::store::{self as conversations, ConversationMessage, CreateCo
 /// does not fail the call (the thread still exists and the runner will
 /// append the sub-agent's turns).
 pub(crate) fn create_worker_thread(
+    ctx: &DispatchCtx,
     workspace_dir: PathBuf,
     parent_thread_id: &str,
     agent_id: &str,
@@ -35,7 +36,7 @@ pub(crate) fn create_worker_thread(
     let now = chrono::Utc::now().to_rfc3339();
 
     conversations::ensure_thread(
-        &DispatchCtx::ambient(),
+        ctx,
         workspace_dir.clone(),
         CreateConversationThread {
             id: worker_thread_id.clone(),
@@ -56,7 +57,7 @@ pub(crate) fn create_worker_thread(
     );
 
     if let Err(err) = conversations::append_message(
-        &DispatchCtx::ambient(),
+        ctx,
         workspace_dir,
         &worker_thread_id,
         ConversationMessage {
@@ -79,6 +80,7 @@ pub(crate) fn create_worker_thread(
 }
 
 pub(crate) fn append_worker_user_message(
+    ctx: &DispatchCtx,
     workspace_dir: PathBuf,
     worker_thread_id: &str,
     agent_id: &str,
@@ -86,7 +88,7 @@ pub(crate) fn append_worker_user_message(
     prompt: &str,
 ) -> Result<(), String> {
     conversations::append_message(
-        &DispatchCtx::ambient(),
+        ctx,
         workspace_dir,
         worker_thread_id,
         ConversationMessage {

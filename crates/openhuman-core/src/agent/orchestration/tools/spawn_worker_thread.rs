@@ -241,7 +241,7 @@ impl SpawnWorkerThreadTool {
         );
 
         let threads =
-            conversations::list_threads(&DispatchCtx::ambient(), parent.workspace_dir.clone())
+            conversations::list_threads(&run_context.dispatch_ctx(), parent.workspace_dir.clone())
                 .map_err(|e| anyhow::anyhow!(e))?;
         if let Some(current_thread) = threads.iter().find(|t| t.id == current_thread_id) {
             let is_delegated_label = current_thread
@@ -293,6 +293,7 @@ impl SpawnWorkerThreadTool {
         // Shared with `spawn_subagent` so both delegation paths persist an
         // identical, reopenable sub-thread seeded with the prompt.
         let worker_thread_id = super::worker_thread::create_worker_thread(
+            &run_context.dispatch_ctx(),
             parent.workspace_dir.clone(),
             &current_thread_id,
             &agent_id,

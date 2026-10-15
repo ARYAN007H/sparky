@@ -259,6 +259,7 @@ impl SpawnAsyncSubagentTool {
         {
             if session.worker_thread_id.as_deref() == Some(worker_thread_id.as_str()) {
                 if let Err(err) = super::worker_thread::append_worker_user_message(
+                    &dispatch,
                     parent.workspace_dir.clone(),
                     worker_thread_id,
                     &definition.id,
@@ -446,6 +447,7 @@ impl SpawnAsyncSubagentTool {
                                 // thread (survives reload / reconnect) and carry the full
                                 // payload in the delivery notice for the follow-up turn.
                                 let delivery_summary = attach_workflow_proposal(
+                                    &background_dispatch,
                                     &background_workspace_dir,
                                     background_parent_thread_id.as_deref(),
                                     &outcome.task_id,
@@ -527,6 +529,7 @@ impl SpawnAsyncSubagentTool {
                                 // proposal before stalling — preserve it durably too.
                                 let status_output = framed.clone();
                                 let framed = attach_workflow_proposal(
+                                    &background_dispatch,
                                     &background_workspace_dir,
                                     background_parent_thread_id.as_deref(),
                                     &outcome.task_id,
