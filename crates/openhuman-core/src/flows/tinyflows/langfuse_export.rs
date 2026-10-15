@@ -222,13 +222,29 @@ pub async fn export_flow_run_trace(
         "[flows] pushing flow run trace to Langfuse"
     );
 
-    // `send_observations_otlp` fails on a partial OTLP rejection; the outer
-    // timeout caps a hung connection the same way the agent exporter does.
-    match tokio::time::timeout(
-        PUSH_TIMEOUT,
-        exporter.send_observations_otlp(trace, &observations, flow_service_name()),
-    )
-    .await
+    let requests = match flow_otlp_requests(&exporter, trace, &observations) {
+        Ok(requests) => requests,
+        Err(err) => {
+            tracing::warn!(
+                target: LOG_TARGET,
+                flow_id = %flow_id,
+                thread_id = %thread_id,
+                error = %err,
+                "[flows] langfuse export skipped: could not build OTLP requests"
+            );
+            return;
+        }
+    };
+    let request_count = requests.len();
+    // `send_otlp` fails on a partial OTLP rejection; the outer timeout caps
+    // the whole export the same way the agent exporter does.
+    let send = async {
+        for request in requests {
+            exporter.client().send_otlp(request).await?;
+        }
+        Ok::<(), tinyagents_harness::TinyAgentsError>(())
+    };
+    match tokio::time::timeout(PUSH_TIMEOUT, send).await
     {
         Ok(Ok(_)) => {
             tracing::debug!(
@@ -236,6 +252,7 @@ pub async fn export_flow_run_trace(
                 flow_id = %flow_id,
                 thread_id = %thread_id,
                 observation_count,
+                request_count,
                 "[flows] pushed flow run trace to Langfuse"
             );
         }
