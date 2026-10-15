@@ -55,29 +55,39 @@ test("EX63 installs script dependencies only after changed areas are detected", 
   const install = ciLanes.indexOf(
     "- name: Install jq for release-script tests",
   );
+  const python = ciLanes.indexOf("- name: Setup Python for lanes");
+  const start = ciLanes.indexOf("- name: Start lanes");
   assert.ok(
-    detect >= 0 && install > detect,
-    "filter outputs must exist before they gate jq installation",
+    detect >= 0 && install > detect && python > detect && start > python,
+    "area detection and Python setup must precede lane startup",
   );
   const nextStep = ciLanes.indexOf("\n      - name:", install + 1);
   const installBlock = ciLanes.slice(
     install,
     nextStep < 0 ? undefined : nextStep,
   );
-  assert.match(
+  assert.doesNotMatch(
     installBlock,
-    /import tomllib/,
-    "Python 3.11+ already provides TOML parsing",
+    /\bsudo\b|apt-get/,
+    "the pinned jq download does not require package installation",
+  );
+  assert.match(installBlock, /JQ_SHA256/);
+  assert.match(installBlock, /sha256sum -c/);
+
+  const pythonBlock = ciLanes.slice(
+    python,
+    ciLanes.indexOf("\n      - name:", python + 1),
+  );
+  assert.match(pythonBlock, /python-version: "3\.12"/);
+  assert.match(pythonBlock, /update-environment: false/);
+  const startBlock = ciLanes.slice(
+    start,
+    ciLanes.indexOf("\n      - name:", start + 1),
   );
   assert.match(
-    installBlock,
-    /command -v sudo/,
-    "non-root runners may not have sudo",
-  );
-  assert.match(
-    installBlock,
-    /cannot install packages/,
-    "the EX63 image may not grant package installation",
+    startBlock,
+    /OPENHUMAN_CI_PYTHON: \$\{\{ steps\.python\.outputs\.python-path \}\}/,
+    "the pinned Python interpreter is passed to the lanes without exporting its PATH",
   );
 });
 
