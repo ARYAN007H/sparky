@@ -42,7 +42,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use tinyagents_session::transcript::{
-    FileTranscriptLocator, SessionRef, SessionTranscript, TranscriptLocator, TranscriptMessage,
+    SessionRef, SessionTranscript, TranscriptLocator, TranscriptMessage,
     TranscriptMeta, TruncateCut,
 };
 
@@ -256,26 +256,28 @@ fn find_head_transcript(
     workspace_dir: &std::path::Path,
     thread_id: &str,
 ) -> Result<Option<HeadTranscript>, String> {
-    let Some(root_path) =
-        tinyagents_session::transcript::find_root_transcript_for_thread(workspace_dir, thread_id)
-    else {
+    // The same store the session host writes the thread's turns to: the
+    // installed provider, else the workspace's driver-backed store. No
+    // transcript file is named here.
+    let store_key = crate::agent::session_store::current_agent_key_or(CHAT_AGENT_ID);
+    let locator = crate::agent::session_store::transcripts_or_files(&store_key, workspace_dir);
+    let Some(root) = locator.root_for_thread(thread_id) else {
         log::debug!("[threads][edit] thread {thread_id} has no session transcript");
         return Ok(None);
     };
-    let root_transcript = tinyagents_session::transcript::read_transcript(&root_path)
-        .map_err(|e| format!("read root transcript for thread {thread_id}: {e}"))?;
+    let root_transcript = root
+        .read_session()
+        .map_err(|e| format!("read root transcript for thread {thread_id}: {e}"))?
+        .ok_or_else(|| format!("root transcript for thread {thread_id} vanished while reading"))?;
     let agent_id = root_transcript.meta.agent_id.clone().unwrap_or_default();
     let session_root = SessionRef::scoped(thread_id, agent_id);
-    let locator: std::sync::Arc<dyn TranscriptLocator> =
-        std::sync::Arc::new(FileTranscriptLocator::new(workspace_dir.to_path_buf()));
     let head = locator.head_generation(&session_root);
-    let head_path = tinyagents_session::transcript::resolve_keyed_transcript_path(
-        workspace_dir,
-        &tinyagents_session::transcript::session_stem(&head),
-    )
-    .map_err(|e| format!("resolve head transcript path for thread {thread_id}: {e}"))?;
-    let head_transcript = tinyagents_session::transcript::read_transcript(&head_path)
-        .map_err(|e| format!("read head transcript for thread {thread_id}: {e}"))?;
+    let head_transcript = locator
+        .read_session_transcript(&head)
+        .ok_or_else(|| format!("head transcript for thread {thread_id} is missing"))?
+        .read_session()
+        .map_err(|e| format!("read head transcript for thread {thread_id}: {e}"))?
+        .ok_or_else(|| format!("head transcript for thread {thread_id} vanished while reading"))?;
     Ok(Some((head, locator, head_transcript)))
 }
 
