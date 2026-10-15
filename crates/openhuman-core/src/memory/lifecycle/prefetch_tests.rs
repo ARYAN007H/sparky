@@ -453,7 +453,7 @@ async fn an_erase_retires_queued_automatic_work_and_allows_later_work() {
     );
     // The current-thread executor has not polled the earlier job. Erasure
     // advances the owner fence synchronously before its first suspension.
-    let fence = crate::memory::tool_writes::fence_and_clear(&config)
+    let fence = crate::memory::tool_writes::fence_and_clear(&crate::core::runtime::DispatchCtx::ambient(), &config)
         .await
         .unwrap();
     let new_count = later.clone();
@@ -505,7 +505,7 @@ async fn erase_waits_for_current_automatic_work_before_returning_its_barrier() {
     let erase_config = config.clone();
     let mut fencing =
         tokio::spawn(
-            async move { crate::memory::tool_writes::fence_and_clear(&erase_config).await },
+            async move { crate::memory::tool_writes::fence_and_clear(&crate::core::runtime::DispatchCtx::ambient(), &erase_config).await },
         );
     assert!(
         tokio::time::timeout(Duration::from_secs(1), &mut fencing)
