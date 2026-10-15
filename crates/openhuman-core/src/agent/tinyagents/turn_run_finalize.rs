@@ -117,6 +117,7 @@ pub(super) async fn finalize_turn_outcome(
                     .with_cached_input_tokens(cached),
             );
             crate::agent::tinyagents::turn_outcome::record_unobserved_turn_usage(
+                &run_context.dispatch_ctx(),
                 model, input, output, cached, estimate,
             );
             let mut cost = tinyagents_harness::cost::CostTally::default();

@@ -19,6 +19,7 @@ use std::sync::Arc;
 
 use parking_lot::RwLock;
 
+use crate::core::runtime::DispatchCtx;
 use crate::config::CostConfig;
 use crate::inference::provider::types::BilledUsage;
 
