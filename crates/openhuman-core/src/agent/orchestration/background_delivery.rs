@@ -723,11 +723,7 @@ fn persist_delivery_reply(
             id: crate::threads::store::run_reply_message_id(run_id),
             content,
             message_type: "text".to_string(),
-            extra_metadata: json!({
-                "scope": "background_delivery",
-                "success": success,
-                "requestId": run_id,
-            }),
+            extra_metadata: json!({"scope": "background_delivery", "success": success, "requestId": run_id}),
             sender: "agent".to_string(),
             created_at: chrono::Utc::now().to_rfc3339(),
         },
