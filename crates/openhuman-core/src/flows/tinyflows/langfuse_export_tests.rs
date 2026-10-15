@@ -86,12 +86,17 @@ fn ingestion_url_targets_backend_proxy_route() {
 fn flow_export_targets_the_v4_otlp_proxy_route() {
     let mut config = Config::default();
     config.api_url = Some("https://staging-api.tinyhumans.ai/api/v1".to_string());
-    let client = LangfuseClient::new(ingestion_url(&config), LangfuseAuth::Bearer {
-        token: "tok".to_string(),
-    })
+    let client = LangfuseClient::new(
+        ingestion_url(&config),
+        LangfuseAuth::Bearer {
+            token: "tok".to_string(),
+        },
+    )
     .expect("client");
     assert_eq!(
-        build_flow_exporter(client, "flow-1").client().otlp_endpoint(),
+        build_flow_exporter(client, "flow-1")
+            .client()
+            .otlp_endpoint(),
         "https://staging-api.tinyhumans.ai/telemetry/langfuse/otel/v1/traces"
     );
 }
@@ -133,7 +138,9 @@ fn otlp_flow_trace_puts_flow_attributes_on_every_span() {
         resource["resource"]["attributes"][0]["value"]["stringValue"],
         "openhuman"
     );
-    let spans = resource["scopeSpans"][0]["spans"].as_array().expect("spans");
+    let spans = resource["scopeSpans"][0]["spans"]
+        .as_array()
+        .expect("spans");
     assert!(spans.len() >= 3, "run, step and node spans");
     for span in spans {
         assert_eq!(

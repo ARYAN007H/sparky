@@ -244,8 +244,7 @@ pub async fn export_flow_run_trace(
         }
         Ok::<(), tinyagents_harness::TinyAgentsError>(())
     };
-    match tokio::time::timeout(PUSH_TIMEOUT, send).await
-    {
+    match tokio::time::timeout(PUSH_TIMEOUT, send).await {
         Ok(Ok(_)) => {
             tracing::debug!(
                 target: LOG_TARGET,
