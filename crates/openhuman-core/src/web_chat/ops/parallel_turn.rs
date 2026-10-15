@@ -213,14 +213,14 @@ pub(crate) async fn spawn_parallel_turn(
                 }
             }
 
-            parallel_in_flight()
+            parallel_in_flight(ctx)
                 .lock_owned()
                 .await
                 .remove(&map_key_task);
         },
     ));
 
-    parallel_in_flight().lock_owned().await.insert(
+    parallel_in_flight(ctx).lock_owned().await.insert(
         map_key,
         ParallelEntry {
             thread_id: key_for(ctx, thread_id),
@@ -240,7 +240,7 @@ pub(crate) async fn cancel_parallel_turns_for_thread(
 ) -> Vec<(String, String)> {
     let mut cancelled = Vec::new();
     let scoped_thread = key_for(ctx, thread_id);
-    let mut parallel = parallel_in_flight().lock_owned().await;
+    let mut parallel = parallel_in_flight(ctx).lock_owned().await;
     let request_ids: Vec<String> = parallel
         .iter()
         .filter(|(_, entry)| entry.thread_id == scoped_thread)
@@ -275,7 +275,7 @@ pub(crate) async fn cancel_parallel_turn_by_request_id(
 ) -> Vec<(String, String)> {
     let map_key = key_for(ctx, request_id);
     let scoped_thread = key_for(ctx, thread_id);
-    let mut parallel = parallel_in_flight().lock_owned().await;
+    let mut parallel = parallel_in_flight(ctx).lock_owned().await;
     let matches = parallel
         .get(&map_key)
         .map(|entry| entry.thread_id == scoped_thread)

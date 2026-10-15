@@ -132,7 +132,7 @@ pub async fn invalidate_thread_sessions(ctx: &DispatchCtx, thread_id: &str) {
     // Under an embedded agent or a profile only that tenant's entry goes.
     // Outside both every entry for the thread in the current table goes.
     let tenant = tenant_of(ctx);
-    let mut sessions = thread_sessions().lock_owned().await;
+    let mut sessions = thread_sessions(ctx).lock_owned().await;
     let keys_to_remove: Vec<String> = match tenant.agent.as_ref().or(tenant.profile.as_ref()) {
         Some(_) => {
             let key = key_for(ctx, thread_id);
@@ -184,21 +184,21 @@ pub(crate) async fn invalidate_thread_sessions_for_tenant(
 
 /// Hold the real session table while exercising callback cancellation.
 #[cfg(test)]
-pub(crate) async fn lock_thread_sessions_for_test() -> impl Send + 'static {
-    thread_sessions().lock_owned().await
+pub(crate) async fn lock_thread_sessions_for_test(ctx: &DispatchCtx) -> impl Send + 'static {
+    thread_sessions(ctx).lock_owned().await
 }
 
 /// The thread ids (as the caller chose them) with a primary or parallel turn
 /// in the calling context's tables.
 pub(crate) async fn live_thread_ids(ctx: &DispatchCtx) -> Vec<String> {
-    let mut threads: Vec<String> = in_flight()
+    let mut threads: Vec<String> = in_flight(ctx)
         .lock_owned()
         .await
         .keys()
         .map(|key| unscope(ctx, key))
         .collect();
     threads.extend(
-        parallel_in_flight()
+        parallel_in_flight(ctx)
             .lock_owned()
             .await
             .values()
@@ -213,14 +213,14 @@ pub(crate) async fn live_thread_ids(ctx: &DispatchCtx) -> Vec<String> {
 /// calling context's tables, so callers can watch a teardown reach it.
 #[cfg(test)]
 pub(crate) async fn track_parallel_turn_for_test(
+    ctx: &DispatchCtx,
     thread_id: &str,
     request_id: &str,
     cancel: tokio_util::sync::CancellationToken,
 ) {
-    let ctx = &DispatchCtx::ambient();
     let watched = cancel.clone();
     let handle = crate::core::runtime::spawn_scoped(async move { watched.cancelled().await });
-    parallel_in_flight().lock_owned().await.insert(
+    parallel_in_flight(ctx).lock_owned().await.insert(
         key_for(ctx, request_id),
         ParallelEntry {
             thread_id: key_for(ctx, thread_id),
@@ -231,8 +231,8 @@ pub(crate) async fn track_parallel_turn_for_test(
     );
 }
 
-pub async fn in_flight_entries_for_test() -> Vec<(String, String)> {
-    let guard = in_flight().lock_owned().await;
+pub async fn in_flight_entries_for_test(ctx: &DispatchCtx) -> Vec<(String, String)> {
+    let guard = in_flight(ctx).lock_owned().await;
     guard
         .iter()
         .map(|(k, v)| (k.clone(), v.request_id.clone()))
@@ -245,11 +245,11 @@ pub async fn in_flight_entries_for_test() -> Vec<(String, String)> {
 /// status and terminal dispatch paths.
 #[cfg(test)]
 pub async fn drain_queued_turns_for_test(
+    ctx: &DispatchCtx,
     thread_id: &str,
     lane: tinyagents_harness::run_queue::QueueLane,
 ) -> Vec<crate::agent::queued_turn::QueuedTurn> {
-    let ctx = &DispatchCtx::ambient();
-    let guard = in_flight().lock_owned().await;
+    let guard = in_flight(ctx).lock_owned().await;
     match guard.get(&key_for(ctx, thread_id)) {
         Some(entry) => entry.run_queue.drain(lane).await,
         None => Vec::new(),
@@ -258,8 +258,8 @@ pub async fn drain_queued_turns_for_test(
 
 /// Test accessor: `(request_id, thread_id)` for every in-flight parallel turn.
 #[cfg(any(test, debug_assertions))]
-pub async fn parallel_in_flight_entries_for_test() -> Vec<(String, String)> {
-    let guard = parallel_in_flight().lock_owned().await;
+pub async fn parallel_in_flight_entries_for_test(ctx: &DispatchCtx) -> Vec<(String, String)> {
+    let guard = parallel_in_flight(ctx).lock_owned().await;
     guard
         .iter()
         .map(|(request_id, entry)| (request_id.clone(), entry.thread_id.clone()))
