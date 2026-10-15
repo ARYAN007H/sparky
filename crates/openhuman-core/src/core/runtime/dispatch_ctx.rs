@@ -159,8 +159,7 @@ impl DispatchCtx {
         self.turn_origin()
             .or_else(|| Self::ambient_turn().turn_origin())
     }
-
-, for state that outlives the
+    /// A non-owning handle on the bound context, for state that outlives the
     /// call (a session, a built turn). The tenant lease is the strong count of
     /// the context ([`CoreContext::tenant_in_use`]), so a long-lived holder
     /// must not keep it alive.
