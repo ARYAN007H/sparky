@@ -119,7 +119,7 @@ async fn unknown_workflow_id_does_not_burn_a_spawn_slot() {
     // DELTA is zero (the counter is global + monotonic, so absolute value is
     // shared with the backstop test — hence the serial lock + delta check).
     let _s = guard_serial().lock().await;
-    let before = super::guard::total_spawns();
+    let before = super::guard::total_spawns(&crate::core::runtime::DispatchCtx::ambient());
     let t = RunWorkflowTool::new();
     // wait_seconds: 0 → fire-and-forget path (no await slot taken); the
     // unknown id makes the spawn fail before accounting.
@@ -136,7 +136,7 @@ async fn unknown_workflow_id_does_not_burn_a_spawn_slot() {
         "error should reference the unknown workflow: {}",
         res.output()
     );
-    let after = super::guard::total_spawns();
+    let after = super::guard::total_spawns(&crate::core::runtime::DispatchCtx::ambient());
     assert_eq!(
         before, after,
         "a rejected spawn must not increment the spawn backstop counter"
@@ -154,7 +154,7 @@ fn account_spawn_trips_the_process_backstop() {
     // path does, and that runs in a separate process).
     let mut last = Ok(());
     for _ in 0..600 {
-        last = super::guard::account_spawn();
+        last = super::guard::account_spawn(&crate::core::runtime::DispatchCtx::ambient());
         if last.is_err() {
             break;
         }

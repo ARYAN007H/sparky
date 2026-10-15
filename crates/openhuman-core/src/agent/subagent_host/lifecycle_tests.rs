@@ -331,9 +331,9 @@ async fn each_agent_dedupes_its_own_in_flight_sub_agents() {
     let alpha = test_agent_context(&root, "alpha");
     let beta = test_agent_context(&root, "beta");
 
-    let alpha_map = CoreContext::scope(Arc::clone(&alpha), async { host_in_flight() }).await;
-    let beta_map = CoreContext::scope(beta, async { host_in_flight() }).await;
-    let alpha_again = CoreContext::scope(alpha, async { host_in_flight() }).await;
+    let alpha_map = CoreContext::scope(Arc::clone(&alpha), async { host_in_flight(&crate::core::runtime::DispatchCtx::ambient()) }).await;
+    let beta_map = CoreContext::scope(beta, async { host_in_flight(&crate::core::runtime::DispatchCtx::ambient()) }).await;
+    let alpha_again = CoreContext::scope(alpha, async { host_in_flight(&crate::core::runtime::DispatchCtx::ambient()) }).await;
 
     assert!(!Arc::ptr_eq(&alpha_map, &beta_map));
     assert!(Arc::ptr_eq(&alpha_map, &alpha_again));
