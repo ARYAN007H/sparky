@@ -68,9 +68,9 @@ async fn ambient_scope_reads_the_turn_and_prefers_the_subagent() {
         crate::agent::turn_origin::with_origin(origin, async {
             async {
                 (
-                    UsageScope::ambient(Some("openhuman"), None)
+                    UsageScope::in_ctx(&DispatchCtx::ambient(), Some("openhuman"), None)
                         .with_definition(Some("orchestrator")),
-                    UsageScope::ambient(Some("openhuman"), Some(("researcher", "task-1")))
+                    UsageScope::in_ctx(&DispatchCtx::ambient(), Some("openhuman"), Some(("researcher", "task-1")))
                         .with_definition(Some("orchestrator")),
                 )
             }
@@ -89,6 +89,6 @@ async fn ambient_scope_reads_the_turn_and_prefers_the_subagent() {
 
 #[test]
 fn outside_any_turn_and_without_a_provider_the_scope_is_empty() {
-    let scope = UsageScope::ambient(Some(""), None);
+    let scope = UsageScope::in_ctx(&DispatchCtx::ambient(), Some(""), None);
     assert!(scope.is_empty(), "{scope:?}");
 }
