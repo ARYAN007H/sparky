@@ -106,7 +106,7 @@ pub fn tenant_in(saas: bool, ctx: Option<&CoreContext>) -> Result<Tenant, NoTena
 /// [`current_tenant`], or for a SaaS task with no scope a tenant no other
 /// work can share: a fresh, random profile. For infallible key builders whose
 /// tables are already per-context (an unscoped SaaS task gets throwaway state
-/// slots, see [`current_slot`](super::current_slot)), so the key can only miss.
+/// slots, see [`slot_for`](super::slot_for)), so the key can only miss.
 pub fn current_tenant_or_isolated(site: &str) -> Tenant {
     isolated_unless_tenant(current_tenant(), site)
 }

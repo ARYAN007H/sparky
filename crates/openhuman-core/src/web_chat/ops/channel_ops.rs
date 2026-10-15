@@ -94,7 +94,7 @@ async fn cancel_chat_inner(
     let mut removed_client_id: Option<String> = None;
 
     {
-        let mut in_flight = in_flight().lock_owned().await;
+        let mut in_flight = in_flight(ctx).lock_owned().await;
         // #4760: only tear down the primary turn when the cancel is unscoped OR
         // targets exactly the request that is running. A stale cancel for an
         // already-superseded request must be a no-op so the newer turn lives.
@@ -149,7 +149,7 @@ async fn cancel_chat_inner(
     //
     // Only once nothing is left running on the thread: a scoped cancel can leave
     // the primary or a parallel turn alive, and those still owe a terminal event.
-    if cancelled_any.is_some() && !thread_has_live_turn(thread_id, &map_key).await {
+    if cancelled_any.is_some() && !thread_has_live_turn(ctx, thread_id, &map_key).await {
         crate::agent::orchestration::busy_guard::clear_busy_for_thread(ctx, thread_id);
         // A drain that fired while the cancelled turn counted as busy returned
         // without claiming anything; ask for another.
@@ -230,11 +230,15 @@ async fn cancel_chat_inner(
 }
 
 /// Is a primary or parallel turn still running on `thread_id`?
-async fn thread_has_live_turn(thread_id: &str, map_key: &str) -> bool {
-    if super::state::in_flight().lock().await.contains_key(map_key) {
+async fn thread_has_live_turn(ctx: &DispatchCtx, thread_id: &str, map_key: &str) -> bool {
+    if super::state::in_flight(ctx)
+        .lock()
+        .await
+        .contains_key(map_key)
+    {
         return true;
     }
-    super::state::parallel_in_flight()
+    super::state::parallel_in_flight(ctx)
         .lock()
         .await
         .values()
@@ -265,7 +269,7 @@ pub async fn channel_web_chat(
     if let Some(run_mode) = run_mode.as_deref() {
         match crate::agent::tinyagents::run_mode::parse_mode_label(run_mode) {
             Some(mode) => {
-                crate::agent::tinyagents::run_mode::set_mode(thread_id, mode);
+                crate::agent::tinyagents::run_mode::set_mode(ctx, thread_id, mode);
             }
             None => log::warn!(
                 "[web_chat] channel_web_chat thread_id={thread_id} ignoring unrecognized run_mode={run_mode}"
@@ -319,7 +323,7 @@ pub async fn channel_web_queue_status(
     thread_id: &str,
 ) -> Result<Outcome<Value>, String> {
     let map_key = key_for(ctx, thread_id);
-    let in_flight = in_flight().lock_owned().await;
+    let in_flight = in_flight(ctx).lock_owned().await;
     if let Some(entry) = in_flight.get(&map_key) {
         let status = entry.run_queue.status().await;
         let items: Vec<Value> = entry
@@ -376,7 +380,7 @@ pub async fn channel_web_queue_remove(
         return Err("item_id is required".to_string());
     }
     let map_key = key_for(ctx, thread_id);
-    let in_flight = in_flight().lock_owned().await;
+    let in_flight = in_flight(ctx).lock_owned().await;
     let Some(entry) = in_flight.get(&map_key) else {
         return Ok(Outcome::single_log(
             json!({
@@ -424,7 +428,7 @@ pub async fn channel_web_queue_clear(
     thread_id: &str,
 ) -> Result<Outcome<Value>, String> {
     let map_key = key_for(ctx, thread_id);
-    let in_flight = in_flight().lock_owned().await;
+    let in_flight = in_flight(ctx).lock_owned().await;
     if let Some(entry) = in_flight.get(&map_key) {
         let dropped = entry.run_queue.clear().await;
         log::info!(

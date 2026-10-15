@@ -304,8 +304,8 @@ fn handle_read_workspace_file(_ctx: DispatchCtx, params: Map<String, Value>) -> 
     })
 }
 
-fn handle_in_flight_chats(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async move { to_json(introspect::in_flight_chats().await?) })
+fn handle_in_flight_chats(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+    Box::pin(async move { to_json(introspect::in_flight_chats(&ctx).await?) })
 }
 
 fn handle_wallet_prepared_quotes(

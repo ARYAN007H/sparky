@@ -417,7 +417,11 @@ async fn drive_turn(
             ..
         }) = run_context.origin.as_ref()
         {
-            journal::register_request_journal_run(request_id, journal_run_id.as_str());
+            journal::register_request_journal_run(
+                &run_context.dispatch_ctx(),
+                request_id,
+                journal_run_id.as_str(),
+            );
         }
     }
     ctx = ctx.with_events(sink.clone());
@@ -517,10 +521,12 @@ async fn drive_turn(
             has_route_fallback,
             hosted_security_gate,
             pause_at_cap,
-            run_mode: run_context
-                .thread_id
-                .as_deref()
-                .map(crate::agent::tinyagents::run_mode::handle_for_thread),
+            run_mode: run_context.thread_id.as_deref().map(|thread_id| {
+                crate::agent::tinyagents::run_mode::handle_for_thread(
+                    &run_context.dispatch_ctx(),
+                    thread_id,
+                )
+            }),
             memory_turn: run_context.memory_turn.clone(),
             summarizer_model,
             failure_map: failure_map.clone(),
