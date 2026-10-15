@@ -27,6 +27,7 @@
 //! `TrustedAutomation { Cron }` and a workflow node under its workflow
 //! origin. Resolving an agent does not change who is asking.
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::{Arc, LazyLock, PoisonError, RwLock};
 
 use crate::agent::harness::host_definition::AgentDefinition;

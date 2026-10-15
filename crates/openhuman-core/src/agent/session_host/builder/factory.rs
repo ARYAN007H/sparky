@@ -1,5 +1,6 @@
 //! `OpenHumanSessionHost::from_config` factory methods and internal `build_session_agent_inner` constructor.
 
+use crate::core::runtime::DispatchCtx;
 use super::should_synthesize_delegation_tools;
 use crate::agent::harness::host_definition::{
     AgentDefinitionExt, AgentDefinitionRegistry, NO_TOOLS_SENTINEL,
