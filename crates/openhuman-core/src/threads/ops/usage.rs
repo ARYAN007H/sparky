@@ -70,7 +70,7 @@ pub async fn token_usage(
     request: ThreadTokenUsageRequest,
 ) -> Result<Outcome<ApiEnvelope<ThreadTokenUsageResponse>>, String> {
     // Resolved here, in the request's scope; the read itself is blocking.
-    let locator = transcript_store(ctx).await?.locator();
+    let locator = transcript_store(ctx, &request.thread_id).await?.locator();
     let thread_id = request.thread_id.clone();
     let spend = tokio::task::spawn_blocking(move || thread_spend_in(locator.as_ref(), &thread_id))
         .await
