@@ -54,7 +54,7 @@ async fn seed_thread(workspace: &Path, thread_id: &str, messages: &[(&str, &str)
 
 async fn wait_done(config: &Config) -> BackfillView {
     for _ in 0..200 {
-        let view = status(config).await.unwrap();
+        let view = status(&DispatchCtx::ambient(), config).await.unwrap();
         if view.state.phase != ImportPhase::Running {
             return view;
         }
@@ -67,11 +67,11 @@ async fn wait_done(config: &Config) -> BackfillView {
 async fn refuses_without_consent_and_with_memory_off() {
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
-    let error = start(&config, BackfillStartParams { consent: false })
+    let error = start(&DispatchCtx::ambient(), &config, BackfillStartParams { consent: false })
         .await
         .unwrap_err();
     assert_eq!(error.code(), INVALID_REQUEST);
-    let error = start(&config, BackfillStartParams { consent: true })
+    let error = start(&DispatchCtx::ambient(), &config, BackfillStartParams { consent: true })
         .await
         .unwrap_err();
     assert_eq!(error.code(), MEMORY_OFF);
@@ -124,11 +124,11 @@ async fn stores_past_chats_once_and_skips_what_live_logging_took() {
     )
     .await;
 
-    let before = status(&config).await.unwrap();
+    let before = status(&DispatchCtx::ambient(), &config).await.unwrap();
     assert_eq!(before.state.phase, ImportPhase::Idle);
     assert_eq!((before.pending_threads, before.pending_turns), (2, 3));
 
-    let started = start(&config, BackfillStartParams { consent: true })
+    let started = start(&DispatchCtx::ambient(), &config, BackfillStartParams { consent: true })
         .await
         .unwrap();
     assert_eq!(started.state.threads_total, 2);
@@ -152,7 +152,7 @@ async fn stores_past_chats_once_and_skips_what_live_logging_took() {
     );
 
     // A second run has nothing to send.
-    start(&config, BackfillStartParams { consent: true })
+    start(&DispatchCtx::ambient(), &config, BackfillStartParams { consent: true })
         .await
         .unwrap();
     let again = wait_done(&config).await;
