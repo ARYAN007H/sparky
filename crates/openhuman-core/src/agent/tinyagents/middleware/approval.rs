@@ -1,6 +1,7 @@
 //! [`ApprovalSecurityMiddleware`]: route external-effect tool calls through
 //! OpenHuman's human-in-the-loop approval gate at the tool boundary.
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -83,7 +84,13 @@ impl ApprovalSecurityMiddleware {
             .flat_map(|set| set.iter())
             .find(|tool| tool.name() == name)
         {
-            Some(tool) => crate::desktop::control::approvals_disabled_for(tool.as_ref()).await,
+            Some(tool) => {
+                crate::desktop::control::approvals_disabled_for(
+                    &DispatchCtx::ambient(),
+                    tool.as_ref(),
+                )
+                .await
+            }
             None => false,
         };
         #[cfg(not(feature = "modules"))]
@@ -136,7 +143,12 @@ impl ApprovalResolver<crate::agent::tinyagents::host::OpenHumanRunContext>
         let summary = summarize_action(&call.name, &call.arguments);
         let redacted = redact_args(&call.arguments);
         let (outcome, request_id) = gate
-            .intercept_audited(&ctx.data.approval, approval_name.as_ref(), &summary, redacted)
+            .intercept_audited(
+                &ctx.data.approval,
+                approval_name.as_ref(),
+                &summary,
+                redacted,
+            )
             .await;
         match outcome {
             GateOutcome::Deny { reason } => {

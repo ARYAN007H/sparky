@@ -27,6 +27,7 @@
 //! #3026 Files panel, and the orchestrator grounding rule in #3029
 //! continue to work without change.
 
+use crate::core::runtime::DispatchCtx;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -82,7 +83,8 @@ impl ImageInspector for ModuleImageInspector<'_> {
         let config = match self.config {
             Some(config) => config,
             None => {
-                loaded = crate::config::ops::load_config_with_timeout()
+                loaded = DispatchCtx::ambient()
+                    .load_config()
                     .await
                     .map_err(|error| format!("config unavailable: {error}"))?;
                 &loaded
@@ -407,8 +409,14 @@ impl PresentationTool {
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_default();
             let reason = format!("failed to write generated deck ({filename}): {err}");
-            let _ =
-                fail_artifact(&self.workspace_dir, &self.files_dir, &meta.id, &reason, chat).await;
+            let _ = fail_artifact(
+                &self.workspace_dir,
+                &self.files_dir,
+                &meta.id,
+                &reason,
+                chat,
+            )
+            .await;
             tracing::warn!(
                 target: "presentation",
                 err = %err,
@@ -420,7 +428,8 @@ impl PresentationTool {
         }
 
         let size_bytes = bytes.len() as u64;
-        let updated = match finalize_artifact(&self.workspace_dir, &meta.id, size_bytes, chat).await {
+        let updated = match finalize_artifact(&self.workspace_dir, &meta.id, size_bytes, chat).await
+        {
             Ok(updated) => updated,
             Err(err) => {
                 let reason = format!("failed to finalize artifact: {err}");

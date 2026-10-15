@@ -1,5 +1,6 @@
 //! The tiered cloud → retry → local fallback orchestration.
 
+use crate::core::runtime::DispatchCtx;
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{Mutex, OnceLock};
@@ -76,7 +77,7 @@ fn retry_state() -> &'static RetryState {
 /// 5. On local failure, return `TriageOutcome::Deferred` so the
 ///    caller can retry when a local arm is available.
 pub async fn run_triage(envelope: &TriggerEnvelope) -> anyhow::Result<TriageOutcome> {
-    let config = crate::config::ops::load_current_or_init()
+    let config = crate::config::ops::load_current_or_init(&DispatchCtx::ambient())
         .await
         .context("loading config for triage turn")?;
     let cloud = resolve_provider_with_config(&config)

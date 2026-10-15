@@ -4,6 +4,7 @@
 //! the acting workspace and provider bytes are prepared only on request copies.
 //! The older stash remains readable so existing conversations can resume.
 
+use crate::core::runtime::DispatchCtx;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::OnceLock;
@@ -125,7 +126,7 @@ impl TextExtractor for DocumentsTextExtractor {
         use crate::modules::documents;
 
         match tokio::time::timeout(PDF_EXTRACTION_TIMEOUT, async {
-            let config = crate::config::ops::load_current_or_init()
+            let config = crate::config::ops::load_current_or_init(&DispatchCtx::ambient())
                 .await
                 .map_err(|error| format!("config unavailable for pdf extraction: {error}"))?;
             documents::extract_text(&config, bytes)

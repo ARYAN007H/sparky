@@ -43,6 +43,7 @@
 //!
 //! [`EventSink::with_stream_id`]: tinyagents_harness::events::EventSink::with_stream_id
 
+use crate::core::runtime::DispatchCtx;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -95,7 +96,7 @@ pub(crate) fn take_request_journal_run(request_id: &str) -> Option<String> {
 /// belong to (the storage backend is resolved from it). Async because the
 /// config load is async; errors are surfaced so callers can log-and-skip.
 async fn resolve_workspace() -> anyhow::Result<PathBuf> {
-    let config = crate::config::ops::load_current_or_init()
+    let config = crate::config::ops::load_current_or_init(&DispatchCtx::ambient())
         .await
         .map_err(|e| anyhow::anyhow!("[journal] load config for workspace: {e}"))?;
     Ok(config.workspace_dir)

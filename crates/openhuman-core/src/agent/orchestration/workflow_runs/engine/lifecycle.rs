@@ -1,6 +1,7 @@
 //! Public entry points (`start`/`stop`/`resume`) and the spawned engine loop
 //! that drives a run's phase DAG to completion.
 
+use crate::core::runtime::DispatchCtx;
 use anyhow::{anyhow, Context, Result};
 use serde_json::Value;
 use std::sync::Arc;
@@ -68,7 +69,7 @@ pub async fn start_workflow_run(
     // Inherit-only: `None` leaves the loop unlabelled and failing closed.
     let inherited_origin = crate::agent::turn_origin::capture();
     crate::core::runtime::spawn_scoped(async move {
-        match crate::config::ops::load_current_or_init().await {
+        match crate::config::ops::load_current_or_init(&DispatchCtx::ambient()).await {
             Ok(task_config) => {
                 crate::agent::turn_origin::with_inherited_origin(
                     inherited_origin,
@@ -207,7 +208,7 @@ pub async fn resume_workflow_run(config: &Config, id: &str) -> Result<WorkflowRu
     // loop runs on a fresh task, which would otherwise drop the caller's label.
     let inherited_origin = crate::agent::turn_origin::capture();
     crate::core::runtime::spawn_scoped(async move {
-        match crate::config::ops::load_current_or_init().await {
+        match crate::config::ops::load_current_or_init(&DispatchCtx::ambient()).await {
             Ok(task_config) => {
                 crate::agent::turn_origin::with_inherited_origin(
                     inherited_origin,
