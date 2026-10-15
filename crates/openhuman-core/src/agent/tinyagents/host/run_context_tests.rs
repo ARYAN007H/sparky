@@ -604,3 +604,71 @@ fn the_memory_identity_rides_the_run_and_its_children() {
         Some(MemoryIdentity::team_member("acme", "lead"))
     );
 }
+
+fn tool_context_for(
+    run: OpenHumanRunContext,
+) -> tinyagents_harness::tool::ToolExecutionContext {
+    let run = run.into_tinyagents(tinyagents_harness::context::RunConfig::new("core-carrier"));
+    tinyagents_harness::tool::ToolExecutionContext::from_run_context(
+        &run,
+        tinyagents_harness::ids::CallId::new("core-carrier-call"),
+    )
+}
+
+#[tokio::test]
+async fn a_tool_reads_the_runs_core_not_the_ambient_scope() {
+    use crate::core::runtime::{CoreContext, DomainSet};
+
+    let runs = CoreContext::for_test(DomainSet::full(), None);
+    let ambient = CoreContext::for_test(DomainSet::full(), None);
+    let context = tool_context_for(OpenHumanRunContext::new().with_core(Some(runs.clone())));
+
+    CoreContext::scope(ambient.clone(), async {
+        let ctx = dispatch_ctx_for_tool(Some(&context));
+        assert!(Arc::ptr_eq(ctx.core().expect("bound"), &runs));
+        assert!(!Arc::ptr_eq(ctx.core().expect("bound"), &ambient));
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn concurrent_runs_keep_their_own_core_across_awaits_and_spawns() {
+    use crate::core::runtime::{CoreContext, DomainSet};
+
+    let a = CoreContext::for_test(DomainSet::full(), None);
+    let b = CoreContext::for_test(DomainSet::full(), None);
+    let ctx_a = tool_context_for(OpenHumanRunContext::new().with_core(Some(a.clone())));
+    let ctx_b = tool_context_for(OpenHumanRunContext::new().with_core(Some(b.clone())));
+
+    let read = |context: tinyagents_harness::tool::ToolExecutionContext| async move {
+        tokio::task::yield_now().await;
+        // A plain spawn loses every task-local; the carrier does not.
+        tokio::spawn(async move { dispatch_ctx_for_tool(Some(&context)).into_core() })
+            .await
+            .unwrap()
+    };
+    let (got_a, got_b) = tokio::join!(read(ctx_a), read(ctx_b));
+    assert!(Arc::ptr_eq(&got_a.expect("a bound"), &a));
+    assert!(Arc::ptr_eq(&got_b.expect("b bound"), &b));
+}
+
+#[test]
+fn the_core_rides_the_host_env_and_survives_child_and_detached_child() {
+    use crate::core::runtime::{CoreContext, DomainSet};
+
+    let core = CoreContext::for_test(DomainSet::full(), None);
+    let env = crate::agent::turn_env::HostTurnEnv {
+        core: Some(core.clone()),
+        ..Default::default()
+    };
+    let run = OpenHumanRunContext::new().with_host_env(&env);
+    assert!(Arc::ptr_eq(run.core.as_ref().unwrap(), &core));
+    assert!(Arc::ptr_eq(run.child().core.as_ref().unwrap(), &core));
+    assert!(Arc::ptr_eq(
+        run.detached_child().core.as_ref().unwrap(),
+        &core
+    ));
+    // An env with no core leaves the run's own in place.
+    let kept = run.with_host_env(&crate::agent::turn_env::HostTurnEnv::default());
+    assert!(Arc::ptr_eq(kept.core.as_ref().unwrap(), &core));
+}
