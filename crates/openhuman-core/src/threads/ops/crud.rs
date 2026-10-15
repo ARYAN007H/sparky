@@ -23,10 +23,11 @@ use std::path::PathBuf;
 
 /// Lists all conversation threads.
 pub async fn threads_list(
+    ctx: &DispatchCtx,
     _request: EmptyRequest,
 ) -> Result<Outcome<ApiEnvelope<ConversationThreadsListResponse>>, String> {
     let dir = workspace_dir().await?;
-    let threads = conversations::blocking::list_threads(dir)
+    let threads = conversations::blocking::list_threads(ctx.clone(), dir)
         .await?
         .into_iter()
         .map(thread_to_summary)
@@ -41,10 +42,12 @@ pub async fn threads_list(
 
 /// Creates or refreshes a conversation thread.
 pub async fn thread_upsert(
+    ctx: &DispatchCtx,
     request: UpsertConversationThreadRequest,
 ) -> Result<Outcome<ApiEnvelope<ConversationThreadSummary>>, String> {
     let dir = workspace_dir().await?;
     let thread = conversations::blocking::ensure_thread(
+        ctx.clone(),
         dir,
         conversations::CreateConversationThread {
             id: request.id,
@@ -66,6 +69,7 @@ pub async fn thread_upsert(
 
 /// Creates a new conversation thread with auto-generated ID and title.
 pub async fn thread_create_new(
+    ctx: &DispatchCtx,
     request: CreateConversationThreadRequest,
 ) -> Result<Outcome<ApiEnvelope<ConversationThreadSummary>>, String> {
     let dir = workspace_dir().await?;
@@ -75,6 +79,7 @@ pub async fn thread_create_new(
     let title = format!("Chat {} {}", now.format("%b %-d"), now.format("%-I:%M %p"));
     let created_at = chrono::Utc::now().to_rfc3339();
     let thread = conversations::blocking::ensure_thread(
+        ctx.clone(),
         dir,
         conversations::CreateConversationThread {
             id,
@@ -105,10 +110,11 @@ pub async fn thread_create_new(
 
 /// Lists messages for a conversation thread.
 pub async fn messages_list(
+    ctx: &DispatchCtx,
     request: ConversationMessagesRequest,
 ) -> Result<Outcome<ApiEnvelope<ConversationMessagesResponse>>, String> {
     let dir = workspace_dir().await?;
-    let messages = conversations::blocking::get_messages(dir, request.thread_id.clone())
+    let messages = conversations::blocking::get_messages(ctx.clone(), dir, request.thread_id.clone())
         .await?
         .into_iter()
         .map(message_to_record)
@@ -129,6 +135,7 @@ pub async fn messages_list(
 /// Read-only and workspace-scoped. `exclude_thread_id` lets a caller drop the
 /// active chat from the results when it already has that context in hand.
 pub async fn transcript_search(
+    ctx: &DispatchCtx,
     query: &str,
     limit: usize,
     exclude_thread_id: Option<&str>,
@@ -141,6 +148,7 @@ pub async fn transcript_search(
         exclude_thread_id
     );
     let hits = conversations::blocking::search_cross_thread_messages(
+        ctx.clone(),
         dir,
         query.to_string(),
         limit,
@@ -162,10 +170,11 @@ pub async fn message_append(
         .await
         .map_err(|error| ThreadsError::Message(format!("load config: {error}")))?;
     let persistence_dir = workspace_dir().await.map_err(ThreadsError::Message)?;
-    message_append_with_config(request, &config, origin.as_ref(), &persistence_dir).await
+    message_append_with_config(ctx, request, &config, origin.as_ref(), &persistence_dir).await
 }
 
 async fn message_append_with_config(
+    ctx: &DispatchCtx,
     mut request: AppendConversationMessageRequest,
     config: &crate::config::Config,
     origin: Option<&crate::agent::turn_origin::AgentTurnOrigin>,
@@ -283,6 +292,7 @@ async fn message_append_with_config(
         }
     }
     let message = conversations::blocking::append_message(
+        ctx.clone(),
         persistence_dir.to_path_buf(),
         request.thread_id.clone(),
         record_to_message(request.message),
@@ -306,10 +316,12 @@ mod message_append_tests;
 /// making it invisible in every non-"All" filter view. Callers should
 /// ensure this is intentional.
 pub async fn thread_update_labels(
+    ctx: &DispatchCtx,
     request: UpdateConversationThreadLabelsRequest,
 ) -> Result<Outcome<ApiEnvelope<ConversationThreadSummary>>, String> {
     let dir = workspace_dir().await?;
     let thread = conversations::blocking::update_thread_labels(
+        ctx.clone(),
         dir,
         request.thread_id.clone(),
         request.labels.clone(),
@@ -330,6 +342,7 @@ pub async fn thread_update_labels(
 
 /// Sets a user-specified title on a conversation thread, bypassing AI generation.
 pub async fn thread_update_title(
+    ctx: &DispatchCtx,
     request: UpdateConversationThreadTitleRequest,
 ) -> Result<Outcome<ApiEnvelope<ConversationThreadSummary>>, String> {
     let dir = workspace_dir().await?;
@@ -338,6 +351,7 @@ pub async fn thread_update_title(
         return Err("title must not be empty".to_string());
     }
     let updated = conversations::blocking::update_thread_title(
+        ctx.clone(),
         dir,
         request.thread_id.clone(),
         title,
@@ -359,10 +373,12 @@ pub async fn thread_update_title(
 
 /// Updates metadata on an existing conversation message.
 pub async fn message_update(
+    ctx: &DispatchCtx,
     request: UpdateConversationMessageRequest,
 ) -> Result<Outcome<ApiEnvelope<ConversationMessageRecord>>, String> {
     let dir = workspace_dir().await?;
     let message = conversations::blocking::update_message(
+        ctx.clone(),
         dir,
         request.thread_id.clone(),
         request.message_id.clone(),
@@ -388,11 +404,13 @@ pub async fn message_update(
 /// should treat that as "nothing to truncate" (e.g. a stale/already-edited
 /// message id), not as an empty thread.
 pub async fn delete_after(
+    ctx: &DispatchCtx,
     thread_id: &str,
     message_id: &str,
 ) -> Result<Option<usize>, ThreadsError> {
     let dir = workspace_dir().await?;
     conversations::blocking::delete_messages_from(
+        ctx.clone(),
         dir,
         thread_id.to_string(),
         message_id.to_string(),
@@ -415,15 +433,17 @@ pub async fn thread_delete(
         .load_config()
         .await
         .map_err(|e| format!("load config: {e}"))?;
-    run_to_completion("thread_delete", thread_delete_inner(config, request)).await
+    run_to_completion("thread_delete", thread_delete_inner(ctx.clone(), config, request)).await
 }
 
 async fn thread_delete_inner(
+    ctx: DispatchCtx,
     config: crate::config::Config,
     request: DeleteConversationThreadRequest,
 ) -> Result<Outcome<ApiEnvelope<DeleteConversationThreadResponse>>, String> {
     let dir: PathBuf = config.workspace_dir.clone();
     let deleted = conversations::blocking::delete_thread(
+        ctx.clone(),
         dir.clone(),
         request.thread_id.clone(),
         request.deleted_at.clone(),
