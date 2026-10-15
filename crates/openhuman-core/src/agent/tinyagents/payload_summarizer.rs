@@ -114,10 +114,12 @@ impl HarnessPayloadSummarizer<OpenHumanRunContext> for SubagentPayloadSummarizer
             "[payload_summarizer] prepared a summary call under the parent turn"
         );
 
+        let dispatch = parent_ctx.data.dispatch_ctx();
         Ok(Box::new(move |request: GenerateRequest| {
+            let dispatch = dispatch.clone();
             Box::pin(async move {
                 let config_loaded =
-                    crate::config::ops::load_current_or_init(&DispatchCtx::ambient()).await;
+                    crate::config::ops::load_current_or_init(&dispatch).await;
                 let (source, model) = subagent_host::resolve_subagent_source(
                     &definition.model,
                     &definition.id,
