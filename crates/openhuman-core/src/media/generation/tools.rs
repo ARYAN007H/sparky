@@ -52,10 +52,22 @@ const VIDEO_DESCRIPTION: &str = "Generate a short video clip via OpenRouter (def
 
 /// Registers the media tools, or nothing when no backend is reachable.
 pub fn build_media_tools(root_config: &Config, action_dir: &Path) -> Vec<Box<dyn Tool>> {
+    build_media_tools_with_allowlist(
+        root_config,
+        action_dir,
+        Arc::new(Mutex::new(HashSet::new())),
+    )
+}
+
+pub(crate) fn build_media_tools_with_allowlist(
+    root_config: &Config,
+    action_dir: &Path,
+    allowed_references: MediaReferenceAllowlist,
+) -> Vec<Box<dyn Tool>> {
     let Some(generators) = managed_generators(root_config) else {
         return Vec::new();
     };
-    media_tools_from(
+    media_tools_from_with_allowlist(
         generators,
         action_dir,
         &root_config.workspace_dir,
@@ -64,6 +76,7 @@ pub fn build_media_tools(root_config: &Config, action_dir: &Path) -> Vec<Box<dyn
         // (`super::progress`, wired per call by `MediaArtifactTool`), so a
         // multi-minute wait is not silent.
         WaitPolicy::new(VIDEO_POLL_INTERVAL, VIDEO_WAIT_BUDGET),
+        allowed_references,
     )
 }
 
@@ -77,9 +90,26 @@ pub fn media_tools_from(
     files_dir: impl Into<crate::agent::artifacts::FileRoots>,
     video_wait: WaitPolicy,
 ) -> Vec<Box<dyn Tool>> {
+    media_tools_from_with_allowlist(
+        generators,
+        action_dir,
+        workspace_dir,
+        files_dir,
+        video_wait,
+        Arc::new(Mutex::new(HashSet::new())),
+    )
+}
+
+fn media_tools_from_with_allowlist(
+    generators: MediaGenerators,
+    action_dir: &Path,
+    workspace_dir: &Path,
+    files_dir: impl Into<crate::agent::artifacts::FileRoots>,
+    video_wait: WaitPolicy,
+    allowed_artifacts: MediaReferenceAllowlist,
+) -> Vec<Box<dyn Tool>> {
     let files = files_dir.into();
     let generators = Arc::new(generators);
-    let allowed_artifacts = Arc::new(Mutex::new(HashSet::new()));
     let output = MediaOutput::new(action_dir).with_reference_policy(reference_policy(
         action_dir,
         workspace_dir,
@@ -187,8 +217,8 @@ pub(crate) fn reference_policy(
         }
         let is_filed_artifact = allowed_artifacts
             .lock()
-            .map(|paths| paths.contains(path))
-            .unwrap_or(false);
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .contains(path);
         if !is_filed_artifact && !roots.iter().any(|root| path.starts_with(root)) {
             return Err(format!(
                 "reference path {} is outside the workspace; use a URL or a file inside the workspace",

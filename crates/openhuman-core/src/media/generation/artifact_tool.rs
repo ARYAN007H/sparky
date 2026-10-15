@@ -47,6 +47,41 @@ use tinyagents_harness::tinyinference_video::ProgressFn;
 
 use super::progress::{video_status_observer, JobStateSlot};
 
+const FILE_REFERENCE_FIELDS: [&str; 8] = [
+    "references",
+    "reference_images",
+    "input_images",
+    "inputImages",
+    "first_frame",
+    "inputImage",
+    "input_image",
+    "last_frame",
+];
+
+/// Whether a media call references an absolute path under a trusted Files root.
+/// Only these requests need a durable-artifact refresh before tool execution.
+fn has_reusable_files_reference(args: &Value, files: &crate::agent::artifacts::FileRoots) -> bool {
+    for field in FILE_REFERENCE_FIELDS {
+        let Some(value) = args.get(field) else {
+            continue;
+        };
+        let candidates = value.as_str().into_iter().chain(
+            value
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str),
+        );
+        if candidates.into_iter().any(|candidate| {
+            let path = Path::new(candidate);
+            path.is_absolute() && files.contains_path(path)
+        }) {
+            return true;
+        }
+    }
+    false
+}
+
 /// Maximum characters of the prompt kept in a generated artifact's title.
 const TITLE_PROMPT_CHARS: usize = 60;
 
@@ -333,49 +368,40 @@ impl<T: Tool> MediaArtifactTool<T> {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
-        let mut offset = 0usize;
-        loop {
-            let (artifacts, total) = match crate::agent::artifacts::store::list_artifacts(
+        let artifacts = match crate::agent::artifacts::store::list_artifacts(
+            &self.workspace_dir,
+            0,
+            usize::MAX,
+            None,
+        )
+        .await
+        {
+            Ok((artifacts, _)) => artifacts,
+            Err(error) => {
+                tracing::warn!(
+                    target: "media_generation",
+                    %error,
+                    "[media_generation] could not refresh reusable artifact paths"
+                );
+                return;
+            }
+        };
+
+        for meta in artifacts.iter().filter(|meta| {
+            matches!(&meta.kind, ArtifactKind::Image | ArtifactKind::Video)
+                && matches!(&meta.status, crate::agent::artifacts::ArtifactStatus::Ready)
+        }) {
+            let Ok(path) = crate::agent::artifacts::resolve_ready_file_meta(
                 &self.workspace_dir,
-                offset,
-                200,
-                None,
+                &self.files_dir,
+                meta,
             )
             .await
-            {
-                Ok(page) => page,
-                Err(error) => {
-                    tracing::warn!(
-                        target: "media_generation",
-                        %error,
-                        "[media_generation] could not refresh reusable artifact paths"
-                    );
-                    return;
-                }
+            else {
+                continue;
             };
-
-            for meta in artifacts.iter().filter(|meta| {
-                matches!(&meta.kind, ArtifactKind::Image | ArtifactKind::Video)
-                    && matches!(&meta.status, crate::agent::artifacts::ArtifactStatus::Ready)
-            }) {
-                let Ok(path) = crate::agent::artifacts::resolve_ready_file(
-                    &self.workspace_dir,
-                    &self.files_dir,
-                    &meta.id,
-                )
-                .await
-                else {
-                    continue;
-                };
-                if let Ok(path) = tokio::fs::canonicalize(path).await {
-                    recovered.insert(path);
-                }
-            }
-
-            let page_len = artifacts.len();
-            offset = offset.saturating_add(page_len);
-            if page_len == 0 || offset >= total {
-                break;
+            if let Ok(path) = tokio::fs::canonicalize(path).await {
+                recovered.insert(path);
             }
         }
 
@@ -535,7 +561,9 @@ impl<T: Tool> Tool for MediaArtifactTool<T> {
         options: ToolCallOptions,
         context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
-        self.refresh_allowed_references().await;
+        if has_reusable_files_reference(&args, &self.files_dir) {
+            self.refresh_allowed_references().await;
+        }
 
         // Generation blocks for minutes; report a heartbeat (with the video
         // job's polled state) so the wait is visible on the call.

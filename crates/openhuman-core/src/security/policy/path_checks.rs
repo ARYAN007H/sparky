@@ -96,6 +96,21 @@ impl SecurityPolicy {
             return false;
         }
 
+        // Media outputs live in the configured Files folder, which can be
+        // outside the action/workspace roots. Let those candidates reach the
+        // asynchronous Ready-artifact check in `validate_path`; a Files-root
+        // match alone never grants the read.
+        if self.is_media_artifact_path_cached(expanded_path)
+            || self
+                .media_files_roots
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .as_ref()
+                .is_some_and(|roots| roots.contains_path(expanded_path))
+        {
+            return true;
+        }
+
         // With the policy disabled, containment (`workspace_only`,
         // `forbidden_paths`, trusted roots, the workspace-internal boundary) is
         // inert; the host's container/jail is what bounds the agent. The
@@ -327,7 +342,9 @@ impl SecurityPolicy {
         let resolved = tokio::fs::canonicalize(&full_path)
             .await
             .map_err(|e| format!("Failed to resolve path '{path}': {e}"))?;
-        if !self.is_resolved_path_allowed_for(&resolved, false) {
+        if !self.is_resolved_path_allowed_for(&resolved, false)
+            && !self.authorize_ready_media_artifact_path(&resolved).await
+        {
             return Err(format!(
                 "{POLICY_BLOCKED_MARKER} Resolved path escapes workspace: {}",
                 resolved.display()
@@ -556,6 +573,9 @@ impl SecurityPolicy {
         if !self.enabled {
             return true;
         }
+        if !require_write && self.is_media_artifact_path_cached(resolved) {
+            return true;
+        }
         let workspace_root = self.workspace_root_sync();
         resolved.starts_with(&workspace_root)
             || self.is_within_trusted_root(resolved, require_write)
@@ -587,6 +607,9 @@ impl SecurityPolicy {
                 resolved.display()
             ));
         }
+        if self.is_media_artifact_path_cached(resolved) {
+            return Ok(());
+        }
         // A trusted-root grant takes precedence over forbidden_paths for its subtree.
         if self.is_within_trusted_root(resolved, false) {
             return Ok(());
@@ -609,5 +632,77 @@ impl SecurityPolicy {
             }
         }
         Ok(())
+    }
+
+    fn is_media_artifact_path_cached(&self, path: &Path) -> bool {
+        self.media_artifact_paths
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .contains(path)
+    }
+
+    /// Resolve a candidate outside the normal tool roots through the durable
+    /// artifact store. Only Ready image/video files in configured Files roots
+    /// are cached for the read-only file inspection tools.
+    async fn authorize_ready_media_artifact_path(&self, path: &Path) -> bool {
+        if Self::is_always_forbidden(path) || self.is_workspace_internal_path(path) {
+            return false;
+        }
+        let Some(roots) = self
+            .media_files_roots
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+        else {
+            return false;
+        };
+        if !roots.contains_path(path) {
+            return false;
+        }
+
+        let artifacts = match crate::agent::artifacts::store::list_artifacts(
+            &self.workspace_dir,
+            0,
+            usize::MAX,
+            None,
+        )
+        .await
+        {
+            Ok((artifacts, _)) => artifacts,
+            Err(error) => {
+                tracing::warn!(
+                    target: "security",
+                    %error,
+                    "[security] could not resolve a media artifact read"
+                );
+                return false;
+            }
+        };
+
+        for meta in artifacts.iter().filter(|meta| {
+            matches!(
+                &meta.kind,
+                crate::agent::artifacts::ArtifactKind::Image
+                    | crate::agent::artifacts::ArtifactKind::Video
+            ) && matches!(&meta.status, crate::agent::artifacts::ArtifactStatus::Ready)
+        }) {
+            let Ok(ready_path) =
+                crate::agent::artifacts::resolve_ready_file_meta(&self.workspace_dir, &roots, meta)
+                    .await
+            else {
+                continue;
+            };
+            let Ok(ready_path) = tokio::fs::canonicalize(ready_path).await else {
+                continue;
+            };
+            if ready_path == path {
+                self.media_artifact_paths
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .insert(ready_path);
+                return true;
+            }
+        }
+        false
     }
 }

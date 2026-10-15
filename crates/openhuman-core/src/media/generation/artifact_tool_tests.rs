@@ -6,8 +6,35 @@ use tinyagents_harness::media::MediaOutput;
 use tinystoragedrivers::BlobStore;
 use tinytools::{PermissionLevel, Tool, ToolCategory, ToolContent, ToolResult};
 
-use super::{copy_blob_to_file, MediaArtifactTool};
-use crate::agent::artifacts::{ArtifactKind, ArtifactStatus};
+use super::{copy_blob_to_file, has_reusable_files_reference, MediaArtifactTool};
+use crate::agent::artifacts::{ArtifactKind, ArtifactStatus, FileRoots};
+
+#[test]
+fn artifact_history_is_refreshed_only_for_absolute_paths_in_files_roots() {
+    let root = tempfile::tempdir().unwrap();
+    let files = root.path().join("Files");
+    std::fs::create_dir_all(&files).unwrap();
+    let roots = FileRoots::new(&files);
+    let filed = files.join("generated.png");
+    let outside = root.path().join("action/generated.png");
+
+    assert!(has_reusable_files_reference(
+        &json!({ "references": [filed.to_string_lossy()] }),
+        &roots
+    ));
+    assert!(!has_reusable_files_reference(
+        &json!({ "references": ["https://example.test/image.png"] }),
+        &roots
+    ));
+    assert!(!has_reusable_files_reference(
+        &json!({ "first_frame": outside.to_string_lossy() }),
+        &roots
+    ));
+    assert!(!has_reusable_files_reference(
+        &json!({ "references": ["generated.png"] }),
+        &roots
+    ));
+}
 
 struct PartialThenFail(bool);
 
