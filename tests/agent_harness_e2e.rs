@@ -4789,18 +4789,17 @@ async fn todo_list_ticks_off_five_items_across_turns_inner() {
     stack.shutdown();
 }
 
-/// Two `in_progress` items break the single-focus invariant: the store
-/// refuses the write, the agent gets a tool error it can correct, and the
-/// list it wrote before is untouched.
+/// Two `in_progress` items break the single-focus invariant: the store keeps
+/// the first active item and repairs the rest to pending.
 #[test]
-fn todo_list_rejects_two_items_in_progress() {
+fn todo_list_repairs_two_items_in_progress() {
     run_on_agent_stack(
-        "todo_list_rejects_two_items_in_progress",
-        todo_list_rejects_two_items_in_progress_inner,
+        "todo_list_repairs_two_items_in_progress",
+        todo_list_repairs_two_items_in_progress_inner,
     );
 }
 
-async fn todo_list_rejects_two_items_in_progress_inner() {
+async fn todo_list_repairs_two_items_in_progress_inner() {
     let _lock = env_lock();
     reset_script(vec![
         todo_write(&["Only step", "Next step"], 0),
@@ -4811,7 +4810,7 @@ async fn todo_list_rejects_two_items_in_progress_inner() {
                 { "content": "Next step", "status": "in_progress" }
             ] }),
         ),
-        // A read (no `todos`) shows the earlier write survived the rejection.
+        // A read (no `todos`) shows the repaired list was persisted.
         tool_call_completion("todo", json!({})),
         text_completion("Kept one thing in progress."),
     ]);
@@ -4850,28 +4849,34 @@ async fn todo_list_rejects_two_items_in_progress_inner() {
     assert_eq!(
         todo_frames.len(),
         3,
-        "write, rejected write, read: {results:?}"
+        "write, repaired write, read: {results:?}"
     );
     assert_eq!(todo_frames[0]["success"], json!(true), "{}", todo_frames[0]);
     assert_eq!(
         todo_frames[1]["success"],
-        json!(false),
-        "two in_progress must be rejected: {}",
+        json!(true),
+        "the duplicate in_progress item is repaired: {}",
         todo_frames[1]
     );
     assert!(
         todo_frames[1]["output"]
             .as_str()
             .unwrap_or("")
-            .contains("in_progress"),
-        "the error names the invariant: {}",
+            .contains("Only one step may be in progress"),
+        "the repair explains the invariant: {}",
         todo_frames[1]
+    );
+    let repaired: Value = serde_json::from_str(todo_frames[1]["output"].as_str().unwrap()).unwrap();
+    assert_eq!(
+        todo_statuses(&repaired),
+        vec!["in_progress", "pending"],
+        "the second active item is reset: {repaired}"
     );
     let read: Value = serde_json::from_str(todo_frames[2]["output"].as_str().unwrap()).unwrap();
     assert_eq!(
         todo_statuses(&read),
         vec!["in_progress", "pending"],
-        "the rejected write left the list untouched: {read}"
+        "the repaired list is persisted: {read}"
     );
 
     stack.shutdown();
