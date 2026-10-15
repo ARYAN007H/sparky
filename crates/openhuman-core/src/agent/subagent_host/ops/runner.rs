@@ -13,8 +13,7 @@ use crate::agent::harness::artifact_offload::offload_run_result;
 use crate::agent::harness::fork_context::ParentExecutionContext;
 use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::agent::prompts::{
-    render_connected_identities, render_subagent_system_prompt_with_format, PromptContext,
-    SubagentRenderOptions,
+    render_subagent_system_prompt_with_format, PromptContext, SubagentRenderOptions,
 };
 use crate::agent::subagent_host::definition_iter_cap;
 use crate::agent::subagent_host::tool_prep::{
@@ -773,7 +772,7 @@ async fn run_typed_mode(
         visible_tool_names: &visible_tool_names,
         tool_call_format: prompt_tool_call_format,
         connected_integrations: &connected_integrations_for_prompt,
-        connected_identities_md: render_connected_identities(&options.run_context.dispatch_ctx()),
+        connected_identities_md: options.run_context.connected_identities_md(),
         user_identity: crate::security::credentials::identity::peek_credential_user_identity(),
         personality_roster: vec![],
         agents_md_global: agents_md.global.clone(),

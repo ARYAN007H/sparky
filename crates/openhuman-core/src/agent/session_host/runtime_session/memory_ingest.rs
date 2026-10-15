@@ -73,6 +73,11 @@ pub(super) fn in_prompt_window(
 impl OpenHumanTurnPrelude {
     /// The context this session's turns run under, from the host environment
     /// bound at the start of the turn.
+    /// The connected-identities prompt section, read under the session's context.
+    pub(in crate::agent::session_host) fn connected_identities_md(&self) -> String {
+        crate::agent::prompts::render_connected_identities(&self.dispatch_ctx())
+    }
+
     pub(in crate::agent::session_host) fn dispatch_ctx(&self) -> crate::core::runtime::DispatchCtx {
         match &self.host_env.core {
             Some(core) => crate::core::runtime::DispatchCtx::new(Arc::clone(core)),
