@@ -78,7 +78,7 @@ struct ModuleRemixer<'a> {
 #[async_trait]
 impl Remixer for ModuleRemixer<'_> {
     async fn remix(&self, request: RemixRequest) -> Result<RemixResponse, String> {
-        service::remix(self.config, request).await
+        service::remix(self.ctx, self.config, request).await
     }
 }
 
@@ -143,10 +143,10 @@ async fn remix_final_reply(
         log_outcome(&turn, started, "history_unavailable", None);
         return None;
     };
-    let remixer = ModuleRemixer { config };
+    let remixer = ModuleRemixer { ctx, config };
     remix_with(
         &remixer,
-        options(config),
+        options(ctx, config),
         &messages,
         &turn,
         started,
@@ -212,11 +212,11 @@ async fn load(
 /// What the host decides for the module: the meme cooldown
 /// (`OPENHUMAN_TINYMEMES_MEME_COOLDOWN` over `[memes] meme_cooldown`) and
 /// whether web search can serve research at all.
-fn options(config: &Config) -> RemixOptions {
+fn options(ctx: &DispatchCtx, config: &Config) -> RemixOptions {
     options_with(
         std::env::var(COOLDOWN_ENV).ok().as_deref(),
         config.memes.meme_cooldown,
-        search::OpenHumanSearch::available(config).is_some(),
+        search::OpenHumanSearch::available(ctx, config).is_some(),
     )
 }
 
