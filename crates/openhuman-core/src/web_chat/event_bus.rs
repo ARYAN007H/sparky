@@ -8,6 +8,7 @@ use std::sync::{Arc, OnceLock};
 use tokio::sync::broadcast;
 
 use crate::core::events::DomainEvent;
+use crate::core::runtime::DispatchCtx;
 use crate::web_chat::WebChannelEvent;
 use tinybus::EventHandler;
 use tinybus::SubscriptionHandle;
@@ -25,11 +26,17 @@ pub fn subscribe_web_channel_events() -> broadcast::Receiver<WebChannelEvent> {
 /// `/events` stream, stamping `ts` (epoch ms) when the caller left it unset
 /// so every emitted event carries a wall-clock time the frontend can use for
 /// ordering/latency display without guessing at receive time.
-pub fn publish_web_channel_event(mut event: WebChannelEvent) {
+pub fn publish_web_channel_event(event: WebChannelEvent) {
+    publish_web_channel_event_in(&DispatchCtx::ambient(), event);
+}
+
+/// [`publish_web_channel_event`] with the tenant stamped from `ctx`: the one
+/// the calling turn runs under, rather than the calling task's own scope.
+pub fn publish_web_channel_event_in(ctx: &DispatchCtx, mut event: WebChannelEvent) {
     if event.ts.is_none() {
         event.ts = Some(crate::web_chat::progress_bridge::unix_epoch_ms());
     }
-    event.stamp_tenant(crate::core::runtime::current_tenant().ok());
+    event.stamp_tenant(ctx.tenant().ok());
     let _ = EVENT_BUS.send(event);
 }
 
