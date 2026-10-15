@@ -215,7 +215,7 @@ pub(super) fn handle_search(_ctx: DispatchCtx, params: Map<String, Value>) -> Co
 }
 
 pub(super) fn handle_edit_message(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
@@ -224,7 +224,7 @@ pub(super) fn handle_edit_message(
     })
 }
 
-pub(super) fn handle_regenerate(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_regenerate(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = parse::<ops::RegenerateRequest>(params)?;
         to_json(ops::regenerate(&ctx, p).await.map_err(|e| e.to_string())?)
