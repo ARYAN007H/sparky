@@ -45,6 +45,7 @@ pub(super) fn failed_run_history(
 /// message so per-thread usage reads price the sub-agent at its own model.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn persist_subagent_transcript(
+    ctx: &crate::core::runtime::DispatchCtx,
     workspace_dir: &std::path::Path,
     transcript_stem: &str,
     agent_id: &str,
@@ -60,7 +61,7 @@ pub(super) fn persist_subagent_transcript(
 ) {
     use tinyagents_session::transcript;
 
-    let root = crate::agent::session_store::transcript_root(workspace_dir);
+    let root = crate::agent::session_store::transcript_root(ctx, workspace_dir);
     let path = match transcript::resolve_keyed_transcript_path(&root, transcript_stem) {
         Ok(p) => p,
         Err(err) => {
@@ -142,6 +143,7 @@ pub(super) fn persist_subagent_transcript(
 /// number of model calls a provider answered.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn persist_failed_run(
+    ctx: &crate::core::runtime::DispatchCtx,
     workspace_dir: &std::path::Path,
     transcript_stem: &str,
     agent_id: &str,
@@ -166,6 +168,7 @@ pub(super) fn persist_failed_run(
     history.push(TranscriptMessage::assistant(marker.clone()));
 
     persist_subagent_transcript(
+        ctx,
         workspace_dir,
         transcript_stem,
         agent_id,

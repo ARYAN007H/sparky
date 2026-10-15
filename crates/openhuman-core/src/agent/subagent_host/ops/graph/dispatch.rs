@@ -318,6 +318,7 @@ pub(in super::super) async fn run_subagent_via_graph(
                 "[subagent_host:graph] sub-agent run errored; persisting recovered transcript before returning (#4466)"
             );
             super::transcript::persist_failed_run(
+                &dispatch,
                 &workspace_dir,
                 transcript_stem,
                 agent_id,
@@ -466,7 +467,8 @@ pub(in super::super) async fn run_subagent_via_graph(
         history.as_slice()
     };
     persist_subagent_transcript(
-        &workspace_dir,
+        &dispatch,
+        &workspace_dir
         transcript_stem,
         agent_id,
         task_id,
