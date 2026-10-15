@@ -213,7 +213,7 @@ pub(crate) async fn spawn_parallel_turn(
                 }
             }
 
-            parallel_in_flight(ctx)
+            parallel_in_flight(&ctx_task)
                 .lock_owned()
                 .await
                 .remove(&map_key_task);

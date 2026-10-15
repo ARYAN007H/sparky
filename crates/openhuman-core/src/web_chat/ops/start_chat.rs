@@ -555,7 +555,7 @@ async fn start_chat_inner(
                     // Release any in-flight slot we still own and stop. The
                     // `request_id` guard below prevents clobbering a newer turn that
                     // replaced us on the interrupt path.
-                    let mut in_flight = in_flight(ctx).lock_owned().await;
+                    let mut in_flight = in_flight(&ctx_task).lock_owned().await;
                     if let Some(current) = in_flight.get(&map_key_task) {
                         if current.request_id == request_id_task {
                             in_flight.remove(&map_key_task);
@@ -652,7 +652,7 @@ async fn start_chat_inner(
 
             // Drain followup messages queued during this turn.
             let followups = {
-                let mut in_flight = in_flight(ctx).lock_owned().await;
+                let mut in_flight = in_flight(&ctx_task).lock_owned().await;
                 let followups = if let Some(current) = in_flight.get(&map_key_task) {
                     if current.request_id == request_id_task {
                         let fups = current.run_queue.drain(QueueLane::Followup).await;
