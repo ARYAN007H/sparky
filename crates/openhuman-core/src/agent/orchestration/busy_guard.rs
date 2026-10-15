@@ -67,10 +67,10 @@ impl TurnBusy {
 const THREAD_MARK: char = '\u{2}';
 
 /// The thread a busy session id is a turn on.
-fn thread_of(session: &str) -> Option<String> {
+fn thread_of(ctx: &crate::core::runtime::DispatchCtx, session: &str) -> Option<String> {
     match session.strip_prefix(THREAD_MARK) {
         Some(thread) => Some(thread.to_string()),
-        None => background_completions::thread_for_session(session),
+        None => background_completions::thread_for_session(ctx, session),
     }
 }
 
@@ -95,7 +95,7 @@ pub(crate) fn is_busy(ctx: &crate::core::runtime::DispatchCtx, thread_id: &str) 
         .expect("background_delivery busy poisoned")
         .keys()
         .filter_map(|key| session_of(key, &me))
-        .any(|session| thread_of(session).as_deref() == Some(thread_id))
+        .any(|session| thread_of(ctx, session).as_deref() == Some(thread_id))
 }
 
 /// Forget every in-flight turn of the calling profile on `thread_id`. A turn
@@ -108,7 +108,7 @@ pub(crate) fn clear_busy_for_thread(ctx: &crate::core::runtime::DispatchCtx, thr
     let mut busy = busy().lock().expect("background_delivery busy poisoned");
     let before = busy.len();
     busy.retain(|key, _| {
-        session_of(key, &me).is_none_or(|session| thread_of(session).as_deref() != Some(thread_id))
+        session_of(key, &me).is_none_or(|session| thread_of(ctx, session).as_deref() != Some(thread_id))
     });
     let cleared = before - busy.len();
     if cleared > 0 {

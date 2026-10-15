@@ -35,9 +35,9 @@ async fn threads_purge_inner(
     let cancelled_threads = running_subagents::cancel_all(&ctx);
     let mut discarded = 0;
     for thread_id in &cancelled_threads {
-        discarded += background_completions::discard_for_thread(&dir, thread_id);
+        discarded += background_completions::discard_for_thread(&ctx, &dir, thread_id);
     }
-    discarded += background_completions::clear_all(&dir);
+    discarded += background_completions::clear_all(&ctx, &dir);
     log::debug!(
         "[threads] threads_purge cancelled_threads={} discarded_completions={}",
         cancelled_threads.len(),
