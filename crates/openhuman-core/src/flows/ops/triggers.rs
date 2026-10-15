@@ -179,7 +179,7 @@ pub async fn reconcile_schedule_triggers_on_boot(config: &Config) -> Result<(), 
     // that scope, where the scheduler visits them.
     let mut errors = Vec::new();
     for (agent, result) in
-        crate::storage::agents::for_each_scope("flows schedule reconcile", || {
+        crate::storage::agents::for_each_scope("flows schedule reconcile", |_| {
             reconcile_schedule_triggers_in_scope(config)
         })
         .await

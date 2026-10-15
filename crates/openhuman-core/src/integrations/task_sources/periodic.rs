@@ -101,8 +101,8 @@ async fn run_loop() {
         // `local`, then every agent that keeps its sources in its own storage
         // scope (`crate::storage::agents`).
         for (agent, result) in
-            crate::storage::agents::for_each_live_scope("task_sources", || async {
-                run_one_tick(&DispatchCtx::ambient()).await
+            crate::storage::agents::for_each_live_scope("task_sources", |ctx| async move {
+                run_one_tick(&ctx).await
             })
             .await
         {

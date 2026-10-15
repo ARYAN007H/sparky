@@ -62,7 +62,7 @@ async fn resolve(config: &Config, flow_id: &str) -> Result<Option<String>, Looku
             Some(Ok(false)) | None => forget(flow_id),
         }
     }
-    let Some(owner) = find_owner("flow owner", || has_flow(config, flow_id)).await? else {
+    let Some(owner) = find_owner("flow owner", |_| has_flow(config, flow_id)).await? else {
         return Ok(None);
     };
     tracing::debug!(

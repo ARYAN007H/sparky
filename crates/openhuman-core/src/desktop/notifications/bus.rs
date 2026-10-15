@@ -492,7 +492,7 @@ async fn event_owner(
     if crate::storage::installed().is_none() {
         return Ok(None);
     }
-    let owner = crate::storage::agents::find_owner("notification owner", || async {
+    let owner = crate::storage::agents::find_owner("notification owner", |_| async {
         match crate::cron::get_job(config, job_id) {
             Ok(_) => Ok(true),
             // tinyflows reports a missing job as `Cron job '<id>' not found`
