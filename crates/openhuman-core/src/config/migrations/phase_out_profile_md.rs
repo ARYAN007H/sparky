@@ -21,9 +21,12 @@
 //!    date-grouped subdirs), reads each file, and — if the first
 //!    message is a system message containing a `### PROFILE.md`
 //!    heading — removes the heading and everything beneath it up to
-//!    the next `### ` heading (or end-of-prompt). The transcript is
-//!    rewritten in place via the same [`transcript::write_transcript`]
-//!    used at runtime so the on-disk shape stays byte-compatible.
+//!    the next `### ` heading (or end-of-prompt). The walk and the
+//!    rewrite are TinyAgents' legacy maintenance
+//!    (`tinyagents_session::legacy::rewrite_legacy_transcripts`), which
+//!    owns the format, so the on-disk shape stays byte-compatible and this
+//!    module names no transcript file. It runs before the workspace's
+//!    one-time import into the session store.
 //! 3. **Sweeps `.md` companions** under `{workspace}/sessions/**/*.md`,
 //!    rewriting in place any file whose body still contains a
 //!    `### PROFILE.md` heading. The rest of the transcript
@@ -46,10 +49,10 @@
 //! migration short-circuits without scanning. The caller still bumps
 //! `schema_version` so future launches don't re-check.
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use std::fs;
 use std::path::{Path, PathBuf};
-use tinyagents_session::transcript::{self, SessionTranscript};
+use tinyagents_session::transcript::SessionTranscript;
 
 /// Line that opens a `PROFILE.md` block in a system prompt. Matches the
 /// output of `inject_workspace_file_capped` in `agent/prompts/mod.rs`.
@@ -139,10 +142,9 @@ pub fn run(workspace_dir: &Path) -> Result<PhaseOutStats> {
 /// by [`tinyagents_session::transcript`]
 /// (`sessions/YYYY_MM_DD/{stem}.md` for the new format, legacy
 /// `sessions/DDMMYYYY/{stem}.md` for the date-grouped fallback). The
-/// JSONL walk in [`collect_jsonl_transcripts`] makes the same
-/// assumption. If a future change starts producing deeper nesting
-/// (e.g. `sessions/YYYY/MM/DD/`), both walkers will silently miss the
-/// inner files and this comment needs to be revisited.
+/// legacy JSONL walk makes the same assumption. If a future change starts
+/// producing deeper nesting (e.g. `sessions/YYYY/MM/DD/`), the walk will
+/// silently miss the inner files and this comment needs to be revisited.
 ///
 /// Read/IO errors are folded into `stats.errors` and the walk continues.
 fn sweep_tainted_md_companions(workspace_dir: &Path, stats: &mut PhaseOutStats) -> usize {
@@ -332,18 +334,6 @@ fn is_block_boundary(line: &str) -> bool {
         || trimmed == "<!--/MSG-->"
 }
 
-
-fn push_jsonl_in_dir(dir: &Path, out: &mut Vec<PathBuf>) {
-    let Ok(entries) = fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("jsonl") {
-            out.push(path);
-        }
-    }
-}
 
 #[cfg(test)]
 #[path = "phase_out_profile_md_tests.rs"]
