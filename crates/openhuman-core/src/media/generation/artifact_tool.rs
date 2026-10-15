@@ -1,9 +1,8 @@
 //! [`MediaArtifactTool`] — wraps a media-generation [`Tool`] (TinyAgents'
 //! `GenerateImageTool` / `GenerateVideoTool`, boxed in `super::tools`) so
-//! every file the inner tool saves is also tracked as an OpenHuman artifact,
-//! following the pattern `tools/impl/document/mod.rs` and
-//! `tools/impl/presentation/mod.rs` use for their own producers
-//! (`create_artifact` → write bytes → `finalize_artifact`/`fail_artifact`).
+//! every file the inner tool saves is also filed as a versioned OpenHuman
+//! artifact, through the same [`Production`] flow the document and
+//! presentation producers use.
 //!
 //! The inner tool already writes bytes under
 //! `<action_dir>/generated-media/...` (see [`super::tools::media_tools_from`])
@@ -11,10 +10,9 @@
 //! (`{"type": "image"|"video", "path", "media_type"|"format", "bytes"}`, see
 //! `tinyagents_harness::media::{GenerateImageTool, GenerateVideoTool}`). This
 //! wrapper runs the inner tool unchanged, then for every reported file:
-//! reserves an artifact via `create_artifact_for_call` (recording the
-//! provider-assigned tool-call id so `ArtifactPending`/`Ready`/`Failed`
-//! correlate with the tool-call bubble, #C5), moves the file into the
-//! artifact's reserved path, and finalizes it — or fails just that one
+//! starts a [`Production`] (recording the provider-assigned tool-call id so the
+//! card correlates with the tool-call bubble, #C5), moves the file into the
+//! artifact's reserved path, and completes it — or fails just that one
 //! artifact and annotates its entry with `artifact_error`, without
 //! disturbing the others (`n > 1` generations are common for images). On
 //! success each entry gains an `artifact_id` field so the model (and the
@@ -22,7 +20,7 @@
 //! tool's JSON/markdown result shape is preserved byte-for-byte.
 //!
 //! A run with no context (`execute`/`execute_with_options`, e.g. CLI/tests)
-//! still creates artifacts — `create_artifact_for_call` simply records no
+//! still creates artifacts — the production simply records no
 //! `tool_call_id` and the chat-context bridge in `agent/artifacts/store.rs`
 //! degrades to `thread_id = None` as it already does for every other
 //! producer.
@@ -36,11 +34,8 @@ use tinytools::{
     ToolRunContext, ToolScope, ToolTimeout,
 };
 
-use crate::agent::artifacts::{
-    create_artifact_for_call, fail_artifact, finalize_artifact, ArtifactKind,
-};
-use crate::agent::artifacts::tiny_store::FsArtifactStore;
-use tiny_artifacts::{ArtifactRecord, ArtifactStore};
+use crate::agent::artifacts::production::Production;
+use crate::agent::artifacts::ArtifactKind;
 use crate::tools::host_extensions::tool_call_id;
 
 /// Maximum characters of the prompt kept in a generated artifact's title.
@@ -142,78 +137,55 @@ impl<T: Tool> MediaArtifactTool<T> {
             .unwrap_or("bin")
             .to_string();
         let title = Self::artifact_title(args, index, total);
-        let (meta, dest) = match create_artifact_for_call(
+        let kind = match self.kind {
+            ArtifactKind::Image => tiny_artifacts::ArtifactKind::Image,
+            _ => tiny_artifacts::ArtifactKind::File,
+        };
+        // Reserve the file in the files folder (the card shows
+        // "generating…", tied to this tool call's bubble) and open the
+        // versioned artifact under the same id.
+        let production = match Production::start(
             &self.workspace_dir,
-            &self.files_dir,
-            self.kind.clone(),
+            self.files_dir.clone(),
+            kind,
             &title,
             &ext,
             call_id,
+            None,
         )
         .await
         {
-            Ok(pair) => pair,
+            Ok(production) => production,
             Err(err) => {
                 tracing::warn!(
                     target: "media_generation",
                     err = %err,
-                    "[media_generation] create_artifact failed; generated file left unfiled"
+                    "[media_generation] could not open the artifact; generated file left unfiled"
                 );
                 set_artifact_error(entry, &err);
                 return;
             }
         };
-        match move_or_copy(src, &dest).await {
-            Ok(size_bytes) => {
-                match finalize_artifact(&self.workspace_dir, &meta.id, size_bytes).await {
-                    Ok(updated) => {
-                        if let Some(obj) = entry.as_object_mut() {
-                            obj.insert("artifact_id".into(), json!(updated.id));
-                        }
-                        // Phase 2d: mirror into the versioned artifact store
-                        // (tiny-artifacts crate). Each generated file becomes
-                        // a fresh versioned record – the shared model stores
-                        // a workspace-path reference, not bytes. Best-effort:
-                        // a failure here must not fail the filed artifact.
-                        let versioned = FsArtifactStore::new(&self.workspace_dir, self.files_dir.clone());
-                        let kind = match self.kind {
-                            ArtifactKind::Image => tiny_artifacts::ArtifactKind::Image,
-                            _ => tiny_artifacts::ArtifactKind::File,
-                        };
-                        let record = ArtifactRecord::new(
-                            &updated.id,
-                            &title,
-                            kind,
-                            dest.display().to_string(),
-                            "agent",
-                            tiny_artifacts::now_millis(),
-                        );
-                        if let Err(err) = versioned.upsert(&record).await {
-                            tracing::warn!(
-                                target: "media_generation",
-                                err = %err,
-                                artifact_id = %updated.id,
-                                "[media_generation] failed to mirror artifact into versioned store"
-                            );
-                        }
-                    }
-                    Err(err) => {
-                        let _ = fail_artifact(&self.workspace_dir, &self.files_dir, &meta.id, &err)
-                            .await;
-                        set_artifact_error(entry, &err);
-                    }
+        if let Err(err) = move_or_copy(src, production.path()).await {
+            production.fail(&err).await;
+            tracing::warn!(
+                target: "media_generation",
+                err = %err,
+                artifact_id = %production.id(),
+                "[media_generation] failed to file generated media as an artifact"
+            );
+            set_artifact_error(entry, &err);
+            return;
+        }
+        // The moved file becomes the artifact's first version; the card turns
+        // ready from that record.
+        match production.complete().await {
+            Ok(_) => {
+                if let Some(obj) = entry.as_object_mut() {
+                    obj.insert("artifact_id".into(), json!(production.id()));
                 }
             }
-            Err(err) => {
-                let _ = fail_artifact(&self.workspace_dir, &self.files_dir, &meta.id, &err).await;
-                tracing::warn!(
-                    target: "media_generation",
-                    err = %err,
-                    artifact_id = %meta.id,
-                    "[media_generation] failed to file generated media as an artifact"
-                );
-                set_artifact_error(entry, &err);
-            }
+            Err(err) => set_artifact_error(entry, &err),
         }
     }
 }

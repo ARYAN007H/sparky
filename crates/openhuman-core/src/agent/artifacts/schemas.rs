@@ -12,6 +12,8 @@ pub fn all_controller_schemas() -> Vec<ControllerSchema> {
         schemas("get_artifact"),
         schemas("delete_artifact"),
         schemas("regenerate"),
+        schemas("save_artifact_version"),
+        schemas("share_artifact"),
     ]
 }
 
@@ -32,6 +34,14 @@ pub fn all_registered_controllers() -> Vec<RegisteredController> {
         RegisteredController {
             schema: schemas("regenerate"),
             handler: handle_regenerate,
+        },
+        RegisteredController {
+            schema: schemas("save_artifact_version"),
+            handler: handle_save_artifact_version,
+        },
+        RegisteredController {
+            schema: schemas("share_artifact"),
+            handler: handle_share_artifact,
         },
     ]
 }
@@ -148,6 +158,106 @@ pub fn schemas(function: &str) -> ControllerSchema {
                     required: true,
                 },
             ],
+        },
+        "save_artifact_version" => ControllerSchema {
+            namespace: "ai",
+            function: "save_artifact_version",
+            description: "Save the user's edit of a versioned artifact as a new operator-authored version; updates its file and card.",
+            inputs: vec![
+                artifact_id_input("Identifier of the versioned artifact."),
+                FieldSchema {
+                    name: "body",
+                    ty: TypeSchema::String,
+                    comment: "Full content of the new version.",
+                    required: true,
+                },
+            ],
+            outputs: vec![FieldSchema {
+                name: "result",
+                ty: TypeSchema::Object {
+                    fields: vec![
+                        FieldSchema {
+                            name: "artifact_id",
+                            ty: TypeSchema::String,
+                            comment: "Identifier of the artifact.",
+                            required: true,
+                        },
+                        FieldSchema {
+                            name: "version",
+                            ty: TypeSchema::U64,
+                            comment: "The newest version number after the call.",
+                            required: true,
+                        },
+                        FieldSchema {
+                            name: "saved",
+                            ty: TypeSchema::Bool,
+                            comment: "False when the body matched the newest version and nothing was appended.",
+                            required: true,
+                        },
+                    ],
+                },
+                comment: "Save result payload.",
+                required: true,
+            }],
+        },
+        "share_artifact" => ControllerSchema {
+            namespace: "ai",
+            function: "share_artifact",
+            description: "Share a version of an artifact through cloud file storage and return its link (reused while it still works).",
+            inputs: vec![
+                artifact_id_input("Identifier of the versioned artifact."),
+                FieldSchema {
+                    name: "version",
+                    ty: TypeSchema::Option(Box::new(TypeSchema::U64)),
+                    comment: "Version to share; the newest when absent.",
+                    required: false,
+                },
+                FieldSchema {
+                    name: "public",
+                    ty: TypeSchema::Option(Box::new(TypeSchema::Bool)),
+                    comment: "A stable public link instead of a private, expiring one.",
+                    required: false,
+                },
+            ],
+            outputs: vec![FieldSchema {
+                name: "result",
+                ty: TypeSchema::Object {
+                    fields: vec![
+                        FieldSchema {
+                            name: "url",
+                            ty: TypeSchema::String,
+                            comment: "The shareable link.",
+                            required: true,
+                        },
+                        FieldSchema {
+                            name: "version",
+                            ty: TypeSchema::U64,
+                            comment: "The version shared.",
+                            required: true,
+                        },
+                        FieldSchema {
+                            name: "public",
+                            ty: TypeSchema::Bool,
+                            comment: "Whether the link is public.",
+                            required: true,
+                        },
+                        FieldSchema {
+                            name: "expires_at_millis",
+                            ty: TypeSchema::Option(Box::new(TypeSchema::U64)),
+                            comment: "When the link stops working, if it expires.",
+                            required: false,
+                        },
+                        FieldSchema {
+                            name: "reused",
+                            ty: TypeSchema::Bool,
+                            comment: "True when an existing live link was returned without uploading.",
+                            required: true,
+                        },
+                    ],
+                },
+                comment: "Share result payload.",
+                required: true,
+            }],
         },
         "delete_artifact" => ControllerSchema {
             namespace: "ai",
@@ -281,6 +391,51 @@ fn handle_get_artifact(params: Map<String, Value>) -> ControllerFuture {
         let config = config_rpc::load_config_with_timeout().await?;
         let artifact_id = read_required::<String>(&params, "artifact_id")?;
         to_json(crate::agent::artifacts::ops::ai_get_artifact(&config, artifact_id.trim()).await?)
+    })
+}
+
+fn handle_save_artifact_version(params: Map<String, Value>) -> ControllerFuture {
+    Box::pin(async move {
+        let config = config_rpc::load_config_with_timeout().await?;
+        let artifact_id = read_required::<String>(&params, "artifact_id")?;
+        let body = read_required::<String>(&params, "body")?;
+        to_json(
+            crate::agent::artifacts::ops::ai_save_artifact_version(
+                &config,
+                artifact_id.trim(),
+                &body,
+            )
+            .await?,
+        )
+    })
+}
+
+fn handle_share_artifact(params: Map<String, Value>) -> ControllerFuture {
+    Box::pin(async move {
+        let config = config_rpc::load_config_with_timeout().await?;
+        let artifact_id = read_required::<String>(&params, "artifact_id")?;
+        let version = read_optional_u64(&params, "version")?
+            .map(|v| u32::try_from(v).map_err(|_| "invalid 'version': too large".to_string()))
+            .transpose()?;
+        let public = match params.get("public") {
+            None | Some(Value::Null) => false,
+            Some(Value::Bool(b)) => *b,
+            Some(other) => {
+                return Err(format!(
+                    "invalid 'public': expected bool, got {}",
+                    type_name(other)
+                ))
+            }
+        };
+        to_json(
+            crate::agent::artifacts::ops::ai_share_artifact(
+                &config,
+                artifact_id.trim(),
+                version,
+                public,
+            )
+            .await?,
+        )
     })
 }
 

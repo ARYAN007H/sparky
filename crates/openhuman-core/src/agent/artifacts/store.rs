@@ -596,7 +596,11 @@ pub async fn create_artifact_for_call(
         created_at,
         error: None,
         thread_id,
-        tool_call_id: tool_call_id.map(str::to_string),
+        // A regenerate keeps the tool call that made the artifact: dropping it
+        // would detach the card from that call's bubble.
+        tool_call_id: tool_call_id
+            .map(str::to_string)
+            .or_else(|| previous.as_ref().and_then(|prev| prev.tool_call_id.clone())),
     };
     save_artifact_meta(workspace_dir, &meta).await?;
 

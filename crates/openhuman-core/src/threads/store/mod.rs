@@ -36,10 +36,22 @@ use tinyagents_session::threads as store;
 pub(crate) use bus::claim_channel_turn;
 pub use bus::register_conversation_persistence_subscriber;
 pub use store::{
-    append_message, delete_messages_from, delete_thread, ensure_thread, get_messages,
+    append_message, delete_messages_from, delete_thread, ensure_thread,
     is_deterministic_message_id, list_threads, purge_threads, reply_run_id, run_reply_message_id,
     update_message, update_thread_labels, update_thread_title, update_thread_working_dir,
     ConversationPurgeStats, ConversationStore, ConversationThread, CreateConversationThread,
     CrossThreadHit, ThreadMessage as ConversationMessage,
     ThreadMessagePatch as ConversationMessagePatch,
 };
+
+/// A thread's messages without artifact rows. Artifact rows place artifact
+/// cards in the UI and must never reach a model, so this is what every core
+/// reader uses; only the UI's message list reads them
+/// ([`blocking::get_messages_with_artifact_rows`]).
+pub fn get_messages(
+    workspace_dir: std::path::PathBuf,
+    thread_id: &str,
+) -> Result<Vec<ConversationMessage>, String> {
+    store::get_messages(workspace_dir, thread_id)
+        .map(crate::threads::artifact_rows::without_artifact_rows)
+}

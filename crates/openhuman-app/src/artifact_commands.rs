@@ -25,8 +25,8 @@
 //! already vouches for. The filename hint is still sanitized so nothing is
 //! written outside the Downloads directory.
 
+use serde::Serialize;
 use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
 
 /// Resolve an artifact id to the file the core's artifact store vouches for,
 /// in the given workspace. Isolated from config loading for unit testing.
@@ -62,7 +62,8 @@ pub struct ArtifactBodyResult {
 #[tauri::command]
 pub async fn read_artifact_body(artifact_id: String) -> Result<ArtifactBodyResult, String> {
     let config = openhuman_rpc::embed::config::load_config_with_timeout().await?;
-    let path = config.workspace_dir
+    let path = config
+        .workspace_dir
         .join("artifacts/versioned")
         .join(&artifact_id)
         .with_extension("json");
@@ -113,58 +114,46 @@ pub async fn read_artifact_body(artifact_id: String) -> Result<ArtifactBodyResul
             }
         }
     }
-    Ok(ArtifactBodyResult { kind, title, version: versions, body, is_text })
+    Ok(ArtifactBodyResult {
+        kind,
+        title,
+        version: versions,
+        body,
+        is_text,
+    })
 }
 
-#[derive(Deserialize)]
-pub struct SaveArtifactBodyArgs {
-    pub artifact_id: String,
-    pub body: String,
-    pub note: Option<String>,
-}
-
+/// Ask the user where to save an artifact (the OS save dialog, prefilled with
+/// `filename`) and copy the artifact's file there.
+///
+/// Returns `Ok(Some(path))` once copied, `Ok(None)` when the user cancels.
+/// The file copied is the one the core's artifact store vouches for; for a
+/// versioned artifact that is its latest version.
 #[tauri::command]
-pub async fn save_artifact_body(args: SaveArtifactBodyArgs) -> Result<(), String> {
+pub async fn save_artifact_as(
+    artifact_id: String,
+    filename: String,
+) -> Result<Option<String>, String> {
     let config = openhuman_rpc::embed::config::load_config_with_timeout().await?;
-    let path = config.workspace_dir
-        .join("artifacts/versioned")
-        .join(&args.artifact_id)
-        .with_extension("json");
+    let roots = openhuman_rpc::embed::artifacts::FileRoots::from_config(&config);
+    let source = resolve_source(&config.workspace_dir, &roots, &artifact_id).await?;
+    let sanitized = sanitize_filename(&filename)?;
 
-    // Read existing record
-    let json = tokio::fs::read_to_string(&path)
+    // macOS: NSSavePanel. Windows: IFileSaveDialog. Linux: the GTK chooser.
+    let Some(handle) = rfd::AsyncFileDialog::new()
+        .set_file_name(&sanitized)
+        .save_file()
         .await
-        .map_err(|e| format!("artifact {} not found: {e}", args.artifact_id))?;
-    let mut record: serde_json::Value = serde_json::from_str(&json)
-        .map_err(|e| format!("artifact {} parse error: {e}", args.artifact_id))?;
-
-    // Add new version
-    let now = chrono::Utc::now().to_rfc3339();
-    let new_version = serde_json::json!({
-        "version": record["versions"].as_array().map(|v| v.len() as u64 + 1).unwrap_or(1),
-        "body": args.body,
-        "created_at": now,
-        "note": args.note.unwrap_or_default(),
-    });
-
-    record["versions"]
-        .as_array_mut()
-        .ok_or_else(|| "versions is not an array".to_string())?
-        .push(new_version);
-    record["updated_at"] = serde_json::Value::String(now);
-
-    let updated = serde_json::to_string_pretty(&record)
-        .map_err(|e| format!("serialization error: {e}"))?;
-    tokio::fs::write(&path, &updated)
-        .await
-        .map_err(|e| format!("write error: {e}"))?;
-
-    log::info!(
-        "[artifact_commands] save_artifact_body id={} version={}",
-        args.artifact_id,
-        record["versions"].as_array().map(|v| v.len()).unwrap_or(0)
-    );
-    Ok(())
+    else {
+        log::debug!("[artifact_commands] save_artifact_as cancelled by user");
+        return Ok(None);
+    };
+    let dest = handle.path().to_path_buf();
+    let bytes = copy_to_path(&source, &dest).await?;
+    // The chosen path carries the user's login and folder names; it is not
+    // logged (see `directory_picker`).
+    log::info!("[artifact_commands] save_artifact_as bytes={bytes}");
+    Ok(Some(dest.display().to_string()))
 }
 
 /// Maximum number of `(N)` suffixes we'll append when picking a

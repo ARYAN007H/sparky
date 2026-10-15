@@ -5,22 +5,22 @@
 //! producers stay parallel):
 //! 1. Validate the JSON-Schema input early (`types::validate_input`) so
 //!    the agent gets a structured `InvalidInput` it can self-correct on.
-//! 2. Allocate an artifact dir via `artifacts::create_artifact` (kind =
-//!    [`ArtifactKind::Document`], extension `"docx"`). The returned
-//!    `meta` starts at `ArtifactStatus::Pending` so an interrupted run
-//!    never surfaces as Ready.
+//! 2. Start a [`Production`]: it reserves `<title>.docx` in the files folder
+//!    (the card shows "generating…") and opens the versioned artifact — or,
+//!    with an `artifact_id` arg, a new version of that artifact under the same
+//!    id and file.
 //! 3. Persist the verbatim args via `save_artifact_args` for regeneration
 //!    parity (the failed-card Retry path, #3162).
 //! 4. Generate the `.docx` bytes via [`engine::generate`] — pure Rust,
 //!    `docx-rs`-backed, no subprocess. Wrapped in `spawn_blocking` +
 //!    `tokio::time::timeout`.
-//! 5. Write the bytes, stat for size, flip the artifact to `Ready` via
-//!    `finalize_artifact`, return the artifact id + path.
-//! 6. On any failure: flip the artifact to `Failed` via `fail_artifact`
-//!    so the UI surfaces the reason instead of an indefinite spinner.
+//! 5. Write the bytes and [`Production::complete`]: the file becomes the
+//!    artifact's newest version and the card turns ready.
+//! 6. On any failure: [`Production::fail`] so the UI surfaces the reason
+//!    instead of an indefinite spinner.
 //!
-//! Added in GH #4847 (Problem 3: `.docx` export). The
-//! [`ArtifactKind::Document`] enum variant already existed but had no
+//! Added in GH #4847 (Problem 3: `.docx` export). The legacy
+//! `ArtifactKind::Document` enum variant already existed but had no
 //! producer; the byte-agnostic artifact pipeline (Save-As dialog +
 //! Downloads copy) and the frontend `document → docx` extension map need
 //! no format-specific changes.
@@ -32,11 +32,9 @@ use std::time::Duration;
 use async_trait::async_trait;
 use serde_json::{json, Value};
 
-use crate::agent::artifacts::{create_artifact, fail_artifact, finalize_artifact, ArtifactKind};
-use crate::agent::artifacts::tiny_store::FsArtifactStore;
+use crate::agent::artifacts::production::Production;
 use crate::security::SecurityPolicy;
 use tinytools::{PermissionLevel, Tool, ToolResult};
-use tiny_artifacts::{ArtifactAuthor, ArtifactRecord, ArtifactStore, ArtifactVersion};
 
 mod engine;
 /// The document wire contract, shared with the `tinydocs` module.
@@ -236,28 +234,36 @@ impl Tool for DocumentTool {
             "[document] generation request accepted"
         );
 
-        let (meta, output_path) = create_artifact(
+        // Reserve the file and open the artifact: a new one, or a new version
+        // of `artifact_id` (same id, same file, history kept).
+        let production = Production::start(
             &self.workspace_dir,
-            &self.files_dir,
-            ArtifactKind::Document,
+            self.files_dir.clone(),
+            tiny_artifacts::ArtifactKind::File,
             &input.title,
             "docx",
+            None,
+            artifact_id.as_deref(),
         )
         .await
         .map_err(anyhow::Error::msg)?;
+        let output_path = production.path().to_path_buf();
 
         // Persist the verbatim args next to meta.json so a failed card's
         // Retry can re-dispatch this exact spec (#3162). Best-effort: a
         // write failure only forfeits regeneration, never aborts an
         // otherwise-successful generation.
-        if let Err(err) =
-            crate::agent::artifacts::store::save_artifact_args(&self.workspace_dir, &meta.id, &args)
-                .await
+        if let Err(err) = crate::agent::artifacts::store::save_artifact_args(
+            &self.workspace_dir,
+            production.id(),
+            &args,
+        )
+        .await
         {
             tracing::warn!(
                 target: "document",
                 err = %err,
-                artifact_id = %meta.id,
+                artifact_id = %production.id(),
                 "[document] failed to persist args.json; artifact will not be regenerable"
             );
         }
@@ -265,13 +271,7 @@ impl Tool for DocumentTool {
         let bytes = match engine::generate(&input, GENERATION_TIMEOUT).await {
             Ok(bytes) => bytes,
             Err(err) => {
-                let _ = fail_artifact(
-                    &self.workspace_dir,
-                    &self.files_dir,
-                    &meta.id,
-                    &err.to_string(),
-                )
-                .await;
+                production.fail(&err.to_string()).await;
                 tracing::warn!(
                     target: "document",
                     err = %err,
@@ -287,34 +287,26 @@ impl Tool for DocumentTool {
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_default();
             let reason = format!("failed to write generated document ({filename}): {err}");
-            let _ = fail_artifact(&self.workspace_dir, &self.files_dir, &meta.id, &reason).await;
+            production.fail(&reason).await;
             tracing::warn!(
                 target: "document",
                 err = %err,
-                artifact_id = %meta.id,
+                artifact_id = %production.id(),
                 filename = %filename,
                 "[document] artifact file write failed"
             );
             return Ok(ToolResult::error(reason));
         }
 
-        let size_bytes = bytes.len() as u64;
-        let updated = match finalize_artifact(&self.workspace_dir, &meta.id, size_bytes).await {
-            Ok(updated) => updated,
-            Err(err) => {
-                let reason = format!("failed to finalize artifact: {err}");
-                // File is already on disk but the ledger transition failed.
-                // Flip to Failed so the UI surfaces the error instead of a
-                // stuck `Pending` spinner. Fail-artifact errors are
-                // swallowed — they can only recur if the same ledger backend
-                // is unavailable.
-                let _ =
-                    fail_artifact(&self.workspace_dir, &self.files_dir, &meta.id, &reason).await;
+        // Record the file as the artifact's newest version; the card turns
+        // ready from that record.
+        let size_bytes = match production.complete().await {
+            Ok(size) => size,
+            Err(reason) => {
                 tracing::warn!(
                     target: "document",
-                    err = %err,
-                    artifact_id = %meta.id,
-                    "[document] finalize_artifact failed; flipped to Failed"
+                    artifact_id = %production.id(),
+                    "[document] {reason}"
                 );
                 return Ok(ToolResult::error(reason));
             }
@@ -322,91 +314,14 @@ impl Tool for DocumentTool {
 
         tracing::info!(
             target: "document",
-            artifact_id = %updated.id,
+            artifact_id = %production.id(),
             size_bytes,
             section_count = input.sections.len(),
             "[document] generation complete"
         );
 
-        // Phase 2d: mirror the finished document into the versioned artifact
-        // store (tiny-artifacts crate). With an `artifact_id` arg the document
-        // is saved as a new version of that existing artifact, otherwise a
-        // fresh record is created. The body is the workspace path — the
-        // document is a binary file, and the shared model stores a reference,
-        // not bytes.
-        let versioned_store = FsArtifactStore::new(&self.workspace_dir, self.files_dir.clone());
-        let versioned_result = (|| async {
-            let body = output_path.display().to_string();
-            let now = tiny_artifacts::now_millis();
-            match &artifact_id {
-                Some(existing_id) => {
-                    match versioned_store.get(existing_id).await? {
-                        Some(mut record) => {
-                            let v = ArtifactVersion::new(
-                                0,
-                                body,
-                                ArtifactAuthor::Agent,
-                                "agent",
-                                now,
-                            );
-                            record.push_version(v);
-                            versioned_store.upsert(&record).await?;
-                            tracing::info!(
-                                target: "document",
-                                artifact_id = existing_id,
-                                "[document] versioned artifact updated"
-                            );
-                        }
-                        None => {
-                            let record = ArtifactRecord::new(
-                                existing_id,
-                                &input.title,
-                                tiny_artifacts::ArtifactKind::File,
-                                body,
-                                "agent",
-                                now,
-                            );
-                            versioned_store.upsert(&record).await?;
-                            tracing::info!(
-                                target: "document",
-                                artifact_id = existing_id,
-                                "[document] versioned artifact created from update target"
-                            );
-                        }
-                    }
-                }
-                None => {
-                    let record = ArtifactRecord::new(
-                        &meta.id,
-                        &input.title,
-                        tiny_artifacts::ArtifactKind::File,
-                        body,
-                        "agent",
-                        now,
-                    );
-                    versioned_store.upsert(&record).await?;
-                    tracing::info!(
-                        target: "document",
-                        artifact_id = %meta.id,
-                        "[document] versioned artifact created"
-                    );
-                }
-            }
-            Ok::<(), anyhow::Error>(())
-        })()
-        .await;
-        if let Err(err) = versioned_result {
-            // The legacy meta.json flow already succeeded; a versioned-store
-            // write failure must not abort the reply.
-            tracing::warn!(
-                target: "document",
-                err = %err,
-                "[document] failed to mirror artifact into versioned store"
-            );
-        }
-
         let out = GenerateDocumentOutput {
-            artifact_id: updated.id.clone(),
+            artifact_id: production.id().to_string(),
             artifact_path: output_path.display().to_string(),
             section_count: input.sections.len(),
             size_bytes,

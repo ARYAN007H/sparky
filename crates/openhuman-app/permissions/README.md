@@ -34,7 +34,7 @@ RuntimeAuthority::resolve_access
 | [`allow-core-process.toml`](allow-core-process.toml) | `allow-core-process` | Core endpoint and lifecycle (`core_rpc_*`, `relay_http_rpc`, `relay_remote_socket`, `start_core_process`, `restart_core_process`, `reset_local_data`), app control (`restart_app`, `app_quit`), session (`get_active_user_id`, `auth_*`), dictation and push-to-talk hotkeys, `show_ptt_overlay`, `activate_main_window`, notch window, native notifications, and log folder commands. |
 | [`allow-app-update.toml`](allow-app-update.toml) | `allow-app-update` | `check_app_update`, `apply_app_update`, `download_app_update`, `install_app_update`. |
 | [`allow-workspace-files.toml`](allow-workspace-files.toml) | `allow-workspace-files` | `open_workspace_path`, `reveal_workspace_path`, `preview_workspace_text`. |
-| [`allow-artifact-download.toml`](allow-artifact-download.toml) | `allow-artifact-download` | `download_artifact_to_downloads`. |
+| [`allow-artifact-download.toml`](allow-artifact-download.toml) | `allow-artifact-download` | `download_artifact_to_downloads`, `read_artifact_body`, `save_artifact_as`. |
 | `allow-artifact-save.toml` | `allow-artifact-save` | `save_artifact_via_dialog`. |
 | [`allow-directory-picker.toml`](allow-directory-picker.toml) | `allow-directory-picker` | `pick_directory_via_dialog`. |
 | [`allow-loopback-oauth.toml`](allow-loopback-oauth.toml) | `allow-loopback-oauth` | `start_loopback_oauth_listener`, `stop_loopback_oauth_listener`. Kept separate so a consumer of `allow-core-process` does not also get OAuth listener control. |

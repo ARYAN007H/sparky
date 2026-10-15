@@ -100,13 +100,28 @@ pub async fn list_threads(workspace_dir: PathBuf) -> Result<Vec<ConversationThre
     run("list_threads", move || store::list_threads(workspace_dir)).await
 }
 
-/// [`store::get_messages`] on the blocking pool.
+/// [`super::get_messages`] on the blocking pool: the thread's messages without
+/// artifact rows (see [`crate::threads::artifact_rows`]).
 pub async fn get_messages(
     workspace_dir: PathBuf,
     thread_id: String,
 ) -> Result<Vec<ConversationMessage>, String> {
     run("get_messages", move || {
-        store::get_messages(workspace_dir, &thread_id)
+        super::get_messages(workspace_dir, &thread_id)
+    })
+    .await
+}
+
+/// [`store::get_messages`] on the blocking pool, artifact rows included. Only
+/// for the UI's message list and the artifact-row writers.
+pub async fn get_messages_with_artifact_rows(
+    workspace_dir: PathBuf,
+    thread_id: &str,
+) -> Result<Vec<ConversationMessage>, String> {
+    let thread_id = thread_id.to_string();
+    // The vendored store directly: `store::get_messages` is the filtered one.
+    run("get_messages_with_artifact_rows", move || {
+        tinyagents_session::threads::get_messages(workspace_dir, &thread_id)
     })
     .await
 }

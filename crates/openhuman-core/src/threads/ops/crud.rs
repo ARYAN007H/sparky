@@ -102,13 +102,28 @@ pub async fn thread_create_new(
     ))
 }
 
-/// Lists messages for a conversation thread.
+/// Lists messages for a conversation thread, artifact rows included: the UI
+/// renders each artifact's card from its row (see
+/// [`crate::threads::artifact_rows`]). Artifacts that have no row yet get one
+/// first, so a thread's older artifacts are placed too.
 pub async fn messages_list(
     request: ConversationMessagesRequest,
 ) -> Result<Outcome<ApiEnvelope<ConversationMessagesResponse>>, String> {
     let dir = workspace_dir().await?;
-    let messages = conversations::blocking::get_messages(dir, request.thread_id.clone())
-        .await?
+    let mut messages =
+        conversations::blocking::get_messages_with_artifact_rows(dir.clone(), &request.thread_id)
+            .await?;
+    match crate::threads::artifact_rows::backfill_artifact_rows(&dir, &request.thread_id, &messages)
+        .await
+    {
+        Ok(written) => messages.extend(written),
+        // The list still serves; the rows are retried on the next read.
+        Err(error) => log::warn!(
+            "[threads] artifact row backfill failed thread_id={}: {error}",
+            request.thread_id
+        ),
+    }
+    let messages = messages
         .into_iter()
         .map(message_to_record)
         .collect::<Vec<_>>();
