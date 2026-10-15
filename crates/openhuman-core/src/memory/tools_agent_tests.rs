@@ -33,31 +33,27 @@ async fn turn_citations_stay_with_the_agent_that_recorded_them() {
     let beta = agent(&root, "beta");
     let thread = "shared-thread";
 
-    CoreContext::scope(Arc::clone(&alpha), async {
-        record_pack_citations(
-            &crate::core::runtime::DispatchCtx::ambient(),
-            thread,
-            vec![citation("alpha-cite")],
-        );
-    })
-    .await;
-    CoreContext::scope(Arc::clone(&beta), async {
-        record_pack_citations(
-            &crate::core::runtime::DispatchCtx::ambient(),
-            thread,
-            vec![citation("beta-cite")],
-        );
-    })
-    .await;
+    {
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(&alpha));
 
-    let from_beta = CoreContext::scope(beta, async {
-        take_turn_citations(&crate::core::runtime::DispatchCtx::ambient(), thread)
-    })
-    .await;
-    let from_alpha = CoreContext::scope(alpha, async {
-        take_turn_citations(&crate::core::runtime::DispatchCtx::ambient(), thread)
-    })
-    .await;
+        record_pack_citations(&scope_ctx, thread, vec![citation("alpha-cite")]);
+    };
+    {
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(&beta));
+
+        record_pack_citations(&scope_ctx, thread, vec![citation("beta-cite")]);
+    };
+
+    let from_beta = {
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(beta);
+
+        take_turn_citations(&scope_ctx, thread)
+    };
+    let from_alpha = {
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(alpha);
+
+        take_turn_citations(&scope_ctx, thread)
+    };
 
     assert_eq!(
         from_alpha.iter().map(|c| c.id.as_str()).collect::<Vec<_>>(),
