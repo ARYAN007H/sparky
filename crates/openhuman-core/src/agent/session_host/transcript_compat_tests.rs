@@ -250,7 +250,6 @@ pub(super) fn store_tree(
     root: &Path,
     thread: &str,
     session: &SessionRef,
-    extra_stems: &[String],
 ) -> BTreeMap<String, Value> {
     let locator = store_locator(root);
     let mut out = BTreeMap::new();

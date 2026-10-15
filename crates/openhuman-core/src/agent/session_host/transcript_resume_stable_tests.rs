@@ -9,7 +9,8 @@ use serde_json::Value;
 use tinyinference_llm::model::ModelResponse;
 
 use super::transcript_compat_tests::{
-    build_host, model, place_fixture, run_async, store_tree, thread_id, Layout, SCENARIOS,
+    build_host, model, place_fixture, run_async, store_locator, store_tree, thread_id, Layout,
+    SCENARIOS,
 };
 
 fn tree(root: &Path, thread: &str, host: &crate::agent::OpenHumanSessionHost) -> BTreeMap<String, Value> {
@@ -53,33 +54,40 @@ fn a_legacy_workspace_is_adopted_once_and_the_next_process_resumes_in_place() {
     run_async(async move {
         let root = tempfile::tempdir().expect("tempdir");
         let thread = thread_id(scenario.name);
-        let legacy_only;
+        let legacy_stems = ["1700000001_orchestrator", "1700000002_orchestrator"];
+        let legacy_rows = |root: &Path| -> Vec<Value> {
+            let locator = store_locator(root);
+            legacy_stems
+                .iter()
+                .map(|stem| {
+                    let history = locator
+                        .open_stem(stem, Default::default())
+                        .expect("bind a legacy stem");
+                    serde_json::to_value(history.messages().expect("read a legacy root"))
+                        .expect("rows")
+                })
+                .collect()
+        };
+        let imported;
         let after_first;
         {
             let next = model(vec![ModelResponse::assistant("unused")], scenario.native);
             let mut host = build_host(root.path(), next, scenario.native, &thread);
             let stem = host.session_id().expect("bound session id");
             place_fixture(root.path(), scenario, &stem, "");
-            let l = super::transcript_compat_tests::store_locator(root.path());
-            let sess = host.session.clone().unwrap();
-            let t = tree(root.path(), &thread, &host);
-            eprintln!("DBGX tree keys={:?}", t.keys().collect::<Vec<_>>());
-            let r = host.resume_bound_session().await;
-            eprintln!("DBGX resume={:?} exists_after={} tree={:?}", r.as_ref().ok(), l.session_exists(&sess), tree(root.path(), &thread, &host).keys().collect::<Vec<_>>());
-            assert!(r.expect("first resume"));
-            legacy_only = BTreeMap::<String, Value>::new();
+            imported = legacy_rows(root.path());
+            assert!(imported.iter().all(|rows| !rows.as_array().unwrap().is_empty()));
+            assert!(host.resume_bound_session().await.expect("first resume"));
             after_first = tree(root.path(), &thread, &host);
         }
         // Adoption writes the session's own transcript and modifies no legacy root.
-        for (name, rows) in &legacy_only {
-            assert_eq!(
-                after_first.get(name),
-                Some(rows),
-                "legacy root {name} must stay as imported"
-            );
-        }
+        assert_eq!(
+            legacy_rows(root.path()),
+            imported,
+            "legacy roots must stay as imported"
+        );
         assert!(
-            after_first.len() > legacy_only.len(),
+            after_first.keys().any(|stem| !legacy_stems.contains(&stem.as_str())),
             "adopted transcript written"
         );
 
