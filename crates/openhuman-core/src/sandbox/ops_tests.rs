@@ -5,6 +5,7 @@ use crate::core::runtime::DispatchCtx;
 #[test]
 fn resolve_sandbox_policy_none_mode() {
     let policy = resolve_sandbox_policy(
+        &DispatchCtx::unbound(),
         SandboxMode::None,
         Path::new("/tmp/action"),
         Path::new("/tmp/state"),
@@ -17,6 +18,7 @@ fn resolve_sandbox_policy_none_mode() {
 #[test]
 fn resolve_sandbox_policy_read_only_mode() {
     let policy = resolve_sandbox_policy(
+        &DispatchCtx::unbound(),
         SandboxMode::ReadOnly,
         Path::new("/tmp/action"),
         Path::new("/tmp/state"),
@@ -29,6 +31,7 @@ fn resolve_sandbox_policy_read_only_mode() {
 #[test]
 fn resolve_sandbox_policy_sandboxed_local() {
     let policy = resolve_sandbox_policy(
+        &DispatchCtx::unbound(),
         SandboxMode::Sandboxed,
         Path::new("/tmp/action"),
         Path::new("/tmp/state"),
@@ -42,6 +45,7 @@ fn resolve_sandbox_policy_sandboxed_local() {
 #[test]
 fn resolve_sandbox_policy_sandboxed_remote_uses_docker() {
     let policy = resolve_sandbox_policy(
+        &DispatchCtx::unbound(),
         SandboxMode::Sandboxed,
         Path::new("/tmp/action"),
         Path::new("/tmp/state"),
@@ -60,6 +64,7 @@ fn resolve_sandbox_policy_docker_runtime_forces_docker() {
         ..RuntimeConfig::default()
     };
     let policy = resolve_sandbox_policy(
+        &DispatchCtx::unbound(),
         SandboxMode::Sandboxed,
         Path::new("/tmp/action"),
         Path::new("/tmp/state"),
@@ -89,6 +94,7 @@ fn build_elevated_op_creates_record() {
 #[tokio::test]
 async fn create_sandbox_backend_none() {
     let policy = resolve_sandbox_policy(
+        &DispatchCtx::unbound(),
         SandboxMode::None,
         Path::new("/tmp"),
         Path::new("/tmp/state"),
@@ -103,6 +109,7 @@ async fn create_sandbox_backend_none() {
 /// A `None`-backend policy whose state dir is a throwaway directory.
 fn unsandboxed_policy(workspace: &Path, state: &Path) -> SandboxPolicy {
     resolve_sandbox_policy(
+        &DispatchCtx::unbound(),
         SandboxMode::None,
         workspace,
         state,
@@ -201,6 +208,7 @@ async fn execute_unsandboxed_echo_runs_on_every_os() {
 #[tokio::test]
 async fn execute_in_sandbox_none_backend() {
     let policy = resolve_sandbox_policy(
+        &DispatchCtx::unbound(),
         SandboxMode::None,
         Path::new("/tmp"),
         Path::new("/tmp/state"),
@@ -277,6 +285,7 @@ async fn execute_unsandboxed_applies_environment_overrides() {
 async fn execute_in_sandbox_none_backend_runs_on_every_os() {
     let tempdir = tempfile::tempdir().unwrap();
     let policy = resolve_sandbox_policy(
+        &DispatchCtx::unbound(),
         SandboxMode::None,
         tempdir.path(),
         Path::new("/tmp/state"),
