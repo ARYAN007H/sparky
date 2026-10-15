@@ -173,16 +173,18 @@ pub fn context_for(agent: &str) -> Option<Arc<CoreContext>> {
     })
 }
 
-/// Runs `fut` in the `local` scope: under the process default context when
-/// the caller is an embedded agent outside any SaaS profile, as-is otherwise.
-/// A SaaS profile (or a SaaS task with no scope) never switches to the
-/// process default context, which is the operator's.
+/// The context of the `local` scope: the process default one. `None` in SaaS,
+/// where the default context is the operator's and no work acts as it.
+fn local_context() -> Option<DispatchCtx> {
+    (!crate::core::runtime::mode::is_saas()).then(DispatchCtx::process_default)
+}
+
+/// Runs `fut` in the `local` scope: under the process default context. A SaaS
+/// task never switches to the process default context, which is the
+/// operator's: it runs as-is.
 async fn in_local<F: Future>(fut: F) -> F::Output {
-    let acting = crate::core::runtime::DispatchCtx::ambient()
-        .tenant()
-        .is_ok_and(|tenant| tenant.profile.is_none() && tenant.agent.is_some());
     match CoreContext::default_context() {
-        Some(default) if acting => CoreContext::scope(default, fut).await,
+        Some(default) if local_context().is_some() => CoreContext::scope(default, fut).await,
         _ => fut.await,
     }
 }
@@ -279,12 +281,12 @@ pub fn decide(
 /// `label` names the caller in logs.
 pub async fn for_each_scope<T, F, Fut>(label: &str, step: F) -> Vec<(Option<String>, T)>
 where
-    F: Fn() -> Fut,
+    F: Fn(DispatchCtx) -> Fut,
     Fut: Future<Output = T>,
 {
     let mut results = Vec::new();
-    if !crate::core::runtime::mode::is_saas() {
-        results.push((None, in_local(async { step().await }).await));
+    if let Some(local) = local_context() {
+        results.push((None, in_local(async { step(local).await }).await));
     }
     for (agent, value) in for_each_agent(label, step).await {
         results.push((Some(agent), value));
@@ -297,7 +299,7 @@ where
 /// not split by agent and the `local` pass already covers everything.
 pub async fn for_each_agent<T, F, Fut>(label: &str, step: F) -> Vec<(String, T)>
 where
-    F: Fn() -> Fut,
+    F: Fn(DispatchCtx) -> Fut,
     Fut: Future<Output = T>,
 {
     if installed().is_none() {
@@ -312,12 +314,12 @@ where
 /// a recorded agent's stand-in context (`CoreContext::for_agent`) lacks.
 pub async fn for_each_live_scope<T, F, Fut>(label: &str, step: F) -> Vec<(Option<String>, T)>
 where
-    F: Fn() -> Fut,
+    F: Fn(DispatchCtx) -> Fut,
     Fut: Future<Output = T>,
 {
     let mut results = Vec::new();
-    if !crate::core::runtime::mode::is_saas() {
-        results.push((None, in_local(async { step().await }).await));
+    if let Some(local) = local_context() {
+        results.push((None, in_local(async { step(local).await }).await));
     }
     if installed().is_none() {
         return results;
@@ -336,13 +338,14 @@ async fn visit<T, F, Fut>(
     step: F,
 ) -> Vec<(String, T)>
 where
-    F: Fn() -> Fut,
+    F: Fn(DispatchCtx) -> Fut,
     Fut: Future<Output = T>,
 {
     let mut results = Vec::new();
     for (agent, context) in contexts {
         tracing::trace!(%agent, label, "[storage::agents] visiting agent scope");
-        let value = CoreContext::scope(context, async { step().await }).await;
+        let dispatch = DispatchCtx::new(Arc::clone(&context));
+        let value = CoreContext::scope(context, async { step(dispatch).await }).await;
         results.push((agent, value));
     }
     results
