@@ -294,7 +294,7 @@ fn a_profile_prefixed_key_round_trips_through_edit_and_regenerate() {
         &tenant,
         &crate::web_chat::pick_target_agent_id(&config),
     );
-    let store = transcript_store_for(&config, &tenant);
+    let store = super::super::support::transcript_store_for(&config, &tenant);
     assert_eq!(store.key, writer_key, "the reader resolves the writer's key");
     assert_eq!(store.key, "profile-a~default", "the key keeps the profile prefix");
     assert_eq!(store.workspace_dir, dir.path());
@@ -333,10 +333,10 @@ fn transcript_store_for_a_desktop_tenant_uses_the_chat_agent_and_an_embedded_age
     let mut config = crate::config::Config::default();
     config.workspace_dir = dir.path().to_path_buf();
 
-    let desktop = transcript_store_for(&config, &crate::core::runtime::Tenant::default());
+    let desktop = super::super::support::transcript_store_for(&config, &crate::core::runtime::Tenant::default());
     assert_eq!(desktop.key, crate::web_chat::pick_target_agent_id(&config));
 
-    let embedded = transcript_store_for(
+    let embedded = super::super::support::transcript_store_for(
         &config,
         &crate::core::runtime::Tenant {
             profile: None,
