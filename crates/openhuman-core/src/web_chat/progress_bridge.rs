@@ -95,6 +95,7 @@ impl ProgressBridgeHandle {
 /// vanishing when the turn settles. Clears `buffer` unconditionally; emits
 /// nothing for narration that is empty or too short to stand alone.
 fn flush_interim_narration(
+    ctx: &crate::core::runtime::DispatchCtx,
     buffer: &mut String,
     round: u32,
     client_id: &str,
@@ -113,6 +114,7 @@ fn flush_interim_narration(
         request_id,
     );
     publish_seq_stamped(
+        ctx,
         emit_seq,
         WebChannelEvent {
             event: "chat_interim".to_string(),
@@ -133,10 +135,14 @@ fn flush_interim_narration(
 /// identically to the persisted turn-state snapshot
 /// (conversations-timeline-refactor, Phase 4). The counter advances once per
 /// emitted event so each `(request_id, seq)` pair is unique within a turn.
-fn publish_seq_stamped(next_seq: &mut u64, mut event: WebChannelEvent) {
+fn publish_seq_stamped(
+    ctx: &crate::core::runtime::DispatchCtx,
+    next_seq: &mut u64,
+    mut event: WebChannelEvent,
+) {
     event.seq = Some(*next_seq);
     *next_seq = next_seq.saturating_add(1);
-    publish_web_channel_event(event);
+    publish_web_channel_event(ctx, event);
 }
 
 /// The trimmed narration to surface as an interim bubble, or `None` when it is
@@ -364,7 +370,7 @@ pub(crate) fn spawn_progress_bridge(
                             thread_id,
                             request_id,
                         );
-                        publish_seq_stamped(&mut emit_seq, WebChannelEvent {
+                        publish_seq_stamped(&dispatch_ctx, &mut emit_seq, WebChannelEvent {
                             event: "inference_heartbeat".to_string(),
                             client_id: client_id.clone(),
                             thread_id: thread_id.clone(),
@@ -499,6 +505,7 @@ pub(crate) fn spawn_progress_bridge(
                         },
                     );
                     publish_seq_stamped(
+                        &dispatch_ctx,
                         &mut emit_seq,
                         WebChannelEvent {
                             event: "inference_start".to_string(),
@@ -516,6 +523,7 @@ pub(crate) fn spawn_progress_bridge(
                     round = iteration;
                     parent_max_iterations = max_iterations;
                     publish_seq_stamped(
+                        &dispatch_ctx,
                         &mut emit_seq,
                         WebChannelEvent {
                             event: "iteration_start".to_string(),
@@ -570,6 +578,7 @@ pub(crate) fn spawn_progress_bridge(
                         },
                     );
                     publish_seq_stamped(
+                        &dispatch_ctx,
                         &mut emit_seq,
                         WebChannelEvent {
                             event: "tool_call".to_string(),
@@ -631,6 +640,7 @@ pub(crate) fn spawn_progress_bridge(
                         request_id
                     );
                     publish_seq_stamped(
+                        &dispatch_ctx,
                         &mut emit_seq,
                         WebChannelEvent {
                             event: "tool_result".to_string(),
@@ -940,6 +950,7 @@ pub(crate) fn spawn_progress_bridge(
                 }
                 AgentProgress::ThinkingDelta { delta, iteration } => {
                     publish_seq_stamped(
+                        &dispatch_ctx,
                         &mut emit_seq,
                         WebChannelEvent {
                             event: "thinking_delta".to_string(),
@@ -960,6 +971,7 @@ pub(crate) fn spawn_progress_bridge(
                     iteration,
                 } => {
                     publish_seq_stamped(
+                        &dispatch_ctx,
                         &mut emit_seq,
                         WebChannelEvent {
                             event: "tool_args_delta".to_string(),

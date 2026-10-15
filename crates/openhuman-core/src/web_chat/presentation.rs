@@ -156,6 +156,7 @@ pub(crate) fn announce_reply(
     let timing_payload =
         timing.map(|snapshot| snapshot.into_payload(usage.map(|u| u.output_tokens)));
     publish_chat_done(
+        ctx,
         client_id,
         thread_id,
         request_id,
@@ -186,6 +187,7 @@ pub(crate) fn announce_reply(
 /// segment beside that single row (#5933), so the conversational segmentation
 /// of [`deliver_response`] is deliberately not offered here.
 pub(crate) fn deliver_response_single_bubble(
+    ctx: &crate::core::runtime::DispatchCtx,
     client_id: &str,
     thread_id: &str,
     request_id: &str,
@@ -193,6 +195,7 @@ pub(crate) fn deliver_response_single_bubble(
     usage: Option<&LastTurnUsage>,
 ) {
     publish_chat_done(
+        ctx,
         client_id,
         thread_id,
         request_id,
@@ -207,6 +210,7 @@ pub(crate) fn deliver_response_single_bubble(
 
 /// Emit the terminal `chat_done` for an unsegmented reply.
 fn publish_chat_done(
+    ctx: &crate::core::runtime::DispatchCtx,
     client_id: &str,
     thread_id: &str,
     request_id: &str,
@@ -215,7 +219,7 @@ fn publish_chat_done(
     usage_payload: Option<TurnUsagePayload>,
     timing_payload: Option<crate::web_chat::TurnTimingPayload>,
 ) {
-    publish_web_channel_event(WebChannelEvent {
+    publish_web_channel_event(ctx, WebChannelEvent {
         event: "chat_done".to_string(),
         client_id: client_id.to_string(),
         thread_id: thread_id.to_string(),
