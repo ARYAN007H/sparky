@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use serde_json::{json, Value};
+use std::path::Path;
 use std::sync::Arc;
 use tinyagents_harness::media::MediaOutput;
 use tinystoragedrivers::BlobStore;
@@ -109,7 +110,7 @@ impl Tool for BlobBackedMediaTool {
                     "bytes": 16
                 }]
             }),
-            "generated blob-backed media",
+            "Saved image at generated-media/stub-0.png\nCost: $0.01",
         ))
     }
 }
@@ -153,6 +154,10 @@ async fn files_a_blob_backed_generated_artifact() {
         .expect("artifact record");
     let file = record.file.expect("visible file");
     assert_eq!(artifact["path"].as_str(), Some(file.as_str()));
+    assert_eq!(
+        result.markdown_formatted.as_deref(),
+        Some(format!("Saved image at {file}\nCost: $0.01").as_str())
+    );
     assert_eq!(std::fs::read(file).unwrap(), b"blob-media-bytes");
     assert!(blobs
         .get("generated-media/stub-0.png")
@@ -177,6 +182,36 @@ async fn removes_partial_destination_when_blob_read_fails() {
 
     assert!(error.contains("failed to copy generated media blob"));
     assert!(!dest.exists());
+}
+
+#[tokio::test]
+async fn keeps_source_blob_when_artifact_finalization_fails() {
+    let root = tempfile::tempdir().unwrap();
+    let workspace = root.path().join("workspace");
+    let blobs = MediaOutput::new(root.path()).blobs.clone();
+    let key = "generated-media/finalize-failure.png";
+    blobs
+        .put(key, b"media bytes".to_vec(), Some("image/png"))
+        .await
+        .unwrap();
+    let tool = MediaArtifactTool::new(
+        StubMediaTool {
+            file_count: 0,
+            fail: false,
+        },
+        ArtifactKind::Image,
+        workspace,
+        root.path().join("Files"),
+    )
+    .with_blobs(Arc::clone(&blobs));
+
+    let error = tool
+        .finalize_and_discard_blob("missing-artifact", 11, None, Path::new(key))
+        .await
+        .unwrap_err();
+
+    assert!(error.contains("artifact"));
+    assert!(blobs.get(key).await.unwrap().is_some());
 }
 
 #[tokio::test]
