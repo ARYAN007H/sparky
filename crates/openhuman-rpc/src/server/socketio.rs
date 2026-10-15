@@ -488,6 +488,7 @@ pub fn attach_socketio() -> (socketioxide::layer::SocketIoLayer, SocketIo) {
                         payload.thread_id
                     );
                     let _ = crate::core_host::web_chat::cancel_chat_scoped(
+                        &crate::core_host::core::runtime::DispatchCtx::host_default(),
                         &client_id,
                         &payload.thread_id,
                         payload.request_id.as_deref(),
