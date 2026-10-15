@@ -19,6 +19,7 @@ use super::super::event_bus::publish_web_channel_event;
 use super::super::run_task::run_chat_task;
 use super::super::types::{ChatRequestMetadata, InFlightEntry, QueueMode};
 use super::super::web_errors::classify_inference_error;
+use super::followups::dispatch_followups;
 use super::parallel_turn::spawn_parallel_turn;
 use super::state::{cancel_in_flight_gracefully, in_flight, key_for};
 use super::turn_guards::{
@@ -723,38 +724,6 @@ async fn start_chat_inner(
     }
 
     Ok(request_id)
-}
-
-fn dispatch_followups(
-    ctx: &crate::core::runtime::DispatchCtx,
-    followups: Vec<crate::agent::queued_turn::QueuedTurn>,
-) {
-    for fup in followups {
-        let ctx = ctx.clone();
-        tokio::spawn(crate::core::runtime::context::CoreContext::propagate(
-            async move {
-                if let Err(err) = start_chat(
-                    &ctx,
-                    &fup.client_id,
-                    &fup.thread_id,
-                    &fup.text,
-                    fup.model_override,
-                    fup.temperature,
-                    fup.locale,
-                    Some("followup".to_string()),
-                    ChatRequestMetadata::default(),
-                )
-                .await
-                {
-                    log::warn!(
-                        "[web-channel] failed to dispatch followup thread_id={} err={}",
-                        fup.thread_id,
-                        err
-                    );
-                }
-            },
-        ));
-    }
 }
 
 #[cfg(test)]
