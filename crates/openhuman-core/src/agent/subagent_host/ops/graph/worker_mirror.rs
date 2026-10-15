@@ -1,6 +1,7 @@
 //! Mirroring a sub-agent turn's conversation onto its spawn's worker thread,
 //! matching the legacy `SubagentObserver`.
 
+use crate::core::runtime::DispatchCtx;
 use tinyagents_session::transcript::TranscriptMessage;
 use tinytools_agent::dialect::{DialectRole, TranscriptEntry};
 

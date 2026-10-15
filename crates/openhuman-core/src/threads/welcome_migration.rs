@@ -15,6 +15,7 @@
 //! The migration is idempotent and guarded by a marker file under
 //! `state/migrations/`.
 
+use crate::core::runtime::DispatchCtx;
 use std::fs;
 use std::path::Path;
 

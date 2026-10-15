@@ -9,6 +9,7 @@
 //! Worker threads carry a hard cap on depth: a worker thread cannot spawn
 //! another worker thread.
 
+use crate::core::runtime::DispatchCtx;
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::subagent_host::{run_subagent_with_parent, SubagentRunOptions};
 use crate::threads::store as conversations;

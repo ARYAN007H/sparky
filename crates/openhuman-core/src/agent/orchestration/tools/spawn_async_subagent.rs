@@ -4,6 +4,7 @@
 //! accepted. Completion/failure is reported through normal sub-agent lifecycle
 //! events and, when possible, persisted in the child worker thread.
 
+use crate::core::runtime::DispatchCtx;
 use super::subagent_abort_report::AbortReport;
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::orchestration::fleet_tools::FleetToolSet;

@@ -39,6 +39,7 @@ mod jev;
 mod search;
 pub(crate) mod service;
 
+use crate::core::runtime::DispatchCtx;
 use crate::config::Config;
 use async_trait::async_trait;
 use std::time::{Duration, Instant};

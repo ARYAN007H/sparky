@@ -10,6 +10,7 @@
 //! opening `user` message. The sub-agent runner then appends each turn and
 //! tool result to the same thread via its `worker_thread_id` sink.
 
+use crate::core::runtime::DispatchCtx;
 use std::path::PathBuf;
 
 use serde_json::json;

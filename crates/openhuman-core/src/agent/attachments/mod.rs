@@ -1,6 +1,7 @@
 //! Durable user uploads in the acting workspace. Provider resolution never
 //! changes the original file or writes inline media into session records.
 
+use crate::core::runtime::DispatchCtx;
 use std::path::{Component, Path, PathBuf};
 
 use serde::{Deserialize, Serialize};

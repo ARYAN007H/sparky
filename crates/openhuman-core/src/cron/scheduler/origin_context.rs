@@ -2,6 +2,7 @@
 //! a bounded tail of the conversation that created the job, plus a fixed
 //! preamble saying the run is unattended.
 
+use crate::core::runtime::DispatchCtx;
 use crate::config::Config;
 use {
     crate::cron::channel_bridge, tinyflows_schedule::types::CronJob,

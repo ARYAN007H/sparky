@@ -6,6 +6,7 @@
 //! process-wide channel persistence subscriber is told to leave these turns
 //! alone (`threads::store::claim_channel_turn`).
 
+use crate::core::runtime::DispatchCtx;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};

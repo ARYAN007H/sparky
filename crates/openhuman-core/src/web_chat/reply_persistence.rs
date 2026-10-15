@@ -18,6 +18,7 @@
 //! what makes the second write a no-op rather than a duplicate bubble: the
 //! conversation store is idempotent for exactly this id shape.
 
+use crate::core::runtime::DispatchCtx;
 use std::path::Path;
 
 use serde_json::json;
