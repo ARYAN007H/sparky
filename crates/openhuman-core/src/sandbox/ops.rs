@@ -218,10 +218,9 @@ pub fn resolve_sandbox_policy(
 /// passes unnoticed. That is exactly how the original defect survived.
 #[cfg(any(feature = "modules", test))]
 pub(crate) fn local_status_for_jail(
-    available: bool,
-    suitable_for_untrusted_code: bool,
+    isolation: Option<super::types::SandboxIsolation>,
 ) -> SandboxStatus {
-    if available && suitable_for_untrusted_code {
+    if isolation.is_some() {
         SandboxStatus::Ready
     } else {
         SandboxStatus::Inactive
@@ -239,6 +238,7 @@ pub async fn create_sandbox_backend(
                 kind: policy.backend,
                 status: SandboxStatus::Error,
                 backend_id: None,
+                isolation: None,
             });
     }
     let config = match ctx.load_config().await {
@@ -263,9 +263,10 @@ pub async fn create_sandbox_backend_with_config(
             kind: SandboxBackendKind::None,
             status: SandboxStatus::Ready,
             backend_id: None,
+            isolation: None,
         }),
         SandboxBackendKind::Local => {
-            let (backend_name, status) = super::native_jail::status(config).await?;
+            let (backend_name, status, isolation) = super::native_jail::status(config).await?;
             if status == SandboxStatus::Inactive {
                 tracing::warn!(
                     backend = backend_name,
@@ -276,6 +277,7 @@ pub async fn create_sandbox_backend_with_config(
                 kind: SandboxBackendKind::Local,
                 status,
                 backend_id: Some(backend_name),
+                isolation,
             })
         }
         SandboxBackendKind::Docker => docker::docker_backend_handle(config).await,
@@ -287,6 +289,7 @@ fn docker_error_handle() -> SandboxBackendHandle {
         kind: SandboxBackendKind::Docker,
         status: SandboxStatus::Error,
         backend_id: None,
+        isolation: None,
     }
 }
 
