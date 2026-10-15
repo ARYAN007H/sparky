@@ -22,7 +22,7 @@ pub async fn list_agents(ctx: &DispatchCtx, include_disabled: bool) -> Result<Ve
 
 pub async fn get_agent(ctx: &DispatchCtx, id: &str) -> Result<Option<AgentRegistryEntry>, String> {
     let id = id.trim();
-    Ok(list_agents(true)
+    Ok(list_agents(ctx, true)
         .await?
         .into_iter()
         .find(|agent| agent.id == id))
