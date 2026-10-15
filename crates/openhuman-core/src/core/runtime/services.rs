@@ -257,7 +257,7 @@ pub fn spawn_cron_service(
 ) -> tokio::task::JoinHandle<()> {
     let dispatch = crate::core::runtime::DispatchCtx::new(ctx.clone());
     tokio::spawn(crate::core::runtime::CoreContext::scope(ctx, async move {
-        match crate::config::ops::load_config_with_timeout().await {
+        match dispatch.load_config().await {
             Ok(config) => {
                 if !config.cron.enabled {
                     log::info!("[cron] scheduler disabled via config; skipping");

@@ -72,8 +72,8 @@ pub fn schemas(function: &str) -> ControllerSchema {
 ///
 /// Memory is the only occupant today. This is also what
 /// [`crate::core::subsystems_cli`] renders as a table.
-pub async fn subsystems_status() -> Vec<SubsystemStatus> {
-    match crate::config::rpc::load_config_with_timeout().await {
+pub async fn subsystems_status(ctx: &DispatchCtx) -> Vec<SubsystemStatus> {
+    match ctx.load_config().await {
         Ok(config) => vec![crate::memory::status::subsystem_status(&config).await],
         Err(error) => {
             log::warn!("[subsystems] config unavailable for status: {error}");

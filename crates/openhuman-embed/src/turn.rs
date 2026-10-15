@@ -594,7 +594,8 @@ async fn dispatch(
                     use openhuman_core::inference::host_runtime::ops::{
                         agent_chat_reply_for, AgentChatTarget,
                     };
-                    let mut config = openhuman_core::config::rpc::load_config_with_timeout()
+                    let mut config = openhuman_core::core::runtime::DispatchCtx::new(ctx.clone())
+                        .load_config()
                         .await
                         .map_err(|raw| CoreError::from_rpc_string(AGENT_CHAT, raw))?;
                     let target = match request.agent_id.as_deref().map(str::trim) {
