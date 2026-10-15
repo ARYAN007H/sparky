@@ -16,6 +16,7 @@ use super::{
 };
 use crate::agent::OpenHumanSessionHost;
 use crate::config::Config;
+use crate::core::runtime::DispatchCtx;
 use crate::web_chat::ops::{key_for, thread_sessions};
 use crate::web_chat::types::SessionCacheFingerprint;
 use tinyagents_session::transcript::TranscriptMessage;

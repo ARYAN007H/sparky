@@ -9,7 +9,7 @@ fn single_bubble_delivery_emits_one_unsegmented_chat_done() {
         Nothing needs input from you right now, so I have not rescheduled anything on your behalf.";
     let request_id = format!("single-bubble-{}", uuid::Uuid::new_v4());
 
-    deliver_response_single_bubble("system", "thread-1", &request_id, text, None);
+    deliver_response_single_bubble(&crate::core::runtime::DispatchCtx::ambient(), "system", "thread-1", &request_id, text, None);
 
     // Other tests publish on the same process-global bus; keep only ours.
     let mut mine = Vec::new();
