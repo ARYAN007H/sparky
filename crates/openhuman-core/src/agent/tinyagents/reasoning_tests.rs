@@ -291,27 +291,33 @@ async fn reasoning_effort_stays_with_the_agent_that_chose_it() {
     let beta = test_agent_context(&root, "beta");
     let thread = "effort-shared-thread";
 
-    CoreContext::scope(std::sync::Arc::clone(&alpha), async {
+    {
+ let scope_ctx = DispatchCtx::new(std::sync::Arc::clone(&alpha));
+
         set_thread_effort(
-            &crate::core::runtime::DispatchCtx::ambient(),
+            &crate::core::runtime::scope_ctx.clone(),
             thread,
             Some(ReasoningEffort::High),
         );
-    })
-    .await;
+    
+};
 
     assert_eq!(
-        CoreContext::scope(alpha, async {
-            thread_effort(&crate::core::runtime::DispatchCtx::ambient(), thread)
-        })
-        .await,
+        {
+ let scope_ctx = DispatchCtx::new(alpha);
+
+            thread_effort(&crate::core::runtime::scope_ctx.clone(), thread)
+        
+},
         Some(ReasoningEffort::High)
     );
     assert_eq!(
-        CoreContext::scope(beta, async {
-            thread_effort(&crate::core::runtime::DispatchCtx::ambient(), thread)
-        })
-        .await,
+        {
+ let scope_ctx = DispatchCtx::new(beta);
+
+            thread_effort(&crate::core::runtime::scope_ctx.clone(), thread)
+        
+},
         None
     );
 }

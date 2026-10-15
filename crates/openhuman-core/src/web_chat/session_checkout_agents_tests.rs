@@ -54,24 +54,28 @@ async fn two_agents_with_the_same_thread_id_get_their_own_cache_slots() {
             agent: host_seeded_with(&config, "x"),
             fingerprint: fingerprint.clone(),
         };
-        CoreContext::scope(Arc::clone(ctx), async {
-            thread_sessions(&crate::core::runtime::DispatchCtx::ambient())
+        {
+ let scope_ctx = DispatchCtx::new(Arc::clone(ctx));
+
+            thread_sessions(&crate::core::runtime::scope_ctx.clone())
                 .lock_owned()
                 .await
                 .insert(key.clone(), entry);
-        })
-        .await;
+        
+};
     }
     let cached = |ctx: &Arc<CoreContext>, key: &String| {
         let (ctx, key) = (Arc::clone(ctx), key.clone());
         async move {
-            CoreContext::scope(ctx, async move {
-                thread_sessions(&crate::core::runtime::DispatchCtx::ambient())
+            {
+ let scope_ctx = DispatchCtx::new(ctx);
+
+                thread_sessions(&crate::core::runtime::scope_ctx.clone())
                     .lock_owned()
                     .await
                     .contains_key(&key)
-            })
-            .await
+            
+}
         }
     };
     // Under one agent's scope only that agent's slot goes.

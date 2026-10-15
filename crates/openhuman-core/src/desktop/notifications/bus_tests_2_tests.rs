@@ -543,13 +543,15 @@ async fn a_noted_cron_completion_names_its_agent() {
                 )
                 .session_agent("notif-owner-agent"),
             );
-    crate::core::runtime::CoreContext::scope(context, async {
+    crate::core::runtime::{
+ let scope_ctx = DispatchCtx::new(context);
+
         crate::cron::completion_owner::note(
-            &crate::core::runtime::DispatchCtx::ambient(),
+            &crate::core::runtime::scope_ctx.clone(),
             "notif-owner-job",
         );
-    })
-    .await;
+    
+};
     let event = DomainEvent::CronJobCompleted {
         job_id: "notif-owner-job".into(),
         success: true,

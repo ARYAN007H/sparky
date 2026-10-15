@@ -11,13 +11,15 @@ async fn a_job_completed_as_an_agent_is_noted_once() {
         )
         .session_agent("completion-owner-agent"),
     );
-    CoreContext::scope(agent, async {
+    {
+ let scope_ctx = DispatchCtx::new(agent);
+
         note(
-            &crate::core::runtime::DispatchCtx::ambient(),
+            &crate::core::runtime::scope_ctx.clone(),
             "completion-owner-job",
         )
-    })
-    .await;
+    
+};
     assert_eq!(
         take("completion-owner-job").as_deref(),
         Some("completion-owner-agent")
