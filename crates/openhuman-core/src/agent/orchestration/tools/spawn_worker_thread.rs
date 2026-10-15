@@ -183,6 +183,7 @@ impl SpawnWorkerThreadTool {
                 "spawn_worker_thread requires a live harness run context.",
             ));
         };
+        let dispatch = run_context.dispatch_ctx();
         let started = std::time::Instant::now();
 
         let agent_id = args
@@ -240,9 +241,8 @@ impl SpawnWorkerThreadTool {
             "[spawn_worker_thread] invoked"
         );
 
-        let threads =
-            conversations::list_threads(&DispatchCtx::ambient(), parent.workspace_dir.clone())
-                .map_err(|e| anyhow::anyhow!(e))?;
+        let threads = conversations::list_threads(&dispatch, parent.workspace_dir.clone())
+            .map_err(|e| anyhow::anyhow!(e))?;
         if let Some(current_thread) = threads.iter().find(|t| t.id == current_thread_id) {
             let is_delegated_label = current_thread
                 .labels
@@ -293,6 +293,7 @@ impl SpawnWorkerThreadTool {
         // Shared with `spawn_subagent` so both delegation paths persist an
         // identical, reopenable sub-thread seeded with the prompt.
         let worker_thread_id = super::worker_thread::create_worker_thread(
+            &dispatch,
             parent.workspace_dir.clone(),
             &current_thread_id,
             &agent_id,

@@ -131,6 +131,7 @@ fn build_worker_thread_title(prompt: &str) -> String {
 }
 
 fn persist_worker_thread(
+    ctx: &DispatchCtx,
     workspace_dir: &std::path::Path,
     agent_id: &str,
     prompt: &str,
@@ -141,7 +142,7 @@ fn persist_worker_thread(
     let now = chrono::Utc::now().to_rfc3339();
 
     conversations::ensure_thread(
-        &DispatchCtx::ambient(),
+        ctx,
         workspace_dir.to_path_buf(),
         CreateConversationThread {
             id: thread_id.clone(),
@@ -156,7 +157,7 @@ fn persist_worker_thread(
     .map_err(|err| format!("ensure_thread: {err}"))?;
 
     conversations::append_message(
-        &DispatchCtx::ambient(),
+        ctx,
         workspace_dir.to_path_buf(),
         &thread_id,
         ConversationMessage {
@@ -175,7 +176,7 @@ fn persist_worker_thread(
     .map_err(|err| format!("append user message: {err}"))?;
 
     conversations::append_message(
-        &DispatchCtx::ambient(),
+        ctx,
         workspace_dir.to_path_buf(),
         &thread_id,
         ConversationMessage {

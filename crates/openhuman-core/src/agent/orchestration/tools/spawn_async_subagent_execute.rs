@@ -115,7 +115,8 @@ impl SpawnAsyncSubagentTool {
                 workspace.root.clone()
             })
             .or_else(|| {
-                crate::security::live_policy::effective_in(&dispatch).map(|policy| policy.action_dir.clone())
+                crate::security::live_policy::effective_in(&dispatch)
+                    .map(|policy| policy.action_dir.clone())
             });
         let selector = SubagentSessionSelector {
             parent_session: parent_session.clone(),
@@ -245,6 +246,7 @@ impl SpawnAsyncSubagentTool {
             .or_else(|| {
                 parent_thread_id.as_ref().and_then(|parent_thread_id| {
                     super::worker_thread::create_worker_thread(
+                        &dispatch,
                         parent.workspace_dir.clone(),
                         parent_thread_id,
                         &definition.id,
@@ -258,22 +260,15 @@ impl SpawnAsyncSubagentTool {
             (reusable.as_ref(), worker_thread_id.as_ref())
         {
             if session.worker_thread_id.as_deref() == Some(worker_thread_id.as_str()) {
-                if let Err(err) = super::worker_thread::append_worker_user_message(
+                super::worker_thread::append_reuse_follow_up(
+                    &dispatch,
                     parent.workspace_dir.clone(),
                     worker_thread_id,
                     &definition.id,
                     &task_id,
                     &follow_up_prompt,
-                ) {
-                    log::warn!(
-                        "[subagent_reuse] worker follow-up append failed parent_thread_id={} subagent_session_id={} worker_thread_id={} task_id={} error={}",
-                        parent_thread_id.as_deref().unwrap_or("none"),
-                        session.subagent_session_id,
-                        worker_thread_id,
-                        task_id,
-                        err
-                    );
-                }
+                    (parent_thread_id.as_deref(), &session.subagent_session_id),
+                );
             }
         }
         let durable_session = match subagent_sessions::upsert_running(
@@ -352,6 +347,7 @@ impl SpawnAsyncSubagentTool {
         let (status_tx, status_rx) = running_subagents::status_channel();
 
         let background_workspace_dir = parent.workspace_dir.clone();
+        let background_dispatch = dispatch.clone();
         let background_definition = definition.clone();
         let background_agent_id = definition.id.clone();
         let background_task_id = task_id.clone();
@@ -446,6 +442,7 @@ impl SpawnAsyncSubagentTool {
                                 // thread (survives reload / reconnect) and carry the full
                                 // payload in the delivery notice for the follow-up turn.
                                 let delivery_summary = attach_workflow_proposal(
+                                    &background_dispatch,
                                     &background_workspace_dir,
                                     background_parent_thread_id.as_deref(),
                                     &outcome.task_id,
@@ -527,6 +524,7 @@ impl SpawnAsyncSubagentTool {
                                 // proposal before stalling — preserve it durably too.
                                 let status_output = framed.clone();
                                 let framed = attach_workflow_proposal(
+                                    &background_dispatch,
                                     &background_workspace_dir,
                                     background_parent_thread_id.as_deref(),
                                     &outcome.task_id,

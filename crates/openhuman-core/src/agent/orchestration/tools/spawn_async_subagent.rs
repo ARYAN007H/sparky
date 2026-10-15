@@ -552,6 +552,7 @@ pub(crate) fn extract_workflow_proposal_from_history(
 /// summary; on any persistence error the summary still carries the envelope —
 /// losing durability must not lose delivery.
 fn attach_workflow_proposal(
+    ctx: &DispatchCtx,
     workspace_dir: &std::path::Path,
     parent_thread_id: Option<&str>,
     task_id: &str,
@@ -583,7 +584,7 @@ fn attach_workflow_proposal(
     );
     if let Some(thread_id) = parent_thread_id {
         let persisted = conversations::append_message(
-            &DispatchCtx::ambient(),
+            ctx,
             workspace_dir.to_path_buf(),
             thread_id,
             ConversationMessage {

@@ -25,6 +25,7 @@ use crate::threads::store::{self as conversations, ConversationMessage, CreateCo
 /// does not fail the call (the thread still exists and the runner will
 /// append the sub-agent's turns).
 pub(crate) fn create_worker_thread(
+    ctx: &DispatchCtx,
     workspace_dir: PathBuf,
     parent_thread_id: &str,
     agent_id: &str,
@@ -35,7 +36,7 @@ pub(crate) fn create_worker_thread(
     let now = chrono::Utc::now().to_rfc3339();
 
     conversations::ensure_thread(
-        &DispatchCtx::ambient(),
+        ctx,
         workspace_dir.clone(),
         CreateConversationThread {
             id: worker_thread_id.clone(),
@@ -56,7 +57,7 @@ pub(crate) fn create_worker_thread(
     );
 
     if let Err(err) = conversations::append_message(
-        &DispatchCtx::ambient(),
+        ctx,
         workspace_dir,
         &worker_thread_id,
         ConversationMessage {
@@ -79,6 +80,7 @@ pub(crate) fn create_worker_thread(
 }
 
 pub(crate) fn append_worker_user_message(
+    ctx: &DispatchCtx,
     workspace_dir: PathBuf,
     worker_thread_id: &str,
     agent_id: &str,
@@ -86,7 +88,7 @@ pub(crate) fn append_worker_user_message(
     prompt: &str,
 ) -> Result<(), String> {
     conversations::append_message(
-        &DispatchCtx::ambient(),
+        ctx,
         workspace_dir,
         worker_thread_id,
         ConversationMessage {
@@ -109,3 +111,34 @@ pub(crate) fn append_worker_user_message(
 #[cfg(test)]
 #[path = "worker_thread_tests.rs"]
 mod tests;
+
+/// Appends a reused sub-agent's follow-up prompt to its worker thread. A
+/// failure is logged and does not fail the spawn. `ids` is the parent thread
+/// and the sub-agent session, for the log line.
+pub(crate) fn append_reuse_follow_up(
+    ctx: &DispatchCtx,
+    workspace_dir: PathBuf,
+    worker_thread_id: &str,
+    agent_id: &str,
+    task_id: &str,
+    prompt: &str,
+    ids: (Option<&str>, &str),
+) {
+    if let Err(err) = append_worker_user_message(
+        ctx,
+        workspace_dir,
+        worker_thread_id,
+        agent_id,
+        task_id,
+        prompt,
+    ) {
+        log::warn!(
+            "[subagent_reuse] worker follow-up append failed parent_thread_id={} subagent_session_id={} worker_thread_id={} task_id={} error={}",
+            ids.0.unwrap_or("none"),
+            ids.1,
+            worker_thread_id,
+            task_id,
+            err
+        );
+    }
+}

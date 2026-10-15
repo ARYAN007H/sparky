@@ -200,6 +200,7 @@ async fn start_chat_inner(
         // Stage where the turn will read: the thread's working folder when
         // one is bound (`run_task` applies the same folder), else action_dir.
         let workspace = crate::agent::attachments::thread_action_dir(
+            ctx,
             &config,
             &config.workspace_dir,
             Some(&thread_id),

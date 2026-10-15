@@ -519,6 +519,7 @@ async fn drive_turn(
             required_capabilities: routes::turn_required_capabilities(model),
             deterministic_cacheable,
             has_route_fallback,
+            dispatch: run_context.dispatch_ctx(),
             hosted_security_gate,
             pause_at_cap,
             run_mode: run_context.thread_id.as_deref().map(|thread_id| {

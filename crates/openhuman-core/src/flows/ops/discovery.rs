@@ -58,7 +58,7 @@ pub async fn flows_discover(
     )
     .map_err(|e| format!("failed to initialise agent registry: {e}"))?;
 
-    let mut agent = OpenHumanSessionHost::from_config_for_agent(config, "flow_discovery")
+    let mut agent = OpenHumanSessionHost::from_config_for_agent(ctx, config, "flow_discovery")
         .map_err(|e| format!("failed to build flow_discovery agent: {e:#}"))?;
     agent.set_agent_definition_name("flow_discovery".to_string());
 

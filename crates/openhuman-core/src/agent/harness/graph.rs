@@ -62,9 +62,10 @@ pub(crate) async fn run_channel_turn_via_graph(
     memory_identity: crate::memory::scope::MemoryIdentity,
 ) -> Result<crate::agent::tinyagents::TinyagentsTurnOutcome> {
     let extra_arc = Arc::new(extra_tools);
-    // A channel/CLI turn is entered without a run context: bind the calling
-    // task's context here, once, and carry it on the turn's run context.
-    let dispatch = crate::core::runtime::DispatchCtx::ambient();
+    // A channel/CLI turn is entered without a run context: the model source
+    // was built under the turn's context, so bind that one here, once, and
+    // carry it on the turn's run context.
+    let dispatch = source.dispatch_ctx();
 
     // The callable set is the visibility whitelist. The runner advertises each via
     // its own `spec()`, deduped by name (extras shadow the registry).

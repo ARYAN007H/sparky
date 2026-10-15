@@ -190,6 +190,7 @@ async fn message_append_with_config(
         // where the turn reads them (#7714).
         let workspace = if raw_upload || durable_upload {
             crate::agent::attachments::thread_action_dir(
+                ctx,
                 config,
                 persistence_dir,
                 Some(&request.thread_id),
