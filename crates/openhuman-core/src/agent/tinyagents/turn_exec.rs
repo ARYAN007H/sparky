@@ -485,6 +485,13 @@ async fn drive_turn(
             anyhow::anyhow!("turn driver prepared a run without a steering handle")
         })?;
     let tool_count = prepared.tools().registered.len();
+    // A turn without the `todo` tool (tools suppressed, or `todo` not admitted)
+    // cannot tick its plan, so it gets no plan-order middleware.
+    let todo_registered = prepared
+        .tools()
+        .registered
+        .iter()
+        .any(|name| name == "todo");
 
     let candidate_names = prepared.tools().plan.candidates.clone();
     let TurnWiring {
@@ -519,6 +526,12 @@ async fn drive_turn(
             failure_map: failure_map.clone(),
             provider_usage_carry: provider_usage_carry.clone(),
             tool_outcome_sink: tool_outcome_sink.clone(),
+            // The store the `todo` tool resolves from the same parent context.
+            todo_store: run_context
+                .parent
+                .as_ref()
+                .filter(|_| todo_registered)
+                .map(|parent| crate::agent::todos::ops::store(&parent.workspace_dir)),
         },
     );
     if let Some(scope) = run_context.response_shape.clone() {
