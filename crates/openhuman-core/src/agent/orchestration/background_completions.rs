@@ -706,3 +706,7 @@ pub(crate) fn recover_pending_threads(ctx: &DispatchCtx, workspace_dir: &Path) -
 #[cfg(test)]
 #[path = "background_completions_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "background_completions_release_tests.rs"]
+mod release_tests;
