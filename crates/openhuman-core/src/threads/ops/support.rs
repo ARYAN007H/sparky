@@ -42,16 +42,21 @@ impl TranscriptStore {
     }
 }
 
-/// The transcript store of the request `ctx` carries, resolved exactly as the
-/// session host resolved it when it wrote the thread: the config's chat agent
-/// as the fallback id, and the request's own tenant (never the ambient one),
-/// so a SaaS profile's key keeps its profile prefix.
+/// The transcript store of `thread_id` for the request `ctx` carries: the key
+/// the thread's transcripts were first written under, recorded with the thread
+/// ([`ConversationStore::record_transcript_key`](crate::threads::store::ConversationStore::record_transcript_key)),
+/// so a later `chat_agent_id` change cannot strand its earlier turns. A thread
+/// with no record resolves as the session host would today: the config's chat
+/// agent as the fallback id, and the request's own tenant (never the ambient
+/// one), so a SaaS profile's key keeps its profile prefix.
 ///
 /// # Errors
 ///
-/// The config cannot be loaded, or the request has no tenant in SaaS mode.
+/// The config cannot be loaded, the request has no tenant in SaaS mode, or the
+/// recorded key cannot be read.
 pub(crate) async fn transcript_store(
     ctx: &crate::core::runtime::DispatchCtx,
+    thread_id: &str,
 ) -> Result<TranscriptStore, String> {
     let config = ctx
         .load_config()
@@ -62,7 +67,21 @@ pub(crate) async fn transcript_store(
         ctx.resolved().as_deref(),
     )
     .map_err(|no_tenant| no_tenant.to_string())?;
-    Ok(transcript_store_for(&config, &tenant))
+    let mut store = transcript_store_for(&config, &tenant);
+    let recorded = crate::threads::store::blocking::transcript_key(
+        ctx.clone(),
+        config.workspace_dir.clone(),
+        thread_id.to_string(),
+    )
+    .await?;
+    if let Some(key) = recorded {
+        log::debug!(
+            "[threads] transcript store key from the thread's recorded key (differs_from_current_rule={})",
+            key != store.key
+        );
+        store.key = key;
+    }
+    Ok(store)
 }
 
 /// [`transcript_store`] for an already-resolved config and tenant.

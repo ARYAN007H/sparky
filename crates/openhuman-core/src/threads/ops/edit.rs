@@ -90,7 +90,9 @@ pub async fn edit_message(
     let dir = workspace_dir().await.map_err(ThreadsError::Message)?;
     // The request's own tenant picks the store key, so a SaaS profile edits
     // the transcript its turns were written to.
-    let store = transcript_store(ctx).await.map_err(ThreadsError::Message)?;
+    let store = transcript_store(ctx, &thread_id)
+        .await
+        .map_err(ThreadsError::Message)?;
 
     crate::web_chat::cancel_chat_scoped(ctx, &client_id, &thread_id, None)
         .await
@@ -157,7 +159,9 @@ pub async fn regenerate(
     let dir = workspace_dir().await.map_err(ThreadsError::Message)?;
     // The request's own tenant picks the store key, so a SaaS profile edits
     // the transcript its turns were written to.
-    let store = transcript_store(ctx).await.map_err(ThreadsError::Message)?;
+    let store = transcript_store(ctx, &thread_id)
+        .await
+        .map_err(ThreadsError::Message)?;
 
     crate::web_chat::cancel_chat_scoped(ctx, &client_id, &thread_id, None)
         .await

@@ -8,7 +8,7 @@
 
 use std::path::Path;
 
-use tinyagents_session::transcript::{write_transcript, TranscriptMeta};
+use tinyagents_session::transcript::TranscriptMeta;
 
 use super::{
     checkin_session_agent, checkin_session_agent_if_vacant, checkout_session_agent,
@@ -74,7 +74,7 @@ fn write_thread_transcript(workspace_dir: &Path, stem: &str, thread_id: &str, ro
         thread_id: Some(thread_id.to_string()),
         task_id: None,
     };
-    write_transcript(&path, &messages, &meta, None).unwrap();
+    crate::util::classic_transcript_fixture::write_classic(&path, &messages, &meta);
 }
 
 fn prose(history: &[TranscriptEntry]) -> Vec<String> {
