@@ -291,7 +291,7 @@ mod x402 {
                 .ok_or_else(|| {
                     "402 response is missing a valid PAYMENT-REQUIRED header".to_string()
                 })?;
-            let config = DispatchCtx::ambient().load_config()
+            let config = crate::core::runtime::DispatchCtx::ambient().load_config()
                 .await
                 .map_err(|error| format!("x402 payment failed: {error}"))?;
             declined_when_wallet_off(&config)?;
