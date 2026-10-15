@@ -16,7 +16,7 @@ fn context_with_store() -> (Arc<CoreContext>, Arc<dyn SessionStoreProvider>) {
     let provider: Arc<dyn SessionStoreProvider> = Arc::new(
         tinyagents_session::DriverSessionStores::new(backend)
             .unwrap()
-            .recover_on_open(&crate::core::runtime::DispatchCtx::ambient(), false),
+            .recover_on_open(false),
     );
     let mut overrides = crate::agent::host_overrides::HostOverrides::default();
     overrides.session_store = Some(Arc::clone(&provider));

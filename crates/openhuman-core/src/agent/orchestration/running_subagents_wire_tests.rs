@@ -32,7 +32,7 @@ async fn roster_status_labels_are_literal() {
     let mut senders = Vec::new();
     for id in ["wire-run", "wire-done", "wire-await", "wire-fail"] {
         let (tx, rx) = status_channel();
-        register(
+        register(&crate::core::runtime::DispatchCtx::ambient(), 
             id.into(),
             "researcher".into(),
             "wire-parent".into(),
@@ -161,7 +161,7 @@ async fn spawn_ledger_record_has_literal_persisted_shape() {
     let _guard = super::test_guard_async().await;
     let ws = tempfile::tempdir().unwrap();
     let (_tx, rx) = status_channel();
-    register(
+    register(&crate::core::runtime::DispatchCtx::ambient(), 
         "wire-shape-1".into(),
         "researcher".into(),
         "wire-shape-parent".into(),

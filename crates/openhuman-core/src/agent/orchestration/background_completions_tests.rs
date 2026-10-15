@@ -158,11 +158,11 @@ fn clear_all_withdraws_every_pending_completion() {
     record(w, "sess-c1", "sub-1", "a", Some("t1"));
     record(w, "sess-c2", "sub-2", "b", Some("t2"));
 
-    let removed = clear_all(w);
+    let removed = clear_all(&crate::core::runtime::DispatchCtx::ambient(), w);
     assert_eq!(removed, 2);
     assert!(pending_ids(w, "t1").is_empty());
     assert!(pending_ids(w, "t2").is_empty());
-    assert_eq!(clear_all(w), 0);
+    assert_eq!(clear_all(&crate::core::runtime::DispatchCtx::ambient(), w), 0);
 }
 
 #[test]
@@ -173,7 +173,7 @@ fn clear_all_is_scoped_to_its_workspace() {
     record(purged.path(), "sess-p", "sub-1", "a", Some("t-purged"));
     record(other.path(), "sess-o", "sub-2", "b", Some("t-other"));
 
-    assert_eq!(clear_all(purged.path()), 1);
+    assert_eq!(clear_all(&crate::core::runtime::DispatchCtx::ambient(), purged.path()), 1);
 
     assert!(pending_ids(purged.path(), "t-purged").is_empty());
     assert_eq!(
@@ -522,7 +522,7 @@ fn clear_all_also_withdraws_a_completion_a_delivery_has_leased() {
         1
     );
 
-    assert_eq!(clear_all(w), 1);
+    assert_eq!(clear_all(&crate::core::runtime::DispatchCtx::ambient(), w), 1);
 
     assert!(pending_ids(w, "thread-leased").is_empty());
     assert_eq!(

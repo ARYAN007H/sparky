@@ -88,7 +88,7 @@ fn register_test_with_thread(
     rq: Arc<RunQueue<QueuedTurn>>,
 ) -> watch::Sender<DetachedSubagentStatus> {
     let (tx, rx) = status_channel();
-    register(
+    register(&crate::core::runtime::DispatchCtx::ambient(), 
         task_id.into(),
         "researcher".into(),
         parent_session.into(),
@@ -161,7 +161,7 @@ async fn task_id_for_session_enforces_parent_ownership() {
     let _guard = test_guard_async().await;
     let rq = run_queue();
     let (tx, rx) = status_channel();
-    register(
+    register(&crate::core::runtime::DispatchCtx::ambient(), 
         "task-session".into(),
         "researcher".into(),
         "session-owner".into(),
@@ -194,7 +194,7 @@ async fn task_id_for_session_enforces_parent_ownership() {
 async fn snapshot_and_block_scope_to_parent_and_reflect_live_status() {
     let _guard = test_guard_async().await;
     let (tx_a, rx_a) = status_channel();
-    register(
+    register(&crate::core::runtime::DispatchCtx::ambient(), 
         "task-fleet-a".into(),
         "researcher".into(),
         "fleet-parent".into(),
@@ -208,7 +208,7 @@ async fn snapshot_and_block_scope_to_parent_and_reflect_live_status() {
     )
     .expect("fixture registration admitted");
     let (tx_b, rx_b) = status_channel();
-    register(
+    register(&crate::core::runtime::DispatchCtx::ambient(), 
         "task-fleet-b".into(),
         "code_executor".into(),
         "fleet-parent".into(),
@@ -223,7 +223,7 @@ async fn snapshot_and_block_scope_to_parent_and_reflect_live_status() {
     .expect("fixture registration admitted");
     // A worker owned by a different parent must not leak into the snapshot.
     let (tx_other, rx_other) = status_channel();
-    register(
+    register(&crate::core::runtime::DispatchCtx::ambient(), 
         "task-fleet-other".into(),
         "researcher".into(),
         "other-parent".into(),
@@ -366,7 +366,7 @@ async fn snapshot_and_block_scope_to_parent_and_reflect_live_status() {
 async fn resume_ref_for_task_includes_resume_fields_and_enforces_ownership() {
     let _guard = test_guard_async().await;
     let (tx, rx) = status_channel();
-    register(
+    register(&crate::core::runtime::DispatchCtx::ambient(), 
         "task-resume".into(),
         "researcher".into(),
         "session-owner".into(),
@@ -403,7 +403,7 @@ async fn resume_ref_for_task_includes_resume_fields_and_enforces_ownership() {
 async fn task_id_for_session_prefers_live_task_over_terminal_task() {
     let _guard = test_guard_async().await;
     let (old_tx, old_rx) = status_channel();
-    register(
+    register(&crate::core::runtime::DispatchCtx::ambient(), 
         "task-old".into(),
         "researcher".into(),
         "session-owner".into(),
@@ -421,7 +421,7 @@ async fn task_id_for_session_prefers_live_task_over_terminal_task() {
         iterations: 1,
     });
     let (_new_tx, new_rx) = status_channel();
-    register(
+    register(&crate::core::runtime::DispatchCtx::ambient(), 
         "task-new".into(),
         "researcher".into(),
         "session-owner".into(),
@@ -458,7 +458,7 @@ async fn wait_returns_completion_once_published() {
         drop(tx);
     });
 
-    let outcome = wait("task-wait", "session-A", Duration::from_secs(5))
+    let outcome = wait(&crate::core::runtime::DispatchCtx::ambient(), "task-wait", "session-A", Duration::from_secs(5))
         .await
         .expect("wait should resolve");
     match outcome {
@@ -471,7 +471,7 @@ async fn wait_returns_completion_once_published() {
 
     // pruned after a terminal wait
     assert!(matches!(
-        wait("task-wait", "session-A", Duration::from_millis(10)).await,
+        wait(&crate::core::runtime::DispatchCtx::ambient(), "task-wait", "session-A", Duration::from_millis(10)).await,
         Err(WaitError::Unknown)
     ));
 }
@@ -482,7 +482,7 @@ async fn wait_times_out_and_leaves_entry_intact() {
     let rq = run_queue();
     let _tx = register_test("task-slow", "session-A", rq);
 
-    let outcome = wait("task-slow", "session-A", Duration::from_millis(20))
+    let outcome = wait(&crate::core::runtime::DispatchCtx::ambient(), "task-slow", "session-A", Duration::from_millis(20))
         .await
         .expect("wait should resolve");
     assert!(matches!(
@@ -491,7 +491,7 @@ async fn wait_times_out_and_leaves_entry_intact() {
     ));
 
     // still steerable after a timed-out wait
-    assert!(steer(
+    assert!(steer(&crate::core::runtime::DispatchCtx::ambient(), 
         "task-slow",
         "session-A",
         "still here".into(),
@@ -518,20 +518,20 @@ async fn cancel_for_thread_aborts_only_matching_entries() {
 
     // The two cancelled entries are gone (steer can't find them).
     assert_eq!(
-        steer("task-tA-1", "session-A", "x".into(), QueueLane::Steer).await,
+        steer(&crate::core::runtime::DispatchCtx::ambient(), "task-tA-1", "session-A", "x".into(), QueueLane::Steer).await,
         Err(SteerError::Unknown)
     );
     assert_eq!(
-        steer("task-tA-2", "session-A", "x".into(), QueueLane::Steer).await,
+        steer(&crate::core::runtime::DispatchCtx::ambient(), "task-tA-2", "session-A", "x".into(), QueueLane::Steer).await,
         Err(SteerError::Unknown)
     );
 
     // Non-matching entries stay live and steerable.
-    assert!(steer("task-tB", "session-A", "x".into(), QueueLane::Steer)
+    assert!(steer(&crate::core::runtime::DispatchCtx::ambient(), "task-tB", "session-A", "x".into(), QueueLane::Steer)
         .await
         .is_ok());
     assert!(
-        steer("task-headless", "session-A", "x".into(), QueueLane::Steer)
+        steer(&crate::core::runtime::DispatchCtx::ambient(), "task-headless", "session-A", "x".into(), QueueLane::Steer)
             .await
             .is_ok()
     );
@@ -566,7 +566,7 @@ async fn cancel_by_task_returns_metadata_and_removes_entry() {
 
     // Entry is gone — steer can no longer find it, and a second cancel is a no-op.
     assert_eq!(
-        steer("task-cbt", "session-Z", "x".into(), QueueLane::Steer).await,
+        steer(&crate::core::runtime::DispatchCtx::ambient(), "task-cbt", "session-Z", "x".into(), QueueLane::Steer).await,
         Err(SteerError::Unknown)
     );
     assert!(cancel_by_task(&crate::core::runtime::DispatchCtx::ambient(), "task-cbt").is_none());
@@ -621,7 +621,7 @@ async fn cancel_all_clears_everything() {
     // Headless (no parent thread) — aborted, but contributes no thread id.
     let _b = register_test_with_thread("task-all-2", "session-B", None, rq);
 
-    let cancelled_threads = cancel_all();
+    let cancelled_threads = cancel_all(&crate::core::runtime::DispatchCtx::ambient(), );
     assert!(
         cancelled_threads.contains(&"thread-1".to_string()),
         "cancel_all should report the parent thread of the cancelled sub-agent"
@@ -632,15 +632,15 @@ async fn cancel_all_clears_everything() {
     );
 
     assert_eq!(
-        steer("task-all-1", "session-A", "x".into(), QueueLane::Steer).await,
+        steer(&crate::core::runtime::DispatchCtx::ambient(), "task-all-1", "session-A", "x".into(), QueueLane::Steer).await,
         Err(SteerError::Unknown)
     );
     assert_eq!(
-        steer("task-all-2", "session-B", "x".into(), QueueLane::Steer).await,
+        steer(&crate::core::runtime::DispatchCtx::ambient(), "task-all-2", "session-B", "x".into(), QueueLane::Steer).await,
         Err(SteerError::Unknown)
     );
     // Registry is empty now.
-    assert!(cancel_all().is_empty());
+    assert!(cancel_all(&crate::core::runtime::DispatchCtx::ambient(), ).is_empty());
 }
 
 #[tokio::test]
@@ -651,7 +651,7 @@ async fn stop_for_thread_aborts_the_threads_running_children() {
     // Stop button used to leave behind.
     let child = tokio::spawn(std::future::pending::<()>());
     let (_tx, rx) = status_channel();
-    register(
+    register(&crate::core::runtime::DispatchCtx::ambient(), 
         "task-stop-1".into(),
         "researcher".into(),
         "session-stop".into(),
@@ -679,11 +679,11 @@ async fn stop_for_thread_aborts_the_threads_running_children() {
         "stop must abort the detached child task"
     );
     assert_eq!(
-        steer("task-stop-1", "session-stop", "x".into(), QueueLane::Steer).await,
+        steer(&crate::core::runtime::DispatchCtx::ambient(), "task-stop-1", "session-stop", "x".into(), QueueLane::Steer).await,
         Err(SteerError::Unknown)
     );
     assert!(
-        steer(
+        steer(&crate::core::runtime::DispatchCtx::ambient(), 
             "task-stop-other",
             "session-stop",
             "x".into(),

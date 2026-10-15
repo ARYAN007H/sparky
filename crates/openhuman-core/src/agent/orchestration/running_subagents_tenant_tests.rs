@@ -60,7 +60,7 @@ impl Worker {
         let (tx, rx) = status_channel();
         let task_handle = tokio::spawn(std::future::pending::<()>());
         let abort = task_handle.abort_handle();
-        register(
+        register(&crate::core::runtime::DispatchCtx::ambient(), 
             task.clone(),
             "researcher".into(),
             PARENT.into(),
@@ -366,7 +366,7 @@ async fn same_parent_resolution_and_wait_refuse_foreign_workers() {
             Err(WaitError::NotOwned)
         ));
         assert!(matches!(
-            wait(&pair.a.task, PARENT, Duration::ZERO).await,
+            wait(&crate::core::runtime::DispatchCtx::ambient(), &pair.a.task, PARENT, Duration::ZERO).await,
             Err(WaitError::NotOwned)
         ));
         assert_eq!(
@@ -388,11 +388,11 @@ async fn same_parent_agent_steering_refuses_foreign_worker() {
     let pair = Pair::new();
     CoreContext::scope(pair.bob.clone(), async {
         assert_eq!(
-            steer(&pair.a.task, PARENT, "foreign".into(), QueueLane::Steer).await,
+            steer(&crate::core::runtime::DispatchCtx::ambient(), &pair.a.task, PARENT, "foreign".into(), QueueLane::Steer).await,
             Err(SteerError::NotOwned)
         );
         assert_eq!(pair.a.queue.status().await.steers, 0);
-        steer(&pair.b.task, PARENT, "own".into(), QueueLane::Steer)
+        steer(&crate::core::runtime::DispatchCtx::ambient(), &pair.b.task, PARENT, "own".into(), QueueLane::Steer)
             .await
             .unwrap();
         assert_eq!(pair.b.queue.status().await.steers, 1);
@@ -467,7 +467,7 @@ async fn missing_saas_scope_cannot_observe_or_control_workers() {
         Err(WaitError::NotOwned)
     ));
     assert_eq!(
-        steer(&pair.a.task, PARENT, "unscoped".into(), QueueLane::Steer).await,
+        steer(&crate::core::runtime::DispatchCtx::ambient(), &pair.a.task, PARENT, "unscoped".into(), QueueLane::Steer).await,
         Err(SteerError::NotOwned)
     );
     assert_eq!(
