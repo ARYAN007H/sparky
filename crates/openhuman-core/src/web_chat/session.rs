@@ -132,6 +132,7 @@ fn effective_session_config(
 }
 
 pub(super) fn build_session_agent(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     client_id: &str,
     thread_id: &str,
@@ -151,6 +152,7 @@ pub(super) fn build_session_agent(
     );
 
     let agent_result = OpenHumanSessionHost::from_config_for_agent_session(
+        ctx,
         &effective,
         target_agent_id,
         Some(thread_id),
@@ -448,6 +450,7 @@ pub(crate) async fn checkout_session_agent(
             );
             (
                 build_session_agent(
+                    ctx,
                     config,
                     client_id,
                     thread_id,
@@ -460,6 +463,7 @@ pub(crate) async fn checkout_session_agent(
         }
         None => (
             build_session_agent(
+                ctx,
                 config,
                 client_id,
                 thread_id,
