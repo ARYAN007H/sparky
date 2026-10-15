@@ -101,8 +101,8 @@ async fn run_loop() {
         // `local`, then every agent that keeps its sources in its own storage
         // scope (`crate::storage::agents`).
         for (agent, result) in
-            crate::storage::agents::for_each_live_scope("task_sources", || async {
-                run_one_tick(&DispatchCtx::ambient()).await
+            crate::storage::agents::for_each_live_scope(&DispatchCtx::host_default(), "task_sources", |ctx| async move {
+                run_one_tick(&ctx).await
             })
             .await
         {
@@ -165,7 +165,7 @@ pub(crate) async fn run_one_tick(ctx: &DispatchCtx) -> Result<(), String> {
         // Record the attempt up front so a slow/failing fetch doesn't
         // re-fire every tick.
         record_poll(&source.id);
-        let outcome = pipeline::run_source_once(&config, &source, FetchReason::Periodic).await;
+        let outcome = pipeline::run_source_once(ctx, &config, &source, FetchReason::Periodic).await;
         fired += 1;
         tracing::debug!(
             source_id = %source.id,

@@ -93,6 +93,7 @@ fn default_tool_descs(config: &Config) -> Vec<(&'static str, &'static str)> {
 /// `security`. Side-effect free apart from the workspace's audit logger: it
 /// installs no process-global policy and registers no subscriber.
 pub(crate) fn build_channel_turn_parts(
+    dispatch: &DispatchCtx,
     config: &Config,
     security: &Arc<SecurityPolicy>,
     descs: PromptToolDescs,
@@ -143,7 +144,7 @@ pub(crate) fn build_channel_turn_parts(
     )?;
     let workspace = config.workspace_dir.clone();
     let capabilities =
-        crate::profiles::capabilities::ProfileCapabilities::in_ctx(&DispatchCtx::ambient());
+        crate::profiles::capabilities::ProfileCapabilities::in_ctx(dispatch);
     let tools_registry = Arc::new(if capabilities.is_some() {
         // The profile host route builds the selected belt once with the exact
         // durable thread. No second, unnamed factory invocation is needed here.
@@ -231,6 +232,7 @@ pub(crate) fn build_channel_turn_parts(
 /// The runtime context for `parts`, delivering replies to `channels_by_name`
 /// and starting with no per-chat history.
 pub(crate) fn runtime_context(
+    dispatch: &DispatchCtx,
     config: &Config,
     parts: ChannelTurnParts,
     channels_by_name: Arc<HashMap<String, Arc<dyn crate::channels::Channel>>>,
@@ -259,5 +261,6 @@ pub(crate) fn runtime_context(
         multimodal_files: config.multimodal_files.clone(),
         // Crate-native turn models for the channel turn (Phase 3 P3-B).
         config: Some(Arc::new(config.clone())),
+        core: dispatch.downgrade(),
     }
 }

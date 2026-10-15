@@ -20,16 +20,17 @@ pub(super) async fn run_agent_job(
     job: &CronJob,
 ) -> (bool, String, Option<String>) {
     let run_id = uuid::Uuid::new_v4().to_string();
-    run_agent_job_for_run(config, job, &run_id).await
+    run_agent_job_for_run(&crate::core::runtime::DispatchCtx::host_default(), config, job, &run_id).await
 }
 
 pub(super) async fn run_agent_job_for_run(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     job: &CronJob,
     run_id: &str,
 ) -> (bool, String, Option<String>) {
     let name = job.name.clone().unwrap_or_else(|| "cron-job".to_string());
-    let prefixed_prompt = build_run_prompt(config, job, &name).await;
+    let prefixed_prompt = build_run_prompt(ctx, config, job, &name).await;
 
     // Apply per-job model override onto a cloned Config, so the Agent
     // sees it through the normal `default_model` path without mutating
@@ -152,11 +153,7 @@ pub(super) async fn run_agent_job_for_run(
                 target = ?job.session_target,
                 "[cron] building isolated agent for scheduled job"
             );
-            match build_agent_for_cron_job(
-                &crate::core::runtime::DispatchCtx::ambient(),
-                &effective,
-                job,
-            ) {
+            match build_agent_for_cron_job(ctx, &effective, job) {
                 Ok(BuiltCronAgent { mut agent, context }) => {
                     // Tag events so downstream subscribers can correlate
                     // cron-triggered turns. `cron` is the channel so the

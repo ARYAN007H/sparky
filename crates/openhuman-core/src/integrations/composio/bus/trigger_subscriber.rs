@@ -83,7 +83,9 @@ impl EventHandler<DomainEvent> for ComposioTriggerSubscriber {
         // let the event through rather than silently dropping it. The
         // existing env-var / config triage flags below remain the
         // backend-mode gates.
-        let ctx = DispatchCtx::ambient();
+        // A trigger arrives over the host's socket, so it belongs to the host's
+        // own tenant; in SaaS it has none and is dropped.
+        let ctx = DispatchCtx::host_default();
         if let Ok(config) = ctx.load_config().await {
             if config.composio.mode == crate::config::schema::COMPOSIO_MODE_DIRECT {
                 tracing::info!(
@@ -186,8 +188,6 @@ impl EventHandler<DomainEvent> for ComposioTriggerSubscriber {
         // Spawn so the bus dispatch loop stays non-blocking — the
         // triage turn is an LLM round-trip that may take seconds.
         tokio::spawn(async move {
-            // A spawned task does not inherit the handler's task scope: bind its own.
-            let ctx = DispatchCtx::ambient();
             match run_triage(&ctx, &envelope).await {
                 Ok(TriageOutcome::Decision(run)) => {
                     // Remote payload: a Composio trigger body is

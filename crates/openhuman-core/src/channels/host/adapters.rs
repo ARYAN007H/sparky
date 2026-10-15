@@ -209,7 +209,7 @@ impl ConversationStore for ConversationHistoryStore {
         session_key: &str,
         limit: usize,
     ) -> anyhow::Result<Vec<ConversationMessage>> {
-        let ctx = DispatchCtx::ambient();
+        let ctx = DispatchCtx::host_default();
         let messages = crate::threads::store::get_messages(
             &ctx,
             self.workspace_dir.clone(),
@@ -228,7 +228,7 @@ impl ConversationStore for ConversationHistoryStore {
     }
 
     async fn append(&self, session_key: &str, message: ConversationMessage) -> anyhow::Result<()> {
-        let ctx = DispatchCtx::ambient();
+        let ctx = DispatchCtx::host_default();
         let now = chrono::Utc::now().to_rfc3339();
         // `append_message` requires the thread to exist; create-or-noop first.
         crate::threads::store::ensure_thread(

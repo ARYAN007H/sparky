@@ -52,13 +52,17 @@ impl EventHandler<DomainEvent> for PendingDeletionsSubscriber {
     }
 
     async fn handle(&self, event: &DomainEvent) {
-        let DomainEvent::CredentialChanged { kind } = event else {
+        let DomainEvent::CredentialChanged { kind, tenant } = event else {
             return;
         };
         if kind == "cleared" {
             return;
         }
-        let config = match DispatchCtx::ambient().load_config().await {
+        let Some(ctx) = DispatchCtx::for_event(tenant.as_ref()) else {
+            tracing::debug!("[memory:bus] credential change has no tenant; deletions wait");
+            return;
+        };
+        let config = match ctx.load_config().await {
             Ok(config) => config,
             Err(error) => {
                 tracing::debug!(error = %error, "[memory:bus] config unavailable; deletions wait");
@@ -91,13 +95,17 @@ impl EventHandler<DomainEvent> for SystemJobsSubscriber {
     }
 
     async fn handle(&self, event: &DomainEvent) {
-        let DomainEvent::CronSystemJobDue { job } = event else {
+        let DomainEvent::CronSystemJobDue { job, tenant } = event else {
             return;
         };
         if job != SOURCES_SYNC_JOB && job != BACKGROUND_JOB {
             return;
         }
-        let config = match DispatchCtx::ambient().load_config().await {
+        let Some(ctx) = DispatchCtx::for_event(tenant.as_ref()) else {
+            tracing::debug!(job = %job, "[memory:bus] system job has no tenant; skipped");
+            return;
+        };
+        let config = match ctx.load_config().await {
             Ok(config) => config,
             Err(error) => {
                 tracing::debug!(error = %error, job = %job, "[memory:bus] config unavailable");

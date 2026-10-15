@@ -100,7 +100,7 @@ pub(crate) async fn sweep_profiles(backend: &dyn StorageBackend, profile_ids: &[
 /// Agent scopes are enumerated from the installed backend (the only caller,
 /// [`sweep_installed`], passes that one).
 pub async fn sweep_all(backend: Arc<dyn StorageBackend>) -> u64 {
-    let scoped: u64 = super::agents::for_each_scope("blob sweep", || {
+    let scoped: u64 = super::agents::for_each_scope(&crate::core::runtime::DispatchCtx::host_default(), "blob sweep", |_| {
         let backend = Arc::clone(&backend);
         async move {
             match super::current_scope() {

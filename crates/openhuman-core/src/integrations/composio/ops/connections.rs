@@ -111,6 +111,7 @@ pub async fn composio_list_connections(
 }
 
 pub async fn composio_authorize(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     toolkit: &str,
     extra_params: Option<serde_json::Value>,
@@ -139,6 +140,7 @@ pub async fn composio_authorize(
             toolkit: toolkit.to_string(),
             connection_id: resp.connection_id.clone(),
             connect_url: resp.connect_url.clone(),
+            tenant: ctx.event_tenant(),
         },
     );
 
