@@ -306,3 +306,28 @@ async fn a_stashed_attachment_survives_a_restart_of_the_workspace_store() {
         .unwrap()
         .is_none());
 }
+
+#[test]
+fn agent_key_for_matches_the_session_hosts_resolution() {
+    use crate::core::runtime::Tenant;
+    let desktop = Tenant::default();
+    assert_eq!(agent_key_for(&desktop, "orchestrator"), "orchestrator");
+    let embedded = Tenant {
+        profile: None,
+        agent: Some("a1".into()),
+    };
+    assert_eq!(agent_key_for(&embedded, "orchestrator"), "a1");
+    let profile = Tenant {
+        profile: Some("p1".into()),
+        agent: None,
+    };
+    assert_eq!(agent_key_for(&profile, "orchestrator"), "p1~default");
+    let profile_agent = Tenant {
+        profile: Some("p1".into()),
+        agent: Some("a1".into()),
+    };
+    assert_eq!(
+        agent_key_for(&profile_agent, "orchestrator"),
+        crate::core::runtime::session_key(&profile_agent)
+    );
+}
