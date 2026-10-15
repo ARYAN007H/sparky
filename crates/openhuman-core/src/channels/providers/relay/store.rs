@@ -61,6 +61,7 @@ pub async fn record_inbound(
 ) -> Result<Recorded, String> {
     let now = Utc::now().to_rfc3339();
     conversations::ensure_thread(
+        DispatchCtx::ambient(),
         workspace_dir.to_path_buf(),
         CreateConversationThread {
             id: thread_id.to_string(),
@@ -78,11 +79,12 @@ pub async fn record_inbound(
     let lock = thread_lock(workspace_dir, thread_id);
     let _guard = lock.lock().await;
     let existing =
-        conversations::get_messages(workspace_dir.to_path_buf(), thread_id.to_string()).await?;
+        conversations::get_messages(DispatchCtx::ambient(), workspace_dir.to_path_buf(), thread_id.to_string()).await?;
     if existing.iter().any(|message| message.id == id) {
         return Ok(Recorded::Duplicate);
     }
     conversations::append_message(
+        DispatchCtx::ambient(),
         workspace_dir.to_path_buf(),
         thread_id.to_string(),
         ConversationMessage {
@@ -117,6 +119,7 @@ pub async fn record_reply(
         return Ok(());
     }
     conversations::append_message(
+        DispatchCtx::ambient(),
         workspace_dir.to_path_buf(),
         thread_id.to_string(),
         ConversationMessage {
@@ -148,7 +151,7 @@ pub async fn prior_turns(
 ) -> Result<Vec<ChatMessage>, String> {
     let current = inbound_message_id(message_id);
     let messages =
-        conversations::get_messages(workspace_dir.to_path_buf(), thread_id.to_string()).await?;
+        conversations::get_messages(DispatchCtx::ambient(), workspace_dir.to_path_buf(), thread_id.to_string()).await?;
     let rows = to_history(&messages, &current);
     let skip = rows.len().saturating_sub(limit);
     Ok(rows.into_iter().skip(skip).collect())

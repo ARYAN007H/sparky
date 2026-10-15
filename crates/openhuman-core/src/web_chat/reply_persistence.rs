@@ -70,6 +70,7 @@ pub(crate) fn persist_delivered_reply(
         extra_metadata["citations"] = json!(citations);
     }
     conversations::append_message(
+        DispatchCtx::ambient(),
         workspace_dir.to_path_buf(),
         thread_id,
         ConversationMessage {

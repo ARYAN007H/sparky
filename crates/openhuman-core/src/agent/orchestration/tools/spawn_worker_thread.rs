@@ -239,7 +239,7 @@ impl SpawnWorkerThreadTool {
             "[spawn_worker_thread] invoked"
         );
 
-        let threads = conversations::list_threads(parent.workspace_dir.clone())
+        let threads = conversations::list_threads(DispatchCtx::ambient(), parent.workspace_dir.clone())
             .map_err(|e| anyhow::anyhow!(e))?;
         if let Some(current_thread) = threads.iter().find(|t| t.id == current_thread_id) {
             let is_delegated_label = current_thread

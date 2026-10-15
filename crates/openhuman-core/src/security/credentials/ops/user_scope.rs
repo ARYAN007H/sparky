@@ -74,7 +74,7 @@ pub(super) fn activate_user_scope(user_id: &str) -> Result<Vec<String>, String> 
         // concurrent thread RPC in this process cannot interleave.
         let pre_ws = pre_login_user_dir(&root_dir).join("workspace");
         let pre_ws_log = pre_ws.display().to_string();
-        match conversations::purge_threads(pre_ws) {
+        match conversations::purge_threads(DispatchCtx::ambient(), pre_ws) {
             Ok(stats) => {
                 tracing::info!(
                     pre_login_workspace = %pre_ws_log,

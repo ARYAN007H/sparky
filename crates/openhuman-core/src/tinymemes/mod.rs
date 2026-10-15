@@ -190,7 +190,7 @@ async fn load(
     let config = config.clone();
     let thread_id = thread_id.to_owned();
     crate::core::runtime::spawn_blocking_scoped(move || {
-        crate::threads::store::get_messages(config.workspace_dir.clone(), &thread_id)
+        crate::threads::store::get_messages(DispatchCtx::ambient(), config.workspace_dir.clone(), &thread_id)
             .map_err(|e| log::warn!("[tinymemes] thread history unavailable: {e}"))
             .ok()
     })

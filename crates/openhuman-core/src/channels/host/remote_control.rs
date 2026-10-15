@@ -18,7 +18,7 @@ pub(crate) async fn dispatch_callback(
     }
     match request {
         Request::ListThreads => {
-            let threads = conversations::list_threads(ctx.workspace_dir.to_path_buf())
+            let threads = conversations::list_threads(DispatchCtx::ambient(), ctx.workspace_dir.to_path_buf())
                 .map_err(|_| tinybus::Error::failed("conversation state unavailable"))?;
             Ok(Response::Threads(
                 threads
@@ -39,6 +39,7 @@ pub(crate) async fn dispatch_callback(
                 return Err(tinybus::Error::failed("channel session ended"));
             }
             conversations::ensure_thread(
+        DispatchCtx::ambient(),
                 ctx.workspace_dir.to_path_buf(),
                 CreateConversationThread {
                     id: thread.id,

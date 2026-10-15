@@ -140,6 +140,7 @@ fn persist_worker_thread(
     let now = chrono::Utc::now().to_rfc3339();
 
     conversations::ensure_thread(
+        DispatchCtx::ambient(),
         workspace_dir.to_path_buf(),
         CreateConversationThread {
             id: thread_id.clone(),
@@ -154,6 +155,7 @@ fn persist_worker_thread(
     .map_err(|err| format!("ensure_thread: {err}"))?;
 
     conversations::append_message(
+        DispatchCtx::ambient(),
         workspace_dir.to_path_buf(),
         &thread_id,
         ConversationMessage {
@@ -172,6 +174,7 @@ fn persist_worker_thread(
     .map_err(|err| format!("append user message: {err}"))?;
 
     conversations::append_message(
+        DispatchCtx::ambient(),
         workspace_dir.to_path_buf(),
         &thread_id,
         ConversationMessage {

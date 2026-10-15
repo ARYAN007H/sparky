@@ -135,12 +135,12 @@ async fn plan(
     bound: Option<&BoundEngine>,
     stored: &BTreeMap<String, u32>,
 ) -> MemoryResult<Vec<ThreadPlan>> {
-    let listed = threads::list_threads(workspace_dir.to_path_buf())
+    let listed = threads::list_threads(DispatchCtx::ambient(), workspace_dir.to_path_buf())
         .await
         .map_err(|error| MemoryError::Engine(format!("reading chat threads failed: {error}")))?;
     let mut plans = Vec::new();
     for thread in listed {
-        let messages = match threads::get_messages(workspace_dir.to_path_buf(), thread.id.clone())
+        let messages = match threads::get_messages(DispatchCtx::ambient(), workspace_dir.to_path_buf(), thread.id.clone())
             .await
         {
             Ok(messages) => messages,

@@ -582,6 +582,7 @@ fn attach_workflow_proposal(
     );
     if let Some(thread_id) = parent_thread_id {
         let persisted = conversations::append_message(
+        DispatchCtx::ambient(),
             workspace_dir.to_path_buf(),
             thread_id,
             ConversationMessage {

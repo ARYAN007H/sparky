@@ -57,6 +57,7 @@ async fn origin_messages(config: &Config, origin: &JobOrigin) -> Vec<(String, St
     match origin {
         JobOrigin::Web { thread_id, .. } => {
             match crate::threads::store::blocking::get_messages(
+        DispatchCtx::ambient(),
                 config.workspace_dir.clone(),
                 thread_id.clone(),
             )
