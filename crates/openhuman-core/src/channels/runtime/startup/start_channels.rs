@@ -164,6 +164,7 @@ async fn start_channels_inner(mut config: Config, session: CancellationToken) ->
     let context_slot: Arc<OnceLock<Weak<crate::channels::context::ChannelRuntimeContext>>> =
         Arc::new(OnceLock::new());
     let preparing = ModuleChannelRuntime::prepare(
+        &dispatch,
         Arc::new(config.clone()),
         Arc::clone(&context_slot),
         dispatch_tx.clone(),
