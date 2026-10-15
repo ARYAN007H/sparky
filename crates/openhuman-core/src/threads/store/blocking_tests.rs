@@ -361,3 +361,51 @@ async fn update_message_patches_metadata_and_search_finds_content() {
         "cross-thread search must find the appended message, got: {hits:?}"
     );
 }
+
+fn profile_ctx(workspace: &std::path::Path, profile: &str) -> crate::core::runtime::DispatchCtx {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+    let config = crate::config::Config {
+        workspace_dir: workspace.to_path_buf(),
+        action_dir: workspace.to_path_buf(),
+        config_path: workspace.join("config.toml"),
+        ..Default::default()
+    };
+    let context = CoreContext::for_test(DomainSet::none(), Some(workspace.to_path_buf()))
+        .derive_with(
+            ContextOverlay::new(config, DomainSet::full(), Default::default()).profile(profile),
+        );
+    DispatchCtx::new(context)
+}
+
+/// The tenant is read from the context handed in, never from the task: two
+/// profiles driven concurrently over one workspace, with no ambient scope,
+/// each see only their own threads.
+#[tokio::test]
+async fn explicit_context_picks_the_conversation_scope_without_an_ambient_scope() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path().to_path_buf();
+    let alice = profile_ctx(&dir, "alice");
+    let bob = profile_ctx(&dir, "bob");
+
+    let (a, b) = tokio::join!(
+        ensure_thread(alice.clone(), dir.clone(), create("alice-thread")),
+        ensure_thread(bob.clone(), dir.clone(), create("bob-thread")),
+    );
+    a.expect("alice ensure");
+    b.expect("bob ensure");
+
+    let alice_ids: Vec<String> = list_threads(alice, dir.clone())
+        .await
+        .expect("alice list")
+        .into_iter()
+        .map(|t| t.id)
+        .collect();
+    let bob_ids: Vec<String> = list_threads(bob, dir.clone())
+        .await
+        .expect("bob list")
+        .into_iter()
+        .map(|t| t.id)
+        .collect();
+    assert_eq!(alice_ids, vec!["alice-thread".to_string()]);
+    assert_eq!(bob_ids, vec!["bob-thread".to_string()]);
+}
