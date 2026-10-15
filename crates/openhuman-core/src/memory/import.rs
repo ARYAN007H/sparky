@@ -350,7 +350,7 @@ async fn launch(
         "[memory:import] run started"
     );
     let config = config.clone();
-    crate::core::runtime::spawn_scoped(async move {
+    crate::core::runtime::DispatchCtx::ambient().spawn(async move {
         if mode == Mode::Import {
             driver.run(begun).await;
         } else {

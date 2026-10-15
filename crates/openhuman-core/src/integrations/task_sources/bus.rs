@@ -126,7 +126,7 @@ async fn fire_for_connection(
         let config = config.clone();
         let ctx = ctx.clone();
         // Scoped: the fetch keeps the scope's agent context.
-        crate::core::runtime::spawn_scoped(async move {
+        ctx.spawn(async move {
             let _ = pipeline::run_source_once(&ctx, &config, &source, FetchReason::ConnectionCreated)
                 .await;
         });

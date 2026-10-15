@@ -119,7 +119,7 @@ pub(crate) async fn run(config: &Config, mut run: NativeShellRun) -> anyhow::Res
         // cancellation is acknowledged only after the command is gone.
         let hold = tinytools_std::timeout::ProcessCleanup::hold();
         let (_caller, abandoned) = tokio::sync::oneshot::channel::<std::convert::Infallible>();
-        crate::core::runtime::spawn_scoped(async move {
+        crate::core::runtime::DispatchCtx::ambient().spawn(async move {
             let _hold = hold;
             run_owned(&config, run, abandoned, meter).await
         })

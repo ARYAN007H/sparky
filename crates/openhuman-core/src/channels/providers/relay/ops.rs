@@ -77,7 +77,7 @@ pub async fn channel_relay_inbound(
         chars = params.text.chars().count(),
         "[channels::relay] relayed message accepted"
     );
-    crate::core::runtime::spawn_scoped(run_relay_turn(
+    ctx.spawn(run_relay_turn(
         ctx.clone(),
         config,
         params,

@@ -81,7 +81,7 @@ pub fn start_periodic_poll() {
         tracing::debug!("[task_sources:periodic] scheduler already running, skipping start");
         return;
     }
-    crate::core::runtime::spawn_scoped(async move {
+    tokio::spawn(async move {
         tracing::info!(
             tick_seconds = TICK_SECONDS,
             "[task_sources:periodic] scheduler starting"

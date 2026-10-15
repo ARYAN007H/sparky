@@ -411,7 +411,7 @@ impl ServerSession {
         {
             *pending = Some(PendingCallback::Running {
                 id: callback_id.clone(),
-                task: crate::core::runtime::spawn_scoped((self.callback_dispatch)(call)),
+                task: crate::core::runtime::DispatchCtx::ambient().spawn((self.callback_dispatch)(call)),
             });
         }
         let result = match pending.as_mut() {
