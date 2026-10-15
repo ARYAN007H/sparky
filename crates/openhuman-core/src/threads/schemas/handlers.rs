@@ -220,11 +220,7 @@ pub(super) fn handle_edit_message(
 ) -> ControllerFuture {
     Box::pin(async move {
         let p = parse::<ops::EditMessageRequest>(params)?;
-        to_json(
-            ops::edit_message(&ctx, p)
-                .await
-                .map_err(|e| e.to_string())?,
-        )
+        to_json(ops::edit_message(&ctx, p).await.map_err(|e| e.to_string())?)
     })
 }
 
