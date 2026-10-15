@@ -11,6 +11,7 @@
 //! - Channel origin: the reply is sent to the origin's reply target, then
 //!   appended to that chat's history so its next turn sees it.
 
+use crate::core::runtime::DispatchCtx;
 use super::delivery::strip_openhuman_link_markup;
 use crate::config::Config;
 use crate::web_chat::{publish_web_channel_event, WebChannelEvent};
@@ -236,7 +237,7 @@ async fn deliver_to_web_thread(
     let persist_thread = thread_id.to_string();
     let persist_request = request_id.clone();
     let persist_text = text.to_string();
-    let persist_ctx = crate::core::runtime::DispatchCtx::ambient();
+    let persist_ctx = DispatchCtx::ambient();
     crate::core::runtime::spawn_blocking_scoped(move || {
         crate::web_chat::persist_delivered_reply(
             &persist_ctx,

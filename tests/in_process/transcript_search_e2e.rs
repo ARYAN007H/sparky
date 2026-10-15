@@ -110,7 +110,7 @@ async fn transcript_search_op_finds_message_in_prior_thread() {
     let _ws = EnvVarGuard::set_to_path("OPENHUMAN_WORKSPACE", &workspace);
     seed_workspace(&workspace);
 
-    let hits = transcript_search(openhuman_core::core::runtime::DispatchCtx::ambient(), "Postgres migration script", 10, None)
+    let hits = transcript_search(&openhuman_core::core::runtime::DispatchCtx::ambient(), "Postgres migration script", 10, None)
         .await
         .expect("transcript_search op");
 
@@ -141,7 +141,7 @@ async fn transcript_search_op_honours_exclude_thread() {
     let _ws = EnvVarGuard::set_to_path("OPENHUMAN_WORKSPACE", &workspace);
     seed_workspace(&workspace);
 
-    let hits = transcript_search(openhuman_core::core::runtime::DispatchCtx::ambient(), "migration", 10, Some("thread-pg"))
+    let hits = transcript_search(&openhuman_core::core::runtime::DispatchCtx::ambient(), "migration", 10, Some("thread-pg"))
         .await
         .expect("transcript_search op");
 
@@ -162,7 +162,7 @@ async fn transcript_search_op_returns_empty_on_no_match() {
     let _ws = EnvVarGuard::set_to_path("OPENHUMAN_WORKSPACE", &workspace);
     seed_workspace(&workspace);
 
-    let hits = transcript_search(openhuman_core::core::runtime::DispatchCtx::ambient(), "quantum chromodynamics zzz", 10, None)
+    let hits = transcript_search(&openhuman_core::core::runtime::DispatchCtx::ambient(), "quantum chromodynamics zzz", 10, None)
         .await
         .expect("transcript_search op");
 
