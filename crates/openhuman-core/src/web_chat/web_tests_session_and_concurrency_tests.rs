@@ -459,7 +459,7 @@ async fn parallel_turn_runs_concurrently_with_primary_on_same_thread() {
     wait_for_parallel(|e| e.iter().any(|(_, t)| t == thread_id)).await;
     // Primary is still in-flight — the parallel send did not interrupt it.
     assert!(
-        in_flight_entries_for_test()
+        in_flight_entries_for_test(&crate::core::runtime::DispatchCtx::ambient())
             .await
             .iter()
             .any(|(k, _)| k == thread_id),

@@ -103,6 +103,7 @@ impl EventHandler<DomainEvent> for ComposioTriggerSubscriber {
                         metadata: super::super::types::ComposioTriggerMetadata {
                             id: metadata_id.clone(),
                             uuid: metadata_uuid.clone(),
+                            ..Default::default()
                         },
                     };
                     if let Err(error) = store.record(&config, event).await {

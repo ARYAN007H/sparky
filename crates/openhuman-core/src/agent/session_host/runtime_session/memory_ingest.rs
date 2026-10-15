@@ -142,6 +142,7 @@ impl OpenHumanTurnPrelude {
             profile_context,
         });
         let pack = crate::memory::lifecycle::prefetch::pre_turn(
+            &self.dispatch_ctx(),
             config.clone(),
             identity.clone(),
             PreTurnInput {
@@ -162,6 +163,7 @@ impl OpenHumanTurnPrelude {
             identity,
             thread_id,
             pack,
+            core: self.host_env.core.clone(),
         }))
     }
 

@@ -94,6 +94,7 @@ pub fn build_local_provider_with_config(config: &Config) -> Option<ResolvedProvi
     );
     Some(ResolvedProvider {
         turn_model_source: crate::agent::tinyagents::TurnModelSource::new_crate_native_from_string(
+            &crate::core::runtime::DispatchCtx::ambient(),
             TRIAGE_ROLE,
             provider_string,
             Arc::new(config.clone()),
@@ -183,6 +184,7 @@ fn build_remote_provider(config: &Config) -> anyhow::Result<ResolvedProvider> {
         Ok(ResolvedProvider {
             turn_model_source:
                 crate::agent::tinyagents::TurnModelSource::new_crate_native_from_string(
+                    &crate::core::runtime::DispatchCtx::ambient(),
                     TRIAGE_ROLE,
                     provider_string,
                     Arc::new(config.clone()),

@@ -94,8 +94,8 @@ fn describe(error: &ConversationError, subject: Subject<'_>) -> String {
 /// A conversation store bound to one workspace's storage backend.
 #[derive(Clone)]
 pub struct ConversationStore {
-    ctx: DispatchCtx,
-    workspace_dir: PathBuf,
+    pub(super) ctx: DispatchCtx,
+    pub(super) workspace_dir: PathBuf,
 }
 
 impl ConversationStore {
@@ -103,6 +103,10 @@ impl ConversationStore {
     /// Nothing is opened until the first call.
     pub fn new(ctx: DispatchCtx, workspace_dir: PathBuf) -> Self {
         Self { ctx, workspace_dir }
+    }
+
+    pub(super) fn conversation_scope(&self) -> Result<Scope, String> {
+        conversation_scope(&self.ctx)
     }
 
     /// The driver store for this call, its schema declared once per backend
@@ -286,16 +290,20 @@ impl ConversationStore {
     /// Soft-deletes a thread; whether it existed.
     pub fn delete_thread(&self, thread_id: &str, deleted_at: &str) -> Result<bool, String> {
         let (id, at) = (thread_id.to_string(), deleted_at.to_string());
-        self.run("delete_thread", thread(thread_id), |s| async move {
+        let deleted = self.run("delete_thread", thread(thread_id), |s| async move {
             s.delete_thread(&id, &at).await
-        })
+        })?;
+        self.forget_transcript_key(thread_id);
+        Ok(deleted)
     }
 
     /// Removes every thread.
     pub fn purge_threads(&self) -> Result<ConversationPurgeStats, String> {
-        self.run("purge_threads", NONE, |s| async move {
+        let stats = self.run("purge_threads", NONE, |s| async move {
             s.purge_threads().await.map(ConversationPurgeStats::from)
-        })
+        })?;
+        self.forget_all_transcript_keys();
+        Ok(stats)
     }
 }
 

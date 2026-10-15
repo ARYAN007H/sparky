@@ -42,8 +42,8 @@ struct BudgetSignal {
 /// Kept in a sibling map rather than on `SessionEntry` so the signal survives
 /// the de-poison session drop (an empty turn is not poisoned, but cold-boot
 /// reseeds would otherwise be the wrong lifetime to hang this on).
-fn thread_budget_signals() -> Arc<ThreadBudgetSignals> {
-    crate::core::runtime::current_slot::<ThreadBudgetSignals>()
+fn thread_budget_signals(ctx: &DispatchCtx) -> Arc<ThreadBudgetSignals> {
+    crate::core::runtime::slot_for::<ThreadBudgetSignals>(ctx)
 }
 
 type ThreadBudgetSignals = Mutex<HashMap<String, BudgetSignal>>;
@@ -75,7 +75,7 @@ pub(crate) async fn record_budget_signal(
     thread_id: &str,
     provider_binding: &str,
 ) {
-    let mut signals = thread_budget_signals().lock_owned().await;
+    let mut signals = thread_budget_signals(ctx).lock_owned().await;
     prune_stale_budget_signals(&mut signals);
     signals.insert(
         key_for(ctx, thread_id),
@@ -89,7 +89,7 @@ pub(crate) async fn record_budget_signal(
 /// Clear any recorded budget signal for this thread — called on a successful
 /// turn, where the balance is evidently usable again.
 pub(crate) async fn clear_budget_signal(ctx: &DispatchCtx, thread_id: &str) {
-    let mut signals = thread_budget_signals().lock_owned().await;
+    let mut signals = thread_budget_signals(ctx).lock_owned().await;
     signals.remove(&key_for(ctx, thread_id));
 }
 
@@ -102,7 +102,7 @@ pub(crate) async fn has_fresh_budget_signal(
     thread_id: &str,
     provider_binding: &str,
 ) -> bool {
-    let mut signals = thread_budget_signals().lock_owned().await;
+    let mut signals = thread_budget_signals(ctx).lock_owned().await;
     let key = key_for(ctx, thread_id);
     match signals.get(&key) {
         Some(sig)
@@ -128,7 +128,7 @@ async fn record_budget_signal_aged(
     provider_binding: &str,
     age: Duration,
 ) {
-    let mut signals = thread_budget_signals().lock_owned().await;
+    let mut signals = thread_budget_signals(ctx).lock_owned().await;
     let when = Instant::now().checked_sub(age).unwrap_or_else(Instant::now);
     signals.insert(
         key_for(ctx, thread_id),

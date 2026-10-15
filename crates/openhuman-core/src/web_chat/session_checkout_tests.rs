@@ -8,7 +8,7 @@
 
 use std::path::Path;
 
-use tinyagents_session::transcript::{write_transcript, TranscriptMeta};
+use tinyagents_session::transcript::TranscriptMeta;
 
 use super::{
     checkin_session_agent, checkin_session_agent_if_vacant, checkout_session_agent,
@@ -74,7 +74,7 @@ fn write_thread_transcript(workspace_dir: &Path, stem: &str, thread_id: &str, ro
         thread_id: Some(thread_id.to_string()),
         task_id: None,
     };
-    write_transcript(&path, &messages, &meta, None).unwrap();
+    crate::util::classic_transcript_fixture::write_classic(&path, &messages, &meta);
 }
 
 fn prose(history: &[TranscriptEntry]) -> Vec<String> {
@@ -101,7 +101,7 @@ pub(super) fn host_seeded_with(config: &Config, marker: &str) -> OpenHumanSessio
 }
 
 async fn evict(thread_id: &str) {
-    thread_sessions()
+    thread_sessions(&DispatchCtx::ambient())
         .lock_owned()
         .await
         .remove(&key_for(&DispatchCtx::ambient(), thread_id));
@@ -154,10 +154,12 @@ async fn checkout_cold_boots_from_the_thread_transcript_and_checkin_keeps_it_war
     );
 
     checkin_session_agent(&DispatchCtx::ambient(), &thread_id, agent, fingerprint).await;
-    assert!(thread_sessions()
-        .lock()
-        .await
-        .contains_key(&key_for(&DispatchCtx::ambient(), &thread_id)));
+    assert!(
+        thread_sessions(&crate::core::runtime::DispatchCtx::ambient())
+            .lock()
+            .await
+            .contains_key(&key_for(&DispatchCtx::ambient(), &thread_id))
+    );
 
     // The next checkout — a user turn — reuses the warm agent with that history.
     let CheckedOutSession { agent, .. } = checkout_session_agent(
@@ -179,10 +181,12 @@ async fn checkout_cold_boots_from_the_thread_transcript_and_checkin_keeps_it_war
         "warm checkout must carry the same history"
     );
     // Checked out means removed: nobody else can drive this agent meanwhile.
-    assert!(!thread_sessions()
-        .lock()
-        .await
-        .contains_key(&key_for(&DispatchCtx::ambient(), &thread_id)));
+    assert!(
+        !thread_sessions(&crate::core::runtime::DispatchCtx::ambient())
+            .lock()
+            .await
+            .contains_key(&key_for(&DispatchCtx::ambient(), &thread_id))
+    );
     evict(&thread_id).await;
 }
 
@@ -287,10 +291,12 @@ async fn a_fork_never_takes_or_returns_the_cached_agent() {
     // Built fresh: no transcript on disk for this thread, so an empty history.
     assert!(prose(&agent.history()).is_empty());
     // The primary's cached agent was left in place.
-    assert!(thread_sessions()
-        .lock()
-        .await
-        .contains_key(&key_for(&DispatchCtx::ambient(), &thread_id)));
+    assert!(
+        thread_sessions(&crate::core::runtime::DispatchCtx::ambient())
+            .lock()
+            .await
+            .contains_key(&key_for(&DispatchCtx::ambient(), &thread_id))
+    );
     evict(&thread_id).await;
 }
 
@@ -671,7 +677,7 @@ async fn each_checkout_arms_the_reply_language_from_its_own_locale() {
     // Reused cached agent, the user switched the UI to English: the Spanish
     // directives already in the history are superseded explicitly.
     assert!(
-        thread_sessions()
+        thread_sessions(&crate::core::runtime::DispatchCtx::ambient())
             .lock()
             .await
             .contains_key(&key_for(&DispatchCtx::ambient(), &thread_id)),
@@ -685,10 +691,12 @@ async fn each_checkout_arms_the_reply_language_from_its_own_locale() {
     checkin_session_agent(&DispatchCtx::ambient(), &thread_id, agent, fingerprint).await;
 
     // Reused again, now Hindi: re-armed with the new language.
-    assert!(thread_sessions()
-        .lock()
-        .await
-        .contains_key(&key_for(&DispatchCtx::ambient(), &thread_id)));
+    assert!(
+        thread_sessions(&crate::core::runtime::DispatchCtx::ambient())
+            .lock()
+            .await
+            .contains_key(&key_for(&DispatchCtx::ambient(), &thread_id))
+    );
     let CheckedOutSession { agent, .. } = checkout(Some("hi")).await;
     let directive = agent
         .reply_language_directive()

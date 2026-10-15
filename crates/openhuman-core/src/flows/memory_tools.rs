@@ -61,12 +61,12 @@ const FLOW_KEY_INFIX: &str = ":key:";
 /// by a prompt-injected caller. Writes refuse when this is `None`; the
 /// read-only recall falls back to the argument (cross-flow reads are already
 /// open by design, so an argument grants no new read privilege).
-fn trusted_flow_id() -> Option<String> {
-    match turn_origin::current() {
+fn trusted_flow_id(origin: Option<&AgentTurnOrigin>) -> Option<String> {
+    match origin {
         Some(AgentTurnOrigin::TrustedAutomation {
             job_id,
             source: TrustedAutomationSource::Workflow { .. },
-        }) => Some(job_id),
+        }) => Some(job_id.clone()),
         _ => None,
     }
 }
@@ -294,6 +294,18 @@ impl Tool for FlowMemoryRecallTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> anyhow::Result<ToolResult> {
+        self.execute_with_context(args, tinytools::ToolCallOptions::default(), None)
+            .await
+    }
+
+    async fn execute_with_context(
+        &self,
+        args: serde_json::Value,
+        _options: tinytools::ToolCallOptions,
+        tool_context: Option<&dyn tinytools::ToolRunContext>,
+    ) -> anyhow::Result<ToolResult> {
+        let origin =
+            crate::agent::tinyagents::host::run_context::turn_origin_for_tool(tool_context);
         let query = match args.get("query").and_then(|v| v.as_str()) {
             Some(q) => q.trim(),
             None => return Ok(ToolResult::error("Missing 'query' parameter".to_string())),
@@ -305,7 +317,7 @@ impl Tool for FlowMemoryRecallTool {
 
         // SECURITY: inside a running flow the trusted origin wins over the
         // model-supplied `flow_id` argument.
-        let flow_id = match trusted_flow_id() {
+        let flow_id = match trusted_flow_id(origin.as_ref()) {
             Some(trusted_id) => {
                 tracing::debug!(
                     target: "flows",
@@ -429,6 +441,18 @@ impl Tool for FlowMemoryRememberTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> anyhow::Result<ToolResult> {
+        self.execute_with_context(args, tinytools::ToolCallOptions::default(), None)
+            .await
+    }
+
+    async fn execute_with_context(
+        &self,
+        args: serde_json::Value,
+        _options: tinytools::ToolCallOptions,
+        tool_context: Option<&dyn tinytools::ToolRunContext>,
+    ) -> anyhow::Result<ToolResult> {
+        let origin =
+            crate::agent::tinyagents::host::run_context::turn_origin_for_tool(tool_context);
         let flow_id_arg = args.get("flow_id").and_then(|v| v.as_str());
         let Some(key) = args.get("key").and_then(|v| v.as_str()) else {
             return Ok(ToolResult::error("Missing 'key' parameter".to_string()));
@@ -447,7 +471,7 @@ impl Tool for FlowMemoryRememberTool {
 
         // SECURITY (T-M2): the flow comes from the trusted run origin only;
         // outside a workflow run the write is refused.
-        let Some(flow_id) = trusted_flow_id() else {
+        let Some(flow_id) = trusted_flow_id(origin.as_ref()) else {
             tracing::warn!(
                 target: "flows",
                 requested_flow_id_chars = flow_id_arg.map_or(0, str::len),

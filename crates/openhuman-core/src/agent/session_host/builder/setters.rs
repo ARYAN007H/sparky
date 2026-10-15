@@ -83,7 +83,9 @@ impl SessionHostBuilder {
         config: Arc<crate::config::Config>,
     ) -> Self {
         self.turn_model_source = Some(crate::agent::tinyagents::TurnModelSource::new_crate_native(
-            role, config,
+            &crate::core::runtime::DispatchCtx::ambient(),
+            role,
+            config,
         ));
         self
     }
@@ -265,19 +267,15 @@ impl SessionHostBuilder {
     /// This value is stamped onto the built [`OpenHumanSessionHost`] and surfaces in
     /// the following places:
     ///
-    /// * **Transcript filename on disk** — `transcript::write_transcript`
-    ///   and `transcript::find_latest_transcript` use it as the
-    ///   `{agent}` prefix in `sessions/DDMMYYYY/{agent}_{index}.md`.
-    ///   Both the write path and the resume-lookup path read the same
-    ///   field on `self`, so a session is always self-consistent; the
-    ///   user-visible signal is which filename the transcript lands
-    ///   under. Leaving it at the legacy `"main"` fallback silently
-    ///   misfiles every non-orchestrator session under `main_*.md`.
-    /// * **Transcript metadata header** — `transcript::write_transcript`
-    ///   stamps it into the `<!-- session_transcript\nagent: {name}\n… -->`
-    ///   block at the top of every `.md` file. This is the ground-truth
-    ///   signal for "which agent definition ran this session" when
-    ///   inspecting transcripts after the fact.
+    /// * **Transcript identity** — the session's store key and its
+    ///   `SessionRef` use it, on both the write path and the resume-lookup
+    ///   path, so a session is always self-consistent. Leaving it at the
+    ///   legacy `"main"` fallback silently misfiles every non-orchestrator
+    ///   session under `main`.
+    /// * **Transcript metadata header** — it is stamped into the transcript's
+    ///   `_meta` (`agent`, `agent_id`). This is the ground-truth signal for
+    ///   "which agent definition ran this session" when inspecting
+    ///   transcripts after the fact.
     /// * **[`PromptContext::agent_id`]** at prompt-build time (see
     ///   `turn.rs`). The stamped `prompt_builder` injected by
     ///   [`OpenHumanSessionHost::from_config_for_agent`] is what actually

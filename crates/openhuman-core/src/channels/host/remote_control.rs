@@ -67,6 +67,7 @@ pub(crate) async fn dispatch_callback(
         }
         Request::InvalidateThread { thread_id } => {
             let _removed = crate::web_chat::invalidate_thread_sessions_for_tenant(
+                &DispatchCtx::ambient(),
                 tenant,
                 &thread_id,
                 cancellation,

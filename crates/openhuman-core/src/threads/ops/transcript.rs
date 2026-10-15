@@ -30,7 +30,7 @@ pub async fn transcript_get(
         return Err("thread_id is required".to_string());
     }
     // Resolved here, in the request's scope; the projection itself is blocking.
-    let locator = transcript_store(ctx).await?.locator();
+    let locator = transcript_store(ctx, &thread_id).await?.locator();
     let cursor = request.cursor.clone();
     let limit = request.limit;
     let page = tokio::task::spawn_blocking(move || {

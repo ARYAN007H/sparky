@@ -177,8 +177,16 @@ pub fn current() -> Option<Arc<SecurityPolicy>> {
 
 /// The policy a call should be answered against: the ambient agent context's
 /// own policy when it carries one, else the process-global [`current`] policy.
+///
+/// Reads the calling task's ambient context; a caller that holds its own
+/// context uses [`effective_in`].
 pub fn effective() -> Option<Arc<SecurityPolicy>> {
-    if let Some(policy) = crate::core::runtime::CoreContext::current_agent_policy() {
+    effective_in(&crate::core::runtime::DispatchCtx::ambient())
+}
+
+/// [`effective`] for the agent `ctx` runs for.
+pub fn effective_in(ctx: &crate::core::runtime::DispatchCtx) -> Option<Arc<SecurityPolicy>> {
+    if let Some(policy) = ctx.agent_policy() {
         return Some(policy);
     }
     if let Some(agent) = crate::core::runtime::agent_scope::current_agent_id() {

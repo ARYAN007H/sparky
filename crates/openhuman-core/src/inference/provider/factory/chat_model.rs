@@ -2,6 +2,7 @@
 //! default-temperature wrapper, and the unresolved-route error builder.
 
 use super::*;
+use crate::core::runtime::DispatchCtx;
 #[cfg(not(test))]
 use crate::inference::provider::factory::access_gates::verify_session_active;
 
@@ -24,22 +25,36 @@ pub fn create_chat_model(
 /// One-shot callers that persist or log the concrete model (e.g. the memory
 /// summarise audit) need the id the role resolved to; the plain
 /// [`create_chat_model`] drops it.
+///
+/// Resolves the agent-local model overrides against the calling task's ambient
+/// context; a caller that holds its own context uses
+/// [`create_chat_model_with_model_id_in`].
 pub fn create_chat_model_with_model_id(
     role: &str,
     config: &Config,
     temperature: f64,
 ) -> anyhow::Result<(Arc<dyn ChatModel<()>>, String)> {
-    let (model, model_id) = create_chat_model_with_model_id_inner(role, config)?;
+    create_chat_model_with_model_id_in(&DispatchCtx::ambient(), role, config, temperature)
+}
+
+/// [`create_chat_model_with_model_id`] under an explicit context: the host
+/// model overrides of the agent `ctx` runs for win over the configured route.
+pub fn create_chat_model_with_model_id_in(
+    ctx: &DispatchCtx,
+    role: &str,
+    config: &Config,
+    temperature: f64,
+) -> anyhow::Result<(Arc<dyn ChatModel<()>>, String)> {
+    let (model, model_id) = create_chat_model_with_model_id_inner(ctx, role, config)?;
     Ok((with_default_temperature(model, temperature), model_id))
 }
 
 pub(super) fn create_chat_model_with_model_id_inner(
+    ctx: &DispatchCtx,
     role: &str,
     config: &Config,
 ) -> anyhow::Result<(Arc<dyn ChatModel<()>>, String)> {
-    if let Some(model) = crate::core::runtime::CoreContext::current_host_overrides()
-        .and_then(|local| local.model_for(role))
-    {
+    if let Some(model) = ctx.host_overrides().and_then(|local| local.model_for(role)) {
         return Ok((
             model,
             config
@@ -153,7 +168,7 @@ pub async fn probe_inference_readiness(role: &str, config: &Config) -> Result<()
     }
 
     log::debug!("[flows][inference-probe] role={role} verifying model construction");
-    if let Err(e) = create_chat_model_with_model_id_inner(role, config) {
+    if let Err(e) = create_chat_model_with_model_id_inner(&DispatchCtx::ambient(), role, config) {
         log::debug!("[flows][inference-probe] role={role} construction failed: {e}");
         return Err(e.to_string());
     }
