@@ -132,7 +132,9 @@ async fn scenario() {
         .agent(AgentSpec::new("primed").provider(route(&provider, "test-model")))
         .unwrap();
     let mut turn = agent.turn("Summarise the plan.");
-    turn.steering_handle().steer("Keep it to one line.").unwrap();
+    turn.steering_handle()
+        .steer("Keep it to one line.")
+        .unwrap();
     let outcome = turn.send().await.unwrap();
     assert_eq!(outcome.reply, "Noted.");
     assert!(outcome.unapplied_steers.is_empty());
@@ -166,9 +168,6 @@ async fn scenario() {
         sent.await.unwrap(),
         Err(CoreError::TurnCancelled { .. })
     ));
-    assert_eq!(
-        steering.take_unapplied(),
-        ["Actually, stop and summarise."]
-    );
+    assert_eq!(steering.take_unapplied(), ["Actually, stop and summarise."]);
     assert!(steering.steer("refused").is_err());
 }
