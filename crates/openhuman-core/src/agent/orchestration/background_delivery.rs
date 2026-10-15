@@ -391,6 +391,7 @@ async fn try_deliver(busy_ctx: DispatchCtx, thread_id: String, fence: DrainFence
     let turn_workspace = workspace_dir.clone();
     // A drain is event-driven and carries no context of its own.
     let ctx = DispatchCtx::host_default();
+    let give_up_ctx = busy_ctx.clone();
     let retry_after = try_deliver_with(
         &busy_ctx,
         thread_id.clone(),
@@ -401,7 +402,7 @@ async fn try_deliver(busy_ctx: DispatchCtx, thread_id: String, fence: DrainFence
             async move { run_system_turn_on_thread(&ctx, workspace_dir, thread_id, notice).await }
         },
         move |thread_id, notice| async move {
-            persist_undelivered(workspace_dir, thread_id, notice).await
+            persist_undelivered(give_up_ctx, workspace_dir, thread_id, notice).await
         },
     )
     .await;
