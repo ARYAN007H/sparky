@@ -246,6 +246,8 @@ pub struct OpenHumanModelResolver {
     /// Built clients keyed by workload role. Guarded by a `std::sync::Mutex`
     /// held across no `.await` — model construction is synchronous.
     cache: Mutex<HashMap<&'static str, Arc<dyn ChatModel<()>>>>,
+    /// The context the turn runs under; the host's own when none was bound.
+    dispatch: Option<crate::core::runtime::DispatchCtx>,
 }
 
 impl OpenHumanModelResolver {
@@ -257,7 +259,16 @@ impl OpenHumanModelResolver {
             config,
             temperature,
             cache: Mutex::new(HashMap::new()),
+            dispatch: None,
         }
+    }
+
+    /// Resolve models under `dispatch`, the context of the turn this resolver
+    /// serves (agent-local model overrides, tenant routes).
+    #[must_use]
+    pub fn with_dispatch(mut self, dispatch: crate::core::runtime::DispatchCtx) -> Self {
+        self.dispatch = Some(dispatch);
+        self
     }
 
     /// Builds a resolver that pins every resolved model to `temperature`
@@ -304,7 +315,13 @@ impl OpenHumanModelResolver {
         // The one construction chokepoint: provider resolution, BYOK/local/managed
         // selection, and the egress disclosure all happen inside here.
         let (model, model_id) =
-            create_chat_model_with_model_id(role, &self.config, self.temperature).map_err(
+            create_chat_model_with_model_id_in(
+                &self.dispatch.clone().unwrap_or_else(crate::core::runtime::DispatchCtx::host_default),
+                role,
+                &self.config,
+                self.temperature,
+            )
+            .map_err(
                 |error| {
                     TinyAgentsError::Model(format!(
                         "openhuman: no model for workload role `{role}`: {error}"
