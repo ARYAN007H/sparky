@@ -25,6 +25,17 @@ use tinybus::module::{ModuleCallError, ModuleClient};
 
 use super::handler;
 
+/// The host callback for a session: dispatches under the process default
+/// context (the MCP server is a single-tenant host), held weakly so a
+/// long-lived session never pins it.
+fn host_dispatch() -> impl Fn(ServerHostCall) -> HostCallbackFuture + Send + Sync + 'static {
+    let weak = crate::core::runtime::DispatchCtx::process_default().downgrade();
+    move |call| {
+        let ctx = crate::core::runtime::DispatchCtx::from_weak(weak.as_ref());
+        Box::pin(handler::dispatch(ctx, call))
+    }
+}
+
 const MODULE: &str = "tinymcp";
 const POLL_INTERVAL: Duration = Duration::from_millis(5);
 static NEXT_SESSION_ID: AtomicU64 = AtomicU64::new(1);
