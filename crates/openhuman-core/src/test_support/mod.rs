@@ -9,8 +9,6 @@
 //! `introspect` adds read-only RPCs that let specs verify state on disk
 //! and in the live process (workspace tree, files, IN_FLIGHT chat map).
 
-#[cfg(test)]
-pub(crate) mod classic_transcript;
 pub mod introspect;
 pub mod rpc;
 mod schemas;
