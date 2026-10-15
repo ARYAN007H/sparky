@@ -65,13 +65,21 @@ async fn transcripts_come_from_the_store_only_when_one_is_in_effect() {
 }
 
 #[tokio::test]
-async fn without_a_store_transcripts_are_workspace_files() {
-    let dir = std::path::Path::new("/nonexistent-openhuman-workspace");
-    assert_eq!(
-        transcripts_or_files("u1", dir).destination_key(),
-        // tinyagents keys the file destination on the resolved `session_raw`
-        // directory under the workspace (tinyagents#06ad95ea).
-        Some(dir.join("session_raw").to_string_lossy().into_owned())
+async fn without_a_store_transcripts_come_from_the_workspace_store_not_files() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path();
+    let locator = transcripts_or_files("u1", dir);
+    let key = locator.destination_key();
+    assert_ne!(
+        key,
+        Some(dir.join("session_raw").to_string_lossy().into_owned()),
+        "the file layout is no longer a transcript destination"
+    );
+    // The same workspace and agent resolve to the same destination.
+    assert_eq!(transcripts_or_files("u1", dir).destination_key(), key);
+    assert!(
+        dir.join(tinyagents_session::port::STORE_DIR).is_dir(),
+        "the workspace store lives under the workspace"
     );
     let provider: Arc<dyn SessionStoreProvider> = Arc::new(InMemorySessionStores::new());
     let expected = provider.for_agent("u1").transcripts.destination_key();
@@ -80,6 +88,17 @@ async fn without_a_store_transcripts_are_workspace_files() {
     })
     .await;
     assert_eq!(found, expected);
+}
+
+#[test]
+fn an_unopenable_workspace_degrades_to_a_session_that_is_not_kept() {
+    let tmp = tempfile::tempdir().unwrap();
+    // A file where the workspace directory should be: the store cannot open.
+    let blocker = tmp.path().join("not-a-dir");
+    std::fs::write(&blocker, b"x").unwrap();
+    let session = tinyagents_session::transcript::SessionRef::scoped("t1", "u1");
+    let locator = workspace_transcripts("u1", &blocker);
+    assert!(!locator.session_exists(&session));
 }
 
 fn derived(profile: Option<&str>, agent: Option<&str>) -> Arc<crate::core::runtime::CoreContext> {
