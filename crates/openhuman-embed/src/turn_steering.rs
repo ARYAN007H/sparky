@@ -186,14 +186,16 @@ impl SteeringScope {
 impl Drop for SteeringScope {
     fn drop(&mut self) {
         if let Some(steering) = self.0.take() {
-            let left = steering.finish();
+            let mut state = steering.state();
+            state.finished = true;
+            let left = steering.drain_queue();
             if !left.is_empty() {
                 log::debug!(
                     "[embed][agent] turn ended without applying {} steer(s); kept for take_unapplied",
                     left.len()
                 );
             }
-            steering.state().unapplied = left;
+            state.unapplied.extend(left);
         }
     }
 }
