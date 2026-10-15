@@ -10,6 +10,7 @@
 //! opening `user` message. The sub-agent runner then appends each turn and
 //! tool result to the same thread via its `worker_thread_id` sink.
 
+use crate::core::runtime::DispatchCtx;
 use std::path::PathBuf;
 
 use serde_json::json;
@@ -34,6 +35,7 @@ pub(crate) fn create_worker_thread(
     let now = chrono::Utc::now().to_rfc3339();
 
     conversations::ensure_thread(
+        &DispatchCtx::ambient(),
         workspace_dir.clone(),
         CreateConversationThread {
             id: worker_thread_id.clone(),
@@ -54,6 +56,7 @@ pub(crate) fn create_worker_thread(
     );
 
     if let Err(err) = conversations::append_message(
+        &DispatchCtx::ambient(),
         workspace_dir,
         &worker_thread_id,
         ConversationMessage {
@@ -83,6 +86,7 @@ pub(crate) fn append_worker_user_message(
     prompt: &str,
 ) -> Result<(), String> {
     conversations::append_message(
+        &DispatchCtx::ambient(),
         workspace_dir,
         worker_thread_id,
         ConversationMessage {

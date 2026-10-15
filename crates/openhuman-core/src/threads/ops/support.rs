@@ -4,6 +4,7 @@
 
 use crate::config::Config;
 use crate::core::runtime::context::CoreContext;
+use crate::core::runtime::DispatchCtx;
 use crate::threads::store as conversations;
 use crate::threads::store::{ConversationMessage, ConversationThread};
 use crate::threads::THREAD_TITLE_LOG_PREFIX;
@@ -124,6 +125,7 @@ pub(super) fn fallback_title_from_user_message(
 }
 
 pub(super) async fn update_thread_with_fallback_title(
+    ctx: &DispatchCtx,
     dir: PathBuf,
     thread: ConversationThread,
     user_message: &str,
@@ -135,6 +137,7 @@ pub(super) async fn update_thread_with_fallback_title(
         return Ok(thread);
     }
     conversations::blocking::update_thread_title(
+        ctx.clone(),
         dir,
         thread.id.clone(),
         title,
