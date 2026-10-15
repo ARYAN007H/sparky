@@ -45,7 +45,7 @@ pub(crate) async fn spawn_parallel_turn(
     let request_id_task = request_id.clone();
     // Request and thread ids are caller-chosen and only unique per agent, so
     // the table is keyed in the caller's scope (see `key_for`).
-    let map_key = key_for(&request_id);
+    let map_key = key_for(ctx, &request_id);
     let map_key_task = map_key.clone();
     let user_message = message.to_string();
     let ctx_task = ctx.clone();
@@ -169,7 +169,7 @@ pub(crate) async fn spawn_parallel_turn(
                         );
                     }
 
-                    publish_web_channel_event(WebChannelEvent {
+                    publish_web_channel_event(&ctx_task, WebChannelEvent {
                         event: "chat_error".to_string(),
                         client_id: client_id_task.clone(),
                         thread_id: thread_id_task.clone(),
@@ -196,7 +196,7 @@ pub(crate) async fn spawn_parallel_turn(
                     // `chat_error` on this path today — leaving a client
                     // waiting on this request_id with no terminal event.
                     // `chat_cancelled` closes it out.
-                    publish_web_channel_event(WebChannelEvent {
+                    publish_web_channel_event(&ctx_task, WebChannelEvent {
                         event: "chat_cancelled".to_string(),
                         client_id: client_id_task.clone(),
                         thread_id: thread_id_task.clone(),
@@ -217,7 +217,7 @@ pub(crate) async fn spawn_parallel_turn(
     parallel_in_flight().lock_owned().await.insert(
         map_key,
         ParallelEntry {
-            thread_id: key_for(thread_id),
+            thread_id: key_for(ctx, thread_id),
             client_id: client_id.to_string(),
             handle,
             cancel_token,
@@ -228,9 +228,12 @@ pub(crate) async fn spawn_parallel_turn(
 /// Cooperatively cancel every parallel turn on a thread. Returns the cancelled
 /// `(request_id, client_id)` pairs. Used by the thread-level cancel paths so a cancel/stop also
 /// tears down any concurrent forked turns, not just the primary turn.
-pub(crate) async fn cancel_parallel_turns_for_thread(thread_id: &str) -> Vec<(String, String)> {
+pub(crate) async fn cancel_parallel_turns_for_thread(
+    ctx: &crate::core::runtime::DispatchCtx,
+    thread_id: &str,
+) -> Vec<(String, String)> {
     let mut cancelled = Vec::new();
-    let scoped_thread = key_for(thread_id);
+    let scoped_thread = key_for(ctx, thread_id);
     let mut parallel = parallel_in_flight().lock_owned().await;
     let request_ids: Vec<String> = parallel
         .iter()
@@ -249,7 +252,7 @@ pub(crate) async fn cancel_parallel_turns_for_thread(thread_id: &str) -> Vec<(St
                     }
                 }
             });
-            cancelled.push((unscope(&request_id), entry.client_id));
+            cancelled.push((unscope(ctx, &request_id), entry.client_id));
         }
     }
     cancelled
@@ -260,11 +263,12 @@ pub(crate) async fn cancel_parallel_turns_for_thread(thread_id: &str) -> Vec<(St
 /// vec of `(request_id, client_id)`, mirroring [`cancel_parallel_turns_for_thread`]) or empty when no such
 /// parallel turn exists. Request-scoped cancel path (#4760).
 pub(crate) async fn cancel_parallel_turn_by_request_id(
+    ctx: &crate::core::runtime::DispatchCtx,
     thread_id: &str,
     request_id: &str,
 ) -> Vec<(String, String)> {
-    let map_key = key_for(request_id);
-    let scoped_thread = key_for(thread_id);
+    let map_key = key_for(ctx, request_id);
+    let scoped_thread = key_for(ctx, thread_id);
     let mut parallel = parallel_in_flight().lock_owned().await;
     let matches = parallel
         .get(&map_key)
