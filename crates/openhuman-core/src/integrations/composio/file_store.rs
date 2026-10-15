@@ -31,7 +31,7 @@ async fn import_legacy(
 ) -> Result<(), String> {
     let marker_docs = docs.clone();
     let done =
-        tokio::task::spawn_blocking(move || marker_docs.legacy_imported(name))
+        crate::core::runtime::DispatchCtx::ambient().spawn_blocking(move || marker_docs.legacy_imported(name))
             .await
             .map_err(|error| format!("[composio:store] checking legacy {name} failed: {error}"))?
             .map_err(|error| {
@@ -54,7 +54,7 @@ async fn import_legacy(
         .map_err(|error| format!("[composio:store] parsing legacy {name} failed: {error}"))?;
     let docs = docs.clone();
     let wrote =
-        tokio::task::spawn_blocking(move || docs.import_if_absent(name, value))
+        crate::core::runtime::DispatchCtx::ambient().spawn_blocking(move || docs.import_if_absent(name, value))
             .await
             .map_err(|error| format!("[composio:store] importing legacy {name} failed: {error}"))?
             .map_err(|error| {
@@ -78,7 +78,7 @@ where
     import_legacy(config, &docs, name).await?;
     // The document port is reached through a blocking bridge; keep it off the
     // async worker, under the caller's context.
-    tokio::task::spawn_blocking(move || docs.load(name))
+    crate::core::runtime::DispatchCtx::ambient().spawn_blocking(move || docs.load(name))
         .await
         .map_err(|error| format!("[composio:store] reading {name} failed: {error}"))?
         .map_err(|error| format!("[composio:store] reading {name} failed: {error:#}"))
@@ -103,7 +103,7 @@ where
     let docs = super::file_store_documents::current(&config.workspace_dir)
         .map_err(|e| format!("[composio:store] {e:#}"))?;
     import_legacy(config, &docs, name).await?;
-    tokio::task::spawn_blocking(move || docs.update(name, change))
+    crate::core::runtime::DispatchCtx::ambient().spawn_blocking(move || docs.update(name, change))
         .await
         .map_err(|error| format!("[composio:store] updating {name} failed: {error}"))?
         .map_err(|error| format!("[composio:store] updating {name} failed: {error:#}"))
@@ -123,7 +123,7 @@ where
         .map_err(|e| format!("[composio:store] {e:#}"))?;
     let value = serde_json::to_value(value)
         .map_err(|error| format!("[composio:store] serializing failed: {error}"))?;
-    tokio::task::spawn_blocking(move || docs.save(name, &value))
+    crate::core::runtime::DispatchCtx::ambient().spawn_blocking(move || docs.save(name, &value))
         .await
         .map_err(|error| format!("[composio:store] writing {name} failed: {error}"))?
         .map_err(|error| format!("[composio:store] writing {name} failed: {error:#}"))

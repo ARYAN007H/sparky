@@ -110,7 +110,7 @@ async fn import_into(
 
     // The files are read on a blocking thread, from copies.
     let (legacy_servers, legacy_audit) =
-        tokio::task::spawn_blocking(move || -> Result<_> {
+        crate::core::runtime::DispatchCtx::ambient().spawn_blocking(move || -> Result<_> {
             let servers = if clients.exists() {
                 read_servers(&clients)?
             } else {

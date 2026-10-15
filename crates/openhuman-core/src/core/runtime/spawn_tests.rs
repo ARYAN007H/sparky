@@ -97,3 +97,18 @@ fn entering_a_large_task_keeps_its_wrapper_bounded() {
         std::mem::size_of_val(&wrapped),
     );
 }
+
+#[tokio::test]
+async fn a_task_acts_for_the_context_it_was_handed_while_another_is_active() {
+    let handed = DispatchCtx::new(agent_context("u-asha"));
+    // The spawner runs inside a different tenant's scope; the task must act
+    // for the one it was handed, async and blocking alike.
+    let (task, blocking) = CoreContext::scope(agent_context("u-ravi"), async {
+        let task = handed.spawn(async { seen() }).await.unwrap();
+        let blocking = handed.spawn_blocking(seen).await.unwrap();
+        (task, blocking)
+    })
+    .await;
+    assert_eq!(task.as_deref(), Some("u-asha"));
+    assert_eq!(blocking.as_deref(), Some("u-asha"));
+}
