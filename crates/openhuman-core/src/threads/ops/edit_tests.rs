@@ -384,3 +384,63 @@ async fn transcript_store_reads_the_profile_from_the_request_context() {
     assert_eq!(store.key, "profile-b~default");
     assert_eq!(store.workspace_dir, dir.path());
 }
+
+/// Edit and regenerate read the store the thread's first session recorded, so
+/// they still find the earlier turns after `[agent] chat_agent_id` changed.
+#[tokio::test]
+async fn edit_and_regenerate_use_the_threads_recorded_key_after_a_chat_agent_change() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+    let _ = crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins();
+    let dir = TempDir::new().expect("tempdir");
+    let ctx_with = |chat_agent: Option<&str>| {
+        let mut config = crate::config::Config {
+            workspace_dir: dir.path().to_path_buf(),
+            ..crate::config::Config::default()
+        };
+        config.agent.chat_agent_id = chat_agent.map(str::to_string);
+        let overlay = ContextOverlay::new(
+            config,
+            DomainSet::kernel(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        );
+        DispatchCtx::new(CoreContext::for_test(DomainSet::full(), None).derive_with(overlay))
+    };
+    let (before, after) = (ctx_with(None), ctx_with(Some("researcher")));
+    let thread_id = "thread-flipped";
+
+    // The first session records its key and writes the transcript there.
+    let written = transcript_store(&before, thread_id).await.expect("store");
+    let recorded = crate::threads::store::bind_transcript_key(
+        &before,
+        dir.path(),
+        thread_id,
+        written.key.clone(),
+    )
+    .await;
+    assert_eq!(recorded, written.key);
+    let (req1, req2) = write_two_turn_transcript(&written, thread_id);
+
+    // After the flip the current rule names another store, the record wins.
+    let flipped = transcript_store(&after, thread_id).await.expect("store");
+    assert_eq!(flipped.key, written.key, "the recorded key is used");
+    assert_ne!(
+        transcript_store(&after, "unrecorded-thread")
+            .await
+            .expect("store")
+            .key,
+        written.key,
+        "the chat agent change does move the derived key"
+    );
+
+    truncate_transcript_before_turn(&flipped, thread_id, &req2).expect("edit forks the transcript");
+    let (_, _, head) = resolve_head_transcript(&flipped, thread_id).expect("resolve head");
+    assert_eq!(
+        head.messages.last().and_then(|m| m.request_id.as_deref()),
+        Some(req1.as_str())
+    );
+    let (prompt, request_id) = truncate_transcript_for_regenerate(&flipped, thread_id, None)
+        .expect("regenerate")
+        .expect("turn 1 is left to regenerate");
+    assert_eq!(prompt, "user prompt 1");
+    assert_eq!(request_id, req1);
+}
