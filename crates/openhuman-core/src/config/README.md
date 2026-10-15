@@ -6,7 +6,7 @@ and CLI launch flags on top of it, runs startup data migrations, and writes it b
 exposes the `config.*` RPC namespace the settings UI uses to read and change those settings.
 
 Nearly every other domain reads its slice of settings from here (`config.agent`, `config.memory`,
-`config.channels`, `config.autonomy`, and so on), usually through `ctx.load_config()`.
+`config.channels`, `config.autonomy`, and so on), usually through `config::load_config_with_timeout()`.
 
 ## How it works
 
@@ -97,7 +97,7 @@ paths are already known and ignores `OPENHUMAN_WORKSPACE`, for long-lived object
 `Config::load_from_default_paths` ignores `OPENHUMAN_WORKSPACE` too and is read-only; the debug prompt
 dump uses it.
 
-Most code does not call these directly. `ctx.load_config()` wraps `load_or_init` in a
+Most code does not call these directly. `ops::load_config_with_timeout()` wraps `load_or_init` in a
 30-second timeout, returns the embedding host's `Config` instead when one is installed on the current
 `CoreContext`, and seeds per-token prices into the model registry in memory. Code handed a specific
 workspace should call `load_config_for_workspace_with_timeout(workspace_dir)` so it does not pick up the
