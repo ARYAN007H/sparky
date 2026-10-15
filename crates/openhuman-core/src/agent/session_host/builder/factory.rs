@@ -1,6 +1,5 @@
 //! `OpenHumanSessionHost::from_config` factory methods and internal `build_session_agent_inner` constructor.
 
-use crate::core::runtime::DispatchCtx;
 use super::should_synthesize_delegation_tools;
 use crate::agent::harness::host_definition::{
     AgentDefinitionExt, AgentDefinitionRegistry, NO_TOOLS_SENTINEL,
@@ -9,6 +8,7 @@ use crate::agent::host_runtime;
 use crate::agent::prompts::SystemPromptBuilder;
 use crate::agent::session_host::types::OpenHumanSessionHost;
 use crate::config::Config;
+use crate::core::runtime::DispatchCtx;
 use crate::security::SecurityPolicy;
 use crate::tools;
 use anyhow::Result;
@@ -78,9 +78,8 @@ impl OpenHumanSessionHost {
     /// The welcome agent uses this entry point when routed from the
     /// Tauri web channel (see `channels::provider::web::build_session_agent`).
     pub fn from_config_for_agent(config: &Config, agent_id: &str) -> Result<Self> {
-        // A hosted profile never receives the ordinary config-derived belt.
-        // Its operator-selected factory carries registration and permission
-        // boundaries into the same session builder, under this profile scope.
+        // A hosted profile never receives the ordinary config-derived belt: its
+        // operator-selected factory carries registration and permission bounds.
         if crate::profiles::capabilities::ProfileCapabilities::in_ctx(&DispatchCtx::ambient()).is_some()
         {
             return Self::from_config_for_agent_session(config, agent_id, None);
