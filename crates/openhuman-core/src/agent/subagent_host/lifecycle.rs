@@ -206,8 +206,10 @@ fn host_observer_outcome(mut outcome: SubagentRunOutcome) -> SubagentRunOutcome 
     outcome
 }
 
-pub(super) fn host_in_flight() -> Arc<AsyncMutex<HashMap<HostLifecycleKey, Arc<HostInFlight>>>> {
-    crate::core::runtime::current_slot()
+pub(super) fn host_in_flight(
+    ctx: &crate::core::runtime::DispatchCtx,
+) -> Arc<AsyncMutex<HashMap<HostLifecycleKey, Arc<HostInFlight>>>> {
+    crate::core::runtime::slot_for(ctx)
 }
 
 fn absolute_checkpoint_dir(path: PathBuf) -> PathBuf {
@@ -290,12 +292,13 @@ impl OpenHumanSubagentHost {
                     })
                     .unwrap_or_else(|| std::path::PathBuf::from(".openhuman/subagent_checkpoints"))
             }));
+        let dispatch = parent.data.dispatch_ctx();
         let lifecycle_key = HostLifecycleKey {
             checkpoint_dir: checkpoint_dir.clone(),
             task_key: task_key.clone(),
         };
         let (entry, is_leader) = {
-            let mut entries = host_in_flight().lock_owned().await;
+            let mut entries = host_in_flight(&dispatch).lock_owned().await;
             match entries.get(&lifecycle_key) {
                 Some(entry) => (entry.clone(), false),
                 None => {
@@ -333,7 +336,7 @@ impl OpenHumanSubagentHost {
         ))
         .await;
         entry.complete(result.as_ref().ok().cloned()).await;
-        let mut entries = host_in_flight().lock_owned().await;
+        let mut entries = host_in_flight(&dispatch).lock_owned().await;
         if entries
             .get(&lifecycle_key)
             .is_some_and(|current| Arc::ptr_eq(current, &entry))
