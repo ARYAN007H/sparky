@@ -72,8 +72,8 @@ fn delivering() -> &'static Mutex<HashSet<String>> {
 
 /// Ask for a delivery attempt on `thread_id` soon (after a Stop cleared a stale
 /// busy mark, or anything else that may have left a drain without its trigger).
-pub(crate) fn kick_delivery(thread_id: &str) {
-    schedule_delivery(thread_id.to_string(), Duration::from_millis(300));
+pub(crate) fn kick_delivery(ctx: &DispatchCtx, thread_id: &str) {
+    schedule_delivery(ctx, thread_id.to_string(), Duration::from_millis(300));
 }
 
 struct BackgroundDeliveryHandler;
@@ -101,9 +101,14 @@ impl EventHandler<DomainEvent> for BackgroundDeliveryHandler {
             match drain.owner {
                 // Re-enter the owner's scope so the scheduled task inherits it.
                 Some(ctx) => {
-                    CoreContext::sync_scope(ctx, || schedule_delivery(drain.thread_id, drain.delay))
+                    {
+                    let dispatch = DispatchCtx::new(Arc::clone(&ctx));
+                    CoreContext::sync_scope(ctx, || {
+                        schedule_delivery(&dispatch, drain.thread_id, drain.delay)
+                    })
                 }
-                None => schedule_delivery(drain.thread_id, drain.delay),
+                }
+                None => schedule_delivery(&DispatchCtx::host_default(), drain.thread_id, drain.delay),
             }
         }
     }
@@ -241,19 +246,20 @@ pub(super) fn drain_schedule_in(
 
 /// Schedule a debounced delivery attempt for a thread, fenced by the calling
 /// profile's lease ([`DrainFence::current`]).
-fn schedule_delivery(thread_id: String, delay: Duration) {
-    schedule_delivery_inner(
-        thread_id,
-        delay,
-        false,
-        DrainFence::current(&DispatchCtx::ambient()),
-    );
+fn schedule_delivery(ctx: &DispatchCtx, thread_id: String, delay: Duration) {
+    schedule_delivery_inner(ctx.clone(), thread_id, delay, false, DrainFence::current(ctx));
 }
 
 /// `wait_idle`: after the delay, keep waiting while the thread's user turn is in
 /// flight instead of giving up (see [`run_drain`]). `fence` drops the drain
 /// once this node loses the owning profile's lease.
-fn schedule_delivery_inner(thread_id: String, delay: Duration, wait_idle: bool, fence: DrainFence) {
+fn schedule_delivery_inner(
+    ctx: DispatchCtx,
+    thread_id: String,
+    delay: Duration,
+    wait_idle: bool,
+    fence: DrainFence,
+) {
     #[cfg(test)]
     scheduled_for_test()
         .lock()
@@ -262,8 +268,6 @@ fn schedule_delivery_inner(thread_id: String, delay: Duration, wait_idle: bool, 
     // Scoped: the thread -> workspace table is keyed per profile, so the
     // delayed task must run under the profile that scheduled it.
     crate::core::runtime::spawn_scoped(async move {
-        // Inside the owner's scope: the context this drain acts for.
-        let ctx = DispatchCtx::ambient();
         let turn_fence = fence.clone();
         let turn_thread = thread_id.clone();
         let outcome = run_drain(
@@ -283,7 +287,7 @@ fn schedule_delivery_inner(thread_id: String, delay: Duration, wait_idle: bool, 
                 "[background_delivery] recovered drain still busy; waiting again \
                  thread_id={thread_id}"
             );
-            schedule_delivery_inner(thread_id, RECOVERY_BUSY_POLL, true, fence);
+            schedule_delivery_inner(ctx, thread_id, RECOVERY_BUSY_POLL, true, fence);
         }
     });
 }
@@ -412,7 +416,7 @@ async fn try_deliver(busy_ctx: DispatchCtx, thread_id: String, fence: DrainFence
              delay_ms={}",
             delay.as_millis()
         );
-        schedule_delivery_inner(thread_id, delay, false, fence);
+        schedule_delivery_inner(busy_ctx, thread_id, delay, false, fence);
     }
 }
 
@@ -451,9 +455,9 @@ fn retry_backoff(attempts: u32) -> Duration {
 /// it is logged at error and the chain ends; that is the one path on which a
 /// result is genuinely lost, and it requires the conversation store to be
 /// failing as well as the agent.
-async fn persist_undelivered(workspace_dir: PathBuf, thread_id: String, notice: String) {
+async fn persist_undelivered(ctx: DispatchCtx, workspace_dir: PathBuf, thread_id: String, notice: String) {
     let run_id = format!("bgdeliver-undelivered-{}", uuid::Uuid::new_v4());
-    match persist_delivery_reply(workspace_dir, &thread_id, &run_id, notice, false) {
+    match persist_delivery_reply(&ctx, workspace_dir, &thread_id, &run_id, notice, false) {
         Ok(()) => log::warn!(
             "[background_delivery] delivery turn gave up; wrote results into the thread \
              verbatim instead thread_id={thread_id} run_id={run_id}"
@@ -634,6 +638,7 @@ async fn run_system_turn_on_thread(
         result,
         |content, success| {
             persist_delivery_reply(
+                ctx,
                 workspace_dir.clone(),
                 &thread_id,
                 &run_id,
@@ -691,6 +696,7 @@ where
 /// chat event. Callers must propagate failures: publishing `chat_done` or
 /// `chat_error` without a stored row loses the result across reconnects.
 fn persist_delivery_reply(
+    ctx: &DispatchCtx,
     workspace_dir: std::path::PathBuf,
     thread_id: &str,
     run_id: &str,
@@ -698,7 +704,7 @@ fn persist_delivery_reply(
     success: bool,
 ) -> Result<(), String> {
     crate::threads::store::append_message(
-        &DispatchCtx::ambient(),
+        ctx,
         workspace_dir,
         thread_id,
         crate::threads::store::ConversationMessage {
