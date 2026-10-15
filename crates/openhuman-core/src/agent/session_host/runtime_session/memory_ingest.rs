@@ -78,7 +78,7 @@ impl OpenHumanTurnPrelude {
             return Some(config.clone());
         }
         crate::config::rpc::load_config_for_workspace_with_timeout(
-            &DispatchCtx::ambient(),
+            &self.dispatch_ctx(),
             &self.workspace_dir,
         )
         .await
