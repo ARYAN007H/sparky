@@ -368,7 +368,8 @@ async fn thread_delete_removes_persisted_turn_state_snapshot() {
     // Queue a finished background sub-agent result for this thread; deleting the
     // thread must discard it so it's never delivered into a dead thread.
     use crate::agent::orchestration::background_completions as bg;
-    bg::record_completion(&crate::core::runtime::DispatchCtx::ambient(), 
+    bg::record_completion(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &dir,
         "sess-del",
         "sub-del-1",
@@ -430,7 +431,8 @@ async fn threads_purge_removes_every_turn_state_snapshot() {
     // Queue background sub-agent results across sessions; a full purge must wipe
     // them all since no parent thread survives.
     use crate::agent::orchestration::background_completions as bg;
-    bg::record_completion(&crate::core::runtime::DispatchCtx::ambient(), 
+    bg::record_completion(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &dir,
         "sess-p1",
         "sub-p1",
@@ -439,7 +441,8 @@ async fn threads_purge_removes_every_turn_state_snapshot() {
         Some("thread-a".into()),
     )
     .await;
-    bg::record_completion(&crate::core::runtime::DispatchCtx::ambient(), 
+    bg::record_completion(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &dir,
         "sess-p2",
         "sub-p2",

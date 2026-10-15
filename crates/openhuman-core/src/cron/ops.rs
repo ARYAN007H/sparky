@@ -260,7 +260,11 @@ pub async fn run_job_now(
 
 /// Execute `job` once (with its retry budget), deliver its output and persist
 /// the run and its last-run state. The caller holds the job's run claim.
-async fn run_and_record(ctx: &crate::core::runtime::DispatchCtx, config: &Config, job: &CronJob) -> (bool, String) {
+async fn run_and_record(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+    job: &CronJob,
+) -> (bool, String) {
     let run_id = uuid::Uuid::new_v4().to_string();
     let started_at = chrono::Utc::now();
     let (success, output) = cron::scheduler::execute_job_now(config, job, &run_id).await;

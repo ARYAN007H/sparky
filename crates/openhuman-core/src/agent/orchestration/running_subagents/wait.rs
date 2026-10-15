@@ -19,7 +19,13 @@ pub(crate) async fn wait(
     parent_session: &str,
     timeout: Duration,
 ) -> Result<WaitOutcome, WaitError> {
-    wait_detached(registry(), task_id, &owner_key(ctx, parent_session)?, timeout).await
+    wait_detached(
+        registry(),
+        task_id,
+        &owner_key(ctx, parent_session)?,
+        timeout,
+    )
+    .await
 }
 
 pub(crate) async fn wait_in_workspace(

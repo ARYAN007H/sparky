@@ -2,6 +2,7 @@
 //! unique per user, so one user's Stop or delete on `t1` must never gate,
 //! drop or reach another user's `t1`.
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use super::background_completions::*;
@@ -23,7 +24,15 @@ fn profile(name: &str, workspace: &std::path::Path) -> Arc<CoreContext> {
 async fn record(ctx: &Arc<CoreContext>, ws: &std::path::Path, task: &str) {
     CoreContext::scope(
         Arc::clone(ctx),
-        record_completion(&crate::core::runtime::DispatchCtx::ambient(), ws, "sess-1", task, "researcher", "done", Some("t1".into())),
+        record_completion(
+            &DispatchCtx::ambient(),
+            ws,
+            "sess-1",
+            task,
+            "researcher",
+            "done",
+            Some("t1".into()),
+        ),
     )
     .await;
 }
@@ -44,7 +53,7 @@ async fn one_profiles_stop_and_delete_never_reach_anothers_thread() {
 
     // Alice presses Stop on her `t1`.
     CoreContext::scope(Arc::clone(&alice), async {
-        discard_pending_for_thread(&crate::core::runtime::DispatchCtx::ambient(), "t1");
+        discard_pending_for_thread(&DispatchCtx::ambient(), "t1");
     })
     .await;
 
@@ -57,13 +66,18 @@ async fn one_profiles_stop_and_delete_never_reach_anothers_thread() {
 
     // Bob deletes his `t1`; Alice re-engages hers and keeps working.
     CoreContext::scope(Arc::clone(&bob), async {
-        discard_for_thread(&crate::core::runtime::DispatchCtx::ambient(), ws_b.path(), "t1");
+        discard_for_thread(&DispatchCtx::ambient(), ws_b.path(), "t1");
     })
     .await;
     CoreContext::scope(Arc::clone(&alice), async {
-        resume_stopped_thread(&crate::core::runtime::DispatchCtx::ambient(), "t1");
+        resume_stopped_thread(&DispatchCtx::ambient(), "t1");
         assert!(
-            !mark_stopped_task_if_thread_stopped(&crate::core::runtime::DispatchCtx::ambient(), ws_a.path(), "t1", "alice-2"),
+            !mark_stopped_task_if_thread_stopped(
+                &DispatchCtx::ambient(),
+                ws_a.path(),
+                "t1",
+                "alice-2"
+            ),
             "bob's delete does not abort alice's child"
         );
     })
@@ -78,7 +92,9 @@ async fn one_profiles_stop_and_delete_never_reach_anothers_thread() {
 
     // Each profile resolves `t1` to its own workspace.
     let resolved = |ctx: &Arc<CoreContext>| {
-        CoreContext::sync_scope(Arc::clone(ctx), || workspace_for_thread(&crate::core::runtime::DispatchCtx::ambient(), "t1"))
+        CoreContext::sync_scope(Arc::clone(ctx), || {
+            workspace_for_thread(&DispatchCtx::ambient(), "t1")
+        })
     };
     assert_eq!(resolved(&alice).as_deref(), Some(ws_a.path()));
     assert_eq!(resolved(&bob).as_deref(), Some(ws_b.path()));

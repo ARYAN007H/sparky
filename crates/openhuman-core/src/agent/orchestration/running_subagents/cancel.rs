@@ -36,7 +36,10 @@ pub(crate) struct CancelledSubagent {
 ///
 /// User controls check the captured profile in SaaS. The desktop user retains
 /// authority over every sub-agent in their own core.
-pub(crate) fn cancel_by_task(ctx: &crate::core::runtime::DispatchCtx, task_id: &str) -> Option<CancelledSubagent> {
+pub(crate) fn cancel_by_task(
+    ctx: &crate::core::runtime::DispatchCtx,
+    task_id: &str,
+) -> Option<CancelledSubagent> {
     let id = TaskId::new(task_id);
     let snapshot = registry().snapshot_trusted(&id).ok()?;
     if !control_admits(ctx, &snapshot.metadata) {
@@ -115,7 +118,10 @@ pub(crate) fn cancel_for_thread(ctx: &crate::core::runtime::DispatchCtx, thread_
 /// recorded: delivering one would start a fresh system turn on the thread,
 /// which is exactly what Stop is meant to prevent. Returns the cancelled task
 /// ids.
-pub(crate) fn stop_for_thread(ctx: &crate::core::runtime::DispatchCtx, thread_id: &str) -> Vec<String> {
+pub(crate) fn stop_for_thread(
+    ctx: &crate::core::runtime::DispatchCtx,
+    thread_id: &str,
+) -> Vec<String> {
     let own = caller_workspace(ctx);
     let cancelled = registry()
         .cancel_where(|metadata| {
@@ -216,10 +222,7 @@ impl CallerWorkspace {
 }
 
 pub(crate) fn caller_workspace(ctx: &crate::core::runtime::DispatchCtx) -> CallerWorkspace {
-    caller_workspace_in(
-        crate::core::runtime::is_saas(),
-        ctx.resolved().as_deref(),
-    )
+    caller_workspace_in(crate::core::runtime::is_saas(), ctx.resolved().as_deref())
 }
 
 /// [`caller_workspace`] as a function of the mode and the task's own scope.

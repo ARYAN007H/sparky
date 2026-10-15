@@ -542,9 +542,15 @@ async fn deliver_if_configured_skips_non_announce_mode() {
     let job = test_job("echo ok");
 
     // Default delivery mode is not "announce", so nothing is published.
-    assert!(deliver_if_configured(&crate::core::runtime::DispatchCtx::ambient(), &config, &job, "x", true)
-        .await
-        .is_ok());
+    assert!(deliver_if_configured(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &job,
+        "x",
+        true
+    )
+    .await
+    .is_ok());
 }
 
 #[tokio::test]
@@ -601,9 +607,15 @@ async fn deliver_if_configured_publishes_event_for_announce_mode() {
     assert_eq!(received.load(Ordering::SeqCst), 1);
 
     // Also verify the function itself succeeds.
-    assert!(deliver_if_configured(&crate::core::runtime::DispatchCtx::ambient(), &config, &job, "hello", true)
-        .await
-        .is_ok());
+    assert!(deliver_if_configured(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &job,
+        "hello",
+        true
+    )
+    .await
+    .is_ok());
 }
 
 #[test]

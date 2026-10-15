@@ -57,7 +57,10 @@ impl TurnBusy {
     /// not map to its thread: a relayed channel turn runs under the channel
     /// pipeline's own session id, which [`background_completions`] never
     /// learns, so marking that session would leave the thread looking idle.
-    pub(crate) fn start_on_thread(ctx: &crate::core::runtime::DispatchCtx, thread_id: &str) -> Self {
+    pub(crate) fn start_on_thread(
+        ctx: &crate::core::runtime::DispatchCtx,
+        thread_id: &str,
+    ) -> Self {
         Self::start(ctx, &format!("{THREAD_MARK}{thread_id}"))
     }
 }
@@ -103,12 +106,16 @@ pub(crate) fn is_busy(ctx: &crate::core::runtime::DispatchCtx, thread_id: &str) 
 /// or `AgentError`, and its session would otherwise stay "busy" and defer this
 /// thread's deliveries until restart. Another profile's turn on a thread with
 /// the same id is left alone. Returns how many sessions were cleared.
-pub(crate) fn clear_busy_for_thread(ctx: &crate::core::runtime::DispatchCtx, thread_id: &str) -> usize {
+pub(crate) fn clear_busy_for_thread(
+    ctx: &crate::core::runtime::DispatchCtx,
+    thread_id: &str,
+) -> usize {
     let me = caller(ctx);
     let mut busy = busy().lock().expect("background_delivery busy poisoned");
     let before = busy.len();
     busy.retain(|key, _| {
-        session_of(key, &me).is_none_or(|session| thread_of(ctx, session).as_deref() != Some(thread_id))
+        session_of(key, &me)
+            .is_none_or(|session| thread_of(ctx, session).as_deref() != Some(thread_id))
     });
     let cleared = before - busy.len();
     if cleared > 0 {

@@ -112,7 +112,10 @@ pub(crate) async fn run_relay_turn(
     // waits instead of landing mid-turn. The pipeline's session id does not
     // name the thread, so the guard is taken on the thread itself; this task
     // runs in the caller's scope, which keys it to the caller's profile.
-    let busy = crate::agent::orchestration::busy_guard::TurnBusy::start_on_thread(&dispatch_ctx, &thread_id);
+    let busy = crate::agent::orchestration::busy_guard::TurnBusy::start_on_thread(
+        &dispatch_ctx,
+        &thread_id,
+    );
     let channel = Arc::new(RelayChannel::new(
         params.channel.clone(),
         params.client_id(),

@@ -132,7 +132,8 @@ impl SteerSubagentTool {
             }
         };
         let parent_session = parent.session_id;
-        let dispatch = crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(tool_context);
+        let dispatch =
+            crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(tool_context);
 
         let resolved_task_id = if task_id.is_empty() {
             match running_subagents::task_id_for_session_in_workspace(

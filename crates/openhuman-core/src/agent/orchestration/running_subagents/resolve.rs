@@ -21,7 +21,11 @@ pub(crate) fn task_id_for_session(
     subagent_session_id: &str,
     parent_session: &str,
 ) -> Result<String, WaitError> {
-    live_task_id(registry(), subagent_session_id, &owner_key(ctx, parent_session)?)
+    live_task_id(
+        registry(),
+        subagent_session_id,
+        &owner_key(ctx, parent_session)?,
+    )
 }
 
 pub(crate) fn task_id_for_session_in_workspace(

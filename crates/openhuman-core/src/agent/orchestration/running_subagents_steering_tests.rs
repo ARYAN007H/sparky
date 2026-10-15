@@ -6,7 +6,8 @@ async fn steer_pushes_into_the_subagent_queue() {
     let rq = run_queue();
     let tx = register_test("task-steer", "session-A", rq.clone());
 
-    steer(&crate::core::runtime::DispatchCtx::ambient(), 
+    steer(
+        &crate::core::runtime::DispatchCtx::ambient(),
         "task-steer",
         "session-A",
         "refocus on memory safety".into(),
@@ -19,7 +20,8 @@ async fn steer_pushes_into_the_subagent_queue() {
     assert_eq!(status.steers, 1, "steer should land in the steer lane");
 
     // collect mode goes to the collect lane
-    steer(&crate::core::runtime::DispatchCtx::ambient(), 
+    steer(
+        &crate::core::runtime::DispatchCtx::ambient(),
         "task-steer",
         "session-A",
         "extra context".into(),
@@ -45,7 +47,8 @@ async fn steer_prefers_registered_tinyagents_handle() {
     let task_id = TaskId::new("task-registered-steer");
     shared_steering_registry().register(task_id.clone(), handle.clone());
 
-    steer(&crate::core::runtime::DispatchCtx::ambient(), 
+    steer(
+        &crate::core::runtime::DispatchCtx::ambient(),
         "task-registered-steer",
         "session-A",
         "refocus".into(),
@@ -80,7 +83,8 @@ async fn steer_rejects_cross_parent_and_unknown() {
     let _tx = register_test("task-owned", "session-owner", rq);
 
     assert_eq!(
-        steer(&crate::core::runtime::DispatchCtx::ambient(), 
+        steer(
+            &crate::core::runtime::DispatchCtx::ambient(),
             "task-owned",
             "session-intruder",
             "x".into(),
@@ -90,7 +94,8 @@ async fn steer_rejects_cross_parent_and_unknown() {
         Err(SteerError::NotOwned)
     );
     assert_eq!(
-        steer(&crate::core::runtime::DispatchCtx::ambient(), 
+        steer(
+            &crate::core::runtime::DispatchCtx::ambient(),
             "task-missing",
             "session-owner",
             "x".into(),
@@ -112,7 +117,14 @@ async fn steer_after_terminal_is_rejected() {
     });
 
     assert_eq!(
-        steer(&crate::core::runtime::DispatchCtx::ambient(), "task-term", "session-A", "x".into(), QueueLane::Steer).await,
+        steer(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            "task-term",
+            "session-A",
+            "x".into(),
+            QueueLane::Steer
+        )
+        .await,
         Err(SteerError::AlreadyDone)
     );
     prune("task-term");
@@ -125,7 +137,8 @@ async fn detached_subagent_rejects_followup_lane() {
     let _tx = register_test("task-no-followup", "session-A", rq.clone());
 
     assert_eq!(
-        steer(&crate::core::runtime::DispatchCtx::ambient(), 
+        steer(
+            &crate::core::runtime::DispatchCtx::ambient(),
             "task-no-followup",
             "session-A",
             "not a new turn".into(),

@@ -161,10 +161,10 @@ async fn cancel_chat_inner(
         // the gap between abort and the queue sweep.
         let discarded =
             crate::agent::orchestration::background_completions::discard_pending_for_thread(
-                ctx,
-                thread_id,
+                ctx, thread_id,
             );
-        let stopped = crate::agent::orchestration::running_subagents::stop_for_thread(ctx, thread_id);
+        let stopped =
+            crate::agent::orchestration::running_subagents::stop_for_thread(ctx, thread_id);
         crate::agent::orchestration::background_completions::finish_stop_for_thread(
             ctx, thread_id, &stopped,
         );

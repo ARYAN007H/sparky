@@ -4,6 +4,7 @@
 //! profile owns. Driven through `drain_schedule_in(true, ..)` with an injected
 //! resolver, so the process-wide SaaS mode flag stays untouched.
 
+use crate::core::runtime::DispatchCtx;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -45,7 +46,8 @@ fn seen_by(drain: &Drain) -> (Option<String>, String, Vec<String>) {
     let ctx = drain.owner.clone().expect("a SaaS drain carries its owner");
     let profile = ctx.profile().map(str::to_owned);
     let pending = CoreContext::sync_scope(ctx, || {
-        let ws = workspace_for_thread(&crate::core::runtime::DispatchCtx::ambient(), &drain.thread_id).expect("owner knows its thread");
+        let ws = workspace_for_thread(&DispatchCtx::ambient(), &drain.thread_id)
+            .expect("owner knows its thread");
         pending_for(&ws, &drain.thread_id)
             .into_iter()
             .map(|r| r.task_id)
@@ -69,7 +71,8 @@ async fn an_off_task_completion_drains_only_its_owners_thread() {
     for (ctx, ws, task) in [(&alice, &ws_a, &task_a), (&bob, &ws_b, &task_b)] {
         CoreContext::scope(
             Arc::clone(ctx),
-            record_completion(&crate::core::runtime::DispatchCtx::ambient(), 
+            record_completion(
+                &DispatchCtx::ambient(),
                 ws.path(),
                 &session,
                 task.as_str(),

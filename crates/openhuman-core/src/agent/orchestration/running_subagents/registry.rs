@@ -56,10 +56,7 @@ pub(crate) struct RunningSubagentMetadata {
 
 /// Resolve the caller's profile without falling back to the operator in SaaS.
 fn caller_profile(ctx: &crate::core::runtime::DispatchCtx) -> Result<Option<String>, WaitError> {
-    let profile = ctx
-        .tenant()
-        .map_err(|_| WaitError::NotOwned)?
-        .profile;
+    let profile = ctx.tenant().map_err(|_| WaitError::NotOwned)?.profile;
     if crate::core::runtime::is_saas() && profile.is_none() {
         return Err(WaitError::NotOwned);
     }
@@ -85,7 +82,10 @@ pub(crate) fn admit_spawn(
 }
 
 /// Host ownership adapter over TinyAgents' opaque owner string.
-pub(super) fn owner_key(ctx: &crate::core::runtime::DispatchCtx, parent_session: &str) -> Result<String, WaitError> {
+pub(super) fn owner_key(
+    ctx: &crate::core::runtime::DispatchCtx,
+    parent_session: &str,
+) -> Result<String, WaitError> {
     let profile = caller_profile(ctx)?;
     Ok(crate::core::runtime::tenant::tenant_key(
         &crate::core::runtime::tenant::Tenant {
@@ -98,7 +98,10 @@ pub(super) fn owner_key(ctx: &crate::core::runtime::DispatchCtx, parent_session:
 
 /// Public user controls may reach any of their profile's parents; desktop
 /// controls retain the process user's existing authority over all workers.
-pub(super) fn control_admits(ctx: &crate::core::runtime::DispatchCtx, metadata: &RunningSubagentMetadata) -> bool {
+pub(super) fn control_admits(
+    ctx: &crate::core::runtime::DispatchCtx,
+    metadata: &RunningSubagentMetadata,
+) -> bool {
     !crate::core::runtime::is_saas()
         || caller_profile(ctx).is_ok_and(|profile| profile == metadata.profile)
 }

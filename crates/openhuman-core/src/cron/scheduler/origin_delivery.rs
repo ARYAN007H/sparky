@@ -80,8 +80,10 @@ pub(crate) async fn append_to_origin_transcript(
         tinyagents_session::transcript::AgentTranscriptFiles::new(workspace_dir, &agent)
             .session_exists(&session);
     }
-    let locator =
-        FileTranscriptLocator::new(crate::agent::session_store::transcript_root(ctx, workspace_dir));
+    let locator = FileTranscriptLocator::new(crate::agent::session_store::transcript_root(
+        ctx,
+        workspace_dir,
+    ));
     let options = BackgroundAppend::new(
         append.idempotency_key,
         serde_json::json!({
@@ -190,7 +192,18 @@ pub(crate) async fn deliver_to_origin(
         JobOrigin::Web {
             thread_id,
             agent_id,
-        } => deliver_to_web_thread(ctx, config, job, run_id, thread_id, agent_id.as_deref(), text).await,
+        } => {
+            deliver_to_web_thread(
+                ctx,
+                config,
+                job,
+                run_id,
+                thread_id,
+                agent_id.as_deref(),
+                text,
+            )
+            .await
+        }
         JobOrigin::Channel {
             channel,
             reply_target,

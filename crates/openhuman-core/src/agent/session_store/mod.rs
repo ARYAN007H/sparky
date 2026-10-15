@@ -25,10 +25,10 @@ mod workspace;
 
 pub use rebound::{rebind_all, ReboundSessionStores};
 pub use workspace::{
-    artifact_blobs_for, attachment_stash_for, current_documents_for, default_turn_states_for, ledger_for,
-    provider_for_workspace, release_workspace_defaults, require_ledger, status_store_for,
-    stores_for, stores_or_ephemeral, turn_states_for, with_ledger, with_ledger_async,
-    WorkspaceSessionStores,
+    artifact_blobs_for, attachment_stash_for, current_documents_for, default_turn_states_for,
+    ledger_for, provider_for_workspace, release_workspace_defaults, require_ledger,
+    status_store_for, stores_for, stores_or_ephemeral, turn_states_for, with_ledger,
+    with_ledger_async, WorkspaceSessionStores,
 };
 
 static PROVIDER: LazyLock<RwLock<Option<Arc<dyn SessionStoreProvider>>>> =
@@ -151,7 +151,10 @@ pub fn transcripts_or_files(
 /// directory under an embedded agent's context, else `workspace_dir` — which
 /// for a SaaS profile's default agent is that profile's own workspace.
 #[must_use]
-pub fn transcript_root(ctx: &crate::core::runtime::DispatchCtx, workspace_dir: &std::path::Path) -> std::path::PathBuf {
+pub fn transcript_root(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: &std::path::Path,
+) -> std::path::PathBuf {
     match current_embedded_agent(ctx) {
         Some(agent) => agent_transcript_root(workspace_dir, &agent),
         None => workspace_dir.to_path_buf(),
@@ -164,9 +167,7 @@ pub fn transcript_root(ctx: &crate::core::runtime::DispatchCtx, workspace_dir: &
 /// workspace it was handed is the only one it touches.
 #[must_use]
 pub fn current_embedded_agent(ctx: &crate::core::runtime::DispatchCtx) -> Option<String> {
-    ctx.tenant()
-        .ok()
-        .and_then(|tenant| tenant.agent)
+    ctx.tenant().ok().and_then(|tenant| tenant.agent)
 }
 
 /// The stores of the tenant the current [`CoreContext`] works for, keyed by
@@ -201,7 +202,8 @@ pub fn current(ctx: &crate::core::runtime::DispatchCtx) -> Option<AgentStores> {
 /// session's own definition id), as before profiles existed.
 #[must_use]
 pub fn current_agent_key_or(ctx: &crate::core::runtime::DispatchCtx, fallback: &str) -> String {
-    let tenant = crate::core::runtime::tenant::isolated_unless_tenant(ctx.tenant(), "session_locator");
+    let tenant =
+        crate::core::runtime::tenant::isolated_unless_tenant(ctx.tenant(), "session_locator");
     if tenant.profile.is_some() {
         return crate::core::runtime::session_key(&tenant);
     }

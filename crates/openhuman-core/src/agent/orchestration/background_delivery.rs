@@ -27,6 +27,7 @@
 //! appends to the thread's transcript. It persists its reply before announcing
 //! `chat_done`, so a reconnect cannot lose a completed delegated result.
 
+use crate::core::runtime::DispatchCtx;
 use std::collections::HashSet;
 use std::future::Future;
 use std::path::{Path, PathBuf};
@@ -198,14 +199,11 @@ pub(super) fn drain_schedule_in(
     let thread_in = |owner: Option<Arc<CoreContext>>| {
         let thread_id = match &owner {
             Some(ctx) => background_completions::thread_for_session(
-                &crate::core::runtime::DispatchCtx::new(Arc::clone(ctx)),
+                &DispatchCtx::new(Arc::clone(ctx)),
                 session,
             ),
             // No owner: the unscoped (desktop) drain reads the ambient context.
-            None => background_completions::thread_for_session(
-                &crate::core::runtime::DispatchCtx::ambient(),
-                session,
-            ),
+            None => background_completions::thread_for_session(&DispatchCtx::ambient(), session),
         };
         if thread_id.is_none() {
             log::trace!("[background_delivery] session has no delivery thread; not scheduling");
@@ -257,7 +255,7 @@ fn schedule_delivery_inner(thread_id: String, delay: Duration, wait_idle: bool, 
     // delayed task must run under the profile that scheduled it.
     crate::core::runtime::spawn_scoped(async move {
         // Inside the owner's scope: the context this drain acts for.
-        let ctx = crate::core::runtime::DispatchCtx::ambient();
+        let ctx = DispatchCtx::ambient();
         let turn_fence = fence.clone();
         let turn_thread = thread_id.clone();
         let outcome = run_drain(
@@ -295,18 +293,11 @@ fn scheduled_for_test() -> &'static Mutex<Vec<(String, Duration)>> {
 /// after [`RECOVERY_DELAY`], through the normal idle-gated path, fenced by the
 /// calling profile's lease when there is one. Returns the number of threads
 /// scheduled.
-pub(crate) fn recover_on_boot(
-    ctx: &crate::core::runtime::DispatchCtx,
-    workspace_dir: &Path,
-) -> usize {
+pub(crate) fn recover_on_boot(ctx: &DispatchCtx, workspace_dir: &Path) -> usize {
     recover_fenced(ctx, workspace_dir, DrainFence::current())
 }
 
-fn recover_fenced(
-    ctx: &crate::core::runtime::DispatchCtx,
-    workspace_dir: &Path,
-    fence: DrainFence,
-) -> usize {
+fn recover_fenced(ctx: &DispatchCtx, workspace_dir: &Path, fence: DrainFence) -> usize {
     // Scheduling needs a runtime; check before claiming so a later call retries.
     if tokio::runtime::Handle::try_current().is_err() {
         log::warn!(
@@ -337,11 +328,7 @@ fn recover_fenced(
 /// host has not published the profile yet, so it cannot be looked up): a drain
 /// that comes due after this node lost that lease is dropped, and the records
 /// stay pending for the node that holds it now.
-pub(crate) fn recover_on_open(
-    ctx: &crate::core::runtime::DispatchCtx,
-    workspace_dir: &Path,
-    fence: DrainFence,
-) -> usize {
+pub(crate) fn recover_on_open(ctx: &DispatchCtx, workspace_dir: &Path, fence: DrainFence) -> usize {
     background_completions::forget_recovery(workspace_dir);
     let scheduled = recover_fenced(ctx, workspace_dir, fence);
     if scheduled == 0 {
@@ -357,7 +344,7 @@ pub(crate) fn recover_on_open(
 /// batch stays leased until the caller settles it with `mark_delivered` /
 /// `mark_failed` / `release`.
 fn claim_ready(
-    ctx: &crate::core::runtime::DispatchCtx,
+    ctx: &DispatchCtx,
     router: &CompletionRouter,
     thread_id: &str,
 ) -> Option<Vec<CompletionRecord>> {
@@ -376,11 +363,7 @@ fn claim_ready(
 
 /// Drain + deliver pending completions for a thread — if idle and not already
 /// delivering. Batches everything ready at this instant into one system turn.
-async fn try_deliver(
-    busy_ctx: crate::core::runtime::DispatchCtx,
-    thread_id: String,
-    fence: DrainFence,
-) {
+async fn try_deliver(busy_ctx: DispatchCtx, thread_id: String, fence: DrainFence) {
     if !fence.admits() {
         log::info!(
             "[background_delivery] profile lease lost; not delivering thread_id={thread_id}"
@@ -395,7 +378,7 @@ async fn try_deliver(
     let router = background_completions::router_for_workspace(&workspace_dir);
     let turn_workspace = workspace_dir.clone();
     // A drain is event-driven and carries no context of its own.
-    let ctx = crate::core::runtime::DispatchCtx::host_default();
+    let ctx = DispatchCtx::host_default();
     let retry_after = try_deliver_with(
         &busy_ctx,
         thread_id.clone(),
@@ -429,7 +412,7 @@ async fn try_deliver(
 /// outside this module.
 #[cfg(test)]
 pub(super) async fn try_deliver_for_test(
-    ctx: crate::core::runtime::DispatchCtx,
+    ctx: DispatchCtx,
     thread_id: String,
     router: Arc<CompletionRouter>,
     turns: Arc<std::sync::atomic::AtomicU32>,
@@ -480,7 +463,7 @@ async fn persist_undelivered(workspace_dir: PathBuf, thread_id: String, notice: 
 /// terminal announcement is observable, and that a record which exhausts its
 /// attempts is handed to `on_undeliverable` rather than dropped.
 async fn try_deliver_with<F, Fut, G, GFut>(
-    ctx: &crate::core::runtime::DispatchCtx,
+    ctx: &DispatchCtx,
     thread_id: String,
     router: Arc<CompletionRouter>,
     mut deliver: F,
@@ -625,11 +608,7 @@ struct DeliverySlot {
 
 impl DeliverySlot {
     /// `None` when a delivery is already in flight for the thread.
-    fn claim(
-        ctx: &crate::core::runtime::DispatchCtx,
-        thread_id: &str,
-        router: Arc<CompletionRouter>,
-    ) -> Option<Self> {
+    fn claim(ctx: &DispatchCtx, thread_id: &str, router: Arc<CompletionRouter>) -> Option<Self> {
         let key = tenant::profile_key_in(&super::busy_guard::caller(ctx), thread_id);
         let mut d = delivering().lock().expect("delivering poisoned");
         if !d.insert(key.clone()) {
@@ -669,7 +648,7 @@ impl Drop for DeliverySlot {
 /// later cold-boot resume would prefer — which is how a restart used to drop
 /// every turn before the delivery notice.
 async fn run_system_turn_on_thread(
-    ctx: &crate::core::runtime::DispatchCtx,
+    ctx: &DispatchCtx,
     workspace_dir: PathBuf,
     thread_id: String,
     prompt: String,
@@ -752,7 +731,7 @@ fn persist_delivery_reply(
     success: bool,
 ) -> Result<(), String> {
     crate::threads::store::append_message(
-        &crate::core::runtime::DispatchCtx::ambient(),
+        &DispatchCtx::ambient(),
         workspace_dir,
         thread_id,
         crate::threads::store::ConversationMessage {

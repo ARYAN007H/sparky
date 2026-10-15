@@ -463,9 +463,10 @@ impl<'a> Cron<'a> {
             .find(name)?
             .ok_or_else(|| CronError::NotFound(name.to_string()))?;
         log::debug!("[embed][cron] run_now name={name} id={}", job.id);
-        let (success, output) = openhuman_core::cron::ops::run_job_now(&self.dispatch, self.config, &job.id)
-            .await
-            .map_err(CronError::Run)?;
+        let (success, output) =
+            openhuman_core::cron::ops::run_job_now(&self.dispatch, self.config, &job.id)
+                .await
+                .map_err(CronError::Run)?;
         Ok(JobRun { success, output })
     }
 
