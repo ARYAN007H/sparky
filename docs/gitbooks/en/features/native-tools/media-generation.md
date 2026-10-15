@@ -1,7 +1,7 @@
 ---
 description: >-
   Ask for an image or a video and dedicated media agents generate it, with
-  image editing and animation of a reference image, saved into your workspace.
+  image editing and animation of a reference image, saved in your Files folder.
 icon: clapperboard
 ---
 
