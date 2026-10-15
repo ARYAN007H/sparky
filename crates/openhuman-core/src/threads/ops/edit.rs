@@ -238,9 +238,10 @@ async fn next_reply_request_id_after(
 /// is unsafe: `.g1` sorts before the un-suffixed root).
 fn resolve_head_transcript(
     workspace_dir: &std::path::Path,
+    store_key: &str,
     thread_id: &str,
 ) -> Result<HeadTranscript, String> {
-    find_head_transcript(workspace_dir, thread_id)?
+    find_head_transcript(workspace_dir, store_key, thread_id)?
         .ok_or_else(|| format!("thread {thread_id} has no session transcript"))
 }
 
@@ -254,13 +255,13 @@ type HeadTranscript = (
 /// written a session transcript. Read and resolve failures still error.
 fn find_head_transcript(
     workspace_dir: &std::path::Path,
+    store_key: &str,
     thread_id: &str,
 ) -> Result<Option<HeadTranscript>, String> {
     // The same store the session host writes the thread's turns to: the
     // installed provider, else the workspace's driver-backed store. No
     // transcript file is named here.
-    let store_key = crate::agent::session_store::current_agent_key_or(CHAT_AGENT_ID);
-    let locator = crate::agent::session_store::transcripts_or_files(&store_key, workspace_dir);
+    let locator = crate::agent::session_store::transcripts_or_files(store_key, workspace_dir);
     let Some(root) = locator.root_for_thread(thread_id) else {
         log::debug!("[threads][edit] thread {thread_id} has no session transcript");
         return Ok(None);
@@ -303,10 +304,11 @@ fn truncation_seed(head: &SessionRef, current: &TranscriptMeta) -> TranscriptMet
 /// path.
 fn truncate_transcript_before_turn(
     workspace_dir: &std::path::Path,
+    store_key: &str,
     thread_id: &str,
     request_id: &str,
 ) -> Result<(), String> {
-    let (head, locator, transcript) = resolve_head_transcript(workspace_dir, thread_id)?;
+    let (head, locator, transcript) = resolve_head_transcript(workspace_dir, store_key, thread_id)?;
     let cut_index = transcript
         .messages
         .iter()
@@ -327,12 +329,13 @@ fn truncate_transcript_before_turn(
 /// regenerate (no transcript yet, or an empty one).
 fn truncate_transcript_for_regenerate(
     workspace_dir: &std::path::Path,
+    store_key: &str,
     thread_id: &str,
     target_request_id: Option<&str>,
 ) -> Result<Option<(String, String)>, String> {
     // Sentry TAURI-REACT-AK: a thread that never wrote a transcript has no turn
     // to regenerate — the caller turns `None` into that friendly error.
-    let Some((head, locator, transcript)) = find_head_transcript(workspace_dir, thread_id)? else {
+    let Some((head, locator, transcript)) = find_head_transcript(workspace_dir, store_key, thread_id)? else {
         return Ok(None);
     };
     let cut = match target_request_id {
