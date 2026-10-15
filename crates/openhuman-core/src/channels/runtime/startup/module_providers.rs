@@ -56,7 +56,7 @@ impl ModuleChannelRuntime {
                 tracing::warn!("[channels] legacy delivery import failed, will retry: {error:#}");
             }
         }
-        let callback = ChannelHostCallbacks::new(Arc::clone(&config), context, dispatch);
+        let callback = ChannelHostCallbacks::new(dispatch_ctx, Arc::clone(&config), context, dispatch);
         let lease = ChannelRuntimeLease::open(client.clone(), callback)
             .await
             .map_err(anyhow::Error::new)
