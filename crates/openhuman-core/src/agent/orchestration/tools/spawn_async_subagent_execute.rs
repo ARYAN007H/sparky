@@ -11,6 +11,7 @@ impl SpawnAsyncSubagentTool {
             >,
         >,
     ) -> anyhow::Result<ToolResult> {
+        let dispatch = run_context.dispatch_ctx();
         let AsyncSpawnArgs {
             agent_id,
             prompt,
@@ -41,7 +42,7 @@ impl SpawnAsyncSubagentTool {
 
         // Preserve the actual caller's authority before any filesystem/session
         // effects. A scoped refusal cannot become an accepted/running reference.
-        if let Err(error) = running_subagents::admit_spawn(&parent.workspace_dir) {
+        if let Err(error) = running_subagents::admit_spawn(&dispatch, &parent.workspace_dir) {
             return Ok(ToolResult::error(format!(
                 "spawn_async_subagent: registration refused: {error}"
             )));
@@ -130,6 +131,7 @@ impl SpawnAsyncSubagentTool {
             match subagent_sessions::find_reusable(&store, &selector) {
                 Ok(Some(session)) => {
                     let _ = running_subagents::cancel_by_session_in_workspace(
+                        &dispatch,
                         &session.subagent_session_id,
                         &parent_session,
                         &parent.workspace_dir,
@@ -180,6 +182,7 @@ impl SpawnAsyncSubagentTool {
             if session.status == DurableSubagentStatus::Running {
                 if let Some(ref running_task_id) = session.current_task_id {
                     match running_subagents::steer(
+                        &dispatch,
                         running_task_id,
                         &parent_session,
                         follow_up_prompt.clone(),
@@ -716,6 +719,7 @@ impl SpawnAsyncSubagentTool {
         // Register *after* spawn so the AbortHandle is available. The task owns
         // `status_tx`; this side holds `status_rx` for `wait_subagent`.
         let registration = running_subagents::register(
+            &dispatch,
             task_id.clone(),
             definition.id.clone(),
             parent_session.clone(),
