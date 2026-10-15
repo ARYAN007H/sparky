@@ -89,6 +89,7 @@ pub async fn handle_ingest(ctx: &DispatchCtx, params: Map<String, Value>) -> Res
     // Spawn background triage — the ingest RPC returns immediately.
     let id_for_triage = id.clone();
     let config_for_triage = config.clone();
+    let ctx = ctx.clone();
     crate::core::runtime::spawn_scoped(async move {
         let envelope = TriggerEnvelope {
             source: TriggerSource::WebviewIntegration {
@@ -109,7 +110,7 @@ pub async fn handle_ingest(ctx: &DispatchCtx, params: Map<String, Value>) -> Res
             received_at: ingest_started_at,
         };
 
-        match run_triage(&envelope).await {
+        match run_triage(&ctx, &envelope).await {
             Ok(TriageOutcome::Decision(triage_run)) => {
                 let action = triage_run.decision.action.as_str().to_string();
                 let reason = triage_run.decision.reason.clone();
@@ -184,7 +185,7 @@ pub async fn handle_ingest(ctx: &DispatchCtx, params: Map<String, Value>) -> Res
                         // (#5634).
                         let origin = local_trigger_origin();
                         if let Err(e) =
-                            with_origin(origin, apply_decision(triage_run, &envelope)).await
+                            with_origin(origin, apply_decision(&ctx, triage_run, &envelope)).await
                         {
                             tracing::warn!(
                                 id = %id_for_triage,

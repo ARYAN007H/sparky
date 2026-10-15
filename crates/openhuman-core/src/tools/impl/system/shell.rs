@@ -3,6 +3,7 @@ use super::shell_description::{command_param_description, shell_description};
 use super::shell_support::container_environment;
 use super::shell_support::{command_failure, exec_result, python_utf8_env, tool_timeout_message};
 use crate::agent::host_runtime::RuntimeAdapter;
+use crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool;
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
 use crate::security::{AuditLogger, CommandExecutionLog, SecurityPolicy};
@@ -264,7 +265,7 @@ impl Tool for ShellTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> anyhow::Result<ToolResult> {
-        self.execute_in_context(&DispatchCtx::ambient(), args, None)
+        self.execute_in_context(&dispatch_ctx_for_tool(None), args, None)
             .await
     }
 
@@ -274,7 +275,7 @@ impl Tool for ShellTool {
         _options: ToolCallOptions,
         context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
-        self.execute_in_context(&DispatchCtx::ambient(), args, context)
+        self.execute_in_context(&dispatch_ctx_for_tool(context), args, context)
             .await
     }
 }

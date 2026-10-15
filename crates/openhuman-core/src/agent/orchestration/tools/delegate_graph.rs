@@ -162,7 +162,10 @@ impl Tool for DelegateGraphTool {
         _options: ToolCallOptions,
         tool_context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
-        let mut run_context = crate::agent::tinyagents::host::OpenHumanRunContext::new();
+        let mut run_context = crate::agent::tinyagents::host::OpenHumanRunContext::new().with_core(
+            crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(tool_context)
+                .into_core(),
+        );
         run_context.thread_id = tool_context
             .and_then(ToolRunContext::thread_id)
             .map(ToOwned::to_owned);
@@ -229,14 +232,15 @@ impl DelegateGraphTool {
             }
         };
 
-        let config = match crate::config::ops::load_current_or_init(&DispatchCtx::ambient()).await {
-            Ok(cfg) => Arc::new(cfg),
-            Err(e) => {
-                return Ok(ToolResult::error(format!(
-                    "delegate: failed to load config: {e}"
-                )));
-            }
-        };
+        let config =
+            match crate::config::ops::load_current_or_init(&run_context.dispatch_ctx()).await {
+                Ok(cfg) => Arc::new(cfg),
+                Err(e) => {
+                    return Ok(ToolResult::error(format!(
+                        "delegate: failed to load config: {e}"
+                    )));
+                }
+            };
 
         match run_subagent_delegation_with_parent_context(
             config,
