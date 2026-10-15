@@ -148,7 +148,12 @@ impl RequestPlanReviewTool {
         // instead of freezing the turn on an approval nobody asked for.
         let mode = thread_id
             .as_deref()
-            .map(crate::agent::tinyagents::run_mode::get_mode)
+            .map(|thread_id| {
+                crate::agent::tinyagents::run_mode::get_mode(
+                    &crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(context),
+                    thread_id,
+                )
+            })
             .unwrap_or_default();
         if mode != tinyagents_harness::middleware::RunMode::Plan {
             tracing::debug!(

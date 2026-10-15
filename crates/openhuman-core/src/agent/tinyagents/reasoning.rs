@@ -101,7 +101,7 @@ pub(crate) fn turn_reasoning_for(
     if ctx.spawn_depth > 0 {
         return None;
     }
-    let reasoning = turn_reasoning(ctx.thread_id.as_deref(), config)
+    let reasoning = turn_reasoning(&ctx.dispatch_ctx(), ctx.thread_id.as_deref(), config)
         .map(|reasoning| with_output_room(reasoning, max_output_tokens));
     if let Some(reasoning) = reasoning.as_ref() {
         log::debug!(
@@ -117,10 +117,11 @@ pub(crate) fn turn_reasoning_for(
 /// The reasoning config one agent turn should request: the thread's own
 /// choice, else [`reasoning_for_config`].
 pub(crate) fn turn_reasoning(
+    dispatch: &DispatchCtx,
     thread_id: Option<&str>,
     config: Option<&Config>,
 ) -> Option<ReasoningConfig> {
-    if let Some(effort) = thread_id.and_then(thread_effort) {
+    if let Some(effort) = thread_id.and_then(|thread_id| thread_effort(dispatch, thread_id)) {
         return Some(ReasoningConfig::effort(effort));
     }
     config.and_then(reasoning_for_config)
