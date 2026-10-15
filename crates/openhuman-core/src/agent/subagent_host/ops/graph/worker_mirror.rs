@@ -1,6 +1,7 @@
 //! Mirroring a sub-agent turn's conversation onto its spawn's worker thread,
 //! matching the legacy `SubagentObserver`.
 
+use crate::core::runtime::DispatchCtx;
 use tinyagents_session::transcript::TranscriptMessage;
 use tinytools_agent::dialect::{DialectRole, TranscriptEntry};
 
@@ -50,7 +51,12 @@ fn append_worker_message(
         sender: sender.to_string(),
         created_at: chrono::Utc::now().to_rfc3339(),
     };
-    if let Err(err) = append_message(workspace_dir.to_path_buf(), thread_id, message) {
+    if let Err(err) = append_message(
+        &DispatchCtx::ambient(),
+        workspace_dir.to_path_buf(),
+        thread_id,
+        message,
+    ) {
         tracing::debug!(
             agent_id,
             thread_id,

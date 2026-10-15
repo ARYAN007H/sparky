@@ -93,6 +93,13 @@ impl DispatchCtx {
         }
     }
 
+    /// The tenant this call acts for: the resolved context's profile and
+    /// agent. Outside SaaS an unresolved context is the default tenant; in SaaS
+    /// it is [`NoTenant`](super::NoTenant), so the caller fails closed.
+    pub fn tenant(&self) -> Result<super::Tenant, super::NoTenant> {
+        super::tenant::tenant_in(super::is_saas(), self.resolved().as_deref())
+    }
+
     /// The configuration an embedder supplied for the context this call runs
     /// under, if any. See [`CoreContext::embedder_config`].
     pub fn embedder_config(&self) -> Option<crate::config::Config> {

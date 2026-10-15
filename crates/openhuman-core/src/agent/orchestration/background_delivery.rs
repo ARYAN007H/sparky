@@ -716,17 +716,14 @@ fn persist_delivery_reply(
     success: bool,
 ) -> Result<(), String> {
     crate::threads::store::append_message(
+        &crate::core::runtime::DispatchCtx::ambient(),
         workspace_dir,
         thread_id,
         crate::threads::store::ConversationMessage {
             id: crate::threads::store::run_reply_message_id(run_id),
             content,
             message_type: "text".to_string(),
-            extra_metadata: json!({
-                "scope": "background_delivery",
-                "success": success,
-                "requestId": run_id,
-            }),
+            extra_metadata: json!({"scope": "background_delivery", "success": success, "requestId": run_id}),
             sender: "agent".to_string(),
             created_at: chrono::Utc::now().to_rfc3339(),
         },

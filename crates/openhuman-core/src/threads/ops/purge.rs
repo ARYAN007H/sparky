@@ -1,6 +1,7 @@
 //! Workspace-wide conversation purge.
 
 use super::support::{envelope, run_to_completion, workspace_dir};
+use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
 use crate::threads::store as conversations;
 use crate::threads::{ApiEnvelope, EmptyRequest, PurgeConversationThreadsResponse};
@@ -12,16 +13,18 @@ use std::path::PathBuf;
 /// / turn-snapshot cleanup are one [`run_to_completion`] unit, so a dropped
 /// caller cannot leave every thread wiped while their sub-agents keep running.
 pub async fn threads_purge(
+    ctx: &DispatchCtx,
     _request: EmptyRequest,
 ) -> Result<Outcome<ApiEnvelope<PurgeConversationThreadsResponse>>, String> {
     let dir = workspace_dir().await?;
-    run_to_completion("threads_purge", threads_purge_inner(dir)).await
+    run_to_completion("threads_purge", threads_purge_inner(ctx.clone(), dir)).await
 }
 
 async fn threads_purge_inner(
+    ctx: DispatchCtx,
     dir: PathBuf,
 ) -> Result<Outcome<ApiEnvelope<PurgeConversationThreadsResponse>>, String> {
-    let stats = conversations::blocking::purge_threads(dir.clone()).await?;
+    let stats = conversations::blocking::purge_threads(ctx.clone(), dir.clone()).await?;
     // No parent thread survives a purge, so cancel every detached sub-agent and
     // wipe every queued result. Same ordering as `thread_delete`: abort the
     // in-flight runs first, then clear the delivery queue. Tombstone each

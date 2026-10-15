@@ -7,6 +7,7 @@
 //! `voice` external-channel origin and an approval chat context for the
 //! thread, so approval prompts reach the user's open conversation.
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use tinyagents_harness::context::RunConfig;
@@ -101,6 +102,7 @@ async fn ensure_thread(
         .filter(|t| !t.trim().is_empty())
         .unwrap_or_else(|| format!("voice-{}", uuid::Uuid::new_v4()));
     crate::threads::store::blocking::ensure_thread(
+        DispatchCtx::ambient(),
         config.workspace_dir.clone(),
         CreateConversationThread {
             id: id.clone(),
@@ -139,6 +141,7 @@ pub(crate) async fn start(
     let harness = assemble_live_tool_harness(host.live_tool_surface());
 
     let recent = crate::threads::store::blocking::get_messages(
+        DispatchCtx::ambient(),
         config.workspace_dir.clone(),
         thread_id.clone(),
     )
