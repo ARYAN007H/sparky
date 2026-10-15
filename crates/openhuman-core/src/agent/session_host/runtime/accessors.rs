@@ -310,7 +310,7 @@ impl OpenHumanSessionHost {
         locator: std::sync::Arc<dyn tinyagents_session::transcript::TranscriptLocator>,
     ) {
         if self.runtime_session.is_some() {
-            tracing::warn!("cannot change the transcript store after runtime session initialization");
+            tracing::debug!("transcript store already bound for this session; keeping it");
             return;
         }
         self.session_history_locator = Some(locator);
