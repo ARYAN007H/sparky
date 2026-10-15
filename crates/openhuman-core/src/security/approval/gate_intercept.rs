@@ -79,7 +79,11 @@ impl ApprovalGate {
         }
         // SaaS has no per-user approval surface: never park, allow only what
         // the deployment's sandboxed tool groups open.
-        if let Some(outcome) = saas_outcome_with(crate::core::runtime::is_saas(), tool_name) {
+        if let Some(outcome) = saas_outcome_with(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            crate::core::runtime::is_saas(),
+            tool_name,
+        ) {
             return (outcome, None);
         }
         if forced
@@ -714,12 +718,16 @@ impl ApprovalGate {
 /// The gate's outcome in SaaS, `None` outside it. SaaS has no per-user approval
 /// surface, so the gate never parks there; the verdict comes from the
 /// deployment's allowlisted tool groups.
-pub(crate) fn saas_outcome_with(saas: bool, tool_name: &str) -> Option<GateOutcome> {
+pub(crate) fn saas_outcome_with(
+    ctx: &crate::core::runtime::DispatchCtx,
+    saas: bool,
+    tool_name: &str,
+) -> Option<GateOutcome> {
     if !saas {
         return None;
     }
     Some(saas_outcome(crate::profiles::tools::gate_verdict(
-        tool_name,
+        ctx, tool_name,
     )))
 }
 

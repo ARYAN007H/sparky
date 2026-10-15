@@ -211,12 +211,12 @@ pub fn resolve(config: &Config) -> Binding {
     }
     if let Some(capabilities) = crate::profiles::capabilities::ProfileCapabilities::current() {
         if let Some(engine) = &capabilities.memory_engine {
-            if let Err(reason) = crate::profiles::host::ensure_hosted() {
+            // The hosted profile's engine is bound for the calling task's own tenant.
+            let ctx = crate::core::runtime::DispatchCtx::ambient();
+            if let Err(reason) = crate::profiles::host::ensure_hosted(&ctx) {
                 return off(None, None, &reason);
             }
-            let profile = crate::core::runtime::current_tenant()
-                .ok()
-                .and_then(|tenant| tenant.profile);
+            let profile = ctx.tenant().ok().and_then(|tenant| tenant.profile);
             let valid = profile.as_ref().is_some_and(|id| {
                 config.memory.agent_id.as_ref() == Some(id)
                     && config.memory.root.as_deref() == Some(format!("user:{id}").as_str())

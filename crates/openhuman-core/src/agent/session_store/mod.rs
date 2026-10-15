@@ -248,9 +248,9 @@ pub fn workspace_transcripts(
 /// [`CoreContext`]: crate::core::runtime::CoreContext
 /// [`CoreContext::session_agent`]: crate::core::runtime::CoreContext::session_agent
 #[must_use]
-pub fn current() -> Option<AgentStores> {
+pub fn current(ctx: &crate::core::runtime::DispatchCtx) -> Option<AgentStores> {
     let provider = installed()?;
-    let tenant = match crate::core::runtime::current_tenant() {
+    let tenant = match ctx.tenant() {
         Ok(tenant) => tenant,
         Err(no_tenant) => {
             log::warn!("[session_store] current: {no_tenant}");
@@ -265,9 +265,9 @@ pub fn current() -> Option<AgentStores> {
 /// serves a SaaS profile, else the context's agent, else `fallback` (the
 /// session's own definition id), as before profiles existed.
 #[must_use]
-pub fn current_agent_key_or(fallback: &str) -> String {
+pub fn current_agent_key_or(ctx: &crate::core::runtime::DispatchCtx, fallback: &str) -> String {
     agent_key_for(
-        &crate::core::runtime::tenant::current_tenant_or_isolated("session_locator"),
+        &crate::core::runtime::tenant::isolated_unless_tenant(ctx.tenant(), "session_locator"),
         fallback,
     )
 }
@@ -276,7 +276,7 @@ pub fn current_agent_key_or(fallback: &str) -> String {
 /// already holds the request's tenant (an RPC handler's context): the
 /// [`session_key`](crate::core::runtime::session_key) when it serves a SaaS
 /// profile, else its agent, else `fallback` (the session's definition id).
-/// [`current_agent_key_or`] is this over the ambient tenant, so a reader that
+/// [`current_agent_key_or`] is this over a context's tenant, so a reader that
 /// passes its tenant here resolves the same store the session host wrote to.
 #[must_use]
 pub fn agent_key_for(tenant: &crate::core::runtime::Tenant, fallback: &str) -> String {

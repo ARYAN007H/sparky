@@ -202,7 +202,13 @@ impl DedupCommitSubscriber {
     /// a schema + call-site change bigger than this PR's scope; reported as a
     /// follow-up rather than attempted here.
     fn dedup_node_ids(&self, flow_id: &str) -> Vec<String> {
-        match store::get_flow(&super::owner::config_for_scope(&self.config), flow_id) {
+        match store::get_flow(
+            &super::owner::config_for_scope(
+                &crate::core::runtime::DispatchCtx::ambient(),
+                &self.config,
+            ),
+            flow_id,
+        ) {
             Ok(Some(flow)) => flow
                 .graph
                 .nodes
@@ -223,7 +229,10 @@ impl DedupCommitSubscriber {
 
     async fn handle_finished(&self, flow_id: &str, run_id: &str, status: &str) {
         // As the flow's owner: its own configuration (`super::owner`).
-        let config = super::owner::config_for_scope(&self.config);
+        let config = super::owner::config_for_scope(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            &self.config,
+        );
         let node_ids = self.dedup_node_ids(flow_id);
         if node_ids.is_empty() {
             tracing::trace!(target: "flows", %flow_id, %run_id, %status, "[dedup-commit] no dedup nodes in this flow — nothing to settle");

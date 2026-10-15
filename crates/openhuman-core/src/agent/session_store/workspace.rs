@@ -125,7 +125,7 @@ fn memory_fallback(workspace_dir: &Path) -> Arc<dyn SessionStoreProvider> {
 /// The key the calling tenant's stores are under, or `None` for a SaaS task
 /// with no scope (which must not act).
 fn tenant_agent_key() -> Option<String> {
-    match crate::core::runtime::current_tenant() {
+    match crate::core::runtime::DispatchCtx::ambient().tenant() {
         Ok(tenant) => Some(crate::core::runtime::session_key(&tenant)),
         Err(no_tenant) => {
             log::warn!("[session_store] {no_tenant}");

@@ -11,6 +11,7 @@ impl SpawnAsyncSubagentTool {
             >,
         >,
     ) -> anyhow::Result<ToolResult> {
+        let dispatch = run_context.dispatch_ctx();
         let AsyncSpawnArgs {
             agent_id,
             prompt,
@@ -41,7 +42,7 @@ impl SpawnAsyncSubagentTool {
 
         // Preserve the actual caller's authority before any filesystem/session
         // effects. A scoped refusal cannot become an accepted/running reference.
-        if let Err(error) = running_subagents::admit_spawn(&parent.workspace_dir) {
+        if let Err(error) = running_subagents::admit_spawn(&dispatch, &parent.workspace_dir) {
             return Ok(ToolResult::error(format!(
                 "spawn_async_subagent: registration refused: {error}"
             )));
@@ -130,6 +131,7 @@ impl SpawnAsyncSubagentTool {
             match subagent_sessions::find_reusable(&store, &selector) {
                 Ok(Some(session)) => {
                     let _ = running_subagents::cancel_by_session_in_workspace(
+                        &dispatch,
                         &session.subagent_session_id,
                         &parent_session,
                         &parent.workspace_dir,
@@ -180,6 +182,7 @@ impl SpawnAsyncSubagentTool {
             if session.status == DurableSubagentStatus::Running {
                 if let Some(ref running_task_id) = session.current_task_id {
                     match running_subagents::steer(
+                        &dispatch,
                         running_task_id,
                         &parent_session,
                         follow_up_prompt.clone(),
@@ -341,10 +344,9 @@ impl SpawnAsyncSubagentTool {
                 .await;
         }
 
-        // Steering channel + status channel so the parent can `steer_subagent`
-        // this run mid-flight and `wait_subagent` for its result. The engine
-        // drains `steer_queue` at iteration boundaries; `status_tx` publishes
-        // the terminal state to any waiter.
+        // Steering + status channels so the parent can `steer_subagent` this run
+        // mid-flight and `wait_subagent` for its result: the engine drains `steer_queue`
+        // at iteration boundaries; `status_tx` publishes the terminal state.
         let steer_queue = Arc::new(RunQueue::new());
         let task_queue = steer_queue.clone();
         let (status_tx, status_rx) = running_subagents::status_channel();
@@ -356,6 +358,7 @@ impl SpawnAsyncSubagentTool {
         let background_parent_session = parent_session.clone();
         let completion_target =
             crate::agent::orchestration::background_completions::CompletionTarget::new(
+                dispatch.clone(),
                 parent.workspace_dir.clone(),
                 parent_session.clone(),
                 parent_thread_id.clone(),
@@ -438,12 +441,10 @@ impl SpawnAsyncSubagentTool {
                                         err
                                     );
                                 }
-                                // A workflow proposal produced inside the child's tool
-                                // history is durable state, not prose: persist it into
-                                // the parent chat thread (survives reload / reconnect —
-                                // the old socket-only delivery could silently drop it)
-                                // and carry the full payload in the delivery notice so
-                                // the follow-up turn can present it faithfully.
+                                // A workflow proposal from the child's tool history is
+                                // durable state, not prose: persist it into the parent chat
+                                // thread (survives reload / reconnect) and carry the full
+                                // payload in the delivery notice for the follow-up turn.
                                 let delivery_summary = attach_workflow_proposal(
                                     &background_workspace_dir,
                                     background_parent_thread_id.as_deref(),
@@ -629,11 +630,9 @@ impl SpawnAsyncSubagentTool {
                                         err
                                     );
                                 }
-                                // #4896: a detached child that pauses for input won't
-                                // continue on its own — queue a framed notice so the
-                                // parent chat learns the delegated task needs input,
-                                // instead of finalizing silently on "Accepted". Rides the
-                                // same idle-gated background_delivery path as a success.
+                                // #4896: a detached child that pauses for input won't continue
+                                // on its own — queue a framed notice so the parent chat learns it
+                                // needs input, not "Accepted". Same idle-gated path as a success.
                                 completion_target
                                     .awaiting_input(
                                         &outcome.task_id,
@@ -716,6 +715,7 @@ impl SpawnAsyncSubagentTool {
         // Register *after* spawn so the AbortHandle is available. The task owns
         // `status_tx`; this side holds `status_rx` for `wait_subagent`.
         let registration = running_subagents::register(
+            &dispatch,
             task_id.clone(),
             definition.id.clone(),
             parent_session.clone(),
