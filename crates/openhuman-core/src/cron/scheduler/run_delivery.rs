@@ -36,8 +36,9 @@ impl RunDelivery for HostDelivery {
         self.binding
             .within(async {
                 let config = self.binding.config();
+                let ctx = self.binding.dispatch_ctx();
                 let result =
-                    deliver_run(&config, job, run_id, &attempt.output, attempt.success).await;
+                    deliver_run(&ctx, &config, job, run_id, &attempt.output, attempt.success).await;
                 // A failed required delivery fails the run, as the runtime
                 // records it.
                 let delivered = match &result {
@@ -48,7 +49,7 @@ impl RunDelivery for HostDelivery {
                 // The job ran as its agent (when it had one); a one-shot job
                 // is deleted once the run completes, so subscribers learn the
                 // owner here, not from the store.
-                crate::cron::completion_owner::note(&job.id);
+                crate::cron::completion_owner::note(&ctx, &job.id);
                 BUS.publish(DomainEvent::CronJobCompleted {
                     job_id: job.id.clone(),
                     success,

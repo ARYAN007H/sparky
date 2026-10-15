@@ -30,7 +30,7 @@ pub async fn channel_relay_inbound(
     params.validate()?;
     // In SaaS a relayed message must run as its user: with no tenant scope
     // there is no workspace, stream or config it may touch.
-    let tenant = crate::core::runtime::current_tenant().map_err(|error| error.to_string())?;
+    let tenant = ctx.tenant().map_err(|error| error.to_string())?;
     let config = ctx.load_config().await?;
     let identity = crate::modules::channel_controller::prepare_identity(
         &crate::modules::client(config.clone()),
@@ -106,13 +106,16 @@ pub(crate) async fn run_relay_turn(
     request_id: String,
 ) -> Vec<String> {
     // One turn at a time per profile: wait behind its chat and cron turns.
-    let _turn = crate::profiles::turn_gate::acquire().await;
+    let _turn = crate::profiles::turn_gate::acquire(&dispatch_ctx).await;
     let workspace_dir = config.workspace_dir.clone();
     // The thread is busy for the whole turn, so a background result due on it
     // waits instead of landing mid-turn. The pipeline's session id does not
     // name the thread, so the guard is taken on the thread itself; this task
     // runs in the caller's scope, which keys it to the caller's profile.
-    let busy = crate::agent::orchestration::busy_guard::TurnBusy::start_on_thread(&thread_id);
+    let busy = crate::agent::orchestration::busy_guard::TurnBusy::start_on_thread(
+        &dispatch_ctx,
+        &thread_id,
+    );
     let channel = Arc::new(RelayChannel::new(
         params.channel.clone(),
         params.client_id(),

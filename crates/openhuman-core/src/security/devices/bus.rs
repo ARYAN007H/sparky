@@ -407,9 +407,7 @@ async fn handle_tunnel_frame(ctx: &DispatchCtx, channel_id: &str, payload_b64: &
             Ok(device) => {
                 super::owner::remember(
                     channel_id,
-                    crate::core::runtime::current_tenant()
-                        .ok()
-                        .and_then(|tenant| tenant.agent),
+                    ctx.tenant().ok().and_then(|tenant| tenant.agent),
                 );
                 log::info!(
                     "[devices/bus] device persisted channel_id={} label={}",

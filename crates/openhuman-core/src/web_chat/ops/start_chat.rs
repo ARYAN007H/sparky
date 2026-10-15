@@ -348,7 +348,7 @@ async fn start_chat_inner(
     // A fresh accepted user request is the explicit boundary after Stop. Keep
     // the gate installed through validation and registry cancellation so a
     // child registering late cannot deliver into the stopped generation.
-    crate::agent::orchestration::background_completions::resume_stopped_thread(&thread_id);
+    crate::agent::orchestration::background_completions::resume_stopped_thread(ctx, &thread_id);
 
     let map_key = key_for(ctx, &thread_id);
 

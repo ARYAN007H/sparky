@@ -14,6 +14,7 @@
 //! Outside SaaS, and for work that serves no hosted profile, a drain has no
 //! fence and always runs.
 
+use crate::core::runtime::DispatchCtx;
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
@@ -93,6 +94,7 @@ pub(super) enum DrainOutcome {
 /// `wait_idle` serves a recovered record: it has no owner noted (that table is
 /// process-local), so the busy turn's completion event would not wake it.
 pub(super) async fn run_drain<F, Fut>(
+    ctx: &DispatchCtx,
     thread_id: &str,
     delay: Duration,
     wait_idle: bool,
@@ -112,7 +114,7 @@ where
     }
     if wait_idle {
         let mut polls = 0;
-        while is_busy(thread_id) && polls < RECOVERY_BUSY_POLLS {
+        while is_busy(ctx, thread_id) && polls < RECOVERY_BUSY_POLLS {
             polls += 1;
             if !fence.sleep(poll).await {
                 log::info!(
@@ -122,7 +124,7 @@ where
                 return DrainOutcome::Fenced;
             }
         }
-        if is_busy(thread_id) {
+        if is_busy(ctx, thread_id) {
             return DrainOutcome::StillBusy;
         }
     }
