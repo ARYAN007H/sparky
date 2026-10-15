@@ -342,16 +342,17 @@ impl SecurityPolicy {
         let resolved = tokio::fs::canonicalize(&full_path)
             .await
             .map_err(|e| format!("Failed to resolve path '{path}': {e}"))?;
-        if !self.is_resolved_path_allowed_for(&resolved, false)
-            && !self.authorize_ready_media_artifact_path(&resolved).await
-        {
+        let is_allowed_root = self.is_resolved_path_allowed_for(&resolved, false);
+        let is_ready_media_artifact =
+            !is_allowed_root && self.authorize_ready_media_artifact_path(&resolved).await;
+        if !is_allowed_root && !is_ready_media_artifact {
             return Err(format!(
                 "{POLICY_BLOCKED_MARKER} Resolved path escapes workspace: {}",
                 resolved.display()
             ));
         }
         let workspace_root = self.workspace_root().await;
-        self.check_resolved_against_forbidden(&resolved, &workspace_root)?;
+        self.check_resolved_against_forbidden(&resolved, &workspace_root, is_ready_media_artifact)?;
         log::debug!(
             "[security] validate_path: '{}' resolved to '{}'",
             path,
@@ -418,8 +419,8 @@ impl SecurityPolicy {
         let result = resolved_parent.join(file_name);
 
         let workspace_root = self.workspace_root().await;
-        self.check_resolved_against_forbidden(&canonical_ancestor, &workspace_root)?;
-        self.check_resolved_against_forbidden(&result, &workspace_root)?;
+        self.check_resolved_against_forbidden(&canonical_ancestor, &workspace_root, false)?;
+        self.check_resolved_against_forbidden(&result, &workspace_root, false)?;
 
         log::debug!(
             "[security] validate_parent_path: '{}' resolved parent to '{}'",
@@ -573,9 +574,6 @@ impl SecurityPolicy {
         if !self.enabled {
             return true;
         }
-        if !require_write && self.is_media_artifact_path_cached(resolved) {
-            return true;
-        }
         let workspace_root = self.workspace_root_sync();
         resolved.starts_with(&workspace_root)
             || self.is_within_trusted_root(resolved, require_write)
@@ -588,6 +586,7 @@ impl SecurityPolicy {
         &self,
         resolved: &Path,
         workspace_root: &Path,
+        ready_media_artifact: bool,
     ) -> Result<(), String> {
         // Credential stores are never reachable, even via a trusted-root grant.
         if Self::is_always_forbidden(resolved) {
@@ -607,7 +606,7 @@ impl SecurityPolicy {
                 resolved.display()
             ));
         }
-        if self.is_media_artifact_path_cached(resolved) {
+        if ready_media_artifact {
             return Ok(());
         }
         // A trusted-root grant takes precedence over forbidden_paths for its subtree.
@@ -654,9 +653,11 @@ impl SecurityPolicy {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone()
         else {
+            self.forget_media_artifact_path(path);
             return false;
         };
         if !roots.contains_path(path) {
+            self.forget_media_artifact_path(path);
             return false;
         }
 
@@ -703,6 +704,14 @@ impl SecurityPolicy {
                 return true;
             }
         }
+        self.forget_media_artifact_path(path);
         false
+    }
+
+    fn forget_media_artifact_path(&self, path: &Path) {
+        self.media_artifact_paths
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .remove(path);
     }
 }

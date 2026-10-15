@@ -58,9 +58,9 @@ async fn ready_media_artifacts_are_readable_but_other_files_are_not() {
         .unwrap();
 
     let policy = SecurityPolicy {
-        workspace_dir: workspace,
+        workspace_dir: workspace.clone(),
         action_dir: tmp.path().join("action"),
-        media_files_roots: Arc::new(std::sync::Mutex::new(Some(FileRoots::new(files)))),
+        media_files_roots: Arc::new(std::sync::Mutex::new(Some(FileRoots::new(files.clone())))),
         ..SecurityPolicy::default()
     };
 
@@ -76,4 +76,18 @@ async fn ready_media_artifacts_are_readable_but_other_files_are_not() {
         .validate_path(&pending_path.to_string_lossy())
         .await
         .is_err());
+
+    crate::agent::artifacts::store::delete_artifact(&workspace, FileRoots::new(files), &image.id)
+        .await
+        .unwrap();
+    tokio::fs::write(&image_path, b"unrelated replacement")
+        .await
+        .unwrap();
+    assert!(
+        policy
+            .validate_path(&image_path.to_string_lossy())
+            .await
+            .is_err(),
+        "a cached path must not authorize a replacement file"
+    );
 }
