@@ -51,3 +51,7 @@ fn acts_for_a_profile(ctx: &DispatchCtx) -> bool {
 pub fn pending_agent(config: &Config, request_id: &str) -> Result<Option<Option<String>>> {
     super::super::store_documents::current(config)?.pending_agent(request_id)
 }
+
+#[cfg(test)]
+#[path = "store_agent_tests.rs"]
+mod tests;

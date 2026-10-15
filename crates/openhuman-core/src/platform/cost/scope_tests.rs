@@ -70,8 +70,12 @@ async fn ambient_scope_reads_the_turn_and_prefers_the_subagent() {
                 (
                     UsageScope::in_ctx(&DispatchCtx::ambient(), Some("openhuman"), None)
                         .with_definition(Some("orchestrator")),
-                    UsageScope::in_ctx(&DispatchCtx::ambient(), Some("openhuman"), Some(("researcher", "task-1")))
-                        .with_definition(Some("orchestrator")),
+                    UsageScope::in_ctx(
+                        &DispatchCtx::ambient(),
+                        Some("openhuman"),
+                        Some(("researcher", "task-1")),
+                    )
+                    .with_definition(Some("orchestrator")),
                 )
             }
             .await
@@ -95,7 +99,8 @@ fn outside_any_turn_and_without_a_provider_the_scope_is_empty() {
 
 #[tokio::test]
 async fn the_explicit_context_names_the_session_agent_not_the_ambient_one() {
-    let root = crate::core::runtime::CoreContext::for_test(crate::core::runtime::DomainSet::full(), None);
+    let root =
+        crate::core::runtime::CoreContext::for_test(crate::core::runtime::DomainSet::full(), None);
     let alice = crate::core::runtime::agent_scope::test_agent_context(&root, "alice");
     let bob = crate::core::runtime::agent_scope::test_agent_context(&root, "bob");
     let alice_ctx = DispatchCtx::new(alice.clone());
