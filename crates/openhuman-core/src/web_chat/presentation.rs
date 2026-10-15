@@ -60,6 +60,7 @@ pub(crate) async fn deliver_response(
     suggest_follow_ups: bool,
 ) {
     persist_reply(
+        ctx,
         thread_id,
         request_id,
         full_response,
@@ -86,6 +87,7 @@ pub(crate) async fn deliver_response(
 /// painted costs the user a repaint, not the reply. A storage failure is
 /// logged and never blocks the announcement. `None` stores nothing.
 pub(crate) async fn persist_reply(
+    ctx: &crate::core::runtime::DispatchCtx,
     thread_id: &str,
     request_id: &str,
     full_response: &str,
@@ -98,7 +100,8 @@ pub(crate) async fn persist_reply(
         // work that has no business holding a runtime worker while a turn
         // is settling. Hand it to the blocking pool and await the handle,
         // which keeps the ordering this whole change rests on.
-        let (dir, thread, request, reply, cites) = (
+        let (dctx, dir, thread, request, reply, cites) = (
+            ctx.clone(),
             dir.to_path_buf(),
             thread_id.to_string(),
             request_id.to_string(),
@@ -107,7 +110,7 @@ pub(crate) async fn persist_reply(
         );
         let persisted = tokio::task::spawn_blocking(move || {
             super::reply_persistence::persist_delivered_reply(
-                &dir, &thread, &request, &reply, &cites,
+                &dctx, &dir, &thread, &request, &reply, &cites,
             )
         })
         .await;

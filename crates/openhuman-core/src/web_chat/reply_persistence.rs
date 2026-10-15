@@ -51,6 +51,7 @@ const REPLY_SCOPE: &str = "web_chat_reply";
 /// shape `chatDoneExtraMetadata` builds, and any field added to that helper
 /// belongs here too.
 pub(crate) fn persist_delivered_reply(
+    ctx: &DispatchCtx,
     workspace_dir: &Path,
     thread_id: &str,
     request_id: &str,
@@ -71,7 +72,7 @@ pub(crate) fn persist_delivered_reply(
         extra_metadata["citations"] = json!(citations);
     }
     conversations::append_message(
-        &DispatchCtx::ambient(),
+        ctx,
         workspace_dir.to_path_buf(),
         thread_id,
         ConversationMessage {

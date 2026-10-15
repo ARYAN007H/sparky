@@ -236,8 +236,10 @@ async fn deliver_to_web_thread(
     let persist_thread = thread_id.to_string();
     let persist_request = request_id.clone();
     let persist_text = text.to_string();
+    let persist_ctx = crate::core::runtime::DispatchCtx::ambient();
     crate::core::runtime::spawn_blocking_scoped(move || {
         crate::web_chat::persist_delivered_reply(
+            &persist_ctx,
             &workspace,
             &persist_thread,
             &persist_request,

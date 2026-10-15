@@ -573,6 +573,7 @@ async fn start_chat_inner(
             let deferred_error = match result {
                 Ok(chat_result) => {
                     crate::web_chat::presentation::persist_reply(
+                        &ctx_task,
                         &thread_id_task,
                         &request_id_task,
                         &chat_result.full_response,
