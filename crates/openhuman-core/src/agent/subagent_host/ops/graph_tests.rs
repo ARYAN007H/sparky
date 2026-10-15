@@ -71,6 +71,50 @@ fn a_subagent_writes_to_its_turn_trees_store_else_its_contexts() {
 }
 
 #[test]
+fn a_detached_subagent_uses_the_store_its_carried_context_selects() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+    use tinyagents_session::port::{InMemorySessionStores, SessionStoreProvider};
+    let workspace = tempfile::tempdir().unwrap();
+    let provider: Arc<dyn SessionStoreProvider> = Arc::new(InMemorySessionStores::new());
+    let mut overrides = crate::agent::host_overrides::HostOverrides::default();
+    overrides.session_store = Some(Arc::clone(&provider));
+    let overlay = ContextOverlay::new(
+        crate::config::Config::default(),
+        DomainSet::kernel(),
+        crate::tools::toolpacks::ToolGroups::none(),
+    )
+    .host_overrides(Arc::new(overrides));
+    let core = CoreContext::for_test(DomainSet::full(), None).derive_with(overlay);
+
+    let mut run_context = crate::agent::tinyagents::host::OpenHumanRunContext::new();
+    run_context.core = Some(Arc::downgrade(&core));
+    // No ambient context is in scope here, as on a bare `tokio::spawn`.
+    assert!(CoreContext::current().is_none());
+    let chosen = super::transcript::subagent_transcripts_in(&run_context, workspace.path(), false);
+    let expected = provider
+        .for_agent(crate::agent::session_store::DEFAULT_AGENT)
+        .transcripts
+        .destination_key();
+    assert_eq!(chosen.destination_key(), expected);
+}
+
+#[test]
+fn a_saas_subagent_without_a_context_or_tree_store_is_kept_in_memory() {
+    let workspace = tempfile::tempdir().unwrap();
+    let unbound = crate::agent::tinyagents::host::OpenHumanRunContext::new();
+    let chosen = super::transcript::subagent_transcripts_in(&unbound, workspace.path(), true);
+    let operator = crate::agent::session_store::transcripts_or_files(
+        crate::agent::session_store::DEFAULT_AGENT,
+        workspace.path(),
+    );
+    assert_ne!(chosen.destination_key(), operator.destination_key());
+    assert!(
+        !workspace.path().join("storage").exists(),
+        "nothing is written under the operator workspace"
+    );
+}
+
+#[test]
 fn subagent_transcript_keeps_cumulative_spend_separate_from_unknown_last_call() {
     let workspace = tempfile::tempdir().unwrap();
     let locator =
