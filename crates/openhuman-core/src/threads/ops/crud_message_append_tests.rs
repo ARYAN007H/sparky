@@ -29,7 +29,7 @@ async fn append_with_test_config(
     config: &crate::config::Config,
     origin: Option<&crate::agent::turn_origin::AgentTurnOrigin>,
 ) -> Result<Outcome<ApiEnvelope<ConversationMessageRecord>>, ThreadsError> {
-    message_append_with_config(crate::core::runtime::DispatchCtx::ambient(), request, config, origin, &config.workspace_dir).await
+    message_append_with_config(&crate::core::runtime::DispatchCtx::ambient(), request, config, origin, &config.workspace_dir).await
 }
 
 fn request(id: &str, content: &str, sender: &str) -> AppendConversationMessageRequest {
@@ -229,7 +229,7 @@ async fn append_uses_host_persistence_workspace_separate_from_rpc_config() {
     .unwrap();
 
     message_append_with_config(
-        crate::core::runtime::DispatchCtx::ambient(),
+        &crate::core::runtime::DispatchCtx::ambient(),
         request("host-store", "saved in host workspace", "assistant"),
         &config,
         None,

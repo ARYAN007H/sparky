@@ -213,7 +213,7 @@ fn mirrored_tool_results_are_hidden_from_the_worker_thread_chat() {
     let now = chrono::Utc::now().to_rfc3339();
     for id in ["worker-typed", "worker-recovered"] {
         store::ensure_thread(
-        crate::core::runtime::DispatchCtx::ambient(),
+        &crate::core::runtime::DispatchCtx::ambient(),
             dir.clone(),
             CreateConversationThread {
                 id: id.to_string(),
@@ -274,7 +274,7 @@ fn mirrored_tool_results_are_hidden_from_the_worker_thread_chat() {
     // failure names every path that is still painting a tool result as chat.
     let mut painted_as_user_chat: Vec<String> = Vec::new();
     for thread_id in ["worker-typed", "worker-recovered"] {
-        let rows = store::get_messages(crate::core::runtime::DispatchCtx::ambient(), dir.clone(), thread_id).unwrap();
+        let rows = store::get_messages(&crate::core::runtime::DispatchCtx::ambient(), dir.clone(), thread_id).unwrap();
         assert!(
             rows.iter().any(|r| r.content == RAW),
             "{thread_id}: the mirror wrote no tool-result row to assert on"

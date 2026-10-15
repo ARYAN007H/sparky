@@ -105,7 +105,7 @@ fn persist_worker_thread_creates_thread_with_tasks_label_and_messages() {
 
     assert!(thread_id.starts_with("worker-"));
 
-    let threads = conversations::list_threads(crate::core::runtime::DispatchCtx::ambient(), temp.path().to_path_buf()).expect("list threads");
+    let threads = conversations::list_threads(&crate::core::runtime::DispatchCtx::ambient(), temp.path().to_path_buf()).expect("list threads");
     let worker = threads
         .iter()
         .find(|t| t.id == thread_id)
@@ -114,7 +114,7 @@ fn persist_worker_thread_creates_thread_with_tasks_label_and_messages() {
     assert!(worker.title.starts_with("draft a long research plan"));
 
     let messages =
-        conversations::get_messages(crate::core::runtime::DispatchCtx::ambient(), temp.path().to_path_buf(), &thread_id).expect("messages");
+        conversations::get_messages(&crate::core::runtime::DispatchCtx::ambient(), temp.path().to_path_buf(), &thread_id).expect("messages");
     assert_eq!(messages.len(), 2);
     assert_eq!(messages[0].sender, "user");
     assert_eq!(messages[0].content, "draft a long research plan");

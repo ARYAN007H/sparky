@@ -396,7 +396,7 @@ fn attach_workflow_proposal_persists_thread_message_and_extends_summary() {
     use crate::threads::store::CreateConversationThread;
     let temp = tempfile::tempdir().expect("tempdir");
     conversations::ensure_thread(
-        crate::core::runtime::DispatchCtx::ambient(),
+        &crate::core::runtime::DispatchCtx::ambient(),
         temp.path().to_path_buf(),
         CreateConversationThread {
             id: "thread-parent".into(),
@@ -431,7 +431,7 @@ fn attach_workflow_proposal_persists_thread_message_and_extends_summary() {
     // Proposal is durably persisted in the parent thread with rehydratable
     // metadata (this is what survives reload / a dropped socket event).
     let messages =
-        conversations::get_messages(crate::core::runtime::DispatchCtx::ambient(), temp.path().to_path_buf(), "thread-parent").expect("messages");
+        conversations::get_messages(&crate::core::runtime::DispatchCtx::ambient(), temp.path().to_path_buf(), "thread-parent").expect("messages");
     let proposal_msg = messages
         .iter()
         .find(|m| m.id == "workflow-proposal:sub-task-1")

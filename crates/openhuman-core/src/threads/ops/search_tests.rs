@@ -47,7 +47,7 @@ fn request_limit_is_optional() {
 
 #[tokio::test]
 async fn blank_query_answers_no_hits() {
-    let out = thread_search(crate::core::runtime::DispatchCtx::ambient(), ThreadSearchRequest {
+    let out = thread_search(&crate::core::runtime::DispatchCtx::ambient(), ThreadSearchRequest {
         query: "   ".into(),
         limit: None,
     })
