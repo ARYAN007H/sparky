@@ -162,8 +162,10 @@ pub(crate) async fn bootstrap_core_runtime(
         // result never reached its chat thread is still pending in the durable
         // completion log (`<workspace>/.openhuman/background_completions.jsonl`).
         // Schedule its delivery turn through the normal idle-gated path.
-        let redelivering =
-            crate::agent::orchestration::background_delivery::recover_on_boot(&workspace_dir);
+        let redelivering = crate::agent::orchestration::background_delivery::recover_on_boot(
+            &DispatchCtx::ambient(),
+            &workspace_dir,
+        );
         if redelivering > 0 {
             log::info!(
                 "[runtime] scheduled redelivery of undelivered background completions for \

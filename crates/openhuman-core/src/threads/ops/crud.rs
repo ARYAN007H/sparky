@@ -466,8 +466,9 @@ async fn thread_delete_inner(
     // queued for delivery. Both target a thread that's being deleted, so there's
     // nowhere left to deliver to — abort + cleanup is the whole behavior.
     let cancelled =
-        crate::agent::orchestration::running_subagents::cancel_for_thread(&request.thread_id);
+        crate::agent::orchestration::running_subagents::cancel_for_thread(&ctx, &request.thread_id);
     let discarded = crate::agent::orchestration::background_completions::discard_for_thread(
+        &ctx,
         &dir,
         &request.thread_id,
     );

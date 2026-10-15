@@ -29,7 +29,8 @@ async fn a_scoped_provider_serves_only_its_own_task() {
 async fn work_outside_an_agent_context_uses_the_default_agent() {
     let provider: Arc<dyn SessionStoreProvider> = Arc::new(InMemorySessionStores::new());
     let key = scope(provider.clone(), async {
-        current().map(|stores| stores.transcripts.destination_key())
+        current(&crate::core::runtime::DispatchCtx::ambient())
+            .map(|stores| stores.transcripts.destination_key())
     })
     .await;
     // No agent context in a unit test: the shared default bucket.
@@ -42,7 +43,7 @@ async fn work_outside_an_agent_context_uses_the_default_agent() {
                 .destination_key()
         )
     );
-    assert!(current().is_none() || is_installed());
+    assert!(current(&crate::core::runtime::DispatchCtx::ambient()).is_none() || is_installed());
 }
 
 #[tokio::test]
@@ -177,9 +178,18 @@ async fn under<T>(ctx: Arc<crate::core::runtime::CoreContext>, f: impl FnOnce() 
 
 #[tokio::test]
 async fn desktop_session_keys_are_unchanged() {
-    assert_eq!(current_agent_key_or("orchestrator"), "orchestrator");
+    assert_eq!(
+        current_agent_key_or(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            "orchestrator"
+        ),
+        "orchestrator"
+    );
     let key = under(derived(None, Some("alpha")), || {
-        current_agent_key_or("orchestrator")
+        current_agent_key_or(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            "orchestrator",
+        )
     })
     .await;
     assert_eq!(key, "alpha");
@@ -188,11 +198,17 @@ async fn desktop_session_keys_are_unchanged() {
 #[tokio::test]
 async fn two_profiles_default_agents_keep_separate_session_keys_and_stores() {
     let alice_key = under(derived(Some("alice"), None), || {
-        current_agent_key_or("orchestrator")
+        current_agent_key_or(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            "orchestrator",
+        )
     })
     .await;
     let bob_key = under(derived(Some("bob"), None), || {
-        current_agent_key_or("orchestrator")
+        current_agent_key_or(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            "orchestrator",
+        )
     })
     .await;
     assert_eq!(alice_key, "alice~default");
@@ -203,7 +219,10 @@ async fn two_profiles_default_agents_keep_separate_session_keys_and_stores() {
         let provider = provider.clone();
         crate::core::runtime::CoreContext::scope(
             derived_with_store(Some(profile), None, provider),
-            async { current().map(|stores| stores.transcripts.destination_key()) },
+            async {
+                current(&crate::core::runtime::DispatchCtx::ambient())
+                    .map(|stores| stores.transcripts.destination_key())
+            },
         )
     };
     let (alice, bob) = (stores_of("alice").await, stores_of("bob").await);

@@ -141,6 +141,7 @@ pub(crate) fn origin_transcripts(
 /// `Ok(Suppressed)` for an intentional empty/`NO_REPLY` output; `Ok(Delivered)`
 /// when the reply was committed and sent; `Err` when it could not be.
 pub(crate) async fn deliver_to_origin(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     job: &CronJob,
     run_id: &str,
@@ -163,7 +164,7 @@ pub(crate) async fn deliver_to_origin(
 
     // The job's tenant: a hosted profile's or an embedded agent's host routes
     // the reply itself; otherwise it keys the transcript store below.
-    let tenant = crate::core::runtime::current_tenant().ok();
+    let tenant = ctx.tenant().ok();
     let owner = tenant
         .clone()
         .filter(|tenant| tenant.profile.is_some() || tenant.agent.is_some());

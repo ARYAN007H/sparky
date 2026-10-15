@@ -124,16 +124,16 @@ pub fn isolated_unless_tenant(tenant: Result<Tenant, NoTenant>, site: &str) -> T
     })
 }
 
-/// [`tenant_key`] of `id` under the calling tenant's profile alone: for
-/// process-wide tables keyed by a caller-chosen id (thread or session ids)
-/// that must keep SaaS profiles apart but that the agents of one profile
-/// share. With no profile (the desktop, embedded agents) it is the bare id,
-/// as before. A SaaS task with no scope gets a key nothing else shares.
-pub fn profile_key(id: &str) -> String {
-    tenant_key(
-        &current_tenant_or_isolated("profile_key").profile_only(),
-        id,
-    )
+/// [`tenant_key`] of `id` under `tenant`'s profile alone: for process-wide
+/// tables keyed by a caller-chosen id (thread or session ids) that must keep
+/// SaaS profiles apart but that the agents of one profile share. With no
+/// profile (the desktop, embedded agents) it is the bare id, as before.
+///
+/// The tenant comes from the caller's [`DispatchCtx`](super::DispatchCtx)
+/// (`ctx.tenant()`, through [`isolated_unless_tenant`] for a key builder that
+/// cannot fail), never from the calling task's ambient scope.
+pub fn profile_key_in(tenant: &Tenant, id: &str) -> String {
+    tenant_key(&tenant.profile_only(), id)
 }
 
 /// Profile prefix byte of a [`tenant_key`].

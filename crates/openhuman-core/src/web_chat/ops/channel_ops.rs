@@ -150,7 +150,7 @@ async fn cancel_chat_inner(
     // Only once nothing is left running on the thread: a scoped cancel can leave
     // the primary or a parallel turn alive, and those still owe a terminal event.
     if cancelled_any.is_some() && !thread_has_live_turn(thread_id, &map_key).await {
-        crate::agent::orchestration::busy_guard::clear_busy_for_thread(thread_id);
+        crate::agent::orchestration::busy_guard::clear_busy_for_thread(ctx, thread_id);
         // A drain that fired while the cancelled turn counted as busy returned
         // without claiming anything; ask for another.
         crate::agent::orchestration::background_delivery::kick_delivery(thread_id);
@@ -161,11 +161,12 @@ async fn cancel_chat_inner(
         // the gap between abort and the queue sweep.
         let discarded =
             crate::agent::orchestration::background_completions::discard_pending_for_thread(
-                thread_id,
+                ctx, thread_id,
             );
-        let stopped = crate::agent::orchestration::running_subagents::stop_for_thread(thread_id);
+        let stopped =
+            crate::agent::orchestration::running_subagents::stop_for_thread(ctx, thread_id);
         crate::agent::orchestration::background_completions::finish_stop_for_thread(
-            thread_id, &stopped,
+            ctx, thread_id, &stopped,
         );
         log::info!(
             "[web-channel] stop thread_id={} turn={:?} parallel={} subagents_cancelled={} completions_discarded={}",
