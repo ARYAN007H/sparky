@@ -285,7 +285,7 @@ pub fn spawn_cron_service(
                 log::warn!("[core] config load failed, skipping cron scheduler: {err}");
             }
         }
-    }))
+    })
 }
 
 /// Realtime channel listeners (Telegram getUpdates, Discord gateway, etc.).
