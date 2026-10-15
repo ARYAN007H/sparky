@@ -707,7 +707,7 @@ impl OpenHumanRunContext {
                 .as_ref()
                 .map(|parent| parent.agent_definition_id.clone()),
             memory_identity: self.memory_identity.clone(),
-            core: self.core.clone(),
+            dispatch: self.core.clone().map(crate::core::runtime::DispatchCtx::new),
         });
         let context = tinyagents_harness::context::RunContext::new(config, self)
             .with_cancellation(cancellation)

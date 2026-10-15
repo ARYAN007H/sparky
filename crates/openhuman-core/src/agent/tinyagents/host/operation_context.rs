@@ -22,7 +22,7 @@ pub(crate) struct HostOperationContext {
     pub(crate) memory_identity: Option<crate::memory::scope::MemoryIdentity>,
     /// The context the run acts under; see
     /// [`OpenHumanRunContext::core`](super::OpenHumanRunContext::core).
-    pub(crate) core: Option<std::sync::Arc<crate::core::runtime::CoreContext>>,
+    pub(crate) dispatch: Option<crate::core::runtime::DispatchCtx>,
 }
 
 /// The dispatch context of the run a tool executes in, from the explicit tool
@@ -32,17 +32,14 @@ pub(crate) struct HostOperationContext {
 pub(crate) fn dispatch_ctx_for_tool(
     context: Option<&dyn tinytools::ToolRunContext>,
 ) -> crate::core::runtime::DispatchCtx {
-    let core = context
+    let bound = context
         .and_then(tinytools::ToolRunContext::host_extension)
         .and_then(|extension| {
             extension.downcast_ref::<tinyagents_harness::tool::ToolExecutionContext>()
         })
         .and_then(|context| context.state::<HostOperationContext>())
-        .and_then(|host| host.core.clone());
-    match core {
-        Some(core) => crate::core::runtime::DispatchCtx::new(core),
-        None => crate::core::runtime::DispatchCtx::ambient(),
-    }
+        .and_then(|host| host.dispatch.clone());
+    bound.unwrap_or_else(crate::core::runtime::DispatchCtx::ambient)
 }
 
 /// Reads the spawning agent's definition id from the explicit tool carrier.
