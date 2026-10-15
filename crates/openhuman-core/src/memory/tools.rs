@@ -29,6 +29,7 @@ use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolResult, ToolRunConte
 use crate::config::Config;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
+use crate::core::runtime::DispatchCtx;
 
 use super::error::MemoryError;
 use super::ops;
@@ -46,11 +47,14 @@ fn turn_citations(ctx: &DispatchCtx) -> Arc<TurnCitations> {
     crate::core::runtime::slot_for::<TurnCitations>(ctx)
 }
 
-fn record_turn_citations(thread_id: &str, citations: &[tinymemory_api::Citation]) {
+fn record_turn_citations(
+    ctx: &DispatchCtx,
+    thread_id: &str, citations: &[tinymemory_api::Citation],
+) {
     if citations.is_empty() {
         return;
     }
-    let citations_by_thread = turn_citations();
+    let citations_by_thread = turn_citations(ctx);
     let mut all = citations_by_thread
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -68,11 +72,11 @@ fn record_turn_citations(thread_id: &str, citations: &[tinymemory_api::Citation]
 /// Records `citations` for `thread_id`'s in-flight turn: what the turn's
 /// memory pack cited (`lifecycle::hooks::pre_turn`), beside what `recall`
 /// cites.
-pub fn record_pack_citations(thread_id: &str, citations: Vec<TurnCitation>) {
+pub fn record_pack_citations(ctx: &DispatchCtx, thread_id: &str, citations: Vec<TurnCitation>) {
     if citations.is_empty() {
         return;
     }
-    let citations_by_thread = turn_citations();
+    let citations_by_thread = turn_citations(ctx);
     let mut all = citations_by_thread
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -90,8 +94,8 @@ pub fn record_pack_citations(thread_id: &str, citations: Vec<TurnCitation>) {
 /// Drains the citations `recall` and the turn's pack produced for
 /// `thread_id` since the last drain.
 #[must_use]
-pub fn take_turn_citations(thread_id: &str) -> Vec<TurnCitation> {
-    turn_citations()
+pub fn take_turn_citations(ctx: &DispatchCtx, thread_id: &str) -> Vec<TurnCitation> {
+    turn_citations(ctx)
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .remove(thread_id)

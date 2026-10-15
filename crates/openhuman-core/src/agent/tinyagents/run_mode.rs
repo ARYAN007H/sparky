@@ -57,8 +57,8 @@ pub fn get_mode(ctx: &DispatchCtx, thread_id: &str) -> RunMode {
 /// `DomainEvent::ThreadRunModeChanged` so the web channel can bridge a
 /// `run_mode_changed` socket event. A no-op publish-wise when the mode is
 /// already what was requested — still safe to call unconditionally.
-pub fn set_mode(thread_id: &str, mode: RunMode) {
-    let handle = handle_for_thread(thread_id);
+pub fn set_mode(ctx: &DispatchCtx, thread_id: &str, mode: RunMode) {
+    let handle = handle_for_thread(ctx, thread_id);
     let changed = handle.get() != mode;
     handle.set(mode);
     if changed {
