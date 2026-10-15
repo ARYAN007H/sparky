@@ -52,7 +52,7 @@ pub(crate) async fn run_chat_task(
     approval: crate::security::approval::ApprovalTurnContext,
 ) -> Result<WebChatTaskResult, String> {
     // One turn at a time per profile: wait behind its relay and cron turns.
-    let _turn = crate::profiles::turn_gate::acquire().await;
+    let _turn = crate::profiles::turn_gate::acquire(ctx).await;
 
     #[cfg(any(test, debug_assertions))]
     {
