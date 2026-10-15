@@ -30,7 +30,7 @@ pub async fn channel_relay_inbound(
     params.validate()?;
     // In SaaS a relayed message must run as its user: with no tenant scope
     // there is no workspace, stream or config it may touch.
-    let tenant = crate::core::runtime::current_tenant().map_err(|error| error.to_string())?;
+    let tenant = ctx.tenant().map_err(|error| error.to_string())?;
     let config = ctx.load_config().await?;
     let identity = crate::modules::channel_controller::prepare_identity(
         &crate::modules::client(config.clone()),
