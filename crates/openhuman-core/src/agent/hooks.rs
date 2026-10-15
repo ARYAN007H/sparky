@@ -309,23 +309,27 @@ pub fn embedder_tool_hooks_in(ctx: &crate::core::runtime::DispatchCtx) -> Vec<Ar
 mod tests;
 
 /// Fire all hooks in parallel, logging errors without blocking the caller.
-pub fn fire_hooks(hooks: &[Arc<dyn PostTurnHook>], ctx: TurnContext) {
+pub fn fire_hooks(
+    hooks: &[Arc<dyn PostTurnHook>],
+    dispatch: &crate::core::runtime::DispatchCtx,
+    ctx: TurnContext,
+) {
     log::debug!(
         "[learning] dispatching {} post-turn hook(s) (tool_calls={}, response_chars={})",
         hooks.len(),
         ctx.tool_calls.len(),
         ctx.assistant_response.chars().count()
     );
-    // Capture the ambient CoreContext before detaching: a bare `tokio::spawn`
+    // Take the caller's CoreContext before detaching: a bare `tokio::spawn`
     // does not inherit the `CURRENT_CONTEXT` task-local, so under a scoped
     // multi-tenant dispatch a detached hook would fall back to the process
     // default context — and anything context-derived inside the hook (for
     // example a workspace-scoped store) would read and
     // write another tenant's workspace. Re-entering the scope inside the task
     // keeps the hook on the dispatch it belongs to; when there is no scoped
-    // context (the desktop's single-tenant path), `current()` already answers
-    // the process default and re-scoping it is a no-op.
-    let core_ctx = crate::core::runtime::context::CoreContext::current();
+    // context (the desktop's single-tenant path), the process default is
+    // already what the hook reads and re-scoping it is a no-op.
+    let core_ctx = dispatch.core().cloned();
     for (idx, hook) in hooks.iter().enumerate() {
         let hook = Arc::clone(hook);
         let ctx = ctx.clone();

@@ -112,7 +112,12 @@ impl LearningSink for OpenHumanLearningSink {
             self.hooks.len()
         );
 
-        hooks::fire_hooks(&self.hooks, Self::turn_context_from(summary));
+        // Transitional (#7801): the learning sink is built without a context.
+        hooks::fire_hooks(
+            &self.hooks,
+            &crate::core::runtime::DispatchCtx::ambient(),
+            Self::turn_context_from(summary),
+        );
         Ok(())
     }
 }
