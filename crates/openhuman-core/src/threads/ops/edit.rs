@@ -84,6 +84,7 @@ pub async fn edit_message(request: EditMessageRequest) -> Result<Outcome<Value>,
     let client_id = request.client_id.unwrap_or_else(|| "system".to_string());
     let thread_id = request.thread_id;
     let dir = workspace_dir().await.map_err(ThreadsError::Message)?;
+    let store_key = transcript_store_key().await;
 
     crate::web_chat::cancel_chat_scoped(&client_id, &thread_id, None)
         .await
@@ -98,11 +99,13 @@ pub async fn edit_message(request: EditMessageRequest) -> Result<Outcome<Value>,
 
     if let Some(cut_request_id) = &cut_request_id {
         let dir_for_blocking = dir.clone();
+        let store_key_owned = store_key.clone();
         let thread_id_owned = thread_id.clone();
         let cut_request_id_owned = cut_request_id.clone();
         tokio::task::spawn_blocking(move || {
             truncate_transcript_before_turn(
                 &dir_for_blocking,
+                &store_key_owned,
                 &thread_id_owned,
                 &cut_request_id_owned,
             )
@@ -148,6 +151,7 @@ pub async fn regenerate(request: RegenerateRequest) -> Result<Outcome<Value>, Th
     let client_id = request.client_id.unwrap_or_else(|| "system".to_string());
     let thread_id = request.thread_id;
     let dir = workspace_dir().await.map_err(ThreadsError::Message)?;
+    let store_key = transcript_store_key().await;
 
     crate::web_chat::cancel_chat_scoped(&client_id, &thread_id, None)
         .await
@@ -165,11 +169,13 @@ pub async fn regenerate(request: RegenerateRequest) -> Result<Outcome<Value>, Th
     };
 
     let dir_for_blocking = dir.clone();
+    let store_key_for_blocking = store_key.clone();
     let thread_id_for_blocking = thread_id.clone();
     let target_for_blocking = target_request_id.clone();
     let (prompt, cut_request_id) = tokio::task::spawn_blocking(move || {
         truncate_transcript_for_regenerate(
             &dir_for_blocking,
+            &store_key_for_blocking,
             &thread_id_for_blocking,
             target_for_blocking.as_deref(),
         )
@@ -243,6 +249,20 @@ fn resolve_head_transcript(
 ) -> Result<HeadTranscript, String> {
     find_head_transcript(workspace_dir, store_key, thread_id)?
         .ok_or_else(|| format!("thread {thread_id} has no session transcript"))
+}
+
+/// The key the thread's session transcripts are stored under: the chat agent's
+/// store key for the calling tenant, as the session host resolves it. Computed
+/// on the async side because the blocking pool drops the task's context.
+async fn transcript_store_key() -> String {
+    let chat_agent = match crate::config::Config::load_or_init().await {
+        Ok(config) => crate::web_chat::pick_target_agent_id(&config),
+        Err(error) => {
+            log::warn!("[threads][edit] config unavailable for the chat agent id: {error}");
+            "orchestrator".to_string()
+        }
+    };
+    crate::agent::session_store::current_agent_key_or(&chat_agent)
 }
 
 type HeadTranscript = (
