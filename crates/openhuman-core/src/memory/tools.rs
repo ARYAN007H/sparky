@@ -224,7 +224,12 @@ fn parse<T: serde::de::DeserializeOwned>(args: &Value) -> Result<T, String> {
 
 /// Runs one action. Errors become a model-visible tool error, never a hard
 /// failure, so the model can adapt (memory off, unsupported mode, …).
-pub async fn run_action(config: &Config, args: &Value, facts: &CallFacts) -> ToolResult {
+pub async fn run_action(
+    ctx: &DispatchCtx,
+    config: &Config,
+    args: &Value,
+    facts: &CallFacts,
+) -> ToolResult {
     let action = arg_str(args, "action").unwrap_or_default();
     tracing::debug!(action = %action, "[memory:tool] dispatch");
     let result: Result<Value, String> = match action.as_str() {
@@ -236,7 +241,7 @@ pub async fn run_action(config: &Config, args: &Value, facts: &CallFacts) -> Too
                     .await
                     .map(|view| {
                         if let Some(thread_id) = facts.thread_id.as_deref() {
-                            record_turn_citations(thread_id, &view.citations);
+                            record_turn_citations(ctx, thread_id, &view.citations);
                         }
                         BUS.publish(DomainEvent::MemoryRecalled {
                             query: question,
@@ -371,6 +376,7 @@ impl Tool for MemoryTool {
         context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
         let facts = CallFacts::gather(&self.config, context);
+        let dispatch = crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(context);
         let run_id = context
             .and_then(ToolRunContext::host_extension)
             .and_then(|any| any.downcast_ref::<tinyagents_harness::tool::ToolExecutionContext>())
@@ -404,7 +410,7 @@ impl Tool for MemoryTool {
         }
         Ok(self
             .budget
-            .run(run_id, run_action(&self.config, &args, &facts))
+            .run(run_id, run_action(&dispatch, &self.config, &args, &facts))
             .await)
     }
 }
