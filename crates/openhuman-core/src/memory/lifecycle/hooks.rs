@@ -212,7 +212,7 @@ pub async fn pre_turn(
     let dispatch = ctx.clone();
     let identity = identity.clone();
     let thread = input.thread_id.clone();
-    let task = crate::core::runtime::spawn_scoped(async move {
+    let task = ctx.spawn(async move {
         pre_turn_work(&dispatch, &config, &identity, input).await
     });
     let pack = match tokio::time::timeout(timeout, task).await {

@@ -29,7 +29,7 @@ async fn relayed_thread_and_external_authority_survive_scoped_spawn() {
             async {
                 crate::agent::turn_origin::with_origin(origin, async {
                     let (child_thread, child_agent, child_origin) =
-                        crate::core::runtime::spawn_scoped(async {
+                        crate::core::runtime::DispatchCtx::ambient().spawn(async {
                             (
                                 CoreContext::current_channel_thread(),
                                 CoreContext::scoped()

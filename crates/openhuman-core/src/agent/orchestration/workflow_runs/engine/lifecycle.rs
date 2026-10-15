@@ -70,7 +70,7 @@ pub async fn start_workflow_run(
     // Inherit-only: `None` leaves the loop unlabelled and failing closed.
     let inherited_origin = crate::agent::turn_origin::capture();
     let task_ctx = ctx.clone();
-    crate::core::runtime::spawn_scoped(async move {
+    ctx.spawn(async move {
         match crate::config::ops::load_current_or_init(&task_ctx).await {
             Ok(task_config) => {
                 crate::agent::turn_origin::with_inherited_origin(
@@ -221,7 +221,7 @@ pub async fn resume_workflow_run(
     // loop runs on a fresh task, which would otherwise drop the caller's label.
     let inherited_origin = crate::agent::turn_origin::capture();
     let task_ctx = ctx.clone();
-    crate::core::runtime::spawn_scoped(async move {
+    ctx.spawn(async move {
         match crate::config::ops::load_current_or_init(&task_ctx).await {
             Ok(task_config) => {
                 crate::agent::turn_origin::with_inherited_origin(

@@ -75,7 +75,7 @@ where
         elapsed_ms = elapsed_ms(started),
         "[session-runtime] post-commit: turn completion published"
     );
-    let handle = crate::core::runtime::spawn_scoped(async move {
+    let handle = crate::core::runtime::DispatchCtx::ambient().spawn(async move {
         let started = Instant::now();
         tail.await;
         tracing::debug!(

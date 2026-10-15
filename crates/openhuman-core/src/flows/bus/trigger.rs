@@ -232,7 +232,7 @@ impl FlowTriggerSubscriber {
 
         let config = self.config_for_scope(ctx);
         // Scoped: the run keeps the owner's context the handler entered.
-        crate::core::runtime::spawn_scoped(async move {
+        ctx.spawn(async move {
             // Held for the lifetime of the run; released on drop (including
             // on panic) by `InFlightGuard`.
             let _guard = guard;

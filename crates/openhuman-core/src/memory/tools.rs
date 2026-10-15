@@ -391,7 +391,7 @@ impl Tool for MemoryTool {
             let config = self.config.clone();
             let write_args = args.clone();
             let queued_root = facts.reach.at.clone();
-            let queued = crate::core::runtime::spawn_blocking_scoped(move || {
+            let queued = crate::core::runtime::DispatchCtx::ambient().spawn_blocking(move || {
                 super::tool_writes::enqueue(&config, &write_args, &facts)
             })
             .await;

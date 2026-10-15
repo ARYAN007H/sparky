@@ -1,5 +1,5 @@
 use super::*;
-use crate::core::runtime::{spawn_scoped, ContextOverlay, DispatchCtx, DomainSet};
+use crate::core::runtime::{ContextOverlay, DispatchCtx, DomainSet};
 use crate::security::{AutonomyLevel, SecurityPolicy};
 use crate::tools::toolpacks::ToolGroups;
 
@@ -143,7 +143,7 @@ async fn scope_dir_and_agent_id_follow_the_ambient_context() {
 }
 
 #[tokio::test]
-async fn spawn_scoped_keeps_the_agent_context_and_tokio_spawn_does_not() {
+async fn a_context_spawn_keeps_the_agent_context_and_tokio_spawn_does_not() {
     let parent = root("/tmp/agent-scope-spawn");
     let policy = Arc::new(SecurityPolicy {
         autonomy: AutonomyLevel::ReadOnly,
@@ -156,7 +156,7 @@ async fn spawn_scoped_keeps_the_agent_context_and_tokio_spawn_does_not() {
     );
 
     let (scoped, bare) = CoreContext::scope(alpha, async {
-        let scoped = spawn_scoped(async {
+        let scoped = DispatchCtx::ambient().spawn(async {
             (
                 current_agent_id(),
                 DispatchCtx::ambient().agent_policy().map(|p| p.autonomy),
