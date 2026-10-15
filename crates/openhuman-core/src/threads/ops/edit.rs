@@ -42,8 +42,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use tinyagents_session::transcript::{
-    FileTranscriptLocator, SessionRef, SessionTranscript, TranscriptLocator, TranscriptMessage,
-    TranscriptMeta, TruncateCut,
+    SessionRef, SessionTranscript, TranscriptLocator, TranscriptMessage, TranscriptMeta,
+    TruncateCut,
 };
 
 use crate::core::runtime::DispatchCtx;
@@ -51,7 +51,7 @@ use crate::core::Outcome;
 use crate::threads::store::{self as conversations, reply_run_id, run_reply_message_id};
 use crate::threads::ThreadsError;
 
-use super::support::workspace_dir;
+use super::support::{transcript_store, workspace_dir, TranscriptStore};
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -88,6 +88,9 @@ pub async fn edit_message(
     let client_id = request.client_id.unwrap_or_else(|| "system".to_string());
     let thread_id = request.thread_id;
     let dir = workspace_dir().await.map_err(ThreadsError::Message)?;
+    // The request's own tenant picks the store key, so a SaaS profile edits
+    // the transcript its turns were written to.
+    let store = transcript_store(ctx).await.map_err(ThreadsError::Message)?;
 
     crate::web_chat::cancel_chat_scoped(ctx, &client_id, &thread_id, None)
         .await
@@ -101,15 +104,11 @@ pub async fn edit_message(
         .map_err(ThreadsError::Message)?;
 
     if let Some(cut_request_id) = &cut_request_id {
-        let dir_for_blocking = dir.clone();
+        let store_owned = store.clone();
         let thread_id_owned = thread_id.clone();
         let cut_request_id_owned = cut_request_id.clone();
-        tokio::task::spawn_blocking(move || {
-            truncate_transcript_before_turn(
-                &dir_for_blocking,
-                &thread_id_owned,
-                &cut_request_id_owned,
-            )
+        crate::core::runtime::spawn_blocking_scoped(move || {
+            truncate_transcript_before_turn(&store_owned, &thread_id_owned, &cut_request_id_owned)
         })
         .await
         .map_err(|e| ThreadsError::Message(format!("truncate transcript task: {e}")))?
@@ -156,6 +155,9 @@ pub async fn regenerate(
     let client_id = request.client_id.unwrap_or_else(|| "system".to_string());
     let thread_id = request.thread_id;
     let dir = workspace_dir().await.map_err(ThreadsError::Message)?;
+    // The request's own tenant picks the store key, so a SaaS profile edits
+    // the transcript its turns were written to.
+    let store = transcript_store(ctx).await.map_err(ThreadsError::Message)?;
 
     crate::web_chat::cancel_chat_scoped(ctx, &client_id, &thread_id, None)
         .await
@@ -172,12 +174,12 @@ pub async fn regenerate(
         None => None,
     };
 
-    let dir_for_blocking = dir.clone();
+    let store_for_blocking = store.clone();
     let thread_id_for_blocking = thread_id.clone();
     let target_for_blocking = target_request_id.clone();
-    let (prompt, cut_request_id) = tokio::task::spawn_blocking(move || {
+    let (prompt, cut_request_id) = crate::core::runtime::spawn_blocking_scoped(move || {
         truncate_transcript_for_regenerate(
-            &dir_for_blocking,
+            &store_for_blocking,
             &thread_id_for_blocking,
             target_for_blocking.as_deref(),
         )
@@ -240,21 +242,18 @@ async fn next_reply_request_id_after(
         .find_map(|m| reply_run_id(&m.id).map(str::to_string)))
 }
 
-/// Resolve the head generation of `thread_id`'s session transcript: the
-/// `SessionRef`, its locator, and its current content.
+/// Resolve the head generation of `thread_id`'s session transcript in
+/// `store`: the `SessionRef`, its locator, and its current content.
 ///
-/// `find_root_transcript_for_thread` locates *some* root file for the thread
-/// (used only to recover the `agent_id` a fresh [`SessionRef::scoped`]
-/// needs); the actual head — walking any compaction/edit generations already
-/// on disk — is then resolved through the locator itself
-/// (`TranscriptLocator::head_generation`), never by trusting file-name sort
-/// order (`tinyagents_session::transcript::view`'s resolver module doc explains why that
-/// is unsafe: `.g1` sorts before the un-suffixed root).
+/// The thread's newest root (`TranscriptLocator::root_for_thread`) only
+/// recovers the `agent_id` a fresh [`SessionRef::scoped`] needs; the actual
+/// head — walking any compaction/edit generations already written — is then
+/// resolved through the locator itself (`TranscriptLocator::head_generation`).
 fn resolve_head_transcript(
-    workspace_dir: &std::path::Path,
+    store: &TranscriptStore,
     thread_id: &str,
 ) -> Result<HeadTranscript, String> {
-    find_head_transcript(workspace_dir, thread_id)?
+    find_head_transcript(store, thread_id)?
         .ok_or_else(|| format!("thread {thread_id} has no session transcript"))
 }
 
@@ -267,29 +266,30 @@ type HeadTranscript = (
 /// [`resolve_head_transcript`], answering `Ok(None)` when the thread has never
 /// written a session transcript. Read and resolve failures still error.
 fn find_head_transcript(
-    workspace_dir: &std::path::Path,
+    store: &TranscriptStore,
     thread_id: &str,
 ) -> Result<Option<HeadTranscript>, String> {
-    let Some(root_path) =
-        tinyagents_session::transcript::find_root_transcript_for_thread(workspace_dir, thread_id)
-    else {
+    // The same store the session host writes the thread's turns to: the
+    // installed provider, else the workspace's driver-backed store, under the
+    // key the caller resolved from the request. No transcript file is named.
+    let locator = store.locator();
+    let Some(root) = locator.root_for_thread(thread_id) else {
         log::debug!("[threads][edit] thread {thread_id} has no session transcript");
         return Ok(None);
     };
-    let root_transcript = tinyagents_session::transcript::read_transcript(&root_path)
-        .map_err(|e| format!("read root transcript for thread {thread_id}: {e}"))?;
+    let root_transcript = root
+        .read_session()
+        .map_err(|e| format!("read root transcript for thread {thread_id}: {e}"))?
+        .ok_or_else(|| format!("root transcript for thread {thread_id} vanished while reading"))?;
     let agent_id = root_transcript.meta.agent_id.clone().unwrap_or_default();
     let session_root = SessionRef::scoped(thread_id, agent_id);
-    let locator: std::sync::Arc<dyn TranscriptLocator> =
-        std::sync::Arc::new(FileTranscriptLocator::new(workspace_dir.to_path_buf()));
     let head = locator.head_generation(&session_root);
-    let head_path = tinyagents_session::transcript::resolve_keyed_transcript_path(
-        workspace_dir,
-        &tinyagents_session::transcript::session_stem(&head),
-    )
-    .map_err(|e| format!("resolve head transcript path for thread {thread_id}: {e}"))?;
-    let head_transcript = tinyagents_session::transcript::read_transcript(&head_path)
-        .map_err(|e| format!("read head transcript for thread {thread_id}: {e}"))?;
+    let head_transcript = locator
+        .read_session_transcript(&head)
+        .ok_or_else(|| format!("head transcript for thread {thread_id} is missing"))?
+        .read_session()
+        .map_err(|e| format!("read head transcript for thread {thread_id}: {e}"))?
+        .ok_or_else(|| format!("head transcript for thread {thread_id} vanished while reading"))?;
     Ok(Some((head, locator, head_transcript)))
 }
 
@@ -314,11 +314,11 @@ fn truncation_seed(head: &SessionRef, current: &TranscriptMeta) -> TranscriptMet
 /// everything after — backs `edit_message`'s correlation-through-next-reply
 /// path.
 fn truncate_transcript_before_turn(
-    workspace_dir: &std::path::Path,
+    store: &TranscriptStore,
     thread_id: &str,
     request_id: &str,
 ) -> Result<(), String> {
-    let (head, locator, transcript) = resolve_head_transcript(workspace_dir, thread_id)?;
+    let (head, locator, transcript) = resolve_head_transcript(store, thread_id)?;
     let cut_index = transcript
         .messages
         .iter()
@@ -338,13 +338,13 @@ fn truncate_transcript_before_turn(
 /// dropped turn's `request_id`, or `Ok(None)` when the thread has no turn to
 /// regenerate (no transcript yet, or an empty one).
 fn truncate_transcript_for_regenerate(
-    workspace_dir: &std::path::Path,
+    store: &TranscriptStore,
     thread_id: &str,
     target_request_id: Option<&str>,
 ) -> Result<Option<(String, String)>, String> {
     // Sentry TAURI-REACT-AK: a thread that never wrote a transcript has no turn
     // to regenerate — the caller turns `None` into that friendly error.
-    let Some((head, locator, transcript)) = find_head_transcript(workspace_dir, thread_id)? else {
+    let Some((head, locator, transcript)) = find_head_transcript(store, thread_id)? else {
         return Ok(None);
     };
     let cut = match target_request_id {

@@ -171,6 +171,17 @@ pub(super) fn model(responses: Vec<ModelResponse>, native: bool) -> Arc<Scripted
     }))
 }
 
+/// These suites pin the classic JSONL transcript format and its resume
+/// behaviour, so their hosts write through the file locator explicitly (the
+/// default for a host with no session store is the workspace's driver store).
+pub(super) fn file_locator(
+    root: &Path,
+) -> Arc<dyn tinyagents_session::transcript::TranscriptLocator> {
+    Arc::new(tinyagents_session::transcript::FileTranscriptLocator::new(
+        root.join("workspace"),
+    ))
+}
+
 pub(super) fn build_host(
     root: &Path,
     model: Arc<ScriptedModel>,
@@ -179,6 +190,7 @@ pub(super) fn build_host(
 ) -> crate::agent::OpenHumanSessionHost {
     let chat_model: Arc<dyn ChatModel<()>> = model;
     let builder = crate::agent::SessionHostBuilder::new()
+        .with_session_history_locator(file_locator(root))
         .chat_model(chat_model)
         .tools(tools())
         .workspace_dir(root.join("workspace"))
@@ -623,6 +635,7 @@ fn assert_retired_tool_replay(identity_bound: bool) {
         );
         let chat_model: Arc<dyn ChatModel<()>> = first_model;
         let mut first = crate::agent::SessionHostBuilder::new()
+            .with_session_history_locator(file_locator(root.path()))
             .chat_model(chat_model)
             .tools(vec![Box::new(ArchivedAudioTool)])
             .permanent_tool_names(std::collections::HashSet::from([RETIRED.to_string()]))
@@ -661,6 +674,7 @@ fn assert_retired_tool_replay(identity_bound: bool) {
         } else {
             let chat_model: Arc<dyn ChatModel<()>> = next.clone();
             crate::agent::SessionHostBuilder::new()
+                .with_session_history_locator(file_locator(root.path()))
                 .chat_model(chat_model)
                 .tools(tools())
                 .workspace_dir(workspace.clone())
