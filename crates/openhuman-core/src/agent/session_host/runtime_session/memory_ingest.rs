@@ -164,6 +164,7 @@ impl OpenHumanTurnPrelude {
             identity,
             thread_id,
             pack,
+            core: self.host_env.core.clone(),
         }))
     }
 

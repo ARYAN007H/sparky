@@ -151,6 +151,18 @@ pub struct MemoryTurn {
     pub thread_id: String,
     /// The pack the turn was given, if any.
     pub pack: Option<TurnPack>,
+    /// The context the turn runs under, held weakly so a finished tenant's
+    /// lease is not kept alive by a lingering turn handle.
+    pub core: Option<std::sync::Weak<crate::core::runtime::CoreContext>>,
+}
+
+impl MemoryTurn {
+    /// The dispatch context the turn's memory work runs under: its own, else
+    /// the calling task's.
+    #[must_use]
+    pub fn dispatch_ctx(&self) -> crate::core::runtime::DispatchCtx {
+        crate::core::runtime::DispatchCtx::from_weak(self.core.as_ref())
+    }
 }
 
 /// What the agent loop knows before the model runs.
