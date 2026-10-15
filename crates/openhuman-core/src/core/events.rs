@@ -882,7 +882,7 @@ pub enum DomainEvent {
         toolkit: String,
         connection_id: String,
         connect_url: String,
-        /// The tenant owns the connection; `None` for the host's own.
+        /// The tenant that owns the connection; `None` for the host's own.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         tenant: Option<crate::core::runtime::Tenant>,
     },
