@@ -73,7 +73,7 @@ use tinyagents_harness::Result as TaResult;
 use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse, ModelStream};
 
 use crate::config::Config;
-use crate::inference::provider::{create_chat_model_with_model_id, role_for_model_tier};
+use crate::inference::provider::{create_chat_model_with_model_id_in, role_for_model_tier};
 
 /// The workload roles `provider_for_role` understands **and** that name a
 /// chat-shaped model.
@@ -278,6 +278,7 @@ impl OpenHumanModelResolver {
             config,
             temperature,
             cache: Mutex::new(HashMap::new()),
+            dispatch: None,
         }
     }
 

@@ -220,6 +220,7 @@ async fn derivative_cache_survives_model_recreation_and_invalidates_changed_cont
         config: config.clone(),
         profile: ModelProfile::default(),
         fallback_cache: Mutex::new(Default::default()),
+        core: None,
     };
     let first = make();
     let scope = super::super::AttachmentAccessScope::default();
@@ -268,6 +269,7 @@ async fn cache_is_not_written_beside_unmanaged_local_files() {
         config: Arc::new(config),
         profile: ModelProfile::default(),
         fallback_cache: Mutex::new(Default::default()),
+        core: None,
     };
     model
         .save_fallback(
@@ -665,6 +667,7 @@ async fn pdf_attachment_degrades_to_a_note_when_documents_component_is_off() {
         config: Arc::new(config),
         profile: ModelProfile::default(),
         fallback_cache: Mutex::new(Default::default()),
+        core: None,
     };
     let (text, cacheable) = model
         .fallback(
