@@ -416,6 +416,8 @@ pub fn attach_socketio() -> (socketioxide::layer::SocketIoLayer, SocketIo) {
 
                     // Trigger the web channel's chat logic.
                     match crate::core_host::web_chat::start_chat(
+                        // Outside SaaS the host's one context; in SaaS the socket task's own scope.
+                        &crate::core_host::core::runtime::DispatchCtx::host_default(),
                         &client_id,
                         &payload.thread_id,
                         &payload.message,

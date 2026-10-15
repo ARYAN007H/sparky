@@ -118,6 +118,7 @@ async fn delegation_rejects_malformed_explicit_paths_and_external_reads_before_c
 
 async fn thread_in(config: &Config, id: &str, working_dir: Option<&Path>) {
     crate::threads::store::blocking::ensure_thread(
+        crate::core::runtime::DispatchCtx::ambient(),
         config.workspace_dir.clone(),
         crate::threads::store::CreateConversationThread {
             id: id.into(),

@@ -1,6 +1,7 @@
 //! Captured host conversation and session state supplied to the channel module.
 
 use crate::channels::context::{clear_sender_history, ChannelRuntimeContext};
+use crate::core::runtime::DispatchCtx;
 use crate::threads::store::{self as conversations, CreateConversationThread};
 
 /// Serves product-owned conversation state to the captured module runtime.
@@ -18,8 +19,11 @@ pub(crate) async fn dispatch_callback(
     }
     match request {
         Request::ListThreads => {
-            let threads = conversations::list_threads(ctx.workspace_dir.to_path_buf())
-                .map_err(|_| tinybus::Error::failed("conversation state unavailable"))?;
+            let threads = conversations::list_threads(
+                &DispatchCtx::ambient(),
+                ctx.workspace_dir.to_path_buf(),
+            )
+            .map_err(|_| tinybus::Error::failed("conversation state unavailable"))?;
             Ok(Response::Threads(
                 threads
                     .into_iter()
@@ -39,6 +43,7 @@ pub(crate) async fn dispatch_callback(
                 return Err(tinybus::Error::failed("channel session ended"));
             }
             conversations::ensure_thread(
+                &DispatchCtx::ambient(),
                 ctx.workspace_dir.to_path_buf(),
                 CreateConversationThread {
                     id: thread.id,

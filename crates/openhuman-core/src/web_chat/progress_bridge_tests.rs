@@ -115,6 +115,7 @@ async fn tool_call_completed_forwards_real_output_on_tool_result() {
         store,
         ChatRequestMetadata::default(),
         config,
+        crate::core::runtime::DispatchCtx::ambient(),
     );
 
     tx.send(crate::agent::progress::AgentProgress::ToolCallCompleted {
@@ -227,6 +228,7 @@ fn spawn_test_bridge(
         store,
         ChatRequestMetadata::default(),
         Config::default(),
+        crate::core::runtime::DispatchCtx::ambient(),
     );
     tx
 }
@@ -422,6 +424,7 @@ async fn wait_drained_returns_after_queued_events_are_forwarded() {
         store,
         ChatRequestMetadata::default(),
         drain_test_config(&tmp),
+        crate::core::runtime::DispatchCtx::ambient(),
     );
 
     tx.send(AgentProgress::ToolCallCompleted {
@@ -479,6 +482,7 @@ async fn wait_drained_is_bounded_when_the_turn_never_completes() {
         store,
         ChatRequestMetadata::default(),
         drain_test_config(&tmp),
+        crate::core::runtime::DispatchCtx::ambient(),
     );
     assert!(!handle.wait_drained(Duration::from_millis(50)).await);
     // Closing the channel ends the bridge, which counts as drained.
@@ -504,6 +508,7 @@ async fn short_narration_is_flushed_on_the_rounds_first_tool_call() {
         store,
         ChatRequestMetadata::default(),
         drain_test_config(&tmp),
+        crate::core::runtime::DispatchCtx::ambient(),
     );
     tx.send(AgentProgress::TextDelta {
         delta: "Let me check.".into(),
@@ -700,6 +705,7 @@ async fn hold_text_stream_suppresses_text_delta_but_keeps_interim() {
             ..Default::default()
         },
         config,
+        crate::core::runtime::DispatchCtx::ambient(),
     );
 
     tx.send(AgentProgress::TextDelta {

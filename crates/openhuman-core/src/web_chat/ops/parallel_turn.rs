@@ -27,6 +27,7 @@ use super::turn_guards::{
 /// can render it as an interleaved branch.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn spawn_parallel_turn(
+    ctx: &crate::core::runtime::DispatchCtx,
     client_id: &str,
     thread_id: &str,
     request_id: String,
@@ -47,6 +48,7 @@ pub(crate) async fn spawn_parallel_turn(
     let map_key = key_for(&request_id);
     let map_key_task = map_key.clone();
     let user_message = message.to_string();
+    let ctx_task = ctx.clone();
     // Forked turns don't participate in the steer/followup/collect queue, but
     // `run_chat_task` requires a queue handle — give each its own.
     let run_queue = Arc::new(RunQueue::new());
@@ -64,11 +66,13 @@ pub(crate) async fn spawn_parallel_turn(
                 request_id: Some(request_id_task.clone()),
             };
             let result = run_turn_under_cancel_and_deadline(
+                &ctx_task,
                 task_cancel_token,
                 origin.clone(),
                 approval_ctx,
                 |host_env, activity, approval| {
                     run_chat_task(
+                        &ctx_task,
                         &client_id_task,
                         &thread_id_task,
                         &request_id_task,
@@ -91,6 +95,7 @@ pub(crate) async fn spawn_parallel_turn(
             match result {
                 Some(Ok(chat_result)) => {
                     crate::web_chat::presentation::deliver_response(
+                        &ctx_task,
                         &client_id_task,
                         &thread_id_task,
                         &request_id_task,

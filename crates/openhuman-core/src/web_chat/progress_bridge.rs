@@ -279,6 +279,7 @@ pub(crate) fn spawn_progress_bridge(
     turn_state_store: std::sync::Arc<dyn TurnStates>,
     metadata: ChatRequestMetadata,
     config: crate::config::Config,
+    dispatch_ctx: crate::core::runtime::DispatchCtx,
 ) -> ProgressBridgeHandle {
     use crate::agent::progress::AgentProgress;
     use std::collections::HashMap;
@@ -1164,6 +1165,7 @@ pub(crate) fn spawn_progress_bridge(
             let live_spans = collector.spans().to_vec();
             let journal_export = if let Some(trace_ctx) = journal_trace_ctx.take() {
                 super::journal_shadow::shadow_compare_journal_projection(
+                    &dispatch_ctx,
                     &request_id,
                     trace_ctx.clone(),
                     parent_max_iterations,

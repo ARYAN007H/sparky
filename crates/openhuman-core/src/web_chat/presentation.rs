@@ -47,6 +47,7 @@ fn usage_payload(usage: Option<&LastTurnUsage>) -> Option<TurnUsagePayload> {
 /// (#6034). Pass `None` from a caller that has no workspace in scope; delivery
 /// then behaves exactly as it did when the renderer was the only writer.
 pub(crate) async fn deliver_response(
+    ctx: &crate::core::runtime::DispatchCtx,
     client_id: &str,
     thread_id: &str,
     request_id: &str,
@@ -59,6 +60,7 @@ pub(crate) async fn deliver_response(
     suggest_follow_ups: bool,
 ) {
     persist_reply(
+        ctx,
         thread_id,
         request_id,
         full_response,
@@ -67,6 +69,7 @@ pub(crate) async fn deliver_response(
     )
     .await;
     announce_reply(
+        ctx,
         client_id,
         thread_id,
         request_id,
@@ -84,6 +87,7 @@ pub(crate) async fn deliver_response(
 /// painted costs the user a repaint, not the reply. A storage failure is
 /// logged and never blocks the announcement. `None` stores nothing.
 pub(crate) async fn persist_reply(
+    ctx: &crate::core::runtime::DispatchCtx,
     thread_id: &str,
     request_id: &str,
     full_response: &str,
@@ -96,7 +100,8 @@ pub(crate) async fn persist_reply(
         // work that has no business holding a runtime worker while a turn
         // is settling. Hand it to the blocking pool and await the handle,
         // which keeps the ordering this whole change rests on.
-        let (dir, thread, request, reply, cites) = (
+        let (dctx, dir, thread, request, reply, cites) = (
+            ctx.clone(),
             dir.to_path_buf(),
             thread_id.to_string(),
             request_id.to_string(),
@@ -105,7 +110,7 @@ pub(crate) async fn persist_reply(
         );
         let persisted = tokio::task::spawn_blocking(move || {
             super::reply_persistence::persist_delivered_reply(
-                &dir, &thread, &request, &reply, &cites,
+                &dctx, &dir, &thread, &request, &reply, &cites,
             )
         })
         .await;
@@ -136,6 +141,7 @@ pub(crate) async fn persist_reply(
 /// `chat_done`, then (for the main chat turn) the follow-up suggestions.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn announce_reply(
+    ctx: &crate::core::runtime::DispatchCtx,
     client_id: &str,
     thread_id: &str,
     request_id: &str,
@@ -160,6 +166,7 @@ pub(crate) fn announce_reply(
     );
     if suggest_follow_ups {
         super::suggestions::spawn_follow_up_suggestions(
+            ctx.clone(),
             client_id.to_string(),
             thread_id.to_string(),
             request_id.to_string(),

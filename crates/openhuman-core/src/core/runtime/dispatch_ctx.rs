@@ -65,6 +65,19 @@ impl DispatchCtx {
         Self { core }
     }
 
+    /// The context for work that arrives with none of its own: a bus event, a
+    /// module host callback, a shutdown hook. Outside SaaS that is the process
+    /// default, the one context a single-user host has. In SaaS it is the
+    /// task's own tenant scope only, so work that lost its tenant fails closed
+    /// instead of acting as the operator.
+    pub fn host_default() -> Self {
+        if super::is_saas() {
+            Self::ambient()
+        } else {
+            Self::process_default()
+        }
+    }
+
     /// The context readers act under: the bound one, else (outside SaaS) the
     /// process default, else none.
     ///
@@ -78,6 +91,13 @@ impl DispatchCtx {
             None if super::is_saas() => None,
             None => CoreContext::default_context(),
         }
+    }
+
+    /// The tenant this call acts for: the resolved context's profile and
+    /// agent. Outside SaaS an unresolved context is the default tenant; in SaaS
+    /// it is [`NoTenant`](super::NoTenant), so the caller fails closed.
+    pub fn tenant(&self) -> Result<super::Tenant, super::NoTenant> {
+        super::tenant::tenant_in(super::is_saas(), self.resolved().as_deref())
     }
 
     /// The configuration an embedder supplied for the context this call runs

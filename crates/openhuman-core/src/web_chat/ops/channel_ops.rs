@@ -230,6 +230,7 @@ async fn thread_has_live_turn(thread_id: &str, map_key: &str) -> bool {
 }
 
 pub async fn channel_web_chat(
+    ctx: &crate::core::runtime::DispatchCtx,
     client_id: &str,
     thread_id: &str,
     message: &str,
@@ -261,6 +262,7 @@ pub async fn channel_web_chat(
     }
 
     let result = start_chat(
+        ctx,
         client_id,
         thread_id,
         message,

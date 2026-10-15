@@ -134,7 +134,7 @@ pub(crate) async fn flows_build_with_extra_hidden_tools(
     // `propose_workflow` tool result the frontend renders as a proposal card.
     // Best-effort — with no target the run stays headless (CLI / tests).
     if let Some(target) = &stream {
-        attach_flow_progress_bridge(&mut agent, target, "flows_build", config);
+        attach_flow_progress_bridge(ctx, &mut agent, target, "flows_build", config);
     }
 
     // Run to completion, bounded by a wall-clock timeout. PR3

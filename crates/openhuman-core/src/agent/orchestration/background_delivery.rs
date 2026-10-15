@@ -366,12 +366,15 @@ async fn try_deliver(thread_id: String, fence: DrainFence) {
     };
     let router = background_completions::router_for_workspace(&workspace_dir);
     let turn_workspace = workspace_dir.clone();
+    // A drain is event-driven and carries no context of its own.
+    let ctx = crate::core::runtime::DispatchCtx::host_default();
     let retry_after = try_deliver_with(
         thread_id.clone(),
         router,
         move |thread_id, notice| {
             let workspace_dir = turn_workspace.clone();
-            async move { run_system_turn_on_thread(workspace_dir, thread_id, notice).await }
+            let ctx = ctx.clone();
+            async move { run_system_turn_on_thread(&ctx, workspace_dir, thread_id, notice).await }
         },
         move |thread_id, notice| async move {
             persist_undelivered(workspace_dir, thread_id, notice).await
@@ -630,12 +633,14 @@ impl Drop for DeliverySlot {
 /// later cold-boot resume would prefer — which is how a restart used to drop
 /// every turn before the delivery notice.
 async fn run_system_turn_on_thread(
+    ctx: &crate::core::runtime::DispatchCtx,
     workspace_dir: PathBuf,
     thread_id: String,
     prompt: String,
 ) -> Result<String, String> {
     let run_id = format!("bgdeliver-{}", uuid::Uuid::new_v4());
     let result = crate::web_chat::run_system_turn_on_thread(
+        ctx,
         &thread_id,
         &run_id,
         &prompt,
@@ -711,17 +716,14 @@ fn persist_delivery_reply(
     success: bool,
 ) -> Result<(), String> {
     crate::threads::store::append_message(
+        &crate::core::runtime::DispatchCtx::ambient(),
         workspace_dir,
         thread_id,
         crate::threads::store::ConversationMessage {
             id: crate::threads::store::run_reply_message_id(run_id),
             content,
             message_type: "text".to_string(),
-            extra_metadata: json!({
-                "scope": "background_delivery",
-                "success": success,
-                "requestId": run_id,
-            }),
+            extra_metadata: json!({"scope": "background_delivery", "success": success, "requestId": run_id}),
             sender: "agent".to_string(),
             created_at: chrono::Utc::now().to_rfc3339(),
         },
