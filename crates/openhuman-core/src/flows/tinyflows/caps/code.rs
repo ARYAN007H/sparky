@@ -148,7 +148,7 @@ impl CodeRunner for OpenHumanCode {
                 "[flows] code: running sandboxed script"
             );
 
-            execute_in_sandbox(&DispatchCtx::ambient(), 
+            execute_in_sandbox(&DispatchCtx::ambient(),
                 &policy,
                 &command,
                 &self.config.action_dir,
