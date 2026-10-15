@@ -218,11 +218,11 @@ pub fn gate_verdict_with(tool: &str, groups: &[SaasToolGroup]) -> Result<(), Str
 }
 
 /// [`gate_verdict_with`] for the running deployment.
-pub fn gate_verdict(tool: &str) -> Result<(), String> {
+pub fn gate_verdict(ctx: &crate::core::runtime::DispatchCtx, tool: &str) -> Result<(), String> {
     let verdict = if super::capabilities::ProfileCapabilities::current()
         .is_some_and(|caps| caps.authorizes_approval(tool))
     {
-        super::host::ensure_hosted()
+        super::host::ensure_hosted(ctx)
     } else {
         gate_verdict_with(tool, &allowlisted())
     };

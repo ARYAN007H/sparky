@@ -189,7 +189,7 @@ async fn start_chat_inner(
     }
     // A profile this node no longer hosts (its lease was lost or released)
     // starts no new turn here. No-op outside SaaS.
-    crate::profiles::host::ensure_hosted().map_err(StartChatError::Other)?;
+    crate::profiles::host::ensure_hosted(ctx).map_err(StartChatError::Other)?;
 
     // Save originals before scanning, history, memory, or queue persistence.
     // A missing config/root cannot safely accept an upload.
