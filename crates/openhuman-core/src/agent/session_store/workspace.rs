@@ -38,6 +38,7 @@ pub fn release_workspace_defaults() {
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
         .clear();
+    super::release_workspace_stores();
     crate::storage::local::release_all();
 }
 

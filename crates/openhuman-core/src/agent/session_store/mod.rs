@@ -14,7 +14,8 @@
 //! OpenHuman runs one runtime per process. With nothing installed, the core
 //! keeps today's on-disk layout.
 
-use std::sync::{Arc, LazyLock, PoisonError, RwLock};
+use std::collections::HashMap;
+use std::sync::{Arc, LazyLock, Mutex, PoisonError, RwLock};
 
 use tinyagents_session::port::{AgentStores, SessionStoreProvider};
 use tinyagents_session::transcript::agent_transcript_root;
@@ -139,6 +140,20 @@ pub fn transcripts_or_files(
     transcripts_for(agent_id).unwrap_or_else(|| workspace_transcripts(agent_id, workspace_dir))
 }
 
+/// The workspace stores this process holds open, so repeat lookups share one
+/// backend ([`release_workspace_stores`] drops them for a data reset).
+static OPEN_WORKSPACE_STORES: LazyLock<
+    Mutex<HashMap<(std::path::PathBuf, String), tinyagents_session::port::WorkspaceStores>>,
+> = LazyLock::new(Mutex::default);
+
+/// Drops the workspace transcript stores held open by [`workspace_transcripts`].
+pub fn release_workspace_stores() {
+    OPEN_WORKSPACE_STORES
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .clear();
+}
+
 /// `agent_id`'s transcripts for a host that only has a workspace directory:
 /// TinyAgents' `WorkspaceStores` (the driver ports over a SQLite store under
 /// the workspace). It imports the workspace's classic `session_raw/*.jsonl`
@@ -151,13 +166,22 @@ pub fn workspace_transcripts(
     agent_id: &str,
     workspace_dir: &std::path::Path,
 ) -> Arc<dyn tinyagents_session::transcript::TranscriptLocator> {
+    let key = (workspace_dir.to_path_buf(), agent_id.to_string());
+    let mut open = OPEN_WORKSPACE_STORES
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
+    if let Some(stores) = open.get(&key) {
+        return stores.transcripts();
+    }
     match tinyagents_session::port::WorkspaceStores::open(workspace_dir, agent_id) {
         Ok(stores) => {
             log::debug!(
                 "[session_store] transcripts via the workspace store agent={agent_id} import={:?}",
                 stores.import_outcome()
             );
-            stores.transcripts()
+            let transcripts = stores.transcripts();
+            open.insert(key, stores);
+            transcripts
         }
         Err(error) => {
             log::error!(
