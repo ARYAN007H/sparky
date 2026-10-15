@@ -631,6 +631,11 @@ async fn saas_controls_follow_the_explicit_context_not_the_tasks_scope() {
         .iter()
         .all(|worker| worker.task_id != a_task));
 
+    assert!(
+        cancel_by_task(&alice, &b_task).is_none(),
+        "alice cannot cancel bob's worker"
+    );
+
     // Concurrent, across awaits, and from spawned tasks: each carries its own.
     let spawned = |ctx: DispatchCtx, task: String| {
         tokio::spawn(async move {
@@ -645,10 +650,14 @@ async fn saas_controls_follow_the_explicit_context_not_the_tasks_scope() {
         spawned(alice.clone(), a_task.clone()),
         spawned(bob.clone(), b_task.clone())
     );
-    assert_eq!(a_side.unwrap(), (true, true), "alice reaches her own worker");
+    assert_eq!(
+        a_side.unwrap(),
+        (true, true),
+        "alice reaches her own worker"
+    );
     assert_eq!(b_side.unwrap(), (true, true), "bob reaches his own worker");
     assert!(
-        cancel_by_task(&alice, &b_task).is_none(),
-        "and each cancel removed only that profile's worker"
+        resume_ref_for_task(&alice, &a_task, PARENT).is_err(),
+        "each cancel removed only that profile's worker, and it is gone"
     );
 }
