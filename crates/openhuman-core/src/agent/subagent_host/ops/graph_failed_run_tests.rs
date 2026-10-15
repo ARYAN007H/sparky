@@ -140,16 +140,15 @@ async fn failed_subagent_run_keeps_its_unanswered_round_out_of_history() {
 
     // Two model calls were answered before the rejection; the recorded
     // iteration must say so rather than count persisted messages.
-    let raw = std::fs::read_to_string(&path).expect("raw transcript");
-    let marker_line = raw
-        .lines()
-        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
-        .rfind(|line| line.get("role").and_then(|role| role.as_str()) == Some("assistant"))
-        .expect("failure marker line");
+    let iteration = persisted
+        .messages
+        .last()
+        .and_then(|marker| marker.turn_usage.as_ref())
+        .map(|usage| usage.iteration);
     assert_eq!(
-        marker_line.get("iteration").and_then(|n| n.as_u64()),
+        iteration,
         Some(2),
-        "the failed run reports the model calls a provider answered: {marker_line}"
+        "the failed run reports the model calls a provider answered"
     );
 }
 
