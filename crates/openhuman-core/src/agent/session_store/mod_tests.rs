@@ -75,8 +75,27 @@ async fn without_a_store_transcripts_come_from_the_workspace_store_not_files() {
         Some(dir.join("session_raw").to_string_lossy().into_owned()),
         "the file layout is no longer a transcript destination"
     );
-    // The same workspace and agent resolve to the same destination.
-    assert_eq!(transcripts_or_files("u1", dir).destination_key(), key);
+    // A transcript written through one lookup is visible through the next:
+    // both resolve to the same durable workspace store.
+    let session = tinyagents_session::transcript::SessionRef::scoped("t1", "u1");
+    let meta = tinyagents_session::transcript::TranscriptMeta {
+        agent_name: "u1".into(),
+        agent_id: Some("u1".into()),
+        thread_id: Some("t1".into()),
+        ..Default::default()
+    };
+    let history = locator
+        .open_stem(&tinyagents_session::transcript::session_stem(&session), meta)
+        .expect("open the session's write handle");
+    history
+        .append_turn(
+            &[],
+            &[tinyagents_session::transcript::TranscriptMessage::user("hi")],
+            None,
+            None,
+        )
+        .expect("append a turn");
+    assert!(transcripts_or_files("u1", dir).session_exists(&session));
     assert!(
         dir.join(tinyagents_session::port::STORE_DIR).is_dir(),
         "the workspace store lives under the workspace"
