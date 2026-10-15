@@ -44,6 +44,29 @@ fn read_stem(
 }
 
 #[test]
+fn a_subagent_writes_to_its_turn_trees_store_else_its_contexts() {
+    let workspace = tempfile::tempdir().unwrap();
+    let tree = crate::agent::session_store::transcripts_or_files("tree-key", workspace.path());
+    let mut run_context = crate::agent::tinyagents::host::OpenHumanRunContext::new();
+    run_context.transcripts = Some(tree.clone());
+    let chosen = super::transcript::subagent_transcripts(&run_context, workspace.path());
+    assert!(Arc::ptr_eq(&chosen, &tree), "the root session's store is used as is");
+
+    // No session handed a store over: the default agent's store of the run's
+    // (here unbound, desktop) tenant.
+    let unbound = crate::agent::tinyagents::host::OpenHumanRunContext::new();
+    let fallback = super::transcript::subagent_transcripts(&unbound, workspace.path());
+    assert_eq!(
+        fallback.destination_key(),
+        crate::agent::session_store::transcripts_or_files(
+            crate::agent::session_store::DEFAULT_AGENT,
+            workspace.path()
+        )
+        .destination_key()
+    );
+}
+
+#[test]
 fn subagent_transcript_keeps_cumulative_spend_separate_from_unknown_last_call() {
     let workspace = tempfile::tempdir().unwrap();
     let locator = crate::agent::session_store::transcripts_or_files("orchestrator", workspace.path());
