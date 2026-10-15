@@ -106,7 +106,7 @@ impl TriggerSink for HostTriggers {
                 // `[components] flows = false`: schedule-triggered flows stop
                 // while agent, shell and system jobs keep running. The tick is
                 // answered, not retried, so the row's recurrence moves on.
-                if !flows_component_enabled() {
+                if !self.binding.dispatch_ctx().components().flows {
                     tracing::debug!(
                         target: "flows",
                         %flow_id,
@@ -144,12 +144,6 @@ impl TriggerSink for HostTriggers {
             })
             .await
     }
-}
-
-/// Whether `[components] flows` is on in the ambient context. No context
-/// means nothing narrowed it.
-fn flows_component_enabled() -> bool {
-    crate::core::runtime::CoreContext::current().is_none_or(|ctx| ctx.components().flows)
 }
 
 /// A host-owned system job (`system:<name>`): announced on the bus, then its
