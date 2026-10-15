@@ -313,12 +313,19 @@ pub fn ensure_thread(
 }
 
 /// Free-function shim around [`ConversationStore::list_threads`].
-pub fn list_threads(ctx: &DispatchCtx, workspace_dir: PathBuf) -> Result<Vec<ConversationThread>, String> {
+pub fn list_threads(
+    ctx: &DispatchCtx,
+    workspace_dir: PathBuf,
+) -> Result<Vec<ConversationThread>, String> {
     store(ctx, workspace_dir).list_threads()
 }
 
 /// Free-function shim around [`ConversationStore::get_messages`].
-pub fn get_messages(ctx: &DispatchCtx, workspace_dir: PathBuf, thread_id: &str) -> Result<Vec<ThreadMessage>, String> {
+pub fn get_messages(
+    ctx: &DispatchCtx,
+    workspace_dir: PathBuf,
+    thread_id: &str,
+) -> Result<Vec<ThreadMessage>, String> {
     store(ctx, workspace_dir).get_messages(thread_id)
 }
 
@@ -387,7 +394,10 @@ pub fn delete_messages_from(
 }
 
 /// Free-function shim around [`ConversationStore::purge_threads`].
-pub fn purge_threads(ctx: &DispatchCtx, workspace_dir: PathBuf) -> Result<ConversationPurgeStats, String> {
+pub fn purge_threads(
+    ctx: &DispatchCtx,
+    workspace_dir: PathBuf,
+) -> Result<ConversationPurgeStats, String> {
     store(ctx, workspace_dir).purge_threads()
 }
 

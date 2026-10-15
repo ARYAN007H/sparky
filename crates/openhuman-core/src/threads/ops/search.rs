@@ -6,8 +6,8 @@
 //! message, so a broad query never ships every long transcript to the UI.
 
 use super::crud::transcript_search;
-use crate::core::runtime::DispatchCtx;
 use super::support::envelope;
+use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
 use crate::threads::ApiEnvelope;
 

@@ -98,8 +98,14 @@ pub async fn ensure_thread(
 }
 
 /// [`store::list_threads`] on the blocking pool.
-pub async fn list_threads(ctx: DispatchCtx, workspace_dir: PathBuf) -> Result<Vec<ConversationThread>, String> {
-    run("list_threads", move || store::list_threads(&ctx, workspace_dir)).await
+pub async fn list_threads(
+    ctx: DispatchCtx,
+    workspace_dir: PathBuf,
+) -> Result<Vec<ConversationThread>, String> {
+    run("list_threads", move || {
+        store::list_threads(&ctx, workspace_dir)
+    })
+    .await
 }
 
 /// [`store::get_messages`] on the blocking pool.
@@ -210,8 +216,14 @@ pub async fn delete_thread(
 }
 
 /// [`store::purge_threads`] on the blocking pool.
-pub async fn purge_threads(ctx: DispatchCtx, workspace_dir: PathBuf) -> Result<ConversationPurgeStats, String> {
-    run("purge_threads", move || store::purge_threads(&ctx, workspace_dir)).await
+pub async fn purge_threads(
+    ctx: DispatchCtx,
+    workspace_dir: PathBuf,
+) -> Result<ConversationPurgeStats, String> {
+    run("purge_threads", move || {
+        store::purge_threads(&ctx, workspace_dir)
+    })
+    .await
 }
 
 /// [`ConversationStore::search_cross_thread_messages`] on the blocking pool.

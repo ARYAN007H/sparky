@@ -226,8 +226,12 @@ async fn next_reply_request_id_after(
     thread_id: &str,
     after_message_id: &str,
 ) -> Result<Option<String>, String> {
-    let messages =
-        conversations::blocking::get_messages(ctx.clone(), dir.to_path_buf(), thread_id.to_string()).await?;
+    let messages = conversations::blocking::get_messages(
+        ctx.clone(),
+        dir.to_path_buf(),
+        thread_id.to_string(),
+    )
+    .await?;
     let Some(start) = messages.iter().position(|m| m.id == after_message_id) else {
         return Ok(None);
     };

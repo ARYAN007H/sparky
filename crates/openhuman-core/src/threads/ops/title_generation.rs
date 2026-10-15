@@ -61,7 +61,8 @@ pub async fn thread_generate_title(
     };
 
     let messages =
-        conversations::blocking::get_messages(ctx.clone(), dir.clone(), request.thread_id.clone()).await?;
+        conversations::blocking::get_messages(ctx.clone(), dir.clone(), request.thread_id.clone())
+            .await?;
     let first_user_message = messages
         .iter()
         .find(|message| message.sender == "user" && !message.content.trim().is_empty())
@@ -115,7 +116,8 @@ pub async fn thread_generate_title(
             thread_id = %request.thread_id,
             "{THREAD_TITLE_LOG_PREFIX} no assistant message yet; applying fallback title"
         );
-        let updated = update_thread_with_fallback_title(ctx, dir, thread, &first_user_message).await?;
+        let updated =
+            update_thread_with_fallback_title(ctx, dir, thread, &first_user_message).await?;
         return Ok(envelope(
             thread_to_summary(updated),
             Some(counts([("num_threads", 1)])),
@@ -136,7 +138,8 @@ pub async fn thread_generate_title(
                     "{THREAD_TITLE_LOG_PREFIX} provider init failed; applying fallback title"
                 );
                 let updated =
-                    update_thread_with_fallback_title(ctx, dir, thread, &first_user_message).await?;
+                    update_thread_with_fallback_title(ctx, dir, thread, &first_user_message)
+                        .await?;
                 return Ok(envelope(
                     thread_to_summary(updated),
                     Some(counts([("num_threads", 1)])),
@@ -184,7 +187,8 @@ pub async fn thread_generate_title(
             raw_title_hash = %title_log_fingerprint(&raw_title),
             "{THREAD_TITLE_LOG_PREFIX} generated empty title after sanitization; applying fallback title"
         );
-        let updated = update_thread_with_fallback_title(ctx, dir, thread, &first_user_message).await?;
+        let updated =
+            update_thread_with_fallback_title(ctx, dir, thread, &first_user_message).await?;
         return Ok(envelope(
             thread_to_summary(updated),
             Some(counts([("num_threads", 1)])),

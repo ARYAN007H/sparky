@@ -114,11 +114,12 @@ pub async fn messages_list(
     request: ConversationMessagesRequest,
 ) -> Result<Outcome<ApiEnvelope<ConversationMessagesResponse>>, String> {
     let dir = workspace_dir().await?;
-    let messages = conversations::blocking::get_messages(ctx.clone(), dir, request.thread_id.clone())
-        .await?
-        .into_iter()
-        .map(message_to_record)
-        .collect::<Vec<_>>();
+    let messages =
+        conversations::blocking::get_messages(ctx.clone(), dir, request.thread_id.clone())
+            .await?
+            .into_iter()
+            .map(message_to_record)
+            .collect::<Vec<_>>();
     let count = messages.len();
     Ok(envelope(
         ConversationMessagesResponse { messages, count },
@@ -433,7 +434,11 @@ pub async fn thread_delete(
         .load_config()
         .await
         .map_err(|e| format!("load config: {e}"))?;
-    run_to_completion("thread_delete", thread_delete_inner(ctx.clone(), config, request)).await
+    run_to_completion(
+        "thread_delete",
+        thread_delete_inner(ctx.clone(), config, request),
+    )
+    .await
 }
 
 async fn thread_delete_inner(
