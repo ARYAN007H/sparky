@@ -53,10 +53,10 @@ const MAX_WAIT_SECONDS: u64 = 600;
 /// Coarse, process-global spawn/await guardrails. See the module doc for why
 /// these are global rather than per-lineage.
 mod guard {
+    use crate::core::runtime::DispatchCtx;
     use std::collections::HashSet;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::{Arc, Mutex};
-    use crate::core::runtime::DispatchCtx;
 
     /// Per-agent lifetime backstop against a runaway spawn loop.
     const TOTAL_SPAWN_BACKSTOP: u64 = 500;

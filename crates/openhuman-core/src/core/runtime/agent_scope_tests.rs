@@ -218,7 +218,10 @@ async fn an_explicit_dispatch_context_wins_over_the_ambient_one() {
     })
     .await;
 
-    assert!(Arc::ptr_eq(&explicit, &alpha.agent_state().slot::<Counter>()));
+    assert!(Arc::ptr_eq(
+        &explicit,
+        &alpha.agent_state().slot::<Counter>()
+    ));
     assert!(Arc::ptr_eq(&ambient, &beta.agent_state().slot::<Counter>()));
     assert!(!Arc::ptr_eq(&explicit, &ambient));
 }

@@ -167,7 +167,12 @@ async fn renewal_keeps_the_lease_and_a_lost_lease_fences_the_profile() {
     let turn = tokio_util::sync::CancellationToken::new();
     CoreContext::scope(
         Arc::clone(state.context()),
-        crate::web_chat::track_parallel_turn_for_test(&crate::core::runtime::DispatchCtx::ambient(), "t1", "req-1", turn.clone()),
+        crate::web_chat::track_parallel_turn_for_test(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            "t1",
+            "req-1",
+            turn.clone(),
+        ),
     )
     .await;
     assert_eq!(

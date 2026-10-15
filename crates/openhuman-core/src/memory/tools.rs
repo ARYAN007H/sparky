@@ -49,7 +49,8 @@ fn turn_citations(ctx: &DispatchCtx) -> Arc<TurnCitations> {
 
 fn record_turn_citations(
     ctx: &DispatchCtx,
-    thread_id: &str, citations: &[tinymemory_api::Citation],
+    thread_id: &str,
+    citations: &[tinymemory_api::Citation],
 ) {
     if citations.is_empty() {
         return;

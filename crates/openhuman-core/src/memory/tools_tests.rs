@@ -88,7 +88,13 @@ async fn every_action_reports_memory_off_as_a_tool_error() {
         json!({"action": "learn", "text": "t"}),
         json!({"action": "forget", "ids": ["a"]}),
     ] {
-        let result = run_action(&crate::core::runtime::DispatchCtx::ambient(), &config, &args, &facts()).await;
+        let result = run_action(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            &config,
+            &args,
+            &facts(),
+        )
+        .await;
         assert!(result.is_error, "{args}");
         assert!(text(&result).contains("MEMORY_OFF"), "{}", text(&result));
     }
@@ -100,15 +106,33 @@ async fn bad_arguments_and_unknown_actions_are_model_visible_errors() {
     let config = config_in(&tmp);
     bind_reference(&config);
 
-    let unknown = run_action(&crate::core::runtime::DispatchCtx::ambient(), &config, &json!({"action": "explode"}), &facts()).await;
+    let unknown = run_action(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &json!({"action": "explode"}),
+        &facts(),
+    )
+    .await;
     assert!(unknown.is_error);
     assert!(text(&unknown).contains("unknown action `explode`"));
 
-    let missing = run_action(&crate::core::runtime::DispatchCtx::ambient(), &config, &json!({}), &facts()).await;
+    let missing = run_action(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &json!({}),
+        &facts(),
+    )
+    .await;
     assert!(missing.is_error);
 
     for action in ["recall", "fetch", "learn", "forget"] {
-        let result = run_action(&crate::core::runtime::DispatchCtx::ambient(), &config, &json!({ "action": action }), &facts()).await;
+        let result = run_action(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            &config,
+            &json!({ "action": action }),
+            &facts(),
+        )
+        .await;
         assert!(result.is_error, "{action}");
         assert!(text(&result).contains("invalid arguments"), "{action}");
     }
@@ -128,7 +152,13 @@ async fn learn_stamps_what_the_host_knows_and_ignores_model_meta() {
         // The model must not be able to forge host-owned fields.
         "meta": {"thread_id": "forged", "agent_id": "forged"},
     });
-    let result = run_action(&crate::core::runtime::DispatchCtx::ambient(), &config, &args, &facts()).await;
+    let result = run_action(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &args,
+        &facts(),
+    )
+    .await;
     assert!(!result.is_error, "{}", text(&result));
     let id = serde_json::from_str::<Value>(&text(&result)).unwrap()["id"]
         .as_str()
@@ -185,10 +215,17 @@ async fn recall_fetch_and_forget_round_trip_and_recall_records_citations() {
     )
     .await;
     assert!(!recalled.is_error, "{}", text(&recalled));
-    let cites = take_turn_citations(&crate::core::runtime::DispatchCtx::ambient(), "thread-citations");
+    let cites = take_turn_citations(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "thread-citations",
+    );
     assert!(cites.iter().any(|c| c.id == id), "{cites:?}");
     assert!(
-        take_turn_citations(&crate::core::runtime::DispatchCtx::ambient(), "thread-citations").is_empty(),
+        take_turn_citations(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            "thread-citations"
+        )
+        .is_empty(),
         "draining empties the thread's citations"
     );
 
@@ -208,7 +245,13 @@ async fn recall_fetch_and_forget_round_trip_and_recall_records_citations() {
         1
     );
 
-    let forgotten = run_action(&crate::core::runtime::DispatchCtx::ambient(), &config, &json!({"action": "forget", "ids": [id]}), &facts).await;
+    let forgotten = run_action(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &json!({"action": "forget", "ids": [id]}),
+        &facts,
+    )
+    .await;
     assert!(!forgotten.is_error, "{}", text(&forgotten));
     assert!(engine.is_empty());
 }
@@ -275,7 +318,11 @@ fn turn_citations_are_capped_and_deduplicated() {
     let thread = "thread-cap";
     let many: Vec<_> = (0..MAX_TURN_CITATIONS + 10).map(citation).collect();
     record_turn_citations(&crate::core::runtime::DispatchCtx::ambient(), thread, &many);
-    record_turn_citations(&crate::core::runtime::DispatchCtx::ambient(), thread, &many[..2]);
+    record_turn_citations(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        thread,
+        &many[..2],
+    );
     record_turn_citations(&crate::core::runtime::DispatchCtx::ambient(), thread, &[]);
     let drained = take_turn_citations(&crate::core::runtime::DispatchCtx::ambient(), thread);
     assert_eq!(drained.len(), MAX_TURN_CITATIONS);

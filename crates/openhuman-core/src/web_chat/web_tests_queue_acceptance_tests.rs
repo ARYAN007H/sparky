@@ -67,7 +67,12 @@ async fn web_queue_retains_typed_queued_turn_metadata() {
 
     // This drains the actual in-flight host queue, not a standalone
     // RunQueue<String>, proving the concrete public DTO survives admission.
-    let queued = drain_queued_turns_for_test(&crate::core::runtime::DispatchCtx::ambient(), thread_id, QueueLane::Followup).await;
+    let queued = drain_queued_turns_for_test(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        thread_id,
+        QueueLane::Followup,
+    )
+    .await;
     assert_eq!(queued.len(), 1);
     let queued = &queued[0];
     assert_eq!(queued.text, "defer this exact payload");
@@ -222,15 +227,27 @@ async fn cancellation_discards_pending_lanes_before_a_replacement_turn() {
         .await
         .expect("replacement queue status should be available");
     assert_eq!(replacement.value["total"], 0);
-    assert!(drain_queued_turns_for_test(&crate::core::runtime::DispatchCtx::ambient(), thread_id, QueueLane::Followup)
-        .await
-        .is_empty());
-    assert!(drain_queued_turns_for_test(&crate::core::runtime::DispatchCtx::ambient(), thread_id, QueueLane::Steer)
-        .await
-        .is_empty());
-    assert!(drain_queued_turns_for_test(&crate::core::runtime::DispatchCtx::ambient(), thread_id, QueueLane::Collect)
-        .await
-        .is_empty());
+    assert!(drain_queued_turns_for_test(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        thread_id,
+        QueueLane::Followup
+    )
+    .await
+    .is_empty());
+    assert!(drain_queued_turns_for_test(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        thread_id,
+        QueueLane::Steer
+    )
+    .await
+    .is_empty());
+    assert!(drain_queued_turns_for_test(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        thread_id,
+        QueueLane::Collect
+    )
+    .await
+    .is_empty());
 
     cancel_parked_turn(thread_id, &replacement_block).await;
 }
@@ -455,7 +472,9 @@ async fn chat_done_is_published_only_after_the_in_flight_slot_is_released() {
         event.event == "chat_done" && event.request_id == request_id
     };
 
-    let held = crate::web_chat::ops::in_flight(&crate::core::runtime::DispatchCtx::ambient()).lock_owned().await;
+    let held = crate::web_chat::ops::in_flight(&crate::core::runtime::DispatchCtx::ambient())
+        .lock_owned()
+        .await;
     block.release.notify_one();
     let early = timeout(Duration::from_millis(500), async {
         loop {

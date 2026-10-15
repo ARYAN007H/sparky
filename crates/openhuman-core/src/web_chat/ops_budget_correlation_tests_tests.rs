@@ -112,7 +112,9 @@ async fn record_prunes_other_threads_stale_entries() {
     // ...which a later budget event on a DIFFERENT thread sweeps away.
     record_budget_signal(&ctx(), active, BINDING).await;
     {
-        let signals = thread_budget_signals(&crate::core::runtime::DispatchCtx::ambient()).lock_owned().await;
+        let signals = thread_budget_signals(&crate::core::runtime::DispatchCtx::ambient())
+            .lock_owned()
+            .await;
         assert!(
             !signals.contains_key(abandoned),
             "stale entry should be pruned"

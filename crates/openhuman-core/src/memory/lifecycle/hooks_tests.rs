@@ -78,12 +78,20 @@ async fn pre_turn_logs_the_user_turn_and_injects_what_memory_holds() {
         .unwrap();
     let identity = MemoryIdentity::agent("orchestrator").resolve(&config);
 
-    let pack = pre_turn(&crate::core::runtime::DispatchCtx::ambient(),&config, &identity, input("t1", 0, "what colour do I like?"))
-        .await
-        .expect("a pack");
+    let pack = pre_turn(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &identity,
+        input("t1", 0, "what colour do I like?"),
+    )
+    .await
+    .expect("a pack");
     assert!(pack.markdown.contains("teal"), "{}", pack.markdown);
     assert!(!pack.refs.is_empty());
-    let chips = crate::memory::tools::take_turn_citations(&crate::core::runtime::DispatchCtx::ambient(), "t1");
+    let chips = crate::memory::tools::take_turn_citations(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "t1",
+    );
     assert!(
         chips.iter().any(|chip| chip.snippet.contains("teal")),
         "the pack's citations reach the chat: {chips:?}"
@@ -114,11 +122,14 @@ async fn recall_off_still_logs_and_logging_off_still_recalls() {
 
     config.memory.recall.enabled = false;
     let quiet = MemoryIdentity::agent("a").resolve(&config);
-    assert!(
-        pre_turn(&crate::core::runtime::DispatchCtx::ambient(),&config, &quiet, input("t", 0, "when do deploys happen?"))
-            .await
-            .is_none()
-    );
+    assert!(pre_turn(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &quiet,
+        input("t", 0, "when do deploys happen?")
+    )
+    .await
+    .is_none());
     assert_eq!(
         stored(&engine, MetaFilter::kinds([ItemKind::Conversation]))
             .await
@@ -129,7 +140,13 @@ async fn recall_off_still_logs_and_logging_off_still_recalls() {
     config.memory.recall.enabled = true;
     config.memory.conversations.enabled = false;
     let reader = MemoryIdentity::agent("a").resolve(&config);
-    let pack = pre_turn(&crate::core::runtime::DispatchCtx::ambient(),&config, &reader, input("t", 2, "when do deploys happen?")).await;
+    let pack = pre_turn(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &reader,
+        input("t", 2, "when do deploys happen?"),
+    )
+    .await;
     assert!(pack.expect("a pack").markdown.contains("Fridays"));
     assert_eq!(
         stored(&engine, MetaFilter::kinds([ItemKind::Conversation]))
@@ -141,9 +158,14 @@ async fn recall_off_still_logs_and_logging_off_still_recalls() {
 
     config.memory.recall.enabled = false;
     let none = MemoryIdentity::agent("a").resolve(&config);
-    assert!(pre_turn(&crate::core::runtime::DispatchCtx::ambient(),&config, &none, input("t", 4, "hi"))
-        .await
-        .is_none());
+    assert!(pre_turn(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &none,
+        input("t", 4, "hi")
+    )
+    .await
+    .is_none());
 }
 
 #[tokio::test]
@@ -151,9 +173,14 @@ async fn pre_turn_without_an_engine_runs_the_turn_without_a_pack() {
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
     let identity = MemoryIdentity::agent("a").resolve(&config);
-    assert!(pre_turn(&crate::core::runtime::DispatchCtx::ambient(),&config, &identity, input("t", 0, "hello"))
-        .await
-        .is_none());
+    assert!(pre_turn(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &identity,
+        input("t", 0, "hello")
+    )
+    .await
+    .is_none());
     post_turn(&config, &identity, reply("t", 1, "hi")).await;
 }
 
@@ -227,9 +254,14 @@ async fn an_out_of_credits_recall_tells_the_turn_memory_is_unavailable() {
     crate::memory::test_fixtures::RefusingEngine::out_of_credits().bind(&config);
     let identity = MemoryIdentity::agent("orchestrator").resolve(&config);
 
-    let pack = pre_turn(&crate::core::runtime::DispatchCtx::ambient(),&config, &identity, input("t", 0, "what colour do I like?"))
-        .await
-        .expect("a refused recall still gives the turn a notice");
+    let pack = pre_turn(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &identity,
+        input("t", 0, "what colour do I like?"),
+    )
+    .await
+    .expect("a refused recall still gives the turn a notice");
 
     assert_eq!(
         pack.refusal,
@@ -255,9 +287,14 @@ async fn an_unreachable_engine_is_named_as_unreachable() {
     .bind(&config);
     let identity = MemoryIdentity::agent("orchestrator").resolve(&config);
 
-    let pack = pre_turn(&crate::core::runtime::DispatchCtx::ambient(),&config, &identity, input("t", 0, "hello"))
-        .await
-        .expect("notice");
+    let pack = pre_turn(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &identity,
+        input("t", 0, "hello"),
+    )
+    .await
+    .expect("notice");
 
     assert_eq!(pack.refusal, Some(crate::memory::error::UNAVAILABLE));
     assert!(
@@ -277,9 +314,14 @@ async fn an_engine_fault_that_is_not_account_wide_injects_nothing() {
     .bind(&config);
     let identity = MemoryIdentity::agent("orchestrator").resolve(&config);
 
-    assert!(pre_turn(&crate::core::runtime::DispatchCtx::ambient(),&config, &identity, input("t", 0, "hello"))
-        .await
-        .is_none());
+    assert!(pre_turn(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &identity,
+        input("t", 0, "hello")
+    )
+    .await
+    .is_none());
 }
 
 #[test]
@@ -427,7 +469,14 @@ async fn a_resumed_session_pack_stays_within_one_budget_and_repeats_nothing() {
     let mut resumed = input("t-resumed", 12, "when does the Lisbon release ship?");
     resumed.resumed_after_compaction = true;
     resumed.in_prompt_from = 12;
-    let pack = pre_turn(&crate::core::runtime::DispatchCtx::ambient(),&config, &identity, resumed).await.expect("a pack");
+    let pack = pre_turn(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &identity,
+        resumed,
+    )
+    .await
+    .expect("a pack");
     eprintln!(
         "resumed session: pack {} tokens (budget {}), repeated lines {}",
         pack.tokens,
@@ -480,7 +529,14 @@ async fn a_resumed_session_without_logging_still_opens_with_the_thread() {
     let mut resumed = input("t-quiet", 2, "remind me where the offsite is");
     resumed.resumed_after_compaction = true;
     resumed.in_prompt_from = 2;
-    let pack = pre_turn(&crate::core::runtime::DispatchCtx::ambient(),&config, &reader, resumed).await.expect("a pack");
+    let pack = pre_turn(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &reader,
+        resumed,
+    )
+    .await
+    .expect("a pack");
     assert!(pack.markdown.contains("Alfama hotel"), "{}", pack.markdown);
     assert!(repeated_lines(&pack.markdown).is_empty());
 }
@@ -491,9 +547,14 @@ async fn a_blank_turn_is_refused_without_a_pack_with_or_without_logging() {
     let mut config = config_in(&tmp);
     let engine = bind_reference(&config);
     let identity = MemoryIdentity::agent("orchestrator").resolve(&config);
-    assert!(pre_turn(&crate::core::runtime::DispatchCtx::ambient(),&config, &identity, input("t-blank", 0, "   "))
-        .await
-        .is_none());
+    assert!(pre_turn(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &identity,
+        input("t-blank", 0, "   ")
+    )
+    .await
+    .is_none());
     assert!(
         stored(&engine, MetaFilter::kinds([ItemKind::Conversation]))
             .await
@@ -503,12 +564,24 @@ async fn a_blank_turn_is_refused_without_a_pack_with_or_without_logging() {
 
     config.memory.conversations.enabled = false;
     let reader = MemoryIdentity::agent("orchestrator").resolve(&config);
-    assert!(pre_turn(&crate::core::runtime::DispatchCtx::ambient(),&config, &reader, input("t-blank", 2, "   "))
-        .await
-        .is_none());
+    assert!(pre_turn(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &reader,
+        input("t-blank", 2, "   ")
+    )
+    .await
+    .is_none());
     let mut resumed = input("  ", 4, "where were we?");
     resumed.resumed_after_compaction = true;
-    assert!(pre_turn(&crate::core::runtime::DispatchCtx::ambient(),&config, &reader, resumed).await.is_none());
+    assert!(pre_turn(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &reader,
+        resumed
+    )
+    .await
+    .is_none());
 }
 
 /// With `date_hint` on, the turn's text goes to the chat model with the date
