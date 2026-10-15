@@ -214,7 +214,7 @@ pub(super) async fn finalize_committed_turn(
         }
     };
     let (_, pending) = complete_then_defer(
-        &receipt.options.run_context.data.dispatch_ctx(),
+        &receipt.options.context.dispatch_ctx(),
         super::progress::send_receipt_progress(&receipt, &input, &output, iterations),
         goal_accounting,
     )
