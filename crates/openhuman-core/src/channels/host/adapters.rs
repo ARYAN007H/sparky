@@ -7,6 +7,9 @@
 use std::sync::Arc;
 
 #[cfg(test)]
+use crate::core::runtime::DispatchCtx;
+
+#[cfg(test)]
 use async_trait::async_trait;
 #[cfg(test)]
 use parking_lot::Mutex;
