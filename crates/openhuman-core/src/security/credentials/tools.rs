@@ -228,18 +228,17 @@ impl Tool for OAuthListTool {
     fn parameters_schema(&self) -> serde_json::Value {
         json!({ "type": "object", "properties": {} })
     }
-    async fn execute(&self, _args: serde_json::Value) -> anyhow::Result<ToolResult> {
-        self.execute_with_context(_args, tinytools::ToolCallOptions::default(), None)
+    async fn execute(&self, args: serde_json::Value) -> anyhow::Result<ToolResult> {
+        self.execute_with_context(args, tinytools::ToolCallOptions::default(), None)
             .await
     }
     async fn execute_with_context(
         &self,
-        args: serde_json::Value,
+        _args: serde_json::Value,
         _options: tinytools::ToolCallOptions,
         context: Option<&dyn tinytools::ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
         let ctx = crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(context);
-        let _ = &args;
         log::debug!("[tool][credentials] oauth_list invoked");
         let value = invoke_hosted(ctx, "openhuman.auth_oauth_list_integrations", Default::default())
             .await
