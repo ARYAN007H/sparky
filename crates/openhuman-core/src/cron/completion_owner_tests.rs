@@ -12,14 +12,10 @@ async fn a_job_completed_as_an_agent_is_noted_once() {
         .session_agent("completion-owner-agent"),
     );
     {
- let scope_ctx = DispatchCtx::new(agent);
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(agent);
 
-        note(
-            &crate::core::runtime::scope_ctx.clone(),
-            "completion-owner-job",
-        )
-    
-};
+        note(&scope_ctx, "completion-owner-job")
+    };
     assert_eq!(
         take("completion-owner-job").as_deref(),
         Some("completion-owner-agent")

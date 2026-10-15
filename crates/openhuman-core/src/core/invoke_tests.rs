@@ -69,14 +69,15 @@ async fn gated_method_is_unknown_at_transport_even_with_malformed_params() {
     for params in [json!({}), json!({ "obviously_not_a_real_param_xyz": true })] {
         let ctx = CoreContext::for_test(DomainSet::harness(), None);
         let err = {
- let scope_ctx = DispatchCtx::new(ctx);
- invoke_method(
+            let scope_ctx = crate::core::runtime::DispatchCtx::new(ctx);
+            invoke_method(
                 scope_ctx.clone(),
                 default_state(),
                 &gated_method,
                 params.clone(),
-            ).await
-}
+            )
+            .await
+        }
         .expect_err("gated flows method must error under harness()");
         assert!(
             err.contains("unknown method"),

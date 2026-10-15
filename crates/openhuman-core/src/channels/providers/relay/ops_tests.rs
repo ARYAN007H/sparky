@@ -227,32 +227,26 @@ async fn invalid_or_repeated_messages_start_no_turn() {
     );
 
     {
- let scope_ctx = DispatchCtx::new(ctx);
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(ctx);
 
         let mut bad = params("m1", "hello");
         bad.chat_id = "a/b".into();
-        let err = channel_relay_inbound(&crate::core::runtime::scope_ctx.clone(), bad)
+        let err = channel_relay_inbound(&scope_ctx, bad)
             .await
             .expect_err("invalid");
         assert!(err.contains("chat_id"), "{err}");
 
         let p = params("m1", "hello");
         let thread = p.thread_id();
-        store::record_inbound(
-            &crate::core::runtime::scope_ctx.clone(),
-            &workspace,
-            &p,
-            &thread,
-        )
-        .await
-        .unwrap();
-        let outcome = channel_relay_inbound(&crate::core::runtime::scope_ctx.clone(), p)
+        store::record_inbound(&scope_ctx, &workspace, &p, &thread)
+            .await
+            .unwrap();
+        let outcome = channel_relay_inbound(&scope_ctx, p)
             .await
             .expect("duplicate is not an error");
         let value = outcome.into_cli_compatible_json().unwrap();
         let text = value.to_string();
         assert!(text.contains("\"duplicate\":true"), "{text}");
         assert!(text.contains(&thread), "{text}");
-    
-};
+    };
 }

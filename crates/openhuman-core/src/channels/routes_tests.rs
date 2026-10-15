@@ -244,13 +244,10 @@ async fn sign_out_cancels_remote_invalidation_while_it_waits_for_the_session_tab
     let core_context =
         crate::core::runtime::CoreContext::for_test(crate::core::runtime::DomainSet::full(), None);
     let expected_core_context = Arc::clone(&core_context);
-    crate::core::runtime::{
- let scope_ctx = DispatchCtx::new(core_context);
+    {
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(core_context);
 
-        let guard = crate::web_chat::lock_thread_sessions_for_test(
-            &crate::core::runtime::scope_ctx.clone(),
-        )
-        .await;
+        let guard = crate::web_chat::lock_thread_sessions_for_test(&scope_ctx).await;
         let cancellation = tokio_util::sync::CancellationToken::new();
         let callback = RouteCallbacks::new(
             runtime_context(PathBuf::from("/tmp/channel-callback")),
@@ -285,8 +282,7 @@ async fn sign_out_cancels_remote_invalidation_while_it_waits_for_the_session_tab
         );
 
         drop(guard);
-    
-};
+    };
 }
 
 #[cfg(feature = "modules")]

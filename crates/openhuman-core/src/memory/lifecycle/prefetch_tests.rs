@@ -368,12 +368,12 @@ async fn queued_work_keeps_the_callers_core_context() {
         crate::core::runtime::DomainSet::full(),
         Some(config.workspace_dir.clone()),
     );
-    crate::core::runtime::{
- let scope_ctx = DispatchCtx::new(ctx.clone());
+    {
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(ctx.clone());
 
         let identity = MemoryIdentity::agent("scoped-agent").resolve(&config);
         let key = Key::new(&config, &identity, "t", false);
-        let cache = cache(&crate::core::runtime::scope_ctx.clone());
+        let cache = cache(&scope_ctx);
         let expected = ctx.clone();
         enqueue(
             cache.clone(),
@@ -388,8 +388,7 @@ async fn queued_work_keeps_the_callers_core_context() {
         );
         drain(&cache, &key).await;
         assert_eq!(completed(&cache, &key).unwrap().markdown, "scoped");
-    
-};
+    };
 }
 
 #[test]

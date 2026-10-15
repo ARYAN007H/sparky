@@ -19,33 +19,29 @@ async fn each_agent_context_owns_its_turn_tables() {
     let alpha = agent(&root, "alpha");
     let beta = agent(&root, "beta");
 
-    let (alpha_sessions, alpha_in_flight, alpha_parallel) =
-        {
- let scope_ctx = DispatchCtx::new(Arc::clone(&alpha));
-
-            (
-                thread_sessions(&crate::core::runtime::scope_ctx.clone()),
-                in_flight(&crate::core::runtime::scope_ctx.clone()),
-                parallel_in_flight(&crate::core::runtime::scope_ctx.clone()),
-            )
-        
-};
-    let (beta_sessions, beta_in_flight, beta_parallel) = {
- let scope_ctx = DispatchCtx::new(beta);
+    let (alpha_sessions, alpha_in_flight, alpha_parallel) = {
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(&alpha));
 
         (
-            thread_sessions(&crate::core::runtime::scope_ctx.clone()),
-            in_flight(&crate::core::runtime::scope_ctx.clone()),
-            parallel_in_flight(&crate::core::runtime::scope_ctx.clone()),
+            thread_sessions(&scope_ctx),
+            in_flight(&scope_ctx),
+            parallel_in_flight(&scope_ctx),
         )
-    
-};
-    let alpha_again = {
- let scope_ctx = DispatchCtx::new(alpha);
+    };
+    let (beta_sessions, beta_in_flight, beta_parallel) = {
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(beta);
 
-        in_flight(&crate::core::runtime::scope_ctx.clone())
-    
-};
+        (
+            thread_sessions(&scope_ctx),
+            in_flight(&scope_ctx),
+            parallel_in_flight(&scope_ctx),
+        )
+    };
+    let alpha_again = {
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(alpha);
+
+        in_flight(&scope_ctx)
+    };
 
     assert!(!Arc::ptr_eq(&alpha_sessions, &beta_sessions));
     assert!(!Arc::ptr_eq(&alpha_in_flight, &beta_in_flight));

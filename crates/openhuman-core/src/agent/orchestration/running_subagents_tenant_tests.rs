@@ -228,11 +228,10 @@ async fn saas_dispatch_exposes_only_the_callers_detached_worker_controls() {
     })
     .await;
     {
- let scope_ctx = DispatchCtx::new(pair.alice.clone());
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(pair.alice.clone());
 
         assert!(resume_ref_for_task(&scope_ctx, &pair.a.task, PARENT).is_ok());
-    
-};
+    };
     for function in ["steer", "cancel"] {
         assert!(dispatched_control(function, &pair.a.task).await.is_err());
     }
@@ -362,7 +361,7 @@ async fn same_parent_resolution_and_wait_refuse_foreign_workers() {
     }
     let pair = Pair::new();
     {
- let scope_ctx = DispatchCtx::new(pair.bob.clone());
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(pair.bob.clone());
 
         assert!(matches!(
             task_id_for_session(&scope_ctx, &pair.a.session, PARENT),
@@ -373,21 +372,14 @@ async fn same_parent_resolution_and_wait_refuse_foreign_workers() {
             Err(WaitError::NotOwned)
         ));
         assert!(matches!(
-            wait(
-                &scope_ctx,
-                &pair.a.task,
-                PARENT,
-                Duration::ZERO
-            )
-            .await,
+            wait(&scope_ctx, &pair.a.task, PARENT, Duration::ZERO).await,
             Err(WaitError::NotOwned)
         ));
         assert_eq!(
             task_id_for_session(&scope_ctx, &pair.b.session, PARENT).unwrap(),
             pair.b.task
         );
-    
-};
+    };
 }
 
 #[tokio::test]
@@ -400,7 +392,7 @@ async fn same_parent_agent_steering_refuses_foreign_worker() {
     }
     let pair = Pair::new();
     {
- let scope_ctx = DispatchCtx::new(pair.bob.clone());
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(pair.bob.clone());
 
         assert_eq!(
             steer(
@@ -424,8 +416,7 @@ async fn same_parent_agent_steering_refuses_foreign_worker() {
         .await
         .unwrap();
         assert_eq!(pair.b.queue.status().await.steers, 1);
-    
-};
+    };
 }
 
 #[tokio::test]
@@ -459,7 +450,7 @@ async fn public_cancellation_refuses_another_profiles_task() {
     }
     let pair = Pair::new();
     {
- let scope_ctx = DispatchCtx::new(pair.bob.clone());
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(pair.bob.clone());
 
         assert_eq!(
             field(&control("cancel", &pair.a.task).await, "cancelled"),
@@ -470,17 +461,15 @@ async fn public_cancellation_refuses_another_profiles_task() {
             field(&control("cancel", &pair.b.task).await, "cancelled"),
             Some(true)
         );
-    
-};
+    };
     {
- let scope_ctx = DispatchCtx::new(pair.alice.clone());
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(pair.alice.clone());
 
         assert!(
             resume_ref_for_task(&scope_ctx, &pair.a.task, PARENT).is_ok(),
             "foreign cancel leaves original worker live"
         );
-    
-};
+    };
 }
 
 #[tokio::test]
@@ -523,7 +512,8 @@ async fn missing_saas_scope_cannot_observe_or_control_workers() {
     });
     // A scoped kernel context without an admitted profile is not authority.
     {
- let scope_ctx = DispatchCtx::new(CoreContext::for_test(DomainSet::full(), None));
+        let scope_ctx =
+            crate::core::runtime::DispatchCtx::new(CoreContext::for_test(DomainSet::full(), None));
 
         assert!(snapshot_for_parent(&scope_ctx, PARENT).is_empty());
         assert!(matches!(
@@ -538,8 +528,7 @@ async fn missing_saas_scope_cannot_observe_or_control_workers() {
             field(&control("cancel", &pair.a.task).await, "cancelled"),
             Some(false)
         );
-    
-};
+    };
 }
 
 #[tokio::test]

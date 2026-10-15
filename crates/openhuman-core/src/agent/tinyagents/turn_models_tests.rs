@@ -28,9 +28,9 @@ async fn role_pins_apply_when_the_primary_uses_config_routing() {
             .host_overrides(Arc::new(overrides)),
     );
     {
- let scope_ctx = DispatchCtx::new(context);
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(context);
 
-        let models = TurnModelSource::new_crate_native(&crate::core::runtime::scope_ctx.clone(), "chat", Arc::new(config))
+        let models = TurnModelSource::new_crate_native(&scope_ctx, "chat", Arc::new(config))
             .build("hint:chat", 0.0, None, None)
             .expect("config-routed models");
         let coding = models
@@ -40,8 +40,7 @@ async fn role_pins_apply_when_the_primary_uses_config_routing() {
             .expect("pinned role route");
         assert_eq!(name_of(&coding.1).await, "pinned coding");
         assert_eq!(name_of(&models.summarizer).await, "pinned summary");
-    
-};
+    };
 }
 
 /// A stub that answers with its own name so a test can tell which model the

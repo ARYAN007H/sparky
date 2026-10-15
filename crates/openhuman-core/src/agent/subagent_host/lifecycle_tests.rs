@@ -332,23 +332,20 @@ async fn each_agent_dedupes_its_own_in_flight_sub_agents() {
     let beta = test_agent_context(&root, "beta");
 
     let alpha_map = {
- let scope_ctx = DispatchCtx::new(Arc::clone(&alpha));
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(&alpha));
 
-        host_in_flight(&crate::core::runtime::scope_ctx.clone())
-    
-};
+        host_in_flight(&scope_ctx)
+    };
     let beta_map = {
- let scope_ctx = DispatchCtx::new(beta);
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(beta);
 
-        host_in_flight(&crate::core::runtime::scope_ctx.clone())
-    
-};
+        host_in_flight(&scope_ctx)
+    };
     let alpha_again = {
- let scope_ctx = DispatchCtx::new(alpha);
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(alpha);
 
-        host_in_flight(&crate::core::runtime::scope_ctx.clone())
-    
-};
+        host_in_flight(&scope_ctx)
+    };
 
     assert!(!Arc::ptr_eq(&alpha_map, &beta_map));
     assert!(Arc::ptr_eq(&alpha_map, &alpha_again));

@@ -63,32 +63,25 @@ async fn plan_mode_stays_with_the_agent_that_set_it() {
     let thread = "plan-mode-shared-thread";
 
     {
- let scope_ctx = DispatchCtx::new(std::sync::Arc::clone(&alpha));
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(std::sync::Arc::clone(&alpha));
 
-        set_mode(
-            &crate::core::runtime::scope_ctx.clone(),
-            thread,
-            RunMode::Plan,
-        );
-    
-};
+        set_mode(&scope_ctx, thread, RunMode::Plan);
+    };
 
     assert_eq!(
         {
- let scope_ctx = DispatchCtx::new(alpha);
+            let scope_ctx = crate::core::runtime::DispatchCtx::new(alpha);
 
-            get_mode(&crate::core::runtime::scope_ctx.clone(), thread)
-        
-},
+            get_mode(&scope_ctx, thread)
+        },
         RunMode::Plan
     );
     assert_eq!(
         {
- let scope_ctx = DispatchCtx::new(beta);
+            let scope_ctx = crate::core::runtime::DispatchCtx::new(beta);
 
-            get_mode(&crate::core::runtime::scope_ctx.clone(), thread)
-        
-},
+            get_mode(&scope_ctx, thread)
+        },
         RunMode::Build
     );
 }

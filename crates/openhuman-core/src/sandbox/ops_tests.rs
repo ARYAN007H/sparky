@@ -382,12 +382,11 @@ async fn sandbox_component_is_on_without_a_context_or_when_enabled() {
     let ctx = crate::core::runtime::context::CoreContext::for_test_with_components(
         crate::core::runtime::ComponentSet::all(),
     );
-    crate::core::runtime::context::{
- let scope_ctx = DispatchCtx::new(ctx);
+    {
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(ctx);
 
         assert!(!sandbox_component_off(&scope_ctx));
-    
-};
+    };
 }
 
 #[test]
