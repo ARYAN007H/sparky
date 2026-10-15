@@ -26,9 +26,9 @@ mod workspace;
 pub use rebound::{rebind_all, ReboundSessionStores, StoreRegistry};
 pub use workspace::{
     artifact_blobs_for, attachment_stash_for, current_documents_for, default_turn_states_for,
-    ledger_for, provider_for_workspace, release_workspace, release_workspace_defaults, require_ledger,
-    status_store_for, stores_for, stores_or_ephemeral, turn_states_for, with_ledger,
-    with_ledger_async, WorkspaceSessionStores,
+    ledger_for, provider_for_workspace, release_workspace, release_workspace_defaults,
+    require_ledger, status_store_for, stores_for, stores_or_ephemeral, turn_states_for,
+    with_ledger, with_ledger_async, WorkspaceSessionStores,
 };
 
 static PROVIDER: LazyLock<RwLock<Option<Arc<dyn SessionStoreProvider>>>> =
@@ -82,11 +82,20 @@ pub fn restore(provider: Option<Arc<dyn SessionStoreProvider>>) {
     *PROVIDER.write().unwrap_or_else(PoisonError::into_inner) = provider;
 }
 
-/// The provider in effect: the context's host-override one, else the
-/// installed one, if any.
+/// The provider in effect for the calling task's ambient context: see
+/// [`installed_in`].
 #[must_use]
 pub fn installed() -> Option<Arc<dyn SessionStoreProvider>> {
-    crate::core::runtime::CoreContext::current_host_overrides()
+    installed_in(&crate::core::runtime::DispatchCtx::ambient())
+}
+
+/// The provider in effect for `ctx`: the host-override one of the agent it
+/// runs for, else the installed one, if any.
+#[must_use]
+pub fn installed_in(
+    ctx: &crate::core::runtime::DispatchCtx,
+) -> Option<Arc<dyn SessionStoreProvider>> {
+    ctx.host_overrides()
         .and_then(|local| local.session_store.clone())
         .or_else(|| {
             PROVIDER

@@ -562,7 +562,8 @@ pub(super) fn install_turn_middleware(
     // observation-only (never mutates the result), so running first in the
     // reverse-order `after_tool` chain is safe — it cannot perturb the
     // summarization/cap or tool-outcome capture layers.
-    let mut embedder_tool_hooks = crate::agent::hooks::embedder_tool_hooks();
+    let mut embedder_tool_hooks =
+        crate::agent::hooks::embedder_tool_hooks_in(&crate::core::runtime::DispatchCtx::ambient());
     embedder_tool_hooks.extend(scoped_tool_hooks);
     if !embedder_tool_hooks.is_empty() {
         harness.push_middleware(Arc::new(

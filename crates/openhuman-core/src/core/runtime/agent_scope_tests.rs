@@ -159,7 +159,7 @@ async fn spawn_scoped_keeps_the_agent_context_and_tokio_spawn_does_not() {
         let scoped = spawn_scoped(async {
             (
                 current_agent_id(),
-                CoreContext::current_agent_policy().map(|p| p.autonomy),
+                DispatchCtx::ambient().agent_policy().map(|p| p.autonomy),
             )
         })
         .await

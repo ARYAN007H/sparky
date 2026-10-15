@@ -437,7 +437,9 @@ impl OpenHumanAgentRunner {
         // Cancellation: the run_registry token aborts the engine future, and the
         // inner turn drops with it (task-local scope unwinds cleanly).
         use crate::agent::turn_origin;
-        let escalated_origin = escalated_origin_for_nested_harness(turn_origin::current());
+        let escalated_origin = escalated_origin_for_nested_harness(
+            crate::core::runtime::DispatchCtx::ambient_turn().turn_origin(),
+        );
         if let Some(ref escalated) = escalated_origin {
             tracing::debug!(
                 target: "flows",

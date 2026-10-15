@@ -119,7 +119,8 @@ impl RequestPlanReviewTool {
 
         // Only interactive (WebChat) turns have a human to review the plan.
         // Anything else auto-approves so background automation isn't wedged.
-        let origin = turn_origin::current().unwrap_or(AgentTurnOrigin::Unknown);
+        let origin = crate::agent::tinyagents::host::run_context::turn_origin_for_tool(context)
+            .unwrap_or(AgentTurnOrigin::Unknown);
         if !matches!(origin, AgentTurnOrigin::WebChat { .. }) {
             tracing::debug!(
                 origin = ?origin,

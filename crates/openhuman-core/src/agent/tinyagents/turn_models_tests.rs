@@ -28,7 +28,7 @@ async fn role_pins_apply_when_the_primary_uses_config_routing() {
             .host_overrides(Arc::new(overrides)),
     );
     CoreContext::scope(context, async {
-        let models = TurnModelSource::new_crate_native("chat", Arc::new(config))
+        let models = TurnModelSource::new_crate_native(&crate::core::runtime::DispatchCtx::ambient(), "chat", Arc::new(config))
             .build("hint:chat", 0.0, None, None)
             .expect("config-routed models");
         let coding = models
