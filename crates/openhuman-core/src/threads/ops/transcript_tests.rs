@@ -10,10 +10,20 @@ use tinyagents_session::transcript::{
 const THREAD: &str = "thread-store";
 
 fn ctx_for(workspace: &std::path::Path, profile: Option<&str>) -> DispatchCtx {
-    let config = crate::config::Config {
+    ctx_with_chat_agent(workspace, profile, None)
+}
+
+/// A context whose config selects `chat_agent_id` as the web-chat agent.
+fn ctx_with_chat_agent(
+    workspace: &std::path::Path,
+    profile: Option<&str>,
+    chat_agent_id: Option<&str>,
+) -> DispatchCtx {
+    let mut config = crate::config::Config {
         workspace_dir: workspace.to_path_buf(),
         ..crate::config::Config::default()
     };
+    config.agent.chat_agent_id = chat_agent_id.map(str::to_string);
     let mut overlay = ContextOverlay::new(
         config,
         DomainSet::kernel(),
@@ -68,7 +78,7 @@ fn usage(input: u64, output: u64) -> TurnUsage {
 /// A root turn and one sub-agent run of [`THREAD`], written where the session
 /// host and the sub-agent runner write them: `ctx`'s transcript store.
 async fn write_thread(ctx: &DispatchCtx) {
-    let locator = super::super::support::transcript_store(ctx)
+    let locator = super::super::support::transcript_store(ctx, THREAD)
         .await
         .expect("store")
         .locator();
@@ -186,4 +196,81 @@ async fn a_blank_thread_id_is_refused() {
     .await
     .expect_err("blank thread id");
     assert!(err.contains("thread_id is required"));
+}
+
+/// After the operator changes `[agent] chat_agent_id`, a thread written under
+/// the earlier chat agent keeps its transcript store: the readers use the key
+/// recorded with the thread, not the one the current config would derive.
+#[tokio::test]
+async fn changing_the_chat_agent_does_not_strand_an_existing_threads_turns() {
+    let _ = crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins();
+    let dir = tempfile::tempdir().unwrap();
+    let before = ctx_with_chat_agent(dir.path(), None, None);
+    let after = ctx_with_chat_agent(dir.path(), None, Some("researcher"));
+
+    // The two configs derive different keys, or this proves nothing.
+    let rule_before = super::super::support::transcript_store(&before, THREAD)
+        .await
+        .unwrap()
+        .key;
+    let rule_after = super::super::support::transcript_store(&after, "unrecorded-thread")
+        .await
+        .unwrap()
+        .key;
+    assert_ne!(rule_before, rule_after, "the chat agent flip changes the key");
+
+    // The first session on the thread records its key, then writes under it.
+    let recorded = crate::threads::store::bind_transcript_key(
+        &before,
+        dir.path(),
+        THREAD,
+        rule_before.clone(),
+    )
+    .await;
+    assert_eq!(recorded, rule_before);
+    write_thread(&before).await;
+
+    let request = || TranscriptGetRequest {
+        thread_id: THREAD.into(),
+        cursor: None,
+        limit: None,
+    };
+    let page = transcript_get(&after, request())
+        .await
+        .unwrap()
+        .value
+        .data
+        .unwrap();
+    assert!(
+        page.has_transcript && !page.items.is_empty(),
+        "the earlier turns are still read after the chat agent changed"
+    );
+    let spend = super::super::usage::token_usage(
+        &after,
+        super::super::usage::ThreadTokenUsageRequest {
+            thread_id: THREAD.into(),
+        },
+    )
+    .await
+    .unwrap()
+    .value
+    .data
+    .unwrap();
+    assert_eq!(spend.input_tokens, 140);
+
+    // A thread with no recorded key falls back to the current rule.
+    let other = tempfile::tempdir().unwrap();
+    let unrecorded_before = ctx_with_chat_agent(other.path(), None, None);
+    let unrecorded_after = ctx_with_chat_agent(other.path(), None, Some("researcher"));
+    write_thread(&unrecorded_before).await;
+    let page = transcript_get(&unrecorded_after, request())
+        .await
+        .unwrap()
+        .value
+        .data
+        .unwrap();
+    assert!(
+        !page.has_transcript,
+        "without a recorded key the reader keeps today's rule"
+    );
 }
