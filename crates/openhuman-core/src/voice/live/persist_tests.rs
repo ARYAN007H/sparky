@@ -44,10 +44,13 @@ async fn saves_into_the_thread_store() {
     p.save(TranscriptRole::User, "hello").await;
     p.save(TranscriptRole::Agent, "hi there").await;
     p.save(TranscriptRole::Agent, "").await;
-    let messages =
-        crate::threads::store::blocking::get_messages(crate::core::runtime::DispatchCtx::ambient(), dir.path().to_path_buf(), "t1".into())
-            .await
-            .unwrap();
+    let messages = crate::threads::store::blocking::get_messages(
+        crate::core::runtime::DispatchCtx::ambient(),
+        dir.path().to_path_buf(),
+        "t1".into(),
+    )
+    .await
+    .unwrap();
     let texts: Vec<_> = messages
         .iter()
         .map(|m| (m.sender.as_str(), m.content.as_str()))

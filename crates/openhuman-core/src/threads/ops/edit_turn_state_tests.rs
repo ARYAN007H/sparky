@@ -155,9 +155,14 @@ async fn next_reply_request_id_after_finds_the_correlated_turn() {
     let thread_id = "thread-reply-lookup";
     seed_message_log(dir.path(), thread_id).await;
 
-    let found = next_reply_request_id_after(&crate::core::runtime::DispatchCtx::ambient(), dir.path(), thread_id, "user-1")
-        .await
-        .expect("lookup");
+    let found = next_reply_request_id_after(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        dir.path(),
+        thread_id,
+        "user-1",
+    )
+    .await
+    .expect("lookup");
     assert_eq!(found, Some("turn-1".to_string()));
 }
 
@@ -168,9 +173,14 @@ async fn next_reply_request_id_after_none_when_message_is_the_log_tail() {
     seed_message_log(dir.path(), thread_id).await;
 
     let last_reply_id = run_reply_message_id("turn-2");
-    let found = next_reply_request_id_after(&crate::core::runtime::DispatchCtx::ambient(), dir.path(), thread_id, &last_reply_id)
-        .await
-        .expect("lookup");
+    let found = next_reply_request_id_after(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        dir.path(),
+        thread_id,
+        &last_reply_id,
+    )
+    .await
+    .expect("lookup");
     assert_eq!(
         found, None,
         "the last message in the log has no reply after it"
@@ -183,8 +193,13 @@ async fn next_reply_request_id_after_none_when_message_id_unknown() {
     let thread_id = "thread-reply-lookup-unknown";
     seed_message_log(dir.path(), thread_id).await;
 
-    let found = next_reply_request_id_after(&crate::core::runtime::DispatchCtx::ambient(), dir.path(), thread_id, "does-not-exist")
-        .await
-        .expect("lookup");
+    let found = next_reply_request_id_after(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        dir.path(),
+        thread_id,
+        "does-not-exist",
+    )
+    .await
+    .expect("lookup");
     assert_eq!(found, None);
 }

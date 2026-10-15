@@ -76,7 +76,7 @@ impl TranscriptPersister {
         };
         let id = message.id.clone();
         match crate::threads::store::blocking::append_message(
-        DispatchCtx::ambient(),
+            DispatchCtx::ambient(),
             self.workspace_dir.clone(),
             self.thread_id.clone(),
             message,

@@ -194,12 +194,9 @@ async fn start_chat_inner(
     // Save originals before scanning, history, memory, or queue persistence.
     // A missing config/root cannot safely accept an upload.
     let mut message = if message.contains("[FILE:") || message.contains("[IMAGE:") {
-        let config = ctx
-            .load_config()
-            .await
-            .map_err(|error| {
-                StartChatError::Other(format!("upload configuration unavailable: {error}"))
-            })?;
+        let config = ctx.load_config().await.map_err(|error| {
+            StartChatError::Other(format!("upload configuration unavailable: {error}"))
+        })?;
         // Stage where the turn will read: the thread's working folder when
         // one is bound (`run_task` applies the same folder), else action_dir.
         let workspace = crate::agent::attachments::thread_action_dir(

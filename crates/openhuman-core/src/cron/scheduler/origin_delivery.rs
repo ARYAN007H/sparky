@@ -11,9 +11,9 @@
 //! - Channel origin: the reply is sent to the origin's reply target, then
 //!   appended to that chat's history so its next turn sees it.
 
-use crate::core::runtime::DispatchCtx;
 use super::delivery::strip_openhuman_link_markup;
 use crate::config::Config;
+use crate::core::runtime::DispatchCtx;
 use crate::web_chat::{publish_web_channel_event, WebChannelEvent};
 use anyhow::{anyhow, Result};
 use std::path::Path;

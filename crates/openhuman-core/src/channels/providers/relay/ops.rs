@@ -46,7 +46,8 @@ pub async fn channel_relay_inbound(
     let thread_id = identity.thread_id;
     let workspace_dir = config.workspace_dir.clone();
 
-    if store::record_inbound(ctx, &workspace_dir, &params, &thread_id).await? == Recorded::Duplicate {
+    if store::record_inbound(ctx, &workspace_dir, &params, &thread_id).await? == Recorded::Duplicate
+    {
         tracing::info!(
             channel = %params.channel,
             thread_id = %thread_id,
@@ -134,7 +135,14 @@ pub(crate) async fn run_relay_turn(
                     &crate::channels::SendMessage::new(reply, &params.chat_id),
                 )
                 .await;
-                record(&dispatch_ctx, &workspace_dir, &params, &thread_id, &channel.sent()).await;
+                record(
+                    &dispatch_ctx,
+                    &workspace_dir,
+                    &params,
+                    &thread_id,
+                    &channel.sent(),
+                )
+                .await;
                 return channel.sent();
             }
         };
@@ -159,7 +167,14 @@ pub(crate) async fn run_relay_turn(
                 &crate::channels::SendMessage::new(reply, &params.chat_id),
             )
             .await;
-            record(&dispatch_ctx, &workspace_dir, &params, &thread_id, &channel.sent()).await;
+            record(
+                &dispatch_ctx,
+                &workspace_dir,
+                &params,
+                &thread_id,
+                &channel.sent(),
+            )
+            .await;
             return channel.sent();
         }
     };

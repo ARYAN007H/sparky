@@ -171,7 +171,12 @@ async fn delivery_stores_the_reply_before_announcing_it() {
     // a row present here proves the write happened no later than the announce.
     // A client that never receives that event, or fails to append it, no longer
     // decides whether the reply exists.
-    let messages = conversations::get_messages(&crate::core::runtime::DispatchCtx::ambient(), ws.clone(), "t-deliver").expect("messages");
+    let messages = conversations::get_messages(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        ws.clone(),
+        "t-deliver",
+    )
+    .expect("messages");
     assert_eq!(messages.len(), 1, "delivery must leave exactly one row");
     assert_eq!(messages[0].id, "agent:req-deliver");
     assert_eq!(messages[0].content, "Here is the summary you asked for.");
@@ -207,8 +212,12 @@ async fn delivery_still_announces_when_the_reply_cannot_be_stored() {
     // `get_messages` answers `Ok(vec![])` for a thread it has never seen — only
     // `append_message` refuses one — so absence is what proves the write was
     // rejected and swallowed rather than silently creating a thread.
-    let messages = crate::threads::store::get_messages(&crate::core::runtime::DispatchCtx::ambient(), ws.clone(), "absent-thread")
-        .expect("reading an unknown thread is not an error");
+    let messages = crate::threads::store::get_messages(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        ws.clone(),
+        "absent-thread",
+    )
+    .expect("reading an unknown thread is not an error");
     assert!(
         messages.is_empty(),
         "the thread was never created, so nothing should have been written"

@@ -9,10 +9,13 @@ async fn thread_update_title_persists_new_title() {
     let thread_id = "t-title";
     create_thread_with_title(&workspace, thread_id, "Original title").await;
 
-    let outcome = thread_update_title(&crate::core::runtime::DispatchCtx::ambient(), crate::threads::UpdateConversationThreadTitleRequest {
-        thread_id: thread_id.to_string(),
-        title: "  Invoice follow-up  ".to_string(),
-    })
+    let outcome = thread_update_title(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        crate::threads::UpdateConversationThreadTitleRequest {
+            thread_id: thread_id.to_string(),
+            title: "  Invoice follow-up  ".to_string(),
+        },
+    )
     .await
     .expect("thread_update_title");
 
@@ -30,10 +33,13 @@ async fn thread_update_title_returns_error_for_missing_thread() {
     let workspace = tempfile::tempdir().expect("workspace");
     let _workspace_guard = EnvVarGuard::set("OPENHUMAN_WORKSPACE", workspace.path());
 
-    let err = thread_update_title(&crate::core::runtime::DispatchCtx::ambient(), crate::threads::UpdateConversationThreadTitleRequest {
-        thread_id: "nonexistent-thread".to_string(),
-        title: "New title".to_string(),
-    })
+    let err = thread_update_title(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        crate::threads::UpdateConversationThreadTitleRequest {
+            thread_id: "nonexistent-thread".to_string(),
+            title: "New title".to_string(),
+        },
+    )
     .await
     .expect_err("missing thread must return an error");
 

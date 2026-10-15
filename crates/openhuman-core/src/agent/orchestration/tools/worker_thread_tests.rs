@@ -16,7 +16,9 @@ fn creates_child_thread_linked_to_parent_and_seeds_prompt() {
 
     // The new thread is labelled `tasks` and linked to the parent so it
     // stays grouped with delegated task work in the chat sidebar.
-    let threads = conversations::list_threads(&crate::core::runtime::DispatchCtx::ambient(), dir.clone()).unwrap();
+    let threads =
+        conversations::list_threads(&crate::core::runtime::DispatchCtx::ambient(), dir.clone())
+            .unwrap();
     let thread = threads
         .iter()
         .find(|t| t.id == id)
@@ -26,7 +28,12 @@ fn creates_child_thread_linked_to_parent_and_seeds_prompt() {
 
     // It opens with the delegation prompt as the user message, so the
     // drawer can render the parent↔subagent chat from memory on reopen.
-    let messages = conversations::get_messages(&crate::core::runtime::DispatchCtx::ambient(), dir.clone(), &id).unwrap();
+    let messages = conversations::get_messages(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        dir.clone(),
+        &id,
+    )
+    .unwrap();
     assert_eq!(messages.len(), 1);
     assert_eq!(messages[0].sender, "user");
     assert_eq!(messages[0].content, "Find Q3");
@@ -49,7 +56,12 @@ fn appends_follow_up_prompt_to_existing_worker_thread() {
     append_worker_user_message(dir.clone(), &id, "researcher", "sub-2", "Follow-up prompt")
         .unwrap();
 
-    let messages = conversations::get_messages(&crate::core::runtime::DispatchCtx::ambient(), dir.clone(), &id).unwrap();
+    let messages = conversations::get_messages(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        dir.clone(),
+        &id,
+    )
+    .unwrap();
     assert_eq!(messages.len(), 2);
     assert_eq!(messages[1].sender, "user");
     assert_eq!(messages[1].content, "Follow-up prompt");

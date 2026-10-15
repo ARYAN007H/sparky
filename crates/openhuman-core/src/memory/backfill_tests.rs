@@ -37,7 +37,7 @@ async fn seed_thread(workspace: &Path, thread_id: &str, messages: &[(&str, &str)
     .unwrap();
     for (index, (sender, content)) in messages.iter().enumerate() {
         threads::append_message(
-        crate::core::runtime::DispatchCtx::ambient(),
+            crate::core::runtime::DispatchCtx::ambient(),
             workspace.to_path_buf(),
             thread_id.to_string(),
             message(

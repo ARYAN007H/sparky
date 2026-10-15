@@ -94,11 +94,13 @@ async fn no_reply_is_suppressed_without_writing_anything() {
         .await
         .unwrap();
     assert_eq!(status, DeliveryStatus::Suppressed);
-    assert!(
-        conversations::get_messages(&crate::core::runtime::DispatchCtx::ambient(), cfg.workspace_dir.clone(), "t-1")
-            .unwrap()
-            .is_empty()
-    );
+    assert!(conversations::get_messages(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        cfg.workspace_dir.clone(),
+        "t-1"
+    )
+    .unwrap()
+    .is_empty());
 }
 
 #[tokio::test]
@@ -114,7 +116,12 @@ async fn web_delivery_stores_one_row_under_the_run_reply_id_and_is_idempotent() 
             .unwrap();
         assert_eq!(status, DeliveryStatus::Delivered);
     }
-    let messages = conversations::get_messages(&crate::core::runtime::DispatchCtx::ambient(), cfg.workspace_dir.clone(), "t-1").unwrap();
+    let messages = conversations::get_messages(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        cfg.workspace_dir.clone(),
+        "t-1",
+    )
+    .unwrap();
     assert_eq!(messages.len(), 1, "same run collapses onto one row");
     assert_eq!(
         messages[0].id,
@@ -127,9 +134,13 @@ async fn web_delivery_stores_one_row_under_the_run_reply_id_and_is_idempotent() 
         .await
         .unwrap();
     assert_eq!(
-        conversations::get_messages(&crate::core::runtime::DispatchCtx::ambient(), cfg.workspace_dir.clone(), "t-1")
-            .unwrap()
-            .len(),
+        conversations::get_messages(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            cfg.workspace_dir.clone(),
+            "t-1"
+        )
+        .unwrap()
+        .len(),
         2
     );
 }

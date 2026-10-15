@@ -29,7 +29,14 @@ async fn append_with_test_config(
     config: &crate::config::Config,
     origin: Option<&crate::agent::turn_origin::AgentTurnOrigin>,
 ) -> Result<Outcome<ApiEnvelope<ConversationMessageRecord>>, ThreadsError> {
-    message_append_with_config(&crate::core::runtime::DispatchCtx::ambient(), request, config, origin, &config.workspace_dir).await
+    message_append_with_config(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        request,
+        config,
+        origin,
+        &config.workspace_dir,
+    )
+    .await
 }
 
 fn request(id: &str, content: &str, sender: &str) -> AppendConversationMessageRequest {
@@ -101,10 +108,13 @@ async fn user_append_stages_original_strips_upload_bytes_and_reuses_returned_con
     .await
     .unwrap();
     assert_eq!(staged, first.content);
-    let persisted =
-        conversations::blocking::get_messages(crate::core::runtime::DispatchCtx::ambient(), config.workspace_dir.clone(), "uploads".into())
-            .await
-            .unwrap();
+    let persisted = conversations::blocking::get_messages(
+        crate::core::runtime::DispatchCtx::ambient(),
+        config.workspace_dir.clone(),
+        "uploads".into(),
+    )
+    .await
+    .unwrap();
     assert_eq!(persisted.len(), 2);
     assert!(!serde_json::to_string(&persisted)
         .unwrap()
@@ -139,12 +149,14 @@ async fn rejected_upload_never_appends_a_message() {
             .await
             .is_err()
     );
-    assert!(
-        conversations::blocking::get_messages(crate::core::runtime::DispatchCtx::ambient(), config.workspace_dir.clone(), "uploads".into())
-            .await
-            .unwrap()
-            .is_empty()
-    );
+    assert!(conversations::blocking::get_messages(
+        crate::core::runtime::DispatchCtx::ambient(),
+        config.workspace_dir.clone(),
+        "uploads".into()
+    )
+    .await
+    .unwrap()
+    .is_empty());
 }
 
 #[tokio::test]
@@ -172,12 +184,14 @@ async fn external_origin_cannot_reuse_an_existing_attachment_marker() {
             .await
             .is_err()
     );
-    assert!(
-        conversations::blocking::get_messages(crate::core::runtime::DispatchCtx::ambient(), config.workspace_dir, "uploads".into())
-            .await
-            .unwrap()
-            .is_empty()
-    );
+    assert!(conversations::blocking::get_messages(
+        crate::core::runtime::DispatchCtx::ambient(),
+        config.workspace_dir,
+        "uploads".into()
+    )
+    .await
+    .unwrap()
+    .is_empty());
 }
 
 #[tokio::test]
@@ -238,16 +252,22 @@ async fn append_uses_host_persistence_workspace_separate_from_rpc_config() {
     .await
     .unwrap();
 
-    let persisted = conversations::blocking::get_messages(crate::core::runtime::DispatchCtx::ambient(), persistence_dir, "uploads".into())
-        .await
-        .unwrap();
+    let persisted = conversations::blocking::get_messages(
+        crate::core::runtime::DispatchCtx::ambient(),
+        persistence_dir,
+        "uploads".into(),
+    )
+    .await
+    .unwrap();
     assert_eq!(persisted.len(), 1);
-    assert!(
-        conversations::blocking::get_messages(crate::core::runtime::DispatchCtx::ambient(), config.workspace_dir, "uploads".into())
-            .await
-            .unwrap()
-            .is_empty()
-    );
+    assert!(conversations::blocking::get_messages(
+        crate::core::runtime::DispatchCtx::ambient(),
+        config.workspace_dir,
+        "uploads".into()
+    )
+    .await
+    .unwrap()
+    .is_empty());
 }
 
 #[tokio::test]
@@ -261,12 +281,14 @@ async fn poster_only_user_metadata_is_rejected_before_persistence() {
     assert!(append_with_test_config(upload, &config, None)
         .await
         .is_err());
-    assert!(
-        conversations::blocking::get_messages(crate::core::runtime::DispatchCtx::ambient(), config.workspace_dir.clone(), "uploads".into())
-            .await
-            .unwrap()
-            .is_empty()
-    );
+    assert!(conversations::blocking::get_messages(
+        crate::core::runtime::DispatchCtx::ambient(),
+        config.workspace_dir.clone(),
+        "uploads".into()
+    )
+    .await
+    .unwrap()
+    .is_empty());
 }
 
 #[tokio::test]
