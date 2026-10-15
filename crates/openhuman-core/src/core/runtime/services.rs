@@ -255,8 +255,8 @@ pub fn spawn_flows_boot_reconcile() {
 pub fn spawn_cron_service(
     ctx: std::sync::Arc<crate::core::runtime::CoreContext>,
 ) -> tokio::task::JoinHandle<()> {
-    let dispatch = crate::core::runtime::DispatchCtx::new(ctx.clone());
-    tokio::spawn(crate::core::runtime::CoreContext::scope(ctx, async move {
+    let dispatch = crate::core::runtime::DispatchCtx::new(ctx);
+    dispatch.clone().spawn(async move {
         match dispatch.load_config().await {
             Ok(config) => {
                 if !config.cron.enabled {
