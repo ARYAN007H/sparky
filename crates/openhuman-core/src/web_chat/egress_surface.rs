@@ -12,7 +12,7 @@ use tinybus::{EventHandler, SubscriptionHandle};
 use crate::core::events::DomainEvent;
 use crate::web_chat::WebChannelEvent;
 
-use super::event_bus::publish_web_channel_event;
+use super::event_bus::publish_web_channel_event_in;
 
 static EGRESS_SURFACE_HANDLE: OnceLock<SubscriptionHandle> = OnceLock::new();
 

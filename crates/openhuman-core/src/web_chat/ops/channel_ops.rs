@@ -8,7 +8,7 @@ use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
 use crate::web_chat::WebChannelEvent;
 
-use super::super::event_bus::publish_web_channel_event;
+use super::super::event_bus::publish_web_channel_event_in;
 use super::super::types::ChatRequestMetadata;
 use super::parallel_turn::{cancel_parallel_turn_by_request_id, cancel_parallel_turns_for_thread};
 use super::start_chat::start_chat;

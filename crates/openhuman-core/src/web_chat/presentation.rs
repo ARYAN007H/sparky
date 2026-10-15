@@ -4,7 +4,7 @@
 use crate::agent::tinyagents::host::LastTurnUsage;
 use crate::web_chat::{SubagentUsagePayload, TurnUsagePayload, WebChannelEvent};
 
-use super::publish_web_channel_event;
+use super::publish_web_channel_event_in;
 
 /// Convert a turn's [`LastTurnUsage`] into the wire payload carried on
 /// `chat_done`. Returns `None` for a turn that recorded no spend at all (e.g. a

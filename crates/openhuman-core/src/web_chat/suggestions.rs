@@ -37,7 +37,7 @@ use tinyinference_llm::model::ModelRequest;
 use crate::inference::provider;
 use crate::web_chat::{ChatSuggestion, WebChannelEvent};
 
-use super::publish_web_channel_event;
+use super::publish_web_channel_event_in;
 
 /// Upper bound on the whole suggestions round-trip. A cheap `summarization`
 /// role call should complete in well under this; if it doesn't, the turn has

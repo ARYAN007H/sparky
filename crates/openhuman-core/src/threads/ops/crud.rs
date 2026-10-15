@@ -459,7 +459,7 @@ async fn thread_delete_inner(
     // returns early on error; if invalidation ran after, an active
     // session for the now-deleted thread could linger and try to
     // append to a thread index row that no longer exists.
-    web_channel::invalidate_thread_sessions(&request.thread_id).await;
+    web_channel::invalidate_thread_sessions(ctx, &request.thread_id).await;
     // Cancel any detached sub-agents this thread spawned BEFORE clearing their
     // queued results: abort the in-flight ones first so a child can't record a
     // completion in the gap between the two calls, then discard anything already
