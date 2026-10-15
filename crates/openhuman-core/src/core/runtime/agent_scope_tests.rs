@@ -201,3 +201,50 @@ fn an_unscoped_saas_task_never_meets_shared_slots() {
         &ctx.agent_state().slot::<Counter>()
     ));
 }
+
+#[tokio::test]
+async fn an_explicit_dispatch_context_wins_over_the_ambient_one() {
+    let parent = root("/tmp/agent-scope-explicit");
+    let alpha = agent(&parent, "alpha");
+    let beta = agent(&parent, "beta");
+
+    // The ambient scope is beta's; the explicit context is alpha's, and the
+    // slot must come from alpha's.
+    let (explicit, ambient) = CoreContext::scope(Arc::clone(&beta), async {
+        (
+            slot_for::<Counter>(&DispatchCtx::new(Arc::clone(&alpha))),
+            slot_for::<Counter>(&DispatchCtx::ambient()),
+        )
+    })
+    .await;
+
+    assert!(Arc::ptr_eq(&explicit, &alpha.agent_state().slot::<Counter>()));
+    assert!(Arc::ptr_eq(&ambient, &beta.agent_state().slot::<Counter>()));
+    assert!(!Arc::ptr_eq(&explicit, &ambient));
+}
+
+#[tokio::test]
+async fn explicit_contexts_keep_their_slots_across_awaits_and_spawned_tasks() {
+    let parent = root("/tmp/agent-scope-concurrent");
+    let alpha = DispatchCtx::new(agent(&parent, "alpha"));
+    let beta = DispatchCtx::new(agent(&parent, "beta"));
+
+    let work = |ctx: DispatchCtx, times: u32| async move {
+        for _ in 0..times {
+            tokio::task::yield_now().await;
+            *slot_for::<Counter>(&ctx).0.lock().unwrap() += 1;
+        }
+        // A spawned task with no ambient scope still reaches the same slot
+        // because the context travels as an argument.
+        tokio::spawn(async move { *slot_for::<Counter>(&ctx).0.lock().unwrap() })
+            .await
+            .unwrap()
+    };
+    let (a, b) = tokio::join!(
+        tokio::spawn(work(alpha.clone(), 3)),
+        tokio::spawn(work(beta.clone(), 5))
+    );
+
+    assert_eq!(a.unwrap(), 3, "alpha counts only its own work");
+    assert_eq!(b.unwrap(), 5, "beta counts only its own work");
+}
