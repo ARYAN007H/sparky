@@ -32,7 +32,7 @@ use serde_json::json;
 use tinystoragedrivers::{CollectionSpec, Precondition, Query, Scope};
 
 use super::{block_on, installed, DocumentStoreExt, StorageBackend};
-use crate::core::runtime::{AgentContextRegistry, CoreContext};
+use crate::core::runtime::{AgentContextRegistry, CoreContext, DispatchCtx};
 
 /// The `local`-scope collection recording which agents have their own scope.
 const AGENTS: &str = "storage_agents";
@@ -245,7 +245,7 @@ pub async fn find_owner<F, Fut>(
     probe: F,
 ) -> Result<Option<Option<String>>, LookupFailed>
 where
-    F: Fn() -> Fut,
+    F: Fn(DispatchCtx) -> Fut,
     Fut: Future<Output = Result<bool, String>>,
 {
     decide(for_each_scope(label, probe).await)
