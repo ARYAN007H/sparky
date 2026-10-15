@@ -17,6 +17,8 @@ use tinyagents_session::transcript::{
 };
 
 const AGENT_ID: &str = "test-agent";
+/// The store key the fixtures' legacy JSONL is imported under.
+const STORE_KEY: &str = "orchestrator";
 
 fn base_meta(agent_id: &str, thread_id: &str) -> TranscriptMeta {
     TranscriptMeta {
@@ -125,7 +127,7 @@ fn truncate_transcript_before_turn_cuts_head_and_seals_original_untouched() {
 
     let original_bytes = std::fs::read(&path).expect("read original transcript");
 
-    truncate_transcript_before_turn(dir.path(), thread_id, &req2).expect("truncate");
+    truncate_transcript_before_turn(dir.path(), STORE_KEY, thread_id, &req2).expect("truncate");
 
     // Sealed generation preserved byte-for-byte: "a compaction never
     // erases" applies identically to this edit-driven fork.
@@ -136,7 +138,7 @@ fn truncate_transcript_before_turn_cuts_head_and_seals_original_untouched() {
     );
 
     // Head truncated: the new head ends right before turn 2's first row.
-    let (_, _, head) = resolve_head_transcript(dir.path(), thread_id).expect("resolve head");
+    let (_, _, head) = resolve_head_transcript(dir.path(), STORE_KEY, thread_id).expect("resolve head");
     assert!(
         head.messages
             .iter()
@@ -145,6 +147,22 @@ fn truncate_transcript_before_turn_cuts_head_and_seals_original_untouched() {
         head.messages
     );
     let last = head.messages.last().expect("head keeps turn 1");
+    // The sealed generation is still readable through the store port, with
+    // both turns, even though the model now reads only the new head.
+    let locator = crate::agent::session_store::transcripts_or_files(STORE_KEY, dir.path());
+    let sealed = locator
+        .read_session_transcript(&SessionRef::scoped(thread_id, AGENT_ID))
+        .expect("sealed generation stays in the store")
+        .read_session()
+        .expect("read sealed")
+        .expect("sealed transcript exists");
+    assert!(
+        sealed
+            .messages
+            .iter()
+            .any(|m| m.request_id.as_deref() == Some(req2.as_str())),
+        "the sealed generation keeps the dropped turn"
+    );
     assert_eq!(last.request_id.as_deref(), Some(req1.as_str()));
     assert_eq!(last.content, "answer 1", "turn 1's answer is kept intact");
 }
@@ -155,7 +173,7 @@ fn truncate_transcript_before_turn_errs_when_turn_not_found() {
     let thread_id = "thread-missing-turn";
     write_two_turn_transcript(dir.path(), thread_id);
 
-    let err = truncate_transcript_before_turn(dir.path(), thread_id, "no-such-turn")
+    let err = truncate_transcript_before_turn(dir.path(), STORE_KEY, thread_id, "no-such-turn")
         .expect_err("unknown request_id must fail");
     assert!(
         err.contains("no-such-turn"),
@@ -171,7 +189,7 @@ fn truncate_transcript_for_regenerate_targets_specific_turn() {
     let original_bytes = std::fs::read(&path).expect("read original transcript");
 
     let (prompt, request_id) =
-        truncate_transcript_for_regenerate(dir.path(), thread_id, Some(&req2))
+        truncate_transcript_for_regenerate(dir.path(), STORE_KEY, thread_id, Some(&req2))
             .expect("truncate")
             .expect("a turn to regenerate");
     assert_eq!(prompt, "user prompt 2");
@@ -183,7 +201,7 @@ fn truncate_transcript_for_regenerate_targets_specific_turn() {
         "sealed generation must stay byte-for-byte untouched"
     );
 
-    let (_, _, head) = resolve_head_transcript(dir.path(), thread_id).expect("resolve head");
+    let (_, _, head) = resolve_head_transcript(dir.path(), STORE_KEY, thread_id).expect("resolve head");
     let last = head.messages.last().expect("head keeps turn 2's prompt");
     assert_eq!(last.role, "user");
     assert_eq!(last.content, "user prompt 2");
@@ -201,7 +219,7 @@ fn truncate_transcript_for_regenerate_none_resolves_last_turn() {
     let thread_id = "thread-regen-last";
     let (_, _req1, req2) = write_two_turn_transcript(dir.path(), thread_id);
 
-    let (prompt, request_id) = truncate_transcript_for_regenerate(dir.path(), thread_id, None)
+    let (prompt, request_id) = truncate_transcript_for_regenerate(dir.path(), STORE_KEY, thread_id, None)
         .expect("truncate")
         .expect("a turn to regenerate");
 
@@ -215,7 +233,7 @@ fn truncate_transcript_for_regenerate_returns_none_when_no_turn_exists() {
     let thread_id = "thread-no-turns";
     write_turnless_transcript(dir.path(), thread_id);
 
-    let result = truncate_transcript_for_regenerate(dir.path(), thread_id, None).expect("truncate");
+    let result = truncate_transcript_for_regenerate(dir.path(), STORE_KEY, thread_id, None).expect("truncate");
     assert_eq!(result, None, "no user/assistant turn to regenerate");
 }
 
@@ -226,7 +244,7 @@ fn truncate_transcript_for_regenerate_returns_none_when_no_turn_exists() {
 fn truncate_transcript_for_regenerate_returns_none_when_thread_has_no_transcript() {
     let dir = TempDir::new().expect("tempdir");
 
-    let result = truncate_transcript_for_regenerate(dir.path(), "thread-without-transcript", None)
+    let result = truncate_transcript_for_regenerate(dir.path(), STORE_KEY, "thread-without-transcript", None)
         .expect("a thread with no transcript has no turn to regenerate, not an error");
     assert_eq!(result, None);
 }
