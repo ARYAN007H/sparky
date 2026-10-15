@@ -50,9 +50,10 @@ async fn every_desktop_controller_answers_component_disabled_when_computer_is_of
     let (_dir, context) = scoped_context(false);
     CoreContext::scope(context.clone(), async {
         for function in ["status", "probe", "pending"] {
-            let error = (controller(function).handler)(DispatchCtx::new(context.clone()), Map::new())
-                .await
-                .unwrap_err();
+            let error =
+                (controller(function).handler)(DispatchCtx::new(context.clone()), Map::new())
+                    .await
+                    .unwrap_err();
             assert!(
                 error.contains("COMPONENT_DISABLED:computer"),
                 "{function}: {error}"
@@ -133,9 +134,10 @@ async fn controllers_use_scoped_config_for_disabled_desktop_and_reject_unknown_c
 
         let mut params = Map::new();
         params.insert("enabled".to_owned(), Value::Bool(false));
-        let disabled = (controller("set_enabled").handler)(DispatchCtx::new(context.clone()), params)
-            .await
-            .unwrap();
+        let disabled =
+            (controller("set_enabled").handler)(DispatchCtx::new(context.clone()), params)
+                .await
+                .unwrap();
         assert_eq!(disabled["enabled"], false);
 
         let mut params = Map::new();
