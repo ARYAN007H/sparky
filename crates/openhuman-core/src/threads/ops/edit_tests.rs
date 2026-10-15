@@ -345,3 +345,24 @@ fn transcript_store_for_a_desktop_tenant_uses_the_chat_agent_and_an_embedded_age
     );
     assert_eq!(embedded.key, "agent-7");
 }
+
+/// The handler-level resolution: the key comes from the request's own
+/// `DispatchCtx` (its profile), with no ambient context in scope.
+#[tokio::test]
+async fn transcript_store_reads_the_profile_from_the_request_context() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+    let dir = TempDir::new().expect("tempdir");
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = dir.path().to_path_buf();
+    let overlay = ContextOverlay::new(
+        config,
+        DomainSet::kernel(),
+        crate::tools::toolpacks::ToolGroups::none(),
+    )
+    .profile("profile-b");
+    let ctx = DispatchCtx::new(CoreContext::for_test(DomainSet::full(), None).derive_with(overlay));
+
+    let store = transcript_store(&ctx).await.expect("resolve the store");
+    assert_eq!(store.key, "profile-b~default");
+    assert_eq!(store.workspace_dir, dir.path());
+}
