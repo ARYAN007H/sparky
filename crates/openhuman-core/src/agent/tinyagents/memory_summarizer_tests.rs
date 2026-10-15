@@ -23,6 +23,7 @@ async fn bound_turn(tmp: &tempfile::TempDir) -> Arc<MemoryTurn> {
     bind_reference(&config);
     let identity = MemoryIdentity::agent("orchestrator").resolve(&config);
     pre_turn(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &identity,
         PreTurnInput {
@@ -53,6 +54,7 @@ async fn bound_turn(tmp: &tempfile::TempDir) -> Arc<MemoryTurn> {
         identity,
         thread_id: "t".into(),
         pack: None,
+        core: None,
     })
 }
 
@@ -233,6 +235,7 @@ async fn a_held_memory_engine_does_not_delay_transcript_compaction() {
         identity,
         thread_id: "held".into(),
         pack: None,
+        core: None,
     });
     let summarizer = MemoryRecallSummarizer::wrap(Box::new(ConcatSummarizer), Some(turn));
     let record = tokio::time::timeout(
