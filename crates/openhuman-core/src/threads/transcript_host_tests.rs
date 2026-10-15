@@ -229,6 +229,7 @@ fn text_dialect_tool_turn_projects_calls_on_their_issuing_row_as_settled() {
         ],
         "the issuing assistant row carries its calls"
     );
+    eprintln!("DBG {:?}", assistants[1].turn_usage);
     assert!(
         assistants[1]
             .turn_usage
