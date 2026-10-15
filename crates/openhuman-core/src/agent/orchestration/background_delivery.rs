@@ -43,6 +43,11 @@ use crate::core::events::DomainEvent;
 use tinybus::EventHandler;
 use tinybus::SubscriptionHandle;
 
+mod slot;
+use slot::DeliverySlot;
+#[cfg(test)]
+use slot::delivering;
+
 use super::background_completions;
 use super::busy_guard::is_busy;
 #[cfg(test)]
@@ -59,13 +64,6 @@ const DEBOUNCE: Duration = Duration::from_secs(3);
 /// How long after boot a recovered, never-delivered completion waits before its
 /// delivery turn, so providers and the session store are up first.
 const RECOVERY_DELAY: Duration = Duration::from_secs(15);
-
-/// Threads whose delivery turn is in flight — prevents two concurrent turns.
-/// Keyed by [`tenant::profile_key`] of the thread id, for the same reason.
-fn delivering() -> &'static Mutex<HashSet<String>> {
-    static D: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
-    D.get_or_init(|| Mutex::new(HashSet::new()))
-}
 
 /// Ask for a delivery attempt on `thread_id` soon (after a Stop cleared a stale
 /// busy mark, or anything else that may have left a drain without its trigger).
@@ -594,47 +592,6 @@ where
 
     // The slot is released only AFTER the turn settles (on drop).
     retry_after
-}
-
-/// The per-thread (per profile) delivery slot, plus the batch lease.
-/// Dropping it frees both: `release` on an already-settled record is a no-op,
-/// so a settled batch is untouched and an abandoned one is claimable again.
-struct DeliverySlot {
-    /// [`tenant::profile_key`] of the thread id.
-    key: String,
-    router: Arc<CompletionRouter>,
-    held: Vec<String>,
-}
-
-impl DeliverySlot {
-    /// `None` when a delivery is already in flight for the thread.
-    fn claim(ctx: &DispatchCtx, thread_id: &str, router: Arc<CompletionRouter>) -> Option<Self> {
-        let key = tenant::profile_key_in(&super::busy_guard::caller(ctx), thread_id);
-        let mut d = delivering().lock().expect("delivering poisoned");
-        if !d.insert(key.clone()) {
-            return None;
-        }
-        Some(Self {
-            key,
-            router,
-            held: Vec::new(),
-        })
-    }
-
-    fn hold(&mut self, task_ids: &[String]) {
-        self.held = task_ids.to_vec();
-    }
-}
-
-impl Drop for DeliverySlot {
-    fn drop(&mut self) {
-        if !self.held.is_empty() {
-            self.router.release(&self.held);
-        }
-        if let Ok(mut d) = delivering().lock() {
-            d.remove(&self.key);
-        }
-    }
 }
 
 /// Run one system-authored delivery turn on an existing conversation thread.
