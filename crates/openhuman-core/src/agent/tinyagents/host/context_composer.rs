@@ -74,6 +74,7 @@ use crate::agent::prompts::{
     PromptContext, PromptTool, SystemPromptBuilder,
 };
 use crate::config::{Config, DEFAULT_MODEL};
+use crate::core::runtime::DispatchCtx;
 use tinyskills::Skill as Workflow;
 
 /// Composes OpenHuman's system prompt for a TinyAgents turn.
@@ -127,8 +128,15 @@ impl OpenHumanContextComposer {
             model_name,
             tool_call_format: ToolCallFormat::Json,
             connected_integrations: Vec::new(),
+            dispatch: None,
             builder: SystemPromptBuilder::with_defaults(),
         }
+    }
+
+    /// Binds the turn's dispatch context, which the composer reads config under.
+    pub fn with_dispatch(mut self, dispatch: DispatchCtx) -> Self {
+        self.dispatch = Some(dispatch);
+        self
     }
 
     /// Pins the model name rendered into the runtime section.
