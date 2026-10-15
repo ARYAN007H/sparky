@@ -58,8 +58,8 @@ pub(in super::super) async fn run_subagent_via_graph(
     model_vision: bool,
     // Transcript-persistence provenance: the resolved child transcript stem
     // (`{parent_chain}__{child_session_key}`) and the provider label (the parent
-    // turn's event channel) so the child's raw transcript lands in `session_raw`
-    // with the right stem + provider/model meta — parity with the removed
+    // turn's event channel) so the child's raw transcript lands in the turn
+    // tree's transcript store with the right stem + provider/model meta — parity with the removed
     // `SubagentObserver::persist_transcript`.
     transcript_stem: &str,
     provider_label: &str,
@@ -285,8 +285,8 @@ pub(in super::super) async fn run_subagent_via_graph(
         Err(err) => {
             // #4466: the harness dropped its partial transcript, but the snapshot
             // middleware mirrored every completed round. Persist those rounds to
-            // `session_raw` (so `learning/transcript_ingest` can still read a
-            // failed run) and mirror them onto the worker thread, THEN surface the
+            // the turn tree's transcript store (so the thread's usage and view
+            // still count a failed run) and mirror them onto the worker thread, THEN surface the
             // error. Previously the `?`-return skipped both persistence steps, so
             // a failed run left no transcript and an empty worker thread.
             let mapped = map_tinyagents_subagent_error(err);
@@ -444,11 +444,9 @@ pub(in super::super) async fn run_subagent_via_graph(
         }
     }
 
-    // Persist the sub-agent's raw transcript to `session_raw` (parity with the
-    // removed `SubagentObserver::persist_transcript`). The graph runner replaced
-    // the observer but only mirrored to the worker thread, so per-child
-    // transcripts stopped being written — breaking downstream learning ingestion
-    // (`learning/transcript_ingest`, which reads `session_raw/*.jsonl`).
+    // Persist the sub-agent's raw transcript to the turn tree's transcript
+    // store (parity with the removed `SubagentObserver::persist_transcript`),
+    // where the thread's usage and transcript view read every child back.
     // On a cap-hit / early-exit, `outcome.text` is the checkpoint (or clarifying
     // question) that stands in for a final assistant turn — append it so the
     // persisted transcript reflects the actual final state, not the pre-checkpoint
