@@ -489,12 +489,9 @@ fn a_subagent_thread_binding_claims_no_session_identity() {
     };
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
 
-    let mut root = super::OpenHumanSessionHost::from_config_for_agent(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        &config,
-        "orchestrator",
-    )
-    .unwrap();
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let mut root =
+        super::OpenHumanSessionHost::from_config_for_agent(&ctx, &config, "orchestrator").unwrap();
     root.set_thread_id(Some("thread-1"));
     // The exact stem encoding (sanitisation, per-component digest, generation
     // suffix) belongs to tinyagents and is pinned by its own tests. What
@@ -508,12 +505,8 @@ fn a_subagent_thread_binding_claims_no_session_identity() {
         "a root chat session is addressed by its conversation, got {root_session}"
     );
 
-    let mut child = super::OpenHumanSessionHost::from_config_for_agent(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        &config,
-        "orchestrator",
-    )
-    .unwrap();
+    let mut child =
+        super::OpenHumanSessionHost::from_config_for_agent(&ctx, &config, "orchestrator").unwrap();
     child.session_parent_prefix = Some("1713000000_orchestrator".into());
     child.set_thread_id(Some("thread-1"));
     assert_eq!(child.session_id(), None);
