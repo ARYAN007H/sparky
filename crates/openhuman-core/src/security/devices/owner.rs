@@ -151,7 +151,7 @@ pub(super) async fn owner_of(
         }
     }
     let lookups = crate::storage::agents::for_each_scope("device owner", |scope_ctx| {
-        has_live_device_in(scope_ctx, channel_id)
+        has_live_device(&scope_ctx, channel_id)
     })
     .await;
     let owner = decide(lookups)?;
