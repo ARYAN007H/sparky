@@ -81,11 +81,15 @@ fn unbound_context_carries_no_turn_origin_or_agent_state() {
 
 #[tokio::test]
 async fn host_default_is_the_process_default_whatever_the_task_scope_says() {
-    // `first` makes sure a process default exists; `scoped` is a later context.
-    let _first = CoreContext::for_test(DomainSet::full(), None);
+    // A test context is never the process default, so the scoped one below
+    // must not be what `host_default` answers with.
     let scoped = CoreContext::for_test(DomainSet::full(), None);
-    let default = CoreContext::default_context().expect("a context was built");
-    assert!(!Arc::ptr_eq(&default, &scoped));
+    let default = CoreContext::default_context();
+    let same = |ctx: &DispatchCtx| match (ctx.core(), &default) {
+        (Some(got), Some(want)) => Arc::ptr_eq(got, want),
+        (None, None) => true,
+        _ => false,
+    };
 
     let host = CoreContext::scope(Arc::clone(&scoped), async {
         // Across an await and inside a spawned task the answer is the same.
@@ -93,9 +97,10 @@ async fn host_default_is_the_process_default_whatever_the_task_scope_says() {
         let spawned = tokio::spawn(async { DispatchCtx::host_default() })
             .await
             .unwrap();
-        assert!(Arc::ptr_eq(spawned.core().unwrap(), &default));
+        assert!(same(&spawned));
         DispatchCtx::host_default()
     })
     .await;
-    assert!(Arc::ptr_eq(host.core().unwrap(), &default));
+    assert!(same(&host));
+    assert!(host.core().is_none_or(|got| !Arc::ptr_eq(got, &scoped)));
 }
