@@ -160,7 +160,9 @@ pub fn transcripts_or_files_in(
         });
     match provider {
         Some(provider) => {
-            log::debug!("[session_store] transcripts via the carried context's store agent={agent_id}");
+            log::debug!(
+                "[session_store] transcripts via the carried context's store agent={agent_id}"
+            );
             provider.for_agent(agent_id).transcripts
         }
         None => workspace_transcripts(agent_id, workspace_dir),
