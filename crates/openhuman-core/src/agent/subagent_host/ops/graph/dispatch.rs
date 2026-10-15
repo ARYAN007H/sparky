@@ -468,7 +468,7 @@ pub(in super::super) async fn run_subagent_via_graph(
     };
     persist_subagent_transcript(
         &dispatch,
-        &workspace_dir
+        &workspace_dir,
         transcript_stem,
         agent_id,
         task_id,
