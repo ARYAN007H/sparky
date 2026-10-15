@@ -153,17 +153,66 @@ async fn files_a_blob_backed_generated_artifact() {
         .await
         .expect("artifact record");
     let file = record.file.expect("visible file");
-    assert_eq!(artifact["path"].as_str(), Some(file.as_str()));
+    let canonical_file = std::path::Path::new(&file).canonicalize().unwrap();
+    assert_eq!(
+        artifact["path"].as_str(),
+        Some(canonical_file.to_str().unwrap())
+    );
     assert_eq!(
         result.markdown_formatted.as_deref(),
-        Some(format!("Saved image at {file}\nCost: $0.01").as_str())
+        Some(format!("Saved image at {}\nCost: $0.01", canonical_file.display()).as_str())
     );
-    assert_eq!(std::fs::read(file).unwrap(), b"blob-media-bytes");
+    assert_eq!(std::fs::read(&file).unwrap(), b"blob-media-bytes");
     assert!(blobs
         .get("generated-media/stub-0.png")
         .await
         .unwrap()
         .is_none());
+
+    let (_, failed_file) = crate::agent::artifacts::create_artifact_for_call(
+        &workspace,
+        files_dir.clone(),
+        ArtifactKind::Video,
+        "Failed generated clip",
+        "mp4",
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+    std::fs::write(&failed_file, b"failed output").unwrap();
+    let failed = crate::agent::artifacts::store::list_artifacts(&workspace, 0, 10, None)
+        .await
+        .unwrap()
+        .0
+        .into_iter()
+        .find(|meta| meta.title == "Failed generated clip")
+        .expect("failed artifact record");
+    crate::agent::artifacts::fail_artifact(
+        &workspace,
+        files_dir.clone(),
+        &failed.id,
+        "test finalization failure",
+        None,
+    )
+    .await
+    .unwrap();
+
+    let fresh = MediaArtifactTool::new(
+        StubMediaTool {
+            file_count: 0,
+            fail: false,
+        },
+        ArtifactKind::Image,
+        workspace.clone(),
+        files_dir,
+    )
+    .with_blobs(blobs)
+    .with_reference_allowlist(Arc::new(std::sync::Mutex::new(Default::default())));
+    fresh.refresh_allowed_references().await;
+    let allowed = fresh.allowed_references.as_ref().unwrap().lock().unwrap();
+    assert!(allowed.contains(&std::path::PathBuf::from(file).canonicalize().unwrap()));
+    assert!(!allowed.contains(&failed_file.canonicalize().unwrap()));
 }
 
 #[tokio::test]

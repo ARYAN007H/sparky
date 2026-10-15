@@ -239,23 +239,24 @@ impl<T: Tool> MediaArtifactTool<T> {
         };
         match stored {
             Ok(size_bytes) => {
-                let filed_path = dest.display().to_string();
+                let canonical = dest.canonicalize().ok();
+                let filed_path = canonical.as_deref().unwrap_or(&dest).display().to_string();
                 if let Some(obj) = entry.as_object_mut() {
                     obj.insert("path".into(), json!(filed_path));
-                }
-                if let Some(allowed) = &self.allowed_references {
-                    if let Ok(canonical) = dest.canonicalize() {
-                        allowed
-                            .lock()
-                            .unwrap_or_else(std::sync::PoisonError::into_inner)
-                            .insert(canonical);
-                    }
                 }
                 match self
                     .finalize_and_discard_blob(&meta.id, size_bytes, chat, src)
                     .await
                 {
                     Ok(updated) => {
+                        if let (Some(allowed), Some(canonical)) =
+                            (&self.allowed_references, canonical)
+                        {
+                            allowed
+                                .lock()
+                                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                                .insert(canonical);
+                        }
                         if let Some(obj) = entry.as_object_mut() {
                             obj.insert("artifact_id".into(), json!(updated.id));
                         }
@@ -317,6 +318,69 @@ impl<T: Tool> MediaArtifactTool<T> {
             finalize_artifact(&self.workspace_dir, artifact_id, size_bytes, chat).await?;
         self.delete_blob_after_finalize(src).await;
         Ok(finalized)
+    }
+
+    /// Rehydrates finalized media paths after a session rebuild. Only Ready
+    /// image/video artifacts whose files still resolve through the configured
+    /// trusted roots enter the exact-path allowlist.
+    async fn refresh_allowed_references(&self) {
+        let Some(allowed) = &self.allowed_references else {
+            return;
+        };
+
+        let mut recovered = std::collections::HashSet::new();
+        let mut offset = 0usize;
+        loop {
+            let (artifacts, total) = match crate::agent::artifacts::store::list_artifacts(
+                &self.workspace_dir,
+                offset,
+                200,
+                None,
+            )
+            .await
+            {
+                Ok(page) => page,
+                Err(error) => {
+                    tracing::warn!(
+                        target: "media_generation",
+                        %error,
+                        "[media_generation] could not refresh reusable artifact paths"
+                    );
+                    return;
+                }
+            };
+
+            for meta in artifacts.iter().filter(|meta| {
+                matches!(&meta.kind, ArtifactKind::Image | ArtifactKind::Video)
+                    && matches!(&meta.status, crate::agent::artifacts::ArtifactStatus::Ready)
+            }) {
+                let Ok(path) = crate::agent::artifacts::resolve_ready_file(
+                    &self.workspace_dir,
+                    &self.files_dir,
+                    &meta.id,
+                )
+                .await
+                else {
+                    continue;
+                };
+                if let Ok(path) = tokio::fs::canonicalize(path).await {
+                    recovered.insert(path);
+                }
+            }
+
+            let page_len = artifacts.len();
+            offset = offset.saturating_add(page_len);
+            if page_len == 0 || offset >= total {
+                break;
+            }
+        }
+
+        // Merge rather than replace so an artifact finalized concurrently with
+        // this scan cannot be lost from the current session's allowlist.
+        allowed
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .extend(recovered);
     }
 
     async fn file_blob(&self, key: &Path, dest: &Path) -> Result<u64, String> {
@@ -466,6 +530,8 @@ impl<T: Tool> Tool for MediaArtifactTool<T> {
         options: ToolCallOptions,
         context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
+        self.refresh_allowed_references().await;
+
         // Generation blocks for minutes; report a heartbeat (with the video
         // job's polled state) so the wait is visible on the call.
         let label = match self.kind {
