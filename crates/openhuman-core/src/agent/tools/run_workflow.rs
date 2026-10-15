@@ -323,6 +323,7 @@ impl Tool for RunWorkflowTool {
         context: Option<&dyn tinytools::ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
         let dispatch = crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(context);
+        let origin = crate::agent::tinyagents::host::run_context::turn_origin_for_tool(context);
         // Accept `workflow_id`, falling back to the legacy `skill_id` alias so
         // any in-flight caller from before the rename still works.
         let workflow_id = match args
@@ -343,7 +344,7 @@ impl Tool for RunWorkflowTool {
         // Fire-and-forget: only the spawn backstop applies — no await, so no
         // re-entrancy/nesting slot to take.
         if wait_seconds == 0 {
-            return match spawn_workflow_run_background(workflow_id.clone(), inputs).await {
+            return match spawn_workflow_run_background(workflow_id.clone(), inputs, origin).await {
                 // Count only spawns that actually start against the backstop —
                 // unknown-workflow / bad-input rejections (the Err arm) must not
                 // burn the budget, or rejected calls accumulate and trip the
@@ -377,7 +378,7 @@ impl Tool for RunWorkflowTool {
             Err(e) => return Ok(ToolResult::error(format!("run_workflow: {e}"))),
         };
 
-        let started = match spawn_workflow_run_background(workflow_id.clone(), inputs).await {
+        let started = match spawn_workflow_run_background(workflow_id.clone(), inputs, origin).await {
             Ok(s) => {
                 if let Err(e) = guard::account_spawn(&dispatch) {
                     return Ok(ToolResult::error(format!("run_workflow: {e}")));

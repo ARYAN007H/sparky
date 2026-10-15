@@ -151,7 +151,16 @@ impl DispatchCtx {
         self.core.as_ref().and_then(|core| core.turn_origin().cloned())
     }
 
-    /// A non-owning handle on the bound context, for state that outlives the
+    /// [`turn_origin`](Self::turn_origin) of this call, else the origin the
+    /// calling task's turn scope carries. For a handler whose context was
+    /// built by a transport that does not carry the turn's origin, while a
+    /// turn that called it into being still holds it (transitional, #7801).
+    pub fn turn_origin_or_scoped(&self) -> Option<crate::agent::turn_origin::AgentTurnOrigin> {
+        self.turn_origin()
+            .or_else(|| Self::ambient_turn().turn_origin())
+    }
+
+, for state that outlives the
     /// call (a session, a built turn). The tenant lease is the strong count of
     /// the context ([`CoreContext::tenant_in_use`]), so a long-lived holder
     /// must not keep it alive.

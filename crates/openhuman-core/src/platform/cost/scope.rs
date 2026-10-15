@@ -24,7 +24,7 @@ impl UsageScope {
         provider: Option<&str>,
         subagent: Option<(&str, &str)>,
     ) -> Self {
-        let origin = crate::core::runtime::CoreContext::current_turn_origin();
+        let origin = ctx.turn_origin_or_scoped();
         let (thread_id, origin) = describe_origin(origin.as_ref());
         let session_agent = ctx.tenant().ok().and_then(|tenant| tenant.agent);
         let (agent_id, subagent_task_id) = match subagent {

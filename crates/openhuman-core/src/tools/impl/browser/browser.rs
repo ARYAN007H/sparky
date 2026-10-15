@@ -559,11 +559,8 @@ impl Tool for BrowserTool {
         }
         // The typed origin bound to this turn's immutable CoreContext by its
         // entry point (cron, background job, workflow, chat).
-        let origin = crate::core::runtime::CoreContext::current_turn_origin();
-        match self.run(&args, origin.as_ref()).await {
-            Ok(v) => Ok(ToolResult::success(serde_json::to_string_pretty(&v)?)),
-            Err(e) => Ok(ToolResult::error(e.to_string())),
-        }
+        let origin = crate::core::runtime::DispatchCtx::ambient_turn().turn_origin();
+        self.execute_with_origin(args, origin).await
     }
 
     async fn execute_with_context(
@@ -579,7 +576,8 @@ impl Tool for BrowserTool {
                 *held = Some(key);
             }
         }
-        self.execute(args).await
+        let origin = crate::agent::tinyagents::host::run_context::turn_origin_for_tool(context);
+        self.execute_with_origin(args, origin).await
     }
 }
 

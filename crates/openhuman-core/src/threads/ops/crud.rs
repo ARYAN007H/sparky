@@ -165,7 +165,7 @@ pub async fn message_append(
     ctx: &DispatchCtx,
     request: AppendConversationMessageRequest,
 ) -> Result<Outcome<ApiEnvelope<ConversationMessageRecord>>, ThreadsError> {
-    let origin = crate::core::runtime::CoreContext::current_turn_origin();
+    let origin = ctx.turn_origin_or_scoped();
     let config = ctx
         .load_config()
         .await
