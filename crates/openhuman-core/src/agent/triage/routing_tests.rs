@@ -123,7 +123,7 @@ async fn resolve_provider_with_config_always_returns_remote() {
     // Even when runtime_enabled is true, triage must always use remote.
     let mut config = test_config();
     config.local_ai.runtime_enabled = true;
-    let resolved = resolve_provider_with_config(&config)
+    let resolved = resolve_provider_with_config(&crate::core::runtime::DispatchCtx::ambient(), &config)
         .await
         .expect("resolve should succeed");
     assert!(!resolved.used_local, "triage must never use local AI");
@@ -134,7 +134,7 @@ async fn resolve_provider_with_config_always_returns_remote() {
 async fn resolve_provider_with_config_returns_remote_when_local_disabled() {
     let mut config = test_config();
     config.local_ai.runtime_enabled = false;
-    let resolved = resolve_provider_with_config(&config)
+    let resolved = resolve_provider_with_config(&crate::core::runtime::DispatchCtx::ambient(), &config)
         .await
         .expect("resolve should succeed");
     assert!(!resolved.used_local);

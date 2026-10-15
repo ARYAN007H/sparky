@@ -27,7 +27,7 @@ async fn flows_discover_applies_the_flow_discovery_definitions_effective_iterati
     assert_eq!(expected, 50);
 
     let agent =
-        crate::agent::OpenHumanSessionHost::from_config_for_agent(&config, "flow_discovery")
+        crate::agent::OpenHumanSessionHost::from_config_for_agent(&crate::core::runtime::DispatchCtx::ambient(), &config, "flow_discovery")
             .expect("build flow_discovery agent");
     assert_eq!(agent.agent_config().max_tool_iterations, expected);
 }

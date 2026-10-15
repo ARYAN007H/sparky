@@ -22,7 +22,7 @@ fn a_session_composes_the_operator_and_definition_layers() {
         .find(|def| def.id == "orchestrator")
         .expect("orchestrator");
     definition.disallowed_tools = vec!["web_*".to_string()];
-    let host = OpenHumanSessionHost::from_config_with_definition(&config, &definition)
+    let host = OpenHumanSessionHost::from_config_with_definition(&crate::core::runtime::DispatchCtx::ambient(), &config, &definition)
         .expect("session builds");
 
     let rules = host.session_tool_rules();

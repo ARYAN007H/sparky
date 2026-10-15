@@ -335,7 +335,7 @@ async fn an_empty_named_scope_advertises_no_tools_at_all() {
 
     let tmp = tempfile::TempDir::new().unwrap();
     let config = test_config(&tmp);
-    let agent = OpenHumanSessionHost::from_config_for_agent(&config, "summarizer")
+    let agent = OpenHumanSessionHost::from_config_for_agent(&crate::core::runtime::DispatchCtx::ambient(), &config, "summarizer")
         .expect("summarizer is a shipped agent definition");
 
     let visible = agent.visible_tool_names_for_test();
@@ -365,7 +365,7 @@ async fn a_zero_tool_agent_does_not_gain_the_compaction_recovery_tool() {
 
     let tmp = tempfile::TempDir::new().unwrap();
     let config = test_config(&tmp);
-    let agent = OpenHumanSessionHost::from_config_for_agent(&config, "trigger_triage")
+    let agent = OpenHumanSessionHost::from_config_for_agent(&crate::core::runtime::DispatchCtx::ambient(), &config, "trigger_triage")
         .expect("trigger_triage is a shipped agent definition");
 
     assert!(
@@ -421,7 +421,7 @@ async fn a_summarized_agent_sees_the_recovery_tool_with_compaction_off() {
     let mut config = test_config(&tmp);
     config.context.compaction_enabled = false;
     assert!(super::summarizes_tool_output("orchestrator", &config));
-    let agent = OpenHumanSessionHost::from_config_for_agent(&config, "orchestrator")
+    let agent = OpenHumanSessionHost::from_config_for_agent(&crate::core::runtime::DispatchCtx::ambient(), &config, "orchestrator")
         .expect("orchestrator is a shipped agent definition");
     let visible = agent.visible_tool_names_for_test();
     assert!(
@@ -494,7 +494,7 @@ async fn a_curated_orchestrator_sees_and_holds_every_juice_tool_in_handle_mode()
     config.tokenjuice.repl_handle_enabled = true;
     assert!(crate::inference::tokenjuice::repl_handle_active(&config));
 
-    let agent = OpenHumanSessionHost::from_config_for_agent(&config, "orchestrator")
+    let agent = OpenHumanSessionHost::from_config_for_agent(&crate::core::runtime::DispatchCtx::ambient(), &config, "orchestrator")
         .expect("orchestrator is a shipped agent definition");
     let visible = agent.visible_tool_names_for_test();
     assert!(

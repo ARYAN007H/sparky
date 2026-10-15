@@ -155,13 +155,13 @@ async fn thread_folder_upload_is_staged_where_the_turn_reads_it() {
     thread_in(&config, "gone", Some(&gone)).await;
     std::fs::remove_dir(&gone).unwrap();
 
-    let root = thread_action_dir(&config, &config.workspace_dir, Some("bound"))
+    let root = thread_action_dir(&crate::core::runtime::DispatchCtx::ambient(), &config, &config.workspace_dir, Some("bound"))
         .await
         .unwrap();
     assert_eq!(root, folder);
     for unbound in [Some("unbound"), Some("missing"), Some(""), None] {
         assert_eq!(
-            thread_action_dir(&config, &config.workspace_dir, unbound)
+            thread_action_dir(&crate::core::runtime::DispatchCtx::ambient(), &config, &config.workspace_dir, unbound)
                 .await
                 .unwrap(),
             config.action_dir
@@ -170,7 +170,7 @@ async fn thread_folder_upload_is_staged_where_the_turn_reads_it() {
     // A folder that disappeared is an error, as in `run_task`, not a silent
     // fallback to the global dir.
     assert!(
-        thread_action_dir(&config, &config.workspace_dir, Some("gone"))
+        thread_action_dir(&crate::core::runtime::DispatchCtx::ambient(), &config, &config.workspace_dir, Some("gone"))
             .await
             .is_err()
     );

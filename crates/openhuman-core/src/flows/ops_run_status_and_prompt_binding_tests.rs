@@ -151,7 +151,7 @@ async fn flows_build_hides_the_live_run_tool_from_the_builder_belt() {
     )
     .expect("agent registry init");
     let mut agent =
-        crate::agent::OpenHumanSessionHost::from_config_for_agent(&config, "workflow_builder")
+        crate::agent::OpenHumanSessionHost::from_config_for_agent(&crate::core::runtime::DispatchCtx::ambient(), &config, "workflow_builder")
             .expect("build workflow_builder agent");
     agent.set_agent_definition_name("workflow_builder".to_string());
 
@@ -251,7 +251,7 @@ async fn flows_build_copilot_toolset_unhides_the_live_run_tools() {
     )
     .expect("agent registry init");
     let mut agent =
-        crate::agent::OpenHumanSessionHost::from_config_for_agent(&config, "workflow_builder")
+        crate::agent::OpenHumanSessionHost::from_config_for_agent(&crate::core::runtime::DispatchCtx::ambient(), &config, "workflow_builder")
             .expect("build workflow_builder agent");
     agent.set_agent_definition_name("workflow_builder".to_string());
 
@@ -329,7 +329,7 @@ async fn flows_build_applies_the_builder_definitions_effective_iteration_cap() {
     // definition's cap straight off the unmodified `config` — the session
     // builder resolves it internally now, no `flows_build`-side override.
     let agent =
-        crate::agent::OpenHumanSessionHost::from_config_for_agent(&config, "workflow_builder")
+        crate::agent::OpenHumanSessionHost::from_config_for_agent(&crate::core::runtime::DispatchCtx::ambient(), &config, "workflow_builder")
             .expect("build workflow_builder agent");
     assert_eq!(agent.agent_config().max_tool_iterations, expected);
     assert_ne!(

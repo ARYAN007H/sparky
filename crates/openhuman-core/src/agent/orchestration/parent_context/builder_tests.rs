@@ -16,7 +16,7 @@ fn test_config() -> (tempfile::TempDir, Config) {
 #[tokio::test]
 async fn with_root_parent_hands_a_root_parent_to_the_closure() {
     let (_dir, config) = test_config();
-    let observed = with_root_parent(None, &config, "cron", "cron", "cron", |parent| async move {
+    let observed = with_root_parent(&crate::core::runtime::DispatchCtx::ambient(), None, &config, "cron", "cron", "cron", |parent| async move {
         parent.agent_definition_id
     })
     .await
@@ -33,10 +33,10 @@ async fn with_root_parent_hands_a_root_parent_to_the_closure() {
 #[tokio::test]
 async fn with_root_parent_uses_an_explicit_parent_override() {
     let (_dir, config) = test_config();
-    let outer = build_root_parent(&config, "outer", "outer", "outer")
+    let outer = build_root_parent(&crate::core::runtime::DispatchCtx::ambient(), &config, "outer", "outer", "outer")
         .await
         .expect("build explicit parent");
-    let observed = with_root_parent(
+    let observed = with_root_parent(&crate::core::runtime::DispatchCtx::ambient(), 
         Some(outer),
         &config,
         "inner",
@@ -59,11 +59,11 @@ async fn with_root_parent_uses_an_explicit_parent_override() {
 async fn concurrent_root_parents_do_not_cross() {
     let (_dir, config) = test_config();
     let (a, b) = tokio::join!(
-        with_root_parent(None, &config, "surface_a", "a", "a", |parent| async move {
+        with_root_parent(&crate::core::runtime::DispatchCtx::ambient(), None, &config, "surface_a", "a", "a", |parent| async move {
             tokio::task::yield_now().await;
             parent.agent_definition_id
         }),
-        with_root_parent(None, &config, "surface_b", "b", "b", |parent| async move {
+        with_root_parent(&crate::core::runtime::DispatchCtx::ambient(), None, &config, "surface_b", "b", "b", |parent| async move {
             tokio::task::yield_now().await;
             parent.agent_definition_id
         }),

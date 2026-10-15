@@ -16,7 +16,7 @@ async fn build_triage_parent_scopes_allowed_subagents_to_target() {
     };
 
     let _ = AgentDefinitionRegistry::init_global_builtins();
-    let ctx = build_triage_parent(&config, "researcher")
+    let ctx = build_triage_parent(&crate::core::runtime::DispatchCtx::ambient(), &config, "researcher")
         .await
         .expect("build triage parent");
 

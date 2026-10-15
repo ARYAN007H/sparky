@@ -56,7 +56,7 @@ async fn a_resumed_thread_keeps_recorded_juice_specs_and_executors_when_repl_is_
     current_config.tokenjuice.repl_handle_enabled = false;
     assert!(repl_tools_for(&current_config).is_empty());
     let mut host =
-        crate::agent::OpenHumanSessionHost::from_config_for_agent(&current_config, "summarizer")
+        crate::agent::OpenHumanSessionHost::from_config_for_agent(&crate::core::runtime::DispatchCtx::ambient(), &current_config, "summarizer")
             .expect("summarizer session");
     host.ensure_runtime_session().expect("runtime session");
     let prelude = host
@@ -177,7 +177,7 @@ async fn resumed_juice_snapshot_does_not_add_live_repl_declarations() {
     recorded_spec.parameters = serde_json::json!({"type":"object","frozen":true});
     let recorded = ToolSnapshot::new(vec![recorded_spec.clone()]).expect("recorded snapshot");
 
-    let mut host = crate::agent::OpenHumanSessionHost::from_config_for_agent(&config, "summarizer")
+    let mut host = crate::agent::OpenHumanSessionHost::from_config_for_agent(&crate::core::runtime::DispatchCtx::ambient(), &config, "summarizer")
         .expect("summarizer session");
     host.ensure_runtime_session().expect("runtime session");
     let prelude = host
@@ -261,7 +261,7 @@ async fn juice_off_turn_loads_no_module_and_passes_tool_output_through() {
     config.tokenjuice.router_enabled = true;
     assert!(config.components.set("juice", false));
 
-    let mut host = crate::agent::OpenHumanSessionHost::from_config_for_agent(&config, "summarizer")
+    let mut host = crate::agent::OpenHumanSessionHost::from_config_for_agent(&crate::core::runtime::DispatchCtx::ambient(), &config, "summarizer")
         .expect("summarizer session");
     host.ensure_runtime_session().expect("runtime session");
     let context_mw = host
