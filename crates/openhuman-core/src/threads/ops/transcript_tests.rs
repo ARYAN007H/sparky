@@ -10,8 +10,10 @@ use tinyagents_session::transcript::{
 const THREAD: &str = "thread-store";
 
 fn ctx_for(workspace: &std::path::Path, profile: Option<&str>) -> DispatchCtx {
-    let mut config = crate::config::Config::default();
-    config.workspace_dir = workspace.to_path_buf();
+    let config = crate::config::Config {
+        workspace_dir: workspace.to_path_buf(),
+        ..crate::config::Config::default()
+    };
     let mut overlay = ContextOverlay::new(
         config,
         DomainSet::kernel(),

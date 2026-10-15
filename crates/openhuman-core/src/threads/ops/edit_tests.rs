@@ -284,8 +284,10 @@ fn truncate_transcript_for_regenerate_returns_none_when_thread_has_no_transcript
 #[test]
 fn a_profile_prefixed_key_round_trips_through_edit_and_regenerate() {
     let dir = TempDir::new().expect("tempdir");
-    let mut config = crate::config::Config::default();
-    config.workspace_dir = dir.path().to_path_buf();
+    let config = crate::config::Config {
+        workspace_dir: dir.path().to_path_buf(),
+        ..crate::config::Config::default()
+    };
     let tenant = crate::core::runtime::Tenant {
         profile: Some("profile-a".to_string()),
         agent: None,
@@ -339,8 +341,10 @@ fn a_profile_prefixed_key_round_trips_through_edit_and_regenerate() {
 #[test]
 fn transcript_store_for_a_desktop_tenant_uses_the_chat_agent_and_an_embedded_agent_its_own() {
     let dir = TempDir::new().expect("tempdir");
-    let mut config = crate::config::Config::default();
-    config.workspace_dir = dir.path().to_path_buf();
+    let config = crate::config::Config {
+        workspace_dir: dir.path().to_path_buf(),
+        ..crate::config::Config::default()
+    };
 
     let desktop = super::super::support::transcript_store_for(
         &config,
@@ -364,8 +368,10 @@ fn transcript_store_for_a_desktop_tenant_uses_the_chat_agent_and_an_embedded_age
 async fn transcript_store_reads_the_profile_from_the_request_context() {
     use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
     let dir = TempDir::new().expect("tempdir");
-    let mut config = crate::config::Config::default();
-    config.workspace_dir = dir.path().to_path_buf();
+    let config = crate::config::Config {
+        workspace_dir: dir.path().to_path_buf(),
+        ..crate::config::Config::default()
+    };
     let overlay = ContextOverlay::new(
         config,
         DomainSet::kernel(),
