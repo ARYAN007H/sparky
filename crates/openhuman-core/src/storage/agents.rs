@@ -197,11 +197,27 @@ async fn in_local<F: Future>(fut: F) -> F::Output {
 /// context can act for it (SaaS with the agent gone, or no booted core):
 /// running it anywhere else would act outside the agent's scope.
 pub async fn within_agent<F: Future>(agent: Option<&str>, fut: F) -> Option<F::Output> {
+    within_agent_ctx(agent, |_| fut).await
+}
+
+/// [`within_agent`] for work that takes the context it acts under: `step` is
+/// handed the dispatch context of the agent's scope (the host's own for
+/// `None`, which in SaaS is unbound: work that lost its tenant never acts as
+/// the operator).
+pub async fn within_agent_ctx<F, Fut>(agent: Option<&str>, step: F) -> Option<Fut::Output>
+where
+    F: FnOnce(DispatchCtx) -> Fut,
+    Fut: Future,
+{
     let Some(agent) = agent else {
-        return Some(in_local(fut).await);
+        let local = local_context().unwrap_or_else(DispatchCtx::host_default);
+        return Some(in_local(step(local)).await);
     };
     match context_for(agent) {
-        Some(context) => Some(CoreContext::scope(context, fut).await),
+        Some(context) => {
+            let dispatch = DispatchCtx::new(Arc::clone(&context));
+            Some(CoreContext::scope(context, step(dispatch)).await)
+        }
         None => {
             tracing::warn!(%agent, "[storage::agents] no context can act for the agent; skipped");
             None

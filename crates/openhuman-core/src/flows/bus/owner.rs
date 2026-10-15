@@ -11,7 +11,8 @@ use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
 
 use crate::config::Config;
-use crate::storage::agents::{find_owner, within_agent, LookupFailed};
+use crate::core::runtime::DispatchCtx;
+use crate::storage::agents::{find_owner, within_agent, within_agent_ctx, LookupFailed};
 
 /// Flows whose owner this process has resolved (`None` = `local`).
 static OWNERS: LazyLock<Mutex<HashMap<String, Option<String>>>> = LazyLock::new(Default::default);
@@ -78,16 +79,16 @@ async fn resolve(config: &Config, flow_id: &str) -> Result<Option<String>, Looku
     Ok(owner)
 }
 
-/// Runs `fut` as `flow_id`'s owner; logs and skips it when the owner is
+/// Runs `step`, handed the owner's context, as `flow_id`'s owner; logs and skips it when the owner is
 /// unknown (a failed lookup) or no context can act for it.
-pub(super) async fn as_owner<F: std::future::Future<Output = ()>>(
-    config: &Config,
-    flow_id: &str,
-    fut: F,
-) {
+pub(super) async fn as_owner<F, Fut>(config: &Config, flow_id: &str, step: F)
+where
+    F: FnOnce(DispatchCtx) -> Fut,
+    Fut: std::future::Future<Output = ()>,
+{
     match flow_owner(config, flow_id).await {
         Ok(owner) => {
-            within_agent(owner.as_deref(), fut).await;
+            within_agent_ctx(owner.as_deref(), step).await;
         }
         Err(failed) => tracing::warn!(
             target: "flows",
