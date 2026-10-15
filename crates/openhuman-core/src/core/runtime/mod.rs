@@ -52,6 +52,7 @@ pub use components::{ComponentSet, COMPONENT_NAMES};
 pub mod context;
 pub mod dispatch_ctx;
 pub mod domain_set;
+pub mod event_ctx;
 mod features;
 pub use features::compiled_features;
 pub mod mode;

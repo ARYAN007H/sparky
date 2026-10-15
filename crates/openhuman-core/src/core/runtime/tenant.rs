@@ -23,7 +23,7 @@ use std::sync::Arc;
 use super::CoreContext;
 
 /// The tenant (profile) and the agent inside it that work runs for.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Tenant {
     /// The SaaS profile; `None` on the desktop and for embedded agents.
     pub profile: Option<String>,
