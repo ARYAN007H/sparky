@@ -221,6 +221,7 @@ impl<T: Tool> MediaArtifactTool<T> {
                     Ok(updated) => {
                         if let Some(obj) = entry.as_object_mut() {
                             obj.insert("artifact_id".into(), json!(updated.id));
+                            obj.insert("path".into(), json!(dest.display().to_string()));
                         }
                     }
                     Err(err) => {
@@ -262,26 +263,7 @@ impl<T: Tool> MediaArtifactTool<T> {
             .await
             .map_err(|error| format!("failed to read generated media blob {key:?}: {error}"))?
             .ok_or_else(|| format!("generated media blob {key:?} was not found"))?;
-        let mut file = tokio::fs::OpenOptions::new()
-            .write(true)
-            .truncate(true)
-            .open(dest)
-            .await
-            .map_err(|error| {
-                format!(
-                    "failed to open artifact destination {}: {error}",
-                    dest.display()
-                )
-            })?;
-        let size = tokio::io::copy(&mut blob.reader, &mut file)
-            .await
-            .map_err(|error| format!("failed to copy generated media blob {key:?}: {error}"))?;
-        file.flush().await.map_err(|error| {
-            format!(
-                "failed to flush artifact destination {}: {error}",
-                dest.display()
-            )
-        })?;
+        let size = copy_blob_to_file(&mut *blob.reader, dest, key).await?;
         if let Err(error) = blobs.delete(key).await {
             tracing::warn!(
                 target: "media_generation",
@@ -292,6 +274,42 @@ impl<T: Tool> MediaArtifactTool<T> {
         }
         Ok(size)
     }
+}
+
+async fn copy_blob_to_file<R>(reader: &mut R, dest: &Path, key: &str) -> Result<u64, String>
+where
+    R: tokio::io::AsyncRead + Unpin + ?Sized,
+{
+    let mut file = tokio::fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(dest)
+        .await
+        .map_err(|error| {
+            format!(
+                "failed to open artifact destination {}: {error}",
+                dest.display()
+            )
+        })?;
+    let size = match tokio::io::copy(reader, &mut file).await {
+        Ok(size) => size,
+        Err(error) => {
+            drop(file);
+            let _ = tokio::fs::remove_file(dest).await;
+            return Err(format!(
+                "failed to copy generated media blob {key:?}: {error}"
+            ));
+        }
+    };
+    if let Err(error) = file.flush().await {
+        drop(file);
+        let _ = tokio::fs::remove_file(dest).await;
+        return Err(format!(
+            "failed to flush artifact destination {}: {error}",
+            dest.display()
+        ));
+    }
+    Ok(size)
 }
 
 fn set_artifact_error(entry: &mut Value, message: &str) {

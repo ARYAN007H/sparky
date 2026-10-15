@@ -35,14 +35,14 @@ const VIDEO_WAIT_BUDGET: Duration = Duration::from_secs(600);
 
 const IMAGE_DESCRIPTION: &str = "Generate or edit images from a text prompt via OpenRouter \
      (default model: Seedream 5.0 Lite). Pass `references` (https URLs or workspace file paths) \
-     to edit, restyle, or keep a subject consistent. Saves each image under the workspace \
-     `generated-media/` folder and returns the file path. Billed per call: after an error that \
+     to edit, restyle, or keep a subject consistent. Saves each image in the Files folder and \
+     returns its local file path. Billed per call: after an error that \
      says the call was billed, do not call again — report it to the user.";
 
 const VIDEO_DESCRIPTION: &str = "Generate a short video clip via OpenRouter (default model: \
      Seedance 2.0 Mini, 4–15 s, 480p/720p, optional audio). Optionally start from \
      `first_frame` or end on `last_frame` (URL or workspace path). Blocks until the clip is \
-     ready (minutes) and saves it under `generated-media/`. Billed per call: if it times out, \
+     ready (minutes) and saves it in the Files folder. Billed per call: if it times out, \
      call again with `resume_job_id` instead of submitting a new job.";
 
 /// Registers the media tools, or nothing when no backend is reachable.

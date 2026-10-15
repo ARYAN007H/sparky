@@ -27,7 +27,7 @@ images you generate.
   matter. `n` asks for several variants; `seed` makes a result reproducible.
 - For edits, pass the source image(s) in `references` and describe the change
   precisely.
-- Each generation **saves the image to the workspace and returns a local file
+- Each generation **saves the image to the Files folder and returns a local file
   path**. Always report that path back so the deck/answer can reference the
   concrete artifact. Do not paste raw base64 or invent URLs.
 - Generation is billed. Don't loop on near-identical prompts — generate, inspect

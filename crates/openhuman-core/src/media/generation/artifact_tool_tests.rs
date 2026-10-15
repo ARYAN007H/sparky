@@ -5,8 +5,26 @@ use tinyagents_harness::media::MediaOutput;
 use tinystoragedrivers::BlobStore;
 use tinytools::{PermissionLevel, Tool, ToolCategory, ToolContent, ToolResult};
 
-use super::MediaArtifactTool;
+use super::{copy_blob_to_file, MediaArtifactTool};
 use crate::agent::artifacts::{ArtifactKind, ArtifactStatus};
+
+struct PartialThenFail(bool);
+
+impl tokio::io::AsyncRead for PartialThenFail {
+    fn poll_read(
+        self: std::pin::Pin<&mut Self>,
+        _cx: &mut std::task::Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        let this = self.get_mut();
+        if this.0 {
+            return std::task::Poll::Ready(Err(std::io::Error::other("reader failed")));
+        }
+        this.0 = true;
+        buf.put_slice(b"partial media");
+        std::task::Poll::Ready(Ok(()))
+    }
+}
 
 /// A minimal stand-in for `GenerateImageTool` / `GenerateVideoTool`: writes
 /// a fixed number of files under `<action_dir>/generated-media/` and reports
@@ -134,12 +152,31 @@ async fn files_a_blob_backed_generated_artifact() {
         .await
         .expect("artifact record");
     let file = record.file.expect("visible file");
+    assert_eq!(artifact["path"].as_str(), Some(file.as_str()));
     assert_eq!(std::fs::read(file).unwrap(), b"blob-media-bytes");
     assert!(blobs
         .get("generated-media/stub-0.png")
         .await
         .unwrap()
         .is_none());
+}
+
+#[tokio::test]
+async fn removes_partial_destination_when_blob_read_fails() {
+    let root = tempfile::tempdir().unwrap();
+    let dest = root.path().join("partial.png");
+    std::fs::write(&dest, b"reserved placeholder").unwrap();
+
+    let error = copy_blob_to_file(
+        &mut PartialThenFail(false),
+        &dest,
+        "generated-media/fail.png",
+    )
+    .await
+    .unwrap_err();
+
+    assert!(error.contains("failed to copy generated media blob"));
+    assert!(!dest.exists());
 }
 
 #[tokio::test]
