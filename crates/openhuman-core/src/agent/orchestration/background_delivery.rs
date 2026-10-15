@@ -328,7 +328,7 @@ fn recover_fenced(ctx: &DispatchCtx, workspace_dir: &Path, fence: DrainFence) ->
             "[background_delivery] scheduling redelivery of undelivered completions after restart \
              thread_id={thread_id}"
         );
-        schedule_delivery_inner(thread_id.clone(), RECOVERY_DELAY, true, fence.clone());
+        schedule_delivery_inner(ctx.clone(), thread_id.clone(), RECOVERY_DELAY, true, fence.clone());
     }
     threads.len()
 }
