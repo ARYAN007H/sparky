@@ -133,6 +133,7 @@ pub(super) fn install_turn_middleware(
         required_capabilities,
         deterministic_cacheable,
         has_route_fallback,
+        dispatch,
         hosted_security_gate,
         pause_at_cap,
         run_mode,
@@ -563,7 +564,7 @@ pub(super) fn install_turn_middleware(
     // reverse-order `after_tool` chain is safe — it cannot perturb the
     // summarization/cap or tool-outcome capture layers.
     let mut embedder_tool_hooks =
-        crate::agent::hooks::embedder_tool_hooks_in(&crate::core::runtime::DispatchCtx::ambient());
+        crate::agent::hooks::embedder_tool_hooks_in(&dispatch);
     embedder_tool_hooks.extend(scoped_tool_hooks);
     if !embedder_tool_hooks.is_empty() {
         harness.push_middleware(Arc::new(
