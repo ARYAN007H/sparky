@@ -210,8 +210,10 @@ pub(super) fn drain_schedule_in(
                 &DispatchCtx::new(Arc::clone(ctx)),
                 session,
             ),
-            // No owner: the unscoped (desktop) drain reads the ambient context.
-            None => background_completions::thread_for_session(&DispatchCtx::ambient(), session),
+            // No owner: the unscoped (desktop) drain reads the host's own context.
+            None => {
+                background_completions::thread_for_session(&DispatchCtx::host_default(), session)
+            }
         };
         if thread_id.is_none() {
             log::trace!("[background_delivery] session has no delivery thread; not scheduling");
