@@ -18,7 +18,7 @@
 
 use serde_json::{json, Value};
 use crate::agent::session_store::splice_fixture::head_of;
-use tinyagents_session::transcript::{TranscriptLocator, TranscriptMeta};
+use tinyagents_session::transcript::{TranscriptLocator as _, TranscriptMeta};
 use tinyinference_llm::message::ContentBlock;
 use tinyinference_llm::model::ModelResponse;
 
