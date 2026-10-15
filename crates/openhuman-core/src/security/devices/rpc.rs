@@ -138,10 +138,7 @@ pub async fn devices_create_pairing(
             core_pubkey: core_pubkey.clone(),
             rpc_url: rpc_url.clone(),
             expires_at: expires_at.clone(),
-            agent: ctx
-                .tenant()
-                .ok()
-                .and_then(|tenant| tenant.agent),
+            agent: ctx.tenant().ok().and_then(|tenant| tenant.agent),
         },
     );
 

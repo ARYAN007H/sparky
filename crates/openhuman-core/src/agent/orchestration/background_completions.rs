@@ -24,10 +24,10 @@
 use crate::core::runtime::DispatchCtx;
 use std::collections::{HashMap, HashSet, VecDeque};
 mod thread_index;
+use thread_index::{key, note_thread_workspace};
 pub(crate) use thread_index::{
     note_session_thread, router_for_thread, thread_for_session, workspace_for_thread,
 };
-use thread_index::{key, note_thread_workspace};
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};

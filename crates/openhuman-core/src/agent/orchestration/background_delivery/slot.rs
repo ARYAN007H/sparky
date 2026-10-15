@@ -28,7 +28,11 @@ pub(super) struct DeliverySlot {
 
 impl DeliverySlot {
     /// `None` when a delivery is already in flight for the thread.
-    pub(super) fn claim(ctx: &DispatchCtx, thread_id: &str, router: Arc<CompletionRouter>) -> Option<Self> {
+    pub(super) fn claim(
+        ctx: &DispatchCtx,
+        thread_id: &str,
+        router: Arc<CompletionRouter>,
+    ) -> Option<Self> {
         let key = tenant::profile_key_in(&super::super::busy_guard::caller(ctx), thread_id);
         let mut d = delivering().lock().expect("delivering poisoned");
         if !d.insert(key.clone()) {
