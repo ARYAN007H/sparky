@@ -205,9 +205,9 @@ async fn tokenjuice_methods_are_not_gated_when_juice_is_on() {
     let ctx = crate::core::runtime::context::CoreContext::for_test_with_components(
         crate::core::runtime::ComponentSet::all(),
     );
-    crate::core::runtime::context::CoreContext::scope(ctx, async {
+    crate::core::runtime::context::CoreContext::scope(ctx.clone(), async {
         // Gate passes; the handler then fails on its own missing param.
-        let err = handle_detect(DispatchCtx::process_default(), Map::new())
+        let err = handle_detect(DispatchCtx::new(ctx.clone()), Map::new())
             .await
             .unwrap_err();
         assert!(!err.contains("COMPONENT_DISABLED"), "{err}");
