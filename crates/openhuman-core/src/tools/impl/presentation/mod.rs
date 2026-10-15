@@ -74,6 +74,7 @@ trait ImageInspector: Sync {
 
 struct ModuleImageInspector<'a> {
     config: Option<&'a crate::config::Config>,
+    ctx: &'a DispatchCtx,
 }
 
 #[async_trait]
@@ -83,7 +84,8 @@ impl ImageInspector for ModuleImageInspector<'_> {
         let config = match self.config {
             Some(config) => config,
             None => {
-                loaded = DispatchCtx::ambient()
+                loaded = self
+                    .ctx
                     .load_config()
                     .await
                     .map_err(|error| format!("config unavailable: {error}"))?;
@@ -291,7 +293,7 @@ impl Tool for PresentationTool {
     }
 
     async fn execute(&self, args: Value) -> anyhow::Result<ToolResult> {
-        self.run(args, None).await
+        self.run(args, None, &dispatch_ctx_for_tool(None)).await
     }
 
     async fn execute_with_context(
@@ -301,7 +303,8 @@ impl Tool for PresentationTool {
         context: Option<&dyn tinytools::ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
         let approval = crate::agent::tinyagents::host::run_context::approval_for_tool(context);
-        self.run(args, approval.chat.as_ref()).await
+        self.run(args, approval.chat.as_ref(), &dispatch_ctx_for_tool(context))
+            .await
     }
 }
 
@@ -312,6 +315,7 @@ impl PresentationTool {
         &self,
         args: Value,
         chat: Option<&crate::security::approval::ApprovalChatContext>,
+        ctx: &DispatchCtx,
     ) -> anyhow::Result<ToolResult> {
         let input: GeneratePresentationInput = match serde_json::from_value(args.clone()) {
             Ok(v) => v,
@@ -338,7 +342,7 @@ impl PresentationTool {
         // Resolve + validate per-slide images at the async boundary. A
         // bad image is skipped with a warning (partial success) rather
         // than failing the whole deck — mirrors the #3076 ethos.
-        let (resolved_images, image_warnings) = self.resolve_images(&input).await;
+        let (resolved_images, image_warnings) = self.resolve_images(&input, ctx).await;
         if !image_warnings.is_empty() {
             tracing::info!(
                 target: "presentation",
@@ -498,11 +502,13 @@ impl PresentationTool {
     async fn resolve_images(
         &self,
         input: &GeneratePresentationInput,
+        ctx: &DispatchCtx,
     ) -> (Vec<Vec<SlideImage>>, Vec<String>) {
         self.resolve_images_with_inspector(
             input,
             &ModuleImageInspector {
                 config: self.config.as_ref(),
+                ctx,
             },
         )
         .await
