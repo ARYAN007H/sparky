@@ -128,7 +128,10 @@ impl OpenHumanTurnPrelude {
         if self.omit_memory_context {
             identity.recall = false;
         }
-        let profile_context = capture_profile_context(&self.dispatch_ctx(), crate::profiles::host::host().as_deref());
+        let profile_context = capture_profile_context(
+            &self.dispatch_ctx(),
+            crate::profiles::host::host().as_deref(),
+        );
         if matches!(profile_context, ProfileMemoryContext::Denied) {
             return None;
         }

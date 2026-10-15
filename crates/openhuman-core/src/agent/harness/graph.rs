@@ -141,8 +141,8 @@ pub(crate) async fn run_channel_turn_via_graph(
         "[channel:graph] routing channel turn through tinyagents harness"
     );
     let turn_origin = origin.clone();
-    let mut run_context =
-        crate::agent::tinyagents::host::OpenHumanRunContext::new().with_core(dispatch.core().cloned());
+    let mut run_context = crate::agent::tinyagents::host::OpenHumanRunContext::new()
+        .with_core(dispatch.core().cloned());
     run_context.origin = origin;
     run_context.approval = approval;
     run_context.memory_identity = Some(memory_identity);

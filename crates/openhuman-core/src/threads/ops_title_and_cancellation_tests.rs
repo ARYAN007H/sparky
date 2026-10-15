@@ -69,13 +69,17 @@ async fn run_to_completion_runs_the_tail_after_the_caller_is_dropped() {
     let (release, parked) = tokio::sync::oneshot::channel::<()>();
 
     let dispatch = crate::core::runtime::DispatchCtx::unbound();
-    let mut call = Box::pin(run_to_completion(&dispatch, "test_destructive_op", async move {
-        // Stands in for the blocking store mutation still in progress.
-        let _ = parked.await;
-        // Stands in for the cleanup that must never be skipped.
-        flag.store(true, Ordering::SeqCst);
-        Ok::<(), String>(())
-    }));
+    let mut call = Box::pin(run_to_completion(
+        &dispatch,
+        "test_destructive_op",
+        async move {
+            // Stands in for the blocking store mutation still in progress.
+            let _ = parked.await;
+            // Stands in for the cleanup that must never be skipped.
+            flag.store(true, Ordering::SeqCst);
+            Ok::<(), String>(())
+        },
+    ));
 
     // Poll once so the inner task is spawned, then abandon the caller — exactly
     // what dropping the RPC future does.

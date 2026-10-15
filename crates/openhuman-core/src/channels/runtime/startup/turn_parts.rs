@@ -6,13 +6,13 @@
 //! the caller's own config and policy, so a relayed turn never runs with the
 //! operator's tools or workspace.
 
-use crate::core::runtime::DispatchCtx;
 use super::chat_workload::{resolve_chat_workload, ChatWorkloadResolution};
 use super::prompt::format_access_context;
 use crate::agent::host_runtime;
 use crate::channels::context::ChannelRuntimeContext;
 use crate::channels::system_prompt::{ChannelPromptInputs, ChannelSystemPrompt};
 use crate::config::Config;
+use crate::core::runtime::DispatchCtx;
 use crate::inference::provider;
 use crate::security::SecurityPolicy;
 use crate::tools;
@@ -142,7 +142,8 @@ pub(crate) fn build_channel_turn_parts(
         config.workspace_dir.clone(),
     )?;
     let workspace = config.workspace_dir.clone();
-    let capabilities = crate::profiles::capabilities::ProfileCapabilities::in_ctx(&DispatchCtx::ambient());
+    let capabilities =
+        crate::profiles::capabilities::ProfileCapabilities::in_ctx(&DispatchCtx::ambient());
     let tools_registry = Arc::new(if capabilities.is_some() {
         // The profile host route builds the selected belt once with the exact
         // durable thread. No second, unnamed factory invocation is needed here.

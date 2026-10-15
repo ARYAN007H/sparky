@@ -56,7 +56,8 @@ pub(crate) fn bound_agent_id<'a>(config: &'a Config, channel: &str) -> Option<&'
 pub(crate) fn route(ctx: &ChannelRuntimeContext, channel: &str) -> HostRoute {
     // Transitional (#7801): the channel runtime context carries no core yet.
     let dispatch = DispatchCtx::ambient();
-    if let Some(capabilities) = crate::profiles::capabilities::ProfileCapabilities::in_ctx(&dispatch)
+    if let Some(capabilities) =
+        crate::profiles::capabilities::ProfileCapabilities::in_ctx(&dispatch)
     {
         if let (Some(context), Some(config), Some(definitions)) = (
             dispatch.core().cloned(),

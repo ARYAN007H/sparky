@@ -50,8 +50,8 @@ impl OpenHumanSearch {
             &self.config,
             request,
         )
-            .await
-            .map_err(|e| crate::search::tools::user_facing_error(&e))?;
+        .await
+        .map_err(|e| crate::search::tools::user_facing_error(&e))?;
         Ok(response
             .results
             .into_iter()

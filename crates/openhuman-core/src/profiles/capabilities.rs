@@ -150,7 +150,9 @@ impl ProfileCapabilities {
             .unwrap_or_default();
         // Transitional (#7801): the host-tools factory carries no context yet.
         let dispatch = DispatchCtx::ambient();
-        supplied.tools.retain(|tool| self.admits(&dispatch, tool.name()));
+        supplied
+            .tools
+            .retain(|tool| self.admits(&dispatch, tool.name()));
         if let Some(names) = &self.names {
             let mut groups = ToolGroups::none();
             for name in names.iter().filter(|name| self.admits(&dispatch, name)) {
@@ -206,7 +208,8 @@ impl ProfileCapabilities {
                         .filter(|tool| tool.name() != "web_search_tool")
                         .chain(search)
                         .filter(|tool| {
-                            self.admits(&dispatch, tool.name()) && !supplied_names.contains(tool.name())
+                            self.admits(&dispatch, tool.name())
+                                && !supplied_names.contains(tool.name())
                         }),
                 );
             }
@@ -264,10 +267,7 @@ impl ToolHook for ProfilePermission {
     async fn before_tool_decision(&self, context: &ToolHookContext) -> ToolHookDecision {
         // The hook runs inside the turn's own task, so its tenant is the ambient one.
         let dispatch = DispatchCtx::ambient();
-        let tenant = dispatch
-            .tenant()
-            .ok()
-            .and_then(|tenant| tenant.profile);
+        let tenant = dispatch.tenant().ok().and_then(|tenant| tenant.profile);
         if tenant.as_deref() != Some(self.profile.as_str())
             || self.fence.check_local(super::lease::now_ms()).is_err()
             || !self.capabilities.admits(&dispatch, &context.tool_name)

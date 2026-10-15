@@ -114,7 +114,9 @@ fn handle_about_app_list(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
             .transpose()?;
 
         tracing::debug!(?category, "[about_app] list capabilities");
-        to_json(crate::platform::about_app::list_capabilities(&ctx, category))
+        to_json(crate::platform::about_app::list_capabilities(
+            &ctx, category,
+        ))
     })
 }
 
@@ -122,7 +124,10 @@ fn handle_about_app_lookup(ctx: DispatchCtx, params: Map<String, Value>) -> Cont
     Box::pin(async move {
         let payload = deserialize_params::<AboutAppLookupParams>(params)?;
         tracing::debug!(id = %payload.id, "[about_app] lookup capability");
-        to_json(crate::platform::about_app::lookup_capability(&ctx, &payload.id)?)
+        to_json(crate::platform::about_app::lookup_capability(
+            &ctx,
+            &payload.id,
+        )?)
     })
 }
 

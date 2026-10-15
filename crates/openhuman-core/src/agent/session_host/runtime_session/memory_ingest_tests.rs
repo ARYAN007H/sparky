@@ -90,7 +90,8 @@ async fn deferred_memory_commit_survives_the_turn_scope_without_pinning_the_prof
     let id = ProfileId::parse("deferred-memory").unwrap();
     host.provision(&id).await.unwrap();
     let profile = host.open(&id).await.unwrap();
-    let captured = capture_profile_context(&DispatchCtx::new(profile.context().clone()), Some(&host));
+    let captured =
+        capture_profile_context(&DispatchCtx::new(profile.context().clone()), Some(&host));
     // The entire temporary turn context is gone before this callback is polled.
     let config = profile.config.clone();
     let work = async {

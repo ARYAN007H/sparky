@@ -82,7 +82,10 @@ async fn an_explicit_context_decides_which_capabilities_are_disabled() {
     // The two contexts answer independently, concurrently and across awaits.
     let ask = |ctx: DispatchCtx| async move {
         tokio::task::yield_now().await;
-        lookup_capability(&ctx, "voice.ptt").expect("voice.ptt").value.status
+        lookup_capability(&ctx, "voice.ptt")
+            .expect("voice.ptt")
+            .value
+            .status
     };
     let (disabled, enabled) = tokio::join!(ask(off), ask(on));
     assert_eq!(disabled, CapabilityStatus::Disabled);

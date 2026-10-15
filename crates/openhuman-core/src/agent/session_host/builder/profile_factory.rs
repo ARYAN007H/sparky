@@ -1,8 +1,8 @@
 //! Profile session construction carries the caller's exact conversation key.
 
-use crate::core::runtime::DispatchCtx;
 use crate::agent::OpenHumanSessionHost;
 use crate::config::Config;
+use crate::core::runtime::DispatchCtx;
 
 impl OpenHumanSessionHost {
     /// Build a config-routed agent with its caller's exact conversation key.
