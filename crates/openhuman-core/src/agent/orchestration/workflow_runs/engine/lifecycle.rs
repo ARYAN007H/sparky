@@ -75,7 +75,14 @@ pub async fn start_workflow_run(
             Ok(task_config) => {
                 crate::agent::turn_origin::with_inherited_origin(
                     inherited_origin,
-                    run_engine_loop(&task_ctx, &task_config, &task_run_id, definition, cancel, None),
+                    run_engine_loop(
+                        &task_ctx,
+                        &task_config,
+                        &task_run_id,
+                        definition,
+                        cancel,
+                        None,
+                    ),
                 )
                 .await;
             }
@@ -219,7 +226,14 @@ pub async fn resume_workflow_run(
             Ok(task_config) => {
                 crate::agent::turn_origin::with_inherited_origin(
                     inherited_origin,
-                    run_engine_loop(&task_ctx, &task_config, &task_run_id, definition, cancel, None),
+                    run_engine_loop(
+                        &task_ctx,
+                        &task_config,
+                        &task_run_id,
+                        definition,
+                        cancel,
+                        None,
+                    ),
                 )
                 .await;
             }

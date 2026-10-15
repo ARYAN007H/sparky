@@ -5,7 +5,8 @@ fn creates_child_thread_linked_to_parent_and_seeds_prompt() {
     let dir = std::env::temp_dir().join(format!("wt-test-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&dir).unwrap();
 
-    let id = create_worker_thread(&crate::core::runtime::DispatchCtx::ambient(), 
+    let id = create_worker_thread(
+        &crate::core::runtime::DispatchCtx::ambient(),
         dir.clone(),
         "parent-thread-1",
         "researcher",
@@ -44,7 +45,8 @@ fn creates_child_thread_linked_to_parent_and_seeds_prompt() {
 fn appends_follow_up_prompt_to_existing_worker_thread() {
     let dir = std::env::temp_dir().join(format!("wt-test-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&dir).unwrap();
-    let id = create_worker_thread(&crate::core::runtime::DispatchCtx::ambient(), 
+    let id = create_worker_thread(
+        &crate::core::runtime::DispatchCtx::ambient(),
         dir.clone(),
         "parent-thread-1",
         "researcher",
@@ -53,8 +55,15 @@ fn appends_follow_up_prompt_to_existing_worker_thread() {
     )
     .unwrap();
 
-    append_worker_user_message(&crate::core::runtime::DispatchCtx::ambient(), dir.clone(), &id, "researcher", "sub-2", "Follow-up prompt")
-        .unwrap();
+    append_worker_user_message(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        dir.clone(),
+        &id,
+        "researcher",
+        "sub-2",
+        "Follow-up prompt",
+    )
+    .unwrap();
 
     let messages = conversations::get_messages(
         &crate::core::runtime::DispatchCtx::ambient(),

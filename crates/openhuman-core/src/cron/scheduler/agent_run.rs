@@ -152,7 +152,11 @@ pub(super) async fn run_agent_job_for_run(
                 target = ?job.session_target,
                 "[cron] building isolated agent for scheduled job"
             );
-            match build_agent_for_cron_job(&crate::core::runtime::DispatchCtx::ambient(), &effective, job) {
+            match build_agent_for_cron_job(
+                &crate::core::runtime::DispatchCtx::ambient(),
+                &effective,
+                job,
+            ) {
                 Ok(BuiltCronAgent { mut agent, context }) => {
                     // Tag events so downstream subscribers can correlate
                     // cron-triggered turns. `cron` is the channel so the

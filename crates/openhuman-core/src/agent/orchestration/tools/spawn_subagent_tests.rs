@@ -95,7 +95,8 @@ fn render_worker_thread_result_carries_machine_readable_envelope() {
 fn persist_worker_thread_creates_thread_with_tasks_label_and_messages() {
     let temp = TempDir::new().expect("tempdir");
     let outcome = sample_outcome("the answer is 42");
-    let thread_id = persist_worker_thread(&crate::core::runtime::DispatchCtx::ambient(), 
+    let thread_id = persist_worker_thread(
+        &crate::core::runtime::DispatchCtx::ambient(),
         temp.path(),
         "task_manager_agent",
         "draft a long research plan",

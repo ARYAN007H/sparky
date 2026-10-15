@@ -88,7 +88,12 @@ fn prose(history: &[TranscriptEntry]) -> Vec<String> {
 }
 
 pub(super) fn host_seeded_with(config: &Config, marker: &str) -> OpenHumanSessionHost {
-    let mut host = OpenHumanSessionHost::from_config_for_agent(&crate::core::runtime::DispatchCtx::ambient(), config, "orchestrator").unwrap();
+    let mut host = OpenHumanSessionHost::from_config_for_agent(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        config,
+        "orchestrator",
+    )
+    .unwrap();
     host.seed_resume_from_messages(
         vec![
             ("user".to_string(), marker.to_string()),

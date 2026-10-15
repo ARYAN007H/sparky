@@ -52,12 +52,7 @@ fn append_worker_message(
         sender: sender.to_string(),
         created_at: chrono::Utc::now().to_rfc3339(),
     };
-    if let Err(err) = append_message(
-        ctx,
-        workspace_dir.to_path_buf(),
-        thread_id,
-        message,
-    ) {
+    if let Err(err) = append_message(ctx, workspace_dir.to_path_buf(), thread_id, message) {
         tracing::debug!(
             agent_id,
             thread_id,

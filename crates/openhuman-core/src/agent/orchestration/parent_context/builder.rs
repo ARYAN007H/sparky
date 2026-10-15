@@ -157,7 +157,9 @@ where
 {
     let parent = match parent_override {
         Some(parent) => parent,
-        None => build_root_parent(ctx, config, agent_definition_id, channel, session_prefix).await?,
+        None => {
+            build_root_parent(ctx, config, agent_definition_id, channel, session_prefix).await?
+        }
     };
     Ok(run(parent).await)
 }

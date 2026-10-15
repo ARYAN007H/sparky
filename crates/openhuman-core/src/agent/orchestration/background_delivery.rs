@@ -101,14 +101,14 @@ impl EventHandler<DomainEvent> for BackgroundDeliveryHandler {
             match drain.owner {
                 // Re-enter the owner's scope so the scheduled task inherits it.
                 Some(ctx) => {
-                    {
                     let dispatch = DispatchCtx::new(Arc::clone(&ctx));
                     CoreContext::sync_scope(ctx, || {
                         schedule_delivery(&dispatch, drain.thread_id, drain.delay)
                     })
                 }
+                None => {
+                    schedule_delivery(&DispatchCtx::host_default(), drain.thread_id, drain.delay)
                 }
-                None => schedule_delivery(&DispatchCtx::host_default(), drain.thread_id, drain.delay),
             }
         }
     }
@@ -247,7 +247,13 @@ pub(super) fn drain_schedule_in(
 /// Schedule a debounced delivery attempt for a thread, fenced by the calling
 /// profile's lease ([`DrainFence::current`]).
 fn schedule_delivery(ctx: &DispatchCtx, thread_id: String, delay: Duration) {
-    schedule_delivery_inner(ctx.clone(), thread_id, delay, false, DrainFence::current(ctx));
+    schedule_delivery_inner(
+        ctx.clone(),
+        thread_id,
+        delay,
+        false,
+        DrainFence::current(ctx),
+    );
 }
 
 /// `wait_idle`: after the delay, keep waiting while the thread's user turn is in
@@ -328,7 +334,13 @@ fn recover_fenced(ctx: &DispatchCtx, workspace_dir: &Path, fence: DrainFence) ->
             "[background_delivery] scheduling redelivery of undelivered completions after restart \
              thread_id={thread_id}"
         );
-        schedule_delivery_inner(ctx.clone(), thread_id.clone(), RECOVERY_DELAY, true, fence.clone());
+        schedule_delivery_inner(
+            ctx.clone(),
+            thread_id.clone(),
+            RECOVERY_DELAY,
+            true,
+            fence.clone(),
+        );
     }
     threads.len()
 }
@@ -456,7 +468,12 @@ fn retry_backoff(attempts: u32) -> Duration {
 /// it is logged at error and the chain ends; that is the one path on which a
 /// result is genuinely lost, and it requires the conversation store to be
 /// failing as well as the agent.
-async fn persist_undelivered(ctx: DispatchCtx, workspace_dir: PathBuf, thread_id: String, notice: String) {
+async fn persist_undelivered(
+    ctx: DispatchCtx,
+    workspace_dir: PathBuf,
+    thread_id: String,
+    notice: String,
+) {
     let run_id = format!("bgdeliver-undelivered-{}", uuid::Uuid::new_v4());
     match persist_delivery_reply(&ctx, workspace_dir, &thread_id, &run_id, notice, false) {
         Ok(()) => log::warn!(

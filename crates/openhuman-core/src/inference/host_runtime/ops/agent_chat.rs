@@ -449,7 +449,8 @@ pub async fn agent_chat_reply_for(
                 "[inference] agent_chat rooting turn tools at cwd={}",
                 root.display()
             );
-            let mut agent = build_turn_agent(&turn_ctx, &scoped, &target, turn_session_id, temperature)?;
+            let mut agent =
+                build_turn_agent(&turn_ctx, &scoped, &target, turn_session_id, temperature)?;
             // Also thread it as the turn's workspace descriptor so acting tools
             // that read `ToolExecutionContext::workspace` (shell) resolve their
             // default cwd here, and so spawned sub-agents inherit the same root.

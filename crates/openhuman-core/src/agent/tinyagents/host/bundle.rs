@@ -192,7 +192,9 @@ impl OpenHumanHostBundleFactory {
         // stays registered as the host capability with an unconsumed channel;
         // nothing OpenHuman renders depends on it.
         let progress = Arc::new(OpenHumanProgressSink::new(tokio::sync::mpsc::channel(1).0));
-        let learning = Arc::new(OpenHumanLearningSink::new(inputs.post_turn_hooks).with_dispatch(turn.dispatch_ctx()));
+        let learning = Arc::new(
+            OpenHumanLearningSink::new(inputs.post_turn_hooks).with_dispatch(turn.dispatch_ctx()),
+        );
         let tool_outcomes = Arc::new(OpenHumanToolOutcomeClassifier::new());
 
         let capabilities = HostCapabilities::new(

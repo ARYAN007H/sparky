@@ -72,8 +72,7 @@ impl HostAgent {
         );
         let dispatch = DispatchCtx::new(Arc::clone(&self.context));
         let mut session = CoreContext::sync_scope(Arc::clone(&self.context), || {
-            if crate::profiles::capabilities::ProfileCapabilities::in_ctx(&dispatch).is_some()
-            {
+            if crate::profiles::capabilities::ProfileCapabilities::in_ctx(&dispatch).is_some() {
                 return OpenHumanSessionHost::from_config_host_only(
                     &dispatch,
                     config,
@@ -90,7 +89,11 @@ impl HostAgent {
                     host,
                     session_id,
                 ),
-                None => OpenHumanSessionHost::from_config_with_definition(&dispatch, config, &self.definition),
+                None => OpenHumanSessionHost::from_config_with_definition(
+                    &dispatch,
+                    config,
+                    &self.definition,
+                ),
             }
         })?;
         // The agent's own callbacks ride the session explicitly: its tool and
