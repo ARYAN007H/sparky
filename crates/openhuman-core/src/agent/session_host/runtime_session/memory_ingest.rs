@@ -15,7 +15,6 @@
 //! The committed turn is also published as
 //! `DomainEvent::ConversationTurnCommitted` for observers.
 
-use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use chrono::Utc;
