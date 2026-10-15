@@ -433,7 +433,7 @@ async fn direct_connected_integrations_fetches_schemas_without_backend_composio_
     let gmail = integrations
         .iter()
         .find(|integration| integration.toolkit == "gmail")
-        .expect("direct connection should be represented");
+        .unwrap_or_else(|| panic!("direct connection should be represented: {integrations:?}"));
     assert_eq!(gmail.tools.len(), 1);
     assert_eq!(gmail.tools[0].name, "GMAIL_SEND_EMAIL");
     assert_eq!(backend_tool_requests.load(Ordering::SeqCst), 0);
