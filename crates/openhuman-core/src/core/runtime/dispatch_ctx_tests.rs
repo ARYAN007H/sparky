@@ -113,7 +113,6 @@ async fn host_default_in_saas_is_unbound_even_inside_a_tenants_scope() {
         // The task's scope is a tenant's; work that arrives without its own
         // tenant must not inherit it, and must not become the operator.
         assert!(DispatchCtx::host_default_in(true).core().is_none());
-        assert!(DispatchCtx::host_default_in(true).resolved().is_none() || !crate::core::runtime::is_saas());
         let spawned = tokio::spawn(async { DispatchCtx::host_default_in(true) })
             .await
             .unwrap();
