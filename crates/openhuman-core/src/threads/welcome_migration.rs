@@ -37,6 +37,7 @@ pub struct WelcomeMigrationResult {
 }
 
 pub fn migrate_welcome_agent_artifacts(
+    ctx: &DispatchCtx,
     workspace_dir: &Path,
 ) -> Result<WelcomeMigrationResult, String> {
     let marker = workspace_dir.join(MIGRATION_MARKER);
