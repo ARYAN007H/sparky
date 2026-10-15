@@ -1164,6 +1164,7 @@ pub(crate) fn spawn_progress_bridge(
             let live_spans = collector.spans().to_vec();
             let journal_export = if let Some(trace_ctx) = journal_trace_ctx.take() {
                 super::journal_shadow::shadow_compare_journal_projection(
+                    &crate::core::runtime::DispatchCtx::ambient(),
                     &request_id,
                     trace_ctx.clone(),
                     parent_max_iterations,
