@@ -273,7 +273,7 @@ fn schedule_delivery_inner(
         .push((thread_id.clone(), delay));
     // Scoped: the thread -> workspace table is keyed per profile, so the
     // delayed task must run under the profile that scheduled it.
-    ctx.spawn(async move {
+    ctx.clone().spawn(async move {
         let turn_fence = fence.clone();
         let turn_thread = thread_id.clone();
         let outcome = run_drain(

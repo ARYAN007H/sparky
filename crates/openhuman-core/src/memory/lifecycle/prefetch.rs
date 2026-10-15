@@ -166,7 +166,7 @@ pub(crate) fn pre_turn(
         key,
         guard_turn_work(
             &config.clone(),
-            Box::pin(dispatch.enter(async move {
+            Box::pin(dispatch.clone().enter(async move {
                 if config.memory.conversations.enabled {
                     if let Some(channel) = channel {
                         let workspace = config.workspace_dir.clone();
