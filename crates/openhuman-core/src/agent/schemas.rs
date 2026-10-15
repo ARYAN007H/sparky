@@ -356,7 +356,7 @@ struct TriageEvaluateParams {
     dry_run: Option<bool>,
 }
 
-fn handle_triage_evaluate(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_triage_evaluate(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<TriageEvaluateParams>(params)?;
 
@@ -421,7 +421,7 @@ fn handle_triage_evaluate(_ctx: DispatchCtx, params: Map<String, Value>) -> Cont
             "[rpc][agent] running triage pipeline"
         );
 
-        let outcome = crate::agent::triage::run_triage(&envelope)
+        let outcome = crate::agent::triage::run_triage(&ctx, &envelope)
             .await
             .map_err(|e| format!("triage evaluation failed: {e}"))?;
 
@@ -436,7 +436,7 @@ fn handle_triage_evaluate(_ctx: DispatchCtx, params: Map<String, Value>) -> Cont
                     let origin = crate::agent::triage::local_trigger_origin();
                     crate::agent::turn_origin::with_origin(
                         origin,
-                        crate::agent::triage::apply_decision(run.clone(), &envelope),
+                        crate::agent::triage::apply_decision(&ctx, run.clone(), &envelope),
                     )
                     .await
                     .map_err(|e| format!("apply_decision failed: {e}"))?;
