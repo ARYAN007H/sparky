@@ -509,7 +509,7 @@ impl OpenHumanAgentRunner {
         conn: Option<&str>,
     ) -> Result<Value> {
         // Resolve + validate the requested agent kind against the registry.
-        let entry = crate::agent::registry::get_agent(agent_ref)
+        let entry = crate::agent::registry::get_agent(&crate::core::runtime::DispatchCtx::ambient(), agent_ref)
             .await
             .map_err(EngineError::Capability)?
             .ok_or_else(|| {

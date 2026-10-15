@@ -40,6 +40,7 @@ pub struct AvailableToolsResponse {
 }
 
 pub async fn available_tools_rpc(
+    ctx: &DispatchCtx,
     _req: AvailableToolsRequest,
 ) -> Result<Outcome<AvailableToolsResponse>, String> {
     Ok(Outcome::new(

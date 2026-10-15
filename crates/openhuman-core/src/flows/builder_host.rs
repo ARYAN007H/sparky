@@ -222,7 +222,7 @@ impl BuilderGates for FlowsHost {
 #[async_trait]
 impl AgentDirectory for FlowsHost {
     async fn list(&self) -> PortResult<Vec<AgentDefinition>> {
-        let agents = crate::agent::registry::list_agents(false)
+        let agents = crate::agent::registry::list_agents(&crate::core::runtime::DispatchCtx::ambient(), false)
             .await
             .map_err(|e| e.to_string())?;
         Ok(agents
