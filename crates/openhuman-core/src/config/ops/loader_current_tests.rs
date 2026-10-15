@@ -41,12 +41,9 @@ async fn a_context_route_follows_every_load_of_the_context_config() {
 
 #[tokio::test]
 async fn a_context_without_a_route_loads_unchanged_providers() {
-    let loaded = CoreContext::scope(
-        context_with(base_config()),
-        load_current_or_init(&DispatchCtx::process_default()),
-    )
-    .await
-    .expect("context config loads");
+    let loaded = load_current_or_init(&DispatchCtx::new(context_with(base_config())))
+        .await
+        .expect("context config loads");
 
     assert!(loaded.ephemeral_route.is_none());
     assert!(loaded
