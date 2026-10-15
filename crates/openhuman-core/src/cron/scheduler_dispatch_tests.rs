@@ -449,8 +449,9 @@ async fn a_flow_schedule_job_is_skipped_when_the_flows_component_is_off() {
     let ctx = CoreContext::for_test_with_components(off);
     let security = security(&config);
     let cfg = config.clone();
+    let dispatch = crate::core::runtime::DispatchCtx::new(Arc::clone(&ctx));
     CoreContext::scope(ctx, async move {
-        let mut dispatcher = JobDispatcher::new(&crate::core::runtime::DispatchCtx::ambient(), &cfg, &security);
+        let mut dispatcher = JobDispatcher::new(&dispatch, &cfg, &security);
         dispatcher.dispatch(vec![job]).await.unwrap();
         dispatcher.drain().await;
     })
@@ -461,4 +462,33 @@ async fn a_flow_schedule_job_is_skipped_when_the_flows_component_is_off() {
     assert!(output.contains("COMPONENT_DISABLED:flows"), "got: {output}");
     assert!(!output.contains("tick emitted"));
     assert!(stored.next_run > Utc::now(), "the recurrence moved on");
+}
+
+#[tokio::test]
+async fn a_dispatcher_binds_the_context_it_is_handed_not_the_ambient_one() {
+    let (_tmp, config) = test_config().await;
+    let security = security(&config);
+    let handed = CoreContext::for_test(crate::core::runtime::DomainSet::full(), None);
+    let ambient = CoreContext::for_test(crate::core::runtime::DomainSet::full(), None);
+
+    let dispatcher = CoreContext::scope(Arc::clone(&ambient), async {
+        // Across an await the handed context is still the one bound.
+        tokio::task::yield_now().await;
+        JobDispatcher::new(
+            &crate::core::runtime::DispatchCtx::new(Arc::clone(&handed)),
+            &config,
+            &security,
+        )
+    })
+    .await;
+    let bound = dispatcher.binding.dispatch_ctx();
+    assert!(Arc::ptr_eq(bound.core().expect("bound"), &handed));
+    assert!(!Arc::ptr_eq(bound.core().unwrap(), &ambient));
+
+    // An unbound context binds nothing, whatever the task's scope is.
+    let unbound = CoreContext::scope(ambient, async {
+        JobDispatcher::new(&crate::core::runtime::DispatchCtx::unbound(), &config, &security)
+    })
+    .await;
+    assert!(unbound.binding.context.is_none());
 }
