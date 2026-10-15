@@ -251,18 +251,18 @@ fn resolve_head_transcript(
         .ok_or_else(|| format!("thread {thread_id} has no session transcript"))
 }
 
-/// The key the thread's session transcripts are stored under: the chat agent's
-/// store key for the calling tenant, as the session host resolves it. Computed
-/// on the async side because the blocking pool drops the task's context.
+/// The key the thread's session transcripts are stored under: the configured
+/// chat agent's id, derived from the config alone. It deliberately reads no
+/// ambient tenant or context (those accessors are being removed); the key is
+/// passed down explicitly to every helper below.
 async fn transcript_store_key() -> String {
-    let chat_agent = match crate::config::Config::load_or_init().await {
+    match crate::config::Config::load_or_init().await {
         Ok(config) => crate::web_chat::pick_target_agent_id(&config),
         Err(error) => {
             log::warn!("[threads][edit] config unavailable for the chat agent id: {error}");
             "orchestrator".to_string()
         }
-    };
-    crate::agent::session_store::current_agent_key_or(&chat_agent)
+    }
 }
 
 type HeadTranscript = (
