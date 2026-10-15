@@ -354,6 +354,7 @@ pub async fn channel_web_queue_status(
 /// removal; a no-op removal (unknown id, or no active turn) is silently
 /// `removed: false` — the item is already gone either way.
 pub async fn channel_web_queue_remove(
+    ctx: &DispatchCtx,
     client_id: &str,
     thread_id: &str,
     item_id: &str,
@@ -438,6 +439,7 @@ pub async fn channel_web_queue_clear(
 }
 
 pub async fn channel_web_cancel(
+    ctx: &DispatchCtx,
     client_id: &str,
     thread_id: &str,
     request_id: Option<&str>,
