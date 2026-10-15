@@ -19,6 +19,7 @@ pub(crate) async fn bootstrap_core_runtime(
     host_kind: crate::core::types::HostKind,
     config: Option<crate::config::Config>,
     domains: crate::core::runtime::DomainSet,
+    ctx: &DispatchCtx,
 ) {
     use crate::platform::socket::{set_global_socket_manager, SocketManager};
     use std::sync::Arc;
@@ -87,7 +88,7 @@ pub(crate) async fn bootstrap_core_runtime(
     // meant to gate the first tool call of the first turn has to be loaded
     // before any session exists, and the alternative — loading lazily on the
     // first event — would let that first call through while the file is read.
-    crate::hooks::init(&DispatchCtx::ambient(), &cfg).await;
+    crate::hooks::init(ctx, &cfg).await;
 
     // --- Turn-state recovery -------------------------------------------
     // Any per-thread turn snapshots left on disk from a previous process
@@ -97,7 +98,7 @@ pub(crate) async fn bootstrap_core_runtime(
     //
     // An installed host session store repairs itself, once; with none, the
     // workspace default store is swept.
-    let host_store = crate::agent::session_store::installed_in(&DispatchCtx::ambient());
+    let host_store = crate::agent::session_store::installed_in(ctx);
     if let Some(provider) = &host_store {
         match provider.recover() {
             Ok(()) => log::info!("[runtime] host session store recovered"),
@@ -163,7 +164,7 @@ pub(crate) async fn bootstrap_core_runtime(
         // completion log (`<workspace>/.openhuman/background_completions.jsonl`).
         // Schedule its delivery turn through the normal idle-gated path.
         let redelivering = crate::agent::orchestration::background_delivery::recover_on_boot(
-            &DispatchCtx::ambient(),
+            ctx,
             &workspace_dir,
         );
         if redelivering > 0 {
@@ -371,7 +372,7 @@ pub(crate) async fn bootstrap_core_runtime(
     crate::web_chat::register_memory_activity_surface_subscriber();
 
     // --- Workspace migrations --------------------------------------------
-    crate::platform::startup::run_workspace_migrations(&workspace_dir);
+    crate::platform::startup::run_workspace_migrations(ctx, &workspace_dir);
 
     // --- Socket manager bootstrap ---
     let socket_mgr = Arc::new(SocketManager::new());
