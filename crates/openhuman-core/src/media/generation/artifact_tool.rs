@@ -358,18 +358,16 @@ impl<T: Tool> MediaArtifactTool<T> {
     /// Rehydrates finalized media paths after a session rebuild. Only Ready
     /// image/video artifacts whose files still resolve through the configured
     /// trusted roots enter the exact-path allowlist.
-    async fn refresh_allowed_references(&self) {
+    async fn refresh_allowed_references(&self) -> Result<(), String> {
         let Some(allowed) = &self.allowed_references else {
-            return;
+            return Ok(());
         };
 
         let mut recovered = std::collections::HashSet::new();
-        let previously_allowed = {
-            let mut allowed = allowed
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            std::mem::take(&mut *allowed)
-        };
+        let previously_allowed = allowed
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
         let artifacts = match crate::agent::artifacts::store::list_artifacts(
             &self.workspace_dir,
             0,
@@ -385,7 +383,10 @@ impl<T: Tool> MediaArtifactTool<T> {
                     %error,
                     "[media_generation] could not refresh reusable artifact paths"
                 );
-                return;
+                return Err(
+                    "could not validate previously generated media references; retry the media call"
+                        .to_string(),
+                );
             }
         };
 
@@ -414,6 +415,7 @@ impl<T: Tool> MediaArtifactTool<T> {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         allowed.retain(|path| !previously_allowed.contains(path) || recovered.contains(path));
         allowed.extend(recovered);
+        Ok(())
     }
 
     async fn file_blob(&self, key: &Path, dest: &Path) -> Result<u64, String> {
@@ -564,7 +566,9 @@ impl<T: Tool> Tool for MediaArtifactTool<T> {
         context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
         if has_reusable_files_reference(&args, &self.files_dir) {
-            self.refresh_allowed_references().await;
+            self.refresh_allowed_references()
+                .await
+                .map_err(anyhow::Error::msg)?;
         }
 
         // Generation blocks for minutes; report a heartbeat (with the video

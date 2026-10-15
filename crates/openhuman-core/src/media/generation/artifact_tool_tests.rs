@@ -8,7 +8,6 @@ use tinytools::{PermissionLevel, Tool, ToolCategory, ToolContent, ToolResult};
 
 use super::{copy_blob_to_file, has_reusable_files_reference, MediaArtifactTool};
 use crate::agent::artifacts::{ArtifactKind, ArtifactStatus, FileRoots};
-use crate::media::generation::tools::reference_policy;
 
 #[test]
 fn artifact_history_is_refreshed_only_for_absolute_paths_in_files_roots() {
@@ -38,7 +37,7 @@ fn artifact_history_is_refreshed_only_for_absolute_paths_in_files_roots() {
 }
 
 #[tokio::test]
-async fn artifact_history_refresh_failure_clears_previous_reference_grants() {
+async fn artifact_history_refresh_failure_fails_closed_for_cached_files() {
     let root = tempfile::tempdir().unwrap();
     let workspace = root.path().join("not-a-workspace-directory");
     std::fs::write(&workspace, b"force artifact listing failure").unwrap();
@@ -62,11 +61,11 @@ async fn artifact_history_refresh_failure_clears_previous_reference_grants() {
     )
     .with_reference_allowlist(Arc::clone(&allowed));
 
-    tool.refresh_allowed_references().await;
-
-    assert!(allowed.lock().unwrap().is_empty());
-    let policy = reference_policy(&action, &workspace, allowed);
-    assert!(policy(&replacement).is_err());
+    assert!(allowed.lock().unwrap().contains(&replacement));
+    assert!(tool
+        .execute(json!({ "references": [replacement.to_string_lossy()] }))
+        .await
+        .is_err());
 }
 
 struct PartialThenFail(bool);
@@ -269,7 +268,7 @@ async fn files_a_blob_backed_generated_artifact() {
     )
     .with_blobs(blobs)
     .with_reference_allowlist(Arc::new(std::sync::Mutex::new(Default::default())));
-    fresh.refresh_allowed_references().await;
+    fresh.refresh_allowed_references().await.unwrap();
     {
         let allowed = fresh.allowed_references.as_ref().unwrap().lock().unwrap();
         assert!(allowed.contains(&canonical_file));
@@ -289,7 +288,7 @@ async fn files_a_blob_backed_generated_artifact() {
         canonical_file.exists(),
         "failed regeneration retains the previous non-empty file"
     );
-    fresh.refresh_allowed_references().await;
+    fresh.refresh_allowed_references().await.unwrap();
     assert!(!fresh
         .allowed_references
         .as_ref()
