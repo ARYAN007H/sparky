@@ -158,3 +158,15 @@ fn the_correlation_id_is_read_from_the_first_argument_only() {
         assert_eq!(correlation_of(&bad), None, "{bad}");
     }
 }
+
+#[tokio::test]
+async fn a_remix_session_answers_under_the_context_that_registered_it() {
+    use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
+    let dir = tempfile::tempdir().unwrap();
+    let caller = CoreContext::for_test(DomainSet::full(), None);
+    let other = CoreContext::for_test(DomainSet::full(), None);
+    let session = Session::new(&DispatchCtx::new(Arc::clone(&caller)), &config_in(dir.path()));
+    // A callback arrives on the module bus while some other context is active.
+    let seen = CoreContext::scope(Arc::clone(&other), async { session.dispatch_ctx() }).await;
+    assert!(Arc::ptr_eq(seen.core().expect("bound"), &caller));
+}
