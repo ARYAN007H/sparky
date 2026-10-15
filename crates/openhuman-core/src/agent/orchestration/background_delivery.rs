@@ -468,14 +468,9 @@ fn retry_backoff(attempts: u32) -> Duration {
 /// it is logged at error and the chain ends; that is the one path on which a
 /// result is genuinely lost, and it requires the conversation store to be
 /// failing as well as the agent.
-async fn persist_undelivered(
-    ctx: DispatchCtx,
-    workspace_dir: PathBuf,
-    thread_id: String,
-    notice: String,
-) {
+async fn persist_undelivered(ctx: DispatchCtx, dir: PathBuf, thread_id: String, notice: String) {
     let run_id = format!("bgdeliver-undelivered-{}", uuid::Uuid::new_v4());
-    match persist_delivery_reply(&ctx, workspace_dir, &thread_id, &run_id, notice, false) {
+    match persist_delivery_reply(&ctx, dir, &thread_id, &run_id, notice, false) {
         Ok(()) => log::warn!(
             "[background_delivery] delivery turn gave up; wrote results into the thread \
              verbatim instead thread_id={thread_id} run_id={run_id}"
