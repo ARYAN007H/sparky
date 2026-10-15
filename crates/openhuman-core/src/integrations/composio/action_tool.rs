@@ -28,6 +28,7 @@
 //! tool migration in
 //! [`super::tools::ComposioExecuteTool`].
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -162,7 +163,7 @@ impl ComposioActionTool {
 
     /// The live config for one call: a reload anchored to the spawn-time
     /// snapshot when there is one, else the core's read path.
-    async fn live_config(&self) -> Result<Config, String> {
+    async fn live_config(&self, ctx: &DispatchCtx) -> Result<Config, String> {
         match self.config.as_deref() {
             Some(snapshot) => super::tools::live_composio_config(snapshot).await,
             None => ctx.load_config().await,

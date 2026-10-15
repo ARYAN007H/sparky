@@ -8,6 +8,7 @@
 //! process-global map, and errors are logged and swallowed so the loop
 //! never unwinds.
 
+use crate::core::runtime::DispatchCtx;
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
@@ -111,7 +112,7 @@ async fn run_loop() {
 
 /// Run a single scheduler tick. `pub(crate)` so tests can drive ticks
 /// without the real `interval`.
-pub(crate) async fn run_one_tick() -> Result<(), String> {
+pub(crate) async fn run_one_tick(ctx: &DispatchCtx, ) -> Result<(), String> {
     let config = ctx.load_config()
         .await
         .map_err(|e| format!("load_config: {e}"))?;

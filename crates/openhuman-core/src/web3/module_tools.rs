@@ -1,5 +1,6 @@
 //! Agent tool adapters that route Web3 operations through the TinyWallet bus.
 
+use crate::core::runtime::DispatchCtx;
 use async_trait::async_trait;
 use serde_json::Value;
 use tinytools::{Tool, ToolCallOptions, ToolExposure, ToolResult};
@@ -60,7 +61,7 @@ impl Tool for Web3ModuleTool {
 impl Web3ModuleTool {
     /// Runs the tool for a turn whose approval context is `chat`.
     pub(crate) async fn run(
-        &self,
+        &self, ctx: &DispatchCtx,
         args: Value,
         chat: Option<&crate::security::approval::ApprovalChatContext>,
     ) -> anyhow::Result<ToolResult> {

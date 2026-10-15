@@ -5,6 +5,7 @@
 //! `[http_request]` defaults, TinyJuice for page extraction, and (with the
 //! `web3` feature) the x402 payment flow.
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 #[cfg(feature = "web3")]
@@ -290,7 +291,7 @@ mod x402 {
                 .ok_or_else(|| {
                     "402 response is missing a valid PAYMENT-REQUIRED header".to_string()
                 })?;
-            let config = ctx.load_config()
+            let config = DispatchCtx::ambient().load_config()
                 .await
                 .map_err(|error| format!("x402 payment failed: {error}"))?;
             declined_when_wallet_off(&config)?;

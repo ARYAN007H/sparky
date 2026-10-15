@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use serde_json::json;
 
 use crate::config::rpc as config_rpc;
@@ -67,7 +68,7 @@ fn classify_workspace_entry(
 }
 
 /// Create default dirs, copy bundled prompts, and the skills README.
-pub async fn init_workspace(force: bool) -> Result<serde_json::Value, String> {
+pub async fn init_workspace(ctx: &DispatchCtx, force: bool) -> Result<serde_json::Value, String> {
     let config = ctx.load_config().await?;
     let workspace_dir = config.workspace_dir.clone();
 

@@ -1,5 +1,6 @@
 //! Direct mode (BYO API key) ops.
 
+use crate::core::runtime::DispatchCtx;
 use crate::config::Config;
 use crate::core::Outcome;
 
@@ -71,7 +72,7 @@ pub async fn composio_get_mode(config: &Config) -> OpResult<Outcome<serde_json::
 /// (optionally) flip `config.composio.mode` over to `"direct"`.
 ///
 /// **Logging redacts the key** — only its length and presence are recorded.
-pub async fn composio_set_api_key(
+pub async fn composio_set_api_key(ctx: &DispatchCtx, 
     config: &Config,
     api_key: &str,
     activate_direct: bool,
@@ -131,7 +132,7 @@ pub async fn composio_set_api_key(
 
 /// Clear the stored direct-mode API key and reset
 /// `config.composio.mode` back to `"backend"`.
-pub async fn composio_clear_api_key(config: &Config) -> OpResult<Outcome<serde_json::Value>> {
+pub async fn composio_clear_api_key(ctx: &DispatchCtx, config: &Config) -> OpResult<Outcome<serde_json::Value>> {
     tracing::debug!("[composio-direct] clear_api_key");
     crate::security::credentials::clear_composio_api_key(config)
         .await

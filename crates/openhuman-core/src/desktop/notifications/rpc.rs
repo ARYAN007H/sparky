@@ -8,6 +8,7 @@
 //!  - `notification_mark_acted` — mark a single notification as acted upon
 //!  - `notification_stats`    — return aggregate pipeline statistics
 
+use crate::core::runtime::DispatchCtx;
 use chrono::Utc;
 use serde_json::{json, Map, Value};
 use uuid::Uuid;
@@ -35,7 +36,7 @@ use super::types::{
 ///
 /// Writes the record immediately, returns the new `id`, then spawns a
 /// background task to run the triage pipeline and back-fill the score.
-pub async fn handle_ingest(params: Map<String, Value>) -> Result<Value, String> {
+pub async fn handle_ingest(ctx: &DispatchCtx, params: Map<String, Value>) -> Result<Value, String> {
     let ingest_started_at = Utc::now();
     let config = ctx.load_config().await?;
 
@@ -257,7 +258,7 @@ pub async fn handle_ingest(params: Map<String, Value>) -> Result<Value, String> 
 ///
 /// Optional params: `provider` (string), `limit` (u64), `offset` (u64),
 /// `min_score` (f64).
-pub async fn handle_list(params: Map<String, Value>) -> Result<Value, String> {
+pub async fn handle_list(ctx: &DispatchCtx, params: Map<String, Value>) -> Result<Value, String> {
     let config = ctx.load_config().await?;
 
     let provider = params
@@ -294,7 +295,7 @@ pub async fn handle_list(params: Map<String, Value>) -> Result<Value, String> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Mark a single notification as read.
-pub async fn handle_mark_read(params: Map<String, Value>) -> Result<Value, String> {
+pub async fn handle_mark_read(ctx: &DispatchCtx, params: Map<String, Value>) -> Result<Value, String> {
     let config = ctx.load_config().await?;
 
     let id = params
@@ -313,7 +314,7 @@ pub async fn handle_mark_read(params: Map<String, Value>) -> Result<Value, Strin
 }
 
 /// Read notification routing settings for a provider.
-pub async fn handle_settings_get(params: Map<String, Value>) -> Result<Value, String> {
+pub async fn handle_settings_get(ctx: &DispatchCtx, params: Map<String, Value>) -> Result<Value, String> {
     let config = ctx.load_config().await?;
     let provider = params
         .get("provider")
@@ -326,7 +327,7 @@ pub async fn handle_settings_get(params: Map<String, Value>) -> Result<Value, St
 }
 
 /// Upsert notification routing settings for a provider.
-pub async fn handle_settings_set(params: Map<String, Value>) -> Result<Value, String> {
+pub async fn handle_settings_set(ctx: &DispatchCtx, params: Map<String, Value>) -> Result<Value, String> {
     let config = ctx.load_config().await?;
     let req: NotificationSettingsUpsertRequest = serde_json::from_value(Value::Object(params))
         .map_err(|e| format!("[notification_intel] invalid settings_set params: {e}"))?;
@@ -347,7 +348,7 @@ pub async fn handle_settings_set(params: Map<String, Value>) -> Result<Value, St
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Mark a single notification as dismissed.
-pub async fn handle_dismiss(params: Map<String, Value>) -> Result<Value, String> {
+pub async fn handle_dismiss(ctx: &DispatchCtx, params: Map<String, Value>) -> Result<Value, String> {
     let config = ctx.load_config().await?;
     let id = params
         .get("id")
@@ -367,7 +368,7 @@ pub async fn handle_dismiss(params: Map<String, Value>) -> Result<Value, String>
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Mark a single notification as acted upon.
-pub async fn handle_mark_acted(params: Map<String, Value>) -> Result<Value, String> {
+pub async fn handle_mark_acted(ctx: &DispatchCtx, params: Map<String, Value>) -> Result<Value, String> {
     let config = ctx.load_config().await?;
     let id = params
         .get("id")
@@ -396,7 +397,7 @@ pub async fn handle_mark_acted(params: Map<String, Value>) -> Result<Value, Stri
 /// closed / disconnected — these are otherwise lost because the live channel
 /// is broadcast-only. Optional params: `only_unread` (bool, default true),
 /// `limit` (u64, default 100).
-pub async fn handle_core_list(params: Map<String, Value>) -> Result<Value, String> {
+pub async fn handle_core_list(ctx: &DispatchCtx, params: Map<String, Value>) -> Result<Value, String> {
     let config = ctx.load_config().await?;
 
     let only_unread = params
@@ -420,7 +421,7 @@ pub async fn handle_core_list(params: Map<String, Value>) -> Result<Value, Strin
 
 /// Mark a persisted core notification as read so it isn't re-surfaced on the
 /// next sync-down.
-pub async fn handle_core_mark_read(params: Map<String, Value>) -> Result<Value, String> {
+pub async fn handle_core_mark_read(ctx: &DispatchCtx, params: Map<String, Value>) -> Result<Value, String> {
     let config = ctx.load_config().await?;
     let id = params
         .get("id")
@@ -440,7 +441,7 @@ pub async fn handle_core_mark_read(params: Map<String, Value>) -> Result<Value, 
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Return aggregate pipeline statistics.
-pub async fn handle_stats(_params: Map<String, Value>) -> Result<Value, String> {
+pub async fn handle_stats(ctx: &DispatchCtx, _params: Map<String, Value>) -> Result<Value, String> {
     let config = ctx.load_config().await?;
     tracing::debug!("[notification_intel] stats requested");
 

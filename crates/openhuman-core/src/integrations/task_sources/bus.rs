@@ -5,6 +5,7 @@
 //! `ConnectionCreated` fetch so freshly-connected work shows up without
 //! waiting for the next periodic tick.
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::{Arc, OnceLock};
 
 use async_trait::async_trait;
@@ -62,7 +63,7 @@ impl EventHandler<DomainEvent> for TaskSourcesConnectionSubscriber {
 /// loaded inside it — so an agent whose own config disables task sources is
 /// skipped even when the process config enables them, and the other way
 /// round.
-async fn fire_in_scope(provider: ProviderSlug, toolkit: &str, connection_id: &str) {
+async fn fire_in_scope(ctx: &DispatchCtx, provider: ProviderSlug, toolkit: &str, connection_id: &str) {
     let config = match ctx.load_config().await {
         Ok(config) => config,
         Err(e) => {

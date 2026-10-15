@@ -29,7 +29,7 @@ fn optional_text(params: &Map<String, Value>, key: &str) -> Option<String> {
 }
 
 /// Run one role tool and shape the response for RPC callers.
-async fn run_role_tool(
+async fn run_role_tool(ctx: &DispatchCtx, 
     tool: &'static str,
     arguments: Value,
     method: &str,

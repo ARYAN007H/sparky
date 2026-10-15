@@ -9,6 +9,7 @@
 //! user's directory, persist the profile, rebind its process globals, start
 //! the credential-gated services, open the scheduler gate and scope Sentry.
 
+use crate::core::runtime::DispatchCtx;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -505,7 +506,7 @@ pub async fn clear_credential(
 /// teardown, user-dir deactivation, service stop, rebind to the signed-out
 /// workspace, and Sentry / identity clear. Callers hold
 /// [`CREDENTIAL_MUTATION_LOCK`].
-async fn clear_session_credential(config: &Config) -> Result<Outcome<bool>, String> {
+async fn clear_session_credential(ctx: &DispatchCtx, config: &Config) -> Result<Outcome<bool>, String> {
     let mut logs = Vec::new();
     crate::cron::scheduler_gate::set_signed_out(true);
     #[cfg(feature = "web3")]

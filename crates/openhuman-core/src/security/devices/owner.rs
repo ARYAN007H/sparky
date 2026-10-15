@@ -13,6 +13,7 @@
 //!
 //! `None` means the `local` scope (a single-user host, or no backend).
 
+use crate::core::runtime::DispatchCtx;
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
 
@@ -62,7 +63,7 @@ pub(super) type OwnerLookupFailed = crate::storage::agents::LookupFailed;
 /// Whether the current scope holds `channel_id` as a live (not revoked)
 /// paired device. The configuration is loaded inside the scope: in SaaS mode
 /// loading it needs an acting agent, which the tunnel task does not have.
-async fn has_live_device(channel_id: &str) -> Result<bool, String> {
+async fn has_live_device(ctx: &DispatchCtx, channel_id: &str) -> Result<bool, String> {
     let config = ctx.load_config()
         .await
         .map_err(|error| format!("load config: {error}"))?;
@@ -73,7 +74,7 @@ async fn has_live_device(channel_id: &str) -> Result<bool, String> {
 
 /// Whether the current scope holds `channel_id` as a revoked device (a missing
 /// row is not revoked).
-async fn is_revoked(channel_id: &str) -> Result<bool, String> {
+async fn is_revoked(ctx: &DispatchCtx, channel_id: &str) -> Result<bool, String> {
     let config = ctx.load_config()
         .await
         .map_err(|error| format!("load config: {error}"))?;

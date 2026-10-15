@@ -3,6 +3,7 @@
 //! onboarding) fetches the account profile for toolkits with a native
 //! identity provider.
 
+use crate::core::runtime::DispatchCtx;
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -93,7 +94,7 @@ impl EventHandler<DomainEvent> for ComposioConnectionCreatedSubscriber {
     }
 }
 
-async fn on_connection_created(toolkit: String, connection_id: String) {
+async fn on_connection_created(ctx: &DispatchCtx, toolkit: String, connection_id: String) {
     let config = match ctx.load_config().await {
         Ok(c) => c,
         Err(e) => {

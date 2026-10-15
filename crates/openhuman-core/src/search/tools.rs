@@ -8,6 +8,7 @@
 //! agent's config carries host-pinned search keys, which make it the config
 //! the call runs under.
 
+use crate::core::runtime::DispatchCtx;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::sync::{Arc, Mutex};
@@ -116,7 +117,7 @@ impl TinySearchTool {
         &self.spec
     }
 
-    async fn live_config(&self) -> anyhow::Result<Config> {
+    async fn live_config(&self, ctx: &DispatchCtx) -> anyhow::Result<Config> {
         match &self.config {
             Some(config) => Ok(config.as_ref().clone()),
             None => ctx.load_config()

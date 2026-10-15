@@ -1,5 +1,6 @@
 //! JSON-RPC / CLI controller surface for the update domain.
 
+use crate::core::runtime::DispatchCtx;
 use std::path::PathBuf;
 
 use serde_json::Value;
@@ -9,7 +10,7 @@ use crate::core::Outcome;
 use crate::platform::update;
 use crate::platform::update::types::{UpdateApplyResult, UpdateInfo, UpdateRunResult, VersionInfo};
 
-async fn load_update_policy() -> Result<UpdateConfig, String> {
+async fn load_update_policy(ctx: &DispatchCtx, ) -> Result<UpdateConfig, String> {
     ctx.load_config()
         .await
         .map(|cfg| cfg.update)

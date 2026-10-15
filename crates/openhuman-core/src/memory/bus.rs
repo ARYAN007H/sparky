@@ -17,6 +17,7 @@
 //! Turns are not ingested from the bus: the session host calls the lifecycle
 //! hooks itself, under the session's own config (`lifecycle::hooks`).
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::{Arc, OnceLock};
 
 use async_trait::async_trait;
@@ -57,7 +58,7 @@ impl EventHandler<DomainEvent> for PendingDeletionsSubscriber {
         if kind == "cleared" {
             return;
         }
-        let config = match ctx.load_config().await {
+        let config = match DispatchCtx::ambient().load_config().await {
             Ok(config) => config,
             Err(error) => {
                 tracing::debug!(error = %error, "[memory:bus] config unavailable; deletions wait");
@@ -96,7 +97,7 @@ impl EventHandler<DomainEvent> for SystemJobsSubscriber {
         if job != SOURCES_SYNC_JOB && job != BACKGROUND_JOB {
             return;
         }
-        let config = match ctx.load_config().await {
+        let config = match DispatchCtx::ambient().load_config().await {
             Ok(config) => config,
             Err(error) => {
                 tracing::debug!(error = %error, job = %job, "[memory:bus] config unavailable");

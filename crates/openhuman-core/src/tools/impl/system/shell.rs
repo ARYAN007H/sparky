@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use super::shell_description::{command_param_description, shell_description};
 #[cfg(feature = "modules")]
 use super::shell_support::container_environment;
@@ -334,7 +335,7 @@ impl ShellTool {
     }
 
     async fn run_with_security_in_context(
-        &self,
+        &self, ctx: &DispatchCtx,
         command: &str,
         requested_timeout: Option<u64>,
         context: Option<&dyn ToolRunContext>,

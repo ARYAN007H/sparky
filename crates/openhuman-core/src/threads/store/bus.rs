@@ -21,6 +21,7 @@
 //! promise, and this file's behaviour is untouched by the move — which matters,
 //! because it decides the id under which channel turns are persisted.
 
+use crate::core::runtime::DispatchCtx;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock, RwLock};
 
@@ -347,7 +348,7 @@ struct ChannelTurnDescriptor<'a> {
     source: &'a str,
 }
 
-async fn persist_channel_turn(
+async fn persist_channel_turn(ctx: &DispatchCtx, 
     workspace_dir: &Path,
     descriptor: ChannelTurnDescriptor<'_>,
 ) -> Result<(), String> {

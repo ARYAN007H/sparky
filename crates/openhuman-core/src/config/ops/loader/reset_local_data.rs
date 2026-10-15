@@ -2,6 +2,7 @@
 //! root markers, plus the path-discovery RPCs the Tauri shell uses to do the
 //! same from outside the core process.
 
+use crate::core::runtime::DispatchCtx;
 use std::path::Path;
 
 use serde_json::json;
@@ -147,7 +148,7 @@ pub(crate) async fn reset_local_data_for_paths(
 /// callers where in-process removal is acceptable (POSIX file semantics
 /// tolerate unlinking open files; on Windows the CLI invocation runs
 /// without the core attached, so no handle is in the way).
-pub async fn reset_local_data() -> Result<Outcome<serde_json::Value>, String> {
+pub async fn reset_local_data(ctx: &DispatchCtx, ) -> Result<Outcome<serde_json::Value>, String> {
     let config = ctx.load_config().await?;
     let current_openhuman_dir = config_openhuman_dir(&config);
     let default_openhuman_dir = default_openhuman_dir();
@@ -164,7 +165,7 @@ pub async fn reset_local_data() -> Result<Outcome<serde_json::Value>, String> {
 /// after which the Tauri shell removes them while no process holds open
 /// handles. See OPENHUMAN-TAURI-AF for the Windows file-locking failure
 /// that motivated the split.
-pub async fn get_data_paths() -> Result<Outcome<serde_json::Value>, String> {
+pub async fn get_data_paths(ctx: &DispatchCtx, ) -> Result<Outcome<serde_json::Value>, String> {
     let config = ctx.load_config().await?;
     let current_openhuman_dir = config_openhuman_dir(&config);
     let default_openhuman_dir = default_openhuman_dir();

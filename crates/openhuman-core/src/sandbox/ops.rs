@@ -1,6 +1,7 @@
 //! Sandbox backend operations — policy resolution, backend creation, and
 //! routed execution.
 
+use crate::core::runtime::DispatchCtx;
 use super::docker;
 use super::types::{
     ElevatedOp, SandboxBackendHandle, SandboxBackendKind, SandboxExecRequest, SandboxExecResult,
@@ -45,7 +46,7 @@ pub fn sandbox_off_value(value: Option<&str>) -> bool {
 /// Whether a command tool must use the sandbox execution path. An explicit
 /// backend in the active config is an operator requirement even when the
 /// agent definition uses the usual `SandboxMode::None` default.
-pub async fn command_requires_sandbox(sandbox_mode: Option<SandboxMode>) -> Result<bool, String> {
+pub async fn command_requires_sandbox(ctx: &DispatchCtx, sandbox_mode: Option<SandboxMode>) -> Result<bool, String> {
     if crate::core::runtime::is_saas() {
         // Every SaaS command must enter the per-user container path, including
         // language tools whose agent definition does not request a sandbox.
@@ -73,7 +74,7 @@ pub async fn command_requires_sandbox(sandbox_mode: Option<SandboxMode>) -> Resu
 /// Resolve the policy for a command tool before building its command line.
 /// SaaS always uses the user's container; other hosts apply the operator's
 /// backend selection while retaining an agent-level sandbox requirement.
-pub(crate) async fn resolve_command_policy(
+pub(crate) async fn resolve_command_policy(ctx: &DispatchCtx, 
     action_dir: &Path,
     state_dir: &Path,
 ) -> Result<SandboxPolicy, String> {
@@ -222,7 +223,7 @@ pub(crate) fn local_status_for_jail(
     }
 }
 
-pub async fn create_sandbox_backend(policy: &SandboxPolicy) -> SandboxBackendHandle {
+pub async fn create_sandbox_backend(ctx: &DispatchCtx, policy: &SandboxPolicy) -> SandboxBackendHandle {
     if policy.backend != SandboxBackendKind::Docker {
         return create_sandbox_backend_with_config(policy, &crate::config::Config::default())
             .await
@@ -298,7 +299,7 @@ pub async fn execute_in_sandbox(
 /// [`execute_in_sandbox`] that feeds `meter` with the command's output as it
 /// streams (the native backends; Docker reports elapsed time only), for the
 /// shell tool's progress line.
-pub(crate) async fn execute_in_sandbox_metered(
+pub(crate) async fn execute_in_sandbox_metered(ctx: &DispatchCtx, 
     policy: &SandboxPolicy,
     command: &str,
     working_dir: &Path,

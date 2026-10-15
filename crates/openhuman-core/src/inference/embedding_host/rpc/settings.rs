@@ -1,6 +1,7 @@
 //! Embedding settings: reading the current configuration and applying an
 //! update, including the save-time verification of a custom endpoint.
 
+use crate::core::runtime::DispatchCtx;
 use crate::config::Config;
 use crate::core::Outcome;
 use crate::security::credentials::AuthService;
@@ -192,7 +193,7 @@ pub async fn get_settings(config: &Config) -> Result<Outcome<serde_json::Value>,
 /// Updates embedding provider/model/dimensions. Nothing persisted depends on
 /// the embedding signature any more (memory v2 engines embed server-side), so a
 /// change applies directly.
-pub async fn update_settings(
+pub async fn update_settings(ctx: &DispatchCtx, 
     provider: Option<String>,
     model: Option<String>,
     dimensions: Option<usize>,

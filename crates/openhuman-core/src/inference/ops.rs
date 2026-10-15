@@ -1,5 +1,6 @@
 //! JSON-RPC controller surface for inference operations.
 
+use crate::core::runtime::DispatchCtx;
 use crate::config::rpc as config_rpc;
 use crate::config::Config;
 use crate::core::Outcome;
@@ -272,7 +273,7 @@ pub async fn inference_update_model_settings(
     result
 }
 
-pub async fn inference_update_local_settings(
+pub async fn inference_update_local_settings(ctx: &DispatchCtx, 
     update: config_rpc::LocalAiSettingsPatch,
 ) -> Result<Outcome<Value>, String> {
     debug!("{LOG_PREFIX} update_local_settings:start");

@@ -7,6 +7,7 @@
 //! - Persisting the `PairedDevice` record after a successful handshake.
 //! - Publishing `DomainEvent::DevicePaired / DevicePeerOnline / DevicePeerOffline`.
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::{Arc, OnceLock};
 
 use crate::core::bus::BUS;
@@ -176,7 +177,7 @@ fn handle_peer_offline(channel_id: &str) {
 /// Handle an incoming `tunnel:frame` — first frame from the device contains its
 /// X25519 public key sealed to the core's public key. After successful decryption
 /// we derive the shared secret and persist the `PairedDevice`.
-async fn handle_tunnel_frame(channel_id: &str, payload_b64: &str) {
+async fn handle_tunnel_frame(ctx: &DispatchCtx, channel_id: &str, payload_b64: &str) {
     log::debug!(
         "[devices/bus] tunnel:frame channel_id={} payload_len={}",
         channel_id,
