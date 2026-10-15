@@ -311,7 +311,7 @@ pub struct OpenHumanRunContext {
     pub memory_identity: Option<crate::memory::scope::MemoryIdentity>,
     /// The context the turn runs under, read by tools, middleware and the
     /// provider factory instead of the ambient scope. Children inherit it.
-    pub core: Option<Arc<crate::core::runtime::CoreContext>>,
+    pub core: Option<std::sync::Weak<crate::core::runtime::CoreContext>>,
     /// File-state identity used to detect stale parent reads after child writes.
     pub file_state_agent_id: Option<String>,
     /// Host-owned artifact index for tool-result references.
@@ -486,20 +486,17 @@ impl OpenHumanRunContext {
         self
     }
 
-    /// Binds the context this run acts under.
+    /// Binds the context this run acts under, held weakly so a run kept past its turn never pins the tenant.
     #[must_use]
     pub fn with_core(mut self, core: Option<Arc<crate::core::runtime::CoreContext>>) -> Self {
-        self.core = core;
+        self.core = core.as_ref().map(Arc::downgrade);
         self
     }
 
     /// The dispatch context this run's readers use: its own `core`, else the
     /// calling task's (a run assembled by a caller that did not bind one).
     pub fn dispatch_ctx(&self) -> crate::core::runtime::DispatchCtx {
-        match &self.core {
-            Some(core) => crate::core::runtime::DispatchCtx::new(Arc::clone(core)),
-            None => crate::core::runtime::DispatchCtx::ambient(),
-        }
+        crate::core::runtime::DispatchCtx::from_weak(self.core.as_ref())
     }
 
     /// The connected-identities prompt section, read under this run's context.
@@ -680,10 +677,7 @@ impl OpenHumanRunContext {
                 .as_ref()
                 .map(|parent| parent.agent_definition_id.clone()),
             memory_identity: self.memory_identity.clone(),
-            dispatch: self
-                .core
-                .clone()
-                .map(crate::core::runtime::DispatchCtx::new),
+            core: self.core.clone(),
         });
         let context = tinyagents_harness::context::RunContext::new(config, self)
             .with_cancellation(cancellation)

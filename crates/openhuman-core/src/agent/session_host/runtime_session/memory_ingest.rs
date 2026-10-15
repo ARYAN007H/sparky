@@ -79,10 +79,7 @@ impl OpenHumanTurnPrelude {
     }
 
     pub(in crate::agent::session_host) fn dispatch_ctx(&self) -> crate::core::runtime::DispatchCtx {
-        match &self.host_env.core {
-            Some(core) => crate::core::runtime::DispatchCtx::new(Arc::clone(core)),
-            None => crate::core::runtime::DispatchCtx::ambient(),
-        }
+        crate::core::runtime::DispatchCtx::from_weak(self.host_env.core.as_ref())
     }
     /// The config memory runs under: the session's own, else the
     /// workspace's on disk.

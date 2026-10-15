@@ -108,7 +108,7 @@ pub struct OpenHumanContextComposer {
     connected_integrations: Vec<ConnectedIntegration>,
     /// The turn's dispatch context for config reads; `None` falls back to the
     /// calling task's.
-    dispatch: Option<DispatchCtx>,
+    dispatch: Option<std::sync::Weak<crate::core::runtime::CoreContext>>,
     /// The section chain. Built once so per-turn composition is just a render.
     builder: SystemPromptBuilder,
 }
@@ -135,7 +135,7 @@ impl OpenHumanContextComposer {
 
     /// Binds the turn's dispatch context, which the composer reads config under.
     pub fn with_dispatch(mut self, dispatch: DispatchCtx) -> Self {
-        self.dispatch = Some(dispatch);
+        self.dispatch = dispatch.downgrade();
         self
     }
 
@@ -216,7 +216,7 @@ impl ContextComposer for OpenHumanContextComposer {
             tool_call_format: self.tool_call_format,
             connected_integrations: &self.connected_integrations,
             connected_identities_md: render_connected_identities(
-                &self.dispatch.clone().unwrap_or_else(DispatchCtx::ambient),
+                &DispatchCtx::from_weak(self.dispatch.as_ref()),
             ),
             user_identity: crate::security::credentials::identity::peek_credential_user_identity(),
             // TODO(phase4): the master agent's personality roster is built

@@ -31,7 +31,7 @@ impl OpenHumanSessionHost {
         // snapshots the host environment: the one ambient read at the turn
         // boundary, for a host that did not hand a context over.
         if self.host_env.core.is_none() {
-            self.host_env.core = crate::core::runtime::DispatchCtx::ambient().into_core();
+            self.host_env.core = crate::core::runtime::DispatchCtx::ambient().downgrade();
         }
         self.ensure_runtime_session()?;
         let staged = super::attachment_input::stage_turn(self, user_message, origin).await?;

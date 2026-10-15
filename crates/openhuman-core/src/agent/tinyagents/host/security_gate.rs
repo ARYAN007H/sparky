@@ -154,7 +154,7 @@ pub struct OpenHumanSecurityGate {
     approval: ApprovalTurnContext,
     /// The owning turn's dispatch context, read from the turn's run context
     /// when the gate is built; `None` falls back to the calling task's.
-    dispatch: Option<DispatchCtx>,
+    dispatch: Option<std::sync::Weak<crate::core::runtime::CoreContext>>,
 }
 
 impl OpenHumanSecurityGate {
@@ -179,7 +179,7 @@ impl OpenHumanSecurityGate {
 
     /// Binds the owning turn's dispatch context.
     pub fn with_dispatch(mut self, dispatch: DispatchCtx) -> Self {
-        self.dispatch = Some(dispatch);
+        self.dispatch = dispatch.downgrade();
         self
     }
 
@@ -426,7 +426,7 @@ impl OpenHumanSecurityGate {
         let desktop_approval_disabled = match self.resolve_tool(&call.tool_name) {
             Some(tool) => {
                 crate::desktop::control::approvals_disabled_for(
-                    &self.dispatch.clone().unwrap_or_else(DispatchCtx::ambient),
+                    &DispatchCtx::from_weak(self.dispatch.as_ref()),
                     tool,
                 )
                 .await

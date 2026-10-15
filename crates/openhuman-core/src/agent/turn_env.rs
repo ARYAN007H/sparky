@@ -58,11 +58,12 @@ pub struct HostTurnEnv {
     /// from a parent snapshot keep the parent's team.
     pub memory_identity: Option<crate::memory::scope::MemoryIdentity>,
     /// The [`CoreContext`](crate::core::runtime::CoreContext) the turn runs
-    /// under (the tenant's, an embedded agent's, or the host's own). The
-    /// session copies it onto the turn's run context, from which tools,
-    /// middleware and the provider factory read it; `None` leaves the session
-    /// to bind the calling task's context when the turn starts.
-    pub core: Option<std::sync::Arc<crate::core::runtime::CoreContext>>,
+    /// under (the tenant's, an embedded agent's, or the host's own), held
+    /// weakly: the env outlives a turn, and a strong handle would keep the
+    /// tenant in use. The session copies it onto the turn's run context, from
+    /// which tools, middleware and the provider factory read it; `None` leaves
+    /// the session to bind the calling task's context when the turn starts.
+    pub core: Option<std::sync::Weak<crate::core::runtime::CoreContext>>,
 }
 
 impl std::fmt::Debug for HostTurnEnv {

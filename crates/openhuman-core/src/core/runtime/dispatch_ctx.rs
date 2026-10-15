@@ -95,6 +95,24 @@ impl DispatchCtx {
         crate::config::ops::load_config_in(self).await
     }
 
+    /// A non-owning handle on the bound context, for state that outlives the
+    /// call (a session, a built turn). The tenant lease is the strong count of
+    /// the context ([`CoreContext::tenant_in_use`]), so a long-lived holder
+    /// must not keep it alive.
+    pub fn downgrade(&self) -> Option<std::sync::Weak<CoreContext>> {
+        self.core.as_ref().map(Arc::downgrade)
+    }
+
+    /// Dispatch under the context `weak` still points at, else the calling
+    /// task's ambient one (a holder that was never bound, or whose tenant is
+    /// gone).
+    pub fn from_weak(weak: Option<&std::sync::Weak<CoreContext>>) -> Self {
+        match weak.and_then(std::sync::Weak::upgrade) {
+            Some(core) => Self::new(core),
+            None => Self::ambient(),
+        }
+    }
+
     /// The context this call runs under, if any.
     pub fn core(&self) -> Option<&Arc<CoreContext>> {
         self.core.as_ref()
