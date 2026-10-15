@@ -86,16 +86,18 @@ fn approval_describes_selector_and_locator_targets() {
     assert!(locator.contains("Role locator") && locator.contains("Email"));
     assert!(!locator.contains("private@example.com"));
 
-    let (reference, press) = approval_target(&Action::Press {
+    let targeted = Action::Press {
         key: "Enter".into(),
         target: Some(Target::reference("e7")),
-    });
+    };
+    let (reference, press) = approval_target(&targeted);
     assert_eq!(reference, Some("e7"));
     assert_eq!(press, " @e7");
-    let (_, untargeted) = approval_target(&Action::Press {
+    let bare = Action::Press {
         key: "Enter".into(),
         target: None,
-    });
+    };
+    let (_, untargeted) = approval_target(&bare);
     assert!(untargeted.is_empty());
 }
 
