@@ -309,10 +309,8 @@ pub struct OpenHumanRunContext {
     pub prepared_context_sources: Arc<Vec<AgentContextPreparedSource>>,
     /// Who the run acts as on memory; `None` is the root identity.
     pub memory_identity: Option<crate::memory::scope::MemoryIdentity>,
-    /// The context the turn runs under. Tools, middleware and the provider
-    /// factory read it from here ([`dispatch_ctx_for_tool`]) instead of the
-    /// calling task's ambient scope. Inherited by children and detached
-    /// children: a sub-agent acts for the same tenant as its parent.
+    /// The context the turn runs under, read by tools, middleware and the
+    /// provider factory instead of the ambient scope. Children inherit it.
     pub core: Option<Arc<crate::core::runtime::CoreContext>>,
     /// File-state identity used to detect stale parent reads after child writes.
     pub file_state_agent_id: Option<String>,
@@ -494,9 +492,8 @@ impl OpenHumanRunContext {
         self
     }
 
-    /// The dispatch context this run's readers (config, tenant stores) use:
-    /// the run's own context, else the calling task's (a run assembled by a
-    /// caller that did not bind one).
+    /// The dispatch context this run's readers use: its own `core`, else the
+    /// calling task's (a run assembled by a caller that did not bind one).
     pub fn dispatch_ctx(&self) -> crate::core::runtime::DispatchCtx {
         match &self.core {
             Some(core) => crate::core::runtime::DispatchCtx::new(Arc::clone(core)),

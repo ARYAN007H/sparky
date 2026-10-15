@@ -51,14 +51,14 @@
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/agent/orchestration/workflow_runs/engine/lifecycle.rs",
-    "line": 211,
+    "line": 215,
     "text": "let inherited_origin = crate::agent::turn_origin::capture();",
     "occurrence": 2
   },
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/agent/orchestration/workflow_runs/engine/lifecycle.rs",
-    "line": 216,
+    "line": 220,
     "text": "crate::agent::turn_origin::with_inherited_origin(",
     "occurrence": 2
   },
@@ -311,7 +311,7 @@
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/integrations/composio/bus/trigger_subscriber.rs",
     "line": 195,
-    "text": "if let Err(e) = with_origin(origin, apply_decision(&crate::core::runtime::DispatchCtx::ambient(), run, &envelope)).await {",
+    "text": "if let Err(e) = with_origin(",
     "occurrence": 1
   },
   {
@@ -394,7 +394,7 @@
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/skills/webhooks/bus.rs",
-    "line": 317,
+    "line": 318,
     "text": "crate::agent::turn_origin::with_origin(",
     "occurrence": 1
   },
