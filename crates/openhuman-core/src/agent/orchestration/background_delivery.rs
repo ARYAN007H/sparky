@@ -197,10 +197,15 @@ pub(super) fn drain_schedule_in(
     let profiles = owners_of(session, task);
     let thread_in = |owner: Option<Arc<CoreContext>>| {
         let thread_id = match &owner {
-            Some(ctx) => CoreContext::sync_scope(Arc::clone(ctx), || {
-                background_completions::thread_for_session(session)
-            }),
-            None => background_completions::thread_for_session(session),
+            Some(ctx) => background_completions::thread_for_session(
+                &crate::core::runtime::DispatchCtx::new(Arc::clone(ctx)),
+                session,
+            ),
+            // No owner: the unscoped (desktop) drain reads the ambient context.
+            None => background_completions::thread_for_session(
+                &crate::core::runtime::DispatchCtx::ambient(),
+                session,
+            ),
         };
         if thread_id.is_none() {
             log::trace!("[background_delivery] session has no delivery thread; not scheduling");
@@ -290,11 +295,11 @@ fn scheduled_for_test() -> &'static Mutex<Vec<(String, Duration)>> {
 /// after [`RECOVERY_DELAY`], through the normal idle-gated path, fenced by the
 /// calling profile's lease when there is one. Returns the number of threads
 /// scheduled.
-pub(crate) fn recover_on_boot(workspace_dir: &Path) -> usize {
-    recover_fenced(workspace_dir, DrainFence::current())
+pub(crate) fn recover_on_boot(ctx: &crate::core::runtime::DispatchCtx, workspace_dir: &Path) -> usize {
+    recover_fenced(ctx, workspace_dir, DrainFence::current())
 }
 
-fn recover_fenced(workspace_dir: &Path, fence: DrainFence) -> usize {
+fn recover_fenced(ctx: &crate::core::runtime::DispatchCtx, workspace_dir: &Path, fence: DrainFence) -> usize {
     // Scheduling needs a runtime; check before claiming so a later call retries.
     if tokio::runtime::Handle::try_current().is_err() {
         log::warn!(
@@ -307,7 +312,7 @@ fn recover_fenced(workspace_dir: &Path, fence: DrainFence) -> usize {
     if !background_completions::claim_recovery(workspace_dir) {
         return 0;
     }
-    let threads = background_completions::recover_pending_threads(workspace_dir);
+    let threads = background_completions::recover_pending_threads(ctx, workspace_dir);
     for thread_id in &threads {
         log::info!(
             "[background_delivery] scheduling redelivery of undelivered completions after restart \
@@ -325,9 +330,13 @@ fn recover_fenced(workspace_dir: &Path, fence: DrainFence) -> usize {
 /// host has not published the profile yet, so it cannot be looked up): a drain
 /// that comes due after this node lost that lease is dropped, and the records
 /// stay pending for the node that holds it now.
-pub(crate) fn recover_on_open(workspace_dir: &Path, fence: DrainFence) -> usize {
+pub(crate) fn recover_on_open(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: &Path,
+    fence: DrainFence,
+) -> usize {
     background_completions::forget_recovery(workspace_dir);
-    let scheduled = recover_fenced(workspace_dir, fence);
+    let scheduled = recover_fenced(ctx, workspace_dir, fence);
     if scheduled == 0 {
         // Nothing pending: do not keep this profile's log handle cached for a
         // workspace that may never complete anything on this node.
@@ -371,7 +380,7 @@ async fn try_deliver(
         );
         return;
     }
-    let Some(workspace_dir) = background_completions::workspace_for_thread(&thread_id) else {
+    let Some(workspace_dir) = background_completions::workspace_for_thread(&busy_ctx, &thread_id) else {
         log::debug!("[background_delivery] no workspace for thread_id={thread_id}");
         return;
     };

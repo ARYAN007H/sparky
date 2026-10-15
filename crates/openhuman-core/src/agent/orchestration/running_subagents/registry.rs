@@ -196,6 +196,7 @@ pub(crate) fn register(
     );
     if let Some(thread_id) = parent_thread_id.as_deref() {
         if crate::agent::orchestration::background_completions::mark_stopped_task_if_thread_stopped(
+            ctx,
             &workspace_dir,
             thread_id,
             &task_id,
@@ -212,7 +213,7 @@ pub(crate) fn register(
         }
         // First spawn in a workspace this process has not scanned: redeliver any
         // completions a previous process finished there but never delivered.
-        crate::agent::orchestration::background_delivery::recover_on_boot(&workspace_dir);
+        crate::agent::orchestration::background_delivery::recover_on_boot(ctx, &workspace_dir);
     }
 
     let metadata = RunningSubagentMetadata {
