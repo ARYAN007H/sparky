@@ -424,7 +424,8 @@ pub(in super::super) async fn run_subagent_via_graph(
                     crate::platform::cost::record_provider_usage_scoped(
                         model,
                         &billed,
-                        crate::platform::cost::UsageScope::ambient(
+                        crate::platform::cost::UsageScope::in_ctx(
+                            &dispatch,
                             Some(&usage_provider_id),
                             Some((agent_id, task_id)),
                         ),
