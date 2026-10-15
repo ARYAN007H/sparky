@@ -215,9 +215,9 @@ impl ContextComposer for OpenHumanContextComposer {
             visible_tool_names: &visible_tool_names,
             tool_call_format: self.tool_call_format,
             connected_integrations: &self.connected_integrations,
-            connected_identities_md: render_connected_identities(
-                &DispatchCtx::from_weak(self.dispatch.as_ref()),
-            ),
+            connected_identities_md: render_connected_identities(&DispatchCtx::from_weak(
+                self.dispatch.as_ref(),
+            )),
             user_identity: crate::security::credentials::identity::peek_credential_user_identity(),
             // TODO(phase4): the master agent's personality roster is built
             // from the profiles domain (`crate::profiles`); the

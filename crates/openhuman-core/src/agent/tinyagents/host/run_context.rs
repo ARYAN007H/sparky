@@ -414,11 +414,11 @@ pub(crate) struct HarnessHostPolicy {
 
 #[cfg(test)]
 pub(crate) use super::operation_context::tool_context_with_approval;
+pub use super::operation_context::OpenHumanRunExt;
 pub(crate) use super::operation_context::{
     approval_for_tool, dispatch_ctx_for_tool, memory_identity_for_tool, parent_agent_id_for_tool,
     sandbox_mode_for_tool, task_recency_window_for_tool, HostOperationContext,
 };
-pub use super::operation_context::OpenHumanRunExt;
 
 impl Default for OpenHumanRunContext {
     fn default() -> Self {
