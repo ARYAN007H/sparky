@@ -232,3 +232,8 @@ async fn effective_falls_back_to_the_process_policy_for_an_agent_without_one() {
         crate::core::runtime::CoreContext::scope(agent_context(None), async { effective() }).await;
     assert!(Arc::ptr_eq(&seen.expect("process policy"), &process));
 }
+
+/// The policy in effect for the calling task's ambient context.
+fn effective() -> Option<Arc<SecurityPolicy>> {
+    effective_in(&crate::core::runtime::DispatchCtx::ambient())
+}
