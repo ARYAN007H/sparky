@@ -649,3 +649,7 @@ mod endpoint;
 #[cfg(test)]
 #[path = "storage_host_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "storage_host_ctx_tests.rs"]
+mod ctx_tests;
