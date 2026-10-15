@@ -81,9 +81,11 @@ pub(super) fn subagent_transcripts_in(
                 "[subagent_host:graph] no turn-tree store and no carried context in SaaS mode; \
                  transcript kept in memory only"
             );
-            return tinyagents_session::port::InMemorySessionStores::new()
-                .for_agent(fallback)
-                .transcripts;
+            return tinyagents_session::port::SessionStoreProvider::for_agent(
+                &tinyagents_session::port::InMemorySessionStores::new(),
+                fallback,
+            )
+            .transcripts;
         }
         let key = crate::agent::session_store::agent_key_for(
             &crate::core::runtime::Tenant::default(),
