@@ -101,6 +101,7 @@ impl EventHandler<DomainEvent> for DeviceTunnelSubscriber {
                 match super::owner::owner_of(&ctx, channel_id, pending.as_ref()).await {
                     Ok(owner) => {
                         let handled = crate::storage::agents::within_agent(
+                            &ctx,
                             owner.as_deref(),
                             handle_tunnel_frame(&ctx, channel_id, payload_b64),
                         )
