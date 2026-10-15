@@ -99,7 +99,7 @@ pub fn with_claim_at<T>(
         // A bare OS thread on purpose (baselined in the SaaS ambient ratchet):
         // the heartbeat reads no ambient state, only the `repo` handed to it,
         // and is joined below before this returns. `with_claim` is synchronous
-        // and may run outside a tokio runtime, so `spawn_blocking_scoped`
+        // and may run outside a tokio runtime, so `DispatchCtx::spawn_blocking`
         // (which needs `Handle::current()`) is not available here.
         std::thread::spawn(move || {
             let started = std::time::Instant::now();
