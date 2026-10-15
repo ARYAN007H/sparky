@@ -97,7 +97,7 @@ impl DispatchCtx {
     /// agent. Outside SaaS an unresolved context is the default tenant; in SaaS
     /// it is [`NoTenant`](super::NoTenant), so the caller fails closed.
     pub fn tenant(&self) -> Result<super::Tenant, super::NoTenant> {
-        super::tenant_in(super::is_saas(), self.resolved().as_deref())
+        super::tenant::tenant_in(super::is_saas(), self.resolved().as_deref())
     }
 
     /// The configuration an embedder supplied for the context this call runs
