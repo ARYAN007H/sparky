@@ -209,11 +209,7 @@ impl StockQuoteTool {
         tracing::info!("[stock_quote] symbol={}", symbol);
 
         let body = json!({ "symbol": symbol });
-        match self
-            .client
-            .post::<QuoteResponse>(approval, PATH_QUOTE, &body)
-            .await
-        {
+        match self.client.post::<QuoteResponse>(approval, PATH_QUOTE, &body).await {
             Ok(resp) => {
                 let q = &resp.quote;
                 let mut out = format!(
