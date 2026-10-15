@@ -129,7 +129,7 @@ async fn control(function: &str, task: &str) -> serde_json::Value {
     if function == "steer" {
         params.insert("message".into(), serde_json::json!("ownership regression"));
     }
-    (controller.handler)(DispatchCtx::process_default(), params)
+    (controller.handler)(DispatchCtx::ambient(), params)
         .await
         .expect("control response")
 }
