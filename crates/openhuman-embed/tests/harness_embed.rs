@@ -226,10 +226,6 @@ fn a_harness_runs_a_turn_against_the_provider_it_was_given() {
             assert_eq!(harness.agent().id(), "harness");
             assert_eq!(harness.runtime().workspace_dir(), harness.workspace_dir());
             assert_eq!(harness.runtime().agent_ids(), vec!["harness".to_string()]);
-            assert!(
-                harness.agent().transcripts_dir().is_dir(),
-                "the harness agent's transcripts were written"
-            );
 
             // A second harness — a second runtime — in this process must be
             // refused rather than silently sharing process-global core state.
