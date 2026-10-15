@@ -247,6 +247,7 @@ pub(crate) fn thread_for_session(session_id: &str) -> Option<String> {
 /// Record a finished background sub-agent for idle delivery, keyed by its
 /// parent chat thread. Idempotent on `task_id`.
 pub(crate) async fn record_completion(
+    ctx: &crate::core::runtime::DispatchCtx,
     workspace_dir: &Path,
     parent_session: &str,
     task_id: impl Into<String>,
@@ -255,6 +256,7 @@ pub(crate) async fn record_completion(
     parent_thread_id: Option<String>,
 ) {
     record_outcome(
+        ctx,
         workspace_dir,
         parent_session,
         task_id,
@@ -275,6 +277,7 @@ pub(crate) async fn record_completion(
 /// The router drops the record when its task was tombstoned (collected inline,
 /// stopped) or its thread was cancelled (deleted, stopped).
 pub(crate) async fn record_outcome(
+    ctx: &crate::core::runtime::DispatchCtx,
     workspace_dir: &Path,
     parent_session: &str,
     task_id: impl Into<String>,
@@ -320,7 +323,7 @@ pub(crate) async fn record_outcome(
     }
     note_thread_workspace(&thread_id, workspace_dir);
     note_session_thread(parent_session, &thread_id);
-    super::completion_owners::note(&[&task_id, parent_session]); // owner, for off-task delivery
+    super::completion_owners::note(ctx, &[&task_id, parent_session]); // owner, for off-task delivery
 
     let record = CompletionRecord::new(
         task_id.clone(),
@@ -380,6 +383,7 @@ pub(crate) async fn record_outcome(
 /// relay, so the user learns the delegated task errored instead of the turn
 /// silently finalizing on "Accepted".
 pub(crate) async fn record_failure(
+    ctx: &crate::core::runtime::DispatchCtx,
     workspace_dir: &Path,
     parent_session: &str,
     task_id: impl Into<String>,
@@ -390,6 +394,7 @@ pub(crate) async fn record_failure(
     let summary =
         format!("[SUBAGENT_FAILED] the async sub-agent errored before producing a result: {error}");
     record_outcome(
+        ctx,
         workspace_dir,
         parent_session,
         task_id,
@@ -406,6 +411,7 @@ pub(crate) async fn record_failure(
 /// the framed `[SUBAGENT_NEEDS_INPUT]` notice is delivered back into chat for the
 /// parent agent to relay to (or answer for) the user.
 pub(crate) async fn record_awaiting_input(
+    ctx: &crate::core::runtime::DispatchCtx,
     workspace_dir: &Path,
     parent_session: &str,
     task_id: impl Into<String>,
@@ -424,6 +430,7 @@ pub(crate) async fn record_awaiting_input(
         checkpointed,
     );
     record_outcome(
+        ctx,
         workspace_dir,
         parent_session,
         task_id,

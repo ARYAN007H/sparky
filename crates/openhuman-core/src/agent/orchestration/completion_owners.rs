@@ -43,8 +43,8 @@ fn owners() -> MutexGuard<'static, Owners> {
 
 /// Note the calling task's profile as an owner of each id. A no-op outside a
 /// profile (the desktop, embedded agents).
-pub(crate) fn note(ids: &[&str]) {
-    let Ok(Some(profile)) = crate::core::runtime::current_tenant().map(|t| t.profile) else {
+pub(crate) fn note(ctx: &crate::core::runtime::DispatchCtx, ids: &[&str]) {
+    let Ok(Some(profile)) = ctx.tenant().map(|t| t.profile) else {
         return;
     };
     note_profile(ids, &profile);

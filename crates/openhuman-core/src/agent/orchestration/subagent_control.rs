@@ -144,6 +144,7 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                 // record a completion that flows through the same idle-gated
                 // delivery and surfaces the cancellation in chat.
                 background_completions::record_completion(
+                    &ctx,
                     &meta.workspace_dir,
                     &meta.parent_session,
                     &task_id,
