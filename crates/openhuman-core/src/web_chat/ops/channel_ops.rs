@@ -163,7 +163,7 @@ async fn cancel_chat_inner(
             crate::agent::orchestration::background_completions::discard_pending_for_thread(
                 thread_id,
             );
-        let stopped = crate::agent::orchestration::running_subagents::stop_for_thread(thread_id);
+        let stopped = crate::agent::orchestration::running_subagents::stop_for_thread(ctx, thread_id);
         crate::agent::orchestration::background_completions::finish_stop_for_thread(
             thread_id, &stopped,
         );
