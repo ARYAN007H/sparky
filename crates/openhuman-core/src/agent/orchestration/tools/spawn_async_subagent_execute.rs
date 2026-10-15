@@ -245,6 +245,7 @@ impl SpawnAsyncSubagentTool {
             .or_else(|| {
                 parent_thread_id.as_ref().and_then(|parent_thread_id| {
                     super::worker_thread::create_worker_thread(
+                        &dispatch,
                         parent.workspace_dir.clone(),
                         parent_thread_id,
                         &definition.id,
