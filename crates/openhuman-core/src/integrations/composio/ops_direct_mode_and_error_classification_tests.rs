@@ -177,7 +177,7 @@ async fn composio_authorize_routes_through_direct_mode() {
     // "composio unavailable / no backend session" instead.
     let tmp = tempfile::tempdir().unwrap();
     let config = direct_mode_config(&tmp);
-    let err = composio_authorize(&config, "gmail", None)
+    let err = composio_authorize(&crate::core::runtime::DispatchCtx::host_default(), &config, "gmail", None)
         .await
         .unwrap_err();
     assert!(

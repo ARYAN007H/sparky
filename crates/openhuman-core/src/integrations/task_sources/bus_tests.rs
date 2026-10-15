@@ -74,6 +74,7 @@ async fn a_connection_event_is_handled_per_scope() {
         toolkit: toolkit.to_string(),
         connection_id: "conn-1".to_string(),
         connect_url: String::new(),
+        tenant: None,
     };
     // Not a task-source toolkit.
     TaskSourcesConnectionSubscriber
