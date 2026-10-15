@@ -27,7 +27,6 @@
 //! appends to the thread's transcript. It persists its reply before announcing
 //! `chat_done`, so a reconnect cannot lose a completed delegated result.
 
-use crate::core::runtime::DispatchCtx;
 use std::collections::HashSet;
 use std::future::Future;
 use std::path::{Path, PathBuf};
@@ -717,7 +716,7 @@ fn persist_delivery_reply(
     success: bool,
 ) -> Result<(), String> {
     crate::threads::store::append_message(
-        &DispatchCtx::ambient(),
+        &crate::core::runtime::DispatchCtx::ambient(),
         workspace_dir,
         thread_id,
         crate::threads::store::ConversationMessage {
