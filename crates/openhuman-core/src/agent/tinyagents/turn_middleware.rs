@@ -90,7 +90,8 @@ pub(super) struct TurnMiddlewareInputs {
     /// Per-call tool success/content capture for honest `ToolCallRecord`s.
     pub(super) tool_outcome_sink: ToolOutcomeSink,
     /// The store the `todo` tool writes this turn's plan to; `Some` lets the
-    /// plan-order middleware read it. `None` for a turn with no workspace.
+    /// plan-order middleware read it. `None` for a turn with no workspace or
+    /// without the `todo` tool.
     pub(super) todo_store: Option<Arc<dyn tinyagents_harness::store::Store>>,
 }
 
