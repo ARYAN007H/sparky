@@ -505,7 +505,7 @@ where
         // concurrently with it. Dropping the slot releases the lease (the claim
         // already counted one attempt; this window is narrow).
         if is_busy(ctx, &thread_id) {
-            log::debug!
+            log::debug!(
                 "[background_delivery] thread became busy after the claim; deferring \
                  thread_id={thread_id}"
             );
