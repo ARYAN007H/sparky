@@ -58,14 +58,15 @@ fn a_subagent_writes_to_its_turn_trees_store_else_its_contexts() {
     // No session handed a store over: the default agent's store of the run's
     // (here unbound, desktop) tenant.
     let unbound = crate::agent::tinyagents::host::OpenHumanRunContext::new();
-    let fallback = super::transcript::subagent_transcripts(&unbound, workspace.path());
-    assert_eq!(
-        fallback.destination_key(),
-        crate::agent::session_store::transcripts_or_files(
-            crate::agent::session_store::DEFAULT_AGENT,
-            workspace.path()
-        )
+    let fallback = super::transcript::subagent_transcripts(&unbound, workspace.path())
         .destination_key()
+        .expect("a workspace store names its destination");
+    assert!(
+        fallback.ends_with(&format!(
+            "/{}/transcripts",
+            crate::agent::session_store::DEFAULT_AGENT
+        )),
+        "{fallback}"
     );
 }
 
