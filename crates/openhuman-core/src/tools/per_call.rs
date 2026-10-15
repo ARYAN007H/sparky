@@ -21,7 +21,8 @@ use tinytools::{
     ToolPolicy, ToolResult, ToolRunContext, ToolScope, ToolSpec, ToolTimeout,
 };
 
-use crate::agent::tinyagents::host::run_context::approval_for_tool;
+use crate::agent::tinyagents::host::run_context::{approval_for_tool, dispatch_ctx_for_tool};
+use crate::core::runtime::DispatchCtx;
 use crate::security::approval::ApprovalChatContext;
 
 /// Builds the tool one call runs, from that call's chat routing and the
