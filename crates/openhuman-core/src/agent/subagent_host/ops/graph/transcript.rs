@@ -225,6 +225,7 @@ pub(super) fn persist_subagent_transcript(
 /// number of model calls a provider answered.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn persist_failed_run(
+    ctx: &crate::core::runtime::DispatchCtx,
     transcripts: &dyn TranscriptLocator,
     workspace_dir: &std::path::Path,
     transcript_stem: &str,
@@ -266,6 +267,7 @@ pub(super) fn persist_failed_run(
 
     if let Some(thread_id) = worker_thread_id {
         mirror_worker_thread_from_history(
+            ctx,
             workspace_dir,
             thread_id,
             agent_id,

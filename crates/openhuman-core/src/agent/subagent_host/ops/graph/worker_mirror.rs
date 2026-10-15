@@ -13,6 +13,7 @@ use tinytools_agent::dialect::{DialectRole, TranscriptEntry};
 /// task_id}` only, dropping the fields worker-thread consumers key on.
 #[allow(clippy::too_many_arguments)]
 fn append_worker_message(
+    ctx: &crate::core::runtime::DispatchCtx,
     workspace_dir: &std::path::Path,
     thread_id: &str,
     agent_id: &str,
@@ -52,7 +53,7 @@ fn append_worker_message(
         created_at: chrono::Utc::now().to_rfc3339(),
     };
     if let Err(err) = append_message(
-        &DispatchCtx::ambient(),
+        ctx,
         workspace_dir.to_path_buf(),
         thread_id,
         message,
@@ -76,6 +77,7 @@ fn append_worker_message(
 /// `iteration` counter, `final` on the trailing message, `tool_calls` on an
 /// assistant round, and `tool_call_id` / `tool_name` on each tool result.
 pub(super) fn mirror_worker_thread(
+    ctx: &crate::core::runtime::DispatchCtx,
     workspace_dir: &std::path::Path,
     thread_id: &str,
     agent_id: &str,
@@ -147,6 +149,7 @@ pub(super) fn mirror_worker_thread(
             {
                 iteration += 1;
                 append_worker_message(
+                    ctx,
                     workspace_dir,
                     thread_id,
                     agent_id,
@@ -182,6 +185,7 @@ pub(super) fn mirror_worker_thread(
 /// `conversation`) is available. `failure_final`, when set, is appended as a
 /// trailing `agent` failure marker.
 pub(super) fn mirror_worker_thread_from_history(
+    ctx: &crate::core::runtime::DispatchCtx,
     workspace_dir: &std::path::Path,
     thread_id: &str,
     agent_id: &str,
@@ -195,6 +199,7 @@ pub(super) fn mirror_worker_thread_from_history(
             "assistant" if !m.content.trim().is_empty() => {
                 iteration += 1;
                 append_worker_message(
+                    ctx,
                     workspace_dir,
                     thread_id,
                     agent_id,
@@ -206,6 +211,7 @@ pub(super) fn mirror_worker_thread_from_history(
             }
             "tool" if !m.content.trim().is_empty() => {
                 append_worker_message(
+                    ctx,
                     workspace_dir,
                     thread_id,
                     agent_id,
