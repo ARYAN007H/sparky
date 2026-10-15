@@ -18,21 +18,21 @@ type InFlight = Mutex<HashMap<String, InFlightEntry>>;
 type ParallelInFlight = Mutex<HashMap<String, ParallelEntry>>;
 
 /// The current agent context's per-thread session cache.
-pub(crate) fn thread_sessions() -> Arc<ThreadSessions> {
-    crate::core::runtime::current_slot::<ThreadSessions>()
+pub(crate) fn thread_sessions(ctx: &DispatchCtx) -> Arc<ThreadSessions> {
+    crate::core::runtime::slot_for::<ThreadSessions>(ctx)
 }
 
 /// The current agent context's primary in-flight turns, keyed by thread.
-pub(crate) fn in_flight() -> Arc<InFlight> {
-    crate::core::runtime::current_slot::<InFlight>()
+pub(crate) fn in_flight(ctx: &DispatchCtx) -> Arc<InFlight> {
+    crate::core::runtime::slot_for::<InFlight>(ctx)
 }
 
 /// Parallel (forked) turns, keyed by `request_id`. A separate lane from
 /// [`in_flight`] (which holds one primary, interrupt-able turn per thread) so
 /// any number of concurrent `QueueMode::Parallel` turns can run on the same
 /// thread without touching interrupt/steer/queue semantics.
-pub(crate) fn parallel_in_flight() -> Arc<ParallelInFlight> {
-    crate::core::runtime::current_slot::<ParallelInFlight>()
+pub(crate) fn parallel_in_flight(ctx: &DispatchCtx) -> Arc<ParallelInFlight> {
+    crate::core::runtime::slot_for::<ParallelInFlight>(ctx)
 }
 
 /// The map key for `thread_id` in the calling scope.

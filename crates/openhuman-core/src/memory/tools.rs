@@ -42,8 +42,8 @@ type TurnCitations = Mutex<HashMap<String, Vec<TurnCitation>>>;
 
 /// Citations `recall` produced during a thread's in-flight turn, drained by
 /// the chat surface once the turn returns ([`take_turn_citations`]).
-fn turn_citations() -> Arc<TurnCitations> {
-    crate::core::runtime::current_slot::<TurnCitations>()
+fn turn_citations(ctx: &DispatchCtx) -> Arc<TurnCitations> {
+    crate::core::runtime::slot_for::<TurnCitations>(ctx)
 }
 
 fn record_turn_citations(thread_id: &str, citations: &[tinymemory_api::Citation]) {

@@ -23,8 +23,8 @@ use crate::config::Config;
 
 type ThreadEfforts = Mutex<HashMap<String, ReasoningEffort>>;
 
-fn thread_efforts() -> Arc<ThreadEfforts> {
-    crate::core::runtime::current_slot::<ThreadEfforts>()
+fn thread_efforts(ctx: &DispatchCtx) -> Arc<ThreadEfforts> {
+    crate::core::runtime::slot_for::<ThreadEfforts>(ctx)
 }
 
 /// The effort a thread's user picked, if any.

@@ -27,8 +27,8 @@ use crate::core::events::DomainEvent;
 
 type RunModeRegistry = Mutex<HashMap<String, RunModeHandle>>;
 
-fn registry() -> Arc<RunModeRegistry> {
-    crate::core::runtime::current_slot::<RunModeRegistry>()
+fn registry(ctx: &DispatchCtx) -> Arc<RunModeRegistry> {
+    crate::core::runtime::slot_for::<RunModeRegistry>(ctx)
 }
 
 /// Returns the [`RunModeHandle`] for `thread_id`, creating one (starting in
