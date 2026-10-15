@@ -253,7 +253,7 @@ mod x402 {
     use async_trait::async_trait;
     use tinytools_std::network::{PaymentAttempt, PaymentHook};
 
-    use super::ApprovalChatContext;
+    use super::{ApprovalChatContext, DispatchCtx};
     use crate::modules::x402_service;
 
     /// `Err("COMPONENT_DISABLED:wallet")` when `[components] wallet` is off:
