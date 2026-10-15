@@ -72,7 +72,7 @@ async fn an_off_task_completion_drains_only_its_owners_thread() {
         CoreContext::scope(
             Arc::clone(ctx),
             record_completion(
-                &DispatchCtx::ambient(),
+                &DispatchCtx::new(Arc::clone(ctx)),
                 ws.path(),
                 &session,
                 task.as_str(),
