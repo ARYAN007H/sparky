@@ -171,23 +171,19 @@ async fn under<T>(ctx: Arc<crate::core::runtime::CoreContext>, f: impl FnOnce() 
 }
 
 #[tokio::test]
-async fn desktop_session_keys_and_transcript_roots_are_unchanged() {
-    let ws = std::path::Path::new("/ws");
+async fn desktop_session_keys_are_unchanged() {
     assert_eq!(current_agent_key_or("orchestrator"), "orchestrator");
-    assert_eq!(transcript_root(ws), ws.to_path_buf());
-    let (key, root) = under(derived(None, Some("alpha")), || {
-        (current_agent_key_or("orchestrator"), transcript_root(ws))
+    let key = under(derived(None, Some("alpha")), || {
+        current_agent_key_or("orchestrator")
     })
     .await;
     assert_eq!(key, "alpha");
-    assert_eq!(root, agent_transcript_root(ws, "alpha"));
 }
 
 #[tokio::test]
 async fn two_profiles_default_agents_keep_separate_session_keys_and_stores() {
-    let ws = std::path::Path::new("/ws-profile");
-    let (alice_key, alice_root) = under(derived(Some("alice"), None), || {
-        (current_agent_key_or("orchestrator"), transcript_root(ws))
+    let alice_key = under(derived(Some("alice"), None), || {
+        current_agent_key_or("orchestrator")
     })
     .await;
     let bob_key = under(derived(Some("bob"), None), || {
@@ -196,8 +192,6 @@ async fn two_profiles_default_agents_keep_separate_session_keys_and_stores() {
     .await;
     assert_eq!(alice_key, "alice~default");
     assert_eq!(bob_key, "bob~default");
-    // The default agent's transcripts sit at the profile's workspace root.
-    assert_eq!(alice_root, ws.to_path_buf());
 
     let provider: Arc<dyn SessionStoreProvider> = Arc::new(InMemorySessionStores::new());
     let stores_of = |profile: &'static str| {

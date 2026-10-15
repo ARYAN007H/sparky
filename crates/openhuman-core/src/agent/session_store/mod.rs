@@ -18,7 +18,6 @@ use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex, PoisonError, RwLock};
 
 use tinyagents_session::port::{AgentStores, SessionStoreProvider};
-use tinyagents_session::transcript::agent_transcript_root;
 
 pub mod ledger_sync;
 mod rebound;
@@ -194,28 +193,6 @@ pub fn workspace_transcripts(
                 .transcripts
         }
     }
-}
-
-/// The workspace root transcripts are written under: the agent's own
-/// directory under an embedded agent's context, else `workspace_dir` — which
-/// for a SaaS profile's default agent is that profile's own workspace.
-#[must_use]
-pub fn transcript_root(workspace_dir: &std::path::Path) -> std::path::PathBuf {
-    match current_embedded_agent() {
-        Some(agent) => agent_transcript_root(workspace_dir, &agent),
-        None => workspace_dir.to_path_buf(),
-    }
-}
-
-/// The embedded agent the calling tenant runs as, if any. A SaaS profile's
-/// default agent has none: its transcripts live at its workspace root, which
-/// no other profile shares. A SaaS task with no scope has none either; the
-/// workspace it was handed is the only one it touches.
-#[must_use]
-pub fn current_embedded_agent() -> Option<String> {
-    crate::core::runtime::current_tenant()
-        .ok()
-        .and_then(|tenant| tenant.agent)
 }
 
 /// The stores of the tenant the current [`CoreContext`] works for, keyed by
