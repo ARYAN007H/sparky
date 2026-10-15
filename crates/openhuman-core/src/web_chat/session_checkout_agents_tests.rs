@@ -72,17 +72,17 @@ async fn two_agents_with_the_same_thread_id_get_their_own_cache_slots() {
         }
     };
     // Under one agent's scope only that agent's slot goes.
-    crate::web_chat::ops::invalidate_thread_sessions(
-        &crate::core::runtime::DispatchCtx::new(asha.clone()),
-        &thread_id,
-    )
+    CoreContext::scope(asha.clone(), async {
+        let ctx = crate::core::runtime::DispatchCtx::new(asha.clone());
+        crate::web_chat::ops::invalidate_thread_sessions(&ctx, &thread_id).await;
+    })
     .await;
     assert!(!cached(&asha, &key_a).await, "asha's slot is evicted");
     assert!(cached(&ravi, &key_b).await, "ravi's slot survives");
-    crate::web_chat::ops::invalidate_thread_sessions(
-        &crate::core::runtime::DispatchCtx::new(ravi.clone()),
-        &thread_id,
-    )
+    CoreContext::scope(ravi.clone(), async {
+        let ctx = crate::core::runtime::DispatchCtx::new(ravi.clone());
+        crate::web_chat::ops::invalidate_thread_sessions(&ctx, &thread_id).await;
+    })
     .await;
     assert!(!cached(&ravi, &key_b).await, "ravi's slot is evicted");
 }
