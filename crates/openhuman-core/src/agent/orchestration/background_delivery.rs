@@ -251,15 +251,18 @@ fn schedule_delivery_inner(thread_id: String, delay: Duration, wait_idle: bool, 
     // Scoped: the thread -> workspace table is keyed per profile, so the
     // delayed task must run under the profile that scheduled it.
     crate::core::runtime::spawn_scoped(async move {
+        // Inside the owner's scope: the context this drain acts for.
+        let ctx = crate::core::runtime::DispatchCtx::ambient();
         let turn_fence = fence.clone();
         let turn_thread = thread_id.clone();
         let outcome = run_drain(
+            &ctx,
             &thread_id,
             delay,
             wait_idle,
             &fence,
             RECOVERY_BUSY_POLL,
-            || try_deliver(turn_thread, turn_fence),
+            || try_deliver(ctx.clone(), turn_thread, turn_fence),
         )
         .await;
         if outcome == DrainOutcome::StillBusy {
@@ -337,8 +340,12 @@ pub(crate) fn recover_on_open(workspace_dir: &Path, fence: DrainFence) -> usize 
 /// (queue untouched) when the thread is busy or nothing is pending. A claimed
 /// batch stays leased until the caller settles it with `mark_delivered` /
 /// `mark_failed` / `release`.
-fn claim_ready(router: &CompletionRouter, thread_id: &str) -> Option<Vec<CompletionRecord>> {
-    if is_busy(thread_id) {
+fn claim_ready(
+    ctx: &crate::core::runtime::DispatchCtx,
+    router: &CompletionRouter,
+    thread_id: &str,
+) -> Option<Vec<CompletionRecord>> {
+    if is_busy(ctx, thread_id) {
         return None;
     }
     match router.claim_pending(thread_id, usize::MAX) {
@@ -353,7 +360,11 @@ fn claim_ready(router: &CompletionRouter, thread_id: &str) -> Option<Vec<Complet
 
 /// Drain + deliver pending completions for a thread — if idle and not already
 /// delivering. Batches everything ready at this instant into one system turn.
-async fn try_deliver(thread_id: String, fence: DrainFence) {
+async fn try_deliver(
+    busy_ctx: crate::core::runtime::DispatchCtx,
+    thread_id: String,
+    fence: DrainFence,
+) {
     if !fence.admits() {
         log::info!(
             "[background_delivery] profile lease lost; not delivering thread_id={thread_id}"
@@ -369,6 +380,7 @@ async fn try_deliver(thread_id: String, fence: DrainFence) {
     // A drain is event-driven and carries no context of its own.
     let ctx = crate::core::runtime::DispatchCtx::host_default();
     let retry_after = try_deliver_with(
+        &busy_ctx,
         thread_id.clone(),
         router,
         move |thread_id, notice| {
@@ -400,11 +412,13 @@ async fn try_deliver(thread_id: String, fence: DrainFence) {
 /// outside this module.
 #[cfg(test)]
 pub(super) async fn try_deliver_for_test(
+    ctx: &crate::core::runtime::DispatchCtx,
     thread_id: String,
     router: Arc<CompletionRouter>,
     turns: Arc<std::sync::atomic::AtomicU32>,
 ) -> Option<Duration> {
     try_deliver_with(
+        ctx,
         thread_id,
         router,
         move |_, _| {
@@ -449,6 +463,7 @@ async fn persist_undelivered(workspace_dir: PathBuf, thread_id: String, notice: 
 /// terminal announcement is observable, and that a record which exhausts its
 /// attempts is handed to `on_undeliverable` rather than dropped.
 async fn try_deliver_with<F, Fut, G, GFut>(
+    ctx: &crate::core::runtime::DispatchCtx,
     thread_id: String,
     router: Arc<CompletionRouter>,
     mut deliver: F,
@@ -461,7 +476,7 @@ where
     GFut: Future<Output = ()>,
 {
     let mut retry_after = None;
-    if is_busy(&thread_id) {
+    if is_busy(ctx, &thread_id) {
         return None;
     }
     // Claim the delivery slot — held for the WHOLE delivery (including the
@@ -469,19 +484,19 @@ where
     // turn on the same thread. Skip if a delivery is already in flight. The
     // guard frees the slot, and any lease still held, even if this future is
     // dropped mid-turn.
-    let mut slot = DeliverySlot::claim(&thread_id, router.clone())?;
+    let mut slot = DeliverySlot::claim(ctx, &thread_id, router.clone())?;
 
     // A busy thread defers *before* the claim: the claim counts a delivery
     // attempt, and a user who keeps typing must not burn a record's budget.
-    if let Some(batch) = claim_ready(&router, &thread_id) {
+    if let Some(batch) = claim_ready(ctx, &router, &thread_id) {
         let task_ids: Vec<String> = batch.iter().map(|c| c.task_id.clone()).collect();
         slot.hold(&task_ids);
         // A user turn can start between the idle check inside `claim_ready` and
         // the awaited turn below; re-check so a system turn is never streamed
         // concurrently with it. Dropping the slot releases the lease (the claim
         // already counted one attempt; this window is narrow).
-        if is_busy(&thread_id) {
-            log::debug!(
+        if is_busy(ctx, &thread_id) {
+            log::debug!
                 "[background_delivery] thread became busy after the claim; deferring \
                  thread_id={thread_id}"
             );
@@ -593,8 +608,8 @@ struct DeliverySlot {
 
 impl DeliverySlot {
     /// `None` when a delivery is already in flight for the thread.
-    fn claim(thread_id: &str, router: Arc<CompletionRouter>) -> Option<Self> {
-        let key = tenant::profile_key(thread_id);
+    fn claim(ctx: &crate::core::runtime::DispatchCtx, thread_id: &str, router: Arc<CompletionRouter>) -> Option<Self> {
+        let key = tenant::profile_key_in(&super::busy_guard::caller(ctx), thread_id);
         let mut d = delivering().lock().expect("delivering poisoned");
         if !d.insert(key.clone()) {
             return None;

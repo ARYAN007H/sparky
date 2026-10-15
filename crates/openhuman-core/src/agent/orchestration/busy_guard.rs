@@ -20,8 +20,8 @@ pub(super) fn busy() -> &'static Mutex<HashMap<String, HashSet<u64>>> {
 }
 
 /// The calling task's profile, as the tenant its busy/slot keys carry.
-pub(super) fn caller() -> Tenant {
-    tenant::current_tenant_or_isolated("background_delivery").profile_only()
+pub(super) fn caller(ctx: &crate::core::runtime::DispatchCtx) -> Tenant {
+    tenant::isolated_unless_tenant(ctx.tenant(), "background_delivery").profile_only()
 }
 
 /// The session id of a busy key, when the key belongs to `me`.
@@ -40,9 +40,9 @@ pub(crate) struct TurnBusy {
 }
 
 impl TurnBusy {
-    pub(crate) fn start(session_id: &str) -> Self {
+    pub(crate) fn start(ctx: &crate::core::runtime::DispatchCtx, session_id: &str) -> Self {
         static NEXT: AtomicU64 = AtomicU64::new(0);
-        let key = tenant::profile_key(session_id);
+        let key = tenant::profile_key_in(&caller(ctx), session_id);
         let id = NEXT.fetch_add(1, Ordering::Relaxed);
         busy()
             .lock()
@@ -57,8 +57,8 @@ impl TurnBusy {
     /// not map to its thread: a relayed channel turn runs under the channel
     /// pipeline's own session id, which [`background_completions`] never
     /// learns, so marking that session would leave the thread looking idle.
-    pub(crate) fn start_on_thread(thread_id: &str) -> Self {
-        Self::start(&format!("{THREAD_MARK}{thread_id}"))
+    pub(crate) fn start_on_thread(ctx: &crate::core::runtime::DispatchCtx, thread_id: &str) -> Self {
+        Self::start(ctx, &format!("{THREAD_MARK}{thread_id}"))
     }
 }
 
@@ -88,8 +88,8 @@ impl Drop for TurnBusy {
 }
 
 /// Is any in-flight turn of the calling profile running on `thread_id`?
-pub(crate) fn is_busy(thread_id: &str) -> bool {
-    let me = caller();
+pub(crate) fn is_busy(ctx: &crate::core::runtime::DispatchCtx, thread_id: &str) -> bool {
+    let me = caller(ctx);
     busy()
         .lock()
         .expect("background_delivery busy poisoned")
@@ -103,8 +103,8 @@ pub(crate) fn is_busy(thread_id: &str) -> bool {
 /// or `AgentError`, and its session would otherwise stay "busy" and defer this
 /// thread's deliveries until restart. Another profile's turn on a thread with
 /// the same id is left alone. Returns how many sessions were cleared.
-pub(crate) fn clear_busy_for_thread(thread_id: &str) -> usize {
-    let me = caller();
+pub(crate) fn clear_busy_for_thread(ctx: &crate::core::runtime::DispatchCtx, thread_id: &str) -> usize {
+    let me = caller(ctx);
     let mut busy = busy().lock().expect("background_delivery busy poisoned");
     let before = busy.len();
     busy.retain(|key, _| {
