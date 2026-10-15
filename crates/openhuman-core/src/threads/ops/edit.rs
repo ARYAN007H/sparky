@@ -236,16 +236,13 @@ async fn next_reply_request_id_after(
         .find_map(|m| reply_run_id(&m.id).map(str::to_string)))
 }
 
-/// Resolve the head generation of `thread_id`'s session transcript: the
-/// `SessionRef`, its locator, and its current content.
+/// Resolve the head generation of `thread_id`'s session transcript in
+/// `store`: the `SessionRef`, its locator, and its current content.
 ///
-/// `find_root_transcript_for_thread` locates *some* root file for the thread
-/// (used only to recover the `agent_id` a fresh [`SessionRef::scoped`]
-/// needs); the actual head — walking any compaction/edit generations already
-/// on disk — is then resolved through the locator itself
-/// (`TranscriptLocator::head_generation`), never by trusting file-name sort
-/// order (`tinyagents_session::transcript::view`'s resolver module doc explains why that
-/// is unsafe: `.g1` sorts before the un-suffixed root).
+/// The thread's newest root (`TranscriptLocator::root_for_thread`) only
+/// recovers the `agent_id` a fresh [`SessionRef::scoped`] needs; the actual
+/// head — walking any compaction/edit generations already written — is then
+/// resolved through the locator itself (`TranscriptLocator::head_generation`).
 fn resolve_head_transcript(
     store: &TranscriptStore,
     thread_id: &str,
