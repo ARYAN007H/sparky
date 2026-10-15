@@ -92,7 +92,7 @@ pub async fn edit_message(
     // the transcript its turns were written to.
     let store = transcript_store(ctx).await.map_err(ThreadsError::Message)?;
 
-    crate::web_chat::cancel_chat_scoped(&client_id, &thread_id, None)
+    crate::web_chat::cancel_chat_scoped(ctx, &client_id, &thread_id, None)
         .await
         .map_err(ThreadsError::Message)?;
 
@@ -120,7 +120,7 @@ pub async fn edit_message(
     // it and everything after it is replaced by the fresh turn below.
     super::delete_after(ctx, &thread_id, &request.message_id).await?;
 
-    crate::web_chat::invalidate_thread_sessions(&thread_id).await;
+    crate::web_chat::invalidate_thread_sessions(ctx, &thread_id).await;
 
     let new_request_id = crate::web_chat::start_chat(
         ctx,
@@ -159,7 +159,7 @@ pub async fn regenerate(
     // the transcript its turns were written to.
     let store = transcript_store(ctx).await.map_err(ThreadsError::Message)?;
 
-    crate::web_chat::cancel_chat_scoped(&client_id, &thread_id, None)
+    crate::web_chat::cancel_chat_scoped(ctx, &client_id, &thread_id, None)
         .await
         .map_err(ThreadsError::Message)?;
 
@@ -194,7 +194,7 @@ pub async fn regenerate(
     clear_dropped_turn_states(&dir, &thread_id, &cut_request_id).await;
     super::delete_after(ctx, &thread_id, &run_reply_message_id(&cut_request_id)).await?;
 
-    crate::web_chat::invalidate_thread_sessions(&thread_id).await;
+    crate::web_chat::invalidate_thread_sessions(ctx, &thread_id).await;
 
     let new_request_id = crate::web_chat::start_chat(
         ctx,

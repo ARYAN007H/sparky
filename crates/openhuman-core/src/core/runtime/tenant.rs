@@ -108,7 +108,14 @@ pub fn tenant_in(saas: bool, ctx: Option<&CoreContext>) -> Result<Tenant, NoTena
 /// tables are already per-context (an unscoped SaaS task gets throwaway state
 /// slots, see [`current_slot`](super::current_slot)), so the key can only miss.
 pub fn current_tenant_or_isolated(site: &str) -> Tenant {
-    current_tenant().unwrap_or_else(|NoTenant| {
+    isolated_unless_tenant(current_tenant(), site)
+}
+
+/// `tenant`, or the isolated tenant of [`current_tenant_or_isolated`] when a
+/// SaaS call carries none. For callers that resolved the tenant from an
+/// explicit [`DispatchCtx`](super::DispatchCtx).
+pub fn isolated_unless_tenant(tenant: Result<Tenant, NoTenant>, site: &str) -> Tenant {
+    tenant.unwrap_or_else(|NoTenant| {
         log::warn!("[tenant] {site}: no tenant scope in SaaS; using an isolated key");
         Tenant {
             profile: Some(format!("\u{0}unscoped:{}", uuid::Uuid::new_v4().simple())),

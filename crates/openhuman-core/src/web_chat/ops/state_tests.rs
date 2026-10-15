@@ -51,18 +51,27 @@ async fn two_profiles_on_the_same_thread_id_hold_two_keys() {
         )
     };
     let (alice, bob) = (profile("u-alice"), profile("u-bob"));
-    let key_a = CoreContext::scope(Arc::clone(&alice), async { key_for("t1") }).await;
-    let key_b = CoreContext::scope(Arc::clone(&bob), async { key_for("t1") }).await;
-    assert_ne!(key_a, key_b);
-    assert_eq!(
-        CoreContext::scope(Arc::clone(&alice), async { unscope(&key_a) }).await,
-        "t1"
+    let (ctx_a, ctx_b) = (
+        DispatchCtx::new(Arc::clone(&alice)),
+        DispatchCtx::new(Arc::clone(&bob)),
     );
+    let key_a = key_for(&ctx_a, "t1");
+    let key_b = key_for(&ctx_b, "t1");
+    assert_ne!(key_a, key_b);
+    assert_eq!(unscope(&ctx_a, &key_a), "t1");
     assert_eq!(
-        CoreContext::scope(Arc::clone(&alice), async { unscope(&key_b) }).await,
+        unscope(&ctx_a, &key_b),
         key_b,
         "another tenant's key is not unscoped"
     );
+    // The explicit context wins over whatever scope the caller happens to run
+    // in, and concurrent callers do not cross.
+    let (under_bob, under_alice) = tokio::join!(
+        CoreContext::scope(Arc::clone(&bob), async { key_for(&ctx_a, "t1") }),
+        CoreContext::scope(Arc::clone(&alice), async { key_for(&ctx_b, "t1") }),
+    );
+    assert_eq!(under_bob, key_a);
+    assert_eq!(under_alice, key_b);
     assert_eq!(thread_id_of_key(&key_b), Some("t1"));
     // The desktop keeps the bare id.
     assert_eq!(key_in(&crate::core::runtime::Tenant::default(), "t1"), "t1");
@@ -74,9 +83,14 @@ async fn a_user_cancel_under_the_fence_placeholder_id_keeps_the_callers_client()
     track_parallel_turn_for_test("fence-thread", "fence-req", token.clone()).await;
     let mut events = crate::web_chat::subscribe_web_channel_events();
 
-    crate::web_chat::ops::channel_ops::cancel_chat_scoped("profile-fence", "fence-thread", None)
-        .await
-        .unwrap();
+    crate::web_chat::ops::channel_ops::cancel_chat_scoped(
+        &DispatchCtx::ambient(),
+        "profile-fence",
+        "fence-thread",
+        None,
+    )
+    .await
+    .unwrap();
 
     assert!(token.is_cancelled());
     let mut seen = None;
