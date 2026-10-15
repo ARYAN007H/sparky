@@ -29,12 +29,13 @@ pub async fn transcript_get(
     if thread_id.is_empty() {
         return Err("thread_id is required".to_string());
     }
-    let store = transcript_store(ctx).await?;
+    // Resolved here, in the request's scope; the projection itself is blocking.
+    let locator = transcript_store(ctx).await?.locator();
     let cursor = request.cursor.clone();
     let limit = request.limit;
     let page = tokio::task::spawn_blocking(move || {
         tinyagents_session::transcript::view::get_page_in(
-            store.locator().as_ref(),
+            locator.as_ref(),
             &thread_id,
             None,
             cursor.as_deref(),

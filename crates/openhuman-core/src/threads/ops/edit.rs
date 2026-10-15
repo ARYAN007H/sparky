@@ -106,7 +106,7 @@ pub async fn edit_message(
         let store_owned = store.clone();
         let thread_id_owned = thread_id.clone();
         let cut_request_id_owned = cut_request_id.clone();
-        tokio::task::spawn_blocking(move || {
+        crate::core::runtime::spawn_blocking_scoped(move || {
             truncate_transcript_before_turn(&store_owned, &thread_id_owned, &cut_request_id_owned)
         })
         .await
@@ -176,7 +176,7 @@ pub async fn regenerate(
     let store_for_blocking = store.clone();
     let thread_id_for_blocking = thread_id.clone();
     let target_for_blocking = target_request_id.clone();
-    let (prompt, cut_request_id) = tokio::task::spawn_blocking(move || {
+    let (prompt, cut_request_id) = crate::core::runtime::spawn_blocking_scoped(move || {
         truncate_transcript_for_regenerate(
             &store_for_blocking,
             &thread_id_for_blocking,
