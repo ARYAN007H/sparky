@@ -2129,6 +2129,17 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
                 status: 'running',
                 argsBuffer: '{"command":"cargo build"}',
               },
+              // A detached run from an earlier turn, hydrated from the run
+              // ledger after this turn's call: issued later, still running,
+              // but not this turn's work.
+              {
+                id: 'subagent:run-old',
+                name: 'subagent:researcher',
+                round: 0,
+                seq: 1,
+                status: 'running',
+                sourceToolName: 'run_ledger',
+              },
             ],
           })
         );
@@ -2141,7 +2152,7 @@ describe('Conversations — smoke render (#1123 welcome-lock removal)', () => {
       const warning = await screen.findByTestId('chat-stall-warning');
       expect(warning).toHaveAttribute('data-chat-stall-phase', 'tool_use');
       expect(warning).toHaveAttribute('data-chat-stall-state', 'tool');
-      expect(warning).toHaveTextContent('Running command for');
+      expect(warning).toHaveTextContent('Running command.');
       expect(warning).not.toHaveTextContent('may be stuck');
       expect(store!.getState().thread.activeThreadIds[thread.id]).toBe(true);
     } finally {

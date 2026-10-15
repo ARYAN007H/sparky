@@ -1280,7 +1280,7 @@ const messages: TranslationMap = {
   'chat.stallWarning.working':
     'لا يوجد ناتج جديد منذ {duration}. قد يكون الوكيل عالقًا؛ اضغط إيقاف للإلغاء.',
   'chat.stallWarning.toolRunning':
-    '{tool} منذ {duration}. قد تستغرق الخطوات الطويلة مثل عمليات البناء أو مراقبة CI بعض الوقت.',
+    '{tool}. قد تستغرق الخطوات الطويلة مثل عمليات البناء أو مراقبة CI بعض الوقت.',
   'chat.filter.tasks': 'المهام',
   'chat.selectThread': 'اختر محادثة',
   'chat.noThreads': 'لا توجد محادثات بعد',

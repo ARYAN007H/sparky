@@ -1308,7 +1308,7 @@ const messages: TranslationMap = {
   'chat.stallWarning.working':
     '{duration} से कोई नया आउटपुट नहीं। एजेंट अटका हो सकता है; रद्द करने के लिए रोकें दबाएँ।',
   'chat.stallWarning.toolRunning':
-    '{tool}, {duration} से। बिल्ड या CI निगरानी जैसे लंबे चरणों में समय लग सकता है।',
+    '{tool}। बिल्ड या CI निगरानी जैसे लंबे चरणों में समय लग सकता है।',
   'chat.filter.tasks': 'टास्क',
   'chat.selectThread': 'एक थ्रेड चुनें',
   'chat.noThreads': 'अभी कोई थ्रेड नहीं',

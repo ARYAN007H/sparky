@@ -1301,7 +1301,7 @@ const messages: TranslationMap = {
   'chat.stallWarning.working':
     '{duration} ধরে নতুন কোনো আউটপুট নেই। এজেন্ট আটকে থাকতে পারে; বাতিল করতে থামান চাপুন।',
   'chat.stallWarning.toolRunning':
-    '{tool}, {duration} ধরে। বিল্ড বা CI নজরদারির মতো দীর্ঘ ধাপে কিছুটা সময় লাগতে পারে।',
+    '{tool}। বিল্ড বা CI নজরদারির মতো দীর্ঘ ধাপে কিছুটা সময় লাগতে পারে।',
   'chat.filter.tasks': 'টাস্ক',
   'chat.selectThread': 'একটি থ্রেড বেছে নিন',
   'chat.noThreads': 'এখনো কোনো থ্রেড নেই',

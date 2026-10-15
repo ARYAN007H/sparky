@@ -1348,7 +1348,7 @@ const messages: TranslationMap = {
   'chat.stallWarning.working':
     "{duration} boyunca yeni çıktı yok. Ajan takılmış olabilir; iptal etmek için Durdur'a basın.",
   'chat.stallWarning.toolRunning':
-    '{tool}, {duration} süredir. Derleme veya CI izleme gibi uzun adımlar biraz zaman alabilir.',
+    '{tool}. Derleme veya CI izleme gibi uzun adımlar biraz zaman alabilir.',
   'chat.filter.tasks': 'Görevler',
   'chat.selectThread': 'Bir sohbet dizisi seçin',
   'chat.noThreads': 'Henüz sohbet dizisi yok',

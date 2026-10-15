@@ -1332,7 +1332,7 @@ const messages: TranslationMap = {
   'chat.stallWarning.working':
     'Sin resultados nuevos desde hace {duration}. Puede que el agente se haya atascado; pulsa Detener para cancelar.',
   'chat.stallWarning.toolRunning':
-    '{tool} desde hace {duration}. Los pasos largos, como compilaciones o el seguimiento de CI, pueden tardar.',
+    '{tool}. Los pasos largos, como compilaciones o el seguimiento de CI, pueden tardar.',
   'chat.filter.tasks': 'Tareas',
   'chat.selectThread': 'Selecciona un hilo',
   'chat.noThreads': 'Sin hilos aún',

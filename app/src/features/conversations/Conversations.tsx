@@ -2012,11 +2012,18 @@ const Conversations = ({
       ? (inferenceStatusByThread[selectedThreadId]?.phase ?? 'thinking')
       : null;
   // The most recently issued tool still running, so a long healthy step (a
-  // build, a CI watch) is named instead of reading as a stuck turn.
+  // build, a CI watch) is named instead of reading as a stuck turn. Run-ledger
+  // rows and detached sub-agents can outlive the turn that started them, so
+  // they say nothing about whether THIS turn is still working.
   const selectedRunningTool =
     selectedStalledPhase && selectedThreadId
       ? (toolTimelineByThread[selectedThreadId] ?? [])
-          .filter(entry => entry.status === 'running')
+          .filter(
+            entry =>
+              entry.status === 'running' &&
+              entry.sourceToolName !== 'run_ledger' &&
+              entry.subagent?.mode !== 'async'
+          )
           .sort((a, b) => b.seq - a.seq)[0]
       : undefined;
   const stallWarningBanner =

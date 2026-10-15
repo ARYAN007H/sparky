@@ -1220,8 +1220,7 @@ const messages: TranslationMap = {
   'chat.stallWarning.thinking':
     '仍在思考。已有 2 分钟没有新输出，但助手仍在工作。如需取消，请点击停止。',
   'chat.stallWarning.working': '已有 {duration} 没有新输出。助手可能卡住了；点击停止即可取消。',
-  'chat.stallWarning.toolRunning':
-    '{tool}，已持续 {duration}。构建或 CI 监视等较长步骤可能需要一段时间。',
+  'chat.stallWarning.toolRunning': '{tool}。构建或 CI 监视等较长步骤可能需要一段时间。',
   'chat.filter.tasks': '任务',
   'chat.selectThread': '选择一个对话',
   'chat.noThreads': '暂无对话',

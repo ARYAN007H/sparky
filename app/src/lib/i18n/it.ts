@@ -1329,7 +1329,7 @@ const messages: TranslationMap = {
   'chat.stallWarning.working':
     "Nessun nuovo output da {duration}. L'agente potrebbe essersi bloccato; premi Interrompi per annullare.",
   'chat.stallWarning.toolRunning':
-    '{tool} da {duration}. I passaggi lunghi, come le build o il monitoraggio della CI, possono richiedere tempo.',
+    '{tool}. I passaggi lunghi, come le build o il monitoraggio della CI, possono richiedere tempo.',
   'chat.filter.tasks': 'Attività',
   'chat.selectThread': 'Seleziona un thread',
   'chat.noThreads': 'Nessun thread',

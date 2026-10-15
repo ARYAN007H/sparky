@@ -1320,7 +1320,7 @@ const messages: TranslationMap = {
   'chat.stallWarning.working':
     'Brak nowych danych od {duration}. Agent mógł utknąć; naciśnij Zatrzymaj, aby anulować.',
   'chat.stallWarning.toolRunning':
-    '{tool} od {duration}. Długie kroki, takie jak kompilacje czy śledzenie CI, mogą chwilę potrwać.',
+    '{tool}. Długie kroki, takie jak kompilacje czy śledzenie CI, mogą chwilę potrwać.',
   'chat.filter.tasks': 'Zadania',
   'chat.selectThread': 'Wybierz wątek',
   'chat.noThreads': 'Brak wątków',

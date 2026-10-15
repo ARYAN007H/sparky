@@ -8,7 +8,8 @@ const COPY: Record<string, string> = {
   'chat.status.quietFor': 'Quiet for {duration}.',
   'chat.stallWarning.thinking': 'Still thinking.',
   'chat.stallWarning.working': 'No new output for {duration}. The agent may be stuck.',
-  'chat.stallWarning.toolRunning': '{tool} for {duration}. Long steps can take a while.',
+  'chat.stallWarning.toolRunning': '{tool}. Long steps can take a while.',
+  'conversations.tools.useApp.active': 'Using {app}',
 };
 
 vi.mock('../../../lib/i18n/I18nContext', () => ({
@@ -33,7 +34,7 @@ describe('StallWarning', () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it('names a running tool and its elapsed time in a neutral status', () => {
+  it('names a running tool and how long the turn has been quiet in a neutral status', () => {
     const onStop = vi.fn();
     render(
       <StallWarning
@@ -46,19 +47,40 @@ describe('StallWarning', () => {
 
     const warning = screen.getByTestId('chat-stall-warning');
     expect(warning).toHaveAttribute('data-chat-stall-state', 'tool');
-    expect(warning).toHaveTextContent('Running command for 2m 1s. Long steps can take a while.');
+    expect(warning).toHaveTextContent('Running command. Long steps can take a while.');
+    expect(screen.getByTestId('chat-stall-quiet')).toHaveTextContent('Quiet for 2m 1s.');
     expect(warning).not.toHaveTextContent('stuck');
     expect(warning.closest('[data-slot="alert"]')).toHaveAttribute('data-variant', 'default');
 
     act(() => {
       vi.advanceTimersByTime(5_000);
     });
-    expect(warning).toHaveTextContent('Running command for 2m 6s.');
+    expect(screen.getByTestId('chat-stall-quiet')).toHaveTextContent('Quiet for 2m 6s.');
 
     const stop = screen.getByTestId('chat-stall-stop');
     expect(stop).toHaveAttribute('data-variant', 'tertiary');
     fireEvent.click(stop);
     expect(onStop).toHaveBeenCalledTimes(1);
+  });
+
+  it('names the app a delegated integrations agent is using, as the timeline does', () => {
+    render(
+      <StallWarning
+        phase="tool_use"
+        quietSince={Date.now() - 120_000}
+        runningTool={{
+          id: 'call-2',
+          name: 'subagent:integrations_agent',
+          round: 1,
+          seq: 2,
+          status: 'running',
+          sourceToolName: 'delegate_notion',
+        }}
+        onStop={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTestId('chat-stall-warning')).toHaveTextContent('Using Notion.');
   });
 
   it('warns in amber when nothing is running past the window', () => {

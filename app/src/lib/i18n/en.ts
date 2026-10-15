@@ -1498,8 +1498,7 @@ const en: TranslationMap = {
     'Still thinking. No new output for 2 minutes, but the agent is still working. Press Stop if you want to cancel.',
   'chat.stallWarning.working':
     'No new output for {duration}. The agent may be stuck; press Stop to cancel.',
-  'chat.stallWarning.toolRunning':
-    '{tool} for {duration}. Long steps like builds or CI watches can take a while.',
+  'chat.stallWarning.toolRunning': '{tool}. Long steps like builds or CI watches can take a while.',
   'chat.filter.tasks': 'Tasks',
   'chat.selectThread': 'Select a thread',
   'chat.noThreads': 'No threads yet',

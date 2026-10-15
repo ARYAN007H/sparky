@@ -1342,7 +1342,7 @@ const messages: TranslationMap = {
   'chat.stallWarning.working':
     'Seit {duration} keine neue Ausgabe. Der Agent hängt möglicherweise; drücke Stoppen, um abzubrechen.',
   'chat.stallWarning.toolRunning':
-    '{tool} seit {duration}. Lange Schritte wie Builds oder CI-Überwachung können eine Weile dauern.',
+    '{tool}. Lange Schritte wie Builds oder CI-Überwachung können eine Weile dauern.',
   'chat.filter.tasks': 'Aufgaben',
   'chat.selectThread': 'Wähle einen Thread aus',
   'chat.noThreads': 'Noch keine Threads',

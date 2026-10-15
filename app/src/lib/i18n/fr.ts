@@ -1341,7 +1341,7 @@ const messages: TranslationMap = {
   'chat.stallWarning.working':
     "Aucune nouvelle sortie depuis {duration}. L'agent est peut-être bloqué ; appuie sur Arrêter pour annuler.",
   'chat.stallWarning.toolRunning':
-    '{tool} depuis {duration}. Les étapes longues, comme les builds ou le suivi de la CI, peuvent prendre du temps.',
+    '{tool}. Les étapes longues, comme les builds ou le suivi de la CI, peuvent prendre du temps.',
   'chat.filter.tasks': 'Tâches',
   'chat.selectThread': 'Sélectionne un fil',
   'chat.noThreads': "Aucun fil pour l'instant",

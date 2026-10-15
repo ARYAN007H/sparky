@@ -1316,7 +1316,7 @@ const messages: TranslationMap = {
   'chat.stallWarning.working':
     'Нового вывода нет уже {duration}. Возможно, агент завис; нажмите «Остановить», чтобы отменить.',
   'chat.stallWarning.toolRunning':
-    '{tool} уже {duration}. Долгие шаги, например сборка или отслеживание CI, могут занять время.',
+    '{tool}. Долгие шаги, например сборка или отслеживание CI, могут занять время.',
   'chat.filter.tasks': 'Задачи',
   'chat.selectThread': 'Выбери чат',
   'chat.noThreads': 'Чатов пока нет',

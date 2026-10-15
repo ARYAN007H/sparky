@@ -1493,7 +1493,7 @@ const messages: TranslationMap = {
   'chat.stallWarning.working':
     '{duration}間、新しい出力がありません。エージェントが停止している可能性があります。キャンセルするには「停止」を押してください。',
   'chat.stallWarning.toolRunning':
-    '{tool}（{duration}経過）。ビルドや CI の監視など、長いステップには時間がかかることがあります。',
+    '{tool}。ビルドや CI の監視など、長いステップには時間がかかることがあります。',
   'chat.filter.tasks': 'タスク',
   'chat.selectThread': 'スレッドを選択',
   'chat.noThreads': 'スレッドがありません',

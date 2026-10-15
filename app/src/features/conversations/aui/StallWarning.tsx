@@ -14,8 +14,9 @@ import { Alert, AlertDescription } from '../../../components/ui/Alert';
 import Button from '../../../components/ui/Button';
 import { useT } from '../../../lib/i18n/I18nContext';
 import type { ToolTimelineEntry } from '../../../store/chatRuntimeSlice';
+import { presentTimelineEntry } from '../../../utils/toolTimelineFormatting';
 import { formatElapsed } from '../components/AssistantUiToolCall';
-import { describeToolCall, toolLabel } from '../tools/toolPresentation';
+import { toolLabel } from '../tools/toolPresentation';
 import { useLiveElapsed } from './useLiveElapsed';
 
 export interface StallWarningProps {
@@ -43,24 +44,11 @@ export function StallWarning({ phase, quietSince, runningTool, onStop }: StallWa
 
   let message: string;
   if (runningTool) {
-    // A tool's start (or its last args delta) is the turn's last signal, so
-    // the quiet time is how long the tool has been running.
-    const label = toolLabel(
-      {
-        ...describeToolCall({
-          name: runningTool.name,
-          args: runningTool.argsBuffer,
-          status: 'running',
-          serverLabel: runningTool.displayName,
-          serverDetail: runningTool.detail,
-        }),
-        tense: 'active',
-      },
-      t
-    );
-    message = t('chat.stallWarning.toolRunning')
-      .replace('{tool}', label)
-      .replace('{duration}', shown);
+    // Same label as the timeline row. The duration is shown as quiet time
+    // below, not as the tool's runtime: a parallel call or sub-agent event
+    // mid-run restarts the quiet clock while this tool keeps going.
+    const label = toolLabel({ ...presentTimelineEntry(runningTool), tense: 'active' }, t);
+    message = t('chat.stallWarning.toolRunning').replace('{tool}', label);
   } else if (state === 'thinking') {
     message = t('chat.stallWarning.thinking');
   } else {
@@ -78,7 +66,7 @@ export function StallWarning({ phase, quietSince, runningTool, onStop }: StallWa
         data-chat-stall-phase={phase}
         data-chat-stall-state={state}>
         {message}
-        {state === 'thinking' && duration !== undefined && (
+        {state !== 'stuck' && duration !== undefined && (
           <>
             {' '}
             <span data-testid="chat-stall-quiet" className="tabular-nums font-medium">

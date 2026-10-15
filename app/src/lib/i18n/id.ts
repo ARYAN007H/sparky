@@ -1317,7 +1317,7 @@ const messages: TranslationMap = {
   'chat.stallWarning.working':
     'Tidak ada keluaran baru selama {duration}. Agen mungkin macet; tekan Hentikan untuk membatalkan.',
   'chat.stallWarning.toolRunning':
-    '{tool} selama {duration}. Langkah panjang seperti build atau pemantauan CI bisa memakan waktu.',
+    '{tool}. Langkah panjang seperti build atau pemantauan CI bisa memakan waktu.',
   'chat.filter.tasks': 'Tugas',
   'chat.selectThread': 'Pilih thread',
   'chat.noThreads': 'Belum ada thread',
