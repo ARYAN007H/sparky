@@ -210,7 +210,7 @@ impl ServerSession {
     }
 
     async fn open_with_port(port: Arc<dyn ServerPort>) -> Result<Self, ServerError> {
-        Self::open_with_port_and_dispatch(port, |call| Box::pin(handler::dispatch(call))).await
+        Self::open_with_port_and_dispatch(port, host_dispatch()).await
     }
 
     pub(super) async fn open_with_port_and_dispatch<F, Fut>(
@@ -270,7 +270,7 @@ impl ServerSession {
             .map_err(ServerError::Module)?;
         Ok(Self {
             port,
-            callback_dispatch: Arc::new(|call| Box::pin(handler::dispatch(call))),
+            callback_dispatch: Arc::new(host_dispatch()),
             id,
             next_operation: AtomicU64::new(1),
             operation: tokio::sync::Mutex::new(()),

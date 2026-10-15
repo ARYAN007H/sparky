@@ -142,6 +142,7 @@ pub(crate) fn build_rpc_params_for_test(
 }
 
 async fn validate_tool_arguments(
+    ctx: &DispatchCtx,
     tool_name: &str,
     arguments: Value,
 ) -> Result<Map<String, Value>, ToolCallError> {
