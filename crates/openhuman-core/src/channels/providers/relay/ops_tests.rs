@@ -207,9 +207,7 @@ async fn invalid_or_repeated_messages_start_no_turn() {
     CoreContext::scope(ctx, async {
         let mut bad = params("m1", "hello");
         bad.chat_id = "a/b".into();
-        let err = channel_relay_inbound(&crate::core::runtime::DispatchCtx::ambient(), bad)
-            .await
-            .expect_err("invalid");
+        let err = channel_relay_inbound(&crate::core::runtime::DispatchCtx::ambient(), bad).await.expect_err("invalid");
         assert!(err.contains("chat_id"), "{err}");
 
         let p = params("m1", "hello");
