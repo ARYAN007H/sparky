@@ -364,10 +364,12 @@ impl<T: Tool> MediaArtifactTool<T> {
         };
 
         let mut recovered = std::collections::HashSet::new();
-        let previously_allowed = allowed
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone();
+        let previously_allowed = {
+            let mut allowed = allowed
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            std::mem::take(&mut *allowed)
+        };
         let artifacts = match crate::agent::artifacts::store::list_artifacts(
             &self.workspace_dir,
             0,

@@ -8,6 +8,7 @@ use tinytools::{PermissionLevel, Tool, ToolCategory, ToolContent, ToolResult};
 
 use super::{copy_blob_to_file, has_reusable_files_reference, MediaArtifactTool};
 use crate::agent::artifacts::{ArtifactKind, ArtifactStatus, FileRoots};
+use crate::media::generation::tools::reference_policy;
 
 #[test]
 fn artifact_history_is_refreshed_only_for_absolute_paths_in_files_roots() {
@@ -34,6 +35,38 @@ fn artifact_history_is_refreshed_only_for_absolute_paths_in_files_roots() {
         &json!({ "references": ["generated.png"] }),
         &roots
     ));
+}
+
+#[tokio::test]
+async fn artifact_history_refresh_failure_clears_previous_reference_grants() {
+    let root = tempfile::tempdir().unwrap();
+    let workspace = root.path().join("not-a-workspace-directory");
+    std::fs::write(&workspace, b"force artifact listing failure").unwrap();
+    let action = root.path().join("action");
+    let files = root.path().join("Files");
+    std::fs::create_dir_all(&action).unwrap();
+    std::fs::create_dir_all(&files).unwrap();
+    let replacement = files.join("generated.png");
+    std::fs::write(&replacement, b"unrelated replacement").unwrap();
+    let allowed = Arc::new(std::sync::Mutex::new(std::collections::HashSet::from([
+        replacement.clone(),
+    ])));
+    let tool = MediaArtifactTool::new(
+        StubMediaTool {
+            file_count: 0,
+            fail: false,
+        },
+        ArtifactKind::Image,
+        workspace.clone(),
+        files,
+    )
+    .with_reference_allowlist(Arc::clone(&allowed));
+
+    tool.refresh_allowed_references().await;
+
+    assert!(allowed.lock().unwrap().is_empty());
+    let policy = reference_policy(&action, &workspace, allowed);
+    assert!(policy(&replacement).is_err());
 }
 
 struct PartialThenFail(bool);
