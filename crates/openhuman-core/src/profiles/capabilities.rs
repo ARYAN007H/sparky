@@ -7,7 +7,7 @@
 use crate::agent::hooks::{ToolHook, ToolHookContext, ToolHookDecision};
 use crate::agent::{HostTools, HostTurnTools, TurnContext};
 use crate::config::Config;
-use crate::core::runtime::{ContextOverlay, CoreContext};
+use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx};
 use crate::tools::toolpacks::{GroupMode, ToolGroups};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -91,7 +91,7 @@ impl ProfileCapabilities {
     /// Whether the operator named `name` in its tool scope and it is one of
     /// [`OPERATOR_ADMITTABLE`](super::tools::OPERATOR_ADMITTABLE), the tools
     /// registered although their domain family is off for profiles.
-    pub fn names_admittable(&self, ctx: &DispatchCtx, name: &str) -> bool {
+    pub fn names_admittable(&self, name: &str) -> bool {
         super::tools::OPERATOR_ADMITTABLE.contains(&name)
             && self
                 .names
