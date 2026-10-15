@@ -8,7 +8,6 @@ use std::sync::Arc;
 use tinyagents_harness::run_queue::RunQueue;
 
 use crate::agent::progress::AgentProgress;
-use crate::config::rpc as config_rpc;
 
 use super::ops::BudgetCorrelation;
 use super::progress_bridge::spawn_progress_bridge;
@@ -26,6 +25,7 @@ use tinyinference_llm::failure::is_empty_provider_response_text;
 use super::ops::TEST_FORCED_RUN_CHAT_TASK_ERROR;
 
 pub(crate) async fn run_chat_task(
+    ctx: &crate::core::runtime::DispatchCtx,
     client_id: &str,
     thread_id: &str,
     request_id: &str,
@@ -116,7 +116,7 @@ pub(crate) async fn run_chat_task(
         }
     }
 
-    let mut config = config_rpc::load_config_with_timeout().await?;
+    let mut config = ctx.load_config().await?;
     // A thread started in a chosen folder acts there, not in the global
     // `action_dir`. Applied before checkout so the session agent, its security
     // policy (which grants `action_dir` as a trusted root) and its tools are
@@ -197,6 +197,7 @@ pub(crate) async fn run_chat_task(
         turn_state_store,
         bridge_metadata,
         config.clone(),
+        ctx.clone(),
     );
 
     // `run_single`'s future is very large; box it so the two ambient-scope
