@@ -82,11 +82,20 @@ pub fn restore(provider: Option<Arc<dyn SessionStoreProvider>>) {
     *PROVIDER.write().unwrap_or_else(PoisonError::into_inner) = provider;
 }
 
-/// The provider in effect: the context's host-override one, else the
-/// installed one, if any.
+/// The provider in effect for the calling task's ambient context: see
+/// [`installed_in`].
 #[must_use]
 pub fn installed() -> Option<Arc<dyn SessionStoreProvider>> {
-    crate::core::runtime::CoreContext::current_host_overrides()
+    installed_in(&crate::core::runtime::DispatchCtx::ambient())
+}
+
+/// The provider in effect for `ctx`: the host-override one of the agent it
+/// runs for, else the installed one, if any.
+#[must_use]
+pub fn installed_in(
+    ctx: &crate::core::runtime::DispatchCtx,
+) -> Option<Arc<dyn SessionStoreProvider>> {
+    ctx.host_overrides()
         .and_then(|local| local.session_store.clone())
         .or_else(|| {
             PROVIDER
