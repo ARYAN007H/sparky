@@ -362,7 +362,7 @@ impl OpenHumanTurnPrelude {
         }
         let config = match self.runtime_config.clone() {
             Some(config) => Some(config),
-            None => crate::config::ops::load_current_or_init(&DispatchCtx::ambient())
+            None => crate::config::ops::load_current_or_init(&self.dispatch_ctx())
                 .await
                 .ok()
                 .map(Arc::new),
@@ -400,7 +400,7 @@ impl OpenHumanTurnPrelude {
         let skills_changed = self.drain_host_events();
         let config = match self.runtime_config.clone() {
             Some(config) => Some(config),
-            None => crate::config::ops::load_current_or_init(&DispatchCtx::ambient())
+            None => crate::config::ops::load_current_or_init(&self.dispatch_ctx())
                 .await
                 .ok()
                 .map(Arc::new),

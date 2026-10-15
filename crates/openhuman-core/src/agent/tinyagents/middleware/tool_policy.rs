@@ -334,7 +334,7 @@ impl ToolMiddleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         let desktop_approval_disabled = match self.resolve_tool(&call.name) {
             Some(tool) => {
                 crate::desktop::control::approvals_disabled_for(
-                    &crate::core::runtime::DispatchCtx::ambient(),
+                    &ctx.data.dispatch_ctx(),
                     tool.as_ref(),
                 )
                 .await

@@ -76,7 +76,12 @@ impl ApprovalSecurityMiddleware {
             .unwrap_or(false)
     }
 
-    pub(crate) async fn requires_approval(&self, name: &str, args: &serde_json::Value) -> bool {
+    pub(crate) async fn requires_approval(
+        &self,
+        dispatch: &DispatchCtx,
+        name: &str,
+        args: &serde_json::Value,
+    ) -> bool {
         #[cfg(feature = "modules")]
         let desktop_approval_disabled = match self
             .tool_sets
@@ -85,11 +90,7 @@ impl ApprovalSecurityMiddleware {
             .find(|tool| tool.name() == name)
         {
             Some(tool) => {
-                crate::desktop::control::approvals_disabled_for(
-                    &DispatchCtx::ambient(),
-                    tool.as_ref(),
-                )
-                .await
+                crate::desktop::control::approvals_disabled_for(dispatch, tool.as_ref()).await
             }
             None => false,
         };
@@ -108,12 +109,14 @@ impl ApprovalResolver<crate::agent::tinyagents::host::OpenHumanRunContext>
 {
     async fn requires_approval(
         &self,
-        _ctx: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+        ctx: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
         call: &TaToolCall,
     ) -> bool {
         // Resolve external-effect up front so no tool borrow is held across the
         // approval await.
-        let has_ext = self.requires_approval(&call.name, &call.arguments).await;
+        let has_ext = self
+            .requires_approval(&ctx.data.dispatch_ctx(), &call.name, &call.arguments)
+            .await;
         tracing::debug!(
             tool = %call.name,
             has_external_effect = has_ext,
