@@ -246,7 +246,16 @@ impl Tool for TinySearchTool {
         args: Value,
         options: ToolCallOptions,
     ) -> anyhow::Result<ToolResult> {
-        let ctx = DispatchCtx::ambient();
+        self.execute_with_context(args, options, None).await
+    }
+
+    async fn execute_with_context(
+        &self,
+        args: Value,
+        options: ToolCallOptions,
+        context: Option<&dyn tinytools::ToolRunContext>,
+    ) -> anyhow::Result<ToolResult> {
+        let ctx = crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(context);
         let config = self.live_config(&ctx).await?;
         // Re-read per call, so a key added or a provider switched mid-session
         // clears an earlier refusal instead of outliving it.

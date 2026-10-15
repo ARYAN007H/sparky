@@ -87,6 +87,7 @@ impl Remixer for ModuleRemixer<'_> {
 /// the thread is in the treatment arm. Fails open: the reply is left
 /// untouched on any error.
 pub(crate) async fn remix_task_reply(
+    ctx: &DispatchCtx,
     config: &Config,
     thread_id: &str,
     request_id: &str,
@@ -100,6 +101,7 @@ pub(crate) async fn remix_task_reply(
     }
     if let Some(remixed) = remix_final_reply(
         arm::arm_for(config, arm::mode(), thread_id),
+        ctx,
         config,
         thread_id,
         request_id,
@@ -118,6 +120,7 @@ pub(crate) async fn remix_task_reply(
 /// duration, logged for both arms so throughput can be compared.
 async fn remix_final_reply(
     arm: Arm,
+    ctx: &DispatchCtx,
     config: &Config,
     thread_id: &str,
     request_id: &str,
@@ -136,7 +139,7 @@ async fn remix_final_reply(
     let started = Instant::now();
     // Fail open: without the thread, the reading would judge the reply out of
     // context, so the original goes out instead.
-    let Some(messages) = load(config, thread_id).await else {
+    let Some(messages) = load(ctx, config, thread_id).await else {
         log_outcome(&turn, started, "history_unavailable", None);
         return None;
     };
@@ -185,14 +188,16 @@ fn gate(arm: Arm, turn: &TurnInfo<'_>) -> bool {
 /// The thread as stored. Blocking file work, so it runs off the async
 /// runtime. `None` when the thread cannot be read.
 async fn load(
+    ctx: &DispatchCtx,
     config: &Config,
     thread_id: &str,
 ) -> Option<Vec<crate::threads::store::ConversationMessage>> {
     let config = config.clone();
     let thread_id = thread_id.to_owned();
+    let ctx = ctx.clone();
     crate::core::runtime::spawn_blocking_scoped(move || {
         crate::threads::store::get_messages(
-            &DispatchCtx::ambient(),
+            &ctx,
             config.workspace_dir.clone(),
             &thread_id,
         )
