@@ -160,6 +160,7 @@ fn handle_chat(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture
         let p = deserialize_params::<WebChatParams>(params)?;
         // Recorded before the turn starts so it reads the new choice.
         crate::agent::tinyagents::apply_requested_effort(
+            &ctx,
             &p.thread_id,
             p.reasoning_effort.as_deref(),
         )?;
