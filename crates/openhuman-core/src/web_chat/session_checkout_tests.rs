@@ -101,7 +101,7 @@ pub(super) fn host_seeded_with(config: &Config, marker: &str) -> OpenHumanSessio
 }
 
 async fn evict(thread_id: &str) {
-    thread_sessions()
+    thread_sessions(&DispatchCtx::ambient())
         .lock_owned()
         .await
         .remove(&key_for(&DispatchCtx::ambient(), thread_id));
