@@ -79,11 +79,12 @@ impl SessionHostBuilder {
     /// inject a mock they observe.
     pub fn crate_native_provider(
         mut self,
+        ctx: &crate::core::runtime::DispatchCtx,
         role: impl Into<String>,
         config: Arc<crate::config::Config>,
     ) -> Self {
         self.turn_model_source = Some(crate::agent::tinyagents::TurnModelSource::new_crate_native(
-            &crate::core::runtime::DispatchCtx::ambient(),
+            ctx,
             role,
             config,
         ));

@@ -345,12 +345,14 @@ impl OpenHumanSessionHost {
     /// `session_id` is the conversation this turn runs in, reaching the
     /// factory as [`TurnContext::session_id`]; `None` when none is named yet.
     pub fn from_config_with_host_tools(
+        ctx: &crate::core::runtime::DispatchCtx,
         config: &Config,
         definition: &crate::agent::harness::host_definition::AgentDefinition,
         host: &super::HostTools,
         session_id: Option<&str>,
     ) -> Result<Self> {
         OpenHumanSessionHost::build_session_agent_inner(
+            ctx,
             config,
             &definition.id,
             Some(definition),

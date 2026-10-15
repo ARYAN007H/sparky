@@ -70,13 +70,12 @@ impl HostAgent {
             host_tools = self.host_tools.is_some(),
             "[host_agents] building session for host agent"
         );
+        let dispatch = DispatchCtx::new(Arc::clone(&self.context));
         let mut session = CoreContext::sync_scope(Arc::clone(&self.context), || {
-            if crate::profiles::capabilities::ProfileCapabilities::in_ctx(&DispatchCtx::new(
-                Arc::clone(&self.context),
-            ))
-            .is_some()
+            if crate::profiles::capabilities::ProfileCapabilities::in_ctx(&dispatch).is_some()
             {
                 return OpenHumanSessionHost::from_config_host_only(
+                    &dispatch,
                     config,
                     &self.definition,
                     self.host_tools.as_ref(),
@@ -85,12 +84,13 @@ impl HostAgent {
             }
             match &self.host_tools {
                 Some(host) => OpenHumanSessionHost::from_config_with_host_tools(
+                    &dispatch,
                     config,
                     &self.definition,
                     host,
                     session_id,
                 ),
-                None => OpenHumanSessionHost::from_config_with_definition(config, &self.definition),
+                None => OpenHumanSessionHost::from_config_with_definition(&dispatch, config, &self.definition),
             }
         })?;
         // The agent's own callbacks ride the session explicitly: its tool and
