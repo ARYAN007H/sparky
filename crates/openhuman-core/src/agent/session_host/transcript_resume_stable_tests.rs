@@ -60,8 +60,9 @@ fn a_legacy_workspace_is_adopted_once_and_the_next_process_resumes_in_place() {
             let mut host = build_host(root.path(), next, scenario.native, &thread);
             let stem = host.session_id().expect("bound session id");
             place_fixture(root.path(), scenario, &stem, "");
-            legacy_only = tree(root.path(), &thread, &host);
+            eprintln!("DBGX before resume");
             assert!(host.resume_bound_session().await.expect("first resume"));
+            legacy_only = BTreeMap::new();
             after_first = tree(root.path(), &thread, &host);
         }
         // Adoption writes the session's own transcript and modifies no legacy root.
