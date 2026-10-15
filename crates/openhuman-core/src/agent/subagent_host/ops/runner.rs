@@ -6,7 +6,6 @@
 //! calls and tool execution until the model returns without further tool calls
 //! (or the iteration budget is exhausted).
 
-use crate::core::runtime::DispatchCtx;
 use std::collections::HashSet;
 use std::time::Instant;
 
@@ -282,7 +281,9 @@ pub(crate) async fn run_subagent_direct(
 
         // Loaded once per spawn (see `LoadedConfig`), after the tier gate so a
         // rejected spawn never initialises config on first run.
-        let loaded_config: LoadedConfig = Box::pin(crate::config::ops::load_current_or_init(&DispatchCtx::ambient()))
+        let loaded_config: LoadedConfig = Box::pin(crate::config::ops::load_current_or_init(
+            &crate::core::runtime::DispatchCtx::ambient(),
+        ))
             .await
             .map(std::sync::Arc::new)
             .map_err(|e| e.to_string());
