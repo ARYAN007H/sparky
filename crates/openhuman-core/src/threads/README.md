@@ -34,9 +34,14 @@ agent reply, which `threads.messages_list` returns. The transcript is what
 the model sees, written by the agent session host through the session store
 port, and is the source for `threads.transcript_get` and `threads.token_usage`.
 Every transcript read here goes through that port under the key the session
-host wrote with: `ops::support::transcript_store(ctx)` resolves it from the
-request's own context (`<profile>~<agent>` for a SaaS profile, else the
-context's agent, else the chat agent id), never from ambient state. The turn-state snapshots
+host wrote with. The web-chat checkout records that key with the thread the
+first time a session is bound to it (`threads::store::bind_transcript_key`,
+first writer wins, the `threads_transcript_keys` collection in the thread's
+scope), and `ops::support::transcript_store(ctx, thread_id)` reads it back, so
+a later `[agent] chat_agent_id` change cannot strand the thread's earlier
+turns. A thread with no record resolves the key as the session host would
+today, from the request's own context (`<profile>~<agent>` for a SaaS profile,
+else the context's agent, else the chat agent id), never from ambient state. The turn-state snapshots
 record what a turn was doing (phase, tool timeline, streamed text) so a client
 that reloads mid-turn, or after a restart, can rebuild the process view.
 
