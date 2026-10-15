@@ -23,14 +23,15 @@ fn profile(name: &str, workspace: &std::path::Path) -> Arc<CoreContext> {
 
 async fn record(ctx: &Arc<CoreContext>, ws: &std::path::Path, task: &str) {
     record_completion(
-            &DispatchCtx::new(Arc::clone(ctx)),
-            ws,
-            "sess-1",
-            task,
-            "researcher",
-            "done",
-            Some("t1".into()),
-        ).await;
+        &DispatchCtx::new(Arc::clone(ctx)),
+        ws,
+        "sess-1",
+        task,
+        "researcher",
+        "done",
+        Some("t1".into()),
+    )
+    .await;
 }
 
 fn pending(ws: &std::path::Path) -> Vec<String> {

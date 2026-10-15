@@ -70,14 +70,15 @@ async fn an_off_task_completion_drains_only_its_owners_thread() {
 
     for (ctx, ws, task) in [(&alice, &ws_a, &task_a), (&bob, &ws_b, &task_b)] {
         record_completion(
-                &DispatchCtx::new(Arc::clone(ctx)),
-                ws.path(),
-                &session,
-                task.as_str(),
-                "r",
-                "done",
-                Some(thread.into()),
-            ).await;
+            &DispatchCtx::new(Arc::clone(ctx)),
+            ws.path(),
+            &session,
+            task.as_str(),
+            "r",
+            "done",
+            Some(thread.into()),
+        )
+        .await;
     }
     let resolve = |p: &str| {
         [&alice, &bob]
