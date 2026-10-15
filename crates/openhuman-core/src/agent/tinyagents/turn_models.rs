@@ -6,11 +6,8 @@ use std::sync::Arc;
 use crate::core::runtime::DispatchCtx;
 pub(crate) use super::turn_model_resolver::TurnModelResolver;
 
-use async_trait::async_trait;
-
 use crate::agent::tinyagents::model::{BuiltTurnModels, TierRoutes, TurnChatModel};
-use tinyagents_harness::host::{ModelResolveRequest, ModelResolver};
-use tinyinference_llm::model::{ErrorSlotModel, ProfileOverrideModel};
+use tinyinference_llm::model::ProfileOverrideModel;
 use tinyinference_llm::model::{ResolvedModelRoute, RouteRecordingModel};
 
 /// The per-turn crate [`ChatModel`](tinyinference_llm::model::ChatModel) set,

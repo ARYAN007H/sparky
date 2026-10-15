@@ -697,12 +697,8 @@ impl WalletHost {
         &self,
         request: AuthorizeX402PaymentRequest,
     ) -> tinybus::Result<HostResponse> {
-        let owner_matches = x402_request_owner_matches(
-            &request,
-            crate::core::runtime::DispatchCtx::ambient_turn()
-                .turn_origin()
-                .as_ref(),
-        );
+        let origin = crate::core::runtime::DispatchCtx::ambient_turn().turn_origin();
+        let owner_matches = x402_request_owner_matches(&request, origin.as_ref());
         let approved = if owner_matches {
             if let Some(gate) = crate::security::approval::ApprovalGate::try_global() {
                 matches!(
