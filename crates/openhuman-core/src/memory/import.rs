@@ -351,6 +351,7 @@ async fn launch(
         "[memory:import] run started"
     );
     let config = config.clone();
+    let task_ctx = ctx.clone();
     ctx.spawn(async move {
         if mode == Mode::Import {
             driver.run(begun).await;
@@ -362,6 +363,7 @@ async fn launch(
         // screen the user is, once the import is done.
         if mode == Mode::Import && read_file(&workspace_dir).state.phase == ImportPhase::Done {
             let started = super::layout_migration::start(
+                &task_ctx,
                 config.clone(),
                 Arc::new(super::layout_migration::AppHost::new(config)),
                 // Migration is free: organizing follows a finished import
