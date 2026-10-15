@@ -56,13 +56,14 @@ fn thread_lock(workspace_dir: &Path, thread_id: &str) -> Arc<tokio::sync::Mutex<
 /// Create the thread if needed and append the inbound message, unless it is
 /// already there.
 pub async fn record_inbound(
+    ctx: &DispatchCtx,
     workspace_dir: &Path,
     params: &RelayInboundParams,
     thread_id: &str,
 ) -> Result<Recorded, String> {
     let now = Utc::now().to_rfc3339();
     conversations::ensure_thread(
-        DispatchCtx::ambient(),
+        ctx.clone(),
         workspace_dir.to_path_buf(),
         CreateConversationThread {
             id: thread_id.to_string(),
@@ -80,7 +81,7 @@ pub async fn record_inbound(
     let lock = thread_lock(workspace_dir, thread_id);
     let _guard = lock.lock().await;
     let existing = conversations::get_messages(
-        DispatchCtx::ambient(),
+        ctx.clone(),
         workspace_dir.to_path_buf(),
         thread_id.to_string(),
     )
@@ -89,7 +90,7 @@ pub async fn record_inbound(
         return Ok(Recorded::Duplicate);
     }
     conversations::append_message(
-        DispatchCtx::ambient(),
+        ctx.clone(),
         workspace_dir.to_path_buf(),
         thread_id.to_string(),
         ConversationMessage {
@@ -115,6 +116,7 @@ pub async fn record_inbound(
 
 /// Append the turn's reply: every text the relay sink sent, in order.
 pub async fn record_reply(
+    ctx: &DispatchCtx,
     workspace_dir: &Path,
     params: &RelayInboundParams,
     thread_id: &str,
@@ -124,7 +126,7 @@ pub async fn record_reply(
         return Ok(());
     }
     conversations::append_message(
-        DispatchCtx::ambient(),
+        ctx.clone(),
         workspace_dir.to_path_buf(),
         thread_id.to_string(),
         ConversationMessage {
@@ -149,6 +151,7 @@ pub async fn record_reply(
 /// The thread's earlier turns as the channel pipeline's per-chat history:
 /// user and assistant rows before `message_id`, the most recent `limit`.
 pub async fn prior_turns(
+    ctx: &DispatchCtx,
     workspace_dir: &Path,
     thread_id: &str,
     message_id: &str,
@@ -156,7 +159,7 @@ pub async fn prior_turns(
 ) -> Result<Vec<ChatMessage>, String> {
     let current = inbound_message_id(message_id);
     let messages = conversations::get_messages(
-        DispatchCtx::ambient(),
+        ctx.clone(),
         workspace_dir.to_path_buf(),
         thread_id.to_string(),
     )

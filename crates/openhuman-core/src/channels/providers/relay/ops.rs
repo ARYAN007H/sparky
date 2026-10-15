@@ -46,7 +46,7 @@ pub async fn channel_relay_inbound(
     let thread_id = identity.thread_id;
     let workspace_dir = config.workspace_dir.clone();
 
-    if store::record_inbound(&workspace_dir, &params, &thread_id).await? == Recorded::Duplicate {
+    if store::record_inbound(ctx, &workspace_dir, &params, &thread_id).await? == Recorded::Duplicate {
         tracing::info!(
             channel = %params.channel,
             thread_id = %thread_id,
@@ -77,6 +77,7 @@ pub async fn channel_relay_inbound(
         "[channels::relay] relayed message accepted"
     );
     crate::core::runtime::spawn_scoped(run_relay_turn(
+        ctx.clone(),
         config,
         params,
         thread_id.clone(),
@@ -97,6 +98,7 @@ pub async fn channel_relay_inbound(
 /// record the reply. `config` is the caller's: its tools, policy, model and
 /// workspace, never the process's channel runtime.
 pub(crate) async fn run_relay_turn(
+    dispatch_ctx: crate::core::runtime::DispatchCtx,
     config: Config,
     params: RelayInboundParams,
     thread_id: String,
@@ -132,7 +134,7 @@ pub(crate) async fn run_relay_turn(
                     &crate::channels::SendMessage::new(reply, &params.chat_id),
                 )
                 .await;
-                record(&workspace_dir, &params, &thread_id, &channel.sent()).await;
+                record(&dispatch_ctx, &workspace_dir, &params, &thread_id, &channel.sent()).await;
                 return channel.sent();
             }
         };
@@ -157,7 +159,7 @@ pub(crate) async fn run_relay_turn(
                 &crate::channels::SendMessage::new(reply, &params.chat_id),
             )
             .await;
-            record(&workspace_dir, &params, &thread_id, &channel.sent()).await;
+            record(&dispatch_ctx, &workspace_dir, &params, &thread_id, &channel.sent()).await;
             return channel.sent();
         }
     };
@@ -196,6 +198,7 @@ pub(crate) async fn run_relay_turn(
         }
     };
     match store::prior_turns(
+        &dispatch_ctx,
         &workspace_dir,
         &thread_id,
         &params.message_id,
@@ -237,7 +240,7 @@ pub(crate) async fn run_relay_turn(
     }
 
     let replies = channel.sent();
-    record(&workspace_dir, &params, &thread_id, &replies).await;
+    record(&dispatch_ctx, &workspace_dir, &params, &thread_id, &replies).await;
     // Idle again: deliver anything that finished while the turn ran. No
     // `AgentTurnCompleted` maps to this thread, so nothing else would.
     drop(busy);
@@ -253,12 +256,13 @@ pub(crate) async fn run_relay_turn(
 }
 
 async fn record(
+    ctx: &crate::core::runtime::DispatchCtx,
     workspace_dir: &std::path::Path,
     params: &RelayInboundParams,
     thread_id: &str,
     replies: &[String],
 ) {
-    if let Err(error) = store::record_reply(workspace_dir, params, thread_id, replies).await {
+    if let Err(error) = store::record_reply(ctx, workspace_dir, params, thread_id, replies).await {
         tracing::warn!(
             thread_id = %thread_id,
             %error,
