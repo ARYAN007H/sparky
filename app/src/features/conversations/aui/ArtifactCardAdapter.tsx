@@ -8,8 +8,7 @@
  * Only artifacts with NO owning tool call (`ArtifactSnapshot.toolCallId`
  * absent) reach this deck — `Conversations.tsx`'s `liveArtifactDeck` filters
  * those out; an artifact with a `toolCallId` renders inline through its own
- * tool-call card instead (`MediaAndDocumentCalls.tsx`). A `ready` artifact
- * never reaches either: it moves to `ChatFilesChip` (unchanged).
+ * tool-call card instead (`MediaAndDocumentCalls.tsx`).
  *
  * The vendored card has no built-in failed/retry state (it only knows
  * "writing" vs. "settled"), so the failed case renders the settled meta line
@@ -41,7 +40,11 @@ export interface ArtifactCardAdapterProps {
   onOpenPreview?: (artifactId: string) => void;
 }
 
-export function ArtifactCardAdapter({ artifact, onRetry, onOpenPreview }: ArtifactCardAdapterProps) {
+export function ArtifactCardAdapter({
+  artifact,
+  onRetry,
+  onOpenPreview,
+}: ArtifactCardAdapterProps) {
   const { t } = useT();
   const generating = artifact.status === 'in_progress';
   const isReady = artifact.status === 'ready';
@@ -72,8 +75,7 @@ export function ArtifactCardAdapter({ artifact, onRetry, onOpenPreview }: Artifa
       onClick={handleClick}
       onKeyDown={isReady && onOpenPreview ? handleKeyDown : undefined}
       className={'flex flex-col items-start gap-1.5' + (isReady ? ' cursor-pointer' : '')}
-      data-testid="artifact-card-adapter"
-    >
+      data-testid="artifact-card-adapter">
       <ArtifactCard
         title={artifact.title}
         meta={meta}

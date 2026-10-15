@@ -6,7 +6,6 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { type ChatSendError, chatSendError } from '../../chat/chatSendError';
 import { checkPromptInjection, promptGuardMessage } from '../../chat/promptInjectionGuard';
 import { trackAnalyticsEvent } from '../../components/analytics';
-import ChatFilesChip from '../../components/chat/ChatFilesChip';
 import WorkflowProposalCard from '../../components/chat/WorkflowProposalCard';
 import { ConfirmationModal } from '../../components/intelligence/ConfirmationModal';
 import { SidebarContent } from '../../components/layout/shell/SidebarSlot';
@@ -110,6 +109,7 @@ import {
 import { StallWarning } from './aui/StallWarning';
 import { ThreadWorkspaceChip } from './aui/ThreadWorkspaceChip';
 import { useChatSurfaceRegistration } from './hooks/useChatSurfaceRegistration';
+import { useThreadArtifactsHydration } from './hooks/useThreadArtifactsHydration';
 import { useThreadDraft } from './hooks/useThreadDraft';
 import { ThreadList } from './threadList/ThreadList';
 import { useThreadPins } from './threadList/useThreadPins';
@@ -2144,9 +2144,7 @@ const Conversations = ({
 
   // Surface in-flight + failed artifact cards above the composer (#2779).
   // Mirrors the approval-card placement so the user sees the spinner / error
-  // without scrolling. `ready` cards are delegated to the header ChatFilesChip
-  // panel (#3024) so the chat scroll area isn't permanently occupied —
-  // restored decks are listable from the chip on demand.
+  // without scrolling.
   //
   // The failed-card Retry button re-dispatches the producing tool via
   // `ai_regenerate` (#3162): the core reloads the persisted creation args and
@@ -2156,18 +2154,14 @@ const Conversations = ({
   // Only artifacts with NO owning tool call belong in the header deck — one
   // with a `toolCallId` renders inline through its own tool-call card
   // (`MediaAndDocumentCalls.tsx`) instead, per the `ArtifactCardAdapter` doc.
-  // We ALSO keep ready artifacts visible as clickable cards (not just the
-  // ChatFilesChip count) so the user can open live artifact previews.
   const liveArtifacts = artifactDeckThreadId
     ? (artifactsByThread[artifactDeckThreadId] ?? []).filter(
         a =>
-          // Cards with a producing turn now render inline inside that
-          // message (MessageArtifactCards); only artifacts without an
-          // owning requestId (older cores / persisted snapshots) fall
-          // back to the end-of-transcript deck.
-          !a.ownerRequestId &&
-          !a.toolCallId &&
-          (a.status === 'in_progress' || a.status === 'ready')
+          // Ready artifacts render inside their turn's reply, placed by the
+          // core's artifact rows (`MessageArtifactCards`); so does an
+          // in-progress one whose event names its turn. Only an in-progress
+          // artifact with no turn (an older core) waits at the end.
+          !a.ownerRequestId && !a.toolCallId && a.status === 'in_progress'
       )
     : [];
   const liveArtifactDeck =
@@ -2188,10 +2182,7 @@ const Conversations = ({
       </div>
     ) : null;
 
-  const chatFilesChip =
-    (selectedThreadId ?? firstActiveThreadId) ? (
-      <ChatFilesChip threadId={(selectedThreadId ?? firstActiveThreadId) as string} />
-    ) : null;
+  useThreadArtifactsHydration(selectedThreadId ?? firstActiveThreadId);
 
   const assistantComposerHeader = (
     <div
@@ -2241,7 +2232,6 @@ const Conversations = ({
         onChange={applyComposerReasoningEffort}
         modelLabel={reasoningModel}
       />
-      {chatFilesChip}
     </>
   );
 
@@ -2404,10 +2394,7 @@ const Conversations = ({
           </SidebarContent>
           <div className="flex h-full w-full min-w-0">
             {mainPanel}
-            {activeArtifactId && (
-              <ArtifactPreviewPanel
-              />
-            )}
+            {activeArtifactId && <ArtifactPreviewPanel />}
           </div>
         </>
       )}

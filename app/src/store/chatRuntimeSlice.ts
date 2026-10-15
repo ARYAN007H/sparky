@@ -893,10 +893,10 @@ export interface ArtifactSnapshot {
    */
   toolCallId?: string;
   /**
-   * The `request_id` of the chat turn that was live when this artifact's
-   * pending/ready event landed. Lets the transcript render the card inside
-   * the exact assistant message that produced it (MessageArtifactCards
-   * matches message metadata.requestId against this).
+   * The turn that made the artifact, from its pending/ready event. Places the
+   * card in that turn's message while the turn runs; saved replies place
+   * their cards from the core's artifact rows instead
+   * (`services/api/artifactRows.ts`).
    */
   ownerRequestId?: string;
 }
@@ -1199,6 +1199,20 @@ function subagentRows(
     ...Object.values(state.settledTurnsByThread[threadId] ?? {}).flatMap(turn => turn.timeline),
   ].filter(predicate);
   return rows.filter((row, index) => rows.indexOf(row) === index);
+}
+
+/**
+ * The turn an artifact belongs to. The event names it; older cores that do not
+ * fall back to the thread's live turn. An artifact keeps the owner it already
+ * has, so a re-hydration or a late event never moves it.
+ */
+function ownerFor(
+  state: { liveRequestIdByThread: Record<string, string | undefined> },
+  threadId: string,
+  existing: ArtifactSnapshot | undefined,
+  requestId: string | undefined
+): string | undefined {
+  return existing?.ownerRequestId ?? requestId ?? state.liveRequestIdByThread[threadId];
 }
 
 /**
@@ -2639,9 +2653,10 @@ const chatRuntimeSlice = createSlice({
         kind: ArtifactSnapshot['kind'];
         title: string;
         toolCallId?: string;
+        requestId?: string;
       }>
     ) => {
-      const { threadId, artifactId, kind, title, toolCallId } = action.payload;
+      const { threadId, artifactId, kind, title, toolCallId, requestId } = action.payload;
       // No-downgrade guard: a late `artifact_pending` (re-delivery, or a
       // socket race) must never regress an artifact that already reached
       // `ready` / `failed` back to a spinner. Only the regenerate flow
@@ -2663,7 +2678,7 @@ const chatRuntimeSlice = createSlice({
         status: 'in_progress',
         updatedAt: Date.now(),
         toolCallId: toolCallId ?? existing?.toolCallId,
-        ownerRequestId: state.liveRequestIdByThread[threadId],
+        ownerRequestId: ownerFor(state, threadId, existing, requestId),
       };
       state.artifactsByThread[threadId] = upsertArtifact(
         state.artifactsByThread[threadId],
@@ -2685,9 +2700,11 @@ const chatRuntimeSlice = createSlice({
         path: string;
         sizeBytes: number;
         toolCallId?: string;
+        requestId?: string;
       }>
     ) => {
-      const { threadId, artifactId, kind, title, path, sizeBytes, toolCallId } = action.payload;
+      const { threadId, artifactId, kind, title, path, sizeBytes, toolCallId, requestId } =
+        action.payload;
       const existing = (state.artifactsByThread[threadId] ?? []).find(
         entry => entry.artifactId === artifactId
       );
@@ -2700,7 +2717,7 @@ const chatRuntimeSlice = createSlice({
         sizeBytes,
         updatedAt: Date.now(),
         toolCallId: toolCallId ?? existing?.toolCallId,
-        ownerRequestId: state.liveRequestIdByThread[threadId],
+        ownerRequestId: ownerFor(state, threadId, existing, requestId),
       };
       state.artifactsByThread[threadId] = upsertArtifact(
         state.artifactsByThread[threadId],
@@ -2721,9 +2738,10 @@ const chatRuntimeSlice = createSlice({
         title: string;
         error: string;
         toolCallId?: string;
+        requestId?: string;
       }>
     ) => {
-      const { threadId, artifactId, kind, title, error, toolCallId } = action.payload;
+      const { threadId, artifactId, kind, title, error, toolCallId, requestId } = action.payload;
       const existing = (state.artifactsByThread[threadId] ?? []).find(
         entry => entry.artifactId === artifactId
       );
@@ -2735,6 +2753,7 @@ const chatRuntimeSlice = createSlice({
         error,
         updatedAt: Date.now(),
         toolCallId: toolCallId ?? existing?.toolCallId,
+        ownerRequestId: ownerFor(state, threadId, existing, requestId),
       };
       state.artifactsByThread[threadId] = upsertArtifact(
         state.artifactsByThread[threadId],
@@ -2771,6 +2790,11 @@ const chatRuntimeSlice = createSlice({
     /** Set the active tab explicitly (clicking a tab). */
     activateArtifactTab: (state, action: PayloadAction<string>) => {
       state.activeArtifactId = action.payload;
+    },
+    /** Close the preview panel and every tab in it (the header X). */
+    closeArtifactPanel: state => {
+      state.openArtifactIds = [];
+      state.activeArtifactId = null;
     },
     clearArtifactsForThread: (state, action: PayloadAction<{ threadId: string }>) => {
       delete state.artifactsByThread[action.payload.threadId];
@@ -3320,6 +3344,7 @@ export const {
   openArtifact,
   closeArtifactTab,
   activateArtifactTab,
+  closeArtifactPanel,
   setQueueStatusForThread,
   clearQueueStatusForThread,
   beginInferenceTurn,

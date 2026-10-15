@@ -16,8 +16,8 @@ import { ChatConversationMap } from '../aui/ChatConversationMap';
 import { ComposerTriggers } from '../aui/ComposerTriggers';
 import { ContextUsage } from '../aui/ContextUsage';
 import { InterruptedTurnNotice } from '../aui/InterruptedTurnNotice';
-import { ActiveTurnTaskCards, TurnTaskCards, TurnTaskProvider } from '../aui/TurnTaskCards';
 import { MessageArtifactCards } from '../aui/MessageArtifactCards';
+import { ActiveTurnTaskCards, TurnTaskCards, TurnTaskProvider } from '../aui/TurnTaskCards';
 import { ChatSources } from './aui/ChatSources';
 import { ChatToolFallback } from './ChatToolParts';
 
@@ -342,7 +342,10 @@ export function AssistantUiChat({
       AfterMessages,
       // Artifact cards render INSIDE the message that produced them
       // (matched by requestId), not just at the end of the transcript.
-      MessageArtifacts: () => <MessageArtifactCards />,
+      // Pass the component itself: an inline arrow is a new component type
+      // each time this memo recomputes (e.g. when a turn starts or ends), which
+      // remounts every card and replays its fade-in, so the cards flicker.
+      MessageArtifacts: MessageArtifactCards,
       // The web pages the turn fetched, grouped from its `source` parts into
       // one collapsed disclosure under the answer.
       SourceGroup: ChatSources,
