@@ -341,7 +341,10 @@ impl EventHandler<DomainEvent> for DedupCommitSubscriber {
         } = event
         {
             // Settle the run as the agent its flow belongs to (`super::owner`).
-            super::owner::as_owner(&self.config, flow_id, |ctx| {
+            // `FlowRunFinished` carries no tenant: the host's own, and in SaaS
+            // none (the run is then not settled here).
+            let host = crate::core::runtime::DispatchCtx::host_default();
+            super::owner::as_owner(&host, &self.config, flow_id, |ctx| {
                 self.handle_finished(ctx, flow_id, run_id, status)
             })
             .await;

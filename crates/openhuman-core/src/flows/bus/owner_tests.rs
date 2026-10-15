@@ -11,7 +11,7 @@ async fn without_a_backend_every_flow_is_local() {
         workspace_dir: dir.path().to_path_buf(),
         ..Config::default()
     };
-    assert_eq!(flow_owner(&config, "any-flow").await, Ok(None));
+    assert_eq!(flow_owner(&DispatchCtx::unbound(), &config, "any-flow").await, Ok(None));
 }
 
 #[test]

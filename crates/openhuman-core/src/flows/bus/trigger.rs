@@ -125,8 +125,12 @@ impl FlowTriggerSubscriber {
     /// enabled with a `schedule` trigger (it may have been disabled/edited
     /// since the job was registered), and dispatches it with an empty trigger
     /// payload.
-    pub(crate) async fn dispatch_schedule_tick(&self, flow_id: &str) {
-        super::owner::as_owner(&self.config, flow_id, |ctx| {
+    pub(crate) async fn dispatch_schedule_tick(
+        &self,
+        host: &crate::core::runtime::DispatchCtx,
+        flow_id: &str,
+    ) {
+        super::owner::as_owner(host, &self.config, flow_id, |ctx| {
             self.handle_schedule_tick(ctx, flow_id)
         })
         .await
@@ -284,7 +288,7 @@ impl EventHandler<DomainEvent> for FlowTriggerSubscriber {
                 payload,
                 ..
             } => {
-                crate::storage::agents::for_each_live_scope("flows app_event", |ctx| {
+                crate::storage::agents::for_each_live_scope(&host, "flows app_event", |ctx| {
                     self.handle_app_event(ctx, toolkit, trigger, payload)
                 })
                 .await;

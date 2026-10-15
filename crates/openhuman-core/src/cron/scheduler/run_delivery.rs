@@ -132,7 +132,7 @@ impl TriggerSink for HostTriggers {
                             self.binding.config(),
                         ))
                     })
-                    .dispatch_schedule_tick(flow_id)
+                    .dispatch_schedule_tick(&self.binding.dispatch_ctx(), flow_id)
                     .await;
                 #[cfg(not(feature = "flows"))]
                 tracing::warn!(%flow_id, "[cron] built without `flows`; schedule trigger dropped");
