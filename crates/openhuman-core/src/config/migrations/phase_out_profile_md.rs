@@ -88,41 +88,22 @@ pub fn run(workspace_dir: &Path) -> Result<PhaseOutStats> {
     // transcript walk so that a partial run still removes the file.
     stats.profile_md_removed = remove_workspace_profile_md(workspace_dir, &mut stats);
 
-    let raw_root = workspace_dir.join("session_raw");
-    let transcripts = collect_jsonl_transcripts(&raw_root);
-    if transcripts.is_empty() {
+    // The legacy JSONL transcripts are rewritten by TinyAgents' legacy
+    // maintenance walk, which owns that format and its layout (flat and
+    // `DDMMYYYY/` date-grouped). This runs before the boot-time import of
+    // the workspace, so what is imported is already clean.
+    let report = tinyagents_session::legacy::rewrite_legacy_transcripts(
+        workspace_dir,
+        strip_profile_md_in_first_system_message,
+    );
+    stats.scanned = report.scanned;
+    stats.cleaned = report.rewritten;
+    stats.skipped = report.unchanged;
+    stats.errors += report.errors;
+    if report.scanned == 0 {
         log::info!(
-            "[migration:phase-out-profile-md] no transcripts under {} — \
-             continuing to .md sweep",
-            raw_root.display()
+            "[migration:phase-out-profile-md] no legacy transcripts — continuing to .md sweep"
         );
-    }
-
-    for path in transcripts {
-        stats.scanned += 1;
-        match process_transcript(&path) {
-            Ok(true) => {
-                stats.cleaned += 1;
-                log::info!(
-                    "[migration:phase-out-profile-md] cleaned path={}",
-                    path.display()
-                );
-            }
-            Ok(false) => {
-                stats.skipped += 1;
-                log::debug!(
-                    "[migration:phase-out-profile-md] skipped (already clean) path={}",
-                    path.display()
-                );
-            }
-            Err(err) => {
-                stats.errors += 1;
-                log::warn!(
-                    "[migration:phase-out-profile-md] failed path={}: {err:#}",
-                    path.display()
-                );
-            }
-        }
     }
 
     // Sweep stale `.md` companions and legacy-format transcripts that
@@ -259,22 +240,6 @@ fn remove_workspace_profile_md(workspace_dir: &Path, stats: &mut PhaseOutStats) 
     }
 }
 
-/// Process one transcript file. Returns `true` when the file was
-/// rewritten with a cleaned system prompt.
-fn process_transcript(path: &Path) -> Result<bool> {
-    let mut session = transcript::read_transcript(path)
-        .with_context(|| format!("read transcript {}", path.display()))?;
-
-    if !strip_profile_md_in_first_system_message(&mut session) {
-        return Ok(false);
-    }
-
-    transcript::write_transcript(path, &session.messages, &session.meta, None)
-        .with_context(|| format!("rewrite cleaned transcript {}", path.display()))?;
-
-    Ok(true)
-}
-
 /// Strip a `### PROFILE.md` block from the first system message of a
 /// transcript. Returns `true` when the message was mutated.
 pub(super) fn strip_profile_md_in_first_system_message(session: &mut SessionTranscript) -> bool {
@@ -367,27 +332,6 @@ fn is_block_boundary(line: &str) -> bool {
         || trimmed == "<!--/MSG-->"
 }
 
-/// Collect every `*.jsonl` under `session_raw/` (flat) and its legacy
-/// `DDMMYYYY/` subdirectories. Returns empty when the root does not
-/// exist. Directory-iteration errors are swallowed — the migration
-/// should never abort startup on a single unreadable directory.
-fn collect_jsonl_transcripts(raw_root: &Path) -> Vec<PathBuf> {
-    let mut paths = Vec::new();
-    if !raw_root.is_dir() {
-        return paths;
-    }
-    push_jsonl_in_dir(raw_root, &mut paths);
-    if let Ok(entries) = fs::read_dir(raw_root) {
-        for entry in entries.flatten() {
-            let sub = entry.path();
-            if sub.is_dir() {
-                push_jsonl_in_dir(&sub, &mut paths);
-            }
-        }
-    }
-    paths.sort();
-    paths
-}
 
 fn push_jsonl_in_dir(dir: &Path, out: &mut Vec<PathBuf>) {
     let Ok(entries) = fs::read_dir(dir) else {
