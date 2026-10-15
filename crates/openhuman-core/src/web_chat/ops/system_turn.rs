@@ -56,6 +56,7 @@ pub async fn run_system_turn_on_thread(
         mut agent,
         fingerprint,
     } = checkout_session_agent(
+        ctx,
         &config,
         SYSTEM_CLIENT_ID,
         thread_id,
@@ -103,7 +104,7 @@ pub async fn run_system_turn_on_thread(
             run_id
         );
     } else {
-        checkin_session_agent_if_vacant(thread_id, agent, fingerprint).await;
+        checkin_session_agent_if_vacant(ctx, thread_id, agent, fingerprint).await;
     }
 
     result
