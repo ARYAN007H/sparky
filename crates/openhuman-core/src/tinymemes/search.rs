@@ -45,7 +45,11 @@ impl OpenHumanSearch {
             name: TOOL.to_string(),
             arguments: json!({ "query": query, "max_results": max_results.clamp(1, 20) }),
         };
-        let response = crate::modules::search::execute_tool(&self.config, request)
+        let response = crate::modules::search::execute_tool(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            &self.config,
+            request,
+        )
             .await
             .map_err(|e| crate::search::tools::user_facing_error(&e))?;
         Ok(response

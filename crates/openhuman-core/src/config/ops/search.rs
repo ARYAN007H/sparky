@@ -295,7 +295,7 @@ pub async fn apply_search_settings(
     apply_search_patch(config, update)?;
     config.save().await.map_err(|e| e.to_string())?;
     #[cfg(feature = "modules")]
-    crate::modules::search::refresh_loaded(config).await?;
+    crate::modules::search::refresh_loaded(&crate::core::runtime::DispatchCtx::ambient(), config).await?;
     tracing::debug!(
         enabled = crate::search::is_active(config),
         providers = ?config.search.enabled_provider_names(),
