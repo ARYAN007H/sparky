@@ -392,12 +392,24 @@ pub struct TurnModelSource {
 pub(crate) struct CrateNativeSource {
     role: String,
     config: Arc<crate::config::Config>,
+    /// The context the source was built under, held weakly (the tenant lease
+    /// is the context's strong count). It supplies the agent-local host model
+    /// overrides every build reads, so a turn resolves them against the agent
+    /// it was built for rather than whichever task happens to build it.
+    core: Option<std::sync::Weak<crate::core::runtime::CoreContext>>,
     /// An explicit provider string for the **primary** model, overriding the
     /// role's default resolution. Set when a producer's effective provider differs
     /// from `provider_for_role(role)` — e.g. triage's #1257 force-managed override
     /// (`build_remote_provider`). `None` builds the primary from `role`. Routes
     /// always use the standard workload tiers.
     primary_override: Option<String>,
+}
+
+impl CrateNativeSource {
+    /// The dispatch context this source builds under.
+    fn ctx(&self) -> crate::core::runtime::DispatchCtx {
+        crate::core::runtime::DispatchCtx::from_weak(self.core.as_ref())
+    }
 }
 
 impl TurnModelSource {
@@ -434,6 +446,7 @@ impl TurnModelSource {
     /// (`crate_native_provider`); the triage path uses
     /// [`new_crate_native_from_string`](Self::new_crate_native_from_string).
     pub(crate) fn new_crate_native(
+        ctx: &crate::core::runtime::DispatchCtx,
         role: impl Into<String>,
         config: Arc<crate::config::Config>,
     ) -> Self {
@@ -443,6 +456,7 @@ impl TurnModelSource {
             crate_native: Some(CrateNativeSource {
                 role: role.into(),
                 config,
+                core: ctx.downgrade(),
                 primary_override: None,
             }),
         }
@@ -454,6 +468,7 @@ impl TurnModelSource {
     /// override (`build_remote_provider` picks the effective string). Routes still
     /// use the standard workload tiers.
     pub(crate) fn new_crate_native_from_string(
+        ctx: &crate::core::runtime::DispatchCtx,
         role: impl Into<String>,
         provider_string: impl Into<String>,
         config: Arc<crate::config::Config>,
@@ -464,6 +479,7 @@ impl TurnModelSource {
             crate_native: Some(CrateNativeSource {
                 role: role.into(),
                 config,
+                core: ctx.downgrade(),
                 primary_override: Some(provider_string.into()),
             }),
         }
@@ -486,7 +502,9 @@ impl TurnModelSource {
         let Some(source) = self.crate_native.as_ref() else {
             return crate::inference::model_context::context_window_for_model(model);
         };
-        if let Some(custom) = source_ctx.host_overrides()
+        if let Some(custom) = source
+            .ctx()
+            .host_overrides()
             .and_then(|local| local.model_for(&source.role))
         {
             return custom
@@ -515,6 +533,7 @@ impl TurnModelSource {
         thread_id: Option<&str>,
     ) -> anyhow::Result<TurnModels> {
         if let Some(source) = &self.crate_native {
+            let source_ctx = source.ctx();
             if let Some(local) = source_ctx.host_overrides() {
                 if let Some(custom) = local.model_for(&source.role) {
                     let mut models = Self::from_model(custom)
@@ -611,6 +630,7 @@ impl TurnModelSource {
                     .to_string()
             };
             return build_turn_models_crate(
+                &cn.ctx(),
                 &cn.role,
                 &cn.config,
                 model,
@@ -653,7 +673,9 @@ impl TurnModelSource {
             });
         }
         if let Some(cn) = &self.crate_native {
-            if let Some(custom) = source_ctx.host_overrides()
+            if let Some(custom) = cn
+                .ctx()
+                .host_overrides()
                 .and_then(|local| {
                     local
                         .model_for("summarization")
@@ -691,6 +713,7 @@ impl TurnModelSource {
             let built = match cn.primary_override.as_deref() {
                 Some(ps) => {
                     crate::inference::provider::factory::create_turn_chat_model_from_string(
+                        &cn.ctx(),
                         &cn.role,
                         ps,
                         &cn.config,
@@ -699,6 +722,7 @@ impl TurnModelSource {
                     )
                 }
                 None => crate::inference::provider::factory::create_turn_chat_model(
+                    &cn.ctx(),
                     &cn.role,
                     &cn.config,
                     model,
