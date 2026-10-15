@@ -180,7 +180,7 @@ impl ModelResolver<()> for TurnModelResolver {
 /// the host turn loop).
 #[allow(clippy::too_many_arguments)]
 fn build_turn_models_crate(
-    ctx: &crate::core::runtime::DispatchCtx,
+    ctx: &DispatchCtx,
     role: &str,
     config: &crate::config::Config,
     model: &str,
@@ -390,8 +390,7 @@ pub struct TurnModelSource {
 pub(crate) struct CrateNativeSource {
     role: String,
     config: Arc<crate::config::Config>,
-    /// The context the source was built under (weak: the tenant lease is its
-    /// strong count); it supplies the host model overrides every build reads.
+    /// Built-under context (weak: it is the tenant lease); supplies host model overrides.
     core: Option<std::sync::Weak<crate::core::runtime::CoreContext>>,
     /// An explicit provider string for the **primary** model, overriding the
     /// role's default resolution. Set when a producer's effective provider differs
@@ -401,19 +400,18 @@ pub(crate) struct CrateNativeSource {
     primary_override: Option<String>,
 }
 
+use crate::core::runtime::DispatchCtx;
+
 impl CrateNativeSource {
-    fn ctx(&self) -> crate::core::runtime::DispatchCtx {
-        crate::core::runtime::DispatchCtx::from_weak(self.core.as_ref())
+    fn ctx(&self) -> DispatchCtx {
+        DispatchCtx::from_weak(self.core.as_ref())
     }
 }
 
 impl TurnModelSource {
     /// The context this source builds under: its own, else the ambient one.
-    pub(crate) fn dispatch_ctx(&self) -> crate::core::runtime::DispatchCtx {
-        match &self.crate_native {
-            Some(source) => source.ctx(),
-            None => crate::core::runtime::DispatchCtx::ambient(),
-        }
+    pub(crate) fn dispatch_ctx(&self) -> DispatchCtx {
+        (self.crate_native.as_ref()).map_or_else(DispatchCtx::ambient, CrateNativeSource::ctx)
     }
 
     /// Use an already-constructed TinyAgents model as the complete turn model
@@ -449,7 +447,7 @@ impl TurnModelSource {
     /// (`crate_native_provider`); the triage path uses
     /// [`new_crate_native_from_string`](Self::new_crate_native_from_string).
     pub(crate) fn new_crate_native(
-        ctx: &crate::core::runtime::DispatchCtx,
+        ctx: &DispatchCtx,
         role: impl Into<String>,
         config: Arc<crate::config::Config>,
     ) -> Self {
@@ -471,7 +469,7 @@ impl TurnModelSource {
     /// override (`build_remote_provider` picks the effective string). Routes still
     /// use the standard workload tiers.
     pub(crate) fn new_crate_native_from_string(
-        ctx: &crate::core::runtime::DispatchCtx,
+        ctx: &DispatchCtx,
         role: impl Into<String>,
         provider_string: impl Into<String>,
         config: Arc<crate::config::Config>,
