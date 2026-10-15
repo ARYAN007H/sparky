@@ -64,8 +64,9 @@ fn a_legacy_workspace_is_adopted_once_and_the_next_process_resumes_in_place() {
             let sess = host.session.clone().unwrap();
             let t = tree(root.path(), &thread, &host);
             eprintln!("DBGX tree keys={:?}", t.keys().collect::<Vec<_>>());
-            eprintln!("DBGX adopt={:?}", l.adopt_legacy(&sess, &thread, &l.thread_transcripts(&thread, None).unwrap().roots[0].transcript.read_session().unwrap().unwrap().meta).map(|a| a.map(|x| x.messages)));
-            assert!(host.resume_bound_session().await.expect("first resume"));
+            let r = host.resume_bound_session().await;
+            eprintln!("DBGX resume={:?} exists_after={} tree={:?}", r.as_ref().ok(), l.session_exists(&sess), tree(root.path(), &thread, &host).keys().collect::<Vec<_>>());
+            assert!(r.expect("first resume"));
             legacy_only = BTreeMap::<String, Value>::new();
             after_first = tree(root.path(), &thread, &host);
         }
