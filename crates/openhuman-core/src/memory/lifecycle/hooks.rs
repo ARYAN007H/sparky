@@ -188,6 +188,7 @@ pub struct PreTurnInput {
 /// The work is spawned, so a timed-out log still completes in the
 /// background; only its pack is dropped.
 pub async fn pre_turn(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     identity: &ResolvedIdentity,
     input: PreTurnInput,
@@ -213,7 +214,7 @@ pub async fn pre_turn(
         }
     };
     if let Some(pack) = &pack {
-        crate::memory::tools::record_pack_citations(&thread, pack.citations.clone());
+        crate::memory::tools::record_pack_citations(ctx, &thread, pack.citations.clone());
     }
     tracing::debug!(thread_id = %thread, %agent_id, injected = pack.is_some(), tokens = pack.as_ref().map_or(0, |pack| pack.tokens), refs = pack.as_ref().map_or(0, |pack| pack.refs.len()), elapsed_ms = started.elapsed().as_millis() as u64, "[memory:hooks] pre_turn");
     pack
