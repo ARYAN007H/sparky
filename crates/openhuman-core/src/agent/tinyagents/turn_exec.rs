@@ -670,6 +670,7 @@ async fn drive_turn(
         &tool_outcome_sink,
         resolved_route,
         request_base_len,
+        &run_context.dispatch_ctx(),
     )
     .await)
 }

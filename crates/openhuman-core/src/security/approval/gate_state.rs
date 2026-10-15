@@ -1,3 +1,5 @@
+use crate::core::runtime::DispatchCtx;
+
 impl ApprovalGate {
     /// Write the *terminal* status of a tool call onto its approval
     /// audit row — see [`store::record_execution`] for semantics.
