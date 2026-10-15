@@ -155,11 +155,16 @@ impl ApprovalGate {
 
     /// Deny every undecided request `agent` parked, resolving its waiters.
     /// Returns how many rows were denied.
-    pub fn deny_all_for_agent(&self, agent: &str, resolution: &str) -> anyhow::Result<usize> {
+    pub fn deny_all_for_agent(
+        &self,
+        ctx: &DispatchCtx,
+        agent: &str,
+        resolution: &str,
+    ) -> anyhow::Result<usize> {
         if !store::exists(&self.config) {
             return Ok(0);
         }
-        let rows = store::list_pending_for_agent(&self.config, Some(agent))?;
+        let rows = store::list_pending_for_agent(ctx, &self.config, Some(agent))?;
         let mut denied = 0;
         for row in rows {
             let Some(decided) =
@@ -248,9 +253,10 @@ impl ApprovalGate {
     /// process's own rows.
     pub fn list_pending_for_agent(
         &self,
+        ctx: &DispatchCtx,
         agent: Option<&str>,
     ) -> anyhow::Result<Vec<PendingApproval>> {
-        store::list_pending_for_agent(&self.config, agent)
+        store::list_pending_for_agent(ctx, &self.config, agent)
     }
 
     /// List recently decided rows for durable audit views.
