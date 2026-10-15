@@ -344,10 +344,9 @@ impl SpawnAsyncSubagentTool {
                 .await;
         }
 
-        // Steering channel + status channel so the parent can `steer_subagent`
-        // this run mid-flight and `wait_subagent` for its result. The engine
-        // drains `steer_queue` at iteration boundaries; `status_tx` publishes
-        // the terminal state to any waiter.
+        // Steering + status channels so the parent can `steer_subagent` this run
+        // mid-flight and `wait_subagent` for its result: the engine drains `steer_queue`
+        // at iteration boundaries; `status_tx` publishes the terminal state.
         let steer_queue = Arc::new(RunQueue::new());
         let task_queue = steer_queue.clone();
         let (status_tx, status_rx) = running_subagents::status_channel();
@@ -442,12 +441,10 @@ impl SpawnAsyncSubagentTool {
                                         err
                                     );
                                 }
-                                // A workflow proposal produced inside the child's tool
-                                // history is durable state, not prose: persist it into
-                                // the parent chat thread (survives reload / reconnect —
-                                // the old socket-only delivery could silently drop it)
-                                // and carry the full payload in the delivery notice so
-                                // the follow-up turn can present it faithfully.
+                                // A workflow proposal from the child's tool history is
+                                // durable state, not prose: persist it into the parent chat
+                                // thread (survives reload / reconnect) and carry the full
+                                // payload in the delivery notice for the follow-up turn.
                                 let delivery_summary = attach_workflow_proposal(
                                     &background_workspace_dir,
                                     background_parent_thread_id.as_deref(),
@@ -633,11 +630,9 @@ impl SpawnAsyncSubagentTool {
                                         err
                                     );
                                 }
-                                // #4896: a detached child that pauses for input won't
-                                // continue on its own — queue a framed notice so the
-                                // parent chat learns the delegated task needs input,
-                                // instead of finalizing silently on "Accepted". Rides the
-                                // same idle-gated background_delivery path as a success.
+                                // #4896: a detached child that pauses for input won't continue
+                                // on its own — queue a framed notice so the parent chat learns it
+                                // needs input, not "Accepted". Same idle-gated path as a success.
                                 completion_target
                                     .awaiting_input(
                                         &outcome.task_id,
