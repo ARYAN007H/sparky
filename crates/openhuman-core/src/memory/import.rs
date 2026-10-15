@@ -190,7 +190,7 @@ pub(crate) fn scheduler_paused() -> bool {
 
 /// Resumes an import the app quit in the middle of, if there is one, under
 /// the scheduler's pause. Called from memory's background job.
-pub async fn resume_interrupted(config: &Config) -> bool {
+pub async fn resume_interrupted(ctx: &crate::core::runtime::DispatchCtx, config: &Config) -> bool {
     // A credits pause resumes on its own only while memory work is free
     // (`billing::free_period_active`). The backend is asked only when such a
     // pause is waiting on it.
@@ -234,9 +234,9 @@ pub(crate) async fn resume_interrupted_with(
     }
     let retrying = file.state.phase == ImportPhase::Running && file.retrying;
     let resumed = if retrying {
-        launch(config, Mode::ResumeRetry, true, Some(paused)).await
+        launch(ctx, config, Mode::ResumeRetry, true, Some(paused)).await
     } else {
-        launch(config, Mode::Import, true, Some(paused)).await
+        launch(ctx, config, Mode::Import, true, Some(paused)).await
     };
     match resumed {
         Ok(state) => {
@@ -272,14 +272,14 @@ pub(crate) async fn resume_interrupted_with(
 }
 
 /// `memory_import_start`: requires `consent`, memory on, and a legacy store.
-pub async fn start(config: &Config, consent: bool) -> MemoryResult<ImportState> {
-    launch(config, Mode::Import, consent, None).await
+pub async fn start(ctx: &crate::core::runtime::DispatchCtx, config: &Config, consent: bool) -> MemoryResult<ImportState> {
+    launch(ctx, config, Mode::Import, consent, None).await
 }
 
 /// `memory_import_retry_failed`: stores again the items a finished import
 /// skipped because the engine refused them.
-pub async fn retry_failed(config: &Config) -> MemoryResult<ImportState> {
-    launch(config, Mode::Retry, true, None).await
+pub async fn retry_failed(ctx: &crate::core::runtime::DispatchCtx, config: &Config) -> MemoryResult<ImportState> {
+    launch(ctx, config, Mode::Retry, true, None).await
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -291,6 +291,7 @@ enum Mode {
 
 /// Claims the workspace, begins the run on the module's driver and spawns it.
 async fn launch(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     mode: Mode,
     consent: bool,
@@ -325,7 +326,7 @@ async fn launch(
     let driver = importer(config, bound.engine, consent, paused);
     let begin = {
         let driver = driver.clone();
-        crate::core::runtime::DispatchCtx::ambient().spawn_blocking(move || match mode {
+        ctx.spawn_blocking(move || match mode {
             Mode::Import => driver.begin(),
             Mode::Retry => driver.begin_retry(),
             Mode::ResumeRetry => Ok(driver.begin_retry_resume()),
@@ -350,7 +351,7 @@ async fn launch(
         "[memory:import] run started"
     );
     let config = config.clone();
-    crate::core::runtime::DispatchCtx::ambient().spawn(async move {
+    ctx.spawn(async move {
         if mode == Mode::Import {
             driver.run(begun).await;
         } else {
