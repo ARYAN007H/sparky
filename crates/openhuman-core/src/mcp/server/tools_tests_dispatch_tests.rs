@@ -88,3 +88,53 @@ async fn call_tool_validates_memory_arguments_before_dispatch() {
         std::env::remove_var("OPENHUMAN_WORKSPACE");
     }
 }
+
+/// The policy a tool call is judged by comes from the context handed to
+/// `call_tool`, not from whichever context the task happens to be scoped to,
+/// and two sessions running side by side never see each other's.
+#[tokio::test]
+async fn call_tool_judges_the_policy_of_the_explicit_context_across_scopes() {
+    use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
+    use crate::security::AutonomyLevel;
+    use std::sync::Arc;
+
+    let tmp_deny = tempfile::tempdir().expect("tempdir");
+    let tmp_allow = tempfile::tempdir().expect("tempdir");
+    let mut denying = crate::config::Config::default();
+    denying.workspace_dir = tmp_deny.path().to_path_buf();
+    denying.action_dir = tmp_deny.path().to_path_buf();
+    denying.autonomy.enabled = true;
+    denying.autonomy.level = AutonomyLevel::ReadOnly;
+    let mut allowing = crate::config::Config::default();
+    allowing.workspace_dir = tmp_allow.path().to_path_buf();
+    allowing.action_dir = tmp_allow.path().to_path_buf();
+    let deny_core = CoreContext::for_test_with_config(DomainSet::full(), denying);
+    let allow_core = CoreContext::for_test_with_config(DomainSet::full(), allowing);
+
+    let args = json!({ "agent_id": "no-such-agent", "prompt": "hello" });
+    // Each call runs scoped to the *other* context, so an ambient read would
+    // answer the wrong policy.
+    let denied = CoreContext::scope(Arc::clone(&allow_core), {
+        let ctx = DispatchCtx::new(Arc::clone(&deny_core));
+        let args = args.clone();
+        async move { call_tool(&ctx, "agent.run_subagent", args, "mcp:test").await }
+    });
+    let allowed = CoreContext::scope(Arc::clone(&deny_core), {
+        let ctx = DispatchCtx::new(Arc::clone(&allow_core));
+        async move { call_tool(&ctx, "agent.run_subagent", args, "mcp:test").await }
+    });
+    let (denied, allowed) = tokio::join!(denied, allowed);
+
+    let denied = denied.expect_err("read-only context must refuse an act tool");
+    let allowed = allowed.expect_err("unknown agent still fails, but not on policy");
+    assert!(
+        !denied.message().contains("no-such-agent"),
+        "policy must refuse before the agent is built: {}",
+        denied.message()
+    );
+    assert!(
+        allowed.message().contains("no-such-agent"),
+        "the permissive context reaches agent construction: {}",
+        allowed.message()
+    );
+}
