@@ -81,20 +81,29 @@ async fn without_a_store_transcripts_come_from_the_workspace_store_not_files() {
     let meta = tinyagents_session::transcript::TranscriptMeta {
         agent_name: "u1".into(),
         agent_id: Some("u1".into()),
+        agent_type: Some("test".into()),
+        dispatcher: "native".into(),
+        provider: None,
+        model: None,
+        created: "2026-10-15T00:00:00Z".into(),
+        updated: "2026-10-15T00:00:00Z".into(),
+        turn_count: 0,
+        prefix_message_count: None,
+        input_tokens: 0,
+        output_tokens: 0,
+        cached_input_tokens: 0,
+        charged_amount_usd: 0.0,
         thread_id: Some("t1".into()),
-        ..Default::default()
+        task_id: None,
+        session_id: None,
+        parent_session_id: None,
     };
     let history = locator
         .open_stem(&tinyagents_session::transcript::session_stem(&session), meta)
         .expect("open the session's write handle");
     history
-        .append_turn(
-            &[],
-            &[tinyagents_session::transcript::TranscriptMessage::user("hi")],
-            None,
-            None,
-        )
-        .expect("append a turn");
+        .append(tinyagents_session::transcript::TranscriptMessage::user("hi"))
+        .expect("append a message");
     assert!(transcripts_or_files("u1", dir).session_exists(&session));
     assert!(
         dir.join(tinyagents_session::port::STORE_DIR).is_dir(),
