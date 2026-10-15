@@ -335,6 +335,7 @@ pub(crate) async fn run_chat_task(
     #[cfg(feature = "tinymemes")]
     if let Ok(ref mut task_result) = result {
         crate::tinymemes::remix_task_reply(
+            ctx,
             &config,
             thread_id,
             request_id,
