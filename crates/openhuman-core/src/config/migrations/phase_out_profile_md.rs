@@ -271,7 +271,7 @@ pub(super) fn strip_profile_md_in_first_system_message(session: &mut SessionTran
 ///   the new `.md` companion format ([`render_markdown`]).
 /// - `## [` — the next-message header in a `.md` companion.
 /// - `<!--/MSG-->` — the close tag in the legacy HTML-comment `.md`
-///   format read by [`transcript::read_transcript_legacy_md`].
+///   format read by `tinyagents_session::transcript::read_transcript_legacy_md`.
 ///
 /// The extra boundaries make the same function safe to apply to either
 /// a raw system-prompt string or a `.md` transcript body, without
