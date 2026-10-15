@@ -76,3 +76,67 @@ fn appends_follow_up_prompt_to_existing_worker_thread() {
     assert_eq!(messages[1].content, "Follow-up prompt");
     let _ = std::fs::remove_dir_all(dir);
 }
+
+fn profile_ctx(name: &str, workspace: &std::path::Path) -> crate::core::runtime::DispatchCtx {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+    let config = crate::config::Config {
+        workspace_dir: workspace.to_path_buf(),
+        ..crate::config::Config::default()
+    };
+    DispatchCtx::new(
+        CoreContext::for_test(DomainSet::full(), None).derive_with(
+            ContextOverlay::new(
+                config,
+                DomainSet::kernel(),
+                crate::tools::toolpacks::ToolGroups::none(),
+            )
+            .profile(name)
+            .session_agent(name),
+        ),
+    )
+}
+
+#[tokio::test]
+async fn worker_threads_follow_the_explicit_context_across_awaits() {
+    let _guard = crate::config::TEST_ENV_LOCK.lock().await;
+    let tmp = |tag: &str| {
+        let dir = std::env::temp_dir().join(format!("wt-ctx-{tag}-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    };
+    let (dir_a, dir_b) = (tmp("a"), tmp("b"));
+    let alice = profile_ctx(
+        &format!("u-alice-{}", uuid::Uuid::new_v4().simple()),
+        &dir_a,
+    );
+    let bob = profile_ctx(&format!("u-bob-{}", uuid::Uuid::new_v4().simple()), &dir_b);
+
+    // No ambient scope here: each call acts under the context it was handed,
+    // including after the task has yielded.
+    let id_a = create_worker_thread(
+        &alice,
+        dir_a.clone(),
+        "parent",
+        "researcher",
+        "A",
+        "A prompt",
+    )
+    .unwrap();
+    tokio::task::yield_now().await;
+    let id_b =
+        create_worker_thread(&bob, dir_b.clone(), "parent", "researcher", "B", "B prompt").unwrap();
+
+    let ids = |ctx: &crate::core::runtime::DispatchCtx, dir: &std::path::Path| -> Vec<String> {
+        conversations::list_threads(ctx, dir.to_path_buf())
+            .unwrap()
+            .into_iter()
+            .map(|t| t.id)
+            .collect()
+    };
+    assert!(ids(&alice, &dir_a).contains(&id_a));
+    assert!(!ids(&alice, &dir_a).contains(&id_b));
+    assert!(ids(&bob, &dir_b).contains(&id_b));
+    assert!(!ids(&bob, &dir_b).contains(&id_a));
+    let _ = std::fs::remove_dir_all(dir_a);
+    let _ = std::fs::remove_dir_all(dir_b);
+}
