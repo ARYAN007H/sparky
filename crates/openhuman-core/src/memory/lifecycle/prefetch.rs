@@ -171,7 +171,7 @@ pub(crate) fn pre_turn(
                     if let Some(channel) = channel {
                         let workspace = config.workspace_dir.clone();
                         let thread = input.thread_id.clone();
-                        let _ = crate::core::runtime::DispatchCtx::ambient().spawn_blocking(move || {
+                        let _ = dispatch.spawn_blocking(move || {
                             crate::memory::channels::record(&workspace, &channel, &thread)
                         })
                         .await;
