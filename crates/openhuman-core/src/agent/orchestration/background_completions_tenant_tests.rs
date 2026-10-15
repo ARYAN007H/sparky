@@ -118,3 +118,64 @@ fn a_saas_cancel_reaches_only_the_callers_workspace() {
         _ => panic!("a scoped SaaS caller reaches its own workspace"),
     }
 }
+
+/// The explicit context decides, with no ambient scope anywhere: two profiles
+/// recording and resolving the same thread id concurrently, across awaits and
+/// from spawned tasks, never see each other's state.
+#[tokio::test]
+async fn the_explicit_context_keys_completions_without_any_ambient_scope() {
+    let _guard = crate::config::TEST_ENV_LOCK.lock().await;
+    let (ws_a, ws_b) = (TestWorkspace::new(), TestWorkspace::new());
+    let alice = DispatchCtx::new(profile("x-alice", ws_a.path()));
+    let bob = DispatchCtx::new(profile("x-bob", ws_b.path()));
+
+    let record_for = |ctx: DispatchCtx, ws: std::path::PathBuf, task: &'static str| async move {
+        // Yield between the steps: nothing may lean on a task-local scope.
+        tokio::task::yield_now().await;
+        record_completion(
+            &ctx,
+            &ws,
+            "sess-x",
+            task,
+            "researcher",
+            "done",
+            Some("t-x".into()),
+        )
+        .await;
+        tokio::task::yield_now().await;
+        workspace_for_thread(&ctx, "t-x")
+    };
+    let spawned = tokio::spawn(record_for(
+        alice.clone(),
+        ws_a.path().to_path_buf(),
+        "x-alice-1",
+    ));
+    let (bobs, alices) = (
+        record_for(bob.clone(), ws_b.path().to_path_buf(), "x-bob-1").await,
+        spawned.await.expect("alice's task ran"),
+    );
+
+    assert_eq!(alices.as_deref(), Some(ws_a.path()));
+    assert_eq!(bobs.as_deref(), Some(ws_b.path()));
+    assert_eq!(
+        thread_for_session(&alice, "sess-x").as_deref(),
+        Some("t-x"),
+        "the session index is alice's own"
+    );
+    // A stop through one context gates only that profile's `t-x`.
+    discard_pending_for_thread(&alice, "t-x");
+    assert!(
+        pending_for(ws_a.path(), "t-x").is_empty(),
+        "alice's stop withdraws her queue"
+    );
+    assert_eq!(
+        pending_for(ws_b.path(), "t-x")
+            .into_iter()
+            .map(|r| r.task_id)
+            .collect::<Vec<_>>(),
+        ["x-bob-1"],
+        "bob's thread of the same id is untouched"
+    );
+    resume_stopped_thread(&alice, "t-x");
+    discard_for_thread(&bob, ws_b.path(), "t-x");
+}

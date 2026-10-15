@@ -597,3 +597,58 @@ async fn desktop_public_controls_remain_available_without_parent_scope() {
         Some(true)
     );
 }
+
+/// The explicit context decides, with no task scope anywhere: a worker is
+/// reachable through its own profile's context and refused through another's,
+/// across awaits, from spawned tasks and concurrently.
+#[tokio::test]
+async fn saas_controls_follow_the_explicit_context_not_the_tasks_scope() {
+    if !child(
+        "saas_controls_follow_the_explicit_context_not_the_tasks_scope",
+        Mode::Saas,
+    ) {
+        return;
+    }
+    let pair = Pair::new();
+    let alice = DispatchCtx::new(pair.alice.clone());
+    let bob = DispatchCtx::new(pair.bob.clone());
+    let (a_task, b_task) = (pair.a.task.clone(), pair.b.task.clone());
+
+    // Not a single `CoreContext::scope` here: with the ambient reader the
+    // task would be unscoped, which fails closed in SaaS.
+    assert!(resume_ref_for_task(&alice, &a_task, PARENT).is_ok());
+    assert!(matches!(
+        resume_ref_for_task(&bob, &a_task, PARENT),
+        Err(WaitError::NotOwned)
+    ));
+    assert!(cancel_by_task(&bob, &a_task).is_none());
+    assert_eq!(
+        steer_control(&bob, &a_task, "x".into(), QueueLane::Steer).await,
+        Err(SteerError::NotOwned)
+    );
+    assert_eq!(pair.a.queue.status().await.steers, 0);
+    assert!(snapshot_for_parent(&bob, PARENT)
+        .iter()
+        .all(|worker| worker.task_id != a_task));
+
+    // Concurrent, across awaits, and from spawned tasks: each carries its own.
+    let spawned = |ctx: DispatchCtx, task: String| {
+        tokio::spawn(async move {
+            tokio::task::yield_now().await;
+            let own = resume_ref_for_task(&ctx, &task, PARENT).is_ok();
+            tokio::task::yield_now().await;
+            let foreign = cancel_by_task(&ctx, &task).is_some();
+            (own, foreign)
+        })
+    };
+    let (a_side, b_side) = tokio::join!(
+        spawned(alice.clone(), a_task.clone()),
+        spawned(bob.clone(), b_task.clone())
+    );
+    assert_eq!(a_side.unwrap(), (true, true), "alice reaches her own worker");
+    assert_eq!(b_side.unwrap(), (true, true), "bob reaches his own worker");
+    assert!(
+        cancel_by_task(&alice, &b_task).is_none(),
+        "and each cancel removed only that profile's worker"
+    );
+}
