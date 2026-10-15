@@ -199,6 +199,7 @@ pub async fn resume_interrupted(ctx: &crate::core::runtime::DispatchCtx, config:
         && file.paused_for_credits
         && super::billing::free_period_active(config).await;
     resume_interrupted_with(
+        ctx,
         config,
         Arc::new(scheduler_paused),
         Arc::new(move |_: &Config| free),
@@ -215,6 +216,7 @@ pub async fn resume_interrupted(ctx: &crate::core::runtime::DispatchCtx, config:
 /// that cannot start is persisted as stopped, so a failure that would recur
 /// does not loop. Returns whether a run was started.
 pub(crate) async fn resume_interrupted_with(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     paused: PauseCheck,
     billing: BillingCheck,
