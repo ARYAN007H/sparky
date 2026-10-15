@@ -111,3 +111,34 @@ pub(crate) fn append_worker_user_message(
 #[cfg(test)]
 #[path = "worker_thread_tests.rs"]
 mod tests;
+
+/// Appends a reused sub-agent's follow-up prompt to its worker thread. A
+/// failure is logged and does not fail the spawn. `ids` is the parent thread
+/// and the sub-agent session, for the log line.
+pub(crate) fn append_reuse_follow_up(
+    ctx: &DispatchCtx,
+    workspace_dir: PathBuf,
+    worker_thread_id: &str,
+    agent_id: &str,
+    task_id: &str,
+    prompt: &str,
+    ids: (Option<&str>, &str),
+) {
+    if let Err(err) = append_worker_user_message(
+        ctx,
+        workspace_dir,
+        worker_thread_id,
+        agent_id,
+        task_id,
+        prompt,
+    ) {
+        log::warn!(
+            "[subagent_reuse] worker follow-up append failed parent_thread_id={} subagent_session_id={} worker_thread_id={} task_id={} error={}",
+            ids.0.unwrap_or("none"),
+            ids.1,
+            worker_thread_id,
+            task_id,
+            err
+        );
+    }
+}

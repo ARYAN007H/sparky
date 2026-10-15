@@ -260,23 +260,15 @@ impl SpawnAsyncSubagentTool {
             (reusable.as_ref(), worker_thread_id.as_ref())
         {
             if session.worker_thread_id.as_deref() == Some(worker_thread_id.as_str()) {
-                if let Err(err) = super::worker_thread::append_worker_user_message(
+                super::worker_thread::append_reuse_follow_up(
                     &dispatch,
                     parent.workspace_dir.clone(),
                     worker_thread_id,
                     &definition.id,
                     &task_id,
                     &follow_up_prompt,
-                ) {
-                    log::warn!(
-                        "[subagent_reuse] worker follow-up append failed parent_thread_id={} subagent_session_id={} worker_thread_id={} task_id={} error={}",
-                        parent_thread_id.as_deref().unwrap_or("none"),
-                        session.subagent_session_id,
-                        worker_thread_id,
-                        task_id,
-                        err
-                    );
-                }
+                    (parent_thread_id.as_deref(), &session.subagent_session_id),
+                );
             }
         }
         let durable_session = match subagent_sessions::upsert_running(
