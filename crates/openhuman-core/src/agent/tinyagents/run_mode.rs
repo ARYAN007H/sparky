@@ -35,8 +35,8 @@ fn registry(ctx: &DispatchCtx) -> Arc<RunModeRegistry> {
 /// [`RunMode::Build`]) if none exists yet. Cloning a `RunModeHandle` shares
 /// the same underlying atomic, so every clone (a live turn's middleware, this
 /// registry's own copy, a later RPC call) observes the same live value.
-pub fn handle_for_thread(thread_id: &str) -> RunModeHandle {
-    let registry = registry();
+pub fn handle_for_thread(ctx: &DispatchCtx, thread_id: &str) -> RunModeHandle {
+    let registry = registry(ctx);
     let mut map = registry.lock();
     map.entry(thread_id.to_string())
         .or_insert_with(|| RunModeHandle::new(RunMode::Build))
@@ -45,8 +45,8 @@ pub fn handle_for_thread(thread_id: &str) -> RunModeHandle {
 
 /// Returns the current mode for `thread_id` without creating a handle —
 /// `Build` (the default) when the thread has never toggled plan mode.
-pub fn get_mode(thread_id: &str) -> RunMode {
-    registry()
+pub fn get_mode(ctx: &DispatchCtx, thread_id: &str) -> RunMode {
+    registry(ctx)
         .lock()
         .get(thread_id)
         .map(|h| h.get())
@@ -196,7 +196,7 @@ struct ThreadIdParams {
     thread_id: String,
 }
 
-fn handle_set_run_mode(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_set_run_mode(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = parse::<ThreadModeParams>(params)?;
         let Some(mode) = parse_mode_label(&p.mode) else {
@@ -207,15 +207,15 @@ fn handle_set_run_mode(_ctx: DispatchCtx, params: Map<String, Value>) -> Control
             mode = %p.mode,
             "[rpc][agent] set_run_mode entry"
         );
-        set_mode(&p.thread_id, mode);
+        set_mode(&ctx, &p.thread_id, mode);
         Ok(serde_json::json!({ "mode": mode_label(mode) }))
     })
 }
 
-fn handle_get_run_mode(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_get_run_mode(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = parse::<ThreadIdParams>(params)?;
-        let mode = get_mode(&p.thread_id);
+        let mode = get_mode(&ctx, &p.thread_id);
         Ok(serde_json::json!({ "mode": mode_label(mode) }))
     })
 }
