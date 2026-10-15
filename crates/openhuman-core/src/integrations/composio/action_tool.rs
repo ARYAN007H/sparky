@@ -251,7 +251,7 @@ impl Tool for ComposioActionTool {
         context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
         let (config, outcome) = Box::pin(self.execute_unredacted(
-            &DispatchCtx::ambient(),
+            &dispatch_ctx_for_tool(context),
             args,
             sandbox_mode_for_tool(context),
         ))
