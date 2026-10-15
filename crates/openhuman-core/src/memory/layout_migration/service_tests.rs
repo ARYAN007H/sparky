@@ -132,6 +132,7 @@ async fn retry_puts_a_lost_copy_back_in_line() {
     let state = retry(&config).unwrap();
     assert!(!state.caught_up && !state.cleaning);
     assert!(start(
+        &crate::core::runtime::DispatchCtx::ambient(),
         config.clone(),
         host.clone(),
         Trigger::Manual { takeover: false },
