@@ -22,7 +22,6 @@
 //! [`FlowMemoryRecallTool`] only ever reads with a flow tag filter
 //! (`flow:<id>` or `flows`), so it never reaches the user's own memory.
 
-use crate::core::runtime::DispatchCtx;
 use crate::tools::schema_cache::static_schema;
 use std::sync::Arc;
 
