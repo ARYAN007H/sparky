@@ -125,6 +125,22 @@ fn releasing_defaults_lets_the_next_call_open_afresh() {
 }
 
 #[test]
+fn releasing_one_workspace_keeps_the_others_open() {
+    let (mine, other) = (scratch(), scratch());
+    let kept = fallback_provider(other.path());
+    let released = fallback_provider(mine.path());
+    release_workspace(mine.path());
+    assert!(
+        Arc::ptr_eq(&kept, &fallback_provider(other.path())),
+        "another workspace keeps its provider"
+    );
+    assert!(
+        !Arc::ptr_eq(&released, &fallback_provider(mine.path())),
+        "the released workspace opens afresh"
+    );
+}
+
+#[test]
 fn the_workspace_session_stores_are_a_workspace_default_with_nothing_to_recover() {
     let stores = WorkspaceSessionStores;
     assert!(stores.recover().is_ok());

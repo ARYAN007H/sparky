@@ -23,7 +23,7 @@ pub mod ledger_sync;
 mod rebound;
 mod workspace;
 
-pub use rebound::{rebind_all, ReboundSessionStores};
+pub use rebound::{rebind_all, ReboundSessionStores, StoreRegistry};
 pub use workspace::{
     artifact_blobs_for, attachment_stash_for, current_documents_for, default_turn_states_for,
     ledger_for, provider_for_workspace, release_workspace, release_workspace_defaults, require_ledger,
