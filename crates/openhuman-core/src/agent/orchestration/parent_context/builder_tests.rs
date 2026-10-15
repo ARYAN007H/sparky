@@ -58,12 +58,13 @@ async fn with_root_parent_uses_an_explicit_parent_override() {
 #[tokio::test]
 async fn concurrent_root_parents_do_not_cross() {
     let (_dir, config) = test_config();
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
     let (a, b) = tokio::join!(
-        with_root_parent(&crate::core::runtime::DispatchCtx::ambient(), None, &config, "surface_a", "a", "a", |parent| async move {
+        with_root_parent(&ctx, None, &config, "surface_a", "a", "a", |parent| async move {
             tokio::task::yield_now().await;
             parent.agent_definition_id
         }),
-        with_root_parent(&crate::core::runtime::DispatchCtx::ambient(), None, &config, "surface_b", "b", "b", |parent| async move {
+        with_root_parent(&ctx, None, &config, "surface_b", "b", "b", |parent| async move {
             tokio::task::yield_now().await;
             parent.agent_definition_id
         }),

@@ -21,7 +21,7 @@ fn build_remote_provider_managed_uses_backend_id_and_default_model() {
     // Default config → chat workload resolves to the managed backend →
     // the managed default model.
     let config = test_config();
-    let resolved = build_remote_provider(&config).expect("remote provider should build");
+    let resolved = build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config).expect("remote provider should build");
     assert_eq!(resolved.provider_name, INFERENCE_BACKEND_ID);
     assert_eq!(resolved.model, crate::config::MODEL_MANAGED_DEFAULT);
     assert!(!resolved.used_local, "used_local is always false");
@@ -33,12 +33,12 @@ fn build_remote_provider_managed_follows_the_pinned_default_model() {
     // slug in `default_model` is not a pin, a catalog id is.
     let mut config = test_config();
     config.default_model = Some("reasoning-v1".to_string());
-    let resolved = build_remote_provider(&config).expect("remote provider should build");
+    let resolved = build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config).expect("remote provider should build");
     assert_eq!(resolved.provider_name, INFERENCE_BACKEND_ID);
     assert_eq!(resolved.model, crate::config::MODEL_MANAGED_DEFAULT);
 
     config.default_model = Some("openrouter/deepseek/deepseek-v4-pro".to_string());
-    let resolved = build_remote_provider(&config).expect("remote provider should build");
+    let resolved = build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config).expect("remote provider should build");
     assert_eq!(resolved.model, "openrouter/deepseek/deepseek-v4-pro");
     assert!(!resolved.used_local);
 }
@@ -50,7 +50,7 @@ fn build_remote_provider_falls_back_to_managed_when_chat_local() {
     // never errors because Ollama is down.
     let mut config = test_config();
     config.chat_provider = Some("ollama:llama3.2:3b".to_string());
-    let resolved = build_remote_provider(&config).expect("remote provider should build");
+    let resolved = build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config).expect("remote provider should build");
     assert_eq!(resolved.provider_name, INFERENCE_BACKEND_ID);
     assert_eq!(resolved.model, crate::config::MODEL_MANAGED_DEFAULT);
     assert!(!resolved.used_local, "triage never goes local");
@@ -68,7 +68,7 @@ fn build_remote_provider_forces_managed_for_local_cli_routes() {
     ] {
         let mut config = test_config();
         config.chat_provider = Some(route.to_string());
-        let resolved = build_remote_provider(&config)
+        let resolved = build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config)
             .unwrap_or_else(|e| panic!("route {route} should build, got {e}"));
         assert_eq!(
             resolved.provider_name, INFERENCE_BACKEND_ID,
@@ -99,7 +99,7 @@ fn build_remote_provider_routes_through_byok_chat() {
     let mut config = test_config();
     config.cloud_providers.push(openai_entry("p_oai", "openai"));
     config.chat_provider = Some("openai:gpt-4o-mini".to_string());
-    let resolved = build_remote_provider(&config).expect("remote provider should build");
+    let resolved = build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config).expect("remote provider should build");
     assert_eq!(resolved.provider_name, "openai");
     assert_eq!(resolved.model, "gpt-4o-mini");
     assert!(!resolved.used_local);
@@ -112,7 +112,7 @@ fn build_remote_provider_falls_back_when_byok_build_fails() {
     // backend rather than erroring the turn.
     let mut config = test_config();
     config.chat_provider = Some("groq:llama3".to_string());
-    let resolved = build_remote_provider(&config).expect("remote provider should build");
+    let resolved = build_remote_provider(&crate::core::runtime::DispatchCtx::ambient(), &config).expect("remote provider should build");
     assert_eq!(resolved.provider_name, INFERENCE_BACKEND_ID);
     assert_eq!(resolved.model, crate::config::MODEL_MANAGED_DEFAULT);
     assert!(!resolved.used_local);
