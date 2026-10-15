@@ -69,9 +69,7 @@ async fn an_off_task_completion_drains_only_its_owners_thread() {
     let (task_a, task_b) = (unique("sub-a"), unique("sub-b"));
 
     for (ctx, ws, task) in [(&alice, &ws_a, &task_a), (&bob, &ws_b, &task_b)] {
-        CoreContext::scope(
-            Arc::clone(ctx),
-            record_completion(
+        record_completion(
                 &DispatchCtx::new(Arc::clone(ctx)),
                 ws.path(),
                 &session,
@@ -79,9 +77,7 @@ async fn an_off_task_completion_drains_only_its_owners_thread() {
                 "r",
                 "done",
                 Some(thread.into()),
-            ),
-        )
-        .await;
+            ).await;
     }
     let resolve = |p: &str| {
         [&alice, &bob]
