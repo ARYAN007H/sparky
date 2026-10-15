@@ -78,3 +78,24 @@ fn unbound_context_carries_no_turn_origin_or_agent_state() {
     assert!(ctx.agent_policy().is_none());
     assert!(!ctx.approvals_disabled());
 }
+
+#[tokio::test]
+async fn host_default_is_the_process_default_whatever_the_task_scope_says() {
+    // `first` makes sure a process default exists; `scoped` is a later context.
+    let _first = CoreContext::for_test(DomainSet::full(), None);
+    let scoped = CoreContext::for_test(DomainSet::full(), None);
+    let default = CoreContext::default_context().expect("a context was built");
+    assert!(!Arc::ptr_eq(&default, &scoped));
+
+    let host = CoreContext::scope(Arc::clone(&scoped), async {
+        // Across an await and inside a spawned task the answer is the same.
+        tokio::task::yield_now().await;
+        let spawned = tokio::spawn(async { DispatchCtx::host_default() })
+            .await
+            .unwrap();
+        assert!(Arc::ptr_eq(spawned.core().unwrap(), &default));
+        DispatchCtx::host_default()
+    })
+    .await;
+    assert!(Arc::ptr_eq(host.core().unwrap(), &default));
+}
