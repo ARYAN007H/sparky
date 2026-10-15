@@ -106,7 +106,8 @@ pub(crate) fn build_channel_turn_parts(
     };
     let (model, provider_name) = match resolve_chat_workload(config) {
         ChatWorkloadResolution::Cloud => {
-            let (_chat, model) = provider::create_chat_model_with_model_id(
+            let (_chat, model) = provider::create_chat_model_with_model_id_in(
+                dispatch,
                 "chat",
                 config,
                 config.default_temperature,
@@ -122,7 +123,8 @@ pub(crate) fn build_channel_turn_parts(
                 slug = %slug,
                 "[channels][startup] chat workload routed to per-workload provider — building dedicated channel provider"
             );
-            let (_chat, model_id) = provider::create_chat_model_with_model_id(
+            let (_chat, model_id) = provider::create_chat_model_with_model_id_in(
+                dispatch,
                 "chat",
                 config,
                 config.default_temperature,

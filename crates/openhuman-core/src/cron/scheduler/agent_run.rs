@@ -93,7 +93,8 @@ pub(super) async fn run_agent_job_for_run(
                         // discarded — `create_chat_model_with_model_id` wraps the
                         // same `create_chat_provider` resolution, so the model id is
                         // identical; temperature is irrelevant to id resolution.
-                        match crate::inference::provider::create_chat_model_with_model_id(
+                        match crate::inference::provider::create_chat_model_with_model_id_in(
+                            ctx,
                             workload,
                             &effective,
                             effective.default_temperature,

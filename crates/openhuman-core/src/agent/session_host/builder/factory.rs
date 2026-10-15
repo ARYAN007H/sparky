@@ -253,7 +253,8 @@ impl OpenHumanSessionHost {
         // the crate registry `FallbackPolicy`, so `config.reliability.*` no longer
         // layers on the turn path (it still governs the non-seam provider paths).
         let (resolved_chat_model, mut model_name) =
-            crate::inference::provider::create_chat_model_with_model_id(
+            crate::inference::provider::create_chat_model_with_model_id_in(
+                ctx,
                 provider_role,
                 config,
                 config.default_temperature,

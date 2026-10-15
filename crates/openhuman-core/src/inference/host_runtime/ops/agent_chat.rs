@@ -628,6 +628,7 @@ pub async fn agent_chat_reply_for(
 
 /// A simplified chat interface that does not update the base configuration.
 pub async fn agent_chat_simple(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     message: &str,
     model_override: Option<String>,
@@ -666,7 +667,8 @@ pub async fn agent_chat_simple(
             .map_err(|e| e.to_string())?;
         (backend, resolved_model)
     } else {
-        providers::create_chat_model_with_model_id(
+        providers::create_chat_model_with_model_id_in(
+            ctx,
             "chat",
             &effective,
             effective.default_temperature,
