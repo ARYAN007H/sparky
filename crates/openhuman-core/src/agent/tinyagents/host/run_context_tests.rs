@@ -656,17 +656,32 @@ fn the_core_rides_the_host_env_and_survives_child_and_detached_child() {
 
     let core = CoreContext::for_test(DomainSet::full(), None);
     let env = crate::agent::turn_env::HostTurnEnv {
-        core: Some(core.clone()),
+        core: Some(Arc::downgrade(&core)),
         ..Default::default()
     };
     let run = OpenHumanRunContext::new().with_host_env(&env);
-    assert!(Arc::ptr_eq(run.core.as_ref().unwrap(), &core));
-    assert!(Arc::ptr_eq(run.child().core.as_ref().unwrap(), &core));
-    assert!(Arc::ptr_eq(
-        run.detached_child().core.as_ref().unwrap(),
-        &core
-    ));
+    let bound = |run: &OpenHumanRunContext| run.core.as_ref().and_then(std::sync::Weak::upgrade);
+    assert!(Arc::ptr_eq(&bound(&run).unwrap(), &core));
+    assert!(Arc::ptr_eq(&bound(&run.child()).unwrap(), &core));
+    assert!(Arc::ptr_eq(&bound(&run.detached_child()).unwrap(), &core));
     // An env with no core leaves the run's own in place.
     let kept = run.with_host_env(&crate::agent::turn_env::HostTurnEnv::default());
-    assert!(Arc::ptr_eq(kept.core.as_ref().unwrap(), &core));
+    assert!(Arc::ptr_eq(&bound(&kept).unwrap(), &core));
+}
+
+#[test]
+fn a_run_kept_past_its_turn_does_not_pin_the_tenant() {
+    use crate::core::runtime::{CoreContext, DomainSet};
+
+    let core = CoreContext::for_test(DomainSet::full(), None);
+    let run = OpenHumanRunContext::new().with_core(Some(core.clone()));
+    let env = crate::agent::turn_env::HostTurnEnv {
+        core: Some(Arc::downgrade(&core)),
+        ..Default::default()
+    };
+    let _kept_run = run.child();
+    let _kept_env = env.clone();
+    // Only the handle in this test holds the context: sessions and runs that
+    // outlive a turn reference it weakly.
+    assert!(!core.tenant_in_use());
 }
