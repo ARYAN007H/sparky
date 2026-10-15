@@ -213,11 +213,11 @@ pub(crate) async fn live_thread_ids(ctx: &DispatchCtx) -> Vec<String> {
 /// calling context's tables, so callers can watch a teardown reach it.
 #[cfg(test)]
 pub(crate) async fn track_parallel_turn_for_test(
-    ctx: &DispatchCtx,
     thread_id: &str,
     request_id: &str,
     cancel: tokio_util::sync::CancellationToken,
 ) {
+    let ctx = &DispatchCtx::ambient();
     let watched = cancel.clone();
     let handle = crate::core::runtime::spawn_scoped(async move { watched.cancelled().await });
     parallel_in_flight().lock_owned().await.insert(
@@ -245,10 +245,10 @@ pub async fn in_flight_entries_for_test() -> Vec<(String, String)> {
 /// status and terminal dispatch paths.
 #[cfg(test)]
 pub async fn drain_queued_turns_for_test(
-    ctx: &DispatchCtx,
     thread_id: &str,
     lane: tinyagents_harness::run_queue::QueueLane,
 ) -> Vec<crate::agent::queued_turn::QueuedTurn> {
+    let ctx = &DispatchCtx::ambient();
     let guard = in_flight().lock_owned().await;
     match guard.get(&key_for(ctx, thread_id)) {
         Some(entry) => entry.run_queue.drain(lane).await,
