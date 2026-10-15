@@ -415,42 +415,11 @@ pub(crate) struct HarnessHostPolicy {
 }
 
 pub(crate) use super::operation_context::{
-    approval_for_tool, dispatch_ctx_for_tool, memory_identity_for_tool, parent_agent_id_for_tool, sandbox_mode_for_tool,
-    HostOperationContext,
+    approval_for_tool, dispatch_ctx_for_tool, memory_identity_for_tool, parent_agent_id_for_tool,
+    sandbox_mode_for_tool, task_recency_window_for_tool, HostOperationContext, OpenHumanRunExt,
 };
 #[cfg(test)]
 pub(crate) use super::operation_context::tool_context_with_approval;
-
-/// OpenHuman product values that tools read from the run through
-/// `ToolExecutionContext::host::<OpenHumanRunExt>()`, installed by
-/// [`OpenHumanRunContext::into_tinyagents`] with `RunContext::with_host`.
-/// It replaces the former per-value task-locals, which do not cross a module
-/// boundary.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct OpenHumanRunExt {
-    /// Recency window narrowing integration task-fetch tools (morning
-    /// briefing only); `None` leaves them unbounded.
-    pub task_recency_window: Option<Duration>,
-}
-
-/// Reads the run's task-recency window from the explicit tool carrier.
-/// Direct tool dispatch (CLI, JSON-RPC, tests) has none.
-pub(crate) fn task_recency_window_for_tool(
-    context: Option<&dyn tinytools::ToolRunContext>,
-) -> Option<Duration> {
-    let window = context
-        .and_then(tinytools::ToolRunContext::host_extension)
-        .and_then(|extension| {
-            extension.downcast_ref::<tinyagents_harness::tool::ToolExecutionContext>()
-        })
-        .and_then(|context| context.host::<OpenHumanRunExt>())
-        .and_then(|ext| ext.task_recency_window);
-    tracing::trace!(
-        has_window = window.is_some(),
-        "[composio][task-window] read run window"
-    );
-    window
-}
 
 impl Default for OpenHumanRunContext {
     fn default() -> Self {
