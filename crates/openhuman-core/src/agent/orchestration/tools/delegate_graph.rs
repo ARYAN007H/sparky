@@ -229,7 +229,7 @@ impl DelegateGraphTool {
             }
         };
 
-        let config = match crate::config::ops::load_current_or_init(&DispatchCtx::ambient()).await {
+        let config = match crate::config::ops::load_current_or_init(&run_context.dispatch_ctx()).await {
             Ok(cfg) => Arc::new(cfg),
             Err(e) => {
                 return Ok(ToolResult::error(format!(

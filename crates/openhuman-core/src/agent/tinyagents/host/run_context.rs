@@ -526,11 +526,12 @@ impl OpenHumanRunContext {
     }
 
     /// The dispatch context this run's readers (config, tenant stores) use:
-    /// the run's own context, else unbound.
+    /// the run's own context, else the calling task's (a run assembled by a
+    /// caller that did not bind one).
     pub fn dispatch_ctx(&self) -> crate::core::runtime::DispatchCtx {
         match &self.core {
             Some(core) => crate::core::runtime::DispatchCtx::new(Arc::clone(core)),
-            None => crate::core::runtime::DispatchCtx::unbound(),
+            None => crate::core::runtime::DispatchCtx::ambient(),
         }
     }
 

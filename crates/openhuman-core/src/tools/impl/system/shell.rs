@@ -4,6 +4,7 @@ use super::shell_support::container_environment;
 use super::shell_support::{command_failure, exec_result, python_utf8_env, tool_timeout_message};
 use crate::agent::host_runtime::RuntimeAdapter;
 use crate::config::Config;
+use crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool;
 use crate::core::runtime::DispatchCtx;
 use crate::security::{AuditLogger, CommandExecutionLog, SecurityPolicy};
 use async_trait::async_trait;

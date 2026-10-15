@@ -27,6 +27,7 @@
 //! #3026 Files panel, and the orchestrator grounding rule in #3029
 //! continue to work without change.
 
+use crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool;
 use crate::core::runtime::DispatchCtx;
 use std::path::PathBuf;
 use std::sync::Arc;
