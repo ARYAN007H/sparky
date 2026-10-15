@@ -9,7 +9,7 @@ use super::background_completions;
 use crate::core::runtime::tenant::{self, Tenant};
 
 /// Sessions with a user turn in flight — delivery defers while busy. Keyed by
-/// [`tenant::profile_key`]: two SaaS profiles can share a session id (desktop: bare id).
+/// [`tenant::profile_key_in`]: two SaaS profiles can share a session id (desktop: bare id).
 ///
 /// Each key holds the ids of the live [`TurnBusy`] guards on it, so a replacement
 /// turn that starts before the one it interrupted has unwound stays busy when

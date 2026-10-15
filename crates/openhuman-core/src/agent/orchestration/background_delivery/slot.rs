@@ -12,7 +12,7 @@ use crate::core::runtime::DispatchCtx;
 /// Dropping it frees both: `release` on an already-settled record is a no-op,
 /// so a settled batch is untouched and an abandoned one is claimable again.
 pub(super) struct DeliverySlot {
-    /// [`tenant::profile_key`] of the thread id.
+    /// [`tenant::profile_key_in`] of the thread id.
     pub(super) key: String,
     router: Arc<CompletionRouter>,
     held: Vec<String>,

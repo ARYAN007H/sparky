@@ -2,7 +2,7 @@
 //! bus subscriber that delivers it.
 //!
 //! The background-completion tables are keyed per profile
-//! (`tenant::profile_key`), but the delivery subscriber
+//! (`tenant::profile_key_in`), but the delivery subscriber
 //! ([`super::background_delivery`]) runs off-task with no `CoreContext` scope,
 //! so in SaaS it cannot read them. [`record_outcome`] runs inside the user's
 //! scope: it notes the profile here under the sub-agent's task id (core-minted,
