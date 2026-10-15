@@ -144,7 +144,7 @@ fn removing_an_agent_releases_everything_it_held() {
                 "a removal barrier is a benign decision miss, not a lost registration"
             );
             for owner in [None, Some("closing")] {
-                assert!(openhuman_core::security::approval::rpc::approval_decide(
+                assert!(openhuman_core::security::approval::rpc::approval_decide(&ctx, 
                     &closing_request.request_id,
                     openhuman_embed::ApprovalDecision::ApproveOnce,
                     owner,

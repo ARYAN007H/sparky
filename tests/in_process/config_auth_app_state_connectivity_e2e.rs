@@ -1,6 +1,7 @@
 //! Focused JSON-RPC E2E coverage for config, auth/credentials, app_state,
 //! and connectivity controller surfaces.
 
+use openhuman_core::core::runtime::DispatchCtx;
 use crate::env_guard::{env_lock, env_lock_async, EnvVarGuard};
 use crate::rpc_auth::ensure_rpc_auth;
 use crate::rpc_harness::{ok, payload, rpc, schema};
@@ -2680,10 +2681,10 @@ async fn config_auto_approve_public_helper_persists_once_and_is_idempotent() {
         EnvVarGuard::unset(APP_ENV_VAR),
         EnvVarGuard::unset(VITE_APP_ENV_VAR)];
 
-    openhuman_core::config::add_auto_approve_tool("tool.config.round10")
+    openhuman_core::config::add_auto_approve_tool(&DispatchCtx::process_default(), "tool.config.round10")
         .await
         .expect("add auto approve tool");
-    openhuman_core::config::add_auto_approve_tool("tool.config.round10")
+    openhuman_core::config::add_auto_approve_tool(&DispatchCtx::process_default(), "tool.config.round10")
         .await
         .expect("idempotent auto approve tool");
 
