@@ -391,10 +391,9 @@ impl Tool for MemoryTool {
             let config = self.config.clone();
             let write_args = args.clone();
             let queued_root = facts.reach.at.clone();
-            let queued = dispatch.spawn_blocking(move || {
-                super::tool_writes::enqueue(&config, &write_args, &facts)
-            })
-            .await;
+            let queued = dispatch
+                .spawn_blocking(move || super::tool_writes::enqueue(&config, &write_args, &facts))
+                .await;
             return Ok(
                 match queued.unwrap_or_else(|_| {
                     Err(MemoryError::Unavailable(

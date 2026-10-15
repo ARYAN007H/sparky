@@ -274,13 +274,20 @@ pub(crate) async fn resume_interrupted_with(
 }
 
 /// `memory_import_start`: requires `consent`, memory on, and a legacy store.
-pub async fn start(ctx: &crate::core::runtime::DispatchCtx, config: &Config, consent: bool) -> MemoryResult<ImportState> {
+pub async fn start(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+    consent: bool,
+) -> MemoryResult<ImportState> {
     launch(ctx, config, Mode::Import, consent, None).await
 }
 
 /// `memory_import_retry_failed`: stores again the items a finished import
 /// skipped because the engine refused them.
-pub async fn retry_failed(ctx: &crate::core::runtime::DispatchCtx, config: &Config) -> MemoryResult<ImportState> {
+pub async fn retry_failed(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+) -> MemoryResult<ImportState> {
     launch(ctx, config, Mode::Retry, true, None).await
 }
 

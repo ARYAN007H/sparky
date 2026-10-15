@@ -266,7 +266,8 @@ pub(super) fn sources_sync(ctx: DispatchCtx, params: Map<String, Value>) -> Cont
     Box::pin(async move {
         let params = parse::<SourcesSyncParams>(params)?;
         let config = load(&ctx).await?;
-        let started = sources::start_sync(&ctx, &config, params.id.as_deref()).map_err(String::from)?;
+        let started =
+            sources::start_sync(&ctx, &config, params.id.as_deref()).map_err(String::from)?;
         to_json(SourcesSyncView { started })
     })
 }

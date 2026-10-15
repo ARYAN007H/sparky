@@ -232,7 +232,11 @@ pub fn start_sync(
 
 /// The scheduled tick: starts every source whose `schedule_mins` has elapsed.
 /// Returns the ids started. Memory off starts nothing.
-pub fn sync_due(ctx: &crate::core::runtime::DispatchCtx, config: &Config, now: DateTime<Utc>) -> Vec<String> {
+pub fn sync_due(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+    now: DateTime<Utc>,
+) -> Vec<String> {
     if !engine::is_on(config) {
         return Vec::new();
     }
