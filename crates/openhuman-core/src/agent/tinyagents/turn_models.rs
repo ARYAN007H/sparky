@@ -413,6 +413,15 @@ impl CrateNativeSource {
 }
 
 impl TurnModelSource {
+    /// The context this source builds its models under: the one it was
+    /// constructed for, else the calling task's ambient one.
+    pub(crate) fn dispatch_ctx(&self) -> crate::core::runtime::DispatchCtx {
+        match &self.crate_native {
+            Some(source) => source.ctx(),
+            None => crate::core::runtime::DispatchCtx::ambient(),
+        }
+    }
+
     /// Use an already-constructed TinyAgents model as the complete turn model
     /// source. Intended for deterministic tests and embedding callers that do
     /// not need role/config-based route construction.
