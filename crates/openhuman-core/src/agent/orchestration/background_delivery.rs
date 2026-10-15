@@ -44,8 +44,6 @@ use tinybus::EventHandler;
 use tinybus::SubscriptionHandle;
 
 mod slot;
-#[cfg(test)]
-use slot::delivering;
 use slot::DeliverySlot;
 
 use super::background_completions;
