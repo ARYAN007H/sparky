@@ -290,7 +290,7 @@ mod x402 {
                 .ok_or_else(|| {
                     "402 response is missing a valid PAYMENT-REQUIRED header".to_string()
                 })?;
-            let config = crate::config::rpc::load_config_with_timeout()
+            let config = ctx.load_config()
                 .await
                 .map_err(|error| format!("x402 payment failed: {error}"))?;
             declined_when_wallet_off(&config)?;

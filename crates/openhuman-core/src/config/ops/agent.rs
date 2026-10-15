@@ -151,13 +151,13 @@ pub async fn apply_autonomy_settings(
 pub async fn load_and_apply_autonomy_settings(
     update: AutonomySettingsPatch,
 ) -> Result<Outcome<serde_json::Value>, String> {
-    let mut config = load_config_with_timeout().await?;
+    let mut config = ctx.load_config().await?;
     apply_autonomy_settings(&mut config, update).await
 }
 
 /// Returns the current `[autonomy]` settings block as JSON (no secrets).
 pub async fn get_autonomy_settings() -> Result<Outcome<serde_json::Value>, String> {
-    let config = load_config_with_timeout().await?;
+    let config = ctx.load_config().await?;
     let value = serde_json::to_value(&config.autonomy).map_err(|e| e.to_string())?;
     Ok(Outcome::single_log(value, "autonomy settings read"))
 }
@@ -172,7 +172,7 @@ fn auto_approve_write_lock() -> &'static tokio::sync::Mutex<()> {
 /// already allow-listed. Backs the `ApproveAlwaysForTool` approval decision.
 pub async fn add_auto_approve_tool(tool_name: &str) -> Result<(), String> {
     let _guard = auto_approve_write_lock().lock().await;
-    let mut config = load_config_with_timeout().await?;
+    let mut config = ctx.load_config().await?;
     if config.autonomy.auto_approve.iter().any(|t| t == tool_name) {
         tracing::debug!(
             tool = tool_name,
@@ -267,7 +267,7 @@ pub async fn apply_agent_settings(
 pub async fn load_and_apply_agent_settings(
     update: AgentSettingsPatch,
 ) -> Result<Outcome<serde_json::Value>, String> {
-    let mut config = load_config_with_timeout().await?;
+    let mut config = ctx.load_config().await?;
     apply_agent_settings(&mut config, update).await
 }
 
@@ -275,7 +275,7 @@ pub async fn load_and_apply_agent_settings(
 /// runtime-effective value and whether the `OPENHUMAN_TOOL_TIMEOUT_SECS` env var
 /// is overriding the configured value, so the UI can explain a no-op control.
 pub async fn get_agent_settings() -> Result<Outcome<serde_json::Value>, String> {
-    let config = load_config_with_timeout().await?;
+    let config = ctx.load_config().await?;
     crate::tools::timeout::set_tool_timeout_secs(config.agent.agent_timeout_secs);
     let value = serde_json::json!({
         "agent_timeout_secs": config.agent.agent_timeout_secs,
@@ -653,7 +653,7 @@ pub async fn apply_agent_paths_settings(
 pub async fn load_and_apply_agent_paths_settings(
     update: AgentPathsPatch,
 ) -> Result<Outcome<serde_json::Value>, String> {
-    let mut config = load_config_with_timeout().await?;
+    let mut config = ctx.load_config().await?;
     apply_agent_paths_settings(&mut config, update).await
 }
 
@@ -667,7 +667,7 @@ fn paths_equal(a: &Path, b: &Path) -> bool {
 /// Reports the agent's filesystem roots so the UI can render them live
 /// instead of hard-coding strings that drift away from `Config`.
 pub async fn get_agent_paths() -> Result<Outcome<serde_json::Value>, String> {
-    let config = load_config_with_timeout().await?;
+    let config = ctx.load_config().await?;
     Ok(Outcome::new(
         agent_paths_payload(&config),
         vec![format!(

@@ -29,7 +29,7 @@ pub(crate) async fn approvals_disabled_for(tool: &dyn tinytools::Tool) -> bool {
     if tool.family() != Some("desktop") || !DESKTOP_AGENT_TOOLS.contains(&tool.name()) {
         return false;
     }
-    crate::config::rpc::load_config_with_timeout()
+    ctx.load_config()
         .await
         .is_ok_and(|config| approval_bypass_decision(&config, tool))
 }

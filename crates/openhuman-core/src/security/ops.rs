@@ -25,7 +25,7 @@ pub fn security_policy_info_for_config(config: &Config) -> Outcome<serde_json::V
 }
 
 pub async fn load_and_get_security_policy_info() -> Result<Outcome<serde_json::Value>, String> {
-    let config = crate::config::ops::load_config_with_timeout().await?;
+    let config = ctx.load_config().await?;
     Ok(security_policy_info_for_config(&config))
 }
 

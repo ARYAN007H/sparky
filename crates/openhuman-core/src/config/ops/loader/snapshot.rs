@@ -136,7 +136,7 @@ pub fn client_config_json(config: &Config) -> serde_json::Value {
 
 /// Loads config and returns the client-facing AI config slice.
 pub async fn load_and_get_client_config_snapshot() -> Result<Outcome<serde_json::Value>, String> {
-    let config = load_config_with_timeout().await?;
+    let config = ctx.load_config().await?;
     let snapshot = client_config_json(&config);
     Ok(Outcome::new(
         snapshot,
@@ -158,7 +158,7 @@ pub async fn get_config_snapshot(config: &Config) -> Result<Outcome<serde_json::
 
 /// Loads the configuration from disk and returns a snapshot.
 pub async fn load_and_get_config_snapshot() -> Result<Outcome<serde_json::Value>, String> {
-    let config = load_config_with_timeout().await?;
+    let config = ctx.load_config().await?;
     get_config_snapshot(&config).await
 }
 
@@ -178,7 +178,7 @@ pub async fn get_dashboard_settings() -> Result<Outcome<serde_json::Value>, Stri
         "OPENHUMAN: get_dashboard_settings loading config"
     );
 
-    let config = load_config_with_timeout().await.map_err(|error| {
+    let config = ctx.load_config().await.map_err(|error| {
         tracing::warn!(
             target: "openhuman_core::config",
             request_id = %request_id,

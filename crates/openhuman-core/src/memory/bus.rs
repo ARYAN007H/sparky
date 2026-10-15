@@ -57,7 +57,7 @@ impl EventHandler<DomainEvent> for PendingDeletionsSubscriber {
         if kind == "cleared" {
             return;
         }
-        let config = match crate::config::rpc::load_config_with_timeout().await {
+        let config = match ctx.load_config().await {
             Ok(config) => config,
             Err(error) => {
                 tracing::debug!(error = %error, "[memory:bus] config unavailable; deletions wait");
@@ -96,7 +96,7 @@ impl EventHandler<DomainEvent> for SystemJobsSubscriber {
         if job != SOURCES_SYNC_JOB && job != BACKGROUND_JOB {
             return;
         }
-        let config = match crate::config::rpc::load_config_with_timeout().await {
+        let config = match ctx.load_config().await {
             Ok(config) => config,
             Err(error) => {
                 tracing::debug!(error = %error, job = %job, "[memory:bus] config unavailable");

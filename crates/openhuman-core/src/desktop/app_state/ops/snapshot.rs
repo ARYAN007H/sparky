@@ -43,7 +43,7 @@ pub async fn snapshot() -> Result<Outcome<AppStateSnapshot>, String> {
     let t_total = Instant::now();
 
     let t_config = Instant::now();
-    let config = config_rpc::load_config_with_timeout().await?;
+    let config = ctx.load_config().await?;
     // Latch corruption recovery from *this* poll's load, not only from boot.
     // `load_config_with_timeout` re-reads config.toml on every snapshot, so a
     // config that becomes corrupt after boot is healed here — carrying a fresh
@@ -143,7 +143,7 @@ pub async fn snapshot() -> Result<Outcome<AppStateSnapshot>, String> {
 pub async fn update_local_state(
     patch: StoredAppStatePatch,
 ) -> Result<Outcome<StoredAppState>, String> {
-    let config = config_rpc::load_config_with_timeout().await?;
+    let config = ctx.load_config().await?;
     let _guard = APP_STATE_FILE_LOCK.lock();
     let mut current = load_stored_app_state_unlocked(&config)?;
 

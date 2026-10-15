@@ -57,7 +57,7 @@ pub async fn command_requires_sandbox(sandbox_mode: Option<SandboxMode>) -> Resu
     if matches!(sandbox_mode, Some(SandboxMode::Sandboxed)) {
         return Ok(true);
     }
-    let config = crate::config::ops::load_config_with_timeout().await?;
+    let config = ctx.load_config().await?;
     if config_disables_sandbox(&config) {
         return Ok(false);
     }
@@ -80,7 +80,7 @@ pub(crate) async fn resolve_command_policy(
     if crate::core::runtime::is_saas() {
         return crate::profiles::tools::sandbox_policy(action_dir, state_dir);
     }
-    let config = crate::config::ops::load_config_with_timeout()
+    let config = ctx.load_config()
         .await
         .map_err(|error| format!("Cannot read sandbox configuration: {error}"))?;
     let mut policy = resolve_sandbox_policy(
@@ -232,7 +232,7 @@ pub async fn create_sandbox_backend(policy: &SandboxPolicy) -> SandboxBackendHan
                 backend_id: None,
             });
     }
-    let config = match crate::config::ops::load_config_with_timeout().await {
+    let config = match ctx.load_config().await {
         Ok(config) => config,
         Err(_) if policy.backend == SandboxBackendKind::Docker => {
             return docker_error_handle();
@@ -317,7 +317,7 @@ pub(crate) async fn execute_in_sandbox_metered(
     let explicitly_requested = if crate::core::runtime::is_saas() || sandbox_disabled_by_host() {
         false
     } else {
-        let config = crate::config::ops::load_config_with_timeout()
+        let config = ctx.load_config()
             .await
             .map_err(|e| anyhow::anyhow!("Cannot read sandbox configuration: {e}"))?;
         module_config = Some(config.clone());
@@ -349,7 +349,7 @@ pub(crate) async fn execute_in_sandbox_metered(
             crate::config::ensure_usable_cwd(working_dir)?;
             let config = match module_config {
                 Some(config) => config,
-                None => crate::config::ops::load_config_with_timeout()
+                None => ctx.load_config()
                     .await
                     .map_err(|error| {
                         anyhow::anyhow!("Cannot read module configuration: {error}")
@@ -370,7 +370,7 @@ pub(crate) async fn execute_in_sandbox_metered(
             crate::config::ensure_usable_cwd(working_dir)?;
             let config = match module_config {
                 Some(config) => config,
-                None => crate::config::ops::load_config_with_timeout()
+                None => ctx.load_config()
                     .await
                     .map_err(|error| {
                         anyhow::anyhow!("Cannot read module configuration: {error}")
@@ -399,7 +399,7 @@ pub(crate) async fn execute_in_sandbox_metered(
             };
             let config = match module_config {
                 Some(config) => config,
-                None => crate::config::ops::load_config_with_timeout()
+                None => ctx.load_config()
                     .await
                     .map_err(|error| {
                         anyhow::anyhow!("Cannot read module configuration: {error}")

@@ -110,7 +110,7 @@ pub(super) fn deactivate_user_scope() -> Result<(), String> {
 /// activation so credentials, keys and workspaces land in the user-scoped
 /// location — or `fallback` when the reload fails.
 pub(super) async fn reload_config_or(_fallback: &Config) -> Result<Config, String> {
-    crate::config::load_config_with_timeout()
+    ctx.load_config()
         .await
         .map_err(|error| error.to_string())
 }

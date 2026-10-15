@@ -10,7 +10,7 @@ use crate::platform::update;
 use crate::platform::update::types::{UpdateApplyResult, UpdateInfo, UpdateRunResult, VersionInfo};
 
 async fn load_update_policy() -> Result<UpdateConfig, String> {
-    config::rpc::load_config_with_timeout()
+    ctx.load_config()
         .await
         .map(|cfg| cfg.update)
         .map_err(|err| format!("failed to load config for update policy: {err}"))

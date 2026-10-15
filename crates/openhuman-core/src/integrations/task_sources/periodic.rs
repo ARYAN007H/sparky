@@ -112,7 +112,7 @@ async fn run_loop() {
 /// Run a single scheduler tick. `pub(crate)` so tests can drive ticks
 /// without the real `interval`.
 pub(crate) async fn run_one_tick() -> Result<(), String> {
-    let config = config_rpc::load_config_with_timeout()
+    let config = ctx.load_config()
         .await
         .map_err(|e| format!("load_config: {e}"))?;
 

@@ -393,7 +393,7 @@ async fn handle_tunnel_frame(channel_id: &str, payload_b64: &str) {
 
     // Load config from global env (best-effort; pairing persists even if config
     // loading is slow — the UI will see the device on next list call).
-    if let Ok(config) = crate::config::rpc::load_config_with_timeout().await {
+    if let Ok(config) = ctx.load_config().await {
         match store::insert_device(
             &config,
             channel_id,

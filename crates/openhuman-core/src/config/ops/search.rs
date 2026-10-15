@@ -312,7 +312,7 @@ pub async fn apply_search_settings(
 pub async fn load_and_apply_search_settings(
     update: SearchSettingsPatch,
 ) -> Result<Outcome<Value>, String> {
-    let mut config = load_config_with_timeout().await?;
+    let mut config = ctx.load_config().await?;
     apply_search_settings(&mut config, update).await
 }
 
@@ -391,7 +391,7 @@ pub(crate) fn search_settings_json_with(config: &Config, managed_available: bool
 
 /// Read the current search settings. Keys are reported only as booleans.
 pub async fn get_search_settings() -> Result<Outcome<Value>, String> {
-    let config = load_config_with_timeout().await?;
+    let config = ctx.load_config().await?;
     Ok(Outcome::new(
         search_settings_json(&config),
         vec!["search settings read".to_string()],

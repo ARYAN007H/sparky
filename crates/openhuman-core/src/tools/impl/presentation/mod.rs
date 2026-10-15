@@ -82,7 +82,7 @@ impl ImageInspector for ModuleImageInspector<'_> {
         let config = match self.config {
             Some(config) => config,
             None => {
-                loaded = crate::config::ops::load_config_with_timeout()
+                loaded = ctx.load_config()
                     .await
                     .map_err(|error| format!("config unavailable: {error}"))?;
                 &loaded

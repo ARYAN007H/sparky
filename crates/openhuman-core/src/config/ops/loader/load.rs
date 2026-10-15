@@ -86,7 +86,7 @@ pub async fn load_config_in(ctx: &crate::core::runtime::DispatchCtx) -> Result<C
 /// runs inside a turn: [`load_config_with_timeout`] with the context's
 /// inference route applied.
 pub async fn load_current_or_init() -> anyhow::Result<Config> {
-    let mut config = load_config_with_timeout()
+    let mut config = ctx.load_config()
         .await
         .map_err(anyhow::Error::msg)?;
     if let Some(route) = config.ephemeral_route.clone() {
@@ -157,7 +157,7 @@ pub async fn load_config_for_workspace_with_timeout(
         workspace = %workspace_dir.display(),
         "[config] no config.toml beside workspace; falling back to the process-global load"
     );
-    let mut config = load_config_with_timeout().await?;
+    let mut config = ctx.load_config().await?;
     config.workspace_dir = workspace_dir.to_path_buf();
     Ok(config)
 }

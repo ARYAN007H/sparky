@@ -82,7 +82,7 @@ impl EventHandler<DomainEvent> for ComposioTriggerSubscriber {
         // let the event through rather than silently dropping it. The
         // existing env-var / config triage flags below remain the
         // backend-mode gates.
-        if let Ok(config) = config_rpc::load_config_with_timeout().await {
+        if let Ok(config) = ctx.load_config().await {
             if config.composio.mode == crate::config::schema::COMPOSIO_MODE_DIRECT {
                 tracing::info!(
                     toolkit = %toolkit,
@@ -94,7 +94,7 @@ impl EventHandler<DomainEvent> for ComposioTriggerSubscriber {
         }
 
         if let Some(store) = trigger_history::global() {
-            match config_rpc::load_config_with_timeout().await {
+            match ctx.load_config().await {
                 Ok(config) => {
                     let event = super::super::types::ComposioTriggerEvent {
                         toolkit: toolkit.clone(),
@@ -128,7 +128,7 @@ impl EventHandler<DomainEvent> for ComposioTriggerSubscriber {
         // remains a global emergency kill-switch that works even when the
         // config file is corrupt. Fail-open on load error: if we can't read
         // the config we let triage run rather than silently drop events.
-        match config_rpc::load_config_with_timeout().await {
+        match ctx.load_config().await {
             Ok(config) => {
                 if config.composio.triage_disabled {
                     tracing::debug!(

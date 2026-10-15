@@ -335,7 +335,7 @@ impl Tool for FlowMemoryRecallTool {
             .and_then(serde_json::Value::as_u64)
             .map_or(5, |v| v as usize);
 
-        let config = match crate::config::rpc::load_config_with_timeout().await {
+        let config = match ctx.load_config().await {
             Ok(config) => config,
             Err(error) => {
                 return Ok(ToolResult::error(format!(
@@ -472,7 +472,7 @@ impl Tool for FlowMemoryRememberTool {
             ));
         }
 
-        let config = match crate::config::rpc::load_config_with_timeout().await {
+        let config = match ctx.load_config().await {
             Ok(config) => config,
             Err(error) => {
                 return Ok(ToolResult::error(format!(

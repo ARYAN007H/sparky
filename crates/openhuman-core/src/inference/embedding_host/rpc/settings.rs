@@ -202,7 +202,7 @@ pub async fn update_settings(
     use crate::config::ops as config_rpc;
     use tinyinference_embeddings::format_embedding_signature;
 
-    let mut config = config_rpc::load_config_with_timeout().await?;
+    let mut config = ctx.load_config().await?;
 
     // Upgrade-in-place for users whose endpoint predates the retained Custom
     // profile: if they disable or switch away now, capture the active profile

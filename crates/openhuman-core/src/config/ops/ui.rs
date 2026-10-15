@@ -165,7 +165,7 @@ fn normalize_browser_backend(raw: &str) -> Result<String, String> {
 pub async fn load_and_apply_browser_settings(
     update: BrowserSettingsPatch,
 ) -> Result<Outcome<serde_json::Value>, String> {
-    let mut config = load_config_with_timeout().await?;
+    let mut config = ctx.load_config().await?;
     apply_browser_settings(&mut config, update).await
 }
 
@@ -232,7 +232,7 @@ pub async fn apply_user_timezone(
 pub async fn load_and_apply_user_timezone(
     timezone: Option<String>,
 ) -> Result<Outcome<serde_json::Value>, String> {
-    let mut config = load_config_with_timeout().await?;
+    let mut config = ctx.load_config().await?;
     apply_user_timezone(&mut config, timezone).await
 }
 
@@ -249,7 +249,7 @@ pub fn user_timezone_json(config: &Config) -> serde_json::Value {
 pub async fn load_and_apply_analytics_settings(
     update: AnalyticsSettingsPatch,
 ) -> Result<Outcome<serde_json::Value>, String> {
-    let mut config = load_config_with_timeout().await?;
+    let mut config = ctx.load_config().await?;
     apply_analytics_settings(&mut config, update).await
 }
 
@@ -267,7 +267,7 @@ pub async fn workspace_onboarding_flag_resolve(
     {
         return Err("Invalid onboarding flag name".to_string());
     }
-    let workspace_dir = match load_config_with_timeout().await {
+    let workspace_dir = match ctx.load_config().await {
         Ok(cfg) => cfg.workspace_dir,
         Err(_) => fallback_workspace_dir(),
     };
@@ -308,7 +308,7 @@ pub async fn workspace_onboarding_flag_set(
     {
         return Err("Invalid onboarding flag name".to_string());
     }
-    let workspace_dir = match load_config_with_timeout().await {
+    let workspace_dir = match ctx.load_config().await {
         Ok(cfg) => cfg.workspace_dir,
         Err(_) => fallback_workspace_dir(),
     };
@@ -332,7 +332,7 @@ pub async fn workspace_onboarding_flag_set(
 
 /// Returns whether the onboarding process has been marked as completed.
 pub async fn get_onboarding_completed() -> Result<Outcome<bool>, String> {
-    let config = load_config_with_timeout().await?;
+    let config = ctx.load_config().await?;
     Ok(Outcome::single_log(
         config.onboarding_completed,
         "onboarding_completed read from config",
@@ -345,7 +345,7 @@ pub async fn get_onboarding_completed() -> Result<Outcome<bool>, String> {
 /// cron job via [`crate::cron::seed::seed_proactive_agents`].
 pub async fn set_onboarding_completed(value: bool) -> Result<Outcome<bool>, String> {
     tracing::debug!(value, "[onboarding] set_onboarding_completed called");
-    let mut config = load_config_with_timeout().await?;
+    let mut config = ctx.load_config().await?;
     let was_completed = config.onboarding_completed;
     config.onboarding_completed = value;
 
@@ -377,7 +377,7 @@ pub async fn set_onboarding_completed(value: bool) -> Result<Outcome<bool>, Stri
 
 /// Returns the current dictation settings as a JSON object.
 pub async fn get_dictation_settings() -> Result<Outcome<serde_json::Value>, String> {
-    let config = load_config_with_timeout().await?;
+    let config = ctx.load_config().await?;
     let result = json!({
         "enabled": config.dictation.enabled,
         "hotkey": config.dictation.hotkey,
@@ -396,7 +396,7 @@ pub async fn get_dictation_settings() -> Result<Outcome<serde_json::Value>, Stri
 pub async fn load_and_apply_dictation_settings(
     update: DictationSettingsPatch,
 ) -> Result<Outcome<serde_json::Value>, String> {
-    let mut config = load_config_with_timeout().await?;
+    let mut config = ctx.load_config().await?;
     if let Some(enabled) = update.enabled {
         config.dictation.enabled = enabled;
     }
@@ -440,7 +440,7 @@ pub async fn load_and_apply_dictation_settings(
 
 /// Returns the current voice server settings as a JSON object.
 pub async fn get_voice_server_settings() -> Result<Outcome<serde_json::Value>, String> {
-    let config = load_config_with_timeout().await?;
+    let config = ctx.load_config().await?;
     let result = json!({
         "auto_start": config.voice_server.auto_start,
         "hotkey": config.voice_server.hotkey,
@@ -463,7 +463,7 @@ pub async fn get_voice_server_settings() -> Result<Outcome<serde_json::Value>, S
 pub async fn load_and_apply_voice_server_settings(
     update: VoiceServerSettingsPatch,
 ) -> Result<Outcome<serde_json::Value>, String> {
-    let mut config = load_config_with_timeout().await?;
+    let mut config = ctx.load_config().await?;
     if let Some(auto_start) = update.auto_start {
         config.voice_server.auto_start = auto_start;
     }

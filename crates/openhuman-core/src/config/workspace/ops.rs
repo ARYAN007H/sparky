@@ -68,7 +68,7 @@ fn classify_workspace_entry(
 
 /// Create default dirs, copy bundled prompts, and the skills README.
 pub async fn init_workspace(force: bool) -> Result<serde_json::Value, String> {
-    let config = config_rpc::load_config_with_timeout().await?;
+    let config = ctx.load_config().await?;
     let workspace_dir = config.workspace_dir.clone();
 
     let mut created_dirs = Vec::new();

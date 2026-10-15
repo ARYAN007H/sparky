@@ -119,7 +119,7 @@ impl TinySearchTool {
     async fn live_config(&self) -> anyhow::Result<Config> {
         match &self.config {
             Some(config) => Ok(config.as_ref().clone()),
-            None => crate::config::rpc::load_config_with_timeout()
+            None => ctx.load_config()
                 .await
                 .map_err(|error| anyhow::anyhow!(error)),
         }

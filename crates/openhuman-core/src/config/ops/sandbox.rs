@@ -17,7 +17,7 @@ pub struct SandboxSettingsPatch {
 }
 
 pub async fn get_sandbox_settings() -> Result<Outcome<serde_json::Value>, String> {
-    let config = load_config_with_timeout().await?;
+    let config = ctx.load_config().await?;
     let sandbox = &config.sandbox;
     let docker = &config.runtime.docker;
 
@@ -123,7 +123,7 @@ pub async fn apply_sandbox_settings(
 pub async fn load_and_apply_sandbox_settings(
     update: SandboxSettingsPatch,
 ) -> Result<Outcome<serde_json::Value>, String> {
-    let mut config = load_config_with_timeout().await?;
+    let mut config = ctx.load_config().await?;
     apply_sandbox_settings(&mut config, update).await
 }
 

@@ -34,7 +34,7 @@ async fn run_role_tool(
     arguments: Value,
     method: &str,
 ) -> Result<Value, String> {
-    let config = config_rpc::load_config_with_timeout().await?;
+    let config = ctx.load_config().await?;
     run_role_tool_with(&config, tool, arguments, method).await
 }
 

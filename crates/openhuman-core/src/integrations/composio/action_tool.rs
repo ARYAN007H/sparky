@@ -165,7 +165,7 @@ impl ComposioActionTool {
     async fn live_config(&self) -> Result<Config, String> {
         match self.config.as_deref() {
             Some(snapshot) => super::tools::live_composio_config(snapshot).await,
-            None => config_rpc::load_config_with_timeout().await,
+            None => ctx.load_config().await,
         }
     }
 }

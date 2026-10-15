@@ -35,7 +35,7 @@ fn finish<T: Serialize>(result: MemoryResult<T>) -> Result<Value, String> {
 }
 
 async fn load() -> Result<Config, String> {
-    crate::config::rpc::load_config_with_timeout().await
+    ctx.load_config().await
 }
 
 async fn save(config: &Config) -> MemoryResult<()> {

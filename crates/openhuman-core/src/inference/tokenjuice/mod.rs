@@ -442,7 +442,7 @@ mod repl_module_tests;
 pub async fn query(
     request: tinyjuice_bus::wire::QueryRequest,
 ) -> Result<tinyjuice_bus::wire::QueryResponse, String> {
-    let config = crate::config::ops::load_config_with_timeout().await?;
+    let config = ctx.load_config().await?;
     query_for_config(&config, request).await
 }
 
@@ -459,7 +459,7 @@ pub(crate) async fn query_for_config(
 
 /// Extract HTML through the compiled module independently of compression settings.
 pub async fn extract_html(html: String) -> Result<String, String> {
-    let config = crate::config::ops::load_config_with_timeout().await?;
+    let config = ctx.load_config().await?;
     let response: tinyjuice_bus::wire::HtmlResponse = client(&config)
         .call("tinyjuice", methods::EXTRACT_HTML, (html,))
         .await

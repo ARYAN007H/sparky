@@ -66,7 +66,7 @@ pub fn is_local_session_token(token: &str) -> bool {
 /// this credential remains valid; those errors must not broadcast sign-out.
 /// A failed lookup leaves the ordinary session-expiry path in place.
 pub async fn current_session_is_local() -> bool {
-    let Ok(config) = crate::config::rpc::load_config_with_timeout().await else {
+    let Ok(config) = ctx.load_config().await else {
         return false;
     };
     get_session_token(&config)

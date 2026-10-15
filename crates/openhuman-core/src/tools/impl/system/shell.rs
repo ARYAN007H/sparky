@@ -596,7 +596,7 @@ impl ShellTool {
         );
         let config = match self.analysis_config.as_deref() {
             Some(config) => config.clone(),
-            None => match crate::config::ops::load_config_with_timeout().await {
+            None => match ctx.load_config().await {
                 Ok(config) => config,
                 Err(e) => {
                     return (

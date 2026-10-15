@@ -41,7 +41,7 @@ pub async fn generate_recovery_phrase(
     word_count: u8,
 ) -> Result<Outcome<GeneratedRecoveryPhrase>, String> {
     tinywallet_bus::validate_mnemonic_word_count(word_count).map_err(|error| error.to_string())?;
-    let config = config_rpc::load_config_with_timeout().await?;
+    let config = ctx.load_config().await?;
     let generated = crate::modules::wallet::generate_mnemonic(&config, word_count)
         .await
         .map_err(|error| error.to_string())?;
@@ -70,7 +70,7 @@ pub async fn derive_recovery_material(
         ));
     }
 
-    let config = config_rpc::load_config_with_timeout().await?;
+    let config = ctx.load_config().await?;
     let mnemonic = Zeroizing::new(mnemonic);
     let mnemonic = Zeroizing::new(mnemonic.split_whitespace().collect::<Vec<_>>().join(" "));
     let seed = crate::modules::wallet::derive_mnemonic_seed(&config, mnemonic.to_string())
@@ -119,7 +119,7 @@ pub async fn validate_recovery_phrase(
 ) -> Result<Outcome<RecoveryPhraseValidation>, String> {
     use crate::modules::wallet::WalletCallError;
 
-    let config = config_rpc::load_config_with_timeout().await?;
+    let config = ctx.load_config().await?;
     let valid = match crate::modules::wallet::derive_mnemonic_seed(&config, mnemonic).await {
         Ok(mut response) => {
             if response.seed.len() != 64 {
@@ -201,7 +201,7 @@ fn validate_setup(params: &WalletSetupParams) -> Result<Vec<WalletAccount>, Stri
 }
 
 pub async fn status() -> Result<Outcome<WalletStatus>, String> {
-    let config = config_rpc::load_config_with_timeout().await?;
+    let config = ctx.load_config().await?;
     let _guard = WALLET_STATE_FILE_LOCK.lock();
     let status = to_status(&config, load_stored_wallet_state_unlocked(&config)?);
 
@@ -219,7 +219,7 @@ pub async fn status() -> Result<Outcome<WalletStatus>, String> {
 }
 
 pub async fn setup(params: WalletSetupParams) -> Result<Outcome<WalletStatus>, String> {
-    let config = config_rpc::load_config_with_timeout().await?;
+    let config = ctx.load_config().await?;
     let accounts = validate_setup(&params)?;
     let encrypted_mnemonic = params
         .encrypted_mnemonic
@@ -273,7 +273,7 @@ pub async fn setup(params: WalletSetupParams) -> Result<Outcome<WalletStatus>, S
 pub async fn reveal_recovery_phrase() -> Result<Outcome<RevealRecoveryPhraseResult>, String> {
     debug!("{LOG_PREFIX} reveal_recovery_phrase ENTRY");
 
-    let config = config_rpc::load_config_with_timeout().await.map_err(|e| {
+    let config = ctx.load_config().await.map_err(|e| {
         log::warn!("{LOG_PREFIX} reveal_recovery_phrase config load failed: {e}");
         e
     })?;
@@ -353,7 +353,7 @@ pub(crate) async fn secret_material(chain: WalletChain) -> Result<WalletSecretMa
         "{LOG_PREFIX} secret_material loading config chain={}",
         chain.as_str()
     );
-    let config = config_rpc::load_config_with_timeout().await?;
+    let config = ctx.load_config().await?;
     debug!(
         "{LOG_PREFIX} secret_material acquiring state lock chain={}",
         chain.as_str()

@@ -551,7 +551,7 @@ async fn clear_session_credential(config: &Config) -> Result<Outcome<bool>, Stri
     // Every process-global store must follow the now-active pre-login
     // workspace, or a signed-out caller keeps reading the previous account's
     // context until the process restarts.
-    match crate::config::load_config_with_timeout().await {
+    match ctx.load_config().await {
         Ok(signed_out_config) => {
             logs.extend(rebind_after_credential_change(
                 &signed_out_config,

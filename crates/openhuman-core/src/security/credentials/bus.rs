@@ -86,7 +86,7 @@ impl SessionExpiredSubscriber {
         //     turns out to be a local offline session (never truly expired).
         scheduler_gate::set_signed_out(true);
 
-        match crate::config::rpc::load_config_with_timeout().await {
+        match ctx.load_config().await {
             Ok(config) => {
                 // An API-key runtime has no session to clear: a backend 401 on
                 // the key is a per-call error for the caller, not a sign-out.

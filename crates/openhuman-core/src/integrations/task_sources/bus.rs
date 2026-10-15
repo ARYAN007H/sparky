@@ -63,7 +63,7 @@ impl EventHandler<DomainEvent> for TaskSourcesConnectionSubscriber {
 /// skipped even when the process config enables them, and the other way
 /// round.
 async fn fire_in_scope(provider: ProviderSlug, toolkit: &str, connection_id: &str) {
-    let config = match config_rpc::load_config_with_timeout().await {
+    let config = match ctx.load_config().await {
         Ok(config) => config,
         Err(e) => {
             tracing::debug!(error = %e, "[task_sources:bus] load_config failed, skipping scope");

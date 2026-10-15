@@ -94,7 +94,7 @@ impl EventHandler<DomainEvent> for ComposioConnectionCreatedSubscriber {
 }
 
 async fn on_connection_created(toolkit: String, connection_id: String) {
-    let config = match config_rpc::load_config_with_timeout().await {
+    let config = match ctx.load_config().await {
         Ok(c) => c,
         Err(e) => {
             tracing::warn!(

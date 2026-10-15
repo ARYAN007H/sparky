@@ -120,7 +120,7 @@ pub(crate) async fn setup_wallet_in(temp: &TempDir) -> Result<EnvVarGuard, Strin
     // each test. Return a guard so the tempdir path does not leak into later
     // parallel tests after this test's TempDir has been dropped.
     let workspace_guard = set_workspace_env_for_test(temp).await;
-    let config = config_rpc::load_config_with_timeout().await?;
+    let config = ctx.load_config().await?;
     let encrypted = crate::security::encryption::rpc::encrypt_secret(&config, TEST_MNEMONIC)
         .await?
         .value;

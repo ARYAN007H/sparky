@@ -92,7 +92,7 @@ pub async fn composio_set_api_key(
         .map_err(|e| format!("[composio-direct] store_composio_api_key failed: {e}"))?;
 
     let mode_log = if activate_direct {
-        let mut cfg_mut = crate::config::rpc::load_config_with_timeout()
+        let mut cfg_mut = ctx.load_config()
             .await
             .map_err(|e| format!("[composio-direct] reload config failed: {e}"))?;
         cfg_mut.composio.mode = crate::config::schema::COMPOSIO_MODE_DIRECT.into();
@@ -137,7 +137,7 @@ pub async fn composio_clear_api_key(config: &Config) -> OpResult<Outcome<serde_j
         .await
         .map_err(|e| format!("[composio-direct] clear_composio_api_key failed: {e}"))?;
 
-    let mut cfg_mut = crate::config::rpc::load_config_with_timeout()
+    let mut cfg_mut = ctx.load_config()
         .await
         .map_err(|e| format!("[composio-direct] reload config failed: {e}"))?;
     cfg_mut.composio.mode = crate::config::schema::COMPOSIO_MODE_BACKEND.into();

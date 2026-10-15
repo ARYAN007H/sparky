@@ -96,7 +96,7 @@ pub async fn apply_computer_settings(
 pub async fn load_and_apply_computer_settings(
     update: ComputerSettingsPatch,
 ) -> Result<Outcome<serde_json::Value>, String> {
-    let mut config = load_config_with_timeout().await?;
+    let mut config = ctx.load_config().await?;
     apply_computer_settings(&mut config, update).await
 }
 

@@ -29,7 +29,7 @@ fn slot() -> &'static RwLock<Option<ShellInvocation>> {
 pub(super) async fn resolve() {
     #[cfg(feature = "modules")]
     {
-        let config = match crate::config::ops::load_config_with_timeout().await {
+        let config = match ctx.load_config().await {
             Ok(config) => config,
             Err(error) => {
                 log::warn!("[hooks] cannot read config to select the hook shell: {error}");

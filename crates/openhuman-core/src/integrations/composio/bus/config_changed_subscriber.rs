@@ -62,7 +62,7 @@ impl EventHandler<DomainEvent> for ComposioConfigChangedSubscriber {
         ops::invalidate_connected_integrations_cache();
 
         tokio::spawn(async move {
-            let config = match config_rpc::load_config_with_timeout().await {
+            let config = match ctx.load_config().await {
                 Ok(config) => config,
                 Err(error) => {
                     tracing::debug!(

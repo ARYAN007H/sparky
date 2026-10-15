@@ -28,7 +28,7 @@ impl EventHandler<DomainEvent> for CredentialRefreshSubscriber {
         let DomainEvent::CredentialChanged { kind } = event else {
             return;
         };
-        let config = match crate::config::rpc::load_config_with_timeout().await {
+        let config = match ctx.load_config().await {
             Ok(config) => config,
             Err(error) => {
                 tracing::warn!(kind = %kind, %error, "[search][bus] config unavailable; skipping refresh");

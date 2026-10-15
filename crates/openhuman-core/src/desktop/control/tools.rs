@@ -180,7 +180,7 @@ impl Tool for DesktopTool {
                 Err(error) => Err(error.into()),
             },
             DesktopToolKind::Goal => {
-                let live_config = match crate::config::rpc::load_config_with_timeout().await {
+                let live_config = match ctx.load_config().await {
                     Ok(config) => config,
                     Err(error) => {
                         return Ok(ToolResult::error(format!(

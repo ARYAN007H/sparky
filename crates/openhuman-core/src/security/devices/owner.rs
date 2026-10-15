@@ -63,7 +63,7 @@ pub(super) type OwnerLookupFailed = crate::storage::agents::LookupFailed;
 /// paired device. The configuration is loaded inside the scope: in SaaS mode
 /// loading it needs an acting agent, which the tunnel task does not have.
 async fn has_live_device(channel_id: &str) -> Result<bool, String> {
-    let config = crate::config::rpc::load_config_with_timeout()
+    let config = ctx.load_config()
         .await
         .map_err(|error| format!("load config: {error}"))?;
     super::store::get_device(&config, channel_id)
@@ -74,7 +74,7 @@ async fn has_live_device(channel_id: &str) -> Result<bool, String> {
 /// Whether the current scope holds `channel_id` as a revoked device (a missing
 /// row is not revoked).
 async fn is_revoked(channel_id: &str) -> Result<bool, String> {
-    let config = crate::config::rpc::load_config_with_timeout()
+    let config = ctx.load_config()
         .await
         .map_err(|error| format!("load config: {error}"))?;
     super::store::get_device(&config, channel_id)

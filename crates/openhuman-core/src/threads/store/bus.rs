@@ -356,7 +356,7 @@ async fn persist_channel_turn(
     let client = crate::channels::module_fixture::client().await;
     #[cfg(not(all(test, feature = "channels", feature = "modules")))]
     let client = {
-        let config = crate::config::rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         if config.workspace_dir != workspace_dir {
             return Err("channel workspace changed".into());
         }

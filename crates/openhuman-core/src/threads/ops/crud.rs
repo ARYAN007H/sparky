@@ -155,7 +155,7 @@ pub async fn message_append(
     request: AppendConversationMessageRequest,
 ) -> Result<Outcome<ApiEnvelope<ConversationMessageRecord>>, ThreadsError> {
     let origin = crate::core::runtime::CoreContext::current_turn_origin();
-    let config = crate::config::rpc::load_config_with_timeout()
+    let config = ctx.load_config()
         .await
         .map_err(|error| ThreadsError::Message(format!("load config: {error}")))?;
     let persistence_dir = workspace_dir().await.map_err(ThreadsError::Message)?;
@@ -407,7 +407,7 @@ pub async fn delete_after(
 pub async fn thread_delete(
     request: DeleteConversationThreadRequest,
 ) -> Result<Outcome<ApiEnvelope<DeleteConversationThreadResponse>>, String> {
-    let config = crate::config::rpc::load_config_with_timeout()
+    let config = ctx.load_config()
         .await
         .map_err(|e| format!("load config: {e}"))?;
     run_to_completion("thread_delete", thread_delete_inner(config, request)).await

@@ -65,7 +65,7 @@ impl Web3ModuleTool {
         chat: Option<&crate::security::approval::ApprovalChatContext>,
     ) -> anyhow::Result<ToolResult> {
         let owner = crate::modules::web3_service::owner_of(chat);
-        let config = match crate::config::rpc::load_config_with_timeout().await {
+        let config = match ctx.load_config().await {
             Ok(config) => config,
             Err(error) => return Ok(ToolResult::error(error)),
         };
