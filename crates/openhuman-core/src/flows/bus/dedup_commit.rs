@@ -201,7 +201,7 @@ impl DedupCommitSubscriber {
     /// having this method read that snapshot instead of `store::get_flow` —
     /// a schema + call-site change bigger than this PR's scope; reported as a
     /// follow-up rather than attempted here.
-    fn dedup_node_ids(
+    pub(super) fn dedup_node_ids(
         &self,
         ctx: &crate::core::runtime::DispatchCtx,
         flow_id: &str,
