@@ -1,4 +1,5 @@
 use super::*;
+use crate::core::runtime::DispatchCtx;
 
 use serde_json::json;
 
@@ -39,7 +40,7 @@ async fn queue_message(thread_id: &str, text: &str, mode: &str) -> serde_json::V
 }
 
 async fn cancel_parked_turn(thread_id: &str, block: &TestRunChatTaskBlock) {
-    cancel_chat_scoped("queue-test-client", thread_id, None)
+    cancel_chat_scoped(&DispatchCtx::ambient(), "queue-test-client", thread_id, None)
         .await
         .expect("parked turn should cancel");
     wait_for_in_flight(|entries| !entries.iter().any(|(key, _)| key == thread_id)).await;
