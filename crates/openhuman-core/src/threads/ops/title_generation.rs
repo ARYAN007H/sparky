@@ -3,6 +3,7 @@
 
 use super::support::{counts, envelope, thread_to_summary, update_thread_with_fallback_title};
 use crate::config::Config;
+use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
 use crate::inference::provider;
 use crate::threads::store as conversations;
@@ -114,7 +115,7 @@ pub async fn thread_generate_title(
             thread_id = %request.thread_id,
             "{THREAD_TITLE_LOG_PREFIX} no assistant message yet; applying fallback title"
         );
-        let updated = update_thread_with_fallback_title(dir, thread, &first_user_message).await?;
+        let updated = update_thread_with_fallback_title(ctx, dir, thread, &first_user_message).await?;
         return Ok(envelope(
             thread_to_summary(updated),
             Some(counts([("num_threads", 1)])),
@@ -135,7 +136,7 @@ pub async fn thread_generate_title(
                     "{THREAD_TITLE_LOG_PREFIX} provider init failed; applying fallback title"
                 );
                 let updated =
-                    update_thread_with_fallback_title(dir, thread, &first_user_message).await?;
+                    update_thread_with_fallback_title(ctx, dir, thread, &first_user_message).await?;
                 return Ok(envelope(
                     thread_to_summary(updated),
                     Some(counts([("num_threads", 1)])),
@@ -167,7 +168,7 @@ pub async fn thread_generate_title(
                 "{THREAD_TITLE_LOG_PREFIX} title generation failed; applying fallback title"
             );
             let updated =
-                update_thread_with_fallback_title(dir, thread, &first_user_message).await?;
+                update_thread_with_fallback_title(ctx, dir, thread, &first_user_message).await?;
             return Ok(envelope(
                 thread_to_summary(updated),
                 Some(counts([("num_threads", 1)])),
@@ -183,7 +184,7 @@ pub async fn thread_generate_title(
             raw_title_hash = %title_log_fingerprint(&raw_title),
             "{THREAD_TITLE_LOG_PREFIX} generated empty title after sanitization; applying fallback title"
         );
-        let updated = update_thread_with_fallback_title(dir, thread, &first_user_message).await?;
+        let updated = update_thread_with_fallback_title(ctx, dir, thread, &first_user_message).await?;
         return Ok(envelope(
             thread_to_summary(updated),
             Some(counts([("num_threads", 1)])),

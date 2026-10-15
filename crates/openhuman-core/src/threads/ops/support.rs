@@ -3,6 +3,7 @@
 //! store-type <-> wire-type conversions every handler needs.
 
 use crate::config::Config;
+use crate::core::runtime::DispatchCtx;
 use crate::core::runtime::context::CoreContext;
 use crate::threads::store as conversations;
 use crate::threads::store::{ConversationMessage, ConversationThread};

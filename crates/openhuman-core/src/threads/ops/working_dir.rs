@@ -8,6 +8,7 @@
 //! in another.
 
 use super::support::{counts, envelope, thread_to_summary, workspace_dir};
+use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
 use crate::security::SecurityPolicy;
 use crate::threads::store as conversations;

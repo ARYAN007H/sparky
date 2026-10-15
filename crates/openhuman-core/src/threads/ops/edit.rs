@@ -46,6 +46,7 @@ use tinyagents_session::transcript::{
     TranscriptMeta, TruncateCut,
 };
 
+use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
 use crate::threads::store::{self as conversations, reply_run_id, run_reply_message_id};
 use crate::threads::ThreadsError;
@@ -95,7 +96,7 @@ pub async fn edit_message(
     // Correlate through the next assistant reply, if any — see the module
     // doc's mapping section. `None` means the edited message has no reply
     // yet, so there is nothing to cut on the model side.
-    let cut_request_id = next_reply_request_id_after(&dir, &thread_id, &request.message_id)
+    let cut_request_id = next_reply_request_id_after(ctx, &dir, &thread_id, &request.message_id)
         .await
         .map_err(ThreadsError::Message)?;
 
