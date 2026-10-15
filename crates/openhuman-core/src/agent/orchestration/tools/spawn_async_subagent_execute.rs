@@ -359,6 +359,7 @@ impl SpawnAsyncSubagentTool {
         let background_parent_session = parent_session.clone();
         let completion_target =
             crate::agent::orchestration::background_completions::CompletionTarget::new(
+                dispatch.clone(),
                 parent.workspace_dir.clone(),
                 parent_session.clone(),
                 parent_thread_id.clone(),
