@@ -9,71 +9,9 @@ use tinyinference_llm::tool::ToolCall;
 use tinytools::Tool;
 use tinytools::ToolResult;
 
-/// Reads the transcript a sub-agent run wrote under `stem` back through the
-/// store it wrote to.
-fn read_stem(
-    locator: &dyn tinyagents_session::transcript::TranscriptLocator,
-    stem: &str,
-) -> tinyagents_session::transcript::SessionTranscript {
-    let seed = tinyagents_session::transcript::TranscriptMeta {
-        agent_name: String::new(),
-        agent_id: None,
-        agent_type: None,
-        dispatcher: String::new(),
-        provider: None,
-        model: None,
-        created: String::new(),
-        updated: String::new(),
-        turn_count: 0,
-        prefix_message_count: None,
-        input_tokens: 0,
-        output_tokens: 0,
-        cached_input_tokens: 0,
-        charged_amount_usd: 0.0,
-        thread_id: None,
-        task_id: None,
-        session_id: None,
-        parent_session_id: None,
-    };
-    locator
-        .open_stem(stem, seed)
-        .expect("open the child stem")
-        .read_session()
-        .expect("read the child transcript")
-        .expect("the child transcript was written")
-}
-
-#[test]
-fn a_subagent_writes_to_its_turn_trees_store_else_its_contexts() {
-    let workspace = tempfile::tempdir().unwrap();
-    let tree = crate::agent::session_store::transcripts_or_files("tree-key", workspace.path());
-    let mut run_context = crate::agent::tinyagents::host::OpenHumanRunContext::new();
-    run_context.transcripts = Some(tree.clone());
-    let chosen = super::transcript::subagent_transcripts(&run_context, workspace.path());
-    assert!(
-        Arc::ptr_eq(&chosen, &tree),
-        "the root session's store is used as is"
-    );
-
-    // No session handed a store over: the default agent's store of the run's
-    // (here unbound, desktop) tenant.
-    let unbound = crate::agent::tinyagents::host::OpenHumanRunContext::new();
-    let fallback = super::transcript::subagent_transcripts(&unbound, workspace.path());
-    assert_eq!(
-        fallback.destination_key(),
-        crate::agent::session_store::transcripts_or_files(
-            crate::agent::session_store::DEFAULT_AGENT,
-            workspace.path()
-        )
-        .destination_key()
-    );
-}
-
 #[test]
 fn subagent_transcript_keeps_cumulative_spend_separate_from_unknown_last_call() {
     let workspace = tempfile::tempdir().unwrap();
-    let locator =
-        crate::agent::session_store::transcripts_or_files("orchestrator", workspace.path());
     let usage = AggregatedUsage {
         input_tokens: 120,
         output_tokens: 30,
@@ -84,7 +22,7 @@ fn subagent_transcript_keeps_cumulative_spend_separate_from_unknown_last_call() 
         },
     };
     super::transcript::persist_subagent_transcript(
-        locator.as_ref(),
+        workspace.path(),
         "root__usage",
         "worker",
         "task",
@@ -97,7 +35,10 @@ fn subagent_transcript_keeps_cumulative_spend_separate_from_unknown_last_call() 
         "test",
         2,
     );
-    let transcript = read_stem(locator.as_ref(), "root__usage");
+    let root = crate::agent::session_store::transcript_root(workspace.path());
+    let path = tinyagents_session::transcript::resolve_keyed_transcript_path(&root, "root__usage")
+        .unwrap();
+    let transcript = tinyagents_session::transcript::read_transcript(&path).unwrap();
     let recorded = &transcript
         .messages
         .last()
@@ -208,11 +149,8 @@ fn parallel_worker_without_thread_keeps_parent_transcript_affinity() {
 #[tokio::test]
 async fn explicit_worker_thread_replaces_parent_for_model_run_and_transcript() {
     let workspace = tempfile::tempdir().expect("workspace");
-    let locator =
-        crate::agent::session_store::transcripts_or_files("orchestrator", workspace.path());
     let mut parent = crate::agent::tinyagents::host::OpenHumanRunContext::new();
     parent.thread_id = Some("parent-thread".to_owned());
-    parent.transcripts = Some(locator.clone());
     let mut history = vec![TranscriptMessage::user("finish this")];
 
     run_subagent_via_graph(
@@ -247,7 +185,13 @@ async fn explicit_worker_thread_replaces_parent_for_model_run_and_transcript() {
     .await
     .expect("worker run");
 
-    let persisted = read_stem(locator.as_ref(), "root__worker-thread");
+    let path = tinyagents_session::transcript::resolve_keyed_transcript_path(
+        workspace.path(),
+        "root__worker-thread",
+    )
+    .expect("transcript path");
+    let persisted =
+        tinyagents_session::transcript::read_transcript(&path).expect("worker transcript");
     assert_eq!(persisted.meta.thread_id.as_deref(), Some("worker-thread"));
     assert_ne!(persisted.meta.thread_id.as_deref(), Some("parent-thread"));
 }

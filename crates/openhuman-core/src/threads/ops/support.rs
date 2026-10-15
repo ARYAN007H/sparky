@@ -21,69 +21,6 @@ pub(super) async fn workspace_dir() -> Result<PathBuf, String> {
         .map_err(|e| format!("load config: {e}"))
 }
 
-/// Where a thread's session transcripts live for one request: the workspace
-/// and the agent key the session host stored them under.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct TranscriptStore {
-    pub workspace_dir: PathBuf,
-    /// The store key ([`agent_key_for`](crate::agent::session_store::agent_key_for)):
-    /// `<profile>~<agent>` for a SaaS profile, else the agent, else the chat agent id.
-    pub key: String,
-}
-
-impl TranscriptStore {
-    /// The transcript port for this key: the installed session store, else
-    /// the workspace's own store.
-    pub(crate) fn locator(
-        &self,
-    ) -> std::sync::Arc<dyn tinyagents_session::transcript::TranscriptLocator> {
-        crate::agent::session_store::transcripts_or_files(&self.key, &self.workspace_dir)
-    }
-}
-
-/// The transcript store of the request `ctx` carries, resolved exactly as the
-/// session host resolved it when it wrote the thread: the config's chat agent
-/// as the fallback id, and the request's own tenant (never the ambient one),
-/// so a SaaS profile's key keeps its profile prefix.
-///
-/// # Errors
-///
-/// The config cannot be loaded, or the request has no tenant in SaaS mode.
-pub(crate) async fn transcript_store(
-    ctx: &crate::core::runtime::DispatchCtx,
-) -> Result<TranscriptStore, String> {
-    let config = ctx
-        .load_config()
-        .await
-        .map_err(|e| format!("load config: {e}"))?;
-    let tenant = crate::core::runtime::tenant::tenant_in(
-        crate::core::runtime::is_saas(),
-        ctx.resolved().as_deref(),
-    )
-    .map_err(|no_tenant| no_tenant.to_string())?;
-    Ok(transcript_store_for(&config, &tenant))
-}
-
-/// [`transcript_store`] for an already-resolved config and tenant.
-pub(crate) fn transcript_store_for(
-    config: &Config,
-    tenant: &crate::core::runtime::Tenant,
-) -> TranscriptStore {
-    let key = crate::agent::session_store::agent_key_for(
-        tenant,
-        &crate::web_chat::pick_target_agent_id(config),
-    );
-    log::debug!(
-        "[threads] transcript store key resolved profile={} agent={}",
-        tenant.profile.is_some(),
-        tenant.agent.is_some()
-    );
-    TranscriptStore {
-        workspace_dir: config.workspace_dir.clone(),
-        key,
-    }
-}
-
 /// Run a destructive sequence to completion even if the caller's future is
 /// dropped (client disconnect, RPC timeout).
 ///

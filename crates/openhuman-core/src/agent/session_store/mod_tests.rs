@@ -99,15 +99,10 @@ async fn without_a_store_transcripts_come_from_the_workspace_store_not_files() {
         parent_session_id: None,
     };
     let history = locator
-        .open_stem(
-            &tinyagents_session::transcript::session_stem(&session),
-            meta,
-        )
+        .open_stem(&tinyagents_session::transcript::session_stem(&session), meta)
         .expect("open the session's write handle");
     history
-        .append(tinyagents_session::transcript::TranscriptMessage::user(
-            "hi",
-        ))
+        .append(tinyagents_session::transcript::TranscriptMessage::user("hi"))
         .expect("append a message");
     assert!(transcripts_or_files("u1", dir).session_exists(&session));
     assert!(
@@ -176,19 +171,23 @@ async fn under<T>(ctx: Arc<crate::core::runtime::CoreContext>, f: impl FnOnce() 
 }
 
 #[tokio::test]
-async fn desktop_session_keys_are_unchanged() {
+async fn desktop_session_keys_and_transcript_roots_are_unchanged() {
+    let ws = std::path::Path::new("/ws");
     assert_eq!(current_agent_key_or("orchestrator"), "orchestrator");
-    let key = under(derived(None, Some("alpha")), || {
-        current_agent_key_or("orchestrator")
+    assert_eq!(transcript_root(ws), ws.to_path_buf());
+    let (key, root) = under(derived(None, Some("alpha")), || {
+        (current_agent_key_or("orchestrator"), transcript_root(ws))
     })
     .await;
     assert_eq!(key, "alpha");
+    assert_eq!(root, agent_transcript_root(ws, "alpha"));
 }
 
 #[tokio::test]
 async fn two_profiles_default_agents_keep_separate_session_keys_and_stores() {
-    let alice_key = under(derived(Some("alice"), None), || {
-        current_agent_key_or("orchestrator")
+    let ws = std::path::Path::new("/ws-profile");
+    let (alice_key, alice_root) = under(derived(Some("alice"), None), || {
+        (current_agent_key_or("orchestrator"), transcript_root(ws))
     })
     .await;
     let bob_key = under(derived(Some("bob"), None), || {
@@ -197,6 +196,8 @@ async fn two_profiles_default_agents_keep_separate_session_keys_and_stores() {
     .await;
     assert_eq!(alice_key, "alice~default");
     assert_eq!(bob_key, "bob~default");
+    // The default agent's transcripts sit at the profile's workspace root.
+    assert_eq!(alice_root, ws.to_path_buf());
 
     let provider: Arc<dyn SessionStoreProvider> = Arc::new(InMemorySessionStores::new());
     let stores_of = |profile: &'static str| {
@@ -304,29 +305,4 @@ async fn a_stashed_attachment_survives_a_restart_of_the_workspace_store() {
         .await
         .unwrap()
         .is_none());
-}
-
-#[test]
-fn agent_key_for_matches_the_session_hosts_resolution() {
-    use crate::core::runtime::Tenant;
-    let desktop = Tenant::default();
-    assert_eq!(agent_key_for(&desktop, "orchestrator"), "orchestrator");
-    let embedded = Tenant {
-        profile: None,
-        agent: Some("a1".into()),
-    };
-    assert_eq!(agent_key_for(&embedded, "orchestrator"), "a1");
-    let profile = Tenant {
-        profile: Some("p1".into()),
-        agent: None,
-    };
-    assert_eq!(agent_key_for(&profile, "orchestrator"), "p1~default");
-    let profile_agent = Tenant {
-        profile: Some("p1".into()),
-        agent: Some("a1".into()),
-    };
-    assert_eq!(
-        agent_key_for(&profile_agent, "orchestrator"),
-        crate::core::runtime::session_key(&profile_agent)
-    );
 }

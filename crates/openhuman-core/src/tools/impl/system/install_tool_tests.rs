@@ -34,12 +34,7 @@ fn chat_tool_context(
 #[tokio::test]
 async fn blocked_when_install_disabled() {
     let tool = InstallToolTool::new(policy(false, AutonomyLevel::Full));
-    let result = tool
-        .execute_with_context(
-            json!({ "package": "jq" }),
-            tinytools::ToolCallOptions::default(),
-            Some(&chat_tool_context(chat_ctx())),
-        )
+    let result = tool.execute_with_context(json!({ "package": "jq" }), tinytools::ToolCallOptions::default(), Some(&chat_tool_context(chat_ctx())))
         .await
         .unwrap();
     assert!(result.is_error);
@@ -49,12 +44,7 @@ async fn blocked_when_install_disabled() {
 #[tokio::test]
 async fn blocked_when_readonly() {
     let tool = InstallToolTool::new(policy(true, AutonomyLevel::ReadOnly));
-    let result = tool
-        .execute_with_context(
-            json!({ "package": "jq" }),
-            tinytools::ToolCallOptions::default(),
-            Some(&chat_tool_context(chat_ctx())),
-        )
+    let result = tool.execute_with_context(json!({ "package": "jq" }), tinytools::ToolCallOptions::default(), Some(&chat_tool_context(chat_ctx())))
         .await
         .unwrap();
     assert!(result.is_error);
@@ -64,12 +54,7 @@ async fn blocked_when_readonly() {
 #[tokio::test]
 async fn rejects_injection_in_package_name() {
     let tool = InstallToolTool::new(policy(true, AutonomyLevel::Full));
-    let result = tool
-        .execute_with_context(
-            json!({ "package": "jq; rm -rf /" }),
-            tinytools::ToolCallOptions::default(),
-            Some(&chat_tool_context(chat_ctx())),
-        )
+    let result = tool.execute_with_context(json!({ "package": "jq; rm -rf /" }), tinytools::ToolCallOptions::default(), Some(&chat_tool_context(chat_ctx())))
         .await
         .unwrap();
     assert!(result.is_error);
