@@ -17,7 +17,10 @@ use tinyagents_session::transcript::TranscriptMessage;
 use tinyagents_session::transcript::{self, TranscriptLocator};
 
 /// A thread's display records, read back through the store port.
-fn display_of(locator: &Arc<dyn TranscriptLocator>, thread_id: &str) -> transcript::DisplaySessionTranscript {
+fn display_of(
+    locator: &Arc<dyn TranscriptLocator>,
+    thread_id: &str,
+) -> transcript::DisplaySessionTranscript {
     locator
         .root_for_thread(thread_id)
         .expect("the thread has a root transcript")

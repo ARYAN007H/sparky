@@ -13,7 +13,11 @@ use super::transcript_compat_tests::{
     SCENARIOS,
 };
 
-fn tree(root: &Path, thread: &str, host: &crate::agent::OpenHumanSessionHost) -> BTreeMap<String, Value> {
+fn tree(
+    root: &Path,
+    thread: &str,
+    host: &crate::agent::OpenHumanSessionHost,
+) -> BTreeMap<String, Value> {
     store_tree(root, thread, host.session.as_ref().expect("bound session"))
 }
 
@@ -61,7 +65,10 @@ fn a_legacy_workspace_is_adopted_once_and_the_next_process_resumes_in_place() {
                 .iter()
                 .map(|stem| {
                     let history = locator
-                        .open_stem(stem, crate::agent::session_store::splice_fixture::blank_meta())
+                        .open_stem(
+                            stem,
+                            crate::agent::session_store::splice_fixture::blank_meta(),
+                        )
                         .expect("bind a legacy stem");
                     serde_json::to_value(history.messages().expect("read a legacy root"))
                         .expect("rows")
@@ -76,7 +83,9 @@ fn a_legacy_workspace_is_adopted_once_and_the_next_process_resumes_in_place() {
             let stem = host.session_id().expect("bound session id");
             place_fixture(root.path(), scenario, &stem, "");
             imported = legacy_rows(root.path());
-            assert!(imported.iter().all(|rows| !rows.as_array().unwrap().is_empty()));
+            assert!(imported
+                .iter()
+                .all(|rows| !rows.as_array().unwrap().is_empty()));
             assert!(host.resume_bound_session().await.expect("first resume"));
             after_first = tree(root.path(), &thread, &host);
         }
@@ -87,7 +96,9 @@ fn a_legacy_workspace_is_adopted_once_and_the_next_process_resumes_in_place() {
             "legacy roots must stay as imported"
         );
         assert!(
-            after_first.keys().any(|stem| !legacy_stems.contains(&stem.as_str())),
+            after_first
+                .keys()
+                .any(|stem| !legacy_stems.contains(&stem.as_str())),
             "adopted transcript written"
         );
 

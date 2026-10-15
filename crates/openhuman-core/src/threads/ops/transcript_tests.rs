@@ -217,7 +217,10 @@ async fn changing_the_chat_agent_does_not_strand_an_existing_threads_turns() {
         .await
         .unwrap()
         .key;
-    assert_ne!(rule_before, rule_after, "the chat agent flip changes the key");
+    assert_ne!(
+        rule_before, rule_after,
+        "the chat agent flip changes the key"
+    );
 
     // The first session on the thread records its key, then writes under it.
     let recorded = crate::threads::store::bind_transcript_key(

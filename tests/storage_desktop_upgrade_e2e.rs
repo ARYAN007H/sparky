@@ -27,9 +27,7 @@ use openhuman_core::config::Config;
 use openhuman_core::storage::import::{self, Outcome};
 use openhuman_core::storage::{rusqlite, DocumentStoreExt, Scope, ScopedStorage, StorageBackend};
 use sha2::Digest;
-use tinyagents_session::transcript::{
-    session_stem, SessionRef, TranscriptMessage, TranscriptMeta,
-};
+use tinyagents_session::transcript::{session_stem, SessionRef, TranscriptMessage, TranscriptMeta};
 use tinyagents_session::turn_state::TurnState;
 use tinystoragedrivers_core::Query;
 

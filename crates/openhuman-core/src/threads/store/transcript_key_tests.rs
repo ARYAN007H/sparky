@@ -16,12 +16,16 @@ fn the_first_recorded_key_wins() {
     let dir = tempfile::tempdir().unwrap();
     let store = store(&dir);
     assert_eq!(
-        store.record_transcript_key("thread-a", "orchestrator").unwrap(),
+        store
+            .record_transcript_key("thread-a", "orchestrator")
+            .unwrap(),
         "orchestrator"
     );
     // A later session under another chat agent keeps the original key.
     assert_eq!(
-        store.record_transcript_key("thread-a", "researcher").unwrap(),
+        store
+            .record_transcript_key("thread-a", "researcher")
+            .unwrap(),
         "orchestrator"
     );
     assert_eq!(
@@ -47,10 +51,16 @@ fn deleting_a_thread_forgets_its_key() {
             working_dir: None,
         })
         .unwrap();
-    store.record_transcript_key("thread-a", "orchestrator").unwrap();
-    store.record_transcript_key("thread-b", "orchestrator").unwrap();
+    store
+        .record_transcript_key("thread-a", "orchestrator")
+        .unwrap();
+    store
+        .record_transcript_key("thread-b", "orchestrator")
+        .unwrap();
 
-    assert!(store.delete_thread("thread-a", "2026-01-02T00:00:00Z").unwrap());
+    assert!(store
+        .delete_thread("thread-a", "2026-01-02T00:00:00Z")
+        .unwrap());
     assert_eq!(store.transcript_key("thread-a").unwrap(), None);
     assert!(store.transcript_key("thread-b").unwrap().is_some());
 
@@ -58,7 +68,9 @@ fn deleting_a_thread_forgets_its_key() {
     assert_eq!(store.transcript_key("thread-b").unwrap(), None);
     // A recreated thread records afresh.
     assert_eq!(
-        store.record_transcript_key("thread-a", "researcher").unwrap(),
+        store
+            .record_transcript_key("thread-a", "researcher")
+            .unwrap(),
         "researcher"
     );
 }

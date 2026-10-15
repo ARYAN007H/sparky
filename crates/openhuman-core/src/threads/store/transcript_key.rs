@@ -53,10 +53,7 @@ impl ConversationStore {
         let recorded = repo
             .run(|docs| async move {
                 let body: Value = json!({ "key": wanted });
-                match docs
-                    .put(COLLECTION, &id, body, Precondition::Absent)
-                    .await
-                {
+                match docs.put(COLLECTION, &id, body, Precondition::Absent).await {
                     Ok(_) => Ok(None),
                     Err(error) if error.kind() == ErrorKind::Conflict => {
                         let stored = docs.get(COLLECTION, &id).await?;
@@ -84,11 +81,9 @@ impl ConversationStore {
     pub(super) fn forget_transcript_key(&self, thread_id: &str) {
         let outcome = self.key_repo().and_then(|repo| {
             let id = thread_id.to_string();
-            repo.run(|docs| async move {
-                docs.delete(COLLECTION, &id, Precondition::None).await
-            })
-            .map(|_| ())
-            .map_err(|e| format!("{e:#}"))
+            repo.run(|docs| async move { docs.delete(COLLECTION, &id, Precondition::None).await })
+                .map(|_| ())
+                .map_err(|e| format!("{e:#}"))
         });
         if let Err(error) = outcome {
             log::warn!("{LOG_PREFIX} forget failed: {error}");

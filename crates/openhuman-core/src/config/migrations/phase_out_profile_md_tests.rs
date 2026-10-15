@@ -1,9 +1,9 @@
 use super::*;
+use crate::util::classic_transcript_fixture::{read_classic_rows, write_classic};
 use std::fs;
 use tempfile::TempDir;
 use tinyagents_session::transcript::TranscriptMessage;
 use tinyagents_session::transcript::TranscriptMeta;
-use crate::util::classic_transcript_fixture::{read_classic_rows, write_classic};
 
 fn durable_messages(
     messages: impl IntoIterator<Item = TranscriptMessage>,
@@ -176,7 +176,10 @@ fn sanitize_only_touches_first_system_message() {
     );
 
     let rows = read_classic_rows(&path);
-    assert!(!rows[0]["content"].as_str().unwrap().contains("### PROFILE.md"));
+    assert!(!rows[0]["content"]
+        .as_str()
+        .unwrap()
+        .contains("### PROFILE.md"));
     assert!(rows.iter().any(|m| {
         m["role"] == "user" && m["content"].as_str().unwrap().contains("### PROFILE.md")
     }));

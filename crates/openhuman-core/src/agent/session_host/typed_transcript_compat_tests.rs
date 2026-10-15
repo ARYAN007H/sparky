@@ -16,8 +16,8 @@
 //! The `.typed` files were derived once with the retired file writer; they are
 //! committed corpus now.
 
-use serde_json::{json, Value};
 use crate::agent::session_store::splice_fixture::head_of;
+use serde_json::{json, Value};
 use tinyagents_session::transcript::TranscriptLocator as _;
 use tinyinference_llm::message::ContentBlock;
 use tinyinference_llm::model::ModelResponse;

@@ -43,10 +43,7 @@ impl AgentLayout {
         Self {
             home: workspace_dir.join("agents").join(id),
             skills: workspace_dir.join("agents").join(id).join("skills"),
-            transcripts: workspace_dir
-                .join("agents")
-                .join(id)
-                .join("session_raw"),
+            transcripts: workspace_dir.join("agents").join(id).join("session_raw"),
             action_dir,
         }
     }

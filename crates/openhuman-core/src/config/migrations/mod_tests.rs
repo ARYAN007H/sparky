@@ -1,10 +1,10 @@
 use super::*;
+use crate::util::classic_transcript_fixture::{read_classic_rows, write_classic};
 use std::fs;
 use std::path::Path;
 use tempfile::TempDir;
 use tinyagents_session::transcript::TranscriptMessage;
 use tinyagents_session::transcript::TranscriptMeta;
-use crate::util::classic_transcript_fixture::{read_classic_rows, write_classic};
 
 fn durable_messages(
     messages: impl IntoIterator<Item = TranscriptMessage>,

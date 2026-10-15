@@ -1,10 +1,10 @@
 use super::*;
 use crate::storage::rusqlite;
 use crate::storage::MemoryStorage;
+use crate::util::classic_transcript_fixture::write_classic;
 use sha2::Digest as _;
 use std::collections::BTreeMap;
 use tempfile::TempDir;
-use crate::util::classic_transcript_fixture::write_classic;
 use tinyagents_session::transcript::{TranscriptMessage, TranscriptMeta};
 use tinyagents_session::turn_state::TurnState;
 

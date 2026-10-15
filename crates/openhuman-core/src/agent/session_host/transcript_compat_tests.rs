@@ -262,7 +262,10 @@ pub(super) fn store_tree(
     };
     for generation in locator.session_chain(session) {
         if let Some(read) = locator.read_session_transcript(&generation) {
-            put(tinyagents_session::transcript::session_stem(&generation), read);
+            put(
+                tinyagents_session::transcript::session_stem(&generation),
+                read,
+            );
         }
     }
     if let Some(found) = locator.thread_transcripts(thread, None) {
@@ -287,7 +290,10 @@ pub(super) fn place_fixture(root: &Path, scenario: &Scenario, stem: &str, varian
             );
         }
         Layout::Chain => {
-            place(fixture(&format!("{name}.g0.jsonl")), classic_path(root, stem));
+            place(
+                fixture(&format!("{name}.g0.jsonl")),
+                classic_path(root, stem),
+            );
             place(
                 fixture(&format!("{name}.g1.jsonl")),
                 classic_path(root, &format!("{stem}.g1")),

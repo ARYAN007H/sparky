@@ -435,7 +435,8 @@ async fn runtime_adapter_passes_host_context_commits_before_finalize_and_emits_o
         [SessionTerminal::Completed(_)]
     ));
     assert!(
-        locator.latest_for_agent("adapter-test").is_some() || locator.root_for_thread("thread-1").is_some(),
+        locator.latest_for_agent("adapter-test").is_some()
+            || locator.root_for_thread("thread-1").is_some(),
         "commit precedes finalization"
     );
 }

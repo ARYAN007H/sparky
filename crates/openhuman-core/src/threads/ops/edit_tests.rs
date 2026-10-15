@@ -380,7 +380,9 @@ async fn transcript_store_reads_the_profile_from_the_request_context() {
     .profile("profile-b");
     let ctx = DispatchCtx::new(CoreContext::for_test(DomainSet::full(), None).derive_with(overlay));
 
-    let store = transcript_store(&ctx, "any-thread").await.expect("resolve the store");
+    let store = transcript_store(&ctx, "any-thread")
+        .await
+        .expect("resolve the store");
     assert_eq!(store.key, "profile-b~default");
     assert_eq!(store.workspace_dir, dir.path());
 }

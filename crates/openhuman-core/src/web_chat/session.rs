@@ -475,7 +475,14 @@ pub(crate) async fn checkout_session_agent(
     // reused agent may have been built under a different one, and `None`
     // (English, or no locale sent) must clear a stale instruction.
     let mut agent = agent;
-    bind_transcript_store(ctx, config, thread_id, &fingerprint.target_agent_id, &mut agent).await;
+    bind_transcript_store(
+        ctx,
+        config,
+        thread_id,
+        &fingerprint.target_agent_id,
+        &mut agent,
+    )
+    .await;
     let directive = match locale.and_then(locale_reply_directive) {
         Some(directive) => Some(directive),
         // Messages this session already sent carry another language's
