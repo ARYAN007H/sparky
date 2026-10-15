@@ -274,9 +274,9 @@ fn turn_citations_are_capped_and_deduplicated() {
     };
     let thread = "thread-cap";
     let many: Vec<_> = (0..MAX_TURN_CITATIONS + 10).map(citation).collect();
-    record_turn_citations(thread, &many);
-    record_turn_citations(thread, &many[..2]);
-    record_turn_citations(thread, &[]);
+    record_turn_citations(&crate::core::runtime::DispatchCtx::ambient(), thread, &many);
+    record_turn_citations(&crate::core::runtime::DispatchCtx::ambient(), thread, &many[..2]);
+    record_turn_citations(&crate::core::runtime::DispatchCtx::ambient(), thread, &[]);
     let drained = take_turn_citations(&crate::core::runtime::DispatchCtx::ambient(), thread);
     assert_eq!(drained.len(), MAX_TURN_CITATIONS);
     assert_eq!(
