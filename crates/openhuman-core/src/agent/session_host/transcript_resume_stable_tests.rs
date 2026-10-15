@@ -62,7 +62,8 @@ fn a_legacy_workspace_is_adopted_once_and_the_next_process_resumes_in_place() {
             place_fixture(root.path(), scenario, &stem, "");
             legacy_only = tree(root.path(), &thread, &host);
             eprintln!("DBG tree={:?} session={:?}", legacy_only.keys().collect::<Vec<_>>(), host.session);
-            let l = super::transcript_compat_tests::store_locator(root.path()); eprintln!("DBG roots={:?}", l.thread_transcripts(&thread, None).map(|t| t.roots.iter().map(|r| r.stem.clone()).collect::<Vec<_>>()));
+            let l = super::transcript_compat_tests::store_locator(root.path()); for r in l.thread_transcripts(&thread, None).unwrap().roots { let m = r.transcript.read_session().unwrap().unwrap(); eprintln!("DBG meta sid={:?} thread={:?} agent={:?} n={}", m.meta.session_id, m.meta.thread_id, m.meta.agent_id, m.messages.len()); }
+            eprintln!("DBG roots={:?}", l.thread_transcripts(&thread, None).map(|t| t.roots.iter().map(|r| r.stem.clone()).collect::<Vec<_>>()));
             assert!(host.resume_bound_session().await.expect("first resume"));
             after_first = tree(root.path(), &thread, &host);
         }
