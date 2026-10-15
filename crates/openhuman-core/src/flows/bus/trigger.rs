@@ -279,6 +279,9 @@ impl EventHandler<DomainEvent> for FlowTriggerSubscriber {
     }
 
     async fn handle(&self, event: &DomainEvent) {
+        // Trigger events arrive over the host's socket or its own scheduler:
+        // the host's own tenant, and in SaaS none.
+        let host = crate::core::runtime::DispatchCtx::host_default();
         match event {
             // Every scope's flows may listen for this trigger: match them in
             // each, so each run starts as its flow's owner.

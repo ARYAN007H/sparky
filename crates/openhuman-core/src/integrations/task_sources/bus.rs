@@ -39,9 +39,14 @@ impl EventHandler<DomainEvent> for TaskSourcesConnectionSubscriber {
         let DomainEvent::ComposioConnectionCreated {
             toolkit,
             connection_id,
+            tenant,
             ..
         } = event
         else {
+            return;
+        };
+        let Some(ctx) = DispatchCtx::for_event(tenant.as_ref()) else {
+            tracing::debug!(toolkit = %toolkit, "[task_sources:bus] connection_created has no tenant; skipped");
             return;
         };
 

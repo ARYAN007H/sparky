@@ -51,18 +51,18 @@ async fn a_cached_owner_is_dropped_once_its_scope_loses_the_flow() {
     crate::flows::store::upsert_flow(&config, &local_flow("owner-test-revalidate")).unwrap();
 
     // Found in `local`, and remembered there.
-    assert_eq!(resolve(&config, "owner-test-revalidate").await, Ok(None));
+    assert_eq!(resolve(&DispatchCtx::unbound(), &config, "owner-test-revalidate").await, Ok(None));
     assert_eq!(
         OWNERS.lock().unwrap().get("owner-test-revalidate"),
         Some(&None)
     );
     // Still there: the cached answer stands.
-    assert_eq!(resolve(&config, "owner-test-revalidate").await, Ok(None));
+    assert_eq!(resolve(&DispatchCtx::unbound(), &config, "owner-test-revalidate").await, Ok(None));
     assert!(OWNERS.lock().unwrap().contains_key("owner-test-revalidate"));
 
     // Gone: the cache entry is dropped and nothing is found.
     crate::flows::store::remove_flow(&config, "owner-test-revalidate").unwrap();
-    assert_eq!(resolve(&config, "owner-test-revalidate").await, Ok(None));
+    assert_eq!(resolve(&DispatchCtx::unbound(), &config, "owner-test-revalidate").await, Ok(None));
     assert!(!OWNERS.lock().unwrap().contains_key("owner-test-revalidate"));
 }
 
