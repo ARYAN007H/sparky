@@ -9,6 +9,8 @@ use std::time::Duration;
 use serde_json::json;
 use tokio::sync::Mutex;
 
+use crate::core::runtime::DispatchCtx;
+
 use super::super::types::{InFlightEntry, ParallelEntry, SessionEntry};
 
 type ThreadSessions = Mutex<HashMap<String, SessionEntry>>;
@@ -44,18 +46,20 @@ pub(crate) fn parallel_in_flight() -> Arc<ParallelInFlight> {
 /// outside an agent scope, the key stays the bare thread id.
 ///
 /// [`CoreContext::session_agent`]: crate::core::runtime::CoreContext::session_agent
-pub(crate) fn key_for(thread_id: &str) -> String {
-    key_in(&current_tenant(), thread_id)
+pub(crate) fn key_for(ctx: &DispatchCtx, thread_id: &str) -> String {
+    key_in(&tenant_of(ctx), thread_id)
 }
 
 /// `key` with the calling scope's tenant prefix removed: the id the caller
 /// chose, for handing back to it. A key of another tenant is returned as is.
-pub(crate) fn unscope(key: &str) -> String {
-    unscope_in(&current_tenant(), key)
+pub(crate) fn unscope(ctx: &DispatchCtx, key: &str) -> String {
+    unscope_in(&tenant_of(ctx), key)
 }
 
-fn current_tenant() -> crate::core::runtime::Tenant {
-    crate::core::runtime::tenant::current_tenant_or_isolated("web_chat")
+/// The tenant `ctx` acts for; a SaaS context with none gets an isolated
+/// tenant no other work shares, so the key can only miss.
+pub(crate) fn tenant_of(ctx: &DispatchCtx) -> crate::core::runtime::Tenant {
+    crate::core::runtime::tenant::isolated_unless_tenant(ctx.tenant(), "web_chat")
 }
 
 /// [`key_for`] under an explicit tenant.
@@ -124,14 +128,14 @@ pub(crate) fn cancel_in_flight_gracefully(entry: InFlightEntry) -> String {
     request_id
 }
 
-pub async fn invalidate_thread_sessions(thread_id: &str) {
+pub async fn invalidate_thread_sessions(ctx: &DispatchCtx, thread_id: &str) {
     // Under an embedded agent or a profile only that tenant's entry goes.
     // Outside both every entry for the thread in the current table goes.
-    let tenant = current_tenant();
+    let tenant = tenant_of(ctx);
     let mut sessions = thread_sessions().lock_owned().await;
     let keys_to_remove: Vec<String> = match tenant.agent.as_ref().or(tenant.profile.as_ref()) {
         Some(_) => {
-            let key = key_for(thread_id);
+            let key = key_for(ctx, thread_id);
             sessions
                 .contains_key(&key)
                 .then_some(key)
@@ -186,19 +190,19 @@ pub(crate) async fn lock_thread_sessions_for_test() -> impl Send + 'static {
 
 /// The thread ids (as the caller chose them) with a primary or parallel turn
 /// in the calling context's tables.
-pub(crate) async fn live_thread_ids() -> Vec<String> {
+pub(crate) async fn live_thread_ids(ctx: &DispatchCtx) -> Vec<String> {
     let mut threads: Vec<String> = in_flight()
         .lock_owned()
         .await
         .keys()
-        .map(|key| unscope(key))
+        .map(|key| unscope(ctx, key))
         .collect();
     threads.extend(
         parallel_in_flight()
             .lock_owned()
             .await
             .values()
-            .map(|entry| unscope(&entry.thread_id)),
+            .map(|entry| unscope(ctx, &entry.thread_id)),
     );
     threads.sort();
     threads.dedup();
@@ -213,12 +217,13 @@ pub(crate) async fn track_parallel_turn_for_test(
     request_id: &str,
     cancel: tokio_util::sync::CancellationToken,
 ) {
+    let ctx = &DispatchCtx::ambient();
     let watched = cancel.clone();
     let handle = crate::core::runtime::spawn_scoped(async move { watched.cancelled().await });
     parallel_in_flight().lock_owned().await.insert(
-        key_for(request_id),
+        key_for(ctx, request_id),
         ParallelEntry {
-            thread_id: key_for(thread_id),
+            thread_id: key_for(ctx, thread_id),
             client_id: "test-client".to_string(),
             handle,
             cancel_token: cancel,
@@ -243,8 +248,9 @@ pub async fn drain_queued_turns_for_test(
     thread_id: &str,
     lane: tinyagents_harness::run_queue::QueueLane,
 ) -> Vec<crate::agent::queued_turn::QueuedTurn> {
+    let ctx = &DispatchCtx::ambient();
     let guard = in_flight().lock_owned().await;
-    match guard.get(&key_for(thread_id)) {
+    match guard.get(&key_for(ctx, thread_id)) {
         Some(entry) => entry.run_queue.drain(lane).await,
         None => Vec::new(),
     }

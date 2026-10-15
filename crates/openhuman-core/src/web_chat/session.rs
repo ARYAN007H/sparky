@@ -378,6 +378,7 @@ pub(crate) struct CheckedOutSession {
 /// turns can never drive one agent; `checkin_session_agent` /
 /// `checkin_session_agent_if_vacant` put it back.
 pub(crate) async fn checkout_session_agent(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     client_id: &str,
     thread_id: &str,
@@ -386,7 +387,7 @@ pub(crate) async fn checkout_session_agent(
     locale: Option<&str>,
     policy: CheckoutPolicy,
 ) -> Result<CheckedOutSession, String> {
-    let map_key = super::ops::key_for(thread_id);
+    let map_key = super::ops::key_for(ctx, thread_id);
     let target_agent_id = pick_target_agent_id(config);
     let effective = effective_session_config(config, model_override.as_deref(), temperature);
     let provider_role = provider_role_for_model_override(effective.default_model.as_deref());
@@ -514,13 +515,14 @@ pub(crate) async fn checkout_session_agent(
 /// The primary user-turn path: it owns the thread's `IN_FLIGHT` slot, so any
 /// entry it finds was left by a turn that ran concurrently and is now stale.
 pub(crate) async fn checkin_session_agent(
+    ctx: &crate::core::runtime::DispatchCtx,
     thread_id: &str,
     agent: OpenHumanSessionHost,
     fingerprint: SessionCacheFingerprint,
 ) {
     let mut sessions = super::ops::thread_sessions().lock_owned().await;
     sessions.insert(
-        super::ops::key_for(thread_id),
+        super::ops::key_for(ctx, thread_id),
         SessionEntry { agent, fingerprint },
     );
 }
@@ -531,12 +533,13 @@ pub(crate) async fn checkin_session_agent(
 /// agent and cached it; that one carries the user's newer turn and must win.
 /// Both turns appended to the thread's durable transcript regardless.
 pub(crate) async fn checkin_session_agent_if_vacant(
+    ctx: &crate::core::runtime::DispatchCtx,
     thread_id: &str,
     agent: OpenHumanSessionHost,
     fingerprint: SessionCacheFingerprint,
 ) -> bool {
     let mut sessions = super::ops::thread_sessions().lock_owned().await;
-    match sessions.entry(super::ops::key_for(thread_id)) {
+    match sessions.entry(super::ops::key_for(ctx, thread_id)) {
         std::collections::hash_map::Entry::Occupied(_) => {
             log::info!(
                 "[web-channel] system turn finished after a newer turn re-cached thread={} — \

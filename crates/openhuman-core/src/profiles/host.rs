@@ -570,7 +570,9 @@ impl ProfileHost {
         );
         let stopped = CoreContext::scope(
             Arc::clone(state.context()),
-            crate::web_chat::cancel_all_turns(),
+            crate::web_chat::cancel_all_turns(&crate::core::runtime::DispatchCtx::new(Arc::clone(
+                state.context(),
+            ))),
         )
         .await;
         log::info!("[profiles] fenced profile={id}: stopped {stopped} thread(s)");

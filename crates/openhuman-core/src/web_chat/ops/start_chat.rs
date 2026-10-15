@@ -15,7 +15,7 @@ use crate::security::prompt_injection::{
 };
 use crate::web_chat::WebChannelEvent;
 
-use super::super::event_bus::publish_web_channel_event;
+use super::super::event_bus::publish_web_channel_event_in;
 use super::super::run_task::run_chat_task;
 use super::super::types::{ChatRequestMetadata, InFlightEntry, QueueMode};
 use super::super::web_errors::classify_inference_error;
@@ -350,7 +350,7 @@ async fn start_chat_inner(
     // child registering late cannot deliver into the stopped generation.
     crate::agent::orchestration::background_completions::resume_stopped_thread(&thread_id);
 
-    let map_key = key_for(&thread_id);
+    let map_key = key_for(ctx, &thread_id);
 
     let parsed_mode = match queue_mode.as_deref() {
         Some("steer") => QueueMode::Steer,
@@ -455,27 +455,33 @@ async fn start_chat_inner(
                 item_id: Some(request_id.clone()),
                 text_preview: Some(crate::agent::queued_turn::text_preview(&message)),
             });
-            publish_web_channel_event(WebChannelEvent {
-                event: "chat_error".to_string(),
-                client_id: client_id.clone(),
-                thread_id: thread_id.clone(),
-                request_id: cancelled_id.clone(),
-                message: Some("Cancelled by newer request".to_string()),
-                error_type: Some("cancelled".to_string()),
-                ..Default::default()
-            });
+            publish_web_channel_event_in(
+                ctx,
+                WebChannelEvent {
+                    event: "chat_error".to_string(),
+                    client_id: client_id.clone(),
+                    thread_id: thread_id.clone(),
+                    request_id: cancelled_id.clone(),
+                    message: Some("Cancelled by newer request".to_string()),
+                    error_type: Some("cancelled".to_string()),
+                    ..Default::default()
+                },
+            );
             // See channel_ops::cancel_chat_inner — `chat_cancelled` is the
             // structured successor to `chat_error{error_type:"cancelled"}`,
             // kept alongside it for one release.
-            publish_web_channel_event(WebChannelEvent {
-                event: "chat_cancelled".to_string(),
-                client_id: client_id.clone(),
-                thread_id: thread_id.clone(),
-                request_id: cancelled_id,
-                cancel_reason: Some("superseded".to_string()),
-                superseded_by: Some(request_id.clone()),
-                ..Default::default()
-            });
+            publish_web_channel_event_in(
+                ctx,
+                WebChannelEvent {
+                    event: "chat_cancelled".to_string(),
+                    client_id: client_id.clone(),
+                    thread_id: thread_id.clone(),
+                    request_id: cancelled_id,
+                    cancel_reason: Some("superseded".to_string()),
+                    superseded_by: Some(request_id.clone()),
+                    ..Default::default()
+                },
+            );
         }
     }
 
@@ -681,7 +687,7 @@ async fn start_chat_inner(
                 );
             }
             if let Some(event) = deferred_error {
-                publish_web_channel_event(event);
+                publish_web_channel_event_in(&ctx_task, event);
             }
             if !followups.is_empty() {
                 log::info!(

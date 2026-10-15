@@ -85,6 +85,18 @@ pub struct AgentChatEnv {
     /// The host environment installed on the session
     /// ([`OpenHumanSessionHost::set_host_env`]).
     pub host: crate::agent::turn_env::HostTurnEnv,
+    /// Messages to steer the turn while it runs
+    /// ([`OpenHumanSessionHost::set_run_queue`]). Items pushed on its
+    /// [`QueueLane::Steer`](tinyagents_harness::run_queue::QueueLane::Steer)
+    /// lane before or during the turn are injected as user messages at the
+    /// loop's next safe checkpoint; a steer that arrives while the model is
+    /// writing its final answer earns one more model call. Steers the turn
+    /// did not apply are back on the lane once this call returns.
+    pub run_queue: Option<
+        std::sync::Arc<
+            tinyagents_harness::run_queue::RunQueue<crate::agent::queued_turn::QueuedTurn>,
+        >,
+    >,
 }
 
 /// The log line every successful agent chat turn carries.
@@ -540,6 +552,10 @@ pub async fn agent_chat_reply_for(
     // tool-belt authority) rides the session explicitly.
     let approval = env.host.approval.clone();
     agent.set_host_env(env.host);
+    if let Some(queue) = env.run_queue {
+        log::debug!("[inference] agent_chat attached a run queue for mid-turn steering");
+        agent.set_run_queue(Some(queue));
+    }
     // Live progress for in-process embedders. `OpenHumanSessionHost::from_config` never
     // attaches a sink itself, so there is nothing to clobber here; callers that
     // set one explicitly (web chat, platform socket, flows, skills) hold their

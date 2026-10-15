@@ -89,14 +89,24 @@ async fn start_chat_rejects_prompt_injection_payload() {
 
 #[tokio::test]
 async fn cancel_chat_validates_required_fields() {
-    let err = cancel_chat_scoped("", "thread", None)
-        .await
-        .expect_err("client id should be required");
+    let err = cancel_chat_scoped(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "",
+        "thread",
+        None,
+    )
+    .await
+    .expect_err("client id should be required");
     assert!(err.contains("client_id is required"));
 
-    let err = cancel_chat_scoped("client", "", None)
-        .await
-        .expect_err("thread id should be required");
+    let err = cancel_chat_scoped(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "client",
+        "",
+        None,
+    )
+    .await
+    .expect_err("thread id should be required");
     assert!(err.contains("thread_id is required"));
 }
 

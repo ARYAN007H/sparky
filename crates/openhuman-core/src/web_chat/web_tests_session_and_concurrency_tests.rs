@@ -249,8 +249,20 @@ async fn start_chat_runs_distinct_threads_concurrently() {
     );
 
     // Cleanup: cancel both and clear the test hook.
-    let _ = cancel_chat_scoped("client-a", thread_a, None).await;
-    let _ = cancel_chat_scoped("client-b", thread_b, None).await;
+    let _ = cancel_chat_scoped(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "client-a",
+        thread_a,
+        None,
+    )
+    .await;
+    let _ = cancel_chat_scoped(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "client-b",
+        thread_b,
+        None,
+    )
+    .await;
     set_test_run_chat_task_block(None).await;
 }
 
@@ -286,9 +298,14 @@ async fn cancel_chat_cooperatively_stops_in_flight_turn() {
         "turn should still be parked, not yet dropped"
     );
 
-    let cancelled = cancel_chat_scoped("cancel-client", thread_id, None)
-        .await
-        .expect("cancel_chat should succeed");
+    let cancelled = cancel_chat_scoped(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "cancel-client",
+        thread_id,
+        None,
+    )
+    .await
+    .expect("cancel_chat should succeed");
     assert_eq!(
         cancelled.as_deref(),
         Some(request_id.as_str()),
@@ -450,9 +467,14 @@ async fn parallel_turn_runs_concurrently_with_primary_on_same_thread() {
     );
 
     // A thread-level cancel tears down BOTH the primary and the parallel turn.
-    cancel_chat_scoped("pp-client", thread_id, None)
-        .await
-        .expect("cancel should succeed");
+    cancel_chat_scoped(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "pp-client",
+        thread_id,
+        None,
+    )
+    .await
+    .expect("cancel should succeed");
     wait_for_in_flight(|e| !e.iter().any(|(k, _)| k == thread_id)).await;
     wait_for_parallel(|e| !e.iter().any(|(_, t)| t == thread_id)).await;
 
@@ -612,9 +634,14 @@ async fn unscoped_cancel_stops_the_threads_detached_subagents() {
     .expect("fixture registration admitted");
 
     // A scoped cancel for some other request is not a Stop: the child lives.
-    let scoped = channel_web_cancel("stop-client", thread_id, Some("req-unrelated"))
-        .await
-        .expect("scoped cancel");
+    let scoped = channel_web_cancel(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "stop-client",
+        thread_id,
+        Some("req-unrelated"),
+    )
+    .await
+    .expect("scoped cancel");
     assert_eq!(scoped.value["cancelled"], serde_json::json!(false));
     assert_eq!(scoped.value["subagents_cancelled"], serde_json::json!(0));
     assert!(
@@ -623,9 +650,14 @@ async fn unscoped_cancel_stops_the_threads_detached_subagents() {
     );
 
     // The Stop button: no turn in flight, but the detached child is stopped.
-    let stop = channel_web_cancel("stop-client", thread_id, None)
-        .await
-        .expect("stop");
+    let stop = channel_web_cancel(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "stop-client",
+        thread_id,
+        None,
+    )
+    .await
+    .expect("stop");
     assert_eq!(stop.value["cancelled"], serde_json::json!(true));
     assert_eq!(stop.value["request_id"], serde_json::Value::Null);
     assert_eq!(stop.value["subagents_cancelled"], serde_json::json!(1));
