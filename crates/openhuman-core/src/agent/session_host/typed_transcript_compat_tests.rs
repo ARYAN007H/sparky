@@ -17,7 +17,8 @@
 //! committed corpus now.
 
 use serde_json::{json, Value};
-use tinyagents_session::transcript::TranscriptMessage;
+use crate::agent::session_store::splice_fixture::head_of;
+use tinyagents_session::transcript::{TranscriptLocator, TranscriptMeta};
 use tinyinference_llm::message::ContentBlock;
 use tinyinference_llm::model::ModelResponse;
 
@@ -92,6 +93,29 @@ fn build_live_image_host(
         .expect("configured image session");
     host.set_thread_id(Some(thread));
     host
+}
+
+fn head_meta() -> TranscriptMeta {
+    TranscriptMeta {
+        agent_name: "orchestrator".into(),
+        agent_id: Some("orchestrator".into()),
+        agent_type: None,
+        dispatcher: "native".into(),
+        provider: None,
+        model: None,
+        created: "2026-01-01T00:00:00Z".into(),
+        updated: "2026-01-01T00:00:00Z".into(),
+        turn_count: 1,
+        prefix_message_count: None,
+        input_tokens: 0,
+        output_tokens: 0,
+        cached_input_tokens: 0,
+        charged_amount_usd: 0.0,
+        thread_id: None,
+        task_id: None,
+        session_id: None,
+        parent_session_id: None,
+    }
 }
 
 fn scenario(name: &str) -> &'static Scenario {
