@@ -261,26 +261,32 @@ async fn transcript_append_waits_for_a_live_turn() {
     task.await.unwrap().unwrap();
 }
 
-/// The append lands in the store the caller's key names: a SaaS profile's
+/// The append lands in the store the job's tenant keys: a SaaS profile's
 /// `<profile>~<agent>` transcript, never the unprefixed one of the same
 /// workspace.
 #[tokio::test]
-async fn transcript_append_uses_the_store_key_it_is_given() {
+async fn transcript_append_lands_in_the_tenants_store() {
     let tmp = tempfile::TempDir::new().unwrap();
     let cfg = config(&tmp);
-    let tenant = crate::core::runtime::Tenant {
+    let profile = crate::core::runtime::Tenant {
         profile: Some("profile-a".into()),
         agent: None,
     };
-    let key = crate::agent::session_store::agent_key_for(&tenant, "orchestrator");
-    assert_eq!(key, "profile-a~default");
-    let locator = crate::agent::session_store::transcripts_or_files(&key, &cfg.workspace_dir);
+    let desktop = crate::core::runtime::Tenant::default();
+    let profile_store = origin_transcripts(&cfg.workspace_dir, &profile, "orchestrator");
+    let desktop_store = origin_transcripts(&cfg.workspace_dir, &desktop, "orchestrator");
+    assert_ne!(
+        profile_store.destination_key(),
+        desktop_store.destination_key(),
+        "the profile prefix keys a store of its own"
+    );
+
     let session = SessionRef::scoped("t-p", "orchestrator");
     let next = vec![
         TranscriptMessage::user("remind me"),
         TranscriptMessage::assistant("Scheduled."),
     ];
-    locator
+    profile_store
         .open_session(&session, meta())
         .unwrap()
         .append_turn(TranscriptTurn {
@@ -293,25 +299,25 @@ async fn transcript_append_uses_the_store_key_it_is_given() {
         })
         .unwrap();
 
-    let append = |store_key: &'static str| TranscriptAppend {
+    let append = TranscriptAppend {
         thread_id: "t-p",
         agent_id: "orchestrator",
-        store_key,
         text: "Ping!",
         idempotency_key: "cron:job-p:run-1",
         job_id: "job-p",
         run_id: "run-1",
     };
-    // The unprefixed key has no such session: nothing is written anywhere.
-    append_to_origin_transcript(&cfg.workspace_dir, &append("orchestrator"))
+    // The unprefixed store has no such session: nothing is written there.
+    append_to_origin_transcript(desktop_store.as_ref(), &append)
         .await
         .unwrap();
-    append_to_origin_transcript(&cfg.workspace_dir, &append("profile-a~default"))
+    assert!(!desktop_store.session_exists(&session));
+    append_to_origin_transcript(profile_store.as_ref(), &append)
         .await
         .unwrap();
 
-    let head = locator.head_generation(&session);
-    let messages = locator
+    let head = profile_store.head_generation(&session);
+    let messages = profile_store
         .read_session_transcript(&head)
         .unwrap()
         .read_session()
