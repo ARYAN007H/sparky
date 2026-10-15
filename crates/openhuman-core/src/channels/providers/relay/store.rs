@@ -79,8 +79,12 @@ pub async fn record_inbound(
     let id = inbound_message_id(&params.message_id);
     let lock = thread_lock(workspace_dir, thread_id);
     let _guard = lock.lock().await;
-    let existing =
-        conversations::get_messages(DispatchCtx::ambient(), workspace_dir.to_path_buf(), thread_id.to_string()).await?;
+    let existing = conversations::get_messages(
+        DispatchCtx::ambient(),
+        workspace_dir.to_path_buf(),
+        thread_id.to_string(),
+    )
+    .await?;
     if existing.iter().any(|message| message.id == id) {
         return Ok(Recorded::Duplicate);
     }
@@ -151,8 +155,12 @@ pub async fn prior_turns(
     limit: usize,
 ) -> Result<Vec<ChatMessage>, String> {
     let current = inbound_message_id(message_id);
-    let messages =
-        conversations::get_messages(DispatchCtx::ambient(), workspace_dir.to_path_buf(), thread_id.to_string()).await?;
+    let messages = conversations::get_messages(
+        DispatchCtx::ambient(),
+        workspace_dir.to_path_buf(),
+        thread_id.to_string(),
+    )
+    .await?;
     let rows = to_history(&messages, &current);
     let skip = rows.len().saturating_sub(limit);
     Ok(rows.into_iter().skip(skip).collect())

@@ -403,7 +403,7 @@ async fn persist_channel_turn(
     let created_at = Utc::now().to_rfc3339();
 
     ensure_thread(
-        DispatchCtx::ambient(),
+        &DispatchCtx::ambient(),
         workspace_dir.to_path_buf(),
         CreateConversationThread {
             id: thread_id.clone(),
@@ -417,9 +417,13 @@ async fn persist_channel_turn(
     )?;
 
     let persisted_message_id = format!("{}:{}", descriptor.role, descriptor.message_id);
-    if get_messages(DispatchCtx::ambient(), workspace_dir.to_path_buf(), &thread_id)?
-        .iter()
-        .any(|message| message.id == persisted_message_id)
+    if get_messages(
+        &DispatchCtx::ambient(),
+        workspace_dir.to_path_buf(),
+        &thread_id,
+    )?
+    .iter()
+    .any(|message| message.id == persisted_message_id)
     {
         log::debug!(
             "{LOG_PREFIX} skipping duplicate persisted turn thread_id={} message_id={}",
@@ -430,7 +434,7 @@ async fn persist_channel_turn(
     }
 
     append_message(
-        DispatchCtx::ambient(),
+        &DispatchCtx::ambient(),
         workspace_dir.to_path_buf(),
         &thread_id,
         ConversationMessage {

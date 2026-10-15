@@ -9,9 +9,9 @@
 //! Worker threads carry a hard cap on depth: a worker thread cannot spawn
 //! another worker thread.
 
-use crate::core::runtime::DispatchCtx;
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::subagent_host::{run_subagent_with_parent, SubagentRunOptions};
+use crate::core::runtime::DispatchCtx;
 use crate::threads::store as conversations;
 use async_trait::async_trait;
 use serde_json::json;
@@ -240,8 +240,9 @@ impl SpawnWorkerThreadTool {
             "[spawn_worker_thread] invoked"
         );
 
-        let threads = conversations::list_threads(DispatchCtx::ambient(), parent.workspace_dir.clone())
-            .map_err(|e| anyhow::anyhow!(e))?;
+        let threads =
+            conversations::list_threads(&DispatchCtx::ambient(), parent.workspace_dir.clone())
+                .map_err(|e| anyhow::anyhow!(e))?;
         if let Some(current_thread) = threads.iter().find(|t| t.id == current_thread_id) {
             let is_delegated_label = current_thread
                 .labels

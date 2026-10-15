@@ -4,7 +4,6 @@
 //! accepted. Completion/failure is reported through normal sub-agent lifecycle
 //! events and, when possible, persisted in the child worker thread.
 
-use crate::core::runtime::DispatchCtx;
 use super::subagent_abort_report::AbortReport;
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::orchestration::fleet_tools::FleetToolSet;
@@ -18,6 +17,7 @@ use crate::agent::progress::AgentProgress;
 use crate::agent::subagent_host::{
     run_subagent_with_parent, SubagentRunOptions, SubagentRunStatus,
 };
+use crate::core::runtime::DispatchCtx;
 use crate::threads::store::{self as conversations, ConversationMessage};
 use async_trait::async_trait;
 use serde_json::json;
@@ -583,7 +583,7 @@ fn attach_workflow_proposal(
     );
     if let Some(thread_id) = parent_thread_id {
         let persisted = conversations::append_message(
-        DispatchCtx::ambient(),
+            &DispatchCtx::ambient(),
             workspace_dir.to_path_buf(),
             thread_id,
             ConversationMessage {
