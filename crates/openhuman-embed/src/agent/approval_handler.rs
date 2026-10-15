@@ -69,8 +69,7 @@ impl EventHandler<DomainEvent> for Handler {
         if agent_id.as_deref() != Some(&self.agent_id) || *self.removed.borrow() {
             return;
         }
-        let approvals =
-            Approvals::new(
+        let approvals = Approvals::new(
             &self.agent_id,
             self.removed.clone(),
             self.lifecycle.clone(),

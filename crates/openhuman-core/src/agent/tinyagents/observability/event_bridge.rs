@@ -426,7 +426,7 @@ impl OpenhumanEventBridge {
                 Some(&self.provider_id),
                 subagent,
             )
-                .with_definition(self.definition.get().map(String::as_str)),
+            .with_definition(self.definition.get().map(String::as_str)),
         );
 
         // The cost footer is a top-level surface; for a child run the global

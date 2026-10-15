@@ -6,8 +6,8 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use crate::core::runtime::DispatchCtx;
+use async_trait::async_trait;
 use tinyinference_embeddings::{EmbeddingModel, Result as EmbedResult};
 
 /// Wraps the host-bound [`EmbeddingModel`] (credentials, rate limit and

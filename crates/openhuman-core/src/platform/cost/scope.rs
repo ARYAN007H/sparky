@@ -26,9 +26,7 @@ impl UsageScope {
     ) -> Self {
         let origin = crate::core::runtime::CoreContext::current_turn_origin();
         let (thread_id, origin) = describe_origin(origin.as_ref());
-        let session_agent = ctx.tenant()
-            .ok()
-            .and_then(|tenant| tenant.agent);
+        let session_agent = ctx.tenant().ok().and_then(|tenant| tenant.agent);
         let (agent_id, subagent_task_id) = match subagent {
             Some((agent, task)) => (Some(agent.to_string()), Some(task.to_string())),
             None => (None, None),
