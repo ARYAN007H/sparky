@@ -146,7 +146,7 @@ async fn task_store_records_spawn_complete_and_cancel() {
 
     // A second sub-agent that gets cancelled is recorded Cancelled.
     let _tx2 = register_test("task-ledger-2", "ledger-parent", run_queue());
-    assert!(cancel_by_task("task-ledger-2").is_some());
+    assert!(cancel_by_task(&crate::core::runtime::DispatchCtx::ambient(), "task-ledger-2").is_some());
     let cancelled = task_records(None)
         .into_iter()
         .find(|r| r.spec.task_id.as_str() == "task-ledger-2")
@@ -176,11 +176,11 @@ async fn task_id_for_session_enforces_parent_ownership() {
     .expect("fixture registration admitted");
 
     assert_eq!(
-        task_id_for_session("subsess-1", "session-owner").unwrap(),
+        task_id_for_session(&crate::core::runtime::DispatchCtx::ambient(), "subsess-1", "session-owner").unwrap(),
         "task-session"
     );
     assert!(matches!(
-        task_id_for_session("subsess-1", "session-other"),
+        task_id_for_session(&crate::core::runtime::DispatchCtx::ambient(), "subsess-1", "session-other"),
         Err(WaitError::NotOwned)
     ));
     let _ = tx.send(DetachedSubagentStatus::Completed {
@@ -243,7 +243,7 @@ async fn snapshot_and_block_scope_to_parent_and_reflect_live_status() {
     })
     .unwrap();
 
-    let snap = snapshot_for_parent("fleet-parent");
+    let snap = snapshot_for_parent(&crate::core::runtime::DispatchCtx::ambient(), "fleet-parent");
     assert_eq!(snap.len(), 2, "only this parent's workers: {snap:?}");
     // Ordered by agent_id then task_id → code_executor before researcher.
     assert_eq!(snap[0].agent_id, "code_executor");
@@ -252,7 +252,7 @@ async fn snapshot_and_block_scope_to_parent_and_reflect_live_status() {
     assert_eq!(snap[1].status, "running");
 
     let block =
-        active_subagents_context_block("fleet-parent", &test_workspace(), &FleetToolSet::all())
+        active_subagents_context_block(&crate::core::runtime::DispatchCtx::ambient(), "fleet-parent", &test_workspace(), &FleetToolSet::all())
             .expect("block present");
     assert!(block.contains("[active_subagents]"));
     assert!(block.contains("use wait_subagent to collect"));
@@ -263,7 +263,7 @@ async fn snapshot_and_block_scope_to_parent_and_reflect_live_status() {
 
     // A parent with no registered workers gets no block (no perturbation).
     assert!(
-        active_subagents_context_block("nobody-here", &test_workspace(), &FleetToolSet::all())
+        active_subagents_context_block(&crate::core::runtime::DispatchCtx::ambient(), "nobody-here", &test_workspace(), &FleetToolSet::all())
             .is_none()
     );
 
@@ -274,7 +274,7 @@ async fn snapshot_and_block_scope_to_parent_and_reflect_live_status() {
         let registry = AgentDefinitionRegistry::builtins_only();
         let def = registry.get("orchestrator").expect("built-in orchestrator");
         let fleet = FleetToolSet::from_scope(&def.tools, &def.disallowed_tools);
-        let block = active_subagents_context_block("fleet-parent", &test_workspace(), &fleet)
+        let block = active_subagents_context_block(&crate::core::runtime::DispatchCtx::ambient(), "fleet-parent", &test_workspace(), &fleet)
             .expect("block present");
         for name in [
             "wait_subagent",
@@ -335,13 +335,13 @@ async fn snapshot_and_block_scope_to_parent_and_reflect_live_status() {
         .expect("mark idle");
 
         let block =
-            active_subagents_context_block("cold-parent", durable_ws.path(), &FleetToolSet::all())
+            active_subagents_context_block(&crate::core::runtime::DispatchCtx::ambient(), "cold-parent", durable_ws.path(), &FleetToolSet::all())
                 .expect("durable-only roster present");
         assert!(block.contains(&format!("session={}", session.subagent_session_id)));
         assert!(block.contains("status=idle"));
         assert!(block.contains("about: Daily X trending email workflow"));
         // Other parents' durable sessions must not leak in.
-        assert!(active_subagents_context_block(
+        assert!(active_subagents_context_block(&crate::core::runtime::DispatchCtx::ambient(), 
             "unrelated-parent",
             durable_ws.path(),
             &FleetToolSet::all()
@@ -380,7 +380,7 @@ async fn resume_ref_for_task_includes_resume_fields_and_enforces_ownership() {
     )
     .expect("fixture registration admitted");
 
-    let reference = resume_ref_for_task("task-resume", "session-owner").expect("resume reference");
+    let reference = resume_ref_for_task(&crate::core::runtime::DispatchCtx::ambient(), "task-resume", "session-owner").expect("resume reference");
     assert_eq!(reference.task_id, "task-resume");
     assert_eq!(reference.agent_id, "researcher");
     assert_eq!(
@@ -388,7 +388,7 @@ async fn resume_ref_for_task_includes_resume_fields_and_enforces_ownership() {
         Some("subsess-resume")
     );
     assert!(matches!(
-        resume_ref_for_task("task-resume", "session-other"),
+        resume_ref_for_task(&crate::core::runtime::DispatchCtx::ambient(), "task-resume", "session-other"),
         Err(WaitError::NotOwned)
     ));
 
@@ -436,7 +436,7 @@ async fn task_id_for_session_prefers_live_task_over_terminal_task() {
     .expect("fixture registration admitted");
 
     assert_eq!(
-        task_id_for_session("subsess-live", "session-owner").unwrap(),
+        task_id_for_session(&crate::core::runtime::DispatchCtx::ambient(), "subsess-live", "session-owner").unwrap(),
         "task-new"
     );
     prune("task-old");
@@ -513,7 +513,7 @@ async fn cancel_for_thread_aborts_only_matching_entries() {
     // Headless (no parent thread) — must survive.
     let _d = register_test_with_thread("task-headless", "session-A", None, rq);
 
-    let cancelled = cancel_for_thread("thread-X");
+    let cancelled = cancel_for_thread(&crate::core::runtime::DispatchCtx::ambient(), "thread-X");
     assert_eq!(cancelled, 2, "both thread-X entries should be cancelled");
 
     // The two cancelled entries are gone (steer can't find them).
@@ -537,7 +537,7 @@ async fn cancel_for_thread_aborts_only_matching_entries() {
     );
 
     // Idempotent: a second pass cancels nothing.
-    assert_eq!(cancel_for_thread("thread-X"), 0);
+    assert_eq!(cancel_for_thread(&crate::core::runtime::DispatchCtx::ambient(), "thread-X"), 0);
 
     prune("task-tB");
     prune("task-headless");
@@ -551,7 +551,7 @@ async fn cancel_by_task_returns_metadata_and_removes_entry() {
     let task_id = TaskId::new("task-cbt");
     shared_steering_registry().register(task_id.clone(), SteeringHandle::allow_all());
 
-    let meta = cancel_by_task("task-cbt").expect("known task should cancel");
+    let meta = cancel_by_task(&crate::core::runtime::DispatchCtx::ambient(), "task-cbt").expect("known task should cancel");
     assert_eq!(
         meta.already_finished, None,
         "a running task is a real cancel"
@@ -569,9 +569,9 @@ async fn cancel_by_task_returns_metadata_and_removes_entry() {
         steer("task-cbt", "session-Z", "x".into(), QueueLane::Steer).await,
         Err(SteerError::Unknown)
     );
-    assert!(cancel_by_task("task-cbt").is_none());
+    assert!(cancel_by_task(&crate::core::runtime::DispatchCtx::ambient(), "task-cbt").is_none());
     // Unknown ids are simply None.
-    assert!(cancel_by_task("never-existed").is_none());
+    assert!(cancel_by_task(&crate::core::runtime::DispatchCtx::ambient(), "never-existed").is_none());
 }
 
 /// A finished run stays registered until the terminal sweep, so a late
@@ -608,7 +608,7 @@ async fn cancel_by_task_flags_a_run_that_already_finished() {
     for (task_id, status, finished) in cases {
         let tx = register_test(task_id, "session-F", run_queue());
         tx.send(status).expect("status channel open");
-        let meta = cancel_by_task(task_id).expect("registered task is found");
+        let meta = cancel_by_task(&crate::core::runtime::DispatchCtx::ambient(), task_id).expect("registered task is found");
         assert_eq!(meta.already_finished, finished, "{task_id}");
     }
 }
@@ -668,7 +668,7 @@ async fn stop_for_thread_aborts_the_threads_running_children() {
     let _other =
         register_test_with_thread("task-stop-other", "session-stop", Some("thread-keep"), rq);
 
-    let stopped = stop_for_thread("thread-stop");
+    let stopped = stop_for_thread(&crate::core::runtime::DispatchCtx::ambient(), "thread-stop");
     assert_eq!(stopped, vec!["task-stop-1".to_string()]);
 
     let joined = tokio::time::timeout(Duration::from_secs(2), child)
@@ -693,7 +693,7 @@ async fn stop_for_thread_aborts_the_threads_running_children() {
         .is_ok(),
         "a different thread's sub-agent is untouched"
     );
-    assert!(stop_for_thread("thread-stop").is_empty(), "idempotent");
+    assert!(stop_for_thread(&crate::core::runtime::DispatchCtx::ambient(), "thread-stop").is_empty(), "idempotent");
 
     prune("task-stop-other");
 }

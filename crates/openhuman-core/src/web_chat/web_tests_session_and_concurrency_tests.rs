@@ -619,7 +619,7 @@ async fn unscoped_cancel_stops_the_threads_detached_subagents() {
     let workspace = tempfile::tempdir().expect("workspace");
     let child = tokio::spawn(std::future::pending::<()>());
     let (_status_tx, status_rx) = running_subagents::status_channel();
-    running_subagents::register(
+    running_subagents::register(&crate::core::runtime::DispatchCtx::ambient(), 
         "task-web-stop-1".into(),
         "researcher".into(),
         "session-web-stop".into(),

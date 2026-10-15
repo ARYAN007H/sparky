@@ -21,7 +21,7 @@ fn subagent_transcript_keeps_cumulative_spend_separate_from_unknown_last_call() 
             source: tinyagents_harness::cost::CostSource::Charged,
         },
     };
-    super::transcript::persist_subagent_transcript(
+    super::transcript::persist_subagent_transcript(&crate::core::runtime::DispatchCtx::ambient(), 
         workspace.path(),
         "root__usage",
         "worker",
@@ -35,7 +35,7 @@ fn subagent_transcript_keeps_cumulative_spend_separate_from_unknown_last_call() 
         "test",
         2,
     );
-    let root = crate::agent::session_store::transcript_root(workspace.path());
+    let root = crate::agent::session_store::transcript_root(&crate::core::runtime::DispatchCtx::ambient(), workspace.path());
     let path = tinyagents_session::transcript::resolve_keyed_transcript_path(&root, "root__usage")
         .unwrap();
     let transcript = tinyagents_session::transcript::read_transcript(&path).unwrap();

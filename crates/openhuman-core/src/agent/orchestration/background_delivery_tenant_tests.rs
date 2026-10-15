@@ -45,7 +45,7 @@ fn seen_by(drain: &Drain) -> (Option<String>, String, Vec<String>) {
     let ctx = drain.owner.clone().expect("a SaaS drain carries its owner");
     let profile = ctx.profile().map(str::to_owned);
     let pending = CoreContext::sync_scope(ctx, || {
-        let ws = workspace_for_thread(&drain.thread_id).expect("owner knows its thread");
+        let ws = workspace_for_thread(&crate::core::runtime::DispatchCtx::ambient(), &drain.thread_id).expect("owner knows its thread");
         pending_for(&ws, &drain.thread_id)
             .into_iter()
             .map(|r| r.task_id)
@@ -69,7 +69,7 @@ async fn an_off_task_completion_drains_only_its_owners_thread() {
     for (ctx, ws, task) in [(&alice, &ws_a, &task_a), (&bob, &ws_b, &task_b)] {
         CoreContext::scope(
             Arc::clone(ctx),
-            record_completion(
+            record_completion(&crate::core::runtime::DispatchCtx::ambient(), 
                 ws.path(),
                 &session,
                 task.as_str(),

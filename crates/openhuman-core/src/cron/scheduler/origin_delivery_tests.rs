@@ -90,7 +90,7 @@ async fn no_reply_is_suppressed_without_writing_anything() {
     let tmp = tempfile::TempDir::new().unwrap();
     let cfg = config(&tmp);
     seed_thread(&cfg, "t-1");
-    let status = deliver_to_origin(&cfg, &job(Some(web("t-1"))), "run-1", " NO_REPLY ")
+    let status = deliver_to_origin(&crate::core::runtime::DispatchCtx::ambient(), &cfg, &job(Some(web("t-1"))), "run-1", " NO_REPLY ")
         .await
         .unwrap();
     assert_eq!(status, DeliveryStatus::Suppressed);
@@ -111,7 +111,7 @@ async fn web_delivery_stores_one_row_under_the_run_reply_id_and_is_idempotent() 
     let j = job(Some(web("t-1")));
 
     for _ in 0..2 {
-        let status = deliver_to_origin(&cfg, &j, "run-1", "  Drink water!  ")
+        let status = deliver_to_origin(&crate::core::runtime::DispatchCtx::ambient(), &cfg, &j, "run-1", "  Drink water!  ")
             .await
             .unwrap();
         assert_eq!(status, DeliveryStatus::Delivered);
@@ -130,7 +130,7 @@ async fn web_delivery_stores_one_row_under_the_run_reply_id_and_is_idempotent() 
     assert_eq!(messages[0].content, "Drink water!");
     assert_eq!(messages[0].sender, "agent");
 
-    deliver_to_origin(&cfg, &j, "run-2", "Again!")
+    deliver_to_origin(&crate::core::runtime::DispatchCtx::ambient(), &cfg, &j, "run-2", "Again!")
         .await
         .unwrap();
     assert_eq!(
@@ -149,7 +149,7 @@ async fn web_delivery_stores_one_row_under_the_run_reply_id_and_is_idempotent() 
 async fn web_delivery_to_a_missing_thread_fails() {
     let tmp = tempfile::TempDir::new().unwrap();
     let cfg = config(&tmp);
-    let err = deliver_to_origin(&cfg, &job(Some(web("gone"))), "run-1", "hi")
+    let err = deliver_to_origin(&crate::core::runtime::DispatchCtx::ambient(), &cfg, &job(Some(web("gone"))), "run-1", "hi")
         .await
         .unwrap_err();
     assert!(err.to_string().contains("origin thread"));
@@ -159,7 +159,7 @@ async fn web_delivery_to_a_missing_thread_fails() {
 async fn origin_mode_without_an_origin_is_an_error() {
     let tmp = tempfile::TempDir::new().unwrap();
     let cfg = config(&tmp);
-    assert!(deliver_to_origin(&cfg, &job(None), "run-1", "hi")
+    assert!(deliver_to_origin(&crate::core::runtime::DispatchCtx::ambient(), &cfg, &job(None), "run-1", "hi")
         .await
         .is_err());
 }
@@ -220,10 +220,10 @@ async fn web_delivery_appends_to_the_resumed_agent_transcript() {
         agent_id: Some("orchestrator".into()),
     }));
     j.id = "job-1".into();
-    deliver_to_origin(&cfg, &j, "run-1", "Drink water!")
+    deliver_to_origin(&crate::core::runtime::DispatchCtx::ambient(), &cfg, &j, "run-1", "Drink water!")
         .await
         .unwrap();
-    deliver_to_origin(&cfg, &j, "run-1", "Drink water!")
+    deliver_to_origin(&crate::core::runtime::DispatchCtx::ambient(), &cfg, &j, "run-1", "Drink water!")
         .await
         .unwrap();
 
@@ -249,7 +249,7 @@ async fn transcript_append_waits_for_a_live_turn() {
 
     let workspace = cfg.workspace_dir.clone();
     let task = tokio::spawn(async move {
-        append_to_origin_transcript(
+        append_to_origin_transcript(&crate::core::runtime::DispatchCtx::ambient(), 
             &workspace,
             &TranscriptAppend {
                 thread_id: "t-1",

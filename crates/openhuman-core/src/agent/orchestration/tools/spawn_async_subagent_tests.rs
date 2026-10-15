@@ -76,7 +76,7 @@ async fn late_registration_refusal_aborts_the_worker_and_settles_its_durable_ses
     // synthetic error or an accepted worker under another actor.
     let join = tokio::spawn(std::future::pending::<()>());
     let (_tx, rx) = running_subagents::status_channel();
-    let refused = running_subagents::register(
+    let refused = running_subagents::register(&crate::core::runtime::DispatchCtx::ambient(), 
         "late-refusal-task".into(),
         "task_manager_agent".into(),
         "late-parent".into(),

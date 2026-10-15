@@ -16,7 +16,7 @@ fn workspace() -> TestWorkspace {
 }
 
 fn record(ws: &Path, session: &str, task: &str, summary: &str, thread: Option<&str>) {
-    futures::executor::block_on(record_completion(
+    futures::executor::block_on(record_completion(&crate::core::runtime::DispatchCtx::ambient(), 
         ws,
         session,
         task,
@@ -76,7 +76,7 @@ fn headless_completion_is_dropped() {
         .claim_pending("", usize::MAX)
         .unwrap()
         .is_empty());
-    assert!(recover_pending_threads(ws.path()).is_empty());
+    assert!(recover_pending_threads(&crate::core::runtime::DispatchCtx::ambient(), ws.path()).is_empty());
 }
 
 #[test]
@@ -85,13 +85,13 @@ fn the_session_is_mapped_to_its_thread_for_the_idle_gate() {
     let ws = workspace();
     record(ws.path(), "sess-map", "sub-1", "x", Some("thread-map"));
     assert_eq!(
-        thread_for_session("sess-map").as_deref(),
+        thread_for_session(&crate::core::runtime::DispatchCtx::ambient(), "sess-map").as_deref(),
         Some("thread-map")
     );
     // A web-channel session id carries its thread in the JSON body.
     let web = r#"{"client_id":"c","thread_id":"thread-json"}"#;
-    assert_eq!(thread_for_session(web).as_deref(), Some("thread-json"));
-    assert_eq!(thread_for_session("cron:job-1"), None);
+    assert_eq!(thread_for_session(&crate::core::runtime::DispatchCtx::ambient(), web).as_deref(), Some("thread-json"));
+    assert_eq!(thread_for_session(&crate::core::runtime::DispatchCtx::ambient(), "cron:job-1"), None);
 }
 
 #[test]
@@ -103,7 +103,7 @@ fn discard_for_thread_removes_matching_and_drops_stragglers() {
     record(w, "sess-d1", "sub-b", "y", Some("thread-KEEP"));
     record(w, "sess-d2", "sub-c", "z", Some("thread-DEL"));
 
-    assert_eq!(discard_for_thread(w, "thread-DEL"), 2);
+    assert_eq!(discard_for_thread(&crate::core::runtime::DispatchCtx::ambient(), w, "thread-DEL"), 2);
     assert!(pending_ids(w, "thread-DEL").is_empty());
     assert_eq!(pending_ids(w, "thread-KEEP"), ["sub-b"]);
 }
@@ -115,7 +115,7 @@ fn record_after_discard_is_dropped_by_the_cancelled_parent() {
     let w = ws.path();
     // The thread is deleted before this process ever saw a child of it: the
     // delete still writes the cancelled-parent marker in the caller's workspace.
-    discard_for_thread(w, "thread-race");
+    discard_for_thread(&crate::core::runtime::DispatchCtx::ambient(), w, "thread-race");
     // A straggler that records after the sweep (the cooperative-abort race) is
     // dropped rather than queued.
     record(w, "sess-race", "sub-late", "stale", Some("thread-race"));
@@ -130,17 +130,17 @@ fn a_child_registering_after_its_thread_was_deleted_is_aborted_and_stays_dropped
     let _guard = test_guard();
     let ws = workspace();
     let w = ws.path();
-    assert!(!mark_stopped_task_if_thread_stopped(
+    assert!(!mark_stopped_task_if_thread_stopped(&crate::core::runtime::DispatchCtx::ambient(), 
         w,
         "thread-del-reg",
         "sub-a"
     ));
-    discard_for_thread(w, "thread-del-reg");
+    discard_for_thread(&crate::core::runtime::DispatchCtx::ambient(), w, "thread-del-reg");
 
     // A child spawned before the delete registers after it: it must be aborted,
     // and registering must not lift the delete (unlike a stopped thread, a
     // deleted one never reopens).
-    assert!(mark_stopped_task_if_thread_stopped(
+    assert!(mark_stopped_task_if_thread_stopped(&crate::core::runtime::DispatchCtx::ambient(), 
         w,
         "thread-del-reg",
         "sub-b"
@@ -273,7 +273,7 @@ fn record_awaiting_input_queues_a_framed_needs_input_for_delivery() {
     let _guard = test_guard();
     let ws = workspace();
     let w = ws.path();
-    futures::executor::block_on(record_awaiting_input(
+    futures::executor::block_on(record_awaiting_input(&crate::core::runtime::DispatchCtx::ambient(), 
         w,
         "sess-ask",
         "sub-ask",
@@ -296,7 +296,7 @@ fn the_outcome_survives_a_claim() {
     let _guard = test_guard();
     let ws = workspace();
     let w = ws.path();
-    futures::executor::block_on(record_outcome(
+    futures::executor::block_on(record_outcome(&crate::core::runtime::DispatchCtx::ambient(), 
         w,
         "sess-out",
         "sub-1",
@@ -335,7 +335,7 @@ fn discard_pending_for_thread_blocks_late_results_until_the_next_turn() {
     );
 
     // Stop drops the undelivered result so it can't start a delivery turn...
-    assert_eq!(discard_pending_for_thread("thread-stop-live"), 1);
+    assert_eq!(discard_pending_for_thread(&crate::core::runtime::DispatchCtx::ambient(), "thread-stop-live"), 1);
     assert!(pending_ids(w, "thread-stop-live").is_empty());
     assert_eq!(pending_ids(w, "thread-stop-other"), ["sub-stop-keep"]);
 
@@ -352,7 +352,7 @@ fn discard_pending_for_thread_blocks_late_results_until_the_next_turn() {
 
     // Completing Stop keeps the thread gate until a new user turn begins, so a
     // child that registers after the cancellation sweep is still rejected.
-    finish_stop_for_thread("thread-stop-live", &["sub-stop-later".into()]);
+    finish_stop_for_thread(&crate::core::runtime::DispatchCtx::ambient(), "thread-stop-live", &["sub-stop-later".into()]);
     record(
         w,
         "sess-stop",
@@ -364,13 +364,13 @@ fn discard_pending_for_thread_blocks_late_results_until_the_next_turn() {
 
     // A child that was spawned before Stop but registers after the registry
     // sweep gets its own tombstone before the thread can be reopened.
-    assert!(mark_stopped_task_if_thread_stopped(
+    assert!(mark_stopped_task_if_thread_stopped(&crate::core::runtime::DispatchCtx::ambient(), 
         w,
         "thread-stop-live",
         "sub-stop-registered-late"
     ));
 
-    resume_stopped_thread("thread-stop-live");
+    resume_stopped_thread(&crate::core::runtime::DispatchCtx::ambient(), "thread-stop-live");
     record(
         w,
         "sess-stop",
@@ -398,12 +398,12 @@ fn a_stop_before_a_restart_is_lifted_by_the_first_new_spawn() {
     let ws = workspace();
     let w = ws.path();
     record(w, "sess-rs", "sub-1", "x", Some("thread-restart-stop"));
-    assert_eq!(discard_pending_for_thread("thread-restart-stop"), 1);
+    assert_eq!(discard_pending_for_thread(&crate::core::runtime::DispatchCtx::ambient(), "thread-restart-stop"), 1);
 
     // A restart: the in-memory gate is gone, the durable cancelled-parent
     // marker is not.
     forget_workspace_for_test(w);
-    assert!(!mark_stopped_task_if_thread_stopped(
+    assert!(!mark_stopped_task_if_thread_stopped(&crate::core::runtime::DispatchCtx::ambient(), 
         w,
         "thread-restart-stop",
         "sub-new"
@@ -449,7 +449,7 @@ fn undelivered_completions_are_found_again_after_a_restart() {
     drop(router);
 
     forget_workspace_for_test(w);
-    let threads = recover_pending_threads(w);
+    let threads = recover_pending_threads(&crate::core::runtime::DispatchCtx::ambient(), w);
 
     assert_eq!(
         threads,
@@ -460,7 +460,7 @@ fn undelivered_completions_are_found_again_after_a_restart() {
         pending_for(w, "thread-boot")[0].result.text,
         "unseen result"
     );
-    assert!(router_for_thread("thread-boot").is_some());
+    assert!(router_for_thread(&crate::core::runtime::DispatchCtx::ambient(), "thread-boot").is_some());
 }
 
 #[test]
@@ -469,13 +469,13 @@ fn a_delete_survives_a_restart_and_is_not_lifted_by_a_new_spawn() {
     let ws = workspace();
     let w = ws.path();
     record(w, "sess-dr", "sub-1", "x", Some("thread-del-restart"));
-    assert_eq!(discard_for_thread(w, "thread-del-restart"), 1);
+    assert_eq!(discard_for_thread(&crate::core::runtime::DispatchCtx::ambient(), w, "thread-del-restart"), 1);
 
     // A restart: memory is gone, the durable markers are not. A late child for
     // the deleted thread must be aborted rather than treated as a user returning
     // to a stopped thread, and its result must stay dropped.
     forget_workspace_for_test(w);
-    assert!(mark_stopped_task_if_thread_stopped(
+    assert!(mark_stopped_task_if_thread_stopped(&crate::core::runtime::DispatchCtx::ambient(), 
         w,
         "thread-del-restart",
         "sub-late"
@@ -536,12 +536,12 @@ fn clear_all_also_withdraws_a_completion_a_delivery_has_leased() {
 fn the_session_cache_evicts_its_oldest_mapping_only() {
     let _guard = test_guard();
     for i in 0..(SESSION_THREADS_CAP + 5) {
-        note_session_thread(&format!("evict-sess-{i}"), &format!("evict-thread-{i}"));
+        note_session_thread(&crate::core::runtime::DispatchCtx::ambient(), &format!("evict-sess-{i}"), &format!("evict-thread-{i}"));
     }
-    assert_eq!(thread_for_session("evict-sess-0"), None, "oldest evicted");
+    assert_eq!(thread_for_session(&crate::core::runtime::DispatchCtx::ambient(), "evict-sess-0"), None, "oldest evicted");
     for survivor in [5, SESSION_THREADS_CAP / 2, SESSION_THREADS_CAP + 4] {
         assert_eq!(
-            thread_for_session(&format!("evict-sess-{survivor}")).as_deref(),
+            thread_for_session(&crate::core::runtime::DispatchCtx::ambient(), &format!("evict-sess-{survivor}")).as_deref(),
             Some(format!("evict-thread-{survivor}").as_str()),
             "a surviving session still resolves to its own thread"
         );
@@ -554,14 +554,14 @@ fn a_delete_marker_outlives_compaction() {
     let ws = workspace();
     let w = ws.path();
     record(w, "sess-cm", "sub-1", "x", Some("thread-compact"));
-    discard_for_thread(w, "thread-compact");
+    discard_for_thread(&crate::core::runtime::DispatchCtx::ambient(), w, "thread-compact");
 
     // Settled records expire; the deletion must not.
     router_for_workspace(w)
         .compact(std::time::Duration::ZERO)
         .unwrap();
     forget_workspace_for_test(w);
-    assert!(mark_stopped_task_if_thread_stopped(
+    assert!(mark_stopped_task_if_thread_stopped(&crate::core::runtime::DispatchCtx::ambient(), 
         w,
         "thread-compact",
         "sub-late"
@@ -573,7 +573,7 @@ fn deleting_a_thread_that_never_used_background_work_writes_nothing() {
     let _guard = test_guard();
     let ws = workspace();
     let w = ws.path();
-    assert_eq!(discard_for_thread(w, "thread-plain"), 0);
+    assert_eq!(discard_for_thread(&crate::core::runtime::DispatchCtx::ambient(), w, "thread-plain"), 0);
     assert!(
         entry_for(w).store.list(None).is_empty(),
         "no marker is persisted for an ordinary thread"
@@ -589,7 +589,7 @@ fn a_late_record_for_a_deleted_thread_is_dropped_by_the_durable_marker_alone() {
     let ws = workspace();
     let w = ws.path();
     record(w, "sess-dm", "sub-1", "x", Some("thread-dm"));
-    discard_for_thread(w, "thread-dm");
+    discard_for_thread(&crate::core::runtime::DispatchCtx::ambient(), w, "thread-dm");
     // A restart empties the in-memory gates; the marker on disk still decides.
     forget_workspace_for_test(w);
     record(w, "sess-dm", "sub-late", "stale", Some("thread-dm"));
@@ -601,7 +601,7 @@ async fn release_all_closes_every_router_and_the_log_stays_replayable() {
     let _guard = crate::config::TEST_ENV_LOCK.lock().await;
     let ws = workspace();
     let w = ws.path();
-    record_completion(
+    record_completion(&crate::core::runtime::DispatchCtx::ambient(), 
         w,
         "sess-rel",
         "sub-1",
@@ -617,12 +617,12 @@ async fn release_all_closes_every_router_and_the_log_stays_replayable() {
         "the router (and its log handle) is dropped"
     );
     assert!(
-        workspace_for_thread("thread-rel").is_none(),
+        workspace_for_thread(&crate::core::runtime::DispatchCtx::ambient(), "thread-rel").is_none(),
         "process-local maps are cleared"
     );
 
     // The next boot finds the undelivered completion from the log alone.
-    assert_eq!(recover_pending_threads(w), ["thread-rel"]);
+    assert_eq!(recover_pending_threads(&crate::core::runtime::DispatchCtx::ambient(), w), ["thread-rel"]);
 }
 
 #[tokio::test(start_paused = true)]
@@ -662,16 +662,16 @@ async fn release_all_keeps_the_stop_and_delete_gates() {
     let _guard = crate::config::TEST_ENV_LOCK.lock().await;
     let ws = workspace();
     let w = ws.path();
-    discard_pending_for_thread("thread-keep-stop");
+    discard_pending_for_thread(&crate::core::runtime::DispatchCtx::ambient(), "thread-keep-stop");
     state().deleted_threads.insert("thread-keep-del".into());
     release_all().await;
 
     // A detached child finishing after the release is still refused.
-    record_completion(w, "s", "sub-1", "r", "x", Some("thread-keep-stop".into())).await;
-    record_completion(w, "s", "sub-2", "r", "x", Some("thread-keep-del".into())).await;
+    record_completion(&crate::core::runtime::DispatchCtx::ambient(), w, "s", "sub-1", "r", "x", Some("thread-keep-stop".into())).await;
+    record_completion(&crate::core::runtime::DispatchCtx::ambient(), w, "s", "sub-2", "r", "x", Some("thread-keep-del".into())).await;
     assert!(pending_ids(w, "thread-keep-stop").is_empty());
     assert!(pending_ids(w, "thread-keep-del").is_empty());
-    resume_stopped_thread("thread-keep-stop");
+    resume_stopped_thread(&crate::core::runtime::DispatchCtx::ambient(), "thread-keep-stop");
     state().deleted_threads.remove("thread-keep-del");
 }
 
@@ -708,7 +708,7 @@ async fn a_store_that_keeps_failing_degrades_to_memory_instead_of_losing_the_res
     let w = ws.path();
     install_store_for_test(w, Arc::new(FullDisk(InMemoryCompletionStore::new())));
 
-    record_completion(
+    record_completion(&crate::core::runtime::DispatchCtx::ambient(), 
         w,
         "sess-fd",
         "sub-1",

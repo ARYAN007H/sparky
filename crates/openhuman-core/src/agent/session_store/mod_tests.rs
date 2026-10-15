@@ -68,7 +68,7 @@ async fn transcripts_come_from_the_store_only_when_one_is_in_effect() {
 async fn without_a_store_transcripts_are_workspace_files() {
     let dir = std::path::Path::new("/nonexistent-openhuman-workspace");
     assert_eq!(
-        transcripts_or_files("u1", dir).destination_key(),
+        transcripts_or_files(&crate::core::runtime::DispatchCtx::ambient(), "u1", dir).destination_key(),
         // tinyagents keys the file destination on the resolved `session_raw`
         // directory under the workspace (tinyagents#06ad95ea).
         Some(dir.join("session_raw").to_string_lossy().into_owned())
@@ -76,7 +76,7 @@ async fn without_a_store_transcripts_are_workspace_files() {
     let provider: Arc<dyn SessionStoreProvider> = Arc::new(InMemorySessionStores::new());
     let expected = provider.for_agent("u1").transcripts.destination_key();
     let found = scope(provider, async {
-        transcripts_or_files("u1", dir).destination_key()
+        transcripts_or_files(&crate::core::runtime::DispatchCtx::ambient(), "u1", dir).destination_key()
     })
     .await;
     assert_eq!(found, expected);
@@ -126,10 +126,10 @@ async fn under<T>(ctx: Arc<crate::core::runtime::CoreContext>, f: impl FnOnce() 
 #[tokio::test]
 async fn desktop_session_keys_and_transcript_roots_are_unchanged() {
     let ws = std::path::Path::new("/ws");
-    assert_eq!(current_agent_key_or("orchestrator"), "orchestrator");
-    assert_eq!(transcript_root(ws), ws.to_path_buf());
+    assert_eq!(current_agent_key_or(&crate::core::runtime::DispatchCtx::ambient(), "orchestrator"), "orchestrator");
+    assert_eq!(transcript_root(&crate::core::runtime::DispatchCtx::ambient(), ws), ws.to_path_buf());
     let (key, root) = under(derived(None, Some("alpha")), || {
-        (current_agent_key_or("orchestrator"), transcript_root(ws))
+        (current_agent_key_or(&crate::core::runtime::DispatchCtx::ambient(), "orchestrator"), transcript_root(&crate::core::runtime::DispatchCtx::ambient(), ws))
     })
     .await;
     assert_eq!(key, "alpha");
@@ -140,11 +140,11 @@ async fn desktop_session_keys_and_transcript_roots_are_unchanged() {
 async fn two_profiles_default_agents_keep_separate_session_keys_and_stores() {
     let ws = std::path::Path::new("/ws-profile");
     let (alice_key, alice_root) = under(derived(Some("alice"), None), || {
-        (current_agent_key_or("orchestrator"), transcript_root(ws))
+        (current_agent_key_or(&crate::core::runtime::DispatchCtx::ambient(), "orchestrator"), transcript_root(&crate::core::runtime::DispatchCtx::ambient(), ws))
     })
     .await;
     let bob_key = under(derived(Some("bob"), None), || {
-        current_agent_key_or("orchestrator")
+        current_agent_key_or(&crate::core::runtime::DispatchCtx::ambient(), "orchestrator")
     })
     .await;
     assert_eq!(alice_key, "alice~default");

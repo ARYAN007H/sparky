@@ -104,7 +104,7 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
     let _bus = mock_agent_run_turn(move |req: AgentTurnRequest| {
         let mut seen = stub_seen.lock().unwrap();
         seen.busy
-            .push(crate::agent::orchestration::busy_guard::is_busy(
+            .push(crate::agent::orchestration::busy_guard::is_busy(&crate::core::runtime::DispatchCtx::ambient(), 
                 &relayed_thread,
             ));
         seen.histories.push(
@@ -155,7 +155,7 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
         "a relayed turn marks its thread busy, so a background result waits"
     );
     assert!(
-        !crate::agent::orchestration::busy_guard::is_busy(&params("m1", "x").thread_id()),
+        !crate::agent::orchestration::busy_guard::is_busy(&crate::core::runtime::DispatchCtx::ambient(), &params("m1", "x").thread_id()),
         "the thread is idle once the turn ends"
     );
     for origin in &seen.origins {

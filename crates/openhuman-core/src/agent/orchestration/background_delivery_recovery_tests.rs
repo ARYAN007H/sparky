@@ -8,7 +8,7 @@ async fn a_mixed_batch_that_partly_gives_up_still_retries_the_rest() {
     record(w, "bd-mixed", "sub-old", "old", "thread-mixed").await;
     let router = router_for_workspace(w);
     for _ in 0..(DEFAULT_MAX_ATTEMPTS - 1) {
-        try_deliver_with(
+        try_deliver_with(&crate::core::runtime::DispatchCtx::ambient(), 
             "thread-mixed".into(),
             router.clone(),
             |_t, _n| async move { Err::<String, String>("checkout failed".to_string()) },
@@ -21,7 +21,7 @@ async fn a_mixed_batch_that_partly_gives_up_still_retries_the_rest() {
 
     let gave_up = Arc::new(Mutex::new(String::new()));
     let sink = Arc::clone(&gave_up);
-    let retry = try_deliver_with(
+    let retry = try_deliver_with(&crate::core::runtime::DispatchCtx::ambient(), 
         "thread-mixed".into(),
         router,
         |_t, _n| async move { Err::<String, String>("checkout failed".to_string()) },
