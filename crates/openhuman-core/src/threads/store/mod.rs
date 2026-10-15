@@ -33,6 +33,7 @@ pub mod blocking;
 
 mod bus;
 mod legacy_import;
+mod transcript_key;
 #[cfg(test)]
 #[path = "legacy_import_tests.rs"]
 mod legacy_import_tests;
