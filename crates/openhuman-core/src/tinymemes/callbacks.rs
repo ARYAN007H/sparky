@@ -24,7 +24,7 @@ use tinymemes_bus::{
 
 use super::{docs, inference, jev, search};
 use crate::config::Config;
-use crate::core::runtime::CoreContext;
+use crate::core::runtime::{CoreContext, DispatchCtx};
 
 /// How long an entry may live without its `End`.
 const MAX_AGE: Duration = Duration::from_secs(15 * 60);

@@ -72,6 +72,7 @@ pub(crate) trait Remixer: Send + Sync {
 
 /// The loadable `tinymemes` module, with this workspace's callbacks served.
 struct ModuleRemixer<'a> {
+    ctx: &'a DispatchCtx,
     config: &'a Config,
 }
 
