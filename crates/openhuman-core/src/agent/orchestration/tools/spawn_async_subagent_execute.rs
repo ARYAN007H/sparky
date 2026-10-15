@@ -353,6 +353,7 @@ impl SpawnAsyncSubagentTool {
         let (status_tx, status_rx) = running_subagents::status_channel();
 
         let background_workspace_dir = parent.workspace_dir.clone();
+        let background_dispatch = dispatch.clone();
         let background_definition = definition.clone();
         let background_agent_id = definition.id.clone();
         let background_task_id = task_id.clone();

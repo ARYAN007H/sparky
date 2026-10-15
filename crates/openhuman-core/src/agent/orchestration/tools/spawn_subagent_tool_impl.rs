@@ -73,6 +73,7 @@ impl SpawnSubagentTool {
             >,
         >,
     ) -> anyhow::Result<ToolResult> {
+        let dispatch = run_context.dispatch_ctx();
         // ── Argument extraction with back-compat ───────────────────────
         let agent_id = args
             .get("agent_id")
