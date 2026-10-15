@@ -161,6 +161,7 @@ pub(crate) fn action_root(config: &Config, scope: &AttachmentAccessScope) -> Pat
 /// Uploads must be written, validated and read under this one root; the turn
 /// runs with `action_dir` replaced by the thread's folder (#7714).
 pub(crate) async fn thread_action_dir(
+    ctx: &DispatchCtx,
     config: &Config,
     threads_dir: &Path,
     thread_id: Option<&str>,
@@ -169,7 +170,7 @@ pub(crate) async fn thread_action_dir(
         return Ok(config.action_dir.clone());
     };
     let bound = crate::threads::ops::thread_working_dir(
-        &DispatchCtx::ambient(),
+        ctx,
         threads_dir.to_path_buf(),
         thread_id,
     )
