@@ -3,9 +3,7 @@
 //! domain events onto it for Socket.IO and the JSON-RPC `/events` stream.
 
 use async_trait::async_trait;
-use once_cell::sync::Lazy;
 use std::sync::{Arc, OnceLock};
-use tokio::sync::broadcast;
 
 use crate::core::events::DomainEvent;
 use crate::web_chat::WebChannelEvent;
