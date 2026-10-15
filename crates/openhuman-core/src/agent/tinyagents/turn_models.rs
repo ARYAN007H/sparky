@@ -206,9 +206,7 @@ fn build_turn_models_crate(
     // The primary honours an explicit provider-string override when the producer's
     // effective provider differs from `provider_for_role(role)` (triage #1257).
     let build_primary = |m: &str| -> anyhow::Result<TurnChatModel> {
-        if let Some(chat) = ctx.host_overrides()
-            .and_then(|local| local.model_for(role))
-        {
+        if let Some(chat) = ctx.host_overrides().and_then(|local| local.model_for(role)) {
             return Ok(chat);
         }
         let managed = primary_override
@@ -218,10 +216,9 @@ fn build_turn_models_crate(
             })
             .unwrap_or_else(|| factory::resolves_to_managed_backend(role, config));
         if managed {
-            let (backend, _) =
-                factory::make_openhuman_backend_model_for_thread(
-                    role, config, m, true, thread_id, &egress,
-                )?;
+            let (backend, _) = factory::make_openhuman_backend_model_for_thread(
+                role, config, m, true, thread_id, &egress,
+            )?;
             return Ok(Arc::new(RouteRecordingModel::new(
                 crate::agent::attachments::provider::wrap(
                     backend,
@@ -265,90 +262,88 @@ fn build_turn_models_crate(
     };
 
     let (primary, routes, summarizer): BuiltTurnModels = (|| {
-            let primary = build_primary(model)?;
+        let primary = build_primary(model)?;
 
-            // Additive workload-tier routes: one crate-native model per tier (skipping the
-            // turn's own model, which is registered as the default primary), each pinned to
-            // the tier alias so the crate registry resolves cross-route fallback across them.
-            let mut routes: TierRoutes = Vec::new();
-            for &tier in tinyinference_llm::model::workload::WORKLOAD_ROUTE_TIERS {
-                if tier == model {
-                    continue;
-                }
-                let tier_role = factory::role_for_model_tier(tier);
-                if let Some(custom) = ctx.host_overrides()
-                    .and_then(|local| {
-                        local
-                            .role_models
-                            .get(tier)
-                            .or_else(|| local.role_models.get(tier_role))
-                            .cloned()
-                    })
-                {
-                    routes.push((
-                        tier.to_string(),
-                        crate::agent::attachments::provider::wrap_injected(
-                            custom,
+        // Additive workload-tier routes: one crate-native model per tier (skipping the
+        // turn's own model, which is registered as the default primary), each pinned to
+        // the tier alias so the crate registry resolves cross-route fallback across them.
+        let mut routes: TierRoutes = Vec::new();
+        for &tier in tinyinference_llm::model::workload::WORKLOAD_ROUTE_TIERS {
+            if tier == model {
+                continue;
+            }
+            let tier_role = factory::role_for_model_tier(tier);
+            if let Some(custom) = ctx.host_overrides().and_then(|local| {
+                local
+                    .role_models
+                    .get(tier)
+                    .or_else(|| local.role_models.get(tier_role))
+                    .cloned()
+            }) {
+                routes.push((
+                    tier.to_string(),
+                    crate::agent::attachments::provider::wrap_injected(
+                        custom,
+                        Arc::new(config.clone()),
+                    ),
+                ));
+                continue;
+            }
+            let route = if factory::resolves_to_managed_backend(tier_role, config) {
+                factory::make_openhuman_backend_model_for_thread(
+                    tier_role, config, tier, true, thread_id, &egress,
+                )
+                .map(|(backend, _)| (backend, "openhuman".to_string(), tier.to_string()))
+            } else {
+                factory::create_turn_chat_model_with_native_tools_and_route(
+                    ctx,
+                    tier_role,
+                    config,
+                    tier,
+                    temperature,
+                    true,
+                    &egress,
+                )
+            };
+            match route {
+                Ok((route_model, provider, resolved_model)) => routes.push((
+                    tier.to_string(),
+                    Arc::new(RouteRecordingModel::new(
+                        crate::agent::attachments::provider::wrap(
+                            route_model,
                             Arc::new(config.clone()),
+                            &resolved_model,
+                            &provider,
                         ),
-                    ));
-                    continue;
-                }
-                let route = if factory::resolves_to_managed_backend(tier_role, config) {
-                    factory::make_openhuman_backend_model_for_thread(
-                        tier_role, config, tier, true, thread_id, &egress,
-                    )
-                    .map(|(backend, _)| (backend, "openhuman".to_string(), tier.to_string()))
-                } else {
-                    factory::create_turn_chat_model_with_native_tools_and_route(
-                        ctx,
-                        tier_role,
-                        config,
-                        tier,
-                        temperature,
-                        true,
-                        &egress,
-                    )
-                };
-                match route {
-                    Ok((route_model, provider, resolved_model)) => routes.push((
-                        tier.to_string(),
-                        Arc::new(RouteRecordingModel::new(
-                            crate::agent::attachments::provider::wrap(
-                                route_model,
-                                Arc::new(config.clone()),
-                                &resolved_model,
-                                &provider,
-                            ),
-                            ResolvedModelRoute::new(provider, resolved_model, tier),
-                        )),
+                        ResolvedModelRoute::new(provider, resolved_model, tier),
                     )),
-                    Err(e) => {
-                        // A route that can't be built (e.g. an unconfigured BYOK tier) is
-                        // skipped, not fatal — the primary still dispatches (parity with the
-                        // `Provider` path, where an unresolved tier simply isn't registered).
-                        tracing::debug!(
-                            route = tier,
-                            error = %e,
-                            "[models] skipping crate-native workload route that failed to build"
-                        );
-                    }
+                )),
+                Err(e) => {
+                    // A route that can't be built (e.g. an unconfigured BYOK tier) is
+                    // skipped, not fatal — the primary still dispatches (parity with the
+                    // `Provider` path, where an unresolved tier simply isn't registered).
+                    tracing::debug!(
+                        route = tier,
+                        error = %e,
+                        "[models] skipping crate-native workload route that failed to build"
+                    );
                 }
             }
+        }
 
-            // The summarizer is a distinct adapter instance (own empty error slot).
-            let summarizer = match ctx.host_overrides()
-                .and_then(|local| local.role_models.get("summarization").cloned())
-            {
-                Some(custom) => crate::agent::attachments::provider::wrap_injected(
-                    custom,
-                    Arc::new(config.clone()),
-                ),
-                None => build_primary(model)?,
-            };
+        // The summarizer is a distinct adapter instance (own empty error slot).
+        let summarizer = match ctx
+            .host_overrides()
+            .and_then(|local| local.role_models.get("summarization").cloned())
+        {
+            Some(custom) => {
+                crate::agent::attachments::provider::wrap_injected(custom, Arc::new(config.clone()))
+            }
+            None => build_primary(model)?,
+        };
 
-            anyhow::Ok((primary, routes, summarizer))
-        })()?;
+        anyhow::Ok((primary, routes, summarizer))
+    })()?;
 
     let supports_vision = primary.profile().is_some_and(|p| p.modalities.image_in);
     Ok(TurnModels {
@@ -685,15 +680,11 @@ impl TurnModelSource {
             });
         }
         if let Some(cn) = &self.crate_native {
-            if let Some(custom) = cn
-                .ctx()
-                .host_overrides()
-                .and_then(|local| {
-                    local
-                        .model_for("summarization")
-                        .or_else(|| local.model_for(&cn.role))
-                })
-            {
+            if let Some(custom) = cn.ctx().host_overrides().and_then(|local| {
+                local
+                    .model_for("summarization")
+                    .or_else(|| local.model_for(&cn.role))
+            }) {
                 return Ok(crate::agent::attachments::provider::wrap_injected(
                     custom,
                     cn.config.clone(),

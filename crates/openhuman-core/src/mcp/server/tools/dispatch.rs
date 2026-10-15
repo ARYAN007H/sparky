@@ -209,7 +209,9 @@ async fn enforce_act_policy(ctx: &DispatchCtx, tool_name: &str) -> Result<(), To
         .map_err(ToolCallError::InvalidParams)
 }
 
-async fn load_config_and_init_registry(ctx: &DispatchCtx) -> Result<crate::config::Config, ToolCallError> {
+async fn load_config_and_init_registry(
+    ctx: &DispatchCtx,
+) -> Result<crate::config::Config, ToolCallError> {
     let config = ctx
         .load_config()
         .await
@@ -222,7 +224,9 @@ async fn load_config_and_init_registry(ctx: &DispatchCtx) -> Result<crate::confi
     Ok(config)
 }
 
-async fn build_orchestrator_agent(ctx: &DispatchCtx) -> Result<OpenHumanSessionHost, ToolCallError> {
+async fn build_orchestrator_agent(
+    ctx: &DispatchCtx,
+) -> Result<OpenHumanSessionHost, ToolCallError> {
     let config = load_config_and_init_registry(ctx).await?;
     let mut agent =
         OpenHumanSessionHost::from_config_for_agent(&config, "orchestrator").map_err(|err| {
@@ -319,7 +323,10 @@ async fn list_subagents(ctx: &DispatchCtx) -> Result<Value, ToolCallError> {
     }))
 }
 
-async fn run_subagent_tool(ctx: &DispatchCtx, params: &Map<String, Value>) -> Result<Value, ToolCallError> {
+async fn run_subagent_tool(
+    ctx: &DispatchCtx,
+    params: &Map<String, Value>,
+) -> Result<Value, ToolCallError> {
     use super::super::subagent_depth;
 
     let agent_id = validated_param(params, "agent_id")?;

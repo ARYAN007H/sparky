@@ -697,8 +697,9 @@ impl WalletHost {
         &self,
         request: AuthorizeX402PaymentRequest,
     ) -> tinybus::Result<HostResponse> {
-        let owner_matches =
-            x402_request_owner_matches(&request, crate::core::runtime::DispatchCtx::ambient_turn()
+        let owner_matches = x402_request_owner_matches(
+            &request,
+            crate::core::runtime::DispatchCtx::ambient_turn()
                 .turn_origin()
                 .as_ref(),
         );

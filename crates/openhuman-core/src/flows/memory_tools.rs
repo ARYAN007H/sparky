@@ -304,7 +304,8 @@ impl Tool for FlowMemoryRecallTool {
         _options: tinytools::ToolCallOptions,
         tool_context: Option<&dyn tinytools::ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
-        let origin = crate::agent::tinyagents::host::run_context::turn_origin_for_tool(tool_context);
+        let origin =
+            crate::agent::tinyagents::host::run_context::turn_origin_for_tool(tool_context);
         let query = match args.get("query").and_then(|v| v.as_str()) {
             Some(q) => q.trim(),
             None => return Ok(ToolResult::error("Missing 'query' parameter".to_string())),
@@ -450,7 +451,8 @@ impl Tool for FlowMemoryRememberTool {
         _options: tinytools::ToolCallOptions,
         tool_context: Option<&dyn tinytools::ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
-        let origin = crate::agent::tinyagents::host::run_context::turn_origin_for_tool(tool_context);
+        let origin =
+            crate::agent::tinyagents::host::run_context::turn_origin_for_tool(tool_context);
         let flow_id_arg = args.get("flow_id").and_then(|v| v.as_str());
         let Some(key) = args.get("key").and_then(|v| v.as_str()) else {
             return Ok(ToolResult::error("Missing 'key' parameter".to_string()));

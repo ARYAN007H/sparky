@@ -88,8 +88,7 @@ pub(super) fn create_turn_chat_model_with_native_tools_and_route_inner(
     native_tool_calling: bool,
     egress: &EgressLedger,
 ) -> anyhow::Result<(Arc<dyn ChatModel<()>>, String, String)> {
-    if let Some(chat) = ctx.host_overrides().and_then(|local| local.model_for(role))
-    {
+    if let Some(chat) = ctx.host_overrides().and_then(|local| local.model_for(role)) {
         return Ok((chat, "host".into(), model.to_owned()));
     }
     #[cfg(any(test, feature = "e2e-test-support", feature = "rss-bench"))]
@@ -157,14 +156,12 @@ pub(super) fn create_turn_chat_model_with_native_tools_and_route_inner(
             return result
                 .map(|(chat, resolved_model)| (chat, provider_name.clone(), resolved_model));
         }
-        if let Some(result) =
-            try_create_cloud_slug_chat_model_with_native_tools(
-                role,
-                config,
-                native_tool_calling,
-                egress,
-            )
-        {
+        if let Some(result) = try_create_cloud_slug_chat_model_with_native_tools(
+            role,
+            config,
+            native_tool_calling,
+            egress,
+        ) {
             return result
                 .map(|(chat, resolved_model)| (chat, provider_name.clone(), resolved_model));
         }
@@ -244,8 +241,7 @@ pub(crate) fn create_turn_chat_model_from_string_with_native_tools_and_route(
     native_tool_calling: bool,
     egress: &EgressLedger,
 ) -> anyhow::Result<(Arc<dyn ChatModel<()>>, String, String)> {
-    if let Some(chat) = ctx.host_overrides().and_then(|local| local.model_for(role))
-    {
+    if let Some(chat) = ctx.host_overrides().and_then(|local| local.model_for(role)) {
         return Ok((chat, "host".into(), model.to_owned()));
     }
     #[cfg(any(test, feature = "e2e-test-support", feature = "rss-bench"))]

@@ -378,7 +378,8 @@ impl Tool for RunWorkflowTool {
             Err(e) => return Ok(ToolResult::error(format!("run_workflow: {e}"))),
         };
 
-        let started = match spawn_workflow_run_background(workflow_id.clone(), inputs, origin).await {
+        let started = match spawn_workflow_run_background(workflow_id.clone(), inputs, origin).await
+        {
             Ok(s) => {
                 if let Err(e) = guard::account_spawn(&dispatch) {
                     return Ok(ToolResult::error(format!("run_workflow: {e}")));

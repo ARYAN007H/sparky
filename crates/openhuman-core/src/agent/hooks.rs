@@ -293,9 +293,7 @@ pub fn embedder_tool_hooks() -> Vec<Arc<dyn ToolHook>> {
 
 /// Snapshot tool hooks supplied by the embedding host, plus the agent-local
 /// ones of the agent `ctx` runs for.
-pub fn embedder_tool_hooks_in(
-    ctx: &crate::core::runtime::DispatchCtx,
-) -> Vec<Arc<dyn ToolHook>> {
+pub fn embedder_tool_hooks_in(ctx: &crate::core::runtime::DispatchCtx) -> Vec<Arc<dyn ToolHook>> {
     let mut hooks = EMBEDDER_TOOL_HOOKS
         .lock()
         .expect("embedder tool hooks poisoned")

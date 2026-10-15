@@ -109,7 +109,8 @@ impl Tool for CronAddTool {
         options: ToolCallOptions,
         tool_context: Option<&dyn tinytools::ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
-        let origin = crate::agent::tinyagents::host::run_context::turn_origin_for_tool(tool_context);
+        let origin =
+            crate::agent::tinyagents::host::run_context::turn_origin_for_tool(tool_context);
         if !self.config.cron.enabled {
             return Ok(ToolResult::error(
                 "cron is disabled by config (cron.enabled=false)".to_string(),

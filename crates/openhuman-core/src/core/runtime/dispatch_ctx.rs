@@ -141,14 +141,17 @@ impl DispatchCtx {
     /// Whether the interactive approval gate is off for the agent this call
     /// runs for.
     pub fn approvals_disabled(&self) -> bool {
-        self.resolved().is_some_and(|core| core.approvals_disabled())
+        self.resolved()
+            .is_some_and(|core| core.approvals_disabled())
     }
 
     /// The origin of the turn this call belongs to. Only a bound context
     /// supplies one: the process default never carries authority, so an
     /// unbound call answers `None` and the gate reads it as `Unknown`.
     pub fn turn_origin(&self) -> Option<crate::agent::turn_origin::AgentTurnOrigin> {
-        self.core.as_ref().and_then(|core| core.turn_origin().cloned())
+        self.core
+            .as_ref()
+            .and_then(|core| core.turn_origin().cloned())
     }
 
     /// [`turn_origin`](Self::turn_origin) of this call, else the origin the
