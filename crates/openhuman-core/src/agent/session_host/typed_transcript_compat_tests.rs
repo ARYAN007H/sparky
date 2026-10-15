@@ -18,7 +18,7 @@
 
 use serde_json::{json, Value};
 use crate::agent::session_store::splice_fixture::head_of;
-use tinyagents_session::transcript::{TranscriptLocator as _, TranscriptMeta};
+use tinyagents_session::transcript::TranscriptLocator as _;
 use tinyinference_llm::message::ContentBlock;
 use tinyinference_llm::model::ModelResponse;
 
@@ -93,29 +93,6 @@ fn build_live_image_host(
         .expect("configured image session");
     host.set_thread_id(Some(thread));
     host
-}
-
-fn head_meta() -> TranscriptMeta {
-    TranscriptMeta {
-        agent_name: "orchestrator".into(),
-        agent_id: Some("orchestrator".into()),
-        agent_type: None,
-        dispatcher: "native".into(),
-        provider: None,
-        model: None,
-        created: "2026-01-01T00:00:00Z".into(),
-        updated: "2026-01-01T00:00:00Z".into(),
-        turn_count: 1,
-        prefix_message_count: None,
-        input_tokens: 0,
-        output_tokens: 0,
-        cached_input_tokens: 0,
-        charged_amount_usd: 0.0,
-        thread_id: None,
-        task_id: None,
-        session_id: None,
-        parent_session_id: None,
-    }
 }
 
 fn scenario(name: &str) -> &'static Scenario {
@@ -426,7 +403,7 @@ fn typed_and_legacy_rows_bridge_to_identical_model_messages() {
         .filter_map(message_to_native_chat_message)
         .collect();
     let locator = crate::agent::session_store::splice_fixture::memory_locator();
-    let mut meta = head_meta();
+    let mut meta = crate::agent::session_store::splice_fixture::blank_meta();
     meta.thread_id = Some("typed-bridge".into());
     let history = locator.open_stem("typed-bridge", meta).expect("bind");
     history.replace(&rows).expect("write");
