@@ -469,10 +469,10 @@ async fn a_dispatcher_binds_the_context_it_is_handed_not_the_ambient_one() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp).await;
     let security = security(&config);
-    let handed = CoreContext::for_test(crate::core::runtime::DomainSet::full(), None);
-    let ambient = CoreContext::for_test(crate::core::runtime::DomainSet::full(), None);
+    let handed = crate::core::runtime::CoreContext::for_test(crate::core::runtime::DomainSet::full(), None);
+    let ambient = crate::core::runtime::CoreContext::for_test(crate::core::runtime::DomainSet::full(), None);
 
-    let dispatcher = CoreContext::scope(Arc::clone(&ambient), async {
+    let dispatcher = crate::core::runtime::CoreContext::scope(Arc::clone(&ambient), async {
         // Across an await the handed context is still the one bound.
         tokio::task::yield_now().await;
         JobDispatcher::new(
