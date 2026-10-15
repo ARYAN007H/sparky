@@ -1,8 +1,8 @@
 use serde_json::{Map, Value};
 
 use crate::core::all::{ControllerFuture, RegisteredController};
+use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
-use crate::core::DispatchCtx;
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
 use crate::test_support::{introspect, rpc};
 
@@ -308,7 +308,10 @@ fn handle_in_flight_chats(_ctx: DispatchCtx, _params: Map<String, Value>) -> Con
     Box::pin(async move { to_json(introspect::in_flight_chats().await?) })
 }
 
-fn handle_wallet_prepared_quotes(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_wallet_prepared_quotes(
+    _ctx: DispatchCtx,
+    _params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move { to_json(introspect::wallet_prepared_quotes().await?) })
 }
 
