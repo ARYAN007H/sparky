@@ -1,4 +1,10 @@
 use super::*;
+
+/// The context these tests dispatch under: the calling task's own.
+fn cx() -> crate::core::runtime::DispatchCtx {
+    crate::core::runtime::DispatchCtx::ambient()
+}
+
 use crate::agent::orchestration::background_completions::{
     forget_workspace_for_test, pending_for, record_completion, router_for_workspace, TestWorkspace,
 };
@@ -17,16 +23,7 @@ fn workspace() -> TestWorkspace {
 }
 async fn record(ws: &Path, session: &str, task: &str, summary: &str, thread: &str) {
     let thread = Some(thread.to_owned());
-    record_completion(
-        &DispatchCtx::ambient(),
-        ws,
-        session,
-        task,
-        "researcher",
-        summary,
-        thread,
-    )
-    .await;
+    record_completion(&cx(), ws, session, task, "researcher", summary, thread).await;
 }
 fn pending_ids(ws: &Path, thread: &str) -> Vec<String> {
     pending_for(ws, thread)
@@ -57,15 +54,14 @@ async fn claim_takes_the_ready_batch_when_idle() {
     record(w, "bd-ready", "sub-2", "beta", "thread-ready").await;
     let router = router_for_workspace(w);
 
-    let batch =
-        claim_ready(&DispatchCtx::ambient(), &router, "thread-ready").expect("claims a batch");
+    let batch = claim_ready(&cx(), &router, "thread-ready").expect("claims a batch");
     assert_eq!(batch.len(), 2);
     let notice = router.formatter().format_batch(&batch);
     assert!(notice.contains("sub-1") && notice.contains("sub-2"));
     // The records stay pending (leased) until the turn lands.
     assert_eq!(pending_ids(w, "thread-ready").len(), 2);
     assert!(
-        claim_ready(&DispatchCtx::ambient(), &router, "thread-ready").is_none(),
+        claim_ready(&cx(), &router, "thread-ready").is_none(),
         "a held lease is not claimed twice"
     );
 }
@@ -79,10 +75,10 @@ async fn claim_skips_a_busy_thread_and_leaves_the_queue_intact() {
     let router = router_for_workspace(w);
     mark_busy("bd-busy");
 
-    assert!(claim_ready(&DispatchCtx::ambient(), &router, "thread-busy").is_none());
+    assert!(claim_ready(&cx(), &router, "thread-busy").is_none());
     clear_busy("bd-busy");
     assert!(
-        claim_ready(&DispatchCtx::ambient(), &router, "thread-busy").is_some(),
+        claim_ready(&cx(), &router, "thread-busy").is_some(),
         "a deferral leaves the record claimable"
     );
     assert_eq!(
@@ -97,7 +93,7 @@ async fn claim_is_none_when_nothing_is_pending() {
     let _g = test_guard().await;
     let ws = workspace();
     let router = router_for_workspace(ws.path());
-    assert!(claim_ready(&DispatchCtx::ambient(), &router, "bd-empty-unique").is_none());
+    assert!(claim_ready(&cx(), &router, "bd-empty-unique").is_none());
 }
 
 #[tokio::test]
@@ -111,7 +107,7 @@ async fn a_delivered_batch_is_settled_and_not_redelivered() {
     let seen = Arc::clone(&turns);
 
     try_deliver_with(
-        &DispatchCtx::ambient(),
+        &cx(),
         "thread-ok".into(),
         router.clone(),
         move |thread, notice| {
@@ -146,7 +142,7 @@ async fn persistence_failure_releases_batch_without_terminal_announcement() {
     let announced_for_delivery = Arc::clone(&announced);
 
     try_deliver_with(
-        &DispatchCtx::ambient(),
+        &cx(),
         "thread-persist".into(),
         router.clone(),
         move |_thread_id, _notice| {
@@ -186,10 +182,10 @@ async fn persistence_failure_releases_batch_without_terminal_announcement() {
 async fn a_turn_is_busy_until_its_guard_drops() {
     let sid = r#"{"client_id":"c","thread_id":"bd-turn-thread"}"#.to_string();
 
-    let turn = TurnBusy::start(&DispatchCtx::ambient(), &sid);
-    assert!(is_busy(&DispatchCtx::ambient(), "bd-turn-thread"));
+    let turn = TurnBusy::start(&cx(), &sid);
+    assert!(is_busy(&cx(), "bd-turn-thread"));
     drop(turn);
-    assert!(!is_busy(&DispatchCtx::ambient(), "bd-turn-thread"));
+    assert!(!is_busy(&cx(), "bd-turn-thread"));
 
     // The bus events no longer mark busy: the subscriber runs off-task and
     // cannot tell which profile a session belongs to.
@@ -199,7 +195,7 @@ async fn a_turn_is_busy_until_its_guard_drops() {
             channel: "test".into(),
         })
         .await;
-    assert!(!is_busy(&DispatchCtx::ambient(), "bd-turn-thread"));
+    assert!(!is_busy(&cx(), "bd-turn-thread"));
 }
 
 /// Drive the real delivery loop with a turn executor that always fails, the
@@ -220,7 +216,7 @@ async fn drain_until_empty_or(
         let turns_for_delivery = Arc::clone(&turns);
         let sink = Arc::clone(&undelivered);
         try_deliver_with(
-            &DispatchCtx::ambient(),
+            &cx(),
             thread.to_string(),
             router.clone(),
             move |_thread_id, _notice| {
@@ -322,7 +318,7 @@ async fn transient_failure_under_the_ceiling_keeps_the_result() {
     let router = router_for_workspace(w);
 
     try_deliver_with(
-        &DispatchCtx::ambient(),
+        &cx(),
         "thread-transient".into(),
         router.clone(),
         |_t, _n| async move { Err::<String, String>("blip".to_string()) },
@@ -357,7 +353,7 @@ async fn busy_deferral_does_not_consume_the_failure_budget() {
     for _ in 0..(DEFAULT_MAX_ATTEMPTS * 2) {
         mark_busy("bd-busy-defer");
         try_deliver_with(
-            &DispatchCtx::ambient(),
+            &cx(),
             "thread-busy-defer".into(),
             router.clone(),
             |_t, _n| async move { unreachable!("must not run a delivery turn while busy") },
@@ -431,16 +427,15 @@ async fn a_pending_completion_survives_a_restart_and_is_delivered() {
     drop(router);
 
     forget_workspace_for_test(w);
-    let threads = background_completions::recover_pending_threads(&DispatchCtx::ambient(), w);
+    let threads = background_completions::recover_pending_threads(&cx(), w);
     assert_eq!(threads, ["thread-restart"]);
 
     let router =
-        background_completions::router_for_thread(&DispatchCtx::ambient(), "thread-restart")
-            .expect("recovered");
+        background_completions::router_for_thread(&cx(), "thread-restart").expect("recovered");
     let delivered = Arc::new(Mutex::new(Vec::<String>::new()));
     let sink = Arc::clone(&delivered);
     try_deliver_with(
-        &DispatchCtx::ambient(),
+        &cx(),
         "thread-restart".into(),
         router,
         move |thread, notice| {
@@ -466,7 +461,7 @@ async fn a_pending_completion_survives_a_restart_and_is_delivered() {
     );
 
     forget_workspace_for_test(w);
-    assert!(background_completions::recover_pending_threads(&DispatchCtx::ambient(), w).is_empty());
+    assert!(background_completions::recover_pending_threads(&cx(), w).is_empty());
 }
 
 #[tokio::test]
@@ -545,7 +540,7 @@ async fn a_delivered_batch_restores_the_full_failure_budget() {
     };
     for _ in 0..(DEFAULT_MAX_ATTEMPTS - 1) {
         try_deliver_with(
-            &DispatchCtx::ambient(),
+            &cx(),
             "thread-budget".into(),
             router.clone(),
             |_t, _n| async move { Err::<String, String>("blip".to_string()) },
@@ -554,7 +549,7 @@ async fn a_delivered_batch_restores_the_full_failure_budget() {
         .await;
     }
     try_deliver_with(
-        &DispatchCtx::ambient(),
+        &cx(),
         "thread-budget".into(),
         router.clone(),
         |_t, _n| async move { Ok::<String, String>("delivered".to_string()) },
@@ -589,7 +584,7 @@ async fn a_dropped_delivery_releases_its_slot_and_lease() {
         let router = router.clone();
         async move {
             try_deliver_with(
-                &DispatchCtx::ambient(),
+                &cx(),
                 "thread-drop".into(),
                 router,
                 move |_t, _n| {
@@ -610,7 +605,7 @@ async fn a_dropped_delivery_releases_its_slot_and_lease() {
     let delivered = Arc::new(Mutex::new(false));
     let flag = Arc::clone(&delivered);
     try_deliver_with(
-        &DispatchCtx::ambient(),
+        &cx(),
         "thread-drop".into(),
         router,
         move |_t, _n| {
@@ -641,7 +636,7 @@ async fn a_failed_turn_under_the_ceiling_asks_for_a_backoff_retry() {
     let router = router_for_workspace(w);
 
     let retry = try_deliver_with(
-        &DispatchCtx::ambient(),
+        &cx(),
         "thread-retry".into(),
         router.clone(),
         |_t, _n| async move { Err::<String, String>("session checkout failed".to_string()) },
@@ -651,7 +646,7 @@ async fn a_failed_turn_under_the_ceiling_asks_for_a_backoff_retry() {
     assert_eq!(retry, Some(retry_backoff(1)));
 
     let delivered = try_deliver_with(
-        &DispatchCtx::ambient(),
+        &cx(),
         "thread-retry".into(),
         router,
         |_t, _n| async move { Ok::<String, String>("presented".to_string()) },
@@ -683,13 +678,13 @@ async fn boot_recovery_schedules_a_delivery_for_every_thread_with_undelivered_re
     forget_workspace_for_test(w);
     scheduled_for_test().lock().expect("scheduled").clear();
 
-    assert_eq!(recover_on_boot(&DispatchCtx::ambient(), w), 1);
+    assert_eq!(recover_on_boot(&cx(), w), 1);
     assert!(scheduled_for_test()
         .lock()
         .expect("scheduled")
         .contains(&("thread-boot-sched".to_string(), RECOVERY_DELAY)));
     assert_eq!(
-        recover_on_boot(&DispatchCtx::ambient(), w),
+        recover_on_boot(&cx(), w),
         0,
         "a workspace is scanned once per process"
     );
@@ -702,14 +697,10 @@ async fn recover_on_open_rescans_a_workspace_already_recovered() {
     let w = ws.path();
     record(w, "bd-open", "sub-1", "left pending", "thread-open-resc").await;
     forget_workspace_for_test(w);
-    assert_eq!(recover_on_boot(&DispatchCtx::ambient(), w), 1);
+    assert_eq!(recover_on_boot(&cx(), w), 1);
+    assert_eq!(recover_on_boot(&cx(), w), 0, "boot recovery claims once");
     assert_eq!(
-        recover_on_boot(&DispatchCtx::ambient(), w),
-        0,
-        "boot recovery claims once"
-    );
-    assert_eq!(
-        recover_on_open(&DispatchCtx::ambient(), w, DrainFence::none()),
+        recover_on_open(&cx(), w, DrainFence::none()),
         1,
         "a re-open scans again"
     );
@@ -723,16 +714,13 @@ async fn a_cancelled_turn_does_not_leave_the_thread_busy() {
     let other = r#"{"client_id":"c","thread_id":"bd-other-thread"}"#;
     mark_busy(session);
     mark_busy(other);
-    assert!(is_busy(&DispatchCtx::ambient(), "bd-stale-thread"));
+    assert!(is_busy(&cx(), "bd-stale-thread"));
 
-    assert_eq!(
-        clear_busy_for_thread(&DispatchCtx::ambient(), "bd-stale-thread"),
-        1
-    );
+    assert_eq!(clear_busy_for_thread(&cx(), "bd-stale-thread"), 1);
 
-    assert!(!is_busy(&DispatchCtx::ambient(), "bd-stale-thread"));
+    assert!(!is_busy(&cx(), "bd-stale-thread"));
     assert!(
-        is_busy(&DispatchCtx::ambient(), "bd-other-thread"),
+        is_busy(&cx(), "bd-other-thread"),
         "other threads are untouched"
     );
     clear_busy(other);
