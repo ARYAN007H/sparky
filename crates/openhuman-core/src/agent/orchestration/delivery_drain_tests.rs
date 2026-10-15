@@ -38,9 +38,17 @@ async fn drain(
 ) -> (DrainOutcome, bool) {
     let ran = Arc::new(AtomicBool::new(false));
     let flag = Arc::clone(&ran);
-    let outcome = run_drain(&crate::core::runtime::DispatchCtx::ambient(), thread, delay, wait_idle, fence, SHORT, || async move {
-        flag.store(true, Ordering::SeqCst);
-    })
+    let outcome = run_drain(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        thread,
+        delay,
+        wait_idle,
+        fence,
+        SHORT,
+        || async move {
+            flag.store(true, Ordering::SeqCst);
+        },
+    )
     .await;
     (outcome, ran.load(Ordering::SeqCst))
 }
@@ -113,7 +121,10 @@ async fn an_expired_grant_fences_the_drain_without_a_latch() {
 async fn losing_the_lease_while_waiting_for_an_idle_thread_drops_the_drain() {
     let _g = crate::config::TEST_ENV_LOCK.lock().await;
     let (_leases, fence) = live_fence();
-    let turn = TurnBusy::start_on_thread(&crate::core::runtime::DispatchCtx::ambient(), "dd-busy-fenced");
+    let turn = TurnBusy::start_on_thread(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "dd-busy-fenced",
+    );
     let latch = Arc::clone(&fence);
     tokio::spawn(async move {
         tokio::time::sleep(SHORT * 3).await;
@@ -130,7 +141,10 @@ async fn a_recovered_drain_waits_for_a_relayed_turn_on_its_thread() {
     let _g = crate::config::TEST_ENV_LOCK.lock().await;
     let thread = "dd-relayed-thread";
     let turn = TurnBusy::start_on_thread(&crate::core::runtime::DispatchCtx::ambient(), thread);
-    assert!(is_busy(&crate::core::runtime::DispatchCtx::ambient(), thread), "a relayed turn marks its thread busy");
+    assert!(
+        is_busy(&crate::core::runtime::DispatchCtx::ambient(), thread),
+        "a relayed turn marks its thread busy"
+    );
     let release = tokio::spawn(async move {
         tokio::time::sleep(SHORT * 3).await;
         drop(turn);
@@ -139,7 +153,10 @@ async fn a_recovered_drain_waits_for_a_relayed_turn_on_its_thread() {
     release.await.unwrap();
     assert_eq!(outcome, DrainOutcome::Ran);
     assert!(ran);
-    assert!(!is_busy(&crate::core::runtime::DispatchCtx::ambient(), thread));
+    assert!(!is_busy(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        thread
+    ));
 }
 
 #[tokio::test]
@@ -148,7 +165,8 @@ async fn a_delivery_waits_while_a_relayed_turn_runs_on_its_thread() {
     let ws = TestWorkspace::new();
     let w = ws.path();
     let thread = "dd-relay-deliver";
-    record_completion(&crate::core::runtime::DispatchCtx::ambient(), 
+    record_completion(
+        &crate::core::runtime::DispatchCtx::ambient(),
         w,
         "dd-relay-session",
         "sub-relay",
@@ -160,7 +178,8 @@ async fn a_delivery_waits_while_a_relayed_turn_runs_on_its_thread() {
     let router = router_for_workspace(w);
     let turns = Arc::new(AtomicU32::new(0));
     let attempt = |turns: Arc<AtomicU32>| {
-        super::super::background_delivery::try_deliver_for_test(&crate::core::runtime::DispatchCtx::ambient(), 
+        super::super::background_delivery::try_deliver_for_test(
+            crate::core::runtime::DispatchCtx::ambient(),
             thread.to_string(),
             Arc::clone(&router),
             turns,

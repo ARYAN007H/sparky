@@ -11,7 +11,13 @@ async fn a_job_completed_as_an_agent_is_noted_once() {
         )
         .session_agent("completion-owner-agent"),
     );
-    CoreContext::scope(agent, async { note("completion-owner-job") }).await;
+    CoreContext::scope(agent, async {
+        note(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            "completion-owner-job",
+        )
+    })
+    .await;
     assert_eq!(
         take("completion-owner-job").as_deref(),
         Some("completion-owner-agent")
@@ -21,6 +27,9 @@ async fn a_job_completed_as_an_agent_is_noted_once() {
 
 #[test]
 fn a_job_completed_without_an_agent_is_not_noted() {
-    note("completion-owner-local");
+    note(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "completion-owner-local",
+    );
     assert_eq!(take("completion-owner-local"), None);
 }

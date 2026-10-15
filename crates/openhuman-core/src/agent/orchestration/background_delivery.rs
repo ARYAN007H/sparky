@@ -295,11 +295,18 @@ fn scheduled_for_test() -> &'static Mutex<Vec<(String, Duration)>> {
 /// after [`RECOVERY_DELAY`], through the normal idle-gated path, fenced by the
 /// calling profile's lease when there is one. Returns the number of threads
 /// scheduled.
-pub(crate) fn recover_on_boot(ctx: &crate::core::runtime::DispatchCtx, workspace_dir: &Path) -> usize {
+pub(crate) fn recover_on_boot(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: &Path,
+) -> usize {
     recover_fenced(ctx, workspace_dir, DrainFence::current())
 }
 
-fn recover_fenced(ctx: &crate::core::runtime::DispatchCtx, workspace_dir: &Path, fence: DrainFence) -> usize {
+fn recover_fenced(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: &Path,
+    fence: DrainFence,
+) -> usize {
     // Scheduling needs a runtime; check before claiming so a later call retries.
     if tokio::runtime::Handle::try_current().is_err() {
         log::warn!(
@@ -380,7 +387,8 @@ async fn try_deliver(
         );
         return;
     }
-    let Some(workspace_dir) = background_completions::workspace_for_thread(&busy_ctx, &thread_id) else {
+    let Some(workspace_dir) = background_completions::workspace_for_thread(&busy_ctx, &thread_id)
+    else {
         log::debug!("[background_delivery] no workspace for thread_id={thread_id}");
         return;
     };
@@ -421,13 +429,13 @@ async fn try_deliver(
 /// outside this module.
 #[cfg(test)]
 pub(super) async fn try_deliver_for_test(
-    ctx: &crate::core::runtime::DispatchCtx,
+    ctx: crate::core::runtime::DispatchCtx,
     thread_id: String,
     router: Arc<CompletionRouter>,
     turns: Arc<std::sync::atomic::AtomicU32>,
 ) -> Option<Duration> {
     try_deliver_with(
-        ctx,
+        &ctx,
         thread_id,
         router,
         move |_, _| {
@@ -617,7 +625,11 @@ struct DeliverySlot {
 
 impl DeliverySlot {
     /// `None` when a delivery is already in flight for the thread.
-    fn claim(ctx: &crate::core::runtime::DispatchCtx, thread_id: &str, router: Arc<CompletionRouter>) -> Option<Self> {
+    fn claim(
+        ctx: &crate::core::runtime::DispatchCtx,
+        thread_id: &str,
+        router: Arc<CompletionRouter>,
+    ) -> Option<Self> {
         let key = tenant::profile_key_in(&super::busy_guard::caller(ctx), thread_id);
         let mut d = delivering().lock().expect("delivering poisoned");
         if !d.insert(key.clone()) {
