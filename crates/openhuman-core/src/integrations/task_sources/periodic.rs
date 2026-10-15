@@ -165,7 +165,7 @@ pub(crate) async fn run_one_tick(ctx: &DispatchCtx) -> Result<(), String> {
         // Record the attempt up front so a slow/failing fetch doesn't
         // re-fire every tick.
         record_poll(&source.id);
-        let outcome = pipeline::run_source_once(&config, &source, FetchReason::Periodic).await;
+        let outcome = pipeline::run_source_once(ctx, &config, &source, FetchReason::Periodic).await;
         fired += 1;
         tracing::debug!(
             source_id = %source.id,

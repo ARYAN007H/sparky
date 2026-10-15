@@ -84,12 +84,13 @@ async fn fire_in_scope(
     if !config.task_sources.enabled {
         return;
     }
-    fire_for_connection(&config, provider, toolkit, connection_id).await;
+    fire_for_connection(ctx, &config, provider, toolkit, connection_id).await;
 }
 
 /// Starts a one-shot fetch for every enabled source of `provider` in the
 /// current storage scope that the new connection serves.
 async fn fire_for_connection(
+    ctx: &DispatchCtx,
     config: &crate::config::Config,
     provider: ProviderSlug,
     toolkit: &str,
@@ -123,10 +124,11 @@ async fn fire_for_connection(
         // pattern as the periodic poll). Each fetch captures its own
         // owned config + source.
         let config = config.clone();
+        let ctx = ctx.clone();
         // Scoped: the fetch keeps the scope's agent context.
         crate::core::runtime::spawn_scoped(async move {
-            let _ =
-                pipeline::run_source_once(&config, &source, FetchReason::ConnectionCreated).await;
+            let _ = pipeline::run_source_once(&ctx, &config, &source, FetchReason::ConnectionCreated)
+                .await;
         });
     }
 }
