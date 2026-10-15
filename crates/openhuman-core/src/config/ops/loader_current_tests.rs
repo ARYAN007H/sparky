@@ -22,12 +22,9 @@ async fn a_context_route_follows_every_load_of_the_context_config() {
         headers: Vec::new(),
     });
 
-    let loaded = CoreContext::scope(
-        context_with(config),
-        load_current_or_init(&DispatchCtx::process_default()),
-    )
-    .await
-    .expect("context config loads");
+    let loaded = load_current_or_init(&DispatchCtx::new(context_with(config)))
+        .await
+        .expect("context config loads");
 
     let pinned = format!("{EPHEMERAL_ROUTE_SLUG}:ctx-model");
     assert_eq!(loaded.chat_provider.as_deref(), Some(pinned.as_str()));
