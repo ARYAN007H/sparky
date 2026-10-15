@@ -75,6 +75,7 @@ pub(crate) async fn bootstrap_core_runtime(
         cfg.clone(),
         embedded_core,
         domains,
+        ctx,
     );
 
     // Latch the config-corruption recovery signal (#5167) so `app_state_snapshot`

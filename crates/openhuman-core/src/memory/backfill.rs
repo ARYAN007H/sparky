@@ -222,7 +222,7 @@ pub async fn start(
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .insert(workspace_dir.clone());
     if !claimed {
-        return status(config).await;
+        return status(ctx, config).await;
     }
     let mut file = read_file(&workspace_dir);
     let plans = match plan(ctx, &workspace_dir, Some(&bound), &file.stored).await {
