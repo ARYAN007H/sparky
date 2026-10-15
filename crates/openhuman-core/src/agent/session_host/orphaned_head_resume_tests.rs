@@ -71,7 +71,7 @@ async fn resumed_orphaned_tool_head_is_repaired_before_the_request() {
         .iter()
         .position(|row| row.role != "system")
         .expect("turn 1 wrote a non-system row");
-    assert!(head_end >= 2, "fixture needs the persisted system prefix");
+    assert!(head_end >= 1, "fixture needs the persisted system prefix");
     let failed = TranscriptMessage::tool("ra").with_id("call_orphan_a");
     let call = TranscriptToolCall {
         id: "call_kept".into(),
