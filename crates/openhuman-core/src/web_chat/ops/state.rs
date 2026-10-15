@@ -165,11 +165,12 @@ pub async fn invalidate_thread_sessions(ctx: &DispatchCtx, thread_id: &str) {
 /// Call from the captured core context so the original session table is used.
 /// Cancellation while waiting for that table never mutates a replacement session.
 pub(crate) async fn invalidate_thread_sessions_for_tenant(
+    ctx: &DispatchCtx,
     tenant: &crate::core::runtime::Tenant,
     thread_id: &str,
     cancellation: &tokio_util::sync::CancellationToken,
 ) -> bool {
-    let table = thread_sessions();
+    let table = thread_sessions(ctx);
     let mut sessions = tokio::select! {
         biased;
         _ = cancellation.cancelled() => return false,
