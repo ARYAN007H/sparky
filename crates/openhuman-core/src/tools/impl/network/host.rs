@@ -5,6 +5,7 @@
 //! `[http_request]` defaults, TinyJuice for page extraction, and (with the
 //! `web3` feature) the x402 payment flow.
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 #[cfg(feature = "web3")]
@@ -47,7 +48,7 @@ impl AsyncHtmlExtractor for TinyJuiceHtml {
     }
 
     async fn to_markdown(&self, html: &str) -> anyhow::Result<String> {
-        crate::inference::tokenjuice::extract_html(html.to_string())
+        crate::inference::tokenjuice::extract_html(&DispatchCtx::ambient(), html.to_string())
             .await
             .map_err(anyhow::Error::msg)
     }
@@ -284,7 +285,8 @@ mod x402 {
                 .ok_or_else(|| {
                     "402 response is missing a valid PAYMENT-REQUIRED header".to_string()
                 })?;
-            let config = crate::config::rpc::load_config_with_timeout()
+            let config = crate::core::runtime::DispatchCtx::ambient()
+                .load_config()
                 .await
                 .map_err(|error| format!("x402 payment failed: {error}"))?;
             declined_when_wallet_off(&config)?;

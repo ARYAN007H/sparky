@@ -16,6 +16,7 @@
 //! carried explicitly into [`run_subagent`] so it can inherit the provider
 //! and tools.
 
+use crate::core::runtime::DispatchCtx;
 use anyhow::{anyhow, Context};
 
 use crate::agent::harness::fork_context::ParentExecutionContext;
@@ -243,7 +244,7 @@ async fn dispatch_target_agent(agent_id: &str, prompt: &str) -> anyhow::Result<S
         ));
     }
 
-    let config = crate::config::ops::load_current_or_init()
+    let config = crate::config::ops::load_current_or_init(&DispatchCtx::ambient())
         .await
         .context("loading config for sub-agent dispatch")?;
 

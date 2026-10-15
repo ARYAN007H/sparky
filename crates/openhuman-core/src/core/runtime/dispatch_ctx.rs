@@ -48,15 +48,21 @@ impl DispatchCtx {
         }
     }
 
-    /// The ambient context of the calling task, or unbound.
+    /// The ambient context of the calling task, or unbound. In SaaS only the
+    /// task's own scope counts.
     ///
     /// Transitional (#7801): for a caller that has no context of its own to
     /// hand over yet. Every use is a reader still to be moved onto an explicit
     /// carrier, and the function goes away with the ambient context.
     pub fn ambient() -> Self {
-        Self {
-            core: CoreContext::current(),
-        }
+        // SaaS reads only the task's own scope, never the process default, so
+        // work that lost its tenant fails closed instead of acting as the operator.
+        let core = if super::is_saas() {
+            CoreContext::scoped()
+        } else {
+            CoreContext::current()
+        };
+        Self { core }
     }
 
     /// The context readers act under: the bound one, else (outside SaaS) the

@@ -27,6 +27,7 @@
 //! #3026 Files panel, and the orchestrator grounding rule in #3029
 //! continue to work without change.
 
+use crate::core::runtime::DispatchCtx;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -82,7 +83,8 @@ impl ImageInspector for ModuleImageInspector<'_> {
         let config = match self.config {
             Some(config) => config,
             None => {
-                loaded = crate::config::ops::load_config_with_timeout()
+                loaded = DispatchCtx::ambient()
+                    .load_config()
                     .await
                     .map_err(|error| format!("config unavailable: {error}"))?;
                 &loaded
