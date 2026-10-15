@@ -57,7 +57,8 @@ impl Tool for WalletModuleTool {
     }
 
     async fn execute(&self, args: Value) -> anyhow::Result<ToolResult> {
-        self.run(&DispatchCtx::ambient(), args, None).await
+        self.execute_with_context(args, tinytools::ToolCallOptions::default(), None)
+            .await
     }
 
     async fn execute_with_context(
