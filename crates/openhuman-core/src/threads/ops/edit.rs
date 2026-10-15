@@ -118,7 +118,7 @@ pub async fn edit_message(
 
     // Truncate the message log at the edited message itself (inclusive) —
     // it and everything after it is replaced by the fresh turn below.
-    super::delete_after(&thread_id, &request.message_id).await?;
+    super::delete_after(ctx, &thread_id, &request.message_id).await?;
 
     crate::web_chat::invalidate_thread_sessions(&thread_id).await;
 
@@ -189,7 +189,7 @@ pub async fn regenerate(
     })?;
 
     clear_dropped_turn_states(&dir, &thread_id, &cut_request_id).await;
-    super::delete_after(&thread_id, &run_reply_message_id(&cut_request_id)).await?;
+    super::delete_after(ctx, &thread_id, &run_reply_message_id(&cut_request_id)).await?;
 
     crate::web_chat::invalidate_thread_sessions(&thread_id).await;
 
@@ -220,12 +220,13 @@ pub async fn regenerate(
 /// it was minted for. `Ok(None)` when `after_message_id` has no reply yet
 /// (or is the log's last message).
 async fn next_reply_request_id_after(
+    ctx: &DispatchCtx,
     dir: &std::path::Path,
     thread_id: &str,
     after_message_id: &str,
 ) -> Result<Option<String>, String> {
     let messages =
-        conversations::blocking::get_messages(dir.to_path_buf(), thread_id.to_string()).await?;
+        conversations::blocking::get_messages(ctx.clone(), dir.to_path_buf(), thread_id.to_string()).await?;
     let Some(start) = messages.iter().position(|m| m.id == after_message_id) else {
         return Ok(None);
     };

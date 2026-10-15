@@ -44,13 +44,14 @@ pub(crate) fn is_replaceable_title(
 
 /// Generates a durable thread title from the first user message and assistant reply.
 pub async fn thread_generate_title(
+    ctx: &DispatchCtx,
     request: GenerateConversationThreadTitleRequest,
 ) -> Result<Outcome<ApiEnvelope<ConversationThreadSummary>>, ThreadsError> {
     let config = Config::load_or_init()
         .await
         .map_err(|e| format!("load config: {e}"))?;
     let dir = config.workspace_dir.clone();
-    let Some(thread) = conversations::blocking::list_threads(dir.clone())
+    let Some(thread) = conversations::blocking::list_threads(ctx.clone(), dir.clone())
         .await?
         .into_iter()
         .find(|thread| thread.id == request.thread_id)
@@ -59,7 +60,7 @@ pub async fn thread_generate_title(
     };
 
     let messages =
-        conversations::blocking::get_messages(dir.clone(), request.thread_id.clone()).await?;
+        conversations::blocking::get_messages(ctx.clone(), dir.clone(), request.thread_id.clone()).await?;
     let first_user_message = messages
         .iter()
         .find(|message| message.sender == "user" && !message.content.trim().is_empty())
@@ -199,6 +200,7 @@ pub async fn thread_generate_title(
     }
 
     let updated = conversations::blocking::update_thread_title(
+        ctx.clone(),
         dir,
         request.thread_id.clone(),
         title,

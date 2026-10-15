@@ -124,6 +124,7 @@ pub(super) fn fallback_title_from_user_message(
 }
 
 pub(super) async fn update_thread_with_fallback_title(
+    ctx: &DispatchCtx,
     dir: PathBuf,
     thread: ConversationThread,
     user_message: &str,
@@ -135,6 +136,7 @@ pub(super) async fn update_thread_with_fallback_title(
         return Ok(thread);
     }
     conversations::blocking::update_thread_title(
+        ctx.clone(),
         dir,
         thread.id.clone(),
         title,
