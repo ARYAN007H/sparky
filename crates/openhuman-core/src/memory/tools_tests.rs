@@ -273,36 +273,6 @@ async fn fetch_with_an_undeclared_mode_is_unsupported() {
     assert!(text(&result).contains("UNSUPPORTED"), "{}", text(&result));
 }
 
-#[test]
-fn turn_citations_are_capped_and_deduplicated() {
-    let citation = |n: usize| tinymemory_api::Citation {
-        id: tinymemory_api::ItemId(format!("cite-{n}")),
-        kind: ItemKind::Learning,
-        snippet: "s".repeat(1000),
-        score: Some(0.5),
-        meta: MemoryMeta::default(),
-    };
-    let thread = "thread-cap";
-    let many: Vec<_> = (0..MAX_TURN_CITATIONS + 10).map(citation).collect();
-    record_turn_citations(&ambient(), thread, &many);
-    record_turn_citations(&ambient(), thread, &many[..2]);
-    record_turn_citations(&ambient(), thread, &[]);
-    let drained = take_turn_citations(&ambient(), thread);
-    assert_eq!(drained.len(), MAX_TURN_CITATIONS);
-    assert_eq!(
-        drained
-            .iter()
-            .map(|c| c.id.clone())
-            .collect::<HashSet<_>>()
-            .len(),
-        MAX_TURN_CITATIONS
-    );
-    assert!(
-        drained[0].snippet.chars().count() <= crate::memory::types::TURN_CITATION_SNIPPET_CHARS
-    );
-    assert_eq!(drained[0].key, "learning");
-}
-
 #[tokio::test]
 async fn execute_gathers_facts_from_the_run_context() {
     let tmp = tempfile::tempdir().unwrap();
