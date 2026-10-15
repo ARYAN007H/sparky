@@ -384,8 +384,11 @@ fn profile_ctx(workspace: &std::path::Path, profile: &str) -> crate::core::runti
 async fn explicit_context_picks_the_conversation_scope_without_an_ambient_scope() {
     let tmp = TempDir::new().unwrap();
     let dir = tmp.path().to_path_buf();
-    let alice = profile_ctx(&dir, "alice");
-    let bob = profile_ctx(&dir, "bob");
+    // Unique names: the storage fence registry is process-wide, and another
+    // test's lease for a shared name would be consulted for these writes.
+    let suffix = uuid::Uuid::new_v4().simple().to_string();
+    let alice = profile_ctx(&dir, &format!("alice-{suffix}"));
+    let bob = profile_ctx(&dir, &format!("bob-{suffix}"));
 
     let (a, b) = tokio::join!(
         ensure_thread(alice.clone(), dir.clone(), create("alice-thread")),
