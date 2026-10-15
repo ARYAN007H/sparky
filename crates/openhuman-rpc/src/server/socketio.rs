@@ -736,6 +736,7 @@ pub fn spawn_web_channel_bridge(io: SocketIo) {
                 // a contradictory sign-out event from this independent bus
                 // consumer. Real JWT expiry still broadcasts as before.
                 if crate::core_host::security::credentials::session_support::current_session_is_local(
+                    &crate::core_host::core::runtime::DispatchCtx::process_default(),
                 )
                 .await
                 {
