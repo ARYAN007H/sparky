@@ -1,7 +1,6 @@
 use super::*;
 use crate::threads::store::{self as conversations, CreateConversationThread};
 use tinyagents_session::transcript::{
-    read_transcript, resolve_keyed_transcript_path, session_stem, FileTranscriptLocator,
     SessionRef, TranscriptLocator, TranscriptMessage, TranscriptMeta, TranscriptTurn,
 };
 use {
@@ -183,8 +182,12 @@ async fn web_delivery_appends_to_the_resumed_agent_transcript() {
     let cfg = config(&tmp);
     seed_thread(&cfg, "t-1");
 
-    // A prior live turn on the thread, written the way the session host does.
-    let locator = FileTranscriptLocator::new(cfg.workspace_dir.clone());
+    // A prior live turn on the thread, written the way the session host does:
+    // through the store port, under the desktop tenant's key for the agent.
+    let locator = crate::agent::session_store::transcripts_or_files(
+        "orchestrator",
+        &cfg.workspace_dir,
+    );
     let session = SessionRef::scoped("t-1", "orchestrator");
     let next = vec![
         TranscriptMessage::user("remind me to drink water"),
@@ -216,8 +219,12 @@ async fn web_delivery_appends_to_the_resumed_agent_transcript() {
         .unwrap();
 
     let head = locator.head_generation(&session);
-    let path = resolve_keyed_transcript_path(&cfg.workspace_dir, &session_stem(&head)).unwrap();
-    let resumed = read_transcript(&path).unwrap();
+    let resumed = locator
+        .read_session_transcript(&head)
+        .expect("the session's head is in the store")
+        .read_session()
+        .unwrap()
+        .unwrap();
     assert_eq!(resumed.messages.len(), 3, "reply appended once");
     let last = resumed.messages.last().unwrap();
     assert_eq!(last.role, "assistant");
@@ -229,9 +236,12 @@ async fn web_delivery_appends_to_the_resumed_agent_transcript() {
 async fn transcript_append_waits_for_a_live_turn() {
     let tmp = tempfile::TempDir::new().unwrap();
     let cfg = config(&tmp);
-    let locator = FileTranscriptLocator::new(cfg.workspace_dir.clone());
+    let locator = crate::agent::session_store::transcripts_or_files(
+        "orchestrator",
+        &cfg.workspace_dir,
+    );
     let session = SessionRef::scoped("t-1", "orchestrator");
-    let guard = tinyagents_session::transcript::lock_session_turn(&locator, &session)
+    let guard = tinyagents_session::transcript::lock_session_turn(locator.as_ref(), &session)
         .await
         .expect("lock");
 
@@ -242,6 +252,7 @@ async fn transcript_append_waits_for_a_live_turn() {
             &TranscriptAppend {
                 thread_id: "t-1",
                 agent_id: "orchestrator",
+                store_key: "orchestrator",
                 text: "hi",
                 idempotency_key: "cron:job-1:run-1",
                 job_id: "job-1",
