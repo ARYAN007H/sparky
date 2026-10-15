@@ -4,6 +4,7 @@ use serde_json::json;
 
 async fn start_parked_turn(thread_id: &str, block: &TestRunChatTaskBlock) -> String {
     let request_id = start_chat(
+&crate::core::runtime::DispatchCtx::ambient(),
         "queue-test-client",
         thread_id,
         "primary turn",
@@ -22,6 +23,7 @@ async fn start_parked_turn(thread_id: &str, block: &TestRunChatTaskBlock) -> Str
 
 async fn queue_message(thread_id: &str, text: &str, mode: &str) -> serde_json::Value {
     let response = start_chat(
+&crate::core::runtime::DispatchCtx::ambient(),
         "queue-test-client",
         thread_id,
         text,
@@ -82,6 +84,7 @@ async fn interrupt_and_parallel_bypass_the_active_turn_queue() {
     let initial_request_id = start_parked_turn(thread_id, &block).await;
 
     let replacement_request_id = start_chat(
+&crate::core::runtime::DispatchCtx::ambient(),
         "queue-test-client",
         thread_id,
         "replace the active turn",
@@ -102,6 +105,7 @@ async fn interrupt_and_parallel_bypass_the_active_turn_queue() {
     .await;
 
     start_chat(
+&crate::core::runtime::DispatchCtx::ambient(),
         "queue-test-client",
         thread_id,
         "run alongside the replacement",

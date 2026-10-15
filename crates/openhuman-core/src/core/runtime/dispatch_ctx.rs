@@ -65,6 +65,19 @@ impl DispatchCtx {
         Self { core }
     }
 
+    /// The context for work that arrives with none of its own: a bus event, a
+    /// module host callback, a shutdown hook. Outside SaaS that is the process
+    /// default, the one context a single-user host has. In SaaS it is the
+    /// task's own tenant scope only, so work that lost its tenant fails closed
+    /// instead of acting as the operator.
+    pub fn host_default() -> Self {
+        if super::is_saas() {
+            Self::ambient()
+        } else {
+            Self::process_default()
+        }
+    }
+
     /// The context readers act under: the bound one, else (outside SaaS) the
     /// process default, else none.
     ///

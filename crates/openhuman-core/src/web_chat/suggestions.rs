@@ -34,7 +34,6 @@ use serde::Deserialize;
 use tinyinference_llm::message::Message;
 use tinyinference_llm::model::ModelRequest;
 
-use crate::config::rpc as config_rpc;
 use crate::inference::provider;
 use crate::web_chat::{ChatSuggestion, WebChannelEvent};
 
@@ -78,6 +77,7 @@ struct RawSuggestion {
 /// to be called immediately after the turn's terminal `chat_done` has been
 /// published — see module docs for why this never delays that event.
 pub(crate) fn spawn_follow_up_suggestions(
+    ctx: crate::core::runtime::DispatchCtx,
     client_id: String,
     thread_id: String,
     request_id: String,
@@ -87,6 +87,7 @@ pub(crate) fn spawn_follow_up_suggestions(
     tokio::spawn(crate::core::runtime::context::CoreContext::propagate(
         async move {
             generate_and_emit(
+                &ctx,
                 &client_id,
                 &thread_id,
                 &request_id,
@@ -99,6 +100,7 @@ pub(crate) fn spawn_follow_up_suggestions(
 }
 
 async fn generate_and_emit(
+    ctx: &crate::core::runtime::DispatchCtx,
     client_id: &str,
     thread_id: &str,
     request_id: &str,
@@ -115,7 +117,7 @@ async fn generate_and_emit(
         return;
     }
 
-    let config = match config_rpc::load_config_with_timeout().await {
+    let config = match ctx.load_config().await {
         Ok(c) => c,
         Err(err) => {
             log::debug!(

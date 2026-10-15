@@ -155,7 +155,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_chat(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_chat(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<WebChatParams>(params)?;
         // Recorded before the turn starts so it reads the new choice.
@@ -165,6 +165,7 @@ fn handle_chat(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFutur
         )?;
         to_json(
             channel_web_chat(
+                &ctx,
                 &p.client_id,
                 &p.thread_id,
                 &p.message,
