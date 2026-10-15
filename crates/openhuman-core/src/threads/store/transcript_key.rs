@@ -85,7 +85,7 @@ impl ConversationStore {
         let outcome = self.key_repo().and_then(|repo| {
             let id = thread_id.to_string();
             repo.run(|docs| async move {
-                docs.delete(COLLECTION, &id, Precondition::Any).await
+                docs.delete(COLLECTION, &id, Precondition::None).await
             })
             .map(|_| ())
             .map_err(|e| format!("{e:#}"))
