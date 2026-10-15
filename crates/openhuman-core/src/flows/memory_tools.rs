@@ -22,7 +22,6 @@
 //! [`FlowMemoryRecallTool`] only ever reads with a flow tag filter
 //! (`flow:<id>` or `flows`), so it never reaches the user's own memory.
 
-use crate::core::runtime::DispatchCtx;
 use crate::tools::schema_cache::static_schema;
 use std::sync::Arc;
 
@@ -348,7 +347,8 @@ impl Tool for FlowMemoryRecallTool {
             .and_then(serde_json::Value::as_u64)
             .map_or(5, |v| v as usize);
 
-        let config = match DispatchCtx::ambient().load_config().await {
+        let config = match crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(tool_context)
+            .load_config().await {
             Ok(config) => config,
             Err(error) => {
                 return Ok(ToolResult::error(format!(
@@ -497,7 +497,8 @@ impl Tool for FlowMemoryRememberTool {
             ));
         }
 
-        let config = match DispatchCtx::ambient().load_config().await {
+        let config = match crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(tool_context)
+            .load_config().await {
             Ok(config) => config,
             Err(error) => {
                 return Ok(ToolResult::error(format!(
