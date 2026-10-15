@@ -475,6 +475,14 @@ pub(crate) async fn checkout_session_agent(
     // reused agent may have been built under a different one, and `None`
     // (English, or no locale sent) must clear a stale instruction.
     let mut agent = agent;
+    bind_transcript_store(
+        ctx,
+        config,
+        thread_id,
+        &fingerprint.target_agent_id,
+        &mut agent,
+    )
+    .await;
     let directive = match locale.and_then(locale_reply_directive) {
         Some(directive) => Some(directive),
         // Messages this session already sent carry another language's
@@ -509,6 +517,49 @@ pub(crate) async fn checkout_session_agent(
     // carried no system message, so such a turn reached the provider with no
     // system prompt and no prompt-cache key at all.
     Ok(CheckedOutSession { agent, fingerprint })
+}
+
+/// Pin the thread's transcripts to the store key they were first written under.
+///
+/// The key follows `[agent] chat_agent_id`, so after the operator changes it a
+/// session that re-derived the key would write the thread's next turns to a
+/// different store than the one holding its earlier turns, and the readers
+/// (which use the thread's recorded key) would lose them. The first session
+/// bound to a thread records its key; every later one writes there.
+async fn bind_transcript_store(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+    thread_id: &str,
+    target_agent_id: &str,
+    agent: &mut OpenHumanSessionHost,
+) {
+    let tenant = match crate::core::runtime::tenant::tenant_in(
+        crate::core::runtime::is_saas(),
+        ctx.resolved().as_deref(),
+    ) {
+        Ok(tenant) => tenant,
+        Err(no_tenant) => {
+            log::warn!("[web-channel] transcript key not bound thread={thread_id}: {no_tenant}");
+            return;
+        }
+    };
+    let rule_key = crate::agent::session_store::agent_key_for(&tenant, target_agent_id);
+    let key = crate::threads::store::bind_transcript_key(
+        ctx,
+        &config.workspace_dir,
+        thread_id,
+        rule_key.clone(),
+    )
+    .await;
+    if key != rule_key {
+        log::info!(
+            "[web-channel] thread={thread_id} keeps its recorded transcript store (chat agent changed since it was written)"
+        );
+        agent.set_session_history_locator(crate::agent::session_store::transcripts_or_files(
+            &key,
+            &config.workspace_dir,
+        ));
+    }
 }
 
 /// Return a checked-out agent to the thread cache, replacing whatever is there.

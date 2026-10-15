@@ -215,6 +215,33 @@ pub async fn delete_thread(
     .await
 }
 
+/// [`ConversationStore::transcript_key`] on the blocking pool: the session
+/// store key `thread_id`'s transcripts were first written under, if recorded.
+pub async fn transcript_key(
+    ctx: DispatchCtx,
+    workspace_dir: PathBuf,
+    thread_id: String,
+) -> Result<Option<String>, String> {
+    run("transcript_key", move || {
+        ConversationStore::new(ctx, workspace_dir).transcript_key(&thread_id)
+    })
+    .await
+}
+
+/// [`ConversationStore::record_transcript_key`] on the blocking pool: records
+/// `key` unless the thread already has one, and returns the key in effect.
+pub async fn record_transcript_key(
+    ctx: DispatchCtx,
+    workspace_dir: PathBuf,
+    thread_id: String,
+    key: String,
+) -> Result<String, String> {
+    run("record_transcript_key", move || {
+        ConversationStore::new(ctx, workspace_dir).record_transcript_key(&thread_id, &key)
+    })
+    .await
+}
+
 /// [`store::purge_threads`] on the blocking pool.
 pub async fn purge_threads(
     ctx: DispatchCtx,

@@ -42,6 +42,20 @@ pub fn release_workspace_defaults() {
     crate::storage::local::release_all();
 }
 
+/// Drops what this process holds open for `workspace_dir` alone (its fallback
+/// provider, its workspace transcript stores and its default backend), so that
+/// workspace's files can be deleted or reopened afresh while every other
+/// workspace keeps its live handles. A restart of one workspace, not of the
+/// process; [`release_workspace_defaults`] is the process-wide reset.
+pub fn release_workspace(workspace_dir: &Path) {
+    FALLBACKS
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .remove(workspace_dir);
+    super::release_workspace_stores_for(workspace_dir);
+    crate::storage::local::forget(workspace_dir);
+}
+
 /// The provider for `workspace_dir`: the installed one, else a
 /// `DriverSessionStores` over the workspace's default backend.
 ///
