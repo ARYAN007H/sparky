@@ -78,7 +78,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
             outputs: vec![FieldSchema {
                 name: "status",
                 ty: TypeSchema::Json,
-                comment: "Backend handle with kind, status, and backend_id.",
+                comment: "Backend handle with kind, status, backend_id, and (local) isolation.",
                 required: true,
             }],
         },

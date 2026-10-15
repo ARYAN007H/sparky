@@ -25,7 +25,7 @@ impl OpenHumanSessionHost {
                     &self.dispatch_ctx(),
                     &self.agent_definition_id,
                 );
-                transcripts_or_files(&self.dispatch_ctx(), &session_agent_id, &self.workspace_dir)
+                transcripts_or_files(&session_agent_id, &self.workspace_dir)
             })
             .clone()
     }
