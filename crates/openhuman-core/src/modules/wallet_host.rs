@@ -162,8 +162,9 @@ pub(super) fn has_endpoint_reference_for_test(reference: &str) -> bool {
 }
 
 pub(crate) async fn wallet_accounts_snapshot(
+    ctx: &DispatchCtx,
 ) -> Result<tinywallet_bus::wire::WalletAccountsResponse, String> {
-    let status = crate::web3::wallet::status(&DispatchCtx::ambient())
+    let status = crate::web3::wallet::status(ctx)
         .await
         .map_err(|error| error.to_string())?
         .value;
@@ -516,7 +517,9 @@ impl WalletHost {
     /// the host's custody store through this callback.
     async fn wallet_accounts(&self) -> tinybus::Result<HostResponse> {
         Ok(HostResponse::WalletAccounts(
-            wallet_accounts_snapshot().await.map_err(callback_error)?,
+            wallet_accounts_snapshot(&DispatchCtx::host_default())
+                .await
+                .map_err(callback_error)?,
         ))
     }
 
@@ -634,7 +637,8 @@ impl WalletHost {
 
     /// Perform only the named authenticated wallet-backend request.
     async fn wallet_backend(&self, request: WalletBackendRequest) -> tinybus::Result<HostResponse> {
-        let config = crate::config::rpc::load_config_with_timeout()
+        let config = DispatchCtx::host_default()
+            .load_config()
             .await
             .map_err(callback_error)?;
         let client =
