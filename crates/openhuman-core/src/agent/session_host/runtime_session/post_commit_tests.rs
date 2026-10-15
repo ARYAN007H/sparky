@@ -62,7 +62,7 @@ async fn completion_is_published_before_slow_post_commit_work_finishes() {
 
     let (delivered, pending) = tokio::time::timeout(
         std::time::Duration::from_secs(5),
-        complete_then_defer(publish, slow_tail),
+        complete_then_defer(&crate::core::runtime::DispatchCtx::unbound(), publish, slow_tail),
     )
     .await
     .expect("completion does not wait for the slow tail");
