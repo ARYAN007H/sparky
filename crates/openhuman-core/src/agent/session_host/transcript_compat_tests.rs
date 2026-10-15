@@ -469,7 +469,7 @@ fn assert_retired_tool_replay(identity_bound: bool) {
             .turn("save this old conversation")
             .await
             .expect("archive turn");
-        let archived = super::super::session_store::splice_fixture::head_of_full(
+        let archived = super::super::session_store::splice_fixture::head_of(
             &store_locator(root.path()),
             "retired-audio-thread",
         );
@@ -523,7 +523,7 @@ fn assert_retired_tool_replay(identity_bound: bool) {
         // remain intact in the durable transcript.
         assert_eq!(
             to_json(
-                &super::super::session_store::splice_fixture::head_of_full(
+                &super::super::session_store::splice_fixture::head_of(
                     &store_locator(root.path()),
                     "retired-audio-thread",
                 )

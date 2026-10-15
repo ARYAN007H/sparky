@@ -21,6 +21,8 @@ pub(crate) struct Head {
     pub stem: String,
     pub meta: TranscriptMeta,
     pub messages: Vec<TranscriptMessage>,
+    /// The tool declarations last recorded with the transcript.
+    pub tools: Option<serde_json::Value>,
 }
 
 /// The single root transcript of `thread_id`.
@@ -43,6 +45,7 @@ pub(crate) fn head_of(locator: &Arc<dyn TranscriptLocator>, thread_id: &str) -> 
         stem: root.stem.clone(),
         meta: session.meta,
         messages: session.messages,
+        tools: session.tools,
     }
 }
 
