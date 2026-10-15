@@ -141,7 +141,7 @@ pub(crate) fn build_channel_turn_parts(
         config.workspace_dir.clone(),
     )?;
     let workspace = config.workspace_dir.clone();
-    let capabilities = crate::profiles::capabilities::ProfileCapabilities::current();
+    let capabilities = crate::profiles::capabilities::ProfileCapabilities::in_ctx(&DispatchCtx::ambient());
     let tools_registry = Arc::new(if capabilities.is_some() {
         // The profile host route builds the selected belt once with the exact
         // durable thread. No second, unnamed factory invocation is needed here.

@@ -27,7 +27,7 @@
 
 use std::path::Path;
 
-use crate::core::runtime::is_saas;
+use crate::core::runtime::{is_saas, DispatchCtx};
 use crate::core::runtime::saas::SaasSandboxConfig;
 use crate::sandbox::{DockerOverrides, SandboxBackendKind, SandboxPolicy};
 
