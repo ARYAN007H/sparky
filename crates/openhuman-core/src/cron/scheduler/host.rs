@@ -225,6 +225,12 @@ impl JobDispatcher {
         }
     }
 
+    /// The dispatch context the scheduler's ports act under.
+    #[cfg(test)]
+    pub(crate) fn dispatch_ctx(&self) -> crate::core::runtime::DispatchCtx {
+        self.binding.dispatch_ctx()
+    }
+
     /// Read the due jobs and dispatch them; the count dispatched. Errors when
     /// the store cannot be read.
     pub(crate) async fn tick(&mut self, config: &Config) -> Result<usize> {

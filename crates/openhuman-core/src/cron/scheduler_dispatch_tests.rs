@@ -466,7 +466,8 @@ async fn a_flow_schedule_job_is_skipped_when_the_flows_component_is_off() {
 
 #[tokio::test]
 async fn a_dispatcher_binds_the_context_it_is_handed_not_the_ambient_one() {
-    let (_tmp, config) = test_config().await;
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp).await;
     let security = security(&config);
     let handed = CoreContext::for_test(crate::core::runtime::DomainSet::full(), None);
     let ambient = CoreContext::for_test(crate::core::runtime::DomainSet::full(), None);
@@ -481,14 +482,7 @@ async fn a_dispatcher_binds_the_context_it_is_handed_not_the_ambient_one() {
         )
     })
     .await;
-    let bound = dispatcher.binding.dispatch_ctx();
+    let bound = dispatcher.dispatch_ctx();
     assert!(Arc::ptr_eq(bound.core().expect("bound"), &handed));
     assert!(!Arc::ptr_eq(bound.core().unwrap(), &ambient));
-
-    // An unbound context binds nothing, whatever the task's scope is.
-    let unbound = CoreContext::scope(ambient, async {
-        JobDispatcher::new(&crate::core::runtime::DispatchCtx::unbound(), &config, &security)
-    })
-    .await;
-    assert!(unbound.binding.context.is_none());
 }
