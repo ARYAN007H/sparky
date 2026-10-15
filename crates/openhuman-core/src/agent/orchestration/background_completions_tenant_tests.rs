@@ -22,17 +22,14 @@ fn profile(name: &str, workspace: &std::path::Path) -> Arc<CoreContext> {
 }
 
 async fn record(ctx: &Arc<CoreContext>, ws: &std::path::Path, task: &str) {
-    CoreContext::scope(
-        Arc::clone(ctx),
-        record_completion(
-            &DispatchCtx::new(Arc::clone(ctx)),
-            ws,
-            "sess-1",
-            task,
-            "researcher",
-            "done",
-            Some("t1".into()),
-        ),
+    record_completion(
+        &DispatchCtx::new(Arc::clone(ctx)),
+        ws,
+        "sess-1",
+        task,
+        "researcher",
+        "done",
+        Some("t1".into()),
     )
     .await;
 }
