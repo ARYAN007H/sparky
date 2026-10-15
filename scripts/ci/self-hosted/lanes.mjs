@@ -256,8 +256,15 @@ export function tinymoldOnPath(run = spawnSync) {
  * Run a tinymold subcommand and capture its output. Never throws: the cache
  * is an accelerator, so its failures are reported, not fatal.
  */
-export function runTinymold(args, { run = spawnSync, env = process.env } = {}) {
-  const r = run("tinymold", args, { encoding: "utf8", env });
+export function runTinymold(
+  args,
+  { run = spawnSync, env = process.env, timeoutMs = 60_000 } = {},
+) {
+  const r = run("tinymold", args, {
+    encoding: "utf8",
+    env,
+    timeout: timeoutMs,
+  });
   const output = `${r.stdout ?? ""}${r.stderr ?? ""}`.trim();
   return {
     ok: !r.error && r.status === 0,
@@ -272,10 +279,17 @@ export function runTinymold(args, { run = spawnSync, env = process.env } = {}) {
  * sound as a passing one's) and read the wrapper log's stats. A failed push
  * never fails the job; the summary step turns it into a warning.
  */
-export function finishTinymold({ log, since, run = spawnSync, env = process.env }) {
+export function finishTinymold({
+  log,
+  since,
+  run = spawnSync,
+  env = process.env,
+}) {
+  // Bounded: an unreachable server must not hold the job to its timeout.
   const push = runTinymold(["remote", "push", "--since", String(since)], {
     run,
     env,
+    timeoutMs: 10 * 60_000,
   });
   const stats = runTinymold(["stats", "--log", log], { run, env });
   return { log, push, stats: stats.ok ? stats.output : null };

@@ -208,7 +208,11 @@ export function buildPlan({
     {
       name: "static",
       checks: [
-        { name: "rust-fmt", when: rust, run: "cargo fmt --manifest-path Cargo.toml --package openhuman --package openhuman-cli --package openhuman-embed --package openhuman-modules-linked --package openhuman-rpc --package openhuman-tinyhumans --package openhuman-tui -- --check" },
+        {
+          name: "rust-fmt",
+          when: rust,
+          run: "cargo fmt --manifest-path Cargo.toml --package openhuman --package openhuman-cli --package openhuman-embed --package openhuman-modules-linked --package openhuman-rpc --package openhuman-tinyhumans --package openhuman-tui -- --check",
+        },
         {
           name: "rust-layout",
           when: core,
