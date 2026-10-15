@@ -350,7 +350,7 @@ async fn start_chat_inner(
     // child registering late cannot deliver into the stopped generation.
     crate::agent::orchestration::background_completions::resume_stopped_thread(&thread_id);
 
-    let map_key = key_for(&thread_id);
+    let map_key = key_for(ctx, &thread_id);
 
     let parsed_mode = match queue_mode.as_deref() {
         Some("steer") => QueueMode::Steer,
@@ -455,7 +455,7 @@ async fn start_chat_inner(
                 item_id: Some(request_id.clone()),
                 text_preview: Some(crate::agent::queued_turn::text_preview(&message)),
             });
-            publish_web_channel_event(WebChannelEvent {
+            publish_web_channel_event(ctx, WebChannelEvent {
                 event: "chat_error".to_string(),
                 client_id: client_id.clone(),
                 thread_id: thread_id.clone(),
@@ -467,7 +467,7 @@ async fn start_chat_inner(
             // See channel_ops::cancel_chat_inner — `chat_cancelled` is the
             // structured successor to `chat_error{error_type:"cancelled"}`,
             // kept alongside it for one release.
-            publish_web_channel_event(WebChannelEvent {
+            publish_web_channel_event(ctx, WebChannelEvent {
                 event: "chat_cancelled".to_string(),
                 client_id: client_id.clone(),
                 thread_id: thread_id.clone(),
@@ -681,7 +681,7 @@ async fn start_chat_inner(
                 );
             }
             if let Some(event) = deferred_error {
-                publish_web_channel_event(event);
+                publish_web_channel_event(&ctx_task, event);
             }
             if !followups.is_empty() {
                 log::info!(
