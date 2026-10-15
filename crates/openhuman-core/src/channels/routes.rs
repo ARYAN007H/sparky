@@ -107,11 +107,11 @@ impl RouteCallbacks {
     ) -> tinybus::Result<tinychannels_bus::ChannelBackendResult> {
         match request {
             tinychannels_bus::ChannelBackendRequest::RemoteControl(request) => {
-                // The captured context is the carrier; without one the caller's
-                // own ambient context is what the handlers read before.
+                // The captured context is the carrier; without one the host's
+                // default context (none in SaaS, which fails closed).
                 let dispatch_ctx = match &self.core_context {
                     Some(core) => crate::core::runtime::DispatchCtx::new(Arc::clone(core)),
-                    None => crate::core::runtime::DispatchCtx::ambient(),
+                    None => crate::core::runtime::DispatchCtx::host_default(),
                 };
                 let dispatch = async {
                     tokio::select! {
