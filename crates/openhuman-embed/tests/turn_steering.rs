@@ -147,7 +147,7 @@ async fn scenario() {
     );
 
     // 4. A turn cancelled before it could apply a steer hands the steer back.
-    let provider = slow_then_fast("too late", Duration::from_secs(30), "too late").await;
+    let provider = slow_then_fast("too late", Duration::from_secs(4), "too late").await;
     let agent = runtime
         .agent(AgentSpec::new("cancelled").provider(route(&provider, "test-model")))
         .unwrap();
