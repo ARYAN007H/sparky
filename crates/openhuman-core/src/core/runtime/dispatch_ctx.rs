@@ -73,7 +73,13 @@ impl DispatchCtx {
     /// the calling task's scope; an event that names its tenant uses
     /// [`for_event`](Self::for_event), a caller holding a context passes it.
     pub fn host_default() -> Self {
-        if super::is_saas() {
+        Self::host_default_in(super::is_saas())
+    }
+
+    /// [`host_default`](Self::host_default) as a pure function of the mode, so
+    /// the SaaS rule is testable without locking the test process to SaaS.
+    pub(crate) fn host_default_in(saas: bool) -> Self {
+        if saas {
             Self::unbound()
         } else {
             Self::process_default()
