@@ -215,7 +215,7 @@ pub(crate) fn compaction(
     enqueue(
         cache,
         key,
-        Box::pin(dispatch.enter(async move {
+        Box::pin(ctx.enter(async move {
             hooks::compaction_work(&config, &identity, &thread, dropped).await
         })),
     );
