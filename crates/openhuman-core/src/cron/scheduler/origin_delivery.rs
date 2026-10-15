@@ -200,6 +200,7 @@ pub(crate) async fn deliver_to_origin(
             agent_id,
         } => {
             deliver_to_web_thread(
+                ctx,
                 config,
                 tenant.as_ref(),
                 job,
@@ -240,6 +241,7 @@ pub(crate) async fn deliver_to_origin(
 }
 
 async fn deliver_to_web_thread(
+    ctx: &DispatchCtx,
     config: &Config,
     tenant: Option<&crate::core::runtime::Tenant>,
     job: &CronJob,
@@ -260,8 +262,8 @@ async fn deliver_to_web_thread(
     let persist_thread = thread_id.to_string();
     let persist_request = request_id.clone();
     let persist_text = text.to_string();
-    let persist_ctx = DispatchCtx::ambient();
-    crate::core::runtime::spawn_blocking_scoped(move || {
+    let persist_ctx = ctx.clone();
+    persist_ctx.clone().spawn_blocking(move || {
         crate::web_chat::persist_delivered_reply(
             &persist_ctx,
             &workspace,

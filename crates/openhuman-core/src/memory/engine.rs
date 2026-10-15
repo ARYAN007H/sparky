@@ -209,10 +209,10 @@ pub fn resolve(config: &Config) -> Binding {
         tracing::debug!("[memory:engine] components.memory is off; engine not bound");
         return off(None, None, COMPONENT_OFF_REASON);
     }
-    if let Some(capabilities) = crate::profiles::capabilities::ProfileCapabilities::current() {
+    // The hosted profile's engine is bound for the calling task's own tenant.
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    if let Some(capabilities) = crate::profiles::capabilities::ProfileCapabilities::in_ctx(&ctx) {
         if let Some(engine) = &capabilities.memory_engine {
-            // The hosted profile's engine is bound for the calling task's own tenant.
-            let ctx = crate::core::runtime::DispatchCtx::ambient();
             if let Err(reason) = crate::profiles::host::ensure_hosted(&ctx) {
                 return off(None, None, &reason);
             }

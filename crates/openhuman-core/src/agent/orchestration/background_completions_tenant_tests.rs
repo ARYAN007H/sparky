@@ -22,17 +22,14 @@ fn profile(name: &str, workspace: &std::path::Path) -> Arc<CoreContext> {
 }
 
 async fn record(ctx: &Arc<CoreContext>, ws: &std::path::Path, task: &str) {
-    CoreContext::scope(
-        Arc::clone(ctx),
-        record_completion(
-            &DispatchCtx::new(Arc::clone(ctx)),
-            ws,
-            "sess-1",
-            task,
-            "researcher",
-            "done",
-            Some("t1".into()),
-        ),
+    record_completion(
+        &DispatchCtx::new(Arc::clone(ctx)),
+        ws,
+        "sess-1",
+        task,
+        "researcher",
+        "done",
+        Some("t1".into()),
     )
     .await;
 }
@@ -52,10 +49,11 @@ async fn one_profiles_stop_and_delete_never_reach_anothers_thread() {
     let bob = profile("u-bob", ws_b.path());
 
     // Alice presses Stop on her `t1`.
-    CoreContext::scope(Arc::clone(&alice), async {
-        discard_pending_for_thread(&DispatchCtx::ambient(), "t1");
-    })
-    .await;
+    {
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(&alice));
+
+        discard_pending_for_thread(&scope_ctx, "t1");
+    };
 
     // Bob's `t1` is untouched: his results still queue.
     record(&bob, ws_b.path(), "bob-1").await;
@@ -65,23 +63,20 @@ async fn one_profiles_stop_and_delete_never_reach_anothers_thread() {
     assert!(pending(ws_a.path()).is_empty());
 
     // Bob deletes his `t1`; Alice re-engages hers and keeps working.
-    CoreContext::scope(Arc::clone(&bob), async {
-        discard_for_thread(&DispatchCtx::ambient(), ws_b.path(), "t1");
-    })
-    .await;
-    CoreContext::scope(Arc::clone(&alice), async {
-        resume_stopped_thread(&DispatchCtx::ambient(), "t1");
+    {
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(&bob));
+
+        discard_for_thread(&scope_ctx, ws_b.path(), "t1");
+    };
+    {
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(&alice));
+
+        resume_stopped_thread(&scope_ctx, "t1");
         assert!(
-            !mark_stopped_task_if_thread_stopped(
-                &DispatchCtx::ambient(),
-                ws_a.path(),
-                "t1",
-                "alice-2"
-            ),
+            !mark_stopped_task_if_thread_stopped(&scope_ctx, ws_a.path(), "t1", "alice-2"),
             "bob's delete does not abort alice's child"
         );
-    })
-    .await;
+    };
     record(&alice, ws_a.path(), "alice-2").await;
     assert_eq!(pending(ws_a.path()), ["alice-2"]);
     record(&bob, ws_b.path(), "bob-2").await;

@@ -320,6 +320,7 @@ pub(in super::super) async fn run_subagent_via_graph(
                 "[subagent_host:graph] sub-agent run errored; persisting recovered transcript before returning (#4466)"
             );
             super::transcript::persist_failed_run(
+                &dispatch,
                 transcripts.as_ref(),
                 &workspace_dir,
                 transcript_stem,
@@ -489,6 +490,7 @@ pub(in super::super) async fn run_subagent_via_graph(
     // initial user prompt was already written when the worker thread was created.
     if let Some(thread_id) = worker_thread_id {
         mirror_worker_thread(
+            &dispatch,
             &workspace_dir,
             &thread_id,
             agent_id,

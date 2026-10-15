@@ -121,7 +121,7 @@ pub struct OpenHumanSecurityGate {
     /// Fallback policy used when no process-global live policy is installed.
     ///
     /// Per-call resolution prefers
-    /// [`crate::security::live_policy::effective`] so an autonomy
+    /// [`crate::security::live_policy::effective_in`] so an autonomy
     /// change made mid-session is observed on the very next tool call — the
     /// same live-first / snapshot-fallback discipline `ApprovalGate` uses for
     /// `auto_approve`. The trait explicitly forbids the runtime caching a

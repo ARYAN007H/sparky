@@ -160,6 +160,7 @@ impl OpenHumanSessionHost {
     ///
     /// As [`OpenHumanSessionHost::from_config_with_definition`].
     pub fn from_config_host_only(
+        ctx: &crate::core::runtime::DispatchCtx,
         config: &Config,
         definition: &AgentDefinition,
         host: Option<&super::HostTools>,
@@ -167,6 +168,7 @@ impl OpenHumanSessionHost {
     ) -> Result<Self> {
         let definition = host_only_definition(definition);
         let mut agent = OpenHumanSessionHost::build_session_agent_inner(
+            ctx,
             config,
             &definition.id,
             Some(&definition),

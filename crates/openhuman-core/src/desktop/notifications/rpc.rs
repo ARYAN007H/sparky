@@ -89,7 +89,7 @@ pub async fn handle_ingest(ctx: &DispatchCtx, params: Map<String, Value>) -> Res
     let id_for_triage = id.clone();
     let config_for_triage = config.clone();
     let ctx = ctx.clone();
-    crate::core::runtime::spawn_scoped(async move {
+    ctx.clone().spawn(async move {
         let envelope = TriggerEnvelope {
             source: TriggerSource::WebviewIntegration {
                 provider: req.provider.clone(),

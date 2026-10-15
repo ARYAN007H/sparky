@@ -415,6 +415,7 @@ fn attach_workflow_proposal_persists_thread_message_and_extends_summary() {
         r#"{"type":"workflow_proposal","persisted":false,"name":"Daily X Trending Email","graph":{"nodes":[],"edges":[]}}"#,
     )];
     let summary = attach_workflow_proposal(
+        &crate::core::runtime::DispatchCtx::ambient(),
         temp.path(),
         Some("thread-parent"),
         "sub-task-1",
@@ -455,6 +456,7 @@ fn attach_workflow_proposal_persists_thread_message_and_extends_summary() {
 fn attach_workflow_proposal_without_proposal_returns_summary_unchanged() {
     let temp = tempfile::tempdir().expect("tempdir");
     let summary = attach_workflow_proposal(
+        &crate::core::runtime::DispatchCtx::ambient(),
         temp.path(),
         Some("thread-x"),
         "sub-task-2",

@@ -48,19 +48,19 @@ async fn pair() -> Pair {
     let thread = unique("t");
     let session = web_session(&thread);
     for (ctx, ws, task) in [(&alice, &ws_a, "task-alice"), (&bob, &ws_b, "task-bob")] {
-        CoreContext::scope(
-            Arc::clone(ctx),
+        {
+            let scope_ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(ctx));
             record_completion(
-                &DispatchCtx::ambient(),
+                &scope_ctx,
                 ws.path(),
                 &session,
                 task,
                 "researcher",
                 "done",
                 Some(thread.clone()),
-            ),
-        )
-        .await;
+            )
+            .await
+        };
     }
     Pair {
         alice,
@@ -171,32 +171,28 @@ async fn a_delivery_in_flight_for_one_profile_does_not_take_anothers_slot() {
         let (thread, router_bob, bob_log) = (thread.clone(), router_bob.clone(), bob_log.clone());
         let alice_log = log("alice");
         async move {
-            let retry = CoreContext::scope(
-                bob,
-                try_deliver_with(
-                    &DispatchCtx::ambient(),
-                    thread,
-                    router_bob,
-                    bob_log,
-                    |_t, _n| async { unreachable!("bob's delivery succeeds") },
-                ),
-            )
-            .await;
+            let retry = {
+                let scope_ctx = crate::core::runtime::DispatchCtx::new(bob);
+                try_deliver_with(&scope_ctx, thread, router_bob, bob_log, |_t, _n| async {
+                    unreachable!("bob's delivery succeeds")
+                })
+                .await
+            };
             assert_eq!(retry, None);
             alice_log(thread_a, notice).await
         }
     };
-    let retry = CoreContext::scope(
-        Arc::clone(&p.alice),
+    let retry = {
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(&p.alice));
         try_deliver_with(
-            &DispatchCtx::ambient(),
+            &scope_ctx,
             p.thread.clone(),
             router_a,
             alice_deliver,
             |_t, _n| async { unreachable!("alice's delivery succeeds") },
-        ),
-    )
-    .await;
+        )
+        .await
+    };
     assert_eq!(retry, None);
 
     let delivered = delivered.lock().unwrap().clone();

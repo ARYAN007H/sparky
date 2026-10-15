@@ -189,21 +189,23 @@ async fn each_agent_owns_its_workflow_await_guard() {
     let beta = test_agent_context(&root, "beta");
     let key = "agent-guard-shared-key".to_string();
 
-    let held = CoreContext::scope(std::sync::Arc::clone(&alpha), async {
-        super::guard::acquire_await(&crate::core::runtime::DispatchCtx::ambient(), key.clone())
-            .expect("alpha acquires")
-    })
-    .await;
+    let held = {
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(std::sync::Arc::clone(&alpha));
 
-    let beta_result = CoreContext::scope(beta, async {
-        super::guard::acquire_await(&crate::core::runtime::DispatchCtx::ambient(), key.clone())
-    })
-    .await;
+        super::guard::acquire_await(&scope_ctx, key.clone()).expect("alpha acquires")
+    };
+
+    let beta_result = {
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(beta);
+
+        super::guard::acquire_await(&scope_ctx, key.clone())
+    };
     assert!(beta_result.is_ok(), "beta is not blocked by alpha's await");
-    let alpha_again = CoreContext::scope(alpha, async {
-        super::guard::acquire_await(&crate::core::runtime::DispatchCtx::ambient(), key.clone())
-    })
-    .await;
+    let alpha_again = {
+        let scope_ctx = crate::core::runtime::DispatchCtx::new(alpha);
+
+        super::guard::acquire_await(&scope_ctx, key.clone())
+    };
     assert!(alpha_again.is_err(), "alpha still holds its own key");
     drop(held);
 }

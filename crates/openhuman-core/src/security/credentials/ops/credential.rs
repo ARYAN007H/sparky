@@ -222,7 +222,7 @@ pub async fn set_credential(
             "{LOG_PREFIX} api key stored"
         );
         let state = build_session_state(config)?;
-        publish_credential_changed(CredentialKind::ApiKey.as_str());
+        publish_credential_changed(ctx, CredentialKind::ApiKey.as_str());
         return Ok(Outcome::single_log(state, "api key stored"));
     }
 
@@ -295,7 +295,7 @@ pub async fn set_credential(
         logs.push("credential refreshed (same secret, same user)".to_string());
         config.clone()
     } else {
-        logs.extend(activate_user_scope(&user_id)?);
+        logs.extend(activate_user_scope(ctx, &user_id)?);
         // Reload so auth-profiles.json, the encryption key and the workspace
         // resolve to the user-scoped location before the profile is written.
         let effective = reload_config_or(ctx, config).await?;
@@ -371,7 +371,7 @@ pub async fn set_credential(
     );
 
     let state = build_session_state(&effective_config)?;
-    publish_credential_changed(resolved.kind.as_str());
+    publish_credential_changed(ctx, resolved.kind.as_str());
     Ok(Outcome::new(state, logs))
 }
 
@@ -491,7 +491,7 @@ pub async fn clear_credential(
     }
 
     if removed_session || removed_api_key {
-        publish_credential_changed("cleared");
+        publish_credential_changed(ctx, "cleared");
     }
     Ok(Outcome::new(
         json!({
@@ -629,10 +629,11 @@ pub(crate) fn process_credential_refusal(saas: bool, operation: &str) -> Result<
 
 /// Tell credential-derived caches (the search module's managed routes) to
 /// refresh. Carries only the kind, never the credential.
-fn publish_credential_changed(kind: &str) {
+fn publish_credential_changed(ctx: &DispatchCtx, kind: &str) {
     tracing::debug!(kind, "{LOG_PREFIX} publishing CredentialChanged");
     crate::core::bus::BUS.publish(crate::core::events::DomainEvent::CredentialChanged {
         kind: kind.to_string(),
+        tenant: ctx.event_tenant(),
     });
 }
 

@@ -56,7 +56,7 @@ pub(super) fn handle_authorize(ctx: DispatchCtx, params: Map<String, Value>) -> 
         let config = ctx.load_config().await?;
         let toolkit = read_required_non_empty(&params, "toolkit")?;
         let extra_params = params.get("extra_params").cloned();
-        to_json(ops::composio_authorize(&config, &toolkit, extra_params).await?)
+        to_json(ops::composio_authorize(&ctx, &config, &toolkit, extra_params).await?)
     })
 }
 

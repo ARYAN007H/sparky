@@ -289,6 +289,7 @@ fn handle_chat_simple(ctx: DispatchCtx, params: Map<String, Value>) -> Controlle
         let config = ctx.load_config().await?;
         to_json(
             crate::inference::host_runtime::rpc::agent_chat_simple(
+                &ctx,
                 &config,
                 &p.message,
                 p.model_override,

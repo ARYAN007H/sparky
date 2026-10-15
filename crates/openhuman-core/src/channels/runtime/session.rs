@@ -109,7 +109,7 @@ where
     F: FnMut(CancellationToken) -> Fut + Send + 'static,
     Fut: Future<Output = anyhow::Result<()>> + Send + 'static,
 {
-    crate::core::runtime::spawn_scoped(async move {
+    tokio::spawn(async move {
         // A logout can race the service task's first poll. Do not let a
         // service created during that window start with the replacement
         // token before a credential has been installed again.

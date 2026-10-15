@@ -434,7 +434,7 @@ pub(crate) async fn fence_and_clear(config: &Config) -> MemoryResult<WriteFence>
     };
     fence.guard = Some(state.barrier.clone().write_owned().await);
     let snapshot_config = config.clone();
-    crate::core::runtime::spawn_blocking_scoped(move || {
+    crate::core::runtime::DispatchCtx::ambient().spawn_blocking(move || {
         let _guard = LOCK
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -464,10 +464,10 @@ pub(super) fn schedule_all(config: Arc<Config>) {
     if super::engine::switched_off(&config) {
         return;
     }
-    crate::core::runtime::spawn_scoped(async move {
+    crate::core::runtime::DispatchCtx::ambient().spawn(async move {
         let scan_config = config.clone();
         let files =
-            match crate::core::runtime::spawn_blocking_scoped(move || partitions(&scan_config))
+            match crate::core::runtime::DispatchCtx::ambient().spawn_blocking(move || partitions(&scan_config))
                 .await
             {
                 Ok(Ok(files)) => files,
@@ -498,7 +498,7 @@ fn schedule_partition(config: Arc<Config>, file: PathBuf) {
     let Ok(guard) = state.barrier.clone().try_lock_owned() else {
         return;
     };
-    crate::core::runtime::spawn_scoped(async move {
+    crate::core::runtime::DispatchCtx::ambient().spawn(async move {
         let _guard = guard;
         let _owner_guard = owner_guard;
         let _state = state;

@@ -120,16 +120,20 @@ pub(crate) fn transcript_store_for(
 /// to hold.
 ///
 /// Owning the mutation *and* its cleanup in one spawned task decouples the
-/// sequence from the caller's lifetime. The ambient [`CoreContext`] is carried
-/// across explicitly: a bare `tokio::spawn` drops the `task_local` scope, and
-/// `CoreContext::current` then silently falls back to the process default —
-/// which under multi-tenant scoped dispatch is the wrong workspace.
-pub(super) async fn run_to_completion<T, F>(operation: &'static str, fut: F) -> Result<T, String>
+/// sequence from the caller's lifetime. The caller's [`CoreContext`] is moved
+/// into the task explicitly: a bare `tokio::spawn` drops the `task_local` scope,
+/// and the task would silently fall back to the process default — which under
+/// multi-tenant scoped dispatch is the wrong workspace.
+pub(super) async fn run_to_completion<T, F>(
+    dispatch: &crate::core::runtime::DispatchCtx,
+    operation: &'static str,
+    fut: F,
+) -> Result<T, String>
 where
     F: std::future::Future<Output = Result<T, String>> + Send + 'static,
     T: Send + 'static,
 {
-    let ctx = CoreContext::current();
+    let ctx = dispatch.core().cloned();
     tokio::spawn(async move {
         match ctx {
             Some(ctx) => CoreContext::scope(ctx, fut).await,

@@ -100,7 +100,7 @@ pub(crate) async fn sweep_profiles(backend: &dyn StorageBackend, profile_ids: &[
 /// Agent scopes are enumerated from the installed backend (the only caller,
 /// [`sweep_installed`], passes that one).
 pub async fn sweep_all(backend: Arc<dyn StorageBackend>) -> u64 {
-    let scoped: u64 = super::agents::for_each_scope("blob sweep", || {
+    let scoped: u64 = super::agents::for_each_scope(&crate::core::runtime::DispatchCtx::host_default(), "blob sweep", |_| {
         let backend = Arc::clone(&backend);
         async move {
             match super::current_scope() {
@@ -174,7 +174,7 @@ pub async fn sweep_installed() -> u64 {
 /// Spawns the sweeper: after `first_delay`, then every `interval`, until the
 /// task is aborted. Missed ticks are skipped, not replayed.
 pub fn spawn(first_delay: Duration, interval: Duration) -> tokio::task::JoinHandle<()> {
-    crate::core::runtime::spawn_scoped(async move {
+    tokio::spawn(async move {
         tracing::debug!(
             first_delay_secs = first_delay.as_secs(),
             interval_secs = interval.as_secs(),

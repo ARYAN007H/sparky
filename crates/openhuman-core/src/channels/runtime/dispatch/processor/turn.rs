@@ -23,7 +23,7 @@ use tokio_util::sync::CancellationToken;
 use tokio_util::task::AbortOnDropHandle;
 
 use super::super::helpers::{
-    build_channel_context_block, log_worker_join_result, spawn_scoped_typing_task,
+    build_channel_context_block, log_worker_join_result, spawn_typing_task,
     REPLY_LOG_TRUNCATE_CHARS,
 };
 use super::super::host_agent::{self, run_host_agent_turn, seed_rows, HostChannelTurn, HostRoute};
@@ -387,7 +387,7 @@ pub(crate) async fn process_channel_runtime_message(
     // Typing was already started early (before memory/provider setup). Here we only
     // spawn the background refresh task that keeps the indicator alive during long turns.
     let typing_task = match (target_channel.as_ref(), typing_cancellation.as_ref()) {
-        (Some(channel), Some(token)) => Some(AbortOnDropHandle::new(spawn_scoped_typing_task(
+        (Some(channel), Some(token)) => Some(AbortOnDropHandle::new(spawn_typing_task(
             Arc::clone(channel),
             msg.reply_target.clone(),
             token.clone(),

@@ -127,7 +127,10 @@ impl OpenHumanTurnPrelude {
         if self.omit_memory_context {
             identity.recall = false;
         }
-        let profile_context = capture_profile_context(crate::profiles::host::host().as_deref());
+        let profile_context = capture_profile_context(
+            &self.dispatch_ctx(),
+            crate::profiles::host::host().as_deref(),
+        );
         if matches!(profile_context, ProfileMemoryContext::Denied) {
             return None;
         }
@@ -230,14 +233,17 @@ impl OpenHumanTurnPrelude {
             )
             .await;
         };
-        crate::core::runtime::spawn_scoped(deferred_memory_work(profile_context, work));
+        crate::core::runtime::DispatchCtx::ambient().spawn(deferred_memory_work(profile_context, work));
     }
 }
 
 // Resolve the profile owner at preparation; a canonical commit may run after
 // the immutable turn-origin scope has ended.
-fn capture_profile_context(host: Option<&crate::profiles::ProfileHost>) -> ProfileMemoryContext {
-    let Some(context) = crate::core::runtime::CoreContext::scoped() else {
+fn capture_profile_context(
+    ctx: &DispatchCtx,
+    host: Option<&crate::profiles::ProfileHost>,
+) -> ProfileMemoryContext {
+    let Some(context) = ctx.core().cloned() else {
         return if crate::core::runtime::is_saas() {
             ProfileMemoryContext::Denied
         } else {

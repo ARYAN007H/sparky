@@ -95,13 +95,15 @@ impl EventHandler<DomainEvent> for DeviceTunnelSubscriber {
                     .unwrap_or_else(std::sync::PoisonError::into_inner)
                     .get(channel_id.as_str())
                     .cloned();
-                match super::owner::owner_of(&DispatchCtx::ambient(), channel_id, pending.as_ref())
-                    .await
-                {
+                // Tunnel frames arrive over the host's socket: its own tenant,
+                // and in SaaS none (the frame is then dropped below).
+                let ctx = DispatchCtx::host_default();
+                match super::owner::owner_of(&ctx, channel_id, pending.as_ref()).await {
                     Ok(owner) => {
                         let handled = crate::storage::agents::within_agent(
+                            &ctx,
                             owner.as_deref(),
-                            handle_tunnel_frame(&DispatchCtx::ambient(), channel_id, payload_b64),
+                            handle_tunnel_frame(&ctx, channel_id, payload_b64),
                         )
                         .await;
                         // Fail closed: no context can act for the owner.

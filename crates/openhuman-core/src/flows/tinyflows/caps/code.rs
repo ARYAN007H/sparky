@@ -83,8 +83,11 @@ impl CodeRunner for OpenHumanCode {
             return Err(EngineError::Capability(reason));
         }
 
+        // Transitional (#7801): the flow caps carry no context yet.
+        let dispatch = DispatchCtx::ambient();
         let outcome: Result<Value> = async {
         let policy = resolve_sandbox_policy(
+            &dispatch,
             SandboxMode::Sandboxed,
             &self.config.action_dir,
             &self.config.workspace_dir,
@@ -148,7 +151,7 @@ impl CodeRunner for OpenHumanCode {
                 "[flows] code: running sandboxed script"
             );
 
-            execute_in_sandbox(&DispatchCtx::ambient(),
+            execute_in_sandbox(&dispatch,
                 &policy,
                 &command,
                 &self.config.action_dir,

@@ -28,6 +28,7 @@ use super::types::{EnrichedTask, SourceTarget, TaskSource};
 /// Route an enriched task: for proactive sources dispatch a triage turn;
 /// collect-only sources stop at the ledger the caller already wrote.
 pub async fn route_enriched(
+    ctx: &crate::core::runtime::DispatchCtx,
     _config: &Config,
     source: &TaskSource,
     enriched: &EnrichedTask,
@@ -41,18 +42,20 @@ pub async fn route_enriched(
             );
             Ok(())
         }
-        SourceTarget::AgentTodoProactive => dispatch_triage(source, enriched).await,
+        SourceTarget::AgentTodoProactive => dispatch_triage(ctx, source, enriched).await,
     }
 }
 
 /// Dispatch a triage turn for a proactive task, gated by scheduler
 /// capacity. A gated-off or deferred turn is non-fatal — the task is already
 /// in the ledger.
-async fn dispatch_triage(source: &TaskSource, enriched: &EnrichedTask) -> Result<(), String> {
+async fn dispatch_triage(
+    ctx: &crate::core::runtime::DispatchCtx,
+    source: &TaskSource,
+    enriched: &EnrichedTask,
+) -> Result<(), String> {
     // Respect background-AI throttling. When the gate denies capacity
     // (Off / paused), we keep the card but skip the proactive turn.
-    // Entry point of a scheduler-driven turn: bind the calling task's context once.
-    let ctx = crate::core::runtime::DispatchCtx::ambient();
     let Some(_permit) = scheduler_gate::wait_for_capacity().await else {
         tracing::info!(
             source_id = %source.id,

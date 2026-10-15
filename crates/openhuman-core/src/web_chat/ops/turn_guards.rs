@@ -95,6 +95,7 @@ enum Stop {
 /// harness wind-down. `run_chat_task` taps the turn's progress stream into the
 /// [`TurnActivity`] built here and handed to the turn.
 async fn drive_turn_with_deadline<B, F>(
+    ctx: &crate::core::runtime::DispatchCtx,
     deadline: Option<Duration>,
     idle_window: Option<Duration>,
     ids: Option<TurnIds>,
@@ -172,6 +173,7 @@ where
         stuck,
         config,
         locale,
+        ctx: ctx.clone(),
     };
     let close = super::super::turn_close::close_reply(stopped);
     match tokio::time::timeout(CLOSE_REPLY_BUDGET, close).await {
@@ -244,6 +246,7 @@ where
         cancel_token,
         turn_cancellation,
         drive_turn_with_deadline(
+            ctx,
             deadline,
             turn_activity::configured_idle_window(),
             ids,

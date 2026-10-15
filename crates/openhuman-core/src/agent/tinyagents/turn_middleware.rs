@@ -64,6 +64,8 @@ pub(super) struct TurnMiddlewareInputs {
     pub(super) deterministic_cacheable: bool,
     /// Whether the run has a cross-route fallback chain.
     pub(super) has_route_fallback: bool,
+    /// The turn's dispatch context (its embedder tool hooks come from it).
+    pub(super) dispatch: crate::core::runtime::DispatchCtx,
     /// Hosted roots authorize tools through `OpenHumanSecurityGate`; installing
     /// the legacy approval middleware as well would issue a second approval.
     pub(super) hosted_security_gate: bool,
@@ -133,6 +135,7 @@ pub(super) fn install_turn_middleware(
         required_capabilities,
         deterministic_cacheable,
         has_route_fallback,
+        dispatch,
         hosted_security_gate,
         pause_at_cap,
         run_mode,
@@ -562,8 +565,7 @@ pub(super) fn install_turn_middleware(
     // observation-only (never mutates the result), so running first in the
     // reverse-order `after_tool` chain is safe — it cannot perturb the
     // summarization/cap or tool-outcome capture layers.
-    let mut embedder_tool_hooks =
-        crate::agent::hooks::embedder_tool_hooks_in(&crate::core::runtime::DispatchCtx::ambient());
+    let mut embedder_tool_hooks = crate::agent::hooks::embedder_tool_hooks_in(&dispatch);
     embedder_tool_hooks.extend(scoped_tool_hooks);
     if !embedder_tool_hooks.is_empty() {
         harness.push_middleware(Arc::new(

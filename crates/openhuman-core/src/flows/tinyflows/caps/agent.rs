@@ -175,6 +175,8 @@ impl AgentRunner for OpenHumanAgentRunner {
         request: Value,
         conn: Option<&str>,
     ) -> Result<Value> {
+        // Entry point of a flow agent node: bind the calling task's context once.
+        let dispatch = crate::core::runtime::DispatchCtx::ambient();
         // The harness definition registry must be initialised before we can
         // build a named agent. Idempotent: a booted core already did this at
         // startup; a bare flow run (tests, standalone) has not. A failure here
@@ -203,7 +205,7 @@ impl AgentRunner for OpenHumanAgentRunner {
                     "[flows] agent_runner: HOST AGENT path — running the host-registered agent \
                      with its own tools in its own context"
                 );
-                self.run_via_harness(agent_ref, request, conn, None, host)
+                self.run_via_harness(&dispatch, agent_ref, request, conn, None, host)
                     .await
             }
             AgentRoute::Harness => {
@@ -215,7 +217,7 @@ impl AgentRunner for OpenHumanAgentRunner {
                 // A shipped/TOML harness definition has no `entry.model` — the
                 // definition's own `ModelSpec` (already applied by the session
                 // builder) is the only model pin in play here.
-                self.run_via_harness(agent_ref, request, conn, None, None)
+                self.run_via_harness(&dispatch, agent_ref, request, conn, None, None)
                     .await
             }
             AgentRoute::RegistryFallback => {
@@ -256,7 +258,14 @@ impl AgentRunner for OpenHumanAgentRunner {
                         // comment on this PR: this previously regressed to the
                         // default chat model for a custom flow agent with no
                         // per-node override).
-                        self.run_via_harness(agent_ref, request, conn, entry_model.as_deref(), None)
+                        self.run_via_harness(
+                            &dispatch,
+                            agent_ref,
+                            request,
+                            conn,
+                            entry_model.as_deref(),
+                            None,
+                        )
                             .await
                     }
                     AgentRoute::RegistryFallback => {
@@ -266,7 +275,7 @@ impl AgentRunner for OpenHumanAgentRunner {
                             "[flows] agent_runner: FALLBACK path — persona-shaping single \
                              completion for a custom registry entry"
                         );
-                        self.run_via_registry_fallback(agent_ref, request, conn)
+                        self.run_via_registry_fallback(&dispatch, agent_ref, request, conn)
                             .await
                     }
                 }
@@ -322,6 +331,7 @@ impl OpenHumanAgentRunner {
     /// reaching for a background sub-agent from inside a single node.
     async fn run_via_harness(
         &self,
+        dispatch: &crate::core::runtime::DispatchCtx,
         agent_ref: &str,
         request: Value,
         conn: Option<&str>,
@@ -375,7 +385,11 @@ impl OpenHumanAgentRunner {
 
         let built = match &host {
             Some(host) => host.session_host(effective.as_ref(), None),
-            None => OpenHumanSessionHost::from_config_for_agent(effective.as_ref(), agent_ref),
+            None => OpenHumanSessionHost::from_config_for_agent(
+                dispatch,
+                effective.as_ref(),
+                agent_ref,
+            ),
         };
         let mut agent = built.map_err(|e| {
             EngineError::Capability(format!(
@@ -506,13 +520,14 @@ impl OpenHumanAgentRunner {
     /// agents don't regress.
     async fn run_via_registry_fallback(
         &self,
+        dispatch: &crate::core::runtime::DispatchCtx,
         agent_ref: &str,
         request: Value,
         conn: Option<&str>,
     ) -> Result<Value> {
         // Resolve + validate the requested agent kind against the registry.
         let entry = crate::agent::registry::get_agent(
-            &crate::core::runtime::DispatchCtx::ambient(),
+            dispatch,
             agent_ref,
         )
         .await

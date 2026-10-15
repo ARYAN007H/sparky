@@ -110,6 +110,7 @@ pub(super) fn register_domain_subscribers(
     config: crate::config::Config,
     embedded_core: bool,
     domains: crate::core::runtime::DomainSet,
+    ctx: &DispatchCtx,
 ) {
     use crate::core::all::DomainGroup;
     use std::sync::{Arc, Once};
@@ -174,8 +175,9 @@ pub(super) fn register_domain_subscribers(
         crate::security::credentials::seed_api_key_from_env(&config);
         if std::env::var_os(crate::security::credentials::BACKEND_SESSION_TOKEN_ENV).is_some() {
             let config = config.clone();
+            let ctx = ctx.clone();
             tokio::spawn(async move {
-                crate::security::credentials::seed_session_from_env(&DispatchCtx::ambient(), &config).await;
+                crate::security::credentials::seed_session_from_env(&ctx, &config).await;
             });
         }
 

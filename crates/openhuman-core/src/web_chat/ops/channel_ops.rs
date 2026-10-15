@@ -153,7 +153,7 @@ async fn cancel_chat_inner(
         crate::agent::orchestration::busy_guard::clear_busy_for_thread(ctx, thread_id);
         // A drain that fired while the cancelled turn counted as busy returned
         // without claiming anything; ask for another.
-        crate::agent::orchestration::background_delivery::kick_delivery(thread_id);
+        crate::agent::orchestration::background_delivery::kick_delivery(ctx, thread_id);
     }
     let subagents_cancelled = if request_id.is_none() {
         // Gate completion recording before aborting: Tokio abort is

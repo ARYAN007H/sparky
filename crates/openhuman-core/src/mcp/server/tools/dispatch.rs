@@ -228,8 +228,8 @@ async fn build_orchestrator_agent(
     ctx: &DispatchCtx,
 ) -> Result<OpenHumanSessionHost, ToolCallError> {
     let config = load_config_and_init_registry(ctx).await?;
-    let mut agent =
-        OpenHumanSessionHost::from_config_for_agent(&config, "orchestrator").map_err(|err| {
+    let mut agent = OpenHumanSessionHost::from_config_for_agent(ctx, &config, "orchestrator")
+        .map_err(|err| {
             ToolCallError::Internal(format!("failed to build orchestrator agent: {err}"))
         })?;
     agent.fetch_connected_integrations().await;
@@ -349,7 +349,7 @@ async fn run_subagent_tool(
 
     let config = load_config_and_init_registry(ctx).await?;
     let mut agent =
-        OpenHumanSessionHost::from_config_for_agent(&config, agent_id).map_err(|err| {
+        OpenHumanSessionHost::from_config_for_agent(ctx, &config, agent_id).map_err(|err| {
             ToolCallError::InvalidParams(format!("failed to build agent `{agent_id}`: {err}"))
         })?;
     agent.set_event_context(

@@ -36,7 +36,8 @@ use serde_json::Value;
 
 use super::contract::ToolScope;
 use super::tools::resolve_action_scope;
-use crate::agent::tinyagents::host::run_context::sandbox_mode_for_tool;
+use crate::agent::tinyagents::host::run_context::{dispatch_ctx_for_tool, sandbox_mode_for_tool};
+use crate::config::rpc as config_rpc;
 use crate::config::Config;
 use tinyagents_definition::SandboxMode;
 use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolCategory, ToolResult, ToolRunContext};
@@ -240,7 +241,7 @@ impl Tool for ComposioActionTool {
 
     async fn execute(&self, args: Value) -> anyhow::Result<ToolResult> {
         let (config, outcome) =
-            Box::pin(self.execute_unredacted(&DispatchCtx::ambient(), args, None)).await;
+            Box::pin(self.execute_unredacted(&dispatch_ctx_for_tool(None), args, None)).await;
         super::tools::redact_composio_outcome(&config, outcome)
     }
     async fn execute_with_context(
@@ -250,7 +251,7 @@ impl Tool for ComposioActionTool {
         context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
         let (config, outcome) = Box::pin(self.execute_unredacted(
-            &DispatchCtx::ambient(),
+            &dispatch_ctx_for_tool(context),
             args,
             sandbox_mode_for_tool(context),
         ))

@@ -364,18 +364,51 @@ impl OpenHumanSessionHost {
     /// `session_id` is the conversation this turn runs in, reaching the
     /// factory as [`TurnContext::session_id`]; `None` when none is named yet.
     pub fn from_config_with_host_tools(
+        ctx: &crate::core::runtime::DispatchCtx,
         config: &Config,
         definition: &crate::agent::harness::host_definition::AgentDefinition,
         host: &super::HostTools,
         session_id: Option<&str>,
     ) -> Result<Self> {
         OpenHumanSessionHost::build_session_agent_inner(
+            ctx,
             config,
             &definition.id,
             Some(definition),
             false,
             Some(host),
             session_id,
+        )
+    }
+
+    /// Build a session agent from a definition the caller already holds,
+    /// rather than an id resolved through `AgentDefinitionRegistry::current()`
+    /// or `config.agent_registry`.
+    ///
+    /// The definition is authoritative for this agent's prompt, tool scope,
+    /// sandbox mode and delegation allowlist; it is stamped on the session so
+    /// in-turn readers ([`OpenHumanSessionHost::resolved_definition`]) never fall back to a
+    /// registry entry that happens to share its id. This is the constructor a
+    /// library host uses to run many independently specified agents on one
+    /// booted core.
+    pub fn from_config_with_definition(
+        ctx: &crate::core::runtime::DispatchCtx,
+        config: &Config,
+        definition: &crate::agent::harness::host_definition::AgentDefinition,
+    ) -> Result<Self> {
+        log::debug!(
+            "[agent] from_config_with_definition id={} sandbox={:?}",
+            definition.id,
+            definition.sandbox_mode,
+        );
+        OpenHumanSessionHost::build_session_agent_inner(
+            ctx,
+            config,
+            &definition.id,
+            Some(definition),
+            false,
+            None,
+            None,
         )
     }
 }

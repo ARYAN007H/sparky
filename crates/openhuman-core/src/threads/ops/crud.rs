@@ -190,6 +190,7 @@ async fn message_append_with_config(
         // where the turn reads them (#7714).
         let workspace = if raw_upload || durable_upload {
             crate::agent::attachments::thread_action_dir(
+                ctx,
                 config,
                 persistence_dir,
                 Some(&request.thread_id),
@@ -435,6 +436,7 @@ pub async fn thread_delete(
         .await
         .map_err(|e| format!("load config: {e}"))?;
     run_to_completion(
+        ctx,
         "thread_delete",
         thread_delete_inner(ctx.clone(), config, request),
     )

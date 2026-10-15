@@ -167,7 +167,7 @@ pub(super) fn conversations_backfill_status(
 ) -> ControllerFuture {
     Box::pin(async move {
         parse::<EmptyParams>(params)?;
-        finish(backfill::status(&load(&ctx).await?).await)
+        finish(backfill::status(&ctx, &load(&ctx).await?).await)
     })
 }
 
@@ -177,7 +177,7 @@ pub(super) fn conversations_backfill_start(
 ) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<backfill::BackfillStartParams>(params)?;
-        finish(backfill::start(&load(&ctx).await?, params).await)
+        finish(backfill::start(&ctx, &load(&ctx).await?, params).await)
     })
 }
 

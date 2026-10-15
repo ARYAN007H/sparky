@@ -78,6 +78,7 @@ impl EventHandler<DomainEvent> for ComposioConnectionCreatedSubscriber {
             toolkit,
             connection_id,
             connect_url: _,
+            tenant,
         } = event
         else {
             return;
@@ -87,11 +88,15 @@ impl EventHandler<DomainEvent> for ComposioConnectionCreatedSubscriber {
             connection_id = %connection_id,
             "[composio:bus] connection_created"
         );
+        let Some(ctx) = DispatchCtx::for_event(tenant.as_ref()) else {
+            tracing::debug!(toolkit = %toolkit, "[composio:bus] connection_created has no tenant; skipped");
+            return;
+        };
         // The cache refresh runs for every toolkit; only the profile fetch is gated on a native provider.
         let toolkit = toolkit.clone();
         let connection_id = connection_id.clone();
         tokio::spawn(async move {
-            on_connection_created(&DispatchCtx::ambient(), toolkit, connection_id).await
+            on_connection_created(&ctx, toolkit, connection_id).await
         });
     }
 }
