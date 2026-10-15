@@ -32,6 +32,24 @@ pub(super) struct BridgeCtx<'a> {
     pub(super) dispatch: &'a crate::core::runtime::DispatchCtx,
 }
 
+impl<'a> BridgeCtx<'a> {
+    pub(super) fn new(
+        client_id: &'a str,
+        thread_id: &'a str,
+        request_id: &'a str,
+        config: &'a crate::config::Config,
+        dispatch: &'a crate::core::runtime::DispatchCtx,
+    ) -> Self {
+        Self {
+            client_id,
+            thread_id,
+            request_id,
+            config,
+            dispatch,
+        }
+    }
+}
+
 pub(super) fn on_subagent_spawned(
     ctx: &BridgeCtx<'_>,
     emit_seq: &mut u64,
