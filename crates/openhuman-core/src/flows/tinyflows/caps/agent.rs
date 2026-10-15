@@ -375,7 +375,11 @@ impl OpenHumanAgentRunner {
 
         let built = match &host {
             Some(host) => host.session_host(effective.as_ref(), None),
-            None => OpenHumanSessionHost::from_config_for_agent(effective.as_ref(), agent_ref),
+            None => OpenHumanSessionHost::from_config_for_agent(
+                &crate::core::runtime::DispatchCtx::ambient(),
+                effective.as_ref(),
+                agent_ref,
+            ),
         };
         let mut agent = built.map_err(|e| {
             EngineError::Capability(format!(

@@ -183,7 +183,11 @@ pub async fn spawn_workflow_run_background(
                 config.http_request.allowed_domains = vec!["*".to_string()];
             }
             let mut agent =
-                match OpenHumanSessionHost::from_config_for_agent(&config, "orchestrator") {
+                match OpenHumanSessionHost::from_config_for_agent(
+                    &crate::core::runtime::DispatchCtx::ambient(),
+                    &config,
+                    "orchestrator",
+                ) {
                     Ok(a) => a,
                     Err(e) => {
                         let _ = run_log::write_footer(
