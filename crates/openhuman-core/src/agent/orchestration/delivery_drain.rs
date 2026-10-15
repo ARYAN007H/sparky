@@ -45,8 +45,8 @@ impl DrainFence {
 
     /// The fence of the profile the calling task serves, when this node hosts
     /// it. `None` outside SaaS or outside a profile.
-    pub(crate) fn current() -> Self {
-        Self(crate::profiles::host::current().map(|profile| Arc::clone(profile.lease_fence())))
+    pub(crate) fn current(ctx: &crate::core::runtime::DispatchCtx) -> Self {
+        Self(crate::profiles::host::current(ctx).map(|profile| Arc::clone(profile.lease_fence())))
     }
 
     /// Whether this node may still act for the profile: the fence is not

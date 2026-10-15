@@ -242,7 +242,12 @@ pub(super) fn drain_schedule_in(
 /// Schedule a debounced delivery attempt for a thread, fenced by the calling
 /// profile's lease ([`DrainFence::current`]).
 fn schedule_delivery(thread_id: String, delay: Duration) {
-    schedule_delivery_inner(thread_id, delay, false, DrainFence::current());
+    schedule_delivery_inner(
+        thread_id,
+        delay,
+        false,
+        DrainFence::current(&DispatchCtx::ambient()),
+    );
 }
 
 /// `wait_idle`: after the delay, keep waiting while the thread's user turn is in
@@ -297,7 +302,7 @@ fn scheduled_for_test() -> &'static Mutex<Vec<(String, Duration)>> {
 /// calling profile's lease when there is one. Returns the number of threads
 /// scheduled.
 pub(crate) fn recover_on_boot(ctx: &DispatchCtx, workspace_dir: &Path) -> usize {
-    recover_fenced(ctx, workspace_dir, DrainFence::current())
+    recover_fenced(ctx, workspace_dir, DrainFence::current(ctx))
 }
 
 fn recover_fenced(ctx: &DispatchCtx, workspace_dir: &Path, fence: DrainFence) -> usize {

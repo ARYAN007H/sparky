@@ -259,7 +259,9 @@ impl ToolHook for ProfilePermission {
         Ok(())
     }
     async fn before_tool_decision(&self, context: &ToolHookContext) -> ToolHookDecision {
-        let tenant = crate::core::runtime::current_tenant()
+        // The hook runs inside the turn's own task, so its tenant is the ambient one.
+        let tenant = crate::core::runtime::DispatchCtx::ambient()
+            .tenant()
             .ok()
             .and_then(|tenant| tenant.profile);
         if tenant.as_deref() != Some(self.profile.as_str())
