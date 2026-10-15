@@ -180,6 +180,7 @@ impl ModelResolver<()> for TurnModelResolver {
 /// the host turn loop).
 #[allow(clippy::too_many_arguments)]
 fn build_turn_models_crate(
+    ctx: &crate::core::runtime::DispatchCtx,
     role: &str,
     config: &crate::config::Config,
     model: &str,
@@ -205,7 +206,7 @@ fn build_turn_models_crate(
     // The primary honours an explicit provider-string override when the producer's
     // effective provider differs from `provider_for_role(role)` (triage #1257).
     let build_primary = |m: &str| -> anyhow::Result<TurnChatModel> {
-        if let Some(chat) = crate::core::runtime::CoreContext::current_host_overrides()
+        if let Some(chat) = ctx.host_overrides()
             .and_then(|local| local.model_for(role))
         {
             return Ok(chat);
@@ -273,7 +274,7 @@ fn build_turn_models_crate(
                     continue;
                 }
                 let tier_role = factory::role_for_model_tier(tier);
-                if let Some(custom) = crate::core::runtime::CoreContext::current_host_overrides()
+                if let Some(custom) = ctx.host_overrides()
                     .and_then(|local| {
                         local
                             .role_models
@@ -333,7 +334,7 @@ fn build_turn_models_crate(
             }
 
             // The summarizer is a distinct adapter instance (own empty error slot).
-            let summarizer = match crate::core::runtime::CoreContext::current_host_overrides()
+            let summarizer = match ctx.host_overrides()
                 .and_then(|local| local.role_models.get("summarization").cloned())
             {
                 Some(custom) => crate::agent::attachments::provider::wrap_injected(
@@ -485,7 +486,7 @@ impl TurnModelSource {
         let Some(source) = self.crate_native.as_ref() else {
             return crate::inference::model_context::context_window_for_model(model);
         };
-        if let Some(custom) = crate::core::runtime::CoreContext::current_host_overrides()
+        if let Some(custom) = source_ctx.host_overrides()
             .and_then(|local| local.model_for(&source.role))
         {
             return custom
@@ -514,7 +515,7 @@ impl TurnModelSource {
         thread_id: Option<&str>,
     ) -> anyhow::Result<TurnModels> {
         if let Some(source) = &self.crate_native {
-            if let Some(local) = crate::core::runtime::CoreContext::current_host_overrides() {
+            if let Some(local) = source_ctx.host_overrides() {
                 if let Some(custom) = local.model_for(&source.role) {
                     let mut models = Self::from_model(custom)
                         .with_attachment_config(source.config.clone())
@@ -652,7 +653,7 @@ impl TurnModelSource {
             });
         }
         if let Some(cn) = &self.crate_native {
-            if let Some(custom) = crate::core::runtime::CoreContext::current_host_overrides()
+            if let Some(custom) = source_ctx.host_overrides()
                 .and_then(|local| {
                     local
                         .model_for("summarization")
