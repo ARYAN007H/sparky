@@ -416,7 +416,7 @@ pub async fn build_with_profile_capabilities(
     capabilities: Option<Arc<crate::profiles::capabilities::ProfileCapabilities>>,
 ) -> anyhow::Result<CoreRuntime> {
     crate::profiles::provider_settings::ProfileProviderSettings::from_saas(&config)?;
-    if CoreContext::current().is_some() {
+    if CoreContext::default_context().is_some() {
         anyhow::bail!(
             "[saas] a core is already running in this process; a SaaS core must be the only one"
         );

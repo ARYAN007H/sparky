@@ -401,8 +401,8 @@ async fn try_deliver(busy_ctx: DispatchCtx, thread_id: String, fence: DrainFence
     };
     let router = background_completions::router_for_workspace(&workspace_dir);
     let turn_workspace = workspace_dir.clone();
-    // A drain is event-driven and carries no context of its own.
-    let ctx = DispatchCtx::host_default();
+    // The turn runs under the context the drain was scheduled for.
+    let ctx = busy_ctx.clone();
     let give_up_ctx = busy_ctx.clone();
     let retry_after = try_deliver_with(
         &busy_ctx,
