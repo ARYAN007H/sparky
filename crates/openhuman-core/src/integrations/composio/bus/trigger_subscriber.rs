@@ -184,7 +184,7 @@ impl EventHandler<DomainEvent> for ComposioTriggerSubscriber {
         // Spawn so the bus dispatch loop stays non-blocking — the
         // triage turn is an LLM round-trip that may take seconds.
         tokio::spawn(async move {
-            match run_triage(&envelope).await {
+            match run_triage(&crate::core::runtime::DispatchCtx::ambient(), &envelope).await {
                 Ok(TriageOutcome::Decision(run)) => {
                     // Remote payload: a Composio trigger body is
                     // attacker-influenceable, so the dispatch parks rather than
@@ -192,7 +192,7 @@ impl EventHandler<DomainEvent> for ComposioTriggerSubscriber {
                     // spawned task, because `AGENT_TURN_ORIGIN` is a task-local
                     // and does not cross `tokio::spawn`.
                     let origin = remote_trigger_origin(&envelope);
-                    if let Err(e) = with_origin(origin, apply_decision(run, &envelope)).await {
+                    if let Err(e) = with_origin(origin, apply_decision(&crate::core::runtime::DispatchCtx::ambient(), run, &envelope)).await {
                         tracing::error!(
                             label = %envelope.display_label,
                             error = %e,
