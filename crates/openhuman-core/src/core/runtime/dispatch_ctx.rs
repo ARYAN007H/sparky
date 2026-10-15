@@ -128,6 +128,20 @@ impl DispatchCtx {
         }
     }
 
+    /// The `[components]` switches of the context this call runs under. No
+    /// context at all (a bare library call, pre-boot) means nothing narrowed
+    /// them, so every component is on.
+    pub fn components(&self) -> super::ComponentSet {
+        self.resolved()
+            .map_or_else(super::ComponentSet::all, |core| core.components())
+    }
+
+    /// The domain families live for the context this call runs under, or
+    /// `None` when there is no context (callers read that as "unfiltered").
+    pub fn domains(&self) -> Option<super::DomainSet> {
+        self.resolved().map(|core| core.domains())
+    }
+
     /// Host adapters of the agent this call runs for.
     pub fn host_overrides(&self) -> Option<Arc<crate::agent::host_overrides::HostOverrides>> {
         self.resolved().and_then(|core| core.host_overrides())
