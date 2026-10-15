@@ -50,7 +50,10 @@ async fn connect_with_session_using(
     Ok(manager.get_state())
 }
 
-pub async fn connect_with_session(ctx: &DispatchCtx, manager: &SocketManager) -> Result<SocketState, String> {
+pub async fn connect_with_session(
+    ctx: &DispatchCtx,
+    manager: &SocketManager,
+) -> Result<SocketState, String> {
     log::info!("[socket:rpc] connect_with_session — resolving credentials");
     let config = std::sync::Arc::new(ctx.load_config().await?);
     let api_url = crate::backend::require_base_url(&config.api_url)?;

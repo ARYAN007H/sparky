@@ -27,7 +27,7 @@ fn slot() -> &'static RwLock<Option<ShellInvocation>> {
 /// Ask TinyBox which shell it selects and remember it for [`command`].
 ///
 /// A failure is logged and leaves any earlier selection in place.
-pub(super) async fn resolve(ctx: &DispatchCtx, ) {
+pub(super) async fn resolve(ctx: &DispatchCtx) {
     #[cfg(feature = "modules")]
     {
         let config = match ctx.load_config().await {

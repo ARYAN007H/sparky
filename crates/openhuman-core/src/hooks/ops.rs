@@ -43,7 +43,8 @@ pub async fn init(ctx: &DispatchCtx, config: &crate::config::schema::Config) {
     super::host::engine()
         .set_default_timeout(Duration::from_secs(settings.default_timeout_secs))
         .await;
-    let loaded = super::host::reload(&ctx, 
+    let loaded = super::host::reload(
+        &ctx,
         Some(config.action_dir.clone()),
         Some(config.workspace_dir.clone()),
     )

@@ -10,9 +10,9 @@
 //! - `build_run_result_from_staged_update` sets `restart_requested = false`
 //!   under the `Supervisor` strategy.
 
-use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::config::UpdateRestartStrategy;
+use crate::core::runtime::DispatchCtx;
 use crate::platform::update::types::{UpdateApplyResult, UpdateInfo};
 
 // ── update_version ────────────────────────────────────────────────────────────

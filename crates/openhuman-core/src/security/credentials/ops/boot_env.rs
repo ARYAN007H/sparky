@@ -11,8 +11,8 @@
 //! a fresh install and is otherwise ignored, so rotating it means clearing the
 //! stored one first (`openhuman-core auth clear_credential`).
 
-use crate::core::runtime::DispatchCtx;
 use crate::config::Config;
+use crate::core::runtime::DispatchCtx;
 use crate::security::credentials::api_key;
 use crate::security::credentials::session_support::{get_session_token, CredentialKind};
 

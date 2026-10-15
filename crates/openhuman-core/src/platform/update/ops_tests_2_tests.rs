@@ -1,7 +1,7 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::config::test_env::EnvVarGuard;
 use crate::config::TEST_ENV_LOCK;
+use crate::core::runtime::DispatchCtx;
 use tempfile::TempDir;
 
 async fn write_update_policy(tmp: &TempDir, update: UpdateConfig) {
@@ -102,7 +102,8 @@ fn validate_asset_name_rejects_unprefixed_asset() {
 #[tokio::test]
 async fn update_apply_rejects_non_github_url_before_network_call() {
     let _guard = TEST_ENV_LOCK.lock().await;
-    let outcome = update_apply(&DispatchCtx::process_default(), 
+    let outcome = update_apply(
+        &DispatchCtx::process_default(),
         "https://evil.example.com/asset".to_string(),
         "openhuman-core-x86_64.tar.gz".to_string(),
         None,
@@ -118,7 +119,8 @@ async fn update_apply_rejects_non_github_url_before_network_call() {
 #[tokio::test]
 async fn update_apply_rejects_unsafe_asset_name() {
     let _guard = TEST_ENV_LOCK.lock().await;
-    let outcome = update_apply(&DispatchCtx::process_default(), 
+    let outcome = update_apply(
+        &DispatchCtx::process_default(),
         "https://github.com/owner/repo/releases/download/v1/x".to_string(),
         "../etc/passwd".to_string(),
         None,
@@ -145,7 +147,8 @@ async fn update_apply_rejects_when_rpc_mutations_disabled() {
     )
     .await;
 
-    let outcome = update_apply(&DispatchCtx::process_default(), 
+    let outcome = update_apply(
+        &DispatchCtx::process_default(),
         "https://github.com/owner/repo/releases/download/v1/x".to_string(),
         "openhuman-core-x86_64.tar.gz".to_string(),
         None,

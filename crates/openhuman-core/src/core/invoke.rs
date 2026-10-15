@@ -97,8 +97,9 @@ async fn invoke_scoped(
     params: Value,
 ) -> Result<Value, String> {
     let core = ctx.core().cloned();
-    let call: std::pin::Pin<Box<dyn std::future::Future<Output = Result<Value, String>> + Send + '_>> =
-        Box::pin(invoke_method_inner(ctx, state, method, params));
+    let call: std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<Value, String>> + Send + '_>,
+    > = Box::pin(invoke_method_inner(ctx, state, method, params));
     match core {
         Some(core) => CoreContext::scope(core, call).await,
         None => call.await,

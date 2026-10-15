@@ -440,14 +440,17 @@ fn handle_setup(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFutur
     Box::pin(async move {
         let payload: SetupWalletParams = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("invalid params: {e}"))?;
-        crate::web3::wallet::setup(&ctx, WalletSetupParams {
-            consent_granted: payload.consent_granted,
-            source: payload.source,
-            mnemonic_word_count: payload.mnemonic_word_count,
-            encrypted_mnemonic: Some(payload.encrypted_mnemonic),
-            accounts: payload.accounts,
-            force: payload.force,
-        })
+        crate::web3::wallet::setup(
+            &ctx,
+            WalletSetupParams {
+                consent_granted: payload.consent_granted,
+                source: payload.source,
+                mnemonic_word_count: payload.mnemonic_word_count,
+                encrypted_mnemonic: Some(payload.encrypted_mnemonic),
+                accounts: payload.accounts,
+                force: payload.force,
+            },
+        )
         .await?
         .into_cli_compatible_json()
     })
@@ -472,8 +475,10 @@ fn handle_encode_erc20_transfer(ctx: DispatchCtx, params: Map<String, Value>) ->
         if parsed.chain != WalletChain::Evm {
             return Err("encode_erc20_transfer only supports the evm chain".to_string());
         }
-        serde_json::to_value(encode_erc20_transfer(&ctx, &parsed.to_address, &parsed.amount_raw).await?)
-            .map_err(|e| format!("failed to encode ERC20 transfer output: {e}"))
+        serde_json::to_value(
+            encode_erc20_transfer(&ctx, &parsed.to_address, &parsed.amount_raw).await?,
+        )
+        .map_err(|e| format!("failed to encode ERC20 transfer output: {e}"))
     })
 }
 

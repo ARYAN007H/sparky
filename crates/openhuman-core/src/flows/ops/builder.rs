@@ -1,5 +1,5 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
+use crate::core::runtime::DispatchCtx;
 
 /// Runs the `workflow_builder` agent for one authoring turn and returns its
 /// proposal, invoking it as a first-class backend agent (exactly like the Flow
@@ -16,7 +16,8 @@ use super::*;
 /// Persistence stays with the agent's tools: `propose`/`revise` never persist;
 /// `save_workflow` (only reachable in `build` mode with a real `flow_id`)
 /// writes onto an existing flow. This op never enables or runs a flow.
-pub async fn flows_build(ctx: &DispatchCtx, 
+pub async fn flows_build(
+    ctx: &DispatchCtx,
     config: &Config,
     req: crate::flows::agents::workflow_builder::builder_prompt::BuilderRequest,
     stream: Option<FlowStreamTarget>,
@@ -30,7 +31,8 @@ pub async fn flows_build(ctx: &DispatchCtx,
 /// This is intentionally crate-private: product surfaces use [`flows_build`]'s
 /// normal builder belt. Host integrations that add their own persistence
 /// boundary can hide tools that would bypass that boundary.
-pub(crate) async fn flows_build_with_extra_hidden_tools(ctx: &DispatchCtx, 
+pub(crate) async fn flows_build_with_extra_hidden_tools(
+    ctx: &DispatchCtx,
     config: &Config,
     req: crate::flows::agents::workflow_builder::builder_prompt::BuilderRequest,
     stream: Option<FlowStreamTarget>,

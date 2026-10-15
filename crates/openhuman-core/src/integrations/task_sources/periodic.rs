@@ -103,7 +103,8 @@ async fn run_loop() {
         for (agent, result) in
             crate::storage::agents::for_each_live_scope("task_sources", || async {
                 run_one_tick(&DispatchCtx::ambient()).await
-            }).await
+            })
+            .await
         {
             if let Err(e) = result {
                 tracing::warn!(error = %e, agent = agent.as_deref().unwrap_or("local"), "[task_sources:periodic] tick failed (continuing)");
@@ -114,8 +115,9 @@ async fn run_loop() {
 
 /// Run a single scheduler tick. `pub(crate)` so tests can drive ticks
 /// without the real `interval`.
-pub(crate) async fn run_one_tick(ctx: &DispatchCtx, ) -> Result<(), String> {
-    let config = ctx.load_config()
+pub(crate) async fn run_one_tick(ctx: &DispatchCtx) -> Result<(), String> {
+    let config = ctx
+        .load_config()
         .await
         .map_err(|e| format!("load_config: {e}"))?;
 

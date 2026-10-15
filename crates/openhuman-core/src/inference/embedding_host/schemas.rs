@@ -182,7 +182,8 @@ fn handle_update_settings(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
     Box::pin(async move {
         let p = deserialize_params::<UpdateSettingsParams>(params)?;
         to_json(
-            super::rpc::update_settings(&ctx, 
+            super::rpc::update_settings(
+                &ctx,
                 p.provider,
                 p.model,
                 p.dimensions,

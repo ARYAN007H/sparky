@@ -95,7 +95,9 @@ impl EventHandler<DomainEvent> for DeviceTunnelSubscriber {
                     .unwrap_or_else(std::sync::PoisonError::into_inner)
                     .get(channel_id.as_str())
                     .cloned();
-                match super::owner::owner_of(&DispatchCtx::ambient(), channel_id, pending.as_ref()).await {
+                match super::owner::owner_of(&DispatchCtx::ambient(), channel_id, pending.as_ref())
+                    .await
+                {
                     Ok(owner) => {
                         let handled = crate::storage::agents::within_agent(
                             owner.as_deref(),

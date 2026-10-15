@@ -149,7 +149,8 @@ pub async fn apply_autonomy_settings(
 }
 
 /// Loads the configuration, applies autonomy settings updates, and saves it.
-pub async fn load_and_apply_autonomy_settings(ctx: &DispatchCtx, 
+pub async fn load_and_apply_autonomy_settings(
+    ctx: &DispatchCtx,
     update: AutonomySettingsPatch,
 ) -> Result<Outcome<serde_json::Value>, String> {
     let mut config = ctx.load_config().await?;
@@ -157,7 +158,9 @@ pub async fn load_and_apply_autonomy_settings(ctx: &DispatchCtx,
 }
 
 /// Returns the current `[autonomy]` settings block as JSON (no secrets).
-pub async fn get_autonomy_settings(ctx: &DispatchCtx, ) -> Result<Outcome<serde_json::Value>, String> {
+pub async fn get_autonomy_settings(
+    ctx: &DispatchCtx,
+) -> Result<Outcome<serde_json::Value>, String> {
     let config = ctx.load_config().await?;
     let value = serde_json::to_value(&config.autonomy).map_err(|e| e.to_string())?;
     Ok(Outcome::single_log(value, "autonomy settings read"))
@@ -265,7 +268,8 @@ pub async fn apply_agent_settings(
 }
 
 /// Loads the configuration, applies agent settings updates, and saves it.
-pub async fn load_and_apply_agent_settings(ctx: &DispatchCtx, 
+pub async fn load_and_apply_agent_settings(
+    ctx: &DispatchCtx,
     update: AgentSettingsPatch,
 ) -> Result<Outcome<serde_json::Value>, String> {
     let mut config = ctx.load_config().await?;
@@ -275,7 +279,7 @@ pub async fn load_and_apply_agent_settings(ctx: &DispatchCtx,
 /// Returns the agent execution settings (currently the action timeout) plus the
 /// runtime-effective value and whether the `OPENHUMAN_TOOL_TIMEOUT_SECS` env var
 /// is overriding the configured value, so the UI can explain a no-op control.
-pub async fn get_agent_settings(ctx: &DispatchCtx, ) -> Result<Outcome<serde_json::Value>, String> {
+pub async fn get_agent_settings(ctx: &DispatchCtx) -> Result<Outcome<serde_json::Value>, String> {
     let config = ctx.load_config().await?;
     crate::tools::timeout::set_tool_timeout_secs(config.agent.agent_timeout_secs);
     let value = serde_json::json!({
@@ -651,7 +655,8 @@ pub async fn apply_agent_paths_settings(
 }
 
 /// Loads the configuration, applies agent-paths updates, and saves it.
-pub async fn load_and_apply_agent_paths_settings(ctx: &DispatchCtx, 
+pub async fn load_and_apply_agent_paths_settings(
+    ctx: &DispatchCtx,
     update: AgentPathsPatch,
 ) -> Result<Outcome<serde_json::Value>, String> {
     let mut config = ctx.load_config().await?;
@@ -667,7 +672,7 @@ fn paths_equal(a: &Path, b: &Path) -> bool {
 
 /// Reports the agent's filesystem roots so the UI can render them live
 /// instead of hard-coding strings that drift away from `Config`.
-pub async fn get_agent_paths(ctx: &DispatchCtx, ) -> Result<Outcome<serde_json::Value>, String> {
+pub async fn get_agent_paths(ctx: &DispatchCtx) -> Result<Outcome<serde_json::Value>, String> {
     let config = ctx.load_config().await?;
     Ok(Outcome::new(
         agent_paths_payload(&config),

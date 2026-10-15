@@ -1,5 +1,5 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
+use crate::core::runtime::DispatchCtx;
 use crate::integrations::task_sources::types::{
     provider_can_fetch, FilterSpec, ProviderSlug, SourceTarget,
 };

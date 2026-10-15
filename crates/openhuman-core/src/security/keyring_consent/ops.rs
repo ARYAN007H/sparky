@@ -19,7 +19,10 @@ pub async fn keyring_status() -> Result<Outcome<KeyringStatus>, String> {
     Ok(Outcome::single_log(status, "keyring status fetched"))
 }
 
-pub async fn keyring_consent_decide(ctx: &DispatchCtx, mode: String) -> Result<Outcome<ConsentPreference>, String> {
+pub async fn keyring_consent_decide(
+    ctx: &DispatchCtx,
+    mode: String,
+) -> Result<Outcome<ConsentPreference>, String> {
     if mode != "local_encrypted" && mode != "declined" {
         return Err(format!(
             "invalid mode '{mode}': expected 'local_encrypted' or 'declined'"

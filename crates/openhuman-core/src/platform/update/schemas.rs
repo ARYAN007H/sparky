@@ -152,7 +152,8 @@ fn handle_apply(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFutur
             .map(|s| s.to_string());
 
         to_json(
-            crate::platform::update::rpc::update_apply(&ctx, download_url, asset_name, staging_dir).await,
+            crate::platform::update::rpc::update_apply(&ctx, download_url, asset_name, staging_dir)
+                .await,
         )
     })
 }

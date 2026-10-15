@@ -1,13 +1,13 @@
 //! Sandbox backend operations — policy resolution, backend creation, and
 //! routed execution.
 
-use crate::core::runtime::DispatchCtx;
 use super::docker;
 use super::types::{
     ElevatedOp, SandboxBackendHandle, SandboxBackendKind, SandboxExecRequest, SandboxExecResult,
     SandboxPolicy, SandboxStatus, ELEVATED_TOOLS,
 };
 use crate::config::{RuntimeConfig, SandboxBackend, SandboxConfig};
+use crate::core::runtime::DispatchCtx;
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::path::Path;
@@ -46,7 +46,10 @@ pub fn sandbox_off_value(value: Option<&str>) -> bool {
 /// Whether a command tool must use the sandbox execution path. An explicit
 /// backend in the active config is an operator requirement even when the
 /// agent definition uses the usual `SandboxMode::None` default.
-pub async fn command_requires_sandbox(ctx: &DispatchCtx, sandbox_mode: Option<SandboxMode>) -> Result<bool, String> {
+pub async fn command_requires_sandbox(
+    ctx: &DispatchCtx,
+    sandbox_mode: Option<SandboxMode>,
+) -> Result<bool, String> {
     if crate::core::runtime::is_saas() {
         // Every SaaS command must enter the per-user container path, including
         // language tools whose agent definition does not request a sandbox.
@@ -74,14 +77,16 @@ pub async fn command_requires_sandbox(ctx: &DispatchCtx, sandbox_mode: Option<Sa
 /// Resolve the policy for a command tool before building its command line.
 /// SaaS always uses the user's container; other hosts apply the operator's
 /// backend selection while retaining an agent-level sandbox requirement.
-pub(crate) async fn resolve_command_policy(ctx: &DispatchCtx, 
+pub(crate) async fn resolve_command_policy(
+    ctx: &DispatchCtx,
     action_dir: &Path,
     state_dir: &Path,
 ) -> Result<SandboxPolicy, String> {
     if crate::core::runtime::is_saas() {
         return crate::profiles::tools::sandbox_policy(action_dir, state_dir);
     }
-    let config = ctx.load_config()
+    let config = ctx
+        .load_config()
         .await
         .map_err(|error| format!("Cannot read sandbox configuration: {error}"))?;
     let mut policy = resolve_sandbox_policy(
@@ -223,7 +228,10 @@ pub(crate) fn local_status_for_jail(
     }
 }
 
-pub async fn create_sandbox_backend(ctx: &DispatchCtx, policy: &SandboxPolicy) -> SandboxBackendHandle {
+pub async fn create_sandbox_backend(
+    ctx: &DispatchCtx,
+    policy: &SandboxPolicy,
+) -> SandboxBackendHandle {
     if policy.backend != SandboxBackendKind::Docker {
         return create_sandbox_backend_with_config(policy, &crate::config::Config::default())
             .await
@@ -286,7 +294,8 @@ fn docker_error_handle() -> SandboxBackendHandle {
 ///
 /// Returns the sandboxed execution result. The caller (typically the
 /// shell tool) is responsible for converting this into a `ToolResult`.
-pub async fn execute_in_sandbox(ctx: &DispatchCtx, 
+pub async fn execute_in_sandbox(
+    ctx: &DispatchCtx,
     policy: &SandboxPolicy,
     command: &str,
     working_dir: &Path,
@@ -299,7 +308,8 @@ pub async fn execute_in_sandbox(ctx: &DispatchCtx,
 /// [`execute_in_sandbox`] that feeds `meter` with the command's output as it
 /// streams (the native backends; Docker reports elapsed time only), for the
 /// shell tool's progress line.
-pub(crate) async fn execute_in_sandbox_metered(ctx: &DispatchCtx, 
+pub(crate) async fn execute_in_sandbox_metered(
+    ctx: &DispatchCtx,
     policy: &SandboxPolicy,
     command: &str,
     working_dir: &Path,
@@ -318,7 +328,8 @@ pub(crate) async fn execute_in_sandbox_metered(ctx: &DispatchCtx,
     let explicitly_requested = if crate::core::runtime::is_saas() || sandbox_disabled_by_host() {
         false
     } else {
-        let config = ctx.load_config()
+        let config = ctx
+            .load_config()
             .await
             .map_err(|e| anyhow::anyhow!("Cannot read sandbox configuration: {e}"))?;
         module_config = Some(config.clone());
@@ -350,11 +361,9 @@ pub(crate) async fn execute_in_sandbox_metered(ctx: &DispatchCtx,
             crate::config::ensure_usable_cwd(working_dir)?;
             let config = match module_config {
                 Some(config) => config,
-                None => ctx.load_config()
-                    .await
-                    .map_err(|error| {
-                        anyhow::anyhow!("Cannot read module configuration: {error}")
-                    })?,
+                None => ctx.load_config().await.map_err(|error| {
+                    anyhow::anyhow!("Cannot read module configuration: {error}")
+                })?,
             };
             execute_unsandboxed(
                 &config,
@@ -371,11 +380,9 @@ pub(crate) async fn execute_in_sandbox_metered(ctx: &DispatchCtx,
             crate::config::ensure_usable_cwd(working_dir)?;
             let config = match module_config {
                 Some(config) => config,
-                None => ctx.load_config()
-                    .await
-                    .map_err(|error| {
-                        anyhow::anyhow!("Cannot read module configuration: {error}")
-                    })?,
+                None => ctx.load_config().await.map_err(|error| {
+                    anyhow::anyhow!("Cannot read module configuration: {error}")
+                })?,
             };
             let policy = super::local_grants::with_resolved_grants(&config, policy).await?;
             super::native_jail::execute(
@@ -400,11 +407,9 @@ pub(crate) async fn execute_in_sandbox_metered(ctx: &DispatchCtx,
             };
             let config = match module_config {
                 Some(config) => config,
-                None => ctx.load_config()
-                    .await
-                    .map_err(|error| {
-                        anyhow::anyhow!("Cannot read module configuration: {error}")
-                    })?,
+                None => ctx.load_config().await.map_err(|error| {
+                    anyhow::anyhow!("Cannot read module configuration: {error}")
+                })?,
             };
             docker::docker_exec(&config, policy, &request).await
         }

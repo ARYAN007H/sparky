@@ -241,7 +241,8 @@ impl EventHandler<DomainEvent> for ConversationPersistenceSubscriber {
                     );
                     return;
                 }
-                if let Err(error) = persist_channel_turn(&DispatchCtx::ambient(), 
+                if let Err(error) = persist_channel_turn(
+                    &DispatchCtx::ambient(),
                     &my_workspace,
                     ChannelTurnDescriptor {
                         channel,
@@ -299,7 +300,8 @@ impl EventHandler<DomainEvent> for ConversationPersistenceSubscriber {
                     );
                     return;
                 }
-                if let Err(error) = persist_channel_turn(&DispatchCtx::ambient(), 
+                if let Err(error) = persist_channel_turn(
+                    &DispatchCtx::ambient(),
                     &my_workspace,
                     ChannelTurnDescriptor {
                         channel,
@@ -348,7 +350,8 @@ struct ChannelTurnDescriptor<'a> {
     source: &'a str,
 }
 
-async fn persist_channel_turn(ctx: &DispatchCtx, 
+async fn persist_channel_turn(
+    ctx: &DispatchCtx,
     workspace_dir: &Path,
     descriptor: ChannelTurnDescriptor<'_>,
 ) -> Result<(), String> {

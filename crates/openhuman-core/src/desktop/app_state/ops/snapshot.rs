@@ -8,7 +8,6 @@
 //! shell's `openhuman_tinyhumans::session` cache — so this snapshot never talks to the
 //! backend.
 
-use crate::core::runtime::DispatchCtx;
 use super::runtime_snapshot::{
     build_runtime_snapshot, degraded_runtime_snapshot, RUNTIME_SNAPSHOT_TIMEOUT,
 };
@@ -19,6 +18,7 @@ use super::state_file::{
 use super::types::{AppStateSnapshot, StoredAppState, StoredAppStatePatch};
 use super::LOG_PREFIX;
 use crate::config::rpc as config_rpc;
+use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
 use crate::security::credentials::session_support::{
     load_app_session_profile, session_state_from_profile,
@@ -39,7 +39,7 @@ pub(super) fn sanitize_snapshot_user(user: Option<Value>) -> Option<Value> {
     }
 }
 
-pub async fn snapshot(ctx: &DispatchCtx, ) -> Result<Outcome<AppStateSnapshot>, String> {
+pub async fn snapshot(ctx: &DispatchCtx) -> Result<Outcome<AppStateSnapshot>, String> {
     let req_id = SNAPSHOT_REQ_COUNTER.fetch_add(1, Ordering::Relaxed);
     let t_total = Instant::now();
 
@@ -141,7 +141,8 @@ pub async fn snapshot(ctx: &DispatchCtx, ) -> Result<Outcome<AppStateSnapshot>, 
     ))
 }
 
-pub async fn update_local_state(ctx: &DispatchCtx, 
+pub async fn update_local_state(
+    ctx: &DispatchCtx,
     patch: StoredAppStatePatch,
 ) -> Result<Outcome<StoredAppState>, String> {
     let config = ctx.load_config().await?;

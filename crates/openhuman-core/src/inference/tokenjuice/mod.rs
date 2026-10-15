@@ -440,7 +440,8 @@ pub(crate) mod module_stub;
 mod repl_module_tests;
 
 /// Run a typed query inside TinyJuice; cached originals stay inside the module.
-pub async fn query(ctx: &DispatchCtx, 
+pub async fn query(
+    ctx: &DispatchCtx,
     request: tinyjuice_bus::wire::QueryRequest,
 ) -> Result<tinyjuice_bus::wire::QueryResponse, String> {
     let config = ctx.load_config().await?;

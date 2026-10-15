@@ -1,5 +1,5 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
+use crate::core::runtime::DispatchCtx;
 
 // NOTE: the title_log_fingerprint / collapse_whitespace copies were removed
 // here (plan.md §2.1) — threads/title.rs (the owning module) already covers
@@ -186,17 +186,20 @@ async fn message_append_returns_typed_not_found_for_stale_thread() {
     let _workspace_guard = EnvVarGuard::set("OPENHUMAN_WORKSPACE", workspace.path());
     let thread_id = "thread-missing";
 
-    let err = message_append(&DispatchCtx::process_default(), AppendConversationMessageRequest {
-        thread_id: thread_id.to_string(),
-        message: ConversationMessageRecord {
-            id: "msg-1".to_string(),
-            content: "hello".to_string(),
-            message_type: "text".to_string(),
-            extra_metadata: Value::Null,
-            sender: "user".to_string(),
-            created_at: "2026-01-01T00:00:00Z".to_string(),
+    let err = message_append(
+        &DispatchCtx::process_default(),
+        AppendConversationMessageRequest {
+            thread_id: thread_id.to_string(),
+            message: ConversationMessageRecord {
+                id: "msg-1".to_string(),
+                content: "hello".to_string(),
+                message_type: "text".to_string(),
+                extra_metadata: Value::Null,
+                sender: "user".to_string(),
+                created_at: "2026-01-01T00:00:00Z".to_string(),
+            },
         },
-    })
+    )
     .await
     .expect_err("missing thread must return a typed not-found error");
 
@@ -362,10 +365,13 @@ async fn thread_delete_removes_persisted_turn_state_snapshot() {
     .await;
     assert_eq!(bg::pending_for(&dir, thread_id).len(), 1);
 
-    thread_delete(&DispatchCtx::process_default(), DeleteConversationThreadRequest {
-        thread_id: thread_id.to_string(),
-        deleted_at: "2026-01-01T00:02:00Z".into(),
-    })
+    thread_delete(
+        &DispatchCtx::process_default(),
+        DeleteConversationThreadRequest {
+            thread_id: thread_id.to_string(),
+            deleted_at: "2026-01-01T00:02:00Z".into(),
+        },
+    )
     .await
     .expect("delete thread");
 
@@ -492,10 +498,13 @@ async fn thread_delete_forgets_its_conversation_memory_or_queues_it() {
         .expect("load config")
         .workspace_dir;
 
-    thread_delete(&DispatchCtx::process_default(), DeleteConversationThreadRequest {
-        thread_id: thread_id.to_string(),
-        deleted_at: "2026-01-01T00:02:00Z".into(),
-    })
+    thread_delete(
+        &DispatchCtx::process_default(),
+        DeleteConversationThreadRequest {
+            thread_id: thread_id.to_string(),
+            deleted_at: "2026-01-01T00:02:00Z".into(),
+        },
+    )
     .await
     .expect("delete thread");
 

@@ -240,7 +240,8 @@ impl Tool for ComposioActionTool {
     }
 
     async fn execute(&self, args: Value) -> anyhow::Result<ToolResult> {
-        let (config, outcome) = Box::pin(self.execute_unredacted(&DispatchCtx::ambient(), args, None)).await;
+        let (config, outcome) =
+            Box::pin(self.execute_unredacted(&DispatchCtx::ambient(), args, None)).await;
         super::tools::redact_composio_outcome(&config, outcome)
     }
     async fn execute_with_context(
@@ -249,8 +250,12 @@ impl Tool for ComposioActionTool {
         _options: ToolCallOptions,
         context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
-        let (config, outcome) =
-            Box::pin(self.execute_unredacted(&DispatchCtx::ambient(), args, sandbox_mode_for_tool(context))).await;
+        let (config, outcome) = Box::pin(self.execute_unredacted(
+            &DispatchCtx::ambient(),
+            args,
+            sandbox_mode_for_tool(context),
+        ))
+        .await;
         super::tools::redact_composio_outcome(&config, outcome)
     }
 }
@@ -261,7 +266,8 @@ impl ComposioActionTool {
     /// credential that dispatched — for both a spawn-time config and a
     /// deferred instance with none.
     async fn execute_unredacted(
-        &self, ctx: &DispatchCtx,
+        &self,
+        ctx: &DispatchCtx,
         args: Value,
         sandbox_mode: Option<SandboxMode>,
     ) -> (Box<Config>, anyhow::Result<ToolResult>) {

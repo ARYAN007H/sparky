@@ -1,6 +1,6 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::config::test_env::EnvVarGuard;
+use crate::core::runtime::DispatchCtx;
 
 /// Build a minimal `Arc<Config>` with `composio.mode = "backend"`
 /// (the default). The sandbox gate runs *before* any HTTP call or
@@ -496,8 +496,12 @@ fn deferred_instance_returns_live_config_for_redaction() {
         );
 
         // Boxed exactly like `Tool::execute` does.
-        let (live_config, outcome) =
-            Box::pin(t.execute_unredacted(&DispatchCtx::process_default(), serde_json::json!({}), None)).await;
+        let (live_config, outcome) = Box::pin(t.execute_unredacted(
+            &DispatchCtx::process_default(),
+            serde_json::json!({}),
+            None,
+        ))
+        .await;
         let first = outcome.expect("contract-gate surface is Ok(error result)");
         assert!(
             first.is_error && error_text(&first).contains("Input JSON schema"),

@@ -414,7 +414,9 @@ impl OpenHumanSecurityGate {
         let policy = self.effective_policy();
         #[cfg(feature = "modules")]
         let desktop_approval_disabled = match self.resolve_tool(&call.tool_name) {
-            Some(tool) => crate::desktop::control::approvals_disabled_for(&DispatchCtx::ambient(), tool).await,
+            Some(tool) => {
+                crate::desktop::control::approvals_disabled_for(&DispatchCtx::ambient(), tool).await
+            }
             None => false,
         };
         #[cfg(not(feature = "modules"))]

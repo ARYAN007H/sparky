@@ -25,7 +25,9 @@ pub fn security_policy_info_for_config(config: &Config) -> Outcome<serde_json::V
     Outcome::single_log(payload, "security_policy_info computed from active config")
 }
 
-pub async fn load_and_get_security_policy_info(ctx: &DispatchCtx, ) -> Result<Outcome<serde_json::Value>, String> {
+pub async fn load_and_get_security_policy_info(
+    ctx: &DispatchCtx,
+) -> Result<Outcome<serde_json::Value>, String> {
     let config = ctx.load_config().await?;
     Ok(security_policy_info_for_config(&config))
 }

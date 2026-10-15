@@ -1,8 +1,8 @@
 //! JSON-RPC controller surface for inference operations.
 
-use crate::core::runtime::DispatchCtx;
 use crate::config::rpc as config_rpc;
 use crate::config::Config;
+use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
 use crate::inference::host_runtime as local_runtime;
 use crate::inference::provider as providers;
@@ -251,7 +251,7 @@ pub async fn inference_analyze_sentiment(
     result
 }
 
-pub async fn inference_get_client_config(ctx: &DispatchCtx, ) -> Result<Outcome<Value>, String> {
+pub async fn inference_get_client_config(ctx: &DispatchCtx) -> Result<Outcome<Value>, String> {
     debug!("{LOG_PREFIX} get_client_config:start");
     let result = config_rpc::load_and_get_client_config_snapshot(&ctx).await;
     match &result {
@@ -261,7 +261,8 @@ pub async fn inference_get_client_config(ctx: &DispatchCtx, ) -> Result<Outcome<
     result
 }
 
-pub async fn inference_update_model_settings(ctx: &DispatchCtx, 
+pub async fn inference_update_model_settings(
+    ctx: &DispatchCtx,
     update: config_rpc::ModelSettingsPatch,
 ) -> Result<Outcome<Value>, String> {
     debug!("{LOG_PREFIX} update_model_settings:start");
@@ -273,7 +274,8 @@ pub async fn inference_update_model_settings(ctx: &DispatchCtx,
     result
 }
 
-pub async fn inference_update_local_settings(ctx: &DispatchCtx, 
+pub async fn inference_update_local_settings(
+    ctx: &DispatchCtx,
     update: config_rpc::LocalAiSettingsPatch,
 ) -> Result<Outcome<Value>, String> {
     debug!("{LOG_PREFIX} update_local_settings:start");

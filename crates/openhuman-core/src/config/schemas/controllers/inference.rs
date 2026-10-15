@@ -11,10 +11,7 @@ use super::super::helpers::{
     RuntimeSettingsUpdate,
 };
 
-pub(super) fn handle_get_config(
-    ctx: DispatchCtx,
-    _params: Map<String, Value>,
-) -> ControllerFuture {
+pub(super) fn handle_get_config(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move { to_json(config_rpc::load_and_get_config_snapshot(&ctx).await?) })
 }
 

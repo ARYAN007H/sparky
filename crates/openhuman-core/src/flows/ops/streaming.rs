@@ -1,5 +1,5 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
+use crate::core::runtime::DispatchCtx;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Copilot / scout streaming (Phase B) — bridge a builder/scout turn's live
@@ -91,7 +91,8 @@ pub(super) fn attach_flow_progress_bridge(
 /// path, so segmentation/reaction match a normal turn), a failure publishes a
 /// `chat_error`. Broadcast as `"system"` so any viewer of the thread receives
 /// it (frontend keys by `thread_id`).
-pub(super) async fn finalize_flow_stream(ctx: &DispatchCtx, 
+pub(super) async fn finalize_flow_stream(
+    ctx: &DispatchCtx,
     target: &FlowStreamTarget,
     result: &Result<String, String>,
     prompt: &str,

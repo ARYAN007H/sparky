@@ -10,14 +10,17 @@ use crate::core::Outcome;
 use crate::platform::update;
 use crate::platform::update::types::{UpdateApplyResult, UpdateInfo, UpdateRunResult, VersionInfo};
 
-async fn load_update_policy(ctx: &DispatchCtx, ) -> Result<UpdateConfig, String> {
+async fn load_update_policy(ctx: &DispatchCtx) -> Result<UpdateConfig, String> {
     ctx.load_config()
         .await
         .map(|cfg| cfg.update)
         .map_err(|err| format!("failed to load config for update policy: {err}"))
 }
 
-async fn enforce_update_mutation_policy(ctx: &DispatchCtx, method: &str) -> Result<UpdateConfig, String> {
+async fn enforce_update_mutation_policy(
+    ctx: &DispatchCtx,
+    method: &str,
+) -> Result<UpdateConfig, String> {
     let policy = load_update_policy(&ctx).await.map_err(|err| {
         let message = format!(
             "{method} blocked: {err}; failing closed because update policy could not be loaded"
@@ -178,7 +181,7 @@ pub async fn update_version() -> Outcome<Value> {
 /// update was applied the function publishes a restart request before
 /// returning, so the caller will see `restart_requested: true` and the
 /// core process will exit shortly afterwards.
-pub async fn update_run(ctx: &DispatchCtx, ) -> Outcome<Value> {
+pub async fn update_run(ctx: &DispatchCtx) -> Outcome<Value> {
     log::info!("[update:rpc] update_run invoked");
     let policy = match enforce_update_mutation_policy(&ctx, "openhuman.update_run").await {
         Ok(policy) => policy,
@@ -342,7 +345,8 @@ fn validate_asset_name(name: &str) -> Result<(), String> {
 ///   - `asset_name` (string, required): must be a safe filename starting with `openhuman-core-`.
 ///   - `staging_dir` (string, optional): ignored — always uses the default staging directory
 ///     for security (next to the running executable or Resources/).
-pub async fn update_apply(ctx: &DispatchCtx, 
+pub async fn update_apply(
+    ctx: &DispatchCtx,
     download_url: String,
     asset_name: String,
     _staging_dir: Option<String>,

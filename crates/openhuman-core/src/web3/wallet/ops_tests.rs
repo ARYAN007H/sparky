@@ -1,6 +1,6 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::config::Config;
+use crate::core::runtime::DispatchCtx;
 
 fn sample_account(chain: WalletChain) -> WalletAccount {
     WalletAccount {
@@ -249,9 +249,10 @@ async fn reveal_recovery_phrase_returns_error_when_no_wallet() {
 async fn reveal_recovery_phrase_returns_phrase_for_existing_wallet() {
     let temp = tempfile::tempdir().expect("temp dir");
     let _wallet_lock = crate::web3::wallet::test_support::TEST_LOCK.lock().await;
-    let _workspace_guard = crate::web3::wallet::test_support::setup_wallet_in(&DispatchCtx::process_default(), &temp)
-        .await
-        .expect("setup wallet");
+    let _workspace_guard =
+        crate::web3::wallet::test_support::setup_wallet_in(&DispatchCtx::process_default(), &temp)
+            .await
+            .expect("setup wallet");
     let result = reveal_recovery_phrase(&DispatchCtx::process_default())
         .await
         .expect("reveal should succeed");

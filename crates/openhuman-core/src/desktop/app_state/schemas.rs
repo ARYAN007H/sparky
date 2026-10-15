@@ -105,11 +105,14 @@ fn handle_update_local_state(ctx: DispatchCtx, params: Map<String, Value>) -> Co
     Box::pin(async move {
         let payload: UpdateLocalStateParams = serde_json::from_value(Value::Object(params))
             .map_err(|e| format!("invalid params: {e}"))?;
-        crate::desktop::app_state::update_local_state(&ctx, StoredAppStatePatch {
-            encryption_key: payload.encryption_key,
-            onboarding_tasks: payload.onboarding_tasks,
-            keyring_consent: payload.keyring_consent,
-        })
+        crate::desktop::app_state::update_local_state(
+            &ctx,
+            StoredAppStatePatch {
+                encryption_key: payload.encryption_key,
+                onboarding_tasks: payload.onboarding_tasks,
+                keyring_consent: payload.keyring_consent,
+            },
+        )
         .await?
         .into_cli_compatible_json()
     })

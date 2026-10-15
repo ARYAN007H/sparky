@@ -120,7 +120,8 @@ impl TinySearchTool {
     async fn live_config(&self, ctx: &DispatchCtx) -> anyhow::Result<Config> {
         match &self.config {
             Some(config) => Ok(config.as_ref().clone()),
-            None => ctx.load_config()
+            None => ctx
+                .load_config()
                 .await
                 .map_err(|error| anyhow::anyhow!(error)),
         }

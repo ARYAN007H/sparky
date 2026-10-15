@@ -19,7 +19,8 @@ pub(super) fn handle_workspace_onboarding_flag_exists(
     Box::pin(async move {
         let payload = deserialize_params::<WorkspaceOnboardingFlagParams>(params)?;
         to_json(
-            config_rpc::workspace_onboarding_flag_resolve(&ctx, 
+            config_rpc::workspace_onboarding_flag_resolve(
+                &ctx,
                 payload.flag_name,
                 DEFAULT_ONBOARDING_FLAG_NAME,
             )
@@ -35,7 +36,8 @@ pub(super) fn handle_workspace_onboarding_flag_set(
     Box::pin(async move {
         let payload = deserialize_params::<WorkspaceOnboardingFlagSetParams>(params)?;
         to_json(
-            config_rpc::workspace_onboarding_flag_set(&ctx, 
+            config_rpc::workspace_onboarding_flag_set(
+                &ctx,
                 payload.flag_name,
                 DEFAULT_ONBOARDING_FLAG_NAME,
                 payload.value,
@@ -144,7 +146,8 @@ pub(crate) fn handle_get_data_paths(
 /// the explicit id the core would fall back to the pre-login `users/local` dir
 /// and leave the real user's data behind. Absent/blank → marker-based
 /// resolution (the default used by the agent tool and diagnostics).
-async fn resolve_data_paths(ctx: &DispatchCtx, 
+async fn resolve_data_paths(
+    ctx: &DispatchCtx,
     params: Map<String, Value>,
 ) -> Result<crate::core::Outcome<Value>, String> {
     let user_id = params

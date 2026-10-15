@@ -118,7 +118,9 @@ pub(super) fn handle_inference_get_client_config(
     ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
-    Box::pin(async move { to_json(crate::inference::rpc::inference_get_client_config(&ctx).await?) })
+    Box::pin(
+        async move { to_json(crate::inference::rpc::inference_get_client_config(&ctx).await?) },
+    )
 }
 
 pub(super) fn handle_inference_update_model_settings(

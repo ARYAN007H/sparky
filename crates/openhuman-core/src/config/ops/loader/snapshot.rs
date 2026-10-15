@@ -136,7 +136,9 @@ pub fn client_config_json(config: &Config) -> serde_json::Value {
 }
 
 /// Loads config and returns the client-facing AI config slice.
-pub async fn load_and_get_client_config_snapshot(ctx: &DispatchCtx, ) -> Result<Outcome<serde_json::Value>, String> {
+pub async fn load_and_get_client_config_snapshot(
+    ctx: &DispatchCtx,
+) -> Result<Outcome<serde_json::Value>, String> {
     let config = ctx.load_config().await?;
     let snapshot = client_config_json(&config);
     Ok(Outcome::new(
@@ -158,13 +160,17 @@ pub async fn get_config_snapshot(config: &Config) -> Result<Outcome<serde_json::
 }
 
 /// Loads the configuration from disk and returns a snapshot.
-pub async fn load_and_get_config_snapshot(ctx: &DispatchCtx, ) -> Result<Outcome<serde_json::Value>, String> {
+pub async fn load_and_get_config_snapshot(
+    ctx: &DispatchCtx,
+) -> Result<Outcome<serde_json::Value>, String> {
     let config = ctx.load_config().await?;
     get_config_snapshot(&config).await
 }
 
 /// Reads dashboard settings exposed to the desktop UI.
-pub async fn get_dashboard_settings(ctx: &DispatchCtx, ) -> Result<Outcome<serde_json::Value>, String> {
+pub async fn get_dashboard_settings(
+    ctx: &DispatchCtx,
+) -> Result<Outcome<serde_json::Value>, String> {
     let request_id = uuid::Uuid::new_v4().to_string();
     tracing::debug!(
         target: "openhuman_core::config",

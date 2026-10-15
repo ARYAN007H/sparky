@@ -181,7 +181,8 @@ fn resolve(request: SetCredentialRequest) -> Result<Resolved, String> {
 /// no purge, no service restart). A **different user** than the one stored is
 /// signed out first so `active_user.toml` never points at one user while
 /// another's profile exists.
-pub async fn set_credential(ctx: &DispatchCtx, 
+pub async fn set_credential(
+    ctx: &DispatchCtx,
     config: &Config,
     request: SetCredentialRequest,
 ) -> Result<Outcome<AuthStateResponse>, String> {
@@ -377,7 +378,8 @@ pub async fn set_credential(ctx: &DispatchCtx,
 /// Remove the stored credential of `kind` — or every credential when `None`.
 /// A session (or local) removal runs the sign-out teardown; an API-key removal
 /// only closes the scheduler gate when no other credential remains.
-pub async fn clear_credential(ctx: &DispatchCtx, 
+pub async fn clear_credential(
+    ctx: &DispatchCtx,
     config: &Config,
     kind: Option<CredentialKind>,
 ) -> Result<Outcome<Value>, String> {
@@ -506,7 +508,10 @@ pub async fn clear_credential(ctx: &DispatchCtx,
 /// teardown, user-dir deactivation, service stop, rebind to the signed-out
 /// workspace, and Sentry / identity clear. Callers hold
 /// [`CREDENTIAL_MUTATION_LOCK`].
-async fn clear_session_credential(ctx: &DispatchCtx, config: &Config) -> Result<Outcome<bool>, String> {
+async fn clear_session_credential(
+    ctx: &DispatchCtx,
+    config: &Config,
+) -> Result<Outcome<bool>, String> {
     let mut logs = Vec::new();
     crate::cron::scheduler_gate::set_signed_out(true);
     #[cfg(feature = "web3")]
@@ -573,13 +578,15 @@ async fn clear_session_credential(ctx: &DispatchCtx, config: &Config) -> Result<
 
 /// Historical entry point: install a session (or local) credential from a
 /// bare token. Same as [`set_credential`] with the kind classified by shape.
-pub async fn store_session(ctx: &DispatchCtx, 
+pub async fn store_session(
+    ctx: &DispatchCtx,
     config: &Config,
     token: &str,
     user_id: Option<String>,
     user: Option<Value>,
 ) -> Result<Outcome<AuthStateResponse>, String> {
-    set_credential(&ctx, 
+    set_credential(
+        &ctx,
         config,
         SetCredentialRequest {
             token: token.to_string(),

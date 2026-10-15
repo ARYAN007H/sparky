@@ -116,7 +116,10 @@ pub(crate) async fn set_workspace_env_for_test(temp: &TempDir) -> EnvVarGuard {
     EnvVarGuard::workspace_async(temp.path()).await
 }
 
-pub(crate) async fn setup_wallet_in(ctx: &DispatchCtx, temp: &TempDir) -> Result<EnvVarGuard, String> {
+pub(crate) async fn setup_wallet_in(
+    ctx: &DispatchCtx,
+    temp: &TempDir,
+) -> Result<EnvVarGuard, String> {
     // Wallet state lookups rely on OPENHUMAN_WORKSPACE for the duration of
     // each test. Return a guard so the tempdir path does not leak into later
     // parallel tests after this test's TempDir has been dropped.
@@ -125,23 +128,26 @@ pub(crate) async fn setup_wallet_in(ctx: &DispatchCtx, temp: &TempDir) -> Result
     let encrypted = crate::security::encryption::rpc::encrypt_secret(&config, TEST_MNEMONIC)
         .await?
         .value;
-    setup(&ctx, WalletSetupParams {
-        consent_granted: true,
-        source: WalletSetupSource::Imported,
-        mnemonic_word_count: 12,
-        encrypted_mnemonic: Some(encrypted),
-        accounts: [
-            WalletChain::Evm,
-            WalletChain::Btc,
-            WalletChain::Solana,
-            WalletChain::Tron,
-        ]
-        .into_iter()
-        .map(sample_account)
-        .collect(),
-        // Test helper: force=true allows re-setup in tests that already have a wallet.
-        force: true,
-    })
+    setup(
+        &ctx,
+        WalletSetupParams {
+            consent_granted: true,
+            source: WalletSetupSource::Imported,
+            mnemonic_word_count: 12,
+            encrypted_mnemonic: Some(encrypted),
+            accounts: [
+                WalletChain::Evm,
+                WalletChain::Btc,
+                WalletChain::Solana,
+                WalletChain::Tron,
+            ]
+            .into_iter()
+            .map(sample_account)
+            .collect(),
+            // Test helper: force=true allows re-setup in tests that already have a wallet.
+            force: true,
+        },
+    )
     .await?;
     Ok(workspace_guard)
 }

@@ -86,10 +86,8 @@ pub async fn load_config_in(ctx: &crate::core::runtime::DispatchCtx) -> Result<C
 /// The context-aware counterpart of [`Config::load_or_init`] for code that
 /// runs inside a turn: [`load_config_with_timeout`] with the context's
 /// inference route applied.
-pub async fn load_current_or_init(ctx: &DispatchCtx, ) -> anyhow::Result<Config> {
-    let mut config = ctx.load_config()
-        .await
-        .map_err(anyhow::Error::msg)?;
+pub async fn load_current_or_init(ctx: &DispatchCtx) -> anyhow::Result<Config> {
+    let mut config = ctx.load_config().await.map_err(anyhow::Error::msg)?;
     if let Some(route) = config.ephemeral_route.clone() {
         tracing::trace!(
             agent = crate::core::runtime::agent_scope::current_agent_id()
@@ -120,7 +118,8 @@ pub async fn load_current_or_init(ctx: &DispatchCtx, ) -> anyhow::Result<Config>
 /// exists there is nothing workspace-specific to read, so this falls back to
 /// the process-global load with `workspace_dir` re-anchored — the previous
 /// behaviour, and still correct for a single-workspace host.
-pub async fn load_config_for_workspace_with_timeout(ctx: &DispatchCtx, 
+pub async fn load_config_for_workspace_with_timeout(
+    ctx: &DispatchCtx,
     workspace_dir: &Path,
 ) -> Result<Config, String> {
     let candidate = [

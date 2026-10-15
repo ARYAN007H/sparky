@@ -34,7 +34,7 @@ fn finish<T: Serialize>(result: MemoryResult<T>) -> Result<Value, String> {
     to_json(result.map_err(String::from)?)
 }
 
-async fn load(ctx: &DispatchCtx, ) -> Result<Config, String> {
+async fn load(ctx: &DispatchCtx) -> Result<Config, String> {
     ctx.load_config().await
 }
 

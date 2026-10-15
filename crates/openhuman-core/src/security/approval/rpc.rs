@@ -202,7 +202,8 @@ pub async fn approval_preauthorize_flow(
 /// Apply a decision to a pending row. Errors when the request id is
 /// unknown / already decided / belongs to a different session. With
 /// `agent_id`, also errors when the request belongs to another agent.
-pub async fn approval_decide(ctx: &DispatchCtx, 
+pub async fn approval_decide(
+    ctx: &DispatchCtx,
     request_id: &str,
     decision: ApprovalDecision,
     agent_id: Option<&str>,

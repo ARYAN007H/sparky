@@ -11,16 +11,21 @@
 //! keeps the override scoped to this evaluation: nothing persists, and a
 //! concurrent turn on the real config is unaffected.
 
-use crate::core::runtime::DispatchCtx;
 use crate::config::schema::Config;
+use crate::core::runtime::DispatchCtx;
 
 /// Ask the model to judge a hook condition, returning its raw answer.
 ///
 /// Errors are strings rather than `anyhow` because every caller folds them into
 /// the fail-open / fail-closed decision, where the only thing that matters is
 /// the message.
-pub async fn evaluate(ctx: &DispatchCtx, instruction: &str, model: Option<&str>) -> Result<String, String> {
-    let mut config = ctx.load_config()
+pub async fn evaluate(
+    ctx: &DispatchCtx,
+    instruction: &str,
+    model: Option<&str>,
+) -> Result<String, String> {
+    let mut config = ctx
+        .load_config()
         .await
         .map_err(|error| format!("loading config for prompt hook: {error}"))?;
     if let Some(model) = model {

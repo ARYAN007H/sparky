@@ -1,6 +1,6 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::config::schema::{EphemeralRoute, EPHEMERAL_ROUTE_SLUG};
+use crate::core::runtime::DispatchCtx;
 use crate::core::runtime::{context::CoreContext, DomainSet};
 
 fn context_with(config: Config) -> std::sync::Arc<CoreContext> {
@@ -22,9 +22,12 @@ async fn a_context_route_follows_every_load_of_the_context_config() {
         headers: Vec::new(),
     });
 
-    let loaded = CoreContext::scope(context_with(config), load_current_or_init(&DispatchCtx::process_default()))
-        .await
-        .expect("context config loads");
+    let loaded = CoreContext::scope(
+        context_with(config),
+        load_current_or_init(&DispatchCtx::process_default()),
+    )
+    .await
+    .expect("context config loads");
 
     let pinned = format!("{EPHEMERAL_ROUTE_SLUG}:ctx-model");
     assert_eq!(loaded.chat_provider.as_deref(), Some(pinned.as_str()));
@@ -41,9 +44,12 @@ async fn a_context_route_follows_every_load_of_the_context_config() {
 
 #[tokio::test]
 async fn a_context_without_a_route_loads_unchanged_providers() {
-    let loaded = CoreContext::scope(context_with(base_config()), load_current_or_init(&DispatchCtx::process_default()))
-        .await
-        .expect("context config loads");
+    let loaded = CoreContext::scope(
+        context_with(base_config()),
+        load_current_or_init(&DispatchCtx::process_default()),
+    )
+    .await
+    .expect("context config loads");
 
     assert!(loaded.ephemeral_route.is_none());
     assert!(loaded

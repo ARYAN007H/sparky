@@ -46,7 +46,8 @@ impl Tool for Web3ModuleTool {
         context: Option<&dyn tinytools::ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
         let approval = crate::agent::tinyagents::host::run_context::approval_for_tool(context);
-        self.run(&DispatchCtx::ambient(), args, approval.chat.as_ref()).await
+        self.run(&DispatchCtx::ambient(), args, approval.chat.as_ref())
+            .await
     }
 
     async fn execute_with_options(
@@ -61,7 +62,8 @@ impl Tool for Web3ModuleTool {
 impl Web3ModuleTool {
     /// Runs the tool for a turn whose approval context is `chat`.
     pub(crate) async fn run(
-        &self, ctx: &DispatchCtx,
+        &self,
+        ctx: &DispatchCtx,
         args: Value,
         chat: Option<&crate::security::approval::ApprovalChatContext>,
     ) -> anyhow::Result<ToolResult> {

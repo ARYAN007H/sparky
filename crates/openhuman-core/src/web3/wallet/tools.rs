@@ -67,14 +67,16 @@ impl Tool for WalletModuleTool {
         context: Option<&dyn tinytools::ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
         let approval = crate::agent::tinyagents::host::run_context::approval_for_tool(context);
-        self.run(&DispatchCtx::ambient(), args, approval.chat.as_ref()).await
+        self.run(&DispatchCtx::ambient(), args, approval.chat.as_ref())
+            .await
     }
 }
 
 impl WalletModuleTool {
     /// Runs the tool for a turn whose approval context is `chat`.
     pub(crate) async fn run(
-        &self, ctx: &DispatchCtx,
+        &self,
+        ctx: &DispatchCtx,
         args: Value,
         chat: Option<&crate::security::approval::ApprovalChatContext>,
     ) -> anyhow::Result<ToolResult> {
@@ -106,11 +108,17 @@ impl WalletModuleTool {
                 };
                 let result = match self.name() {
                     "wallet_tx_status" => outcome_value(
-                        crate::web3::wallet::tx_status(&ctx, query.chain, query.evm_network, &query.hash)
-                            .await,
+                        crate::web3::wallet::tx_status(
+                            &ctx,
+                            query.chain,
+                            query.evm_network,
+                            &query.hash,
+                        )
+                        .await,
                     ),
                     "wallet_tx_receipt" => outcome_value(
-                        crate::web3::wallet::tx_receipt(&ctx, 
+                        crate::web3::wallet::tx_receipt(
+                            &ctx,
                             query.chain,
                             query.evm_network,
                             &query.hash,
@@ -118,8 +126,13 @@ impl WalletModuleTool {
                         .await,
                     ),
                     _ => outcome_value(
-                        crate::web3::wallet::lookup_tx(&ctx, query.chain, query.evm_network, &query.hash)
-                            .await,
+                        crate::web3::wallet::lookup_tx(
+                            &ctx,
+                            query.chain,
+                            query.evm_network,
+                            &query.hash,
+                        )
+                        .await,
                     ),
                 };
                 result

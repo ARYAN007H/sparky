@@ -1,7 +1,7 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
 use crate::config::test_env::EnvVarGuard;
 use crate::config::Config;
+use crate::core::runtime::DispatchCtx;
 use tempfile::TempDir;
 
 fn config_in(tmp: &TempDir) -> Config {

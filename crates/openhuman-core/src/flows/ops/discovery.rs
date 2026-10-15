@@ -1,5 +1,5 @@
-use crate::core::runtime::DispatchCtx;
 use super::*;
+use crate::core::runtime::DispatchCtx;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Flow Scout — workflow discovery + suggestion lifecycle
@@ -36,7 +36,8 @@ const FLOW_DISCOVER_PROMPT: &str = "Discover the most useful automations you cou
 /// (`PermissionLevel::None`) — so this never persists, enables, or runs a flow.
 /// Turning a suggestion into a real flow is the user's separate "Build this"
 /// action, which routes to `workflow_builder`.
-pub async fn flows_discover(ctx: &DispatchCtx, 
+pub async fn flows_discover(
+    ctx: &DispatchCtx,
     config: &Config,
     stream: Option<FlowStreamTarget>,
 ) -> Result<Outcome<Vec<FlowSuggestion>>, String> {
