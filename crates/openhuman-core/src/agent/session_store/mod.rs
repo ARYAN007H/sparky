@@ -297,5 +297,8 @@ pub fn context_workspace_dir() -> std::path::PathBuf {
 pub const DEFAULT_AGENT: &str = "default";
 
 #[cfg(test)]
+pub(crate) mod splice_fixture;
+
+#[cfg(test)]
 #[path = "mod_tests.rs"]
 mod tests;
