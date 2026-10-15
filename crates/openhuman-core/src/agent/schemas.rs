@@ -304,9 +304,9 @@ fn handle_server_status(_ctx: DispatchCtx, _params: Map<String, Value>) -> Contr
     Box::pin(async { to_json(config_rpc::agent_server_status()) })
 }
 
-fn handle_list_definitions(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async {
-        let defs = crate::agent::library::list_definition_metadata().await?;
+fn handle_list_definitions(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+    Box::pin(async move {
+        let defs = crate::agent::library::list_definition_metadata(&ctx).await?;
         Ok(serde_json::json!({ "definitions": defs }))
     })
 }
@@ -687,11 +687,11 @@ fn handle_registry_snapshot(ctx: DispatchCtx, _params: Map<String, Value>) -> Co
     })
 }
 
-fn handle_context_breakdown(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_context_breakdown(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p =
             deserialize_params::<crate::agent::context_breakdown::ContextBreakdownParams>(params)?;
-        to_json(crate::agent::context_breakdown::context_breakdown(p).await?)
+        to_json(crate::agent::context_breakdown::context_breakdown(&ctx, p).await?)
     })
 }
 
