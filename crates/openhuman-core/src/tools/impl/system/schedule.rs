@@ -65,7 +65,14 @@ impl Tool for ScheduleTool {
         match args.get("action").and_then(|v| v.as_str()) {
             Some("list") | Some("get") => false,
             Some("create") | Some("add") | Some("once") => {
-                !current_turn_may_skip_approval(&schedule_args_as_cron_add(args))
+                // The trait predicate carries no run context, so it reads the
+                // calling task's turn scope.
+                !current_turn_may_skip_approval(
+                    &schedule_args_as_cron_add(args),
+                    crate::core::runtime::DispatchCtx::ambient_turn()
+                        .turn_origin()
+                        .as_ref(),
+                )
             }
             _ => true,
         }
