@@ -154,7 +154,7 @@ async fn checkout_cold_boots_from_the_thread_transcript_and_checkin_keeps_it_war
     );
 
     checkin_session_agent(&DispatchCtx::ambient(), &thread_id, agent, fingerprint).await;
-    assert!(thread_sessions()
+    assert!(thread_sessions(&crate::core::runtime::DispatchCtx::ambient())
         .lock()
         .await
         .contains_key(&key_for(&DispatchCtx::ambient(), &thread_id)));
@@ -179,7 +179,7 @@ async fn checkout_cold_boots_from_the_thread_transcript_and_checkin_keeps_it_war
         "warm checkout must carry the same history"
     );
     // Checked out means removed: nobody else can drive this agent meanwhile.
-    assert!(!thread_sessions()
+    assert!(!thread_sessions(&crate::core::runtime::DispatchCtx::ambient())
         .lock()
         .await
         .contains_key(&key_for(&DispatchCtx::ambient(), &thread_id)));
@@ -287,7 +287,7 @@ async fn a_fork_never_takes_or_returns_the_cached_agent() {
     // Built fresh: no transcript on disk for this thread, so an empty history.
     assert!(prose(&agent.history()).is_empty());
     // The primary's cached agent was left in place.
-    assert!(thread_sessions()
+    assert!(thread_sessions(&crate::core::runtime::DispatchCtx::ambient())
         .lock()
         .await
         .contains_key(&key_for(&DispatchCtx::ambient(), &thread_id)));
@@ -671,7 +671,7 @@ async fn each_checkout_arms_the_reply_language_from_its_own_locale() {
     // Reused cached agent, the user switched the UI to English: the Spanish
     // directives already in the history are superseded explicitly.
     assert!(
-        thread_sessions()
+        thread_sessions(&crate::core::runtime::DispatchCtx::ambient())
             .lock()
             .await
             .contains_key(&key_for(&DispatchCtx::ambient(), &thread_id)),
@@ -685,7 +685,7 @@ async fn each_checkout_arms_the_reply_language_from_its_own_locale() {
     checkin_session_agent(&DispatchCtx::ambient(), &thread_id, agent, fingerprint).await;
 
     // Reused again, now Hindi: re-armed with the new language.
-    assert!(thread_sessions()
+    assert!(thread_sessions(&crate::core::runtime::DispatchCtx::ambient())
         .lock()
         .await
         .contains_key(&key_for(&DispatchCtx::ambient(), &thread_id)));

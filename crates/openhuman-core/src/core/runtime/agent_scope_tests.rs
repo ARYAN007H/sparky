@@ -177,9 +177,9 @@ async fn spawn_scoped_keeps_the_agent_context_and_tokio_spawn_does_not() {
 }
 
 #[test]
-fn current_slot_without_a_context_uses_the_unscoped_state() {
-    let first = current_slot::<Counter>();
-    let second = current_slot::<Counter>();
+fn slot_without_a_context_uses_the_unscoped_state() {
+    let first = slot_for::<Counter>(&crate::core::runtime::DispatchCtx::ambient());
+    let second = slot_for::<Counter>(&crate::core::runtime::DispatchCtx::ambient());
     assert!(Arc::ptr_eq(&first, &second));
 }
 

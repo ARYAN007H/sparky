@@ -21,14 +21,14 @@ async fn each_agent_context_owns_its_turn_tables() {
 
     let (alpha_sessions, alpha_in_flight, alpha_parallel) =
         CoreContext::scope(Arc::clone(&alpha), async {
-            (thread_sessions(), in_flight(), parallel_in_flight())
+            (thread_sessions(&crate::core::runtime::DispatchCtx::ambient()), in_flight(&crate::core::runtime::DispatchCtx::ambient()), parallel_in_flight(&crate::core::runtime::DispatchCtx::ambient()))
         })
         .await;
     let (beta_sessions, beta_in_flight, beta_parallel) = CoreContext::scope(beta, async {
-        (thread_sessions(), in_flight(), parallel_in_flight())
+        (thread_sessions(&crate::core::runtime::DispatchCtx::ambient()), in_flight(&crate::core::runtime::DispatchCtx::ambient()), parallel_in_flight(&crate::core::runtime::DispatchCtx::ambient()))
     })
     .await;
-    let alpha_again = CoreContext::scope(alpha, async { in_flight() }).await;
+    let alpha_again = CoreContext::scope(alpha, async { in_flight(&crate::core::runtime::DispatchCtx::ambient()) }).await;
 
     assert!(!Arc::ptr_eq(&alpha_sessions, &beta_sessions));
     assert!(!Arc::ptr_eq(&alpha_in_flight, &beta_in_flight));
