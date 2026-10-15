@@ -65,6 +65,13 @@ const DEBOUNCE: Duration = Duration::from_secs(3);
 /// delivery turn, so providers and the session store are up first.
 const RECOVERY_DELAY: Duration = Duration::from_secs(15);
 
+/// Threads whose delivery turn is in flight — prevents two concurrent turns.
+/// Keyed by [`tenant::profile_key`] of the thread id, for the same reason.
+fn delivering() -> &'static Mutex<HashSet<String>> {
+    static D: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+    D.get_or_init(|| Mutex::new(HashSet::new()))
+}
+
 /// Ask for a delivery attempt on `thread_id` soon (after a Stop cleared a stale
 /// busy mark, or anything else that may have left a drain without its trigger).
 pub(crate) fn kick_delivery(thread_id: &str) {

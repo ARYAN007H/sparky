@@ -1,20 +1,12 @@
 //! The per-thread (per profile) delivery slot: at most one delivery turn is in
 //! flight for a thread, and the batch it claimed is leased until it settles.
 
-use std::collections::HashSet;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::Arc;
 
 use tinyagents_tasks::CompletionRouter;
 
 use crate::core::runtime::tenant;
 use crate::core::runtime::DispatchCtx;
-
-/// Threads whose delivery turn is in flight — prevents two concurrent turns.
-/// Keyed by [`tenant::profile_key`] of the thread id, for the same reason.
-pub(super) fn delivering() -> &'static Mutex<HashSet<String>> {
-    static D: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
-    D.get_or_init(|| Mutex::new(HashSet::new()))
-}
 
 /// The per-thread (per profile) delivery slot, plus the batch lease.
 /// Dropping it frees both: `release` on an already-settled record is a no-op,
@@ -34,7 +26,7 @@ impl DeliverySlot {
         router: Arc<CompletionRouter>,
     ) -> Option<Self> {
         let key = tenant::profile_key_in(&super::super::busy_guard::caller(ctx), thread_id);
-        let mut d = delivering().lock().expect("delivering poisoned");
+        let mut d = super::delivering().lock().expect("delivering poisoned");
         if !d.insert(key.clone()) {
             return None;
         }
@@ -55,7 +47,7 @@ impl Drop for DeliverySlot {
         if !self.held.is_empty() {
             self.router.release(&self.held);
         }
-        if let Ok(mut d) = delivering().lock() {
+        if let Ok(mut d) = super::delivering().lock() {
             d.remove(&self.key);
         }
     }
