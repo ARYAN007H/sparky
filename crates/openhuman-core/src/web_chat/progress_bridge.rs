@@ -10,6 +10,7 @@ use crate::web_chat::{SubagentProgressDetail, WebChannelEvent};
 use tinyagents_session::{port::TurnStates, turn_state::TurnStateMirror};
 
 use super::event_bus::publish_web_channel_event_in;
+use crate::core::runtime::DispatchCtx;
 use super::types::ChatRequestMetadata;
 
 #[path = "progress_bridge_subagent_events.rs"]
@@ -135,11 +136,7 @@ fn flush_interim_narration(
 /// identically to the persisted turn-state snapshot
 /// (conversations-timeline-refactor, Phase 4). The counter advances once per
 /// emitted event so each `(request_id, seq)` pair is unique within a turn.
-fn publish_seq_stamped(
-    ctx: &crate::core::runtime::DispatchCtx,
-    next_seq: &mut u64,
-    mut event: WebChannelEvent,
-) {
+fn publish_seq_stamped(ctx: &DispatchCtx, next_seq: &mut u64, mut event: WebChannelEvent) {
     event.seq = Some(*next_seq);
     *next_seq = next_seq.saturating_add(1);
     publish_web_channel_event_in(ctx, event);
@@ -284,8 +281,7 @@ pub(crate) fn spawn_progress_bridge(
     request_id: String,
     turn_state_store: std::sync::Arc<dyn TurnStates>,
     metadata: ChatRequestMetadata,
-    config: crate::config::Config,
-    dispatch_ctx: crate::core::runtime::DispatchCtx,
+    config: crate::config::Config, dispatch_ctx: crate::core::runtime::DispatchCtx,
 ) -> ProgressBridgeHandle {
     use crate::agent::progress::AgentProgress;
     use std::collections::HashMap;
@@ -1189,11 +1185,7 @@ pub(crate) fn spawn_progress_bridge(
             let live_spans = collector.spans().to_vec();
             let journal_export = if let Some(trace_ctx) = journal_trace_ctx.take() {
                 super::journal_shadow::shadow_compare_journal_projection(
-                    &dispatch_ctx,
-                    &request_id,
-                    trace_ctx.clone(),
-                    parent_max_iterations,
-                    &live_spans,
+                    &dispatch_ctx, &request_id, trace_ctx.clone(), parent_max_iterations, &live_spans,
                 )
                 .await
                 .map(|observations| (trace_ctx, observations))
