@@ -26,7 +26,7 @@ mod workspace;
 pub use rebound::{rebind_all, ReboundSessionStores};
 pub use workspace::{
     artifact_blobs_for, attachment_stash_for, current_documents_for, default_turn_states_for,
-    ledger_for, provider_for_workspace, release_workspace_defaults, require_ledger,
+    ledger_for, provider_for_workspace, release_workspace, release_workspace_defaults, require_ledger,
     status_store_for, stores_for, stores_or_ephemeral, turn_states_for, with_ledger,
     with_ledger_async, WorkspaceSessionStores,
 };
@@ -181,6 +181,15 @@ pub fn release_workspace_stores() {
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
         .clear();
+}
+
+/// Drops the workspace transcript stores held open for `workspace_dir` (every
+/// agent's), leaving other workspaces' alone.
+pub fn release_workspace_stores_for(workspace_dir: &std::path::Path) {
+    OPEN_WORKSPACE_STORES
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .retain(|(dir, _), _| dir != workspace_dir);
 }
 
 /// `agent_id`'s transcripts for a host that only has a workspace directory:

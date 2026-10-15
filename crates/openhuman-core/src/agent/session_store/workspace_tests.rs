@@ -119,7 +119,7 @@ fn releasing_defaults_lets_the_next_call_open_afresh() {
     let before = fallback_provider(ws.path());
     let cached = fallback_provider(ws.path());
     assert!(Arc::ptr_eq(&before, &cached), "a repeat call reuses the provider");
-    release_workspace_defaults();
+    release_workspace(ws.path());
     let after = fallback_provider(ws.path());
     assert!(!Arc::ptr_eq(&before, &after), "release drops the cached provider");
 }

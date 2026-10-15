@@ -263,7 +263,7 @@ async fn a_threads_turn_state_survives_a_restart_of_the_workspace_store() {
         .unwrap();
 
     // A restart: every handle and cached default backend is dropped.
-    release_workspace_defaults();
+    release_workspace(dir.path());
 
     let resumed = turn_states_for(dir.path())
         .get("thread-1")
@@ -292,7 +292,7 @@ async fn a_stashed_attachment_survives_a_restart_of_the_workspace_store() {
     let stash = attachment_stash_for(dir.path()).expect("a stash for the default tenant");
     stash.write("att-1", data_uri).await.unwrap();
 
-    release_workspace_defaults();
+    release_workspace(dir.path());
 
     let resumed = attachment_stash_for(dir.path()).expect("a stash after the restart");
     assert_eq!(
