@@ -63,7 +63,7 @@ impl EventHandler<DomainEvent> for WebhookRequestSubscriber {
         };
 
         // An inbound webhook arrives over the host's socket: its own tenant,
-        // and in SaaS none (the request is then not handled).
+        // and in SaaS none, so the triage fails closed.
         let ctx = crate::core::runtime::DispatchCtx::host_default();
         let started_at = Instant::now();
 
