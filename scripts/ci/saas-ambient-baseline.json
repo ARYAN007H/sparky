@@ -119,13 +119,6 @@
     "occurrence": 1
   },
   {
-    "rule": "ambient-context",
-    "path": "crates/openhuman-core/src/channels/routes.rs",
-    "line": 93,
-    "text": "core_context: crate::core::runtime::CoreContext::current(),",
-    "occurrence": 1
-  },
-  {
     "rule": "bare-spawn",
     "path": "crates/openhuman-core/src/channels/runtime/dispatch/helpers.rs",
     "line": 27,
@@ -165,13 +158,6 @@
     "path": "crates/openhuman-core/src/channels/runtime/session.rs",
     "line": 112,
     "text": "tokio::spawn(async move {",
-    "occurrence": 1
-  },
-  {
-    "rule": "ambient-context",
-    "path": "crates/openhuman-core/src/channels/runtime/startup/callback.rs",
-    "line": 38,
-    "text": "core_context: crate::core::runtime::CoreContext::current(),",
     "occurrence": 1
   },
   {
@@ -422,35 +408,35 @@
   {
     "rule": "bare-spawn",
     "path": "crates/openhuman-core/src/core/runtime/services.rs",
-    "line": 258,
-    "text": "tokio::spawn(crate::core::runtime::CoreContext::scope(ctx, async {",
+    "line": 259,
+    "text": "tokio::spawn(crate::core::runtime::CoreContext::scope(ctx, async move {",
     "occurrence": 1
   },
   {
     "rule": "ambient-config",
     "path": "crates/openhuman-core/src/core/runtime/services.rs",
-    "line": 311,
+    "line": 312,
     "text": "let config = match crate::config::Config::load_or_init().await {",
     "occurrence": 1
   },
   {
     "rule": "bare-spawn",
     "path": "crates/openhuman-core/src/core/runtime/services.rs",
-    "line": 422,
+    "line": 423,
     "text": "tokio::spawn(async move {",
     "occurrence": 2
   },
   {
     "rule": "bare-spawn",
     "path": "crates/openhuman-core/src/core/runtime/services.rs",
-    "line": 479,
+    "line": 480,
     "text": "tokio::spawn(async move {",
     "occurrence": 3
   },
   {
     "rule": "ambient-config",
     "path": "crates/openhuman-core/src/core/runtime/services.rs",
-    "line": 481,
+    "line": 482,
     "text": "let config = match Config::load_or_init().await {",
     "occurrence": 1
   },

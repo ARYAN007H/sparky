@@ -255,7 +255,8 @@ pub fn spawn_flows_boot_reconcile() {
 pub fn spawn_cron_service(
     ctx: std::sync::Arc<crate::core::runtime::CoreContext>,
 ) -> tokio::task::JoinHandle<()> {
-    tokio::spawn(crate::core::runtime::CoreContext::scope(ctx, async {
+    let dispatch = crate::core::runtime::DispatchCtx::new(ctx.clone());
+    tokio::spawn(crate::core::runtime::CoreContext::scope(ctx, async move {
         match crate::config::ops::load_config_with_timeout().await {
             Ok(config) => {
                 if !config.cron.enabled {
@@ -276,7 +277,7 @@ pub fn spawn_cron_service(
                         "[flows] boot reconciliation of schedule-trigger cron jobs failed: {e}"
                     );
                 }
-                if let Err(e) = crate::cron::scheduler::run(config).await {
+                if let Err(e) = crate::cron::scheduler::run(&dispatch, config).await {
                     log::error!("[cron] scheduler loop ended with error: {e}");
                 }
             }
