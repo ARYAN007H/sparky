@@ -62,3 +62,7 @@ pub async fn transcript_get(
     });
     Ok(envelope(page, Some(counts), pagination))
 }
+
+#[cfg(test)]
+#[path = "transcript_tests.rs"]
+mod tests;
