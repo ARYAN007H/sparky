@@ -1,8 +1,7 @@
 use super::*;
 use crate::threads::store::{self as conversations, CreateConversationThread};
 use tinyagents_session::transcript::{
-    read_transcript, resolve_keyed_transcript_path, session_stem, FileTranscriptLocator,
-    SessionRef, TranscriptLocator, TranscriptMessage, TranscriptMeta, TranscriptTurn,
+    SessionRef, TranscriptMessage, TranscriptMeta, TranscriptTurn,
 };
 use {
     tinyflows_schedule::types::DeliveryConfig, tinyflows_schedule::types::JobType,
@@ -195,8 +194,10 @@ async fn web_delivery_appends_to_the_resumed_agent_transcript() {
     let cfg = config(&tmp);
     seed_thread(&cfg, "t-1");
 
-    // A prior live turn on the thread, written the way the session host does.
-    let locator = FileTranscriptLocator::new(cfg.workspace_dir.clone());
+    // A prior live turn on the thread, written the way the session host does:
+    // through the store port, under the desktop tenant's key for the agent.
+    let locator =
+        crate::agent::session_store::transcripts_or_files("orchestrator", &cfg.workspace_dir);
     let session = SessionRef::scoped("t-1", "orchestrator");
     let next = vec![
         TranscriptMessage::user("remind me to drink water"),
@@ -228,8 +229,12 @@ async fn web_delivery_appends_to_the_resumed_agent_transcript() {
         .unwrap();
 
     let head = locator.head_generation(&session);
-    let path = resolve_keyed_transcript_path(&cfg.workspace_dir, &session_stem(&head)).unwrap();
-    let resumed = read_transcript(&path).unwrap();
+    let resumed = locator
+        .read_session_transcript(&head)
+        .expect("the session's head is in the store")
+        .read_session()
+        .unwrap()
+        .unwrap();
     assert_eq!(resumed.messages.len(), 3, "reply appended once");
     let last = resumed.messages.last().unwrap();
     assert_eq!(last.role, "assistant");
@@ -241,16 +246,16 @@ async fn web_delivery_appends_to_the_resumed_agent_transcript() {
 async fn transcript_append_waits_for_a_live_turn() {
     let tmp = tempfile::TempDir::new().unwrap();
     let cfg = config(&tmp);
-    let locator = FileTranscriptLocator::new(cfg.workspace_dir.clone());
+    let locator =
+        crate::agent::session_store::transcripts_or_files("orchestrator", &cfg.workspace_dir);
     let session = SessionRef::scoped("t-1", "orchestrator");
-    let guard = tinyagents_session::transcript::lock_session_turn(&locator, &session)
+    let guard = tinyagents_session::transcript::lock_session_turn(locator.as_ref(), &session)
         .await
         .expect("lock");
 
-    let workspace = cfg.workspace_dir.clone();
     let task = tokio::spawn(async move {
         append_to_origin_transcript(
-            &workspace,
+            locator.as_ref(),
             &TranscriptAppend {
                 thread_id: "t-1",
                 agent_id: "orchestrator",
@@ -266,4 +271,75 @@ async fn transcript_append_waits_for_a_live_turn() {
     assert!(!task.is_finished(), "append must wait behind the live turn");
     drop(guard);
     task.await.unwrap().unwrap();
+}
+
+/// The append lands in the store the job's tenant keys: a SaaS profile's
+/// `<profile>~<agent>` transcript, never the unprefixed one of the same
+/// workspace.
+#[tokio::test]
+async fn transcript_append_lands_in_the_tenants_store() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let cfg = config(&tmp);
+    let profile = crate::core::runtime::Tenant {
+        profile: Some("profile-a".into()),
+        agent: None,
+    };
+    let desktop = crate::core::runtime::Tenant::default();
+    let profile_store = origin_transcripts(&cfg.workspace_dir, &profile, "orchestrator");
+    let desktop_store = origin_transcripts(&cfg.workspace_dir, &desktop, "orchestrator");
+    assert_ne!(
+        profile_store.destination_key(),
+        desktop_store.destination_key(),
+        "the profile prefix keys a store of its own"
+    );
+
+    let session = SessionRef::scoped("t-p", "orchestrator");
+    let next = vec![
+        TranscriptMessage::user("remind me"),
+        TranscriptMessage::assistant("Scheduled."),
+    ];
+    profile_store
+        .open_session(&session, meta())
+        .unwrap()
+        .append_turn(TranscriptTurn {
+            prev: &[],
+            next: &next,
+            meta: &meta(),
+            turn_usage: None,
+            request_id: None,
+            tools: None,
+        })
+        .unwrap();
+
+    let append = TranscriptAppend {
+        thread_id: "t-p",
+        agent_id: "orchestrator",
+        text: "Ping!",
+        idempotency_key: "cron:job-p:run-1",
+        job_id: "job-p",
+        run_id: "run-1",
+    };
+    // The unprefixed store has no such session: nothing is written there.
+    append_to_origin_transcript(desktop_store.as_ref(), &append)
+        .await
+        .unwrap();
+    assert!(!desktop_store.session_exists(&session));
+    append_to_origin_transcript(profile_store.as_ref(), &append)
+        .await
+        .unwrap();
+
+    let head = profile_store.head_generation(&session);
+    let messages = profile_store
+        .read_session_transcript(&head)
+        .unwrap()
+        .read_session()
+        .unwrap()
+        .unwrap()
+        .messages;
+    assert_eq!(
+        messages.len(),
+        3,
+        "appended once, to the profile's transcript"
+    );
+    assert_eq!(messages.last().unwrap().content, "Ping!");
 }

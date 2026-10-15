@@ -108,5 +108,15 @@
     "category": "A",
     "reason": "Test-only (cfg(test)): serializes each TinyConnectors call with the route it sets, because libtest runs a crate's tests in one process and the module's route is process-global; it guards no data and carries no tenant state.",
     "verification": "flows/tinyflows/caps/tools/composio_tests.rs: backend_dispatch_forwards_the_workflow_connection_id"
+  },
+  {
+    "file": "crates/openhuman-core/src/agent/session_store/mod.rs",
+    "scope": "",
+    "name": "OPEN_WORKSPACE_STORES",
+    "type": "LazyLock<Mutex<HashMap<(std::path::PathBuf,String),tinyagents_session::port::WorkspaceStores>>, >",
+    "count": 1,
+    "category": "D",
+    "reason": "Holds open the workspace transcript stores used when no host session store is installed. Each entry is a handle to the SQLite store under one workspace, keyed by that workspace and the session store key (agent_key_for: <profile>~<agent> for a SaaS profile), so two profiles or agents never share an entry; the store under the workspace is the authoritative data. release_workspace_defaults drops them for a data reset.",
+    "verification": "threads/ops/edit_tests.rs: a_profile_prefixed_key_round_trips_through_edit_and_regenerate; agent/session_store/mod_tests.rs: without_a_store_transcripts_come_from_the_workspace_store_not_files"
   }
 ]

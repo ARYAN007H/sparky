@@ -380,6 +380,7 @@ async fn drive_turn(
             failure_map.clone(),
             provider_usage_carry.clone(),
             bridge_tool_sets.clone(),
+            run_context.dispatch_ctx(),
         );
         bridge.set_definition(
             run_context
@@ -669,6 +670,7 @@ async fn drive_turn(
         &tool_outcome_sink,
         resolved_route,
         request_base_len,
+        &run_context.dispatch_ctx(),
     )
     .await)
 }

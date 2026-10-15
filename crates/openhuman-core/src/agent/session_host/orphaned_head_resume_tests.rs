@@ -46,6 +46,12 @@ async fn resumed_orphaned_tool_head_is_repaired_before_the_request() {
     let chat_model: Arc<dyn tinyinference_llm::model::ChatModel<()>> = model.clone();
     let new_host = || {
         crate::agent::SessionHostBuilder::new()
+            // Splices raw JSONL rows: the host writes through the file locator.
+            .with_session_history_locator(Arc::new(
+                tinyagents_session::transcript::FileTranscriptLocator::new(
+                    root.path().join("workspace"),
+                ),
+            ))
             .chat_model(chat_model.clone())
             .tools(Vec::new())
             .workspace_dir(root.path().join("workspace"))
