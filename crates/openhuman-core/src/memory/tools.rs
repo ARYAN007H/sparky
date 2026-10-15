@@ -402,7 +402,7 @@ impl Tool for MemoryTool {
                     ))
                 }) {
                     Ok(value) => {
-                        super::tool_writes::schedule(self.config.clone(), &queued_root);
+                        super::tool_writes::schedule(&dispatch, self.config.clone(), &queued_root);
                         ToolResult::success(value.to_string())
                     }
                     Err(error) => ToolResult::error(render_error(error)),

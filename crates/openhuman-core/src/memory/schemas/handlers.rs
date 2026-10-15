@@ -105,7 +105,7 @@ pub(super) fn forget(ctx: DispatchCtx, params: Map<String, Value>) -> Controller
 pub(super) fn erase_all(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let params = parse::<EraseAllParams>(params)?;
-        finish(ops::erase_all(&load(&ctx).await?, params).await)
+        finish(ops::erase_all(&ctx, &load(&ctx).await?, params).await)
     })
 }
 
