@@ -8,6 +8,7 @@ use crate::agent::host_runtime;
 use crate::agent::prompts::SystemPromptBuilder;
 use crate::agent::session_host::types::OpenHumanSessionHost;
 use crate::config::Config;
+use crate::core::runtime::DispatchCtx;
 use crate::security::SecurityPolicy;
 use crate::tools;
 use anyhow::Result;
@@ -78,9 +79,8 @@ impl OpenHumanSessionHost {
     /// Tauri web channel (see `channels::provider::web::build_session_agent`).
     pub fn from_config_for_agent(config: &Config, agent_id: &str) -> Result<Self> {
         // A hosted profile never receives the ordinary config-derived belt.
-        // Its operator-selected factory carries registration and permission
-        // boundaries into the same session builder, under this profile scope.
-        if crate::profiles::capabilities::ProfileCapabilities::current().is_some() {
+        let ambient = DispatchCtx::ambient();
+        if crate::profiles::capabilities::ProfileCapabilities::in_ctx(&ambient).is_some() {
             return Self::from_config_for_agent_session(config, agent_id, None);
         }
         let target_def = resolve_target_definition(config, agent_id)?;

@@ -247,7 +247,7 @@ pub(crate) async fn run_relay_turn(
     let mut runtime_message = crate::channels::runtime::RuntimeChannelMessage::from(message);
     runtime_message.prepared_inbound = Some(prepared);
     let turn = process_channel_runtime_message(ctx, runtime_message);
-    if let Some(context) = crate::core::runtime::CoreContext::scoped() {
+    if let Some(context) = dispatch_ctx.core() {
         crate::core::runtime::CoreContext::scope(
             context.derive_channel_turn(Some(thread_id.clone()), None),
             Box::pin(turn),

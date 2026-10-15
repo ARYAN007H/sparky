@@ -2,6 +2,7 @@
 
 use crate::agent::OpenHumanSessionHost;
 use crate::config::Config;
+use crate::core::runtime::DispatchCtx;
 
 impl OpenHumanSessionHost {
     /// Build a config-routed agent with its caller's exact conversation key.
@@ -15,7 +16,9 @@ impl OpenHumanSessionHost {
         agent_id: &str,
         session_id: Option<&str>,
     ) -> anyhow::Result<Self> {
-        if let Some(capabilities) = crate::profiles::capabilities::ProfileCapabilities::current() {
+        if let Some(capabilities) =
+            crate::profiles::capabilities::ProfileCapabilities::in_ctx(&DispatchCtx::ambient())
+        {
             let mut definition = super::factory::resolve_target_definition(config, agent_id)?
                 .ok_or_else(|| anyhow::anyhow!("profile agent definition is unavailable"))?;
             capabilities.apply_system_prompt(&mut definition);

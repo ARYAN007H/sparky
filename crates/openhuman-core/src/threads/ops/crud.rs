@@ -435,6 +435,7 @@ pub async fn thread_delete(
         .await
         .map_err(|e| format!("load config: {e}"))?;
     run_to_completion(
+        ctx,
         "thread_delete",
         thread_delete_inner(ctx.clone(), config, request),
     )

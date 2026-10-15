@@ -17,7 +17,7 @@ pub async fn threads_purge(
     _request: EmptyRequest,
 ) -> Result<Outcome<ApiEnvelope<PurgeConversationThreadsResponse>>, String> {
     let dir = workspace_dir().await?;
-    run_to_completion("threads_purge", threads_purge_inner(ctx.clone(), dir)).await
+    run_to_completion(ctx, "threads_purge", threads_purge_inner(ctx.clone(), dir)).await
 }
 
 async fn threads_purge_inner(

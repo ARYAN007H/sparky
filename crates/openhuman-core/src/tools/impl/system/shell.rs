@@ -642,6 +642,7 @@ impl ShellTool {
     ) -> (bool, ToolResult) {
         let config = crate::config::RuntimeConfig::default();
         let policy = crate::sandbox::resolve_sandbox_policy(
+            ctx,
             tinyagents_definition::SandboxMode::Sandboxed,
             action_dir,
             &self.security.workspace_dir,
