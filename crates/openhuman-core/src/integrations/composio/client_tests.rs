@@ -435,12 +435,17 @@ async fn direct_connected_integrations_fetches_schemas_without_backend_composio_
     let mut integrations = Vec::new();
     for attempt in 1..=5 {
         match crate::integrations::composio::fetch_connected_integrations_status(&config).await {
-            crate::integrations::composio::FetchConnectedIntegrationsStatus::Authoritative(found) => {
+            crate::integrations::composio::FetchConnectedIntegrationsStatus::Authoritative(
+                found,
+            ) => {
                 integrations = found;
                 break;
             }
             crate::integrations::composio::FetchConnectedIntegrationsStatus::Unavailable => {
-                tracing::debug!(attempt, "[composio][test] fetch fenced or unavailable; retrying");
+                tracing::debug!(
+                    attempt,
+                    "[composio][test] fetch fenced or unavailable; retrying"
+                );
             }
         }
     }
