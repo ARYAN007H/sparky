@@ -48,7 +48,7 @@ fn chat(thread: &str) -> ApprovalChatContext {
 }
 
 fn tool() -> PerCallTool<Probe> {
-    PerCallTool::new(|chat| Probe {
+    PerCallTool::new(|chat, _ctx| Probe {
         built_for: chat.cloned(),
     })
 }
