@@ -32,7 +32,7 @@ async fn threads_purge_inner(
     // wins the cooperative-abort race (records after the wipe) is still dropped
     // by `record_completion` rather than delivered into a purged thread.
     use crate::agent::orchestration::{background_completions, running_subagents};
-    let cancelled_threads = running_subagents::cancel_all();
+    let cancelled_threads = running_subagents::cancel_all(&ctx);
     let mut discarded = 0;
     for thread_id in &cancelled_threads {
         discarded += background_completions::discard_for_thread(&dir, thread_id);

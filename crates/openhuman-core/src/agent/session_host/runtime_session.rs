@@ -461,6 +461,7 @@ impl OpenHumanTurnPrelude {
         };
         if let Some(block) =
             crate::agent::orchestration::running_subagents::active_subagents_context_block(
+                &self.dispatch_ctx(),
                 &self.event_session_id,
                 &self.workspace_dir,
                 &turn_fleet,
