@@ -26,7 +26,6 @@ use super::file_store::{self, IDENTITIES_FILE};
 ///
 /// The identities file cannot be read or written.
 pub async fn persist_provider_profile(
-    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     profile: &ProviderUserProfile,
 ) -> Result<usize, String> {
@@ -49,7 +48,6 @@ pub async fn persist_provider_profile(
     let written = rows.len();
     let (key_source, key_identifier) = (toolkit.clone(), identifier.clone());
     file_store::update(
-        ctx,
         config,
         IDENTITIES_FILE,
         move |identities: &mut Vec<ConnectedIdentity>| {
@@ -155,11 +153,8 @@ fn json_str<'a>(v: &'a serde_json::Value, key: &str) -> Option<&'a str> {
 /// # Errors
 ///
 /// The identities file exists but cannot be read or parsed.
-pub async fn load_connected_identities(
-    ctx: &crate::core::runtime::DispatchCtx,
-    config: &Config,
-) -> Result<Vec<ConnectedIdentity>, String> {
-    file_store::load(ctx, config, IDENTITIES_FILE).await
+pub async fn load_connected_identities(config: &Config) -> Result<Vec<ConnectedIdentity>, String> {
+    file_store::load(config, IDENTITIES_FILE).await
 }
 
 /// Delete the stored identity for a `(source, connection_id)` pair — used on
@@ -169,7 +164,6 @@ pub async fn load_connected_identities(
 ///
 /// The identities file cannot be read or written.
 pub async fn delete_connected_identity_facets(
-    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     source: &str,
     identifier: &str,
@@ -182,7 +176,6 @@ pub async fn delete_connected_identity_facets(
     let identifier = keys.next().unwrap_or_default();
 
     file_store::update(
-        ctx,
         config,
         IDENTITIES_FILE,
         move |identities: &mut Vec<ConnectedIdentity>| {
