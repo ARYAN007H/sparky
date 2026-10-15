@@ -625,8 +625,3 @@ async fn cancel_by_task_returns_metadata_and_removes_entry() {
     // Unknown ids are simply None.
     assert!(cancel_by_task(&cx(), "never-existed").is_none());
 }
-
-/// A finished run stays registered until the terminal sweep, so a late
-/// "Cancel" still finds it. It must come back flagged, so the RPC does not
-/// rewrite a completed session as "cancelled by user" — while a run paused on
-/// the user is still a real cancel.

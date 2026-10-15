@@ -12,6 +12,13 @@ fn workspace() -> TestWorkspace {
     TestWorkspace::new()
 }
 
+fn pending_ids(ws: &Path, thread: &str) -> Vec<String> {
+    pending_for(ws, thread)
+        .into_iter()
+        .map(|r| r.task_id)
+        .collect()
+}
+
 #[tokio::test]
 async fn release_all_closes_every_router_and_the_log_stays_replayable() {
     let _guard = crate::config::TEST_ENV_LOCK.lock().await;

@@ -21,7 +21,7 @@ pub(super) fn delivering() -> &'static Mutex<HashSet<String>> {
 /// so a settled batch is untouched and an abandoned one is claimable again.
 pub(super) struct DeliverySlot {
     /// [`tenant::profile_key`] of the thread id.
-    key: String,
+    pub(super) key: String,
     router: Arc<CompletionRouter>,
     held: Vec<String>,
 }

@@ -2,6 +2,10 @@
 
 use super::*;
 
+/// A finished run stays registered until the terminal sweep, so a late
+/// "Cancel" still finds it. It must come back flagged, so the RPC does not
+/// rewrite a completed session as "cancelled by user" — while a run paused on
+/// the user is still a real cancel.
 #[tokio::test]
 async fn cancel_by_task_flags_a_run_that_already_finished() {
     let _guard = test_guard_async().await;
