@@ -20,6 +20,7 @@ use tinysearch_bus::{names, ExecuteToolRequest, ExecuteToolResponse, ListToolsRe
 
 use super::{module_config, MODULE_ID};
 use crate::config::Config;
+use crate::core::runtime::DispatchCtx;
 
 /// Bus deadline for one `ExecuteTool` call.
 ///
