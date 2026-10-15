@@ -18,7 +18,6 @@ use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex, PoisonError, RwLock};
 
 use tinyagents_session::port::{AgentStores, SessionStoreProvider};
-use tinyagents_session::transcript::agent_transcript_root;
 
 pub mod ledger_sync;
 mod rebound;
@@ -26,10 +25,10 @@ mod workspace;
 
 pub use rebound::{rebind_all, ReboundSessionStores};
 pub use workspace::{
-    artifact_blobs_for, attachment_stash_for, current_documents_for, default_turn_states_for, ledger_for,
-    provider_for_workspace, release_workspace_defaults, require_ledger, status_store_for,
-    stores_for, stores_or_ephemeral, turn_states_for, with_ledger, with_ledger_async,
-    WorkspaceSessionStores,
+    artifact_blobs_for, attachment_stash_for, current_documents_for, default_turn_states_for,
+    ledger_for, provider_for_workspace, release_workspace_defaults, require_ledger,
+    status_store_for, stores_for, stores_or_ephemeral, turn_states_for, with_ledger,
+    with_ledger_async, WorkspaceSessionStores,
 };
 
 static PROVIDER: LazyLock<RwLock<Option<Arc<dyn SessionStoreProvider>>>> =
@@ -196,28 +195,6 @@ pub fn workspace_transcripts(
     }
 }
 
-/// The workspace root transcripts are written under: the agent's own
-/// directory under an embedded agent's context, else `workspace_dir` — which
-/// for a SaaS profile's default agent is that profile's own workspace.
-#[must_use]
-pub fn transcript_root(workspace_dir: &std::path::Path) -> std::path::PathBuf {
-    match current_embedded_agent() {
-        Some(agent) => agent_transcript_root(workspace_dir, &agent),
-        None => workspace_dir.to_path_buf(),
-    }
-}
-
-/// The embedded agent the calling tenant runs as, if any. A SaaS profile's
-/// default agent has none: its transcripts live at its workspace root, which
-/// no other profile shares. A SaaS task with no scope has none either; the
-/// workspace it was handed is the only one it touches.
-#[must_use]
-pub fn current_embedded_agent() -> Option<String> {
-    crate::core::runtime::current_tenant()
-        .ok()
-        .and_then(|tenant| tenant.agent)
-}
-
 /// The stores of the tenant the current [`CoreContext`] works for, keyed by
 /// [`session_key`](crate::core::runtime::session_key): the agent it was
 /// derived for ([`CoreContext::session_agent`]), else [`DEFAULT_AGENT`],
@@ -250,11 +227,24 @@ pub fn current() -> Option<AgentStores> {
 /// session's own definition id), as before profiles existed.
 #[must_use]
 pub fn current_agent_key_or(fallback: &str) -> String {
-    let tenant = crate::core::runtime::tenant::current_tenant_or_isolated("session_locator");
+    agent_key_for(
+        &crate::core::runtime::tenant::current_tenant_or_isolated("session_locator"),
+        fallback,
+    )
+}
+
+/// The agent id `tenant`'s transcripts are kept under, for a caller that
+/// already holds the request's tenant (an RPC handler's context): the
+/// [`session_key`](crate::core::runtime::session_key) when it serves a SaaS
+/// profile, else its agent, else `fallback` (the session's definition id).
+/// [`current_agent_key_or`] is this over the ambient tenant, so a reader that
+/// passes its tenant here resolves the same store the session host wrote to.
+#[must_use]
+pub fn agent_key_for(tenant: &crate::core::runtime::Tenant, fallback: &str) -> String {
     if tenant.profile.is_some() {
-        return crate::core::runtime::session_key(&tenant);
+        return crate::core::runtime::session_key(tenant);
     }
-    tenant.agent.unwrap_or_else(|| fallback.to_string())
+    tenant.agent.clone().unwrap_or_else(|| fallback.to_string())
 }
 
 /// The workspace the current [`CoreContext`](crate::core::runtime::CoreContext)

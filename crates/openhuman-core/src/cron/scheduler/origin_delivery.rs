@@ -42,6 +42,10 @@ pub(crate) struct TranscriptAppend<'a> {
     /// The agent that owns the thread's session (its transcript is keyed by
     /// thread id and agent id).
     pub agent_id: &'a str,
+    /// The session store key the thread's transcripts were written under
+    /// ([`agent_key_for`](crate::agent::session_store::agent_key_for) of the
+    /// job's tenant and `agent_id`), resolved by the caller.
+    pub store_key: &'a str,
     pub text: &'a str,
     /// `cron:<job_id>:<run_id>`; the append is idempotent on it.
     pub idempotency_key: &'a str,
@@ -57,29 +61,26 @@ const TRANSCRIPT_APPEND_TIMEOUT: std::time::Duration = std::time::Duration::from
 /// model-facing `SessionRef` transcript) as an assistant message, so the next
 /// live turn in that thread sees the reminder.
 ///
-/// Uses `tinyagents_session::transcript::append_background_message`: it waits
-/// for any live turn of the session (the per-session turn lock), dedupes on the
-/// idempotency key and records `{kind: "cron", job_id, run_id}` provenance.
-/// The session is addressed exactly as the session host does it
-/// (`SessionRef::scoped(thread_id, agent_id)` over the workspace path). A
-/// thread that never had an agent turn has no transcript (`NoSession`) and is
-/// skipped. Must never be called from inside a turn of the same session.
+/// Uses `tinyagents_session::transcript::append_background_message_in`: it
+/// waits for any live turn of the session (the per-session turn lock), dedupes
+/// on the idempotency key and records `{kind: "cron", job_id, run_id}`
+/// provenance. The session is addressed exactly as the session host does it
+/// (`SessionRef::scoped(thread_id, agent_id)`) in the store the host wrote it
+/// to: the transcript port for `append.store_key` (the installed session
+/// store, else the workspace's own). A thread that never had an agent turn has
+/// no transcript (`NoSession`) and is skipped. Must never be called from
+/// inside a turn of the same session.
 pub(crate) async fn append_to_origin_transcript(
     workspace_dir: &Path,
     append: &TranscriptAppend<'_>,
 ) -> Result<(), String> {
     use tinyagents_session::transcript::{
-        append_background_message, BackgroundAppend, BackgroundAppendOutcome,
-        FileTranscriptLocator, SessionRef, TranscriptMessage,
+        append_background_message_in, BackgroundAppend, BackgroundAppendOutcome, SessionRef,
+        TranscriptMessage,
     };
     let session = SessionRef::scoped(append.thread_id.to_string(), append.agent_id.to_string());
-    if let Some(agent) = crate::agent::session_store::current_embedded_agent() {
-        use tinyagents_session::transcript::TranscriptLocator;
-        tinyagents_session::transcript::AgentTranscriptFiles::new(workspace_dir, &agent)
-            .session_exists(&session);
-    }
     let locator =
-        FileTranscriptLocator::new(crate::agent::session_store::transcript_root(workspace_dir));
+        crate::agent::session_store::transcripts_or_files(append.store_key, workspace_dir);
     let options = BackgroundAppend::new(
         append.idempotency_key,
         serde_json::json!({
@@ -90,8 +91,8 @@ pub(crate) async fn append_to_origin_transcript(
     );
     let outcome = tokio::time::timeout(
         TRANSCRIPT_APPEND_TIMEOUT,
-        append_background_message(
-            &locator,
+        append_background_message_in(
+            locator.as_ref(),
             &session,
             TranscriptMessage::assistant(append.text),
             options,
@@ -152,9 +153,11 @@ pub(crate) async fn deliver_to_origin(
     };
     let text = output.trim();
 
-    // A hosted profile's or an embedded agent's host routes the reply itself.
-    let owner = crate::core::runtime::current_tenant()
-        .ok()
+    // The job's tenant: a hosted profile's or an embedded agent's host routes
+    // the reply itself; otherwise it keys the transcript store below.
+    let tenant = crate::core::runtime::current_tenant().ok();
+    let owner = tenant
+        .clone()
         .filter(|tenant| tenant.profile.is_some() || tenant.agent.is_some());
     if let (Some(sink), Some(owner)) = (crate::cron::host_delivery::installed(), owner) {
         let thread_id = match origin {
@@ -186,7 +189,18 @@ pub(crate) async fn deliver_to_origin(
         JobOrigin::Web {
             thread_id,
             agent_id,
-        } => deliver_to_web_thread(config, job, run_id, thread_id, agent_id.as_deref(), text).await,
+        } => {
+            deliver_to_web_thread(
+                config,
+                tenant.as_ref(),
+                job,
+                run_id,
+                thread_id,
+                agent_id.as_deref(),
+                text,
+            )
+            .await
+        }
         JobOrigin::Channel {
             channel,
             reply_target,
@@ -218,6 +232,7 @@ pub(crate) async fn deliver_to_origin(
 
 async fn deliver_to_web_thread(
     config: &Config,
+    tenant: Option<&crate::core::runtime::Tenant>,
     job: &CronJob,
     run_id: &str,
     thread_id: &str,
@@ -262,11 +277,23 @@ async fn deliver_to_web_thread(
 
     // After the announcement: waiting out a live turn of this session must not
     // delay the user seeing the reply (the thread row is already stored).
+    // A job with no tenant (SaaS work that lost its scope) has no store to
+    // append to and must not guess one.
+    let Some(tenant) = tenant else {
+        tracing::warn!(
+            job_id = %job.id,
+            run_id = %run_id,
+            "[cron] origin transcript append skipped: the job has no tenant"
+        );
+        return Ok(DeliveryStatus::Delivered);
+    };
+    let store_key = crate::agent::session_store::agent_key_for(tenant, &agent_id);
     if let Err(e) = append_to_origin_transcript(
         &config.workspace_dir,
         &TranscriptAppend {
             thread_id,
             agent_id: &agent_id,
+            store_key: &store_key,
             text,
             idempotency_key: &request_id,
             job_id: &job.id,
