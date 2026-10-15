@@ -93,6 +93,7 @@ impl HostAgent {
         // the learning sink.
         session.set_host_env(crate::agent::turn_env::HostTurnEnv {
             hooks: self.hooks.clone(),
+            core: Some(Arc::clone(&self.context)),
             ..Default::default()
         });
         Ok(session)

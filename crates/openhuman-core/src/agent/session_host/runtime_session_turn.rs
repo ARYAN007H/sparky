@@ -29,6 +29,11 @@ impl OpenHumanSessionHost {
     ) -> Result<String> {
         self.ensure_runtime_session()?;
         let staged = super::attachment_input::stage_turn(self, user_message, origin).await?;
+        // The turn's context is bound once, here: the one ambient read at the
+        // turn boundary for a host that did not hand a context over.
+        if self.host_env.core.is_none() {
+            self.host_env.core = crate::core::runtime::DispatchCtx::ambient().into_core();
+        }
         let mut context = OpenHumanRunContext::new().with_host_env(&self.host_env);
         context.untrusted_input_turn = self.untrusted_input;
         context.origin = origin.cloned();

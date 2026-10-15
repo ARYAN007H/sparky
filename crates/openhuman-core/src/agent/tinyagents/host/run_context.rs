@@ -309,6 +309,11 @@ pub struct OpenHumanRunContext {
     pub prepared_context_sources: Arc<Vec<AgentContextPreparedSource>>,
     /// Who the run acts as on memory; `None` is the root identity.
     pub memory_identity: Option<crate::memory::scope::MemoryIdentity>,
+    /// The context the turn runs under. Tools, middleware and the provider
+    /// factory read it from here ([`dispatch_ctx_for_tool`]) instead of the
+    /// calling task's ambient scope. Inherited by children and detached
+    /// children: a sub-agent acts for the same tenant as its parent.
+    pub core: Option<Arc<crate::core::runtime::CoreContext>>,
     /// File-state identity used to detect stale parent reads after child writes.
     pub file_state_agent_id: Option<String>,
     /// Host-owned artifact index for tool-result references.
@@ -410,7 +415,7 @@ pub(crate) struct HarnessHostPolicy {
 }
 
 pub(crate) use super::operation_context::{
-    approval_for_tool, memory_identity_for_tool, parent_agent_id_for_tool, sandbox_mode_for_tool,
+    approval_for_tool, dispatch_ctx_for_tool, memory_identity_for_tool, parent_agent_id_for_tool, sandbox_mode_for_tool,
     HostOperationContext,
 };
 #[cfg(test)]
@@ -472,6 +477,7 @@ impl OpenHumanRunContext {
             parent: None,
             prepared_context_sources: Arc::new(Vec::new()),
             memory_identity: None,
+            core: None,
             file_state_agent_id: None,
             tool_result_artifact_index: None,
             attachment_placeholders: Arc::new(Vec::new()),
@@ -510,6 +516,22 @@ impl OpenHumanRunContext {
     ) -> Self {
         self.tool_dialect = dialect;
         self
+    }
+
+    /// Binds the context this run acts under.
+    #[must_use]
+    pub fn with_core(mut self, core: Option<Arc<crate::core::runtime::CoreContext>>) -> Self {
+        self.core = core;
+        self
+    }
+
+    /// The dispatch context this run's readers (config, tenant stores) use:
+    /// the run's own context, else unbound.
+    pub fn dispatch_ctx(&self) -> crate::core::runtime::DispatchCtx {
+        match &self.core {
+            Some(core) => crate::core::runtime::DispatchCtx::new(Arc::clone(core)),
+            None => crate::core::runtime::DispatchCtx::unbound(),
+        }
     }
 
     /// Sets the direct TinyTools workspace descriptor for this run.
@@ -593,6 +615,7 @@ impl OpenHumanRunContext {
         self.turn_deadline = env.turn_deadline.or(self.turn_deadline);
         self.tool_call_limit = env.tool_call_limit.or(self.tool_call_limit);
         self.memory_identity = env.memory_identity.clone().or(self.memory_identity);
+        self.core = env.core.clone().or(self.core);
         self.stop_hooks
             .extend(env.hooks.stop_hooks().iter().cloned());
         self.tool_hooks
@@ -684,6 +707,7 @@ impl OpenHumanRunContext {
                 .as_ref()
                 .map(|parent| parent.agent_definition_id.clone()),
             memory_identity: self.memory_identity.clone(),
+            core: self.core.clone(),
         });
         let context = tinyagents_harness::context::RunContext::new(config, self)
             .with_cancellation(cancellation)
