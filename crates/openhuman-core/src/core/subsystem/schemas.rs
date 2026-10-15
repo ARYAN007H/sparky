@@ -82,9 +82,9 @@ pub async fn subsystems_status(ctx: &DispatchCtx) -> Vec<SubsystemStatus> {
     }
 }
 
-fn handle_status(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_status(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let rows = subsystems_status().await;
+        let rows = subsystems_status(&ctx).await;
         log::debug!("[subsystem] status requested: {} slot(s)", rows.len());
         Outcome::new(serde_json::json!({ "subsystems": rows }), vec![]).into_cli_compatible_json()
     })
