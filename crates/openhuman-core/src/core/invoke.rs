@@ -34,7 +34,7 @@ pub async fn invoke_method(
     method: &str,
     params: Value,
 ) -> Result<Value, String> {
-    let mut result = invoke_scoped(ctx, state, method, params).await;
+    let mut result = invoke_scoped(ctx.clone(), state, method, params).await;
 
     // Session auto-cleanup: if the OpenHuman auth session is explicitly
     // expired, publish a `SessionExpired` event. The credentials subscriber

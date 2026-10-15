@@ -90,6 +90,7 @@ impl WalletModuleTool {
                 };
                 outcome_value(
                     crate::web3::wallet::prepare_transfer(
+                        ctx,
                         params,
                         crate::modules::web3_service::owner_of(chat),
                     )
