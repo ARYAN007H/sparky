@@ -66,6 +66,7 @@ const TRANSCRIPT_APPEND_TIMEOUT: std::time::Duration = std::time::Duration::from
 /// thread that never had an agent turn has no transcript (`NoSession`) and is
 /// skipped. Must never be called from inside a turn of the same session.
 pub(crate) async fn append_to_origin_transcript(
+    ctx: &crate::core::runtime::DispatchCtx,
     workspace_dir: &Path,
     append: &TranscriptAppend<'_>,
 ) -> Result<(), String> {
@@ -74,13 +75,13 @@ pub(crate) async fn append_to_origin_transcript(
         FileTranscriptLocator, SessionRef, TranscriptMessage,
     };
     let session = SessionRef::scoped(append.thread_id.to_string(), append.agent_id.to_string());
-    if let Some(agent) = crate::agent::session_store::current_embedded_agent() {
+    if let Some(agent) = crate::agent::session_store::current_embedded_agent(ctx) {
         use tinyagents_session::transcript::TranscriptLocator;
         tinyagents_session::transcript::AgentTranscriptFiles::new(workspace_dir, &agent)
             .session_exists(&session);
     }
     let locator =
-        FileTranscriptLocator::new(crate::agent::session_store::transcript_root(workspace_dir));
+        FileTranscriptLocator::new(crate::agent::session_store::transcript_root(ctx, workspace_dir));
     let options = BackgroundAppend::new(
         append.idempotency_key,
         serde_json::json!({
@@ -133,6 +134,7 @@ pub(crate) async fn append_to_origin_transcript(
 /// `Ok(Suppressed)` for an intentional empty/`NO_REPLY` output; `Ok(Delivered)`
 /// when the reply was committed and sent; `Err` when it could not be.
 pub(crate) async fn deliver_to_origin(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     job: &CronJob,
     run_id: &str,
@@ -154,7 +156,8 @@ pub(crate) async fn deliver_to_origin(
     let text = output.trim();
 
     // A hosted profile's or an embedded agent's host routes the reply itself.
-    let owner = crate::core::runtime::current_tenant()
+    let owner = ctx
+        .tenant()
         .ok()
         .filter(|tenant| tenant.profile.is_some() || tenant.agent.is_some());
     if let (Some(sink), Some(owner)) = (crate::cron::host_delivery::installed(), owner) {
@@ -187,7 +190,7 @@ pub(crate) async fn deliver_to_origin(
         JobOrigin::Web {
             thread_id,
             agent_id,
-        } => deliver_to_web_thread(config, job, run_id, thread_id, agent_id.as_deref(), text).await,
+        } => deliver_to_web_thread(ctx, config, job, run_id, thread_id, agent_id.as_deref(), text).await,
         JobOrigin::Channel {
             channel,
             reply_target,
@@ -218,6 +221,7 @@ pub(crate) async fn deliver_to_origin(
 }
 
 async fn deliver_to_web_thread(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     job: &CronJob,
     run_id: &str,
@@ -266,6 +270,7 @@ async fn deliver_to_web_thread(
     // After the announcement: waiting out a live turn of this session must not
     // delay the user seeing the reply (the thread row is already stored).
     if let Err(e) = append_to_origin_transcript(
+        ctx,
         &config.workspace_dir,
         &TranscriptAppend {
             thread_id,
