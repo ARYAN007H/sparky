@@ -260,10 +260,10 @@ pub fn schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_chat(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_chat(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<AgentChatParams>(params)?;
-        let mut config = config_rpc::load_config_with_timeout().await?;
+        let mut config = ctx.load_config().await?;
         to_json(
             crate::inference::host_runtime::rpc::agent_chat(
                 &mut config,
@@ -283,10 +283,10 @@ fn handle_chat(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFutur
     })
 }
 
-fn handle_chat_simple(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_chat_simple(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<AgentChatParams>(params)?;
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_json(
             crate::inference::host_runtime::rpc::agent_chat_simple(
                 &config,
@@ -577,8 +577,8 @@ fn local_catalog_models_from_config(
         .collect()
 }
 
-fn handle_registry_snapshot(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async {
+fn handle_registry_snapshot(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+    Box::pin(async move {
         use tinyagents_registry::{ComponentKind, ComponentMetadata, RegistrySnapshot};
 
         let mut components: Vec<ComponentMetadata> = Vec::new();
@@ -588,7 +588,7 @@ fn handle_registry_snapshot(_ctx: DispatchCtx, _params: Map<String, Value>) -> C
         // any entry whose provider is a local runtime (ollama, lmstudio, mlx, …)
         // is overlaid as a free, runtime-profiled catalog entry so local models
         // appear in the one projection alongside priced vendor rows.
-        let local_models = match config_rpc::load_config_with_timeout().await {
+        let local_models = match ctx.load_config().await {
             Ok(config) => local_catalog_models_from_config(&config),
             Err(err) => {
                 tracing::debug!(

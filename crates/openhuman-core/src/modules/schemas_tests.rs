@@ -60,8 +60,8 @@ async fn computer_status_handler_returns_serialized_status() {
     let ctx =
         CoreContext::for_test_with_config(DomainSet::full(), crate::config::Config::default());
 
-    let status = CoreContext::scope(ctx, async {
-        super::handle_computer_status(DispatchCtx::process_default(), Map::new()).await
+    let status = CoreContext::scope(ctx.clone(), async {
+        super::handle_computer_status(DispatchCtx::new(ctx.clone()), Map::new()).await
     })
     .await
     .expect("computer status should serialize");
@@ -81,16 +81,16 @@ async fn forgetting_sites_reports_how_many_went() {
     }
     let ctx = CoreContext::for_test_with_config(DomainSet::full(), config);
 
-    let (one, every) = CoreContext::scope(ctx, async {
+    let (one, every) = CoreContext::scope(ctx.clone(), async {
         let mut one = Map::new();
         one.insert(
             "site".to_string(),
             Value::String("https://www.shop.test/cart".to_string()),
         );
-        let one = super::handle_browser_forget_sites(DispatchCtx::process_default(), one).await;
+        let one = super::handle_browser_forget_sites(DispatchCtx::new(ctx.clone()), one).await;
         (
             one,
-            super::handle_browser_forget_sites(DispatchCtx::process_default(), Map::new()).await,
+            super::handle_browser_forget_sites(DispatchCtx::new(ctx.clone()), Map::new()).await,
         )
     })
     .await;

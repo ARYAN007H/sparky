@@ -69,11 +69,11 @@ pub(super) fn handle_update_user_timezone(
 }
 
 pub(super) fn handle_get_user_timezone(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
-    Box::pin(async {
-        let config = config_rpc::load_config_with_timeout().await?;
+    Box::pin(async move {
+        let config = ctx.load_config().await?;
         to_json(crate::core::Outcome::single_log(
             config_rpc::user_timezone_json(&config),
             "user time zone read",
@@ -82,12 +82,12 @@ pub(super) fn handle_get_user_timezone(
 }
 
 pub(super) fn handle_get_analytics_settings(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
-    Box::pin(async {
+    Box::pin(async move {
         use crate::core::Outcome;
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let result = serde_json::json!({
             "enabled": config.observability.analytics_enabled,
         });

@@ -82,12 +82,12 @@ pub(super) struct InferenceListModelsParams {
 }
 
 pub(super) fn handle_inference_resolve_model(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<InferenceResolveModelParams>(params)?;
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         let resolved =
             crate::inference::provider::factory::resolve_model_for_hint(&p.hint, &config);
         // Whether the resolved model accepts image input — drives the chat UI's
@@ -105,11 +105,11 @@ pub(super) fn handle_inference_resolve_model(
 }
 
 pub(super) fn handle_inference_status(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_json(crate::inference::rpc::inference_status(&config).await?)
     })
 }
@@ -303,11 +303,11 @@ pub(super) fn handle_inference_provider_auth_errors(
 }
 
 pub(super) fn handle_inference_diagnostics(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_json(crate::inference::rpc::inference_diagnostics(&config).await?)
     })
 }

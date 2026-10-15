@@ -143,11 +143,11 @@ fn handle_list_definitions(_ctx: DispatchCtx, _params: Map<String, Value>) -> Co
     })
 }
 
-fn handle_list(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_list(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "workflow_run_rpc", "[workflow_run_rpc][{cid}] list.entry");
-        let config = config_rpc::load_config_with_timeout().await.inspect_err(|err| {
+        let config = ctx.load_config().await.inspect_err(|err| {
             log::warn!(target: "workflow_run_rpc", "[workflow_run_rpc][{cid}] list.config_failed err={err}");
         })?;
         let request: WorkflowRunListRequest = if params.is_empty() {
@@ -171,11 +171,11 @@ fn handle_list(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFutur
     })
 }
 
-fn handle_get(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_get(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "workflow_run_rpc", "[workflow_run_rpc][{cid}] get.entry");
-        let config = config_rpc::load_config_with_timeout().await.inspect_err(|err| {
+        let config = ctx.load_config().await.inspect_err(|err| {
             log::warn!(target: "workflow_run_rpc", "[workflow_run_rpc][{cid}] get.config_failed err={err}");
         })?;
         let id = params
@@ -193,11 +193,11 @@ fn handle_get(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture
     })
 }
 
-fn handle_start(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_start(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "workflow_run_rpc", "[workflow_run_rpc][{cid}] start.entry");
-        let config = config_rpc::load_config_with_timeout().await.inspect_err(|err| {
+        let config = ctx.load_config().await.inspect_err(|err| {
             log::warn!(target: "workflow_run_rpc", "[workflow_run_rpc][{cid}] start.config_failed err={err}");
         })?;
         let definition_id = params
@@ -228,11 +228,11 @@ fn handle_start(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFutu
     })
 }
 
-fn handle_stop(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_stop(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "workflow_run_rpc", "[workflow_run_rpc][{cid}] stop.entry");
-        let config = config_rpc::load_config_with_timeout().await.inspect_err(|err| {
+        let config = ctx.load_config().await.inspect_err(|err| {
             log::warn!(target: "workflow_run_rpc", "[workflow_run_rpc][{cid}] stop.config_failed err={err}");
         })?;
         let id = params
@@ -250,11 +250,11 @@ fn handle_stop(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFutur
     })
 }
 
-fn handle_resume(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_resume(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let cid = new_correlation_id();
         log::debug!(target: "workflow_run_rpc", "[workflow_run_rpc][{cid}] resume.entry");
-        let config = config_rpc::load_config_with_timeout().await.inspect_err(|err| {
+        let config = ctx.load_config().await.inspect_err(|err| {
             log::warn!(target: "workflow_run_rpc", "[workflow_run_rpc][{cid}] resume.config_failed err={err}");
         })?;
         let id = params
