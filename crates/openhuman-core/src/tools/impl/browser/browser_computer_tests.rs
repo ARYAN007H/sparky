@@ -53,7 +53,8 @@ fn every_direct_or_controller_action_that_can_submit_needs_confirmation() {
         delay_ms: None
     }));
     assert!(needs_host_confirmation(&Action::Press {
-        key: "Enter".into()
+        key: "Enter".into(),
+        target: None
     }));
     assert!(!needs_host_confirmation(&Action::Hover {
         target: Target::reference("e1")
@@ -84,6 +85,18 @@ fn approval_describes_selector_and_locator_targets() {
     });
     assert!(locator.contains("Role locator") && locator.contains("Email"));
     assert!(!locator.contains("private@example.com"));
+
+    let (reference, press) = approval_target(&Action::Press {
+        key: "Enter".into(),
+        target: Some(Target::reference("e7")),
+    });
+    assert_eq!(reference, Some("e7"));
+    assert_eq!(press, " @e7");
+    let (_, untargeted) = approval_target(&Action::Press {
+        key: "Enter".into(),
+        target: None,
+    });
+    assert!(untargeted.is_empty());
 }
 
 #[test]
