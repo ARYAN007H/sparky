@@ -42,10 +42,6 @@ pub(crate) struct TranscriptAppend<'a> {
     /// The agent that owns the thread's session (its transcript is keyed by
     /// thread id and agent id).
     pub agent_id: &'a str,
-    /// The session store key the thread's transcripts were written under
-    /// ([`agent_key_for`](crate::agent::session_store::agent_key_for) of the
-    /// job's tenant and `agent_id`), resolved by the caller.
-    pub store_key: &'a str,
     pub text: &'a str,
     /// `cron:<job_id>:<run_id>`; the append is idempotent on it.
     pub idempotency_key: &'a str,
@@ -65,13 +61,13 @@ const TRANSCRIPT_APPEND_TIMEOUT: std::time::Duration = std::time::Duration::from
 /// waits for any live turn of the session (the per-session turn lock), dedupes
 /// on the idempotency key and records `{kind: "cron", job_id, run_id}`
 /// provenance. The session is addressed exactly as the session host does it
-/// (`SessionRef::scoped(thread_id, agent_id)`) in the store the host wrote it
-/// to: the transcript port for `append.store_key` (the installed session
-/// store, else the workspace's own). A thread that never had an agent turn has
-/// no transcript (`NoSession`) and is skipped. Must never be called from
-/// inside a turn of the same session.
+/// (`SessionRef::scoped(thread_id, agent_id)`) in `transcripts`, the store
+/// the host wrote it to, which the caller resolved from the job's tenant
+/// ([`origin_transcripts`]). A thread that never had an agent turn has no
+/// transcript (`NoSession`) and is skipped. Must never be called from inside a
+/// turn of the same session.
 pub(crate) async fn append_to_origin_transcript(
-    workspace_dir: &Path,
+    transcripts: &dyn tinyagents_session::transcript::TranscriptLocator,
     append: &TranscriptAppend<'_>,
 ) -> Result<(), String> {
     use tinyagents_session::transcript::{
@@ -79,8 +75,6 @@ pub(crate) async fn append_to_origin_transcript(
         TranscriptMessage,
     };
     let session = SessionRef::scoped(append.thread_id.to_string(), append.agent_id.to_string());
-    let locator =
-        crate::agent::session_store::transcripts_or_files(append.store_key, workspace_dir);
     let options = BackgroundAppend::new(
         append.idempotency_key,
         serde_json::json!({
@@ -92,7 +86,7 @@ pub(crate) async fn append_to_origin_transcript(
     let outcome = tokio::time::timeout(
         TRANSCRIPT_APPEND_TIMEOUT,
         append_background_message_in(
-            locator.as_ref(),
+            transcripts,
             &session,
             TranscriptMessage::assistant(append.text),
             options,
@@ -126,6 +120,19 @@ pub(crate) async fn append_to_origin_transcript(
         ),
     }
     Ok(())
+}
+
+/// The transcript store a web thread's turns were written to: the session
+/// store under [`agent_key_for`](crate::agent::session_store::agent_key_for)
+/// of the job's tenant and the thread's agent, the key the session host
+/// resolved for the same tenant.
+pub(crate) fn origin_transcripts(
+    workspace_dir: &Path,
+    tenant: &crate::core::runtime::Tenant,
+    agent_id: &str,
+) -> std::sync::Arc<dyn tinyagents_session::transcript::TranscriptLocator> {
+    let key = crate::agent::session_store::agent_key_for(tenant, agent_id);
+    crate::agent::session_store::transcripts_or_files(&key, workspace_dir)
 }
 
 /// Deliver one run's output to the job's origin conversation.
@@ -287,13 +294,12 @@ async fn deliver_to_web_thread(
         );
         return Ok(DeliveryStatus::Delivered);
     };
-    let store_key = crate::agent::session_store::agent_key_for(tenant, &agent_id);
+    let transcripts = origin_transcripts(&config.workspace_dir, tenant, &agent_id);
     if let Err(e) = append_to_origin_transcript(
-        &config.workspace_dir,
+        transcripts.as_ref(),
         &TranscriptAppend {
             thread_id,
             agent_id: &agent_id,
-            store_key: &store_key,
             text,
             idempotency_key: &request_id,
             job_id: &job.id,

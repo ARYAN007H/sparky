@@ -241,14 +241,12 @@ async fn transcript_append_waits_for_a_live_turn() {
         .await
         .expect("lock");
 
-    let workspace = cfg.workspace_dir.clone();
     let task = tokio::spawn(async move {
         append_to_origin_transcript(
-            &workspace,
+            locator.as_ref(),
             &TranscriptAppend {
                 thread_id: "t-1",
                 agent_id: "orchestrator",
-                store_key: "orchestrator",
                 text: "hi",
                 idempotency_key: "cron:job-1:run-1",
                 job_id: "job-1",
