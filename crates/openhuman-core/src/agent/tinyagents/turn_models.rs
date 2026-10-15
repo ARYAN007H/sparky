@@ -234,6 +234,7 @@ fn build_turn_models_crate(
         }
         let (model, provider, resolved_model) = match primary_override {
             Some(ps) => factory::create_turn_chat_model_from_string_with_native_tools_and_route(
+                ctx,
                 role,
                 ps,
                 config,
@@ -243,6 +244,7 @@ fn build_turn_models_crate(
                 &egress,
             ),
             None => factory::create_turn_chat_model_with_native_tools_and_route(
+                ctx,
                 role,
                 config,
                 m,
@@ -299,6 +301,7 @@ fn build_turn_models_crate(
                     .map(|(backend, _)| (backend, "openhuman".to_string(), tier.to_string()))
                 } else {
                     factory::create_turn_chat_model_with_native_tools_and_route(
+                        ctx,
                         tier_role,
                         config,
                         tier,
