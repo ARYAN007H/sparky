@@ -182,7 +182,7 @@ impl EventHandler<DomainEvent> for MemoryActivitySurfaceSubscriber {
         log::debug!(
             "[web-channel] memory-activity-surface emitting memory_activity kind={event_name} thread_id={thread_id} client_id={client_id}"
         );
-        publish_web_channel_event(&ctx, WebChannelEvent {
+        publish_web_channel_event_in(&ctx, WebChannelEvent {
             event: "memory_activity".to_string(),
             client_id,
             thread_id,
@@ -246,7 +246,7 @@ impl EventHandler<DomainEvent> for AgentSurfaceSubscriber {
                 log::debug!(
                     "[web-channel] agent-surface emitting thread_goal_updated thread_id={thread_id}"
                 );
-                publish_web_channel_event(&ctx, WebChannelEvent {
+                publish_web_channel_event_in(&ctx, WebChannelEvent {
                     event: "thread_goal_updated".to_string(),
                     client_id: String::new(),
                     thread_id: thread_id.clone(),
@@ -258,7 +258,7 @@ impl EventHandler<DomainEvent> for AgentSurfaceSubscriber {
                 log::debug!(
                     "[web-channel] agent-surface emitting thread_goal_cleared thread_id={thread_id}"
                 );
-                publish_web_channel_event(&ctx, WebChannelEvent {
+                publish_web_channel_event_in(&ctx, WebChannelEvent {
                     event: "thread_goal_cleared".to_string(),
                     client_id: String::new(),
                     thread_id: thread_id.clone(),
@@ -269,7 +269,7 @@ impl EventHandler<DomainEvent> for AgentSurfaceSubscriber {
                 log::debug!(
                     "[web-channel] agent-surface emitting thread_todos_changed thread_id={thread_id}"
                 );
-                publish_web_channel_event(&ctx, WebChannelEvent {
+                publish_web_channel_event_in(&ctx, WebChannelEvent {
                     event: "thread_todos_changed".to_string(),
                     client_id: String::new(),
                     thread_id: thread_id.clone(),
@@ -281,7 +281,7 @@ impl EventHandler<DomainEvent> for AgentSurfaceSubscriber {
                 log::debug!(
                     "[web-channel] agent-surface emitting run_mode_changed thread_id={thread_id} mode={mode}"
                 );
-                publish_web_channel_event(&ctx, WebChannelEvent {
+                publish_web_channel_event_in(&ctx, WebChannelEvent {
                     event: "run_mode_changed".to_string(),
                     client_id: String::new(),
                     thread_id: thread_id.clone(),
@@ -307,7 +307,7 @@ impl EventHandler<DomainEvent> for AgentSurfaceSubscriber {
                 log::debug!(
                     "[web-channel] agent-surface emitting queue_item_queued thread_id={thread_id} item_id={item_id}"
                 );
-                publish_web_channel_event(&ctx, WebChannelEvent {
+                publish_web_channel_event_in(&ctx, WebChannelEvent {
                     event: "queue_item_queued".to_string(),
                     client_id: String::new(),
                     thread_id: thread_id.clone(),
@@ -333,7 +333,7 @@ impl EventHandler<DomainEvent> for AgentSurfaceSubscriber {
                 log::debug!(
                     "[web-channel] agent-surface emitting queue_item_delivered thread_id={thread_id} item_id={item_id}"
                 );
-                publish_web_channel_event(&ctx, WebChannelEvent {
+                publish_web_channel_event_in(&ctx, WebChannelEvent {
                     event: "queue_item_delivered".to_string(),
                     client_id: String::new(),
                     thread_id: thread_id.clone(),
@@ -364,7 +364,7 @@ impl EventHandler<DomainEvent> for AgentSurfaceSubscriber {
                 log::debug!(
                     "[web-channel] agent-surface emitting queue_item_delivered thread_id={thread_id} item_id={item_id}"
                 );
-                publish_web_channel_event(&ctx, WebChannelEvent {
+                publish_web_channel_event_in(&ctx, WebChannelEvent {
                     event: "queue_item_delivered".to_string(),
                     client_id: String::new(),
                     thread_id: thread_id.clone(),
@@ -418,7 +418,7 @@ impl EventHandler<DomainEvent> for ArtifactSurfaceSubscriber {
                 log::info!(
                     "[web-channel] artifact-surface emitting artifact_ready id={artifact_id} kind={kind} thread_id={thread_id} client_id={client_id} tool_call_id={tool_call_id:?}"
                 );
-                publish_web_channel_event(&ctx, WebChannelEvent {
+                publish_web_channel_event_in(&ctx, WebChannelEvent {
                     event: "artifact_ready".to_string(),
                     client_id: client_id.clone(),
                     thread_id: thread_id.clone(),
@@ -456,7 +456,7 @@ impl EventHandler<DomainEvent> for ArtifactSurfaceSubscriber {
                     "[web-channel] artifact-surface emitting artifact_failed id={artifact_id} kind={kind} thread_id={thread_id} client_id={client_id} tool_call_id={tool_call_id:?} error_len={}",
                     error.len()
                 );
-                publish_web_channel_event(&ctx, WebChannelEvent {
+                publish_web_channel_event_in(&ctx, WebChannelEvent {
                     event: "artifact_failed".to_string(),
                     client_id: client_id.clone(),
                     thread_id: thread_id.clone(),
@@ -492,7 +492,7 @@ impl EventHandler<DomainEvent> for ArtifactSurfaceSubscriber {
                 log::info!(
                     "[web-channel] artifact-surface emitting artifact_pending id={artifact_id} kind={kind} thread_id={thread_id} client_id={client_id} tool_call_id={tool_call_id:?}"
                 );
-                publish_web_channel_event(&ctx, WebChannelEvent {
+                publish_web_channel_event_in(&ctx, WebChannelEvent {
                     event: "artifact_pending".to_string(),
                     client_id: client_id.clone(),
                     thread_id: thread_id.clone(),
@@ -635,7 +635,7 @@ impl EventHandler<DomainEvent> for ApprovalSurfaceSubscriber {
                     log::info!(
                         "[web-channel] approval-surface emitting approval_request request_id={request_id} thread_id={thread_id} client_id={client_id} tool={tool_name}"
                     );
-                    publish_web_channel_event(&ctx, approval_request_event(
+                    publish_web_channel_event_in(&ctx, approval_request_event(
                         request_id,
                         tool_name,
                         action_summary,
@@ -669,7 +669,7 @@ impl EventHandler<DomainEvent> for ApprovalSurfaceSubscriber {
                     log::info!(
                         "[web-channel] approval-surface emitting approval_decided request_id={request_id} thread_id={thread_id} client_id={client_id} tool={tool_name} decision={decision}"
                     );
-                    publish_web_channel_event(&ctx, WebChannelEvent {
+                    publish_web_channel_event_in(&ctx, WebChannelEvent {
                         event: "approval_decided".to_string(),
                         client_id: client_id.clone(),
                         thread_id: thread_id.clone(),
@@ -701,7 +701,7 @@ impl EventHandler<DomainEvent> for ApprovalSurfaceSubscriber {
                         "[web-channel] plan-review-surface emitting plan_review_request request_id={request_id} thread_id={thread_id} client_id={client_id} steps={}",
                         steps.len()
                     );
-                    publish_web_channel_event(&ctx, plan_review_request_event(
+                    publish_web_channel_event_in(&ctx, plan_review_request_event(
                         request_id,
                         summary,
                         steps,
@@ -731,7 +731,7 @@ impl EventHandler<DomainEvent> for ApprovalSurfaceSubscriber {
                     log::info!(
                         "[web-channel] plan-review-surface emitting plan_review_decided request_id={request_id} thread_id={thread_id} client_id={client_id} decision={decision}"
                     );
-                    publish_web_channel_event(&ctx, WebChannelEvent {
+                    publish_web_channel_event_in(&ctx, WebChannelEvent {
                         event: "plan_review_decided".to_string(),
                         client_id: client_id.clone(),
                         thread_id: thread_id.clone(),

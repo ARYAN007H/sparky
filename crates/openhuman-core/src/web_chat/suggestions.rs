@@ -189,7 +189,7 @@ async fn generate_and_emit(
          request_id={request_id} count={}",
         suggestions.len()
     );
-    publish_web_channel_event(ctx, WebChannelEvent {
+    publish_web_channel_event_in(ctx, WebChannelEvent {
         event: "chat_suggestions".to_string(),
         client_id: client_id.to_string(),
         thread_id: thread_id.to_string(),

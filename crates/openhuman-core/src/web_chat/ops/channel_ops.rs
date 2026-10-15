@@ -195,7 +195,7 @@ async fn cancel_chat_inner(
             (true, Some(started_by)) => started_by,
             _ => client_id.to_string(),
         };
-        publish_web_channel_event(ctx, WebChannelEvent {
+        publish_web_channel_event_in(ctx, WebChannelEvent {
             event: "chat_error".to_string(),
             client_id: client_id.clone(),
             thread_id: thread_id.to_string(),
@@ -204,7 +204,7 @@ async fn cancel_chat_inner(
             error_type: Some("cancelled".to_string()),
             ..Default::default()
         });
-        publish_web_channel_event(ctx, WebChannelEvent {
+        publish_web_channel_event_in(ctx, WebChannelEvent {
             event: "chat_cancelled".to_string(),
             client_id,
             thread_id: thread_id.to_string(),
@@ -384,7 +384,7 @@ pub async fn channel_web_queue_remove(
     drop(in_flight);
     if removed > 0 {
         log::info!("[web-channel] removed queued item thread_id={thread_id} item_id={item_id}");
-        publish_web_channel_event(ctx, WebChannelEvent {
+        publish_web_channel_event_in(ctx, WebChannelEvent {
             event: "queue_item_removed".to_string(),
             client_id: client_id.to_string(),
             thread_id: thread_id.to_string(),

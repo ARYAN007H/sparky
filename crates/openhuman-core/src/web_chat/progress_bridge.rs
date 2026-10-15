@@ -142,7 +142,7 @@ fn publish_seq_stamped(
 ) {
     event.seq = Some(*next_seq);
     *next_seq = next_seq.saturating_add(1);
-    publish_web_channel_event(ctx, event);
+    publish_web_channel_event_in(ctx, event);
 }
 
 /// The trimmed narration to surface as an interim bubble, or `None` when it is

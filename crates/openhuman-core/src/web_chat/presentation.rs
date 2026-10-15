@@ -219,7 +219,7 @@ fn publish_chat_done(
     usage_payload: Option<TurnUsagePayload>,
     timing_payload: Option<crate::web_chat::TurnTimingPayload>,
 ) {
-    publish_web_channel_event(ctx, WebChannelEvent {
+    publish_web_channel_event_in(ctx, WebChannelEvent {
         event: "chat_done".to_string(),
         client_id: client_id.to_string(),
         thread_id: thread_id.to_string(),
