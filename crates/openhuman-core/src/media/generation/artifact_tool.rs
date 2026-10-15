@@ -329,6 +329,10 @@ impl<T: Tool> MediaArtifactTool<T> {
         };
 
         let mut recovered = std::collections::HashSet::new();
+        let previously_allowed = allowed
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
         let mut offset = 0usize;
         loop {
             let (artifacts, total) = match crate::agent::artifacts::store::list_artifacts(
@@ -375,12 +379,13 @@ impl<T: Tool> MediaArtifactTool<T> {
             }
         }
 
-        // Merge rather than replace so an artifact finalized concurrently with
-        // this scan cannot be lost from the current session's allowlist.
-        allowed
+        // Prune paths that were allowed before this scan but are no longer
+        // Ready. Paths added concurrently after the snapshot are preserved.
+        let mut allowed = allowed
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .extend(recovered);
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        allowed.retain(|path| !previously_allowed.contains(path) || recovered.contains(path));
+        allowed.extend(recovered);
     }
 
     async fn file_blob(&self, key: &Path, dest: &Path) -> Result<u64, String> {

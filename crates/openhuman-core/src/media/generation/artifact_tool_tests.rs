@@ -210,9 +210,33 @@ async fn files_a_blob_backed_generated_artifact() {
     .with_blobs(blobs)
     .with_reference_allowlist(Arc::new(std::sync::Mutex::new(Default::default())));
     fresh.refresh_allowed_references().await;
-    let allowed = fresh.allowed_references.as_ref().unwrap().lock().unwrap();
-    assert!(allowed.contains(&std::path::PathBuf::from(file).canonicalize().unwrap()));
-    assert!(!allowed.contains(&failed_file.canonicalize().unwrap()));
+    {
+        let allowed = fresh.allowed_references.as_ref().unwrap().lock().unwrap();
+        assert!(allowed.contains(&canonical_file));
+        assert!(!allowed.contains(&failed_file.canonicalize().unwrap()));
+    }
+
+    crate::agent::artifacts::fail_artifact(
+        &workspace,
+        fresh.files_dir.clone(),
+        artifact_id,
+        "revoked for the refresh test",
+        None,
+    )
+    .await
+    .unwrap();
+    assert!(
+        canonical_file.exists(),
+        "failed regeneration retains the previous non-empty file"
+    );
+    fresh.refresh_allowed_references().await;
+    assert!(!fresh
+        .allowed_references
+        .as_ref()
+        .unwrap()
+        .lock()
+        .unwrap()
+        .contains(&canonical_file));
 }
 
 #[tokio::test]
