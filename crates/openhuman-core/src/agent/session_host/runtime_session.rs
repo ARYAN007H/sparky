@@ -183,7 +183,6 @@ struct OpenHumanTurnPreludeMutable {
 }
 
 impl OpenHumanTurnPrelude {
-
     #[allow(clippy::type_complexity)]
     fn current_tool_source(
         &self,
