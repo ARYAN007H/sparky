@@ -162,7 +162,10 @@ impl Tool for DelegateGraphTool {
         _options: ToolCallOptions,
         tool_context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
-        let mut run_context = crate::agent::tinyagents::host::OpenHumanRunContext::new();
+        let mut run_context = crate::agent::tinyagents::host::OpenHumanRunContext::new().with_core(
+            crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(tool_context)
+                .into_core(),
+        );
         run_context.thread_id = tool_context
             .and_then(ToolRunContext::thread_id)
             .map(ToOwned::to_owned);

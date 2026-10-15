@@ -198,6 +198,7 @@ impl HttpClient for OpenHumanHttp {
         }
 
         let tool = http_request_tool(
+            &crate::core::runtime::DispatchCtx::ambient(),
             self.security.clone(),
             self.http_config.allowed_domains.clone(),
             self.http_config.max_response_size,
