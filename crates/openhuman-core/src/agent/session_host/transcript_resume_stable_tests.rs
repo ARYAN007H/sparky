@@ -60,7 +60,10 @@ fn a_legacy_workspace_is_adopted_once_and_the_next_process_resumes_in_place() {
             let mut host = build_host(root.path(), next, scenario.native, &thread);
             let stem = host.session_id().expect("bound session id");
             place_fixture(root.path(), scenario, &stem, "");
-            eprintln!("DBGX before resume");
+            let l = super::transcript_compat_tests::store_locator(root.path());
+            let sess = host.session.clone().unwrap();
+            eprintln!("DBGX chain={:?}", l.session_chain(&sess));
+            eprintln!("DBGX adopt={:?}", l.adopt_legacy(&sess, &thread, &l.thread_transcripts(&thread, None).unwrap().roots[0].transcript.read_session().unwrap().unwrap().meta).map(|a| a.map(|x| x.messages)));
             assert!(host.resume_bound_session().await.expect("first resume"));
             legacy_only = BTreeMap::<String, Value>::new();
             after_first = tree(root.path(), &thread, &host);
