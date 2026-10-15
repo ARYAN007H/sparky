@@ -73,7 +73,7 @@ pub(crate) async fn import_legacy(data_dir: &Path) -> Result<Outcome> {
     let Some(backend) = crate::storage::installed() else {
         return Ok(Outcome::NoBackend);
     };
-    let scope = super::storage_host::current_module_scope(MODULE_ID)
+    let scope = super::storage_host::current_module_scope(&crate::core::runtime::DispatchCtx::ambient(), MODULE_ID)
         .map_err(|error| anyhow!("resolve the module scope: {:?}", error.kind()))?;
     let scoped = backend
         .for_scope(&scope)
@@ -109,21 +109,22 @@ async fn import_into(
     }
 
     // The files are read on a blocking thread, from copies.
-    let (legacy_servers, legacy_audit) = tokio::task::spawn_blocking(move || -> Result<_> {
-        let servers = if clients.exists() {
-            read_servers(&clients)?
-        } else {
-            Vec::new()
-        };
-        let audit = if audit.exists() {
-            read_audit(&audit)?
-        } else {
-            Vec::new()
-        };
-        Ok((servers, audit))
-    })
-    .await
-    .context("the legacy reader panicked")??;
+    let (legacy_servers, legacy_audit) =
+        crate::core::runtime::spawn_blocking_scoped(move || -> Result<_> {
+            let servers = if clients.exists() {
+                read_servers(&clients)?
+            } else {
+                Vec::new()
+            };
+            let audit = if audit.exists() {
+                read_audit(&audit)?
+            } else {
+                Vec::new()
+            };
+            Ok((servers, audit))
+        })
+        .await
+        .context("the legacy reader panicked")??;
 
     for name in [SERVERS, SERVER_NAMES] {
         docs.ensure_collection(&CollectionSpec::new(name))

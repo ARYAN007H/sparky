@@ -198,6 +198,28 @@ impl Tool for DocumentTool {
     }
 
     async fn execute(&self, args: Value) -> anyhow::Result<ToolResult> {
+        self.run(args, None).await
+    }
+
+    async fn execute_with_context(
+        &self,
+        args: Value,
+        _options: tinytools::ToolCallOptions,
+        context: Option<&dyn tinytools::ToolRunContext>,
+    ) -> anyhow::Result<ToolResult> {
+        let approval = crate::agent::tinyagents::host::run_context::approval_for_tool(context);
+        self.run(args, approval.chat.as_ref()).await
+    }
+}
+
+impl DocumentTool {
+    /// Produces the artifact for a turn whose chat routing is `chat` (`None`
+    /// outside a chat turn).
+    pub(crate) async fn run(
+        &self,
+        args: Value,
+        chat: Option<&crate::security::approval::ApprovalChatContext>,
+    ) -> anyhow::Result<ToolResult> {
         // The document wire contract is `deny_unknown_fields`, so the optional
         // `artifact_id` is read here (and stripped from the args before
         // deserialisation) rather than deserialised into
@@ -244,6 +266,7 @@ impl Tool for DocumentTool {
             "docx",
             None,
             artifact_id.as_deref(),
+            chat,
         )
         .await
         .map_err(anyhow::Error::msg)?;

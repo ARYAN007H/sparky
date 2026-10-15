@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use tiny_artifacts::{ArtifactKind, ArtifactStatus as RecordStatus, ArtifactStore};
 
 use super::*;
-use crate::agent::artifacts::store::{get_artifact, REGENERATE_TARGET_ID};
+use crate::agent::artifacts::store::get_artifact;
 use crate::agent::artifacts::tiny_store::versioned_store;
 use crate::agent::artifacts::types::{ArtifactKind as CardKind, ArtifactStatus as CardStatus};
 
@@ -39,6 +39,7 @@ async fn produce(
         "pptx",
         tool_call_id,
         revise,
+        None,
     )
     .await
     .unwrap();
@@ -56,6 +57,7 @@ async fn a_new_artifact_shares_one_id_and_one_file_between_card_and_record() {
         ArtifactKind::File,
         "Quarterly Deck",
         "pptx",
+        None,
         None,
         None,
     )
@@ -116,21 +118,6 @@ async fn a_revision_reuses_the_id_and_file_and_keeps_the_history() {
 }
 
 #[tokio::test]
-async fn a_regenerate_in_scope_revises_the_target() {
-    let (workspace, files) = temp_dirs();
-    let id = produce(&workspace, &files, b"deck-v1", None, None).await;
-    let again = REGENERATE_TARGET_ID
-        .scope(
-            id.clone(),
-            produce(&workspace, &files, b"deck-v2", None, None),
-        )
-        .await;
-    assert_eq!(again, id);
-    let record = versioned_store(&workspace).get(&id).await.unwrap().unwrap();
-    assert_eq!(record.versions.len(), 2);
-}
-
-#[tokio::test]
 async fn a_failed_production_fails_card_and_record() {
     let (workspace, files) = temp_dirs();
     let production = Production::start(
@@ -139,6 +126,7 @@ async fn a_failed_production_fails_card_and_record() {
         ArtifactKind::Image,
         "Logo",
         "png",
+        None,
         None,
         None,
     )

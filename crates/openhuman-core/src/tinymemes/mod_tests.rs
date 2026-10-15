@@ -229,6 +229,7 @@ async fn a_disabled_flag_leaves_the_task_reply_alone() {
     // Disabled arm: no module is touched and nothing changes.
     let out = remix_final_reply(
         Arm::Disabled,
+        &DispatchCtx::ambient(),
         &config,
         "thread",
         "req",
@@ -239,6 +240,7 @@ async fn a_disabled_flag_leaves_the_task_reply_alone() {
     .await;
     assert_eq!(out, None);
     remix_task_reply(
+        &DispatchCtx::ambient(),
         &config,
         "thread",
         "req",

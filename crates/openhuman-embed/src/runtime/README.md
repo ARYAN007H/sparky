@@ -55,9 +55,13 @@ an ephemeral one), and the installed session store. Both `Runtime` and every
 agent or in-flight turn exists, even after the host drops its `Runtime`. When
 the last owner drops, the guard drops the core while the process slot is
 still claimed, restores the previous session store if it still owns the
-slot, removes an ephemeral workspace with a short retry loop (background
-writers can recreate subdirectories just after a turn returns), and only then
-releases `RUNTIME_LIVE`.
+slot, drops its handle on an ephemeral workspace, and releases `RUNTIME_LIVE`.
+The ephemeral root (`EphemeralRoot`) is removed with a short retry loop
+(background writers can recreate subdirectories just after a turn returns)
+when its last holder drops. A dropped agent's deferred MCP cleanup holds that
+root, never the `CoreGuard`: an embedded host runs no shutdown hook, so a close
+the module never acknowledges would otherwise hold the process slot forever and
+every later `Runtime::builder().build()` would fail with `AlreadyRunning`.
 
 ## Layout
 

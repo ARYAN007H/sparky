@@ -42,6 +42,8 @@ pub(crate) struct NativeShellRun {
     pub(crate) hide_window: bool,
     /// Whether the resource keeps default network isolation; `false` is open.
     pub(crate) isolate_network: bool,
+    /// Receives the command's output as it streams, for progress reporting.
+    pub(crate) meter: Option<super::shell_progress::ShellOutputMeter>,
     /// Native confinement; `None` is ordinary local execution.
     #[cfg(feature = "modules")]
     pub(crate) jail: Option<contract::NativeJailConfig>,
@@ -66,6 +68,7 @@ impl NativeShellRun {
             python_utf8: false,
             hide_window: false,
             isolate_network: false,
+            meter: None,
             #[cfg(feature = "modules")]
             jail: None,
         }
@@ -94,7 +97,7 @@ pub(crate) static USE_FIXTURE: std::sync::atomic::AtomicBool =
 /// Run `run` through the module and collect its output.
 ///
 /// A worker owns cancellation and resource cleanup if the caller drops its wait.
-pub(crate) async fn run(config: &Config, run: NativeShellRun) -> anyhow::Result<SandboxExecResult> {
+pub(crate) async fn run(config: &Config, mut run: NativeShellRun) -> anyhow::Result<SandboxExecResult> {
     #[cfg(test)]
     if !run.is_jailed() && USE_FIXTURE.load(std::sync::atomic::Ordering::SeqCst) {
         let _ = config;
@@ -103,14 +106,25 @@ pub(crate) async fn run(config: &Config, run: NativeShellRun) -> anyhow::Result<
     #[cfg(feature = "modules")]
     {
         let config = config.clone();
+        // Taken before the spawn: the worker task owns the meter.
+        let meter = run.meter.take();
         tracing::debug!(
             jailed = run.jail.is_some(),
             timeout_ms = run.timeout.as_millis() as u64,
             "[sandbox:shell] starting native shell through TinyBox"
         );
-        tokio::spawn(async move { run_owned(&config, run).await })
-            .await
-            .map_err(|_| anyhow::anyhow!("TinyBox shell worker did not finish"))?
+        // A cancelled turn drops this wait mid-command. The worker then cancels
+        // the command (`_caller` closes `abandoned`) and holds the turn's
+        // cleanup open until TinyBox has stopped it, so an awaited turn
+        // cancellation is acknowledged only after the command is gone.
+        let hold = tinytools_std::timeout::ProcessCleanup::hold();
+        let (_caller, abandoned) = tokio::sync::oneshot::channel::<std::convert::Infallible>();
+        crate::core::runtime::spawn_scoped(async move {
+            let _hold = hold;
+            run_owned(&config, run, abandoned, meter).await
+        })
+        .await
+        .map_err(|_| anyhow::anyhow!("TinyBox shell worker did not finish"))?
     }
     #[cfg(not(feature = "modules"))]
     {
@@ -120,7 +134,12 @@ pub(crate) async fn run(config: &Config, run: NativeShellRun) -> anyhow::Result<
 }
 
 #[cfg(feature = "modules")]
-async fn run_owned(config: &Config, run: NativeShellRun) -> anyhow::Result<SandboxExecResult> {
+async fn run_owned(
+    config: &Config,
+    run: NativeShellRun,
+    abandoned: tokio::sync::oneshot::Receiver<std::convert::Infallible>,
+    meter: Option<super::shell_progress::ShellOutputMeter>,
+) -> anyhow::Result<SandboxExecResult> {
     let resource = tinybox::reserve(config, contract::ReserveRequest::Resource)
         .await
         .map_err(|_| anyhow::anyhow!("TinyBox could not reserve a command resource"))?;
@@ -155,7 +174,7 @@ async fn run_owned(config: &Config, run: NativeShellRun) -> anyhow::Result<Sandb
         let process = tinybox::start_native_shell_exec(config, request)
             .await
             .map_err(|_| anyhow::anyhow!("TinyBox could not start the command process"))?;
-        collect_process(config, process, timeout).await
+        collect_process(config, process, timeout, abandoned, meter).await
     }
     .await;
     let close = tinybox::close(config, resource).await;
@@ -204,8 +223,11 @@ async fn collect_process(
     config: &Config,
     process: contract::ProcessRef,
     timeout: Duration,
+    mut abandoned: tokio::sync::oneshot::Receiver<std::convert::Infallible>,
+    meter: Option<super::shell_progress::ShellOutputMeter>,
 ) -> anyhow::Result<SandboxExecResult> {
     use contract::{ExecutionFailure, ExecutionState, OutputStream};
+    use tokio::sync::oneshot::error::TryRecvError;
 
     let deadline = tokio::time::Instant::now() + timeout;
     let mut cursor = 0;
@@ -213,7 +235,11 @@ async fn collect_process(
     let mut stderr = Vec::new();
     let mut requested_cancel = false;
     let timed_out = loop {
-        if !requested_cancel && tokio::time::Instant::now() >= deadline {
+        let caller_gone = matches!(abandoned.try_recv(), Err(TryRecvError::Closed));
+        if !requested_cancel && (caller_gone || tokio::time::Instant::now() >= deadline) {
+            if caller_gone {
+                tracing::debug!("[sandbox:shell] caller dropped its wait; cancelling the command");
+            }
             tinybox::cancel(config, process.clone())
                 .await
                 .map_err(|_| {
@@ -230,6 +256,9 @@ async fn collect_process(
         let has_chunks = !batch.chunks.is_empty();
         let state = batch.state;
         for chunk in batch.chunks {
+            if let Some(meter) = &meter {
+                meter.record(&chunk.bytes);
+            }
             match chunk.stream {
                 OutputStream::Stdout => stdout.extend_from_slice(&chunk.bytes),
                 OutputStream::Stderr => stderr.extend_from_slice(&chunk.bytes),
@@ -295,8 +324,10 @@ pub(crate) async fn run_host(
     env: BTreeMap<String, String>,
     timeout: Duration,
     preserve_pipeline_status: bool,
+    meter: Option<super::shell_progress::ShellOutputMeter>,
 ) -> anyhow::Result<SandboxExecResult> {
     let mut shell = NativeShellRun::new(command, cwd, state_dir, timeout);
+    shell.meter = meter;
     shell.env = env;
     shell.preserve_pipeline_status = preserve_pipeline_status;
     run(config, shell).await

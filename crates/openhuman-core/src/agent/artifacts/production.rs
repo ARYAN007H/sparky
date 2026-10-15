@@ -7,9 +7,9 @@
 //! a "generating…" card. The flow:
 //!
 //! 1. [`Production::start`] reserves the file and the card, and opens the
-//!    versioned record under the same id. A revision (`revise`, or a
-//!    regenerate running inside [`super::store::REGENERATE_TARGET_ID`]) reuses
-//!    the existing id and file, and keeps the record's history.
+//!    versioned record under the same id. A revision (`revise`: an
+//!    `artifact_id` argument or a regenerate target) reuses the existing id
+//!    and file, and keeps the record's history.
 //! 2. The producer writes its bytes to [`Production::path`].
 //! 3. [`Production::complete`] appends the file as a new agent version; the UI
 //!    bridge marks the card ready. [`Production::fail`] fails both instead.
@@ -24,12 +24,14 @@ use tiny_artifacts::{ArtifactKind, Artifacts, Author, Content};
 use super::files::FileRoots;
 use super::tiny_store::{artifacts_service, legacy_kind_for_extension};
 use super::types::ArtifactKind as LegacyArtifactKind;
+use crate::security::approval::ApprovalChatContext;
 
 /// A file being produced as an artifact.
 pub struct Production {
     artifacts: Artifacts,
     workspace_dir: PathBuf,
     files: FileRoots,
+    chat: Option<ApprovalChatContext>,
     id: String,
     path: PathBuf,
 }
@@ -46,8 +48,9 @@ impl std::fmt::Debug for Production {
 impl Production {
     /// Reserve the file (`<title>.<extension>` in the files folder) and open
     /// the artifact. `revise` names an existing artifact to add a version to;
-    /// otherwise a regenerate in scope is revised, or a new artifact is made.
-    /// `tool_call_id` ties the card to the producing call's bubble.
+    /// otherwise a new artifact is made. `tool_call_id` ties the card to the
+    /// producing call's bubble; `chat` is the turn the card is announced to
+    /// (`None` outside a chat turn).
     ///
     /// # Errors
     ///
@@ -61,42 +64,32 @@ impl Production {
         extension: &str,
         tool_call_id: Option<&str>,
         revise: Option<&str>,
+        chat: Option<&ApprovalChatContext>,
     ) -> Result<Self, String> {
         let legacy_kind = if kind == ArtifactKind::Image {
             LegacyArtifactKind::Image
         } else {
             legacy_kind_for_extension(&extension.to_ascii_lowercase())
         };
-        let target = revise
-            .map(str::to_string)
-            .or_else(|| {
-                super::store::REGENERATE_TARGET_ID
-                    .try_with(Clone::clone)
-                    .ok()
-            })
-            .filter(|id| !id.trim().is_empty());
-        let reserve = super::store::create_artifact_for_call(
+        let target = revise.filter(|id| !id.trim().is_empty());
+        let (meta, path) = super::store::create_artifact_regenerating(
             workspace_dir,
             files.clone(),
             legacy_kind,
             title,
             extension,
             tool_call_id,
-        );
-        let (meta, path) = match &target {
-            Some(id) => {
-                super::store::REGENERATE_TARGET_ID
-                    .scope(id.clone(), reserve)
-                    .await?
-            }
-            None => reserve.await?,
-        };
+            target,
+            chat,
+        )
+        .await?;
 
-        let artifacts = artifacts_service(workspace_dir, files.clone(), None);
+        let artifacts = artifacts_service(workspace_dir, files.clone(), None, chat);
         let production = Self {
             artifacts,
             workspace_dir: workspace_dir.to_path_buf(),
             files,
+            chat: chat.cloned(),
             id: meta.id.clone(),
             path,
         };
@@ -183,9 +176,14 @@ impl Production {
 
     /// Fail the card directly (when the record could not take the change).
     async fn fail_card(&self, reason: &str) {
-        let _ =
-            super::store::fail_artifact(&self.workspace_dir, self.files.clone(), &self.id, reason)
-                .await;
+        let _ = super::store::fail_artifact(
+            &self.workspace_dir,
+            self.files.clone(),
+            &self.id,
+            reason,
+            self.chat.as_ref(),
+        )
+        .await;
     }
 }
 

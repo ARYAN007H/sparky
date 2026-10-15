@@ -7,7 +7,7 @@ icon: database
 
 # Storage
 
-OpenHuman keeps durable state on the ports of [`tinystoragedrivers`](https://github.com/tinyhumansai/tinystoragedrivers), vendored through `vendor/tinyagents/vendor/tinystoragedrivers`. One URL picks the backend for the whole process. The host adapter is `crates/openhuman-core/src/storage/`. It resolves the URL, opens the backend, holds it in a process slot and decides which scope a call runs in. The ports, the drivers and their conformance suites belong to `tinystoragedrivers`, and the typed records stay with the domain that owns them.
+OpenHuman keeps durable state on the ports of [`tinystoragedrivers`](https://github.com/tinyhumansai/tinystoragedrivers), taken by git tag (`v0.11.0`) by the host and by every module, so the build holds one copy. One URL picks the backend for the whole process. The host adapter is `crates/openhuman-core/src/storage/`. It resolves the URL, opens the backend, holds it in a process slot and decides which scope a call runs in. The ports, the drivers and their conformance suites belong to `tinystoragedrivers`, and the typed records stay with the domain that owns them.
 
 With no URL configured, which is the desktop default, the host opens `sqlite:<workspace>/storage` and installs it. The URL decides where the whole process keeps its state, and there is no second layout: older installs' per-domain databases, transcripts and turn-state files are imported once, read-only, when the backend is installed. The files that remain outside the ports are listed under "What is not on the ports yet" below.
 
@@ -113,7 +113,7 @@ A SaaS core with no URL keeps one default database per profile workspace, and it
 
 ### What is not on the ports yet
 
-The keyring or `secrets.enc`, the path-bound artifacts and media, and a few stores that keep a file next to a document fallback (cost tracking, the Composio file store, sub-agent sessions, agent artifacts) still use files when no backend is installed. The vault watcher's mtime table stays a per-machine SQLite file on purpose, because its rows are absolute paths on one host. On first read with a backend installed, the auth-profile and HTTP-credential stores copy the records in their files into the backend, and the keyring adopts a secret it finds in the process backend. The source files are left untouched.
+The keyring or `secrets.enc` and the path-bound artifact bytes and media still use files. Cost tracking, the Composio state, sub-agent sessions and agent artifact records have no file fallback: with no backend installed they use the workspace's own default (`sqlite:<workspace>/storage`), the same as a host would, and a legacy cost ledger, artifact `meta.json`, Composio state file or sub-agent session file is imported once (and the file renamed to `*.migrated`). The vault watcher's mtime table stays a per-machine SQLite file on purpose, because its rows are absolute paths on one host. On first read with a backend installed, the auth-profile and HTTP-credential stores copy the records in their files into the backend, and the keyring adopts a secret it finds in the process backend. The source files are left untouched.
 
 ### Importing the legacy small stores
 
@@ -148,7 +148,10 @@ cargo test -p openhuman-cli --features storage-sqlite,storage-file --test storag
 For MongoDB, start a single-node replica set and set the URL (a replica set is what lets the driver report and exercise transactions):
 
 ```bash
-bash vendor/tinyagents/vendor/tinystoragedrivers/.github/scripts/start-mongo-replset.sh 27017
+# the script lives in the tinystoragedrivers repo (tag v0.11.0); fetch the pinned copy first
+curl -fsSL -o start-mongo-replset.sh \
+  https://raw.githubusercontent.com/tinyhumansai/tinystoragedrivers/9eeef54aea403ac07461a612189bdf4982782823/.github/scripts/start-mongo-replset.sh
+bash start-mongo-replset.sh 27017
 export TSD_MONGO_URL='mongodb://127.0.0.1:27017/tsd_test?directConnection=true'
 cargo test -p openhuman-cli --features storage-mongodb --test storage_approvals_e2e
 ```
@@ -161,5 +164,5 @@ CI has two lanes for this:
 ## Where to read next
 
 - `crates/openhuman-core/src/storage/README.md` for the entry points and the consumers.
-- The `tinystoragedrivers` specs: `docs/specs/storage-ports.md` and `docs/plans/storage-rollout.md` in `vendor/tinyagents/vendor/tinystoragedrivers`.
+- The `tinystoragedrivers` specs: `docs/specs/storage-ports.md` and `docs/plans/storage-rollout.md` in the tinystoragedrivers repository (tag `v0.11.0`).
 - [Security](security.md) for the keyring and credential stores.

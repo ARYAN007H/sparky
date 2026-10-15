@@ -5,6 +5,7 @@ use serde_json::json;
 
 use super::*;
 use crate::agent::artifacts::types::{ArtifactKind, ArtifactMeta, ArtifactStatus};
+use crate::core::runtime::DispatchCtx;
 use crate::threads::store::{self as conversations, CreateConversationThread};
 
 fn temp_ws() -> PathBuf {
@@ -15,6 +16,7 @@ fn temp_ws() -> PathBuf {
 
 fn seed_thread(ws: &Path, thread_id: &str) {
     conversations::ensure_thread(
+        &DispatchCtx::unbound(),
         ws.to_path_buf(),
         CreateConversationThread {
             id: thread_id.to_string(),
@@ -104,21 +106,30 @@ fn no_row_for_existing_rows_tool_calls_or_unfinished_artifacts() {
 fn readers_never_see_artifact_rows_but_the_ui_list_does() {
     let ws = temp_ws();
     seed_thread(&ws, "t-1");
-    conversations::append_message(ws.clone(), "t-1", reply("req-1", 10)).unwrap();
     conversations::append_message(
+        &DispatchCtx::unbound(),
+        ws.clone(),
+        "t-1",
+        reply("req-1", 10),
+    )
+    .unwrap();
+    conversations::append_message(
+        &DispatchCtx::unbound(),
         ws.clone(),
         "t-1",
         artifact_row("a", "A", Some("req-1"), at(5).to_rfc3339()),
     )
     .unwrap();
 
-    let model_facing = conversations::get_messages(ws.clone(), "t-1").unwrap();
+    let model_facing =
+        conversations::get_messages(&DispatchCtx::unbound(), ws.clone(), "t-1").unwrap();
     assert_eq!(model_facing.len(), 1);
     assert!(!model_facing.iter().any(is_artifact_row));
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let blocking = runtime
         .block_on(conversations::blocking::get_messages(
+            DispatchCtx::unbound(),
             ws.clone(),
             "t-1".to_string(),
         ))
@@ -126,7 +137,9 @@ fn readers_never_see_artifact_rows_but_the_ui_list_does() {
     assert!(!blocking.iter().any(is_artifact_row));
     let ui = runtime
         .block_on(conversations::blocking::get_messages_with_artifact_rows(
-            ws, "t-1",
+            DispatchCtx::unbound(),
+            ws,
+            "t-1",
         ))
         .unwrap();
     assert_eq!(ui.iter().filter(|m| is_artifact_row(m)).count(), 1);
@@ -137,24 +150,35 @@ async fn recording_an_artifact_twice_writes_one_row() {
     let ws = temp_ws();
     seed_thread(&ws, "t-1");
 
-    assert!(
-        record_artifact_row(ws.clone(), "t-1", "a", "A", Some("req-1"))
-            .await
-            .unwrap()
-    );
+    assert!(record_artifact_row(
+        &DispatchCtx::unbound(),
+        ws.clone(),
+        "t-1",
+        "a",
+        "A",
+        Some("req-1")
+    )
+    .await
+    .unwrap());
     // A new version, a retry or a re-delivered ready event.
-    assert!(
-        !record_artifact_row(ws.clone(), "t-1", "a", "A v2", Some("req-2"))
+    assert!(!record_artifact_row(
+        &DispatchCtx::unbound(),
+        ws.clone(),
+        "t-1",
+        "a",
+        "A v2",
+        Some("req-2")
+    )
+    .await
+    .unwrap());
+
+    let rows: Vec<_> =
+        conversations::blocking::get_messages_with_artifact_rows(DispatchCtx::unbound(), ws, "t-1")
             .await
             .unwrap()
-    );
-
-    let rows: Vec<_> = conversations::blocking::get_messages_with_artifact_rows(ws, "t-1")
-        .await
-        .unwrap()
-        .into_iter()
-        .filter(is_artifact_row)
-        .collect();
+            .into_iter()
+            .filter(is_artifact_row)
+            .collect();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].id, "artifact:a");
     assert_eq!(row_request_id(&rows[0]), Some("req-1"));

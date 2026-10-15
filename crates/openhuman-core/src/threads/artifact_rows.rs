@@ -29,6 +29,7 @@ use tinybus::{EventHandler, SubscriptionHandle};
 
 use crate::agent::artifacts::types::{ArtifactMeta, ArtifactStatus};
 use crate::core::events::DomainEvent;
+use crate::core::runtime::DispatchCtx;
 use crate::threads::store::{self as conversations, ConversationMessage};
 
 /// `type` of an artifact row.
@@ -81,21 +82,26 @@ fn artifact_row(
 /// Append the row for `artifact_id` unless the thread already has it. Returns
 /// whether a row was written.
 pub async fn record_artifact_row(
+    ctx: &DispatchCtx,
     workspace_dir: PathBuf,
     thread_id: &str,
     artifact_id: &str,
     title: &str,
     request_id: Option<&str>,
 ) -> Result<bool, String> {
-    let messages =
-        conversations::blocking::get_messages_with_artifact_rows(workspace_dir.clone(), thread_id)
-            .await?;
+    let messages = conversations::blocking::get_messages_with_artifact_rows(
+        ctx.clone(),
+        workspace_dir.clone(),
+        thread_id,
+    )
+    .await?;
     let row_id = artifact_row_id(artifact_id);
     if messages.iter().any(|message| message.id == row_id) {
         return Ok(false);
     }
     let row = artifact_row(artifact_id, title, request_id, Utc::now().to_rfc3339());
-    conversations::blocking::append_message(workspace_dir, thread_id.to_string(), row).await?;
+    conversations::blocking::append_message(ctx.clone(), workspace_dir, thread_id.to_string(), row)
+        .await?;
     log::debug!(
         "{LOG_PREFIX} recorded artifact_id={artifact_id} thread_id={thread_id} request_id={request_id:?}"
     );
@@ -162,6 +168,7 @@ pub(crate) fn missing_rows(
 /// rows existed, or whose row write failed), given the thread's full message
 /// log. Returns the rows written.
 pub async fn backfill_artifact_rows(
+    ctx: &DispatchCtx,
     workspace_dir: &Path,
     thread_id: &str,
     messages: &[ConversationMessage],
@@ -176,6 +183,7 @@ pub async fn backfill_artifact_rows(
     let mut written = Vec::new();
     for row in missing_rows(messages, &artifacts) {
         let stored = conversations::blocking::append_message(
+            ctx.clone(),
             workspace_dir.to_path_buf(),
             thread_id.to_string(),
             row,
@@ -218,7 +226,10 @@ impl EventHandler<DomainEvent> for ArtifactRowSubscriber {
         else {
             return;
         };
+        // A bus event carries no context of its own (see
+        // `DispatchCtx::host_default`).
         if let Err(error) = record_artifact_row(
+            &DispatchCtx::host_default(),
             PathBuf::from(workspace_dir),
             thread_id,
             artifact_id,

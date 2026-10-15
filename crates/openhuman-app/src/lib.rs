@@ -69,7 +69,6 @@ mod app_update;
 // Artifact export command (#2779) — cross-platform Downloads copy. The `rfd`
 // Save-As dialog that used to sit in front of it was removed with the crate.
 mod artifact_commands;
-mod docx;
 mod claude_code;
 mod core_process;
 mod core_rpc;
@@ -77,6 +76,7 @@ mod core_rpc;
 mod deep_link_ipc;
 #[cfg(target_os = "windows")]
 mod deep_link_ipc_windows;
+mod docx;
 mod remote_ws_relay;
 // Cross-platform module: the registry-reading function is windows-only, but
 // the parsing helpers compile (and test) everywhere so `cargo test` on the
@@ -110,6 +110,7 @@ mod ptt_overlay;
 mod reset_reboot_schedule;
 mod session;
 mod stderr_panic_hook;
+mod widget_scheme;
 mod window_state;
 mod workspace_paths;
 
@@ -2880,6 +2881,7 @@ pub fn run() {
         // Native backstop: the main webview never loads a remote page; any
         // http(s) navigation away from the app is handed to the OS browser.
         .plugin(external_navigation::init())
+        .register_asynchronous_uri_scheme_protocol(widget_scheme::SCHEME, widget_scheme::handle)
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())

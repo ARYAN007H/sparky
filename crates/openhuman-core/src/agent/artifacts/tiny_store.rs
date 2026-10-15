@@ -19,8 +19,10 @@
 //! service write into that pipeline: the newest version's content (or, for an
 //! image or file artifact, a copy of its file) is written into the files folder
 //! under the same artifact id, through the "regenerate in place" flow
-//! ([`super::store::REGENERATE_TARGET_ID`]), so a revision overwrites the file
-//! the artifact already owns and its card updates in place.
+//! ([`super::store::create_artifact_regenerating`]), so a revision overwrites
+//! the file the artifact already owns and its card updates in place. The bridge
+//! carries the chat routing of the turn that made the change, so the card
+//! reaches that chat live.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -33,6 +35,8 @@ use tiny_artifacts::{
 
 use super::files::FileRoots;
 use super::types::ArtifactKind as LegacyArtifactKind;
+use crate::security::approval::ApprovalChatContext;
+use crate::tools::per_call::PerCallTool;
 
 /// Subdirectory under the artifacts root holding versioned records.
 const VERSIONED_SUBDIR: &str = "versioned";
@@ -92,14 +96,21 @@ pub fn versioned_store(workspace_dir: &Path) -> FsArtifactStore {
 pub struct LegacyUiBridge {
     workspace_dir: PathBuf,
     files: FileRoots,
+    chat: Option<ApprovalChatContext>,
 }
 
 impl LegacyUiBridge {
-    /// A bridge writing into `files` (the visible files folder).
-    pub fn new(workspace_dir: impl Into<PathBuf>, files: FileRoots) -> Self {
+    /// A bridge writing into `files` (the visible files folder), announcing
+    /// cards to `chat` (`None` outside a chat turn).
+    pub fn new(
+        workspace_dir: impl Into<PathBuf>,
+        files: FileRoots,
+        chat: Option<&ApprovalChatContext>,
+    ) -> Self {
         Self {
             workspace_dir: workspace_dir.into(),
             files,
+            chat: chat.cloned(),
         }
     }
 
@@ -119,44 +130,48 @@ impl LegacyUiBridge {
                 let owned = meta.file.as_deref().map(Path::new);
                 if owned.is_some_and(|owned| same_file(owned, Path::new(&file.path))) {
                     let size = tokio::fs::metadata(&file.path).await?.len();
-                    super::store::finalize_artifact(&self.workspace_dir, &record.id, size)
-                        .await
-                        .map_err(anyhow::Error::msg)?;
+                    super::store::finalize_artifact(
+                        &self.workspace_dir,
+                        &record.id,
+                        size,
+                        self.chat.as_ref(),
+                    )
+                    .await
+                    .map_err(anyhow::Error::msg)?;
                     return Ok(());
                 }
             }
         }
-        super::store::REGENERATE_TARGET_ID
-            .scope(record.id.clone(), async {
-                let (meta, dest) = super::store::create_artifact(
-                    &self.workspace_dir,
-                    self.files.clone(),
-                    legacy_kind,
-                    &record.title,
-                    &ext,
-                )
-                .await
-                .map_err(anyhow::Error::msg)?;
-                let size = if record.holds_file() {
-                    let source = latest
-                        .file
-                        .as_ref()
-                        .map_or_else(|| PathBuf::from(&latest.body), |f| PathBuf::from(&f.path));
-                    if same_file(&source, &dest) {
-                        tokio::fs::metadata(&dest).await?.len()
-                    } else {
-                        tokio::fs::copy(&source, &dest).await?
-                    }
-                } else {
-                    tokio::fs::write(&dest, latest.body.as_bytes()).await?;
-                    latest.body.len() as u64
-                };
-                super::store::finalize_artifact(&self.workspace_dir, &meta.id, size)
-                    .await
-                    .map_err(anyhow::Error::msg)?;
-                Ok::<(), anyhow::Error>(())
-            })
+        let (meta, dest) = super::store::create_artifact_regenerating(
+            &self.workspace_dir,
+            self.files.clone(),
+            legacy_kind,
+            &record.title,
+            &ext,
+            None,
+            Some(&record.id),
+            self.chat.as_ref(),
+        )
+        .await
+        .map_err(anyhow::Error::msg)?;
+        let size = if record.holds_file() {
+            let source = latest
+                .file
+                .as_ref()
+                .map_or_else(|| PathBuf::from(&latest.body), |f| PathBuf::from(&f.path));
+            if same_file(&source, &dest) {
+                tokio::fs::metadata(&dest).await?.len()
+            } else {
+                tokio::fs::copy(&source, &dest).await?
+            }
+        } else {
+            tokio::fs::write(&dest, latest.body.as_bytes()).await?;
+            latest.body.len() as u64
+        };
+        super::store::finalize_artifact(&self.workspace_dir, &meta.id, size, self.chat.as_ref())
             .await
+            .map_err(anyhow::Error::msg)?;
+        Ok(())
     }
 }
 
@@ -185,6 +200,7 @@ impl ArtifactObserver for LegacyUiBridge {
                         self.files.clone(),
                         id,
                         reason,
+                        self.chat.as_ref(),
                     )
                     .await
                     .map_err(anyhow::Error::msg)?;
@@ -206,16 +222,18 @@ impl ArtifactObserver for LegacyUiBridge {
 
 /// The artifact service for one workspace: OpenHuman's store and UI bridge,
 /// with file artifacts allowed from the agent's working folder and the files
-/// folder.
+/// folder. Cards are announced to `chat`, the turn making the change (`None`
+/// outside a chat turn).
 pub fn artifacts_service(
     workspace_dir: &Path,
     files: FileRoots,
     action_dir: Option<&Path>,
+    chat: Option<&ApprovalChatContext>,
 ) -> Artifacts {
     let mut roots: Vec<PathBuf> = action_dir.map(Path::to_path_buf).into_iter().collect();
     roots.push(files.current().to_path_buf());
     Artifacts::new(Arc::new(versioned_store(workspace_dir)))
-        .with_observer(Arc::new(LegacyUiBridge::new(workspace_dir, files)))
+        .with_observer(Arc::new(LegacyUiBridge::new(workspace_dir, files, chat)))
         .with_file_roots(tiny_artifacts::FileRoots::new(roots))
 }
 
@@ -224,24 +242,59 @@ pub fn artifacts_service(
 /// `list_artifacts`), `delete_artifact` (default-off through its
 /// `tools::user_filter` family), and — only when a `publisher` exists, i.e. the
 /// user can use cloud file storage — `share_artifact`.
+///
+/// The crate's tools run without a run context, so each call builds its tool
+/// around a service whose UI bridge carries that call's chat routing
+/// ([`PerCallTool`]); the card then reaches the chat the agent is answering.
 pub fn registered_tools(
     workspace_dir: &Path,
     files: FileRoots,
     action_dir: &Path,
     publisher: Option<Arc<dyn tiny_artifacts::ArtifactPublisher>>,
 ) -> Vec<Box<dyn tinytools::Tool>> {
-    let mut service = artifacts_service(workspace_dir, files, Some(action_dir));
-    if let Some(publisher) = publisher {
-        service = service.with_publisher(publisher);
+    let can_publish = publisher.is_some();
+    let service = {
+        let workspace_dir = workspace_dir.to_path_buf();
+        let action_dir = action_dir.to_path_buf();
+        Arc::new(move |chat: Option<&ApprovalChatContext>| {
+            let mut service =
+                artifacts_service(&workspace_dir, files.clone(), Some(&action_dir), chat);
+            if let Some(publisher) = &publisher {
+                service = service.with_publisher(publisher.clone());
+            }
+            Arc::new(service)
+        })
+    };
+    let author = Author::agent(AGENT_AUTHOR_ID);
+    let mut tools: Vec<Box<dyn tinytools::Tool>> = Vec::new();
+    {
+        let (service, author) = (service.clone(), author.clone());
+        tools.push(Box::new(PerCallTool::new(move |chat, _| {
+            tiny_artifacts::CreateArtifactTool::new(service(chat), author.clone())
+        })));
     }
-    let artifacts = Arc::new(service);
-    let mut tools =
-        tiny_artifacts::registered_tools(artifacts.clone(), Author::agent(AGENT_AUTHOR_ID));
-    tools.push(Box::new(tiny_artifacts::DeleteArtifactTool::new(
-        artifacts.clone(),
-    )));
-    if artifacts.can_publish() {
-        tools.push(Box::new(tiny_artifacts::ShareArtifactTool::new(artifacts)));
+    tools.push(Box::new(tiny_artifacts::ReadArtifactTool::new(service(
+        None,
+    ))));
+    {
+        let (service, author) = (service.clone(), author.clone());
+        tools.push(Box::new(PerCallTool::new(move |chat, _| {
+            tiny_artifacts::UpdateArtifactTool::new(service(chat), author.clone())
+        })));
+    }
+    tools.push(Box::new(tiny_artifacts::ListArtifactsTool::new(service(
+        None,
+    ))));
+    {
+        let service = service.clone();
+        tools.push(Box::new(PerCallTool::new(move |chat, _| {
+            tiny_artifacts::DeleteArtifactTool::new(service(chat))
+        })));
+    }
+    if can_publish {
+        tools.push(Box::new(PerCallTool::new(move |chat, _| {
+            tiny_artifacts::ShareArtifactTool::new(service(chat))
+        })));
     }
     tools
 }
@@ -264,7 +317,7 @@ pub async fn save_operator_version(
     id: &str,
     body: &str,
 ) -> Result<SavedVersion, String> {
-    let saved = artifacts_service(workspace_dir, files, None)
+    let saved = artifacts_service(workspace_dir, files, None, None)
         .revise(
             id,
             Content::Text(body.to_string()),

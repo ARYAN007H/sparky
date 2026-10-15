@@ -24,6 +24,7 @@ use tiny_artifacts::{
 use super::tools::helpers::{file_path, mime_for_path, FILES_PATH};
 use super::types::{LinkResponse, UploadResponse};
 use crate::integrations::IntegrationClient;
+use crate::security::approval::ApprovalTurnContext;
 use crate::security::SecurityPolicy;
 
 /// Lifetime of a private link when the caller does not choose: the backend's
@@ -34,13 +35,20 @@ const DEFAULT_LINK_SECONDS: u64 = 604_800;
 pub struct StorageArtifactPublisher {
     client: Arc<IntegrationClient>,
     security: Arc<SecurityPolicy>,
+    /// The turn the backend requests are reported to. A publisher is built
+    /// once per tool set, not per call, so it reports outside any chat.
+    approval: ApprovalTurnContext,
 }
 
 impl StorageArtifactPublisher {
     /// A publisher over `client`, refusing to share when `security` is
     /// read-only.
     pub fn new(client: Arc<IntegrationClient>, security: Arc<SecurityPolicy>) -> Self {
-        Self { client, security }
+        Self {
+            client,
+            security,
+            approval: ApprovalTurnContext::default(),
+        }
     }
 }
 
@@ -142,7 +150,11 @@ impl StorageArtifactPublisher {
         let route = file_path(file_id, "/link");
         match self
             .client
-            .post::<LinkResponse>(&route, &json!({ "expiresInSeconds": seconds }))
+            .post::<LinkResponse>(
+                &self.approval,
+                &route,
+                &json!({ "expiresInSeconds": seconds }),
+            )
             .await
         {
             Ok(link) => Ok(link),
@@ -154,7 +166,7 @@ impl StorageArtifactPublisher {
                     "[file_storage] link with a set lifetime refused; retrying with the default"
                 );
                 self.client
-                    .post::<LinkResponse>(&route, &json!({}))
+                    .post::<LinkResponse>(&self.approval, &route, &json!({}))
                     .await
                     .map_err(|e| anyhow::anyhow!("link generation failed: {e}"))
             }
@@ -165,7 +177,7 @@ impl StorageArtifactPublisher {
     async fn discard(&self, file_id: &str) {
         if let Err(err) = self
             .client
-            .delete::<super::types::DeleteResponse>(&file_path(file_id, ""))
+            .delete::<super::types::DeleteResponse>(&self.approval, &file_path(file_id, ""))
             .await
         {
             tracing::warn!(file_id, err = %err, "[file_storage] could not delete an unshared upload");
@@ -201,7 +213,7 @@ impl ArtifactPublisher for StorageArtifactPublisher {
             .text("visibility", visibility);
         let uploaded = self
             .client
-            .upload_multipart::<UploadResponse>(FILES_PATH, form)
+            .upload_multipart::<UploadResponse>(&self.approval, FILES_PATH, form)
             .await
             .map_err(|e| anyhow::anyhow!("upload failed: {e}"))?;
 

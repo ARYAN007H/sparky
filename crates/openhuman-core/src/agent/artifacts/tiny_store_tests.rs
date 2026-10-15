@@ -89,7 +89,7 @@ async fn an_image_filed_through_the_service_gets_a_card_and_a_copy_in_files() {
     let action = workspace.parent().unwrap().join("projects");
     std::fs::create_dir_all(&action).unwrap();
     std::fs::write(action.join("chart.png"), b"png-bytes").unwrap();
-    let artifacts = artifacts_service(&workspace, FileRoots::new(&files), Some(&action));
+    let artifacts = artifacts_service(&workspace, FileRoots::new(&files), Some(&action), None);
 
     let saved = artifacts
         .create(
@@ -122,7 +122,7 @@ async fn a_file_outside_the_allowed_folders_is_refused() {
     let elsewhere = workspace.parent().unwrap().join("elsewhere");
     std::fs::create_dir_all(&elsewhere).unwrap();
     std::fs::write(elsewhere.join("x.pdf"), b"x").unwrap();
-    let artifacts = artifacts_service(&workspace, FileRoots::new(&files), None);
+    let artifacts = artifacts_service(&workspace, FileRoots::new(&files), None, None);
     let err = artifacts
         .create(
             ArtifactKind::File,
@@ -139,7 +139,7 @@ async fn a_file_outside_the_allowed_folders_is_refused() {
 #[tokio::test]
 async fn deleting_an_artifact_removes_its_card() {
     let (workspace, files) = temp_dirs();
-    let artifacts = artifacts_service(&workspace, FileRoots::new(&files), None);
+    let artifacts = artifacts_service(&workspace, FileRoots::new(&files), None, None);
     let saved = artifacts
         .create(
             ArtifactKind::Markdown,
