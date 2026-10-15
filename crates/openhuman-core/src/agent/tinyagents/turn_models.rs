@@ -390,10 +390,8 @@ pub struct TurnModelSource {
 pub(crate) struct CrateNativeSource {
     role: String,
     config: Arc<crate::config::Config>,
-    /// The context the source was built under, held weakly (the tenant lease
-    /// is the context's strong count). It supplies the agent-local host model
-    /// overrides every build reads, so a turn resolves them against the agent
-    /// it was built for rather than whichever task happens to build it.
+    /// The context the source was built under (weak: the tenant lease is its
+    /// strong count); it supplies the host model overrides every build reads.
     core: Option<std::sync::Weak<crate::core::runtime::CoreContext>>,
     /// An explicit provider string for the **primary** model, overriding the
     /// role's default resolution. Set when a producer's effective provider differs
@@ -404,15 +402,13 @@ pub(crate) struct CrateNativeSource {
 }
 
 impl CrateNativeSource {
-    /// The dispatch context this source builds under.
     fn ctx(&self) -> crate::core::runtime::DispatchCtx {
         crate::core::runtime::DispatchCtx::from_weak(self.core.as_ref())
     }
 }
 
 impl TurnModelSource {
-    /// The context this source builds its models under: the one it was
-    /// constructed for, else the calling task's ambient one.
+    /// The context this source builds under: its own, else the ambient one.
     pub(crate) fn dispatch_ctx(&self) -> crate::core::runtime::DispatchCtx {
         match &self.crate_native {
             Some(source) => source.ctx(),
