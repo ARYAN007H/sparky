@@ -80,8 +80,8 @@ impl OpenHumanSessionHost {
     pub fn from_config_for_agent(config: &Config, agent_id: &str) -> Result<Self> {
         // A hosted profile never receives the ordinary config-derived belt: its
         // operator-selected factory carries registration and permission bounds.
-        if crate::profiles::capabilities::ProfileCapabilities::in_ctx(&DispatchCtx::ambient()).is_some()
-        {
+        let ambient = DispatchCtx::ambient();
+        if crate::profiles::capabilities::ProfileCapabilities::in_ctx(&ambient).is_some() {
             return Self::from_config_for_agent_session(config, agent_id, None);
         }
         let target_def = resolve_target_definition(config, agent_id)?;
