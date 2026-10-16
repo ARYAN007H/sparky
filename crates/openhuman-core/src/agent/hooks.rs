@@ -68,6 +68,15 @@ pub fn embedder_post_turn_hooks() -> Vec<Arc<dyn LearningSink>> {
         .collect()
 }
 
+pub fn embedder_post_turn_hook_named(name: &str) -> Option<Arc<dyn LearningSink>> {
+    EMBEDDER_POST_TURN_HOOKS
+        .lock()
+        .expect("embedder learning sinks poisoned")
+        .iter()
+        .find(|(registered, _)| registered.as_deref() == Some(name))
+        .map(|(_, hook)| Arc::clone(hook))
+}
+
 pub fn embedder_post_turn_hooks_in(
     ctx: &crate::core::runtime::DispatchCtx,
 ) -> Vec<Arc<dyn LearningSink>> {
