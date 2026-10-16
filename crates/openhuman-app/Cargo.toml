@@ -319,15 +319,14 @@ tinybus = { path = "../../vendor/tinybus/crates/tinybus" }
 # declare; scripts/ci/check-storage-owner.mjs enforces that every tsd package
 # resolves to a path under vendor/tinystoragedrivers/. tinystoragedrivers-tinybus
 # is left out: nothing here depends on it, and an unused patch warns. Add it with
-# the first dependent.
+# the first dependent. The app world does not link the mongodb or s3 drivers, so
+# those are omitted here too (the root patch carries them).
 tinystoragedrivers = { path = "../../vendor/tinystoragedrivers/crates/tinystoragedrivers" }
 tinystoragedrivers-bus = { path = "../../vendor/tinystoragedrivers/crates/tinystoragedrivers-bus" }
 tinystoragedrivers-busproxy = { path = "../../vendor/tinystoragedrivers/crates/tinystoragedrivers-busproxy" }
 tinystoragedrivers-client = { path = "../../vendor/tinystoragedrivers/crates/tinystoragedrivers-client" }
 tinystoragedrivers-core = { path = "../../vendor/tinystoragedrivers/crates/tinystoragedrivers-core" }
 tinystoragedrivers-file = { path = "../../vendor/tinystoragedrivers/crates/tinystoragedrivers-file" }
-tinystoragedrivers-mongodb = { path = "../../vendor/tinystoragedrivers/crates/tinystoragedrivers-mongodb" }
-tinystoragedrivers-s3 = { path = "../../vendor/tinystoragedrivers/crates/tinystoragedrivers-s3" }
 tinystoragedrivers-secrets = { path = "../../vendor/tinystoragedrivers/crates/tinystoragedrivers-secrets" }
 tinystoragedrivers-sqlite = { path = "../../vendor/tinystoragedrivers/crates/tinystoragedrivers-sqlite" }
 

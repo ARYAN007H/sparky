@@ -9412,11 +9412,3 @@ dependencies = [
  "syn 3.0.6",
  "winnow 1.0.4",
 ]
-
-[[patch.unused]]
-name = "tinystoragedrivers-mongodb"
-version = "0.11.0"
-
-[[patch.unused]]
-name = "tinystoragedrivers-s3"
-version = "0.11.0"
