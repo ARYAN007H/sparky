@@ -114,6 +114,8 @@ fn dedup_state_namespace(flow_id: &str) -> String {
 mod dedup_commit_lock_tests;
 #[path = "bus_subscriber_tests.rs"]
 mod subscriber_tests;
+#[path = "bus_trigger_queue_tests.rs"]
+mod trigger_queue_tests;
 
 #[tokio::test]
 async fn a_trigger_handled_as_an_agent_uses_the_agent_config() {

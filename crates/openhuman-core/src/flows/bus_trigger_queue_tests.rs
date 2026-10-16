@@ -1,5 +1,6 @@
 use super::*;
 
+#[tokio::test]
 async fn schedule_tick_is_coalesced_while_a_trigger_run_is_active() {
     use std::sync::Mutex;
     use tokio::sync::{mpsc, oneshot};

@@ -171,9 +171,6 @@ async fn handle_schedule_tick_ignores_disabled_flow() {
     .await;
 }
 
-// ── in-flight dedupe (CodeRabbit finding B) ─────────────────────
-
-#[tokio::test]
 // ── FlowRunDigestSubscriber ─────────────────────────────────────
 
 #[test]
