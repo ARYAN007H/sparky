@@ -337,17 +337,17 @@ impl OpenHumanSubagentHost {
     ) -> Result<SubagentRunOutcome, SubagentRunError> {
         let failures = Arc::new(Mutex::new(HashMap::new()));
         let host_outcome = Arc::new(Mutex::new(HashMap::new()));
-        let plan = Arc::new(Mutex::new(HashMap::new()));
+        let plans = Arc::new(Mutex::new(HashMap::new()));
         let fallback_agent_id = self.definition.id.clone();
         let request = HostRequest {
             definition: self.definition,
             options: self.options,
         };
         let planner = Arc::new(OpenHumanPlanner {
-            plan: Arc::clone(&plan),
+            plans: Arc::clone(&plans),
         });
         let executor = Arc::new(OpenHumanExecutor {
-            plan,
+            plans,
             failures: Arc::clone(&failures),
             host_outcome: Arc::clone(&host_outcome),
         });
@@ -463,16 +463,13 @@ impl SubagentPlanner<crate::agent::tinyagents::host::OpenHumanRunContext, HostRe
         };
         options.task_id = Some(request.task_key.task_id.clone());
         options.run_context = request.run_context.data.clone();
-        self.plans
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .insert(
-                task_key,
-                PreparedHostPlan {
-                    definition: request.host_request.definition.clone(),
-                    options,
-                },
-            );
+        self.plans.lock().unwrap_or_else(|p| p.into_inner()).insert(
+            task_key,
+            PreparedHostPlan {
+                definition: request.host_request.definition.clone(),
+                options,
+            },
+        );
         // The host leaf resolves the real tool snapshot and policy; an empty
         // declaration here advertises no unresolved authority.
         Ok(PreparedSubagent::new(
@@ -1049,7 +1046,7 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
                 .host_outcome
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .as_ref()
+                .get(&pause.key)
                 .map(|outcome| outcome.elapsed.as_millis() as u64)
                 .unwrap_or_default(),
         };
@@ -1104,7 +1101,8 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
             .host_outcome
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .clone();
+            .get(key)
+            .cloned();
         let record = serde_json::to_vec(&TerminalRecord {
             outcome: outcome.clone(),
             agent_id: host
