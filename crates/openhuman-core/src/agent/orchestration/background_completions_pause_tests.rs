@@ -107,6 +107,68 @@ fn awaiting_input_does_not_dedupe_the_later_completion() {
 }
 
 #[test]
+fn delivered_pause_leaves_the_task_key_free_for_a_later_delivery() {
+    let _guard = test_guard();
+    let ws = workspace();
+    let w = ws.path();
+    futures::executor::block_on(record_awaiting_input(
+        &cx(),
+        w,
+        "sess-sequential",
+        "sub-sequential",
+        "researcher",
+        "which repo?",
+        true,
+        Some("thread-sequential".into()),
+    ));
+
+    let router = router_for_workspace(w);
+    let pause_batch = router
+        .claim_pending("thread-sequential", usize::MAX)
+        .unwrap();
+    assert_eq!(pause_batch.len(), 1);
+    assert_eq!(
+        pause_batch[0].label.as_deref(),
+        Some(AWAITING_INPUT_LABEL),
+        "the first batch contains only the pause"
+    );
+    let pause_notice = BackgroundCompletionFormatter.format_batch(&pause_batch);
+    assert!(pause_notice.contains("<background_agent_needs_input id=\"sub-sequential\""));
+    assert_eq!(
+        router
+            .mark_delivered(&[pause_batch[0].task_id.as_str()])
+            .unwrap(),
+        1
+    );
+
+    record(
+        w,
+        "sess-sequential",
+        "sub-sequential",
+        "finished after answer",
+        Some("thread-sequential"),
+    );
+    let completion_batch = router
+        .claim_pending("thread-sequential", usize::MAX)
+        .unwrap();
+    assert_eq!(completion_batch.len(), 1);
+    assert_eq!(completion_batch[0].task_id, "sub-sequential");
+    assert_eq!(completion_batch[0].result.text, "finished after answer");
+    let completion_notice = BackgroundCompletionFormatter.format_batch(&completion_batch);
+    assert!(completion_notice.contains("<background_agent_result id=\"sub-sequential\""));
+    assert_eq!(
+        router
+            .mark_delivered(&[completion_batch[0].task_id.as_str()])
+            .unwrap(),
+        1
+    );
+    assert!(router
+        .claim_pending("thread-sequential", usize::MAX)
+        .unwrap()
+        .is_empty());
+}
+
+#[test]
 fn repeated_pauses_are_distinct_and_inline_collection_sweeps_them() {
     let _guard = test_guard();
     let ws = workspace();
