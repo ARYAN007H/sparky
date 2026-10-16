@@ -391,7 +391,7 @@ impl JobDispatcher {
     /// Restrict the dispatcher to agent jobs (the hosted-profile sweep).
     #[must_use]
     pub(crate) fn agent_only(mut self) -> Self {
-        self.binding = self.binding.agent_only();
+        self.binding = self.binding.clone().agent_only();
         self
     }
 
