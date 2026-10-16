@@ -233,8 +233,8 @@
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/integrations/composio/bus/trigger_subscriber.rs",
-    "line": 199,
-    "text": "if let Err(e) = with_origin(",
+    "line": 198,
+    "text": "if let Err(e) = with_origin(origin, apply_decision(&ctx, run, &envelope)).await",
     "occurrence": 1
   },
   {
