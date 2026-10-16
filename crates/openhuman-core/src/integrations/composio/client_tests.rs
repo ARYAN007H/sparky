@@ -152,6 +152,7 @@ async fn disabled_mode_reports_no_integrations_without_a_backend_call() {
 fn resolve_composio_route_backend_errors_without_session() {
     // Backend mode requires the app-session JWT — without it the
     // factory must return an explicit error (not silently downgrade).
+    register_fake_backend_route();
     let tmp = tempfile::tempdir().expect("tempdir");
     let mut config = crate::config::Config::default();
     config.config_path = tmp.path().join("config.toml");
