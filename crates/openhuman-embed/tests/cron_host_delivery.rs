@@ -130,7 +130,12 @@ fn a_library_agents_scheduled_reply_is_handed_to_the_host() {
                 .expect("the stretch turn runs");
 
             let jobs = runtime.cron().list().expect("scheduled job is stored");
-            assert_eq!(jobs.len(), 1, "{jobs:?}");
+            assert_eq!(
+                jobs.len(),
+                1,
+                "{jobs:?}; requests: {:#?}",
+                common::chat_requests(&provider).await
+            );
             let job = &jobs[0];
             assert_eq!(job.name, "stretch");
             assert!(job.next_run > std::time::SystemTime::now(), "{job:?}");
