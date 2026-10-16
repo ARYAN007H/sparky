@@ -2,9 +2,9 @@
 
 use std::sync::Arc;
 use tinyagents_harness::cost::TurnCost;
-use tinyagents_hooks::stop::StopHookMiddleware;
-use tinyagents_hooks::stop::StopHook;
 use tinyagents_harness::steering::SteeringHandle;
+use tinyagents_hooks::stop::StopHook;
+use tinyagents_hooks::stop::StopHookMiddleware;
 
 /// Install product policies and preserve the host-facing halt summary.
 pub(super) fn install(
