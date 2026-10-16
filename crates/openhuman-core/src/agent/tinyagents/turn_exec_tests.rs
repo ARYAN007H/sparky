@@ -566,8 +566,10 @@ async fn session_screens_the_new_input_but_not_a_replayed_tool_results_row() {
 
     // Splice a text-dialect `[Tool results]` round that scores Blocked into the
     // transcript the real writer produced, as an earlier admitted turn.
-    let head =
-        crate::agent::session_store::splice_fixture_tests::head_of(&locator, "thread-replayed-results");
+    let head = crate::agent::session_store::splice_fixture_tests::head_of(
+        &locator,
+        "thread-replayed-results",
+    );
     let mut messages = head.messages.clone();
     messages.extend([
         tinyagents_session::transcript::TranscriptMessage::user("look it up"),

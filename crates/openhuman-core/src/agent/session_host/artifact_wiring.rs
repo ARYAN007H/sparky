@@ -14,7 +14,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::agent::harness::tool_result_artifacts::{new_tool_result_store, HostArtifactStore};
+use crate::agent::harness::tool_result_artifacts::{HostArtifactStore, new_tool_result_store};
 use crate::agent::session_store::artifact_blobs_for;
 use crate::security::policy::tool_result_artifacts_dir;
 use tinystoragedrivers::{MemoryStorage, Scope, StorageBackend};

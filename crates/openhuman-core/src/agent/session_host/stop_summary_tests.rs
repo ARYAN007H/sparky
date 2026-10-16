@@ -1,6 +1,6 @@
 use super::*;
 use crate::agent::session_host::turn_checkpoint::{
-    build_deterministic_final_summary, CheckpointToolResult,
+    CheckpointToolResult, build_deterministic_final_summary,
 };
 
 fn result(name: &str, success: bool, content: &str) -> CheckpointToolResult {

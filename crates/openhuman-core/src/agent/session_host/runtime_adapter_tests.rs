@@ -15,8 +15,8 @@ use super::announcement_notes::{
 };
 use super::runtime_session::tool_surface::reconcile_synthesized_visibility;
 use super::runtime_session::{
-    account_committed_turn_against_goal, begin_turn_resume, holistic_last_turn_usage,
-    OpenHumanSessionState,
+    OpenHumanSessionState, account_committed_turn_against_goal, begin_turn_resume,
+    holistic_last_turn_usage,
 };
 use super::{OpenHumanSessionFactory, OpenHumanSessionHooks, OpenHumanTranscriptCodec};
 use crate::agent::tinyagents::host::OpenHumanRunContext;
@@ -90,10 +90,12 @@ fn codec_marks_failed_tool_rows_from_the_explicit_turn_sidecar() {
             },
         )
         .unwrap();
-    assert!(rows[0]
-        .tool_failure
-        .as_ref()
-        .is_some_and(|failure| failure.failed));
+    assert!(
+        rows[0]
+            .tool_failure
+            .as_ref()
+            .is_some_and(|failure| failure.failed)
+    );
 }
 
 /// The durable record is the parent's OWN spend.

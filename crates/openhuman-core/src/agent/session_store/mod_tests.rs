@@ -318,11 +318,13 @@ async fn a_stashed_attachment_survives_a_restart_of_the_workspace_store() {
         resumed.read_data_uri("att-1").await.unwrap().as_deref(),
         Some(data_uri)
     );
-    assert!(resumed
-        .read_data_uri("never-stashed")
-        .await
-        .unwrap()
-        .is_none());
+    assert!(
+        resumed
+            .read_data_uri("never-stashed")
+            .await
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[test]

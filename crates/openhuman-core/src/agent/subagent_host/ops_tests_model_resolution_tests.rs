@@ -1,6 +1,6 @@
 use super::*;
 use crate::agent::subagent_host::run_subagent;
-use tinyagents_harness::context::{current_run_depth, with_run_depth, RunDepth};
+use tinyagents_harness::context::{RunDepth, current_run_depth, with_run_depth};
 
 #[tokio::test]
 async fn runner_rejects_spawn_beyond_max_depth() {

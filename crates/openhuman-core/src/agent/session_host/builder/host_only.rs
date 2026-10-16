@@ -29,8 +29,8 @@ use tinyagents_harness::context::RunContext;
 use tinyagents_harness::middleware::{PolicyDecision, ToolCallPolicy};
 use tinyinference_llm::tool::ToolCall;
 
-use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent::OpenHumanSessionHost;
+use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::config::Config;
 use anyhow::Result;
 use tinyagents_definition::{SandboxMode, ToolScope};
@@ -45,8 +45,8 @@ pub struct HostOnlyToolPolicy {
     host: Option<
         Arc<
             dyn tinyagents_harness::middleware::ToolCallPolicy<
-                crate::agent::tinyagents::host::OpenHumanRunContext,
-            >,
+                    crate::agent::tinyagents::host::OpenHumanRunContext,
+                >,
         >,
     >,
 }
@@ -59,8 +59,8 @@ impl HostOnlyToolPolicy {
         host: Option<
             Arc<
                 dyn tinyagents_harness::middleware::ToolCallPolicy<
-                    crate::agent::tinyagents::host::OpenHumanRunContext,
-                >,
+                        crate::agent::tinyagents::host::OpenHumanRunContext,
+                    >,
             >,
         >,
     ) -> Self {
@@ -112,15 +112,15 @@ pub(super) fn session_policy(
     host: Option<
         Arc<
             dyn tinyagents_harness::middleware::ToolCallPolicy<
-                crate::agent::tinyagents::host::OpenHumanRunContext,
-            >,
+                    crate::agent::tinyagents::host::OpenHumanRunContext,
+                >,
         >,
     >,
 ) -> Option<
     Arc<
         dyn tinyagents_harness::middleware::ToolCallPolicy<
-            crate::agent::tinyagents::host::OpenHumanRunContext,
-        >,
+                crate::agent::tinyagents::host::OpenHumanRunContext,
+            >,
     >,
 > {
     if !host_only {

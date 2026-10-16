@@ -35,19 +35,19 @@ use std::time::Duration;
 
 use tinyagents_tasks::{
     CompletionRecord, CompletionResult, CompletionRouter, CompletionState, CompletionStatus,
-    CompletionStore, DriverCompletionStore, InMemoryCompletionStore, NotifyMode, RecordOutcome,
-    TombstoneOutcome, DEFAULT_MAX_ATTEMPTS,
+    CompletionStore, DEFAULT_MAX_ATTEMPTS, DriverCompletionStore, InMemoryCompletionStore,
+    NotifyMode, RecordOutcome, TombstoneOutcome,
 };
 
 use super::completion_notice::BackgroundCompletionFormatter;
-pub(crate) use super::completion_notice::{BackgroundAgentOutcome, AWAITING_INPUT_LABEL};
+pub(crate) use super::completion_notice::{AWAITING_INPUT_LABEL, BackgroundAgentOutcome};
 pub(crate) use super::completion_target::CompletionTarget;
+#[cfg(test)]
+pub(crate) use super::completion_target::tests::{
+    TestWorkspace, forget_workspace_for_test, install_store_for_test,
+};
 use super::completion_target::{awaiting_input_record_id, awaiting_input_record_prefix};
 pub(crate) use super::completion_target::{claim_recovery, forget_recovery};
-#[cfg(test)]
-pub(crate) use super::completion_target::{
-    tests::{forget_workspace_for_test, install_store_for_test, TestWorkspace},
-};
 
 /// How long a settled record (delivered / gave up / tombstoned) is kept before
 /// compaction drops it. Dropping a settled record also drops its dedupe and its

@@ -4,12 +4,23 @@ use crate::agent::subagent_host::types::SubagentCheckpointData;
 
 fn checkpoint_data(task_id: &str) -> SubagentCheckpointData {
     SubagentCheckpointData {
-        task_key: None, task_id: task_id.to_string(), agent_id: "researcher".to_string(),
-        worker_thread_id: None, history: Vec::new(), question: "Which region?".to_string(),
-        options: None, skill_filter_override: None, model_override: None,
-        created_at: "2026-09-02T00:00:00Z".to_string(), resume_checkpoint: None,
-        resume_metadata: Default::default(), output: String::new(), iterations: 0,
-        usage: Default::default(), artifact_paths: Vec::new(), elapsed_ms: 0,
+        task_key: None,
+        task_id: task_id.to_string(),
+        agent_id: "researcher".to_string(),
+        worker_thread_id: None,
+        history: Vec::new(),
+        question: "Which region?".to_string(),
+        options: None,
+        skill_filter_override: None,
+        model_override: None,
+        created_at: "2026-09-02T00:00:00Z".to_string(),
+        resume_checkpoint: None,
+        resume_metadata: Default::default(),
+        output: String::new(),
+        iterations: 0,
+        usage: Default::default(),
+        artifact_paths: Vec::new(),
+        elapsed_ms: 0,
     }
 }
 

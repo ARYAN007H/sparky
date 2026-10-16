@@ -13,7 +13,7 @@ use crate::agent::harness::artifact_offload::offload_run_result;
 use crate::agent::harness::fork_context::ParentExecutionContext;
 use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::agent::prompts::{
-    render_subagent_system_prompt_with_format, PromptContext, SubagentRenderOptions,
+    PromptContext, SubagentRenderOptions, render_subagent_system_prompt_with_format,
 };
 use crate::agent::subagent_host::definition_iter_cap;
 use crate::agent::subagent_host::tool_prep::{
@@ -25,14 +25,14 @@ use crate::agent::subagent_host::types::{
 use crate::agent::tinyagents::budget::MAX_SPAWN_DEPTH;
 use crate::inference::provider::AGENT_TURN_MAX_OUTPUT_TOKENS;
 use tinyagents_definition::{
-    validate_tier_transition, AgentTier, IterationPolicy, PromptSource,
-    SandboxMode as AgentSandboxMode,
+    AgentTier, IterationPolicy, PromptSource, SandboxMode as AgentSandboxMode,
+    validate_tier_transition,
 };
 use tinyagents_harness::artifacts::{
-    effective_offload_threshold, extract_artifact_paths, note_artifact_handoff,
-    DEFAULT_OFFLOAD_THRESHOLD_BYTES, HANDOFF_STAGE_RECORDED,
+    DEFAULT_OFFLOAD_THRESHOLD_BYTES, HANDOFF_STAGE_RECORDED, effective_offload_threshold,
+    extract_artifact_paths, note_artifact_handoff,
 };
-use tinyagents_harness::context::{current_run_depth, with_run_depth, RunConfig, RunDepth};
+use tinyagents_harness::context::{RunConfig, RunDepth, current_run_depth, with_run_depth};
 use tinytools::{SandboxMode as TinyagentsSandboxMode, ToolSpec, WorkspaceDescriptor};
 use tinytools_std::file_state::with_file_state_agent_id;
 
