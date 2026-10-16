@@ -56,7 +56,7 @@ fn migrated() -> &'static Mutex<HashSet<PathBuf>> {
 /// Move rows still in the legacy workspace file into the module, then empty
 /// the file. A failure leaves the file untouched and is retried on the next
 /// call, so no stored preference is lost to a transient module error.
-async fn migrate_legacy(config: &Config) {
+async fn migrate_legacy(ctx: &crate::core::runtime::DispatchCtx, config: &Config) {
     let workspace = config.workspace_dir.clone();
     if migrated()
         .lock()
@@ -65,9 +65,7 @@ async fn migrate_legacy(config: &Config) {
     {
         return;
     }
-    // Transitional (#7801): the scope-pref readers carry no context yet.
-    let ctx = crate::core::runtime::DispatchCtx::ambient();
-    let rows = match file_store::load::<LegacyScopeFile>(&ctx, config, USER_SCOPES_FILE).await {
+    let rows = match file_store::load::<LegacyScopeFile>(ctx, config, USER_SCOPES_FILE).await {
         Ok(rows) => rows,
         Err(error) => {
             // Unreadable is not "no rows": keep the file and try again later.
@@ -93,7 +91,7 @@ async fn migrate_legacy(config: &Config) {
     }
     if !rows.is_empty() {
         let cleared = file_store::update(
-            &ctx,
+            ctx,
             config,
             USER_SCOPES_FILE,
             |prefs: &mut LegacyScopeFile| {
@@ -118,8 +116,8 @@ async fn migrate_legacy(config: &Config) {
 /// preference (a visibility query, a filtered listing) sees rows a user stored
 /// before the preference moved into the module. Idempotent per workspace; the
 /// pref reads and writes below call it themselves.
-pub(crate) async fn ensure_migrated(config: &Config) {
-    migrate_legacy(config).await;
+pub(crate) async fn ensure_migrated(ctx: &crate::core::runtime::DispatchCtx, config: &Config) {
+    migrate_legacy(ctx, config).await;
 }
 
 /// The scope pref stored for `toolkit`, or the default when none is.
@@ -129,12 +127,16 @@ pub(crate) async fn ensure_migrated(config: &Config) {
 /// gets. A failed read is not evidence the user revoked anything, and refusing
 /// every integration on a transient error would break a working app. The
 /// failure is logged. The **write** below does not fail open.
-pub(crate) async fn load_or_default(config: &Config, toolkit: &str) -> UserScopePref {
+pub(crate) async fn load_or_default(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+    toolkit: &str,
+) -> UserScopePref {
     let key = UserScopePref::key(toolkit);
     if key.is_empty() {
         return UserScopePref::default();
     }
-    migrate_legacy(config).await;
+    migrate_legacy(ctx, config).await;
     let request = ComposioGetUserScopesRequest {
         toolkit: key.clone(),
     };
@@ -173,6 +175,7 @@ pub(crate) async fn load_or_default(config: &Config, toolkit: &str) -> UserScope
 ///
 /// An empty toolkit, or the module could not store the row.
 pub(crate) async fn save(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     toolkit: &str,
     pref: UserScopePref,
@@ -181,7 +184,7 @@ pub(crate) async fn save(
     if key.is_empty() {
         return Err("user_scopes: toolkit must not be empty".to_string());
     }
-    migrate_legacy(config).await;
+    migrate_legacy(ctx, config).await;
     let request = ComposioSetUserScopesRequest {
         toolkit: key.clone(),
         scopes: to_wire(pref),
