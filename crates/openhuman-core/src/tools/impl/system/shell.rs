@@ -626,7 +626,7 @@ impl ShellTool {
         run.python_utf8 = true;
         run.hide_window = self.runtime.hide_window();
         run.meter = meter;
-        let result = crate::sandbox::shell_exec::run(&config, run).await;
+        let result = crate::sandbox::shell_exec::run(ctx, &config, run).await;
         (true, exec_result(result, effective))
     }
 

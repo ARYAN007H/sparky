@@ -100,7 +100,7 @@ pub(crate) async fn sweep_profiles(backend: &dyn StorageBackend, profile_ids: &[
 /// Agent scopes are enumerated from the installed backend (the only caller,
 /// [`sweep_installed`], passes that one).
 pub async fn sweep_all(backend: Arc<dyn StorageBackend>) -> u64 {
-    let scoped: u64 = super::agents::for_each_scope(&crate::core::runtime::DispatchCtx::host_default(), "blob sweep", |_| {
+    let scoped: u64 = super::agents::for_each_scope(&crate::core::runtime::DispatchCtx::host_default(), "blob sweep", |ctx| {
         let backend = Arc::clone(&backend);
         async move {
             match super::current_scope() {
@@ -108,7 +108,7 @@ pub async fn sweep_all(backend: Arc<dyn StorageBackend>) -> u64 {
                     // Modules keep their expiring blobs in their own scopes
                     // derived from the acting scope (TinyJuice's CCR TTL).
                     let mut removed = sweep_scope(backend.as_ref(), &scope).await;
-                    for module_scope in crate::modules::expiring_blob_module_scopes() {
+                    for module_scope in crate::modules::expiring_blob_module_scopes(&ctx) {
                         if module_scope != scope {
                             removed += sweep_scope(backend.as_ref(), &module_scope).await;
                         }
