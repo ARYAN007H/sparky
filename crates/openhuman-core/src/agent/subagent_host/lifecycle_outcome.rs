@@ -13,6 +13,8 @@ pub(super) fn host_outcome_to_neutral(
     let usage_cost = outcome.usage.cost();
     let mut extensions = std::collections::BTreeMap::from_iter([
         ("agent_id".into(), serde_json::json!(definition.id)),
+        ("task_id".into(), serde_json::json!(&outcome.task_id)),
+        ("iterations".into(), serde_json::json!(outcome.iterations)),
         (
             "tier".into(),
             serde_json::json!(definition.agent_tier.as_str()),
