@@ -37,7 +37,7 @@ use super::turn_guards::{
 /// # Progress
 ///
 /// An in-process embedder hands a
-/// [`ProgressSink`](crate::agent::progress_sink::ProgressSink) through
+/// [`AgentProgress`](crate::agent::progress::AgentProgress) channel through
 /// [`AgentChatEnv`] (see [`agent_chat_for`]); it is attached to the agent built
 /// here, so the embedder observes the turn's tool calls and deltas live instead
 /// of only its final string.
@@ -81,7 +81,7 @@ pub async fn agent_chat(
 pub struct AgentChatEnv {
     /// Live progress for the turn; `None` attaches a drain-only sink so the
     /// model calls still stream.
-    pub progress: Option<crate::agent::progress_sink::ProgressSink>,
+    pub progress: Option<tokio::sync::mpsc::Sender<crate::agent::progress::AgentProgress>>,
     /// The host environment installed on the session
     /// ([`OpenHumanSessionHost::set_host_env`]).
     pub host: crate::agent::turn_env::HostTurnEnv,

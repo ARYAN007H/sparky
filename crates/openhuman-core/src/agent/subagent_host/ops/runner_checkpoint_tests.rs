@@ -1,10 +1,17 @@
-//! `write_pause_checkpoint` — the pause-persistence contract (#5928).
-//!
-//! Every failure branch returns `None`, and that `None` is what stops the
-//! runner reporting a resumable `AwaitingUser` for a pause it never saved.
-//! Before this, all three failures were logged at `warn` and then dropped, so
-//! the orchestrator relayed a `task_id` and asked the user to answer a question
-//! whose answer had nowhere to go.
+//! Regression tests for checkpoint task identifiers and legacy payloads.
+
+use crate::agent::subagent_host::types::SubagentCheckpointData;
+
+fn checkpoint_data(task_id: &str) -> SubagentCheckpointData {
+    SubagentCheckpointData {
+        task_key: None, task_id: task_id.to_string(), agent_id: "researcher".to_string(),
+        worker_thread_id: None, history: Vec::new(), question: "Which region?".to_string(),
+        options: None, skill_filter_override: None, model_override: None,
+        created_at: "2026-09-02T00:00:00Z".to_string(), resume_checkpoint: None,
+        resume_metadata: Default::default(), output: String::new(), iterations: 0,
+        usage: Default::default(), artifact_paths: Vec::new(), elapsed_ms: 0,
+    }
+}
 
 // ── task_id is untrusted on its way into a path (tinysweeper, #5951) ────────
 //
