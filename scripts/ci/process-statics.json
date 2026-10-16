@@ -237,6 +237,6 @@
     "count": 1,
     "category": "A",
     "reason": "This cfg(test)-only recorder captures trigger events emitted by unit-test fixtures so assertions can inspect helper output; it is absent from production builds and is not an application event store.",
-    "verification": "triage/escalation_tests.rs: escalation_events_record_the_trigger_and_target"
+    "verification": "triage/escalation_tests.rs: apply_decision_escalate_failure_publishes_failed_event"
   }
 ]
