@@ -153,3 +153,67 @@ async fn a_failed_production_fails_card_and_record() {
     assert_eq!(record.status, RecordStatus::Failed);
     assert_eq!(record.error.as_deref(), Some("provider timed out"));
 }
+
+#[tokio::test]
+async fn a_failed_revision_keeps_the_artifact_and_shows_its_newest_version() {
+    let (workspace, files) = temp_dirs();
+    let id = produce(&workspace, &files, b"deck-v1", None, None).await;
+
+    let revision = Production::start(
+        &workspace,
+        FileRoots::new(&files),
+        ArtifactKind::File,
+        "Quarterly Deck",
+        "pptx",
+        None,
+        Some(&id),
+        None,
+    )
+    .await
+    .unwrap();
+    // The producer got as far as clobbering the file before failing.
+    tokio::fs::write(revision.path(), b"half-writ")
+        .await
+        .unwrap();
+    revision.fail("engine crashed").await;
+
+    let record = versioned_store(&workspace).get(&id).await.unwrap().unwrap();
+    assert_eq!(record.status, RecordStatus::Ready);
+    assert_eq!(record.versions.len(), 1);
+    let card = get_artifact(&workspace, &id).await.unwrap();
+    assert_eq!(card.status, CardStatus::Ready);
+    assert_eq!(
+        std::fs::read(files.join("quarterly-deck.pptx")).unwrap(),
+        b"deck-v1"
+    );
+}
+
+#[tokio::test]
+async fn a_completion_that_records_nothing_fails_the_record_too() {
+    let (workspace, files) = temp_dirs();
+    let production = Production::start(
+        &workspace,
+        FileRoots::new(&files),
+        ArtifactKind::File,
+        "Quarterly Deck",
+        "pptx",
+        None,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+    // No file: the version cannot be recorded.
+    let _ = std::fs::remove_file(production.path());
+    assert!(production.complete().await.is_err());
+
+    let record = versioned_store(&workspace)
+        .get(production.id())
+        .await
+        .unwrap()
+        .unwrap();
+    // Not left pending, so its card never stays "generating".
+    assert_eq!(record.status, RecordStatus::Failed);
+    let card = get_artifact(&workspace, production.id()).await.unwrap();
+    assert_eq!(card.status, CardStatus::Failed);
+}

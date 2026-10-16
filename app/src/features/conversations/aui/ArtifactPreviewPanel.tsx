@@ -190,7 +190,7 @@ export function ArtifactPreviewPanel(_props: ArtifactPreviewPanelProps) {
       {/* Content */}
       <div className="flex-1 overflow-hidden">
         {activeArtifact ? (
-          <ArtifactContentPanel artifact={activeArtifact} />
+          <ArtifactContentPanel key={activeArtifact.artifactId} artifact={activeArtifact} />
         ) : (
           <div className="flex items-center justify-center h-full p-4 text-sm text-muted-foreground">
             {t('chat.artifact.notFound')}
@@ -243,6 +243,27 @@ function ArtifactContentPanel({ artifact }: { artifact: ArtifactSnapshot }) {
       cancelled = true;
     };
   }, [artifact.artifactId]);
+
+  // A new version saved while the panel is open (the agent revised it, or an
+  // autosave landed): read it again, without the loading state.
+  const seenUpdate = useRef(artifact.updatedAt);
+  useEffect(() => {
+    if (seenUpdate.current === artifact.updatedAt) return;
+    seenUpdate.current = artifact.updatedAt;
+    if (!artifact.artifactId || artifact.status !== 'ready') return;
+    let cancelled = false;
+    void callCoreRpc<ArtifactBodyResponse>({
+      method: 'openhuman.ai_read_artifact_body',
+      params: { artifact_id: artifact.artifactId },
+    })
+      .then(result => {
+        if (!cancelled) setBodyResult(result);
+      })
+      .catch(err => console.warn('[ArtifactPreviewPanel] refresh failed:', err));
+    return () => {
+      cancelled = true;
+    };
+  }, [artifact.artifactId, artifact.status, artifact.updatedAt]);
 
   if (loading) {
     return (
@@ -400,7 +421,9 @@ export function useArtifactAutosave(
 
   useEffect(() => {
     setVersion(initialVersion);
-    setStatus('saved');
+    // A new body read in while an edit is pending does not make that edit
+    // saved.
+    if (pending.current === null) setStatus('saved');
   }, [artifactId, body, initialVersion]);
 
   const save = useCallback(async () => {
@@ -659,9 +682,13 @@ function EditableTextViewer({
   const editable = EDITABLE_KINDS.has(kind) && !error;
   const autosave = useArtifactAutosave(artifact.artifactId, body, version, editable);
 
-  // Sync when body changes (switching artifact tabs)
+  // Take a new body (another artifact, or a version saved elsewhere) unless
+  // there is an unsaved edit here: that edit is saved as the next version.
+  const hasLocalEdit = autosave.status === 'pending' || autosave.status === 'saving';
+  const hasLocalEditRef = useRef(hasLocalEdit);
+  hasLocalEditRef.current = hasLocalEdit;
   useEffect(() => {
-    setEditedBody(body);
+    if (!hasLocalEditRef.current) setEditedBody(body);
   }, [body]);
 
   const onEdit = useCallback(

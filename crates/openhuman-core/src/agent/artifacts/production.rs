@@ -34,6 +34,9 @@ pub struct Production {
     chat: Option<ApprovalChatContext>,
     id: String,
     path: PathBuf,
+    /// Whether this adds a version to an artifact that already has one: its
+    /// failure must leave that artifact as it was, not fail it.
+    revision: bool,
 }
 
 impl std::fmt::Debug for Production {
@@ -85,13 +88,14 @@ impl Production {
         .await?;
 
         let artifacts = artifacts_service(workspace_dir, files.clone(), None, chat);
-        let production = Self {
+        let mut production = Self {
             artifacts,
             workspace_dir: workspace_dir.to_path_buf(),
             files,
             chat: chat.cloned(),
             id: meta.id.clone(),
             path,
+            revision: false,
         };
         // A revision keeps its record and history; a new artifact opens one.
         let existing = production
@@ -100,7 +104,10 @@ impl Production {
             .await
             .map_err(|e| e.to_string());
         let opened = match existing {
-            Ok(Some(_)) => Ok(()),
+            Ok(Some(record)) => {
+                production.revision = !record.versions.is_empty();
+                Ok(())
+            }
             Ok(None) => production
                 .artifacts
                 .begin(kind, title, Some(meta.id.clone()))
@@ -145,30 +152,81 @@ impl Production {
                 None,
             )
             .await;
-        let reason = match saved {
-            Ok(saved) => match (
-                saved.notice,
-                saved.record.latest().and_then(|v| v.file.clone()),
-            ) {
-                (None, Some(file)) => return Ok(file.size_bytes),
-                (Some(notice), _) => notice,
-                (None, None) => "the recorded version has no file".to_string(),
-            },
-            Err(err) => err.to_string(),
-        };
-        let reason = format!("failed to finalize artifact: {reason}");
-        self.fail_card(&reason).await;
-        Err(reason)
+        match saved {
+            Ok(saved) => {
+                let reason = match (
+                    saved.notice,
+                    saved.record.latest().and_then(|v| v.file.clone()),
+                ) {
+                    (None, Some(file)) => return Ok(file.size_bytes),
+                    (Some(notice), _) => notice,
+                    (None, None) => "the recorded version has no file".to_string(),
+                };
+                // The version is recorded; only the card could not follow.
+                let reason = format!("failed to finalize artifact: {reason}");
+                self.fail_card(&reason).await;
+                Err(reason)
+            }
+            // Nothing was recorded: end it as any failed production ends.
+            Err(err) => {
+                let reason = format!("failed to finalize artifact: {err}");
+                self.fail(&reason).await;
+                Err(reason)
+            }
+        }
     }
 
-    /// Fail the artifact with `reason`.
+    /// End the production with `reason`. A new artifact is failed, record and
+    /// card. A revision leaves the artifact as it was: the record keeps its
+    /// versions and the card shows the newest of them again.
     pub async fn fail(&self, reason: &str) {
-        if let Err(err) = self.artifacts.fail(&self.id, reason).await {
+        if self.revision {
+            self.restore_card(reason).await;
+            return;
+        }
+        let shown = match self.artifacts.fail(&self.id, reason).await {
+            Ok(saved) => saved.notice,
+            Err(err) => Some(err.to_string()),
+        };
+        // The record took the failure but the card did not follow (or the
+        // record could not take it): fail the card directly, so it never stays
+        // "generating".
+        if let Some(why) = shown {
+            tracing::warn!(
+                target: "tiny-artifacts",
+                artifact_id = %self.id,
+                err = %why,
+                "[artifacts] the failure did not reach the card; failing it directly"
+            );
+            self.fail_card(reason).await;
+        }
+    }
+
+    /// Show a revised artifact's newest recorded version again after its
+    /// revision failed. Failing the card is the fallback when that is not
+    /// possible.
+    async fn restore_card(&self, reason: &str) {
+        tracing::warn!(
+            target: "tiny-artifacts",
+            artifact_id = %self.id,
+            reason,
+            "[artifacts] revision failed; keeping the artifact's newest version"
+        );
+        let record = match self.artifacts.get(&self.id).await {
+            Ok(Some(record)) if record.latest().is_some() => record,
+            _ => return self.fail_card(reason).await,
+        };
+        let bridge = super::tiny_store::LegacyUiBridge::new(
+            &self.workspace_dir,
+            self.files.clone(),
+            self.chat.as_ref(),
+        );
+        if let Err(err) = bridge.show_newest(&record).await {
             tracing::warn!(
                 target: "tiny-artifacts",
                 artifact_id = %self.id,
                 err = %err,
-                "[artifacts] could not mark the versioned record failed"
+                "[artifacts] could not show the newest version again"
             );
             self.fail_card(reason).await;
         }

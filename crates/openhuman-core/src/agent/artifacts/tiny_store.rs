@@ -121,7 +121,7 @@ impl LegacyUiBridge {
     /// Put the newest version in the files folder under the artifact's id and
     /// mark it ready: the content for text kinds, a copy of the file for file
     /// kinds (unless the file already is the one the artifact owns).
-    async fn show_newest(&self, record: &ArtifactRecord) -> anyhow::Result<()> {
+    pub(crate) async fn show_newest(&self, record: &ArtifactRecord) -> anyhow::Result<()> {
         let (Some(latest), Some((legacy_kind, ext))) = (record.latest(), legacy_shape(record))
         else {
             return Ok(());
@@ -235,18 +235,37 @@ impl ArtifactObserver for LegacyUiBridge {
     }
 }
 
+/// The folders a file version may point into: its own kept copy, the agent's
+/// working folder, and every files folder the host trusts. A folder used
+/// before the current one stays trusted, so an artifact made there can still
+/// be revised in place.
+pub fn file_roots(
+    workspace_dir: &Path,
+    files: &FileRoots,
+    action_dir: Option<&Path>,
+) -> Vec<PathBuf> {
+    // A relative path resolves against the first root: the agent's working
+    // folder when there is one, else the current files folder.
+    let mut roots: Vec<PathBuf> = action_dir.map(Path::to_path_buf).into_iter().collect();
+    for folder in files.trusted() {
+        if !roots.contains(folder) {
+            roots.push(folder.clone());
+        }
+    }
+    roots.push(version_files_dir(workspace_dir));
+    roots
+}
+
 /// The artifact service for one workspace: OpenHuman's store and UI bridge,
-/// with file artifacts allowed from the agent's working folder and the files
-/// folder. Cards are announced to `chat`, the turn making the change (`None`
-/// outside a chat turn).
+/// with file artifacts allowed from [`file_roots`]. Cards are announced to
+/// `chat`, the turn making the change (`None` outside a chat turn).
 pub fn artifacts_service(
     workspace_dir: &Path,
     files: FileRoots,
     action_dir: Option<&Path>,
     chat: Option<&ApprovalChatContext>,
 ) -> Artifacts {
-    let mut roots: Vec<PathBuf> = action_dir.map(Path::to_path_buf).into_iter().collect();
-    roots.push(files.current().to_path_buf());
+    let roots = file_roots(workspace_dir, &files, action_dir);
     Artifacts::new(Arc::new(versioned_store(workspace_dir)))
         .with_observer(Arc::new(LegacyUiBridge::new(workspace_dir, files, chat)))
         .with_file_roots(tiny_artifacts::FileRoots::new(roots))

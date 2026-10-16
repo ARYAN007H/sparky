@@ -203,3 +203,38 @@ fn share_artifact_is_offered_only_with_a_publisher() {
     let with = names(Some(std::sync::Arc::new(NoopPublisher)));
     assert!(with.contains(&"share_artifact".to_string()), "{with:?}");
 }
+
+#[tokio::test]
+async fn a_file_in_an_earlier_files_folder_can_still_be_revised() {
+    let (workspace, files) = temp_dirs();
+    let earlier = files.parent().unwrap().join("OldFiles");
+    std::fs::create_dir_all(&earlier).unwrap();
+    let old = earlier.join("deck.pptx");
+    std::fs::write(&old, b"v1").unwrap();
+    // The files folder moved; the earlier one stays trusted.
+    let roots = FileRoots::new(&files).with_trusted([earlier.clone()]);
+    let artifacts = artifacts_service(&workspace, roots, None, None);
+    let id = artifacts
+        .create(
+            ArtifactKind::File,
+            "Deck",
+            Content::File(old.display().to_string()),
+            &Author::agent("agent"),
+            None,
+        )
+        .await
+        .unwrap()
+        .record
+        .id;
+    std::fs::write(&old, b"v2").unwrap();
+    let saved = artifacts
+        .revise(
+            &id,
+            Content::File(old.display().to_string()),
+            &Author::agent("agent"),
+            None,
+        )
+        .await
+        .unwrap();
+    assert_eq!(saved.version, 2);
+}

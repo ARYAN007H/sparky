@@ -117,7 +117,12 @@ pub(crate) async fn list_artifacts(
         workspace_dir
     );
     let docs = documents(workspace_dir).await?;
-    let all = on_docs(docs, |docs| docs.list_meta()).await?;
+    let owned = thread_id.map(str::to_string);
+    let all = on_docs(docs, move |docs| match owned {
+        Some(thread_id) => docs.list_meta_for_thread(&thread_id),
+        None => docs.list_meta(),
+    })
+    .await?;
     Ok(page_of(all, offset, limit, thread_id))
 }
 

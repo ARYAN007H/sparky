@@ -1,0 +1,82 @@
+import { configureStore } from '@reduxjs/toolkit';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { callCoreRpc } from '../../../services/coreRpcClient';
+import chatRuntimeReducer, {
+  openArtifact,
+  upsertArtifactReadyForThread,
+} from '../../../store/chatRuntimeSlice';
+import { ArtifactPreviewPanel } from './ArtifactPreviewPanel';
+
+vi.mock('../../../services/coreRpcClient', () => ({ callCoreRpc: vi.fn() }));
+vi.mock('../../../lib/i18n/I18nContext', () => ({
+  useT: () => ({ t: (k: string) => k, locale: 'en' }),
+}));
+
+const rpc = vi.mocked(callCoreRpc);
+const body = (text: string, version: number) => ({
+  kind: 'markdown',
+  title: 'Notes',
+  version,
+  body: text,
+  is_text: true,
+  converted: false,
+});
+const ready = () =>
+  upsertArtifactReadyForThread({
+    threadId: 't-1',
+    artifactId: 'a-1',
+    kind: 'document',
+    title: 'Notes',
+    path: '/tmp/n.md',
+    sizeBytes: 4,
+  });
+
+function setup() {
+  const store = configureStore({ reducer: { chatRuntime: chatRuntimeReducer } });
+  store.dispatch(ready());
+  store.dispatch(openArtifact('a-1'));
+  render(
+    <Provider store={store}>
+      <ArtifactPreviewPanel />
+    </Provider>
+  );
+  return store;
+}
+
+describe('ArtifactPreviewPanel — versions saved elsewhere', () => {
+  beforeEach(() => rpc.mockReset());
+
+  it('shows an agent revision of the open artifact', async () => {
+    rpc.mockResolvedValueOnce(body('# first', 1));
+    const store = setup();
+    expect((await screen.findByRole('heading', { level: 1 })).textContent).toBe('first');
+
+    rpc.mockResolvedValueOnce(body('# revised by the agent', 2));
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 2));
+      store.dispatch(ready());
+    });
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('revised by the agent')
+    );
+  });
+
+  it('keeps an unsaved edit when a revision arrives', async () => {
+    rpc.mockResolvedValueOnce(body('# first', 1));
+    const store = setup();
+    await screen.findByRole('heading', { level: 1 });
+    fireEvent.click(screen.getByRole('button', { name: /Code/ }));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: '# my edit' } });
+
+    rpc.mockResolvedValueOnce(body('# revised by the agent', 2));
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 2));
+      store.dispatch(ready());
+    });
+    await waitFor(() => expect(rpc).toHaveBeenCalledTimes(2));
+    expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('# my edit');
+  });
+});
