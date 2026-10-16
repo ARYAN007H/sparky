@@ -250,13 +250,9 @@ impl PointedInference {
             let token = openhuman_embed::__host::security::credentials::session_support::resolve_backend_credential(request.config)
                 .map(|credential| credential.secret().to_string())
                 .map_err(anyhow::Error::msg)?;
-            let wire = OpenAiModel::compatible_provider(
-                "EmbedTest",
-                token,
-                base_url.clone(),
-                &model,
-            )
-            .with_native_tool_calling(request.native_tool_calling);
+            let wire =
+                OpenAiModel::compatible_provider("EmbedTest", token, base_url.clone(), &model)
+                    .with_native_tool_calling(request.native_tool_calling);
             let wire: std::sync::Arc<dyn tinyinference_llm::model::ChatModel<()>> =
                 std::sync::Arc::new(wire);
             Ok((wire, model))

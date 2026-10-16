@@ -3,8 +3,8 @@
 //! identity, and forward every preset and knob unchanged.
 
 use super::*;
-use openhuman_embed::seams::DomainGroup;
 use crate::transport::BackendTransport;
+use openhuman_embed::seams::DomainGroup;
 use openhuman_embed::BuilderSummary;
 
 fn connected(builder: RuntimeBuilder) -> BuilderSummary {
