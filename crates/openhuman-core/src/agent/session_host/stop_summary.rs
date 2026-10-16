@@ -121,38 +121,7 @@ impl StopReasonKind {
 
     /// English copy completing "I stopped this turn early because …".
     pub(crate) fn copy(self) -> &'static str {
-        match self {
-            Self::Transient => "a service I needed kept timing out or was temporarily unavailable",
-            Self::UncertainSideEffect => {
-                "an action timed out and I could not confirm whether it went through, so I did \
-                 not repeat it"
-            }
-            Self::Authentication => "a service rejected my credentials",
-            Self::Permission => "I don't have permission for a step this needs",
-            Self::Policy => "a step this needs is blocked by your security settings",
-            Self::MissingProgram => {
-                "a program or feature this needs is not available on this device"
-            }
-            Self::NotFound => "something this needs could not be found",
-            Self::InvalidCalls => "a tool kept rejecting my requests as invalid",
-            Self::Unavailable => "a tool this needs is not available right now",
-            Self::SiteRefused => "a website kept refusing my requests",
-            Self::RepeatedFailure => "the same step kept failing",
-            Self::VariedFailures => "several different tool calls in a row failed",
-            Self::RepeatingStep => "I kept repeating the same step without getting anything new",
-            Self::OutOfCredits => {
-                "the account is out of inference credits; add credits, then ask me to try again"
-            }
-            Self::ProviderConfig => {
-                "the configured model or provider rejected the request; check the model and API \
-                 key in Connections"
-            }
-            Self::MissingConnection => {
-                "a service this needs isn't connected; connect it in Connections, then ask me to \
-                 try again"
-            }
-            Self::Generic => "my tool calls were not getting anywhere",
-        }
+        crate::inference::failure_copy::stop_summary_copy(self.key())
     }
 
     /// Read the kind from a breaker stop note. The notes come from a fixed

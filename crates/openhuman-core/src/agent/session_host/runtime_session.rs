@@ -25,7 +25,7 @@ use tinyagents_runtime::{
 };
 use tinyinference_llm::message::Message;
 
-use super::announcement_notes::{
+use crate::integrations::announcement_notes::{
     integration_announcement_note, mcp_announcement_note, skill_announcement_note,
     skill_retraction_note,
 };

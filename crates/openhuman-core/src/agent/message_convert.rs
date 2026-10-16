@@ -19,7 +19,7 @@
 use tinyinference_llm::message::{ContentBlock, ImageRef, MediaRef, Message, UserMessage};
 use tinyinference_llm::tool::ToolCall as TaToolCall;
 use tinytools_agent::dialect::{
-    DialectMessage, DialectResponse, DialectRole, ToolDialect, ToolResultEntry, TranscriptEntry,
+    DialectMessage, DialectRole, ToolDialect, ToolResultEntry, TranscriptEntry,
 };
 
 use tinyagents_runtime::transcript::reasoning_from_content;

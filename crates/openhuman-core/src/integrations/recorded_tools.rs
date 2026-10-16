@@ -28,7 +28,7 @@ use crate::integrations::composio::action_tool::ComposioActionTool;
 ///
 /// Composio slugs are upper-case `TOOLKIT_ACTION`; every OpenHuman-owned tool
 /// name is lower-case snake case, so the shapes never overlap.
-pub(super) fn is_integration_action_name(name: &str) -> bool {
+pub(crate) fn is_integration_action_name(name: &str) -> bool {
     let mut parts = name.splitn(2, '_');
     let (Some(toolkit), Some(action)) = (parts.next(), parts.next()) else {
         return false;
@@ -51,7 +51,7 @@ fn toolkit_of(action: &str) -> String {
 }
 
 /// The recorded integration action declarations, in recorded order.
-pub(super) fn recorded_integration_actions(recorded: &[ToolSpec]) -> Vec<ToolSpec> {
+pub(crate) fn recorded_integration_actions(recorded: &[ToolSpec]) -> Vec<ToolSpec> {
     recorded
         .iter()
         .filter(|spec| is_integration_action_name(&spec.name))
@@ -62,7 +62,7 @@ pub(super) fn recorded_integration_actions(recorded: &[ToolSpec]) -> Vec<ToolSpe
 /// Deferred executors for every recorded action the live set does not
 /// already provide. `live` names win: a still-connected integration keeps
 /// its freshly fetched declaration.
-pub(super) fn rehydrate_integration_actions(
+pub(crate) fn rehydrate_integration_actions(
     recorded: &[ToolSpec],
     live: &[Box<dyn Tool>],
     integrations: &[crate::agent::prompts::ConnectedIntegration],

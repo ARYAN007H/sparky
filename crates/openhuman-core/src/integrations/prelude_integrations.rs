@@ -46,7 +46,7 @@ impl OpenHumanTurnPrelude {
         let Some(recorded) = recorded else {
             return;
         };
-        let actions = super::super::recorded_tools::recorded_integration_actions(recorded.specs());
+        let actions = crate::integrations::recorded_tools::recorded_integration_actions(recorded.specs());
         log::debug!(
             "[session] adopting {} recorded integration action declaration(s) agent={}",
             actions.len(),
@@ -55,7 +55,7 @@ impl OpenHumanTurnPrelude {
         // Search role tools ride in the same list; each rehydration pass
         // keeps only the names it owns.
         let mut actions = actions;
-        actions.extend(super::super::recorded_tools::recorded_search_tools(
+        actions.extend(crate::integrations::recorded_tools::recorded_search_tools(
             recorded.specs(),
         ));
         let mut mutable = self
@@ -122,7 +122,7 @@ impl OpenHumanTurnPrelude {
                     if wildcard.matches_all()
             )
         }) {
-            rebuilt = super::super::recorded_tools::rehydrate_integration_actions(
+            rebuilt = crate::integrations::recorded_tools::rehydrate_integration_actions(
                 &recorded,
                 synthesized,
                 integrations,
@@ -137,7 +137,7 @@ impl OpenHumanTurnPrelude {
             }
         }
         #[cfg(feature = "modules")]
-        rebuilt.extend(super::super::recorded_tools::rehydrate_search_tools(
+        rebuilt.extend(crate::integrations::recorded_tools::rehydrate_search_tools(
             &recorded,
             &[base, synthesized],
             &self.agent_definition_id,

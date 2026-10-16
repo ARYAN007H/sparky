@@ -10,7 +10,7 @@ use tinyagents_session::port::{InMemorySessionStores, SessionStoreProvider};
 use tinyagents_session::transcript::TranscriptMeta;
 use tinyinference_llm::message::Message;
 
-use super::announcement_notes::{
+use crate::integrations::announcement_notes::{
     integration_announcement_note, mcp_announcement_note, skill_announcement_note,
 };
 use super::runtime_session::tool_surface::reconcile_synthesized_visibility;
