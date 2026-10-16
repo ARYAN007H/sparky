@@ -32,7 +32,7 @@ pub(crate) use worktree_schemas::{
 };
 
 /// Registers the orchestration RPC surfaces in their catalogue order.
-pub(crate) fn all_orchestration_registered_controllers() -> Vec<crate::core::RegisteredController> {
+pub(crate) fn all_orchestration_registered_controllers() -> Vec<crate::core::all::RegisteredController> {
     let mut controllers = Vec::new();
     controllers.extend(all_command_center_registered_controllers());
     controllers.extend(all_workflow_run_registered_controllers());
