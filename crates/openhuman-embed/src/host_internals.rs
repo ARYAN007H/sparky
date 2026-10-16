@@ -252,6 +252,7 @@ pub mod security {
                 build_session_state, classify_session_token, current_session_is_local,
                 get_session_token, is_local_session_token, load_app_session_profile, publish_local_session_expiry,
                 resolve_backend_credential, BackendCredential, SessionTokenCheck,
+                SESSION_EXPIRES_AT_META,
                 LOCAL_SESSION_BACKEND_UNAVAILABLE, LOCAL_SESSION_MANAGED_INFERENCE_UNAVAILABLE,
             };
         }
