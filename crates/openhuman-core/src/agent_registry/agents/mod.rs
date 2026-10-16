@@ -1,8 +1,8 @@
 //! Built-in agent archetypes.
 //!
-//! Each submodule below is one shipped agent and owns the same three
-//! files, so none of the 29 leaf `mod.rs` files need their own doc
-//! comment:
+//! Each submodule below is one shipped agent and generally has the same three
+//! files, so none of the leaf `mod.rs` files need their own doc comment. The
+//! trigger prompt builders live with the triage domain instead:
 //!
 //! * `agent.toml`  — id, `when_to_use`, model, tool scope, sandbox mode,
 //!   iteration cap, tier, and `omit_*` flags. Parsed directly into

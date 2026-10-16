@@ -3,12 +3,10 @@
 #[path = "../../agent/orchestration/workflow_runs/host.rs"]
 mod host;
 mod engine {
-    mod cancel {
-        include!("../../agent/orchestration/workflow_runs/engine/cancel.rs");
-    }
-    mod lifecycle {
-        include!("../../agent/orchestration/workflow_runs/engine/lifecycle.rs");
-    }
+    #[path = "../../../agent/orchestration/workflow_runs/engine/cancel.rs"]
+    mod cancel;
+    #[path = "../../../agent/orchestration/workflow_runs/engine/lifecycle.rs"]
+    mod lifecycle;
     pub(super) const LOG_TARGET: &str = "workflow_run_engine";
     pub use lifecycle::{resume_workflow_run, start_workflow_run, stop_workflow_run};
 }

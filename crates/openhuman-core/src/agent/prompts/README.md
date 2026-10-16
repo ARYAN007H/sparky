@@ -88,7 +88,9 @@ Other domains contribute prompt content without living in this directory:
   session-scoped bytes land at the tail of the prompt.
 
 Built-in archetype system prompts (orchestrator, planner, image_agent,
-and so on) live in `agent_registry/agents/<name>/prompt.rs` and
+and so on) generally live in `agent_registry/agents/<name>/prompt.rs`; the
+trigger triage and reactor prompt builders live with `triage`. The remaining
+builders and
 `flows/agents/{flow_discovery,workflow_builder}/prompt.rs`, not here. Each is a
 `PromptSource::Dynamic` function that hand-assembles its body via the
 `render_*` helpers; [`agent/session_host/builder/factory.rs`](../session_host/builder/factory.rs) wraps it with

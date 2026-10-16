@@ -15,6 +15,7 @@
 //! [`running_subagents`] mirrors detached-sub-agent lifecycle into a
 //! TinyAgents task store.
 
+pub mod agent_teams;
 pub(crate) mod background_completions;
 pub(crate) mod background_delivery;
 pub(crate) mod busy_guard;
