@@ -39,17 +39,27 @@ fn path(workspace_dir: &Path) -> PathBuf {
 }
 
 fn read_all(workspace_dir: &Path) -> BTreeMap<String, SourceState> {
-    std::fs::read_to_string(path(workspace_dir))
-        .ok()
-        .and_then(|text| serde_json::from_str(&text).ok())
-        .unwrap_or_default()
+    let file = path(workspace_dir);
+    let Ok(text) = std::fs::read_to_string(&file) else {
+        return BTreeMap::new();
+    };
+    serde_json::from_str(&text).unwrap_or_else(|error| {
+        tracing::warn!(%error, "[memory:sources] sync state unparsable; set aside");
+        if let Err(error) = std::fs::rename(&file, file.with_extension("json.corrupt")) {
+            tracing::warn!(%error, "[memory:sources] could not set sync state file aside");
+        }
+        BTreeMap::new()
+    })
 }
 
 fn write_all(workspace_dir: &Path, all: &BTreeMap<String, SourceState>) {
     let file = path(workspace_dir);
     let result = serde_json::to_vec_pretty(all)
         .map_err(std::io::Error::other)
-        .and_then(|json| crate::memory::files::write_private(&file, &json));
+        .and_then(|json| {
+            crate::security::secret_storage::file_store::write_atomic(&file, &json)
+                .map_err(std::io::Error::other)
+        });
     if let Err(error) = result {
         tracing::warn!(error = %error, "[memory:sources] writing sync state failed");
     }

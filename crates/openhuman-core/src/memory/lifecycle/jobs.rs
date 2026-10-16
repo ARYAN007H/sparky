@@ -52,17 +52,26 @@ struct FileQueueStore {
 
 impl QueueStore for FileQueueStore {
     fn load(&self) -> QueueState {
-        std::fs::read_to_string(&self.file)
-            .ok()
-            .and_then(|text| serde_json::from_str(&text).ok())
-            .unwrap_or_default()
+        let Ok(text) = std::fs::read_to_string(&self.file) else {
+            return QueueState::default();
+        };
+        serde_json::from_str(&text).unwrap_or_else(|error| {
+            tracing::warn!(%error, "[memory:jobs] queue unparsable; set aside");
+            if let Err(error) = std::fs::rename(
+                &self.file,
+                self.file.with_extension("json.corrupt"),
+            ) {
+                tracing::warn!(%error, "[memory:jobs] could not set queue file aside");
+            }
+            QueueState::default()
+        })
     }
 
     fn save(&self, state: &QueueState) -> Result<(), String> {
         serde_json::to_vec_pretty(state)
             .map_err(|error| error.to_string())
             .and_then(|json| {
-                crate::memory::files::write_private(&self.file, &json)
+                crate::security::secret_storage::file_store::write_atomic(&self.file, &json)
                     .map_err(|error| error.to_string())
             })
     }
