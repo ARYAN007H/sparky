@@ -5,8 +5,7 @@ use std::sync::Arc;
 use tinyagents_harness::context::RunContext;
 use tinyagents_harness::tool::ToolDispatch;
 
-use super::host::OpenHumanRunContext;
-use super::tool_registration::RegisteredToolDispatch;
+use super::{OpenHumanRunContext, RegisteredToolDispatch};
 
 #[derive(Clone, Copy)]
 pub(super) enum SubagentResultProjection {
