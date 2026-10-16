@@ -167,5 +167,5 @@ pub(crate) fn journal_push_ready(config: &Config) -> bool {
 }
 
 #[cfg(test)]
-#[path = "../langfuse_tests.rs"]
+#[path = "../../../agent/progress_tracing/langfuse_tests.rs"]
 mod tests;
