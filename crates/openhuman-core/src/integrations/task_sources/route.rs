@@ -56,7 +56,7 @@ async fn dispatch_triage(
 ) -> Result<(), String> {
     // Respect background-AI throttling. When the gate denies capacity
     // (Off / paused), we keep the card but skip the proactive turn.
-    let Some(_permit) = scheduler_gate::wait_for_capacity().await else {
+    let Some(_permit) = llm_gate::wait_for_capacity().await else {
         tracing::info!(
             source_id = %source.id,
             "[task_sources:route] scheduler gate denied capacity; agent turn skipped"

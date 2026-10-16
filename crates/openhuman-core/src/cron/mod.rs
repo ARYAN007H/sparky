@@ -7,7 +7,6 @@
 
 // Host-condition policy (battery / AC / CPU) that throttles background LLM
 // work such as memory digests. The cron poll loop itself does not consult it.
-pub mod scheduler_gate;
 
 pub mod bus;
 pub mod channel_bridge;

@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use anyhow::Context;
 
-use crate::cron::scheduler_gate::LlmPermit;
+use crate::cron::llm_gate::LlmPermit;
 
 use super::super::envelope::TriggerEnvelope;
 use super::super::events;
@@ -89,7 +89,7 @@ pub async fn run_triage(
     let local = build_local_provider_with_config(ctx, &config);
 
     let outcome = run_triage_with_arms_inner(cloud, local, envelope, Some(retry_state()), || {
-        crate::cron::scheduler_gate::wait_for_capacity()
+        crate::cron::llm_gate::wait_for_capacity()
     })
     .await;
     if let Err(err) = &outcome {
@@ -125,7 +125,7 @@ pub(crate) async fn run_triage_with_arms_for_test_with_state(
 ///
 /// `acquire_permit` is called exactly once, on the local-fallback arm,
 /// to obtain the global LLM permit. Production callers pass
-/// `scheduler_gate::wait_for_capacity`; tests pass `|| async { None }`
+/// `llm_gate::wait_for_capacity`; tests pass `|| async { None }`
 /// to skip the shared semaphore.
 async fn run_triage_with_arms_inner<F, Fut>(
     cloud: ResolvedProvider,
