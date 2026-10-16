@@ -223,7 +223,6 @@ fn all_variants_have_correct_domain() {
             },
             "cron",
         ),
-        // Workflow
         (
             DomainEvent::WorkflowLoaded {
                 skill_id: "s".into(),

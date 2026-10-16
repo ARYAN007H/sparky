@@ -392,7 +392,6 @@ pub enum DomainEvent {
         target: String,
         output: String,
     },
-
     /// A proactive message requested for user delivery.
     ProactiveMessageRequested {
         /// Identifies the source (e.g. `"cron:morning_briefing"`, `"cron:welcome"`).
