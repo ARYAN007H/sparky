@@ -64,7 +64,7 @@ async fn composio_get_user_profile_via_mock_returns_provider_profile() {
     let _workspace_env_guard = EnvVarGuard::workspace_unlocked(tmp.path());
     config.save().await.unwrap();
 
-    let outcome = composio_get_user_profile(&config, "c1").await.unwrap();
+    let outcome = composio_get_user_profile(&crate::core::runtime::DispatchCtx::ambient(), &config, "c1").await.unwrap();
 
     assert_eq!(outcome.value.toolkit, "gmail");
     assert_eq!(outcome.value.connection_id.as_deref(), Some("c1"));
@@ -205,7 +205,7 @@ async fn composio_list_tools_honours_a_preference_still_in_the_legacy_file() {
     let base = start_mock_backend(app).await;
     let tmp = tempfile::tempdir().unwrap();
     let config = config_with_backend(&tmp, base);
-    crate::integrations::composio::file_store::save(
+    crate::integrations::composio::file_store::save(&crate::core::runtime::DispatchCtx::ambient(), 
         &config,
         crate::integrations::composio::file_store::USER_SCOPES_FILE,
         &json!({"gmail": {"read": true, "write": false, "admin": false}}),

@@ -520,7 +520,7 @@ async fn enrich_leaves_unmatched_connection_unchanged() {
     let config = test_config(&tmp);
 
     // Persist a profile for a DIFFERENT connection id.
-    persist_provider_profile(
+    persist_provider_profile(&crate::core::runtime::DispatchCtx::ambient(), 
         &config,
         &ProviderUserProfile {
             toolkit: "gmail".to_string(),
