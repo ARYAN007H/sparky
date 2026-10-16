@@ -123,3 +123,7 @@ pub(super) fn host_outcome_to_neutral(
         ..SubagentOutcome::cancelled(String::new())
     }
 }
+
+#[cfg(test)]
+#[path = "lifecycle_outcome_tests.rs"]
+mod tests;

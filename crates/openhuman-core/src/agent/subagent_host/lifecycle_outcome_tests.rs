@@ -1,0 +1,45 @@
+use super::*;
+
+#[test]
+fn paused_outcomes_preserve_answer_choices_and_worker_resume_options() {
+    let definitions = crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only();
+    let definition = definitions.get("orchestrator").unwrap();
+    let options = SubagentRunOptions {
+        worker_thread_id: Some("worker-thread".into()),
+        skill_filter_override: Some("docs".into()),
+        model_override: Some("worker-model".into()),
+        ..SubagentRunOptions::default()
+    };
+    let outcome = SubagentRunOutcome {
+        task_id: "paused-task".into(),
+        agent_id: definition.id.clone(),
+        output: "partial work".into(),
+        iterations: 2,
+        elapsed: std::time::Duration::from_millis(25),
+        mode: super::super::SubagentMode::Typed,
+        status: SubagentRunStatus::AwaitingUser {
+            question: "Which version?".into(),
+            options: Some(vec!["stable".into(), "preview".into()]),
+            checkpoint: None,
+        },
+        final_history: Vec::new(),
+        usage: super::super::SubagentUsage::default(),
+        artifact_paths: vec!["report.md".into()],
+        persistence_disposition:
+            tinyagents_orchestration::subagent::SubagentPersistenceDisposition::PauseInserted,
+    };
+
+    let neutral = host_outcome_to_neutral(outcome, definition, &options);
+    assert_eq!(neutral.worker_thread_id.as_deref(), Some("worker-thread"));
+    assert_eq!(neutral.model_override.as_deref(), Some("worker-model"));
+    assert_eq!(neutral.extensions["options"], serde_json::json!(["stable", "preview"]));
+    assert_eq!(neutral.extensions["artifact_paths"], serde_json::json!(["report.md"]));
+    assert_eq!(neutral.extensions["elapsed_ms"], 25);
+    let SubagentOutcomeKind::AwaitingInput(pause) = neutral.status else {
+        panic!("a paused host outcome must remain resumable");
+    };
+    assert_eq!(pause.reason, "Which version?");
+    assert_eq!(pause.resume.metadata["worker_thread_id"], "worker-thread");
+    assert_eq!(pause.resume.metadata["skill_filter_override"], "docs");
+    assert_eq!(pause.resume.metadata["model_override"], "worker-model");
+}
