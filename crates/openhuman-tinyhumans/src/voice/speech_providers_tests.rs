@@ -41,3 +41,19 @@ fn the_callers_stt_model_is_passed_through() {
     assert_eq!(stt_model(""), DEFAULT_CLOUD_STT_MODEL);
     assert_eq!(stt_model("   "), DEFAULT_CLOUD_STT_MODEL);
 }
+
+#[test]
+fn the_registered_stt_factory_builds_with_the_callers_model() {
+    register();
+    let config = Config::default();
+    let named = create_stt_provider("cloud", "whisper-large", &config).unwrap();
+    let default = create_stt_provider("openhuman", "", &config).unwrap();
+    for slug in STT_SLUGS {
+        unregister_stt_provider(slug);
+    }
+    for slug in TTS_SLUGS {
+        unregister_tts_provider(slug);
+    }
+    assert_eq!(named.configured_model(), Some("whisper-large"));
+    assert_eq!(default.configured_model(), Some(DEFAULT_CLOUD_STT_MODEL));
+}
