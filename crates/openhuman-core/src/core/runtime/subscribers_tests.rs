@@ -215,6 +215,10 @@ async fn tool_timeout_seeds_on_channelless_core_boot() {
 #[tokio::test]
 #[cfg(feature = "channels")]
 async fn proactive_message_reaches_web_on_channelless_core_boot() {
+    // Serialize with the neighboring timeout boot test: both exercise
+    // register_domain_subscribers, whose process-wide registrations and
+    // timeout state must not race in this test binary.
+    let _env = EnvVarGuard::locked_unset_many_async(&["OPENHUMAN_TOOL_TIMEOUT_SECS"]).await;
     crate::core::bus::init().await.expect("bus init");
     let mut web_events = crate::web_chat::subscribe_web_channel_events();
     let config = crate::config::Config::default();
