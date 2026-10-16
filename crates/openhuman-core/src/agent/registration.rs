@@ -6,7 +6,7 @@ use super::orchestration::tools::{
     WaitSubagentTool,
 };
 #[cfg(feature = "skills")]
-use super::tools::{AwaitWorkflowTool, RunWorkflowTool};
+use crate::skills::run_workflow::{AwaitWorkflowTool, RunWorkflowTool};
 use super::tools::{PlanExitTool, TodoTool};
 use crate::config::Config;
 use std::path::Path;

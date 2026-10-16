@@ -51,8 +51,8 @@ impl TieredPrompt {
     }
 }
 
-use super::sections::*;
-use super::sync_workspace_file;
+use crate::prompts::sections::*;
+use crate::prompts::sync_workspace_file;
 use super::types::*;
 use anyhow::Result;
 use std::path::Path;

@@ -24,6 +24,7 @@
 pub mod classify;
 pub mod client;
 pub mod transport;
+pub(crate) mod telemetry;
 
 pub use client::{flatten_authed_error, BackendApiError, BackendClient};
 pub use transport::{

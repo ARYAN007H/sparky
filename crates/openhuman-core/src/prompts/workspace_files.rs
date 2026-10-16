@@ -2,7 +2,7 @@
 //! workspace, injecting on-disk or inline content into a prompt under a
 //! `###` heading with a character cap, and the shared AGENTS.md block writer.
 
-use super::types::*;
+use crate::agent::prompts::types::*;
 use std::fmt::Write;
 use std::hash::{Hash, Hasher};
 use std::path::Path;
@@ -146,7 +146,7 @@ pub fn inject_inline_content(prompt: &mut String, label: &str, content: &str, ma
 ///
 /// Used by both [`crate::prompts::sections::AgentsInstructionsSection`] (the default /
 /// sub-agent builder chains) and the narrow sub-agent renderer
-/// ([`super::subagent::render_subagent_system_prompt_with_format`]) so the two paths never
+/// ([`crate::agent::prompts::subagent::render_subagent_system_prompt_with_format`]) so the two paths never
 /// drift. The heading is emitted only when at least one layer carries content;
 /// the global layer renders first, then the local/project layer. Each layer is
 /// injected via [`inject_inline_content`] under its own `###` sub-heading and
@@ -194,7 +194,7 @@ pub(crate) fn write_agents_md_blocks(out: &mut String, global: Option<&str>, loc
 /// file bytes at call time, and `max_chars`. Callers must invoke this
 /// once per session — re-reading mid-session breaks the inference
 /// backend's automatic prefix cache. See the byte-stability note on
-/// [`super::subagent::render_subagent_system_prompt`].
+/// [`crate::agent::prompts::subagent::render_subagent_system_prompt`].
 pub fn inject_workspace_file_capped(
     prompt: &mut String,
     workspace_dir: &Path,

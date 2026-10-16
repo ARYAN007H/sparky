@@ -5,8 +5,8 @@
 //! workspace-file helpers re-exported by [`super`] for workspace-file injection and
 //! sub-agent plumbing.
 
-use super::types::*;
-use super::{inject_workspace_file, sync_workspace_file};
+use crate::agent::prompts::types::*;
+use crate::prompts::{inject_workspace_file, sync_workspace_file};
 use anyhow::Result;
 use std::fmt::Write;
 use tinytools::ToolSpec;
@@ -227,7 +227,7 @@ impl PromptSection for AgentsInstructionsSection {
 
     fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
         let mut out = String::new();
-        super::write_agents_md_blocks(
+        crate::prompts::write_agents_md_blocks(
             &mut out,
             ctx.agents_md_global.as_deref(),
             ctx.agents_md_local.as_deref(),
@@ -344,7 +344,7 @@ impl PromptSection for SafetySection {
 /// agent's own `prompt.md`, not here.
 ///
 /// Byte-stable (no time / RNG / host) so it lives in the KV-cache-friendly
-/// prefix. Must contain no em-dashes per [`super::builder::GLOBAL_STYLE_SUFFIX`].
+/// prefix. Must contain no em-dashes per [`crate::agent::prompts::builder::GLOBAL_STYLE_SUFFIX`].
 /// Heading the grounding contract renders under, in both the global
 /// [`GROUNDING_BODY`] and any agent prompt that carries its own copy. The
 /// builder matches on this to avoid emitting the contract twice.

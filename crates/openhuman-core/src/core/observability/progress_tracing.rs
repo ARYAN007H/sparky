@@ -52,13 +52,15 @@
 //! is exhaustively unit-testable.
 
 /// Journal-backed projection from durable tinyagents observations.
+#[path = "../../agent/progress_tracing/journal_projection.rs"]
 pub(crate) mod journal_projection;
 /// Langfuse ingestion exporter (remote push through the configured backend).
-#[path = "progress_tracing/langfuse/environment.rs"]
-pub(crate) mod langfuse;
+pub(crate) use crate::backend::telemetry::langfuse;
+#[path = "../../agent/progress_tracing/otlp.rs"]
 mod otlp;
 
 /// The [`SpanCollector`] state machine that folds progress events into spans.
+#[path = "../../agent/progress_tracing/collector/mod.rs"]
 mod collector;
 /// Handing finished spans to the local exporter and the Langfuse push.
 mod export;
@@ -88,8 +90,9 @@ pub(crate) use export::export_subagent_journal_trace;
 pub(crate) use export::{export_run_trace, export_run_trace_from_journal};
 
 #[cfg(test)]
+#[path = "../../agent/progress_tracing/journal_projection_tests.rs"]
 mod journal_projection_tests;
 
 #[cfg(test)]
-#[path = "progress_tracing/progress_tracing_tests.rs"]
+#[path = "../../agent/progress_tracing/progress_tracing_tests.rs"]
 mod tests;
