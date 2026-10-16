@@ -32,7 +32,7 @@ impl tinytools::Tool for Marker {
     }
 }
 
-fn definition() -> crate::agent::harness::host_definition::AgentDefinition {
+fn definition() -> crate::agent_registry::host_definition::AgentDefinition {
     super::wildcard_probe_def()
 }
 

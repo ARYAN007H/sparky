@@ -7,7 +7,7 @@
 
 use std::path::Path;
 
-use openhuman_core::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
+use openhuman_core::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use openhuman_core::core::all::DomainGroup;
 use openhuman_core::core::runtime::{ContextOverlay, DomainSet};
 use openhuman_core::tools::toolpacks::{GroupMode, ToolGroups};

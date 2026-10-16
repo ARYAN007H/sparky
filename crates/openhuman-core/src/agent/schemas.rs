@@ -307,7 +307,7 @@ fn handle_server_status(_ctx: DispatchCtx, _params: Map<String, Value>) -> Contr
 
 fn handle_list_definitions(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let defs = crate::agent::library::list_definition_metadata(&ctx).await?;
+        let defs = crate::agent_registry::library::list_definition_metadata(&ctx).await?;
         Ok(serde_json::json!({ "definitions": defs }))
     })
 }
@@ -320,7 +320,7 @@ struct GetDefinitionParams {
 fn handle_get_definition(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<GetDefinitionParams>(params)?;
-        let registry = crate::agent::harness::host_definition::AgentDefinitionRegistry::current()
+        let registry = crate::agent_registry::host_definition::AgentDefinitionRegistry::current()
             .ok_or_else(|| "AgentDefinitionRegistry not initialised".to_string())?;
         match registry.get(p.id.trim()) {
             Some(def) => Ok(serde_json::json!({ "definition": def })),
@@ -335,7 +335,7 @@ fn handle_reload_definitions(_ctx: DispatchCtx, _params: Map<String, Value>) -> 
         // no-op in v1. Reply with a status payload that explains this
         // and tells the caller how to refresh.
         let already_loaded =
-            crate::agent::harness::host_definition::AgentDefinitionRegistry::global().is_some();
+            crate::agent_registry::host_definition::AgentDefinitionRegistry::global().is_some();
         Ok(serde_json::json!({
             "status": "noop",
             "registry_initialised": already_loaded,
@@ -483,7 +483,7 @@ fn handle_triage_evaluate(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
 fn handle_graph_topologies(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async {
         let reports = tinyagents_orchestration::topology::all_graph_topologies();
-        let agents = crate::agent::registry::agents::load_builtins()
+        let agents = crate::agent_registry::agents::load_builtins()
             .map_err(|e| format!("loading built-in agent graph resolutions: {e}"))?
             .into_iter()
             .map(|def| {
@@ -634,7 +634,7 @@ fn handle_registry_snapshot(ctx: DispatchCtx, _params: Map<String, Value>) -> Co
         }
 
         // ── Agents: built-in archetypes ─────────────────────────────────────
-        let agent_defs = crate::agent::registry::agents::load_builtins()
+        let agent_defs = crate::agent_registry::agents::load_builtins()
             .map_err(|e| format!("loading built-in agents for registry snapshot: {e}"))?;
         let agent_count = agent_defs.len();
         for def in &agent_defs {

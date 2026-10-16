@@ -441,7 +441,7 @@ pub fn split_prompt_tiers(body: &str, default_tier: PromptTier) -> Vec<(PromptTi
 
 /// Per-definition rendering flags passed into the sub-agent prompt
 /// renderer. Mirrors the `omit_*` fields on
-/// [`crate::agent::harness::host_definition::AgentDefinition`]
+/// [`crate::agent_registry::host_definition::AgentDefinition`]
 /// but inverted into positive-sense `include_*` form.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SubagentRenderOptions {

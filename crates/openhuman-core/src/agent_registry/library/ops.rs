@@ -1,4 +1,4 @@
-use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
+use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::core::runtime::DispatchCtx;
 use tinyagents_definition::{AgentTier, ModelSpec, SandboxMode, SubagentEntry, ToolScope};
 

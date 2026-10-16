@@ -11,7 +11,7 @@ use std::time::Instant;
 
 use crate::agent::harness::artifact_offload::offload_run_result;
 use crate::agent::harness::fork_context::ParentExecutionContext;
-use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
+use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::agent::prompts::{
     PromptContext, SubagentRenderOptions, render_subagent_system_prompt_with_format,
 };

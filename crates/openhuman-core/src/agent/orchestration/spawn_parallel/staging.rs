@@ -22,7 +22,7 @@ use tinyagents_orchestration::parallel::{
 };
 
 use crate::agent::harness::fork_context::ParentExecutionContext;
-use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
+use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use tinyagents_definition::{SandboxMode, ToolScope};
 use tinyagents_harness::workspace::GitWorktreeBaseRef;
 use tinytools::PermissionLevel;

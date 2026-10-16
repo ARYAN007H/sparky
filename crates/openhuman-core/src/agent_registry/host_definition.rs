@@ -165,16 +165,16 @@ impl AgentDefinitionRegistry {
     /// Build a registry containing only the built-in definitions.
     pub fn builtins_only() -> Self {
         let mut reg = Self::default();
-        for def in crate::agent::registry::agents::load_builtins()
+        for def in crate::agent_registry::agents::load_builtins()
             .expect("built-in agent TOML must always parse")
         {
             reg.insert(def);
         }
         #[cfg(test)]
         for def in [
-            super::test_support::test_main_def(),
-            super::test_support::test_inherit_echo_def(),
-            super::test_support::test_inherit_parallel_worker_def(),
+            crate::agent::harness::test_support::test_main_def(),
+            crate::agent::harness::test_support::test_inherit_echo_def(),
+            crate::agent::harness::test_support::test_inherit_parallel_worker_def(),
         ] {
             reg.insert(def);
         }

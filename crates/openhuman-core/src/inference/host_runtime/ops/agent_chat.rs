@@ -161,7 +161,7 @@ pub enum AgentChatTarget<'a> {
     /// can honour it: the other two resolve a definition the caller does not
     /// hold, so there is no agent for a host belt to belong to.
     Definition {
-        definition: &'a crate::agent::harness::host_definition::AgentDefinition,
+        definition: &'a crate::agent_registry::host_definition::AgentDefinition,
         host: Option<&'a crate::agent::HostTools>,
         /// History to seed this turn with, as `(role, content)` rows, instead
         /// of whatever the session would otherwise resume.
@@ -254,9 +254,9 @@ impl std::fmt::Debug for AgentChatTarget<'_> {
 // Definitions are reusable snapshots. A turn override belongs only to the
 // definition passed to this call's factory, which otherwise wins over Config.
 fn definition_for_turn(
-    definition: &crate::agent::harness::host_definition::AgentDefinition,
+    definition: &crate::agent_registry::host_definition::AgentDefinition,
     temperature: Option<f64>,
-) -> std::borrow::Cow<'_, crate::agent::harness::host_definition::AgentDefinition> {
+) -> std::borrow::Cow<'_, crate::agent_registry::host_definition::AgentDefinition> {
     match temperature {
         Some(temperature) => {
             let mut scoped = definition.clone();

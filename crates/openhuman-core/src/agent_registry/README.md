@@ -136,7 +136,7 @@ ranking works.
   `DomainGroup::Agent`.
 - [`config/schema/`](../../config/schema/): `Config.agent_registry: AgentRegistryConfig` is the
   persisted store every `ops.rs` function reads and writes.
-- [`agent/harness/host_definition.rs`](../harness/host_definition.rs): seeds the
+- [`agent_registry/host_definition.rs`](../harness/host_definition.rs): seeds the
   process-global `AgentDefinitionRegistry` from `registry::agents::load_builtins()`;
   TinyAgents validates the merged hierarchy when workspace overrides load.
 - [`agent/session_host/builder/factory.rs`](../session_host/builder/factory.rs):

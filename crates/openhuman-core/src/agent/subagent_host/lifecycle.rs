@@ -50,7 +50,7 @@ fn root_context_from_options(
 /// therefore preserves root, parent, thread, and cancellation lineage.
 pub async fn run_subagent_with_parent(
     parent: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
-    definition: crate::agent::harness::host_definition::AgentDefinition,
+    definition: crate::agent_registry::host_definition::AgentDefinition,
     input: impl Into<String>,
     options: SubagentRunOptions,
 ) -> Result<SubagentRunOutcome, SubagentRunError> {
@@ -62,7 +62,7 @@ pub async fn run_subagent_with_parent(
 /// context. It creates the one explicit root context, then drives the same
 /// neutral lifecycle as nested callers.
 pub async fn run_subagent(
-    definition: &crate::agent::harness::host_definition::AgentDefinition,
+    definition: &crate::agent_registry::host_definition::AgentDefinition,
     input: &str,
     options: SubagentRunOptions,
 ) -> Result<SubagentRunOutcome, SubagentRunError> {
@@ -78,7 +78,7 @@ pub async fn run_subagent(
 pub async fn continue_subagent_with_parent(
     parent: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
     original_key: SubagentTaskKey,
-    definition: crate::agent::harness::host_definition::AgentDefinition,
+    definition: crate::agent_registry::host_definition::AgentDefinition,
     input: impl Into<String>,
     options: SubagentRunOptions,
 ) -> Result<SubagentRunOutcome, SubagentRunError> {
@@ -91,7 +91,7 @@ pub async fn continue_subagent_with_parent(
 /// OpenHuman carrier. The original durable key is mandatory.
 pub async fn continue_subagent(
     original_key: SubagentTaskKey,
-    definition: &crate::agent::harness::host_definition::AgentDefinition,
+    definition: &crate::agent_registry::host_definition::AgentDefinition,
     input: &str,
     options: SubagentRunOptions,
 ) -> Result<SubagentRunOutcome, SubagentRunError> {
@@ -118,7 +118,7 @@ pub(crate) fn load_subagent_checkpoint(
 /// for one caller-owned lifecycle; process-wide persistence remains the source
 /// of truth for cross-process continuation and duplicate terminal effects.
 pub struct OpenHumanSubagentHost {
-    definition: crate::agent::harness::host_definition::AgentDefinition,
+    definition: crate::agent_registry::host_definition::AgentDefinition,
     options: SubagentRunOptions,
 }
 
@@ -214,7 +214,7 @@ pub(super) fn host_in_flight(ctx: &crate::core::runtime::DispatchCtx) -> Arc<Hos
 
 impl OpenHumanSubagentHost {
     pub fn new(
-        definition: crate::agent::harness::host_definition::AgentDefinition,
+        definition: crate::agent_registry::host_definition::AgentDefinition,
         options: SubagentRunOptions,
     ) -> Self {
         Self {
@@ -413,12 +413,12 @@ impl OpenHumanSubagentHost {
 
 #[derive(Clone)]
 struct HostRequest {
-    definition: crate::agent::harness::host_definition::AgentDefinition,
+    definition: crate::agent_registry::host_definition::AgentDefinition,
     options: SubagentRunOptions,
 }
 
 struct PreparedHostPlan {
-    definition: crate::agent::harness::host_definition::AgentDefinition,
+    definition: crate::agent_registry::host_definition::AgentDefinition,
     options: SubagentRunOptions,
 }
 

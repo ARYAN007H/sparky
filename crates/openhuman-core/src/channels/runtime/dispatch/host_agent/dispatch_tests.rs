@@ -204,7 +204,7 @@ impl HostAgentResolver for OneHostAgent {
             return None;
         }
         let mut definition =
-            crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only()
+            crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only()
                 .get("orchestrator")
                 .cloned()
                 .unwrap();
@@ -320,7 +320,7 @@ async fn bound_channel_runs_its_host_agent() {
     let tmp = tempfile::tempdir().unwrap();
     // Every host boots the definition registry; a session's hosted authority
     // is built from it.
-    crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins()
+    crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
         .unwrap();
     let mut agent_config = config(&tmp, None);
     agent_config.default_model = Some("fixture".into());

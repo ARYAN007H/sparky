@@ -9,7 +9,7 @@
 //! - **[`session_host::OpenHumanSessionHost`]**: The primary entry point for running a
 //!   conversation. It manages the loop of sending prompts to a provider and
 //!   executing the resulting tool calls.
-//! - **[`crate::agent::registry::agents`]**: Definitions for built-in
+//! - **[`crate::agent_registry::agents`]**: Definitions for built-in
 //!   specialized agents (Orchestrator, Code Executor, Researcher, etc.).
 //! - **[`triage`]**: A high-performance pipeline for classifying and responding
 //!   to external triggers (webhooks, cron jobs) using small local models.

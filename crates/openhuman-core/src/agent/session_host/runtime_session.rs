@@ -102,7 +102,7 @@ struct OpenHumanTurnPrelude {
     host_env: crate::agent::turn_env::HostTurnEnv,
     allowed_subagent_ids: std::collections::HashSet<String>,
     sandbox_mode: tinyagents_definition::SandboxMode,
-    definition: Option<Arc<crate::agent::harness::host_definition::AgentDefinition>>,
+    definition: Option<Arc<crate::agent_registry::host_definition::AgentDefinition>>,
     runtime_config: Option<Arc<crate::config::Config>>,
     /// This session's tool-rule layers; see `tool_rules.rs`.
     tool_rules: Arc<tinytools::ToolRuleSet>,

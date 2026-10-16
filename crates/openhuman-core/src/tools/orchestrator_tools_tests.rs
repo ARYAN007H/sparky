@@ -28,7 +28,7 @@ fn def(id: &str, when_to_use: &str, delegate_name: Option<&str>) -> AgentDefinit
         delegate_name: delegate_name.map(String::from),
         agent_tier: tinyagents_definition::AgentTier::Worker,
         source: DefinitionSource::Builtin,
-        extensions: crate::agent::harness::host_definition::AgentExt {
+        extensions: crate::agent_registry::host_definition::AgentExt {
             omit_identity: true,
             omit_memory_context: true,
             omit_safety_preamble: true,

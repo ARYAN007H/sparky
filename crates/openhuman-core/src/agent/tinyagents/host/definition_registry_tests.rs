@@ -14,7 +14,7 @@ impl NamedToolScope for tinyagents_definition::ToolScope {
         }
     }
 }
-use crate::agent::registry::types::{AgentRegistryEntry, AgentRegistrySource, AgentSubagentPolicy};
+use crate::agent_registry::types::{AgentRegistryEntry, AgentRegistrySource, AgentSubagentPolicy};
 
 fn builtins() -> OpenHumanDefinitionRegistry {
     OpenHumanDefinitionRegistry::builtins_only()
@@ -157,7 +157,7 @@ async fn authorized_delegates_are_declared_by_builtins() {
     // The upstream DefinitionSet validates the built-in hierarchy during
     // loading. This test checks the host registry's authorization view.
     let builtin_defs =
-        crate::agent::registry::agents::load_builtins().expect("built-in TOML must parse");
+        crate::agent_registry::agents::load_builtins().expect("built-in TOML must parse");
 
     let registry = builtins();
     for def in &builtin_defs {

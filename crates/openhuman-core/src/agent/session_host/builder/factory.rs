@@ -1,7 +1,7 @@
 //! `OpenHumanSessionHost::from_config` factory methods and internal `build_session_agent_inner` constructor.
 
 use super::should_synthesize_delegation_tools;
-use crate::agent::harness::host_definition::{
+use crate::agent_registry::host_definition::{
     AgentDefinitionExt, AgentDefinitionRegistry, NO_TOOLS_SENTINEL,
 };
 use crate::agent::host_runtime;
@@ -136,7 +136,7 @@ impl OpenHumanSessionHost {
         ctx: &DispatchCtx,
         config: &Config,
         agent_id: &str,
-        target_def: Option<&crate::agent::harness::host_definition::AgentDefinition>,
+        target_def: Option<&crate::agent_registry::host_definition::AgentDefinition>,
         host_only: bool,
         host: Option<&super::HostTools>,
         session_id: Option<&str>,
@@ -418,7 +418,7 @@ impl OpenHumanSessionHost {
             Option<std::collections::HashSet<String>>,
         ) = match (
             target_def,
-            crate::agent::harness::host_definition::AgentDefinitionRegistry::current(),
+            crate::agent_registry::host_definition::AgentDefinitionRegistry::current(),
         ) {
             // Host-only: no delegation; the host's names join an empty belt.
             _ if host_only => (Vec::new(), Some(super::host_only::empty_belt())),
@@ -705,7 +705,7 @@ impl OpenHumanSessionHost {
         let payload_summarizer: Option<
             std::sync::Arc<crate::agent::tinyagents::payload_summarizer::DynPayloadSummarizer>,
         > = if !host_only && super::summarizes_tool_output(agent_id, config) {
-            match crate::agent::harness::host_definition::AgentDefinitionRegistry::current() {
+            match crate::agent_registry::host_definition::AgentDefinitionRegistry::current() {
                 Some(reg) => match reg.get("summarizer") {
                     Some(summarizer_def) => {
                         log::info!(
@@ -870,7 +870,7 @@ impl OpenHumanSessionHost {
 pub(super) fn resolve_target_definition(
     config: &Config,
     agent_id: &str,
-) -> Result<Option<crate::agent::harness::host_definition::AgentDefinition>> {
+) -> Result<Option<crate::agent_registry::host_definition::AgentDefinition>> {
     let registry = AgentDefinitionRegistry::current();
 
     if let Some(reg) = registry.as_deref() {
@@ -882,7 +882,7 @@ pub(super) fn resolve_target_definition(
     // Harness registry miss (or not yet initialised). Before failing, check
     // the config-backed custom agent registry — the one place custom
     // (non-shipped) agents live.
-    if let Some(entry) = crate::agent::registry::find_custom_in_config(config, agent_id) {
+    if let Some(entry) = crate::agent_registry::find_custom_in_config(config, agent_id) {
         log::info!(
             "[agent::builder] agent_id={} not found in the harness AgentDefinitionRegistry — \
              synthesizing a definition from its custom agent_registry entry so it runs with its \
@@ -890,7 +890,7 @@ pub(super) fn resolve_target_definition(
             agent_id
         );
         return Ok(Some(
-            crate::agent::registry::definition_from_registry_entry(&entry),
+            crate::agent_registry::definition_from_registry_entry(&entry),
         ));
     }
 
@@ -941,7 +941,7 @@ mod provider_role_tests;
 /// Flow readiness shares this path so it checks the provider used at runtime.
 pub(crate) fn provider_role_for_definition(
     default_model: Option<&str>,
-    target_def: Option<&crate::agent::harness::host_definition::AgentDefinition>,
+    target_def: Option<&crate::agent_registry::host_definition::AgentDefinition>,
 ) -> &'static str {
     let master_hint = default_model
         .is_none()

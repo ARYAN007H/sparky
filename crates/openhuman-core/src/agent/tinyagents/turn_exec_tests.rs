@@ -66,7 +66,7 @@ fn hosted_base() -> Arc<crate::agent::tinyagents::host::OpenHumanHostBase> {
     Arc::new(crate::agent::tinyagents::host::OpenHumanHostBase {
         config: Arc::new(crate::config::Config::default()),
         definitions: Arc::new(
-            crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only(),
+            crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only(),
         ),
         security_policy: Arc::new(crate::security::policy::SecurityPolicy::default()),
         session_definition: None,

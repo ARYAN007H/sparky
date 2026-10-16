@@ -14,7 +14,7 @@ fn unprefixed_delegate_name_overrides_are_treated_as_spawn_tools() {
     // They must be stripped from every sub-agent surface, exactly like
     // the `delegate_*`-prefixed defaults.
     let tmp = tempfile::TempDir::new().unwrap();
-    crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global(tmp.path())
+    crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global(tmp.path())
         .unwrap();
     for delegate in [
         "plan",

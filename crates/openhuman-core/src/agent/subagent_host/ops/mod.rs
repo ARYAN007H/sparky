@@ -61,7 +61,7 @@ pub(super) use super::types::{SubagentMode, SubagentRunError, SubagentRunOptions
 #[cfg(test)]
 pub(super) use crate::agent::harness::fork_context::ParentExecutionContext;
 #[cfg(test)]
-pub(super) use crate::agent::harness::host_definition::AgentDefinition;
+pub(super) use crate::agent_registry::host_definition::AgentDefinition;
 #[cfg(test)]
 pub(super) use crate::agent::tinyagents::budget::MAX_SPAWN_DEPTH;
 #[cfg(test)]

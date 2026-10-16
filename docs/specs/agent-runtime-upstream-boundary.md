@@ -3,7 +3,7 @@
 > **Status, verified 2026-10-07.** The migration this spec governs is mostly
 > executed. Its audit matrix is the original work-list, so several rows name
 > paths that have since been deleted and several "Delete" rows are already
-> done; one Package A target, `crates/openhuman-core/src/agent/registry/tools.rs`,
+> done; one Package A target, `crates/openhuman-core/src/agent_registry/tools.rs`,
 > is still present. Read
 > [`../plans/README.md`](../plans/README.md) for the per-plan status and the
 > commands that re-check it, and treat the matrix below as the record of intent

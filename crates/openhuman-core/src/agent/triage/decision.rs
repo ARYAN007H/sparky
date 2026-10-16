@@ -3,7 +3,7 @@
 //! local model is likely to produce.
 //!
 //! The contract is described in
-//! `crates/openhuman-core/src/agent/registry/agents/trigger_triage/prompt.md` — the triage
+//! `crates/openhuman-core/src/agent_registry/agents/trigger_triage/prompt.md` — the triage
 //! agent must end its reply with a JSON object of the form:
 //!
 //! ```json

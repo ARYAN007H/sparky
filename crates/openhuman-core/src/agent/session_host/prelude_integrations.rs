@@ -23,8 +23,8 @@ impl OpenHumanTurnPrelude {
     /// The session's own definition, else the catalogue's entry for its id.
     pub(super) fn session_definition(
         &self,
-        registry: &crate::agent::harness::host_definition::AgentDefinitionRegistry,
-    ) -> Option<crate::agent::harness::host_definition::AgentDefinition> {
+        registry: &crate::agent_registry::host_definition::AgentDefinitionRegistry,
+    ) -> Option<crate::agent_registry::host_definition::AgentDefinition> {
         let definition = self
             .definition
             .as_deref()
@@ -102,7 +102,7 @@ impl OpenHumanTurnPrelude {
     ///   error instead of an unknown-tool failure.
     pub(super) fn rebuilt_recorded_tools(
         &self,
-        definition: &crate::agent::harness::host_definition::AgentDefinition,
+        definition: &crate::agent_registry::host_definition::AgentDefinition,
         base: &[Box<dyn tinytools::Tool>],
         synthesized: &[Box<dyn tinytools::Tool>],
         integrations: &[crate::agent::prompts::ConnectedIntegration],

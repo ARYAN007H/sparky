@@ -18,7 +18,7 @@ use tinytools_agent::dialect::render_pformat_catalogue;
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Sub-agent role prompt — pre-loaded text from an
-/// [`crate::agent::harness::host_definition::AgentDefinition`]'s
+/// [`crate::agent_registry::host_definition::AgentDefinition`]'s
 /// `system_prompt` field. Always rendered first when present.
 pub struct ArchetypePromptSection {
     body: String,
@@ -43,18 +43,18 @@ impl PromptSection for ArchetypePromptSection {
     }
 }
 
-/// Section that defers to a [`crate::agent::harness::host_definition::PromptBuilder`]
+/// Section that defers to a [`crate::agent_registry::host_definition::PromptBuilder`]
 /// every time it renders, so dynamic prompts (orchestrator, welcome, …)
 /// get to see the live runtime
 /// [`PromptContext`] — including `connected_integrations`, which are
 /// fetched asynchronously after the builder itself has been
 /// constructed.
 pub struct DynamicPromptSection {
-    builder: crate::agent::harness::host_definition::PromptBuilder,
+    builder: crate::agent_registry::host_definition::PromptBuilder,
 }
 
 impl DynamicPromptSection {
-    pub fn new(builder: crate::agent::harness::host_definition::PromptBuilder) -> Self {
+    pub fn new(builder: crate::agent_registry::host_definition::PromptBuilder) -> Self {
         Self { builder }
     }
 }

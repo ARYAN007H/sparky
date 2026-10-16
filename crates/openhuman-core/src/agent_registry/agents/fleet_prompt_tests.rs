@@ -6,7 +6,7 @@
 //! anyone writing a test for it.
 
 use super::load_builtins;
-use crate::agent::harness::host_definition::AgentDefinition;
+use crate::agent_registry::host_definition::AgentDefinition;
 use crate::agent::prompts::PromptContext;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::sync::Arc;

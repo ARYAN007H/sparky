@@ -478,7 +478,7 @@ Why the rules.
 
 Enforcement. Two layers:
 
-1. Loader-time (static). [`agents::loader::validate_tier_hierarchy`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-core/src/agent/registry/agents/loader.rs) runs over the merged registry (built-ins + workspace TOMLs) and refuses to boot a registry that lists a same-tier or worker-with-subagents entry. Built-in archetypes are checked at compile-test time; user-shipped TOMLs are checked at workspace load.
+1. Loader-time (static). [`agents::loader::validate_tier_hierarchy`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-core/src/agent_registry/agents/loader.rs) runs over the merged registry (built-ins + workspace TOMLs) and refuses to boot a registry that lists a same-tier or worker-with-subagents entry. Built-in archetypes are checked at compile-test time; user-shipped TOMLs are checked at workspace load.
 2. Runtime depth gate (dynamic). Independent of tier, the sub-agent runner caps total spawn chain depth at `MAX_SPAWN_DEPTH = 3` via a task-local counter incremented across `run_subagent`, surfaced as a `SpawnDepthExceeded` agent error. This makes a user-shipped TOML that drops the tier annotation still unable to recurse past three hops.
 
 > Status: the loader-time tier check, `agent_tier` field, and runtime depth-counter task-local are live. Depth is bounded by both the static loader contract and the runtime `MAX_SPAWN_DEPTH = 3` guard.
@@ -615,7 +615,7 @@ None of these change the loop's shape, they just make the common failure modes r
 
 ## Where to look in the code
 
-The harness shell lives under `crates/openhuman-core/src/agent/`, with the tinyagents adapter seam in `crates/openhuman-core/src/agent/tinyagents/` and archetype definitions in `crates/openhuman-core/src/agent/registry/`. The README in `crates/openhuman-core/src/agent/` enumerates the public surface; the most load-bearing files (paths relative to `crates/openhuman-core/src/agent/` unless prefixed) are:
+The harness shell lives under `crates/openhuman-core/src/agent/`, with the tinyagents adapter seam in `crates/openhuman-core/src/agent/tinyagents/` and archetype definitions in `crates/openhuman-core/src/agent_registry/`. The README in `crates/openhuman-core/src/agent/` enumerates the public surface; the most load-bearing files (paths relative to `crates/openhuman-core/src/agent/` unless prefixed) are:
 
 | File / dir                               | What lives there                                                                                              |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------- |

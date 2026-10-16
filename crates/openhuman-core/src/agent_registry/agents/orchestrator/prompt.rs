@@ -10,7 +10,7 @@
 //! delegate to any more. That prose lives here (not in the shared prompts
 //! module) so nobody has to branch on `agent_id` in a shared section impl.
 
-use crate::agent::harness::host_definition::AgentDefinitionRegistry;
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::agent::prompts::{
     ConnectedIntegration, PromptContext, render_datetime, render_identity, render_tools,
     render_workspace,
@@ -361,7 +361,7 @@ fn strip_route_lines(archetype: &str, skills: bool, mcp: bool, composio: bool) -
 fn resolve_definition<'r>(
     registry: &'r AgentDefinitionRegistry,
     agent_id: &str,
-) -> Option<&'r crate::agent::harness::host_definition::AgentDefinition> {
+) -> Option<&'r crate::agent_registry::host_definition::AgentDefinition> {
     if let Some(found) = registry.get(agent_id) {
         return Some(found);
     }

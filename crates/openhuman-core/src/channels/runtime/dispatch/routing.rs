@@ -6,7 +6,7 @@
 //!   agent and synthesise its delegation tool surface.
 //! * [`build_visible_tool_set`] — union of named tools + extra (delegation) tools.
 
-use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
+use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::agent::prompts::ConnectedIntegration;
 use crate::config::Config;
 use crate::integrations::composio::{

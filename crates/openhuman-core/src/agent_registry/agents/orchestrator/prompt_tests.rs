@@ -605,7 +605,7 @@ fn the_rendered_prompt_never_names_a_withheld_tool() {
 /// Packed tool names `text` presents as directly callable — the shared helper
 /// scoped to the packs withheld from the orchestrator.
 fn withheld_names_presented_as_callable(text: &str) -> Vec<&'static str> {
-    crate::agent::registry::agents::fleet_prompt_tests::names_presented_as_callable(
+    crate::agent_registry::agents::fleet_prompt_tests::names_presented_as_callable(
         text,
         crate::tools::toolpacks::registry::packed_tool_names_for_agent("orchestrator"),
     )

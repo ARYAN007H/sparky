@@ -1,7 +1,7 @@
 //! Prompt assembly for the classifier turn: the system prompt from the
 //! built-in agent definition and the rendered user message.
 
-use crate::agent::harness::host_definition::AgentDefinition;
+use crate::agent_registry::host_definition::AgentDefinition;
 use tinyagents_definition::PromptSource;
 use tinytools_agent::dialect::ToolCallFormat;
 

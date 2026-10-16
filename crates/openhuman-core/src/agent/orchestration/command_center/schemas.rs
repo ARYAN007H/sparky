@@ -7,7 +7,7 @@ use serde_json::{Map, Value};
 
 use tinyagents_session::run_ledger::command_center::ControlVerb;
 
-use crate::agent::harness::host_definition::AgentDefinitionRegistry;
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::core::Outcome;
 use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};

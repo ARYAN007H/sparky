@@ -28,11 +28,11 @@
 //! registry (for delegation target lookups), and the current list of
 //! connected Composio integrations.
 //!
-//! [`AgentDefinition::when_to_use`]: crate::agent::harness::host_definition::AgentDefinition::when_to_use
+//! [`AgentDefinition::when_to_use`]: crate::agent_registry::host_definition::AgentDefinition::when_to_use
 //! [`SubagentEntry::AgentId`]: tinyagents_definition::SubagentEntry::AgentId
 //! [`SubagentEntry::Skills`]: tinyagents_definition::SubagentEntry::Skills
 
-use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
+use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::agent::prompts::ConnectedIntegration;
 use crate::integrations::composio::ComposioActionTool;
 use tinyagents_definition::SubagentEntry;

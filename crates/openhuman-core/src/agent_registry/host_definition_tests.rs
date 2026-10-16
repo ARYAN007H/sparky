@@ -259,7 +259,7 @@ inline = "custom prompt"
 // audit table this list mirrors.
 #[test]
 fn all_builtin_agent_definitions_have_expected_effective_max_iterations() {
-    let defs = crate::agent::registry::agents::load_builtins()
+    let defs = crate::agent_registry::agents::load_builtins()
         .expect("built-in agent TOML must always parse");
 
     let expected: &[(&str, usize)] = &[
@@ -282,7 +282,7 @@ fn all_builtin_agent_definitions_have_expected_effective_max_iterations() {
         ("trigger_triage", 2),
         ("video_agent", 8),
         ("vision_agent", 6),
-        // Compiled out with the `documents` gate — see `openhuman::agent::registry::agents::loader::builtin_enabled`.
+        // Compiled out with the `documents` gate — see `openhuman::agent_registry::agents::loader::builtin_enabled`.
         #[cfg(feature = "documents")]
         ("presentation_agent", 10),
         // Compiled out with the `skills` gate — see `openhuman::skills::stub`.
@@ -387,7 +387,7 @@ tokenjuice_compression = "light"
 
 #[test]
 fn builtin_dynamic_prompts_carry_their_builder_beside_an_inert_marker() {
-    let defs = crate::agent::registry::agents::load_builtins().unwrap();
+    let defs = crate::agent_registry::agents::load_builtins().unwrap();
     assert!(!defs.is_empty());
     for def in &defs {
         assert!(

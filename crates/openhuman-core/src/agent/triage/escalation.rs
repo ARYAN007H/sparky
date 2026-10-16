@@ -20,7 +20,7 @@ use crate::core::runtime::DispatchCtx;
 use anyhow::{anyhow, Context};
 
 use crate::agent::harness::fork_context::ParentExecutionContext;
-use crate::agent::harness::host_definition::AgentDefinitionRegistry;
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::agent::orchestration::parent_context::build_root_parent;
 use crate::agent::subagent_host::{self, SubagentRunOptions};
 use crate::config::Config;

@@ -2,7 +2,7 @@
 
 use serde_json::Value;
 
-use crate::agent::harness::host_definition::AgentDefinition;
+use crate::agent_registry::host_definition::AgentDefinition;
 use tinyagents_definition::{
     AgentTier, DefinitionSource, IterationPolicy, ModelSpec, PromptSource, SandboxMode,
     SubagentEntry, ToolScope,
@@ -11,7 +11,7 @@ use tinyagents_definition::{
 use super::types::{AgentRegistryEntry, AgentRegistrySource, AgentSubagentPolicy};
 
 pub fn default_agents() -> Vec<AgentRegistryEntry> {
-    crate::agent::registry::agents::load_builtins()
+    crate::agent_registry::agents::load_builtins()
         .map(|defs| {
             defs.into_iter()
                 .map(default_entry_from_definition)

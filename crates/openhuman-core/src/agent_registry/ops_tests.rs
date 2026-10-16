@@ -1,7 +1,7 @@
 use serde_json::Value;
 
 use super::*;
-use crate::agent::registry::types::AgentSubagentPolicy;
+use crate::agent_registry::types::AgentSubagentPolicy;
 
 fn custom_agent(id: &str, enabled: bool) -> AgentRegistryEntry {
     AgentRegistryEntry {
@@ -127,7 +127,7 @@ fn a_patch_sets_and_clears_tool_rules() {
         },
     );
     assert_eq!(entry.tool_rules, Some(rules));
-    let definition = crate::agent::registry::defaults::definition_from_registry_entry(&entry);
+    let definition = crate::agent_registry::defaults::definition_from_registry_entry(&entry);
     assert!(
         definition.tool_rules.is_some(),
         "the entry's rules reach the definition"

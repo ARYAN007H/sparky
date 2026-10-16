@@ -207,7 +207,7 @@ fn spec(name: &str) -> ToolSpec {
 #[cfg(feature = "mcp")]
 #[test]
 fn connected_mcp_actions_enter_search_and_leave_on_disconnect() {
-    crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins()
+    crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
         .expect("builtin definitions");
     let tmp = tempfile::tempdir().expect("tempdir");
     let config = crate::config::Config {
@@ -278,7 +278,7 @@ fn connected_mcp_actions_enter_search_and_leave_on_disconnect() {
 #[cfg(feature = "mcp")]
 #[tokio::test]
 async fn resumed_mcp_snapshot_survives_a_cold_catalog_and_keeps_its_frozen_spec() {
-    crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins()
+    crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins()
         .expect("builtin definitions");
     let tmp = tempfile::tempdir().expect("tempdir");
     let config = crate::config::Config {
@@ -453,7 +453,7 @@ async fn desktop_browser_setting_keeps_deferred_tools_in_fresh_and_resumed_surfa
 /// current integration authorization snapshot confirms Gmail is connected.
 #[tokio::test]
 async fn a_resumed_orchestrator_keeps_the_integration_actions_it_was_sent() {
-    let _ = crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins();
+    let _ = crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins();
     let action_dir = tempfile::tempdir().expect("tempdir");
     let model: Arc<dyn tinyinference_llm::model::ChatModel<()>> =
         Arc::new(tinyagents_harness::testkit::ScriptedModel::new(Vec::new()));
@@ -555,7 +555,7 @@ const SURFACED_GOAL_TOOL: &str = "goal_complete";
 fn text_dialect_host(
     thread_id: Option<&str>,
 ) -> (crate::agent::OpenHumanSessionHost, tempfile::TempDir) {
-    let _ = crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins();
+    let _ = crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins();
     let action_dir = tempfile::tempdir().expect("tempdir");
     let model: Arc<dyn tinyinference_llm::model::ChatModel<()>> =
         Arc::new(tinyagents_harness::testkit::ScriptedModel::new(Vec::new()));
@@ -672,7 +672,7 @@ async fn newly_connected_action_cannot_shadow_a_permanent_source() {
             Ok(tinytools::ToolResult::success("host"))
         }
     }
-    let _ = crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins();
+    let _ = crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins();
     let action_dir = tempfile::tempdir().unwrap();
     let model: Arc<dyn tinyinference_llm::model::ChatModel<()>> =
         Arc::new(tinyagents_harness::testkit::ScriptedModel::new(Vec::new()));

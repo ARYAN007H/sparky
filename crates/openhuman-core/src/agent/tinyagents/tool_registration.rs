@@ -246,11 +246,11 @@ pub(crate) fn capability_diagnostics(
     // (built-ins plus workspace/config overrides, already merged by id) first,
     // then the `agent_registry` built-in loader, deduped by id.
     let runtime_ids: Vec<String> =
-        crate::agent::harness::host_definition::AgentDefinitionRegistry::current()
+        crate::agent_registry::host_definition::AgentDefinitionRegistry::current()
             .map(|runtime| runtime.list().iter().map(|def| def.id.clone()).collect())
             .unwrap_or_default();
     let runtime_agent_count = project_descriptors(&mut registry, ComponentKind::Agent, runtime_ids);
-    let builtin_supplement_count = match crate::agent::registry::agents::load_builtins() {
+    let builtin_supplement_count = match crate::agent_registry::agents::load_builtins() {
         Ok(builtins) => project_descriptors(
             &mut registry,
             ComponentKind::Agent,

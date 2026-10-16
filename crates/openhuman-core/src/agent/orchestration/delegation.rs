@@ -17,7 +17,7 @@
 
 use std::sync::Arc;
 
-use crate::agent::harness::host_definition::AgentDefinition;
+use crate::agent_registry::host_definition::AgentDefinition;
 use crate::agent::progress::AgentProgress;
 use crate::agent::subagent_host::{
     SubagentRunOptions, SubagentRunStatus, run_subagent_with_parent,

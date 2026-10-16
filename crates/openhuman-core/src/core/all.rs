@@ -383,7 +383,7 @@ fn build_registered_controllers() -> Vec<GroupedController> {
     push(
         &mut controllers,
         DomainGroup::Agent,
-        crate::agent::registry::all_agent_registry_registered_controllers(),
+        crate::agent_registry::all_agent_registry_registered_controllers(),
     );
     // System and process health monitoring
     push(

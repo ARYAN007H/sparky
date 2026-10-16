@@ -1,6 +1,6 @@
 //! Tool: `spawn_parallel_agents` — fan out independent sub-agent tasks.
 
-use crate::agent::harness::host_definition::AgentDefinitionRegistry;
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 #[cfg(test)]
 use crate::agent::orchestration::spawn_parallel::ParallelAgentLineage;
 #[cfg(test)]

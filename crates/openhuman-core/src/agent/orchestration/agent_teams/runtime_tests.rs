@@ -15,7 +15,7 @@ use async_trait::async_trait;
 
 use super::*;
 use crate::agent::harness::fork_context::ParentExecutionContext;
-use crate::agent::harness::host_definition::AgentDefinitionRegistry;
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::config::{AgentConfig, Config};
 use tinyagents_orchestration::teams::{SessionTeamLedger, TeamService};
 use tinyagents_session::run_ledger::{

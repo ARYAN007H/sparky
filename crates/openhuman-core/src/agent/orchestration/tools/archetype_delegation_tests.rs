@@ -1,5 +1,5 @@
 use super::*;
-use crate::agent::harness::host_definition::AgentDefinitionRegistry;
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 
 fn sample_tool() -> ArchetypeDelegationTool {
     ArchetypeDelegationTool {

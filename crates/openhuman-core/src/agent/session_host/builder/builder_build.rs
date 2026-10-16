@@ -182,7 +182,7 @@ impl SessionHostBuilder {
             deferred_names.retain(|name| !self.withheld_tool_names.contains(name));
             if visible_names.is_empty() {
                 visible_names
-                    .insert(crate::agent::harness::host_definition::NO_TOOLS_SENTINEL.to_string());
+                    .insert(crate::agent_registry::host_definition::NO_TOOLS_SENTINEL.to_string());
             }
         }
         visible_names.extend(self.permanent_tool_names.iter().cloned());
@@ -341,13 +341,13 @@ impl SessionHostBuilder {
         let hosted_config = Arc::new(hosted_config);
         #[cfg(test)]
         let definitions = Some(
-            crate::agent::harness::host_definition::AgentDefinitionRegistry::current().unwrap_or_else(|| {
-                Arc::new(crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only())
+            crate::agent_registry::host_definition::AgentDefinitionRegistry::current().unwrap_or_else(|| {
+                Arc::new(crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only())
             }),
         );
         #[cfg(not(test))]
         let definitions =
-            crate::agent::harness::host_definition::AgentDefinitionRegistry::current();
+            crate::agent_registry::host_definition::AgentDefinitionRegistry::current();
         // A caller that brought its own definition is the authority for this
         // session, so it does not need a process registry to exist before it
         // may run a turn. The stand-in is deliberately *empty* rather than
@@ -360,7 +360,7 @@ impl SessionHostBuilder {
         let session_definition = self.session_definition;
         let definitions = definitions.or_else(|| {
             session_definition.is_some().then(|| {
-                Arc::new(crate::agent::harness::host_definition::AgentDefinitionRegistry::default())
+                Arc::new(crate::agent_registry::host_definition::AgentDefinitionRegistry::default())
             })
         });
         let hosted_base = definitions.map(|definitions| {

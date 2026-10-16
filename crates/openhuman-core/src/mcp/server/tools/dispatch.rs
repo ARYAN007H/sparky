@@ -2,7 +2,7 @@ use crate::core::runtime::DispatchCtx;
 use serde_json::{json, Map, Value};
 use tinyinference_llm::tool::ToolSchema;
 
-use crate::agent::harness::host_definition::AgentDefinitionRegistry;
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::agent::OpenHumanSessionHost;
 use crate::core::all;
 use crate::security::{SecurityPolicy, ToolOperation};

@@ -317,7 +317,7 @@ pub struct OpenHumanSessionHost {
     /// `subagents` list post-fetch) stay correct even after the web
     /// channel's per-thread rename.
     ///
-    /// [`AgentDefinitionRegistry`]: crate::agent::harness::host_definition::AgentDefinitionRegistry
+    /// [`AgentDefinitionRegistry`]: crate::agent_registry::host_definition::AgentDefinitionRegistry
     pub(super) agent_definition_id: String,
     /// Injected transcript locator, or `None` to resolve the session store for
     /// this agent key.
@@ -415,7 +415,7 @@ pub struct OpenHumanSessionHost {
     /// built from an explicit definition (a library host's per-agent spec)
     /// keeps those settings instead of having them silently replaced by
     /// whatever the process-global registry holds under the same id.
-    pub(super) definition: Option<Arc<crate::agent::harness::host_definition::AgentDefinition>>,
+    pub(super) definition: Option<Arc<crate::agent_registry::host_definition::AgentDefinition>>,
     /// Built by `from_config_host_only`: the belt is the host's tools alone.
     pub(super) host_only: bool,
     /// The next messages are untrusted data, so `run_single` skips the
@@ -603,9 +603,9 @@ pub struct SessionHostBuilder {
     ///
     /// `None` (the default) leaves every existing caller as it was.
     ///
-    /// [`AgentDefinitionRegistry`]: crate::agent::harness::host_definition::AgentDefinitionRegistry
+    /// [`AgentDefinitionRegistry`]: crate::agent_registry::host_definition::AgentDefinitionRegistry
     pub(super) session_definition:
-        Option<Arc<crate::agent::harness::host_definition::AgentDefinition>>,
+        Option<Arc<crate::agent_registry::host_definition::AgentDefinition>>,
     /// Directory chain of parent session keys for a sub-agent. `None`
     /// (default) means this is a root session — its transcript lands
     /// flat in `session_raw/DDMMYYYY/{session_key}.jsonl`. Populated

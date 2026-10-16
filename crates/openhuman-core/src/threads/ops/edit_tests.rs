@@ -392,7 +392,7 @@ async fn transcript_store_reads_the_profile_from_the_request_context() {
 #[tokio::test]
 async fn edit_and_regenerate_use_the_threads_recorded_key_after_a_chat_agent_change() {
     use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
-    let _ = crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins();
+    let _ = crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins();
     let dir = TempDir::new().expect("tempdir");
     let ctx_with = |chat_agent: Option<&str>| {
         let mut config = crate::config::Config {

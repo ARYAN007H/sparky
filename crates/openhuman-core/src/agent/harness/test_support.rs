@@ -40,7 +40,7 @@ pub(crate) fn test_main_def() -> AgentDefinition {
         delegate_name: None,
         agent_tier: AgentTier::Chat,
         source: DefinitionSource::Builtin,
-        extensions: crate::agent::harness::host_definition::AgentExt {
+        extensions: crate::agent_registry::host_definition::AgentExt {
             omit_identity: true,
             omit_memory_context: true,
             omit_safety_preamble: true,
@@ -86,7 +86,7 @@ pub(crate) fn test_inherit_echo_def() -> AgentDefinition {
         delegate_name: None,
         agent_tier: tinyagents_definition::AgentTier::Worker,
         source: DefinitionSource::Builtin,
-        extensions: crate::agent::harness::host_definition::AgentExt {
+        extensions: crate::agent_registry::host_definition::AgentExt {
             omit_identity: true,
             omit_memory_context: true,
             omit_safety_preamble: true,
@@ -128,7 +128,7 @@ pub(crate) fn test_inherit_parallel_worker_def() -> AgentDefinition {
         delegate_name: None,
         agent_tier: tinyagents_definition::AgentTier::Worker,
         source: DefinitionSource::Builtin,
-        extensions: crate::agent::harness::host_definition::AgentExt {
+        extensions: crate::agent_registry::host_definition::AgentExt {
             omit_identity: true,
             omit_memory_context: true,
             omit_safety_preamble: true,
