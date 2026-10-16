@@ -348,13 +348,16 @@ async fn regenerate_reruns_producer_and_reuses_id() {
     let value = outcome.into_cli_compatible_json().unwrap();
     assert_eq!(value["artifact_id"], meta.id);
     assert_eq!(value["regenerated"], true);
+    // Read the producer's persisted failure before asserting the thin RPC
+    // result so a failed re-dispatch reports the underlying reason.
+    let got = get_artifact(tmp.path(), &meta.id).await.unwrap();
     assert_eq!(
         value["is_error"], false,
-        "regeneration unexpectedly returned a tool error: {value}"
+        "regeneration unexpectedly returned a tool error: {value}; artifact error: {:?}",
+        got.error
     );
 
     // Same id reused in place; the re-run drove it to Ready.
-    let got = get_artifact(tmp.path(), &meta.id).await.unwrap();
     assert_eq!(got.id, meta.id);
     assert_eq!(got.status, ArtifactStatus::Ready);
 }
