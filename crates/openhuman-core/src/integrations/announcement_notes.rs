@@ -34,7 +34,7 @@ pub(crate) fn skill_announcement_note(skill_ids: &[String]) -> Option<String> {
     ))
 }
 
-pub(super) fn skill_retraction_note(skill_ids: &[String]) -> Option<String> {
+pub(crate) fn skill_retraction_note(skill_ids: &[String]) -> Option<String> {
     (!skill_ids.is_empty()).then(|| format!(
         "[skills retracted] These skill(s) were uninstalled during this conversation and are no longer available: {}. \
 Do not attempt to run them with `run_workflow` — they have been removed. Tell the user to reinstall if they want to use them again.",

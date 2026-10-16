@@ -10,7 +10,7 @@
 /// client (BYO Composio API key). The resolved client is dropped
 /// immediately — this is purely a "signed-in vs not" check used by the
 /// spawn-time refresh path. Per-action dispatch resolves a fresh client
-/// elsewhere via [`resolve_composio_route`] so the live `composio.mode`
+/// elsewhere via [`crate::integrations::composio::client::resolve_composio_route`] so the live `composio.mode`
 /// toggle keeps winning.
 ///
 /// Extracted as a free function so the regression suite can exercise

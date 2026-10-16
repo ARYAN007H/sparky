@@ -16,7 +16,7 @@ pub mod types;
 
 pub(crate) mod announcement_notes;
 pub(crate) mod recorded_tools;
-pub(crate) use connected_identities::render_connected_identities;
+pub use connected_identities::render_connected_identities;
 
 pub use client::{build_client, pricing_for_config, IntegrationClient};
 pub use types::{
