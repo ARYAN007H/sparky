@@ -240,9 +240,14 @@ impl PointedInference {
                 .or(request.default_model)
                 .unwrap_or("embed-test-model")
                 .to_string();
+            // Like the hosted provider: the acting profile's own credential
+            // rides as the bearer.
+            let token = openhuman_embed::__host::security::credentials::session_support::resolve_backend_credential(request.config)
+                .map(|credential| credential.secret().to_string())
+                .map_err(anyhow::Error::msg)?;
             let wire = OpenAiModel::compatible_provider(
                 "EmbedTest",
-                "embed-test-token".to_string(),
+                token,
                 base_url.clone(),
                 &model,
             )
