@@ -33,7 +33,7 @@ impl LearningSink for Hook {
     fn name(&self) -> &str {
         self.name
     }
-    async fn on_turn_complete(&self, ctx: &TurnContext) -> anyhow::Result<()> {
+    async fn on_turn_complete(&self, ctx: &TurnContextTurnSummary) -> anyhow::Result<()> {
         self.seen.send(ctx.agent_id.clone().unwrap_or_default())?;
         Ok(())
     }

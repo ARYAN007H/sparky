@@ -50,7 +50,7 @@ impl LearningSink for ProbeHook {
     }
     async fn on_turn_complete(
         &self,
-        _ctx: &openhuman_embed::seams::TurnContext,
+        _ctx: &openhuman_embed::seams::TurnSummary,
     ) -> anyhow::Result<()> {
         Ok(())
     }

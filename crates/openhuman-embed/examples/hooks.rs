@@ -47,7 +47,7 @@ impl openhuman_embed::seams::LearningSink for Counter {
     }
     async fn on_turn_complete(
         &self,
-        _: &openhuman_embed::seams::TurnContext,
+        _: &openhuman_embed::seams::TurnSummary,
     ) -> anyhow::Result<()> {
         self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         Ok(())

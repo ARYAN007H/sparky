@@ -2,7 +2,8 @@
 //! and the ranker tests (one slot for the whole process) serialize on a lock.
 
 use super::*;
-use openhuman_core::agent::hooks::{ToolHookContext, TurnContext};
+use tinyagents_hooks::tool::ToolHookContext;
+use tinyagents_harness::host::TurnSummary;
 use tinytools::{RankCandidate, RankContext, RankError, RankHit, ToolRanker};
 
 static RANKER_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
@@ -32,7 +33,7 @@ impl LearningSink for NamedPostTurn {
     fn name(&self) -> &str {
         self.0
     }
-    async fn on_turn_complete(&self, _ctx: &TurnContext) -> anyhow::Result<()> {
+    async fn on_turn_complete(&self, _ctx: &TurnContextTurnSummary) -> anyhow::Result<()> {
         Ok(())
     }
 }
