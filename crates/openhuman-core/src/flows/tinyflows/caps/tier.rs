@@ -85,7 +85,9 @@ pub(crate) async fn current_tier_policy(
                 .await
                 .map_err(|error| tier_config_error(&error))?;
             if live.recovered_from_corruption {
-                return Err(tier_config_error("live config was recovered from corruption"));
+                return Err(tier_config_error(
+                    "live config was recovered from corruption",
+                ));
             }
             Some(live)
         }
@@ -115,16 +117,18 @@ pub(crate) fn tier_policy_from_config(
         return Ok(policy);
     }
 
-    let config = live_config
-        .ok_or_else(|| tier_config_error("live config snapshot was not provided"))?;
+    let config =
+        live_config.ok_or_else(|| tier_config_error("live config snapshot was not provided"))?;
     if config.autonomy.enabled {
         policy.enabled = true;
         policy.autonomy = config.autonomy.level;
         if let Some(ceiling) = ceiling {
             policy.autonomy = stricter_tier(policy.autonomy, ceiling);
         }
-    } else if let Some(ceiling @ (crate::security::AutonomyLevel::ReadOnly
-    | crate::security::AutonomyLevel::Supervised)) = ceiling
+    } else if let Some(
+        ceiling @ (crate::security::AutonomyLevel::ReadOnly
+        | crate::security::AutonomyLevel::Supervised),
+    ) = ceiling
     {
         // A disabled config contributes no tier restriction; a restrictive
         // host ceiling remains independently active.

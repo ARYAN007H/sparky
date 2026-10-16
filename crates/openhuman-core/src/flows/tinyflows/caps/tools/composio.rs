@@ -127,11 +127,8 @@ impl ToolBackend for ComposioToolBackend {
             Some(&live_config),
             ctx.security,
         )?;
-        let tier_decision = super::super::enforce_node_tier_gate(
-            &tier_policy,
-            composio_class,
-            "tool_call",
-        )?;
+        let tier_decision =
+            super::super::enforce_node_tier_gate(&tier_policy, composio_class, "tool_call")?;
         tracing::debug!(
             target: "flows",
             %slug,

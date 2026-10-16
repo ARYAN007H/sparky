@@ -44,11 +44,8 @@ async fn one_live_capability_observes_full_readonly_full_updates() {
     let mut config = persisted_tier_config(dir.path(), true, AutonomyLevel::Full);
     save_tier_config(&config).await;
     let ctx = live_tier_context(&config);
-    let mut baseline = SecurityPolicy::from_config(
-        &config.autonomy,
-        &config.workspace_dir,
-        &config.action_dir,
-    );
+    let mut baseline =
+        SecurityPolicy::from_config(&config.autonomy, &config.workspace_dir, &config.action_dir);
     baseline.trusted_roots.push(crate::security::TrustedRoot {
         path: dir.path().join("trusted").display().to_string(),
         access: crate::security::TrustedAccess::ReadWrite,
@@ -68,15 +65,11 @@ async fn one_live_capability_observes_full_readonly_full_updates() {
     );
     config.autonomy.level = AutonomyLevel::ReadOnly;
     save_tier_config(&config).await;
-    assert!(enforce_current_node_tier_gate(
-        &ctx,
-        &config,
-        &baseline,
-        CommandClass::Write,
-        "code"
-    )
-    .await
-    .is_err());
+    assert!(
+        enforce_current_node_tier_gate(&ctx, &config, &baseline, CommandClass::Write, "code")
+            .await
+            .is_err()
+    );
 
     config.autonomy.level = AutonomyLevel::Full;
     save_tier_config(&config).await;
@@ -97,20 +90,12 @@ async fn live_tier_reload_failure_fails_closed() {
     let config = persisted_tier_config(dir.path(), true, AutonomyLevel::Full);
     std::fs::create_dir_all(&config.config_path).unwrap();
     let ctx = live_tier_context(&config);
-    let baseline = SecurityPolicy::from_config(
-        &config.autonomy,
-        &config.workspace_dir,
-        &config.action_dir,
-    );
-    let error = enforce_current_node_tier_gate(
-        &ctx,
-        &config,
-        &baseline,
-        CommandClass::Write,
-        "code",
-    )
-    .await
-    .expect_err("a directory at config_path must not fall back to captured Full");
+    let baseline =
+        SecurityPolicy::from_config(&config.autonomy, &config.workspace_dir, &config.action_dir);
+    let error =
+        enforce_current_node_tier_gate(&ctx, &config, &baseline, CommandClass::Write, "code")
+            .await
+            .expect_err("a directory at config_path must not fall back to captured Full");
     assert!(matches!(
         error,
         EngineError::Capability(ref message) if message.contains(POLICY_BLOCKED_MARKER)
@@ -130,20 +115,12 @@ async fn malformed_live_config_is_denied_without_echoing_its_contents() {
     )
     .unwrap();
     let ctx = live_tier_context(&config);
-    let baseline = SecurityPolicy::from_config(
-        &config.autonomy,
-        &config.workspace_dir,
-        &config.action_dir,
-    );
-    let error = enforce_current_node_tier_gate(
-        &ctx,
-        &config,
-        &baseline,
-        CommandClass::Write,
-        "code",
-    )
-    .await
-    .expect_err("malformed persisted policy must deny rather than reuse Full");
+    let baseline =
+        SecurityPolicy::from_config(&config.autonomy, &config.workspace_dir, &config.action_dir);
+    let error =
+        enforce_current_node_tier_gate(&ctx, &config, &baseline, CommandClass::Write, "code")
+            .await
+            .expect_err("malformed persisted policy must deny rather than reuse Full");
     let message = match error {
         EngineError::Capability(message) => message,
         other => panic!("expected capability denial, got {other:?}"),
@@ -174,9 +151,7 @@ async fn captured_agent_and_config_fn_tiers_are_not_replaced_by_parent_file() {
     );
     captured_overlay.autonomy_tier_source =
         Some(crate::core::runtime::AutonomyTierSource::Captured);
-    let captured_ctx = crate::core::runtime::DispatchCtx::new(
-        parent.derive_with(captured_overlay),
-    );
+    let captured_ctx = crate::core::runtime::DispatchCtx::new(parent.derive_with(captured_overlay));
     let captured_policy = SecurityPolicy::from_config(
         &captured.autonomy,
         &captured.workspace_dir,
@@ -208,8 +183,8 @@ async fn captured_agent_and_config_fn_tiers_are_not_replaced_by_parent_file() {
         &captured.workspace_dir,
         &captured.action_dir,
     );
-    let effective = tier_policy_from_config(&capped_ctx, &captured, Some(&parent_file), &baseline)
-        .unwrap();
+    let effective =
+        tier_policy_from_config(&capped_ctx, &captured, Some(&parent_file), &baseline).unwrap();
     assert_eq!(effective.autonomy, AutonomyLevel::Supervised);
     assert_eq!(
         effective.gate_decision(CommandClass::Write),
@@ -219,13 +194,9 @@ async fn captured_agent_and_config_fn_tiers_are_not_replaced_by_parent_file() {
     capped_overlay.autonomy_tier_ceiling = Some(AutonomyLevel::Full);
     let full_ceiling_ctx =
         crate::core::runtime::DispatchCtx::new(parent.derive_with(capped_overlay));
-    let disabled_full_ceiling = tier_policy_from_config(
-        &full_ceiling_ctx,
-        &captured,
-        Some(&parent_file),
-        &baseline,
-    )
-    .unwrap();
+    let disabled_full_ceiling =
+        tier_policy_from_config(&full_ceiling_ctx, &captured, Some(&parent_file), &baseline)
+            .unwrap();
     assert!(!disabled_full_ceiling.enabled);
     assert_eq!(disabled_full_ceiling.autonomy, AutonomyLevel::Full);
     assert_eq!(
@@ -243,13 +214,8 @@ async fn captured_agent_and_config_fn_tiers_are_not_replaced_by_parent_file() {
     host_only_overlay.autonomy_tier_ceiling = Some(AutonomyLevel::ReadOnly);
     let host_only_ctx =
         crate::core::runtime::DispatchCtx::new(parent.derive_with(host_only_overlay));
-    let host_only = tier_policy_from_config(
-        &host_only_ctx,
-        &captured,
-        Some(&parent_file),
-        &baseline,
-    )
-    .unwrap();
+    let host_only =
+        tier_policy_from_config(&host_only_ctx, &captured, Some(&parent_file), &baseline).unwrap();
     assert_eq!(host_only.autonomy, AutonomyLevel::ReadOnly);
     assert_eq!(
         host_only.gate_decision(CommandClass::Write),
@@ -331,7 +297,11 @@ async fn code_adapter_observes_file_backed_tier_changes_between_calls() {
     config.workspace_dir = dir.path().join("workspace");
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
     config.action_dir = dir.path().join("action-is-a-file");
-    std::fs::write(&config.action_dir, "blocks code staging after the tier gate").unwrap();
+    std::fs::write(
+        &config.action_dir,
+        "blocks code staging after the tier gate",
+    )
+    .unwrap();
     config.autonomy = AutonomyConfig {
         enabled: true,
         level: AutonomyLevel::Full,
@@ -366,12 +336,94 @@ async fn code_adapter_observes_file_backed_tier_changes_between_calls() {
     changed.save().await.unwrap();
 
     let err = code
-        .run(tinyflows::caps::CodeLanguage::JavaScript, "return 1;", json!([]))
+        .run(
+            tinyflows::caps::CodeLanguage::JavaScript,
+            "return 1;",
+            json!([]),
+        )
         .await
         .expect_err("the next call must observe the persisted ReadOnly tier");
     assert!(
         matches!(err, EngineError::Capability(ref message) if message.contains(POLICY_BLOCKED_MARKER)),
         "tier downgrade must block before staging or execution; got {err:?}"
+    );
+}
+
+#[tokio::test]
+async fn native_adapter_uses_live_upgrade_for_filesystem_write() {
+    use crate::security::{AutonomyLevel, SecurityPolicy};
+
+    let dir = tempfile::tempdir().unwrap();
+    let mut captured = persisted_tier_config(dir.path(), true, AutonomyLevel::ReadOnly);
+    save_tier_config(&captured).await;
+    let mut live = captured.clone();
+    live.autonomy.level = AutonomyLevel::Full;
+    save_tier_config(&live).await;
+
+    let tools = OpenHumanTools {
+        ctx: live_tier_context(&captured),
+        config: Arc::new(captured.clone()),
+        security: Arc::new(SecurityPolicy::from_config(
+            &captured.autonomy,
+            &captured.workspace_dir,
+            &captured.action_dir,
+        )),
+        approval: Default::default(),
+    };
+    tools
+        .invoke(
+            "oh:file_write",
+            json!({ "path": "tier-upgrade.txt", "content": "written" }),
+            None,
+        )
+        .await
+        .expect("live Full tier and downstream filesystem gate must allow the write");
+    assert_eq!(
+        std::fs::read_to_string(captured.action_dir.join("tier-upgrade.txt")).unwrap(),
+        "written"
+    );
+}
+
+#[tokio::test]
+async fn http_adapter_passes_its_live_upgrade_to_the_http_gate_without_egress() {
+    use crate::security::{AutonomyLevel, SecurityPolicy};
+
+    let dir = tempfile::tempdir().unwrap();
+    let captured = persisted_tier_config(dir.path(), true, AutonomyLevel::ReadOnly);
+    save_tier_config(&captured).await;
+    let mut live = captured.clone();
+    live.autonomy.level = AutonomyLevel::Full;
+    save_tier_config(&live).await;
+    let http = OpenHumanHttp {
+        ctx: live_tier_context(&captured),
+        config: Arc::new(captured.clone()),
+        security: Arc::new(SecurityPolicy::from_config(
+            &captured.autonomy,
+            &captured.workspace_dir,
+            &captured.action_dir,
+        )),
+        http_config: HttpRequestConfig {
+            allowed_domains: vec!["example.com".to_string()],
+            ..Default::default()
+        },
+        http_creds: Arc::new(HttpCredentialsStore::from_config(&captured)),
+        approval: Default::default(),
+    };
+
+    // The URL is syntactically invalid, so the inner HTTP tool rejects it
+    // before DNS or network access. Reaching that validation proves its
+    // NetGate received the same live Full policy as the outer tier decision.
+    let error = http
+        .request(json!({ "method": "GET", "url": "not-a-url" }), None)
+        .await
+        .expect_err("invalid URL must fail before network access");
+    let message = match error {
+        EngineError::Capability(message) => message,
+        other => panic!("expected capability error, got {other:?}"),
+    };
+    assert!(
+        !message.contains("autonomy is read-only"),
+        "downstream NetGate used the stale ReadOnly policy: {message}"
     );
 }
 

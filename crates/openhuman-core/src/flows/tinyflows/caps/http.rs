@@ -179,7 +179,8 @@ impl HttpClient for OpenHumanHttp {
         // `gate_call_for_tier` is what actually performs the `Prompt` round-trip
         // — it escalates a Supervised `Prompt` decision into a forced approval
         // regardless of the flow's own `require_approval` toggle (Codex P1).
-        let security = Arc::new(current_tier_policy(&self.ctx, &self.config, &self.security).await?);
+        let security =
+            Arc::new(current_tier_policy(&self.ctx, &self.config, &self.security).await?);
         let tier_decision =
             enforce_node_tier_gate(&security, CommandClass::Network, "http_request")?;
 

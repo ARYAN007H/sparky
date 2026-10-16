@@ -54,10 +54,7 @@ fn autonomy_tier_source_and_ceiling_survive_derived_contexts() {
         child.autonomy_tier_source(),
         crate::core::runtime::AutonomyTierSource::Captured
     );
-    assert_eq!(
-        child.autonomy_tier_ceiling(),
-        Some(AutonomyLevel::ReadOnly)
-    );
+    assert_eq!(child.autonomy_tier_ceiling(), Some(AutonomyLevel::ReadOnly));
 
     let mut source_override = overlay("/tmp/autonomy-source-override");
     source_override.autonomy_tier_source =
