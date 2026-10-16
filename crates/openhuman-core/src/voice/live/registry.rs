@@ -113,16 +113,20 @@ pub(super) fn configure(
     }
 }
 
-/// Connects the registered provider `provider`, or `None` when none is
-/// registered under that slug.
-pub(super) async fn prepare(
-    config: &Config,
+/// The registered entry for `provider`, if any.
+pub(super) fn lookup(provider: &str) -> Option<LiveProviderEntry> {
+    LIVE_PROVIDERS.get(provider)
+}
+
+/// Connects `provider` through its registered entry.
+pub(super) async fn prepare_with(
+    entry: &LiveProviderEntry,
     provider: &str,
+    config: &Config,
     live: LiveConfig,
-) -> Option<Result<PreparedProvider, LiveVoiceError>> {
-    let entry = LIVE_PROVIDERS.get(provider)?;
+) -> Result<PreparedProvider, LiveVoiceError> {
     tracing::debug!(provider, "[voice-live] preparing via registered provider");
-    Some((entry.prepare)(config.clone(), live).await)
+    (entry.prepare)(config.clone(), live).await
 }
 
 #[cfg(test)]

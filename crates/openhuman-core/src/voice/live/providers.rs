@@ -191,8 +191,8 @@ pub(crate) async fn prepare(
     provider: &str,
     mut live: LiveConfig,
 ) -> Result<PreparedProvider, LiveVoiceError> {
-    if let Some(prepared) = super::registry::prepare(config, provider, live.clone()).await {
-        return prepared;
+    if let Some(entry) = super::registry::lookup(provider) {
+        return super::registry::prepare_with(&entry, provider, config, live).await;
     }
     match provider {
         LIVE_PROVIDER_GEMINI_HOSTED => {
