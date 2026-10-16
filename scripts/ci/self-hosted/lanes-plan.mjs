@@ -563,7 +563,18 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           when: areas.storage,
           run:
             `cargo test -p openhuman --features ${STORAGE_DRIVERS} --lib --` +
-            STORAGE_LIB_FILTERS.map((f) => ` ${f}`).join(""),
+            STORAGE_LIB_FILTERS.map((f) => ` ${f}`).join("") +
+            " --skip cron::bus_host::tests:: --skip cron::documents_port::tests::",
+        },
+        {
+          // TinyFlows owns a process-global module host during these tests.
+          // Keep them out of the broad storage test process, where unrelated
+          // cron tests can replace handlers while a callback is executing.
+          name: "cron-module-tests",
+          when: areas.storage,
+          run:
+            `cargo test -p openhuman --features ${STORAGE_DRIVERS} --lib --` +
+            " cron::bus_host::tests:: cron::documents_port::tests:: --test-threads=1",
         },
         {
           name: "storage-session-store-tests",
