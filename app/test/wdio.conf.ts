@@ -31,6 +31,10 @@ const tsconfigE2ePath = path.join(projectRoot, 'test', 'tsconfig.e2e.json');
 const testSpecsPath = path.join(projectRoot, 'test', 'e2e', 'specs', '**', '*.spec.ts');
 
 function linuxAppPath(): string {
+  // e2e-run-session creates a private launcher that restores the test-only
+  // environment for the app process started by WebKitWebDriver.
+  const e2eLauncher = process.env.OPENHUMAN_E2E_APP_BINARY;
+  if (e2eLauncher && fs.existsSync(e2eLauncher)) return e2eLauncher;
   const candidate = path.join(
     projectRoot,
     '..',

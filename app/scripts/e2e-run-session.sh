@@ -334,6 +334,35 @@ APP_BIN="$(resolve_app_binary)"
 # Linux builds use Tauri's Wry/WebKit runtime, not CEF. Drive that native
 # webview through tauri-driver instead of waiting for a Chromium CDP endpoint.
 if [ "$OS" = "Linux" ] && [ "${E2E_USE_TAURI_DRIVER:-0}" = "1" ]; then
+  if [ -z "${APP_BIN:-}" ] || [ ! -x "$APP_BIN" ]; then
+    echo "ERROR: built OpenHuman binary not found. Run 'pnpm test:e2e:build' first." >&2
+    exit 1
+  fi
+
+  # WebKitWebDriver may launch the Tauri binary with a reduced environment.
+  # Re-enter the runner's E2E-only settings through a private wrapper so the
+  # in-process core sees the mock backend, isolated workspace and master key.
+  E2E_APP_WRAPPER="$OPENHUMAN_WORKSPACE/openhuman-e2e-launcher"
+  {
+    printf '#!/usr/bin/env bash\nset -euo pipefail\n'
+    for env_name in \
+      BACKEND_URL VITE_BACKEND_URL OPENHUMAN_WORKSPACE OPENHUMAN_E2E_MODE \
+      OPENHUMAN_KEYRING_BACKEND OPENHUMAN_KEYRING_MASTER_KEY \
+      OPENHUMAN_KEYRING_MASTER_KEY_FILE OPENHUMAN_MODULE_PATH \
+      OPENHUMAN_TINYMCP_TEST_MODULE OPENHUMAN_CEF_CACHE_PATH \
+      OPENHUMAN_SERVICE_MOCK OPENHUMAN_SERVICE_MOCK_STATE_FILE \
+      OPENHUMAN_TELEGRAM_BOT_API_BASE OPENHUMAN_COMPOSIO_DIRECT_BASE_V2 \
+      OPENHUMAN_COMPOSIO_DIRECT_BASE_V3 XDG_DATA_HOME; do
+      if declare -p "$env_name" >/dev/null 2>&1; then
+        printf 'export %s=%q\n' "$env_name" "${!env_name}"
+      fi
+    done
+    printf 'exec %q "$@"\n' "$APP_BIN"
+  } > "$E2E_APP_WRAPPER"
+  chmod 700 "$E2E_APP_WRAPPER"
+  export OPENHUMAN_E2E_APP_BINARY="$E2E_APP_WRAPPER"
+  echo "[runner] Created private E2E app launcher with the mock runtime environment"
+
   TAURI_DRIVER_PORT="${TAURI_DRIVER_PORT:-4444}"
   TAURI_DRIVER_LOG="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/tauri-driver-${LOG_SUFFIX}.log"
   echo "[runner] Starting tauri-driver on port $TAURI_DRIVER_PORT"
