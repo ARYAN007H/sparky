@@ -15,7 +15,7 @@ use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolExposure, ToolResult
 use super::cache::{self, InlineEntry};
 use super::resolve::{MAX_RESOURCE_BYTES, MAX_STRUCTURED_BYTES};
 use super::types::{McpUiPresentation, UiCsp, UiFlavor, UiResource, MCP_APP_MIME, MCP_UI_KIND};
-use tinymcp::ui::extract_links;
+use tinymcp_bus::ui::extract_links;
 
 /// The tool's registered name.
 pub const SHOW_UI_TOOL: &str = "show_ui";
