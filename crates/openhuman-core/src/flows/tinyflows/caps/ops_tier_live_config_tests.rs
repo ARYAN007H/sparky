@@ -72,12 +72,18 @@ async fn one_live_capability_observes_full_readonly_full_updates() {
         path: dir.path().join("trusted").display().to_string(),
         access: crate::security::TrustedAccess::ReadWrite,
     });
+    baseline.max_actions_per_hour = 2;
     baseline.tracker.record();
     let fresh = current_tier_policy(&ctx, &config, &baseline).await.unwrap();
     assert_eq!(fresh.workspace_dir, baseline.workspace_dir);
     assert_eq!(fresh.action_dir, baseline.action_dir);
     assert_eq!(fresh.trusted_roots, baseline.trusted_roots);
     assert_eq!(fresh.tracker.count(), baseline.tracker.count());
+    assert!(fresh.record_action());
+    assert_eq!(baseline.tracker.count(), 2);
+    let next_refresh = current_tier_policy(&ctx, &config, &baseline).await.unwrap();
+    assert!(next_refresh.is_rate_limited());
+    assert_eq!(next_refresh.tracker.count(), 2);
 
     assert_eq!(
         enforce_current_node_tier_gate(&ctx, &config, &baseline, CommandClass::Write, "code")

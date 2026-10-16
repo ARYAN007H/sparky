@@ -104,6 +104,7 @@ pub(crate) fn tier_policy_from_config(
     baseline: &SecurityPolicy,
 ) -> Result<SecurityPolicy> {
     let mut policy = baseline.clone();
+    policy.tracker = baseline.tracker.shared_clone();
     let ceiling = ctx.autonomy_tier_ceiling();
     if ctx.autonomy_tier_source() == crate::core::runtime::AutonomyTierSource::Captured {
         if let Some(ceiling) = ceiling {
