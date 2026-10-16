@@ -57,5 +57,8 @@ pub const FILE_STORAGE_SOURCE_ID: &str = "tinyhumans-file-storage";
 pub const INTEGRATION_TOOLS_SOURCE_ID: &str = "tinyhumans-integrations";
 
 #[cfg(test)]
+mod test_support;
+
+#[cfg(test)]
 #[path = "mod_tests.rs"]
 mod tests;
