@@ -11,6 +11,25 @@ fn build(agent: &str) -> BackgroundJob {
     }
 }
 
+#[test]
+fn corrupt_job_queue_file_is_set_aside() {
+    let tmp = tempfile::tempdir().unwrap();
+    let file = path(tmp.path());
+    std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+    std::fs::write(&file, b"{\"pending\":[").unwrap();
+    let store = FileQueueStore { file: file.clone() };
+
+    assert_eq!(store.load(), QueueState::default());
+    assert!(
+        !file.exists(),
+        "corrupt queue must not be silently replaced"
+    );
+    assert_eq!(
+        std::fs::read(file.with_extension("json.corrupt")).unwrap(),
+        b"{\"pending\":["
+    );
+}
+
 #[tokio::test]
 async fn duplicates_merge_and_the_queue_survives_a_reload() {
     let tmp = tempfile::tempdir().unwrap();
