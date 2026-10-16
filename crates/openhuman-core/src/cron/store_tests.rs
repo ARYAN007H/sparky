@@ -189,6 +189,7 @@ fn successive_patches_each_land_on_the_stored_job() {
     )
     .unwrap();
 
+    assert_eq!(job.agent_id.as_deref(), Some("teeny"), "the definition id is stored");
     let renamed = update_job(
         &config,
         &job.id,
