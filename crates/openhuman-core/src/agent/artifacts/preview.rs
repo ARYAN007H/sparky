@@ -48,7 +48,12 @@ pub struct ArtifactBody {
 /// read.
 pub async fn read_body(config: &Config, id: &str) -> Result<ArtifactBody, String> {
     let files = super::files::FileRoots::from_config(config);
-    let mut roots: Vec<PathBuf> = vec![config.action_dir.clone()];
+    // Where a file version may live: its own kept copy, the agent's working
+    // folder, or the files folders.
+    let mut roots: Vec<PathBuf> = vec![
+        super::tiny_store::version_files_dir(&config.workspace_dir),
+        config.action_dir.clone(),
+    ];
     roots.extend(files.trusted().iter().cloned());
     let record = super::tiny_store::artifacts_service(
         &config.workspace_dir,

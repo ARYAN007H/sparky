@@ -79,11 +79,12 @@ async fn upload_body(
         let bytes = tokio::fs::read(path)
             .await
             .map_err(|e| anyhow::anyhow!("cannot read the artifact's file: {e}"))?;
-        let name = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("artifact")
-            .to_string();
+        // Named after the artifact: the file read may be a kept version copy
+        // (`v2.pptx`), whose name means nothing to whoever opens the link.
+        let name = match path.extension().and_then(|e| e.to_str()) {
+            Some(ext) => format!("{}.{ext}", file_stem(&record.title)),
+            None => file_stem(&record.title),
+        };
         let mime = mime_for_path(path);
         return Ok((bytes, name, mime));
     }

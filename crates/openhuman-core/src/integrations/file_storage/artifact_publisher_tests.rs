@@ -104,7 +104,7 @@ async fn a_public_file_share_uses_the_public_url_and_makes_no_link() {
     Mock::given(method("POST"))
         .and(path("/agent-integrations/file-storage/files"))
         .and(body_string_contains("PNG-BYTES"))
-        .and(body_string_contains("filename=\"chart.png\""))
+        .and(body_string_contains("filename=\"Chart.png\""))
         .and(body_string_contains("public"))
         .respond_with(uploaded(Some("https://api.example/public/file-1")))
         .expect(1)

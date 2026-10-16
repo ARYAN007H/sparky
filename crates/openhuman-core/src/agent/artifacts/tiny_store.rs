@@ -122,14 +122,25 @@ impl LegacyUiBridge {
         else {
             return Ok(());
         };
-        // A producer writes its file straight into the row it reserved: the
-        // row only needs marking ready (re-reserving would flash its card
-        // back to "generating").
+        // A file version lands in the file its card already owns: copy it there
+        // (a producer has usually written that file itself) and mark the card
+        // ready. Re-reserving would flash the card back to "generating".
         if let Some(file) = latest.file.as_ref() {
             if let Ok(meta) = super::store::get_artifact(&self.workspace_dir, &record.id).await {
-                let owned = meta.file.as_deref().map(Path::new);
-                if owned.is_some_and(|owned| same_file(owned, Path::new(&file.path))) {
-                    let size = tokio::fs::metadata(&file.path).await?.len();
+                let owned = meta.file.as_deref().map(Path::new).filter(|owned| {
+                    owned
+                        .extension()
+                        .and_then(|e| e.to_str())
+                        .map(str::to_ascii_lowercase)
+                        == Some(ext.clone())
+                });
+                if let Some(owned) = owned {
+                    let source = Path::new(&file.path);
+                    let size = if same_file(owned, source) {
+                        tokio::fs::metadata(source).await?.len()
+                    } else {
+                        tokio::fs::copy(source, owned).await?
+                    };
                     super::store::finalize_artifact(
                         &self.workspace_dir,
                         &record.id,
@@ -235,6 +246,17 @@ pub fn artifacts_service(
     Artifacts::new(Arc::new(versioned_store(workspace_dir)))
         .with_observer(Arc::new(LegacyUiBridge::new(workspace_dir, files, chat)))
         .with_file_roots(tiny_artifacts::FileRoots::new(roots))
+        .with_version_files(version_files_dir(workspace_dir))
+}
+
+/// Where each file version keeps its own copy:
+/// `<workspace>/artifacts/versioned/files/<id>/v<N>.<ext>`. The visible file
+/// in the files folder shows the newest version.
+pub fn version_files_dir(workspace_dir: &Path) -> PathBuf {
+    workspace_dir
+        .join("artifacts")
+        .join(VERSIONED_SUBDIR)
+        .join("files")
 }
 
 /// Build the artifact tools bound to this workspace's service: the crate's
