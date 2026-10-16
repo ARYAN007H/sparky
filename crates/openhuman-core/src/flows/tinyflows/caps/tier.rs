@@ -93,17 +93,26 @@ pub(crate) async fn current_tier_policy(
 /// snapshot for another part of its operation (Composio integrations).
 pub(crate) fn tier_policy_from_config(
     ctx: &crate::core::runtime::DispatchCtx,
-    captured_config: &crate::config::Config,
+    _captured_config: &crate::config::Config,
     live_config: Option<&crate::config::Config>,
     baseline: &SecurityPolicy,
 ) -> Result<SecurityPolicy> {
-    let config = match ctx.autonomy_tier_source() {
-        crate::core::runtime::AutonomyTierSource::Captured => captured_config,
-        crate::core::runtime::AutonomyTierSource::LiveConfig => live_config
-            .ok_or_else(|| tier_config_error("live config snapshot was not provided"))?,
-    };
     let mut policy = baseline.clone();
     let ceiling = ctx.autonomy_tier_ceiling();
+    if ctx.autonomy_tier_source() == crate::core::runtime::AutonomyTierSource::Captured {
+        if let Some(ceiling) = ceiling {
+            if policy.enabled {
+                policy.autonomy = stricter_tier(policy.autonomy, ceiling);
+            } else if ceiling != crate::security::AutonomyLevel::Full {
+                policy.enabled = true;
+                policy.autonomy = ceiling;
+            }
+        }
+        return Ok(policy);
+    }
+
+    let config = live_config
+        .ok_or_else(|| tier_config_error("live config snapshot was not provided"))?;
     if config.autonomy.enabled {
         policy.enabled = true;
         policy.autonomy = config.autonomy.level;
