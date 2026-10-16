@@ -34,7 +34,7 @@ use tinytools::{PermissionLevel, Tool, ToolResult};
 
 use crate::agent::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
 use crate::config::Config;
-use crate::memory::types::{LearnParams, RecallParams};
+use crate::memory::types::{ForgetParams, ItemsListParams, LearnParams, RecallParams};
 use crate::memory::{MemoryError, MemoryResult};
 use crate::security::policy::ToolOperation;
 use crate::security::SecurityPolicy;
@@ -168,14 +168,31 @@ pub async fn remember_keyed(
     // Fail with MEMORY_OFF before touching anything.
     crate::memory::engine::resolve(config).engine()?;
     let key_tag = flow_key_tag(flow_id, key);
-    let replaced = forget_matching(
-        config,
-        MetaFilter {
-            tags_any: vec![key_tag.clone()],
-            ..MetaFilter::default()
-        },
-    )
-    .await?;
+    // Take a scoped snapshot before writing. If learning fails, this leaves
+    // the prior value intact; deleting by these ids after learning also keeps
+    // a concurrent write that was absent from the snapshot.
+    let mut old_ids = Vec::new();
+    let mut cursor = None;
+    loop {
+        let page = crate::memory::ops::items_list(
+            config,
+            ItemsListParams {
+                filter: Some(MetaFilter {
+                    tags_any: vec![key_tag.clone()],
+                    ..MetaFilter::default()
+                }),
+                limit: Some(crate::memory::types::MAX_LIMIT),
+                cursor,
+                ..ItemsListParams::default()
+            },
+        )
+        .await?;
+        old_ids.extend(page.items.into_iter().map(|item| item.id.0));
+        cursor = page.next_cursor;
+        if cursor.is_none() {
+            break;
+        }
+    }
     // A flow's own key/value state: searchable, but nothing is derived from
     // it as memory about the user.
     let mut meta = flow_meta(flow_id, &[key_tag]);
@@ -191,6 +208,23 @@ pub async fn remember_keyed(
         Some(meta),
     )
     .await?;
+    let obsolete_ids: Vec<String> = old_ids
+        .into_iter()
+        .filter(|id| id != &view.id)
+        .collect();
+    let replaced = if obsolete_ids.is_empty() {
+        0
+    } else {
+        crate::memory::ops::forget(
+            config,
+            ForgetParams {
+                ids: obsolete_ids,
+                reach: None,
+            },
+        )
+        .await?
+        .forgotten
+    };
     tracing::debug!(
         flow_id = %flow_id,
         key_chars = key.chars().count(),
