@@ -428,7 +428,7 @@ impl CoreContext {
             autonomy_tier_source: overlay
                 .autonomy_tier_source
                 .unwrap_or(self.autonomy_tier_source),
-            autonomy_tier_ceiling: stricter_autonomy_ceiling(
+            autonomy_tier_ceiling: overlay::stricter_autonomy_ceiling(
                 self.autonomy_tier_ceiling,
                 overlay.autonomy_tier_ceiling,
             ),
@@ -600,20 +600,6 @@ impl CoreContext {
     /// same rule as [`DispatchCtx::spawn`](crate::core::runtime::DispatchCtx::spawn).
     pub fn propagate<F: Future>(fut: F) -> impl Future<Output = F::Output> {
         super::spawn::carry(fut)
-    }
-}
-
-fn stricter_autonomy_ceiling(
-    left: Option<crate::security::AutonomyLevel>,
-    right: Option<crate::security::AutonomyLevel>,
-) -> Option<crate::security::AutonomyLevel> {
-    use crate::security::AutonomyLevel::{Full, ReadOnly, Supervised};
-
-    match (left, right) {
-        (None, ceiling) | (ceiling, None) => ceiling,
-        (Some(ReadOnly), _) | (_, Some(ReadOnly)) => Some(ReadOnly),
-        (Some(Supervised), _) | (_, Some(Supervised)) => Some(Supervised),
-        (Some(Full), Some(Full)) => Some(Full),
     }
 }
 
