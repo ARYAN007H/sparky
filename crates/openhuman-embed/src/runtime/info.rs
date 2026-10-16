@@ -1,8 +1,8 @@
 //! Versioned, credential-safe runtime capability metadata.
 use super::{LearningSettings, ModelDefaults, Runtime, RuntimeBuilder};
 use openhuman_core::config::{
-    schema::{AutonomyConfig, CronConfig, PrivacyConfig, SecretsConfig},
     Config,
+    schema::{AutonomyConfig, CronConfig, PrivacyConfig, SecretsConfig},
 };
 use std::collections::BTreeMap;
 

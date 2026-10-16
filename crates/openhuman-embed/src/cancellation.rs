@@ -47,6 +47,6 @@ impl Cancellation {
 pub(crate) struct Guard(Cancellation);
 impl Drop for Guard {
     fn drop(&mut self) {
-        self.0 .0.active.send_modify(|count| *count -= 1);
+        self.0.0.active.send_modify(|count| *count -= 1);
     }
 }

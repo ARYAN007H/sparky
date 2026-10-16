@@ -28,7 +28,7 @@ impl ProfileHostOptions {
             Some(ToolScopeSpec::Wildcard) => {
                 return Err(ProfileError::Boot(
                     "profile tools require a named or host-only scope".into(),
-                ))
+                ));
             }
             Some(ToolScopeSpec::Named(names)) => Some(names.into_iter().collect()),
             _ => None,

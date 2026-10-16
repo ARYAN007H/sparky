@@ -23,14 +23,14 @@
 use std::sync::Arc;
 
 use openhuman_core::agent::hooks::{
-    embedder_post_turn_hooks, embedder_tool_hooks, replace_embedder_post_turn_hook,
-    replace_embedder_tool_hook, PostTurnHook, ToolHook,
+    PostTurnHook, ToolHook, embedder_post_turn_hooks, embedder_tool_hooks,
+    replace_embedder_post_turn_hook, replace_embedder_tool_hook,
 };
 use openhuman_core::agent::tinyagents::discovery::{
     clear_tool_ranker, install_tool_ranker, installed_tool_ranker,
 };
-use openhuman_core::core::all::{register_controller_extension, ControllerExtension};
-use openhuman_core::core::server_launcher::{install_server_launcher, ServerLauncher};
+use openhuman_core::core::all::{ControllerExtension, register_controller_extension};
+use openhuman_core::core::server_launcher::{ServerLauncher, install_server_launcher};
 use openhuman_core::security::SecurityPolicy;
 use openhuman_core::storage::StorageBackend;
 use tinytools::ToolRanker;

@@ -8,7 +8,7 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex, Weak};
 use std::task::{Context, Poll};
 use tokio::sync::broadcast;
-use tokio_stream::wrappers::{errors::BroadcastStreamRecvError, BroadcastStream};
+use tokio_stream::wrappers::{BroadcastStream, errors::BroadcastStreamRecvError};
 use {openhuman_core::core::bus::BUS, tinybus::EventHandler, tinybus::SubscriptionHandle};
 
 /// Metadata about one runtime transition; never includes user/tool payloads.
