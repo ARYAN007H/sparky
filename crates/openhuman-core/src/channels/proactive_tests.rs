@@ -79,13 +79,6 @@ fn proactive_event() -> DomainEvent {
 }
 
 #[tokio::test]
-async fn web_only_does_not_panic() {
-    let sub = ProactiveMessageSubscriber::web_only();
-    // Should publish to web channel and not panic.
-    sub.handle(&proactive_event()).await;
-}
-
-#[tokio::test]
 async fn routes_to_active_external_channel() {
     let send_count = Arc::new(AtomicUsize::new(0));
     let outbound_intent_count = Arc::new(AtomicUsize::new(0));

@@ -151,9 +151,9 @@ impl EventHandler<DomainEvent> for ProactiveMessageSubscriber {
         );
 
         // Deliver to the active external channel when configured. The web
-        // destination is handled independently by `web_chat::proactive`.
-        //    The `channels_set_default` RPC mutates this handle in place (issue
-        //    #3712), so reading it here picks up a live default-channel switch.
+        // destination is handled independently by `web_chat::proactive`. The
+        // `channels_set_default` RPC mutates this handle in place (issue #3712),
+        // so reading it here picks up a live default-channel switch.
         let active = self
             .active_channel
             .read()
@@ -196,8 +196,8 @@ impl EventHandler<DomainEvent> for ProactiveMessageSubscriber {
                 // Proactive sends to Telegram/Discord/Slack/etc.
                 // are outbound writes — route through the gate
                 // before handing off to the channel implementation.
-                // Web delivery above is internal and exempt. When
-                // the gate persists an approval row, we keep its
+                // The web subscriber is an internal destination and exempt.
+                // When the gate persists an approval row, we keep its
                 // request id so we can record the delivery
                 // outcome after `ch.send` returns (issue #2135).
                 let mut approval_request_id: Option<String> = None;

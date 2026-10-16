@@ -75,7 +75,7 @@ fn domain_subscriber_plan_harness_gates_by_owning_group() {
     assert!(!plan.platform, "harness excludes the platform domain");
     assert!(
         !plan.channels,
-        "harness must skip channel-inbound + web-only proactive"
+        "harness must skip channel-inbound subscriber"
     );
     assert!(!plan.flows, "harness must skip flows trigger dispatch");
     assert!(
