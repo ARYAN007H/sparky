@@ -296,30 +296,34 @@ run_in_process_modules() {
     [ -n "$module" ] || continue
     echo "[rust-e2e]   in_process module: ${module}"
     if [ "$module" = "domain_modules_e2e" ]; then
-      # Each test boots and tears down the in-process RPC host. MCP tests also
-      # use TinyMCP's process-global module runtime, so they cannot share a
-      # process with another test that shuts that runtime down.
-      local test_names test_name
-      test_names="$(bash "$SCRIPT_DIR/ci-cancel-aware.sh" "$CARGO_BIN" test \
+      # MCP tests use TinyMCP's process-global runtime. A different test's RPC
+      # host teardown can close it, so keep those three cases in fresh
+      # processes while the other domain tests share their usual harness.
+      local -a isolated_mcp_tests=(
+        domain_modules_e2e::mcp_audit_list_dispatches_internally_and_stays_out_of_the_schema_dump
+        domain_modules_e2e::mcp_clients_read_paths_validate_before_reaching_outward
+        domain_modules_e2e::mcp_tool_description_scan_flags_injection_and_spares_ordinary_prose
+      )
+      local -a skip_mcp_tests=()
+      local test_name
+      for test_name in "${isolated_mcp_tests[@]}"; do
+        skip_mcp_tests+=(--skip "$test_name")
+      done
+      bash "$SCRIPT_DIR/ci-cancel-aware.sh" "$CARGO_BIN" test \
         --manifest-path Cargo.toml --features "$PRODUCT_FEATURES" \
-        --test in_process_all -- "${module}::" --list | sed -n 's/: test$//p')"
-      if [ -z "$test_names" ]; then
-        echo "::error::in_process module ${module} selected no tests" >&2
-        return 1
-      fi
-      while IFS= read -r test_name; do
-        [ -n "$test_name" ] || continue
+        --test in_process_all -- "${module}::" --test-threads=1 \
+        "${skip_mcp_tests[@]}" ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
+      for test_name in "${isolated_mcp_tests[@]}"; do
         echo "[rust-e2e]     isolated test: ${test_name}"
         bash "$SCRIPT_DIR/ci-cancel-aware.sh" "$CARGO_BIN" test \
           --manifest-path Cargo.toml --features "$PRODUCT_FEATURES" \
           --test in_process_all -- "$test_name" --exact ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
-      done <<< "$test_names"
+      done
       continue
     fi
-    local -a suite_args=()
     bash "$SCRIPT_DIR/ci-cancel-aware.sh" "$CARGO_BIN" test \
       --manifest-path Cargo.toml --features "$PRODUCT_FEATURES" \
-      --test in_process_all -- "${module}::" ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"} "${suite_args[@]}"
+      --test in_process_all -- "${module}::" ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
   done < <(
     find "$REPO_ROOT/tests/in_process" -maxdepth 1 -type f -name '*.rs' -print |
       sed -e 's#.*/##' -e 's#\.rs$##' |
