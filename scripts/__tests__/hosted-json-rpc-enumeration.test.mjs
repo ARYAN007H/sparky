@@ -50,8 +50,8 @@ if [[ "$*" == *"--test json_rpc_e2e"* ]]; then
   echo EXECUTED-JSON-RPC
 fi
 if [[ "$*" == *"test -p openhuman --lib"* ]]; then
-  [[ -n "\${XDG_CACHE_HOME:-}" && "$XDG_CACHE_HOME" == "\${XDG_DATA_HOME:-}" && -d "$XDG_CACHE_HOME" ]] || {
-    echo "core tests need a private XDG cache alongside their private XDG data directory" >&2
+  [[ -n "\${XDG_CACHE_HOME:-}" && -n "\${XDG_DATA_HOME:-}" && "$XDG_CACHE_HOME" != "$XDG_DATA_HOME" && -d "$XDG_CACHE_HOME" && -d "$XDG_DATA_HOME" ]] || {
+    echo "core tests need separate private XDG cache and data directories" >&2
     exit 13
   }
   echo PRIVATE-XDG-CACHE

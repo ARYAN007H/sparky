@@ -53,14 +53,17 @@ test("Rust E2E keeps module cache paths out of a shared runner home", (t) => {
       output.trim().split("\n").map((line) => line.split("=", 2)),
     );
     assert.ok(values.DATA, output);
-    assert.equal(values.CACHE, values.DATA, output);
+    assert.ok(values.CACHE && values.CACHE !== values.DATA, output);
     assert.equal(values.CREATED_DATA, values.DATA, output);
-    assert.equal(values.CREATED_CACHE, "", output);
+    assert.equal(values.CREATED_CACHE, values.CACHE, output);
     assert.equal(fs.statSync(values.DATA).mode & 0o777, 0o700);
+    assert.equal(fs.statSync(values.CACHE).mode & 0o777, 0o700);
     assert.ok(!values.DATA.startsWith(home), output);
   } finally {
     const createdData = output?.match(/^CREATED_DATA=(.*)$/m)?.[1];
+    const createdCache = output?.match(/^CREATED_CACHE=(.*)$/m)?.[1];
     if (createdData) fs.rmSync(createdData, { recursive: true, force: true });
+    if (createdCache) fs.rmSync(createdCache, { recursive: true, force: true });
     fs.rmSync(home, { recursive: true, force: true });
   }
 });
