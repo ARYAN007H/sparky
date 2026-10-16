@@ -420,7 +420,11 @@ fn awaiting_input_record_prefix(task_id: &str) -> String {
 }
 
 fn awaiting_input_record_id(task_id: &str) -> String {
-    format!("{}{ }", awaiting_input_record_prefix(task_id), uuid::Uuid::new_v4().simple())
+    format!(
+        "{}{}",
+        awaiting_input_record_prefix(task_id),
+        uuid::Uuid::new_v4().simple()
+    )
 }
 
 /// Drop every workspace's router and all process-local state about them. Called
