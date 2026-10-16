@@ -30,7 +30,6 @@
 pub mod budget_gate;
 mod bundle;
 pub mod definition_registry;
-pub mod delegation;
 mod operation_context;
 pub mod run_context;
 pub mod security_gate;
