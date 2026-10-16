@@ -4008,12 +4008,14 @@ dependencies = [
  "thiserror 2.0.20",
  "tinychannels-bus",
  "tinyhumans-sdk",
+ "tinyinference-providers",
  "tinyjevclient",
  "tinytools",
  "tinytools-jev",
  "tokio",
  "tracing",
  "url",
+ "urlencoding",
 ]
 
 [[package]]
