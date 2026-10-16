@@ -2,7 +2,7 @@
 //! turn-deadline wind-down, the two graceful pauses of a top-level turn.
 
 use super::*;
-use crate::agent::stop_hooks::BudgetStopHook;
+use tinyagents_hooks::stop::BudgetStopHook;
 use crate::agent::tinyagents::TurnModelSource;
 use async_trait::async_trait;
 use std::sync::Arc;

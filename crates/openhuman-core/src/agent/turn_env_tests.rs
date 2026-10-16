@@ -1,5 +1,5 @@
 use super::*;
-use crate::agent::stop_hooks::BudgetStopHook;
+use tinyagents_hooks::stop::BudgetStopHook;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 use std::sync::Arc;
 use std::time::Duration;
