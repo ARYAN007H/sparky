@@ -38,10 +38,9 @@ fn proactive_approval_gate() -> Option<Arc<crate::security::approval::ApprovalGa
     None
 }
 
-/// Register a web-only proactive message subscriber on the global event
-/// bus. Guarded by `std::sync::Once` so it is safe to call from both
-/// `bootstrap_core_runtime` (desktop/JSON-RPC) and domain-level
-/// startup — only the first call takes effect.
+/// Register a web-only proactive message subscriber on the global event bus.
+/// Guarded by `std::sync::Once` so repeated core boot registration is safe.
+/// Calls before bus initialization are deferred and can be retried later.
 pub fn register_web_only_proactive_subscriber() {
     if crate::core::bus::BUS.get().is_none() {
         tracing::warn!(
