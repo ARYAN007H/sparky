@@ -40,6 +40,7 @@ mod hooks;
 // Tool surface for live voice sessions (`voice::live`).
 #[cfg(feature = "voice")]
 mod live_tools;
+#[path = "../../integrations/recorded_tools.rs"]
 mod recorded_tools;
 #[cfg(test)]
 #[path = "resume_bound_session_tests.rs"]
@@ -66,6 +67,7 @@ pub use types::{OpenHumanSessionHost, SessionHostBuilder, TurnOverrides};
 // share one tested implementation.
 pub(crate) use builder::dedup_visible_tool_specs;
 
+#[path = "../../integrations/announcement_notes.rs"]
 mod announcement_notes;
 
 #[cfg(test)]

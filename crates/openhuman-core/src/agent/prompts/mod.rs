@@ -4,8 +4,7 @@
 
 pub mod types;
 pub use types::*;
-mod connected_identities;
-pub use connected_identities::render_connected_identities;
+pub use crate::integrations::render_connected_identities;
 
 pub mod agents_md;
 pub use agents_md::{AGENTS_MD_FILENAME, AgentsMdContent, load_agents_md, load_agents_md_layers};

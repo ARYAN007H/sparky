@@ -1036,7 +1036,7 @@ pub(super) mod tool_surface;
 mod juice_tests;
 
 mod parent_snapshot;
-#[path = "prelude_integrations.rs"]
+#[path = "../../integrations/prelude_integrations.rs"]
 mod prelude_integrations;
 
 #[cfg(test)]

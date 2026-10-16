@@ -38,6 +38,7 @@
 //! crate::core::events::DomainEvent::ComposioTriggerReceived
 
 pub mod action_tool;
+mod auth_probe;
 pub mod bus;
 pub mod catalog;
 pub mod client;
@@ -62,6 +63,7 @@ pub mod types;
 pub use crate::agent::prompts::types::ConnectedIntegration;
 pub use crate::integrations::composio::contract::ProviderUserProfile;
 pub use action_tool::ComposioActionTool;
+pub(crate) use auth_probe::user_is_signed_in_to_composio;
 pub use bus::{
     register_composio_trigger_subscriber, ComposioConfigChangedSubscriber,
     ComposioConnectionCreatedSubscriber, ComposioTriggerSubscriber,
