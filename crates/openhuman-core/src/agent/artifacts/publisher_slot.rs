@@ -47,7 +47,7 @@ pub fn unregister_artifact_publisher(id: &str) -> bool {
 
 /// The publisher for `config`, or `None` when no registered factory offers one.
 pub fn artifact_publisher(config: &Config) -> Option<Arc<dyn ArtifactPublisher>> {
-    for (id, factory) in PUBLISHERS.entries() {
+    for (id, factory) in PUBLISHERS.entries_context_first() {
         if let Some(publisher) = factory(config) {
             log::debug!("[artifacts] publisher `{id}` serves sharing");
             return Some(publisher);

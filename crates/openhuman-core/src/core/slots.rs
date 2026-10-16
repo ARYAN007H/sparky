@@ -305,9 +305,34 @@ impl<V: Clone + Send + Sync + 'static> HookSlot<V> {
         entries
     }
 
-    /// The first registration in [`entries`](Self::entries) order.
+    /// Every registration, context entries first.
+    ///
+    /// For consult points that pick one winner (`first`, "the first factory
+    /// that answers"): a context registration must take precedence over a
+    /// process-wide one, as it does in [`get`](Self::get). The ambient context
+    /// is the task's own scope under SaaS, so a tenant's registration wins
+    /// there too. Process entries follow in registration order, minus any id
+    /// the context replaced.
+    pub fn entries_context_first(&self) -> Vec<(String, V)> {
+        let mut entries = self
+            .context_table()
+            .map(|context| context.entries())
+            .unwrap_or_default();
+        for (id, value) in self.with_global(Registry::entries) {
+            if !entries.iter().any(|(existing, _)| *existing == id) {
+                entries.push((id, value));
+            }
+        }
+        entries
+    }
+
+    /// The winning registration: the first of
+    /// [`entries_context_first`](Self::entries_context_first).
     pub fn first(&self) -> Option<V> {
-        self.entries().into_iter().next().map(|(_, value)| value)
+        self.entries_context_first()
+            .into_iter()
+            .next()
+            .map(|(_, value)| value)
     }
 
     /// Whether nothing is registered (process-wide or in the ambient context).
