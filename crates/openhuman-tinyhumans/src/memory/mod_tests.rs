@@ -75,6 +75,12 @@ fn a_local_session_token_is_off() {
 
 #[test]
 fn the_host_credential_binds_below_the_endpoint_and_is_cached() {
+    // The engine cache is keyed by a fingerprint that includes the attribution
+    // headers, which derive from the process-global product identity and the
+    // shell-version variable. Hold both locks so neither changes between the
+    // two binds.
+    let _identity = crate::backend::product::product_identity_test_lock();
+    let _env = crate::backend::url::backend_env_test_lock();
     let tmp = tempfile::tempdir().unwrap();
     let config = config_with_endpoint(&tmp, "https://memory.example.test");
     store_key(&config, "jwt.memory.test");
