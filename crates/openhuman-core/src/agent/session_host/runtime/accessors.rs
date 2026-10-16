@@ -107,21 +107,6 @@ impl OpenHumanSessionHost {
         Arc::clone(&self.durable_tool_specs)
     }
 
-    #[cfg(test)]
-    pub(crate) fn visible_tool_names_for_test(&self) -> &std::collections::HashSet<String> {
-        &self.visible_tool_names
-    }
-
-    #[cfg(test)]
-    pub(crate) fn deferred_tool_names_for_test(&self) -> &std::collections::HashSet<String> {
-        &self.deferred_tool_names
-    }
-
-    #[cfg(test)]
-    pub(crate) fn tool_policy_session_for_test(&self) -> &tinytools::ToolPolicySession {
-        &self.tool_policy_session
-    }
-
     /// The full host [`Config`](crate::config::Config) this session
     /// was built with, through the factory or an explicitly configured model.
     ///
