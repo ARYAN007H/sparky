@@ -237,7 +237,6 @@ jobs:
             tools::implementations::network::host::tests::tinyjuice_detects_and_converts_html
           )
           STAGED_MODULE_PATH="${OPENHUMAN_MODULE_PATH:-}"
-          STAGED_MODULE_SOURCE_DIR="${OPENHUMAN_MODULE_SOURCE_DIR:-}"
           echo "[test-reusable] feature set: ${FEATURES} (cli: ${CLI_FEATURES})"
 
           # `--features bin-tools` is load-bearing, not cosmetic: the
@@ -250,13 +249,10 @@ jobs:
           # test process, then run each module-backed regression in its own
           # process below. Boot and parallel resolver tests can otherwise race
           # while attaching the same released library to the one module host.
-          unset OPENHUMAN_MODULE_PATH OPENHUMAN_MODULE_SOURCE_DIR
+          unset OPENHUMAN_MODULE_PATH
           bash scripts/ci-cancel-aware.sh cargo test -p openhuman --lib --features "${CORE_FEATURES}"
           if [ -n "$STAGED_MODULE_PATH" ]; then
             export OPENHUMAN_MODULE_PATH="$STAGED_MODULE_PATH"
-          fi
-          if [ -n "$STAGED_MODULE_SOURCE_DIR" ]; then
-            export OPENHUMAN_MODULE_SOURCE_DIR="$STAGED_MODULE_SOURCE_DIR"
           fi
           for module_test in "${MODULE_TESTS[@]}"; do
             echo "[test-reusable] isolated module test: ${module_test}"
