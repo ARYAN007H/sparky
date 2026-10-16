@@ -79,7 +79,7 @@ async fn sweeping_through_the_fenced_backend_reaches_the_driver() {
 #[tokio::test]
 async fn module_blob_scopes_are_swept_alongside_the_acting_scope() {
     let (now, backend) = backend_with_clock();
-    let module_scopes = crate::modules::expiring_blob_module_scopes();
+    let module_scopes = crate::modules::expiring_blob_module_scopes(&crate::core::runtime::DispatchCtx::host_default());
     assert!(!module_scopes.is_empty(), "TinyJuice owns expiring blobs");
     put_expiring(&backend, &module_scopes[0], "tinyjuice_ccr/t", 10).await;
     now.store(2_000, Ordering::SeqCst);
@@ -89,7 +89,7 @@ async fn module_blob_scopes_are_swept_alongside_the_acting_scope() {
 #[cfg(not(feature = "modules"))]
 #[test]
 fn no_module_blob_scopes_without_the_modules_feature() {
-    assert!(crate::modules::expiring_blob_module_scopes().is_empty());
+    assert!(crate::modules::expiring_blob_module_scopes(&crate::core::runtime::DispatchCtx::host_default()).is_empty());
 }
 
 #[tokio::test]
