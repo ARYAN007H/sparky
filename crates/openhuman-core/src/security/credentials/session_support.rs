@@ -277,8 +277,10 @@ fn check_session_backend(config: &Config, profile: Option<&AuthProfile>) -> Resu
     let Some(issuing) = profile.metadata.get(SESSION_ISSUING_BACKEND_META) else {
         return Ok(());
     };
-    let matches = crate::backend::base_url(&config.api_url)
-        .ok()
+    let matches = config
+        .resolved_endpoints
+        .control_plane_url
+        .clone()
         .and_then(|base| normalize_session_backend(&base).ok())
         .zip(normalize_session_backend(issuing).ok())
         .is_some_and(|(current, issuing)| current == issuing);
@@ -464,8 +466,8 @@ pub fn resolve_backend_credential(config: &Config) -> Result<BackendCredential, 
 /// Resolve a credential for a direct call to the configured backend.
 /// A missing transport or unusable credential is an expected offline state.
 pub fn direct_backend_credential(config: &Config, op: &str) -> Option<BackendCredential> {
-    if !crate::backend::transport::is_installed() {
-        log::debug!("[backend-direct] {op} skipped: no backend transport installed");
+    if config.resolved_endpoints.control_plane_url.is_none() {
+        log::debug!("[backend-direct] {op} skipped: no control plane resolved");
         return None;
     }
     match resolve_backend_credential(config) {

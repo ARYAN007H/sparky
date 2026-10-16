@@ -35,11 +35,13 @@ pub(super) async fn push_spans(config: &Config, spans: &[TraceSpan]) -> Result<(
         }
         _ => return Ok(()),
     };
-    // Backend traffic: the transport's client carries the host's attribution
-    // headers (product identity, versions).
-    let client = crate::backend::resolve_backend_transport()
-        .map_err(|err| format!("Langfuse OTLP push has no backend transport: {err}"))?
-        .http_client(crate::backend::TransportProfile::Api);
+    // Backend traffic: stamp the host's attribution headers (product
+    // identity, versions) resolved onto the config.
+    let attribution = config.resolved_endpoints.attribution_header_map();
+    let client = reqwest::Client::builder()
+        .default_headers(attribution)
+        .build()
+        .map_err(|err| format!("Langfuse OTLP client build failed: {err}"))?;
     for payload in otlp_requests(spans, environment, &super::export_brand()) {
         let response = client
             .post(&url)
