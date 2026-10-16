@@ -25,7 +25,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use openhuman_embed::seams::{
-    ControllerExtension, LearningSink, SecurityPolicy, ServerLauncher, ToolHook,
+    ControllerExtension, LearningSink, OpenHumanRunContext, SecurityPolicy, ServerLauncher,
+    ToolHook,
 };
 use tinytools::ToolRanker;
 
@@ -201,7 +202,7 @@ impl RuntimeBuilder {
     );
     forward!(
         /// See [`openhuman_embed::RuntimeBuilder::tool_hook`].
-        tool_hook(hook: Arc<dyn ToolHook>)
+        tool_hook(hook: Arc<dyn ToolHook<OpenHumanRunContext>>)
     );
     forward!(
         /// See [`openhuman_embed::RuntimeBuilder::server_launcher`].
