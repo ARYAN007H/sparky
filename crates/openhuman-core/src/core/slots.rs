@@ -329,7 +329,7 @@ impl<V: Clone + Send + Sync + 'static> HookSlot<V> {
     /// The winning registration: the first of
     /// [`entries_context_first`](Self::entries_context_first).
     pub fn first(&self) -> Option<V> {
-        self.entries_context_first()
+        self.entries()
             .into_iter()
             .next()
             .map(|(_, value)| value)
