@@ -184,7 +184,6 @@ fn embed_info_is_versioned_and_rejects_unknown_flags() {
 #[cfg(feature = "session-store")]
 #[tokio::test]
 async fn boot_session_store_keeps_a_legacy_managed_config_managed() {
-    use crate::core_host::config::enrichers_test_support as _;
     let _turn = crate::STORAGE_SLOT_TEST_LOCK.lock().await;
     let tmp = tempfile::tempdir().unwrap();
     std::fs::write(
@@ -196,8 +195,8 @@ async fn boot_session_store_keeps_a_legacy_managed_config_managed() {
         ("OPENHUMAN_WORKSPACE", tmp.path().into()),
         ("OPENHUMAN_STORAGE_URL", "".into()),
     ]);
-    openhuman_tinyhumans::embed::__host::config_enrichers::unregister_enricher(
-        "tinyhumans::endpoints",
+    openhuman_tinyhumans::__host::config_enrichers::unregister_enricher(
+        openhuman_tinyhumans::client::ENRICHER_ID,
     );
 
     let previous = crate::core_host::agent::session_store::installed();
@@ -222,5 +221,15 @@ async fn boot_session_store_keeps_a_legacy_managed_config_managed() {
     assert!(
         config.inference_url.is_none(),
         "a managed api_url must not be moved to a custom inference_url"
+    );
+    assert!(
+        config.cloud_providers.iter().all(|p| p.slug != "custom"),
+        "no Custom provider may be seeded from a managed endpoint: {:?}",
+        config.cloud_providers
+    );
+    let on_disk = std::fs::read_to_string(tmp.path().join("config.toml")).unwrap();
+    assert!(
+        !on_disk.contains("slug = \"custom\""),
+        "boot must not persist a managed config as Custom:\n{on_disk}"
     );
 }
