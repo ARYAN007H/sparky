@@ -130,7 +130,7 @@ fn attached_tools_survive_clones_and_session_resume() {
                     .for_agent("attached")
                     .transcripts;
             let continuing = transcripts
-                .thread_transcripts("continuing", Some("attached"))
+                .thread_transcripts("continuing", None)
                 .expect("the continuing session transcript is durable");
             assert_eq!(continuing.roots.len(), 1);
             let frozen_generation_zero = continuing.roots[0]
@@ -168,7 +168,7 @@ fn attached_tools_survive_clones_and_session_resume() {
                 .unwrap();
             assert_eq!(agent.config().action_dir, original_config.action_dir);
             let continuing = transcripts
-                .thread_transcripts("continuing", Some("attached"))
+                .thread_transcripts("continuing", None)
                 .expect("the continuing session transcript remains durable");
             assert_eq!(continuing.roots.len(), 1);
             let continuing = continuing.roots[0]
@@ -182,7 +182,7 @@ fn attached_tools_survive_clones_and_session_resume() {
                 "the continuing session transcript must remain unchanged"
             );
             let successor = transcripts
-                .thread_transcripts("after-attach", Some("attached"))
+                .thread_transcripts("after-attach", None)
                 .expect("a later session has its own transcript")
                 .roots
                 .into_iter()
