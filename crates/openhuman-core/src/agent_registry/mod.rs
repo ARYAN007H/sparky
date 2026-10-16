@@ -6,9 +6,9 @@
 //! execution harness and prompt/runtime implementation.
 
 pub mod agents;
+mod defaults;
 pub mod host_definition;
 pub mod library;
-mod defaults;
 mod ops;
 mod rpc;
 mod schemas;
