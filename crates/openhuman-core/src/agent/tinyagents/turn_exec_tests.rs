@@ -2,7 +2,6 @@ use super::*;
 use crate::agent::tinyagents::TurnModelSource;
 use async_trait::async_trait;
 use std::sync::Arc;
-use tinyagents_harness::host::{ContextComposer, TurnContextRequest};
 use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
 use tinyinference_llm::tool::ToolCall;
 use tinytools::{Tool, ToolResult};
@@ -314,29 +313,6 @@ async fn hosted_root_screens_only_the_new_input_not_replayed_history() {
     )
     .await
     .expect_err("the new input is still screened as user input");
-}
-
-#[tokio::test]
-async fn precomposed_root_context_does_not_duplicate_the_session_prompt_or_preamble() {
-    let request =
-        TurnContextRequest::new("main", tinyagents_harness::ids::ThreadId::new("t"), "hi");
-
-    assert_eq!(
-        PrecomposedRootContext
-            .compose_system_prompt(&request)
-            .await
-            .expect("precomposed root context composes"),
-        "",
-        "the frozen session system/context ladder stays in the invocation request"
-    );
-    assert!(
-        PrecomposedRootContext
-            .preamble(&request)
-            .await
-            .expect("precomposed root context builds preamble")
-            .is_empty(),
-        "host preparation must not insert a second root preamble"
-    );
 }
 
 #[test]

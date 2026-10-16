@@ -8,10 +8,11 @@
 //! finalize the run into a [`TinyagentsTurnOutcome`].
 
 use std::collections::{BTreeSet, HashSet};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use anyhow::Result;
 use tinyagents_harness::runtime::{AgentInvocation, AgentTurnRequest, InvocationRuntime};
+use tinyagents_harness::runtime::AgentHarness;
 use tinyagents_harness::store::{InMemoryStore as ToolResultArtifactIndexStore, StoreRegistry};
 use tinyagents_harness::turn_policy::effective_max_iterations;
 use tinyagents_runtime::turn_driver::{
@@ -50,7 +51,12 @@ use super::ToolPolicyEnforcement;
 /// security or workspace state on a shared harness.
 #[path = "turn_exec_hosted.rs"]
 mod turn_exec_hosted;
-use turn_exec_hosted::{root_hosted_harness, PrecomposedRootContext};
+static ROOT_HOSTED_HARNESS: LazyLock<AgentHarness<(), OpenHumanRunContext>> =
+    LazyLock::new(AgentHarness::new);
+
+fn root_hosted_harness() -> &'static AgentHarness<(), OpenHumanRunContext> {
+    &ROOT_HOSTED_HARNESS
+}
 
 #[cfg(test)]
 #[path = "turn_exec_tests.rs"]
@@ -596,12 +602,6 @@ async fn drive_turn(
                 },
                 &run_context,
             );
-        // The root session has already assembled its exact system prompt,
-        // learned context and history before this graph runs.  Keep those bytes
-        // as the hosted request rather than composing/recalling a second copy;
-        // the host still owns definition resolution, security, model routing,
-        // budgets, progress and outcome classification for this invocation.
-        host_bundle.capabilities.context = Arc::new(PrecomposedRootContext);
         host_bundle.capabilities.memory = None;
         host_bundle.capabilities.experience = None;
         // Session finalization owns the full-fidelity hook payload (including
