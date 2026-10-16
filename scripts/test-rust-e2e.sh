@@ -295,12 +295,28 @@ run_in_process_modules() {
   while IFS= read -r module; do
     [ -n "$module" ] || continue
     echo "[rust-e2e]   in_process module: ${module}"
-    local -a suite_args=()
     if [ "$module" = "domain_modules_e2e" ]; then
-      # These tests open TinyMCP through a process-global module runtime. Run
-      # them serially so another test's teardown cannot close it mid-request.
-      suite_args+=(--test-threads=1)
+      # Each test boots and tears down the in-process RPC host. MCP tests also
+      # use TinyMCP's process-global module runtime, so they cannot share a
+      # process with another test that shuts that runtime down.
+      local test_names test_name
+      test_names="$(bash "$SCRIPT_DIR/ci-cancel-aware.sh" "$CARGO_BIN" test \
+        --manifest-path Cargo.toml --features "$PRODUCT_FEATURES" \
+        --test in_process_all -- "${module}::" --list | sed -n 's/: test$//p')"
+      if [ -z "$test_names" ]; then
+        echo "::error::in_process module ${module} selected no tests" >&2
+        return 1
+      fi
+      while IFS= read -r test_name; do
+        [ -n "$test_name" ] || continue
+        echo "[rust-e2e]     isolated test: ${test_name}"
+        bash "$SCRIPT_DIR/ci-cancel-aware.sh" "$CARGO_BIN" test \
+          --manifest-path Cargo.toml --features "$PRODUCT_FEATURES" \
+          --test in_process_all -- "$test_name" --exact ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
+      done <<< "$test_names"
+      continue
     fi
+    local -a suite_args=()
     bash "$SCRIPT_DIR/ci-cancel-aware.sh" "$CARGO_BIN" test \
       --manifest-path Cargo.toml --features "$PRODUCT_FEATURES" \
       --test in_process_all -- "${module}::" ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"} "${suite_args[@]}"
