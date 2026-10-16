@@ -30,32 +30,21 @@ impl OpenHumanTinySubagentSessionStore {
     }
 
     fn convert(&self, row: DurableSubagentSession) -> Result<TinySession, SubagentError> {
-        let lifecycle_key = match row.lifecycle_key.clone() {
-            Some(key) => key,
-            None => {
-                let task_id = row.current_task_id.as_deref().ok_or_else(|| {
-                    SubagentError::Persistence(
-                        "legacy subagent session has no lifecycle task".into(),
-                    )
-                })?;
-                super::resolve_lifecycle_key(
-                    &self.store,
-                    &row.subagent_session_id,
-                    &row.parent_session,
-                    row.parent_thread_id.as_deref(),
-                    &self.checkpoint_dir,
-                )
-                .map_err(SubagentError::Persistence)
-                .and_then(|key| {
-                    if key.task_id == task_id {
-                        Ok(key)
-                    } else {
-                        Err(SubagentError::Persistence(
-                            "legacy session checkpoint task does not match".into(),
-                        ))
-                    }
-                })?
-            }
+        let lifecycle_key = match (row.lifecycle_key.clone(), row.current_task_id.as_deref()) {
+            (Some(key), _) => Some(key),
+            (None, Some(task_id)) => super::resolve_lifecycle_key(
+                &self.store,
+                &row.subagent_session_id,
+                &row.parent_session,
+                row.parent_thread_id.as_deref(),
+                &self.checkpoint_dir,
+            )
+            .ok()
+            .filter(|key| key.task_id == task_id),
+            // Keep a pre-lifecycle row visible to list/query. Its missing key
+            // is not reconstructed from the raw task id, and continuation by
+            // session id remains fail-closed in TinyAgents.
+            (None, None) => None,
         };
         Ok(TinySession {
             subagent_session_id: row.subagent_session_id,
