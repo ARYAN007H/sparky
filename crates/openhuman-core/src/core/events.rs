@@ -393,10 +393,7 @@ pub enum DomainEvent {
         output: String,
     },
 
-    /// A proactive message (morning briefing, welcome, cron output, etc.)
-    /// needs to be delivered to the user. The web subscriber publishes it to
-    /// the profile-scoped web stream; when configured, the optional channels
-    /// subscriber also routes it to the user's active external channel.
+    /// A proactive message requested for user delivery.
     ProactiveMessageRequested {
         /// Identifies the source (e.g. `"cron:morning_briefing"`, `"cron:welcome"`).
         source: String,
@@ -404,8 +401,7 @@ pub enum DomainEvent {
         message: String,
         /// Optional job name for display/threading purposes.
         job_name: Option<String>,
-        /// Tenant whose work produced this delivery; bus subscribers run on a
-        /// separate task and cannot inherit the publisher's dispatch context.
+        /// The originating tenant; event subscribers execute outside the publisher task.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         tenant: Option<crate::core::runtime::Tenant>,
     },
