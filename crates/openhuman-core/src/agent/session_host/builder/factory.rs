@@ -8,7 +8,7 @@ use crate::agent_registry::host_definition::{
 };
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
-use crate::sandbox::host_runtime;
+use crate::modules::tinybox::host_runtime;
 use crate::security::SecurityPolicy;
 use crate::tools;
 use anyhow::Result;
