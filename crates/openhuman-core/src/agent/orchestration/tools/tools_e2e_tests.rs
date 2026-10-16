@@ -1,5 +1,5 @@
 use super::{ArchetypeDelegationTool, DelegationTarget, SpawnSubagentTool};
-use crate::tools::impl::threads::SpawnWorkerThreadTool;
+use crate::tools::r#impl::threads::SpawnWorkerThreadTool;
 use crate::agent::harness::ParentExecutionContext;
 use crate::integrations::ConnectedIntegration;
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;

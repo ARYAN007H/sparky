@@ -5,7 +5,7 @@
 //! prefix reconciliation, tool snapshots, resume and persistence remain inside
 //! the runtime session.
 
-#[path = "../../../memory/lifecycle/session_hooks.rs"]
+#[path = "../../memory/lifecycle/session_hooks.rs"]
 mod session_hooks;
 mod permanent;
 mod post_commit;

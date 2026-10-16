@@ -22,7 +22,7 @@ use crate::agent::orchestration::tools::{
     ListSubagentsDispatch, SpawnAsyncSubagentDispatch, SpawnParallelAgentsDispatch,
     SpawnSubagentDispatch, SteerSubagentDispatch, WaitSubagentDispatch,
 };
-use crate::tools::impl::threads::SpawnWorkerThreadDispatch;
+use crate::tools::r#impl::threads::SpawnWorkerThreadDispatch;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent::tinyagents::host::run_context::HostOperationContext;
 use crate::agent::tinyagents::turn_policy::is_subagent_spawn_or_delegate_tool;
