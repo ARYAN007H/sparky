@@ -102,8 +102,9 @@ impl LlmProvider for OpenHumanLlm {
             "[flows] llm.complete: dispatching agent-node completion"
         );
 
-        let (chat_model, model) = create_chat_model_with_model_id_in(&self.ctx, role, &self.config, temperature)
-            .map_err(|e| EngineError::Capability(e.to_string()))?;
+        let (chat_model, model) =
+            create_chat_model_with_model_id_in(&self.ctx, role, &self.config, temperature)
+                .map_err(|e| EngineError::Capability(e.to_string()))?;
         // `create_chat_provider` handed back the role's default model. If the node
         // pinned a raw/BYOK id, forward it verbatim instead (issue #4598).
         let model =

@@ -18,7 +18,9 @@ async fn inference_gate_skips_when_no_agent_nodes() {
         ],
         "edges": [ { "from_node": "t", "to_node": "post" } ]
     }));
-    let errors = validate_inference_readiness(&crate::core::runtime::DispatchCtx::ambient(), &config, &g).await;
+    let errors =
+        validate_inference_readiness(&crate::core::runtime::DispatchCtx::ambient(), &config, &g)
+            .await;
     assert!(errors.is_empty(), "{errors:?}");
 }
 
@@ -124,7 +126,9 @@ async fn inference_gate_passes_when_model_constructs() {
         ],
         "edges": [ { "from_node": "t", "to_node": "a" } ]
     }));
-    let errors = validate_inference_readiness(&crate::core::runtime::DispatchCtx::ambient(), &config, &g).await;
+    let errors =
+        validate_inference_readiness(&crate::core::runtime::DispatchCtx::ambient(), &config, &g)
+            .await;
     assert!(errors.is_empty(), "{errors:?}");
 }
 
@@ -151,7 +155,9 @@ async fn inference_gate_surfaces_construction_error() {
         ],
         "edges": [ { "from_node": "t", "to_node": "a" } ]
     }));
-    let errors = validate_inference_readiness(&crate::core::runtime::DispatchCtx::ambient(), &config, &g).await;
+    let errors =
+        validate_inference_readiness(&crate::core::runtime::DispatchCtx::ambient(), &config, &g)
+            .await;
     assert!(!errors.is_empty(), "a construction failure must reject");
     assert!(
         errors.iter().any(|e| e.contains("Node 'a'")),
@@ -251,7 +257,9 @@ async fn inference_gate_probes_every_distinct_agent_node_role() {
         ]
     }));
 
-    let errors = validate_inference_readiness(&crate::core::runtime::DispatchCtx::ambient(), &config, &g).await;
+    let errors =
+        validate_inference_readiness(&crate::core::runtime::DispatchCtx::ambient(), &config, &g)
+            .await;
     assert!(
         !errors.is_empty(),
         "both roles are broken, the gate must reject"
