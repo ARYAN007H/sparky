@@ -59,16 +59,22 @@ pub fn offline_config() -> Config {
 
 /// Serve the tinyflows module (scheduler runtime, job store, schedule maths)
 /// from the test binary instead of a downloaded release. The factory goes in
-/// through the core's `register_linked` seam, and a per-module environment
-/// override (read when the module first resolves, whichever config asks) selects
-/// it, so no other module changes source. Idempotent; every runtime these tests
-/// build calls it first.
-pub fn link_tinyflows() {
-    static ONCE: std::sync::Once = std::sync::Once::new();
-    ONCE.call_once(|| {
-        openhuman_embed::modules::register_linked("tinyflows", tinyflows_module::linked_module);
-        std::env::set_var("OPENHUMAN_MODULE_SOURCE_TINYFLOWS", "linked");
-    });
+/// through the core's `register_linked` seam and the module is resolved once,
+/// here, with a config that asks for `linked`: the resolution slot is
+/// process-wide, so every later caller (a profile's own config included) sees
+/// the linked module. Only this module changes source.
+pub fn link_tinyflows(runtime: &tokio::runtime::Runtime) {
+    use openhuman_core::config::schema::{ModuleOverride, ModuleSourceMode};
+    openhuman_embed::modules::register_linked("tinyflows", tinyflows_module::linked_module);
+    let mut config = Config::default();
+    config.modules.allow_download = false;
+    config
+        .modules
+        .overrides
+        .push(ModuleOverride::with_source("tinyflows", ModuleSourceMode::Linked));
+    runtime
+        .block_on(openhuman_core::modules::ensure_loaded(&config, "tinyflows"))
+        .expect("the linked tinyflows module is admitted");
 }
 
 /// The tuned runtime the harness documents as the caller's responsibility.
@@ -82,13 +88,14 @@ pub fn runtime() -> tokio::runtime::Runtime {
 
 /// A tuned async runtime for profile hosts which initialize keys after choosing their root.
 pub fn runtime_without_master_key() -> tokio::runtime::Runtime {
-    link_tinyflows();
-    tokio::runtime::Builder::new_multi_thread()
+    let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .thread_stack_size(AGENT_WORKER_STACK_BYTES)
         .max_blocking_threads(MAX_BLOCKING_THREADS)
         .build()
-        .expect("tokio runtime")
+        .expect("tokio runtime");
+    link_tinyflows(&runtime);
+    runtime
 }
 
 /// A stub backend that answers every incidental non-inference call.
