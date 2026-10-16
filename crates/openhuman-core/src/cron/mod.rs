@@ -33,6 +33,10 @@ pub mod tools;
 
 pub mod scheduler;
 
+#[cfg(test)]
+#[path = "cutover_tests.rs"]
+mod cutover_tests;
+
 pub use ops as rpc;
 #[cfg(test)]
 pub use ops::update_cron_job;

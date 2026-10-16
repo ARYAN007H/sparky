@@ -95,6 +95,12 @@ fn stand_in(flow_id: &str) -> CronJob {
     }
 }
 
+/// A stand-in `flow` row with `command`, for tests of handlers.
+#[cfg(test)]
+pub(crate) fn stand_in_for_test(command: &str) -> CronJob {
+    stand_in(command)
+}
+
 /// Fire the `flow` row bound to `flow_id` through the registered `flow`
 /// handler.
 pub(crate) async fn trigger(binding: &Binding, flow_id: &str, run_id: &str) -> Attempt {
