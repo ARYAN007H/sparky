@@ -105,13 +105,6 @@
     "occurrence": 1
   },
   {
-    "rule": "ambient-context",
-    "path": "crates/openhuman-core/src/backend/transport/install.rs",
-    "line": 86,
-    "text": "if let Some(transport) = crate::core::runtime::context::CoreContext::current()",
-    "occurrence": 1
-  },
-  {
     "rule": "home-dir",
     "path": "crates/openhuman-core/src/channels/host/adapters.rs",
     "line": 288,
