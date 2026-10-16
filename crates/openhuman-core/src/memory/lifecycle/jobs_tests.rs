@@ -17,6 +17,9 @@ fn workspace_queues_are_released_after_the_last_holder_drops() {
 
     drop(queues);
 
+    let sentinel = temp.path().join("sentinel");
+    drop(queue_of(&sentinel));
+
     let queues = QUEUES.lock().unwrap();
     assert!(workspaces.iter().all(|workspace| !queues.contains_key(workspace)));
 }
