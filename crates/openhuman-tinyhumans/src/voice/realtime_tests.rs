@@ -99,10 +99,12 @@ async fn mint_signed_url_authenticates_with_the_api_key() {
     tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
 
     let dir = tempfile::tempdir().unwrap();
-    let mut config = Config::default();
-    config.workspace_dir = dir.path().join("workspace");
-    config.config_path = dir.path().join("config.toml");
-    config.api_url = Some(format!("http://{addr}"));
+    let config = Config {
+        workspace_dir: dir.path().join("workspace"),
+        config_path: dir.path().join("config.toml"),
+        api_url: Some(format!("http://{addr}")),
+        ..Config::default()
+    };
     openhuman_embed::__host::security::credentials::api_key::store_api_key(
         &config,
         "tiny_test_voice",

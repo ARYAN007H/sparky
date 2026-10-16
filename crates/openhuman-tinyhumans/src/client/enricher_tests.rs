@@ -2,9 +2,10 @@ use super::*;
 use openhuman_embed::__host::config_enrichers::run_enrichers;
 
 fn config_with(api_url: Option<&str>) -> Config {
-    let mut config = Config::default();
-    config.api_url = api_url.map(str::to_string);
-    config
+    Config {
+        api_url: api_url.map(str::to_string),
+        ..Config::default()
+    }
 }
 
 #[test]

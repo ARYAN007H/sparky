@@ -40,6 +40,10 @@ fn deferred_builder_connects_through_tinyhumans_wrapper() {
     let _registry = crate::registry_test_lock();
 
     let summary = connected(RuntimeBuilder::new().defer_services());
+    assert!(
+        !summary.controller_extensions.is_empty(),
+        "deferring services still connects the hosted controllers"
+    );
 }
 
 #[test]

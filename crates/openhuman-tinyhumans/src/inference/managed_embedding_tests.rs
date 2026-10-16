@@ -5,9 +5,10 @@ use std::collections::HashMap;
 use tinyinference_embeddings::{DEFAULT_CLOUD_DIMENSIONS, DEFAULT_CLOUD_MODEL};
 
 fn test_config(tmp: &tempfile::TempDir) -> Config {
-    let mut config = Config::default();
-    config.config_path = tmp.path().join("config.toml");
-    config
+    Config {
+        config_path: tmp.path().join("config.toml"),
+        ..Config::default()
+    }
 }
 
 fn state_dir_of(config: &Config) -> std::path::PathBuf {

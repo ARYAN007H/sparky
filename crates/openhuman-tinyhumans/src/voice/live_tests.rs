@@ -91,9 +91,11 @@ fn hosted_providers_are_listed_ahead_of_the_built_in_ones() {
 #[tokio::test]
 async fn hosted_providers_report_not_configured_without_a_backend_credential() {
     let dir = tempfile::tempdir().unwrap();
-    let mut config = Config::default();
-    config.workspace_dir = dir.path().to_path_buf();
-    config.config_path = dir.path().join("config.toml");
+    let config = Config {
+        workspace_dir: dir.path().to_path_buf(),
+        config_path: dir.path().join("config.toml"),
+        ..Config::default()
+    };
     assert!(!backend_ready(&config));
     let err = prepare_gemini(config, LiveConfig::new())
         .await
