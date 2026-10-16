@@ -152,6 +152,15 @@ cleanup() {
       done
     fi
   fi
+  if [ "$status" -ne 0 ] && [ -n "${OPENHUMAN_WORKSPACE:-}" ]; then
+    # The in-process core writes startup diagnostics beside its workspace.
+    # Preserve them on failed E2E runs before removing this temporary profile.
+    for core_log in "$OPENHUMAN_WORKSPACE"/logs/openhuman-*.log; do
+      [ -f "$core_log" ] || continue
+      mkdir -p "${E2E_ARTIFACTS_DIR:-$APP_DIR/test/e2e/artifacts}"
+      cp "$core_log" "${E2E_ARTIFACTS_DIR:-$APP_DIR/test/e2e/artifacts}/${LOG_SUFFIX}-core.log" 2>/dev/null || true
+    done
+  fi
   if [ -n "$CREATED_TEMP_WORKSPACE" ]; then
     for attempt in 1 2 3; do
       rm -rf "$CREATED_TEMP_WORKSPACE" 2>/dev/null && break
