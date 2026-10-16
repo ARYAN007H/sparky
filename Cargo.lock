@@ -8485,6 +8485,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "tinyagents-graph",
  "tinyagents-harness",
  "tinyinference-llm 0.4.1",
  "tinytools",
