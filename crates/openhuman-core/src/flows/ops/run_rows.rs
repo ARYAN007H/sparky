@@ -55,7 +55,7 @@ impl Drop for RunRowFinalizer {
         );
         // Preserve whatever steps the live observer already persisted.
         let observed = current_persisted_steps(&self.config, &self.thread_id);
-        let _settled = finish_flow_run_row(
+        let settled = finish_flow_run_row(
             &self.config,
             &self.thread_id,
             &self.flow_id,
@@ -65,6 +65,9 @@ impl Drop for RunRowFinalizer {
             Some(INTERRUPTED_DROP_REASON),
             None,
         );
+        if !settled {
+            return;
+        }
         // Keep the flow-definition summary in step with the row, exactly as the
         // success/failure/cancel arms and the boot sweep do — otherwise the
         // runs list keeps advertising the *previous* run's `last_status` /
@@ -169,20 +172,9 @@ pub(super) fn finish_parked_flow_run_row(
         pending_approvals,
         error,
         graph_hash,
-        store::finish_flow_run,
+        store::finish_parked_flow_run,
     )
 }
-
-type RunRowFinishWriter = fn(
-    &Config,
-    &str,
-    &str,
-    &str,
-    &[FlowRunStep],
-    &[String],
-    Option<&str>,
-    Option<&str>,
-) -> anyhow::Result<bool>;
 
 #[allow(clippy::too_many_arguments)]
 fn finish_flow_run_row_with_writer(
@@ -194,7 +186,16 @@ fn finish_flow_run_row_with_writer(
     pending_approvals: &[String],
     error: Option<&str>,
     graph_hash: Option<&str>,
-    writer: RunRowFinishWriter,
+    writer: fn(
+        &Config,
+        &str,
+        &str,
+        &str,
+        &[FlowRunStep],
+        &[String],
+        Option<&str>,
+        Option<&str>,
+    ) -> anyhow::Result<bool>,
 ) -> bool {
     let finished_at = Utc::now().to_rfc3339();
     match writer(
