@@ -1,8 +1,8 @@
 mod common;
 use common::{chat_completion, chat_requests, offline_config, runtime, stub_backend};
 use openhuman_embed::{
-    AgentDefinitionSpec, AgentSpec, HostTools, HostTurnTools, InMemorySessionStores, Provider,
-    Runtime, SessionStoreProvider, Tool, ToolScopeSpec, Workspace,
+    AgentDefinitionSpec, AgentSpec, HostTools, HostTurnTools, Provider, Runtime, Tool,
+    ToolScopeSpec, Workspace,
 };
 use std::sync::Arc;
 use wiremock::matchers::{method, path};
@@ -49,7 +49,6 @@ fn attached_tools_survive_clones_and_session_resume() {
         tokio::spawn(async {
             let backend = stub_backend().await;
             let provider = wiremock::MockServer::start().await;
-            let session_store = Arc::new(InMemorySessionStores::new());
             Mock::given(method("POST"))
                 .and(path("/v1/chat/completions"))
                 .respond_with(ResponseTemplate::new(200).set_body_json(chat_completion("reply")))
@@ -59,7 +58,6 @@ fn attached_tools_survive_clones_and_session_resume() {
                 .config(offline_config())
                 .workspace(Workspace::Ephemeral)
                 .backend_url(backend.uri())
-                .session_store(session_store.clone())
                 .build()
                 .await
                 .unwrap();
@@ -127,7 +125,10 @@ fn attached_tools_survive_clones_and_session_resume() {
                 .send()
                 .await
                 .unwrap();
-            let transcripts = session_store.for_agent("attached").transcripts;
+            let transcripts =
+                openhuman_core::storage::sessions::provider_for_workspace(agent.workspace_dir())
+                    .for_agent("attached")
+                    .transcripts;
             let continuing = transcripts
                 .thread_transcripts("continuing", Some("attached"))
                 .expect("the continuing session transcript is durable");
