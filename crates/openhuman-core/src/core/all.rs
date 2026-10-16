@@ -370,14 +370,14 @@ fn build_registered_controllers() -> Vec<GroupedController> {
     push(
         &mut controllers,
         DomainGroup::Agent,
-        crate::agent::all_agent_registered_controllers(),
+        crate::agent_runs::all_agent_registered_controllers(),
     );
     // Read-only agent run replay + status over the durable journal/status seams
     // (agent_run_events / agent_run_status / agent_runs_active).
     push(
         &mut controllers,
         DomainGroup::Agent,
-        crate::agent::tinyagents::replay::all_agent_replay_registered_controllers(),
+        crate::agent_runs::replay::all_agent_replay_registered_controllers(),
     );
     // User-facing agent registry: defaults, enablement, custom agents, tool policy.
     push(
