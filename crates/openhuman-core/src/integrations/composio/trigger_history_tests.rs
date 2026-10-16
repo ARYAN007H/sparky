@@ -13,7 +13,11 @@ async fn disabled_archive_operations_leave_the_host_filesystem_untouched() {
         fixture: None,
     };
     assert!(owner
-        .read(&crate::core::runtime::DispatchCtx::ambient(), &config, Some(10))
+        .read(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            &config,
+            Some(10)
+        )
         .await
         .unwrap_err()
         .contains("module unavailable"));
@@ -112,9 +116,23 @@ async fn changing_users_releases_the_old_archive_before_opening_the_next_scope()
     );
     let mut config = Config::default();
     config.workspace_dir = PathBuf::from("first");
-    owner.read(&crate::core::runtime::DispatchCtx::ambient(), &config, Some(2)).await.unwrap();
+    owner
+        .read(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            &config,
+            Some(2),
+        )
+        .await
+        .unwrap();
     config.workspace_dir = PathBuf::from("second");
-    owner.read(&crate::core::runtime::DispatchCtx::ambient(), &config, Some(2)).await.unwrap();
+    owner
+        .read(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            &config,
+            Some(2),
+        )
+        .await
+        .unwrap();
     owner.close().await.unwrap();
     owner.close().await.unwrap();
     assert_eq!(
@@ -144,7 +162,15 @@ async fn cancelling_a_pending_open_retains_a_handle_that_shutdown_can_release() 
     config.workspace_dir = PathBuf::from("cancelled");
     let opening = tokio::spawn({
         let owner = owner.clone();
-        async move { owner.read(&crate::core::runtime::DispatchCtx::ambient(), &config, Some(1)).await }
+        async move {
+            owner
+                .read(
+                    &crate::core::runtime::DispatchCtx::ambient(),
+                    &config,
+                    Some(1),
+                )
+                .await
+        }
     });
     observed.open_started.notified().await;
     opening.abort();

@@ -410,7 +410,9 @@ async fn list_tools_with_a_run_context_carrier_matches_the_bare_call() {
 
     let run = OpenHumanRunContext::new()
         .with_core(Some(CoreContext::for_test(DomainSet::full(), None)))
-        .into_tinyagents(tinyagents_harness::context::RunConfig::new("list-tools-carrier"));
+        .into_tinyagents(tinyagents_harness::context::RunConfig::new(
+            "list-tools-carrier",
+        ));
     let carrier = tinyagents_harness::tool::ToolExecutionContext::from_run_context(
         &run,
         tinyagents_harness::ids::CallId::new("list-tools-carrier-call"),

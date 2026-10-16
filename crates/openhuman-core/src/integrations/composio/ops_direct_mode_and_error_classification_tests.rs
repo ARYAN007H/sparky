@@ -134,7 +134,13 @@ async fn composio_list_tools_in_direct_mode_does_not_fall_back_to_backend() {
     let _serialised = module_guard().await;
     let tmp = tempfile::tempdir().unwrap();
     let config = direct_mode_config(&tmp);
-    let result = composio_list_tools(&crate::core::runtime::DispatchCtx::ambient(), &config, None, None).await;
+    let result = composio_list_tools(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        None,
+        None,
+    )
+    .await;
     match result {
         Ok(outcome) => {
             // If the prefetch returns empty connections (test env may

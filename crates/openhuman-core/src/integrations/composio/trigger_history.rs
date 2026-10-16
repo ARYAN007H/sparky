@@ -161,11 +161,10 @@ impl TriggerHistory {
     /// Release the module resource while retaining all persisted documents.
     pub async fn close(&self) -> Result<(), String> {
         let lease = Arc::clone(&self.lease);
-        crate::core::runtime::DispatchCtx::ambient().spawn(async move {
-            Self::release(&mut *lease.lock_owned().await).await
-        })
-        .await
-        .map_err(|_| "trigger archive release task failed".to_owned())?
+        crate::core::runtime::DispatchCtx::ambient()
+            .spawn(async move { Self::release(&mut *lease.lock_owned().await).await })
+            .await
+            .map_err(|_| "trigger archive release task failed".to_owned())?
     }
 }
 

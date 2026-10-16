@@ -114,15 +114,17 @@ impl Tool for ComposioExecuteTool {
         context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
         let ctx = dispatch_ctx_for_tool(context);
-        let (config, outcome) = Box::pin(self.execute_unredacted(
-            &ctx,
-            args,
-            sandbox_mode_for_tool(context),
-            task_recency_window_for_tool(context),
-            crate::agent::tinyagents::host::run_context::approval_for_tool(context)
-                .chat
-                .as_ref(),
-        ))
+        let (config, outcome) = Box::pin(
+            self.execute_unredacted(
+                &ctx,
+                args,
+                sandbox_mode_for_tool(context),
+                task_recency_window_for_tool(context),
+                crate::agent::tinyagents::host::run_context::approval_for_tool(context)
+                    .chat
+                    .as_ref(),
+            ),
+        )
         .await;
         redact_composio_outcome(&config, outcome)
     }

@@ -12,9 +12,7 @@ use super::redact::redact_composio_outcome;
 use crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool;
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
-use tinytools::{
-    PermissionLevel, Tool, ToolCallOptions, ToolCategory, ToolResult, ToolRunContext,
-};
+use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolCategory, ToolResult, ToolRunContext};
 
 use super::super::client::{resolve_composio_route, ComposioRoute};
 use super::super::module_client::{self as connectors};
