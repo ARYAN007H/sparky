@@ -64,7 +64,7 @@ pub(super) fn handle_get_user_scopes(
         // unreadable" into an RPC error would make the scopes panel fail where
         // it used to render the defaults.
         let pref = match ctx.load_config().await {
-            Ok(config) => ops::load_user_scope_pref(&config, &toolkit).await,
+            Ok(config) => ops::load_user_scope_pref(&ctx, &config, &toolkit).await,
             Err(error) => {
                 tracing::warn!(
                     method = "composio.get_user_scopes",
@@ -121,7 +121,7 @@ pub(super) fn handle_set_user_scopes(
         // done, and `ops::user_scopes::save` refuses on the same three
         // grounds (no driver, no `Graph` family, backend write failure).
         let config = ctx.load_config().await?;
-        if let Err(e) = ops::save_user_scope_pref(&config, &toolkit, pref).await {
+        if let Err(e) = ops::save_user_scope_pref(&ctx, &config, &toolkit, pref).await {
             tracing::error!(
                 method = "composio.set_user_scopes",
                 toolkit = %toolkit,
