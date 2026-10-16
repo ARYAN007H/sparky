@@ -194,11 +194,12 @@ async fn tiny_session_port_recovers_legacy_key_from_owned_pause_and_hides_foreig
         .await
         .unwrap();
 
-    let port = crate::agent::orchestration::subagent_sessions::OpenHumanTinySubagentSessionStore::new(
-        workspace.path().to_path_buf(),
-        "owner-session",
-        Some("thread".into()),
-    );
+    let port =
+        crate::agent::orchestration::subagent_sessions::OpenHumanTinySubagentSessionStore::new(
+            workspace.path().to_path_buf(),
+            "owner-session",
+            Some("thread".into()),
+        );
     let owned = port
         .list_for_parent("owner-session", Some("thread"))
         .await

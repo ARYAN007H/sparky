@@ -181,7 +181,8 @@ fn subagent_control_dispatches(
     let Some(parent) = run_context.parent.as_ref() else {
         return std::collections::HashMap::new();
     };
-    let registry = crate::core::runtime::slot_for::<SubAgentJobRegistry>(&run_context.dispatch_ctx());
+    let registry =
+        crate::core::runtime::slot_for::<SubAgentJobRegistry>(&run_context.dispatch_ctx());
     let jobs = (*registry).clone();
     let store: Arc<dyn tinyagents_orchestration::subagent::SubagentSessionStore> = Arc::new(
         crate::agent::orchestration::subagent_sessions::OpenHumanTinySubagentSessionStore::new(
@@ -196,31 +197,31 @@ fn subagent_control_dispatches(
         run_context.thread_id.as_deref().unwrap_or("no-thread")
     );
     let parent_session = parent.session_id.clone();
-    let owner_scope: Arc<dyn Fn(u64) -> String + Send + Sync> =
-        Arc::new(move |_| owner.clone());
+    let owner_scope: Arc<dyn Fn(u64) -> String + Send + Sync> = Arc::new(move |_| owner.clone());
 
     let find_tool = |name: &str| -> Option<Arc<dyn tinytools::Tool>> {
         shared_tool_adapter(tool_sets.to_vec(), name)
             .map(|adapter| Arc::new(adapter) as Arc<dyn tinytools::Tool>)
     };
-    let make_jobs_alias = |name: &str, action: SubAgentJobAction| -> Option<RegisteredToolDispatch> {
-        let adapter = find_tool(name)?;
-        let parent_session = parent_session.clone();
-        let dispatch = SubAgentJobsTool::new(jobs.clone())
-            .with_tool_name(name)
-            .with_description(adapter.description())
-            .with_parameters(adapter.parameters_schema())
-            .with_fixed_action(action)
-            .with_metadata(
-                adapter.permission_level(),
-                adapter.scope(),
-                adapter.category(),
-                tinytools::ToolTimeout::Inherit,
-            )
-            .with_owner_scope(owner_scope.clone())
-            .with_sessions(store.clone(), move |_| parent_session.clone());
-        Some(Arc::new(dispatch))
-    };
+    let make_jobs_alias =
+        |name: &str, action: SubAgentJobAction| -> Option<RegisteredToolDispatch> {
+            let adapter = find_tool(name)?;
+            let parent_session = parent_session.clone();
+            let dispatch = SubAgentJobsTool::new(jobs.clone())
+                .with_tool_name(name)
+                .with_description(adapter.description())
+                .with_parameters(adapter.parameters_schema())
+                .with_fixed_action(action)
+                .with_metadata(
+                    adapter.permission_level(),
+                    adapter.scope(),
+                    adapter.category(),
+                    tinytools::ToolTimeout::Inherit,
+                )
+                .with_owner_scope(owner_scope.clone())
+                .with_sessions(store.clone(), move |_| parent_session.clone());
+            Some(Arc::new(dispatch))
+        };
     let mut dispatches = std::collections::HashMap::new();
     if let Some(dispatch) = make_jobs_alias("list_subagents", SubAgentJobAction::Query) {
         dispatches.insert("list_subagents".into(), dispatch);

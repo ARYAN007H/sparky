@@ -1,19 +1,19 @@
 mod ops;
 mod store;
 mod store_documents;
-mod types;
 mod tiny_port;
+mod types;
 
 pub use ops::{
     action_root_key, close, find_reusable, list_for_parent, mark_failed, mark_finished,
     normalize_task_key, resolve_lifecycle_key, reuse_decision, task_title_from_prompt,
     upsert_running,
 };
+pub(crate) use tiny_port::OpenHumanTinySubagentSessionStore;
 pub use types::{
     DurableSubagentSessionSummary, DurableSubagentStatus, SubagentSessionSelector,
     SubagentSessionStore, SubagentSessionUpsert,
 };
-pub(crate) use tiny_port::OpenHumanTinySubagentSessionStore;
 // Test-only since the `harness-subagent-audit` debug binary (and the
 // `orchestration::harness_audit` facade it needed) were removed: production
 // callers reach the session records through `DurableSubagentSessionSummary`.

@@ -38,8 +38,7 @@ impl OpenHumanTinySubagentSessionStore {
     }
 
     fn is_owned(&self, row: &DurableSubagentSession) -> bool {
-        row.parent_session == self.parent_session
-            && row.parent_thread_id == self.parent_thread_id
+        row.parent_session == self.parent_session && row.parent_thread_id == self.parent_thread_id
     }
 
     fn convert(&self, row: DurableSubagentSession) -> Result<TinySession, SubagentError> {
@@ -151,8 +150,7 @@ impl TinySessionStore for OpenHumanTinySubagentSessionStore {
         let reuse = if upsert.force_fresh {
             None
         } else {
-            super::find_reusable(&self.store, &selector)
-                .map_err(SubagentError::Persistence)?
+            super::find_reusable(&self.store, &selector).map_err(SubagentError::Persistence)?
         };
         let decision = if upsert.force_fresh {
             TinyReuseDecision::ForcedFresh
@@ -205,7 +203,10 @@ impl TinySessionStore for OpenHumanTinySubagentSessionStore {
             TinyStatus::Idle => crate::agent::subagent_host::SubagentRunStatus::Completed,
             TinyStatus::AwaitingUser => {
                 crate::agent::subagent_host::SubagentRunStatus::AwaitingUser {
-                    question: history.last().map(tinyinference_llm::message::Message::text).unwrap_or_default(),
+                    question: history
+                        .last()
+                        .map(tinyinference_llm::message::Message::text)
+                        .unwrap_or_default(),
                     options: None,
                     checkpoint: Some(self.checkpoint_dir.clone()),
                 }
@@ -231,8 +232,7 @@ impl TinySessionStore for OpenHumanTinySubagentSessionStore {
         if self.get(id).await?.is_none() {
             return Ok(false);
         }
-        super::mark_failed(&self.store, id, task_id, error)
-            .map_err(SubagentError::Persistence)?;
+        super::mark_failed(&self.store, id, task_id, error).map_err(SubagentError::Persistence)?;
         Ok(true)
     }
 }
