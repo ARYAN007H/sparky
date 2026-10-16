@@ -544,6 +544,25 @@ pub fn all_tools_with_runtime(
         tracing::debug!("[lsp] capability gate off (set OPENHUMAN_LSP_ENABLED=1 to register)");
     }
 
+    // Registered tool sources (`tools::sources`): tools an outside crate plugs
+    // in, appended in registration order after every built-in and before the
+    // filters below, so they are gated exactly like built-ins. Nothing
+    // registered => nothing appended.
+    tools.extend(crate::tools::sources::build_registered_tool_sources(
+        &crate::tools::sources::ToolSourceCtx {
+            config: &config,
+            root_config,
+            security,
+            runtime: &runtime,
+            audit: &audit,
+            browser_config,
+            http_config,
+            action_dir,
+            agents,
+            approval_workspace_root,
+        },
+    ));
+
     // Post-filters over the assembled list:
     //
     // 1. DomainSet (#4796): drop tools whose DomainGroup is disabled under the
