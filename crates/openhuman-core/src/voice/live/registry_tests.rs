@@ -28,10 +28,8 @@ fn entry(label: &str) -> LiveProviderEntry {
 fn nothing_registered_lists_only_the_built_in_providers() {
     let infos = provider_infos(&Config::default());
     let ids: Vec<_> = infos.iter().map(|i| i.id.as_str()).collect();
-    assert_eq!(
-        ids,
-        crate::config::schema::voice_live::LIVE_PROVIDERS.to_vec()
-    );
+    // The hosted ids are registered by the hosted-backend layer, not built in.
+    assert_eq!(ids, ["gemini", "sarvam"]);
 }
 
 #[test]
