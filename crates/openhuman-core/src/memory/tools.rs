@@ -503,10 +503,8 @@ impl Tool for MemoryTool {
          returns matching items five at a time, best first, each with its id (filter by \
          metadata such as workspace, repo, file_path, kinds). When it also returns \
          `next_cursor`, more items match: for the next five of the same search, call fetch \
-         again with the same query and filter and `cursor` set to it. For a question that \
-         counts or lists things across conversations (how many, which ones, every time), \
-         follow `next_cursor` until fetch stops returning one before answering. A cursor \
-         only continues the search it came from; for different words, fetch without one. \
+         again with the same query and filter and `cursor` set to it. A cursor only \
+         continues the search it came from; for different words, fetch without one. \
          `learn` queues a durable fact, preference, procedure or correction about the \
          user or their work, shared with every agent working alongside you; `forget` \
          queues removal of items by id. Write acknowledgements mean locally queued, \
