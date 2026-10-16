@@ -4,7 +4,7 @@
 use crate::agent::turn_origin::AgentTurnOrigin;
 use tinyagents_definition::SandboxMode;
 
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 /// OpenHuman product values that tools read from the run through
 /// `ToolExecutionContext::host::<OpenHumanRunExt>()`, installed by
@@ -16,6 +16,21 @@ pub struct OpenHumanRunExt {
     /// Recency window narrowing integration task-fetch tools (morning
     /// briefing only); `None` leaves them unbounded.
     pub task_recency_window: Option<Duration>,
+    /// Explicit child-process environment supplied by the embedding host.
+    pub command_environment: Option<Arc<std::collections::BTreeMap<String, String>>>,
+}
+
+/// Reads the explicit command environment from a tool's run context.
+pub(crate) fn command_environment_for_tool(
+    context: Option<&dyn tinytools::ToolRunContext>,
+) -> Option<Arc<std::collections::BTreeMap<String, String>>> {
+    context
+        .and_then(tinytools::ToolRunContext::host_extension)
+        .and_then(|extension| {
+            extension.downcast_ref::<tinyagents_harness::tool::ToolExecutionContext>()
+        })
+        .and_then(|context| context.host::<OpenHumanRunExt>())
+        .and_then(|ext| ext.command_environment.clone())
 }
 
 /// Reads the run's task-recency window from the explicit tool carrier.
