@@ -641,15 +641,9 @@ impl OpenHumanSessionHost {
             self.hosted_base.clone(),
             self.agent_definition_id.clone(),
         ));
-        // A thread-bound root session addresses its transcript by durable
-        // identity, so a restart appends to the conversation's own file rather
-        // than minting a new stem and resuming whichever one happens to be
-        // newest. Everything else — sub-agents, unthreaded CLI turns — keeps
-        // the stem path, where a fresh transcript per run is correct.
-        // The builder's initial binding and the per-turn resume hook must
-        // share one locator allocation. The runtime compares locator identity
-        // once a durable transcript is bound; separately constructed locators
-        // for the same workspace reject the first turn after a cold resume.
+        // Thread-bound roots resume their deterministic transcript; other
+        // turns keep the per-run stem path. Reuse one locator for the initial
+        // binding and each resume because the runtime compares locator identity.
         let session_locator = self.session_locator();
         let resume_target = match self.session.clone() {
             Some(session) => TranscriptTarget::for_session(
