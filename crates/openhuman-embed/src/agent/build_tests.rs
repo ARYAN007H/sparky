@@ -32,7 +32,7 @@ fn config_fn_final_autonomy_is_captured_on_the_built_agent_context() {
         .enable_all()
         .build()
         .unwrap();
-    tokio.block_on(async {
+    let test = tokio.spawn(async {
         use openhuman_core::config::Config;
         use openhuman_core::core::runtime::AutonomyTierSource;
         use openhuman_core::security::AutonomyLevel;
@@ -78,6 +78,7 @@ fn config_fn_final_autonomy_is_captured_on_the_built_agent_context() {
         drop(agent);
         drop(runtime);
     });
+    tokio.block_on(test).unwrap();
 }
 
 #[test]
