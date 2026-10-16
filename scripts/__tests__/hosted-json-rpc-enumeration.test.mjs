@@ -64,7 +64,7 @@ if [[ "$*" == *"test -p openhuman --lib"* ]]; then
     }
     if [[ "$*" == *"cron::bus_host::tests::"* || "$*" == *"cron::documents_port::tests::"* ]]; then
       echo "ISOLATED-CRON-MODULE-TEST:$*"
-    else
+    elif [[ "$*" == *"inference::tokenjuice::"* || "$*" == *"tinyjuice_detects_and_converts_html"* ]]; then
       echo "ISOLATED-MODULE-TEST:$*"
     fi
     echo "test result: ok. 1 passed; 0 failed; 0 ignored"
