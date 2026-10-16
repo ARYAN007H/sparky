@@ -68,6 +68,8 @@ use crate::inference::provider::{is_raw_passthrough_model, role_for_model_tier};
 /// caller's task), so HITL gating still applies to every fanned-out turn.
 pub struct OpenHumanAgentRunner {
     pub config: Arc<Config>,
+    /// The context the run acts under, handed over by whoever started it.
+    pub ctx: crate::core::runtime::DispatchCtx,
     /// The run's approval context (flow run correlation), handed to the gate
     /// with every acting dispatch.
     pub approval: crate::security::approval::ApprovalTurnContext,
@@ -175,8 +177,8 @@ impl AgentRunner for OpenHumanAgentRunner {
         request: Value,
         conn: Option<&str>,
     ) -> Result<Value> {
-        // Entry point of a flow agent node: bind the calling task's context once.
-        let dispatch = crate::core::runtime::DispatchCtx::ambient();
+        // Entry point of a flow agent node: the run's own context.
+        let dispatch = self.ctx.clone();
         // The harness definition registry must be initialised before we can
         // build a named agent. Idempotent: a booted core already did this at
         // startup; a bare flow run (tests, standalone) has not. A failure here

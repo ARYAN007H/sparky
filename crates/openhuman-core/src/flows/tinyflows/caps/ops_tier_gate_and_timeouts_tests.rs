@@ -73,6 +73,7 @@ async fn http_adapter_blocks_under_readonly_tier() {
 
     let (_dir, creds) = http_cred_store();
     let http = OpenHumanHttp {
+        ctx: crate::core::runtime::DispatchCtx::ambient(),
         security: Arc::new(policy(AutonomyLevel::ReadOnly)),
         http_config: HttpRequestConfig::default(),
         http_creds: Arc::new(creds),

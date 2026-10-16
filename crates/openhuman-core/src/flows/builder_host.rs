@@ -132,7 +132,9 @@ impl FlowStore for FlowsHost {
         approve: Vec<String>,
         reject: Vec<String>,
     ) -> PortResult<Value> {
-        ops::flows_resume(&self.config, flow_id, run_id, approve, reject)
+        // Transitional (#7801): the builder host (`FlowsHost`) carries no context yet.
+        let ctx = crate::core::runtime::DispatchCtx::ambient();
+        ops::flows_resume(&ctx, &self.config, flow_id, run_id, approve, reject)
             .await
             .map(|o| o.value)
     }

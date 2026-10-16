@@ -98,6 +98,7 @@ pub(super) async fn export_run_to_langfuse(
 #[allow(clippy::too_many_arguments)]
 #[inline(never)]
 pub(super) fn run_flow_body(
+    ctx: crate::core::runtime::DispatchCtx,
     config_arc: Arc<Config>,
     flow: Flow,
     flow_id: String,
@@ -110,6 +111,7 @@ pub(super) fn run_flow_body(
     _run_guard: run_registry::RunGuard,
 ) -> futures::future::BoxFuture<'static, Result<Outcome<Value>, String>> {
     Box::pin(run_flow_body_inner(
+        ctx,
         config_arc,
         flow,
         flow_id,
@@ -125,6 +127,7 @@ pub(super) fn run_flow_body(
 
 #[allow(clippy::too_many_arguments)]
 async fn run_flow_body_inner(
+    ctx: crate::core::runtime::DispatchCtx,
     config_arc: Arc<Config>,
     flow: Flow,
     flow_id: String,
@@ -233,6 +236,7 @@ async fn run_flow_body_inner(
         run_id: thread_id.clone(),
     };
     let caps = crate::flows::tinyflows::build_capabilities(
+        &ctx,
         config_arc.clone(),
         format!("flow:{flow_id}"),
         Some(flow_run),
