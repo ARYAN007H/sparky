@@ -12,7 +12,7 @@ use crate::agent::orchestration::parent_context::with_root_parent;
 use crate::config::Config;
 use tinyagents_session::run_ledger::{WorkflowRun, WorkflowRunStatus, WorkflowRunUpsert};
 
-use super::super::ops::{
+use super::ops::{
     compare_and_swap_workflow_run_lifecycle, definition_by_id, get_workflow_run, workflow_store,
 };
 use super::LOG_TARGET;
@@ -42,12 +42,12 @@ pub async fn start_workflow_run(
     );
     let definition = definition_by_id(definition_id)
         .ok_or_else(|| anyhow!("unknown workflow definition: {definition_id}"))?;
-    let safety_tier = super::super::host::admit_workflow(&definition)?;
+    let safety_tier = super::host::admit_workflow(&definition)?;
 
     let run_id = format!("wfrun-{}", uuid::Uuid::new_v4());
     let initial_engine = WorkflowEngine::new(
         workflow_store(config)?,
-        Arc::new(super::super::host::OpenHumanWorkflowExecutor::new(
+        Arc::new(super::host::OpenHumanWorkflowExecutor::new(
             &run_id,
             None,
             safety_tier,
@@ -189,7 +189,7 @@ pub async fn resume_workflow_run(
 
     let definition = definition_by_id(&run.definition_id)
         .ok_or_else(|| anyhow!("definition {} no longer exists", run.definition_id))?;
-    let _safety_tier = super::super::host::admit_workflow(&definition)?;
+    let _safety_tier = super::host::admit_workflow(&definition)?;
 
     let resumed = compare_and_swap_workflow_run_lifecycle(
         config,
@@ -274,7 +274,7 @@ pub(crate) async fn run_engine_loop(
                 .map(str::to_owned)
         })
         .filter(|model| !model.trim().is_empty());
-    let safety_tier = match super::super::host::admit_workflow(&definition) {
+    let safety_tier = match super::host::admit_workflow(&definition) {
         Ok(tier) => tier,
         Err(error) => {
             log::error!(target: LOG_TARGET, "[workflow_run_engine] loop.safety_admission_failed run={run_id} err={error}");
@@ -319,7 +319,7 @@ pub(crate) async fn run_engine_loop(
         |parent| async move {
             let engine = WorkflowEngine::new(
                 store,
-                Arc::new(super::super::host::OpenHumanWorkflowExecutor::new(
+                Arc::new(super::host::OpenHumanWorkflowExecutor::new(
                     run_id,
                     model_override,
                     safety_tier,
