@@ -71,7 +71,7 @@
   },
   {
     "rule": "json-write",
-    "path": "crates/openhuman-core/src/agent/progress_tracing/export.rs",
+    "path": "crates/openhuman-core/src/core/observability/progress_tracing/export.rs",
     "line": 33,
     "text": "let opened = std::fs::OpenOptions::new()",
     "occurrence": 1
@@ -85,14 +85,14 @@
   },
   {
     "rule": "json-write",
-    "path": "crates/openhuman-core/src/agent/prompts/render_helpers/workspace_files.rs",
+    "path": "crates/openhuman-core/src/prompts/workspace_files.rs",
     "line": 91,
     "text": "if let Err(e) = std::fs::write(&path, default_content) {",
     "occurrence": 1
   },
   {
     "rule": "json-write",
-    "path": "crates/openhuman-core/src/agent/prompts/render_helpers/workspace_files.rs",
+    "path": "crates/openhuman-core/src/prompts/workspace_files.rs",
     "line": 101,
     "text": "let _ = std::fs::write(&hash_path, &current_hash);",
     "occurrence": 1
