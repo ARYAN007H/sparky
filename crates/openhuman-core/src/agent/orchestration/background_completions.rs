@@ -40,7 +40,9 @@ use tinyagents_tasks::{
 };
 
 use super::completion_notice::BackgroundCompletionFormatter;
-pub(crate) use super::completion_notice::{BackgroundAgentOutcome, AWAITING_INPUT_LABEL};
+pub(crate) use super::completion_notice::{
+    BackgroundAgentOutcome, AWAITING_INPUT_LABEL, AWAITING_INPUT_RECORD_PREFIX,
+};
 pub(crate) use super::completion_target::CompletionTarget;
 pub(crate) use super::completion_target::{claim_recovery, forget_recovery};
 #[cfg(test)]
@@ -62,8 +64,6 @@ const RECORD_RETRIES: u32 = 3;
 /// Reserved prefix for independently deliverable pause notices. The encoded
 /// task id keeps these records out of the terminal task's dedupe slot; the UUID
 /// distinguishes repeated pauses of the same resumable task.
-const AWAITING_INPUT_RECORD_PREFIX: &str = "\u{1}host-awaiting-input:";
-
 /// Bound on the session -> thread cache; the oldest mapping is evicted first.
 const SESSION_THREADS_CAP: usize = 4096;
 
@@ -407,16 +407,20 @@ pub(crate) async fn record_awaiting_input(
 /// Completion-router key for an awaiting-input notification. The real task id
 /// remains available in the notification body; this separate key leaves the
 /// task id's dedupe slot open for its eventual terminal result.
-fn awaiting_input_record_id(task_id: &str) -> String {
-    let encoded_task_id: String = task_id
+fn encoded_task_id(task_id: &str) -> String {
+    task_id
         .as_bytes()
         .iter()
         .map(|byte| format!("{byte:02x}"))
-        .collect();
-    format!(
-        "{AWAITING_INPUT_RECORD_PREFIX}{encoded_task_id}:{}",
-        uuid::Uuid::new_v4().simple()
-    )
+        .collect()
+}
+
+fn awaiting_input_record_prefix(task_id: &str) -> String {
+    format!("{AWAITING_INPUT_RECORD_PREFIX}{}:", encoded_task_id(task_id))
+}
+
+fn awaiting_input_record_id(task_id: &str) -> String {
+    format!("{}{ }", awaiting_input_record_prefix(task_id), uuid::Uuid::new_v4().simple())
 }
 
 /// Drop every workspace's router and all process-local state about them. Called
@@ -496,8 +500,9 @@ pub(crate) fn mark_collected(workspace_dir: &Path, task_id: &str) -> bool {
         .filter(|record| record.task_id.starts_with(&pause_prefix))
         .map(|record| record.task_id)
         .collect();
-    let pauses_collected = pauses.into_iter().any(|pause_id| {
-        matches!(router.tombstone(&pause_id), Ok(TombstoneOutcome::Suppressed))
+    let pauses_collected = pauses.into_iter().fold(false, |collected, pause_id| {
+        let suppressed = matches!(router.tombstone(&pause_id), Ok(TombstoneOutcome::Suppressed));
+        collected | suppressed
     });
     log::debug!(
         "[background_completions] mark_collected task_id={task_id} completion={completion:?} \
