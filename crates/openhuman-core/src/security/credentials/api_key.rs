@@ -9,7 +9,7 @@
 //!   `Authorization: Bearer <key>` — the OpenAI-compatible endpoint takes a
 //!   bearer, and `OpenHumanBackendModel::resolve_bearer` prefers this profile
 //!   over the app session;
-//! * SDK REST clients send it as `x-api-key` — `BackendOAuthClient` and
+//! * SDK REST clients send it as `x-api-key` — `BackendClient` and
 //!   `IntegrationClient` pick the header from [`BackendCredential`];
 //! * bearer-only callers (cloud STT and embeddings, the connector proxy
 //!   route, the memory host) send it as
