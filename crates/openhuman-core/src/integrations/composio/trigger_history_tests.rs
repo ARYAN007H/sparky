@@ -38,8 +38,8 @@ async fn close_releases_under_the_explicit_ctx_not_the_scoped_one() {
         #[cfg(feature = "modules")]
         fixture: None,
     };
-    let scoped = Arc::new(CoreContext::for_test(DomainSet::full(), None));
-    let explicit = DispatchCtx::new(Arc::new(CoreContext::for_test(DomainSet::full(), None)));
+    let scoped = CoreContext::for_test(DomainSet::full(), None);
+    let explicit = DispatchCtx::new(CoreContext::for_test(DomainSet::full(), None));
     // A scope for another context is active; the release task is spawned by the
     // explicit context and completes without consulting the scoped one.
     CoreContext::scope(scoped, async {
