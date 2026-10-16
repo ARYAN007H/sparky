@@ -2,7 +2,7 @@
 //!
 //! Each unit struct renders one logical block of the system prompt.
 //! The rendering logic delegates to the free helpers in
-//! [`super::render_helpers`] for workspace-file injection and
+//! workspace-file helpers re-exported by [`super`] for workspace-file injection and
 //! sub-agent plumbing.
 
 use super::types::*;

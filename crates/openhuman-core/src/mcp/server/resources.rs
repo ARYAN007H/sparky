@@ -111,7 +111,7 @@ const RESOURCE_CATALOG: &[PromptResource] = &[
         uri: "openhuman://prompts/agents/summarizer",
         name: "summarizer",
         description: "The extraction contract oversized tool results are summarized against.",
-        content: crate::agent::registry::agents::summarizer::prompt::ARCHETYPE,
+        content: crate::agent::registry::agents::summarizer::ARCHETYPE,
     },
     PromptResource {
         uri: "openhuman://prompts/agents/presentation_agent",

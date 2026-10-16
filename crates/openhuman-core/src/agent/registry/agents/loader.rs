@@ -54,7 +54,7 @@ pub const BUILTINS: &[BuiltinAgent] = &[
     BuiltinAgent {
         id: "orchestrator",
         toml: include_str!("orchestrator/agent.toml"),
-        prompt_fn: super::orchestrator::prompt::build,
+        prompt_fn: super::orchestrator::build,
     },
     // `planner` and `critic` are not delegable from chat (the orchestrator does
     // not list them): they exist for the `parallel_research_cross_check`
@@ -65,57 +65,57 @@ pub const BUILTINS: &[BuiltinAgent] = &[
     BuiltinAgent {
         id: "planner",
         toml: include_str!("planner/agent.toml"),
-        prompt_fn: super::planner::prompt::build,
+        prompt_fn: super::planner::build,
     },
     BuiltinAgent {
         id: "critic",
         toml: include_str!("critic/agent.toml"),
-        prompt_fn: super::critic::prompt::build,
+        prompt_fn: super::critic::build,
     },
     BuiltinAgent {
         id: "task_manager_agent",
         toml: include_str!("task_manager_agent/agent.toml"),
-        prompt_fn: super::task_manager_agent::prompt::build,
+        prompt_fn: super::task_manager_agent::build,
     },
     BuiltinAgent {
         id: "presentation_agent",
         toml: include_str!("presentation_agent/agent.toml"),
-        prompt_fn: super::presentation_agent::prompt::build,
+        prompt_fn: super::presentation_agent::build,
     },
     BuiltinAgent {
         id: "vision_agent",
         toml: include_str!("vision_agent/agent.toml"),
-        prompt_fn: super::vision_agent::prompt::build,
+        prompt_fn: super::vision_agent::build,
     },
     BuiltinAgent {
         id: "image_agent",
         toml: include_str!("image_agent/agent.toml"),
-        prompt_fn: super::image_agent::prompt::build,
+        prompt_fn: super::image_agent::build,
     },
     BuiltinAgent {
         id: "video_agent",
         toml: include_str!("video_agent/agent.toml"),
-        prompt_fn: super::video_agent::prompt::build,
+        prompt_fn: super::video_agent::build,
     },
     BuiltinAgent {
         id: "trigger_triage",
         toml: include_str!("trigger_triage/agent.toml"),
-        prompt_fn: super::trigger_triage::prompt::build,
+        prompt_fn: super::trigger_triage::build,
     },
     BuiltinAgent {
         id: "trigger_reactor",
         toml: include_str!("trigger_reactor/agent.toml"),
-        prompt_fn: super::trigger_reactor::prompt::build,
+        prompt_fn: super::trigger_reactor::build,
     },
     BuiltinAgent {
         id: "morning_briefing",
         toml: include_str!("morning_briefing/agent.toml"),
-        prompt_fn: super::morning_briefing::prompt::build,
+        prompt_fn: super::morning_briefing::build,
     },
     BuiltinAgent {
         id: "summarizer",
         toml: include_str!("summarizer/agent.toml"),
-        prompt_fn: super::summarizer::prompt::build,
+        prompt_fn: super::summarizer::build,
     },
     // Skill agents — `#[cfg]` rather than stub: `include_str!` embeds the
     // agent TOML from disk regardless of module gating, so the entry itself

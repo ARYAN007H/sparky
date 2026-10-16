@@ -27,9 +27,9 @@ domains use to compose their own prompts.
   `DateTimeSection`, `RuntimeSection`, `AgentsInstructionsSection`,
   `PersonalityRosterSection`, `ArchetypePromptSection`,
   `DynamicPromptSection`, `GroundingSection`).
-- Named re-exports from `render_helpers` ([`render_helpers.rs`](./render_helpers.rs) plus the
-  `render_helpers/` submodules `section_renderers.rs`, `subagent.rs`,
-  `workspace_files.rs`): free `render_*` functions (thin wrappers over the
+- Named exports from the `render_helpers/` implementation files
+  `section_renderers.rs`, `subagent.rs`, and `workspace_files.rs`: free
+  `render_*` functions (thin wrappers over the
   section structs), the workspace-file helpers
   (`inject_workspace_file[_capped]`, `inject_inline_content`,
   `sync_workspace_file`, `default_workspace_file_content`),
