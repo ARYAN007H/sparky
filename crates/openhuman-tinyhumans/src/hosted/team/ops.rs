@@ -16,7 +16,7 @@ use serde_json::{json, Value};
 use tinyhumans_sdk::api::types::{CodeRequest, CreateTeamInviteRequest};
 
 use crate::backend::url::effective_backend_api_url;
-use openhuman_embed::__host::backend::BackendClient;
+use crate::client::BackendClient;
 use openhuman_embed::__host::config::Config;
 use openhuman_embed::__host::core::Outcome;
 use crate::integrations::client::budget_gate;
@@ -124,7 +124,7 @@ async fn legacy_authed_value(
     client
         .authed_json(credential, method, path, body)
         .await
-        .map_err(openhuman_embed::__host::backend::flatten_authed_error)
+        .map_err(crate::client::flatten_authed_error)
 }
 
 pub async fn update_team(

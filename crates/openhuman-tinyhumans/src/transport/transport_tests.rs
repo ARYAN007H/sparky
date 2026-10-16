@@ -236,7 +236,7 @@ async fn backend_client_round_trips_through_the_installed_transport() {
 
     let _guard = global_lock().lock().await;
     let _t = crate::install(crate::InstallOptions::default()).unwrap();
-    let client = openhuman_embed::__host::backend::BackendClient::new(&server.uri()).unwrap();
+    let client = crate::client::BackendClient::new(&server.uri()).unwrap();
     let value = client
         .authed_json("jwt", reqwest::Method::GET, "/announcements/latest", None)
         .await
@@ -331,7 +331,7 @@ fn product_identity_and_attribution_come_from_this_crate() {
 
 #[tokio::test]
 async fn core_channel_routes_recover_from_the_transports_typed_404s() {
-    use openhuman_embed::__host::backend::BackendApiError;
+    use crate::client::HostedApiError as BackendApiError;
     // POST + DELETE only, mirroring the deployed router: PATCH falls through
     // to Express's HTML 404 (#5230); DELETE answers a handler-level 404.
     let server = MockServer::start().await;
@@ -353,7 +353,7 @@ async fn core_channel_routes_recover_from_the_transports_typed_404s() {
 
     let _guard = global_lock().lock().await;
     let _t = crate::install(crate::InstallOptions::default()).unwrap();
-    let client = openhuman_embed::__host::backend::BackendClient::new(&server.uri()).unwrap();
+    let client = crate::client::BackendClient::new(&server.uri()).unwrap();
 
     let err = client
         .send_channel_edit("telegram", "1103", "jwt", json!({}))
