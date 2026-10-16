@@ -1,7 +1,7 @@
 //! The live OpenHuman composition over `tinyagents_runtime::Session`.
 //!
-//! The mutex is intentionally narrow: it carries host preparation and
-//! finalization observations only. Generic model history, transcript rows,
+//! The mutex carries host preparation and finalization observations only.
+//! Generic model history, transcript rows,
 //! prefix reconciliation, tool snapshots, resume and persistence remain inside
 //! the runtime session.
 
