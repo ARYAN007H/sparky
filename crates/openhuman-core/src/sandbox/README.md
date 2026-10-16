@@ -98,14 +98,18 @@ read-write grants, TinyBox's scratch directory, `/private/tmp` and `/dev/null`.
 Network follows `policy.allow_network` (on for a local session, off for a
 remote one), which the jail's `allow_net` enforces.
 
-**Known limitation (`folder_confined`): reads are not confined.** Seatbelt's
-profile is allow-default for reads, so a command can read any file the user
-can, credential stores included (`~/.ssh`, `~/.gnupg`, `~/.aws`, Keychains), and
-with network on could send it out. The pinned TinyBox contract has no way to
-deny reads (`NativeJailConfig` carries no deny list). The capability is
-[tinyhumansai/tinybox#87](https://github.com/tinyhumansai/tinybox/pull/87)
-(`deny_read`, contract 1.20); once it is released and pinned, `folder_confined`
-requests will deny the `is_always_forbidden` credential stores.
+**`folder_confined`: credential stores are read-denied.** Seatbelt's profile
+is allow-default for reads, so `jail_request` sends the credential stores that
+`SecurityPolicy::is_always_forbidden` protects (`~/.ssh`, `~/.gnupg`, `~/.aws`,
+`~/.azure`, `~/.kube`, `~/Library/Keychains`, `~/.netrc`, `~/.git-credentials`,
+`~/.pgpass`, `~/.npmrc`, `~/.docker/config.json`, `~/.cargo/credentials.toml`)
+as `NativeJailConfig.deny_read` (TinyBox contract 1.20), built from the same
+lists by `security::policy::home_credential_stores`. Only stores that exist are
+sent. A store that holds the workspace root or a read-write grant is left out
+with a warning, because TinyBox refuses a denial that would take the command's
+workspace away; a store inside a grant is still denied. Other files the user
+can read stay readable. `isolated` (Landlock) sends none: it already denies
+every path it is not granted.
 
 TinyBox owns the jail provider, child process, pipe capture,
 and kill/reap acknowledgement; OpenHuman reads bounded output batches and

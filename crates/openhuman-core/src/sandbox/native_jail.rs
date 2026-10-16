@@ -237,7 +237,57 @@ fn jail_request(
             contract::JailEnforcement::Declared
         },
         require_process_isolation: isolated,
+        // Landlock denies every path it is not granted; Seatbelt reads
+        // allow-default, so folder confinement names the credential stores.
+        deny_read: if isolated {
+            Vec::new()
+        } else {
+            let home =
+                super::local_grants::grant_home(crate::core::runtime::is_saas(), dirs::home_dir);
+            credential_denials(
+                home.as_deref(),
+                &policy.workspace_root,
+                &policy.read_write_mounts,
+            )
+        },
     })
+}
+
+/// The credential stores under `home` that a folder-confined jail must not
+/// read: the stores [`SecurityPolicy::is_always_forbidden`] protects, as
+/// existing absolute paths (TinyBox drops absent ones anyway). A store that
+/// holds the jail root or a writable grant is left out, because TinyBox refuses
+/// a denial that would take the command's workspace away.
+///
+/// [`SecurityPolicy::is_always_forbidden`]: crate::security::SecurityPolicy
+#[cfg(any(feature = "modules", test))]
+fn credential_denials(
+    home: Option<&Path>,
+    root: &Path,
+    read_write: &[std::path::PathBuf],
+) -> Vec<String> {
+    let Some(home) = home else {
+        return Vec::new();
+    };
+    let granted: Vec<std::path::PathBuf> = std::iter::once(root)
+        .chain(read_write.iter().map(std::path::PathBuf::as_path))
+        .filter_map(|path| path.canonicalize().ok())
+        .collect();
+    crate::security::policy::home_credential_stores(home)
+        .into_iter()
+        .filter_map(|store| {
+            let real = store.canonicalize().ok()?;
+            if granted.iter().any(|path| path.starts_with(&real)) {
+                // The store's name only: the full path carries the user's login.
+                tracing::warn!(
+                    store = ?store.file_name(),
+                    "[sandbox:local] not denying reads of a credential store that holds the workspace or a writable grant"
+                );
+                return None;
+            }
+            real.to_str().map(str::to_owned)
+        })
+        .collect()
 }
 
 #[cfg(feature = "modules")]

@@ -90,7 +90,117 @@ fn native_jail_request_preserves_grants_and_requires_enforcement() -> anyhow::Re
     assert!(!confined.allow_net);
     assert_eq!(confined.enforcement, contract::JailEnforcement::Declared);
     assert!(!confined.require_process_isolation);
+
+    // Landlock is deny-default, so the isolated jail needs no read denials;
+    // Seatbelt reads allow-default, so folder confinement names the
+    // credential stores this host has.
+    assert!(request.deny_read.is_empty());
+    for denied in &confined.deny_read {
+        assert!(
+            crate::security::SecurityPolicy::is_always_forbidden(std::path::Path::new(denied)),
+            "{denied} is not a protected credential store"
+        );
+    }
     Ok(())
+}
+
+/// A home folder holding the given credential stores: a trailing `/` makes a
+/// directory, anything else a file.
+fn home_with(stores: &[&str]) -> tempfile::TempDir {
+    let home = tempfile::tempdir().unwrap();
+    for store in stores {
+        let path = home.path().join(store.trim_end_matches('/'));
+        if store.ends_with('/') {
+            std::fs::create_dir_all(&path).unwrap();
+        } else {
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(&path, "secret").unwrap();
+        }
+    }
+    home
+}
+
+fn real(home: &tempfile::TempDir, store: &str) -> String {
+    home.path()
+        .join(store)
+        .canonicalize()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned()
+}
+
+#[test]
+fn folder_confinement_denies_the_credential_stores_that_exist() {
+    let home = home_with(&[
+        ".ssh/",
+        ".aws/",
+        "Library/Keychains/",
+        ".netrc",
+        ".cargo/credentials.toml",
+    ]);
+    let root = tempfile::tempdir().unwrap();
+
+    let denied = credential_denials(Some(home.path()), root.path(), &[]);
+
+    // Absent stores (`.gnupg`, `.kube`, `.npmrc`, ...) are not sent.
+    assert_eq!(
+        denied,
+        [
+            real(&home, ".ssh"),
+            real(&home, ".aws"),
+            real(&home, "Library/Keychains"),
+            real(&home, ".netrc"),
+            real(&home, ".cargo/credentials.toml"),
+        ]
+    );
+}
+
+#[test]
+fn a_store_holding_the_root_or_a_writable_grant_is_not_denied() {
+    let home = home_with(&[
+        ".ssh/",
+        ".aws/project/",
+        ".kube/",
+        ".cargo/credentials.toml",
+    ]);
+
+    // TinyBox refuses a denial over the root or a writable grant, so those
+    // stores are dropped. A store inside a writable grant is still denied:
+    // Seatbelt carves it out of the grant.
+    let denied = credential_denials(
+        Some(home.path()),
+        &home.path().join(".aws/project"),
+        &[home.path().join(".kube"), home.path().join(".cargo")],
+    );
+
+    assert_eq!(
+        denied,
+        [real(&home, ".ssh"), real(&home, ".cargo/credentials.toml")]
+    );
+}
+
+#[test]
+fn no_home_means_no_credential_denials() {
+    let root = tempfile::tempdir().unwrap();
+    assert!(credential_denials(None, root.path(), &[]).is_empty());
+}
+
+#[test]
+fn every_denied_store_is_one_the_path_floor_forbids() {
+    let home = std::path::Path::new("/home/someone");
+    let stores = crate::security::policy::home_credential_stores(home);
+
+    assert!(stores.contains(&home.join(".ssh")));
+    assert!(stores.contains(&home.join("Library/Keychains")));
+    assert!(stores.contains(&home.join(".git-credentials")));
+    for store in &stores {
+        assert!(
+            crate::security::SecurityPolicy::is_always_forbidden(store),
+            "{} is not on the is_always_forbidden floor",
+            store.display()
+        );
+    }
 }
 
 #[cfg(feature = "modules")]
