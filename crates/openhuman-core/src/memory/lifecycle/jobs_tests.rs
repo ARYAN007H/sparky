@@ -21,7 +21,9 @@ fn workspace_queues_are_released_after_the_last_holder_drops() {
     drop(queue_of(&sentinel));
 
     let queues = QUEUES.lock().unwrap();
-    assert!(workspaces.iter().all(|workspace| !queues.contains_key(workspace)));
+    assert!(workspaces
+        .iter()
+        .all(|workspace| !queues.contains_key(workspace)));
 }
 
 fn build(agent: &str) -> BackgroundJob {

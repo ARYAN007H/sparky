@@ -41,7 +41,11 @@ fn owner_states_are_released_after_the_last_write_holder_drops() {
         ..config_in(&temp)
     };
     drop(owner_state(&sentinel_config));
-    drop(queue(&sentinel_workspace.join("memory").join("sentinel-writes.json")));
+    drop(queue(
+        &sentinel_workspace
+            .join("memory")
+            .join("sentinel-writes.json"),
+    ));
 
     let owners = OWNERS.lock().unwrap();
     assert!(keys.iter().all(|key| !owners.contains_key(key)));
