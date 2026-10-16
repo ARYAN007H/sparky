@@ -3,6 +3,42 @@
 
 use super::*;
 
+/// The managed provider as a registered chat model
+/// ([`crate::inference::registry::register_chat_model`]), or `None` when
+/// nothing is registered under [`PROVIDER_OPENHUMAN`] and the built-in backend
+/// applies. The privacy gate runs first, exactly as for the built-in path.
+pub(super) fn registered_managed_chat_model(
+    role: &str,
+    config: &Config,
+    model_override: Option<&str>,
+    default_model: Option<&str>,
+    native_tool_calling: bool,
+    thread_id: Option<&str>,
+    egress: &EgressLedger,
+) -> Option<
+    anyhow::Result<(
+        std::sync::Arc<dyn tinyinference_llm::model::ChatModel<()>>,
+        String,
+    )>,
+> {
+    let entry = crate::inference::registry::chat_model(PROVIDER_OPENHUMAN)?;
+    log::debug!(
+        "[providers][chat-factory] role={role} managed provider served by a registered chat model"
+    );
+    if let Err(error) = enforce_local_only_inference(role, PROVIDER_OPENHUMAN) {
+        return Some(Err(error));
+    }
+    Some((entry.build)(&crate::inference::registry::ChatModelRequest {
+        role,
+        config,
+        model_override,
+        default_model,
+        native_tool_calling,
+        thread_id,
+        egress,
+    }))
+}
+
 /// Resolve the managed OpenHuman backend for `role` — the model id (tier /
 /// summarization / default, with `hint:<tier>` translation) plus a configured
 /// [`OpenHumanBackendModel`]. Shared by both the `Provider` path
@@ -29,6 +65,17 @@ pub(crate) fn make_openhuman_backend_model_for_thread(
     std::sync::Arc<dyn tinyinference_llm::model::ChatModel<()>>,
     String,
 )> {
+    if let Some(registered) = registered_managed_chat_model(
+        role,
+        config,
+        Some(model),
+        None,
+        native_tool_calling,
+        thread_id,
+        egress,
+    ) {
+        return registered;
+    }
     // `model` may be a role alias (`hint:reasoning`) the registry keys the
     // route by; the backend only ever sees the concrete id it resolves to.
     let (backend, resolved_model) =
@@ -137,6 +184,17 @@ pub(crate) fn make_openhuman_backend_model(
     std::sync::Arc<dyn tinyinference_llm::model::ChatModel<()>>,
     String,
 )> {
+    if let Some(registered) = registered_managed_chat_model(
+        role,
+        config,
+        None,
+        None,
+        false,
+        None,
+        &EgressLedger::none(),
+    ) {
+        return registered;
+    }
     let (model_client, model) = resolve_managed_backend(role, config, &EgressLedger::none())?;
     let chat: std::sync::Arc<dyn tinyinference_llm::model::ChatModel<()>> =
         std::sync::Arc::new(model_client);

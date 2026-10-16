@@ -111,6 +111,18 @@ pub(super) fn create_turn_chat_model_with_native_tools_and_route_inner(
     };
     if !test_override_active {
         if resolves_to_managed_backend(role, config) {
+            if let Some(registered) = registered_managed_chat_model(
+                role,
+                config,
+                None,
+                Some(model),
+                native_tool_calling,
+                None,
+                egress,
+            ) {
+                let (chat, _resolved_model) = registered?;
+                return Ok((chat, PROVIDER_OPENHUMAN.to_string(), model.to_string()));
+            }
             let (backend, _resolved_model) = resolve_managed_backend(role, config, egress)?;
             return Ok((
                 Arc::new(
@@ -269,6 +281,22 @@ pub(crate) fn create_turn_chat_model_from_string_with_native_tools_and_route(
     let p = provider_string.trim();
     let is_managed = p.is_empty() || p == "cloud" || p == PROVIDER_OPENHUMAN;
     if is_managed && !test_override_active {
+        if let Some(registered) = registered_managed_chat_model(
+            role,
+            config,
+            None,
+            Some(model),
+            native_tool_calling,
+            None,
+            egress,
+        ) {
+            let (chat, _resolved_model) = registered?;
+            return Ok((
+                with_default_temperature(chat, temperature),
+                PROVIDER_OPENHUMAN.to_string(),
+                model.to_string(),
+            ));
+        }
         let (backend, _resolved_model) = resolve_managed_backend(role, config, egress)?;
         return Ok((
             with_default_temperature(

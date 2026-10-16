@@ -177,6 +177,12 @@ pub async fn probe_inference_readiness(
         "[flows][inference-probe] role={role} resolves to the managed OpenHuman backend — \
          probing readiness"
     );
+    if let Some(probe) = crate::inference::registry::chat_model(PROVIDER_OPENHUMAN)
+        .and_then(|entry| entry.probe)
+    {
+        log::debug!("[flows][inference-probe] role={role} probing via the registered chat model");
+        return probe(role.to_string(), config.clone()).await;
+    }
     let (managed_model, model_id) =
         resolve_managed_backend(role, config, &EgressLedger::none()).map_err(|e| e.to_string())?;
     let result = managed_model.probe_readiness().await;
