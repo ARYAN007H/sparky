@@ -11,6 +11,7 @@
 //! explicit elevated escape paths.
 
 pub mod docker;
+pub mod host_runtime;
 pub(crate) mod local_grants;
 pub(crate) mod native_jail;
 pub mod ops;

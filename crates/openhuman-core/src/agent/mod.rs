@@ -25,8 +25,6 @@ pub(crate) mod cost;
 pub mod goals;
 pub mod harness;
 pub mod hooks;
-/// Host-side runtime adapters used by agent tools and shell policy.
-pub mod host_runtime;
 /// Host-registered agents the core's own drivers (cron, workflow nodes) can
 /// resolve by id, with their definition, host tools and context.
 pub mod host_agents;
