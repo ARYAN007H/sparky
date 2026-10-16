@@ -1,6 +1,6 @@
 use super::*;
 use openhuman_embed::__host::voice_registry::{
-    unregister_stt_provider, unregister_tts_provider,
+    create_stt_provider, create_tts_provider, unregister_stt_provider, unregister_tts_provider,
 };
 
 #[test]
@@ -8,12 +8,12 @@ fn registration_covers_every_historical_cloud_slug() {
     register();
     let config = Config::default();
     for slug in STT_SLUGS {
-        let factory = lookup_stt(slug);
-        assert_eq!(factory("ignored", &config).unwrap().name(), "cloud", "{slug}");
+        let provider = create_stt_provider(slug, "ignored", &config).unwrap();
+        assert_eq!(provider.name(), "cloud", "{slug}");
     }
     for slug in TTS_SLUGS {
-        let factory = lookup_tts(slug);
-        assert_eq!(factory(None, &config).unwrap().name(), "cloud", "{slug}");
+        let provider = create_tts_provider(slug, "", &config).unwrap();
+        assert_eq!(provider.name(), "cloud", "{slug}");
     }
     for slug in STT_SLUGS {
         unregister_stt_provider(slug);

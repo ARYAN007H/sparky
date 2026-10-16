@@ -363,7 +363,9 @@ pub mod voice_registry {
         register_tts_provider_in, unregister_stt_provider, unregister_tts_provider,
         SttProviderFactory, TtsProviderFactory,
     };
-    pub use openhuman_core::voice::factory::{SttProvider, SttResult, TtsProvider};
+    pub use openhuman_core::voice::factory::{
+        create_stt_provider, create_tts_provider, SttProvider, SttResult, TtsProvider,
+    };
     pub use openhuman_core::voice::live::registry::{
         register_live_provider, register_live_provider_in, unregister_live_provider, ConfigureFn,
         ConfiguredFn, LiveFuture, LiveProviderEntry, PrepareFn,
