@@ -237,7 +237,10 @@ where
     F: std::future::Future<Output = anyhow::Result<T>>,
     T: std::fmt::Debug + Settled,
 {
-    let scope = match storage_host::current_module_scope(&crate::core::runtime::DispatchCtx::ambient(), module_id) {
+    let scope = match storage_host::current_module_scope(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        module_id,
+    ) {
         Ok(scope) => format!("{scope:?}"),
         Err(error) => {
             log::warn!("[{kind}] legacy storage import skipped: {:?}", error.kind());

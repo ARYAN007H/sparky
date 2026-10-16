@@ -343,7 +343,9 @@ pub fn spawn_channels_service(
     #[cfg(not(feature = "channels"))]
     {
         let _ = dispatch;
-        log::debug!("[channels] channels feature disabled at compile time — not spawning listeners");
+        log::debug!(
+            "[channels] channels feature disabled at compile time — not spawning listeners"
+        );
     }
     None
 }
