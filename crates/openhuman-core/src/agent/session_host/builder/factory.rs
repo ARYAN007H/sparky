@@ -742,9 +742,8 @@ impl OpenHumanSessionHost {
 
         // Crate-native turn models (Phase 3 P3-B): the production main-turn agent
         // builds crate `ChatModel`s from `(provider_role, config)` without retaining
-        // a host provider. The
-        // `agent_harness_e2e` mock now serves SSE for streaming, so the crate-native
-        // streaming path is exercised end-to-end.
+        // a host provider. The `agent_harness_e2e` mock now serves SSE for streaming,
+        // so the crate-native streaming path is exercised end-to-end.
         //
         // Resolve the per-turn iteration cap in one place so an explicit
         // operator override takes precedence over the selected definition,
