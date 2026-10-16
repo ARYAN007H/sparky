@@ -31,13 +31,11 @@ async fn import_legacy(
     name: &'static str,
 ) -> Result<(), String> {
     let marker_docs = docs.clone();
-    let done =
-        ctx.spawn_blocking(move || marker_docs.legacy_imported(name))
-            .await
-            .map_err(|error| format!("[composio:store] checking legacy {name} failed: {error}"))?
-            .map_err(|error| {
-                format!("[composio:store] checking legacy {name} failed: {error:#}")
-            })?;
+    let done = ctx
+        .spawn_blocking(move || marker_docs.legacy_imported(name))
+        .await
+        .map_err(|error| format!("[composio:store] checking legacy {name} failed: {error}"))?
+        .map_err(|error| format!("[composio:store] checking legacy {name} failed: {error:#}"))?;
     if done {
         return Ok(());
     }
@@ -54,13 +52,11 @@ async fn import_legacy(
     let value: serde_json::Value = serde_json::from_slice(&bytes)
         .map_err(|error| format!("[composio:store] parsing legacy {name} failed: {error}"))?;
     let docs = docs.clone();
-    let wrote =
-        ctx.spawn_blocking(move || docs.import_if_absent(name, value))
-            .await
-            .map_err(|error| format!("[composio:store] importing legacy {name} failed: {error}"))?
-            .map_err(|error| {
-                format!("[composio:store] importing legacy {name} failed: {error:#}")
-            })?;
+    let wrote = ctx
+        .spawn_blocking(move || docs.import_if_absent(name, value))
+        .await
+        .map_err(|error| format!("[composio:store] importing legacy {name} failed: {error}"))?
+        .map_err(|error| format!("[composio:store] importing legacy {name} failed: {error:#}"))?;
     log::debug!("[composio:store] legacy import name={name} wrote={wrote}");
     Ok(())
 }
@@ -73,7 +69,8 @@ async fn import_legacy(
 pub(crate) async fn load<T>(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
-    name: &'static str) -> Result<T, String>
+    name: &'static str,
+) -> Result<T, String>
 where
     T: DeserializeOwned + Default + Send + 'static,
 {
@@ -123,7 +120,9 @@ where
 pub(crate) async fn save<T>(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
-    name: &'static str, value: &T) -> Result<(), String>
+    name: &'static str,
+    value: &T,
+) -> Result<(), String>
 where
     T: Serialize,
 {
