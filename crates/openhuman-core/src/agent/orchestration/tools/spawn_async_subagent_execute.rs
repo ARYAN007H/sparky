@@ -417,7 +417,7 @@ impl SpawnAsyncSubagentTool {
                     run_queue: Some(task_queue),
                 };
 
-                let result = run_subagent_with_parent(
+                let result = crate::agent::subagent_host::run_async_spawn_via_driver_tool(
                     &detached_parent,
                     background_definition,
                     background_prompt,
