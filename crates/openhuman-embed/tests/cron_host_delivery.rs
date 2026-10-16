@@ -9,14 +9,32 @@
 
 mod common;
 
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc, Mutex,
+};
 use std::time::Duration;
 
-use common::{offline_config, runtime, scripted_provider, stub_backend, tool_call_completion};
+use common::{offline_config, runtime, stub_backend, tool_call_completion};
 use openhuman_embed::{
     Access, AgentDefinitionSpec, AgentSpec, AgentTurnOrigin, CronDelivery, CronReply,
     HostTurnTools, InMemorySessionStores, JobOrigin, Runtime, ServiceSet, ToolScopeSpec, Workspace,
 };
+
+struct CronScript(AtomicUsize);
+
+impl wiremock::Respond for CronScript {
+    fn respond(&self, _: &wiremock::Request) -> wiremock::ResponseTemplate {
+        let response = match self.0.fetch_add(1, Ordering::SeqCst) {
+            // Compute the `at` schedule when the model asks for the tool, not
+            // when the fixture starts booting the runtime.
+            0 => add_job("stretch", "stretch reminder"),
+            1 => common::chat_completion("Scheduled."),
+            _ => common::chat_completion("Time to stretch!"),
+        };
+        wiremock::ResponseTemplate::new(200).set_body_json(response)
+    }
+}
 
 #[derive(Default)]
 struct Recorder(Mutex<Vec<CronReply>>);
@@ -74,17 +92,14 @@ fn a_library_agents_scheduled_reply_is_handed_to_the_host() {
                 !openhuman_core::cron::scheduler_gate::is_signed_out(),
                 "background cron inference requires a signed-in runtime"
             );
-            // Compute the one-shot schedule only after runtime startup; the
-            // scheduler must not receive an already-expired `at` timestamp.
-            // The job's own run answers from the provider's fallback.
-            let provider = scripted_provider(
-                vec![
-                    add_job("stretch", "stretch reminder"),
-                    common::chat_completion("Scheduled."),
-                ],
-                "Time to stretch!",
-            )
-            .await;
+            // The responder computes the one-shot schedule when the model
+            // asks for the tool; startup cannot age the `at` timestamp.
+            let provider = wiremock::MockServer::start().await;
+            wiremock::Mock::given(wiremock::matchers::method("POST"))
+                .and(wiremock::matchers::path("/v1/chat/completions"))
+                .respond_with(CronScript(AtomicUsize::new(0)))
+                .mount(&provider)
+                .await;
             let agent = runtime
                 .agent(
                     AgentSpec::new("teeny")
