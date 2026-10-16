@@ -468,7 +468,7 @@ pub(crate) async fn fence_and_clear(
     let mut fence = WriteFence {
         guard: None,
         token: Some(token),
-        state,
+        state: state.clone(),
         config: Arc::new(config.clone()),
         ctx: ctx.clone(),
     };
@@ -565,7 +565,7 @@ pub(crate) async fn drain(config: &Config) -> usize {
     let state = drain_state(&file);
     let _draining = state.barrier.lock().await;
     let generation = owner.gate.generation();
-    drain_locked(config, &file, owner, generation).await
+    drain_locked(config, &file, &owner, generation).await
 }
 
 /// Runs one queued write against the bound engine, bounded by [`WRITE_TIMEOUT`].
