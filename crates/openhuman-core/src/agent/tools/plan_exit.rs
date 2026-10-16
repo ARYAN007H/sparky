@@ -114,6 +114,11 @@ impl PlanExitTool {
                     thread_id = %thread_id,
                     "[tool][plan_exit] a plan review is still parked on this thread — not flipping to build"
                 );
+            } else if tenant.is_none() {
+                tracing::warn!(
+                    thread_id = %thread_id,
+                    "[tool][plan_exit] tenant context is unavailable — not flipping to build"
+                );
             } else {
                 tracing::info!(
                     thread_id = %thread_id,
