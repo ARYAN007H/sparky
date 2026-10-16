@@ -103,10 +103,8 @@ fn chat_thread(origin: crate::agent::turn_origin::AgentTurnOrigin) -> String {
 async fn agent_chat_origin_comes_from_the_turn_context_before_the_task_scope() {
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
     let base = CoreContext::for_test(DomainSet::full(), None);
-    let own = DispatchCtx::new(std::sync::Arc::new(
-        base.derive_channel_turn(None, Some(chat_origin("own"))),
-    ));
-    let scoped = std::sync::Arc::new(base.derive_channel_turn(None, Some(chat_origin("scoped"))));
+    let own = DispatchCtx::new(base.derive_channel_turn(None, Some(chat_origin("own"))));
+    let scoped = base.derive_channel_turn(None, Some(chat_origin("scoped")));
     CoreContext::scope(scoped, async {
         // The turn's own context wins over whatever the task scope carries.
         assert_eq!(chat_thread(effective_agent_chat_origin(&own)), "own");
