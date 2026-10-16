@@ -10,7 +10,7 @@ use serde_json::Value;
 use tinyjuice_bus::handle;
 use tinyjuice_bus::repl::{ReplLimits, ReplOp};
 use tinyjuice_bus::wire::{QueryError, QueryRequest, QueryResponse, QueryTarget};
-use tinytools::{PermissionLevel, Tool, ToolResult};
+use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolResult, ToolRunContext};
 
 /// The query tools TinyJuice declares. The footer suggests a subset of these.
 use tinyjuice_bus::tools::REPL_TOOLS;
