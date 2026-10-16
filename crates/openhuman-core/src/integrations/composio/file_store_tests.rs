@@ -140,3 +140,41 @@ async fn a_legacy_state_file_is_imported_once_and_left_byte_identical() {
         br#"{"gmail":7}"#
     );
 }
+
+fn agent_ctx(agent: &str) -> crate::core::runtime::DispatchCtx {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+    DispatchCtx::new(
+        CoreContext::for_test(DomainSet::full(), None).derive_with(
+            ContextOverlay::new(Config::default(), DomainSet::full(), Default::default())
+                .session_agent(agent),
+        ),
+    )
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn store_work_runs_under_the_handed_context_and_two_contexts_do_not_cross() {
+    let dir = tempfile::tempdir().unwrap();
+    let config = config_in(&dir);
+    let seen = || {
+        crate::core::runtime::CoreContext::current()
+            .and_then(|c| c.session_agent().map(str::to_owned))
+    };
+    // Called from outside any scope: the blocking store work acts for the
+    // context it was handed, not for whatever the caller happened to run in.
+    let (a, b) = tokio::join!(
+        update(
+            &agent_ctx("u-asha"),
+            &config,
+            IDENTITIES_FILE,
+            move |_: &mut BTreeMap<String, u32>| (seen(), false)
+        ),
+        update(
+            &agent_ctx("u-ravi"),
+            &config,
+            IDENTITIES_FILE,
+            move |_: &mut BTreeMap<String, u32>| (seen(), false)
+        ),
+    );
+    assert_eq!(a.unwrap().as_deref(), Some("u-asha"));
+    assert_eq!(b.unwrap().as_deref(), Some("u-ravi"));
+}
