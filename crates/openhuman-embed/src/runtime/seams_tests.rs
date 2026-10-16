@@ -33,7 +33,7 @@ impl LearningSink for NamedPostTurn {
     fn name(&self) -> &str {
         self.0
     }
-    async fn on_turn_complete(&self, _ctx: &TurnContextTurnSummary) -> anyhow::Result<()> {
+    async fn on_turn_complete(&self, _ctx: &TurnSummary) -> anyhow::Result<()> {
         Ok(())
     }
 }

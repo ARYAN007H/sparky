@@ -14,6 +14,10 @@ pub(super) fn host_outcome_to_neutral(
     let mut extensions = std::collections::BTreeMap::from_iter([
         ("agent_id".into(), serde_json::json!(definition.id)),
         (
+            "tier".into(),
+            serde_json::json!(definition.agent_tier.as_str()),
+        ),
+        (
             "worker_thread_id".into(),
             serde_json::json!(options.worker_thread_id),
         ),
@@ -75,7 +79,7 @@ pub(super) fn host_outcome_to_neutral(
     SubagentOutcome {
         task_id: outcome.task_id,
         worker_thread_id: options.worker_thread_id.clone(),
-        tier: None,
+        tier: Some(definition.agent_tier.as_str().to_owned()),
         model_override: options.model_override.clone(),
         cost_usd: usage_cost.usd(),
         cost_source: Some(usage_cost.source),

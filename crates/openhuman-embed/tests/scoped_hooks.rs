@@ -9,7 +9,7 @@ use common::{
     chat_completion, eventually, offline_config, route, runtime, scripted_provider, stub_backend,
     tool_call_completion,
 };
-use openhuman_embed::seams::{LearningSink, ToolHook, ToolHookContext, TurnContext};
+use openhuman_embed::seams::{LearningSink, OpenHumanRunContext, ToolHook, ToolHookContext, TurnSummary};
 use openhuman_embed::{
     AgentDefinitionSpec, AgentSpec, HostTurnTools, Runtime, Tool, ToolScopeSpec, Workspace,
 };
@@ -69,7 +69,7 @@ impl LearningSink for Observer {
     fn name(&self) -> &str {
         "same-policy-name"
     }
-    async fn on_turn_complete(&self, ctx: &TurnContextTurnSummary) -> anyhow::Result<()> {
+    async fn on_turn_complete(&self, ctx: &TurnSummary) -> anyhow::Result<()> {
         assert!(ctx.session_id.is_some());
         assert!(ctx.agent_id.is_some());
         self.record("turn", ctx.user_message.lines().last().unwrap());

@@ -2,7 +2,7 @@
 mod common;
 use async_trait::async_trait;
 use openhuman_embed::providers::{ChatModel, ModelRequest, ModelResponse};
-use openhuman_embed::seams::{LearningSink, TurnContext};
+use openhuman_embed::seams::{LearningSink, TurnSummary};
 use openhuman_embed::{
     Access, AgentDefinitionSpec, AgentSpec, InMemorySessionStores, ModelDefaults, Provider,
     Runtime, RuntimeEventKind, SessionStoreProvider, StreamEvent,
@@ -33,7 +33,7 @@ impl LearningSink for Hook {
     fn name(&self) -> &str {
         self.name
     }
-    async fn on_turn_complete(&self, ctx: &TurnContextTurnSummary) -> anyhow::Result<()> {
+    async fn on_turn_complete(&self, ctx: &TurnSummary) -> anyhow::Result<()> {
         self.seen.send(ctx.agent_id.clone().unwrap_or_default())?;
         Ok(())
     }
