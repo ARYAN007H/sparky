@@ -85,10 +85,46 @@ fn direct_mode_takes_the_api_key_from_the_config_file() {
     assert!(blob.get("state_dir").is_some());
 }
 
+/// Removes the direct-base overrides for a test's duration and restores them.
+/// The route blob's destination (and so whether a proxy applies to it) follows
+/// them, and other tests point them at a loopback mock while they hold
+/// `TEST_ENV_LOCK`.
+struct DirectBaseScrub(Vec<(&'static str, Option<std::ffi::OsString>)>);
+
+impl DirectBaseScrub {
+    fn new() -> Self {
+        let vars = ["OPENHUMAN_COMPOSIO_DIRECT_BASE_V2", "OPENHUMAN_COMPOSIO_DIRECT_BASE_V3"];
+        Self(
+            vars.into_iter()
+                .map(|name| {
+                    let old = std::env::var_os(name);
+                    std::env::remove_var(name);
+                    (name, old)
+                })
+                .collect(),
+        )
+    }
+}
+
+impl Drop for DirectBaseScrub {
+    fn drop(&mut self) {
+        for (name, old) in self.0.drain(..) {
+            if let Some(value) = old {
+                std::env::set_var(name, value);
+            }
+        }
+    }
+}
+
 #[test]
 fn direct_mode_hands_the_module_the_hosts_proxy_policy() {
     // Part of the route description, so a proxy change reconfigures the module.
     use crate::config::schema::{ProxyConfig, ProxyScope};
+
+    // The destination follows the direct-base env overrides; keep any other
+    // test's loopback override out of this one.
+    let _env = crate::config::TEST_ENV_LOCK.blocking_lock();
+    let _scrub = DirectBaseScrub::new();
 
     let mut config = bare_config();
     config.composio.mode = COMPOSIO_MODE_DIRECT.to_string();
