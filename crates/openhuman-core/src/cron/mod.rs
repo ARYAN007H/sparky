@@ -37,9 +37,6 @@ pub use ops as rpc;
 #[cfg(test)]
 pub use ops::update_cron_job;
 pub use ops::{add_once, add_once_at, pause_job, resume_job};
-// Pure scheduling logic (schedule model, next-run computation) lives in
-// `tinyflows-schedule`; the host keeps the scheduler runtime, store, config
-// and RPC, and re-exports the upstream names so `cron::Schedule` etc. hold.
 pub use schemas::{
     all_controller_schemas as all_cron_controller_schemas,
     all_registered_controllers as all_cron_registered_controllers, schemas as cron_schemas,

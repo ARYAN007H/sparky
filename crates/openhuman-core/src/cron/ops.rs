@@ -9,10 +9,9 @@ use {
     tinyflows_bus::schedule::types::CronRun, tinyflows_bus::schedule::types::Schedule,
 };
 
-/// Claim `job_id` as running. `None` when a run (scheduled or Run Now) already
-/// holds it; the claim is released when the guard drops, including on panic or
+/// Claim `job_id` as running. `None` when a Run Now of it already holds it; the claim is released when the guard drops, including on panic or
 /// future cancellation, so an aborted task can never lock a job id.
-pub(crate) fn try_acquire_run(job_id: &str) -> Option<tinyflows_schedule::runtime::RunClaim> {
+pub(crate) fn try_acquire_run(job_id: &str) -> Option<crate::cron::scheduler::RunGuard> {
     crate::cron::scheduler::try_acquire_run(job_id)
 }
 
@@ -31,7 +30,10 @@ pub(crate) fn load_job_for_run(config: &Config, job_id: &str) -> Result<CronJob>
 }
 
 pub fn add_once(config: &Config, delay: &str, command: &str) -> Result<CronJob> {
-    let duration = tinyflows_schedule::validation::parse_human_delay(delay)?;
+    let delay = delay.to_string();
+    let duration = crate::cron::client::blocking(config, move |config| async move {
+        crate::cron::client::parse_human_delay(&config, &delay).await
+    })?;
     let at = chrono::Utc::now() + duration;
     add_once_at(config, at, command)
 }
