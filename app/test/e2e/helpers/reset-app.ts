@@ -20,7 +20,7 @@
  */
 import { waitForApp, waitForAppReady } from './app-helpers';
 import { callOpenhumanRpc } from './core-rpc';
-import { waitForWebView, waitForWindowVisible } from './element-helpers';
+import { clickText, textExists, waitForWebView, waitForWindowVisible } from './element-helpers';
 import { triggerAuthLoopbackBypass } from './loopback-auth-helpers';
 import { supportsExecuteScript } from './platform';
 import { dismissBootCheckGateIfVisible, waitForHomePage, walkOnboarding } from './shared-flows';
@@ -51,30 +51,21 @@ function stepLog(message: string): void {
 /** Dismiss the Joyride tour if it starts after the home route becomes ready. */
 async function dismissLateWalkthrough(): Promise<void> {
   const appeared = await browser
-    .waitUntil(
-      async () =>
-        Boolean(
-          await browser
-            .execute(() => document.querySelector('[role="tooltip"]') !== null)
-            .catch(() => false)
-        ),
-      { timeout: 4_000, interval: 250, timeoutMsg: 'waiting for a walkthrough tooltip' }
-    )
+    .waitUntil(async () => textExists('Skip tour'), {
+      timeout: 4_000,
+      interval: 250,
+      timeoutMsg: 'waiting for the walkthrough Skip tour action',
+    })
     .then(() => true)
     .catch(() => false);
   if (!appeared) return;
 
-  const dismissed = await dismissWalkthroughIfVisible(5_000);
-  const stillVisible = await browser
-    .execute(() => document.querySelector('[role="tooltip"]') !== null)
-    .catch(() => false);
-  if (stillVisible) {
-    throw new Error(
-      dismissed
-        ? 'walkthrough tooltip remained visible after Skip tour'
-        : 'walkthrough tooltip appeared without a dismissible Skip tour button'
-    );
-  }
+  await clickText('Skip tour', 2_000);
+  await browser.waitUntil(async () => !(await textExists('Skip tour')), {
+    timeout: 5_000,
+    interval: 250,
+    timeoutMsg: 'walkthrough Skip tour action remained visible after dismissal',
+  });
   stepLog('Dismissed walkthrough after home route became ready');
 }
 
