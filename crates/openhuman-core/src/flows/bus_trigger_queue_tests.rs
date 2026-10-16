@@ -358,4 +358,3 @@ fn default_constructs_the_same_as_new() {
     let b = FlowTriggerSubscriber::new(config);
     assert_eq!(a.name(), b.name());
 }
-
