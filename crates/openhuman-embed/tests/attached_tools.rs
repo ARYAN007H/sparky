@@ -1,8 +1,8 @@
 mod common;
 use common::{chat_completion, chat_requests, offline_config, runtime, stub_backend};
 use openhuman_embed::{
-    AgentDefinitionSpec, AgentSpec, HostTools, HostTurnTools, Provider, Runtime, Tool,
-    ToolScopeSpec, Workspace,
+    AgentDefinitionSpec, AgentSpec, HostTools, HostTurnTools, InMemorySessionStores, Provider,
+    Runtime, SessionStoreProvider, Tool, ToolScopeSpec, Workspace,
 };
 use std::sync::Arc;
 use wiremock::matchers::{method, path};
@@ -49,6 +49,7 @@ fn attached_tools_survive_clones_and_session_resume() {
         tokio::spawn(async {
             let backend = stub_backend().await;
             let provider = wiremock::MockServer::start().await;
+            let session_store = Arc::new(InMemorySessionStores::new());
             Mock::given(method("POST"))
                 .and(path("/v1/chat/completions"))
                 .respond_with(ResponseTemplate::new(200).set_body_json(chat_completion("reply")))
@@ -58,6 +59,7 @@ fn attached_tools_survive_clones_and_session_resume() {
                 .config(offline_config())
                 .workspace(Workspace::Ephemeral)
                 .backend_url(backend.uri())
+                .session_store(session_store.clone())
                 .build()
                 .await
                 .unwrap();
@@ -112,33 +114,34 @@ fn attached_tools_survive_clones_and_session_resume() {
                     ))]))
                 )
                 .is_err());
-            agent
+            let first = agent
                 .turn("first user")
                 .session("continuing")
                 .send()
                 .await
                 .unwrap();
+            assert_eq!(first.session_id, "continuing");
             clone
                 .turn("second user")
                 .session("continuing")
                 .send()
                 .await
                 .unwrap();
-            let generation_zero = std::fs::read_dir(agent.transcripts_dir())
+            let transcripts = session_store.for_agent("attached").transcripts;
+            let continuing = transcripts
+                .thread_transcripts("continuing", Some("attached"))
+                .expect("the continuing session transcript is durable");
+            assert_eq!(continuing.roots.len(), 1);
+            let frozen_generation_zero = continuing.roots[0]
+                .transcript
+                .read_session()
                 .unwrap()
-                .map(|entry| entry.unwrap().path())
-                .find(|path| {
-                    let has_generation_suffix = path
-                        .file_stem()
-                        .and_then(|stem| stem.to_str())
-                        .and_then(|stem| stem.rsplit_once(".g"))
-                        .is_some_and(|(_, generation)| generation.parse::<u32>().is_ok());
-                    path.extension()
-                        .is_some_and(|extension| extension == "jsonl")
-                        && !has_generation_suffix
-                })
-                .expect("the first committed prefix has generation zero transcript");
-            let frozen_generation_zero = std::fs::read(&generation_zero).unwrap();
+                .expect("generation zero is committed");
+            let frozen_generation_zero = serde_json::to_string(&(
+                frozen_generation_zero.messages,
+                frozen_generation_zero.tools,
+            ))
+            .unwrap();
             agent
                 .attach_tools(
                     "second",
@@ -163,26 +166,30 @@ fn attached_tools_survive_clones_and_session_resume() {
                 .await
                 .unwrap();
             assert_eq!(agent.config().action_dir, original_config.action_dir);
-            let paths = std::fs::read_dir(agent.transcripts_dir())
+            let continuing = transcripts
+                .thread_transcripts("continuing", Some("attached"))
+                .expect("the continuing session transcript remains durable");
+            assert_eq!(continuing.roots.len(), 1);
+            let continuing = continuing.roots[0]
+                .transcript
+                .read_session()
                 .unwrap()
-                .map(|entry| entry.unwrap().path())
-                .collect::<Vec<_>>();
-            assert!(
-                paths.contains(&generation_zero),
-                "the continuing session transcript must remain durable"
-            );
+                .expect("the continuing session remains readable");
             assert_eq!(
-                std::fs::read(&generation_zero).unwrap(),
+                serde_json::to_string(&(continuing.messages, continuing.tools)).unwrap(),
                 frozen_generation_zero,
-                "the continuing session must leave its transcript byte-for-byte intact"
+                "the continuing session transcript must remain unchanged"
             );
-            let successor = paths
-                .iter()
-                .find(|path| {
-                    std::fs::read_to_string(path).is_ok_and(|text| text.contains("hivemind_list"))
-                })
-                .unwrap();
-            let durable = std::fs::read_to_string(successor).unwrap();
+            let successor = transcripts
+                .thread_transcripts("after-attach", Some("attached"))
+                .expect("a later session has its own transcript")
+                .roots
+                .into_iter()
+                .next()
+                .expect("the later session has a root transcript");
+            let durable =
+                serde_json::to_string(&successor.transcript.read_session().unwrap().unwrap())
+                    .unwrap();
             assert!(
                 durable
                     .lines()
@@ -191,7 +198,7 @@ fn attached_tools_survive_clones_and_session_resume() {
                         && line.contains("hivemind_list")),
                 "successor generation must persist the updated permanent-tool catalogue"
             );
-            let sealed = String::from_utf8(frozen_generation_zero).unwrap();
+            let sealed = frozen_generation_zero;
             assert!(
                 sealed.contains("FROZEN_HOST_PROMPT"),
                 "sealed prefix: {sealed}"
