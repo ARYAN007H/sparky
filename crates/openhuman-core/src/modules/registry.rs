@@ -71,7 +71,7 @@ use records_voice::TINYVOICE;
 
 /// Every module this build can load. The records whose contract crate is an
 /// optional dependency (`documents`, `web3`, `voice`, `hosting`, `tinymemes`) exist only when
-/// that gate is on; a product-feature build carries all twelve.
+/// that gate is on; a product-feature build carries all thirteen.
 pub const ALL: &[ModuleRecord] = &[
     TINYCOMPUTER,
     TINYSEARCH,
