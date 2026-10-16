@@ -165,6 +165,8 @@ jobs:
 
       - name: Run E2E (${{ inputs.spec_label }})
         if: ${{ !inputs.full }}
+        env:
+          E2E_USE_TAURI_DRIVER: "1"
         run: |
           export XDG_DATA_HOME="$(mktemp -d /tmp/openhuman-e2e-xdg.XXXXXX)"
           chmod 700 "$XDG_DATA_HOME"
