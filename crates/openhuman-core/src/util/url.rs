@@ -61,9 +61,9 @@ pub fn normalize_backend_api_base_url(url: &str) -> String {
 ///
 /// | `base`                                    | `path`                    | result                                                                 |
 /// |-------------------------------------------|---------------------------|------------------------------------------------------------------------|
-/// | `https://api.tinyhumans.ai`               | `/auth/me`                | `https://api.tinyhumans.ai/auth/me`                                   |
-/// | `https://api.tinyhumans.ai/openai/v1/…`   | `/agent-integrations/foo` | `https://api.tinyhumans.ai/agent-integrations/foo`  ← path replaced   |
-/// | `https://api.tinyhumans.ai`               | `""`                      | `https://api.tinyhumans.ai`                                           |
+/// | `https://api.example.com`                 | `/auth/me`                | `https://api.example.com/auth/me`                                     |
+/// | `https://api.example.com/v1/chat/…`       | `/integrations/foo`       | `https://api.example.com/integrations/foo`  ← path replaced           |
+/// | `https://api.example.com`                 | `""`                      | `https://api.example.com`                                             |
 /// | `not a url`                               | `/x`                      | `not a url/x`  ← safe fallback concat                                 |
 ///
 /// Paths **must start with `/`**. Relative paths (no leading slash) are
