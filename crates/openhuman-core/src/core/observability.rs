@@ -14,6 +14,8 @@
 //! and return `Err(_)`, but Sentry never saw it. Funnel error sites through
 //! `report_error` so they show up tagged and grep-friendly in Sentry.
 
+pub(crate) mod progress_tracing;
+
 use std::fmt::Display;
 
 #[cfg(feature = "crash-reporting")]
@@ -3464,5 +3466,4 @@ pub fn is_stale_release_event(event: &sentry::protocol::Event<'_>) -> bool {
 #[cfg(test)]
 #[path = "observability_tests.rs"]
 mod tests;
-pub(crate) mod progress_tracing;
 
