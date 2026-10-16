@@ -5,6 +5,7 @@ use crate::agent::tinyagents::middleware::tool_output::ToolOutputMiddleware;
 use super::*;
 use crate::agent::tinyagents::middleware::turn_context::TurnContextMiddleware;
 use tinyagents_harness::middleware::MicrocompactMiddleware;
+use tinyagents_harness::middleware::library::DEFAULT_CLEARED_PLACEHOLDER as CLEARED_PLACEHOLDER;
 use tinytools::{ToolRuntime, ToolTimeout};
 
 #[tokio::test]
