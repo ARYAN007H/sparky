@@ -86,7 +86,7 @@ pub(crate) async fn current_tier_policy(
                 .map_err(|error| tier_config_error(&error))?,
         ),
     };
-    Ok(tier_policy_from_config(ctx, captured_config, live.as_ref(), baseline))
+    tier_policy_from_config(ctx, captured_config, live.as_ref(), baseline)
 }
 
 /// Uses an already reloaded live config when the caller needs that same
@@ -96,12 +96,11 @@ pub(crate) fn tier_policy_from_config(
     captured_config: &crate::config::Config,
     live_config: Option<&crate::config::Config>,
     baseline: &SecurityPolicy,
-) -> SecurityPolicy {
+) -> Result<SecurityPolicy> {
     let config = match ctx.autonomy_tier_source() {
         crate::core::runtime::AutonomyTierSource::Captured => captured_config,
-        crate::core::runtime::AutonomyTierSource::LiveConfig => {
-            live_config.unwrap_or(captured_config)
-        }
+        crate::core::runtime::AutonomyTierSource::LiveConfig => live_config
+            .ok_or_else(|| tier_config_error("live config snapshot was not provided"))?,
     };
     let mut policy = baseline.clone();
     policy.enabled = config.autonomy.enabled;
@@ -110,7 +109,7 @@ pub(crate) fn tier_policy_from_config(
         policy.enabled = true;
         policy.autonomy = stricter_tier(policy.autonomy, ceiling);
     }
-    policy
+    Ok(policy)
 }
 
 /// Async counterpart used by the host adapters. Config failures are policy
