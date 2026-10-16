@@ -228,11 +228,13 @@ async fn proactive_message_reaches_web_on_channelless_core_boot() {
         &crate::core::runtime::DispatchCtx::ambient(),
     );
 
-    crate::core::bus::BUS.publish(crate::core::events::DomainEvent::ProactiveMessageRequested {
-        source: "cron:test".into(),
-        message: "Your morning briefing is ready.".into(),
-        job_name: Some("morning-briefing".into()),
-    });
+    crate::core::bus::BUS.publish(
+        crate::core::events::DomainEvent::ProactiveMessageRequested {
+            source: "cron:test".into(),
+            message: "Your morning briefing is ready.".into(),
+            job_name: Some("morning-briefing".into()),
+        },
+    );
 
     let event = tokio::time::timeout(std::time::Duration::from_secs(2), async {
         loop {
@@ -250,5 +252,8 @@ async fn proactive_message_reaches_web_on_channelless_core_boot() {
     .await
     .expect("proactive message should reach the web event stream");
     assert_eq!(event.event, "proactive_message");
-    assert_eq!(event.full_response.as_deref(), Some("Your morning briefing is ready."));
+    assert_eq!(
+        event.full_response.as_deref(),
+        Some("Your morning briefing is ready.")
+    );
 }

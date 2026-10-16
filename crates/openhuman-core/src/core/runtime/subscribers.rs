@@ -325,9 +325,7 @@ pub(super) fn register_domain_subscribers(
             }
         }
     } else {
-        log::debug!(
-            "[event_bus] channel-inbound subscriber SKIPPED — Channels domain disabled"
-        );
+        log::debug!("[event_bus] channel-inbound subscriber SKIPPED — Channels domain disabled");
     }
     #[cfg(not(feature = "channels"))]
     log::debug!(
