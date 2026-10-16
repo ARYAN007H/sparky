@@ -76,7 +76,7 @@ pub(crate) struct ChatTurnGraph {
     /// Session run queue for mid-flight steering.
     pub run_queue: Option<Arc<RunQueue<crate::agent::queued_turn::QueuedTurn>>>,
     /// openhuman context middlewares (cache-align, microcompact, tool-output
-    /// budget + payload summarizer) sourced from the session's `ContextManager`.
+    /// budget + payload summarizer) sourced from the session's context config.
     pub context_mw: TurnContextMiddleware,
     /// The agent's builder-configured tool policy + session context, enforced at
     /// the tool boundary. `None` when the session has no explicit policy.
@@ -160,7 +160,7 @@ pub(crate) async fn run_chat_turn_graph(graph: ChatTurnGraph) -> Result<Tinyagen
             // Bound the main agent's per-call output (legacy parity — the engine
             // capped every turn at `AGENT_TURN_MAX_OUTPUT_TOKENS`).
             max_output_tokens: Some(AGENT_TURN_MAX_OUTPUT_TOKENS),
-            // Context middlewares sourced from the session's ContextManager.
+            // Context middlewares sourced from the session's context config.
             context_mw: graph.context_mw,
             // Builder-configured tool policy enforcement (session chat path).
             tool_policy: graph.tool_policy,

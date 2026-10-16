@@ -164,10 +164,8 @@ impl SessionHostBuilder {
         self
     }
 
-    /// Sets the global context-management configuration. Threaded
-    /// into the [`ContextManager`] constructed in [`Self::build`]. If
-    /// not set the manager is constructed with
-    /// [`ContextConfig::default`].
+    /// Sets the context middleware configuration used by this session. If
+    /// unset, [`ContextConfig::default`] applies.
     pub fn context_config(mut self, context_config: ContextConfig) -> Self {
         self.context_config = Some(context_config);
         self

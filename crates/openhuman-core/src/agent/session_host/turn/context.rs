@@ -66,14 +66,7 @@ impl OpenHumanSessionHost {
             agents_md_global: agents_md.global,
             agents_md_local: agents_md.local,
         };
-        // Route through the global context manager so every
-        // prompt-building call-site — main agent, sub-agent runner,
-        // channel runtimes — shares one builder configuration.
-        let prompt = self
-            .context
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .build_system_prompt(&ctx)?;
+        let prompt = self.prompt_builder.build(&ctx)?;
         // Appended, not prepended (#5704). Every line of this block is
         // session-scoped — agent id, channel, entry point, risk level, the
         // allowed-tool list — so putting it first moves the prompt's first
