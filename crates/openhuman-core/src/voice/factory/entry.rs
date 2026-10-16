@@ -25,7 +25,7 @@ pub const DEFAULT_PIPER_VOICE: &str = "en_US-lessac-medium";
 /// - A slug registered with the voice registry (see [`super::registry`]) wins.
 ///   The hosted `"cloud"` / `"openhuman"` / `"backend"` slugs are registered by
 ///   the hosted-backend layer, not built into the core; with none registered
-///   they fall through to the slug lookup below and error by name.
+///   they answer the `BACKEND_UNAVAILABLE:` sentinel.
 /// - `"<slug>"` / `"<slug>:<model>"` → a third-party STT API resolved against
 ///   `config.voice_providers` (e.g. `"elevenlabs"`, `"openai:whisper-1"`,
 ///   `"deepgram:nova-2"`).

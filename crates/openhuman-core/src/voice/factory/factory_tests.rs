@@ -400,28 +400,6 @@ fn effective_tts_defaults_to_cloud() {
     assert_eq!(effective_tts_provider(&config), "cloud");
 }
 
-/// The core carries no hosted provider: `cloud`, `openhuman` and `backend` are
-/// slugs the hosted-backend layer registers, so with nothing registered they
-/// error by name instead of resolving to a built-in.
-#[test]
-fn hosted_slugs_error_by_name_when_nothing_is_registered() {
-    for slug in ["cloud", "openhuman", "backend"] {
-        let err = create_stt_provider(slug, "", &cfg())
-            .err()
-            .unwrap_or_else(|| panic!("stt `{slug}` must not resolve without a registration"))
-            .to_string();
-        assert!(err.contains(slug), "{err}");
-        assert!(err.contains("no voice provider"), "{err}");
-    }
-    for slug in ["cloud", "openhuman"] {
-        let err = create_tts_provider(slug, "", &cfg())
-            .err()
-            .unwrap_or_else(|| panic!("tts `{slug}` must not resolve without a registration"))
-            .to_string();
-        assert!(err.contains(slug), "{err}");
-    }
-}
-
 /// With no hosted speech provider registered, the default routing strings are
 /// an expected "unavailable" state (filtered from Sentry), not a bad slug.
 #[test]
