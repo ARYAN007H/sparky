@@ -1,9 +1,9 @@
 use super::{ArchetypeDelegationTool, DelegationTarget, SpawnSubagentTool};
-use crate::tools::r#impl::threads::SpawnWorkerThreadTool;
 use crate::agent::harness::ParentExecutionContext;
-use crate::integrations::ConnectedIntegration;
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
+use crate::integrations::ConnectedIntegration;
 use crate::threads::store as conversations;
+use crate::tools::r#impl::threads::SpawnWorkerThreadTool;
 use async_trait::async_trait;
 use parking_lot::Mutex;
 use serde_json::json;

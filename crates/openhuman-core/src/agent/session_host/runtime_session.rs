@@ -5,12 +5,12 @@
 //! prefix reconciliation, tool snapshots, resume and persistence remain inside
 //! the runtime session.
 
-#[path = "../../memory/lifecycle/session_hooks.rs"]
-mod session_hooks;
 mod permanent;
 mod post_commit;
 #[path = "runtime_session/prompt_surface.rs"]
 mod prompt_surface;
+#[path = "../../memory/lifecycle/session_hooks.rs"]
+mod session_hooks;
 mod tool_rules;
 mod transcript;
 #[path = "runtime_session_turn.rs"]
