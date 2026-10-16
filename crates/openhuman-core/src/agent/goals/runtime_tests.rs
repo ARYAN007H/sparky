@@ -168,4 +168,3 @@ async fn account_turn_clears_suppression_without_losing_usage() {
     assert_eq!(updated.tokens_used, 120);
     assert_eq!(updated.time_used_seconds, 3);
 }
-
