@@ -306,7 +306,10 @@ async fn cancel_after_a_parked_snapshot_does_not_drop_a_resume_starting() {
     .await
     .unwrap_err();
     drop(claim_resume);
-    assert!(error.contains("settled concurrently"), "{error}");
+    assert!(
+        error.contains("settled before it could be cancelled"),
+        "{error}"
+    );
 
     let (token, guard) = owner.take().unwrap();
     assert!(!token.is_cancelled());
