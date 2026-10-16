@@ -161,21 +161,16 @@ async fn parked_reviews_are_isolated_by_tenant() {
         profile: Some("review-bob".into()),
         agent: None,
     };
-    let alice_gate = gate.clone();
-    let alice_tenant = alice.clone();
-    let parked = tokio::spawn(async move {
-        alice_gate
-            .request_review(
-                alice_tenant,
-                Some("same-thread".into()),
-                Some("alice-client".into()),
-                "Alice's plan".into(),
-                vec!["private step".into()],
-                None,
-            )
-            .await
-    });
-    tokio::time::sleep(Duration::from_millis(20)).await;
+    let parked = gate.request_review(
+        alice.clone(),
+        Some("same-thread".into()),
+        Some("alice-client".into()),
+        "Alice's plan".into(),
+        vec!["private step".into()],
+        None,
+    );
+    let mut parked = Box::pin(parked);
+    assert!(futures::poll!(parked.as_mut()).is_pending());
 
     let alice_review = gate
         .parked_review_for_thread(&alice, "same-thread")
@@ -191,5 +186,5 @@ async fn parked_reviews_are_isolated_by_tenant() {
         &alice_review.request_id,
         PlanReviewResolution::Approve
     ));
-    assert_eq!(parked.await.unwrap(), PlanReviewResolution::Approve);
+    assert_eq!(parked.await, PlanReviewResolution::Approve);
 }
