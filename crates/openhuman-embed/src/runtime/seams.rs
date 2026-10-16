@@ -27,6 +27,8 @@ use openhuman_core::agent::hooks::{
     embedder_post_turn_hook_named, embedder_tool_hooks, replace_embedder_post_turn_hook,
     replace_embedder_tool_hook,
 };
+#[cfg(test)]
+use openhuman_core::agent::hooks::embedder_post_turn_hooks;
 use openhuman_core::agent::tinyagents::discovery::{
     clear_tool_ranker, install_tool_ranker, installed_tool_ranker,
 };
