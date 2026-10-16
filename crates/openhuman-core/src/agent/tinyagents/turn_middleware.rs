@@ -571,7 +571,9 @@ pub(super) fn install_turn_middleware(
     embedder_tool_hooks.extend(scoped_tool_hooks);
     if !embedder_tool_hooks.is_empty() {
         harness.push_middleware(Arc::new(
-            middleware::embedder_hooks::EmbedderToolHooksMiddleware::new(embedder_tool_hooks),
+            tinyagents_hooks::tool::ToolHooksMiddleware::<super::host::OpenHumanRunContext>::new(
+                embedder_tool_hooks,
+            ),
         ));
     }
 

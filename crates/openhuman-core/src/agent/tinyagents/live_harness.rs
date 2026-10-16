@@ -128,7 +128,9 @@ pub(crate) fn assemble_live_tool_harness(
     embedder_tool_hooks.extend(tool_hooks);
     if !embedder_tool_hooks.is_empty() {
         harness.push_middleware(Arc::new(
-            middleware::embedder_hooks::EmbedderToolHooksMiddleware::new(embedder_tool_hooks),
+            tinyagents_hooks::tool::ToolHooksMiddleware::<super::host::OpenHumanRunContext>::new(
+                embedder_tool_hooks,
+            ),
         ));
     }
     harness

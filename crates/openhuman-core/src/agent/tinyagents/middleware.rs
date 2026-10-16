@@ -26,7 +26,6 @@
 
 pub(crate) mod approval;
 pub(crate) mod credential_scrub;
-pub(crate) mod embedder_hooks;
 pub(crate) mod failure_policy;
 pub(crate) mod fetched_site;
 pub(crate) mod memory_pack;
