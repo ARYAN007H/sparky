@@ -1,10 +1,8 @@
 //! The authenticated hosted-backend client, owned by this crate.
 //!
-//! A copy of the client the core still carries in `backend/`, sending through
-//! this crate's own [`SdkBackendTransport`](crate::SdkBackendTransport) and
-//! resolving URLs from [`crate::backend::url`]. Domains moving onto
-//! `openhuman-tinyhumans` use this instead of the core's `backend::*`; the
-//! core's copy goes away once its callers do.
+//! The client sends through this crate's [`SdkBackendTransport`](crate::SdkBackendTransport)
+//! and resolves URLs from [`crate::backend::url`]. Every hosted caller in this
+//! crate uses it; the core carries no backend client.
 //!
 //! - [`BackendClient`]: `authed_json`, the channel routes (`channel.rs`), the
 //!   credential/endpoint guards and the error classification (`classify.rs`).

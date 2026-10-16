@@ -13,7 +13,7 @@
 //! A host can also bind registrations to one [`CoreContext`]
 //! ([`HookSlot::register_in`] on an [`Extensions`] handed to
 //! [`CoreBuilder::extensions`](crate::core::runtime::CoreBuilder::extensions)),
-//! the same way the old backend transport was bound. Lookups try the ambient
+//! so a multi-tenant host can give each context its own services. Lookups try the ambient
 //! context first and the process table second: a context entry replaces a
 //! global one with the same id, and context-only ids are appended after the
 //! global ones.

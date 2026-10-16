@@ -1,7 +1,7 @@
 //! URL helpers shared across domains: base-URL normalisation, safe path
 //! joining and local-host classification. Nothing here knows about any
 //! particular backend — hosted-backend URL resolution lives with the host that
-//! installs the backend transport (`openhuman-tinyhumans`).
+//! registers the config enricher (`openhuman-tinyhumans`).
 
 /// Trim whitespace and strip trailing slashes so all base URLs are in
 /// canonical form before being joined with a path.

@@ -1,8 +1,8 @@
 //! Sentinels for "a component this call needs is not available", and their
 //! classifiers.
 //!
-//! Each one marks a condition that is decided once — no backend transport in
-//! this build, a rejected API key, a native module that failed to load — and
+//! Each one marks a condition that is decided once — no hosted backend
+//! registered in this build, a rejected API key, a native module that failed to load — and
 //! then handed back to every caller. Re-reporting it per call carries no new
 //! signal, so [`super::expected_error_kind`] demotes all of them.
 

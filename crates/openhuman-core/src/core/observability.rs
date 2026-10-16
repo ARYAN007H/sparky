@@ -194,7 +194,7 @@ pub enum ExpectedErrorKind {
     /// returned an empty response"` is also demoted — no per-channel typed
     /// suppression needed.
     EmptyProviderResponse,
-    /// The core has no backend transport installed (built and run without
+    /// The core has no hosted backend registered (built and run without
     /// `openhuman-tinyhumans`), so a hosted-backend call could not be sent
     /// at all. Expected build state, not a defect: the core runs agents,
     /// memory and tools without any TinyHumans connection, and every
@@ -2077,7 +2077,7 @@ fn report_expected_message(kind: ExpectedErrorKind, message: &str, domain: &str,
         }
         ExpectedErrorKind::ModuleUnavailable => log_module_unavailable(domain, operation, message),
         ExpectedErrorKind::BackendUnavailable => {
-            // Build-state condition: no backend transport is installed, so
+            // Build-state condition: no hosted backend is registered, so
             // the hosted backend is unreachable by construction. Nothing to
             // fix in Sentry — the host chose a backend-less core.
             tracing::debug!(

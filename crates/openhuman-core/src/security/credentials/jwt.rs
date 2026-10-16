@@ -7,7 +7,7 @@
 //! request with a token already known to be dead.
 //!
 //! Parsing is pure and has no backend dependency, which is why it lives in the
-//! core rather than behind the backend transport: `security::credentials`
+//! core rather than behind a host crate: `security::credentials`
 //! needs it on a core that has no TinyHumans connection at all.
 //!
 //! What stays OpenHuman-specific is *where the token lives*: the credentials

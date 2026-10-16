@@ -8,7 +8,7 @@
 //!
 //! | Piece | Embed option |
 //! |---|---|
-//! //! | the hosted RPC proxies ([`hosted::extension`](crate::hosted::extension)) | `controller_extension` |
+//! | the hosted RPC proxies ([`hosted::extension`](crate::hosted::extension)) | `controller_extension` |
 //! | the Jev `tool_search` ranker (`jev` feature) | `tool_ranker` |
 //!
 //! Every other method forwards to the embed builder unchanged. Start from a

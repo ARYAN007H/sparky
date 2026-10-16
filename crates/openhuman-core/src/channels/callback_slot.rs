@@ -8,8 +8,8 @@
 //! built-in managed path. The callback is a plain closure over the vendor
 //! contract types: the core defines no trait for it.
 //!
-//! With nothing registered [`bus::delivery`](super::bus) uses its built-in
-//! managed transport, unchanged.
+//! With nothing registered [`bus::delivery`](super::bus) has no progressive
+//! delivery transport and answers `BACKEND_UNAVAILABLE:`.
 
 use std::future::Future;
 use std::pin::Pin;

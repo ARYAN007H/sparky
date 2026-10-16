@@ -24,7 +24,7 @@ The host callbacks are narrow:
 | --- | --- |
 | Wallet accounts | Return stored public account addresses. |
 | Chain transport | Apply endpoint configuration and generic HTTP/RPC safety, then return the response. |
-| Backend transport | Make authenticated requests to the TinyHumans integration proxy. |
+| Wallet backend | Answer authenticated wallet-backend requests through the registered handler (`modules::wallet_backend`). |
 | Web3/native/x402 authorization | Apply OpenHuman's explicit user approval policy to the exact module-provided intent. |
 
 Secrets are decrypted from host custody only for a confidential call to the
