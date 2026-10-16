@@ -24,7 +24,6 @@ use async_trait::async_trait;
 use tinyagents_graph::goals::budget as crate_budget;
 use tinyagents_graph::goals::{BudgetVerdict, GoalBudgetGuard, ThreadGoal, ThreadGoalStatus};
 
-use super::store::{self, goals_store};
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 use tinyagents_hooks::stop::{StopDecision, StopHook, TurnState};
@@ -32,7 +31,8 @@ use tinyagents_hooks::stop::{StopDecision, StopHook, TurnState};
 /// Load the goal for an explicitly supplied chat thread.
 pub async fn load_for_thread(workspace_dir: &Path, thread_id: Option<&str>) -> Option<ThreadGoal> {
     let thread_id = normalized_thread(thread_id)?;
-    match store::get(workspace_dir, &thread_id).await {
+    let store = crate::agent::session_store::stores_or_ephemeral(workspace_dir).kv;
+    match tinyagents_graph::goals::store::get(&store, &thread_id).await.map_err(|e| e.to_string()) {
         Ok(goal) => goal,
         Err(e) => {
             tracing::debug!(thread_id = %thread_id, error = %e, "[thread_goals] load_for_thread failed");
@@ -48,7 +48,8 @@ pub async fn resume_for_thread(
     thread_id: Option<&str>,
 ) -> Option<Option<ThreadGoal>> {
     let thread_id = normalized_thread(thread_id)?;
-    match store::resume(workspace_dir, &thread_id).await {
+    let store = crate::agent::session_store::stores_or_ephemeral(workspace_dir).kv;
+    match tinyagents_graph::goals::store::resume(&store, &thread_id).await.map_err(|e| e.to_string()) {
         Ok(goal) => {
             if goal.status.is_active() {
                 BUS.publish(DomainEvent::ThreadGoalUpdated {
@@ -80,7 +81,8 @@ pub async fn complete_for_thread(workspace_dir: &Path, thread_id: Option<&str>) 
     let Some(thread_id) = normalized_thread(thread_id) else {
         return;
     };
-    match store::complete(workspace_dir, &thread_id).await {
+    let store = crate::agent::session_store::stores_or_ephemeral(workspace_dir).kv;
+    match tinyagents_graph::goals::store::complete(&store, &thread_id).await.map_err(|e| e.to_string()) {
         Ok(goal) => {
             if matches!(goal.status, ThreadGoalStatus::Complete) {
                 BUS.publish(DomainEvent::ThreadGoalUpdated {
@@ -108,7 +110,8 @@ pub async fn clear_for_thread(workspace_dir: &Path, thread_id: Option<&str>) {
     let Some(thread_id) = normalized_thread(thread_id) else {
         return;
     };
-    match store::clear(workspace_dir, &thread_id).await {
+    let store = crate::agent::session_store::stores_or_ephemeral(workspace_dir).kv;
+    match tinyagents_graph::goals::store::clear(&store, &thread_id).await.map_err(|e| e.to_string()) {
         Ok(existed) => {
             if existed {
                 BUS.publish(DomainEvent::ThreadGoalCleared {
@@ -149,7 +152,8 @@ pub async fn account_turn_against_goal(
     let Some(thread_id) = normalized_thread(thread_id) else {
         return;
     };
-    let prev = match store::get(workspace_dir, &thread_id).await {
+    let store = crate::agent::session_store::stores_or_ephemeral(workspace_dir).kv;
+    let prev = match tinyagents_graph::goals::store::get(&store, &thread_id).await.map_err(|e| e.to_string()) {
         Ok(Some(goal)) => goal,
         Ok(None) => return,
         Err(e) => {
@@ -160,7 +164,6 @@ pub async fn account_turn_against_goal(
     let prev_status = prev.status;
     let prev_tokens_used = prev.tokens_used;
 
-    let store = goals_store(workspace_dir);
     match crate_budget::account_turn(&store, &thread_id, input, output, secs, true).await {
         Ok(Some(updated)) => {
             tracing::debug!(
@@ -253,7 +256,7 @@ impl StopHook<tinyagents_harness::cost::TurnCost> for GoalBudgetStopHook {
     }
 
     async fn check(&self, ctx: &TurnState<'_, tinyagents_harness::cost::TurnCost>) -> StopDecision {
-        let store = goals_store(&self.workspace_dir);
+        let store = crate::agent::session_store::stores_or_ephemeral(&self.workspace_dir).kv;
         let in_flight = turn_tokens(ctx.cost.input_tokens, ctx.cost.output_tokens);
         match self.guard.check(&store, in_flight).await {
             Ok(BudgetVerdict::Stop { reason }) => StopDecision::Stop { reason },
