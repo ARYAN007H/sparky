@@ -1,11 +1,11 @@
-//! Host adapter: OpenRouter media generators reached through the OpenHuman
-//! backend's `/agent-integrations/openrouter` proxy.
+//! OpenRouter media generators reached through the TinyHumans backend's
+//! `/agent-integrations/openrouter` proxy.
 //!
 //! TinyInference owns the wire contract (`POST /images`, `POST /videos`,
 //! `GET /videos/{id}`, `GET /videos/{id}/content`); this module supplies only
 //! what the host owns:
 //!
-//! - **Endpoint and headers** — the backend transport's `raw_client()` (which
+//! - **Endpoint and headers** — the hosted client's `raw_client()` (which
 //!   already carries `x-sdk-name` and the version headers) and the
 //!   `/agent-integrations/openrouter` base URL.
 //! - **Credential** — a per-request resolver over
@@ -19,17 +19,18 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use tinyagents_harness::tinyinference_image::{
+use tinyinference_image::{
     self as ti_image, BearerResolver, GeneratedMedia, ImageGenerator, ImageRequest, ImageResponse,
     MediaAuth, MediaModel, MediaTransport, OpenRouterImageGenerator,
 };
-use tinyagents_harness::tinyinference_video::{
+use tinyinference_video::{
     self as ti_video, OpenRouterVideoGenerator, VideoGenerator, VideoJob, VideoJobStatus,
     VideoRequest,
 };
 
 use crate::client::BackendClient;
 use openhuman_embed::__host::config::Config;
+use openhuman_embed::__host::media::generation::MediaGenerators;
 use openhuman_embed::__host::security::approval::ApprovalChatContext;
 use openhuman_embed::__host::security::credentials::session_support::{
     resolve_backend_credential, BackendCredential,
@@ -37,56 +38,6 @@ use openhuman_embed::__host::security::credentials::session_support::{
 
 /// Backend route prefix that proxies OpenRouter's media API.
 pub const OPENROUTER_PROXY_PATH: &str = "/agent-integrations/openrouter";
-
-/// Rebuilds the generators so their egress disclosures reach `chat`.
-type GeneratorRouter = Arc<
-    dyn Fn(Option<ApprovalChatContext>) -> (Arc<dyn ImageGenerator>, Arc<dyn VideoGenerator>)
-        + Send
-        + Sync,
->;
-
-/// The image and video generators for this process.
-pub struct MediaGenerators {
-    /// Image generation.
-    pub image: Arc<dyn ImageGenerator>,
-    /// Video generation.
-    pub video: Arc<dyn VideoGenerator>,
-    /// Binds the generators to a turn's chat so their egress disclosures reach
-    /// it. `None` for generators with no disclosures to route (mocks).
-    router: Option<GeneratorRouter>,
-}
-
-impl MediaGenerators {
-    /// Generators with no egress routing.
-    pub fn new(image: Arc<dyn ImageGenerator>, video: Arc<dyn VideoGenerator>) -> Self {
-        Self {
-            image,
-            video,
-            router: None,
-        }
-    }
-
-    /// The generators for one call of a turn whose chat routing is `chat`: the
-    /// egress disclosures they raise are surfaced to that chat. An explicit
-    /// value, so a call made off the chat task still discloses to its own chat.
-    pub fn routed(&self, chat: Option<&ApprovalChatContext>) -> MediaGenerators {
-        match &self.router {
-            Some(router) => {
-                let (image, video) = router(chat.cloned());
-                MediaGenerators {
-                    image,
-                    video,
-                    router: self.router.clone(),
-                }
-            }
-            None => MediaGenerators {
-                image: Arc::clone(&self.image),
-                video: Arc::clone(&self.video),
-                router: None,
-            },
-        }
-    }
-}
 
 /// Builds generators against the managed backend, or `None` when no backend
 /// transport is installed (a core with no TinyHumans connection).
@@ -137,11 +88,7 @@ pub fn managed_generators(config: &Config) -> Option<MediaGenerators> {
         (image, video)
     });
     let (image, video) = build(None);
-    Some(MediaGenerators {
-        image,
-        video,
-        router: Some(build),
-    })
+    Some(MediaGenerators::with_router(image, video, build))
 }
 
 /// Resolves the backend credential on every request, so a session refreshed

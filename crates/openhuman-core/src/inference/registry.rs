@@ -62,9 +62,10 @@ pub type ChatModelFactory = Arc<
         + Sync,
 >;
 
-/// Asks a provider whether it can serve `role` right now: `(role, config)`.
+/// Asks a provider whether it can serve `role` right now: `(role, model,
+/// config)`, where `model` is the concrete model id the core resolved.
 pub type ReadinessProbe =
-    Arc<dyn Fn(String, Config) -> BoxFuture<Result<(), String>> + Send + Sync>;
+    Arc<dyn Fn(String, String, Config) -> BoxFuture<Result<(), String>> + Send + Sync>;
 
 /// A registered chat-model provider.
 #[derive(Clone)]
