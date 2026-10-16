@@ -1,14 +1,14 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { callCoreRpc } from '../../../services/coreRpcClient';
 import chatRuntimeReducer, {
   openArtifact,
   upsertArtifactReadyForThread,
 } from '../../../store/chatRuntimeSlice';
-import { ArtifactPreviewPanel } from './ArtifactPreviewPanel';
+import { ArtifactPreviewPanel, AUTOSAVE_DELAY_MS } from './ArtifactPreviewPanel';
 
 vi.mock('../../../services/coreRpcClient', () => ({ callCoreRpc: vi.fn() }));
 vi.mock('../../../lib/i18n/I18nContext', () => ({
@@ -111,5 +111,47 @@ describe('ArtifactPreviewPanel — resize handle', () => {
     expect(width()).toBe(start - 24);
     for (let i = 0; i < 100; i++) fireEvent.keyDown(handle, { key: 'ArrowLeft' });
     expect(width()).toBe(Number(handle.getAttribute('aria-valuemax')));
+  });
+});
+
+describe('ArtifactPreviewPanel — a failed save, then a revision', () => {
+  beforeEach(() => rpc.mockReset());
+  afterEach(() => vi.useRealTimers());
+
+  it('keeps the revision and never re-sends the failed edit', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const saves = () =>
+      rpc.mock.calls.filter(([req]) => req?.method === 'openhuman.ai_save_artifact_version');
+    rpc.mockImplementation(async req => {
+      if (req?.method === 'openhuman.ai_save_artifact_version') throw new Error('core restarting');
+      return body('# first', 1);
+    });
+    const store = setup();
+    await screen.findByRole('heading', { level: 1 });
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /chat.artifact.view.code/ }));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: '# my edit' } });
+
+    // The save fails; a retry is pending.
+    await act(async () => vi.advanceTimersByTime(AUTOSAVE_DELAY_MS));
+    await waitFor(() => expect(saves()).toHaveLength(1));
+
+    // The agent saves a revision.
+    rpc.mockImplementation(async req => {
+      if (req?.method === 'openhuman.ai_save_artifact_version') throw new Error('core restarting');
+      return body('# revised by the agent', 2);
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(2);
+      store.dispatch(ready());
+    });
+    await waitFor(() =>
+      expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe(
+        '# revised by the agent'
+      )
+    );
+
+    // The old edit's retry is gone.
+    await act(async () => vi.advanceTimersByTime(AUTOSAVE_DELAY_MS * 5));
+    expect(saves()).toHaveLength(1);
   });
 });

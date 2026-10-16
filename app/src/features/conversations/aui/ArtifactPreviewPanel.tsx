@@ -507,9 +507,19 @@ export function useArtifactAutosave(
   // Save a pending edit when switching artifacts or closing the panel.
   useEffect(() => () => void save(), [save]);
 
+  // Drop a held edit and its retry: a newer version saved elsewhere replaced
+  // it.
+  const discard = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    pending.current = null;
+    retries.current = 0;
+    setStatus('saved');
+  }, []);
+
   return useMemo(
-    () => ({ status, version, schedule, flush: save }),
-    [status, version, schedule, save]
+    () => ({ status, version, schedule, flush: save, discard }),
+    [status, version, schedule, save, discard]
   );
 }
 
@@ -726,12 +736,18 @@ function EditableTextViewer({
   const autosave = useArtifactAutosave(artifact.artifactId, body, version, editable);
 
   // Take a new body (another artifact, or a version saved elsewhere) unless
-  // there is an unsaved edit here: that edit is saved as the next version.
-  const hasLocalEdit = autosave.status === 'pending' || autosave.status === 'saving';
-  const hasLocalEditRef = useRef(hasLocalEdit);
-  hasLocalEditRef.current = hasLocalEdit;
+  // an edit here is still on its way: that edit is saved as the next version.
+  // An edit whose save failed is not on its way: the new version replaces it,
+  // and its retry is dropped so it cannot overwrite that version later.
+  const statusRef = useRef(autosave.status);
+  statusRef.current = autosave.status;
+  const discardRef = useRef(autosave.discard);
+  discardRef.current = autosave.discard;
   useEffect(() => {
-    if (!hasLocalEditRef.current) setEditedBody(body);
+    const status = statusRef.current;
+    if (status === 'pending' || status === 'saving') return;
+    if (status === 'error') discardRef.current();
+    setEditedBody(body);
   }, [body]);
 
   const onEdit = useCallback(
