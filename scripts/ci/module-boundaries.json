@@ -29,8 +29,6 @@
     "tinysearch",
     "tinysearch-core",
     "cpal",
-    "tinyflows-schedule",
-    "tinyflows-drivers",
     "tinyflows-module"
   ],
   "implementationPrefixes": [

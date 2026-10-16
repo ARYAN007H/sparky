@@ -520,9 +520,9 @@ tinybox-core = { path = "../../vendor/tinybox/crates/tinybox-core" }
 tinymemory-api = { path = "../../vendor/tinymemory/crates/tinymemory-api", features = ["conformance"] }
 # The document catalog's `*_for_test` fixtures, which the flows store forwards
 # in test builds.
-tinyflows-drivers = { path = "../../vendor/tinyflows/crates/tinyflows-drivers", default-features = false, features = ["schedule", "test-fixtures"] }
+tinyflows-drivers = { path = "../../vendor/tinyflows/crates/tinyflows-drivers", default-features = false, features = ["test-fixtures"] }
 # The real tinyflows module, linked into the test binary (never the product) as
-# the fixture behind `modules::schedule::fixture`: the scheduler runtime, job
+# the fixture behind `modules::tinyflows::fixture`: the scheduler runtime, job
 # store and schedule maths that `cron::` reaches over the bus.
 tinyflows-module = { path = "../../vendor/tinyflows/crates/tinyflows-module", features = ["static-link"] }
 # Test fixtures derive a known account from the BIP-39 vector phrase. Production
