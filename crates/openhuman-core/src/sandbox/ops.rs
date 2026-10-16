@@ -390,6 +390,7 @@ pub(crate) async fn execute_in_sandbox_metered(
             };
             let policy = super::local_grants::with_resolved_grants(&config, policy).await?;
             super::native_jail::execute(
+                ctx,
                 &config,
                 &policy,
                 command,

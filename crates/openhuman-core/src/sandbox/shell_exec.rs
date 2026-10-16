@@ -97,10 +97,14 @@ pub(crate) static USE_FIXTURE: std::sync::atomic::AtomicBool =
 /// Run `run` through the module and collect its output.
 ///
 /// A worker owns cancellation and resource cleanup if the caller drops its wait.
-pub(crate) async fn run(config: &Config, mut run: NativeShellRun) -> anyhow::Result<SandboxExecResult> {
+pub(crate) async fn run(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+    mut run: NativeShellRun,
+) -> anyhow::Result<SandboxExecResult> {
     #[cfg(test)]
     if !run.is_jailed() && USE_FIXTURE.load(std::sync::atomic::Ordering::SeqCst) {
-        let _ = config;
+        let _ = (ctx, config);
         return fixture::run(run).await;
     }
     #[cfg(feature = "modules")]
@@ -119,7 +123,7 @@ pub(crate) async fn run(config: &Config, mut run: NativeShellRun) -> anyhow::Res
         // cancellation is acknowledged only after the command is gone.
         let hold = tinytools_std::timeout::ProcessCleanup::hold();
         let (_caller, abandoned) = tokio::sync::oneshot::channel::<std::convert::Infallible>();
-        crate::core::runtime::DispatchCtx::ambient().spawn(async move {
+        ctx.spawn(async move {
             let _hold = hold;
             run_owned(&config, run, abandoned, meter).await
         })
@@ -128,7 +132,7 @@ pub(crate) async fn run(config: &Config, mut run: NativeShellRun) -> anyhow::Res
     }
     #[cfg(not(feature = "modules"))]
     {
-        let _ = (config, run);
+        let _ = (ctx, config, run);
         anyhow::bail!("TinyBox module support is disabled; command execution is unavailable")
     }
 }
