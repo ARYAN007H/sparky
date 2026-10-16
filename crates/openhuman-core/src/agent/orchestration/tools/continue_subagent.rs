@@ -9,12 +9,12 @@
 //! appended to the conversation history.
 
 use crate::agent::orchestration::tools::dispatch::{incomplete_stop, stopped_subagent_result};
-use crate::progress::AgentProgress;
 use crate::agent::subagent_host::{
     SubagentRunOptions, SubagentRunStatus, continue_subagent, continue_subagent_with_parent,
     load_subagent_checkpoint,
 };
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
+use crate::progress::AgentProgress;
 use async_trait::async_trait;
 use serde_json::json;
 use std::sync::Arc;

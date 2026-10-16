@@ -1,10 +1,10 @@
 //! Handler for the `tools_composio_execute` controller schema.
 
 use crate::core::runtime::DispatchCtx;
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 
-use crate::core::all::ControllerFuture;
 use crate::core::Outcome;
+use crate::core::all::ControllerFuture;
 
 pub(super) fn handle_composio_execute(
     ctx: DispatchCtx,

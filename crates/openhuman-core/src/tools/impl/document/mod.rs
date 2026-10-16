@@ -30,7 +30,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::artifacts::production::Production;
 use crate::security::SecurityPolicy;
@@ -56,7 +56,7 @@ mod types;
 #[path = "document_tests.rs"]
 mod tests;
 
-use self::types::{validate_input, GenerateDocumentInput, GenerateDocumentOutput};
+use self::types::{GenerateDocumentInput, GenerateDocumentOutput, validate_input};
 
 /// Generation timeout. `docx-rs` typically completes the full section cap
 /// in well under a second; the 30 s ceiling is a defensive bound against
@@ -276,12 +276,9 @@ impl DocumentTool {
         // Retry can re-dispatch this exact spec (#3162). Best-effort: a
         // write failure only forfeits regeneration, never aborts an
         // otherwise-successful generation.
-        if let Err(err) = crate::artifacts::store::save_artifact_args(
-            &self.workspace_dir,
-            production.id(),
-            &args,
-        )
-        .await
+        if let Err(err) =
+            crate::artifacts::store::save_artifact_args(&self.workspace_dir, production.id(), &args)
+                .await
         {
             tracing::warn!(
                 target: "document",

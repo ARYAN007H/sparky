@@ -46,7 +46,8 @@ impl OpenHumanTurnPrelude {
         let Some(recorded) = recorded else {
             return;
         };
-        let actions = crate::integrations::recorded_tools::recorded_integration_actions(recorded.specs());
+        let actions =
+            crate::integrations::recorded_tools::recorded_integration_actions(recorded.specs());
         log::debug!(
             "[session] adopting {} recorded integration action declaration(s) agent={}",
             actions.len(),

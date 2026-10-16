@@ -63,13 +63,6 @@ pub mod tinyagents;
 pub mod tools;
 /// Explicit per-turn host environment handed to the session an entry point runs.
 pub mod turn_env;
-/// Turn-origin task-local — explicit trust/routing label scoped by every
-/// entry point that invokes the agent (web chat, channel runtime, cron,
-/// background jobs, CLI). Read by the approval gate to make
-/// origin-aware decisions rather than inferring trust from the absence of
-/// a chat approval context.
-pub mod turn_origin;
-
 #[allow(unused_imports)]
 pub use session_host::{
     HostOnlyToolPolicy, HostTools, HostTurnTools, OpenHumanSessionHost, SessionHostBuilder,

@@ -64,10 +64,12 @@ fn module_presentation_for_an_unconfigured_server_is_not_executable() {
         &config.workspace_dir,
         &config.action_dir,
     ));
-    assert!(configured_server_tools_from_presentations(
-        &config,
-        vec![presentation("removed-server", false)],
-        &security,
-    )
-    .is_empty());
+    assert!(
+        configured_server_tools_from_presentations(
+            &config,
+            vec![presentation("removed-server", false)],
+            &security,
+        )
+        .is_empty()
+    );
 }

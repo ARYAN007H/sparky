@@ -67,5 +67,5 @@ pub fn configured_backstop() -> Option<Duration> {
 }
 
 #[cfg(test)]
-#[path = "turn_backstop_tests.rs"]
+#[path = "backstop_tests.rs"]
 mod tests;

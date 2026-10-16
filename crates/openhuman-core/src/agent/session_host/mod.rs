@@ -52,7 +52,6 @@ mod turn;
 // harness-assembly site has to name it. It stays the one definition — the whole
 // point is that the in-loop conclusion and the out-of-band fallback ask for the
 // same thing.
-pub(crate) mod turn_backstop;
 pub(crate) mod turn_checkpoint;
 mod types;
 
@@ -64,7 +63,6 @@ pub use types::{OpenHumanSessionHost, SessionHostBuilder, TurnOverrides};
 // (`session::runtime`, `subagent_host`) so all provider call sites
 // share one tested implementation.
 pub(crate) use builder::dedup_visible_tool_specs;
-
 
 #[cfg(test)]
 mod orphaned_head_resume_tests;

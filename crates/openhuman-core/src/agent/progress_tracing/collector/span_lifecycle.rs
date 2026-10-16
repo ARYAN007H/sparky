@@ -141,7 +141,10 @@ impl SpanCollector {
         }
     }
 
-    pub(in crate::core::observability::progress_tracing) fn close_current_iteration(&mut self, end_unix_ms: u64) {
+    pub(in crate::core::observability::progress_tracing) fn close_current_iteration(
+        &mut self,
+        end_unix_ms: u64,
+    ) {
         if let Some(index) = self.current_iteration_index.take() {
             self.close_span(
                 index,

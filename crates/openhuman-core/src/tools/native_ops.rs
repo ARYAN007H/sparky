@@ -1,10 +1,10 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use crate::modules::tinybox::host_runtime::{NativeRuntime, RuntimeAdapter};
 use crate::config::Config;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
+use crate::modules::tinybox::host_runtime::{NativeRuntime, RuntimeAdapter};
 use crate::security::SecurityPolicy;
 use crate::tools;
 use crate::tools::native_ops_types::{ExecuteToolOutcome, RuntimeToolSummary};
@@ -158,8 +158,7 @@ pub async fn execute_tool(
     let tools = build_runtime_tools(config)?;
     trace!(
         tool_count = tools.len(),
-        tool_name,
-        "[native_ops] execute_tool: runtime tools built"
+        tool_name, "[native_ops] execute_tool: runtime tools built"
     );
     let tool = tools
         .into_iter()

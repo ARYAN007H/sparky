@@ -5,7 +5,7 @@
 //! pinned on every CI host, not only on a Windows runner.
 
 use super::*;
-use crate::modules::tinybox::host_runtime::{host_shell_flavor, ShellFlavor};
+use crate::modules::tinybox::host_runtime::{ShellFlavor, host_shell_flavor};
 #[cfg(feature = "modules")]
 use crate::tools::system::shell_support::PYTHON_UTF8_DEFAULTS;
 use std::collections::HashMap;

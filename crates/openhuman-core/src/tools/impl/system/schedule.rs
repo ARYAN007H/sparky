@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::cron::job_builder::{create_agent_job, AgentJobInput};
+use crate::cron::job_builder::{AgentJobInput, create_agent_job};
 use crate::cron::origin::{current_job_origin, current_turn_may_skip_approval};
 use crate::security::SecurityPolicy;
 use crate::tools::schema_cache::static_schema;
@@ -109,7 +109,8 @@ impl Tool for ScheduleTool {
                 }
                 let origin =
                     crate::agent::tinyagents::host::run_context::turn_origin_for_tool(tool_context);
-                self.handle_create_like(action, &args, origin.as_ref()).await
+                self.handle_create_like(action, &args, origin.as_ref())
+                    .await
             }
             "cancel" | "remove" => {
                 if let Some(blocked) = self.enforce_mutation_allowed(action) {
@@ -142,8 +143,8 @@ impl Tool for ScheduleTool {
                 Ok(self.handle_pause_resume(id, false))
             }
             other => Ok(ToolResult::error(format!(
-                    "Unknown action '{other}'. Use create/add/once/list/get/cancel/remove/pause/resume."
-                ))),
+                "Unknown action '{other}'. Use create/add/once/list/get/cancel/remove/pause/resume."
+            ))),
         }
     }
 }

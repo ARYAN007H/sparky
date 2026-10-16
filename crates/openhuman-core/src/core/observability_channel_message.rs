@@ -43,4 +43,3 @@ fn event_contains_channel_message_path(event: &sentry::protocol::Event<'_>) -> b
         .iter()
         .any(|exc| exc.value.as_deref().is_some_and(has_pattern))
 }
-

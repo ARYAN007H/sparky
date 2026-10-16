@@ -27,8 +27,8 @@ use crate::modules::documents::DocumentCallError;
 // are the same ones the module validates against, which is the whole reason
 // `spec` is separable.
 pub use crate::tools::implementations::document::format::spec::document::{
-    DocumentSpec as GenerateDocumentInput, MAX_BULLETS_PER_SECTION, MAX_PARAGRAPHS_PER_SECTION,
-    MAX_PARAGRAPH_CHARS, MAX_SECTIONS, MAX_TEXT_CHARS,
+    DocumentSpec as GenerateDocumentInput, MAX_BULLETS_PER_SECTION, MAX_PARAGRAPH_CHARS,
+    MAX_PARAGRAPHS_PER_SECTION, MAX_SECTIONS, MAX_TEXT_CHARS,
 };
 
 // `sections` is a `Vec<DocumentSection>`, so anything constructing an input

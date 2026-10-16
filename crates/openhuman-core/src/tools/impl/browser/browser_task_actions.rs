@@ -2,12 +2,12 @@
 
 use super::Pending;
 use crate::security::approval::{ApprovalGate, GateOutcome};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use tinycomputer_bus::agent::{TaskStatus, TaskView};
-use tinycomputer_bus::browser::tool::ToolArgs;
 use tinycomputer_bus::browser::Action;
+use tinycomputer_bus::browser::tool::ToolArgs;
 
 /// What the host adds to a task report the agent cannot act on alone: a
 /// task that failed because Chrome was not found, or would not start from

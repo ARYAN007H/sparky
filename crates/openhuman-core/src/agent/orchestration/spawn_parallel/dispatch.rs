@@ -13,8 +13,8 @@ use tokio::sync::mpsc::Sender;
 
 use crate::agent::harness::fork_context::ParentExecutionContext;
 use crate::agent::orchestration::worktree;
-use crate::progress::AgentProgress;
 use crate::agent_registry::host_definition::AgentDefinition;
+use crate::progress::AgentProgress;
 use tinyagents_definition::SandboxMode;
 
 use super::staging::{

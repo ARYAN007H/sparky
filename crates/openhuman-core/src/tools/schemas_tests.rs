@@ -1,7 +1,7 @@
 use super::*;
 
 use crate::tools::schemas::registry::tools_schemas;
-use serde_json::{json, Map};
+use serde_json::{Map, json};
 const BASE_CONTROLLERS: usize = 5;
 
 #[test]
@@ -18,9 +18,11 @@ fn all_controllers_covers_the_base_surface() {
 fn apify_linkedin_scrape_controller_is_retired() {
     // The backend retired its Apify routes; the controller must not be
     // registered or resolvable any more.
-    assert!(!all_controller_schemas()
-        .iter()
-        .any(|s| s.function == "apify_linkedin_scrape"));
+    assert!(
+        !all_controller_schemas()
+            .iter()
+            .any(|s| s.function == "apify_linkedin_scrape")
+    );
     assert_eq!(
         tools_schemas("tools_apify_linkedin_scrape").function,
         "unknown"

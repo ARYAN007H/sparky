@@ -108,10 +108,10 @@ fn direct_actions_decode_through_the_bus_tool_args() {
     assert!(direct_action(&json!({"action":"click"})).is_err());
     assert!(direct_action(&json!({"action":"scroll","direction":"diagonal"})).is_err());
     assert!(direct_action(&json!({"action":"arbitrary_script"})).is_err());
-    assert!(direct_action(
-        &json!({"action":"find","by":"text","value":"Save","find_action":"text"})
-    )
-    .is_ok());
+    assert!(
+        direct_action(&json!({"action":"find","by":"text","value":"Save","find_action":"text"}))
+            .is_ok()
+    );
 }
 
 #[test]
@@ -165,13 +165,14 @@ async fn needs_approval_view_is_held_behind_a_token_and_cleared_by_other_states(
     let output = tool.report(paused).await.unwrap();
     let token = output["pending"]["token"].as_str().unwrap().to_owned();
     assert_eq!(output["pending"]["task_id"], "t-1");
-    assert!(tool
-        .pending
-        .lock()
-        .await
-        .as_ref()
-        .unwrap()
-        .matches(&json!({"token": token})));
+    assert!(
+        tool.pending
+            .lock()
+            .await
+            .as_ref()
+            .unwrap()
+            .matches(&json!({"token": token}))
+    );
 
     let done: TaskView = serde_json::from_value(json!({
         "id": "t-1",
@@ -469,7 +470,7 @@ impl tinytools::ToolRunContext for ThreadOnly {
 #[tokio::test]
 async fn two_agents_on_one_thread_get_distinct_browser_session_keys() {
     use crate::core::runtime::agent_scope::test_agent_context;
-    use crate::core::runtime::{context::CoreContext, DomainSet};
+    use crate::core::runtime::{DomainSet, context::CoreContext};
     let root = CoreContext::for_test(DomainSet::full(), None);
     let client = Arc::new(BrowserClient::new(Arc::new(
         crate::config::Config::default(),

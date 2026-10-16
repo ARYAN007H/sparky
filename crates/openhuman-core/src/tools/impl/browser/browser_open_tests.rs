@@ -7,9 +7,10 @@ fn simple_open_still_obeys_shared_website_policy() {
     let client = Arc::new(BrowserClient::new(Arc::new(config)));
     let tool = BrowserOpenTool::new(Arc::new(SecurityPolicy::default()), client);
     assert_eq!(tool.exposure(), tinytools::ToolExposure::Deferred);
-    assert!(tool
-        .validate_url("https://www.selenium.dev/selenium/web/web-form.html")
-        .is_ok());
+    assert!(
+        tool.validate_url("https://www.selenium.dev/selenium/web/web-form.html")
+            .is_ok()
+    );
     assert!(tool.validate_url("https://example.com").is_err());
     assert!(tool.validate_url("http://selenium.dev").is_err());
     assert!(tool.validate_url("https://localhost/").is_err());

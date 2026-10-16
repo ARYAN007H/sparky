@@ -13,9 +13,9 @@
 //! Stashed in `Arc`s so cloning into a child costs a refcount bump
 //! rather than a full copy.
 
-use crate::progress::AgentProgress;
 use crate::agent::tinyagents::TurnModelSource;
 use crate::config::AgentConfig;
+use crate::progress::AgentProgress;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;

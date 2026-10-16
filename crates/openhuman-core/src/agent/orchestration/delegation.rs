@@ -17,13 +17,13 @@
 
 use std::sync::Arc;
 
-use crate::progress::AgentProgress;
 use crate::agent::subagent_host::{
     SubagentRunOptions, SubagentRunStatus, run_subagent_with_parent,
 };
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent_registry::host_definition::AgentDefinition;
 use crate::config::Config;
+use crate::progress::AgentProgress;
 use tinyagents_graph::checkpoint::Checkpointer;
 use tinyagents_graph::delegation::{
     DelegationConfig, DelegationStage, DelegationStageOutput, DelegationState,

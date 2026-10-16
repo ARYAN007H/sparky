@@ -12,12 +12,12 @@ use crate::agent::orchestration::subagent_sessions::{
     SubagentSessionUpsert,
 };
 use crate::agent::orchestration::tools::dispatch::incomplete_stop;
-use crate::progress::AgentProgress;
 use crate::agent::subagent_host::{
     SubagentRunOptions, SubagentRunStatus, run_subagent_with_parent,
 };
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::core::runtime::DispatchCtx;
+use crate::progress::AgentProgress;
 use crate::threads::store::{self as conversations, ConversationMessage};
 use async_trait::async_trait;
 use serde_json::json;

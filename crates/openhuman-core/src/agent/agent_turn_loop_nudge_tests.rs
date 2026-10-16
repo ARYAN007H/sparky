@@ -54,7 +54,11 @@ impl ChatModel<()> for RecordingProvider {
                 guard.remove(0)
             }
         };
-        Ok(crate::inference::provider::model::native_model_response_for_request(&response, &request))
+        Ok(
+            crate::inference::provider::model::native_model_response_for_request(
+                &response, &request,
+            ),
+        )
     }
 }
 

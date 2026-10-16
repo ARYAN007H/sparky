@@ -33,8 +33,8 @@ use release_tag::{parse_release_tag, parse_version};
 mod availability;
 use availability::log_module_unavailable;
 pub use availability::{
-    is_api_key_rejected_message, is_backend_unavailable_message, is_module_unavailable_message,
-    API_KEY_REJECTED_PREFIX, BACKEND_UNAVAILABLE_PREFIX,
+    API_KEY_REJECTED_PREFIX, BACKEND_UNAVAILABLE_PREFIX, is_api_key_rejected_message,
+    is_backend_unavailable_message, is_module_unavailable_message,
 };
 
 /// A `(key, value)` pair attached as a Sentry tag. Tags are short, indexed,
@@ -3427,4 +3427,3 @@ pub fn is_stale_release_event(event: &sentry::protocol::Event<'_>) -> bool {
 #[cfg(test)]
 #[path = "observability_tests.rs"]
 mod tests;
-

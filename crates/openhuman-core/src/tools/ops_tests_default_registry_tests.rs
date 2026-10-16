@@ -28,9 +28,11 @@ fn all_tools_registers_the_memory_tool_while_memory_is_on() {
     );
     // The search half of deferral is the harness's intrinsic bridge, never a
     // registered tool: a host `tool_search` would shadow it.
-    assert!(!tools
-        .iter()
-        .any(|tool| { tool.name() == tinytools::TOOL_SEARCH_NAME }));
+    assert!(
+        !tools
+            .iter()
+            .any(|tool| { tool.name() == tinytools::TOOL_SEARCH_NAME })
+    );
 }
 /// The three `whatsapp_data_*` agent tools are gone, in every build.
 ///
@@ -567,10 +569,9 @@ async fn document_tool_writes_into_the_configured_files_folder() {
         }))
         .await;
 
-    let (artifacts, _) =
-        crate::artifacts::store::list_artifacts(&cfg.workspace_dir, 0, 10, None)
-            .await
-            .expect("list artifacts");
+    let (artifacts, _) = crate::artifacts::store::list_artifacts(&cfg.workspace_dir, 0, 10, None)
+        .await
+        .expect("list artifacts");
     assert_eq!(artifacts.len(), 1, "{artifacts:?}");
     assert_eq!(
         artifacts[0].file_root.as_deref(),

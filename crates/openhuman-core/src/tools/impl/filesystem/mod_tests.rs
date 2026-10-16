@@ -3,8 +3,8 @@
 //! ([`super::gate::security_scoped_to_root`]).
 
 use super::gate::security_scoped_to_root;
-use crate::security::policy::TrustedAccess;
 use crate::security::SecurityPolicy;
+use crate::security::policy::TrustedAccess;
 use std::path::Path;
 use tinyagents_harness::context::{RunConfig, RunContext};
 use tinyagents_harness::tool::ToolExecutionContext;

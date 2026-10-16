@@ -28,7 +28,7 @@ pub use host::{
     web_fetch_tool,
 };
 #[cfg(feature = "mcp")]
-pub use mcp::{mcp_call_tool, McpListServersTool, McpListToolsTool};
+pub use mcp::{McpListServersTool, McpListToolsTool, mcp_call_tool};
 #[cfg(feature = "mcp")]
 pub use mcp_server_tools::configured_server_tools_from_presentations;
 
