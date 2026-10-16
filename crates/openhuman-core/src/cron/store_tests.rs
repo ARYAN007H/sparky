@@ -169,7 +169,7 @@ fn a_legacy_jobs_db_is_imported_by_the_storage_importer_and_left_untouched() {
 }
 
 #[test]
-fn successive_patches_each_land_on_the_stored_job() {
+fn a_patch_over_the_bus_keeps_the_agent_definition_it_does_not_mention() {
     use tinyflows_bus::schedule::types::{CronJobPatch, SessionTarget};
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
@@ -218,5 +218,18 @@ fn successive_patches_each_land_on_the_stored_job() {
     assert_eq!(
         get_job(&config, &job.id).unwrap().prompt.as_deref(),
         Some("check in")
+    );
+    // Regression: `CronJobPatch.agent_id` is `Option<Option<_>>` and a present
+    // `null` means "clear it". A patch that never mentioned the agent used to
+    // serialize `agent_id: null` across the bus, so every update (pausing a
+    // job, a policy change) silently dropped the job's agent definition.
+    assert_eq!(
+        policy.agent_id.as_deref(),
+        Some("teeny"),
+        "an unrelated patch cleared the agent definition"
+    );
+    assert_eq!(
+        get_job(&config, &job.id).unwrap().agent_id.as_deref(),
+        Some("teeny")
     );
 }
