@@ -231,7 +231,7 @@ impl tinymemory_api::MemoryEngine for WaitRecorder {
 }
 
 #[tokio::test]
-async fn batches_are_stored_accepted_without_waiting_on_indexing() {
+async fn batches_are_stored_accepted_and_the_last_one_visible() {
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
     let engine = std::sync::Arc::new(WaitRecorder {
@@ -250,6 +250,15 @@ async fn batches_are_stored_accepted_without_waiting_on_indexing() {
         ],
     )
     .await;
+    seed_thread(
+        &config.workspace_dir,
+        "older-thread",
+        &[
+            ("user", "What is a lifetime?"),
+            ("agent", "How long a reference is valid."),
+        ],
+    )
+    .await;
 
     start(
         &DispatchCtx::ambient(),
@@ -260,15 +269,21 @@ async fn batches_are_stored_accepted_without_waiting_on_indexing() {
     .unwrap();
     let done = wait_done(&config).await;
     assert_eq!(done.state.phase, ImportPhase::Done, "{:?}", done.state);
-    assert_eq!(done.state.items_stored, 4);
+    assert_eq!(done.state.items_stored, 6);
 
     let waits = engine.waits.lock().unwrap().clone();
-    assert!(!waits.is_empty(), "the backfill stores in bulk");
+    assert_eq!(waits.len(), 2, "one batch per thread: {waits:?}");
+    let (last, earlier) = waits.split_last().expect("the backfill stores in bulk");
     assert!(
-        waits
+        earlier
             .iter()
             .all(|wait| *wait == tinymemory_api::WaitFor::Accepted),
-        "every batch is stored accepted, not visible: {waits:?}"
+        "every batch but the last is stored accepted: {waits:?}"
+    );
+    assert_eq!(
+        *last,
+        tinymemory_api::WaitFor::Visible,
+        "the last batch waits until it is visible, so a done run is searchable"
     );
     let filter = MetaFilter {
         kinds: vec![ItemKind::Conversation],
@@ -277,7 +292,7 @@ async fn batches_are_stored_accepted_without_waiting_on_indexing() {
     };
     assert_eq!(
         stored(&engine.inner, filter).await.len(),
-        4,
+        6,
         "an engine without accepted writes still stores everything"
     );
 }
