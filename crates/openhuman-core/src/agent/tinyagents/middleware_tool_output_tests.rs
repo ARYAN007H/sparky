@@ -4,8 +4,8 @@ use crate::agent::tinyagents::middleware::tool_output::ToolOutputMiddleware;
 // fully-qualified), so the module itself no longer references the type.
 use super::*;
 use crate::agent::tinyagents::middleware::turn_context::TurnContextMiddleware;
-use tinyagents_harness::middleware::MicrocompactMiddleware;
 use tinyagents_harness::middleware::library::DEFAULT_CLEARED_PLACEHOLDER as CLEARED_PLACEHOLDER;
+use tinyagents_harness::middleware::MicrocompactMiddleware;
 use tinytools::{ToolRuntime, ToolTimeout};
 
 #[tokio::test]

@@ -12,7 +12,7 @@ use super::super::repeated_failure::{failure_scope, recovery_policy};
 use super::*;
 use crate::agent::tinyagents::middleware::repeated_failure::RepeatedToolFailureMiddleware;
 use tinyagents_harness::middleware::{
-    CallEffect, ToolEffectFacts, ToolFactsLookup, call_effect, dispatch_target,
+    call_effect, dispatch_target, CallEffect, ToolEffectFacts, ToolFactsLookup,
 };
 
 /// The harness's own wording for a tool that outlived its budget

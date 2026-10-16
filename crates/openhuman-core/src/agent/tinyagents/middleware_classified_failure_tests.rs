@@ -344,13 +344,12 @@ async fn a_refused_platform_fetch_still_stops_on_first_failure() {
     .await
     .unwrap();
     assert_eq!(drain_pause_count(&handle), 1);
-    assert!(
-        slot.lock()
-            .unwrap()
-            .clone()
-            .unwrap()
-            .contains("authentication")
-    );
+    assert!(slot
+        .lock()
+        .unwrap()
+        .clone()
+        .unwrap()
+        .contains("authentication"));
 }
 
 /// A shell success in between clears the ledger, so a later, unrelated timeout
@@ -644,14 +643,12 @@ async fn nudges_for_other_models_stay_tail_system_messages() {
         request.messages.last(),
         Some(TaMessage::System(_))
     ));
-    assert!(
-        request
-            .messages
-            .last()
-            .unwrap()
-            .text()
-            .contains("smaller, bounded")
-    );
+    assert!(request
+        .messages
+        .last()
+        .unwrap()
+        .text()
+        .contains("smaller, bounded"));
 }
 
 // ── A public site's HTTP status is not OpenHuman's credential (tinytools#47) ──

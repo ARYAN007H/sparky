@@ -179,7 +179,6 @@ fn other_builtins_default_to_worker_tier() {
     }
 }
 
-#[test]
 /// The orchestrator defers its rarely-used or duplicate-route tools for itself
 /// only (`deferred_tools`): they stay registered, searchable through
 /// `tool_search` and callable by name, while other agents that name them keep

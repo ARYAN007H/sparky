@@ -235,26 +235,22 @@ fn user_actionable_escalation_detects_missing_connection() {
     // A plain environment failure is NOT user-actionable → keep crate summary.
     assert!(user_actionable_escalation("read_file", "file not found").is_none());
     assert!(user_actionable_escalation("shell", "exit code 1: segfault").is_none());
-    assert!(
-        user_actionable_escalation(
-            "gmail_send",
-            "[composio:error:insufficient_scope] `gmail_send` was rejected because the connected \
+    assert!(user_actionable_escalation(
+        "gmail_send",
+        "[composio:error:insufficient_scope] `gmail_send` was rejected because the connected \
          gmail account is missing required permissions (insufficient authentication scopes). \
          Reconnect the integration in Connections → gmail and grant the scopes \
          requested during OAuth."
-        )
-        .is_none()
-    );
-    assert!(
-        user_actionable_escalation(
-            "gmail_trigger",
-            "[composio:error:trigger_permission] Couldn't enable this trigger: the connected \
+    )
+    .is_none());
+    assert!(user_actionable_escalation(
+        "gmail_trigger",
+        "[composio:error:trigger_permission] Couldn't enable this trigger: the connected \
          gmail account doesn't have permission to manage triggers. Reconnect gmail in \
          Connections → gmail and grant the permissions requested during OAuth, \
          then try again."
-        )
-        .is_none()
-    );
+    )
+    .is_none());
 }
 
 #[tokio::test]

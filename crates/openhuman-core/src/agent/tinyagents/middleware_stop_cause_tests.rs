@@ -4,13 +4,13 @@
 //! left, the way the session driver does.
 
 use super::*;
-use crate::agent::session_host::stop_summary::{StopReasonKind, render_stop_summary};
+use crate::agent::session_host::stop_summary::{render_stop_summary, StopReasonKind};
 use crate::agent::session_host::turn_checkpoint::CheckpointToolResult;
 use crate::agent::tinyagents::middleware::repeated_failure::RepeatedToolFailureMiddleware;
 use tinyagents_harness::middleware::is_repeat_call_exempt;
 use tinyagents_harness::middleware::library::{
-    DEFAULT_CLEARED_PLACEHOLDER, REPEAT_GUARD_BLOCKED, REPEAT_GUARD_HALTED,
-    REPEAT_GUARD_METADATA_KEY, RepeatProgressMiddleware,
+    RepeatProgressMiddleware, DEFAULT_CLEARED_PLACEHOLDER, REPEAT_GUARD_BLOCKED,
+    REPEAT_GUARD_HALTED, REPEAT_GUARD_METADATA_KEY,
 };
 use tinyinference_llm::message::{AssistantMessage, ContentBlock};
 use tinyinference_llm::model::ModelResponse;
