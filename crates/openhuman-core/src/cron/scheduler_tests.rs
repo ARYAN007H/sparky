@@ -288,7 +288,13 @@ async fn a_shell_job_runs_on_this_platform() {
 
     let job = test_job("echo tinyhumans");
 
-    let (success, output) = run_job_command(&config, &security, &job).await;
+    let (success, output) = run_job_command(
+        &crate::core::runtime::DispatchCtx::host_default(),
+        &config,
+        &security,
+        &job,
+    )
+    .await;
 
     assert!(success, "the shell job did not succeed: {output}");
     assert!(
@@ -338,7 +344,13 @@ async fn a_pipeline_reports_its_last_stage_rather_than_pipefail() {
 
     let job = test_job("false | true");
 
-    let (success, output) = run_job_command(&config, &security, &job).await;
+    let (success, output) = run_job_command(
+        &crate::core::runtime::DispatchCtx::host_default(),
+        &config,
+        &security,
+        &job,
+    )
+    .await;
 
     assert!(
         success,

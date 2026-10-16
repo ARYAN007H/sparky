@@ -98,12 +98,13 @@ pub(crate) static USE_FIXTURE: std::sync::atomic::AtomicBool =
 ///
 /// A worker owns cancellation and resource cleanup if the caller drops its wait.
 pub(crate) async fn run(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     mut run: NativeShellRun,
 ) -> anyhow::Result<SandboxExecResult> {
     #[cfg(test)]
     if !run.is_jailed() && USE_FIXTURE.load(std::sync::atomic::Ordering::SeqCst) {
-        let _ = config;
+        let _ = (ctx, config);
         return fixture::run(run).await;
     }
     #[cfg(feature = "modules")]
@@ -122,17 +123,16 @@ pub(crate) async fn run(
         // cancellation is acknowledged only after the command is gone.
         let hold = tinytools_std::timeout::ProcessCleanup::hold();
         let (_caller, abandoned) = tokio::sync::oneshot::channel::<std::convert::Infallible>();
-        crate::core::runtime::DispatchCtx::ambient()
-            .spawn(async move {
-                let _hold = hold;
-                run_owned(&config, run, abandoned, meter).await
-            })
-            .await
-            .map_err(|_| anyhow::anyhow!("TinyBox shell worker did not finish"))?
+        ctx.spawn(async move {
+            let _hold = hold;
+            run_owned(&config, run, abandoned, meter).await
+        })
+        .await
+        .map_err(|_| anyhow::anyhow!("TinyBox shell worker did not finish"))?
     }
     #[cfg(not(feature = "modules"))]
     {
-        let _ = (config, run);
+        let _ = (ctx, config, run);
         anyhow::bail!("TinyBox module support is disabled; command execution is unavailable")
     }
 }
@@ -321,6 +321,7 @@ pub(crate) fn path_string(path: &std::path::Path, label: &str) -> anyhow::Result
 /// `preserve_pipeline_status` keeps a pipeline's default exit status for
 /// callers whose retry or settlement behavior depends on it (cron).
 pub(crate) async fn run_host(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     command: &str,
     cwd: &std::path::Path,
@@ -334,7 +335,7 @@ pub(crate) async fn run_host(
     shell.meter = meter;
     shell.env = env;
     shell.preserve_pipeline_status = preserve_pipeline_status;
-    run(config, shell).await
+    run(ctx, config, shell).await
 }
 
 #[cfg(test)]
