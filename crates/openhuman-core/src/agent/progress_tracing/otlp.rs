@@ -20,7 +20,7 @@ pub(super) const OTLP_SERVICE_KEY: &str = "telemetry.otlp";
 /// the underlying client is cached per service key, so every push reuses one
 /// connection pool.
 pub(super) fn otlp_client() -> reqwest::Client {
-    reqwest::Client::new()
+    crate::config::build_runtime_proxy_client_with_timeouts(OTLP_SERVICE_KEY, 10, 10)
 }
 
 pub(super) async fn push_spans(config: &Config, spans: &[TraceSpan]) -> Result<(), String> {

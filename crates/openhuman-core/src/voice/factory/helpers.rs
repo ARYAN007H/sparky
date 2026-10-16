@@ -97,7 +97,7 @@ pub fn effective_tts_provider(config: &Config) -> String {
 /// it carries the shared unavailable sentinel the reporter filters on rather
 /// than reading as a misconfigured slug.
 fn missing_provider_error(slug: &str) -> anyhow::Error {
-    if false {
+    if !slug.trim().is_empty() && defers_to_engine(slug) {
         return anyhow::anyhow!(
             "{} no '{slug}' speech provider is registered in this build",
             crate::core::observability::BACKEND_UNAVAILABLE_PREFIX
