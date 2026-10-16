@@ -5,19 +5,13 @@
 
 use std::sync::Arc;
 
-pub use tinyagents_harness::host::{LearningSink as PostTurnHook, TurnSummary as TurnContext};
-pub use tinyagents_hooks::tool::{
-    HookIdentity, ToolHook, ToolHookContext, ToolHookDecision, ToolHookEvent,
-};
+use tinyagents_harness::host::LearningSink;
+use tinyagents_hooks::tool::{HookIdentity, ToolHook};
 
 use crate::agent::tinyagents::host::OpenHumanRunContext;
-pub type HookScope = tinyagents_hooks::scope::HookScope<
-    OpenHumanRunContext,
-    tinyagents_harness::cost::TurnCost,
->;
 
 static EMBEDDER_POST_TURN_HOOKS:
-    std::sync::LazyLock<std::sync::Mutex<Vec<(Option<String>, Arc<dyn PostTurnHook>)>>> =
+    std::sync::LazyLock<std::sync::Mutex<Vec<(Option<String>, Arc<dyn LearningSink>)>>> =
     std::sync::LazyLock::new(|| std::sync::Mutex::new(Vec::new()));
 static EMBEDDER_TOOL_HOOKS:
     std::sync::LazyLock<
@@ -48,14 +42,14 @@ impl HookIdentity for OpenHumanRunContext {
     }
 }
 
-pub fn register_embedder_post_turn_hook(hook: Arc<dyn PostTurnHook>) {
+pub fn register_embedder_post_turn_hook(hook: Arc<dyn LearningSink>) {
     EMBEDDER_POST_TURN_HOOKS
         .lock()
         .expect("embedder learning sinks poisoned")
         .push((None, hook));
 }
 
-pub fn replace_embedder_post_turn_hook(name: &str, hook: Option<Arc<dyn PostTurnHook>>) {
+pub fn replace_embedder_post_turn_hook(name: &str, hook: Option<Arc<dyn LearningSink>>) {
     let mut hooks = EMBEDDER_POST_TURN_HOOKS
         .lock()
         .expect("embedder learning sinks poisoned");
@@ -65,7 +59,7 @@ pub fn replace_embedder_post_turn_hook(name: &str, hook: Option<Arc<dyn PostTurn
     }
 }
 
-pub fn embedder_post_turn_hooks() -> Vec<Arc<dyn PostTurnHook>> {
+pub fn embedder_post_turn_hooks() -> Vec<Arc<dyn LearningSink>> {
     EMBEDDER_POST_TURN_HOOKS
         .lock()
         .expect("embedder learning sinks poisoned")
@@ -76,7 +70,7 @@ pub fn embedder_post_turn_hooks() -> Vec<Arc<dyn PostTurnHook>> {
 
 pub fn embedder_post_turn_hooks_in(
     ctx: &crate::core::runtime::DispatchCtx,
-) -> Vec<Arc<dyn PostTurnHook>> {
+) -> Vec<Arc<dyn LearningSink>> {
     let mut hooks = embedder_post_turn_hooks();
     if let Some(local) = ctx.host_overrides() {
         hooks.extend(local.learning_hooks().iter().cloned());
