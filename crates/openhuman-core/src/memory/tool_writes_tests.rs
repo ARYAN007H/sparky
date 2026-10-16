@@ -9,6 +9,30 @@ fn facts(config: &Config) -> CallFacts {
     CallFacts::of(config, &MemoryIdentity::agent("outbox-agent"))
 }
 
+#[test]
+fn owner_states_are_released_after_the_last_write_holder_drops() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut keys = Vec::new();
+    let states = (0..32)
+        .map(|index| {
+            let workspace = temp.path().join(index.to_string());
+            std::fs::create_dir_all(&workspace).unwrap();
+            let config = config_in(&temp);
+            let config = Config {
+                workspace_dir: workspace.clone(),
+                ..config
+            };
+            keys.push(workspace.join("memory").join(owner_prefix(&config)));
+            owner_state(&config)
+        })
+        .collect::<Vec<_>>();
+
+    drop(states);
+
+    let owners = OWNERS.lock().unwrap();
+    assert!(keys.iter().all(|key| !owners.contains_key(key)));
+}
+
 #[tokio::test]
 async fn restart_drains_scrubbed_learnings_and_ordered_forgetting() {
     let tmp = tempfile::tempdir().unwrap();

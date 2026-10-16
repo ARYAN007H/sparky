@@ -4,6 +4,23 @@ use tinymemory_api::{ConsolidateRequest, ItemKind, Reach};
 
 use crate::memory::test_fixtures::{bind_reference, config_in};
 
+#[test]
+fn workspace_queues_are_released_after_the_last_holder_drops() {
+    let temp = tempfile::tempdir().unwrap();
+    let workspaces = (0..32)
+        .map(|index| temp.path().join(index.to_string()))
+        .collect::<Vec<_>>();
+    let queues = workspaces
+        .iter()
+        .map(|workspace| queue_of(workspace))
+        .collect::<Vec<_>>();
+
+    drop(queues);
+
+    let queues = QUEUES.lock().unwrap();
+    assert!(workspaces.iter().all(|workspace| !queues.contains_key(workspace)));
+}
+
 fn build(agent: &str) -> BackgroundJob {
     BackgroundJob::BuildBeliefs {
         request: ConsolidateRequest::new(Reach::exact(Namespace::agent(agent)))
