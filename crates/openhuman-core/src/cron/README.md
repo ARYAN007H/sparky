@@ -286,7 +286,7 @@ so two processes sharing one database don't double-advance it.
 | [`seed.rs`](./seed.rs) | Built-in proactive jobs and pruning of retired rows. |
 | `system_jobs.rs` | `system:<name>` flow rows owned by other domains. |
 | [`tools.rs`](./tools.rs), `tools/` | Agent tools. See [tools/README.md](tools/README.md). |
-| `scheduler_gate/` | Host power and CPU policy for background LLM work. Unrelated to the poll loop. See [scheduler_gate/README.md](scheduler_gate/README.md). |
+| (moved) | The background-LLM power/CPU gate now lives in [`platform/llm_gate`](../platform/llm_gate/README.md). |
 
 ## Key types and entry points
 
@@ -379,7 +379,7 @@ Cron publishes, through [`core/bus.rs`](../core/bus.rs), these `DomainEvent` var
 
 ## Gotchas
 
-- `scheduler_gate` lives here for historical reasons, but the poll loop does not
+- the LLM gate (`platform::llm_gate`) is not part of cron; it used to live here, but the poll loop does not
   consult it. Its consumers are `modules/memory_host.rs` and
   [`security/credentials/`](../security/credentials/).
 - Dispatch is non-blocking: each due job is spawned onto a `JoinSet` bounded by

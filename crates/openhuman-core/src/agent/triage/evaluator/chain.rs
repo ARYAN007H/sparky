@@ -99,7 +99,7 @@ pub async fn run_triage(
 }
 
 /// Test-only entry point: skip the global LLM permit acquisition so the
-/// triage tests don't contend with `scheduler_gate`'s process-wide
+/// triage tests don't contend with `llm_gate`'s process-wide
 /// 1-slot semaphore or get trapped by a stale `Paused` policy left in
 /// `STATE` by another test's `init_global` call.
 #[cfg(test)]

@@ -25,7 +25,7 @@
 
 use crate::core::events::DomainEvent;
 use crate::core::runtime::DispatchCtx;
-use crate::cron::scheduler_gate;
+use crate::platform::llm_gate;
 use async_trait::async_trait;
 use tinybus::EventHandler;
 

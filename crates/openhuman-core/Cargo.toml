@@ -374,7 +374,7 @@ sentry = { version = "0.47.0", default-features = false, optional = true, featur
 url = "2"
 tempfile = "3"
 fs2 = "0.4"
-# The scheduler gate's battery/AC probe (`cron::scheduler_gate::signals`),
+# The scheduler gate's battery/AC probe (`platform::llm_gate::signals`),
 # behind the `scheduler-gate` feature. CPU sampling uses `sysinfo` above.
 starship-battery = { version = "0.12", optional = true }
 

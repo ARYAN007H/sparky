@@ -6,7 +6,7 @@
 //! `run_triage` → `apply_decision` path Composio webhooks use — so an agent
 //! can start working immediately; triage's classifier (drop / acknowledge /
 //! react / escalate) gates noise, and the proactive turn is held behind the
-//! `scheduler_gate` capacity semaphore so background AI throttling is
+//! `llm_gate` capacity semaphore so background AI throttling is
 //! respected. [`SourceTarget::TodoOnly`] sources are collected into the ledger
 //! and go no further.
 //!
@@ -21,7 +21,7 @@ use crate::agent::triage::{
 };
 use crate::agent::turn_origin::with_origin;
 use crate::config::Config;
-use crate::cron::scheduler_gate;
+use crate::platform::llm_gate;
 
 use super::types::{EnrichedTask, SourceTarget, TaskSource};
 

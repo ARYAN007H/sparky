@@ -3,7 +3,7 @@
 //!
 //! This is `docs/specs/plan-agents.md` Phase 4. The agent runtime is being made
 //! generic over its host, so it can no longer reach into
-//! [`crate::cron::scheduler_gate`] or [`crate::cost`] directly.
+//! [`crate::platform::llm_gate`] or [`crate::cost`] directly.
 //! It declares [`BudgetGate`] instead, and this module is the single place
 //! OpenHuman's three metering concerns meet it:
 //!
@@ -67,7 +67,7 @@ use tinyagents_harness::host::budget_gate::{
 use tinyinference_llm::usage::Usage;
 
 use crate::config::{Config, DEFAULT_MODEL};
-use crate::cron::scheduler_gate;
+use crate::platform::llm_gate;
 use crate::platform::cost;
 use tinyjuice_bus::types::AgentTokenjuiceCompression;
 
