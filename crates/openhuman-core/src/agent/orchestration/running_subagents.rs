@@ -77,5 +77,8 @@ pub use steering::steer;
 pub(crate) use steering::steer_control;
 #[cfg(test)]
 pub(crate) use task_ledger::task_records;
-pub(crate) use task_ledger::{reconcile_orphaned_tasks_on_boot, task_record_for_task_in_workspace};
+pub(crate) use task_ledger::{
+    reconcile_orphaned_tasks_on_boot, task_record_for_task_in_workspace,
+    task_store_for_workspace,
+};
 pub(crate) use wait::wait_in_workspace;

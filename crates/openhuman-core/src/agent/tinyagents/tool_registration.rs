@@ -241,7 +241,7 @@ fn subagent_control_dispatches(
         let parent_session = parent_session.clone();
         let task_parent_session = parent_session.clone();
         let parent_thread_id = run_context.thread_id.clone();
-        let task_store = crate::agent::orchestration::running_subagents::task_ledger::task_store_for_workspace(
+        let task_store = crate::agent::orchestration::running_subagents::task_store_for_workspace(
             &parent.workspace_dir,
         );
         let wait_dispatch: RegisteredToolDispatch = Arc::new(
