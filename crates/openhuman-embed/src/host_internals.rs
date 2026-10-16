@@ -333,6 +333,7 @@ pub mod composio {
         ComposioRouteBuilder,
     };
     // The proxy route's target (origin + bearer) for `composio.mode = backend`.
+    #[cfg(feature = "modules")]
     pub use openhuman_core::modules::connectors::{
         register_proxy_target, unregister_proxy_target, ProxyTarget, ProxyTargetResolver,
     };
