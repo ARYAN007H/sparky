@@ -262,10 +262,10 @@ jobs:
           # `--bins` silently skips it and this lane goes green having compiled
           # none of it. Its tests would vanish too, with no error.
           # The regular libtest process runs tests in parallel. Keep the
-          # process-global, never-unloaded TinyBus modules out of that shared
-          # test process, then run each module-backed regression in its own
-          # process below. Boot and parallel resolver tests can otherwise race
-          # while attaching the same released library to the one module host.
+          # process-global TinyBus module tests out of it, then run each one in
+          # its own process below. Parallel resolver tests can race while
+          # attaching the same release, and TinyFlows callbacks can race with
+          # another test shutting down the process-global module runtime.
           unset OPENHUMAN_MODULE_PATH
           bash scripts/ci-cancel-aware.sh cargo test -p openhuman --lib --features "${CORE_FEATURES}" -- "${MODULE_TEST_SKIP_ARGS[@]}"
           if [ -n "$STAGED_MODULE_PATH" ]; then

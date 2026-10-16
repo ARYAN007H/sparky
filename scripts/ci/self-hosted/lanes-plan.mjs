@@ -494,7 +494,7 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
             " modules::runtime:: modules::registry:: modules::storage_grant_tinywallet::" +
             " modules::storage_grant_tinyconnectors::" +
             " cron::bus_host::tests:: cron::documents_port::tests::" +
-            " mcp::server::resources:: test_support::introspect::",
+            " mcp::server::resources:: test_support::introspect:: --test-threads=1",
         },
         {
           name: "kernel-floor",
