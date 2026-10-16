@@ -81,6 +81,9 @@ fn embed_info(args: &[String]) -> anyhow::Result<Option<crate::embed::RuntimeInf
 /// the dispatched command failed.
 #[cfg(feature = "server")]
 pub fn cli(args: &[String]) -> anyhow::Result<()> {
+    // Before any config read (`provider_for_host` loads one), so load-time
+    // migrations can recognise managed endpoints.
+    openhuman_tinyhumans::register_hooks();
     // Introspection belongs above the core: never introduce a core -> embed dependency.
     if let Some(info) = embed_info(args)? {
         println!("{}", serde_json::to_string_pretty(&info)?);
@@ -264,6 +267,7 @@ pub async fn desktop(
     shutdown_token: CancellationToken,
     ready_tx: tokio::sync::oneshot::Sender<EmbeddedReadySignal>,
 ) -> anyhow::Result<()> {
+    openhuman_tinyhumans::register_hooks();
     secret_storage::install();
     log::debug!("[rpc:host] desktop options={options:?}");
     serve_desktop(desktop_builder(&options), shutdown_token, ready_tx).await
@@ -312,6 +316,7 @@ pub fn tui_builder() -> RuntimeBuilder {
 /// could not be built.
 #[cfg(feature = "session-store")]
 pub async fn tui() -> anyhow::Result<openhuman_tinyhumans::embed::Runtime> {
+    openhuman_tinyhumans::register_hooks();
     secret_storage::install();
     log::debug!("[rpc:host] tui: building connected runtime");
     let session_store = crate::session_store::provider_for_host().await?;

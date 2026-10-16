@@ -201,6 +201,19 @@ pub fn install(options: InstallOptions) -> Result<Arc<SdkBackendTransport>, Inst
     connect_transport()
 }
 
+/// Register the hooks a config *load* depends on, and nothing else.
+///
+/// A host that reads configuration before it connects (the CLI and TUI open
+/// their storage-backed session store first) must call this before any
+/// config read: the config enricher is what tells the load-time migrations
+/// which endpoints are managed, and with none registered a legacy managed
+/// config is mistaken for a custom one. Cheap and idempotent;
+/// [`install`] and the builder's connect register the same hook again.
+pub fn register_hooks() {
+    log::trace!("[tinyhumans] register_hooks: config enricher");
+    crate::client::register(&InstallOptions::default());
+}
+
 /// Whether [`install`] (or the builder's connect) has run in this process.
 pub fn is_installed() -> bool {
     INSTALLED.load(Ordering::SeqCst)
