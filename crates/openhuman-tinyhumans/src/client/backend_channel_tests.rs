@@ -417,9 +417,7 @@ async fn unavailable_transport_flattens_to_the_backend_unavailable_sentinel() {
     assert!(matches!(typed, HostedApiError::BackendUnavailable { .. }));
     let flat = flatten_authed_error(err);
     assert!(
-        flat.starts_with(
-            openhuman_embed::__host::core::observability::BACKEND_UNAVAILABLE_PREFIX
-        ),
+        flat.starts_with(openhuman_embed::__host::core::observability::BACKEND_UNAVAILABLE_PREFIX),
         "{flat}"
     );
     assert!(flat.contains("GET /teams/me/usage"), "{flat}");

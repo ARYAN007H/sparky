@@ -17,9 +17,9 @@ use openhuman_embed::__host::backend::transport::{
     BackendTransport, BackendTransportError, TransportProfile,
 };
 use openhuman_embed::__host::security::credentials::session_support::BackendCredential;
+use openhuman_embed::__host::util::redact_url_for_log;
 use openhuman_embed::__host::util::tls::tls_client_builder;
 use openhuman_embed::__host::util::url::{join_url, normalize_backend_api_base_url};
-use openhuman_embed::__host::util::redact_url_for_log;
 use openhuman_embed::BackendRequest;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use reqwest::Method;
@@ -227,9 +227,7 @@ impl IntegrationsHttp {
             .map_err(|e| BackendTransportError::Other(e.to_string()))?;
         let transport = self.resolve_transport()?;
         log::trace!("{LOG_PREFIX} {} {path}", method.as_str());
-        transport
-            .send_json(self.request(method, path, body))
-            .await
+        transport.send_json(self.request(method, path, body)).await
     }
 
     /// Send a `multipart/form-data` upload and return the response body.

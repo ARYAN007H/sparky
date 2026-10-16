@@ -20,12 +20,11 @@ fn sanitize_strips_inference_paths_and_is_idempotent() {
 
 #[test]
 fn privileged_paths_are_refused_before_sending() {
-    for route in [
-        "/webhooks/x",
-        "/agent-integrations/admin/y",
-        "/a/ADMIN?q=1",
-    ] {
-        assert!(reject_privileged_backend_path("GET", route).is_err(), "{route}");
+    for route in ["/webhooks/x", "/agent-integrations/admin/y", "/a/ADMIN?q=1"] {
+        assert!(
+            reject_privileged_backend_path("GET", route).is_err(),
+            "{route}"
+        );
     }
     reject_privileged_backend_path("GET", "/agent-integrations/composio/connections").unwrap();
 }
@@ -88,7 +87,10 @@ async fn send_json_surfaces_a_non_2xx_as_the_raw_status_error() {
         .send_json(Method::POST, "/agent-integrations/x", Some(&json!({})))
         .await
         .unwrap_err();
-    assert!(matches!(err, BackendTransportError::Status { status: 401, .. }), "{err:?}");
+    assert!(
+        matches!(err, BackendTransportError::Status { status: 401, .. }),
+        "{err:?}"
+    );
 }
 
 #[tokio::test]
@@ -108,7 +110,10 @@ async fn send_multipart_posts_a_form() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/agent-integrations/upload"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"success": true, "data": {"ok": true}})))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({"success": true, "data": {"ok": true}})),
+        )
         .mount(&server)
         .await;
 
@@ -120,6 +125,14 @@ async fn send_multipart_posts_a_form() {
         .unwrap();
     assert_eq!(value["ok"], json!(true));
     let received = server.received_requests().await.unwrap();
-    let content_type = received[0].headers.get("content-type").unwrap().to_str().unwrap();
-    assert!(content_type.starts_with("multipart/form-data"), "{content_type}");
+    let content_type = received[0]
+        .headers
+        .get("content-type")
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(
+        content_type.starts_with("multipart/form-data"),
+        "{content_type}"
+    );
 }

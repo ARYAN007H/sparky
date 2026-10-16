@@ -23,8 +23,14 @@ fn socket_url_swaps_scheme_and_appends_the_handshake() {
 #[test]
 fn a_loopback_api_url_override_drives_every_derived_field() {
     let resolved = resolve(&config_with(Some("http://127.0.0.1:18765")));
-    assert_eq!(resolved.control_plane_url.as_deref(), Some("http://127.0.0.1:18765"));
-    assert_eq!(resolved.inference_url.as_deref(), Some("http://127.0.0.1:18765"));
+    assert_eq!(
+        resolved.control_plane_url.as_deref(),
+        Some("http://127.0.0.1:18765")
+    );
+    assert_eq!(
+        resolved.inference_url.as_deref(),
+        Some("http://127.0.0.1:18765")
+    );
     assert_eq!(
         resolved.socket_url.as_deref(),
         Some("ws://127.0.0.1:18765/socket.io/?EIO=4&transport=websocket")
@@ -67,7 +73,10 @@ fn control_plane_and_inference_follow_the_same_rules_as_the_transport() {
 fn attribution_headers_and_identity_come_from_this_crate() {
     let resolved = resolve(&config_with(None));
     let identity = crate::backend::product::product_identity();
-    assert_eq!(resolved.product_identity.as_deref(), Some(identity.as_str()));
+    assert_eq!(
+        resolved.product_identity.as_deref(),
+        Some(identity.as_str())
+    );
     let (name, _) = crate::backend::product::product_identity_header();
     let sdk_name = resolved
         .attribution_headers

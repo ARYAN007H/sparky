@@ -49,8 +49,10 @@ pub fn is_managed_endpoint_for_api_key(endpoint: &str) -> bool {
     if !is_safe_endpoint_for_managed_bearer(endpoint) {
         return false;
     }
-    let managed =
-        url.scheme() == "https" && url.host_str().is_some_and(|h| MANAGED_API_KEY_HOSTS.contains(&h));
+    let managed = url.scheme() == "https"
+        && url
+            .host_str()
+            .is_some_and(|h| MANAGED_API_KEY_HOSTS.contains(&h));
     managed || is_loopback_host(&url)
 }
 
