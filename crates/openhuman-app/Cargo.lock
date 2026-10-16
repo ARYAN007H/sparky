@@ -3817,6 +3817,7 @@ dependencies = [
  "tinyagents-definition",
  "tinyagents-graph",
  "tinyagents-harness",
+ "tinyagents-hooks",
  "tinyagents-live",
  "tinyagents-orchestration",
  "tinyagents-registry",
@@ -3944,6 +3945,7 @@ dependencies = [
  "tinyagents-definition",
  "tinyagents-graph",
  "tinyagents-harness",
+ "tinyagents-hooks",
  "tinyagents-session",
  "tinybus",
  "tinyinference-embeddings",
@@ -6616,6 +6618,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "tinyagents-hooks"
+version = "2.1.4"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "regex",
+ "serde",
+ "serde_json",
+ "tinyagents-harness",
+ "tinyinference-llm",
+ "tinytools",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "tinyagents-live"
 version = "2.1.4"
 dependencies = [
@@ -6677,6 +6695,7 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.20",
  "tinyagents-harness",
+ "tinyagents-hooks",
  "tinyagents-registry",
  "tinyagents-session",
  "tinyinference-llm",
