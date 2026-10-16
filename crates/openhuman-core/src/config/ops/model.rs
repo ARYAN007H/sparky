@@ -690,7 +690,7 @@ pub async fn get_composio_trigger_settings(
 /// receive OpenHuman session credentials. `None` when no transport is
 /// installed (no hosted backend).
 pub(crate) fn resolve_backend_api_url(config: &Config) -> Option<String> {
-    crate::backend::base_url(&config.api_url).ok()
+    config.resolved_endpoints.control_plane_url.clone()
 }
 
 /// Resolves the effective backend API URL from configuration or defaults;
