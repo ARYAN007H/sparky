@@ -79,6 +79,7 @@ fn http_adapter(allowed_domains: Vec<String>) -> OpenHumanHttp {
         &config.action_dir,
     ));
     OpenHumanHttp {
+        ctx: crate::core::runtime::DispatchCtx::ambient(),
         security,
         http_config: crate::config::HttpRequestConfig {
             allowed_domains,

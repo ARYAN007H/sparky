@@ -6,7 +6,12 @@ use super::*;
 fn build_capabilities_constructs_every_slot_without_panicking() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
-    let caps = build_capabilities(&crate::core::runtime::DispatchCtx::ambient(), config, "test:build", None);
+    let caps = build_capabilities(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        config,
+        "test:build",
+        None,
+    );
     assert!(caps.tasks.is_some(), "Tinyflows task nodes need a runner");
     assert!(
         caps.approvals.is_none(),
@@ -54,7 +59,12 @@ async fn http_adapter_rejects_host_outside_strict_allowlist() {
 async fn engine_run_drives_trigger_to_http_request_through_the_real_seam() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
-    let caps = build_capabilities(&crate::core::runtime::DispatchCtx::ambient(), config, "test:smoke", None);
+    let caps = build_capabilities(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        config,
+        "test:smoke",
+        None,
+    );
 
     // A deterministically-blocked loopback URL with `on_error: continue` so
     // the run completes even though the (real, SSRF-guarded) HTTP adapter
@@ -110,6 +120,7 @@ async fn code_adapter_javascript_runs_when_isolated_and_refuses_when_isolation_i
         &config.action_dir,
     ));
     let runner = OpenHumanCode {
+        ctx: crate::core::runtime::DispatchCtx::ambient(),
         config,
         security,
         approval: Default::default(),
