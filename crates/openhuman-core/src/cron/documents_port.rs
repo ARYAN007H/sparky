@@ -28,8 +28,8 @@ use serde_json::{json, Value};
 use tinybus::Result as BusResult;
 use tinyflows_bus::schedule::CallbackAddress;
 use tinystoragedrivers::{
-    Capability, CollectionSpec, DocumentStore, Filter, Precondition, Query, Scope, StorageError,
-    WriteOp,
+    Capability, CollectionSpec, DocumentStore, Filter, Precondition, Query, Scope, StorageBackend,
+    StorageError, WriteOp,
 };
 
 use crate::config::Config;
@@ -45,10 +45,13 @@ const COLLECTIONS: [&str; 4] = [
 
 /// Where one scope's cron documents live: the workspace whose default backend
 /// is used when none is installed, and the storage scope within it.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub(crate) struct DocScope {
     workspace_dir: PathBuf,
     scope: Scope,
+    /// A backend to use instead of resolving the workspace's (the legacy
+    /// importer runs against the backend it was handed).
+    backend: Option<Arc<dyn StorageBackend>>,
 }
 
 impl DocScope {
@@ -62,6 +65,7 @@ impl DocScope {
         Ok(Self {
             workspace_dir: config.workspace_dir.clone(),
             scope: opened.scope,
+            backend: None,
         })
     }
 
@@ -71,16 +75,41 @@ impl DocScope {
         Self {
             workspace_dir: config.workspace_dir.clone(),
             scope,
+            backend: None,
+        }
+    }
+
+    /// `scope` of an explicit `backend`.
+    pub(crate) fn on_backend(
+        config: &Config,
+        backend: Arc<dyn StorageBackend>,
+        scope: Scope,
+    ) -> Self {
+        Self {
+            workspace_dir: config.workspace_dir.clone(),
+            scope,
+            backend: Some(backend),
         }
     }
 
     fn key(&self) -> String {
-        format!("{}|{}", self.workspace_dir.display(), self.scope.as_str())
+        let backend = self
+            .backend
+            .as_ref()
+            .map_or(0, |backend| Arc::as_ptr(backend).cast::<()>() as usize);
+        format!(
+            "{}|{}|{backend:x}",
+            self.workspace_dir.display(),
+            self.scope.as_str()
+        )
     }
 
     fn documents(&self) -> Result<Arc<dyn DocumentStore>, StorageError> {
-        let backend = crate::storage::local::backend_for(&self.workspace_dir)
-            .map_err(|error| StorageError::unavailable(error.to_string()))?;
+        let backend = match &self.backend {
+            Some(backend) => Arc::clone(backend),
+            None => crate::storage::local::backend_for(&self.workspace_dir)
+                .map_err(|error| StorageError::unavailable(error.to_string()))?,
+        };
         let scoped = backend.for_scope(&self.scope)?;
         Ok(Arc::clone(scoped.documents()))
     }
