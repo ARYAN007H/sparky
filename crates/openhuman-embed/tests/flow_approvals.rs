@@ -4,7 +4,7 @@ mod common;
 
 use std::time::Duration;
 
-use openhuman_core::agent::turn_origin::{self, TrustedAutomationSource};
+use openhuman_core::security::turn_origin::{self, TrustedAutomationSource};
 use openhuman_core::core::events::DomainEvent;
 use openhuman_core::core::runtime::{AgentContextRegistry, CoreContext};
 use openhuman_core::security::approval::{ApprovalGate, ApprovalSourceContext, GateOutcome};

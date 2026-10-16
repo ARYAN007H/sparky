@@ -63,7 +63,7 @@
 #![warn(missing_docs)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-pub use openhuman_core::agent::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
+pub use openhuman_core::security::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
 /// Complete definition accepted by [`AgentDefinitionSpec::from_base`].
 pub use openhuman_core::agent_registry::host_definition::AgentDefinition;
 
@@ -101,7 +101,7 @@ pub use tinytools::{PermissionLevel, Tool, ToolExposure, ToolResult};
 
 /// Live agent-turn progress for in-process embedders.
 pub mod agent_progress {
-    pub use openhuman_core::agent::progress::AgentProgress;
+    pub use openhuman_core::progress::AgentProgress;
     /// The bounded in-process channel an embedder supplies for one agent turn.
     pub type ProgressSink = tokio::sync::mpsc::Sender<AgentProgress>;
 }
