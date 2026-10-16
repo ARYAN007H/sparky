@@ -3,6 +3,222 @@ use tinyagents_harness::tool::response_fields_from_schema;
 use tinyflows::nodes::integration::agent_prompt::scale_timeout_for_iteration_cap;
 use tinytools::status::POLICY_BLOCKED_MARKER;
 
+fn live_tier_context(config: &Config) -> crate::core::runtime::DispatchCtx {
+    let parent = crate::core::runtime::CoreContext::for_test(
+        crate::core::runtime::DomainSet::full(),
+        Some(config.workspace_dir.clone()),
+    );
+    let context = parent.derive_with(crate::core::runtime::ContextOverlay::new(
+        config.clone(),
+        crate::core::runtime::DomainSet::full(),
+        crate::tools::toolpacks::ToolGroups::default(),
+    ));
+    crate::core::runtime::DispatchCtx::new(context)
+}
+
+fn persisted_tier_config(
+    dir: &std::path::Path,
+    enabled: bool,
+    level: crate::security::AutonomyLevel,
+) -> Config {
+    let mut config = Config::default();
+    config.config_path = dir.join("config.toml");
+    config.workspace_dir = dir.join("workspace");
+    config.action_dir = dir.join("action");
+    config.autonomy.enabled = enabled;
+    config.autonomy.level = level;
+    config
+}
+
+async fn save_tier_config(config: &Config) {
+    std::fs::create_dir_all(&config.workspace_dir).unwrap();
+    std::fs::create_dir_all(&config.action_dir).unwrap();
+    config.save().await.unwrap();
+}
+
+#[tokio::test]
+async fn one_live_capability_observes_full_readonly_full_updates() {
+    use crate::security::AutonomyLevel;
+
+    let dir = tempfile::tempdir().unwrap();
+    let mut config = persisted_tier_config(dir.path(), true, AutonomyLevel::Full);
+    save_tier_config(&config).await;
+    let ctx = live_tier_context(&config);
+    let mut baseline = SecurityPolicy::from_config(
+        &config.autonomy,
+        &config.workspace_dir,
+        &config.action_dir,
+    );
+    baseline.trusted_roots.push(crate::security::TrustedRoot {
+        path: dir.path().join("trusted").display().to_string(),
+        access: crate::security::TrustedAccess::ReadWrite,
+    });
+    baseline.tracker.record();
+    let fresh = current_tier_policy(&ctx, &config, &baseline).await.unwrap();
+    assert_eq!(fresh.workspace_dir, baseline.workspace_dir);
+    assert_eq!(fresh.action_dir, baseline.action_dir);
+    assert_eq!(fresh.trusted_roots, baseline.trusted_roots);
+    assert_eq!(fresh.tracker.count(), baseline.tracker.count());
+
+    assert_eq!(
+        enforce_current_node_tier_gate(&ctx, &config, &baseline, CommandClass::Write, "code")
+            .await
+            .unwrap(),
+        GateDecision::Allow
+    );
+    config.autonomy.level = AutonomyLevel::ReadOnly;
+    save_tier_config(&config).await;
+    assert!(enforce_current_node_tier_gate(
+        &ctx,
+        &config,
+        &baseline,
+        CommandClass::Write,
+        "code"
+    )
+    .await
+    .is_err());
+
+    config.autonomy.level = AutonomyLevel::Full;
+    save_tier_config(&config).await;
+    assert_eq!(
+        enforce_current_node_tier_gate(&ctx, &config, &baseline, CommandClass::Write, "code")
+            .await
+            .unwrap(),
+        GateDecision::Allow,
+        "a config-derived tier must be allowed to upgrade again"
+    );
+}
+
+#[tokio::test]
+async fn live_tier_reload_failure_fails_closed() {
+    use crate::security::AutonomyLevel;
+
+    let dir = tempfile::tempdir().unwrap();
+    let mut config = persisted_tier_config(dir.path(), true, AutonomyLevel::Full);
+    std::fs::create_dir_all(&config.config_path).unwrap();
+    let ctx = live_tier_context(&config);
+    let baseline = SecurityPolicy::from_config(
+        &config.autonomy,
+        &config.workspace_dir,
+        &config.action_dir,
+    );
+    let error = enforce_current_node_tier_gate(
+        &ctx,
+        &config,
+        &baseline,
+        CommandClass::Write,
+        "code",
+    )
+    .await
+    .expect_err("a directory at config_path must not fall back to captured Full");
+    assert!(matches!(
+        error,
+        EngineError::Capability(ref message) if message.contains(POLICY_BLOCKED_MARKER)
+    ));
+}
+
+#[tokio::test]
+async fn captured_agent_tier_and_host_ceiling_are_not_replaced_by_parent_file() {
+    use crate::security::AutonomyLevel;
+
+    let dir = tempfile::tempdir().unwrap();
+    let mut parent_file = persisted_tier_config(dir.path(), true, AutonomyLevel::Full);
+    save_tier_config(&parent_file).await;
+    let mut captured = parent_file.clone();
+    captured.autonomy.level = AutonomyLevel::ReadOnly;
+    let parent = crate::core::runtime::CoreContext::for_test(
+        crate::core::runtime::DomainSet::full(),
+        Some(captured.workspace_dir.clone()),
+    );
+    let mut captured_overlay = crate::core::runtime::ContextOverlay::new(
+        captured.clone(),
+        crate::core::runtime::DomainSet::full(),
+        crate::tools::toolpacks::ToolGroups::default(),
+    );
+    captured_overlay.autonomy_tier_source =
+        Some(crate::core::runtime::AutonomyTierSource::Captured);
+    let captured_ctx = crate::core::runtime::DispatchCtx::new(
+        parent.derive_with(captured_overlay),
+    );
+    let captured_policy = SecurityPolicy::from_config(
+        &captured.autonomy,
+        &captured.workspace_dir,
+        &captured.action_dir,
+    );
+    assert!(enforce_current_node_tier_gate(
+        &captured_ctx,
+        &captured,
+        &captured_policy,
+        CommandClass::Write,
+        "code"
+    )
+    .await
+    .is_err());
+
+    // A fixed ceiling contributes independently of a disabled file tier.
+    parent_file.autonomy.enabled = false;
+    parent_file.autonomy.level = AutonomyLevel::ReadOnly;
+    let mut capped_overlay = crate::core::runtime::ContextOverlay::new(
+        captured.clone(),
+        crate::core::runtime::DomainSet::full(),
+        crate::tools::toolpacks::ToolGroups::default(),
+    );
+    capped_overlay.autonomy_tier_ceiling = Some(AutonomyLevel::Supervised);
+    let capped_ctx =
+        crate::core::runtime::DispatchCtx::new(parent.derive_with(capped_overlay.clone()));
+    let baseline = SecurityPolicy::from_config(
+        &captured.autonomy,
+        &captured.workspace_dir,
+        &captured.action_dir,
+    );
+    let effective = tier_policy_from_config(&capped_ctx, &captured, Some(&parent_file), &baseline)
+        .unwrap();
+    assert_eq!(effective.autonomy, AutonomyLevel::Supervised);
+    assert_eq!(
+        effective.gate_decision(CommandClass::Write),
+        GateDecision::Prompt
+    );
+
+    capped_overlay.autonomy_tier_ceiling = Some(AutonomyLevel::Full);
+    let full_ceiling_ctx =
+        crate::core::runtime::DispatchCtx::new(parent.derive_with(capped_overlay));
+    let disabled_full_ceiling = tier_policy_from_config(
+        &full_ceiling_ctx,
+        &captured,
+        Some(&parent_file),
+        &baseline,
+    )
+    .unwrap();
+    assert_eq!(disabled_full_ceiling.autonomy, AutonomyLevel::Full);
+    assert_eq!(
+        disabled_full_ceiling.gate_decision(CommandClass::Write),
+        GateDecision::Allow,
+        "a disabled file tier must not contribute its stale ReadOnly level"
+    );
+
+    parent_file.autonomy.level = AutonomyLevel::Full;
+    let mut host_only_overlay = crate::core::runtime::ContextOverlay::new(
+        captured.clone(),
+        crate::core::runtime::DomainSet::full(),
+        crate::tools::toolpacks::ToolGroups::default(),
+    );
+    host_only_overlay.autonomy_tier_ceiling = Some(AutonomyLevel::ReadOnly);
+    let host_only_ctx =
+        crate::core::runtime::DispatchCtx::new(parent.derive_with(host_only_overlay));
+    let host_only = tier_policy_from_config(
+        &host_only_ctx,
+        &captured,
+        Some(&parent_file),
+        &baseline,
+    )
+    .unwrap();
+    assert_eq!(host_only.autonomy, AutonomyLevel::ReadOnly);
+    assert_eq!(
+        host_only.gate_decision(CommandClass::Write),
+        GateDecision::Block
+    );
+}
+
 /// The tier gate an `http_request` (Network-class) node calls: BLOCKED under
 /// a read-only tier, and passed through (to the ApprovalGate) under
 /// supervised/full.
