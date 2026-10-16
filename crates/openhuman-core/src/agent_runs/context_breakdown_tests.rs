@@ -84,6 +84,25 @@ fn config_fingerprint_is_stable_for_identical_config() {
     assert_eq!(config_fingerprint(&a), config_fingerprint(&b));
 }
 
+#[test]
+fn report_cache_key_isolated_by_tenant_even_for_identical_config() {
+    let config = Config::default();
+    let alice = crate::core::runtime::Tenant {
+        profile: Some("alice".into()),
+        agent: None,
+    };
+    let bob = crate::core::runtime::Tenant {
+        profile: Some("bob".into()),
+        agent: None,
+    };
+
+    assert_eq!(config_fingerprint(&config), config_fingerprint(&config));
+    assert_ne!(
+        report_cache_key(alice, "orchestrator", &config),
+        report_cache_key(bob, "orchestrator", &config),
+    );
+}
+
 #[tokio::test]
 async fn history_section_is_none_for_an_unknown_thread() {
     // No transcripts exist for this id, so `token_usage` should report
