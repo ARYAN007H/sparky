@@ -132,7 +132,7 @@ async fn concurrent_operations_complete_without_stalling_the_single_async_worker
     // genuinely blocking wait — the same shape as `parking_lot::Mutex::lock`.
     let probe_entered = Arc::new(AtomicBool::new(false));
     let (release, held) = std::sync::mpsc::channel::<()>();
-    let probe = tokio::spawn(run("blocked_probe", {
+    let probe = tokio::spawn(run(crate::core::runtime::DispatchCtx::ambient(), "blocked_probe", {
         let probe_entered = Arc::clone(&probe_entered);
         move || {
             probe_entered.store(true, Ordering::SeqCst);
