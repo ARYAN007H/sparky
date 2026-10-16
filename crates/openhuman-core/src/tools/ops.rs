@@ -400,6 +400,27 @@ pub fn all_tools_with_runtime(
 
     tools.extend(crate::search::build_search_tools(root_config));
 
+    // What every registered tool source can see (`tools::sources`).
+    let source_ctx = crate::tools::sources::ToolSourceCtx {
+        config: &config,
+        root_config,
+        security,
+        runtime: &runtime,
+        audit: &audit,
+        browser_config,
+        http_config,
+        action_dir,
+        agents,
+        approval_workspace_root,
+    };
+
+    // Sources placed after the search tools (a host's media and file-storage
+    // tools), where the catalogue has always listed them.
+    tools.extend(crate::tools::sources::build_registered_tool_sources(
+        &source_ctx,
+        Some(crate::tools::sources::ANCHOR_AFTER_SEARCH),
+    ));
+
     // Media generation roots. The `media_generate_*` tools themselves come from
     // a host's registered tool source (the core ships no media generators);
     // this records the files roots their reference policy reads. Gated by the
@@ -466,6 +487,13 @@ pub fn all_tools_with_runtime(
             },
         )));
     }
+
+    // Sources placed after the delegation tool (a host's place and market-data
+    // tools), ahead of the Composio tools.
+    tools.extend(crate::tools::sources::build_registered_tool_sources(
+        &source_ctx,
+        Some(crate::tools::sources::ANCHOR_AFTER_DELEGATE),
+    ));
 
     let composio_tools = crate::integrations::composio::all_composio_agent_tools(root_config);
     if composio_tools.is_empty() {

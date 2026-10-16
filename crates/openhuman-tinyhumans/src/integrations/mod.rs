@@ -26,25 +26,32 @@ pub use types::{
     BackendResponse, IntegrationPricing, IntegrationPricingEntry, PricingIntegrations,
 };
 
-use openhuman_embed::__host::tool_sources::register_tool_source;
+use openhuman_embed::__host::tool_sources::{
+    register_tool_source_at, ToolSourcePlacement, ANCHOR_AFTER_DELEGATE, ANCHOR_AFTER_SEARCH,
+};
 
 use crate::install::InstallOptions;
 
 /// Registers this area's hooks with the core. Idempotent.
 ///
 /// The tool sources register in the order the core used to build them inline
-/// (media, file storage, then the Google Places / stock tools), but they now
-/// follow every built-in tool in the catalogue instead of sitting between the
-/// search and hosting tools.
+/// (media, file storage, then the Google Places / stock tools) and at the
+/// anchors it built them at: media and file storage right after the search
+/// tools, the Google Places / stock tools right after the delegation tool, so
+/// the catalogue order (a prompt-cache layout input) is unchanged.
 pub(crate) fn register(_options: &InstallOptions) {
     #[cfg(feature = "media")]
     media::register();
-    register_tool_source(FILE_STORAGE_SOURCE_ID, |ctx| {
-        file_storage::build_file_storage_tools(ctx.root_config, ctx.action_dir)
-    });
-    register_tool_source(INTEGRATION_TOOLS_SOURCE_ID, |ctx| {
-        tools::build_integration_tools(ctx.root_config)
-    });
+    register_tool_source_at(
+        FILE_STORAGE_SOURCE_ID,
+        ToolSourcePlacement::After(ANCHOR_AFTER_SEARCH),
+        |ctx| file_storage::build_file_storage_tools(ctx.root_config, ctx.action_dir),
+    );
+    register_tool_source_at(
+        INTEGRATION_TOOLS_SOURCE_ID,
+        ToolSourcePlacement::After(ANCHOR_AFTER_DELEGATE),
+        |ctx| tools::build_integration_tools(ctx.root_config),
+    );
     #[cfg(feature = "web3")]
     web3::register();
     composio::register();

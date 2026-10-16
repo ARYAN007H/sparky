@@ -291,8 +291,9 @@ pub mod util {
 /// Tool sources: tools an outside crate appends to the agent catalogue.
 pub mod tool_sources {
     pub use openhuman_core::tools::sources::{
-        register_tool_source, register_tool_source_in, unregister_tool_source, ToolSourceCtx,
-        ToolSourceFactory,
+        register_tool_source, register_tool_source_at, register_tool_source_in,
+        unregister_tool_source, ToolSourceCtx, ToolSourceFactory, ToolSourcePlacement,
+        ANCHOR_AFTER_DELEGATE, ANCHOR_AFTER_SEARCH,
     };
 }
 
