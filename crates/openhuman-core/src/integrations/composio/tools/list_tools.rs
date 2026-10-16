@@ -9,8 +9,12 @@ use serde_json::Value;
 
 use super::live_config::live_composio_config;
 use super::redact::redact_composio_outcome;
+use crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool;
 use crate::config::Config;
-use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolCategory, ToolResult};
+use crate::core::runtime::DispatchCtx;
+use tinytools::{
+    PermissionLevel, Tool, ToolCallOptions, ToolCategory, ToolResult, ToolRunContext,
+};
 
 use super::super::client::{resolve_composio_route, ComposioRoute};
 use super::super::module_client::{self as connectors};
@@ -73,7 +77,9 @@ impl Tool for ComposioListToolsTool {
         args: Value,
         options: ToolCallOptions,
     ) -> anyhow::Result<ToolResult> {
-        self.execute_with_context(args, options, None).await
+        let ctx = dispatch_ctx_for_tool(None);
+        let (config, outcome) = Box::pin(self.execute_unredacted(&ctx, args, options)).await;
+        redact_composio_outcome(&config, outcome)
     }
 
     async fn execute_with_context(
