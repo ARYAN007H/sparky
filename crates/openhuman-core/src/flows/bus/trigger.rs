@@ -9,6 +9,8 @@ use crate::flows::store;
 use async_trait::async_trait;
 use serde_json::Value;
 use std::collections::HashSet;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use tinybus::EventHandler;
 use tinyflows::model::TriggerKind;
@@ -85,14 +87,85 @@ pub struct FlowTriggerSubscriber {
     /// explicitly asking to run a flow again (e.g. while a scheduled run is
     /// still in flight) is fine.
     in_flight: Arc<Mutex<HashSet<String>>>,
+    runner: Arc<RunExecutor>,
+    queue_capacity: usize,
 }
+
+pub(crate) struct TriggerRunRequest {
+    pub(crate) flow_id: String,
+    pub(crate) input: Value,
+    pub(crate) inputs: serde_json::Map<String, Value>,
+    pub(crate) trigger: tinyflows_catalog::FlowRunTrigger,
+}
+
+type RunFuture = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
+type RunExecutor = dyn Fn(
+        crate::core::runtime::DispatchCtx,
+        Arc<Config>,
+        TriggerRunRequest,
+    ) -> RunFuture
+    + Send
+    + Sync;
+
+const APP_EVENT_QUEUE_CAPACITY: usize = 32;
 
 impl FlowTriggerSubscriber {
     pub fn new(config: Arc<Config>) -> Self {
+        Self::with_executor(config, APP_EVENT_QUEUE_CAPACITY, |ctx, config, request| async move {
+            tracing::info!(target: "flows", flow_id = %request.flow_id, "[flows] trigger fired — starting run");
+            match crate::flows::ops::flows_run(
+                &ctx,
+                &config,
+                &request.flow_id,
+                request.input,
+                request.inputs,
+                request.trigger,
+            )
+            .await
+            {
+                Ok(_) => tracing::info!(target: "flows", flow_id = %request.flow_id, "[flows] trigger-driven run finished"),
+                Err(e) => tracing::warn!(target: "flows", flow_id = %request.flow_id, error = %e, "[flows] trigger-driven run failed"),
+            }
+        })
+    }
+
+    fn with_executor<F, Fut>(config: Arc<Config>, queue_capacity: usize, runner: F) -> Self
+    where
+        F: Fn(
+                crate::core::runtime::DispatchCtx,
+                Arc<Config>,
+                TriggerRunRequest,
+            ) -> Fut
+            + Send
+            + Sync
+            + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        let runner: Arc<RunExecutor> = Arc::new(move |ctx, config, request| {
+            Box::pin(runner(ctx, config, request))
+        });
         Self {
             config,
             in_flight: Arc::new(Mutex::new(HashSet::new())),
+            runner,
+            queue_capacity: queue_capacity.max(1),
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_runner<F, Fut>(config: Arc<Config>, queue_capacity: usize, runner: F) -> Self
+    where
+        F: Fn(
+                crate::core::runtime::DispatchCtx,
+                Arc<Config>,
+                TriggerRunRequest,
+            ) -> Fut
+            + Send
+            + Sync
+            + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        Self::with_executor(config, queue_capacity, runner)
     }
 
     /// Attempts to claim `flow_id` for a trigger-driven dispatch. Returns
@@ -109,6 +182,33 @@ impl FlowTriggerSubscriber {
             set: self.in_flight.clone(),
             flow_id: flow_id.to_string(),
         })
+    }
+
+    async fn dispatch_app_event(
+        &self,
+        ctx: &crate::core::runtime::DispatchCtx,
+        flow_id: String,
+        payload: Value,
+        inputs: serde_json::Map<String, Value>,
+    ) {
+        self.spawn_run(
+            ctx,
+            flow_id,
+            payload,
+            inputs,
+            tinyflows_catalog::FlowRunTrigger::AppEvent,
+        );
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn dispatch_test_app_event(
+        &self,
+        ctx: &crate::core::runtime::DispatchCtx,
+        flow_id: &str,
+        payload: Value,
+    ) {
+        self.dispatch_app_event(ctx, flow_id.to_string(), payload, serde_json::Map::new())
+            .await;
     }
 
     /// The configuration to handle an event under (`super::owner::config_for_scope`).
@@ -194,13 +294,8 @@ impl FlowTriggerSubscriber {
             if matches_app_event(&flow, toolkit, trigger_slug) {
                 matched += 1;
                 let inputs = pinned_trigger_inputs(&flow);
-                self.spawn_run(
-                    &ctx,
-                    flow.id.clone(),
-                    payload.clone(),
-                    inputs,
-                    tinyflows_catalog::FlowRunTrigger::AppEvent,
-                );
+                self.dispatch_app_event(&ctx, flow.id.clone(), payload.clone(), inputs)
+                    .await;
             }
         }
         tracing::debug!(target: "flows", %toolkit, %trigger_slug, matched, "[flows] app_event trigger matching complete");
@@ -229,20 +324,22 @@ impl FlowTriggerSubscriber {
 
         let config = self.config_for_scope(ctx);
         let run_ctx = ctx.clone();
+        let config = self.config_for_scope(ctx);
+        let request = TriggerRunRequest {
+            flow_id: flow_id.clone(),
+            input,
+            inputs,
+            trigger,
+        };
+        let runner = Arc::clone(&self.runner);
         // Scoped: the run keeps the owner's context the handler entered.
         ctx.spawn(async move {
             // Held for the lifetime of the run; released on drop (including
             // on panic) by `InFlightGuard`.
             let _guard = guard;
-            tracing::info!(target: "flows", %flow_id, "[flows] trigger fired — starting run");
-            match crate::flows::ops::flows_run(&run_ctx, &config, &flow_id, input, inputs, trigger).await {
-                Ok(_) => {
-                    tracing::info!(target: "flows", %flow_id, "[flows] trigger-driven run finished")
-                }
-                Err(e) => {
-                    tracing::warn!(target: "flows", %flow_id, error = %e, "[flows] trigger-driven run failed")
-                }
-            }
+            run_ctx
+                .enter((runner)(run_ctx.clone(), config, request))
+                .await;
         });
     }
 }

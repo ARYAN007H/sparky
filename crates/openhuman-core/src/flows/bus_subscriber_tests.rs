@@ -209,13 +209,13 @@ async fn app_event_runs_queue_fifo_per_tenant_while_other_tenants_progress() {
     let started_tx = Arc::new(Mutex::new(Some(started_tx)));
     let (release_first_tx, release_first_rx) = oneshot::channel();
     let release_first_rx = Arc::new(tokio::sync::Mutex::new(Some(release_first_rx)));
-    let runner = Arc::new(move |ctx, flow_id, input, _inputs, _trigger| {
+    let runner = move |ctx, _config, request| {
         let completed_tx = completed_tx.clone();
         let started_tx = Arc::clone(&started_tx);
         let release_first_rx = Arc::clone(&release_first_rx);
-        Box::pin(async move {
+        async move {
             let tenant = ctx.tenant().unwrap();
-            let event = input["event"].as_str().unwrap().to_owned();
+            let event = request.input["event"].as_str().unwrap().to_owned();
             if event == "a1" {
                 if let Some(started_tx) = started_tx.lock().unwrap().take() {
                     let _ = started_tx.send(());
@@ -225,11 +225,11 @@ async fn app_event_runs_queue_fifo_per_tenant_while_other_tenants_progress() {
                 }
             }
             completed_tx
-                .send((tenant.agent.unwrap(), flow_id, event))
+                .send((tenant.agent.unwrap(), request.flow_id, event))
                 .unwrap();
-        })
-    });
-    let subscriber = FlowTriggerSubscriber::with_runner(config, runner, 1);
+        }
+    };
+    let subscriber = FlowTriggerSubscriber::with_runner(config, 1, runner);
     let context = |agent: &str| {
         DispatchCtx::new(
             CoreContext::for_test(DomainSet::full(), None).derive_with(
@@ -252,18 +252,24 @@ async fn app_event_runs_queue_fifo_per_tenant_while_other_tenants_progress() {
         .dispatch_app_event(&tenant_b, "shared-flow", json!({"event": "b1"}))
         .await;
 
+    let receive = async |rx: &mut mpsc::UnboundedReceiver<_>| {
+        tokio::time::timeout(std::time::Duration::from_secs(2), rx.recv())
+            .await
+            .expect("queued trigger did not finish within the hang guard")
+            .unwrap()
+    };
     assert_eq!(
-        completed_rx.recv().await.unwrap(),
+        receive(&mut completed_rx).await,
         ("tenant-b".to_string(), "shared-flow".to_string(), "b1".to_string()),
         "a held run for one tenant must not block the same flow id for another tenant"
     );
     release_first_tx.send(()).unwrap();
     assert_eq!(
-        completed_rx.recv().await.unwrap(),
+        receive(&mut completed_rx).await,
         ("tenant-a".to_string(), "shared-flow".to_string(), "a1".to_string())
     );
     assert_eq!(
-        completed_rx.recv().await.unwrap(),
+        receive(&mut completed_rx).await,
         ("tenant-a".to_string(), "shared-flow".to_string(), "a2".to_string()),
         "app_event payloads for one tenant and flow must execute FIFO"
     );
