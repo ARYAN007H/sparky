@@ -8,6 +8,8 @@ use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde_json::json;
 
+use crate::core_host::core::runtime::DispatchCtx;
+
 /// Query parameters for the dictation WebSocket endpoint.
 ///
 /// Browser `WebSocket` cannot attach an `Authorization` header on upgrade, so
