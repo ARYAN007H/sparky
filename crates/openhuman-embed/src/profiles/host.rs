@@ -12,7 +12,7 @@ use std::sync::Arc;
 pub(super) struct ProfileHostOptions {
     tools: Option<HostTools>,
     scope: Option<ToolScopeSpec>,
-    permission: Option<Arc<dyn ToolHook>>,
+    permission: Option<Arc<dyn ToolHook<OpenHumanRunContext>>>,
     channels: HashMap<String, PermissionLevel>,
     memory: Option<Arc<dyn tinymemory_api::MemoryEngine>>,
     system_prompt: Option<String>,

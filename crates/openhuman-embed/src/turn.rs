@@ -150,7 +150,7 @@ impl Turn {
 
     /// Add a tool callback for this turn only, after runtime and agent hooks.
     /// Does not change the agent or any other concurrent turn.
-    pub fn tool_hook(mut self, hook: Arc<dyn crate::seams::ToolHook>) -> Self {
+    pub fn tool_hook(mut self, hook: Arc<dyn crate::seams::ToolHook<crate::seams::OpenHumanRunContext>>) -> Self {
         self.hooks.push_tool(hook);
         self
     }
@@ -210,7 +210,7 @@ impl Turn {
 
     /// Add a completed-turn callback for this turn only. The callback runs
     /// asynchronously with an owned snapshot after the turn completes.
-    pub fn post_turn_hook(mut self, hook: Arc<dyn crate::seams::PostTurnHook>) -> Self {
+    pub fn post_turn_hook(mut self, hook: Arc<dyn crate::seams::LearningSink>) -> Self {
         self.hooks.push_learning(hook);
         self
     }

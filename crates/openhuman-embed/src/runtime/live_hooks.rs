@@ -1,11 +1,11 @@
 //! Tracked runtime hooks, composed with agent-local hooks.
 use super::Runtime;
-use crate::seams::{PostTurnHook, ToolHook, ToolHookContext, ToolHookDecision, TurnContext};
+use crate::seams::{LearningSink, ToolHook, ToolHookContext, ToolHookDecision, TurnContext};
 use std::sync::Arc;
 
-pub(super) struct NamedPostTurnHook(pub String, pub Arc<dyn PostTurnHook>);
+pub(super) struct NamedPostTurnHook(pub String, pub Arc<dyn LearningSink>);
 #[async_trait::async_trait]
-impl PostTurnHook for NamedPostTurnHook {
+impl LearningSink for NamedPostTurnHook {
     fn name(&self) -> &str {
         &self.0
     }
@@ -13,9 +13,9 @@ impl PostTurnHook for NamedPostTurnHook {
         self.1.on_turn_complete(context).await
     }
 }
-pub(super) struct NamedToolHook(pub String, pub Arc<dyn ToolHook>);
+pub(super) struct NamedToolHook(pub String, pub Arc<dyn ToolHook<OpenHumanRunContext>>);
 #[async_trait::async_trait]
-impl ToolHook for NamedToolHook {
+impl ToolHook<OpenHumanRunContext> for NamedToolHook {
     fn name(&self) -> &str {
         &self.0
     }
@@ -43,7 +43,7 @@ impl Runtime {
     /// Add, replace, or remove a runtime-wide post-turn hook by name.
     /// This also replaces hooks installed by the builder. Changes apply to
     /// subsequently assembled turns; removal restores any predecessor hook.
-    pub fn post_turn_hook(&self, name: &str, hook: Option<Arc<dyn crate::seams::PostTurnHook>>) {
+    pub fn post_turn_hook(&self, name: &str, hook: Option<Arc<dyn crate::seams::LearningSink>>) {
         let context = self.core_runtime().context().clone();
         openhuman_core::core::runtime::CoreContext::sync_scope(context.clone(), || {
             let mut seams = self
@@ -61,7 +61,7 @@ impl Runtime {
     /// Add, replace, or remove a runtime-wide tool hook by name.
     /// This also replaces hooks installed by the builder. Changes apply to
     /// subsequently assembled turns; removal restores any predecessor hook.
-    pub fn tool_hook(&self, name: &str, hook: Option<Arc<dyn crate::seams::ToolHook>>) {
+    pub fn tool_hook(&self, name: &str, hook: Option<Arc<dyn crate::seams::ToolHook<crate::seams::OpenHumanRunContext>>>) {
         let context = self.core_runtime().context().clone();
         openhuman_core::core::runtime::CoreContext::sync_scope(context.clone(), || {
             let mut seams = self

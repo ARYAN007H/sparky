@@ -2,7 +2,7 @@
 mod common;
 use async_trait::async_trait;
 use openhuman_embed::providers::{ChatModel, ModelRequest, ModelResponse};
-use openhuman_embed::seams::{PostTurnHook, TurnContext};
+use openhuman_embed::seams::{LearningSink, TurnContext};
 use openhuman_embed::{
     Access, AgentDefinitionSpec, AgentSpec, InMemorySessionStores, ModelDefaults, Provider,
     Runtime, RuntimeEventKind, SessionStoreProvider, StreamEvent,
@@ -29,7 +29,7 @@ struct Hook {
     seen: tokio::sync::mpsc::UnboundedSender<String>,
 }
 #[async_trait]
-impl PostTurnHook for Hook {
+impl LearningSink for Hook {
     fn name(&self) -> &str {
         self.name
     }

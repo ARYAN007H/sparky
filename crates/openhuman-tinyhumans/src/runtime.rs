@@ -25,7 +25,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use openhuman_embed::seams::{
-    ControllerExtension, PostTurnHook, SecurityPolicy, ServerLauncher, ToolHook,
+    ControllerExtension, LearningSink, SecurityPolicy, ServerLauncher, ToolHook,
 };
 use tinytools::ToolRanker;
 
@@ -197,7 +197,7 @@ impl RuntimeBuilder {
     );
     forward!(
         /// See [`openhuman_embed::RuntimeBuilder::post_turn_hook`].
-        post_turn_hook(hook: Arc<dyn PostTurnHook>)
+        post_turn_hook(hook: Arc<dyn LearningSink>)
     );
     forward!(
         /// See [`openhuman_embed::RuntimeBuilder::tool_hook`].

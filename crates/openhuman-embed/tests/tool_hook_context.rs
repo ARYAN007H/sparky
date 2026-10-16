@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 
 struct Capture(Arc<Mutex<Vec<Value>>>);
 #[async_trait::async_trait]
-impl ToolHook for Capture {
+impl ToolHook<OpenHumanRunContext> for Capture {
     fn name(&self) -> &str {
         "context-probe"
     }

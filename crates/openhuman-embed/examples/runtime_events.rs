@@ -72,7 +72,7 @@ async fn run() -> anyhow::Result<()> {
 }
 struct Counter(Arc<AtomicUsize>);
 #[async_trait::async_trait]
-impl openhuman_embed::seams::PostTurnHook for Counter {
+impl openhuman_embed::seams::LearningSink for Counter {
     fn name(&self) -> &str {
         "live-counter"
     }

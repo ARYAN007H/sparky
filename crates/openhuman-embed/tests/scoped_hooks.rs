@@ -9,7 +9,7 @@ use common::{
     chat_completion, eventually, offline_config, route, runtime, scripted_provider, stub_backend,
     tool_call_completion,
 };
-use openhuman_embed::seams::{PostTurnHook, ToolHook, ToolHookContext, TurnContext};
+use openhuman_embed::seams::{LearningSink, ToolHook, ToolHookContext, TurnContext};
 use openhuman_embed::{
     AgentDefinitionSpec, AgentSpec, HostTurnTools, Runtime, Tool, ToolScopeSpec, Workspace,
 };
@@ -44,7 +44,7 @@ impl Observer {
 }
 
 #[async_trait::async_trait]
-impl ToolHook for Observer {
+impl ToolHook<OpenHumanRunContext> for Observer {
     fn name(&self) -> &str {
         "same-policy-name"
     }
@@ -65,7 +65,7 @@ impl ToolHook for Observer {
 }
 
 #[async_trait::async_trait]
-impl PostTurnHook for Observer {
+impl LearningSink for Observer {
     fn name(&self) -> &str {
         "same-policy-name"
     }

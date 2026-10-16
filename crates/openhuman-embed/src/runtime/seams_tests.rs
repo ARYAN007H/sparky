@@ -28,7 +28,7 @@ impl ToolRanker for NamedRanker {
 struct NamedPostTurn(&'static str);
 
 #[async_trait::async_trait]
-impl PostTurnHook for NamedPostTurn {
+impl LearningSink for NamedPostTurn {
     fn name(&self) -> &str {
         self.0
     }
@@ -42,7 +42,7 @@ struct NamedToolHook(&'static str);
 #[test]
 fn live_replacement_and_removal_update_builder_hooks_and_restore_predecessors() {
     let name = "seams-live-builder-hook";
-    let original: Arc<dyn PostTurnHook> = Arc::new(NamedPostTurn(name));
+    let original: Arc<dyn LearningSink> = Arc::new(NamedPostTurn(name));
     replace_embedder_post_turn_hook(name, Some(original.clone()));
     let mut seams = HostSeams {
         post_turn_hooks: vec![Arc::new(NamedPostTurn(name))],
@@ -91,7 +91,7 @@ fn live_replacement_and_removal_update_builder_hooks_and_restore_predecessors() 
 }
 
 #[async_trait::async_trait]
-impl ToolHook for NamedToolHook {
+impl ToolHook<OpenHumanRunContext> for NamedToolHook {
     fn name(&self) -> &str {
         self.0
     }
@@ -214,7 +214,7 @@ fn post_turn_hooks_are_removed_and_a_replaced_one_restored() {
 
 #[test]
 fn same_named_hooks_unwind_newest_first() {
-    let original: Arc<dyn PostTurnHook> = Arc::new(NamedPostTurn("seams-dup-hook"));
+    let original: Arc<dyn LearningSink> = Arc::new(NamedPostTurn("seams-dup-hook"));
     replace_embedder_post_turn_hook("seams-dup-hook", Some(Arc::clone(&original)));
     let seams = HostSeams {
         post_turn_hooks: vec![
@@ -247,7 +247,7 @@ fn a_hook_replaced_after_build_is_left_alone() {
     }
     .install()
     .expect("install");
-    let later: Arc<dyn ToolHook> = Arc::new(NamedToolHook("seams-late-hook"));
+    let later: Arc<dyn ToolHook<OpenHumanRunContext>> = Arc::new(NamedToolHook("seams-late-hook"));
     replace_embedder_tool_hook("seams-late-hook", Some(Arc::clone(&later)));
 
     drop(seams);

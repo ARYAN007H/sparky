@@ -13,7 +13,7 @@ use std::sync::Arc;
 use common::{offline_config, runtime, stub_backend};
 use openhuman_core::core::all::{ControllerFuture, RegisteredController};
 use openhuman_core::core::ControllerSchema;
-use openhuman_embed::seams::{ControllerExtension, DomainGroup, PostTurnHook, SecurityPolicy};
+use openhuman_embed::seams::{ControllerExtension, DomainGroup, LearningSink, SecurityPolicy};
 use openhuman_embed::{schema_for_rpc_method, Runtime, Workspace};
 use serde_json::{json, Map, Value};
 
@@ -44,7 +44,7 @@ fn extension() -> ControllerExtension {
 struct ProbeHook;
 
 #[async_trait::async_trait]
-impl PostTurnHook for ProbeHook {
+impl LearningSink for ProbeHook {
     fn name(&self) -> &str {
         "embed-seam-runtime-hook"
     }

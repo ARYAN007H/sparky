@@ -305,12 +305,12 @@ impl Agent {
     }
 
     /// Add, replace, or remove an agent-local post-turn hook by name.
-    pub fn post_turn_hook(&self, name: &str, hook: Option<Arc<dyn crate::seams::PostTurnHook>>) {
+    pub fn post_turn_hook(&self, name: &str, hook: Option<Arc<dyn crate::seams::LearningSink>>) {
         self.inner.overrides.post_turn_hook(name, hook);
     }
 
     /// Add, replace, or remove an agent-local tool hook by name.
-    pub fn tool_hook(&self, name: &str, hook: Option<Arc<dyn crate::seams::ToolHook>>) {
+    pub fn tool_hook(&self, name: &str, hook: Option<Arc<dyn crate::seams::ToolHook<crate::seams::OpenHumanRunContext>>>) {
         self.inner.overrides.tool_hook(name, hook);
     }
 
