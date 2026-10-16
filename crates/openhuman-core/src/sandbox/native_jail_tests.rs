@@ -159,7 +159,8 @@ fn folder_confinement_denies_the_credential_stores_that_exist() {
         crate::security::policy::home_credential_stores(home.path()),
         root.path(),
         &[],
-    );
+    )
+    .unwrap();
 
     // Absent stores (`.gnupg`, `.kube`, `.npmrc`, ...) are not sent.
     assert_eq!(
@@ -175,22 +176,53 @@ fn folder_confinement_denies_the_credential_stores_that_exist() {
 }
 
 #[test]
-fn a_store_holding_the_root_or_a_writable_grant_is_not_denied() {
-    let home = home_with(&[
-        ".ssh/",
-        ".aws/project/",
-        ".kube/",
-        ".cargo/credentials.toml",
-    ]);
+fn a_workspace_inside_a_credential_store_is_refused() {
+    let home = home_with(&[".ssh/", ".aws/project/"]);
 
-    // TinyBox refuses a denial over the root or a writable grant, so those
-    // stores are dropped. A store inside a writable grant is still denied:
-    // Seatbelt carves it out of the grant.
-    let denied = credential_denials(
+    // Denying `~/.aws` would take the workspace away, and skipping it would
+    // leave `~/.aws/credentials` readable, so the jail is refused.
+    let err = credential_denials(
         crate::security::policy::home_credential_stores(home.path()),
         &home.path().join(".aws/project"),
-        &[home.path().join(".kube"), home.path().join(".cargo")],
-    );
+        &[],
+    )
+    .unwrap_err()
+    .to_string();
+
+    assert!(err.contains("`.aws`"), "{err}");
+    // The error names the store, never the user's path to it.
+    assert!(!err.contains(home.path().to_str().unwrap()), "{err}");
+}
+
+#[test]
+fn a_writable_grant_inside_a_credential_store_is_refused() {
+    let home = home_with(&[".kube/"]);
+    let root = tempfile::tempdir().unwrap();
+
+    let err = credential_denials(
+        crate::security::policy::home_credential_stores(home.path()),
+        root.path(),
+        &[home.path().join(".kube")],
+    )
+    .unwrap_err()
+    .to_string();
+
+    assert!(err.contains("`.kube`"), "{err}");
+}
+
+#[test]
+fn a_store_inside_a_writable_grant_is_still_denied() {
+    let home = home_with(&[".ssh/", ".cargo/credentials.toml"]);
+    let root = tempfile::tempdir().unwrap();
+
+    // Seatbelt carves the store out of the grant; a store that holds nothing
+    // of the jail's is denied as usual.
+    let denied = credential_denials(
+        crate::security::policy::home_credential_stores(home.path()),
+        root.path(),
+        &[home.path().join(".cargo")],
+    )
+    .unwrap();
 
     assert_eq!(
         denied,
@@ -201,7 +233,9 @@ fn a_store_holding_the_root_or_a_writable_grant_is_not_denied() {
 #[test]
 fn nothing_to_deny_means_no_credential_denials() {
     let root = tempfile::tempdir().unwrap();
-    assert!(credential_denials(Vec::new(), root.path(), &[]).is_empty());
+    assert!(credential_denials(Vec::new(), root.path(), &[])
+        .unwrap()
+        .is_empty());
 }
 
 #[test]
@@ -231,7 +265,8 @@ fn openhumans_own_credential_files_are_denied_when_present() {
         crate::security::credentials::credential_files(&config),
         root.path(),
         &[scratch.clone()],
-    );
+    )
+    .unwrap();
 
     let mut expected: Vec<String> = files
         .iter()
@@ -253,7 +288,8 @@ fn openhumans_own_credential_files_are_denied_when_present() {
         crate::security::credentials::credential_files(&config),
         root.path(),
         &[],
-    );
+    )
+    .unwrap();
     assert_eq!(denied.len(), 3);
     assert!(!denied
         .iter()

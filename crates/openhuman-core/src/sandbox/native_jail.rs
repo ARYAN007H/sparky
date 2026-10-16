@@ -253,40 +253,54 @@ fn jail_request(
                 .into_iter()
                 .chain(crate::security::credentials::credential_files(config))
                 .collect();
-            credential_denials(stores, &policy.workspace_root, &policy.read_write_mounts)
+            credential_denials(stores, &policy.workspace_root, &policy.read_write_mounts)?
         },
     })
 }
 
 /// The credential `stores` a folder-confined jail must not read, as existing
-/// canonical paths (TinyBox drops absent ones anyway). A store that holds the
-/// jail root or a writable grant is left out, because TinyBox refuses a denial
-/// that would take the command's workspace away.
+/// canonical paths (TinyBox drops absent ones anyway).
+///
+/// # Errors
+///
+/// Refuses the jail when its root or a writable grant sits inside a store:
+/// TinyBox cannot deny a store that holds the command's workspace, and running
+/// without that denial would leave the rest of the store readable. A store
+/// inside a grant is fine; Seatbelt carves it out.
 #[cfg(any(feature = "modules", test))]
 fn credential_denials(
     stores: Vec<std::path::PathBuf>,
     root: &Path,
     read_write: &[std::path::PathBuf],
-) -> Vec<String> {
+) -> anyhow::Result<Vec<String>> {
     let granted: Vec<std::path::PathBuf> = std::iter::once(root)
         .chain(read_write.iter().map(std::path::PathBuf::as_path))
         .filter_map(|path| path.canonicalize().ok())
         .collect();
-    stores
-        .into_iter()
-        .filter_map(|store| {
-            let real = store.canonicalize().ok()?;
-            if granted.iter().any(|path| path.starts_with(&real)) {
-                // The store's name only: the full path carries the user's login.
-                tracing::warn!(
-                    store = ?store.file_name(),
-                    "[sandbox:local] not denying reads of a credential store that holds the workspace or a writable grant"
-                );
-                return None;
-            }
-            real.to_str().map(str::to_owned)
-        })
-        .collect()
+    let mut denied = Vec::new();
+    for store in stores {
+        let Ok(real) = store.canonicalize() else {
+            continue;
+        };
+        if granted.iter().any(|path| path.starts_with(&real)) {
+            // The store's name only: the full path carries the user's login.
+            let name = store
+                .file_name()
+                .map_or_else(String::new, |name| name.to_string_lossy().into_owned());
+            tracing::warn!(
+                store = %name,
+                "[sandbox:local] refusing the folder-confined jail: its workspace or a writable grant is inside a credential store"
+            );
+            anyhow::bail!(
+                "the sandbox workspace or a writable folder is inside the credential store `{name}`; \
+                 choose a working folder outside it"
+            );
+        }
+        if let Some(real) = real.to_str() {
+            denied.push(real.to_owned());
+        }
+    }
+    Ok(denied)
 }
 
 #[cfg(feature = "modules")]

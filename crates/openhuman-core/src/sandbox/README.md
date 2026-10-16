@@ -111,10 +111,13 @@ their stores write): the keyring's `secrets.enc`, `auth-profiles.json`,
 OpenHuman state folder stays readable for now, because TinyBox keeps the jail's
 scratch directory (its `TMPDIR`) under `<state_dir>/artifacts/sandbox-scratch`,
 and a denial is the profile's last rule, overriding that write grant. Only
-stores that exist are sent. A store that holds the workspace root or a read-write grant is left out
-with a warning, because TinyBox refuses a denial that would take the command's
-workspace away; a store inside a grant is still denied. Other files the user
-can read stay readable. `isolated` (Landlock) sends none: it already denies
+stores that exist are sent. When the workspace root or a read-write grant sits
+inside a store (an action dir of `~/.aws/project`), the folder-confined jail is
+refused with an error naming the store: TinyBox cannot deny a store that holds
+the command's workspace, and running without the denial would leave the rest of
+the store readable. A store inside a grant is still denied. Credential files
+outside these home locations, such as a project's own `.npmrc`, are not covered
+yet; that needs pattern denials in TinyBox. Other files the user can read stay readable. `isolated` (Landlock) sends none: it already denies
 every path it is not granted.
 
 TinyBox owns the jail provider, child process, pipe capture,
