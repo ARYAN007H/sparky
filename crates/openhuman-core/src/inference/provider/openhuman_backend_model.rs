@@ -68,17 +68,6 @@ pub const REASONING_OFF_METADATA_KEY: &str = "openhuman_reasoning_off";
 
 /// Mark `request` as not needing the model to reason first. Provider-neutral:
 /// `ModelRequest.metadata` never reaches the wire, so a BYOK or local provider
-/// ignores it. The managed backend model turns it into `reasoning: { enabled:
-/// false }` ([`apply_reasoning_hint`]), which the backend forwards to OpenRouter
-/// only. For short structured helper calls (follow-up suggestions) reasoning
-/// adds seconds and more tokens than the answer itself, for no quality gain.
-pub(crate) fn without_reasoning(mut request: ModelRequest) -> ModelRequest {
-    if !request.metadata.is_object() {
-        request.metadata = Value::Object(serde_json::Map::new());
-    }
-
-/// Mark `request` as not needing the model to reason first. Provider-neutral:
-/// `ModelRequest.metadata` never reaches the wire, so a BYOK or local provider
 /// ignores it. The managed provider turns it into `reasoning: { enabled:
 /// false }`, which the backend forwards to OpenRouter only. For short structured
 /// helper calls (follow-up suggestions) reasoning adds seconds and more tokens
