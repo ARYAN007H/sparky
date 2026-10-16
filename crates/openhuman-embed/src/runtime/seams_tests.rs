@@ -30,7 +30,10 @@ struct NamedPostTurn(&'static str);
 
 #[async_trait::async_trait]
 impl LearningSink for NamedPostTurn {
-    async fn on_turn_complete(&self, _ctx: &TurnSummary) -> anyhow::Result<()> {
+    async fn on_turn_complete(
+        &self,
+        _ctx: &TurnSummary,
+    ) -> Result<(), tinyagents_session::TinyAgentsError> {
         Ok(())
     }
 }
@@ -63,17 +66,13 @@ fn live_replacement_and_removal_update_builder_hooks_and_restore_predecessors() 
         "seams-live-tool",
         Some(Arc::new(NamedToolHook("different-tool-name"))),
     );
-    assert!(
-        embedder_tool_hooks()
-            .iter()
-            .any(|hook| hook.name() == "seams-live-tool")
-    );
+    assert!(embedder_tool_hooks()
+        .iter()
+        .any(|hook| hook.name() == "seams-live-tool"));
     seams.tool_hook("seams-live-tool", None);
-    assert!(
-        !embedder_tool_hooks()
-            .iter()
-            .any(|hook| hook.name() == "seams-live-tool")
-    );
+    assert!(!embedder_tool_hooks()
+        .iter()
+        .any(|hook| hook.name() == "seams-live-tool"));
     drop(seams);
     assert!(Arc::ptr_eq(
         &embedder_post_turn_hook_named(name).unwrap(),

@@ -98,15 +98,10 @@ async fn user_append_stages_original_strips_upload_bytes_and_reuses_returned_con
         .data
         .unwrap();
     assert_eq!(second.content, first.content);
-    let staged = crate::attachments::stage_turn(
-        &second.content,
-        Some(&config),
-        None,
-        Some("uploads"),
-        None,
-    )
-    .await
-    .unwrap();
+    let staged =
+        crate::attachments::stage_turn(&second.content, Some(&config), None, Some("uploads"), None)
+            .await
+            .unwrap();
     assert_eq!(staged, first.content);
     let persisted = conversations::blocking::get_messages(
         crate::core::runtime::DispatchCtx::ambient(),
