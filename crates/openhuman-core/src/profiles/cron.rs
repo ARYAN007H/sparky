@@ -66,6 +66,7 @@ pub async fn sweep(host: &ProfileHost, now: DateTime<Utc>) -> SweepReport {
             continue;
         };
         let scope = DocScope::for_scope(&config, crate::storage::scope_for_profile(id.as_str()));
+        eprintln!("DBGSWEEP profile {id}");
         let due: Vec<CronJob> = match store_in::<Vec<CronJob>>(
             &config,
             &scope,
@@ -82,6 +83,7 @@ pub async fn sweep(host: &ProfileHost, now: DateTime<Utc>) -> SweepReport {
                 continue;
             }
         };
+        eprintln!("DBGSWEEP due {}", due.len());
         if due.is_empty() {
             continue;
         }
@@ -115,8 +117,9 @@ pub async fn sweep(host: &ProfileHost, now: DateTime<Utc>) -> SweepReport {
             let mut dispatcher =
                 JobDispatcher::new(&dispatch, &profile_config, &security).agent_only();
             let started = match dispatcher.tick(&profile_config).await {
-                Ok(started) => started,
+                Ok(started) => { eprintln!("DBGSWEEP ticked {started}"); started }
                 Err(error) => {
+                    eprintln!("DBGSWEEP error {error}");
                     log::warn!("[profiles][cron] dispatch failed: {error}");
                     0
                 }
