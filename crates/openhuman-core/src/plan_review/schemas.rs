@@ -81,8 +81,9 @@ struct DecideParams {
     feedback: Option<String>,
 }
 
-fn handle_decide(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_decide(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
+        let tenant = ctx.tenant().map_err(|error| error.to_string())?;
         let p = parse::<DecideParams>(params)?;
         let resolution = match p.decision.trim().to_ascii_lowercase().as_str() {
             "approve" => PlanReviewResolution::Approve,
@@ -105,7 +106,7 @@ fn handle_decide(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFut
             decision = resolution.as_str(),
             "[rpc][plan_review] decide entry"
         );
-        let resolved = gate::global().decide(&p.request_id, resolution);
+        let resolved = gate::global().decide(&tenant, &p.request_id, resolution);
         Ok(serde_json::json!({ "resolved": resolved }))
     })
 }
