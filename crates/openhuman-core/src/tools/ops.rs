@@ -400,10 +400,11 @@ pub fn all_tools_with_runtime(
 
     tools.extend(crate::search::build_search_tools(root_config));
 
-    // Media generation (image/video via GMI through the backend). Skipped when
-    // no integration client is configured; artifacts land under `action_dir`.
-    // Gated by the `media` compile-time feature (#4804); absent from slim
-    // builds. Runtime `DomainSet::media` (#4796) still gates it when compiled.
+    // Media generation roots. The `media_generate_*` tools themselves come from
+    // a host's registered tool source (the core ships no media generators);
+    // this records the files roots their reference policy reads. Gated by the
+    // `media` compile-time feature (#4804); absent from slim builds. Runtime
+    // `DomainSet::media` (#4796) still gates the tools when compiled.
     #[cfg(feature = "media")]
     {
         *security
@@ -411,19 +412,7 @@ pub fn all_tools_with_runtime(
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner) =
             Some(crate::agent::artifacts::FileRoots::from_config(root_config));
-        tools.extend(crate::media::generation::build_media_tools_with_allowlist(
-            root_config,
-            action_dir,
-            Arc::clone(&security.media_artifact_paths),
-        ));
     }
-
-    // Managed cloud file storage (S3 via the backend). Skipped when no
-    // integration client is configured; downloads land under `action_dir`.
-    tools.extend(crate::integrations::file_storage::build_file_storage_tools(
-        root_config,
-        action_dir,
-    ));
 
     // Hosting tools — deploy a workspace directory through the compiled
     // TinyHosts module. Registered only once a credential
@@ -476,50 +465,6 @@ pub fn all_tools_with_runtime(
                 reasoning_enabled: root_config.runtime.reasoning_enabled,
             },
         )));
-    }
-
-    // ── Agent integration tools (backend-proxied) ─────────────────
-    if let Some(client) = crate::integrations::build_client(root_config) {
-        tracing::debug!("[integrations] client built successfully");
-        if root_config.integrations.google_places.is_active() {
-            tools.push(Box::new(
-                crate::integrations::tools::GooglePlacesSearchTool::new(Arc::clone(&client)),
-            ));
-            tools.push(Box::new(
-                crate::integrations::tools::GooglePlacesDetailsTool::new(Arc::clone(&client)),
-            ));
-            tracing::debug!("[integrations] registered google_places tools");
-        } else {
-            tracing::debug!("[integrations] google_places disabled — skipping");
-        }
-        // Web search providers (Exa, Gemini, TinyFish, ...) register through
-        // the TinySearch module above, so `[search] enabled = false`
-        // suppresses them too. `integrations.parallel` is parsed for old
-        // config files and no longer does anything.
-        if root_config.integrations.stock_prices.is_active() {
-            tools.push(Box::new(crate::integrations::tools::StockQuoteTool::new(
-                Arc::clone(&client),
-            )));
-            tools.push(Box::new(
-                crate::integrations::tools::StockExchangeRateTool::new(Arc::clone(&client)),
-            ));
-            tools.push(Box::new(crate::integrations::tools::StockOptionsTool::new(
-                Arc::clone(&client),
-            )));
-            tools.push(Box::new(
-                crate::integrations::tools::StockCryptoSeriesTool::new(Arc::clone(&client)),
-            ));
-            tools.push(Box::new(
-                crate::integrations::tools::StockCommodityTool::new(Arc::clone(&client)),
-            ));
-            tracing::debug!("[integrations] registered stock_prices tools");
-        } else {
-            tracing::debug!("[integrations] stock_prices disabled — skipping");
-        }
-    } else {
-        tracing::debug!(
-            "[integrations] build_client returned None — integration tools not registered"
-        );
     }
 
     let composio_tools = crate::integrations::composio::all_composio_agent_tools(root_config);

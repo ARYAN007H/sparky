@@ -5697,6 +5697,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.20",
  "tinyagents-live",
+ "tinybus",
  "tinychannels-bus",
  "tinyhumans-sdk",
  "tinyinference-core 0.4.1",
