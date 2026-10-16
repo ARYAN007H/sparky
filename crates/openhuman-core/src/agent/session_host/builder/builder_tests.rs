@@ -342,7 +342,7 @@ async fn an_empty_named_scope_advertises_no_tools_at_all() {
     )
     .expect("summarizer is a shipped agent definition");
 
-    let visible = agent.visible_tool_names_for_test();
+    let visible = agent.visible_tool_names;
     let real: Vec<&String> = visible
         .iter()
         .filter(|n| n.as_str() != crate::agent::harness::host_definition::NO_TOOLS_SENTINEL)
@@ -378,7 +378,7 @@ async fn a_zero_tool_agent_does_not_gain_the_compaction_recovery_tool() {
 
     assert!(
         !agent
-            .visible_tool_names_for_test()
+            .visible_tool_names
             .contains(tinyjuice_bus::tools::RETRIEVE),
         "a deliberately tool-less agent must not be handed the recovery tool"
     );
@@ -435,7 +435,7 @@ async fn a_summarized_agent_sees_the_recovery_tool_with_compaction_off() {
         "orchestrator",
     )
     .expect("orchestrator is a shipped agent definition");
-    let visible = agent.visible_tool_names_for_test();
+    let visible = agent.visible_tool_names;
     assert!(
         visible.is_empty() || visible.contains(tinyjuice_bus::tools::RETRIEVE),
         "the orchestrator's summaries point at a tool it must be able to call"
@@ -512,7 +512,7 @@ async fn a_curated_orchestrator_sees_and_holds_every_juice_tool_in_handle_mode()
         "orchestrator",
     )
     .expect("orchestrator is a shipped agent definition");
-    let visible = agent.visible_tool_names_for_test();
+    let visible = agent.visible_tool_names;
     assert!(
         !visible.is_empty(),
         "the orchestrator's belt is curated; an empty set would make this test vacuous"

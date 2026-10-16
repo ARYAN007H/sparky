@@ -384,7 +384,7 @@ async fn desktop_browser_setting_keeps_deferred_tools_in_fresh_and_resumed_surfa
     )
     .expect("desktop orchestrator");
     for name in ["browser", "browser_open"] {
-        assert!(host.deferred_tool_names_for_test().contains(name), "{name}");
+        assert!(host.deferred_tool_names.contains(name), "{name}");
         assert!(!host
             .visible_tool_specs_arc()
             .iter()
@@ -428,7 +428,7 @@ async fn desktop_browser_setting_keeps_deferred_tools_in_fresh_and_resumed_surfa
     .expect("browser-disabled orchestrator");
     for name in ["browser", "browser_open"] {
         assert!(
-            !disabled.deferred_tool_names_for_test().contains(name),
+            !disabled.deferred_tool_names.contains(name),
             "{name}"
         );
     }

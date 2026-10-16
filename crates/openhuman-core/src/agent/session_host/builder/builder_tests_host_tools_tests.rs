@@ -186,7 +186,7 @@ fn withholding_tool_search_disables_wildcard_discovery() {
     .expect("build a wildcard session with discovery withheld");
 
     assert!(
-        agent.deferred_tool_names_for_test().is_empty(),
+        agent.deferred_tool_names.is_empty(),
         "withholding tool_search must also make deferred tools unreachable"
     );
 }
