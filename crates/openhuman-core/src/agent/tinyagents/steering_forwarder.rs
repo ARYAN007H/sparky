@@ -18,9 +18,13 @@
 use std::sync::Arc;
 
 use tinyagents_harness::ids::TaskId;
-use tinyagents_harness::run_queue::{ForwardEvent, ForwardEventSink, QueuedMessage, RunQueue};
+use tinyagents_harness::run_queue::{
+    ForwardEvent, ForwardEventSink, QueuedMessage, RunQueue, RunQueueHandle,
+};
 use tinyagents_harness::steering::SteeringHandle;
-use tinyagents_runtime::turn_driver::{RunQueueFeed, SteeringFeed, SteeringRegistrar};
+use tinyagents_runtime::turn_driver::{
+    MessageRunQueueFeed, RunQueueFeed, SteeringFeed, SteeringRegistrar,
+};
 
 use crate::agent::queued_turn::{text_preview, QueuedTurn};
 use crate::core::bus::BUS;
@@ -84,6 +88,12 @@ fn event_bus_sink() -> ForwardEventSink {
 /// The driver feed over the session's run queue.
 pub(super) fn queue_feed(queue: Arc<RunQueue<QueuedTurn>>) -> Arc<dyn SteeringFeed> {
     Arc::new(RunQueueFeed::new(queue, event_bus_sink()))
+}
+
+/// Feed the driver's native message queue while preserving host event
+/// projection for delivered and requeued messages.
+pub(super) fn message_queue_feed(queue: RunQueueHandle) -> Arc<dyn SteeringFeed> {
+    Arc::new(MessageRunQueueFeed::new(queue, event_bus_sink()))
 }
 
 /// Publishes a delegated child's steering handle in the process-wide registry.

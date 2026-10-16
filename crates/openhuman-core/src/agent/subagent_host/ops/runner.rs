@@ -924,6 +924,7 @@ async fn run_typed_mode(
             allowed_names,
             definition_iter_cap(&options.run_context, definition),
             options.run_queue.clone(),
+            options.message_run_queue.clone(),
             parent.on_progress.clone(),
             &definition.id,
             task_id,
