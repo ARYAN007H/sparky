@@ -196,6 +196,13 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           run: "node scripts/ci/check-openhuman-rust-layout.mjs",
         },
         {
+          // tinystoragedrivers owns every storage backend; reads cargo
+          // metadata for the root workspace and the app crate.
+          name: "storage-owner",
+          when: rust,
+          run: "node scripts/ci/check-storage-owner.mjs",
+        },
+        {
           name: "agent-runtime-boundary",
           when: core,
           run: "pnpm agent:runtime-boundary",

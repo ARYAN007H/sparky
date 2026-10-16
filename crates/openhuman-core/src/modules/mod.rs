@@ -123,6 +123,7 @@ mod storage_import_tinymcp;
 mod storage_import_tinywallet;
 #[cfg(feature = "modules")]
 pub mod tinybox;
+pub(crate) mod tinyflows;
 #[cfg(feature = "modules")]
 mod tokenjuice_host;
 pub mod types;

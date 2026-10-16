@@ -230,7 +230,7 @@ else
   # the native module path; the ignored MCP registry cases need TinyMCP. Both
   # come from the registry-pinned release, digest-verified before any
   # subprocess starts.
-  for released_id in tinyconnectors tinysearch tinybox tinymcp; do
+  for released_id in tinyconnectors tinyflows tinysearch tinybox tinymcp; do
     released_dir="$(stage_release_module "$released_id" "$module_platform" "$module_ext")"
     export OPENHUMAN_MODULE_PATH="$released_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
   done
