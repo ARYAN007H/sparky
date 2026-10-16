@@ -1,4 +1,5 @@
 use super::*;
+use crate::core::runtime::DispatchCtx;
 
 /// The single canonical definition of the builder hard-gate stack: the
 /// author-time gates that reject (not warn) a graph an agent must not propose
