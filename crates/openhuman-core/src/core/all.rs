@@ -690,31 +690,31 @@ fn build_registered_controllers() -> Vec<GroupedController> {
     push(
         &mut controllers,
         DomainGroup::Agent,
-        crate::agent::orchestration::all_command_center_registered_controllers(),
+        crate::agent_runs::all_command_center_registered_controllers(),
     );
     // Durable dynamic workflow runs — definitions + read surface over the run ledger
     push(
         &mut controllers,
         DomainGroup::Agent,
-        crate::agent::orchestration::all_workflow_run_registered_controllers(),
+        crate::agent_runs::all_workflow_run_registered_controllers(),
     );
     // Durable agent-team coordination — teams, members, dependency-aware task claiming, messaging
     push(
         &mut controllers,
         DomainGroup::Agent,
-        crate::agent::orchestration::all_agent_team_registered_controllers(),
+        crate::agent_runs::all_agent_team_registered_controllers(),
     );
     // Git-worktree isolation manager — list / status / diff / remove worker worktrees (#3376)
     push(
         &mut controllers,
         DomainGroup::Agent,
-        crate::agent::orchestration::all_worktree_registered_controllers(),
+        crate::agent_runs::all_worktree_registered_controllers(),
     );
     // User-driven cancel of detached background sub-agents (#3711)
     push(
         &mut controllers,
         DomainGroup::Agent,
-        crate::agent::orchestration::all_subagent_control_registered_controllers(),
+        crate::agent_runs::all_subagent_control_registered_controllers(),
     );
     // SaaS operator plane: provision and inspect user profiles.
     push(

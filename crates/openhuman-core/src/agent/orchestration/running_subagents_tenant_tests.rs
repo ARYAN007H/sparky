@@ -120,7 +120,7 @@ impl Pair {
 }
 
 async fn control(function: &str, task: &str) -> serde_json::Value {
-    let controller = crate::agent::orchestration::subagent_control::all_registered_controllers()
+    let controller = crate::agent_runs::subagent_control::all_registered_controllers()
         .into_iter()
         .find(|c| c.schema.function == function)
         .expect("public controller");
@@ -206,7 +206,7 @@ async fn saas_dispatch_exposes_only_the_callers_detached_worker_controls() {
         );
         assert!(crate::core::all::schema_for_rpc_method("openhuman.config_get_config").is_none());
         let unreviewed =
-            crate::agent::orchestration::command_center::all_command_center_registered_controllers(
+            crate::agent_runs::command_center::all_command_center_registered_controllers(
             )
             .into_iter()
             .find(|controller| controller.schema.function == "list")
