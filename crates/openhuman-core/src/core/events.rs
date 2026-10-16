@@ -721,7 +721,7 @@ pub enum DomainEvent {
     // ── Artifacts ───────────────────────────────────────────────────────
     /// An artifact transitioned to [`ArtifactStatus::Ready`] — file
     /// is on disk and ready to be downloaded. Published by
-    /// [`crate::agent::artifacts::store::finalize_artifact`].
+    /// [`crate::artifacts::store::finalize_artifact`].
     /// Bridged to the web channel as an `artifact_ready` socket event
     /// when the publishing turn carries an `ApprovalChatContext`
     /// (see [`crate::security::approval::ApprovalChatContext`]).
@@ -790,7 +790,7 @@ pub enum DomainEvent {
     /// An artifact record has been **created** (`ArtifactStatus::Pending`)
     /// but no bytes are on disk yet — the producing tool has only just
     /// reserved the row. Published by
-    /// [`crate::agent::artifacts::store::create_artifact`].
+    /// [`crate::artifacts::store::create_artifact`].
     /// Bridged to the web channel as an `artifact_pending` socket event
     /// so the frontend can render an in-progress / "Generating…" card the
     /// moment the tool dispatches, instead of waiting until the file

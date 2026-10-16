@@ -140,8 +140,8 @@ async fn an_unknown_artifact_is_not_found() {
 
 #[tokio::test]
 async fn an_artifact_made_before_versioning_opens_from_its_legacy_record() {
-    use crate::agent::artifacts::store::{create_artifact, finalize_artifact};
-    use crate::agent::artifacts::types::ArtifactKind as LegacyKind;
+    use crate::artifacts::store::{create_artifact, finalize_artifact};
+    use crate::artifacts::types::ArtifactKind as LegacyKind;
 
     let workspace = tempfile::tempdir().unwrap();
     let config = config_in(workspace.path());

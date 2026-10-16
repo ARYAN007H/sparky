@@ -3,11 +3,11 @@ use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
 use super::*;
-use crate::agent::artifacts::store::{
+use crate::artifacts::store::{
     create_artifact, create_artifact_regenerating, delete_artifact, fail_artifact,
     finalize_artifact, list_artifacts, read_artifact_bytes, save_artifact_meta,
 };
-use crate::agent::artifacts::types::ArtifactKind;
+use crate::artifacts::types::ArtifactKind;
 
 async fn create_ready(
     workspace: &Path,

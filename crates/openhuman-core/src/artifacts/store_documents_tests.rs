@@ -1,10 +1,10 @@
 use super::*;
-use crate::agent::artifacts::store::{
+use crate::artifacts::store::{
     delete_artifact, get_artifact, list_artifacts, read_artifact_args, save_artifact_args,
     save_artifact_meta,
 };
-use crate::agent::artifacts::types::{ArtifactKind, ArtifactStatus};
-use crate::agent::artifacts::FileRoots;
+use crate::artifacts::types::{ArtifactKind, ArtifactStatus};
+use crate::artifacts::FileRoots;
 use crate::storage::{MemoryStorage, Scope, StorageBackend};
 use chrono::{TimeZone, Utc};
 

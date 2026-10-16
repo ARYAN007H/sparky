@@ -456,7 +456,7 @@ fn build_registered_controllers() -> Vec<GroupedController> {
     push(
         &mut controllers,
         DomainGroup::Agent,
-        crate::agent::artifacts::all_artifacts_registered_controllers(),
+        crate::artifacts::all_artifacts_registered_controllers(),
     );
     // Read-only command palette listing: built-ins merged with skills.list /
     // flows.list (C5). Tagged `Agent` rather than a new `DomainGroup` variant

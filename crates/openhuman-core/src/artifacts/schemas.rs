@@ -431,7 +431,7 @@ fn handle_list_artifacts(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
             .transpose()?;
         let thread_id = read_optional_string(&params, "thread_id")?;
         to_json(
-            crate::agent::artifacts::ops::ai_list_artifacts(
+            crate::artifacts::ops::ai_list_artifacts(
                 &config,
                 offset,
                 limit,
@@ -446,7 +446,7 @@ fn handle_get_artifact(ctx: DispatchCtx, params: Map<String, Value>) -> Controll
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let artifact_id = read_required::<String>(&params, "artifact_id")?;
-        to_json(crate::agent::artifacts::ops::ai_get_artifact(&config, artifact_id.trim()).await?)
+        to_json(crate::artifacts::ops::ai_get_artifact(&config, artifact_id.trim()).await?)
     })
 }
 
@@ -456,7 +456,7 @@ fn handle_save_artifact_version(ctx: DispatchCtx, params: Map<String, Value>) ->
         let artifact_id = read_required::<String>(&params, "artifact_id")?;
         let body = read_required::<String>(&params, "body")?;
         to_json(
-            crate::agent::artifacts::ops::ai_save_artifact_version(
+            crate::artifacts::ops::ai_save_artifact_version(
                 &config,
                 artifact_id.trim(),
                 &body,
@@ -470,7 +470,7 @@ fn handle_read_artifact_body(ctx: DispatchCtx, params: Map<String, Value>) -> Co
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let artifact_id = read_required::<String>(&params, "artifact_id")?;
-        let body = crate::agent::artifacts::preview::read_body(&config, artifact_id.trim()).await?;
+        let body = crate::artifacts::preview::read_body(&config, artifact_id.trim()).await?;
         to_json(Outcome::new(body, vec![]))
     })
 }
@@ -493,7 +493,7 @@ fn handle_share_artifact(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
             }
         };
         to_json(
-            crate::agent::artifacts::ops::ai_share_artifact(
+            crate::artifacts::ops::ai_share_artifact(
                 &config,
                 artifact_id.trim(),
                 version,
@@ -509,7 +509,7 @@ fn handle_delete_artifact(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
         let config = ctx.load_config().await?;
         let artifact_id = read_required::<String>(&params, "artifact_id")?;
         to_json(
-            crate::agent::artifacts::ops::ai_delete_artifact(&config, artifact_id.trim()).await?,
+            crate::artifacts::ops::ai_delete_artifact(&config, artifact_id.trim()).await?,
         )
     })
 }
@@ -521,7 +521,7 @@ fn handle_regenerate(ctx: DispatchCtx, params: Map<String, Value>) -> Controller
         let thread_id = read_required::<String>(&params, "thread_id")?;
         let client_id = read_required::<String>(&params, "client_id")?;
         to_json(
-            crate::agent::artifacts::ops::ai_regenerate(
+            crate::artifacts::ops::ai_regenerate(
                 &ctx,
                 &config,
                 artifact_id.trim(),

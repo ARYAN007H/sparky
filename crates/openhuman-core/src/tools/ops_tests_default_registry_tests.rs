@@ -568,7 +568,7 @@ async fn document_tool_writes_into_the_configured_files_folder() {
         .await;
 
     let (artifacts, _) =
-        crate::agent::artifacts::store::list_artifacts(&cfg.workspace_dir, 0, 10, None)
+        crate::artifacts::store::list_artifacts(&cfg.workspace_dir, 0, 10, None)
             .await
             .expect("list artifacts");
     assert_eq!(artifacts.len(), 1, "{artifacts:?}");

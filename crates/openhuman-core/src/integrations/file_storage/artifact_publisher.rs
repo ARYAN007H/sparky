@@ -81,7 +81,7 @@ async fn upload_body(
         let resolved = tokio::fs::canonicalize(path)
             .await
             .map_err(|e| anyhow::anyhow!("cannot read the artifact's file: {e}"))?;
-        if let Some(reason) = crate::agent::artifacts::tiny_store::refused_path(&resolved) {
+        if let Some(reason) = crate::artifacts::tiny_store::refused_path(&resolved) {
             anyhow::bail!("[policy-blocked] cannot share this artifact: {reason}");
         }
         let bytes = tokio::fs::read(&resolved)

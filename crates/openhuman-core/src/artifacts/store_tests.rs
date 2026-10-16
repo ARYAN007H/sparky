@@ -2,7 +2,7 @@ use chrono::{TimeZone, Utc};
 use tempfile::TempDir;
 
 use super::*;
-use crate::agent::artifacts::types::{ArtifactKind, ArtifactMeta, ArtifactStatus};
+use crate::artifacts::types::{ArtifactKind, ArtifactMeta, ArtifactStatus};
 
 fn make_meta(id: &str, title: &str, created_at: chrono::DateTime<Utc>) -> ArtifactMeta {
     ArtifactMeta {

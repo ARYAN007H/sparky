@@ -3,11 +3,11 @@ use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
 use super::*;
-use crate::agent::artifacts::store::{
+use crate::artifacts::store::{
     get_artifact, list_artifacts, read_artifact_args, read_artifact_bytes, save_artifact_args,
     save_artifact_meta,
 };
-use crate::agent::artifacts::types::ArtifactKind;
+use crate::artifacts::types::ArtifactKind;
 
 /// A pre-#5505 record: bytes under `<workspace>/artifacts/<id>/<name>`.
 async fn legacy(workspace: &Path, id: &str, name: &str, bytes: &[u8], status: ArtifactStatus) {

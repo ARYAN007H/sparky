@@ -29,8 +29,8 @@ async fn list_empty() {
 /// artifacts from every thread (and the legacy ones without a thread).
 #[tokio::test]
 async fn list_without_thread_filter_returns_all_threads() {
-    use crate::agent::artifacts::store::save_artifact_meta;
-    use crate::agent::artifacts::types::{ArtifactKind, ArtifactMeta, ArtifactStatus};
+    use crate::artifacts::store::save_artifact_meta;
+    use crate::artifacts::types::{ArtifactKind, ArtifactMeta, ArtifactStatus};
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
 
@@ -70,8 +70,8 @@ async fn list_without_thread_filter_returns_all_threads() {
 /// deliberately excluded — they have no addressable owning thread.
 #[tokio::test]
 async fn list_with_thread_filter_returns_only_matching_thread() {
-    use crate::agent::artifacts::store::save_artifact_meta;
-    use crate::agent::artifacts::types::{ArtifactKind, ArtifactMeta, ArtifactStatus};
+    use crate::artifacts::store::save_artifact_meta;
+    use crate::artifacts::types::{ArtifactKind, ArtifactMeta, ArtifactStatus};
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
 
@@ -130,8 +130,8 @@ async fn list_with_thread_filter_returns_only_matching_thread() {
 /// stays meaningful.
 #[tokio::test]
 async fn list_with_thread_filter_unknown_thread_returns_zero() {
-    use crate::agent::artifacts::store::save_artifact_meta;
-    use crate::agent::artifacts::types::{ArtifactKind, ArtifactMeta, ArtifactStatus};
+    use crate::artifacts::store::save_artifact_meta;
+    use crate::artifacts::types::{ArtifactKind, ArtifactMeta, ArtifactStatus};
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     save_artifact_meta(
@@ -224,8 +224,8 @@ async fn regenerate_requires_thread_and_client() {
 
 #[tokio::test]
 async fn regenerate_rejects_non_presentation_kind() {
-    use crate::agent::artifacts::store::{save_artifact_args, save_artifact_meta};
-    use crate::agent::artifacts::types::{ArtifactKind, ArtifactMeta, ArtifactStatus};
+    use crate::artifacts::store::{save_artifact_args, save_artifact_meta};
+    use crate::artifacts::types::{ArtifactKind, ArtifactMeta, ArtifactStatus};
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
 
@@ -274,8 +274,8 @@ async fn regenerate_rejects_non_presentation_kind() {
 #[cfg(feature = "documents")]
 #[tokio::test]
 async fn regenerate_errors_when_args_missing() {
-    use crate::agent::artifacts::store::create_artifact;
-    use crate::agent::artifacts::types::ArtifactKind;
+    use crate::artifacts::store::create_artifact;
+    use crate::artifacts::types::ArtifactKind;
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
 
@@ -312,8 +312,8 @@ async fn regenerate_reruns_producer_and_reuses_id() {
     ) {
         return;
     }
-    use crate::agent::artifacts::store::{create_artifact, get_artifact, save_artifact_args};
-    use crate::agent::artifacts::types::{ArtifactKind, ArtifactStatus};
+    use crate::artifacts::store::{create_artifact, get_artifact, save_artifact_args};
+    use crate::artifacts::types::{ArtifactKind, ArtifactStatus};
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
 
@@ -398,8 +398,8 @@ impl Drop for DefaultFilesDir {
 
 #[tokio::test]
 async fn get_returns_the_files_folder_path() {
-    use crate::agent::artifacts::store::{create_artifact, finalize_artifact};
-    use crate::agent::artifacts::types::ArtifactKind;
+    use crate::artifacts::store::{create_artifact, finalize_artifact};
+    use crate::artifacts::types::ArtifactKind;
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     let default = DefaultFilesDir::under(&tmp).await;
@@ -433,8 +433,8 @@ async fn get_returns_the_files_folder_path() {
 
 #[tokio::test]
 async fn get_reports_a_ready_file_removed_outside_openhuman() {
-    use crate::agent::artifacts::store::{create_artifact, finalize_artifact};
-    use crate::agent::artifacts::types::ArtifactKind;
+    use crate::artifacts::store::{create_artifact, finalize_artifact};
+    use crate::artifacts::types::ArtifactKind;
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     let default = DefaultFilesDir::under(&tmp).await;
@@ -462,8 +462,8 @@ async fn get_reports_a_ready_file_removed_outside_openhuman() {
 /// refused by get, and delete leaves the file it names alone.
 #[tokio::test]
 async fn get_and_delete_refuse_a_record_rooted_outside_the_files_folder() {
-    use crate::agent::artifacts::store::save_artifact_meta;
-    use crate::agent::artifacts::types::{ArtifactKind, ArtifactMeta, ArtifactStatus};
+    use crate::artifacts::store::save_artifact_meta;
+    use crate::artifacts::types::{ArtifactKind, ArtifactMeta, ArtifactStatus};
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     let _default = DefaultFilesDir::under(&tmp).await;

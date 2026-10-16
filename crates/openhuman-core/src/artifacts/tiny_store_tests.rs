@@ -17,7 +17,7 @@ fn temp_dirs() -> (PathBuf, PathBuf) {
 async fn seeded(
     workspace: &std::path::Path,
     _files: &std::path::Path,
-) -> crate::agent::artifacts::version_documents::DocumentArtifactStore {
+) -> crate::artifacts::version_documents::DocumentArtifactStore {
     let store = versioned_store(workspace);
     let record = ArtifactRecord::new(
         "a-1",

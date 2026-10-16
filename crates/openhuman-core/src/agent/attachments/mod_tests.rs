@@ -198,10 +198,10 @@ async fn ready_media_artifact_in_files_folder_can_be_attached() {
     config.files_dir_override = Some(files.clone());
     config.autonomy.enabled = true;
 
-    let (artifact, path) = crate::agent::artifacts::create_artifact(
+    let (artifact, path) = crate::artifacts::create_artifact(
         &config.workspace_dir,
         &files,
-        crate::agent::artifacts::ArtifactKind::Image,
+        crate::artifacts::ArtifactKind::Image,
         "Generated image",
         "png",
         None,
@@ -209,7 +209,7 @@ async fn ready_media_artifact_in_files_folder_can_be_attached() {
     .await
     .unwrap();
     tokio::fs::write(&path, b"image bytes").await.unwrap();
-    crate::agent::artifacts::finalize_artifact(&config.workspace_dir, &artifact.id, 11, None)
+    crate::artifacts::finalize_artifact(&config.workspace_dir, &artifact.id, 11, None)
         .await
         .unwrap();
 

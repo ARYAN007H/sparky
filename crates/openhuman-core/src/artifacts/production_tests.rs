@@ -3,9 +3,9 @@ use std::path::PathBuf;
 use tiny_artifacts::{ArtifactKind, ArtifactStatus as RecordStatus, ArtifactStore};
 
 use super::*;
-use crate::agent::artifacts::store::get_artifact;
-use crate::agent::artifacts::tiny_store::versioned_store;
-use crate::agent::artifacts::types::{ArtifactKind as CardKind, ArtifactStatus as CardStatus};
+use crate::artifacts::store::get_artifact;
+use crate::artifacts::tiny_store::versioned_store;
+use crate::artifacts::types::{ArtifactKind as CardKind, ArtifactStatus as CardStatus};
 
 fn temp_dirs() -> (PathBuf, PathBuf) {
     let root = std::env::temp_dir().join(format!("production-{}", uuid::Uuid::new_v4()));
@@ -85,11 +85,11 @@ async fn a_new_artifact_shares_one_id_and_one_file_between_card_and_record() {
     assert_eq!(record.status, RecordStatus::Ready);
     assert_eq!(
         record.latest().unwrap().author_id,
-        crate::agent::artifacts::tiny_store::AGENT_AUTHOR_ID
+        crate::artifacts::tiny_store::AGENT_AUTHOR_ID
     );
     // The version holds its own copy; the files folder shows the newest.
     let file = record.latest().unwrap().file.clone().unwrap();
-    let kept = crate::agent::artifacts::tiny_store::version_files_dir(&workspace)
+    let kept = crate::artifacts::tiny_store::version_files_dir(&workspace)
         .join(&id)
         .join("v1.pptx");
     assert_eq!(std::path::Path::new(&file.path), kept.as_path());

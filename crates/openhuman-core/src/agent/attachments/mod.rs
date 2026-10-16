@@ -181,7 +181,7 @@ fn policy(config: &Config, root: &Path) -> SecurityPolicy {
         .media_files_roots
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner) =
-        Some(crate::agent::artifacts::FileRoots::from_config(config));
+        Some(crate::artifacts::FileRoots::from_config(config));
     policy
 }
 
