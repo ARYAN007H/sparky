@@ -15,7 +15,7 @@ use openhuman_embed::seams::{
 use openhuman_embed::{
     AgentDefinitionSpec, AgentSpec, HostTurnTools, Runtime, Tool, ToolScopeSpec, Workspace,
 };
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tokio::sync::Barrier;
 use wiremock::MockServer;
 
@@ -76,10 +76,7 @@ impl ToolHook<OpenHumanRunContext> for Observer {
 
 #[async_trait::async_trait]
 impl LearningSink for Observer {
-    async fn on_turn_complete(
-        &self,
-        ctx: &TurnSummary,
-    ) -> tinyagents_harness::error::Result<()> {
+    async fn on_turn_complete(&self, ctx: &TurnSummary) -> tinyagents_harness::error::Result<()> {
         assert!(!ctx.agent_id.is_empty());
         self.record("turn", ctx.input.lines().last().unwrap());
         Ok(())
