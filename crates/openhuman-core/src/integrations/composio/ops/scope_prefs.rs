@@ -65,7 +65,9 @@ async fn migrate_legacy(config: &Config) {
     {
         return;
     }
-    let rows = match file_store::load::<LegacyScopeFile>(config, USER_SCOPES_FILE).await {
+    // Transitional (#7801): the scope-pref readers carry no context yet.
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let rows = match file_store::load::<LegacyScopeFile>(&ctx, config, USER_SCOPES_FILE).await {
         Ok(rows) => rows,
         Err(error) => {
             // Unreadable is not "no rows": keep the file and try again later.
@@ -90,12 +92,16 @@ async fn migrate_legacy(config: &Config) {
         }
     }
     if !rows.is_empty() {
-        let cleared =
-            file_store::update(config, USER_SCOPES_FILE, |prefs: &mut LegacyScopeFile| {
+        let cleared = file_store::update(
+            &ctx,
+            config,
+            USER_SCOPES_FILE,
+            |prefs: &mut LegacyScopeFile| {
                 prefs.clear();
                 ((), true)
-            })
-            .await;
+            },
+        )
+        .await;
         if let Err(error) = cleared {
             tracing::warn!(%error, "{LOG} legacy pref file could not be emptied");
             return;

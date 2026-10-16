@@ -489,7 +489,12 @@ async fn enrich_does_nothing_when_no_cached_identities() {
     let tmp = tempfile::tempdir().unwrap();
     let config = test_config(&tmp);
     let resp = make_connections_response(&[("c1", "gmail", "ACTIVE")]);
-    let enriched = enrich_connections_with_identity(&config, resp).await;
+    let enriched = enrich_connections_with_identity(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        resp,
+    )
+    .await;
     assert_eq!(enriched.connections.len(), 1);
     assert!(enriched.connections[0].account_email.is_none());
     assert!(enriched.connections[0].workspace.is_none());
@@ -506,7 +511,12 @@ async fn enrich_skips_connection_already_having_identity() {
     let mut resp = make_connections_response(&[("c-preloaded", "gmail", "ACTIVE")]);
     resp.connections[0].account_email = Some("preloaded@example.com".to_string());
 
-    let enriched = enrich_connections_with_identity(&config, resp).await;
+    let enriched = enrich_connections_with_identity(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        resp,
+    )
+    .await;
     assert_eq!(
         enriched.connections[0].account_email.as_deref(),
         Some("preloaded@example.com"),
@@ -526,6 +536,7 @@ async fn enrich_leaves_unmatched_connection_unchanged() {
 
     // Persist a profile for a DIFFERENT connection id.
     persist_provider_profile(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &ProviderUserProfile {
             toolkit: "gmail".to_string(),
@@ -538,7 +549,12 @@ async fn enrich_leaves_unmatched_connection_unchanged() {
     .expect("persist provider profile");
 
     let resp = make_connections_response(&[("no-profile-conn", "gmail", "ACTIVE")]);
-    let enriched = enrich_connections_with_identity(&config, resp).await;
+    let enriched = enrich_connections_with_identity(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        resp,
+    )
+    .await;
 
     assert!(
         enriched.connections[0].account_email.is_none(),

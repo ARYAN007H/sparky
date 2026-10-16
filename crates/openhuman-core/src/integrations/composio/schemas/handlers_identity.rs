@@ -17,7 +17,7 @@ pub(super) fn handle_get_user_profile(
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let connection_id = read_required_non_empty(&params, "connection_id")?;
-        to_json(ops::composio_get_user_profile(&config, &connection_id).await?)
+        to_json(ops::composio_get_user_profile(&ctx, &config, &connection_id).await?)
     })
 }
 
@@ -27,7 +27,7 @@ pub(super) fn handle_refresh_all_identities(
 ) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
-        to_json(ops::composio_refresh_all_identities(&config).await?)
+        to_json(ops::composio_refresh_all_identities(&ctx, &config).await?)
     })
 }
 

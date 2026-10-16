@@ -483,7 +483,9 @@ async fn flows_list_connections_aggregates_http_creds_and_tolerates_composio() {
         .upsert(&HttpCredential::bearer("stripe", "sk_live_seed_secret"))
         .unwrap();
 
-    let outcome = flows_list_connections(&config).await.unwrap();
+    let outcome = flows_list_connections(&crate::core::runtime::DispatchCtx::ambient(), &config)
+        .await
+        .unwrap();
     let refs: Vec<_> = outcome
         .value
         .iter()
