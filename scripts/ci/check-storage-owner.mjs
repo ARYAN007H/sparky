@@ -12,7 +12,11 @@
 //   3. a `tinystoragedrivers*` package in the resolved graph is not built from
 //      a path under `vendor/tinystoragedrivers/` (a registry or git source
 //      means some manifest escaped the root `[patch]` onto the vendored copy,
-//      for example a module that bumped its tag past the vendored commit).
+//      for example a module that bumped its tag past the vendored commit),
+//      anchored to THIS repository's root, and
+//   4. a dependency naming tinystoragedrivers by a git tag that differs from
+//      the vendored checkout's version (a tag-only bump still resolves to the
+//      patched path, so rule 3 alone cannot see it).
 // Third-party registry crates are ignored (they are the backends' own deps,
 // e.g. `rusqlite -> libsqlite3-sys`).
 //
@@ -58,18 +62,36 @@ const isOwner = name => name.startsWith('tinystoragedrivers');
 const isFirstParty = pkg => !pkg.source || pkg.source.startsWith('git+');
 
 export const VENDORED_TSD_DIR = 'vendor/tinystoragedrivers/';
+export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
-/** Rule 3: every tinystoragedrivers* package must be a path under VENDORED_TSD_DIR. */
-export function checkVendoredOwner(metadata) {
+const norm = p => String(p ?? '').replaceAll('\\', '/').replace(/\/+$/, '');
+
+/** True when `manifest` lies under `<root>/vendor/tinystoragedrivers/` (this checkout only). */
+export function isUnderVendoredTsd(manifest, root) {
+  const prefix = `${norm(root)}/${VENDORED_TSD_DIR}`;
+  return norm(manifest).startsWith(prefix);
+}
+
+const TSD_GIT = /^git\+https?:\/\/[^?#]*\/tinystoragedrivers(?:\.git)?\?tag=([^#&]+)/;
+
+/**
+ * Rule 3: every tinystoragedrivers* package must be a path under this
+ * repository's `<root>/vendor/tinystoragedrivers/`.
+ * Rule 4: a dependency that names tinystoragedrivers by git tag must name the
+ * tag matching the vendored checkout's version; a bare tag bump stays
+ * semver-compatible, so the `[patch]` would otherwise apply silently.
+ */
+export function checkVendoredOwner(metadata, root = REPO_ROOT) {
   const out = [];
   const packages = metadata.packages ?? [];
+  let vendoredVersion = null;
   for (const pkg of packages) {
     if (!isOwner(pkg.name)) continue;
-    const manifest = String(pkg.manifest_path ?? '').replaceAll('\\', '/');
-    // Top-level checkout only: a nested vendor/*/vendor/tinystoragedrivers copy
-    // has another `/vendor/` before the match.
-    const at = manifest.indexOf(`/${VENDORED_TSD_DIR}`);
-    if (!pkg.source && at >= 0 && !manifest.slice(0, at).includes('/vendor/')) continue;
+    const manifest = norm(pkg.manifest_path);
+    if (!pkg.source && isUnderVendoredTsd(manifest, root)) {
+      vendoredVersion ??= pkg.version ?? null;
+      continue;
+    }
     const dependents = [
       ...new Set(
         packages
@@ -81,16 +103,36 @@ export function checkVendoredOwner(metadata) {
       package: pkg.name,
       kind: 'tsd-not-vendored',
       detail:
-        `resolves to ${pkg.source ?? manifest} instead of ${VENDORED_TSD_DIR}` +
+        `resolves to ${pkg.source ?? manifest} instead of ${norm(root)}/${VENDORED_TSD_DIR}` +
         (dependents.length ? ` (required by ${dependents.join(', ')})` : '') +
         '; bump vendor/tinystoragedrivers or the module\'s tinystoragedrivers tag so they agree',
     });
+  }
+  if (vendoredVersion) {
+    const seen = new Set();
+    for (const p of packages) {
+      if (isOwner(p.name)) continue;
+      for (const d of p.dependencies ?? []) {
+        const tag = isOwner(d.name) ? TSD_GIT.exec(d.source ?? '')?.[1] : null;
+        if (!tag || tag.replace(/^v/, '') === vendoredVersion) continue;
+        const key = `${p.name}|${tag}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({
+          package: p.name,
+          kind: 'tsd-tag-mismatch',
+          detail:
+            `declares tinystoragedrivers tag ${tag} but vendor/tinystoragedrivers is ${vendoredVersion}; ` +
+            'bump the submodule or align the tag',
+        });
+      }
+    }
   }
   return out;
 }
 
 /** Returns `[{ package, kind, detail }]` violations for one metadata document. */
-export function checkMetadata(metadata, allowlist = ALLOWLIST) {
+export function checkMetadata(metadata, allowlist = ALLOWLIST, root = REPO_ROOT) {
   const out = [];
   for (const pkg of metadata.packages ?? []) {
     if (!isFirstParty(pkg) || isOwner(pkg.name)) continue;
@@ -106,7 +148,7 @@ export function checkMetadata(metadata, allowlist = ALLOWLIST) {
       }
     }
   }
-  return [...out, ...checkVendoredOwner(metadata)];
+  return [...out, ...checkVendoredOwner(metadata, root)];
 }
 
 export function formatReport(violations) {
@@ -147,7 +189,7 @@ export function main(argv) {
   }
   const seen = new Set();
   const violations = docs
-    .flatMap(d => checkMetadata(d))
+    .flatMap(d => checkMetadata(d, ALLOWLIST, root))
     .filter(v => !seen.has(`${v.package}|${v.detail}`) && seen.add(`${v.package}|${v.detail}`));
   console.log(formatReport(violations));
   return violations.length ? 1 : 0;

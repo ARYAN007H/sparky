@@ -6,7 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { ALLOWLIST, checkMetadata, formatReport } from '../ci/check-storage-owner.mjs';
+import { ALLOWLIST, checkMetadata as checkMetadataAt, formatReport } from '../ci/check-storage-owner.mjs';
 
 const CHECKER = resolve(dirname(fileURLToPath(import.meta.url)), '../ci/check-storage-owner.mjs');
 const pkg = (name, deps = [], source = null, manifest_path) => ({
@@ -19,6 +19,7 @@ const pkg = (name, deps = [], source = null, manifest_path) => ({
       : `/repo/vendor/${name}/Cargo.toml`),
   dependencies: deps.map(d => ({ name: d, kind: null, optional: false })),
 });
+const checkMetadata = (m, root = '/repo') => checkMetadataAt(m, ALLOWLIST, root);
 const registry = 'registry+https://github.com/rust-lang/crates.io-index';
 
 test('a clean workspace passes', () => {
@@ -108,4 +109,36 @@ test('a path tinystoragedrivers package outside the vendored checkout fails', ()
     packages: [pkg('tinystoragedrivers-core', [], null, '/repo/vendor/tinyagents/vendor/tinystoragedrivers/crates/x/Cargo.toml')],
   });
   assert.equal(v.length, 1);
+});
+
+const tsd = (manifest_path, version = '0.11.0') => ({ ...pkg('tinystoragedrivers-core', [], null, manifest_path), version });
+const TAG = 'git+https://github.com/tinyhumansai/tinystoragedrivers?tag=';
+const dependsAt = (name, tag) => ({
+  name,
+  source: null,
+  manifest_path: `/repo/vendor/${name}/Cargo.toml`,
+  dependencies: [{ name: 'tinystoragedrivers-core', kind: null, optional: false, source: `${TAG}${tag}` }],
+});
+
+test('vendored path is anchored to this repository root', () => {
+  const ok = '/repo/vendor/tinystoragedrivers/crates/core/Cargo.toml';
+  assert.deepEqual(checkMetadata({ packages: [tsd(ok)] }), []);
+  // a checkout below an ancestor named vendor is still accepted
+  assert.deepEqual(checkMetadata({ packages: [tsd('/home/me/vendor/oh/vendor/tinystoragedrivers/c/Cargo.toml')] }, '/home/me/vendor/oh'), []);
+  for (const bad of [
+    '/other/vendor/tinystoragedrivers/crates/core/Cargo.toml',
+    '/repo/vendor/x/vendor/tinystoragedrivers/crates/core/Cargo.toml',
+    '/repo/other/vendor/tinystoragedrivers/crates/core/Cargo.toml',
+  ]) {
+    assert.equal(checkMetadata({ packages: [tsd(bad)] })[0]?.kind, 'tsd-not-vendored', bad);
+  }
+});
+
+test('a module tag differing from the vendored version is rejected', () => {
+  const vend = tsd('/repo/vendor/tinystoragedrivers/crates/core/Cargo.toml');
+  assert.deepEqual(checkMetadata({ packages: [vend, dependsAt('tinyflows', 'v0.11.0')] }), []);
+  const v = checkMetadata({ packages: [vend, dependsAt('tinyflows', 'v0.12.0')] });
+  assert.equal(v.length, 1);
+  assert.equal(v[0].kind, 'tsd-tag-mismatch');
+  assert.match(v[0].detail, /v0\.12\.0.*0\.11\.0/);
 });
