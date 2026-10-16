@@ -100,7 +100,15 @@ pub fn unregister_chat_model(provider_id: &str) -> bool {
 
 /// The registered chat-model provider, if any.
 pub(crate) fn chat_model(provider_id: &str) -> Option<ChatModelEntry> {
-    CHAT_MODELS.get(provider_id)
+    let registered = CHAT_MODELS.get(provider_id);
+    // Unit tests model "a hosted provider is present" by default, as the old
+    // built-in managed backend was; a test that wants the bare core asks for it
+    // with `without_managed_provider`.
+    #[cfg(test)]
+    let registered = registered.or_else(|| {
+        super::registry_test_support::default_managed_entry(provider_id)
+    });
+    registered
 }
 
 // ---------------------------------------------------------------------------

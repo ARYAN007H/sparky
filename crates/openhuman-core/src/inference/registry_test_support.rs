@@ -79,3 +79,35 @@ impl Drop for FakeManaged {
         unregister_chat_model(PROVIDER_OPENHUMAN);
     }
 }
+
+thread_local! {
+    static BARE_CORE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// The managed provider every unit test sees unless it opts out: the fake,
+/// answering for [`PROVIDER_OPENHUMAN`] only.
+pub(crate) fn default_managed_entry(provider_id: &str) -> Option<ChatModelEntry> {
+    if provider_id != PROVIDER_OPENHUMAN || BARE_CORE.with(std::cell::Cell::get) {
+        return None;
+    }
+    Some(ChatModelEntry {
+        build: Arc::new(build),
+        probe: None,
+    })
+}
+
+/// Guard that makes the current thread see a core with no managed chat-model
+/// provider (the default registry state of a host that installed none).
+pub(crate) struct BareCore;
+
+/// Runs the rest of the test on a core with no managed chat-model provider.
+pub(crate) fn without_managed_provider() -> BareCore {
+    BARE_CORE.with(|flag| flag.set(true));
+    BareCore
+}
+
+impl Drop for BareCore {
+    fn drop(&mut self) {
+        BARE_CORE.with(|flag| flag.set(false));
+    }
+}
