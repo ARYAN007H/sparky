@@ -91,7 +91,7 @@ pub(crate) struct Wiring {
     /// The process-wide SDK transport ([`crate::client::shared_transport`]).
     /// Hosted callers fetch it themselves; kept so tests can pin that every
     /// connect shares one instance.
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(crate) transport: Arc<SdkBackendTransport>,
     /// The hosted RPC proxies, unless [`InstallOptions::hosted_controllers`]
     /// is off.
@@ -166,8 +166,11 @@ fn connect_transport() -> Result<Arc<SdkBackendTransport>, InstallError> {
 /// the registry and ranker applied in between, in its historical order.
 pub(crate) fn wiring(options: &InstallOptions) -> Result<Wiring, InstallError> {
     let (controllers, ranker) = prepare(options);
+    // Connecting builds the process transport; only tests read it back.
+    #[cfg_attr(not(test), allow(unused_variables))]
     let transport = connect_transport()?;
     Ok(Wiring {
+        #[cfg(test)]
         transport,
         controllers,
         ranker,
