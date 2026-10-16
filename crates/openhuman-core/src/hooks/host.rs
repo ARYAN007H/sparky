@@ -1,7 +1,7 @@
 //! The process-global hook engine and the OpenHuman seams it is built with.
 //!
 //! The engine, `hooks.json` contract and process runner live in
-//! `tinyagents_runtime::command_hooks`. This module supplies what is specific
+//! `tinyagents_hooks::command`. This module supplies what is specific
 //! to this host: the product name that decides discovery paths and the
 //! `OPENHUMAN_*` hook environment, the user's home directory, the platform
 //! shell, and the model behind `prompt` hooks.
