@@ -75,14 +75,21 @@ pub mod embed {
 pub use openhuman_embed::__host;
 
 pub mod backend;
+pub(crate) mod channels;
+pub(crate) mod client;
 pub mod hosted;
+pub(crate) mod inference;
 mod install;
+pub(crate) mod integrations;
 #[cfg(feature = "jev")]
 pub mod jev;
 pub mod jwt;
+pub(crate) mod memory;
+mod register;
 mod runtime;
 pub mod session;
 pub mod transport;
+pub(crate) mod voice;
 
 pub use backend::{product_identity, set_product_identity, ProductIdentity};
 pub use hosted::extension as hosted_controllers;
