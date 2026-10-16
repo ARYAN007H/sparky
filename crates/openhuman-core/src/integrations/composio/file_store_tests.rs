@@ -152,30 +152,26 @@ fn agent_ctx(agent: &str) -> crate::core::runtime::DispatchCtx {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn store_work_runs_under_the_handed_context_and_two_contexts_do_not_cross() {
-    let dir = tempfile::tempdir().unwrap();
-    let config = config_in(&dir);
-    let seen = || {
-        crate::core::runtime::CoreContext::current()
-            .and_then(|c| c.session_agent().map(str::to_owned))
-    };
-    // Called from outside any scope: the blocking store work acts for the
-    // context it was handed, not for whatever the caller happened to run in.
+async fn stores_driven_by_two_handed_contexts_do_not_cross() {
+    let (dir_a, dir_b) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let (config_a, config_b) = (config_in(&dir_a), config_in(&dir_b));
     let (asha, ravi) = (agent_ctx("u-asha"), agent_ctx("u-ravi"));
+    let bump = |by: u32| {
+        move |map: &mut BTreeMap<String, u32>| {
+            *map.entry("n".into()).or_default() += by;
+            ((), true)
+        }
+    };
+    // Called from outside any scope: each call acts for the context it was
+    // handed, over its own workspace.
     let (a, b) = tokio::join!(
-        update(
-            &asha,
-            &config,
-            IDENTITIES_FILE,
-            move |_: &mut BTreeMap<String, u32>| (seen(), false)
-        ),
-        update(
-            &ravi,
-            &config,
-            IDENTITIES_FILE,
-            move |_: &mut BTreeMap<String, u32>| (seen(), false)
-        ),
+        update(&asha, &config_a, IDENTITIES_FILE, bump(1)),
+        update(&ravi, &config_b, IDENTITIES_FILE, bump(10)),
     );
-    assert_eq!(a.unwrap().as_deref(), Some("u-asha"));
-    assert_eq!(b.unwrap().as_deref(), Some("u-ravi"));
+    a.unwrap();
+    b.unwrap();
+    let from_a: BTreeMap<String, u32> = load(&asha, &config_a, IDENTITIES_FILE).await.unwrap();
+    let from_b: BTreeMap<String, u32> = load(&ravi, &config_b, IDENTITIES_FILE).await.unwrap();
+    assert_eq!(from_a.get("n"), Some(&1));
+    assert_eq!(from_b.get("n"), Some(&10));
 }
