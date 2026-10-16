@@ -12,7 +12,7 @@
 //!   the TinyDocs module. Anything else comes back as its path, for the panel
 //!   to show as a file.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde::Serialize;
 use tiny_artifacts::{ArtifactKind, ArtifactRecord};
