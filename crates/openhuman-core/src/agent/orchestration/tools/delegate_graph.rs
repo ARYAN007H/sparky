@@ -206,7 +206,7 @@ impl DelegateGraphTool {
         };
         let agent_id = match args.get("agent_id").and_then(|v| v.as_str()) {
             Some(s) if !s.trim().is_empty() => s.trim().to_string(),
-            _ => return Ok(ToolResult::error("delegate: `agent_id` is required.")),
+            _ => return Ok(ToolResult::error("delegate_graph: `agent_id` is required.")),
         };
         let task = match args.get("task").and_then(|v| v.as_str()) {
             Some(s) if !s.trim().is_empty() => s.to_string(),
