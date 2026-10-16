@@ -196,6 +196,7 @@ impl Docs {
                     id: key.clone(),
                     version: tinystoragedrivers::Version::FIRST,
                     doc: doc.clone(),
+                    meta: tinystoragedrivers::Meta::unknown(),
                 };
                 let mut source = to_source(&stored).ok()?;
                 apply_patch(&mut source, patch.clone()).ok()?;

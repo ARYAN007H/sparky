@@ -91,7 +91,12 @@ impl Docs {
             let version = docs
                 .put(DEVICES, &id, doc.clone(), Precondition::None)
                 .await?;
-            Ok(to_device(&Versioned { id, version, doc }))
+            Ok(to_device(&Versioned {
+                id,
+                version,
+                doc,
+                meta: tinystoragedrivers::Meta::unknown(),
+            }))
         })
     }
 

@@ -514,6 +514,7 @@ async fn update(
                     id: id.to_string(),
                     version,
                     doc: next,
+                    meta: stored.meta.clone(),
                 }));
             }
             Err(error) if error.kind() == ErrorKind::Conflict => {}

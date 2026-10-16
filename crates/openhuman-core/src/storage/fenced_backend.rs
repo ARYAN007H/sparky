@@ -13,7 +13,7 @@
 //! driver refusal ([`ErrorKind::Fenced`]) latches the fence and surfaces as
 //! [`FenceError::Superseded`](super::fence::FenceError::Superseded). Where
 //! the driver cannot fence (no [`Capability::Fencing`], a write it answers
-//! with `Unsupported(Fencing)`, a named database, or a lease store with no
+//! with `Unsupported(Fencing)`, or a lease store with no
 //! record in the ports) the write runs after the host check alone.
 //!
 //! The fence is looked up per write, not when the scope is bound, because
@@ -41,10 +41,6 @@ use super::{DocumentStore, Scope, ScopedStorage, StorageBackend};
 pub struct FencedBackend {
     inner: Arc<dyn StorageBackend>,
     fences: Arc<FenceRegistry>,
-    /// Whether the driver can see the lease records: true for the default
-    /// database (where the cluster scope's leases live), false for a named
-    /// database ([`Self::database`]), whose writes get the host check only.
-    driver_fencing: bool,
 }
 
 impl std::fmt::Debug for FencedBackend {
@@ -61,7 +57,6 @@ impl FencedBackend {
         Self {
             inner,
             fences,
-            driver_fencing: true,
         }
     }
 }
@@ -86,7 +81,7 @@ impl StorageBackend for FencedBackend {
         let guard = Guard {
             scope: scope.clone(),
             fences: Arc::clone(&self.fences),
-            backend: self.driver_fencing.then(|| Arc::clone(&self.inner)),
+            backend: Some(Arc::clone(&self.inner)),
         };
         Ok(ScopedStorage::new(
             scope.clone(),
@@ -113,21 +108,13 @@ impl StorageBackend for FencedBackend {
         self.inner.sweep_expired_blobs(scope).await
     }
 
-    fn database(&self, name: &str) -> Result<Arc<dyn StorageBackend>> {
-        Ok(Arc::new(Self {
-            inner: self.inner.database(name)?,
-            fences: Arc::clone(&self.fences),
-            driver_fencing: false,
-        }))
-    }
 }
 
 #[derive(Clone)]
 struct Guard {
     scope: Scope,
     fences: Arc<FenceRegistry>,
-    /// The inner backend, when its driver may enforce the fence (see
-    /// [`FencedBackend::driver_fencing`]).
+    /// The inner backend, whose driver may enforce the fence.
     backend: Option<Arc<dyn StorageBackend>>,
 }
 
