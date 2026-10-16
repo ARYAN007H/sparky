@@ -41,9 +41,11 @@ pub(super) fn host_outcome_to_neutral(
     let status = match outcome.status {
         SubagentRunStatus::Completed => SubagentOutcomeKind::Completed,
         SubagentRunStatus::AwaitingUser {
-            question, options, ..
+            question,
+            options: answer_options,
+            ..
         } => {
-            extensions.insert("options".into(), serde_json::json!(options));
+            extensions.insert("options".into(), serde_json::json!(answer_options));
             SubagentOutcomeKind::AwaitingInput(SubagentPause {
                 reason: question,
                 resume: SubagentResume {
