@@ -450,6 +450,21 @@ impl CoreContext {
         &self.extensions
     }
 
+    /// The hook registrations of the context this call runs under, for
+    /// [`HookSlot`](crate::core::slots::HookSlot) lookups.
+    ///
+    /// Outside SaaS that is the ambient context (the process default when the
+    /// task has no scope). In SaaS only the task's own scope counts: a task that
+    /// lost its scope must not read the operator's registrations.
+    pub fn current_extensions() -> Option<crate::core::slots::Extensions> {
+        let ctx = if crate::core::runtime::is_saas() {
+            Self::scoped()
+        } else {
+            Self::current()
+        };
+        ctx.map(|ctx| ctx.extensions.clone())
+    }
+
     /// The backend transport bound to this context, if the host supplied one.
     pub fn backend_transport(
         &self,

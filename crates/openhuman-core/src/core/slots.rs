@@ -279,8 +279,8 @@ impl<V: Clone + Send + Sync + 'static> HookSlot<V> {
     }
 
     fn context_table(&self) -> Option<Arc<Registry<V>>> {
-        crate::core::runtime::context::CoreContext::current()
-            .and_then(|ctx| ctx.extensions().existing::<V>(self.name))
+        crate::core::runtime::context::CoreContext::current_extensions()
+            .and_then(|extensions| extensions.existing::<V>(self.name))
     }
 
     /// The value for `id`: the ambient context's, else the process-wide one.
