@@ -15,7 +15,7 @@ use crate::agent::turn_env::HostTurnEnv;
 /// (env `OPENHUMAN_WEB_TURN_TIMEOUT_SECS=0`).
 ///
 /// This is the turn's fixed total ceiling (issue #4746), and the single source
-/// of truth for the turn's deadlines (`agent::session_host::turn_backstop`, default 3600s,
+/// of truth for the turn's deadlines (`web_chat::turn_guards::backstop`, default 3600s,
 /// the harness's own turn ceiling). The harness derives two earlier points
 /// from it:
 ///
@@ -116,7 +116,7 @@ where
         };
         // The session turn carries the matching `TurnDeadline` on its explicit
         // host environment (`run_turn_under_cancel_and_deadline`), so the
-        // harness (`agent::session_host::turn_backstop`) winds down before `d`.
+        // harness (`web_chat::turn_guards::backstop`) winds down before `d`.
         tokio::time::timeout(d, turn)
             .await
             .map_err(|_elapsed| Stop::Ceiling(d))
