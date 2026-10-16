@@ -66,8 +66,7 @@ pub fn all_registered_controllers() -> Vec<RegisteredController> {
         .iter()
         .map(|function| RegisteredController {
             schema: schema(function),
-            handler: handler_for(function)
-                .expect("every registered memory function has a handler"),
+            handler: handler_for(function).expect("every registered memory function has a handler"),
         })
         .collect()
 }
