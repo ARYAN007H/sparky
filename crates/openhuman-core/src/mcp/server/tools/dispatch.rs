@@ -1,9 +1,9 @@
 use crate::core::runtime::DispatchCtx;
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use tinyinference_llm::tool::ToolSchema;
 
-use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::agent::OpenHumanSessionHost;
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::core::all;
 use crate::security::{SecurityPolicy, ToolOperation};
 

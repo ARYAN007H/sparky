@@ -174,8 +174,12 @@ impl RequestPlanReviewTool {
             "[tool][request_plan_review] parking interactive turn for plan review"
         );
 
+        let dispatch_ctx = crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(context);
+        let tenant = dispatch_ctx
+            .tenant()
+            .map_err(|error| anyhow::anyhow!(error.to_string()))?;
         let resolution = gate::global()
-            .request_review(thread_id, client_id, summary, steps, tool_call_id)
+            .request_review(tenant, thread_id, client_id, summary, steps, tool_call_id)
             .await;
 
         let result = match resolution {

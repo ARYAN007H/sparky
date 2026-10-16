@@ -93,6 +93,8 @@ impl PlanExitTool {
             return Ok(ToolResult::error("`plan` must not be empty"));
         }
         if let Some(thread_id) = context.and_then(ToolRunContext::thread_id) {
+            let dispatch_ctx = crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(context);
+            let tenant = dispatch_ctx.tenant().ok();
             // Only flip to Build when there is no plan review still parked on
             // this thread. A review resolves (approve/reject/revise) before
             // `request_plan_review` returns control to the agent, so by the
@@ -102,9 +104,11 @@ impl PlanExitTool {
             // concurrent `plan_exit` call that races a still-pending review:
             // flipping the mode early would unlock every tool for the thread
             // before the user has actually approved anything.
-            if crate::plan_review::gate::global()
-                .parked_review_for_thread(thread_id)
-                .is_some()
+            if tenant.as_ref().is_some_and(|tenant| {
+                crate::plan_review::gate::global()
+                    .parked_review_for_thread(tenant, thread_id)
+                    .is_some()
+            })
             {
                 tracing::warn!(
                     thread_id = %thread_id,
