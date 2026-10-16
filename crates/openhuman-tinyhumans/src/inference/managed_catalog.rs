@@ -10,7 +10,7 @@
 use openhuman_embed::__host::config::Config;
 use openhuman_embed::__host::core::Outcome;
 use openhuman_embed::__host::inference_registry::{
-    BoxFuture, CatalogEntry, CatalogLimits, CatalogListing,
+    BoxFuture, CatalogEntry, CatalogLimits, CatalogListing, CatalogRequest,
 };
 use openhuman_embed::__host::security::credentials::session_support::{
     classify_session_token, load_app_session_profile, publish_local_session_expiry,
@@ -32,8 +32,8 @@ const MODELS_PATH: &str = "/openai/v1/models";
 /// The registry entry for the managed catalog.
 pub(super) fn entry() -> CatalogEntry {
     let list: CatalogListing = Arc::new(
-        |config: Config| -> BoxFuture<Result<Outcome<serde_json::Value>, String>> {
-            Box::pin(async move { list_models(&config).await })
+        |config: Config, request: CatalogRequest| -> BoxFuture<Result<Outcome<serde_json::Value>, String>> {
+            Box::pin(async move { list_models(&config, request).await })
         },
     );
     let limits: CatalogLimits =
@@ -74,36 +74,73 @@ fn truncate(text: &str, max_chars: usize) -> String {
     format!("{cut}...")
 }
 
-/// The `list_configured_models` listing for the managed provider.
-pub(super) async fn list_models(config: &Config) -> Result<Outcome<serde_json::Value>, String> {
-    // Classify the session directly: a store error propagates (a recoverable
-    // fault the picker should surface), only an absent or expired session
-    // degrades to an empty list.
-    let profile = load_app_session_profile(config)?;
-    let token = match classify_session_token(profile.as_ref(), chrono::Utc::now()) {
-        SessionTokenCheck::Live(token) => token,
+/// What authenticates a listing request: the live session token, or the
+/// entry's provider-scoped key when there is no live session.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum ListingAuth {
+    /// The app session token.
+    Session(String),
+    /// A key stored for the entry's slug (a self-hosted entry that carries one).
+    ProviderKey(String),
+    /// Nothing to authenticate with: the catalog is empty, for this reason.
+    Empty(&'static str),
+}
+
+/// Pick the listing credential. A live session wins; without one the entry's
+/// provider-scoped key still authenticates, and only when neither exists does
+/// the catalog degrade to empty.
+pub(super) fn listing_auth(check: SessionTokenCheck, provider_key: &str) -> ListingAuth {
+    let provider_key = provider_key.trim();
+    match check {
+        SessionTokenCheck::Live(token) => ListingAuth::Session(token),
         SessionTokenCheck::Expired => {
             // `require_live_session_token` announced this; without it an expired
             // token stays in the store with nothing prompting a re-auth.
             publish_local_session_expiry("list_configured_models");
-            log::info!("[tinyhumans][inference] managed catalog unavailable: session expired");
-            return empty_catalog("session expired");
+            if provider_key.is_empty() {
+                ListingAuth::Empty("session expired")
+            } else {
+                ListingAuth::ProviderKey(provider_key.to_string())
+            }
         }
-        SessionTokenCheck::Absent => {
-            log::info!("[tinyhumans][inference] managed catalog unavailable: no session");
-            return empty_catalog("no session");
+        SessionTokenCheck::Absent if provider_key.is_empty() => ListingAuth::Empty("no session"),
+        SessionTokenCheck::Absent => ListingAuth::ProviderKey(provider_key.to_string()),
+    }
+}
+
+/// The `list_configured_models` listing for the managed provider.
+pub(super) async fn list_models(
+    config: &Config,
+    request: CatalogRequest,
+) -> Result<Outcome<serde_json::Value>, String> {
+    // Classify the session directly: a store error propagates (a recoverable
+    // fault the picker should surface), only an absent or expired session
+    // degrades to an empty list, or to the entry's own key.
+    let profile = load_app_session_profile(config)?;
+    let check = classify_session_token(profile.as_ref(), chrono::Utc::now());
+    let (token, session_token) = match listing_auth(check, &request.provider_key) {
+        ListingAuth::Session(token) => (token.clone(), true),
+        ListingAuth::ProviderKey(key) => {
+            log::debug!(
+                "[tinyhumans][inference] no live session; using the provider-scoped key"
+            );
+            (key, false)
+        }
+        ListingAuth::Empty(reason) => {
+            log::info!("[tinyhumans][inference] managed catalog unavailable: {reason}");
+            return empty_catalog(reason);
         }
     };
 
     let url = catalog_url(config);
     log::debug!("[tinyhumans][inference] managed catalog url={url}");
-    let client = openhuman_embed::__host::config::build_runtime_proxy_client_with_timeouts(
-        "providers.list_models",
-        30,
-        10,
-    );
+    let client = request.client;
 
     let attach = is_safe_endpoint_for_managed_bearer(&url);
+    // Whether the session token itself made it onto the wire: a 401 on a
+    // request that carried only a provider key describes that key, not the
+    // session.
+    let session_attached = attach && session_token;
     let mut request = client.get(&url);
     if attach {
         request = request.header("Authorization", format!("Bearer {token}"));
@@ -122,7 +159,7 @@ pub(super) async fn list_models(config: &Config) -> Result<Outcome<serde_json::V
         .map_err(|e| format!("[providers][list_models] HTTP request failed: {e}"))?;
     let status = response.status();
     if !status.is_success() {
-        if managed_401_means_signed_out(status.as_u16(), attach) {
+        if managed_401_means_signed_out(status.as_u16(), session_attached) {
             log::info!(
                 "[tinyhumans][inference] managed catalog unavailable: backend rejected the session token (401)"
             );
