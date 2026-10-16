@@ -1,5 +1,6 @@
 use super::*;
 use crate::agent::subagent_host::run_subagent;
+use crate::agent::subagent_host::run_async_spawn_via_driver_tool;
 use tinyagents_harness::context::{current_run_depth, with_run_depth, RunDepth};
 
 #[tokio::test]
@@ -46,6 +47,31 @@ async fn runner_rejects_spawn_beyond_max_depth() {
         None,
         "depth task-local must not leak after rejection"
     );
+}
+
+#[tokio::test]
+async fn prepared_async_spawn_runs_through_driver_jobs_dispatcher() {
+    let provider = ScriptedProvider::new(vec![text_response("driver result")]);
+    let mut options = with_parent(make_parent(provider, vec![]), SubagentRunOptions::default());
+    options.task_id = Some("driver-backed-async-spawn".into());
+    options.run_context.thread_id = Some("driver-spawn-thread".into());
+    let parent = options.run_context.clone().into_tinyagents(
+        tinyagents_harness::context::RunConfig::new("driver-spawn-parent")
+            .with_thread("driver-spawn-thread"),
+    );
+
+    let outcome = run_async_spawn_via_driver_tool(
+        &parent,
+        make_def_named_tools(&[]),
+        "return the requested result".into(),
+        options,
+    )
+    .await
+    .expect("driver-backed spawn should complete");
+
+    assert!(matches!(outcome.status, SubagentRunStatus::Completed));
+    assert_eq!(outcome.output, "driver result");
+    assert_eq!(outcome.task_id, "driver-backed-async-spawn");
 }
 
 #[tokio::test]
