@@ -15,12 +15,11 @@
 //! * **Billing envelope**: [`managed_usage`](super::managed_usage) re-projects the
 //!   `openhuman.{billing,usage}` envelope into the shape the cost bridge reads.
 
-use serde_json::Value;
 use std::path::PathBuf;
 use std::time::Duration;
 
 use tinyinference_llm::message::Message;
-use tinyinference_llm::model::{Modalities, ModelProfile, ModelRequest, ProviderError};
+use tinyinference_llm::model::{ChatModel, Modalities, ModelProfile, ModelRequest, ProviderError};
 use tinyinference_llm::providers::openai::OpenAiModel;
 use tinyinference_llm::providers::ProviderRequestOptions;
 use tinyinference_llm::Error as TiError;

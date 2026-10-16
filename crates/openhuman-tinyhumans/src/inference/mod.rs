@@ -31,7 +31,7 @@ use openhuman_embed::__host::inference_registry::{
 use tinyinference_llm::model::ChatModel;
 
 pub use managed_embedding::ManagedEmbeddingModel;
-pub use managed_model::{ManagedOptions, OpenHumanBackendModel, PROVIDER_LABEL};
+pub use managed_model::{ManagedOptions, OpenHumanBackendModel};
 
 use crate::install::InstallOptions;
 
