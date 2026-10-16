@@ -176,7 +176,9 @@ impl SteerSubagentTool {
             message.chars().count()
         );
 
-        match running_subagents::steer(&dispatch, &resolved_task_id, &parent_session, message, lane).await {
+        match running_subagents::steer(&dispatch, &resolved_task_id, &parent_session, message, lane)
+            .await
+        {
             Ok(()) => Ok(ToolResult::success(format!(
                 "Steered sub-agent `{resolved_task_id}` ({mode}). It will pick this up at its next step. \
                  Use wait_subagent with its subagent_session_id or task_id to collect its result."
@@ -194,6 +196,9 @@ impl SteerSubagentTool {
             Err(SteerError::UnsupportedLane) => Ok(ToolResult::error(
                 "steer_subagent: only steer and collect messages can be delivered to a running sub-agent",
             )),
+            Err(_) => Ok(ToolResult::error(format!(
+                "steer_subagent: unable to deliver a message to sub-agent `{resolved_task_id}`"
+            ))),
         }
     }
 }

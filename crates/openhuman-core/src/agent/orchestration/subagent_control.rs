@@ -15,12 +15,12 @@
 //! cancelled.
 
 use crate::core::runtime::DispatchCtx;
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 
 use crate::agent::orchestration::running_subagents::{CancelledSubagent, SteerError};
 use crate::agent::orchestration::{background_completions, running_subagents, subagent_sessions};
-use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::Outcome;
+use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
 use tinyagents_harness::run_queue::QueueLane;
 
@@ -215,6 +215,7 @@ fn handle_subagent_steer(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
                     // independently of the caller-supplied task ID.
                     SteerError::NotOwned => "not_owned",
                     SteerError::UnsupportedLane => "unsupported_lane",
+                    _ => "steer_failed",
                 };
                 log::debug!(
                     target: "subagent_control_rpc",
