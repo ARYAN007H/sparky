@@ -336,7 +336,9 @@ impl<'a> TurnContext<'a> {
     /// occasion built without one).
     #[must_use]
     pub fn dispatch_ctx(&self) -> crate::core::runtime::DispatchCtx {
-        self.dispatch.cloned().unwrap_or_else(|| crate::core::runtime::DispatchCtx::from_weak(None))
+        self.dispatch
+            .cloned()
+            .unwrap_or_else(|| crate::core::runtime::DispatchCtx::from_weak(None))
     }
 
     /// The agent definition this turn runs as.
