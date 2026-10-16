@@ -6,7 +6,7 @@ use tinyinference_llm::message::{AssistantMessage, ContentBlock};
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 use tinyinference_llm::tool::ToolCall as TaToolCall;
 use tinyinference_llm::usage::{ProviderUsageReport, recover_usage};
-use tinytools_agent::dialect::{DialectResponse, ToolCall as DialectToolCall};
+use tinytools_agent::dialect::DialectResponse;
 
 use crate::inference::provider::{BilledUsage, ChatResponse};
 
