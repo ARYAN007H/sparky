@@ -472,7 +472,7 @@ async fn a_resumed_orchestrator_keeps_the_integration_actions_it_was_sent() {
 
     // Fresh process: no integrations known, so no actions are synthesised.
     prelude.refresh_delegation_tool_surface().unwrap();
-    assert!(!synthesized_tool_names(&prelude).contains("GMAIL_SEND_EMAIL"));
+    assert!(!synthesized_tool_names(prelude).contains("GMAIL_SEND_EMAIL"));
 
     // Resume hands back what the thread was sent.
     let recorded = ToolSnapshot::new(vec![
@@ -497,7 +497,7 @@ async fn a_resumed_orchestrator_keeps_the_integration_actions_it_was_sent() {
     }
     prelude.refresh_delegation_tool_surface().unwrap();
 
-    let names = synthesized_tool_names(&prelude);
+    let names = synthesized_tool_names(prelude);
     assert!(names.contains("GMAIL_SEND_EMAIL"), "{names:?}");
     assert!(names.contains("GMAIL_FETCH_EMAILS"), "{names:?}");
     assert!(

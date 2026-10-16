@@ -9,7 +9,7 @@
 //!    module; there is no parallel implementation elsewhere in the crate.
 //!
 //! 2. **Middleware configuration** — `ContextConfig` configures the TinyAgents
-//! turn middleware stack.
+//!    turn middleware stack.
 //!
 //! Session hosts hold their prompt builder and context settings directly;
 //! TinyAgents owns live transcript reduction and middleware execution.

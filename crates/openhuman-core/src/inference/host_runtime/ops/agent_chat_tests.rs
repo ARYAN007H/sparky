@@ -87,7 +87,7 @@ fn chat_origin(thread: &str) -> crate::security::turn_origin::AgentTurnOrigin {
     crate::security::turn_origin::AgentTurnOrigin::WebChat {
         thread_id: thread.into(),
         client_id: "client".into(),
-        request_id: format!("req-{thread}").into(),
+        request_id: format!("req-{thread}"),
     }
 }
 
