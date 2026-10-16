@@ -361,7 +361,6 @@ async fn run_through_scheduler(config: &Config, job_id: &str) {
         Utc::now() - ChronoDuration::seconds(1),
     )
     .unwrap();
-    let job = cron::get_job(config, job_id).unwrap();
     let security = Arc::new(SecurityPolicy::from_config(
         &config.autonomy,
         &config.workspace_dir,
@@ -372,7 +371,7 @@ async fn run_through_scheduler(config: &Config, job_id: &str) {
         config,
         &security,
     );
-    dispatcher.dispatch(vec![job]).await.unwrap();
+    dispatcher.tick(config).await.unwrap();
     dispatcher.drain().await;
 }
 
@@ -436,7 +435,7 @@ async fn scheduler_flow_runs_active_hours_job_and_reschedules_inside_window() {
         &config,
         &security,
     );
-    dispatcher.dispatch(vec![job.clone()]).await.unwrap();
+    dispatcher.tick(&config).await.unwrap();
     dispatcher.drain().await;
 
     let stored = cron::get_job(&config, &job.id).unwrap();
