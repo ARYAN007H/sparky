@@ -244,7 +244,7 @@ async fn scenario() {
         .can_use_tool(|context| {
             Box::pin(async move {
                 if context.arguments.get("deny").and_then(Value::as_bool) == Some(true) {
-                    ToolHookDecision::Deny("operator refused this call".into())
+                    ToolHookDecision::deny("operator refused this call")
                 } else {
                     ToolHookDecision::default()
                 }

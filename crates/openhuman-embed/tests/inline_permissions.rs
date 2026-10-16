@@ -84,7 +84,7 @@ async fn scenario() {
                 Box::pin(async move {
                     decision
                         .await
-                        .unwrap_or_else(|_| ToolHookDecision::Deny("UI closed".into()))
+                        .unwrap_or_else(|_| ToolHookDecision::deny("UI closed"))
                 })
             }),
         )
@@ -111,7 +111,7 @@ async fn scenario() {
     other.run("independent worker").await.unwrap();
     assert_eq!(other_calls.load(Ordering::SeqCst), 1);
     answer
-        .send(ToolHookDecision::Deny("human refused".into()))
+        .send(ToolHookDecision::deny("human refused"))
         .unwrap();
     assert!(
         first.await.unwrap().is_err(),
@@ -122,7 +122,7 @@ async fn scenario() {
         agent
             .turn("turn-specific refusal")
             .can_use_tool(|_| {
-                Box::pin(async { ToolHookDecision::Deny("turn narrowed authority".into()) })
+                Box::pin(async { ToolHookDecision::deny("turn narrowed authority") })
             })
             .send(),
     );
@@ -185,7 +185,7 @@ async fn repeated_permissions(runtime: &Runtime) {
                     HostTurnTools::advertised(vec![Box::new(Probe(tool_calls.clone()))])
                 })
                 .can_use_tool(|_| {
-                    Box::pin(async { ToolHookDecision::Deny("first policy refused".into()) })
+                    Box::pin(async { ToolHookDecision::deny("first policy refused") })
                 })
                 .can_use_tool(|_| Box::pin(async { ToolHookDecision::default() })),
         )
