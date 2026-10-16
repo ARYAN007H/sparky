@@ -95,8 +95,8 @@ pub mod voice;
 pub use backend::{product_identity, set_product_identity, ProductIdentity};
 pub use hosted::extension as hosted_controllers;
 pub use install::{install, is_installed, InstallError, InstallOptions};
-pub use openhuman_embed::{
-    BackendRequest, BackendTransport, BackendTransportError, TransportProfile,
+pub use transport::{
+    BackendRequest, BackendTransport, BackendTransportError, BaseUrlPurpose, TransportProfile,
 };
 pub use runtime::{RuntimeBuilder, RuntimeError};
 pub use session::{
