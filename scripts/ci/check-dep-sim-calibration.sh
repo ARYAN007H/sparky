@@ -126,6 +126,8 @@ cd "$(dirname "$0")/../.."
 # 302 -> 304 on 2026-10-13: main already resolves 303; the direct `tinymcp`
 # (`ui`) dependency in openhuman-core adds the `tinymcp` name (329 packages /
 # 304 names / 2 native on Linux). See kernel-floor.limits.
-EXPECTED_NAMES=304
+# 304 -> 303 on 2026-10-16: CI on merge base 63c951aea7 measures the flows
+# profile at 326 packages / 303 names / 2 native. See kernel-floor.limits.
+EXPECTED_NAMES=303
 
 exec python3 scripts/dep-sim.py --cut-nothing --expect-names "${EXPECTED_NAMES}"
