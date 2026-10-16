@@ -30,9 +30,7 @@ impl std::fmt::Debug for OpenHumanRunExt {
 }
 
 impl OpenHumanRunExt {
-    pub(super) fn from_run_context(
-        context: &super::run_context::OpenHumanRunContext,
-    ) -> Self {
+    pub(super) fn from_run_context(context: &super::run_context::OpenHumanRunContext) -> Self {
         Self {
             task_recency_window: context.task_recency_window,
             command_environment: context.command_environment.clone(),

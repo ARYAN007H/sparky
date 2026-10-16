@@ -115,3 +115,18 @@ pub(super) fn container_environment(
     }
     Some(env)
 }
+
+/// Add the explicit turn environment to a sandbox command request.
+pub(super) fn extend_explicit_environment(
+    environment: &mut std::collections::HashMap<std::ffi::OsString, std::ffi::OsString>,
+    explicit: Option<&std::collections::BTreeMap<String, String>>,
+) {
+    if let Some(explicit) = explicit {
+        environment.extend(explicit.iter().map(|(name, value)| {
+            (
+                std::ffi::OsString::from(name),
+                std::ffi::OsString::from(value),
+            )
+        }));
+    }
+}

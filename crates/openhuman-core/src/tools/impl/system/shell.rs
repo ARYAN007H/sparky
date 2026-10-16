@@ -702,14 +702,10 @@ impl ShellTool {
         let mut extra_env =
             std::collections::HashMap::<std::ffi::OsString, std::ffi::OsString>::new();
         let command_environment = command_environment_for_tool(context);
-        if let Some(overrides) = command_environment.as_deref() {
-            extra_env.extend(overrides.iter().map(|(name, value)| {
-                (
-                    std::ffi::OsString::from(name),
-                    std::ffi::OsString::from(value),
-                )
-            }));
-        }
+        super::shell_support::extend_explicit_environment(
+            &mut extra_env,
+            command_environment.as_deref(),
+        );
         // Apply the same Git config hardening to local and sandboxed shells.
         extra_env.extend(tinytools_std::filesystem::shell_git_env());
         // And the same Python UTF-8 defaults the native path sets.
