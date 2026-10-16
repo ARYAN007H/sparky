@@ -30,8 +30,10 @@ pub(crate) mod failure_copy;
 pub mod host_runtime;
 pub mod http;
 pub mod model_context;
+pub(crate) mod reasoning;
 pub mod ops;
 pub mod provider;
+pub(crate) mod turn_models;
 mod schemas;
 pub mod tokenjuice;
 

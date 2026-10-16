@@ -31,7 +31,6 @@ pub(crate) mod journal;
 pub(crate) mod live_harness;
 mod memory_summarizer;
 pub(crate) mod middleware;
-pub(crate) mod model;
 pub(crate) mod observability;
 pub mod run_mode;
 // `pub` since issue #6014, and the inconsistency it removes is the point:
@@ -49,7 +48,6 @@ pub mod budget;
 pub mod payload_summarizer;
 mod policy_denial;
 pub(crate) mod reaper;
-pub(crate) mod reasoning;
 mod routes;
 mod steering_forwarder;
 pub(crate) mod stop_hooks;
@@ -57,7 +55,6 @@ pub(crate) mod tool_registration;
 mod turn_exec;
 mod turn_middleware;
 mod turn_model_resolver;
-mod turn_models;
 mod turn_outcome;
 mod turn_plan;
 mod turn_policy;
@@ -71,10 +68,10 @@ pub(crate) use crate::agent::message_convert::chat_message_to_message;
 pub(crate) use crate::agent::message_convert::ta_call_to_oh_call;
 
 pub(crate) use observability::SubagentScope;
-pub(crate) use reasoning::{apply_requested_effort, parse_reasoning_effort};
+pub(crate) use crate::inference::reasoning::{apply_requested_effort, parse_reasoning_effort};
 pub(crate) use turn_exec::TurnSpec;
-pub use turn_models::TurnModelSource;
-pub(crate) use turn_models::TurnModels;
+pub use crate::inference::turn_models::TurnModelSource;
+pub(crate) use crate::inference::turn_models::TurnModels;
 pub(crate) use turn_outcome::TinyagentsTurnOutcome;
 #[cfg(test)]
 pub(crate) use turn_policy::is_subagent_spawn_or_delegate_tool;

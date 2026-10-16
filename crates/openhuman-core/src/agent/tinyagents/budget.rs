@@ -52,7 +52,7 @@ pub(super) fn install_depth(
     }
 }
 
-impl super::turn_models::TurnModels {
+impl crate::inference::turn_models::TurnModels {
     /// Wrap every concrete route and summarizer below harness retries/fallback.
     pub(crate) fn with_budget(mut self, budget: Option<&ModelBudget>) -> Self {
         let Some(budget) = budget else {

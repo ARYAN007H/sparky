@@ -22,7 +22,6 @@ use tinytools_agent::dialect::{
     DialectMessage, DialectResponse, DialectRole, ToolDialect, ToolResultEntry, TranscriptEntry,
 };
 
-use crate::inference::provider::ChatResponse;
 use tinyagents_runtime::transcript::reasoning_from_content;
 #[cfg(test)]
 use tinyagents_runtime::transcript::{
@@ -33,13 +32,6 @@ use tinyagents_session::transcript::TranscriptMessage;
 
 /// Convert the host provider response at its boundary into the canonical
 /// dialect input. The dialect crate owns all parsing after this field-wise map.
-pub(crate) fn dialect_response_from_provider(response: &ChatResponse) -> DialectResponse {
-    DialectResponse {
-        text: response.text.clone(),
-        tool_calls: response.tool_calls.clone(),
-    }
-}
-
 /// Replay typed conversation entries through a canonical dialect and return
 /// the provider's typed rows (a native tool round keeps its calls and call ids
 /// in fields, never packed into `content`).
