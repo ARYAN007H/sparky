@@ -204,6 +204,9 @@ async fn normalize_loaded_config(config: &mut Config) {
         binding.apply_chat(config);
     }
     seed_and_enrich_model_registry(config);
+    // Hook point for a host's resolved endpoints; covers the embedder-supplied
+    // config path, which never goes through `Config::load_*`.
+    crate::config::enrichers::run_enrichers(config);
 }
 
 /// Populate per-token pricing on the model registry from the static catalog.
