@@ -100,7 +100,7 @@ method accepts both a bare payload and a `success: false` envelope.
 
 ### Errors
 
-`map_transport_error` in [`client/errors.rs`](./client/errors.rs) turns a `BackendTransportError`
+`map_transport_error` in [`client/errors.rs`](./client/errors.rs) turns a `crate::transport::BackendTransportError`
 into an `anyhow::Error` and routes it through
 `core::observability::report_error_or_expected` so expected failures stay out
 of Sentry:
