@@ -52,7 +52,8 @@ pub(crate) struct LiveToolSurface {
     pub(crate) has_thread: bool,
     /// The session's agent/turn tool callbacks, registered after the
     /// runtime's global ones.
-    pub(crate) tool_hooks: Vec<Arc<dyn tinyagents_hooks::tool::ToolHook<super::host::OpenHumanRunContext>>>,
+    pub(crate) tool_hooks:
+        Vec<Arc<dyn tinyagents_hooks::tool::ToolHook<super::host::OpenHumanRunContext>>>,
     /// The context the session acts under (its embedder hooks come from it).
     pub(crate) dispatch: crate::core::runtime::DispatchCtx,
 }
@@ -127,11 +128,9 @@ pub(crate) fn assemble_live_tool_harness(
     let mut embedder_tool_hooks = crate::agent::hooks::embedder_tool_hooks_in(&dispatch);
     embedder_tool_hooks.extend(tool_hooks);
     if !embedder_tool_hooks.is_empty() {
-        harness.push_middleware(Arc::new(
-            tinyagents_hooks::tool::ToolHooksMiddleware::<super::host::OpenHumanRunContext>::new(
-                embedder_tool_hooks,
-            ),
-        ));
+        harness.push_middleware(Arc::new(tinyagents_hooks::tool::ToolHooksMiddleware::<
+            super::host::OpenHumanRunContext,
+        >::new(embedder_tool_hooks)));
     }
     harness
 }

@@ -1,8 +1,6 @@
 //! Tracked runtime hooks, composed with agent-local hooks.
 use super::Runtime;
-use crate::seams::{
-    OpenHumanRunContext, ToolHook, ToolHookContext, ToolHookDecision,
-};
+use crate::seams::{OpenHumanRunContext, ToolHook, ToolHookContext, ToolHookDecision};
 use std::sync::Arc;
 
 pub(super) struct NamedToolHook(pub String, pub Arc<dyn ToolHook<OpenHumanRunContext>>);
@@ -62,7 +60,11 @@ impl Runtime {
     /// Add, replace, or remove a runtime-wide tool hook by name.
     /// This also replaces hooks installed by the builder. Changes apply to
     /// subsequently assembled turns; removal restores any predecessor hook.
-    pub fn tool_hook(&self, name: &str, hook: Option<Arc<dyn crate::seams::ToolHook<crate::seams::OpenHumanRunContext>>>) {
+    pub fn tool_hook(
+        &self,
+        name: &str,
+        hook: Option<Arc<dyn crate::seams::ToolHook<crate::seams::OpenHumanRunContext>>>,
+    ) {
         let context = self.core_runtime().context().clone();
         openhuman_core::core::runtime::CoreContext::sync_scope(context.clone(), || {
             let mut seams = self

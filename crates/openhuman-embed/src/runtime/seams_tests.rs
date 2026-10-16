@@ -2,8 +2,8 @@
 //! and the ranker tests (one slot for the whole process) serialize on a lock.
 
 use super::*;
-use tinyagents_hooks::tool::ToolHookContext;
 use tinyagents_harness::host::TurnSummary;
+use tinyagents_hooks::tool::ToolHookContext;
 use tinytools::{RankCandidate, RankContext, RankError, RankHit, ToolRanker};
 
 static RANKER_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
@@ -224,8 +224,7 @@ fn same_named_hooks_unwind_newest_first() {
     assert_eq!(post_turn_marker("seams-dup-hook"), Some(1));
 
     drop(seams);
-    let restored = embedder_post_turn_hook_named("seams-dup-hook")
-        .expect("a hook under the name");
+    let restored = embedder_post_turn_hook_named("seams-dup-hook").expect("a hook under the name");
     assert!(
         Arc::ptr_eq(&restored, &original),
         "the original is back, not the runtime's first hook"

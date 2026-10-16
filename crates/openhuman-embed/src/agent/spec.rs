@@ -58,7 +58,10 @@ pub struct AgentSpec {
     composio: Option<ComposioHostCredential>,
     config_fn: Option<ConfigEdit>,
     host_tools: Option<openhuman_core::agent::HostTools>,
-    hooks: tinyagents_hooks::scope::HookScope<openhuman_core::agent::tinyagents::host::OpenHumanRunContext, tinyagents_harness::cost::TurnCost>,
+    hooks: tinyagents_hooks::scope::HookScope<
+        openhuman_core::agent::tinyagents::host::OpenHumanRunContext,
+        tinyagents_harness::cost::TurnCost,
+    >,
     memory: Option<MemoryBinding>,
     subagents: Vec<(String, AgentDefinitionSpec)>,
 }
@@ -153,7 +156,10 @@ impl AgentSpec {
     }
 
     /// Register a tool hook local to this agent, in addition to runtime hooks.
-    pub fn tool_hook(mut self, hook: std::sync::Arc<dyn crate::seams::ToolHook<crate::seams::OpenHumanRunContext>>) -> Self {
+    pub fn tool_hook(
+        mut self,
+        hook: std::sync::Arc<dyn crate::seams::ToolHook<crate::seams::OpenHumanRunContext>>,
+    ) -> Self {
         self.tool_hooks.push(hook);
         self
     }
@@ -477,7 +483,8 @@ impl AgentSpec {
 pub(crate) struct AgentSpecParts {
     pub(crate) id: String,
     pub(crate) post_turn_hooks: Vec<std::sync::Arc<dyn crate::seams::LearningSink>>,
-    pub(crate) tool_hooks: Vec<std::sync::Arc<dyn crate::seams::ToolHook<crate::seams::OpenHumanRunContext>>>,
+    pub(crate) tool_hooks:
+        Vec<std::sync::Arc<dyn crate::seams::ToolHook<crate::seams::OpenHumanRunContext>>>,
     pub(crate) session_store: Option<std::sync::Arc<dyn crate::SessionStoreProvider>>,
     pub(crate) approval_handler: Option<std::sync::Arc<dyn crate::ApprovalHandler>>,
     pub(crate) definition: AgentDefinitionSpec,
@@ -500,7 +507,10 @@ pub(crate) struct AgentSpecParts {
     pub(crate) composio: Option<ComposioHostCredential>,
     pub(crate) config_fn: Option<ConfigEdit>,
     pub(crate) host_tools: Option<openhuman_core::agent::HostTools>,
-    pub(crate) hooks: tinyagents_hooks::scope::HookScope<openhuman_core::agent::tinyagents::host::OpenHumanRunContext, tinyagents_harness::cost::TurnCost>,
+    pub(crate) hooks: tinyagents_hooks::scope::HookScope<
+        openhuman_core::agent::tinyagents::host::OpenHumanRunContext,
+        tinyagents_harness::cost::TurnCost,
+    >,
     pub(crate) memory: Option<MemoryBinding>,
     pub(crate) subagents: Vec<(String, AgentDefinitionSpec)>,
 }

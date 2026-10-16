@@ -10,14 +10,12 @@ use tinyagents_hooks::tool::{HookIdentity, ToolHook};
 
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 
-static EMBEDDER_POST_TURN_HOOKS:
-    std::sync::LazyLock<std::sync::Mutex<Vec<(Option<String>, Arc<dyn LearningSink>)>>> =
-    std::sync::LazyLock::new(|| std::sync::Mutex::new(Vec::new()));
-static EMBEDDER_TOOL_HOOKS:
-    std::sync::LazyLock<
-        std::sync::Mutex<Vec<(Option<String>, Arc<dyn ToolHook<OpenHumanRunContext>>) >>,
-    > =
-    std::sync::LazyLock::new(|| std::sync::Mutex::new(Vec::new()));
+static EMBEDDER_POST_TURN_HOOKS: std::sync::LazyLock<
+    std::sync::Mutex<Vec<(Option<String>, Arc<dyn LearningSink>)>>,
+> = std::sync::LazyLock::new(|| std::sync::Mutex::new(Vec::new()));
+static EMBEDDER_TOOL_HOOKS: std::sync::LazyLock<
+    std::sync::Mutex<Vec<(Option<String>, Arc<dyn ToolHook<OpenHumanRunContext>>)>>,
+> = std::sync::LazyLock::new(|| std::sync::Mutex::new(Vec::new()));
 
 impl HookIdentity for OpenHumanRunContext {
     fn session_id(&self) -> Option<String> {

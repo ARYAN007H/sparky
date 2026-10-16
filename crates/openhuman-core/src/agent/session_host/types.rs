@@ -6,11 +6,11 @@
 //! `impl OpenHumanSessionHost`/`impl SessionHostBuilder` can see them without the whole
 //! crate gaining field access.
 
-use tinyagents_harness::host::LearningSink;
 use crate::agent::prompts::SystemPromptBuilder;
 use crate::agent::tinyagents::TurnModelSource;
 use crate::progress::AgentProgress;
 use std::sync::Arc;
+use tinyagents_harness::host::LearningSink;
 use tinytools::ToolPolicySession;
 use tinytools::{Tool, ToolSpec};
 use tinytools_agent::dialect::ToolDialect;

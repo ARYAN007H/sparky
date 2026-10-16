@@ -253,7 +253,11 @@ pub(super) async fn finalize_committed_turn(
             if let Err(error) = hook.on_turn_complete(&summary).await {
                 tracing::warn!(index, %error, "post-turn learning sink failed");
             } else {
-                tracing::debug!(index, elapsed_ms = started.elapsed().as_millis(), "post-turn learning sink finished");
+                tracing::debug!(
+                    index,
+                    elapsed_ms = started.elapsed().as_millis(),
+                    "post-turn learning sink finished"
+                );
             }
         });
     }

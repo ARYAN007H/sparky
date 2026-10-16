@@ -10,10 +10,10 @@ use openhuman_embed::seams::{ToolHookContext, ToolHookDecision};
 use openhuman_embed::{
     AgentDefinitionSpec, AgentSpec, HostTurnTools, Runtime, Tool, ToolScopeSpec, Workspace,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
     Arc,
+    atomic::{AtomicUsize, Ordering},
 };
 
 struct Probe(Arc<AtomicUsize>);
@@ -121,9 +121,7 @@ async fn scenario() {
     let second = tokio::spawn(
         agent
             .turn("turn-specific refusal")
-            .can_use_tool(|_| {
-                Box::pin(async { ToolHookDecision::deny("turn narrowed authority") })
-            })
+            .can_use_tool(|_| Box::pin(async { ToolHookDecision::deny("turn narrowed authority") }))
             .send(),
     );
     let (_, answer) = received.recv().await.unwrap();

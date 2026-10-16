@@ -4,7 +4,6 @@
 //! call additionally passes the profile lease fence and the host permission
 //! callback. These adapters never install process-wide user capabilities.
 
-use tinyagents_hooks::tool::{ToolHook, ToolHookContext, ToolHookDecision};
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent::{HostTools, HostTurnTools, TurnContext};
 use crate::config::Config;
@@ -12,6 +11,7 @@ use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx};
 use crate::tools::toolpacks::{GroupMode, ToolGroups};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use tinyagents_hooks::tool::{ToolHook, ToolHookContext, ToolHookDecision};
 use tinytools::PermissionLevel;
 
 /// Capabilities fixed when the profile runtime boots.
@@ -303,9 +303,7 @@ impl ToolHook<OpenHumanRunContext> for ProfilePermission {
                     decision.updated_input = Some(advertised.arguments);
                 }
             }
-            None => {
-                ToolHookDecision::deny("this profile has no host tool permission callback")
-            }
+            None => ToolHookDecision::deny("this profile has no host tool permission callback"),
         }
     }
 }

@@ -9,7 +9,7 @@ pub mod prompt_eval;
 pub mod schemas;
 mod shell;
 
-pub use ops::{init, PromptVerdict};
+pub use ops::{PromptVerdict, init};
 pub use schemas::{
     all_controller_schemas as all_hooks_controller_schemas,
     all_registered_controllers as all_hooks_registered_controllers,

@@ -135,7 +135,10 @@ pub(crate) struct AgentInner {
     /// The agent's own in-process tools, rebuilt per turn. See
     /// [`AgentSpec::tools`](super::AgentSpec::tools) for why it is a factory.
     pub(crate) host_tools: Option<openhuman_core::agent::HostTools>,
-    pub(crate) hooks: tinyagents_hooks::scope::HookScope<openhuman_core::agent::tinyagents::host::OpenHumanRunContext, tinyagents_harness::cost::TurnCost>,
+    pub(crate) hooks: tinyagents_hooks::scope::HookScope<
+        openhuman_core::agent::tinyagents::host::OpenHumanRunContext,
+        tinyagents_harness::cost::TurnCost,
+    >,
     pub(crate) lifecycle: lifecycle::Lifecycle,
     /// Built from [`ToolScopeSpec::HostOnly`]: every turn's session is built
     /// from the host tools alone.
@@ -310,7 +313,11 @@ impl Agent {
     }
 
     /// Add, replace, or remove an agent-local tool hook by name.
-    pub fn tool_hook(&self, name: &str, hook: Option<Arc<dyn crate::seams::ToolHook<crate::seams::OpenHumanRunContext>>>) {
+    pub fn tool_hook(
+        &self,
+        name: &str,
+        hook: Option<Arc<dyn crate::seams::ToolHook<crate::seams::OpenHumanRunContext>>>,
+    ) {
         self.inner.overrides.tool_hook(name, hook);
     }
 

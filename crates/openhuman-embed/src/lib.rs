@@ -63,9 +63,9 @@
 #![warn(missing_docs)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
+pub use openhuman_core::agent::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
 /// Complete definition accepted by [`AgentDefinitionSpec::from_base`].
 pub use openhuman_core::agent_registry::host_definition::AgentDefinition;
-pub use openhuman_core::agent::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
 
 /// The origin of the executing turn, with its original chat or channel route.
 ///
@@ -217,12 +217,14 @@ pub use runtime::{
 /// agent-runtime ownership boundary.
 pub mod seams {
     pub use openhuman_core::agent::tinyagents::host::OpenHumanRunContext;
-    pub use tinyagents_harness::host::{LearningSink, TurnSummary};
-    pub use tinyagents_hooks::tool::{HookIdentity, ToolHook, ToolHookContext, ToolHookDecision, ToolHookEvent};
-    pub use tinyagents_hooks::stop::BudgetStopHook;
     pub use tinyagents_harness::cost::TurnCost;
+    pub use tinyagents_harness::host::{LearningSink, TurnSummary};
     pub use tinyagents_harness::middleware::{PolicyDecision, ToolCallPolicy};
+    pub use tinyagents_hooks::stop::BudgetStopHook;
     pub use tinyagents_hooks::stop::{StopDecision, StopHook};
+    pub use tinyagents_hooks::tool::{
+        HookIdentity, ToolHook, ToolHookContext, ToolHookDecision, ToolHookEvent,
+    };
     /// Product cost snapshot passed to harness-owned stop policies.
     pub type TurnState<'a> = tinyagents_hooks::stop::TurnState<'a, TurnCost>;
     pub use openhuman_core::core::all::{ControllerExtension, DomainGroup};

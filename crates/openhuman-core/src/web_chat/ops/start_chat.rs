@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use crate::core::events::DomainEvent;
 use crate::security::prompt_injection::{
-    enforce_prompt_input, PromptEnforcementAction, PromptEnforcementContext,
+    PromptEnforcementAction, PromptEnforcementContext, enforce_prompt_input,
 };
 use crate::web_chat::WebChannelEvent;
 

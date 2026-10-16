@@ -98,7 +98,10 @@ pub struct Turn {
     control_deadline: Option<tokio::time::Instant>,
     observer: Option<Arc<dyn crate::observe::TurnObserver>>,
     trace_content: crate::observe::TraceContent,
-    hooks: tinyagents_hooks::scope::HookScope<openhuman_core::agent::tinyagents::host::OpenHumanRunContext, tinyagents_harness::cost::TurnCost>,
+    hooks: tinyagents_hooks::scope::HookScope<
+        openhuman_core::agent::tinyagents::host::OpenHumanRunContext,
+        tinyagents_harness::cost::TurnCost,
+    >,
     tools: Option<openhuman_core::agent::HostTools>,
     tool_env: Option<tinytools_std::timeout::CommandEnvironment>,
 }
@@ -143,14 +146,23 @@ impl Turn {
         self
     }
 
-    pub(crate) fn with_hooks(mut self, hooks: tinyagents_hooks::scope::HookScope<openhuman_core::agent::tinyagents::host::OpenHumanRunContext, tinyagents_harness::cost::TurnCost>) -> Self {
+    pub(crate) fn with_hooks(
+        mut self,
+        hooks: tinyagents_hooks::scope::HookScope<
+            openhuman_core::agent::tinyagents::host::OpenHumanRunContext,
+            tinyagents_harness::cost::TurnCost,
+        >,
+    ) -> Self {
         self.hooks = hooks;
         self
     }
 
     /// Add a tool callback for this turn only, after runtime and agent hooks.
     /// Does not change the agent or any other concurrent turn.
-    pub fn tool_hook(mut self, hook: Arc<dyn crate::seams::ToolHook<crate::seams::OpenHumanRunContext>>) -> Self {
+    pub fn tool_hook(
+        mut self,
+        hook: Arc<dyn crate::seams::ToolHook<crate::seams::OpenHumanRunContext>>,
+    ) -> Self {
         self.hooks.push_tool(hook);
         self
     }

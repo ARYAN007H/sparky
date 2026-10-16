@@ -586,11 +586,9 @@ pub(super) fn install_turn_middleware(
     let mut embedder_tool_hooks = crate::agent::hooks::embedder_tool_hooks_in(&dispatch);
     embedder_tool_hooks.extend(scoped_tool_hooks);
     if !embedder_tool_hooks.is_empty() {
-        harness.push_middleware(Arc::new(
-            tinyagents_hooks::tool::ToolHooksMiddleware::<super::host::OpenHumanRunContext>::new(
-                embedder_tool_hooks,
-            ),
-        ));
+        harness.push_middleware(Arc::new(tinyagents_hooks::tool::ToolHooksMiddleware::<
+            super::host::OpenHumanRunContext,
+        >::new(embedder_tool_hooks)));
     }
 
     // Registered last so its `before_model` sees the request after every
