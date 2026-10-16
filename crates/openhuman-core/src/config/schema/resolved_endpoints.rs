@@ -38,4 +38,43 @@ impl ResolvedEndpoints {
     pub fn is_empty(&self) -> bool {
         *self == Self::default()
     }
+
+    /// The control-plane origin, or the `BACKEND_UNAVAILABLE:` sentinel
+    /// `core::observability` demotes when no enricher resolved one, for
+    /// callers on the JSON-RPC `String` error channel.
+    pub fn require_control_plane(&self) -> Result<&str, String> {
+        self.control_plane_url.as_deref().ok_or_else(|| {
+            format!(
+                "{} no control plane resolved",
+                crate::core::observability::BACKEND_UNAVAILABLE_PREFIX
+            )
+        })
+    }
+
+    /// The inference origin: the resolved one, else the user's explicit
+    /// `api_url` override (normalized), else `None`.
+    pub fn inference_or_configured(&self, api_url: &Option<String>) -> Option<String> {
+        self.inference_url.clone().or_else(|| {
+            api_url
+                .as_deref()
+                .map(str::trim)
+                .filter(|u| !u.is_empty())
+                .map(crate::util::url::normalize_api_base_url)
+        })
+    }
+
+    /// The attribution headers as a `reqwest` header map; invalid pairs are
+    /// skipped.
+    pub fn attribution_header_map(&self) -> reqwest::header::HeaderMap {
+        let mut map = reqwest::header::HeaderMap::new();
+        for (name, value) in &self.attribution_headers {
+            if let (Ok(n), Ok(v)) = (
+                reqwest::header::HeaderName::from_bytes(name.as_bytes()),
+                reqwest::header::HeaderValue::from_str(value),
+            ) {
+                map.insert(n, v);
+            }
+        }
+        map
+    }
 }
