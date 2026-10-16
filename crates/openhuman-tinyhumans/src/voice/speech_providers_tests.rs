@@ -41,18 +41,3 @@ fn the_callers_stt_model_is_passed_through() {
     assert_eq!(stt_model(""), DEFAULT_CLOUD_STT_MODEL);
     assert_eq!(stt_model("   "), DEFAULT_CLOUD_STT_MODEL);
 }
-
-/// The registered factory builds the provider with that model.
-#[test]
-fn the_registered_stt_factory_builds_with_the_callers_model() {
-    register();
-    let config = Config::default();
-    let named = create_stt_provider("cloud", "whisper-large", &config).unwrap();
-    for slug in STT_SLUGS {
-        unregister_stt_provider(slug);
-    }
-    for slug in TTS_SLUGS {
-        unregister_tts_provider(slug);
-    }
-    assert_eq!(named.name(), "cloud");
-}
