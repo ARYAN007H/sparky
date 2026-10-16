@@ -16,6 +16,30 @@ use super::background_completions::{new_router, Entry};
 
 use super::background_completions::{record_awaiting_input, record_completion, record_failure};
 
+/// Completion-router key prefix for one task's awaiting-input notices.
+pub(super) fn awaiting_input_record_prefix(task_id: &str) -> String {
+    let encoded_task_id: String = task_id
+        .as_bytes()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    format!(
+        "{}{}:",
+        super::completion_notice::AWAITING_INPUT_RECORD_PREFIX,
+        encoded_task_id
+    )
+}
+
+/// A pause is an independently delivered record, so each pause of a resumed
+/// task needs its own key while leaving the terminal task id free.
+pub(super) fn awaiting_input_record_id(task_id: &str) -> String {
+    format!(
+        "{}{}",
+        awaiting_input_record_prefix(task_id),
+        uuid::Uuid::new_v4().simple()
+    )
+}
+
 /// Where one detached child's completion lands: its workspace (which router),
 /// the parent session (the idle gate) and the parent chat thread (the router's
 /// parent key). Built once at spawn so every terminal path records the same way.

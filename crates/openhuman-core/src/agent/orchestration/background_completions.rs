@@ -40,10 +40,9 @@ use tinyagents_tasks::{
 };
 
 use super::completion_notice::BackgroundCompletionFormatter;
-pub(crate) use super::completion_notice::{
-    BackgroundAgentOutcome, AWAITING_INPUT_LABEL, AWAITING_INPUT_RECORD_PREFIX,
-};
+pub(crate) use super::completion_notice::{BackgroundAgentOutcome, AWAITING_INPUT_LABEL};
 pub(crate) use super::completion_target::CompletionTarget;
+use super::completion_target::{awaiting_input_record_id, awaiting_input_record_prefix};
 pub(crate) use super::completion_target::{claim_recovery, forget_recovery};
 #[cfg(test)]
 pub(crate) use super::completion_target::{
@@ -404,32 +403,6 @@ pub(crate) async fn record_awaiting_input(
     .await;
 }
 
-/// Completion-router key for an awaiting-input notification. The real task id
-/// remains available in the notification body; this separate key leaves the
-/// task id's dedupe slot open for its eventual terminal result.
-fn encoded_task_id(task_id: &str) -> String {
-    task_id
-        .as_bytes()
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
-}
-
-fn awaiting_input_record_prefix(task_id: &str) -> String {
-    format!(
-        "{AWAITING_INPUT_RECORD_PREFIX}{}:",
-        encoded_task_id(task_id)
-    )
-}
-
-fn awaiting_input_record_id(task_id: &str) -> String {
-    format!(
-        "{}{}",
-        awaiting_input_record_prefix(task_id),
-        uuid::Uuid::new_v4().simple()
-    )
-}
-
 /// Drop every workspace's router and all process-local state about them. Called
 /// when the core server stops (`openhuman_rpc::server::serve`), so the completion logs'
 /// file handles close before a data reset removes their directory (Windows
@@ -765,6 +738,10 @@ pub(crate) fn recover_pending_threads(ctx: &DispatchCtx, workspace_dir: &Path) -
 #[cfg(test)]
 #[path = "background_completions_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "background_completions_pause_tests.rs"]
+mod pause_tests;
 
 #[cfg(test)]
 #[path = "background_completions_release_tests.rs"]
