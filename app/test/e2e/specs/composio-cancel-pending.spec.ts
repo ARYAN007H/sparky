@@ -19,7 +19,7 @@ import {
   seedComposioConnection,
   seedComposioToolkits,
 } from '../helpers/composio-helpers';
-import { triggerAuthDeepLinkBypass } from '../helpers/deep-link-helpers';
+import { triggerAuthLoopbackBypass } from '../helpers/loopback-auth-helpers';
 import {
   clickTestId,
   waitForTestId,
@@ -50,7 +50,7 @@ describe('Composio pending-connection cancel flow', () => {
     seedComposioConnection(TOOLKIT_SLUG, 'INITIATED', PENDING_CONNECTION_ID);
     await waitForApp();
     clearRequestLog();
-    await triggerAuthDeepLinkBypass(AUTH_TOKEN);
+    await triggerAuthLoopbackBypass(AUTH_TOKEN);
     await waitForWindowVisible(25_000);
     await waitForWebView(15_000);
     await completeOnboardingIfVisible(LOG);

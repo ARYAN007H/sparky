@@ -19,7 +19,7 @@ import {
   seedComposioToolkits,
 } from '../helpers/composio-helpers';
 import { callOpenhumanRpc } from '../helpers/core-rpc';
-import { triggerAuthDeepLinkBypass } from '../helpers/deep-link-helpers';
+import { triggerAuthLoopbackBypass } from '../helpers/loopback-auth-helpers';
 import {
   textExists,
   waitForText,
@@ -54,7 +54,7 @@ describe('GitHub Composio connector flow', () => {
     setMockBehavior('composioActiveTriggers', JSON.stringify([]));
     await waitForApp();
     clearRequestLog();
-    await triggerAuthDeepLinkBypass(AUTH_TOKEN);
+    await triggerAuthLoopbackBypass(AUTH_TOKEN);
     await waitForWindowVisible(25_000);
     await waitForWebView(15_000);
     await completeOnboardingIfVisible(LOG);

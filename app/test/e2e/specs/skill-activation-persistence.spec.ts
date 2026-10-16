@@ -29,7 +29,7 @@ import {
   seedComposioConnection,
   seedComposioToolkits,
 } from '../helpers/composio-helpers';
-import { triggerAuthDeepLinkBypass } from '../helpers/deep-link-helpers';
+import { triggerAuthLoopbackBypass } from '../helpers/loopback-auth-helpers';
 import {
   textExists,
   waitForText,
@@ -73,7 +73,7 @@ describe('Skill activation persistence across restart', () => {
     seedComposioConnection(TOOLKIT_SLUG, 'ACTIVE', 'c-gmail-1');
     await waitForApp();
     clearRequestLog();
-    await triggerAuthDeepLinkBypass(AUTH_TOKEN);
+    await triggerAuthLoopbackBypass(AUTH_TOKEN);
     await waitForWindowVisible(25_000);
     await waitForWebView(15_000);
     await completeOnboardingIfVisible(LOG);
