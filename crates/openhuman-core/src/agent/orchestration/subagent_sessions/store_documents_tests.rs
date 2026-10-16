@@ -21,7 +21,7 @@ fn session(id: &str) -> DurableSubagentSession {
         "actionRoot": null,
         "taskKey": "task",
         "taskTitle": "Task",
-        "currentTaskId": null,
+        "currentTaskId": "sub-legacy",
         "status": "idle",
         "reusable": true,
         "latestHistory": null,
@@ -52,7 +52,7 @@ fn save_upserts_sessions_and_keeps_the_others() {
     // The source fixture intentionally predates lifecycle_key. Its owner and
     // task reference remain available for the scoped legacy lookup path.
     assert_eq!(loaded[0].parent_session, "parent");
-    assert_eq!(loaded[0].current_task_id, None);
+    assert_eq!(loaded[0].current_task_id.as_deref(), Some("sub-legacy"));
     assert_eq!(loaded[0].lifecycle_key, None);
     // A save from a stale snapshot never removes a session it does not know.
     docs.save(&[session("c")]).unwrap();
