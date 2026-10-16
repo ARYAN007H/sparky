@@ -399,9 +399,10 @@ impl AutomaticMutation {
 /// Captures authority without waiting on the engine or an active erasure.
 pub(crate) fn automatic_mutation(config: &Config) -> AutomaticMutation {
     let state = owner_state(config);
+    let generation = state.gate.generation();
     AutomaticMutation {
         state,
-        generation: state.gate.generation(),
+        generation,
     }
 }
 
