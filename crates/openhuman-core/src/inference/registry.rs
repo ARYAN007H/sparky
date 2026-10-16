@@ -41,9 +41,11 @@ pub struct ChatModelRequest<'a> {
     pub role: &'a str,
     /// The configuration in force.
     pub config: &'a Config,
-    /// A concrete model id or a role alias (`hint:coding`) the caller pinned.
+    /// The concrete model id the core resolved for this construction (a role
+    /// alias such as `hint:coding` has already been translated to the
+    /// configured default).
     pub model_override: Option<&'a str>,
-    /// The model the turn runs on when the caller did not pin one.
+    /// The model the turn runs on when the request itself names none.
     pub default_model: Option<&'a str>,
     /// Whether the model should use native tool calling.
     pub native_tool_calling: bool,
@@ -115,6 +117,11 @@ pub struct EmbeddingRequest<'a> {
     pub dimensions: usize,
     /// The chat turn the call is made in, so disclosures reach that chat.
     pub chat: Option<ApprovalChatContext>,
+    /// The directory the caller's credentials live in (the config's credential
+    /// scope, or the process default when the caller has no config).
+    pub state_dir: std::path::PathBuf,
+    /// Whether that credential store is encrypted at rest.
+    pub secrets_encrypt: bool,
 }
 
 /// Builds an embedding model.

@@ -6,6 +6,7 @@ use std::sync::Arc;
 use crate::integrations::types::IntegrationPricing;
 
 use super::construct::IntegrationClient;
+use crate::backend::url::effective_backend_api_url;
 
 impl IntegrationClient {
     /// Fetch and cache pricing info from the backend. Returns a default
@@ -56,7 +57,7 @@ pub async fn pricing_for_config(
     client: &IntegrationClient,
     config: &openhuman_embed::__host::config::Config,
 ) -> IntegrationPricing {
-    use crate::config::schema::COMPOSIO_MODE_DIRECT;
+    use openhuman_embed::__host::config::schema::COMPOSIO_MODE_DIRECT;
 
     if config.composio.mode.trim() == COMPOSIO_MODE_DIRECT {
         tracing::debug!(
@@ -74,9 +75,9 @@ pub async fn pricing_for_config(
 ///
 /// Both the backend URL and the credential come from **core defaults**:
 ///
-/// - backend URL → [`crate::backend::base_url`]
+/// - backend URL → [`effective_backend_api_url`]
 ///   applied to `config.api_url`. Unlike the plain
-///   [`crate::backend::inference_base_url`] resolver (which honours a
+///   `effective_api_url` resolver (which honours a
 ///   user-set local-AI endpoint so chat completions still work), the
 ///   backend resolver detects local-AI URLs and falls back to the
 ///   `BACKEND_URL` / `VITE_BACKEND_URL` env vars (and finally the hosted
@@ -102,15 +103,7 @@ pub fn build_client(config: &openhuman_embed::__host::config::Config) -> Option<
     // which 404 against the local LLM and flooded Sentry
     // (OPENHUMAN-TAURI-51 / -80 / -7Z). The helper falls through to env /
     // default backend in that case so integrations actually work.
-    let backend_url = match crate::backend::base_url(&config.api_url) {
-        Ok(url) => url,
-        Err(_) => {
-            tracing::debug!(
-                "[integrations] no backend transport — integrations client unavailable"
-            );
-            return None;
-        }
-    };
+    let backend_url = effective_backend_api_url(&config.api_url);
 
     let credential =
         match openhuman_embed::__host::security::credentials::session_support::resolve_backend_credential(config) {

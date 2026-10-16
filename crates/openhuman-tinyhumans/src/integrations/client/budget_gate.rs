@@ -10,7 +10,7 @@
 //! about one probe a minute across both surfaces.
 //!
 //! The pre-call probe reads `GET /teams/me/usage` through
-//! [`BackendClient`], so it rides the backend transport port. It resolves
+//! [`BackendClient`], so it rides this crate's SDK transport. It resolves
 //! the credential first and defers to the backend (allows the call) without
 //! any request when there is no usable TinyHumans credential — the offline
 //! local session, an API-less core, or a signed-out user.
@@ -20,6 +20,7 @@ use std::time::{Duration, Instant};
 
 use serde_json::Value;
 
+use crate::backend::url::effective_backend_api_url;
 use crate::client::BackendClient;
 use openhuman_embed::__host::config::Config;
 use openhuman_embed::__host::core::Outcome;
@@ -29,7 +30,7 @@ use openhuman_embed::__host::security::credentials::session_support::BackendCred
 /// already-resolved credential. `flatten_authed_error` keeps the typed 401 on
 /// the `SESSION_EXPIRED` sentinel so a lapse never anchors the backoff.
 async fn fetch_usage(config: &Config, credential: BackendCredential) -> Result<Value, String> {
-    let api_url = crate::backend::require_base_url(&config.api_url)?;
+    let api_url = effective_backend_api_url(&config.api_url);
     let client = BackendClient::new(&api_url).map_err(|e| format!("{e:#}"))?;
     client
         .authed_json(&credential, reqwest::Method::GET, "/teams/me/usage", None)
@@ -128,7 +129,7 @@ where
 async fn probe_usage(config: &Config) -> Result<Value, String> {
     let credential =
         openhuman_embed::__host::security::credentials::session_support::resolve_backend_credential(config)?;
-    let backend_key = crate::backend::require_base_url(&config.api_url)?;
+    let backend_key = effective_backend_api_url(&config.api_url);
     usage_with_failure_backoff(&backend_key, || fetch_usage(config, credential))
         .await
         .map(|outcome| outcome.value)
