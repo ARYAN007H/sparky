@@ -409,6 +409,9 @@ pub enum DomainEvent {
     CronSystemJobDue {
         /// The job name, e.g. `memory_context_refresh`.
         job: String,
+        /// The tenant whose scheduler fired the job; `None` for the host's own.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tenant: Option<crate::core::runtime::Tenant>,
     },
     /// Live per-step progress of an in-flight `flows_run` / `flows_resume`
     /// (issue G2, live run observation). Published from
@@ -879,6 +882,9 @@ pub enum DomainEvent {
         toolkit: String,
         connection_id: String,
         connect_url: String,
+        /// The tenant that owns the connection; `None` for the host's own.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tenant: Option<crate::core::runtime::Tenant>,
     },
     /// A Composio connection was removed.
     ComposioConnectionDeleted {
@@ -910,6 +916,9 @@ pub enum DomainEvent {
         /// Whether a direct-mode API key is now present in the encrypted
         /// store. The key itself is never carried on the event.
         api_key_set: bool,
+        /// The tenant the change concerns; `None` for the host's own.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tenant: Option<crate::core::runtime::Tenant>,
     },
 
     // ── Triage ──────────────────────────────────────────────────────────
@@ -1254,7 +1263,12 @@ pub enum DomainEvent {
     /// `local` or `cleared` — never the credential itself. Subscribers that
     /// cache credential-derived state (the search module's managed routes)
     /// refresh on it.
-    CredentialChanged { kind: String },
+    CredentialChanged {
+        kind: String,
+        /// The tenant the change concerns; `None` for the host's own.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tenant: Option<crate::core::runtime::Tenant>,
+    },
 
     // ── Voice ────────────────────────────────────────────────────────────
     /// A voice domain event (PTT, transcription lifecycle, etc.).

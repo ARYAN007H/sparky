@@ -217,7 +217,9 @@ pub(crate) async fn build_builder_proposal(
     // Connector onboarding (Phase 5, item 18): tell the proposal card which
     // toolkits this graph needs and whether they're connected, so it can render
     // "Connect <toolkit>" CTAs instead of a bare gate error later.
-    let required_connections = compute_required_connections(config, graph).await;
+    let required_connections =
+        compute_required_connections(&crate::core::runtime::DispatchCtx::ambient(), config, graph)
+            .await;
     // B45 (design correction): the LLM-provider-connectivity evaluation is
     // ADVISORY here, never a rejection — `run_builder_gates` above no longer
     // includes it (that used to hard-block `propose_workflow`/`edit_workflow`
@@ -384,7 +386,13 @@ pub(crate) async fn validate_agent_refs(config: &Config, graph: &WorkflowGraph) 
             }
             AgentRoute::RegistryFallback => {
                 if custom_registry.is_none() {
-                    custom_registry = Some(crate::agent::registry::list_agents(true).await);
+                    custom_registry = Some(
+                        crate::agent::registry::list_agents(
+                            &crate::core::runtime::DispatchCtx::ambient(),
+                            true,
+                        )
+                        .await,
+                    );
                 }
                 match custom_registry.as_ref().expect("just populated") {
                     Ok(entries) => match entries.iter().find(|entry| entry.id == agent_ref) {

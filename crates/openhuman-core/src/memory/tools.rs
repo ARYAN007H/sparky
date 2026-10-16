@@ -31,6 +31,7 @@ use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolResult, ToolRunConte
 use crate::config::Config;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
+use crate::core::runtime::DispatchCtx;
 
 use super::error::MemoryError;
 use super::ops;
@@ -46,15 +47,19 @@ type TurnCitations = Mutex<HashMap<String, Vec<TurnCitation>>>;
 
 /// Citations `recall` produced during a thread's in-flight turn, drained by
 /// the chat surface once the turn returns ([`take_turn_citations`]).
-fn turn_citations() -> Arc<TurnCitations> {
-    crate::core::runtime::current_slot::<TurnCitations>()
+fn turn_citations(ctx: &DispatchCtx) -> Arc<TurnCitations> {
+    crate::core::runtime::slot_for::<TurnCitations>(ctx)
 }
 
-fn record_turn_citations(thread_id: &str, citations: &[tinymemory_api::Citation]) {
+fn record_turn_citations(
+    ctx: &DispatchCtx,
+    thread_id: &str,
+    citations: &[tinymemory_api::Citation],
+) {
     if citations.is_empty() {
         return;
     }
-    let citations_by_thread = turn_citations();
+    let citations_by_thread = turn_citations(ctx);
     let mut all = citations_by_thread
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -72,11 +77,11 @@ fn record_turn_citations(thread_id: &str, citations: &[tinymemory_api::Citation]
 /// Records `citations` for `thread_id`'s in-flight turn: what the turn's
 /// memory pack cited (`lifecycle::hooks::pre_turn`), beside what `recall`
 /// cites.
-pub fn record_pack_citations(thread_id: &str, citations: Vec<TurnCitation>) {
+pub fn record_pack_citations(ctx: &DispatchCtx, thread_id: &str, citations: Vec<TurnCitation>) {
     if citations.is_empty() {
         return;
     }
-    let citations_by_thread = turn_citations();
+    let citations_by_thread = turn_citations(ctx);
     let mut all = citations_by_thread
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -94,8 +99,8 @@ pub fn record_pack_citations(thread_id: &str, citations: Vec<TurnCitation>) {
 /// Drains the citations `recall` and the turn's pack produced for
 /// `thread_id` since the last drain.
 #[must_use]
-pub fn take_turn_citations(thread_id: &str) -> Vec<TurnCitation> {
-    turn_citations()
+pub fn take_turn_citations(ctx: &DispatchCtx, thread_id: &str) -> Vec<TurnCitation> {
+    turn_citations(ctx)
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .remove(thread_id)
@@ -242,7 +247,12 @@ fn evidence_json(view: &RecallView) -> Value {
 
 /// Runs one action. Errors become a model-visible tool error, never a hard
 /// failure, so the model can adapt (memory off, unsupported mode, …).
-pub async fn run_action(config: &Config, args: &Value, facts: &CallFacts) -> ToolResult {
+pub async fn run_action(
+    ctx: &DispatchCtx,
+    config: &Config,
+    args: &Value,
+    facts: &CallFacts,
+) -> ToolResult {
     let action = arg_str(args, "action").unwrap_or_default();
     tracing::debug!(action = %action, "[memory:tool] dispatch");
     let result: Result<Value, String> = match action.as_str() {
@@ -258,7 +268,7 @@ pub async fn run_action(config: &Config, args: &Value, facts: &CallFacts) -> Too
                     .await
                     .map(|view| {
                         if let Some(thread_id) = facts.thread_id.as_deref() {
-                            record_turn_citations(thread_id, &view.citations);
+                            record_turn_citations(ctx, thread_id, &view.citations);
                         }
                         BUS.publish(DomainEvent::MemoryRecalled {
                             query: question,
@@ -398,6 +408,7 @@ impl Tool for MemoryTool {
         context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
         let facts = CallFacts::gather(&self.config, context);
+        let dispatch = crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(context);
         let run_id = context
             .and_then(ToolRunContext::host_extension)
             .and_then(|any| any.downcast_ref::<tinyagents_harness::tool::ToolExecutionContext>())
@@ -411,10 +422,9 @@ impl Tool for MemoryTool {
             let config = self.config.clone();
             let write_args = args.clone();
             let queued_root = facts.reach.at.clone();
-            let queued = crate::core::runtime::spawn_blocking_scoped(move || {
-                super::tool_writes::enqueue(&config, &write_args, &facts)
-            })
-            .await;
+            let queued = dispatch
+                .spawn_blocking(move || super::tool_writes::enqueue(&config, &write_args, &facts))
+                .await;
             return Ok(
                 match queued.unwrap_or_else(|_| {
                     Err(MemoryError::Unavailable(
@@ -422,7 +432,7 @@ impl Tool for MemoryTool {
                     ))
                 }) {
                     Ok(value) => {
-                        super::tool_writes::schedule(self.config.clone(), &queued_root);
+                        super::tool_writes::schedule(&dispatch, self.config.clone(), &queued_root);
                         ToolResult::success(value.to_string())
                     }
                     Err(error) => ToolResult::error(render_error(error)),
@@ -431,7 +441,7 @@ impl Tool for MemoryTool {
         }
         Ok(self
             .budget
-            .run(run_id, run_action(&self.config, &args, &facts))
+            .run(run_id, run_action(&dispatch, &self.config, &args, &facts))
             .await)
     }
 }

@@ -1,5 +1,6 @@
 //! User-scoped lifecycle and host transport for TinyWallet Web3 quotes.
 
+use crate::core::runtime::DispatchCtx;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -32,11 +33,12 @@ fn service() -> &'static tokio::sync::Mutex<Option<Web3Service>> {
 }
 
 async fn ensure_service(
+    ctx: &DispatchCtx,
     config: &Config,
     active: &mut Option<Web3Service>,
 ) -> Result<(), wallet::WalletCallError> {
     register_shutdown_hook();
-    let accounts = wallet_host::wallet_accounts_snapshot()
+    let accounts = wallet_host::wallet_accounts_snapshot(ctx)
         .await
         .map_err(wallet::WalletCallError::Failed)?;
     let workspace = config.workspace_dir.clone();
@@ -138,7 +140,8 @@ fn register_shutdown_hook() {
         let Some(current) = active.as_ref() else {
             return;
         };
-        let config = crate::config::rpc::load_config_with_timeout().await;
+        // A shutdown hook carries no context of its own.
+        let config = DispatchCtx::host_default().load_config().await;
         let Ok(config) = config else {
             tracing::warn!(
                 "[modules:web3] could not load configuration to close service at shutdown"
@@ -174,13 +177,14 @@ pub(crate) struct ExecuteParams {
 
 /// Prepare one implementation-owned Web3 quote.
 pub(crate) async fn quote(
+    ctx: &DispatchCtx,
     config: &Config,
     owner: Option<QuoteOwner>,
     member: &'static str,
     params: serde_json::Value,
 ) -> Result<Web3QuoteResponse, wallet::WalletCallError> {
     let mut active = service().lock().await;
-    ensure_service(config, &mut active).await?;
+    ensure_service(ctx, config, &mut active).await?;
     let service_handle = active
         .as_ref()
         .expect("ensure_service installs a handle")
@@ -206,14 +210,18 @@ pub(crate) async fn quote(
 }
 
 /// Call the module-owned authenticated-backend route operation.
-pub(crate) async fn routes(config: &Config) -> Result<serde_json::Value, wallet::WalletCallError> {
+pub(crate) async fn routes(
+    ctx: &DispatchCtx,
+    config: &Config,
+) -> Result<serde_json::Value, wallet::WalletCallError> {
     let mut active = service().lock().await;
-    ensure_service(config, &mut active).await?;
+    ensure_service(ctx, config, &mut active).await?;
     wallet::call(config, methods::WEB3_ROUTES, ()).await
 }
 
 /// Execute one explicitly confirmed quote using its module-declared signer chain.
 pub(crate) async fn execute(
+    ctx: &DispatchCtx,
     config: &Config,
     owner: Option<QuoteOwner>,
     quote_id: String,
@@ -225,7 +233,7 @@ pub(crate) async fn execute(
         ));
     }
     let mut active = service().lock().await;
-    ensure_service(config, &mut active).await?;
+    ensure_service(ctx, config, &mut active).await?;
     let service_handle = active
         .as_ref()
         .expect("ensure_service installs a handle")
@@ -245,7 +253,7 @@ pub(crate) async fn execute(
         WalletChain::Solana => crate::web3::wallet::WalletChain::Solana,
         WalletChain::Tron => crate::web3::wallet::WalletChain::Tron,
     };
-    let stored = crate::web3::wallet::secret_material(chain)
+    let stored = crate::web3::wallet::secret_material(ctx, chain)
         .await
         .map_err(|error| wallet::WalletCallError::Failed(error.to_string()))?;
     let mnemonic =

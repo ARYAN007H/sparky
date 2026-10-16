@@ -92,7 +92,7 @@ async fn import_into(scoped: &ScopedStorage, state_dir: &Path) -> Result<Outcome
     }
 
     let legacy =
-        crate::core::runtime::spawn_blocking_scoped(move || read_legacy(&prefs_dir, &triggers_dir))
+        crate::core::runtime::DispatchCtx::ambient().spawn_blocking(move || read_legacy(&prefs_dir, &triggers_dir))
             .await
             .context("the legacy reader panicked")??;
 

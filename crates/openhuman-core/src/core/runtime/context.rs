@@ -305,7 +305,8 @@ impl CoreContext {
         //    background jobs start later, from CoreRuntime::start_services(), after a transport binds
         //    succeeds.
         let runtime_config = config.clone();
-        super::bootstrap::bootstrap_core_runtime(host_kind, config, domains).await;
+        super::bootstrap::bootstrap_core_runtime(host_kind, config, domains, &super::DispatchCtx::new(ctx.clone()))
+            .await;
 
         Ok((ctx, has_operator_token, runtime_config))
     }
@@ -565,7 +566,7 @@ impl CoreContext {
     ///
     /// In SaaS only the caller's own task scope is carried (never the
     /// operator's default context), together with its memory identity — the
-    /// same rule as [`spawn_scoped`](crate::core::runtime::spawn_scoped).
+    /// same rule as [`DispatchCtx::spawn`](crate::core::runtime::DispatchCtx::spawn).
     pub fn propagate<F: Future>(fut: F) -> impl Future<Output = F::Output> {
         super::spawn::carry(fut)
     }

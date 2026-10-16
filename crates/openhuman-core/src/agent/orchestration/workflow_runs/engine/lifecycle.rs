@@ -1,6 +1,7 @@
 //! Public entry points (`start`/`stop`/`resume`) and the spawned engine loop
 //! that drives a run's phase DAG to completion.
 
+use crate::core::runtime::DispatchCtx;
 use anyhow::{anyhow, Context, Result};
 use serde_json::Value;
 use std::sync::Arc;
@@ -29,6 +30,7 @@ use tinyagents_orchestration::workflow::WorkflowDefinition;
 /// [`WorkflowRun`] is the freshly-created row (status `Running`); callers poll
 /// `workflow_run_get` to observe progress.
 pub async fn start_workflow_run(
+    ctx: &DispatchCtx,
     config: &Config,
     definition_id: &str,
     input: Value,
@@ -67,12 +69,20 @@ pub async fn start_workflow_run(
     // sub-agents whose tool calls the approval gate judges by that label.
     // Inherit-only: `None` leaves the loop unlabelled and failing closed.
     let inherited_origin = crate::agent::turn_origin::capture();
-    crate::core::runtime::spawn_scoped(async move {
-        match crate::config::ops::load_current_or_init().await {
+    let task_ctx = ctx.clone();
+    ctx.spawn(async move {
+        match crate::config::ops::load_current_or_init(&task_ctx).await {
             Ok(task_config) => {
                 crate::agent::turn_origin::with_inherited_origin(
                     inherited_origin,
-                    run_engine_loop(&task_config, &task_run_id, definition, cancel, None),
+                    run_engine_loop(
+                        &task_ctx,
+                        &task_config,
+                        &task_run_id,
+                        definition,
+                        cancel,
+                        None,
+                    ),
                 )
                 .await;
             }
@@ -165,7 +175,11 @@ pub async fn stop_workflow_run(config: &Config, id: &str) -> Result<Option<Workf
 /// phase whose dependencies are satisfied. Returns the run row (now `Running`),
 /// or an error if the run is unknown / already terminal-complete / its
 /// definition no longer exists.
-pub async fn resume_workflow_run(config: &Config, id: &str) -> Result<WorkflowRun> {
+pub async fn resume_workflow_run(
+    ctx: &DispatchCtx,
+    config: &Config,
+    id: &str,
+) -> Result<WorkflowRun> {
     log::debug!(target: LOG_TARGET, "[workflow_run_engine] resume.entry run={id}");
     let run = get_workflow_run(config, id)?.ok_or_else(|| anyhow!("unknown workflow run: {id}"))?;
 
@@ -206,12 +220,20 @@ pub async fn resume_workflow_run(config: &Config, id: &str) -> Result<WorkflowRu
     // Same inherit-only origin propagation as `start_workflow_run`: the resumed
     // loop runs on a fresh task, which would otherwise drop the caller's label.
     let inherited_origin = crate::agent::turn_origin::capture();
-    crate::core::runtime::spawn_scoped(async move {
-        match crate::config::ops::load_current_or_init().await {
+    let task_ctx = ctx.clone();
+    ctx.spawn(async move {
+        match crate::config::ops::load_current_or_init(&task_ctx).await {
             Ok(task_config) => {
                 crate::agent::turn_origin::with_inherited_origin(
                     inherited_origin,
-                    run_engine_loop(&task_config, &task_run_id, definition, cancel, None),
+                    run_engine_loop(
+                        &task_ctx,
+                        &task_config,
+                        &task_run_id,
+                        definition,
+                        cancel,
+                        None,
+                    ),
                 )
                 .await;
             }
@@ -235,6 +257,7 @@ pub async fn resume_workflow_run(config: &Config, id: &str) -> Result<WorkflowRu
 /// an owned [`Config`]. Errors are recorded on the run row (status `Failed`)
 /// rather than propagated — there is no caller to receive them.
 pub(crate) async fn run_engine_loop(
+    ctx: &DispatchCtx,
     config: &Config,
     run_id: &str,
     definition: WorkflowDefinition,
@@ -287,6 +310,7 @@ pub(crate) async fn run_engine_loop(
     };
     let cancel_token = cancel.token.clone();
     let outcome = with_root_parent(
+        ctx,
         parent_override,
         config,
         "workflow_engine",

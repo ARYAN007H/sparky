@@ -261,6 +261,17 @@ impl Tool for RunFlowTool {
     }
 
     async fn execute(&self, args: Value) -> anyhow::Result<ToolResult> {
+        self.execute_with_context(args, tinytools::ToolCallOptions::default(), None)
+            .await
+    }
+
+    async fn execute_with_context(
+        &self,
+        args: Value,
+        _options: tinytools::ToolCallOptions,
+        tool_context: Option<&dyn tinytools::ToolRunContext>,
+    ) -> anyhow::Result<ToolResult> {
+        let ctx = crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(tool_context);
         let flow_id = match args.get("flow_id").and_then(Value::as_str).map(str::trim) {
             Some(id) if !id.is_empty() => id.to_string(),
             _ => {
@@ -303,6 +314,7 @@ impl Tool for RunFlowTool {
         // task, and returns `{ run_id, status: "running" }` in well under 120s.
         // The copilot then polls `get_flow_run(run_id)` to observe completion.
         match crate::flows::ops::flows_run_detached(
+            &ctx,
             &self.config,
             &flow_id,
             input,

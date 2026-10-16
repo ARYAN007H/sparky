@@ -93,6 +93,7 @@ pub struct Turn {
     require_tool_call: bool,
     untrusted_input: bool,
     cancellation: Option<crate::TurnCancellation>,
+    steering: Option<crate::TurnSteering>,
     timeout: Option<std::time::Duration>,
     control_deadline: Option<tokio::time::Instant>,
     observer: Option<Arc<dyn crate::observe::TurnObserver>>,
@@ -126,6 +127,7 @@ impl Turn {
             require_tool_call: false,
             untrusted_input: false,
             cancellation: None,
+            steering: None,
             timeout: None,
             control_deadline: None,
             observer: None,
@@ -587,12 +589,14 @@ async fn dispatch(
             }
             let ctx = std::sync::Arc::clone(rt.context());
             let chat_env = options.chat_env;
+            let dispatch = openhuman_core::core::runtime::DispatchCtx::new(std::sync::Arc::clone(&ctx));
             let turn: futures_box::BoxFuture<'_, Result<AgentReply, CoreError>> =
                 Box::pin(async move {
                     use openhuman_core::inference::host_runtime::ops::{
                         agent_chat_reply_for, AgentChatTarget,
                     };
-                    let mut config = openhuman_core::config::rpc::load_config_with_timeout()
+                    let mut config = dispatch
+                        .load_config()
                         .await
                         .map_err(|raw| CoreError::from_rpc_string(AGENT_CHAT, raw))?;
                     let target = match request.agent_id.as_deref().map(str::trim) {

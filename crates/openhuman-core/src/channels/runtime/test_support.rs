@@ -432,6 +432,7 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
         multimodal: MultimodalConfig::default(),
         multimodal_files: MultimodalFileConfig::default(),
         config: None,
+        core: None,
     });
 
     let expected_event_channel = options.channel_name.clone();

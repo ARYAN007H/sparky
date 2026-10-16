@@ -3,6 +3,7 @@
 //! revokes between turns, and adopting the integration actions the tinyagents
 //! session restored for a resumed thread.
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use tinyagents_runtime::ToolSnapshot;
@@ -361,7 +362,7 @@ impl OpenHumanTurnPrelude {
         }
         let config = match self.runtime_config.clone() {
             Some(config) => Some(config),
-            None => crate::config::ops::load_current_or_init()
+            None => crate::config::ops::load_current_or_init(&self.dispatch_ctx())
                 .await
                 .ok()
                 .map(Arc::new),
@@ -383,7 +384,7 @@ impl OpenHumanTurnPrelude {
             connected.len(),
             self.agent_definition_id
         );
-        let mcp_servers = crate::mcp::registry::connections::connected_overview()
+        let mcp_servers = crate::mcp::registry::connections::connected_overview(&self.dispatch_ctx())
             .await
             .into_iter()
             .map(|server| server.qualified_name)
@@ -399,7 +400,7 @@ impl OpenHumanTurnPrelude {
         let skills_changed = self.drain_host_events();
         let config = match self.runtime_config.clone() {
             Some(config) => Some(config),
-            None => crate::config::ops::load_current_or_init()
+            None => crate::config::ops::load_current_or_init(&self.dispatch_ctx())
                 .await
                 .ok()
                 .map(Arc::new),
@@ -426,7 +427,7 @@ impl OpenHumanTurnPrelude {
                 mutable.connected_integrations_authoritative = authoritative;
             }
         }
-        let connected_mcp = crate::mcp::registry::connections::connected_overview()
+        let connected_mcp = crate::mcp::registry::connections::connected_overview(&self.dispatch_ctx())
             .await
             .into_iter()
             .map(|server| server.qualified_name)

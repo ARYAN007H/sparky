@@ -27,11 +27,13 @@ use openhuman_core::config::Config;
 use openhuman_core::storage::import::{self, Outcome};
 use openhuman_core::storage::{rusqlite, DocumentStoreExt, Scope, ScopedStorage, StorageBackend};
 use sha2::Digest;
-use tinyagents_session::transcript::{
-    session_stem, write_transcript, SessionRef, TranscriptMessage, TranscriptMeta,
-};
+use tinyagents_session::transcript::{session_stem, SessionRef, TranscriptMessage, TranscriptMeta};
 use tinyagents_session::turn_state::TurnState;
 use tinystoragedrivers_core::Query;
+
+// The classic-transcript fixture writer, shared with the core's unit tests.
+#[path = "../crates/openhuman-core/src/util/classic_transcript_fixture.rs"]
+mod classic_transcript_fixture;
 
 #[macro_use]
 #[path = "support/storage_drivers.rs"]
@@ -127,13 +129,11 @@ fn legacy_sessions(workspace: &Path) {
         session_id: None,
         parent_session_id: None,
     };
-    write_transcript(
+    classic_transcript_fixture::write_classic(
         &raw.join(format!("{stem}.jsonl")),
         &[TranscriptMessage::new("user", "hello from the old layout")],
         &meta,
-        None,
-    )
-    .unwrap();
+    );
     let snapshot = TurnState::started("thread-1", "req-1", 4, "2026-01-01T00:00:00Z");
     let thread_dir = workspace
         .join("memory/conversations/turn_states")
@@ -442,7 +442,7 @@ async fn a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched(cas
     };
 
     // First boot: every host importer runs and none is left without a source.
-    let reports = import::run(&config).await;
+    let reports = import::run(&openhuman_core::core::runtime::DispatchCtx::process_default(), &config).await;
     assert!(!reports.is_empty());
     for report in &reports {
         match report.outcome.as_ref().unwrap_or_else(|error| {
@@ -542,7 +542,7 @@ async fn a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched(cas
     let _ = fixture.ccr_originals;
 
     // Second boot: nothing runs again, so nothing deleted comes back.
-    let again = import::run(&config).await;
+    let again = import::run(&openhuman_core::core::runtime::DispatchCtx::process_default(), &config).await;
     assert_eq!(again.len(), reports.len());
     for report in &again {
         assert_eq!(

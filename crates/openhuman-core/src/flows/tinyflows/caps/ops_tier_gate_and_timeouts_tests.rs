@@ -73,6 +73,7 @@ async fn http_adapter_blocks_under_readonly_tier() {
 
     let (_dir, creds) = http_cred_store();
     let http = OpenHumanHttp {
+        ctx: crate::core::runtime::DispatchCtx::ambient(),
         security: Arc::new(policy(AutonomyLevel::ReadOnly)),
         http_config: HttpRequestConfig::default(),
         http_creds: Arc::new(creds),
@@ -412,8 +413,12 @@ fn agent_node_runtime_resolves_to_the_definitions_effective_iteration_cap() {
     let expected = def.effective_max_iterations();
     assert_eq!(expected, 50);
 
-    let agent = crate::agent::OpenHumanSessionHost::from_config_for_agent(&config, "planner")
-        .expect("build planner agent");
+    let agent = crate::agent::OpenHumanSessionHost::from_config_for_agent(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        "planner",
+    )
+    .expect("build planner agent");
     assert_eq!(agent.agent_config().max_tool_iterations, expected);
 
     // And the timeout scaling this cap feeds into actually widens the

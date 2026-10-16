@@ -11,6 +11,7 @@
 
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::subagent_host::{run_subagent_with_parent, SubagentRunOptions};
+use crate::core::runtime::DispatchCtx;
 use crate::threads::store as conversations;
 use async_trait::async_trait;
 use serde_json::json;
@@ -148,7 +149,10 @@ impl Tool for SpawnWorkerThreadTool {
         self.execute_with_parent_context(
             args,
             tool_context,
-            crate::agent::tinyagents::host::OpenHumanRunContext::new(),
+            crate::agent::tinyagents::host::OpenHumanRunContext::new().with_core(
+                crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(tool_context)
+                    .into_core(),
+            ),
         )
         .await
     }
@@ -179,6 +183,7 @@ impl SpawnWorkerThreadTool {
                 "spawn_worker_thread requires a live harness run context.",
             ));
         };
+        let dispatch = run_context.dispatch_ctx();
         let started = std::time::Instant::now();
 
         let agent_id = args
@@ -236,7 +241,7 @@ impl SpawnWorkerThreadTool {
             "[spawn_worker_thread] invoked"
         );
 
-        let threads = conversations::list_threads(parent.workspace_dir.clone())
+        let threads = conversations::list_threads(&dispatch, parent.workspace_dir.clone())
             .map_err(|e| anyhow::anyhow!(e))?;
         if let Some(current_thread) = threads.iter().find(|t| t.id == current_thread_id) {
             let is_delegated_label = current_thread
@@ -288,6 +293,7 @@ impl SpawnWorkerThreadTool {
         // Shared with `spawn_subagent` so both delegation paths persist an
         // identical, reopenable sub-thread seeded with the prompt.
         let worker_thread_id = super::worker_thread::create_worker_thread(
+            &dispatch,
             parent.workspace_dir.clone(),
             &current_thread_id,
             &agent_id,

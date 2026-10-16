@@ -1,5 +1,6 @@
 //! Agent tool adapters that send wallet operations through TinyWallet's bus.
 
+use crate::core::runtime::DispatchCtx;
 use async_trait::async_trait;
 use serde::Deserialize;
 use serde::Serialize;
@@ -56,7 +57,8 @@ impl Tool for WalletModuleTool {
     }
 
     async fn execute(&self, args: Value) -> anyhow::Result<ToolResult> {
-        self.run(args, None).await
+        self.execute_with_context(args, tinytools::ToolCallOptions::default(), None)
+            .await
     }
 
     async fn execute_with_context(
@@ -66,7 +68,8 @@ impl Tool for WalletModuleTool {
         context: Option<&dyn tinytools::ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
         let approval = crate::agent::tinyagents::host::run_context::approval_for_tool(context);
-        self.run(args, approval.chat.as_ref()).await
+        let ctx = crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(context);
+        self.run(&ctx, args, approval.chat.as_ref()).await
     }
 }
 
@@ -74,12 +77,13 @@ impl WalletModuleTool {
     /// Runs the tool for a turn whose approval context is `chat`.
     pub(crate) async fn run(
         &self,
+        ctx: &DispatchCtx,
         args: Value,
         chat: Option<&crate::security::approval::ApprovalChatContext>,
     ) -> anyhow::Result<ToolResult> {
         let result = match self.name() {
-            "wallet_status" => outcome_value(crate::web3::wallet::status().await),
-            "wallet_chain_status" => outcome_value(crate::web3::wallet::chain_status().await),
+            "wallet_status" => outcome_value(crate::web3::wallet::status(&ctx).await),
+            "wallet_chain_status" => outcome_value(crate::web3::wallet::chain_status(&ctx).await),
             "wallet_prepare_transfer" => {
                 let params = match serde_json::from_value(args) {
                     Ok(params) => params,
@@ -89,6 +93,7 @@ impl WalletModuleTool {
                 };
                 outcome_value(
                     crate::web3::wallet::prepare_transfer(
+                        ctx,
                         params,
                         crate::modules::web3_service::owner_of(chat),
                     )
@@ -104,11 +109,17 @@ impl WalletModuleTool {
                 };
                 let result = match self.name() {
                     "wallet_tx_status" => outcome_value(
-                        crate::web3::wallet::tx_status(query.chain, query.evm_network, &query.hash)
-                            .await,
+                        crate::web3::wallet::tx_status(
+                            &ctx,
+                            query.chain,
+                            query.evm_network,
+                            &query.hash,
+                        )
+                        .await,
                     ),
                     "wallet_tx_receipt" => outcome_value(
                         crate::web3::wallet::tx_receipt(
+                            &ctx,
                             query.chain,
                             query.evm_network,
                             &query.hash,
@@ -116,8 +127,13 @@ impl WalletModuleTool {
                         .await,
                     ),
                     _ => outcome_value(
-                        crate::web3::wallet::lookup_tx(query.chain, query.evm_network, &query.hash)
-                            .await,
+                        crate::web3::wallet::lookup_tx(
+                            &ctx,
+                            query.chain,
+                            query.evm_network,
+                            &query.hash,
+                        )
+                        .await,
                     ),
                 };
                 result

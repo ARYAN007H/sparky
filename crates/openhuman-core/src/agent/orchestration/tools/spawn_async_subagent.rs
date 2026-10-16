@@ -17,6 +17,7 @@ use crate::agent::progress::AgentProgress;
 use crate::agent::subagent_host::{
     run_subagent_with_parent, SubagentRunOptions, SubagentRunStatus,
 };
+use crate::core::runtime::DispatchCtx;
 use crate::threads::store::{self as conversations, ConversationMessage};
 use async_trait::async_trait;
 use serde_json::json;
@@ -243,7 +244,10 @@ impl Tool for SpawnAsyncSubagentTool {
             args,
             options,
             tool_context,
-            crate::agent::tinyagents::host::OpenHumanRunContext::new(),
+            crate::agent::tinyagents::host::OpenHumanRunContext::new().with_core(
+                crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(tool_context)
+                    .into_core(),
+            ),
             None,
         )
         .await
@@ -548,6 +552,7 @@ pub(crate) fn extract_workflow_proposal_from_history(
 /// summary; on any persistence error the summary still carries the envelope —
 /// losing durability must not lose delivery.
 fn attach_workflow_proposal(
+    ctx: &DispatchCtx,
     workspace_dir: &std::path::Path,
     parent_thread_id: Option<&str>,
     task_id: &str,
@@ -579,6 +584,7 @@ fn attach_workflow_proposal(
     );
     if let Some(thread_id) = parent_thread_id {
         let persisted = conversations::append_message(
+            ctx,
             workspace_dir.to_path_buf(),
             thread_id,
             ConversationMessage {

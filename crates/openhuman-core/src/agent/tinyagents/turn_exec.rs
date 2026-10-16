@@ -188,7 +188,7 @@ async fn drive_turn(
     // Thread-scoped tools (`goal_*`) are only registered when it is `Some`.
     let has_thread = run_context.thread_id.is_some();
     let is_subagent = subagent_scope.is_some();
-    let (policy, has_route_fallback) = turn_run_policy(
+    let (mut policy, has_route_fallback) = turn_run_policy(
         model,
         max_iterations,
         deterministic_cacheable,
@@ -202,6 +202,10 @@ async fn drive_turn(
         run_context.tool_rules.clone(),
         run_context.tool_call_limit,
     );
+    // A `tool_search` of this turn tells its ranker which chat it runs in, so a
+    // cloud embedder's disclosure reaches that chat.
+    policy.discovery.rank_context =
+        crate::agent::tinyagents::discovery::rank_context_for(run_context.approval.chat.as_ref());
     // The turn's crate `ChatModel` set (`turn_models`) and the provider telemetry id are built by
     // the caller via `build_turn_models`: the seam is crate-native and names no `Provider` (#4249,
     // Phase 5). The telemetry id (`{provider_id}.{model}` in Langfuse) rides in as a param.
@@ -309,7 +313,9 @@ async fn drive_turn(
     }
     // `session_kv_store` self-gates on the dual-write flag (config default ON +
     // env kill switch), returning `None` when disabled or unresolvable.
-    if let Some(session_kv) = crate::agent::session_import::live::session_kv_store().await {
+    if let Some(session_kv) =
+        crate::agent::session_import::live::session_kv_store(&run_context.dispatch_ctx()).await
+    {
         stores.get_or_insert_with(StoreRegistry::new).register(
             crate::agent::session_import::live::TINYAGENTS_SESSION_KV_STORE,
             session_kv,
@@ -374,6 +380,7 @@ async fn drive_turn(
             failure_map.clone(),
             provider_usage_carry.clone(),
             bridge_tool_sets.clone(),
+            run_context.dispatch_ctx(),
         );
         bridge.set_definition(
             run_context
@@ -396,15 +403,25 @@ async fn drive_turn(
     let journal_thread_id = subagent_scope
         .as_ref()
         .map(|scope| tinyagents_harness::ids::ThreadId::new(scope.task_id.clone()));
-    let turn_journal =
-        journal::attach_turn_journal(&sink, model, journal_run_id.clone(), journal_thread_id).await;
+    let turn_journal = journal::attach_turn_journal(
+        &run_context.dispatch_ctx(),
+        &sink,
+        model,
+        journal_run_id.clone(),
+        journal_thread_id,
+    )
+    .await;
     if !is_subagent {
         if let Some(crate::agent::turn_origin::AgentTurnOrigin::WebChat {
             request_id: Some(request_id),
             ..
         }) = run_context.origin.as_ref()
         {
-            journal::register_request_journal_run(request_id, journal_run_id.as_str());
+            journal::register_request_journal_run(
+                &run_context.dispatch_ctx(),
+                request_id,
+                journal_run_id.as_str(),
+            );
         }
     }
     ctx = ctx.with_events(sink.clone());
@@ -472,6 +489,13 @@ async fn drive_turn(
             anyhow::anyhow!("turn driver prepared a run without a steering handle")
         })?;
     let tool_count = prepared.tools().registered.len();
+    // A turn without the `todo` tool (tools suppressed, or `todo` not admitted)
+    // cannot tick its plan, so it gets no plan-order middleware.
+    let todo_registered = prepared
+        .tools()
+        .registered
+        .iter()
+        .any(|name| name == "todo");
 
     let candidate_names = prepared.tools().plan.candidates.clone();
     let TurnWiring {
@@ -495,17 +519,26 @@ async fn drive_turn(
             required_capabilities: routes::turn_required_capabilities(model),
             deterministic_cacheable,
             has_route_fallback,
+            dispatch: run_context.dispatch_ctx(),
             hosted_security_gate,
             pause_at_cap,
-            run_mode: run_context
-                .thread_id
-                .as_deref()
-                .map(crate::agent::tinyagents::run_mode::handle_for_thread),
+            run_mode: run_context.thread_id.as_deref().map(|thread_id| {
+                crate::agent::tinyagents::run_mode::handle_for_thread(
+                    &run_context.dispatch_ctx(),
+                    thread_id,
+                )
+            }),
             memory_turn: run_context.memory_turn.clone(),
             summarizer_model,
             failure_map: failure_map.clone(),
             provider_usage_carry: provider_usage_carry.clone(),
             tool_outcome_sink: tool_outcome_sink.clone(),
+            // The store the `todo` tool resolves from the same parent context.
+            todo_store: run_context
+                .parent
+                .as_ref()
+                .filter(|_| todo_registered)
+                .map(|parent| crate::agent::todos::ops::store(&parent.workspace_dir)),
         },
     );
     if let Some(scope) = run_context.response_shape.clone() {
@@ -657,6 +690,7 @@ async fn drive_turn(
         &tool_outcome_sink,
         resolved_route,
         request_base_len,
+        &run_context.dispatch_ctx(),
     )
     .await)
 }

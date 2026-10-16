@@ -142,6 +142,7 @@ async fn message_dispatch_processes_messages_in_parallel() {
             multimodal: crate::config::MultimodalConfig::default(),
             multimodal_files: crate::config::MultimodalFileConfig::default(),
             config: None,
+            core: None,
         });
 
         (channel_impl, runtime_ctx)
@@ -217,6 +218,7 @@ async fn process_channel_message_cancels_scoped_typing_task() {
         multimodal: crate::config::MultimodalConfig::default(),
         multimodal_files: crate::config::MultimodalFileConfig::default(),
         config: None,
+        core: None,
     });
 
     process_channel_message(
@@ -306,6 +308,7 @@ async fn dispatch_routes_through_agent_run_turn_bus_handler() {
         multimodal: crate::config::MultimodalConfig::default(),
         multimodal_files: crate::config::MultimodalFileConfig::default(),
         config: None,
+        core: None,
     });
 
     process_channel_message(
@@ -360,7 +363,7 @@ fn watch_for_channel_processed(message_id: &str) -> tokio::task::JoinHandle<Doma
         .expect("event bus should be initialized")
         .receiver();
     let message_id = message_id.to_string();
-    tokio::spawn(async move {
+    crate::core::runtime::DispatchCtx::ambient().spawn(async move {
         let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
         loop {
             let event = tokio::time::timeout_at(deadline, events.recv())
@@ -426,6 +429,7 @@ async fn resolved_route_ctx() -> Arc<ChannelRuntimeContext> {
         multimodal: crate::config::MultimodalConfig::default(),
         multimodal_files: crate::config::MultimodalFileConfig::default(),
         config: None,
+        core: None,
     })
 }
 
@@ -559,6 +563,7 @@ async fn process_channel_message_hardens_multimodal_files_against_smuggled_marke
         multimodal: crate::config::MultimodalConfig::default(),
         multimodal_files: permissive_operator_default,
         config: None,
+        core: None,
     });
 
     // Attacker-shaped message: an absolute-path FILE marker dropped
@@ -643,6 +648,7 @@ async fn process_channel_message_hardens_against_relative_path_markers() {
         multimodal: crate::config::MultimodalConfig::default(),
         multimodal_files: crate::config::MultimodalFileConfig::default(),
         config: None,
+        core: None,
     });
 
     process_channel_message(

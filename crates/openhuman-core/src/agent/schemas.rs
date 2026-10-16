@@ -1,3 +1,4 @@
+use crate::core::runtime::DispatchCtx;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_json::{Map, Value};
@@ -259,10 +260,10 @@ pub fn schemas(function: &str) -> ControllerSchema {
     }
 }
 
-fn handle_chat(params: Map<String, Value>) -> ControllerFuture {
+fn handle_chat(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<AgentChatParams>(params)?;
-        let mut config = config_rpc::load_config_with_timeout().await?;
+        let mut config = ctx.load_config().await?;
         to_json(
             crate::inference::host_runtime::rpc::agent_chat(
                 &mut config,
@@ -282,12 +283,13 @@ fn handle_chat(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_chat_simple(params: Map<String, Value>) -> ControllerFuture {
+fn handle_chat_simple(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<AgentChatParams>(params)?;
-        let config = config_rpc::load_config_with_timeout().await?;
+        let config = ctx.load_config().await?;
         to_json(
             crate::inference::host_runtime::rpc::agent_chat_simple(
+                &ctx,
                 &config,
                 &p.message,
                 p.model_override,
@@ -299,13 +301,13 @@ fn handle_chat_simple(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_server_status(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_server_status(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async { to_json(config_rpc::agent_server_status()) })
 }
 
-fn handle_list_definitions(_params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async {
-        let defs = crate::agent::library::list_definition_metadata().await?;
+fn handle_list_definitions(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+    Box::pin(async move {
+        let defs = crate::agent::library::list_definition_metadata(&ctx).await?;
         Ok(serde_json::json!({ "definitions": defs }))
     })
 }
@@ -315,7 +317,7 @@ struct GetDefinitionParams {
     id: String,
 }
 
-fn handle_get_definition(params: Map<String, Value>) -> ControllerFuture {
+fn handle_get_definition(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<GetDefinitionParams>(params)?;
         let registry = crate::agent::harness::host_definition::AgentDefinitionRegistry::current()
@@ -327,7 +329,7 @@ fn handle_get_definition(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_reload_definitions(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_reload_definitions(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async {
         // The global registry is OnceLock-backed so live reload is a
         // no-op in v1. Reply with a status payload that explains this
@@ -355,7 +357,7 @@ struct TriageEvaluateParams {
     dry_run: Option<bool>,
 }
 
-fn handle_triage_evaluate(params: Map<String, Value>) -> ControllerFuture {
+fn handle_triage_evaluate(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<TriageEvaluateParams>(params)?;
 
@@ -420,7 +422,7 @@ fn handle_triage_evaluate(params: Map<String, Value>) -> ControllerFuture {
             "[rpc][agent] running triage pipeline"
         );
 
-        let outcome = crate::agent::triage::run_triage(&envelope)
+        let outcome = crate::agent::triage::run_triage(&ctx, &envelope)
             .await
             .map_err(|e| format!("triage evaluation failed: {e}"))?;
 
@@ -435,7 +437,7 @@ fn handle_triage_evaluate(params: Map<String, Value>) -> ControllerFuture {
                     let origin = crate::agent::triage::local_trigger_origin();
                     crate::agent::turn_origin::with_origin(
                         origin,
-                        crate::agent::triage::apply_decision(run.clone(), &envelope),
+                        crate::agent::triage::apply_decision(&ctx, run.clone(), &envelope),
                     )
                     .await
                     .map_err(|e| format!("apply_decision failed: {e}"))?;
@@ -478,7 +480,7 @@ fn handle_triage_evaluate(params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_graph_topologies(_params: Map<String, Value>) -> ControllerFuture {
+fn handle_graph_topologies(_ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async {
         let reports = tinyagents_orchestration::topology::all_graph_topologies();
         let agents = crate::agent::registry::agents::load_builtins()
@@ -576,8 +578,8 @@ fn local_catalog_models_from_config(
         .collect()
 }
 
-fn handle_registry_snapshot(_params: Map<String, Value>) -> ControllerFuture {
-    Box::pin(async {
+fn handle_registry_snapshot(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+    Box::pin(async move {
         use tinyagents_registry::{ComponentKind, ComponentMetadata, RegistrySnapshot};
 
         let mut components: Vec<ComponentMetadata> = Vec::new();
@@ -587,7 +589,7 @@ fn handle_registry_snapshot(_params: Map<String, Value>) -> ControllerFuture {
         // any entry whose provider is a local runtime (ollama, lmstudio, mlx, …)
         // is overlaid as a free, runtime-profiled catalog entry so local models
         // appear in the one projection alongside priced vendor rows.
-        let local_models = match config_rpc::load_config_with_timeout().await {
+        let local_models = match ctx.load_config().await {
             Ok(config) => local_catalog_models_from_config(&config),
             Err(err) => {
                 tracing::debug!(
@@ -686,11 +688,11 @@ fn handle_registry_snapshot(_params: Map<String, Value>) -> ControllerFuture {
     })
 }
 
-fn handle_context_breakdown(params: Map<String, Value>) -> ControllerFuture {
+fn handle_context_breakdown(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p =
             deserialize_params::<crate::agent::context_breakdown::ContextBreakdownParams>(params)?;
-        to_json(crate::agent::context_breakdown::context_breakdown(p).await?)
+        to_json(crate::agent::context_breakdown::context_breakdown(&ctx, p).await?)
     })
 }
 

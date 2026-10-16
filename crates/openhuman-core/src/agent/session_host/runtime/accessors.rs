@@ -278,6 +278,12 @@ impl OpenHumanSessionHost {
         self.host_env = env;
     }
 
+    /// The context this session's turns run under: the one its host
+    /// environment carries, else the calling task's.
+    pub(crate) fn dispatch_ctx(&self) -> crate::core::runtime::DispatchCtx {
+        crate::core::runtime::DispatchCtx::from_weak(self.host_env.core.as_ref())
+    }
+
     /// The host environment installed with [`Self::set_host_env`].
     pub fn host_env(&self) -> &crate::agent::turn_env::HostTurnEnv {
         &self.host_env
@@ -294,6 +300,20 @@ impl OpenHumanSessionHost {
         self.event_channel = channel.into();
         self.rebuild_tool_policy_session();
         self.sync_runtime_tool_surface();
+    }
+
+    /// Route this session's transcripts to `locator` instead of the store its
+    /// agent key resolves to. Must be set before the first turn: the session
+    /// binds its transcript target once.
+    pub fn set_session_history_locator(
+        &mut self,
+        locator: std::sync::Arc<dyn tinyagents_session::transcript::TranscriptLocator>,
+    ) {
+        if self.runtime_session.is_some() {
+            tracing::debug!("transcript store already bound for this session; keeping it");
+            return;
+        }
+        self.session_history_locator = Some(locator);
     }
 
     /// Bind the OpenHuman conversation thread for the next and subsequent

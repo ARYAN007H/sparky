@@ -132,7 +132,9 @@ impl FlowStore for FlowsHost {
         approve: Vec<String>,
         reject: Vec<String>,
     ) -> PortResult<Value> {
-        ops::flows_resume(&self.config, flow_id, run_id, approve, reject)
+        // Transitional (#7801): the builder host (`FlowsHost`) carries no context yet.
+        let ctx = crate::core::runtime::DispatchCtx::ambient();
+        ops::flows_resume(&ctx, &self.config, flow_id, run_id, approve, reject)
             .await
             .map(|o| o.value)
     }
@@ -222,9 +224,12 @@ impl BuilderGates for FlowsHost {
 #[async_trait]
 impl AgentDirectory for FlowsHost {
     async fn list(&self) -> PortResult<Vec<AgentDefinition>> {
-        let agents = crate::agent::registry::list_agents(false)
-            .await
-            .map_err(|e| e.to_string())?;
+        let agents = crate::agent::registry::list_agents(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            false,
+        )
+        .await
+        .map_err(|e| e.to_string())?;
         Ok(agents
             .iter()
             .map(|a| AgentDefinition {

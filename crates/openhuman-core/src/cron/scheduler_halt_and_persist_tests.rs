@@ -341,7 +341,9 @@ async fn cron_agent_job_uses_agent_definition_tool_scope() {
     job.name = Some("morning_briefing".into());
     job.agent_id = Some("morning_briefing".into());
 
-    let built = build_agent_for_cron_job(&config, &job).expect("build cron agent");
+    let built =
+        build_agent_for_cron_job(&crate::core::runtime::DispatchCtx::ambient(), &config, &job)
+            .expect("build cron agent");
     let visible = built.agent.visible_tool_names_for_test();
 
     assert!(
@@ -365,7 +367,11 @@ async fn run_through_scheduler(config: &Config, job_id: &str) {
         &config.workspace_dir,
         &config.action_dir,
     ));
-    let mut dispatcher = JobDispatcher::new(config, &security);
+    let mut dispatcher = JobDispatcher::new(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        config,
+        &security,
+    );
     dispatcher.dispatch(vec![job]).await.unwrap();
     dispatcher.drain().await;
 }
@@ -425,7 +431,11 @@ async fn scheduler_flow_runs_active_hours_job_and_reschedules_inside_window() {
         &config.workspace_dir,
         &config.workspace_dir,
     ));
-    let mut dispatcher = JobDispatcher::new(&config, &security);
+    let mut dispatcher = JobDispatcher::new(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &security,
+    );
     dispatcher.dispatch(vec![job.clone()]).await.unwrap();
     dispatcher.drain().await;
 
@@ -542,9 +552,15 @@ async fn deliver_if_configured_skips_non_announce_mode() {
     let job = test_job("echo ok");
 
     // Default delivery mode is not "announce", so nothing is published.
-    assert!(deliver_if_configured(&config, &job, "x", true)
-        .await
-        .is_ok());
+    assert!(deliver_if_configured(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &job,
+        "x",
+        true
+    )
+    .await
+    .is_ok());
 }
 
 #[tokio::test]
@@ -601,9 +617,15 @@ async fn deliver_if_configured_publishes_event_for_announce_mode() {
     assert_eq!(received.load(Ordering::SeqCst), 1);
 
     // Also verify the function itself succeeds.
-    assert!(deliver_if_configured(&config, &job, "hello", true)
-        .await
-        .is_ok());
+    assert!(deliver_if_configured(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &job,
+        "hello",
+        true
+    )
+    .await
+    .is_ok());
 }
 
 #[test]
