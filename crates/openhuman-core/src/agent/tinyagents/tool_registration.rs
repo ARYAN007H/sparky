@@ -33,6 +33,16 @@ use crate::tools::implementations::threads::SpawnWorkerThreadDispatch;
 
 type RegisteredToolDispatch = Arc<dyn ToolDispatch<(), OpenHumanRunContext>>;
 
+/// Collision-free stable scope for controls over a host-owned parent session
+/// and optional chat thread. JSON tuple encoding distinguishes absent thread
+/// from the literal `"no-thread"` and handles delimiters in either value.
+pub(crate) fn subagent_owner_key(parent_session: &str, thread_id: Option<&str>) -> String {
+    format!(
+        "openhuman-subagent-owner:{}",
+        serde_json::to_string(&(parent_session, thread_id)).unwrap_or_else(|_| "null".into())
+    )
+}
+
 #[path = "subagent_projection.rs"]
 mod subagent_projection;
 use subagent_projection::{ProjectedSubagentDispatch, SubagentResultProjection};
@@ -195,11 +205,7 @@ fn subagent_control_dispatches(
             run_context.thread_id.clone(),
         ),
     );
-    let owner = format!(
-        "{}:{}",
-        parent.session_id,
-        run_context.thread_id.as_deref().unwrap_or("no-thread")
-    );
+    let owner = subagent_owner_key(&parent.session_id, run_context.thread_id.as_deref());
     let parent_session = parent.session_id.clone();
     let owner_scope: Arc<dyn Fn(u64) -> String + Send + Sync> = Arc::new(move |_| owner.clone());
 

@@ -93,6 +93,124 @@ pub async fn continue_subagent(
     continue_subagent_with_parent(&root, original_key, definition.clone(), input, options).await
 }
 
+/// Runs a host-prepared async spawn through TinyAgents' registered driver
+/// dispatcher and shared Jobs/Message registry. Product preflight and result
+/// delivery stay with the caller; the generic driver owns child registration,
+/// execution, control queues, and terminal lifecycle transitions.
+pub(crate) async fn run_async_spawn_via_driver_tool(
+    parent: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+    definition: crate::agent_registry::host_definition::AgentDefinition,
+    input: String,
+    options: SubagentRunOptions,
+) -> Result<SubagentRunOutcome, SubagentRunError> {
+    use tinyagents_harness::tool::ToolDispatch;
+    use tinyagents_orchestration::subagent::{DriverSubAgentTool, SubAgentJobRegistry};
+    use tinytools::{PermissionLevel, ToolCategory, ToolCallOptions, ToolScope, ToolTimeout};
+
+    let task_id = options
+        .task_id
+        .clone()
+        .unwrap_or_else(|| format!("sub-{}", uuid::Uuid::new_v4()));
+    let task_key = SubagentTaskKey::from_context(parent, task_id.clone(), None);
+    let checkpoint_dir = absolute_checkpoint_dir(options.checkpoint_dir.clone().unwrap_or_else(|| {
+        parent
+            .data
+            .parent
+            .as_ref()
+            .map(|context| context.workspace_dir.join(".openhuman/subagent_checkpoints"))
+            .unwrap_or_else(|| PathBuf::from(".openhuman/subagent_checkpoints"))
+    }));
+    let bundle = OpenHumanDriverBundle::new(checkpoint_dir)?;
+    let host_request = HostRequest {
+        definition: definition.clone(),
+        options,
+    };
+    let request_host = host_request.clone();
+    let request_task_id = task_id.clone();
+    let dispatcher = DriverSubAgentTool::new(
+        "spawn_async_subagent",
+        "Host-prepared asynchronous subagent invocation.",
+        bundle.driver.clone(),
+        move |_state: &(), parent, args, _call_id| {
+            let input = args
+                .get("input")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default()
+                .to_owned();
+            let (key, child) = crate::agent::tinyagents::host::direct_subagent_child(
+                parent,
+                request_task_id.clone(),
+                RunConfig::new(format!("subagent-{}", uuid::Uuid::new_v4())),
+            )
+            .map_err(|error| SubagentError::InvalidRequest(error.to_string()))?;
+            debug_assert_eq!(key.task_id, request_task_id);
+            SubagentRequest::fresh_from_parent(
+                parent,
+                child,
+                request_task_id.clone(),
+                request_host.clone(),
+                input,
+                None,
+            )
+        },
+        |_request| None,
+    );
+    let dispatch_ctx = parent.data.dispatch_ctx();
+    let jobs = (*crate::core::runtime::slot_for::<SubAgentJobRegistry>(&dispatch_ctx)).clone();
+    let parent_session = parent
+        .data
+        .parent
+        .as_ref()
+        .map(|context| context.session_id.clone())
+        .unwrap_or_default();
+    let thread_id = parent.thread_id().map(|id| id.as_str().to_owned());
+    let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+        &parent_session,
+        thread_id.as_deref(),
+    );
+    let owner_scope: Arc<dyn Fn(u64) -> String + Send + Sync> = Arc::new(move |_| owner.clone());
+    let dispatcher = dispatcher
+        .with_job_registry(jobs)
+        .with_owner_scope(owner_scope)
+        .with_metadata(
+            PermissionLevel::Execute,
+            ToolScope::All,
+            ToolCategory::System,
+            ToolTimeout::Unbounded,
+        );
+    let args = serde_json::json!({ "input": input, "mode": "inline" });
+    let _tool_result = dispatcher
+        .execute(
+            &(),
+            tinyagents_harness::CallId::new(format!("spawn-{task_id}")),
+            args,
+            ToolCallOptions::default(),
+            parent,
+        )
+        .await
+        .map_err(|error| SubagentRunError::Provider(anyhow::anyhow!(error.to_string())))?;
+
+    if let Some(outcome) = bundle
+        .host_outcome
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .remove(&task_key)
+    {
+        return Ok(outcome);
+    }
+    if let Some(error) = bundle
+        .failures
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .remove(&task_key)
+    {
+        return Err(error);
+    }
+    Err(SubagentRunError::Provider(anyhow::anyhow!(
+        "driver-backed async spawn returned without a host outcome"
+    )))
+}
+
 /// Recover the original durable key and complete host pause payload from the
 /// safe task-id index written at the pause persistence boundary.
 pub(crate) fn load_subagent_checkpoint(
