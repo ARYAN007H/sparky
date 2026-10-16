@@ -137,6 +137,7 @@ impl ManagedTransport {
 /// The callback a registered channel callback
 /// ([`crate::channels::callback_slot`]) serves progressive delivery through,
 /// in place of [`ManagedTransport`].
+#[derive(Clone)]
 struct SlotTransport {
     callback: crate::channels::callback_slot::ChannelCallback,
     config: crate::config::Config,
