@@ -119,10 +119,6 @@ impl TtsProvider for CloudTtsProvider {
         };
         synthesize_reply(config, text, &opts).await
     }
-
-    fn configured_voice(&self) -> Option<&str> {
-        self.voice.as_deref()
-    }
 }
 
 /// Registers the hosted STT and TTS providers under their slugs.
