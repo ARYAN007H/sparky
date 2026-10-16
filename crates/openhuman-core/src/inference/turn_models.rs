@@ -14,7 +14,7 @@ use tinyinference_llm::model::{ResolvedModelRoute, RouteRecordingModel};
 /// built once from an openhuman [`Provider`] by [`build_turn_models`] — the
 /// single place a turn's `native model adapters are constructed (issue #4249, Phase 5).
 ///
-/// [`OpenHumanTurnPlanner`](super::turn_plan::OpenHumanTurnPlanner) takes this bundle instead of the raw provider, so
+/// [`OpenHumanTurnPlanner`](crate::agent::tinyagents::turn_plan::OpenHumanTurnPlanner) takes this bundle instead of the raw provider, so
 /// the harness assembly is expressed purely in crate model types; the
 /// `Provider` → `ChatModel` adaptation is confined to `build_turn_models`.
 pub(crate) struct TurnModels {
@@ -90,7 +90,7 @@ impl TurnModels {
 /// `OpenHumanBackendModel`, local/cloud → crate `OpenAiModel`).
 ///
 /// The `TurnModels` shape is identical to [`build_turn_models`] so
-/// [`OpenHumanTurnPlanner`](super::turn_plan::OpenHumanTurnPlanner) is unchanged. The provider metadata
+/// [`OpenHumanTurnPlanner`](crate::agent::tinyagents::turn_plan::OpenHumanTurnPlanner) is unchanged. The provider metadata
 /// (`provider_id` / `native_tools` / `supports_vision`) is derived by the caller
 /// ([`TurnModelSource::build`]) from the resolved provider string and config.
 /// `error_slot` is a fresh

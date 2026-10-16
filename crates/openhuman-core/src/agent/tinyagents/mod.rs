@@ -57,7 +57,7 @@ mod turn_middleware;
 pub(crate) mod turn_model_resolver;
 mod turn_outcome;
 mod turn_plan;
-mod turn_policy;
+pub(crate) mod turn_policy;
 mod turn_run_error;
 mod turn_run_finalize;
 mod use_skill_dispatch;

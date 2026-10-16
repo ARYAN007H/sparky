@@ -504,7 +504,7 @@ fn resolve_subagent_source_hint_falls_back_on_factory_error() {
 
 #[test]
 fn direct_mode_user_with_stored_key_passes_signed_in_check() {
-    use super::super::user_is_signed_in_to_composio;
+    use crate::integrations::composio::user_is_signed_in_to_composio;
     let tmp = tempfile::tempdir().expect("tempdir");
     let mut config = crate::config::Config::default();
     config.config_path = tmp.path().join("config.toml");
@@ -521,7 +521,7 @@ fn direct_mode_user_with_stored_key_passes_signed_in_check() {
 
 #[test]
 fn unsigned_in_user_fails_probe() {
-    use super::super::user_is_signed_in_to_composio;
+    use crate::integrations::composio::user_is_signed_in_to_composio;
     let tmp = tempfile::tempdir().expect("tempdir");
     let mut config = crate::config::Config::default();
     config.config_path = tmp.path().join("config.toml");

@@ -39,7 +39,8 @@ use tinytools_std::file_state::with_file_state_agent_id;
 use super::prompt::{
     append_artifact_offload_contract, append_subagent_role_contract, dedup_tool_specs_by_name,
 };
-use super::provider::{resolve_subagent_source, user_is_signed_in_to_composio};
+use super::provider::resolve_subagent_source;
+use crate::integrations::composio::user_is_signed_in_to_composio;
 
 /// Runtime spawn-hierarchy gate decision for one delegation hop.
 ///
