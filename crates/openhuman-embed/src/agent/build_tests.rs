@@ -24,52 +24,60 @@ fn agent_ids_must_be_plain_names() {
     assert!(validate_agent_id("../escape").is_err());
 }
 
-#[tokio::test]
-async fn config_fn_final_autonomy_is_captured_on_the_built_agent_context() {
-    use openhuman_core::config::Config;
-    use openhuman_core::core::runtime::AutonomyTierSource;
-    use openhuman_core::security::AutonomyLevel;
-
-    let dir = tempfile::tempdir().unwrap();
-    let mut config = Config::default();
-    config.config_path = dir.path().join("config.toml");
-    config.workspace_dir = dir.path().join("workspace");
-    config.action_dir = dir.path().join("action");
-    config.autonomy.enabled = true;
-    config.autonomy.level = AutonomyLevel::ReadOnly;
-    config.save().await.unwrap();
-
-    let runtime = crate::runtime::RuntimeBuilder::new()
-        .config(config)
-        .services(openhuman_core::core::runtime::ServiceSet::none())
+#[test]
+fn config_fn_final_autonomy_is_captured_on_the_built_agent_context() {
+    let tokio = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .thread_stack_size(openhuman_core::core::runtime::AGENT_WORKER_STACK_BYTES)
+        .enable_all()
         .build()
-        .await
-        .expect("runtime with a file-backed ReadOnly config");
-    assert_eq!(
-        runtime.core_runtime().context().autonomy_tier_source(),
-        AutonomyTierSource::Captured,
-        "a CoreBuilder::config snapshot remains bound to its in-memory tier"
-    );
-    let agent = runtime
-        .agent(crate::AgentSpec::new("config-fn-tier").config(|effective| {
-            effective.autonomy.enabled = true;
-            effective.autonomy.level = AutonomyLevel::Full;
-        }))
-        .expect("AgentSpec config_fn builds");
+        .unwrap();
+    tokio.block_on(async {
+        use openhuman_core::config::Config;
+        use openhuman_core::core::runtime::AutonomyTierSource;
+        use openhuman_core::security::AutonomyLevel;
 
-    assert_eq!(agent.inner.config.autonomy.level, AutonomyLevel::Full);
-    assert_eq!(
-        agent.inner.ctx.autonomy_tier_source(),
-        AutonomyTierSource::Captured
-    );
-    assert_eq!(
-        agent.inner.ctx.agent_policy().unwrap().autonomy,
-        AutonomyLevel::Full,
-        "the final config_fn tier is what the captured policy carries"
-    );
+        let dir = tempfile::tempdir().unwrap();
+        let mut config = Config::default();
+        config.config_path = dir.path().join("config.toml");
+        config.workspace_dir = dir.path().join("workspace");
+        config.action_dir = dir.path().join("action");
+        config.autonomy.enabled = true;
+        config.autonomy.level = AutonomyLevel::ReadOnly;
+        config.save().await.unwrap();
 
-    drop(agent);
-    drop(runtime);
+        let runtime = crate::runtime::RuntimeBuilder::new()
+            .config(config)
+            .services(openhuman_core::core::runtime::ServiceSet::none())
+            .build()
+            .await
+            .expect("runtime with a file-backed ReadOnly config");
+        assert_eq!(
+            runtime.core_runtime().context().autonomy_tier_source(),
+            AutonomyTierSource::Captured,
+            "a CoreBuilder::config snapshot remains bound to its in-memory tier"
+        );
+        let agent = runtime
+            .agent(crate::AgentSpec::new("config-fn-tier").config(|effective| {
+                effective.autonomy.enabled = true;
+                effective.autonomy.level = AutonomyLevel::Full;
+            }))
+            .expect("AgentSpec config_fn builds");
+
+        assert_eq!(agent.inner.config.autonomy.level, AutonomyLevel::Full);
+        assert_eq!(
+            agent.inner.ctx.autonomy_tier_source(),
+            AutonomyTierSource::Captured
+        );
+        assert_eq!(
+            agent.inner.ctx.agent_policy().unwrap().autonomy,
+            AutonomyLevel::Full,
+            "the final config_fn tier is what the captured policy carries"
+        );
+
+        drop(agent);
+        drop(runtime);
+    });
 }
 
 #[test]
