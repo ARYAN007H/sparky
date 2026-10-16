@@ -949,8 +949,20 @@ export async function performFullLogin(
     const authRequests = getRequestLog()
       .filter(entry => typeof entry.url === 'string' && entry.url.startsWith('/auth/'))
       .map(entry => `${entry.method} ${entry.url.split('?')[0]} -> ${entry.status ?? 'pending'}`);
+    const coreState = await browser
+      .execute(() => {
+        const win = window as unknown as { __OPENHUMAN_CORE_STATE__?: () => any };
+        const state = win.__OPENHUMAN_CORE_STATE__?.();
+        return {
+          isReady: state?.isReady ?? null,
+          isBootstrapping: state?.isBootstrapping ?? null,
+          hasSessionToken: Boolean(state?.snapshot?.sessionToken),
+          hasAuthUser: Boolean(state?.snapshot?.auth?.userId),
+        };
+      })
+      .catch(() => null);
     console.error(
-      `${logPrefix} auth bootstrap failed; mock auth endpoints=${JSON.stringify(authRequests)}`
+      `${logPrefix} auth bootstrap failed; mock auth endpoints=${JSON.stringify(authRequests)}; core state=${JSON.stringify(coreState)}`
     );
     throw error;
   }
