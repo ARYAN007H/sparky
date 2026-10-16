@@ -935,7 +935,11 @@ export async function performFullLogin(
   await waitForWindowVisible(25_000);
   await waitForWebView(15_000);
   await waitForAppReady(15_000);
-  await waitForAuthenticatedCore(15_000);
+  // The embedded core's startup budget is 60 seconds, and OAuth readiness
+  // waits for that core before installing the session. Keep this E2E wait
+  // within the product's cold-start budget instead of failing while the
+  // BootCheckGate is still bringing the core up.
+  await waitForAuthenticatedCore(60_000);
 
   await walkOnboarding(logPrefix);
 
