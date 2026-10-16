@@ -161,7 +161,7 @@ async fn scenario() {
 
     // An agent job made through the tool binds to this thread and fires.
     handle.chat("t1", "schedule it").await.unwrap();
-    for r in chat_requests(&chat).await.iter().rev().take(3) { eprintln!("DBGREQ {}", String::from_utf8_lossy(&r.body).chars().rev().take(900).collect::<String>().chars().rev().collect::<String>()); }
+    for r in chat_requests(&chat).await.iter() { let v: serde_json::Value = serde_json::from_slice(&r.body).unwrap(); let m = v["messages"].as_array().unwrap(); for msg in m.iter().rev().take(2) { eprintln!("DBGMSG {} {}", msg["role"], msg["content"].to_string().chars().take(400).collect::<String>()); } }
     common::wait_until(fire_at).await;
     assert_eq!(runtime.sweep_cron_at(chrono::Utc::now()).await.ran, 1);
     tokio::time::timeout(Duration::from_secs(30), async {
