@@ -10,7 +10,7 @@ fn budget_cache_get_returns_none_when_empty() {
 
 // ── GH #4153: `/teams/me/usage` failure backoff ──────────────────────────
 
-use crate::core::observability::is_suppressed_usage_probe_backoff;
+use openhuman_embed::__host::core::observability::is_suppressed_usage_probe_backoff;
 
 const TTL: Duration = Duration::from_secs(60);
 const FAIL_KEY: &str = "backend-under-test";
@@ -172,7 +172,7 @@ async fn produced_sentinel_is_classified() {
     .await
     .unwrap_err();
     assert!(
-        err.starts_with(crate::core::observability::USAGE_PROBE_BACKOFF_PREFIX),
+        err.starts_with(openhuman_embed::__host::core::observability::USAGE_PROBE_BACKOFF_PREFIX),
         "sentinel built from the shared prefix constant: {err}"
     );
     assert!(is_suppressed_usage_probe_backoff(&err));

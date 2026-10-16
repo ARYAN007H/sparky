@@ -460,7 +460,7 @@ async fn get_403_propagates_backend_error_envelope_message() {
 /// regression this guards.
 #[tokio::test]
 async fn post_400_user_input_failure_classifies_as_backend_user_error() {
-    use crate::core::observability::{expected_error_kind, ExpectedErrorKind};
+    use openhuman_embed::__host::core::observability::{expected_error_kind, ExpectedErrorKind};
 
     let app = Router::new().route(
         "/agent-integrations/composio/authorize",
@@ -509,7 +509,7 @@ async fn post_400_user_input_failure_classifies_as_backend_user_error() {
 /// over-reaches and silences 5xx, this test catches it before users do.
 #[tokio::test]
 async fn post_500_remains_actionable() {
-    use crate::core::observability::expected_error_kind;
+    use openhuman_embed::__host::core::observability::expected_error_kind;
 
     let app = Router::new().route(
         "/foo",
@@ -552,7 +552,7 @@ async fn post_500_remains_actionable() {
 /// are caught at review rather than in production.
 #[tokio::test]
 async fn jira_missing_subdomain_error_propagates_and_classifies_as_user_error() {
-    use crate::core::observability::{expected_error_kind, ExpectedErrorKind};
+    use openhuman_embed::__host::core::observability::{expected_error_kind, ExpectedErrorKind};
 
     let app = Router::new().route(
         "/agent-integrations/composio/authorize",
@@ -609,7 +609,7 @@ async fn jira_missing_subdomain_error_propagates_and_classifies_as_user_error() 
 /// not as an unexpected error that would create Sentry noise.
 #[tokio::test]
 async fn jira_generic_400_classifies_as_backend_user_error() {
-    use crate::core::observability::{expected_error_kind, ExpectedErrorKind};
+    use openhuman_embed::__host::core::observability::{expected_error_kind, ExpectedErrorKind};
 
     let app = Router::new().route(
         "/agent-integrations/composio/authorize",

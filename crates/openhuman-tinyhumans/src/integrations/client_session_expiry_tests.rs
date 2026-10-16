@@ -18,7 +18,7 @@ use super::*;
 /// opaque "parallel search failed: Invalid token" with no sign-in nudge.
 #[tokio::test]
 async fn post_401_session_jwt_classifies_as_session_expired() {
-    use crate::core::observability::{
+    use openhuman_embed::__host::core::observability::{
         expected_error_kind, is_session_expired_message, ExpectedErrorKind,
     };
 
@@ -78,7 +78,7 @@ async fn post_401_session_jwt_classifies_as_session_expired() {
 /// same session-expiry recovery on a session-JWT 401.
 #[tokio::test]
 async fn get_401_session_jwt_classifies_as_session_expired() {
-    use crate::core::observability::{
+    use openhuman_embed::__host::core::observability::{
         expected_error_kind, is_session_expired_message, ExpectedErrorKind,
     };
 
@@ -122,7 +122,7 @@ async fn get_401_session_jwt_classifies_as_session_expired() {
 /// widened to swallow other statuses, this catches it.
 #[tokio::test]
 async fn non_401_4xx_does_not_classify_as_session_expired() {
-    use crate::core::observability::{expected_error_kind, is_session_expired_message};
+    use openhuman_embed::__host::core::observability::{expected_error_kind, is_session_expired_message};
 
     // 403 — e.g. an authz/scope rejection on a backend-mediated provider
     // resource. This is NOT a dead session; it must stay a generic backend
@@ -165,7 +165,7 @@ async fn non_401_4xx_does_not_classify_as_session_expired() {
     );
     assert_ne!(
         expected_error_kind(&msg),
-        Some(crate::core::observability::ExpectedErrorKind::SessionExpired),
+        Some(openhuman_embed::__host::core::observability::ExpectedErrorKind::SessionExpired),
         "403 must NOT classify as SessionExpired; got: {msg}"
     );
 }
@@ -236,7 +236,7 @@ fn composio_soft_auth_path_covers_only_trigger_reads() {
 /// the panel with no actionable error (#4281).
 #[tokio::test]
 async fn get_401_composio_triggers_keeps_sentinel_for_in_place_cta() {
-    use crate::core::observability::{
+    use openhuman_embed::__host::core::observability::{
         expected_error_kind, is_session_expired_message, ExpectedErrorKind,
     };
 

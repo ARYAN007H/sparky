@@ -1,5 +1,5 @@
 use super::*;
-use crate::core::events::DomainEvent;
+use openhuman_embed::__host::core::events::DomainEvent;
 
 fn guard(chat: Option<ApprovalChatContext>) -> Guard {
     Guard {
@@ -31,7 +31,7 @@ async fn disclosed_routing(
 #[tokio::test]
 async fn a_guard_discloses_to_the_chat_it_was_built_for() {
     crate::core::bus::init().await.expect("bus init");
-    let mut rx = crate::core::bus::BUS.get().unwrap().receiver();
+    let mut rx = openhuman_embed::__host::core::bus::BUS.get().unwrap().receiver();
 
     let chat_a = ApprovalChatContext {
         thread_id: "thread-media-a".into(),

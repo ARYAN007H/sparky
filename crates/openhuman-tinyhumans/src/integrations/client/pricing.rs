@@ -15,7 +15,7 @@ impl IntegrationClient {
             .get_or_init(|| async {
                 match self
                     .get::<IntegrationPricing>(
-                        &crate::security::approval::ApprovalTurnContext::default(),
+                        &openhuman_embed::__host::security::approval::ApprovalTurnContext::default(),
                         "/agent-integrations/pricing",
                     )
                     .await
@@ -54,7 +54,7 @@ impl IntegrationClient {
 /// downstream consumers don't need a separate code path.
 pub async fn pricing_for_config(
     client: &IntegrationClient,
-    config: &crate::config::Config,
+    config: &openhuman_embed::__host::config::Config,
 ) -> IntegrationPricing {
     use crate::config::schema::COMPOSIO_MODE_DIRECT;
 
@@ -92,8 +92,8 @@ pub async fn pricing_for_config(
 /// callers that need a kill switch (e.g. google_places, parallel,
 /// stock_prices) gate tool registration at their own level.
 ///
-/// [`resolve_backend_credential`]: crate::security::credentials::session_support::resolve_backend_credential
-pub fn build_client(config: &crate::config::Config) -> Option<Arc<IntegrationClient>> {
+/// [`resolve_backend_credential`]: openhuman_embed::__host::security::credentials::session_support::resolve_backend_credential
+pub fn build_client(config: &openhuman_embed::__host::config::Config) -> Option<Arc<IntegrationClient>> {
     // Use the integrations-specific resolver: when `config.api_url` is set
     // to a local-AI endpoint (Ollama, vLLM, …), it would still be perfect
     // for `/v1/chat/completions`, but reusing it as the base for backend
@@ -113,7 +113,7 @@ pub fn build_client(config: &crate::config::Config) -> Option<Arc<IntegrationCli
     };
 
     let credential =
-        match crate::security::credentials::session_support::resolve_backend_credential(config) {
+        match openhuman_embed::__host::security::credentials::session_support::resolve_backend_credential(config) {
             Ok(credential) => Some(credential),
             Err(e) => {
                 tracing::debug!("[integrations] no backend credential: {e}");
@@ -127,15 +127,15 @@ pub fn build_client(config: &crate::config::Config) -> Option<Arc<IntegrationCli
 /// The credential decision is separate from profile-store lookup so callers
 /// can test the backend boundary without process-wide auth-store state.
 fn build_client_with_credential(
-    config: &crate::config::Config,
+    config: &openhuman_embed::__host::config::Config,
     backend_url: String,
-    credential: Option<crate::security::credentials::session_support::BackendCredential>,
+    credential: Option<openhuman_embed::__host::security::credentials::session_support::BackendCredential>,
 ) -> Option<Arc<IntegrationClient>> {
-    use crate::security::credentials::session_support::BackendCredential;
+    use openhuman_embed::__host::security::credentials::session_support::BackendCredential;
 
     let credential = match credential {
         Some(BackendCredential::Session(token))
-            if crate::security::credentials::session_support::is_local_session_token(
+            if openhuman_embed::__host::security::credentials::session_support::is_local_session_token(
                 token.trim(),
             ) =>
         {

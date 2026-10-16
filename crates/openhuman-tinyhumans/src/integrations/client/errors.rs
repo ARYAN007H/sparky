@@ -5,7 +5,7 @@
 
 use std::error::Error as _;
 
-use crate::backend::transport::BackendTransportError;
+use crate::BackendTransportError;
 
 use crate::integrations::types::BackendResponse;
 
@@ -36,11 +36,11 @@ pub(crate) fn extract_error_detail(body: &str, max_bytes: usize) -> String {
         if let Some(msg) = v.get("error").and_then(|e| e.as_str()) {
             let trimmed = msg.trim();
             if !trimmed.is_empty() {
-                return crate::util::truncate_at_byte_boundary(trimmed, max_bytes);
+                return openhuman_embed::__host::util::truncate_at_byte_boundary(trimmed, max_bytes);
             }
         }
     }
-    crate::util::truncate_at_byte_boundary(body, max_bytes)
+    openhuman_embed::__host::util::truncate_at_byte_boundary(body, max_bytes)
 }
 
 /// Handle a `401 Unauthorized` from the OpenHuman backend's
@@ -63,8 +63,8 @@ pub(crate) fn extract_error_detail(body: &str, max_bytes: usize) -> String {
 ///   provider-side failures come back as `2xx` envelope `success:false`
 ///   (`"Toolkit X is not enabled"`, `"Missing required fields: …"`) or a
 ///   descriptive non-401 4xx/5xx — handled by
-///   [`crate::core::observability::is_provider_user_state_message`] /
-///   [`crate::core::observability::is_backend_user_error_message`], NOT a bare
+///   [`openhuman_embed::__host::core::observability::is_provider_user_state_message`] /
+///   [`openhuman_embed::__host::core::observability::is_backend_user_error_message`], NOT a bare
 ///   401. The backend's auth wall is the only thing that returns 401 here.
 /// - **Composio direct mode**: bypasses this client entirely (it talks to
 ///   `backend.composio.dev` with `x-api-key` via `ComposioTool`), so a
@@ -82,7 +82,7 @@ pub(crate) fn extract_error_detail(body: &str, max_bytes: usize) -> String {
 /// (direct publish for paths whose error is consumed inline / swallowed):
 ///
 /// 1. Build a `SESSION_EXPIRED:`-prefixed message so it (a) classifies as
-///    [`crate::core::observability::ExpectedErrorKind::SessionExpired`] and
+///    [`openhuman_embed::__host::core::observability::ExpectedErrorKind::SessionExpired`] and
 ///    stays demoted from Sentry, and (b) is recognised by
 ///    `core::session_expiry::is_session_expired_error` *if* it ever propagates up to
 ///    the RPC boundary.
@@ -112,7 +112,7 @@ fn handle_session_jwt_unauthorized(method: &str, path: &str, url: &str, detail: 
 
     // Demote from Sentry (SESSION_EXPIRED classifies as expected) — keeps the
     // noise suppression the prior fix established. Applies to both paths.
-    crate::core::observability::report_error_or_expected(
+    openhuman_embed::__host::core::observability::report_error_or_expected(
         message.as_str(),
         "integrations",
         "session_expired",
@@ -138,7 +138,7 @@ fn handle_session_jwt_unauthorized(method: &str, path: &str, url: &str, detail: 
     // is already free of secrets (it names the path + sanitized backend
     // `error` detail), but re-scrub for defense-in-depth before it reaches the
     // subscriber's logs.
-    crate::core::bus::BUS.publish(crate::core::events::DomainEvent::SessionExpired {
+    openhuman_embed::__host::core::bus::BUS.publish(openhuman_embed::__host::core::events::DomainEvent::SessionExpired {
         source: format!("integrations.{method}:{path}"),
         reason: tinyinference_core::sanitize::sanitize_api_error(&message),
     });
@@ -164,7 +164,7 @@ fn handle_api_key_unauthorized(method: &str, path: &str, url: &str, detail: &str
         method = %method,
         "[integrations] backend rejected api key (401)"
     );
-    crate::core::observability::report_error_or_expected(
+    openhuman_embed::__host::core::observability::report_error_or_expected(
         message.as_str(),
         "integrations",
         "api_key_rejected",
@@ -222,7 +222,7 @@ impl IntegrationClient {
             chain.push_str(&s.to_string());
             src = s.source();
         }
-        crate::core::observability::report_error_or_expected(
+        openhuman_embed::__host::core::observability::report_error_or_expected(
             chain.as_str(),
             "integrations",
             method,
@@ -247,9 +247,9 @@ impl IntegrationClient {
             BackendTransportError::Unavailable => {
                 let msg = format!(
                     "{}{method_upper} {url}: managed backend is not available in this build",
-                    crate::core::observability::BACKEND_UNAVAILABLE_PREFIX
+                    openhuman_embed::__host::core::observability::BACKEND_UNAVAILABLE_PREFIX
                 );
-                crate::core::observability::report_error_or_expected(
+                openhuman_embed::__host::core::observability::report_error_or_expected(
                     msg.as_str(),
                     "integrations",
                     method,
@@ -288,7 +288,7 @@ impl IntegrationClient {
                     .map(|status| status.to_string())
                     .unwrap_or_else(|_| status.to_string());
                 let status_code = status.to_string();
-                crate::core::observability::report_error_or_expected(
+                openhuman_embed::__host::core::observability::report_error_or_expected(
                     format!("Backend returned {status_text} for {method_upper} {url}: {detail}")
                         .as_str(),
                     "integrations",
@@ -317,7 +317,7 @@ impl IntegrationClient {
             let msg = envelope
                 .error
                 .unwrap_or_else(|| "unknown backend error".into());
-            crate::core::observability::report_error_or_expected(
+            openhuman_embed::__host::core::observability::report_error_or_expected(
                 msg.as_str(),
                 "integrations",
                 method,

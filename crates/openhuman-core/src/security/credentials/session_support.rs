@@ -312,7 +312,7 @@ fn session_expires_at_from_profile(
 /// Liveness verdict for the stored app-session token. Pure + `now`-injected so
 /// the expiry decision is unit-testable without a credential store.
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) enum SessionTokenCheck {
+pub enum SessionTokenCheck {
     /// No token stored (signed out / never authed).
     Absent,
     /// Token present but its recorded `exp` is in the past (− skew).
@@ -321,7 +321,7 @@ pub(crate) enum SessionTokenCheck {
     Live(String),
 }
 
-pub(crate) fn classify_session_token(
+pub fn classify_session_token(
     profile: Option<&AuthProfile>,
     now: chrono::DateTime<chrono::Utc>,
 ) -> SessionTokenCheck {

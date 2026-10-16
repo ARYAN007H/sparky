@@ -11,7 +11,7 @@ use super::helpers::{
     sanitize_filename, validate_file_id, DOWNLOADS_DIR,
 };
 use crate::integrations::IntegrationClient;
-use crate::security::SecurityPolicy;
+use openhuman_embed::__host::security::SecurityPolicy;
 use tinytools::ToolRunContext;
 use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolCategory, ToolResult};
 
@@ -42,7 +42,7 @@ impl StorageDownloadFileTool {
         &self,
         args: Value,
         action_dir: &Path,
-        approval: &crate::security::approval::ApprovalTurnContext,
+        approval: &openhuman_embed::__host::security::approval::ApprovalTurnContext,
     ) -> anyhow::Result<ToolResult> {
         if let Some(blocked) = readonly_autonomy_block(&self.security) {
             return Ok(blocked);
@@ -162,7 +162,7 @@ impl Tool for StorageDownloadFileTool {
         context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
         let action_dir = action_dir_for_context(&self.action_dir, context, self.name());
-        let approval = crate::agent::tinyagents::host::run_context::approval_for_tool(context);
+        let approval = openhuman_embed::__host::agent::tinyagents::host::run_context::approval_for_tool(context);
         self.run(args, &action_dir, &approval).await
     }
 }

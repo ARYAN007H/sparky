@@ -2,7 +2,7 @@
 //! download route bypasses the JSON envelope and needs `Content-Type` /
 //! `Content-Disposition` metadata the SDK's binary primitive doesn't expose.
 
-use crate::backend::transport::BackendTransportError;
+use crate::BackendTransportError;
 
 use super::construct::IntegrationClient;
 use super::requests::{emit_backend_egress, enforce_backend_egress};
@@ -48,7 +48,7 @@ impl IntegrationClient {
     /// client with no backend credential headers.
     pub async fn get_bytes(
         &self,
-        approval: &crate::security::approval::ApprovalTurnContext,
+        approval: &openhuman_embed::__host::security::approval::ApprovalTurnContext,
         path: &str,
     ) -> anyhow::Result<(bytes::Bytes, Option<String>, Option<String>)> {
         self.validate_credential_endpoint()?;
@@ -64,7 +64,7 @@ impl IntegrationClient {
         if !is_file_download {
             anyhow::bail!("route is intentionally not exposed by the SDK: GET {route}");
         }
-        let url = crate::util::url::join_url(&self.backend_url, path);
+        let url = openhuman_embed::__host::util::url::join_url(&self.backend_url, path);
         tracing::debug!("[integrations] GET(bytes) {}", url);
 
         let mut resp = self
@@ -87,7 +87,7 @@ impl IntegrationClient {
                 .to_str()?;
             let redirect_url = resp.url().join(location)?;
             anyhow::ensure!(
-                crate::inference::provider::openhuman_backend_model::is_safe_endpoint_for_managed_bearer(redirect_url.as_str()),
+                crate::client::is_safe_endpoint_for_managed_bearer(redirect_url.as_str()),
                 "download redirect requires HTTPS or a loopback HTTP endpoint"
             );
             // Redirect hops never carry backend headers, including x-api-key.

@@ -50,7 +50,7 @@ impl Tool for StorageListFilesTool {
         _options: tinytools::ToolCallOptions,
         context: Option<&dyn tinytools::ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
-        let approval = crate::agent::tinyagents::host::run_context::approval_for_tool(context);
+        let approval = openhuman_embed::__host::agent::tinyagents::host::run_context::approval_for_tool(context);
         self.run(_args, &approval).await
     }
 }
@@ -60,7 +60,7 @@ impl StorageListFilesTool {
     pub(crate) async fn run(
         &self,
         _args: Value,
-        approval: &crate::security::approval::ApprovalTurnContext,
+        approval: &openhuman_embed::__host::security::approval::ApprovalTurnContext,
     ) -> anyhow::Result<ToolResult> {
         tracing::debug!("[file_storage] listing files");
         match self

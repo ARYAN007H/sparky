@@ -3,8 +3,8 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::config::Config;
-use crate::security::SecurityPolicy;
+use openhuman_embed::__host::config::Config;
+use openhuman_embed::__host::security::SecurityPolicy;
 use tinytools::Tool;
 
 use super::delete::StorageDeleteFileTool;

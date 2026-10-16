@@ -8,7 +8,7 @@ use super::{
     StorageGetLinkTool, StorageListFilesTool, StorageSetVisibilityTool, StorageUploadFileTool,
 };
 use crate::integrations::IntegrationClient;
-use crate::security::{AutonomyLevel, SecurityPolicy};
+use openhuman_embed::__host::security::{AutonomyLevel, SecurityPolicy};
 use tinytools::{PermissionLevel, Tool, ToolCategory};
 
 fn dummy_client() -> Arc<IntegrationClient> {

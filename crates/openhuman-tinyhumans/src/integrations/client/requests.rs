@@ -3,7 +3,7 @@
 //! (`post`/`get`/`patch`/`delete`/`upload_multipart`).
 
 use super::construct::IntegrationClient;
-use crate::security::approval::ApprovalTurnContext;
+use openhuman_embed::__host::security::approval::ApprovalTurnContext;
 
 pub(super) fn managed_budget_applies_to_path(path: &str) -> bool {
     path != "/agent-integrations/pricing" && path.starts_with("/agent-integrations/")
@@ -26,16 +26,16 @@ fn reject_privileged_backend_path(method: &str, path: &str) -> anyhow::Result<()
 /// Build the egress descriptor for a managed-backend round-trip. The query
 /// string is stripped so only the endpoint (the "to where") is described, never
 /// any data carried in the query.
-pub(super) fn backend_egress_descriptor(path: &str) -> crate::security::egress::EgressDescriptor {
+pub(super) fn backend_egress_descriptor(path: &str) -> openhuman_embed::__host::egress::EgressDescriptor {
     let endpoint = path.split('?').next().unwrap_or(path);
-    crate::security::egress::EgressDescriptor::integration(endpoint)
+    openhuman_embed::__host::egress::EgressDescriptor::integration(endpoint)
 }
 
 /// Egress spine (privacy epic S2, #4436): disclose an OpenHuman managed-backend
 /// round-trip before it leaves the device. Fire-and-forget — never fails the
 /// caller.
 pub(super) fn emit_backend_egress(approval: &ApprovalTurnContext, path: &str) {
-    crate::security::egress::emit_external_transfer(
+    openhuman_embed::__host::egress::emit_external_transfer(
         approval.chat.as_ref(),
         backend_egress_descriptor(path),
     );
@@ -46,10 +46,10 @@ pub(super) fn emit_backend_egress(approval: &ApprovalTurnContext, path: &str) {
 /// `Ok(())` for control-plane paths (session / team / billing / integration
 /// connection-management + catalog) even under `LocalOnly` — blocking those
 /// would break sign-in and the Connections UI for no privacy benefit. See
-/// [`is_control_plane`](crate::security::egress). Call before
+/// [`is_control_plane`](openhuman_embed::__host::egress). Call before
 /// [`emit_backend_egress`] so a blocked call is neither disclosed nor sent.
 pub(super) fn enforce_backend_egress(path: &str) -> anyhow::Result<()> {
-    crate::security::egress::enforce_egress(&backend_egress_descriptor(path))
+    openhuman_embed::__host::egress::enforce_egress(&backend_egress_descriptor(path))
 }
 
 impl IntegrationClient {
@@ -134,7 +134,7 @@ impl IntegrationClient {
         enforce_backend_egress(path)?;
         emit_backend_egress(approval, path);
         self.ensure_budget_available(path).await?;
-        let url = crate::util::url::join_url(&self.backend_url, path);
+        let url = openhuman_embed::__host::util::url::join_url(&self.backend_url, path);
         let method_name = method.as_str().to_ascii_lowercase();
         tracing::debug!("[integrations] {} {}", method.as_str(), url);
         let value = self
@@ -185,7 +185,7 @@ impl IntegrationClient {
         enforce_backend_egress(path)?;
         emit_backend_egress(approval, path);
         self.ensure_budget_available(path).await?;
-        let url = crate::util::url::join_url(&self.backend_url, path);
+        let url = openhuman_embed::__host::util::url::join_url(&self.backend_url, path);
         tracing::debug!("[integrations] POST(multipart) {}", url);
 
         let value = self

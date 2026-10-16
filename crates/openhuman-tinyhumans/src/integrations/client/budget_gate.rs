@@ -20,10 +20,10 @@ use std::time::{Duration, Instant};
 
 use serde_json::Value;
 
-use crate::backend::BackendClient;
-use crate::config::Config;
-use crate::core::Outcome;
-use crate::security::credentials::session_support::BackendCredential;
+use crate::client::BackendClient;
+use openhuman_embed::__host::config::Config;
+use openhuman_embed::__host::core::Outcome;
+use openhuman_embed::__host::security::credentials::session_support::BackendCredential;
 
 /// Fetch `GET /teams/me/usage` for the pre-call probe with an
 /// already-resolved credential. `flatten_authed_error` keeps the typed 401 on
@@ -34,7 +34,7 @@ async fn fetch_usage(config: &Config, credential: BackendCredential) -> Result<V
     client
         .authed_json(&credential, reqwest::Method::GET, "/teams/me/usage", None)
         .await
-        .map_err(crate::backend::flatten_authed_error)
+        .map_err(crate::client::flatten_authed_error)
 }
 
 /// How long a *failed* usage fetch is short-circuited before the backend is
@@ -127,7 +127,7 @@ where
 /// document behind the shared failure backoff.
 async fn probe_usage(config: &Config) -> Result<Value, String> {
     let credential =
-        crate::security::credentials::session_support::resolve_backend_credential(config)?;
+        openhuman_embed::__host::security::credentials::session_support::resolve_backend_credential(config)?;
     let backend_key = crate::backend::require_base_url(&config.api_url)?;
     usage_with_failure_backoff(&backend_key, || fetch_usage(config, credential))
         .await
@@ -139,7 +139,7 @@ async fn probe_usage(config: &Config) -> Result<Value, String> {
 ///
 /// - Within `ttl` of a recorded failure → short-circuit WITHOUT calling
 ///   `fetch` (network backpressure) and return the
-///   [`crate::core::observability::USAGE_PROBE_BACKOFF_PREFIX`] sentinel, which
+///   [`openhuman_embed::__host::core::observability::USAGE_PROBE_BACKOFF_PREFIX`] sentinel, which
 ///   the JSON-RPC boundary demotes (no re-report).
 /// - Otherwise call `fetch`: `Ok` clears the streak; a non-session-expiry `Err`
 ///   anchors a fresh streak and propagates verbatim (first-of-streak reports);
@@ -162,7 +162,7 @@ where
         );
         return Err(format!(
             "{} recent /teams/me/usage failure suppressed (backoff)",
-            crate::core::observability::USAGE_PROBE_BACKOFF_PREFIX
+            openhuman_embed::__host::core::observability::USAGE_PROBE_BACKOFF_PREFIX
         ));
     }
 
@@ -172,7 +172,7 @@ where
             Ok(Outcome::single_log(data, "team usage fetched from backend"))
         }
         Err(err) => {
-            if crate::core::observability::is_session_expired_message(&err) {
+            if openhuman_embed::__host::core::observability::is_session_expired_message(&err) {
                 // Session lapse — handled by the session-expired RPC arm and
                 // drives local session cleanup. Never enter the failure window.
                 tracing::debug!(

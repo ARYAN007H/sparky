@@ -1,9 +1,9 @@
 use super::*;
-use crate::security::credentials::session_support::BackendCredential;
+use openhuman_embed::__host::security::credentials::session_support::BackendCredential;
 
 #[test]
 fn local_offline_token_never_constructs_a_hosted_integration_client() {
-    let config = crate::config::Config::default();
+    let config = openhuman_embed::__host::config::Config::default();
     let backend_url = "https://api.example.test".to_owned();
     assert!(build_client_with_credential(
         &config,
@@ -21,7 +21,7 @@ fn local_offline_token_never_constructs_a_hosted_integration_client() {
 
 #[test]
 fn api_key_constructs_a_client_that_authenticates_with_the_key() {
-    let config = crate::config::Config::default();
+    let config = openhuman_embed::__host::config::Config::default();
     let client = build_client_with_credential(
         &config,
         "https://api.tinyhumans.ai".to_owned(),
@@ -49,7 +49,7 @@ fn api_key_rejects_foreign_or_plaintext_integration_endpoints() {
 
 #[test]
 fn missing_or_blank_credential_builds_no_client() {
-    let config = crate::config::Config::default();
+    let config = openhuman_embed::__host::config::Config::default();
     let url = "https://api.example.test".to_owned();
     assert!(build_client_with_credential(&config, url.clone(), None).is_none());
     assert!(build_client_with_credential(

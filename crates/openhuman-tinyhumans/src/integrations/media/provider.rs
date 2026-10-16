@@ -28,10 +28,10 @@ use tinyagents_harness::tinyinference_video::{
     VideoRequest,
 };
 
-use crate::backend::BackendClient;
-use crate::config::Config;
-use crate::security::approval::ApprovalChatContext;
-use crate::security::credentials::session_support::{
+use crate::client::BackendClient;
+use openhuman_embed::__host::config::Config;
+use openhuman_embed::__host::security::approval::ApprovalChatContext;
+use openhuman_embed::__host::security::credentials::session_support::{
     resolve_backend_credential, BackendCredential,
 };
 
@@ -165,14 +165,14 @@ impl Guard {
     /// Local-only enforcement, then the egress disclosure. A blocked call is
     /// neither disclosed nor sent.
     fn admit(&self, route: &str) -> ti_image::Result<()> {
-        let descriptor = crate::security::egress::EgressDescriptor::integration(format!(
+        let descriptor = openhuman_embed::__host::egress::EgressDescriptor::integration(format!(
             "{OPENROUTER_PROXY_PATH}/{route}"
         ));
-        crate::security::egress::enforce_egress(&descriptor).map_err(|error| {
+        openhuman_embed::__host::egress::enforce_egress(&descriptor).map_err(|error| {
             tracing::info!(route, %error, "[media_generation] blocked by privacy policy");
             ti_image::Error::Validation(format!("blocked by the privacy policy: {error}"))
         })?;
-        crate::security::egress::emit_external_transfer(self.chat.as_ref(), descriptor);
+        openhuman_embed::__host::egress::emit_external_transfer(self.chat.as_ref(), descriptor);
         Ok(())
     }
 

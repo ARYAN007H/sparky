@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use serde_json::Value;
 
-use crate::config::Config;
+use openhuman_embed::__host::config::Config;
 use crate::integrations::IntegrationClient;
 
 const LOG_PREFIX: &str = "[web3]";
@@ -42,7 +42,7 @@ impl CryptoClient {
         tracing::debug!("{LOG_PREFIX} routes");
         self.inner
             .get::<Value>(
-                &crate::security::approval::ApprovalTurnContext::default(),
+                &openhuman_embed::__host::security::approval::ApprovalTurnContext::default(),
                 "/agent-integrations/crypto/routes",
             )
             .await
@@ -56,7 +56,7 @@ impl CryptoClient {
         tracing::debug!("{LOG_PREFIX} swap_tx chain_id={:?}", body.get("chainId"));
         self.inner
             .post::<Value>(
-                &crate::security::approval::ApprovalTurnContext::default(),
+                &openhuman_embed::__host::security::approval::ApprovalTurnContext::default(),
                 "/agent-integrations/crypto/swap",
                 body,
             )
@@ -75,7 +75,7 @@ impl CryptoClient {
         );
         self.inner
             .post::<Value>(
-                &crate::security::approval::ApprovalTurnContext::default(),
+                &openhuman_embed::__host::security::approval::ApprovalTurnContext::default(),
                 "/agent-integrations/crypto/bridge",
                 body,
             )

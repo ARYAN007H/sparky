@@ -6,7 +6,7 @@ use super::*;
 use axum::http::HeaderMap;
 use parking_lot::Mutex;
 
-use crate::security::credentials::session_support::BackendCredential;
+use openhuman_embed::__host::security::credentials::session_support::BackendCredential;
 
 const KEY: &str = "tiny_test_integrations_key";
 
@@ -128,7 +128,7 @@ async fn presigned_download_redirect_does_not_forward_api_key() {
 
 #[tokio::test]
 async fn api_key_401_is_api_key_rejected_not_session_expired() {
-    use crate::core::observability::is_session_expired_message;
+    use openhuman_embed::__host::core::observability::is_session_expired_message;
 
     let app = Router::new().route(
         "/agent-integrations/parallel/search",

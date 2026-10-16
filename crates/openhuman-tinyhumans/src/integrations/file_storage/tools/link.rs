@@ -7,7 +7,7 @@ use serde_json::{json, Value};
 
 use super::helpers::{file_path, readonly_autonomy_block, validate_file_id};
 use crate::integrations::IntegrationClient;
-use crate::security::SecurityPolicy;
+use openhuman_embed::__host::security::SecurityPolicy;
 use tinytools::{PermissionLevel, Tool, ToolCategory, ToolResult};
 
 use crate::integrations::file_storage::types::LinkResponse;
@@ -76,7 +76,7 @@ impl Tool for StorageGetLinkTool {
         _options: tinytools::ToolCallOptions,
         context: Option<&dyn tinytools::ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
-        let approval = crate::agent::tinyagents::host::run_context::approval_for_tool(context);
+        let approval = openhuman_embed::__host::agent::tinyagents::host::run_context::approval_for_tool(context);
         self.run(args, &approval).await
     }
 }
@@ -86,7 +86,7 @@ impl StorageGetLinkTool {
     pub(crate) async fn run(
         &self,
         args: Value,
-        approval: &crate::security::approval::ApprovalTurnContext,
+        approval: &openhuman_embed::__host::security::approval::ApprovalTurnContext,
     ) -> anyhow::Result<ToolResult> {
         if let Some(blocked) = readonly_autonomy_block(&self.security) {
             return Ok(blocked);

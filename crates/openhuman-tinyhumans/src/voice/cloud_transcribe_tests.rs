@@ -1,6 +1,6 @@
 use super::*;
 use openhuman_embed::__host::core::observability::{
-    is_backend_unavailable_message, is_session_expired_message,
+    is_session_expired_message, BACKEND_UNAVAILABLE_PREFIX,
 };
 use openhuman_embed::__host::security::credentials::{
     api_key::store_api_key, AuthService, APP_SESSION_PROVIDER, DEFAULT_AUTH_PROFILE_NAME,
@@ -60,10 +60,7 @@ async fn offline_local_session_refuses_without_a_request() {
     let err = transcribe_cloud(&config, "AAAA", &CloudTranscribeOptions::default())
         .await
         .unwrap_err();
-    assert!(
-        is_backend_unavailable_message(&err),
-        "{err}"
-    );
+    assert!(err.starts_with(BACKEND_UNAVAILABLE_PREFIX), "{err}");
 }
 
 #[tokio::test]

@@ -187,7 +187,7 @@ impl Tool for StockQuoteTool {
         _options: tinytools::ToolCallOptions,
         context: Option<&dyn tinytools::ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
-        let approval = crate::agent::tinyagents::host::run_context::approval_for_tool(context);
+        let approval = openhuman_embed::__host::agent::tinyagents::host::run_context::approval_for_tool(context);
         self.run(args, &approval).await
     }
 }
@@ -197,7 +197,7 @@ impl StockQuoteTool {
     pub(crate) async fn run(
         &self,
         args: serde_json::Value,
-        approval: &crate::security::approval::ApprovalTurnContext,
+        approval: &openhuman_embed::__host::security::approval::ApprovalTurnContext,
     ) -> anyhow::Result<ToolResult> {
         let symbol = args
             .get("symbol")
@@ -300,7 +300,7 @@ impl Tool for StockExchangeRateTool {
         _options: tinytools::ToolCallOptions,
         context: Option<&dyn tinytools::ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
-        let approval = crate::agent::tinyagents::host::run_context::approval_for_tool(context);
+        let approval = openhuman_embed::__host::agent::tinyagents::host::run_context::approval_for_tool(context);
         self.run(args, &approval).await
     }
 }
@@ -310,7 +310,7 @@ impl StockExchangeRateTool {
     pub(crate) async fn run(
         &self,
         args: serde_json::Value,
-        approval: &crate::security::approval::ApprovalTurnContext,
+        approval: &openhuman_embed::__host::security::approval::ApprovalTurnContext,
     ) -> anyhow::Result<ToolResult> {
         let from = args
             .get("from_currency")
@@ -414,7 +414,7 @@ impl Tool for StockOptionsTool {
         _options: tinytools::ToolCallOptions,
         context: Option<&dyn tinytools::ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
-        let approval = crate::agent::tinyagents::host::run_context::approval_for_tool(context);
+        let approval = openhuman_embed::__host::agent::tinyagents::host::run_context::approval_for_tool(context);
         self.run(args, &approval).await
     }
 }
@@ -424,7 +424,7 @@ impl StockOptionsTool {
     pub(crate) async fn run(
         &self,
         args: serde_json::Value,
-        approval: &crate::security::approval::ApprovalTurnContext,
+        approval: &openhuman_embed::__host::security::approval::ApprovalTurnContext,
     ) -> anyhow::Result<ToolResult> {
         let symbol = args
             .get("symbol")
@@ -543,7 +543,7 @@ impl Tool for StockCryptoSeriesTool {
         _options: tinytools::ToolCallOptions,
         context: Option<&dyn tinytools::ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
-        let approval = crate::agent::tinyagents::host::run_context::approval_for_tool(context);
+        let approval = openhuman_embed::__host::agent::tinyagents::host::run_context::approval_for_tool(context);
         self.run(args, &approval).await
     }
 }
@@ -553,7 +553,7 @@ impl StockCryptoSeriesTool {
     pub(crate) async fn run(
         &self,
         args: serde_json::Value,
-        approval: &crate::security::approval::ApprovalTurnContext,
+        approval: &openhuman_embed::__host::security::approval::ApprovalTurnContext,
     ) -> anyhow::Result<ToolResult> {
         let symbol = args
             .get("symbol")
@@ -671,7 +671,7 @@ impl Tool for StockCommodityTool {
         _options: tinytools::ToolCallOptions,
         context: Option<&dyn tinytools::ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
-        let approval = crate::agent::tinyagents::host::run_context::approval_for_tool(context);
+        let approval = openhuman_embed::__host::agent::tinyagents::host::run_context::approval_for_tool(context);
         self.run(args, &approval).await
     }
 }
@@ -681,7 +681,7 @@ impl StockCommodityTool {
     pub(crate) async fn run(
         &self,
         args: serde_json::Value,
-        approval: &crate::security::approval::ApprovalTurnContext,
+        approval: &openhuman_embed::__host::security::approval::ApprovalTurnContext,
     ) -> anyhow::Result<ToolResult> {
         let commodity = args
             .get("commodity")
