@@ -25,16 +25,12 @@ impl ChatModel<()> for Model {
     }
 }
 struct Hook {
-    name: &'static str,
     seen: tokio::sync::mpsc::UnboundedSender<String>,
 }
 #[async_trait]
 impl LearningSink for Hook {
-    fn name(&self) -> &str {
-        self.name
-    }
     async fn on_turn_complete(&self, ctx: &TurnSummary) -> anyhow::Result<()> {
-        self.seen.send(ctx.agent_id.clone().unwrap_or_default())?;
+        self.seen.send(ctx.agent_id.clone())?;
         Ok(())
     }
 }
@@ -64,7 +60,7 @@ fn custom_models_local_hooks_session_stores_and_events_stay_scoped() {
                     ..Default::default()
                 })
                 .post_turn_hook(Arc::new(Hook {
-                    name: "global",
+                    
                     seen: global_tx,
                 }))
                 .build()
@@ -84,7 +80,7 @@ fn custom_models_local_hooks_session_stores_and_events_stay_scoped() {
                         .definition(definition())
                         .session_store(store_a.clone())
                         .post_turn_hook(Arc::new(Hook {
-                            name: "local",
+                            
                             seen: hook_tx,
                         })),
                 )
