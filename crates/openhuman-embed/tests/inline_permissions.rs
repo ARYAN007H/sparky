@@ -92,7 +92,7 @@ async fn scenario() {
     let other = runtime
         .agent(
             spec("other", &other_provider, other_calls.clone())
-                .can_use_tool(|_| Box::pin(async { ToolHookDecision::Proceed })),
+                .can_use_tool(|_| Box::pin(async { ToolHookDecision::default() })),
         )
         .unwrap();
     let first = tokio::spawn(agent.turn("needs approval").send());
@@ -127,7 +127,7 @@ async fn scenario() {
             .send(),
     );
     let (_, answer) = received.recv().await.unwrap();
-    answer.send(ToolHookDecision::Proceed).unwrap();
+    answer.send(ToolHookDecision::default()).unwrap();
     assert!(
         second.await.unwrap().is_err(),
         "turn denial unexpectedly succeeded"
@@ -135,7 +135,7 @@ async fn scenario() {
     assert_eq!(calls.load(Ordering::SeqCst), 0, "turn policy was skipped");
     let third = tokio::spawn(agent.turn("next turn").send());
     let (_, answer) = received.recv().await.unwrap();
-    answer.send(ToolHookDecision::Proceed).unwrap();
+    answer.send(ToolHookDecision::default()).unwrap();
     third.await.unwrap().unwrap();
     assert_eq!(
         calls.load(Ordering::SeqCst),
@@ -187,7 +187,7 @@ async fn repeated_permissions(runtime: &Runtime) {
                 .can_use_tool(|_| {
                     Box::pin(async { ToolHookDecision::Deny("first policy refused".into()) })
                 })
-                .can_use_tool(|_| Box::pin(async { ToolHookDecision::Proceed })),
+                .can_use_tool(|_| Box::pin(async { ToolHookDecision::default() })),
         )
         .unwrap();
     assert!(agent.run("perform probe").await.is_err());

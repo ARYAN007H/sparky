@@ -246,7 +246,7 @@ async fn scenario() {
                 if context.arguments.get("deny").and_then(Value::as_bool) == Some(true) {
                     ToolHookDecision::Deny("operator refused this call".into())
                 } else {
-                    ToolHookDecision::Proceed
+                    ToolHookDecision::default()
                 }
             })
         })
@@ -388,7 +388,7 @@ async fn scenario() {
         handles[0]
             .scope(alice_hook.before_tool_decision(&hook_context))
             .await,
-        ToolHookDecision::Proceed
+        ToolHookDecision::default()
     ));
     assert!(handles[1]
         .scope(alice_hook.before_tool_decision(&hook_context))
@@ -529,7 +529,7 @@ async fn scenario() {
         handles[0]
             .scope(alice_hook.before_tool_decision(&hook_context))
             .await,
-        ToolHookDecision::Proceed
+        ToolHookDecision::default()
     ));
     let requests = chat_requests(&inference).await;
     assert!(requests
