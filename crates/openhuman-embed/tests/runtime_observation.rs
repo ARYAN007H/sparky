@@ -29,8 +29,8 @@ struct Hook {
 }
 #[async_trait]
 impl LearningSink for Hook {
-    async fn on_turn_complete(&self, ctx: &TurnSummary) -> anyhow::Result<()> {
-        self.seen.send(ctx.agent_id.clone())?;
+    async fn on_turn_complete(&self, ctx: &TurnSummary) -> tinyagents_harness::error::Result<()> {
+        self.seen.send(ctx.agent_id.clone()).unwrap();
         Ok(())
     }
 }
@@ -59,10 +59,7 @@ fn custom_models_local_hooks_session_stores_and_events_stay_scoped() {
                     top_p: Some(0.8),
                     ..Default::default()
                 })
-                .post_turn_hook(Arc::new(Hook {
-                    
-                    seen: global_tx,
-                }))
+                .post_turn_hook(Arc::new(Hook { seen: global_tx }))
                 .build()
                 .await
                 .unwrap();
@@ -79,10 +76,7 @@ fn custom_models_local_hooks_session_stores_and_events_stay_scoped() {
                     AgentSpec::new("a")
                         .definition(definition())
                         .session_store(store_a.clone())
-                        .post_turn_hook(Arc::new(Hook {
-                            
-                            seen: hook_tx,
-                        })),
+                        .post_turn_hook(Arc::new(Hook { seen: hook_tx })),
                 )
                 .unwrap();
             let b = runtime
