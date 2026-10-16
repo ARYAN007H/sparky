@@ -77,14 +77,14 @@ fn local_only_allows_local_runtime() {
 #[test]
 fn local_only_allows_control_plane_integration() {
     // LocalOnly + an exempt control-plane integration path → allowed.
-    let pricing = EgressDescriptor::integration("/agent-integrations/pricing");
+    let pricing = EgressDescriptor::integration("/pricing").with_control_plane(true);
     assert!(!local_only_blocks(PrivacyMode::LocalOnly, &pricing));
 }
 
 #[test]
 fn local_only_blocks_user_data_integration() {
     // LocalOnly + a user-data integration path → blocked.
-    let execute = EgressDescriptor::integration("/agent-integrations/composio/execute");
+    let execute = EgressDescriptor::integration("/tools/execute");
     assert!(local_only_blocks(PrivacyMode::LocalOnly, &execute));
 }
 
