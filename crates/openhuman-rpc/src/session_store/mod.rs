@@ -43,7 +43,7 @@ use std::sync::Arc;
 use anyhow::Context as _;
 use tinyagents_session::port::SessionStoreProvider;
 
-use crate::core_host::storage::sessions::{ReboundSessionStores, WorkspaceSessionStores};
+use crate::core_host::agent::session_store::{ReboundSessionStores, WorkspaceSessionStores};
 
 /// Installs the session store the host's configuration asks for, before the
 /// core boots.
@@ -122,7 +122,7 @@ fn storage_url_from(
 pub async fn install_for_url(url: Option<String>) -> anyhow::Result<()> {
     let provider = provider_for_url(url).await?;
     log::debug!("[rpc:session_store] installing process-wide (host configuration)");
-    crate::core_host::storage::sessions::install(provider);
+    crate::core_host::agent::session_store::install(provider);
     Ok(())
 }
 
@@ -152,7 +152,7 @@ pub async fn provider_for_url(
 pub async fn install_for_saas(url: Option<String>) -> anyhow::Result<()> {
     let provider = provider_for_url_with(url, Some(false)).await?;
     log::debug!("[rpc:session_store] installing process-wide (SaaS, lease-driven recovery)");
-    crate::core_host::storage::sessions::install(provider);
+    crate::core_host::agent::session_store::install(provider);
     Ok(())
 }
 

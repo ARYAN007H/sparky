@@ -20,11 +20,11 @@ fn restore_backend(previous: Option<Arc<dyn crate::core_host::storage::StorageBa
 #[tokio::test]
 async fn a_storage_url_installs_the_driver_backed_store() {
     let _turn = SLOTS.lock().await;
-    let previous = crate::core_host::storage::sessions::installed();
+    let previous = crate::core_host::agent::session_store::installed();
     let previous_backend = crate::core_host::storage::installed();
     install_for_url(Some("memory".into())).await.unwrap();
 
-    let provider = crate::core_host::storage::sessions::installed().unwrap();
+    let provider = crate::core_host::agent::session_store::installed().unwrap();
     assert!(
         provider
             .destination_key()
@@ -50,14 +50,14 @@ async fn a_storage_url_installs_the_driver_backed_store() {
         .is_none());
 
     restore_backend(previous_backend);
-    crate::core_host::storage::sessions::restore(previous);
+    crate::core_host::agent::session_store::restore(previous);
 }
 
 /// A storage URL installs the driver-backed store, and two agents on the one
 /// backend keep their turn states apart. Run once per driver the build has.
 async fn driver_backed_store_keeps_agents_apart(url: String, driver: &str) {
     let _turn = SLOTS.lock().await;
-    let previous = crate::core_host::storage::sessions::installed();
+    let previous = crate::core_host::agent::session_store::installed();
     let previous_backend = crate::core_host::storage::installed();
     install_for_url(Some(url)).await.unwrap();
 
@@ -65,7 +65,7 @@ async fn driver_backed_store_keeps_agents_apart(url: String, driver: &str) {
         crate::core_host::storage::installed().map(|b| b.driver()),
         Some(driver)
     );
-    let provider = crate::core_host::storage::sessions::installed().unwrap();
+    let provider = crate::core_host::agent::session_store::installed().unwrap();
     let alice = provider.for_agent("alice");
     alice
         .turn_states
@@ -80,7 +80,7 @@ async fn driver_backed_store_keeps_agents_apart(url: String, driver: &str) {
         .is_none());
 
     restore_backend(previous_backend);
-    crate::core_host::storage::sessions::restore(previous);
+    crate::core_host::agent::session_store::restore(previous);
 }
 
 #[cfg(feature = "storage-sqlite")]
@@ -158,18 +158,18 @@ async fn the_mongodb_backend_keeps_agents_apart() {
 #[tokio::test]
 async fn an_unusable_url_fails_the_boot() {
     let _turn = SLOTS.lock().await;
-    let previous = crate::core_host::storage::sessions::installed();
+    let previous = crate::core_host::agent::session_store::installed();
     let error = install_for_url(Some("ftp://nowhere".into()))
         .await
         .unwrap_err();
     assert!(format!("{error:#}").contains("storage"), "{error:#}");
-    crate::core_host::storage::sessions::restore(previous);
+    crate::core_host::agent::session_store::restore(previous);
 }
 
 #[tokio::test]
 async fn the_host_reads_the_storage_url_from_the_environment() {
     let _turn = SLOTS.lock().await;
-    let previous = crate::core_host::storage::sessions::installed();
+    let previous = crate::core_host::agent::session_store::installed();
     let previous_backend = crate::core_host::storage::installed();
     let var = crate::core_host::storage::STORAGE_URL_VAR;
     let old = std::env::var_os(var);
@@ -186,7 +186,7 @@ async fn the_host_reads_the_storage_url_from_the_environment() {
         None => std::env::remove_var(var),
     }
     restore_backend(previous_backend);
-    crate::core_host::storage::sessions::restore(previous);
+    crate::core_host::agent::session_store::restore(previous);
 
     booted.unwrap();
     assert_eq!(driver, Some("memory"));
@@ -196,21 +196,21 @@ async fn the_host_reads_the_storage_url_from_the_environment() {
 #[tokio::test]
 async fn provider_for_url_returns_the_store_without_installing_it() {
     let _turn = SLOTS.lock().await;
-    let previous = crate::core_host::storage::sessions::installed();
+    let previous = crate::core_host::agent::session_store::installed();
     let previous_backend = crate::core_host::storage::installed();
-    crate::core_host::storage::sessions::restore(None);
+    crate::core_host::agent::session_store::restore(None);
 
     let backed = provider_for_url(Some("memory".into())).await.unwrap();
     let backed_key = backed.destination_key();
     let backend_driver = crate::core_host::storage::installed().map(|b| b.driver());
-    let left_uninstalled = crate::core_host::storage::sessions::installed().is_none();
+    let left_uninstalled = crate::core_host::agent::session_store::installed().is_none();
 
     // No URL: each workspace keeps its sessions in its own default database.
     let per_workspace = provider_for_url(None).await.unwrap();
     let cleared = crate::core_host::storage::installed().is_none();
 
     restore_backend(previous_backend);
-    crate::core_host::storage::sessions::restore(previous);
+    crate::core_host::agent::session_store::restore(previous);
 
     assert!(
         backed_key

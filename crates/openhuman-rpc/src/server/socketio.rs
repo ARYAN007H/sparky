@@ -32,10 +32,10 @@
 
 use serde::Deserialize;
 use serde::Serialize;
-use serde_json::Value;
 use serde_json::json;
-use socketioxide::SocketIo;
+use serde_json::Value;
 use socketioxide::extract::{AckSender, Data, SocketRef, TryData};
+use socketioxide::SocketIo;
 
 use crate::core_host::web_chat::{GuardrailPayload, WebChannelEvent};
 
@@ -1276,8 +1276,8 @@ fn replay_parked_plan_review(socket: &SocketRef, thread_id: &str) {
     let Ok(tenant) = crate::core_host::core::runtime::DispatchCtx::ambient().tenant() else {
         return;
     };
-    let Some(row) =
-        crate::core_host::plan_review::gate::global().parked_review_for_thread(&tenant, thread_id)
+    let Some(row) = crate::core_host::agent::plan_review::gate::global()
+        .parked_review_for_thread(&tenant, thread_id)
     else {
         return;
     };
