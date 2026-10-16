@@ -10,6 +10,7 @@ pub mod tiny_store;
 pub mod types;
 pub mod version_documents;
 
+pub(crate) use files::resolve_ready_file_meta;
 pub use files::{resolve_ready_file, FileRoots};
 pub use migrate::{migrate_legacy_artifacts, MigrationReport};
 pub use schemas::{

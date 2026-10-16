@@ -156,6 +156,12 @@ export const ALLOW = new Map(
       "tokio::fs::write(&dest, latest.body.as_bytes()).await?;",
       "writes a text artifact's newest version into its file in the user-visible files folder; the deliverable is a user file on every backend, the versioned record itself goes through the artifact store",
     ],
+    [
+      "media/generation/artifact_tool.rs",
+      "json-write",
+      "let mut file = tokio::fs::OpenOptions::new()",
+      "copies a generated media blob into the artifact's reserved user-visible file; the finalized file remains the artifact bytes on every backend because the storage port has no blob store",
+    ],
   ].reduce((map, [path, rule, site, reason]) => {
     const key = `${SRC}${path}`;
     map.set(key, [...(map.get(key) ?? []), { rule, site, reason }]);

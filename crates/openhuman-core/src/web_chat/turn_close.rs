@@ -290,10 +290,12 @@ async fn read_snapshot(
     request_id: &str,
 ) -> Option<TurnState> {
     let (thread_id, request_id) = (thread_id.to_string(), request_id.to_string());
-    let read = ctx.spawn_blocking(move || {
-        crate::agent::session_store::turn_states_for(&workspace).get_turn(&thread_id, &request_id)
-    })
-    .await;
+    let read = ctx
+        .spawn_blocking(move || {
+            crate::agent::session_store::turn_states_for(&workspace)
+                .get_turn(&thread_id, &request_id)
+        })
+        .await;
     match read {
         Ok(Ok(snapshot)) => snapshot,
         Ok(Err(error)) => {

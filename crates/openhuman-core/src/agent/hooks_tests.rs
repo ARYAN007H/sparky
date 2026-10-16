@@ -216,5 +216,8 @@ async fn embedder_snapshots_read_the_process_registry_not_the_task_scope() {
     replace_embedder_post_turn_hook("snapshot-scope-probe", None);
 
     assert!(in_scope, "the process registry is visible under a scope");
-    assert!(via_ctx, "the per-context snapshot extends the same registry");
+    assert!(
+        via_ctx,
+        "the per-context snapshot extends the same registry"
+    );
 }

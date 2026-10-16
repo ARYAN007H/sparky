@@ -567,6 +567,7 @@ impl OpenHumanAgentRunner {
         }
 
         OpenHumanLlm {
+            ctx: self.ctx.clone(),
             config: self.config.clone(),
         }
         .complete(request, conn)
