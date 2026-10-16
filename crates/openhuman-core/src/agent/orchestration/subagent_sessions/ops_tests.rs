@@ -81,7 +81,7 @@ fn upsert_persists_the_full_lifecycle_key_without_collapsing_to_task_id() {
     let key = tinyagents_orchestration::subagent::SubagentTaskKey {
         root_run_id: "root-run".into(),
         parent_run_id: "turn-run".into(),
-        thread_id: Some("parent-thread".into()),
+        thread_id: Some("thread-a".into()),
         task_id: "sub-1".into(),
     };
     let session = upsert_running(
