@@ -122,15 +122,6 @@ impl AgentDefinitionExt for AgentDefinition {
     }
 }
 
-/// Re-check the spawn-hierarchy contract over a slice of definitions.
-pub fn validate_tier_hierarchy(defs: &[AgentDefinition]) -> Result<()> {
-    let mut set = DefinitionSet::<AgentExt>::new();
-    for def in defs {
-        set.insert(def.clone());
-    }
-    set.validate_tier_hierarchy()
-}
-
 /// Directories scanned for user definitions, in override order: the workspace
 /// `agents/` folder, then `$OPENHUMAN_HOME/agents` (or `~/.openhuman/agents`).
 fn user_definition_dirs(workspace: &Path) -> Vec<PathBuf> {

@@ -31,10 +31,7 @@
 
 use crate::agent::harness::host_definition::{AgentDefinition, PromptBuilder};
 use anyhow::{Context, Result};
-use std::collections::HashMap;
-use tinyagents_definition::{
-    validate_tier_transition, AgentTier, DefinitionSource, PromptSource, SubagentEntry,
-};
+use tinyagents_definition::{DefinitionSet, DefinitionSource, PromptSource};
 
 /// A single built-in agent: its id plus the metadata TOML and a
 /// function-driven prompt builder.
@@ -166,7 +163,12 @@ pub fn load_builtins() -> Result<Vec<AgentDefinition>> {
         .filter(|b| builtin_enabled(b))
         .map(parse_builtin)
         .collect::<Result<_>>()?;
-    validate_tier_hierarchy(&defs)
+    let mut definitions = DefinitionSet::new();
+    for definition in &defs {
+        definitions.insert(definition.clone());
+    }
+    definitions
+        .validate_tier_hierarchy()
         .context("built-in agents violate the spawn-hierarchy contract")?;
     Ok(defs)
 }
@@ -208,58 +210,6 @@ fn builtin_enabled(_b: &BuiltinAgent) -> bool {
 /// after workspace-local TOML overrides are merged, so custom user
 /// agents that violate the contract fail the boot rather than crashing
 /// at spawn time.
-pub fn validate_tier_hierarchy(defs: &[AgentDefinition]) -> Result<()> {
-    let tier_by_id: HashMap<&str, AgentTier> =
-        defs.iter().map(|d| (d.id.as_str(), d.agent_tier)).collect();
-
-    for def in defs {
-        for entry in &def.subagents {
-            let child_id = match entry {
-                SubagentEntry::AgentId(id) => id.as_str(),
-                // Skills wildcards expand to searchable integration
-                // actions, not to an agent — nothing to tier-check.
-                SubagentEntry::Skills(_) => continue,
-            };
-
-            // Worker leaves: no open-ended spawn surface.
-            if def.agent_tier == AgentTier::Worker {
-                anyhow::bail!(
-                    "agent `{parent}` is a `worker` tier and must not list `{child}` in its \
-                     subagents — workers are leaf executors.",
-                    parent = def.id,
-                    child = child_id,
-                );
-            }
-
-            let Some(child_tier) = tier_by_id.get(child_id).copied() else {
-                // Unknown id — that's a separate `subagents` integrity
-                // concern (covered by existing tests / runtime spawn
-                // resolution); don't mask it as a tier error.
-                continue;
-            };
-
-            // Same-tier delegation is forbidden for chat and reasoning.
-            // (Chat→Chat would defeat the whole point of the fast tier;
-            // Reasoning→Reasoning produces a depth-blowing recursion of
-            // slow models.) The pair-rule lives in `validate_tier_transition`
-            // (the single source of truth shared with the runtime spawn gate
-            // in `run_subagent`); here we wrap its reason with the offending
-            // agent ids + tiers for a boot-time-friendly diagnostic.
-            if let Err(reason) = validate_tier_transition(def.agent_tier, child_tier) {
-                anyhow::bail!(
-                    "agent `{parent}` ({ptier}) lists `{child}` ({ctier}) in subagents — {reason}",
-                    parent = def.id,
-                    ptier = def.agent_tier.as_str(),
-                    child = child_id,
-                    ctier = child_tier.as_str(),
-                );
-            }
-        }
-    }
-
-    Ok(())
-}
-
 /// Parse a single [`BuiltinAgent`] triple into a finished [`AgentDefinition`].
 fn parse_builtin(b: &BuiltinAgent) -> Result<AgentDefinition> {
     // The TOML ships without `system_prompt` — serde falls back to
