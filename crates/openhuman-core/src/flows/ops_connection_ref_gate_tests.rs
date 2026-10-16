@@ -11,39 +11,39 @@ use super::*;
 async fn cached_probe_inference_readiness_caches_a_negative_result() {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    let tmp = TempDir::new().unwrap();
-    let mut config = test_config(&tmp);
-    seed_app_session_for_gate_test(&tmp);
+    use crate::inference::registry::{register_chat_model, unregister_chat_model, ChatModelEntry};
 
+    let _guard = crate::inference::inference_test_guard_async().await;
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+
+    // A registered managed provider whose readiness probe is counted and
+    // definitively rejects, standing in for the hosted backend's 400.
     let hit_count = std::sync::Arc::new(AtomicUsize::new(0));
     let counter = hit_count.clone();
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("bind");
-    let addr = listener.local_addr().expect("local_addr");
-    let app = axum::Router::new().route(
-        "/openai/v1/chat/completions",
-        axum::routing::post(move || {
-            let counter = counter.clone();
-            async move {
-                counter.fetch_add(1, Ordering::SeqCst);
-                use axum::response::IntoResponse;
-                (
-                    axum::http::StatusCode::BAD_REQUEST,
-                    axum::Json(json!({
-                        "success": false,
-                        "error": "API key not configured for provider",
-                        "errorCode": "BAD_REQUEST"
-                    })),
-                )
-                    .into_response()
-            }
-        }),
+    let probe: crate::inference::registry::ReadinessProbe =
+        std::sync::Arc::new(move |_role, _model, _config| {
+            counter.fetch_add(1, Ordering::SeqCst);
+            Box::pin(async { Err("API key not configured for provider".to_string()) })
+        });
+    let base = crate::inference::registry_test_support::default_managed_entry(
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+    )
+    .expect("test default managed provider");
+    register_chat_model(
+        crate::inference::provider::factory::PROVIDER_OPENHUMAN,
+        ChatModelEntry {
+            probe: Some(probe),
+            ..base
+        },
     );
-    tokio::spawn(async move {
-        axum::serve(listener, app).await.expect("serve");
-    });
-    config.api_url = Some(format!("http://{addr}"));
+    struct Unregister;
+    impl Drop for Unregister {
+        fn drop(&mut self) {
+            unregister_chat_model(crate::inference::provider::factory::PROVIDER_OPENHUMAN);
+        }
+    }
+    let _unregister = Unregister;
 
     // First call: a real (mock) network round trip, definitively rejected.
     let first = cached_probe_inference_readiness(

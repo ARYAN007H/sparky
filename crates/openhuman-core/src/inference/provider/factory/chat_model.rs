@@ -180,9 +180,10 @@ pub async fn probe_inference_readiness(
     let Some(probe) =
         crate::inference::registry::chat_model(PROVIDER_OPENHUMAN).and_then(|entry| entry.probe)
     else {
-        // No managed provider is registered: construction above already
-        // answered `BACKEND_UNAVAILABLE:`, so this is unreachable in practice.
-        return Err(super::managed_backend::managed_unavailable_error().to_string());
+        // The registered provider has no readiness probe: construction above
+        // succeeded, and there is nothing further to ask it.
+        log::debug!("[flows][inference-probe] role={role} managed provider registered no probe");
+        return Ok(());
     };
     let model_id = resolve_managed_model(role, config, None);
     let result = probe(role.to_string(), model_id.clone(), config.clone()).await;
