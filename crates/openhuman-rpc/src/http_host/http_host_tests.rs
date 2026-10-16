@@ -55,7 +55,7 @@ async fn start_serves_files_with_basic_auth() {
     let mut file = std::fs::File::create(&file_path).unwrap();
     writeln!(file, "hello from hosted dir").unwrap();
 
-    let server = start_hosted_dir_server(StartHostedDirParams {
+    let server = start_hosted_dir_server(&DispatchCtx::host_default(), StartHostedDirParams {
         directory: tmp.path().display().to_string(),
         port: 0,
         bind_host: "127.0.0.1".to_string(),
