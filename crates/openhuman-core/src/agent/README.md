@@ -285,7 +285,7 @@ Turn execution:
 | [`cost.rs`](./cost.rs) | Per-turn token and cost accounting (`TurnCost`) |
 | [`message_convert.rs`](./message_convert.rs), [`messages.rs`](./messages.rs) | Conversions between `TranscriptMessage` rows and TinyAgents `Message`s; the `history_wire` adapter for host-owned files |
 | [`attachments/`](../attachments/), [`multimodal.rs`](./multimodal.rs) | Durable user uploads and provider-side attachment resolution; legacy marker compatibility ([README](../attachments/README.md)) |
-| [`host_runtime.rs`](./host_runtime.rs) | Native and Docker shell `RuntimeAdapter`s; the shell flavor is the contract's `tinybox_bus::ShellFlavor` and execution is TinyBox's |
+| [`host_runtime.rs`](../modules/tinybox/host_runtime.rs) | Host-side native and Docker shell `RuntimeAdapter`s; TinyBox owns execution |
 | [`../storage/sessions/`](../storage/sessions/) | Process-wide `SessionStoreProvider` slot for hosts with their own database |
 
 Delegation and coordination:
