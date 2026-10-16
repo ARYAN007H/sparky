@@ -343,7 +343,7 @@ impl TurnContextMiddleware {
     /// microcompact.
     pub(crate) fn defaults() -> Self {
         Self {
-            tool_result_budget_bytes: tinyagents_harness::config::ToolRuntimeConfig::default()
+            tool_result_budget_bytes: tinyagents_harness::config::TurnConfig::default()
                 .tool_result_budget_bytes,
             payload_summarizer: None,
             // Deliberately `None` on the channel / sub-agent path (#6408).
