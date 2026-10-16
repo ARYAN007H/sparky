@@ -22,6 +22,7 @@ fn socket_url_swaps_scheme_and_appends_the_handshake() {
 
 #[test]
 fn a_loopback_api_url_override_drives_every_derived_field() {
+    let _env = crate::backend::url::backend_env_test_lock();
     let resolved = resolve(&config_with(Some("http://127.0.0.1:18765")));
     assert_eq!(
         resolved.control_plane_url.as_deref(),
@@ -43,6 +44,7 @@ fn a_loopback_api_url_override_drives_every_derived_field() {
 
 #[test]
 fn control_plane_and_inference_follow_the_same_rules_as_the_transport() {
+    let _env = crate::backend::url::backend_env_test_lock();
     // Whatever the override, the enricher must agree with what the SDK
     // transport answers to the core's `base_url` questions today.
     use crate::backend::url::{effective_api_url, effective_backend_api_url};
@@ -71,6 +73,7 @@ fn control_plane_and_inference_follow_the_same_rules_as_the_transport() {
 
 #[test]
 fn attribution_headers_and_identity_come_from_this_crate() {
+    let _env = crate::backend::url::backend_env_test_lock();
     let resolved = resolve(&config_with(None));
     let identity = crate::backend::product::product_identity();
     assert_eq!(
@@ -88,6 +91,7 @@ fn attribution_headers_and_identity_come_from_this_crate() {
 
 #[test]
 fn enrich_replaces_resolved_endpoints_and_is_visible_to_the_core_loader_hook() {
+    let _env = crate::backend::url::backend_env_test_lock();
     let mut config = config_with(Some("http://127.0.0.1:1"));
     assert!(config.resolved_endpoints.is_empty());
     enrich(&mut config);
@@ -150,6 +154,7 @@ fn a_lookalike_staging_host_is_external_not_staging() {
 
 #[test]
 fn the_enricher_fills_otlp_environment_and_managed_hosts() {
+    let _env = crate::backend::url::backend_env_test_lock();
     let resolved = resolve(&config_with(Some("http://127.0.0.1:18765")));
     assert_eq!(
         resolved.tracing_otlp_url.as_deref(),
