@@ -14,21 +14,20 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use tinyagents_harness::cache::InMemoryResponseCache;
-use tinyagents_hooks::lifecycle::BudgetParityObserver;
 use tinyagents_harness::middleware::{
     install_unmet_deliverable, is_repeat_call_exempt, tool_sets_lookup, ResearchBudgetMiddleware,
     ShellTurnBudget, TurnClockMiddleware, DIRECT_WEB_READ_LIMIT,
 };
 use tinyagents_harness::middleware::{
     plan_mode_middleware, ApprovalGateMiddleware, ArgRecoveryMiddleware, BudgetLimits,
-    BudgetMiddleware, ContextCompressionMiddleware,
-    PromptCacheGuardMiddleware, RepeatProgressMiddleware, RunModeHandle,
-    ToolPolicyMiddleware as TaToolPolicyMiddleware,
+    BudgetMiddleware, ContextCompressionMiddleware, PromptCacheGuardMiddleware,
+    RepeatProgressMiddleware, RunModeHandle, ToolPolicyMiddleware as TaToolPolicyMiddleware,
 };
 use tinyagents_harness::runtime::AgentHarness;
 use tinyagents_harness::steering::SteeringHandle;
 use tinyagents_harness::turn_outcome::{HaltSummarySlot, ToolOutcomeSink};
 use tinyagents_harness::turn_policy::REPEATED_TOOL_FAILURE_THRESHOLD;
+use tinyagents_hooks::lifecycle::BudgetParityObserver;
 use tinyinference_llm::model::CapabilitySet;
 
 use crate::agent::tinyagents::context_wiring::install_context_ladder;
