@@ -4,8 +4,8 @@
 //! registry.
 
 use super::*;
-use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::agent::session_host::types::OpenHumanSessionHost;
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use tinyagents_definition::{PromptSource, SandboxMode, ToolScope};
 
 fn explicit_definition(id: &str) -> crate::agent_registry::host_definition::AgentDefinition {

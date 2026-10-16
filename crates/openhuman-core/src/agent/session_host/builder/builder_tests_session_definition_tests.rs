@@ -7,8 +7,8 @@
 //! builder caller had no equivalent, and fell back to the process registry.
 //! These tests pin the route that closes that gap.
 
-use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::agent::tinyagents::host::OpenHumanDefinitionRegistry;
+use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use std::sync::Arc;
 use tinyagents_definition::DefinitionRegistry;
 use tinyagents_definition::ToolScope;
@@ -214,11 +214,9 @@ async fn a_padded_name_is_stored_as_the_definitions_own_id() {
         .expect("a name that differs only by padding is not a contradiction");
 
     assert_eq!(agent.agent_definition_name(), SEAT);
-    assert!(
-        catalogue(&agent)
-            .resolve(agent.agent_definition_name())
-            .await
-            .expect("resolution never errors")
-            .is_some()
-    );
+    assert!(catalogue(&agent)
+        .resolve(agent.agent_definition_name())
+        .await
+        .expect("resolution never errors")
+        .is_some());
 }
