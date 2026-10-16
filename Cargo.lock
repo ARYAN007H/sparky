@@ -8475,6 +8475,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "tinyagents-hooks"
+version = "2.1.4"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "serde",
+ "serde_json",
+ "tinyagents-harness",
+ "tinyinference-llm 0.4.1",
+ "tinytools",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "tinyagents-live"
 version = "2.1.4"
 dependencies = [
@@ -8536,6 +8551,7 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.20",
  "tinyagents-harness",
+ "tinyagents-hooks",
  "tinyagents-registry",
  "tinyagents-session",
  "tinyinference-llm 0.4.1",
