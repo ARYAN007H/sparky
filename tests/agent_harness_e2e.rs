@@ -2597,7 +2597,7 @@ mod streaming_support {
 ///   5. Final answer is "stream final".
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn streaming_tool_call_accumulation() {
-    use openhuman_core::agent::progress::AgentProgress;
+    use openhuman_core::progress::AgentProgress;
     use std::sync::Mutex;
     use streaming_support::{
         agent_with_s, native_tool_response_s, text_response_s, workspace_s, EchoTool,
