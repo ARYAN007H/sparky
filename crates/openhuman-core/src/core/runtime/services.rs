@@ -338,7 +338,10 @@ pub fn spawn_channels_service(
         log::info!("[channels] OPENHUMAN_DISABLE_CHANNEL_LISTENERS set — skipping start_channels");
     }
     #[cfg(not(feature = "channels"))]
-    log::debug!("[channels] channels feature disabled at compile time — not spawning listeners");
+    {
+        let _ = dispatch;
+        log::debug!("[channels] channels feature disabled at compile time — not spawning listeners");
+    }
     None
 }
 
