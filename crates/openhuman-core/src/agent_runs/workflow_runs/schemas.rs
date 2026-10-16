@@ -2,7 +2,7 @@
 //!
 //! Read surface (PR1): list builtin definitions, list durable runs, get a run
 //! by id. Execution surface (PR2): start / stop / resume, delegating to the
-//! [`super::engine`] phase scheduler. Namespace `workflow_run` — distinct from
+//! the workflow phase scheduler. Namespace `workflow_run` — distinct from
 //! the existing `workflows` domain (SKILL.md/WORKFLOW.md discovery).
 
 use crate::core::runtime::DispatchCtx;

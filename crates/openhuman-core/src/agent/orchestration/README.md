@@ -169,7 +169,7 @@ races it against the inherited cancellation token. Execution itself routes throu
 - `tinyagents_session::run_ledger`: the `agent_runs`,
   `agent_teams`/`agent_team_members`/`agent_team_tasks`, and `workflow_runs`
   tables plus the shared `run_events` log, backed by
-  `{workspace}/session_db/sessions.db` (see [`sessions/mod.rs`](../session_db/mod.rs)). Every
+  `{workspace}/session_db/sessions.db` (see [`sessions/mod.rs`](../../sessions/mod.rs)). Every
   spawn path (`spawn_subagent`, `spawn_async_subagent`,
   `spawn_parallel_agents`, `continue_subagent`, `dispatch`) writes a `running`
   `agent_runs` row; `run_ledger_finalize.rs` settles it from the global event

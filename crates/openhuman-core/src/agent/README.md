@@ -286,7 +286,7 @@ Turn execution:
 | [`message_convert.rs`](./message_convert.rs), [`messages.rs`](./messages.rs) | Conversions between `TranscriptMessage` rows and TinyAgents `Message`s; the `history_wire` adapter for host-owned files |
 | [`attachments/`](../attachments/), [`multimodal.rs`](./multimodal.rs) | Durable user uploads and provider-side attachment resolution; legacy marker compatibility ([README](../attachments/README.md)) |
 | [`host_runtime.rs`](./host_runtime.rs) | Native and Docker shell `RuntimeAdapter`s; the shell flavor is the contract's `tinybox_bus::ShellFlavor` and execution is TinyBox's |
-| `session_store/` | Process-wide `SessionStoreProvider` slot for hosts with their own database |
+| [`../storage/sessions/`](../storage/sessions/) | Process-wide `SessionStoreProvider` slot for hosts with their own database |
 
 Delegation and coordination:
 
@@ -316,8 +316,8 @@ Persistence, setup and RPC:
 | Path | What it does |
 | --- | --- |
 | `artifacts/` | Agent-generated artifact storage and the `ai` RPC namespace ([README](artifacts/README.md)) |
-| `session_db/` | `run_ledger` RPC over `tinyagents_session::run_ledger` |
-| `session_import/` | The `session_import.run` retry of the boot-time legacy-session import, and the agent's key-value store on each turn's `RunContext` ([README](session_import/README.md)) |
+| [`../sessions/`](../sessions/) | `run_ledger` RPC over `tinyagents_session::run_ledger` |
+| [`../storage/import/`](../storage/import/) | The `session_import.run` retry of the boot-time legacy-session import, and the agent's key-value store on each turn's `RunContext` ([README](../storage/import/README.md)) |
 | [`schemas.rs`](./schemas.rs) | The `agent` namespace controllers |
 
 ## Key types and entry points
@@ -363,8 +363,8 @@ All controllers register under `DomainGroup::Agent` in [`core/all.rs`](../core/a
 | `agent_registry` | `registry/` | `list`, `available_tools`, `get`, `upsert_custom`, `create_custom`, `update`, `set_enabled`, `remove` |
 | `plan_review` | `../plan_review/` | `decide` |
 | `ai` | `artifacts/` | `list_artifacts`, `get_artifact`, `delete_artifact`, `regenerate` |
-| `run_ledger` | `session_db/` | `list`, `get`, `events` |
-| `session_import` | `session_import/` | `run` |
+| `run_ledger` | `../sessions/` | `list`, `get`, `events` |
+| `session_import` | `../storage/import/` | `run` |
 | `agent_work` | [`orchestration/command_center`](./orchestration/command_center/) | `list`, `control` |
 | `workflow_run` | [`orchestration/workflow_runs`](./orchestration/workflow_runs/) | `list_definitions`, `list`, `get`, `start`, `stop`, `resume` |
 | `agent_team` | [`orchestration/agent_teams`](./orchestration/agent_teams/) | `create`, `list`, `get`, `assign_task`, `claim_task`, `message_member`, `list_messages`, `complete_task`, `shutdown_member`, `close`, `start_member` |
