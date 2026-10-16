@@ -189,7 +189,7 @@ async fn on_connection_created(ctx: &DispatchCtx, toolkit: String, connection_id
         );
         return;
     }
-    if let Err(e) = ops::composio_get_user_profile(&live_config, &connection_id).await {
+    if let Err(e) = ops::composio_get_user_profile(ctx, &live_config, &connection_id).await {
         tracing::warn!(
             toolkit = %toolkit,
             connection_id = %connection_id,

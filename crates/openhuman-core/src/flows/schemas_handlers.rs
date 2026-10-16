@@ -70,7 +70,7 @@ fn handle_list(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFutur
 fn handle_list_connections(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
-        to_json(ops::flows_list_connections(&config).await?)
+        to_json(ops::flows_list_connections(&ctx, &config).await?)
     })
 }
 
@@ -362,7 +362,7 @@ fn handle_required_connections(ctx: DispatchCtx, params: Map<String, Value>) -> 
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let graph = read_required::<Value>(&params, "graph")?;
-        to_json(ops::flows_required_connections(&config, graph).await?)
+        to_json(ops::flows_required_connections(&ctx, &config, graph).await?)
     })
 }
 
