@@ -1,6 +1,5 @@
 'use client';
 
-import { invoke } from '@tauri-apps/api/core';
 import { Check, Clipboard, Code2, Download, Eye, FileBox, FileText, Share2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Markdown from 'react-markdown';
@@ -11,6 +10,7 @@ import {
   WINDOW_DRAG_BAR_HEIGHT,
 } from '../../../components/layout/shell/WindowDragBar';
 import { useT } from '../../../lib/i18n/I18nContext';
+import { saveArtifactViaDialog } from '../../../services/artifactDownloadService';
 import { callCoreRpc } from '../../../services/coreRpcClient';
 import type { ArtifactSnapshot } from '../../../store/chatRuntimeSlice';
 import {
@@ -322,6 +322,8 @@ function FileViewer({
   version: number;
   error: string | null;
 }) {
+  const { t } = useT();
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const filePath = body || artifact.path || '';
   const fileName = filePath.split('/').pop() || filePath;
   // Share is hidden until the backend serves viewable files inline (links download today); see useArtifactShare.
@@ -351,10 +353,11 @@ function FileViewer({
               Binary {artifact.kind} — preview not available
             </p>
             {error && <p className="text-xs text-destructive mt-2">{error}</p>}
+            {downloadError && <p className="text-xs text-destructive mt-2">{downloadError}</p>}
           </div>
           {filePath && (
             <button
-              onClick={() => void saveArtifactAs(artifact)}
+              onClick={() => void saveArtifactAs(artifact, t).then(setDownloadError)}
               className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90">
               <Download className="h-3.5 w-3.5" />
               Download
@@ -378,21 +381,20 @@ export const AUTOSAVE_MAX_RETRIES = 3;
 export const AUTOSAVE_DELAY_MS = 5_000;
 
 /** The artifact's file name: the one it has in the files folder. */
-function downloadName(artifact: ArtifactSnapshot): string {
-  const fromPath = artifact.path?.split(/[\\/]/).pop();
-  return fromPath || artifact.title;
-}
-
-/** Let the user pick where to save the artifact's file (OS save dialog). */
-async function saveArtifactAs(artifact: ArtifactSnapshot): Promise<void> {
-  try {
-    await invoke<string | null>('save_artifact_as', {
-      artifactId: artifact.artifactId,
-      filename: downloadName(artifact),
-    });
-  } catch (err) {
-    console.error('[ArtifactPreviewPanel] download failed:', err);
-  }
+/**
+ * Let the user pick where to save the artifact's file (the OS save dialog),
+ * through the download service. Resolves to a localized error message, or
+ * `null` when saved or cancelled.
+ */
+async function saveArtifactAs(
+  artifact: ArtifactSnapshot,
+  t: (key: string) => string
+): Promise<string | null> {
+  const extension = artifact.path?.split('.').pop() ?? '';
+  const outcome = await saveArtifactViaDialog(artifact.artifactId, artifact.title, extension);
+  if (outcome.ok || outcome.code === 'CANCELLED') return null;
+  console.warn('[ArtifactPreviewPanel] download failed:', outcome.code, outcome.error);
+  return t(`chat.files.error.${(outcome.code ?? 'download_failed').toLowerCase()}`);
 }
 
 type AutosaveStatus = 'saved' | 'pending' | 'saving' | 'error';
@@ -675,6 +677,8 @@ function EditableTextViewer({
   const [tab, setTab] = useState<'preview' | 'code'>('preview');
   const [editedBody, setEditedBody] = useState(body);
   const [copied, setCopied] = useState(false);
+  const { t } = useT();
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   // Only kinds whose record holds the content itself can take a new version;
   // a `file` record holds a path, and its text here is read off that file.
   // A body that failed to load is not the artifact's content: editing it
@@ -708,8 +712,8 @@ function EditableTextViewer({
   const handleDownload = useCallback(async () => {
     // The file is the newest saved version: save a pending edit first.
     await autosave.flush();
-    await saveArtifactAs(artifact);
-  }, [artifact, autosave]);
+    setDownloadError(await saveArtifactAs(artifact, t));
+  }, [artifact, autosave, t]);
 
   // Share the newest saved version: save a pending edit first.
   // Share is hidden until the backend serves viewable files inline (links download today); see useArtifactShare.
@@ -776,6 +780,11 @@ function EditableTextViewer({
       {/* <ShareStatus state={sharing.state} onCopy={sharing.copyAgain} /> */}
 
       {/* Error banner */}
+      {downloadError && (
+        <div className="border-b bg-destructive/10 px-3 py-1.5 text-[11px] text-destructive">
+          {downloadError}
+        </div>
+      )}
       {error && (
         <div className="border-b bg-destructive/10 px-3 py-1.5 text-[11px] text-destructive">
           {error}

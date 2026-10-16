@@ -261,21 +261,43 @@ export async function downloadArtifact(
 }
 
 /**
- * Export an artifact under its own filename.
+ * Let the user choose where to save an artifact: the OS save dialog
+ * (`save_artifact_as`), prefilled with the artifact's own filename. The shell
+ * copies the file the core's artifact store vouches for.
  *
- * Historically (#3162) this opened a native Save-As dialog and fell back
- * to the Downloads copy when no dialog was available. The dialog is gone
- * along with the shell's `rfd` dependency, so the fallback is now the only
- * path: the artifact lands in Downloads and the caller offers "Reveal in
- * Finder". Kept as a named export because `ArtifactCard` calls it, and
- * because a real destination picker may return here later.
+ * Returns `{ ok: true, path }` once saved and `{ ok: false, code: 'CANCELLED' }`
+ * when the user closes the dialog; other failures carry the usual codes.
+ * Desktop only (`NOT_DESKTOP` elsewhere).
  */
 export async function saveArtifactViaDialog(
   artifactId: string,
   fallbackTitle: string,
   extension: string
 ): Promise<DownloadArtifactOutcome> {
-  return downloadArtifact(artifactId, fallbackTitle, extension);
+  if (!isTauri()) {
+    return {
+      ok: false,
+      code: 'NOT_DESKTOP',
+      error: 'Downloads are only available in the desktop app',
+    };
+  }
+
+  const resolved = await resolveArtifactForExport(artifactId, fallbackTitle, extension);
+  if (!resolved.ok) {
+    return { ok: false, code: resolved.code, error: resolved.error };
+  }
+
+  try {
+    const dest = await invoke<string | null>('save_artifact_as', {
+      artifactId,
+      filename: resolved.filename,
+    });
+    if (!dest) return { ok: false, code: 'CANCELLED' };
+    return { ok: true, path: dest };
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    return { ok: false, code: 'DOWNLOAD_FAILED', error: reason };
+  }
 }
 
 /**

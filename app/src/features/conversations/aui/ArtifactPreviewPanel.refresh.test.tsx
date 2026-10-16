@@ -80,3 +80,16 @@ describe('ArtifactPreviewPanel — versions saved elsewhere', () => {
     expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('# my edit');
   });
 });
+
+describe('ArtifactPreviewPanel — download', () => {
+  beforeEach(() => rpc.mockReset());
+
+  it('says why a download is not possible instead of failing silently', async () => {
+    rpc.mockResolvedValueOnce(body('# first', 1));
+    setup();
+    await screen.findByRole('heading', { level: 1 });
+    // Not the desktop app: the service refuses before any dialog.
+    fireEvent.click(screen.getByTitle(/Download/i));
+    expect(await screen.findByText('chat.files.error.not_desktop')).toBeTruthy();
+  });
+});
