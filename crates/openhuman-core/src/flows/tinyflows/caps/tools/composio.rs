@@ -95,9 +95,10 @@ impl ToolBackend for ComposioToolBackend {
         // credentials, account resolution, and direct dispatch.
         let live_config = config_rpc::reload_config_snapshot_with_timeout(ctx.config)
             .await
-            .map_err(|e| {
+            .map_err(|_| {
                 EngineError::Capability(format!(
-                    "tool_call node: failed to load live Composio config: {e}"
+                    "{} flows autonomy and Composio settings could not be refreshed; refusing the node",
+                    tinytools::status::POLICY_BLOCKED_MARKER
                 ))
             })?;
         // Autonomy-tier gate (Phase 2, made effect-aware): the node's

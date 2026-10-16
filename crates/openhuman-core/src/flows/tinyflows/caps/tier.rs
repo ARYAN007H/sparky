@@ -132,9 +132,9 @@ pub(crate) async fn enforce_current_node_tier_gate(
     enforce_node_tier_gate(&policy, class, node)
 }
 
-fn tier_config_error(error: &str) -> EngineError {
+fn tier_config_error(_error: &str) -> EngineError {
     EngineError::Capability(format!(
-        "{POLICY_BLOCKED_MARKER} flows autonomy tier could not be refreshed; refusing the node: {error}"
+        "{POLICY_BLOCKED_MARKER} flows autonomy tier could not be refreshed; refusing the node"
     ))
 }
 

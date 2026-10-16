@@ -118,6 +118,41 @@ async fn live_tier_reload_failure_fails_closed() {
 }
 
 #[tokio::test]
+async fn malformed_live_config_is_denied_without_echoing_its_contents() {
+    use crate::security::AutonomyLevel;
+
+    let dir = tempfile::tempdir().unwrap();
+    let config = persisted_tier_config(dir.path(), true, AutonomyLevel::Full);
+    let canary = "private-config-canary-issue48";
+    std::fs::write(
+        &config.config_path,
+        format!("[autonomy\nlevel = \"{canary}\"\n"),
+    )
+    .unwrap();
+    let ctx = live_tier_context(&config);
+    let baseline = SecurityPolicy::from_config(
+        &config.autonomy,
+        &config.workspace_dir,
+        &config.action_dir,
+    );
+    let error = enforce_current_node_tier_gate(
+        &ctx,
+        &config,
+        &baseline,
+        CommandClass::Write,
+        "code",
+    )
+    .await
+    .expect_err("malformed persisted policy must deny rather than reuse Full");
+    let message = match error {
+        EngineError::Capability(message) => message,
+        other => panic!("expected capability denial, got {other:?}"),
+    };
+    assert!(message.contains(POLICY_BLOCKED_MARKER));
+    assert!(!message.contains(canary), "config text leaked: {message}");
+}
+
+#[tokio::test]
 async fn captured_agent_tier_and_host_ceiling_are_not_replaced_by_parent_file() {
     use crate::security::AutonomyLevel;
 
