@@ -1,6 +1,16 @@
 use super::*;
+use super::super::managed_reasoning::{apply_reasoning_hint, with_thread_id};
 use super::super::managed_session::managed_bearer;
+use super::super::managed_usage::project_managed_usage;
+use openhuman_embed::__host::inference_registry::REASONING_OFF_METADATA_KEY;
 use tinyinference_llm::model::{ChatModel, ModelResponse};
+
+/// Mirror of the core's `without_reasoning` hint: the metadata flag the managed
+/// model turns into `reasoning: { enabled: false }`.
+fn without_reasoning(mut request: ModelRequest) -> ModelRequest {
+    request.metadata = serde_json::json!({ REASONING_OFF_METADATA_KEY: true });
+    request
+}
 use tinyinference_llm::message::Message;
 
 fn backend() -> OpenHumanBackendModel {

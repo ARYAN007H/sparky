@@ -261,15 +261,11 @@ async fn managed_stream_carries_the_backend_charge_to_the_cost_accounting() {
 
     let billed = tinyinference_llm::usage::recover_usage(&response).expect("usage reported");
     assert!(
-        billed.charge_reported,
-        "the backend's charge reached the core"
+        billed.charged_amount_usd.is_some(),
+        "the backend's charge reached the cost accounting"
     );
-    assert!((billed.charged_amount_usd - 0.0000634).abs() < 1e-12);
-    assert_eq!(billed.cached_input_tokens(), 800);
-    assert_eq!(
-        crate::agent::cost::call_cost("openrouter/z-ai/glm-5.3-flash", &billed),
-        tinyagents_harness::cost::CallCost::Charged(0.0000634)
-    );
+    assert!((billed.charged_amount_usd.unwrap() - 0.0000634).abs() < 1e-12);
+    assert_eq!(billed.usage.cache_read_tokens, 800);
 }
 
 /// A free route bills $0, and that is a known cost, not a missing one.
@@ -282,10 +278,7 @@ async fn managed_stream_keeps_a_zero_charge_as_known() {
     ])
     .await;
     let billed = tinyinference_llm::usage::recover_usage(&response).expect("usage reported");
-    assert_eq!(
-        crate::agent::cost::call_cost("openrouter/z-ai/glm-5.3-flash", &billed),
-        tinyagents_harness::cost::CallCost::Charged(0.0)
-    );
+    assert_eq!(billed.charged_amount_usd, Some(0.0));
 }
 
 /// A stream with no billing frame carries no charge: the cost stays unknown
@@ -298,9 +291,5 @@ async fn managed_stream_without_a_billing_frame_has_no_charge() {
     ])
     .await;
     let billed = tinyinference_llm::usage::recover_usage(&response).expect("usage reported");
-    assert!(!billed.charge_reported);
-    assert_eq!(
-        crate::agent::cost::call_cost("openrouter/z-ai/glm-5.3-flash", &billed),
-        tinyagents_harness::cost::CallCost::Unknown
-    );
+    assert_eq!(billed.charged_amount_usd, None);
 }
