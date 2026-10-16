@@ -115,7 +115,9 @@ fn direct_client(
 /// Supported `config.composio.mode` values:
 ///
 /// - `"backend"` (default) — backend-proxied through the connector module.
-///   Returns `Err("no backend session token")` when the user is not signed in.
+///   Resolved by the route builder a host registered for it; `Err` when none is
+///   registered (the `BACKEND_UNAVAILABLE:` sentinel) or when the user is not
+///   signed in.
 /// - `"direct"` — BYO key against `backend.composio.dev`. Requires a
 ///   stored Composio API key under the
 ///   [`crate::security::credentials::COMPOSIO_DIRECT_PROVIDER`]
@@ -156,14 +158,14 @@ pub fn resolve_composio_route(config: &crate::config::Config) -> anyhow::Result<
         // already gives us "backend" for missing fields, but a literal
         // empty string in TOML would otherwise be rejected.
         "" | MODE_BACKEND_PAT => {
-            if crate::integrations::build_client(config).is_none() {
-                anyhow::bail!(
-                    "composio backend mode unavailable: no backend session token. \
-                     Sign in or set a TinyHumans API key."
-                );
-            }
-            tracing::debug!("[composio-factory] resolved backend variant");
-            Ok(ComposioRoute::Backend)
+            // The backend-proxied route is served by a host that registered a
+            // route builder for it (`register_composio_route_builder`); a core
+            // with none has no such route.
+            tracing::debug!("[composio-factory] no backend route builder registered");
+            anyhow::bail!(
+                "{}composio backend mode is not available in this build",
+                crate::core::observability::BACKEND_UNAVAILABLE_PREFIX
+            );
         }
         MODE_DIRECT_PAT => {
             // Prefer keychain-stored key; fall back to `config.toml`.
