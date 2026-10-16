@@ -5,9 +5,8 @@
 //! in the order it wants — so the output IS what the LLM sees, no
 //! post-processing in the runner.
 
-use crate::agent::prompts::{
-    PromptContext, render_ambient_environment, render_tools, render_workspace,
-};
+use crate::agent::prompts::{PromptContext};
+use crate::prompts::{render_ambient_environment, render_tools, render_workspace};
 use anyhow::Result;
 
 const ARCHETYPE: &str = include_str!("prompt.md");

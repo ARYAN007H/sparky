@@ -5,7 +5,8 @@
 //! in the order it wants — so the output IS what the LLM sees, no
 //! post-processing in the runner.
 
-use crate::agent::prompts::{PromptContext, render_tools, render_workspace};
+use crate::agent::prompts::{PromptContext};
+use crate::prompts::{render_tools, render_workspace};
 use anyhow::Result;
 
 /// The summarizer archetype: TinyJuice's extraction contract, verbatim.

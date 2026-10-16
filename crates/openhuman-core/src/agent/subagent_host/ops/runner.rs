@@ -11,9 +11,8 @@ use std::time::Instant;
 
 use crate::agent::harness::artifact_offload::offload_run_result;
 use crate::agent::harness::fork_context::ParentExecutionContext;
-use crate::agent::prompts::{
-    PromptContext, SubagentRenderOptions, render_subagent_system_prompt_with_format,
-};
+use crate::agent::prompts::{PromptContext, SubagentRenderOptions};
+use crate::prompts::{render_subagent_system_prompt_with_format};
 use crate::agent::subagent_host::definition_iter_cap;
 use crate::agent::subagent_host::tool_prep::{
     filter_tool_indices, is_subagent_spawn_tool, load_prompt_source, subagent_prompt_protocol,
@@ -814,7 +813,7 @@ async fn run_typed_mode(
     // Shared one-line stamp (#3602), in the user's zone like the main agent's.
     // On the user message: sub-agent system prompts are byte-stable for caching.
     let zone = config.as_ref().ok().map(|c| c.time_zone());
-    let now_str = crate::agent::prompts::current_datetime_line(zone.as_deref());
+    let now_str = crate::prompts::current_datetime_line(zone.as_deref());
 
     let mut context_parts: Vec<&str> = Vec::new();
     if !definition.extensions.omit_memory_context {

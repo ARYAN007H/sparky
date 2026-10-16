@@ -1,6 +1,7 @@
 //! System prompt builder for the `presentation_agent` built-in agent.
 
-use crate::agent::prompts::{PromptContext, render_tools, render_workspace};
+use crate::agent::prompts::{PromptContext};
+use crate::prompts::{render_tools, render_workspace};
 use anyhow::Result;
 
 const ARCHETYPE: &str = include_str!("prompt.md");
