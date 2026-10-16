@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use crate::agent::session_store::splice_fixture_tests::{head_of, memory_locator, replace_head};
+use crate::storage::sessions::splice_fixture_tests::{head_of, memory_locator, replace_head};
 use tinyagents_session::transcript::{TranscriptMessage, TranscriptToolCall};
 use tinyinference_llm::message::Message;
 

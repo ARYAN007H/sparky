@@ -236,8 +236,8 @@ impl Drop for CoreGuard {
         // Dropping it also stops the background services it started.
         drop(self.core.take());
         if let Some(installed) = self.session_store.take() {
-            if openhuman_core::agent::session_store::clear_if(&installed) {
-                openhuman_core::agent::session_store::restore(self.previous_session_store.take());
+            if openhuman_core::storage::sessions::clear_if(&installed) {
+                openhuman_core::storage::sessions::restore(self.previous_session_store.take());
             }
         }
         drop(

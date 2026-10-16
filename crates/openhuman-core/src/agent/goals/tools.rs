@@ -18,7 +18,7 @@ use tinyagents_graph::goals::ThreadGoal;
 /// The model-facing goal tools for `workspace_dir`, each publishing
 /// `DomainEvent::ThreadGoalUpdated` after a write.
 pub fn goal_tools(workspace_dir: &Path) -> Vec<Box<dyn Tool>> {
-    let goal_store = crate::agent::session_store::stores_or_ephemeral(workspace_dir).kv;
+    let goal_store = crate::storage::sessions::stores_or_ephemeral(workspace_dir).kv;
     let hook: GoalUpdateHook = Arc::new(publish_goal_updated);
     GoalToolKind::MODEL_FACING
         .into_iter()

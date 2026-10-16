@@ -72,7 +72,7 @@ pub(super) fn subagent_transcripts_in(
     let fallback = run_context
         .parent
         .as_ref()
-        .map_or(crate::agent::session_store::DEFAULT_AGENT, |parent| {
+        .map_or(crate::storage::sessions::DEFAULT_AGENT, |parent| {
             parent.agent_definition_id.as_str()
         });
     let Some(core) = core else {
@@ -87,19 +87,19 @@ pub(super) fn subagent_transcripts_in(
             )
             .transcripts;
         }
-        let key = crate::agent::session_store::agent_key_for(
+        let key = crate::storage::sessions::agent_key_for(
             &crate::core::runtime::Tenant::default(),
             fallback,
         );
-        return crate::agent::session_store::transcripts_or_files(&key, workspace_dir);
+        return crate::storage::sessions::transcripts_or_files(&key, workspace_dir);
     };
     let tenant = crate::core::runtime::Tenant::of(&core);
-    let key = crate::agent::session_store::agent_key_for(&tenant, fallback);
+    let key = crate::storage::sessions::agent_key_for(&tenant, fallback);
     tracing::debug!(
         profile = tenant.profile.is_some(),
         "[subagent_host:graph] no turn-tree transcript store; using the carried context's"
     );
-    crate::agent::session_store::transcripts_or_files_in(&core, &key, workspace_dir)
+    crate::storage::sessions::transcripts_or_files_in(&core, &key, workspace_dir)
 }
 
 /// Persist a sub-agent turn's raw transcript to `transcripts` under

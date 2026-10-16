@@ -98,7 +98,7 @@ fn handle_agent_work_list(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
             .get("limit")
             .and_then(|v| v.as_u64())
             .map(|v| v as u32);
-        let view = crate::agent::session_store::with_ledger_async(&config.workspace_dir, |ledger| async move {
+        let view = crate::storage::sessions::with_ledger_async(&config.workspace_dir, |ledger| async move {
             ledger.list_agent_work(limit, &resolve_display_name).await
         })
         .await
@@ -130,7 +130,7 @@ fn handle_agent_work_control(ctx: DispatchCtx, params: Map<String, Value>) -> Co
         let message = opt_str(&params, "message");
         let reason = opt_str(&params, "reason");
         log::debug!(target: "command_center_rpc", "[command_center_rpc][{cid}] control.parsed run_id={run_id} verb={}", verb.as_str());
-        let row = crate::agent::session_store::with_ledger_async(&config.workspace_dir, |ledger| {
+        let row = crate::storage::sessions::with_ledger_async(&config.workspace_dir, |ledger| {
             let run_id = run_id.clone();
             let message = message.clone();
             let reason = reason.clone();

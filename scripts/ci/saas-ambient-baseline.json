@@ -64,28 +64,28 @@
   },
   {
     "rule": "ambient-config",
-    "path": "crates/openhuman-core/src/agent/session_import/schemas.rs",
+    "path": "crates/openhuman-core/src/storage/import/schemas.rs",
     "line": 83,
     "text": "let config = crate::config::Config::load_or_init()",
     "occurrence": 1
   },
   {
     "rule": "ambient-config",
-    "path": "crates/openhuman-core/src/agent/session_import/schemas.rs",
+    "path": "crates/openhuman-core/src/storage/import/schemas.rs",
     "line": 103,
     "text": "let configured = crate::config::Config::load_or_init()",
     "occurrence": 1
   },
   {
     "rule": "bare-spawn",
-    "path": "crates/openhuman-core/src/agent/session_import/schemas.rs",
+    "path": "crates/openhuman-core/src/storage/import/schemas.rs",
     "line": 124,
     "text": "let reports = tokio::task::spawn_blocking(move || {",
     "occurrence": 1
   },
   {
     "rule": "ambient-context",
-    "path": "crates/openhuman-core/src/agent/session_store/mod.rs",
+    "path": "crates/openhuman-core/src/storage/sessions/mod.rs",
     "line": 304,
     "text": "crate::core::runtime::CoreContext::current()",
     "occurrence": 1

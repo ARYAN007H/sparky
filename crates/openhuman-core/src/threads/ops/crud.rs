@@ -510,7 +510,7 @@ async fn thread_delete_inner(
     // mirrors conversation-derived state) remains on disk; the
     // thread row itself is already gone at this point so the caller
     // sees a partial failure they can act on instead of silent drift.
-    crate::agent::session_store::turn_states_for(&dir)
+    crate::storage::sessions::turn_states_for(&dir)
         .delete(&request.thread_id)
         .map_err(|err| {
             format!(

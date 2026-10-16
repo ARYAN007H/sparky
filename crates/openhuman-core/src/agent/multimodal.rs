@@ -584,7 +584,7 @@ pub(crate) fn attachments_dir() -> PathBuf {
 /// this host's policy (none: references stay resolvable).
 fn stash() -> Option<BlobAttachmentStash> {
     match ATTACHMENTS_WORKSPACE.get() {
-        Some(workspace) => crate::agent::session_store::attachment_stash_for(workspace),
+        Some(workspace) => crate::storage::sessions::attachment_stash_for(workspace),
         None => Some(memory_stash().clone()),
     }
 }

@@ -61,7 +61,7 @@ pub async fn todos_get(
     if thread_id.is_empty() {
         return Err("thread_id is required".to_string());
     }
-    let store = crate::agent::session_store::stores_or_ephemeral(&dir).kv;
+    let store = crate::storage::sessions::stores_or_ephemeral(&dir).kv;
     let todos = match tinyagents_graph::todos::store::list(&store, thread_id).await {
         Ok(snapshot) => snapshot.items,
         Err(e) => {

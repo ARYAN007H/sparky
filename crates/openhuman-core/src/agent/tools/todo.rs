@@ -124,7 +124,7 @@ impl TodoTool {
     pub fn new(workspace_dir: PathBuf) -> Self {
         Self {
             inner: graph_todos::TodoTool::new(
-                crate::agent::session_store::stores_or_ephemeral(&workspace_dir).kv,
+                crate::storage::sessions::stores_or_ephemeral(&workspace_dir).kv,
             ),
             workspace_dir,
         }
@@ -204,7 +204,7 @@ impl TodoTool {
     /// swallowed — a failed migration just means the tool starts from an
     /// empty list, same as any other first `todo` call.
     async fn migrate_legacy_list_if_absent(&self, scope: &TodoScope, legacy_key: &str) {
-        let store = crate::agent::session_store::stores_or_ephemeral(&self.workspace_dir).kv;
+        let store = crate::storage::sessions::stores_or_ephemeral(&self.workspace_dir).kv;
         let current = match todos_store::list(&store, scope.key()).await {
             Ok(snapshot) => snapshot,
             Err(e) => {

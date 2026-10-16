@@ -14,7 +14,7 @@
 //!   opened read-only.
 //! - **Whose sessions.** The workspace belongs to the operator. The run
 //!   ledger and the turn states land in the operator's default agent
-//!   ([`DEFAULT_AGENT`](crate::agent::session_store::DEFAULT_AGENT)), where
+//!   ([`DEFAULT_AGENT`](crate::storage::sessions::DEFAULT_AGENT)), where
 //!   the desktop's own work resolves them. A transcript stem names the agent
 //!   definition that wrote it, but only as a digest, so each stem is matched
 //!   against the digests of the known definitions
@@ -40,7 +40,7 @@ use tinyagents_session::DriverSessionStores;
 
 use super::tinyflows::{finish, marked};
 use super::{Outcome, Report, Snapshot};
-use crate::agent::session_store::DEFAULT_AGENT;
+use crate::storage::sessions::DEFAULT_AGENT;
 use crate::config::Config;
 use crate::storage::StorageBackend;
 

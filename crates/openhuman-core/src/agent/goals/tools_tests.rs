@@ -41,7 +41,7 @@ async fn set_persists_to_the_workspace_store_and_answers_goal_and_text() {
     assert!(payload["text"].as_str().unwrap().starts_with("Goal set."));
 
     let stored = tinyagents_graph::goals::store::get(
-        &crate::agent::session_store::stores_or_ephemeral(tmp.path()).kv,
+        &crate::storage::sessions::stores_or_ephemeral(tmp.path()).kv,
         "thread-host-tools",
     )
     .await

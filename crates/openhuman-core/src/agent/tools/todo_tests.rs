@@ -17,7 +17,7 @@ async fn scratch_lock_async() -> tokio::sync::MutexGuard<'static, ()> {
 fn todo_store(
     workspace_dir: &std::path::Path,
 ) -> std::sync::Arc<dyn tinyagents_harness::store::Store> {
-    crate::agent::session_store::stores_or_ephemeral(workspace_dir).kv
+    crate::storage::sessions::stores_or_ephemeral(workspace_dir).kv
 }
 
 /// A fresh on-disk workspace root for one test's `FileStore`-backed todo

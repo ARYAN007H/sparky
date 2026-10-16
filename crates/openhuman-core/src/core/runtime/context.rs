@@ -111,7 +111,7 @@ pub struct CoreContext {
     /// Durable relay conversation carried by the immutable turn context.
     channel_thread: Option<String>,
     /// The agent whose stores a host-installed session store
-    /// ([`crate::agent::session_store`]) hands out to work under this
+    /// ([`crate::storage::sessions`]) hands out to work under this
     /// context. `None` for booted contexts, which use the shared default.
     session_agent: Option<String>,
     /// The tenant (SaaS profile) this context serves. `None` for booted

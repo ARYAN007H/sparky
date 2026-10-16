@@ -60,7 +60,7 @@ pub fn list_runs(
     request: &WorkflowRunListRequest,
 ) -> Result<WorkflowRunListResponse> {
     let request = request.clone();
-    Ok(crate::agent::session_store::with_ledger(
+    Ok(crate::storage::sessions::with_ledger(
         &config.workspace_dir,
         |ledger| async move { ledger.list_workflow_runs(&request).await },
     )?)
@@ -73,7 +73,7 @@ pub fn get_run(config: &Config, id: &str) -> Result<Option<WorkflowRun>> {
 /// The workflow run `id` on the calling tenant's run ledger.
 pub(super) fn get_workflow_run(config: &Config, id: &str) -> Result<Option<WorkflowRun>> {
     let id = id.to_string();
-    Ok(crate::agent::session_store::with_ledger(
+    Ok(crate::storage::sessions::with_ledger(
         &config.workspace_dir,
         |ledger| async move { ledger.get_workflow_run(&id).await },
     )?)
@@ -86,7 +86,7 @@ pub(super) fn compare_and_swap_workflow_run_lifecycle(
     upsert: WorkflowRunUpsert,
     expected_revision: u64,
 ) -> Result<Option<WorkflowRun>> {
-    Ok(crate::agent::session_store::with_ledger(
+    Ok(crate::storage::sessions::with_ledger(
         &config.workspace_dir,
         |ledger| async move {
             ledger
@@ -98,7 +98,7 @@ pub(super) fn compare_and_swap_workflow_run_lifecycle(
 
 /// The engine's workflow store over the calling tenant's run ledger.
 pub(super) fn workflow_store(config: &Config) -> Result<Arc<SessionWorkflowStore>> {
-    let ledger = crate::agent::session_store::require_ledger(&config.workspace_dir)?;
+    let ledger = crate::storage::sessions::require_ledger(&config.workspace_dir)?;
     Ok(Arc::new(SessionWorkflowStore::new(ledger)?))
 }
 

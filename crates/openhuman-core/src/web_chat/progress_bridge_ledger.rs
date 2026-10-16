@@ -1,6 +1,6 @@
 //! Run-ledger persistence and error reporting for web-chat progress events.
 
-use crate::agent::session_store::with_ledger;
+use crate::storage::sessions::with_ledger;
 
 pub(in crate::web_chat) fn ledger_upsert_agent_run(
     config: &crate::config::Config,

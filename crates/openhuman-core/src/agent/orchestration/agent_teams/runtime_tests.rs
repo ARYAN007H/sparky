@@ -95,12 +95,12 @@ fn test_config() -> (tempfile::TempDir, Config) {
 }
 
 fn team_service(config: &Config) -> TeamService<SessionTeamLedger> {
-    let ledger = crate::agent::session_store::require_ledger(&config.workspace_dir).unwrap();
+    let ledger = crate::storage::sessions::require_ledger(&config.workspace_dir).unwrap();
     TeamService::new(SessionTeamLedger::new(ledger).unwrap())
 }
 
 fn seed_team(config: &Config, team_id: &str) {
-    crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = AgentTeamUpsert {
             id: team_id.into(),
             parent_thread_id: None,
@@ -116,7 +116,7 @@ fn seed_team(config: &Config, team_id: &str) {
 }
 
 fn seed_member(config: &Config, team_id: &str, member_id: &str, agent_id: Option<&str>) {
-    crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = AgentTeamMemberUpsert {
             id: member_id.into(),
             team_id: team_id.into(),
@@ -141,7 +141,7 @@ fn seed_task(
     owner: Option<&str>,
     depends_on: Vec<String>,
 ) {
-    crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = AgentTeamTaskUpsert {
             id: task_id.into(),
             team_id: team_id.into(),
@@ -179,7 +179,7 @@ async fn drive_member_completes_task_with_worker_output_as_evidence() {
         vec![],
     );
     // Claim + mark running, mirroring what start_member_run does pre-spawn.
-    crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = ("team-1").to_string();
         let ledger_arg_1 = ("task-a").to_string();
         let ledger_arg_2 = ("m1").to_string();
@@ -191,7 +191,7 @@ async fn drive_member_completes_task_with_worker_output_as_evidence() {
         }
     })
     .unwrap();
-    crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = ("team-1").to_string();
         let ledger_arg_1 = ("m1").to_string();
         let ledger_arg_2 = ("task-a").to_string();
@@ -210,7 +210,7 @@ async fn drive_member_completes_task_with_worker_output_as_evidence() {
         }
     })
     .unwrap();
-    let task = crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    let task = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = ("task-a").to_string();
         async move { ledger.get_agent_team_task(&ledger_arg_0).await }
     })
@@ -234,7 +234,7 @@ async fn drive_member_completes_task_with_worker_output_as_evidence() {
     .await
     .expect("drive_member ok");
 
-    let done = crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    let done = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = ("task-a").to_string();
         async move { ledger.get_agent_team_task(&ledger_arg_0).await }
     })
@@ -245,7 +245,7 @@ async fn drive_member_completes_task_with_worker_output_as_evidence() {
     assert_eq!(done.evidence.len(), 1, "worker output captured as evidence");
     assert!(done.evidence[0].contains("teamrun-x"));
 
-    let member = crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    let member = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = ("m1").to_string();
         async move { ledger.get_agent_team_member(&ledger_arg_0).await }
     })
@@ -274,7 +274,7 @@ async fn run_member_loop_drives_member_under_an_explicit_parent() {
         None,
         vec![],
     );
-    crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = ("team-1").to_string();
         let ledger_arg_1 = ("task-a").to_string();
         let ledger_arg_2 = ("m1").to_string();
@@ -286,7 +286,7 @@ async fn run_member_loop_drives_member_under_an_explicit_parent() {
         }
     })
     .unwrap();
-    crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = ("team-1").to_string();
         let ledger_arg_1 = ("m1").to_string();
         let ledger_arg_2 = ("task-a").to_string();
@@ -305,7 +305,7 @@ async fn run_member_loop_drives_member_under_an_explicit_parent() {
         }
     })
     .unwrap();
-    let task = crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    let task = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = ("task-a").to_string();
         async move { ledger.get_agent_team_task(&ledger_arg_0).await }
     })
@@ -329,7 +329,7 @@ async fn run_member_loop_drives_member_under_an_explicit_parent() {
     )
     .await;
 
-    let done = crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    let done = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = ("task-a").to_string();
         async move { ledger.get_agent_team_task(&ledger_arg_0).await }
     })
@@ -356,7 +356,7 @@ async fn drive_member_releases_task_when_worker_fails() {
         None,
         vec![],
     );
-    crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = ("team-1").to_string();
         let ledger_arg_1 = ("task-a").to_string();
         let ledger_arg_2 = ("m1").to_string();
@@ -368,7 +368,7 @@ async fn drive_member_releases_task_when_worker_fails() {
         }
     })
     .unwrap();
-    crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = ("team-1").to_string();
         let ledger_arg_1 = ("m1").to_string();
         let ledger_arg_2 = ("task-a").to_string();
@@ -387,7 +387,7 @@ async fn drive_member_releases_task_when_worker_fails() {
         }
     })
     .unwrap();
-    let task = crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    let task = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = ("task-a").to_string();
         async move { ledger.get_agent_team_task(&ledger_arg_0).await }
     })
@@ -412,7 +412,7 @@ async fn drive_member_releases_task_when_worker_fails() {
     .expect("drive_member handles worker failure without erroring");
 
     // Task released back to todo, claim cleared → reclaimable.
-    let released = crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    let released = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = ("task-a").to_string();
         async move { ledger.get_agent_team_task(&ledger_arg_0).await }
     })
@@ -421,7 +421,7 @@ async fn drive_member_releases_task_when_worker_fails() {
     assert_eq!(released.status, AgentTeamTaskStatus::Todo);
     assert_eq!(released.claimed_by_member_id, None);
 
-    let member = crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    let member = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = ("m1").to_string();
         async move { ledger.get_agent_team_member(&ledger_arg_0).await }
     })
@@ -486,7 +486,7 @@ async fn start_member_run_reports_already_claimed() {
         vec![],
     );
     // m2 already holds task-a.
-    crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = ("team-1").to_string();
         let ledger_arg_1 = ("task-a").to_string();
         let ledger_arg_2 = ("m2").to_string();
@@ -567,7 +567,7 @@ async fn start_member_run_rejects_already_active_member_without_side_effects() {
     let (_dir, config) = test_config();
     seed_team(&config, "team-1");
     // A member already mid-run (active), plus a fresh claimable task.
-    crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = AgentTeamMemberUpsert {
             id: "m1".into(),
             team_id: "team-1".into(),
@@ -605,7 +605,7 @@ async fn start_member_run_rejects_already_active_member_without_side_effects() {
 
     // No claim happened — the free task is untouched and the member still points
     // at its original run (no clobbered pointer).
-    let task = crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    let task = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = ("t-free").to_string();
         async move { ledger.get_agent_team_task(&ledger_arg_0).await }
     })
@@ -613,7 +613,7 @@ async fn start_member_run_rejects_already_active_member_without_side_effects() {
     .expect("task exists");
     assert_eq!(task.status, AgentTeamTaskStatus::Todo);
     assert!(task.claimed_by_member_id.is_none());
-    let member = crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    let member = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = ("m1").to_string();
         async move { ledger.get_agent_team_member(&ledger_arg_0).await }
     })

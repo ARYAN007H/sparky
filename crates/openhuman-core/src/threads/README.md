@@ -26,7 +26,7 @@ A thread has three separate records on disk, all under the workspace:
   threads/<hex(thread_id)>.jsonl     the thread's message log (what the UI lists)
   turn_states/<hex(thread)>/<hex(request)>.json
                                      snapshot of one turn's progress
-session store (agent::session_store) model-facing transcript (agent session host)
+session store (storage::sessions) model-facing transcript (agent session host)
 ```
 
 The message log is the user-facing history: one row per user message and

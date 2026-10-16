@@ -18,7 +18,7 @@
 //! agent rather than the process default. A miss changes nothing: the driver
 //! falls back to the registries exactly as before.
 //!
-//! Like the session store ([`crate::agent::session_store`]) the slot is
+//! Like the session store ([`crate::storage::sessions`]) the slot is
 //! process-wide, because OpenHuman runs one runtime per process. The
 //! installer keeps the `Arc` it installed and removes it with [`clear_if`],
 //! which never removes a replacement someone else installed later.

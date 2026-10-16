@@ -295,7 +295,7 @@ fn a_profile_prefixed_key_round_trips_through_edit_and_regenerate() {
 
     // What the session host writes under: the ambient-tenant resolution, fed
     // the same tenant the request carries.
-    let writer_key = crate::agent::session_store::agent_key_for(
+    let writer_key = crate::storage::sessions::agent_key_for(
         &tenant,
         &crate::web_chat::pick_target_agent_id(&config),
     );

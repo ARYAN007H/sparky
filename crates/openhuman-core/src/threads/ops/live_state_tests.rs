@@ -64,7 +64,7 @@ async fn goal_get_reads_back_a_stored_goal() {
         .unwrap()
         .workspace_dir;
     tinyagents_graph::goals::store::set(
-        &crate::agent::session_store::stores_or_ephemeral(&dir).kv,
+        &crate::storage::sessions::stores_or_ephemeral(&dir).kv,
         "thread-goal-live",
         "ship it",
         Some(1000),
@@ -101,7 +101,7 @@ async fn todos_get_reads_back_what_the_todo_tool_wrote() {
     let empty_json = empty.into_cli_compatible_json().unwrap();
     assert!(empty_json["data"]["todos"].as_array().unwrap().is_empty());
 
-    let store = crate::agent::session_store::stores_or_ephemeral(&dir).kv;
+    let store = crate::storage::sessions::stores_or_ephemeral(&dir).kv;
     tinyagents_graph::todos::store::replace(
         &store,
         "thread-todos-live",

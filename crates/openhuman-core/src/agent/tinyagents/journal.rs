@@ -108,8 +108,8 @@ async fn journal_stores(
     ctx: &DispatchCtx,
 ) -> anyhow::Result<(Arc<dyn AppendStore>, DriverStatusStore)> {
     let workspace = resolve_workspace(ctx).await?;
-    let stores = crate::agent::session_store::stores_or_ephemeral(&workspace);
-    let status = crate::agent::session_store::status_store_for(&workspace);
+    let stores = crate::storage::sessions::stores_or_ephemeral(&workspace);
+    let status = crate::storage::sessions::status_store_for(&workspace);
     Ok((stores.journal, status))
 }
 

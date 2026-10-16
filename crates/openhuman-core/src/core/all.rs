@@ -678,13 +678,13 @@ fn build_registered_controllers() -> Vec<GroupedController> {
     push(
         &mut controllers,
         DomainGroup::Agent,
-        crate::agent::session_db::all_session_db_registered_controllers(),
+        crate::sessions::all_session_db_registered_controllers(),
     );
     // One-time legacy session import into TinyAgents stores
     push(
         &mut controllers,
         DomainGroup::Agent,
-        crate::agent::session_import::all_session_import_registered_controllers(),
+        crate::storage::import::all_session_import_registered_controllers(),
     );
     // Background agent command center, workflow runs, teams, worktrees, and subagent controls.
     push(

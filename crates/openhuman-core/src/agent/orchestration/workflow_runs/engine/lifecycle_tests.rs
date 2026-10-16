@@ -8,7 +8,7 @@ async fn stop_fences_the_driver_and_makes_a_running_phase_resumable() {
         workspace_dir: workspace.path().to_path_buf(),
         ..Config::default()
     };
-    let run = crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    let run = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = WorkflowRunUpsert {
             id: "stop-resume-lifecycle".into(),
             definition_id: "parallel_research_cross_check".into(),

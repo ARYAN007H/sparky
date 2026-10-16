@@ -16,7 +16,7 @@ fn test_config(dir: &TempDir) -> Config {
 }
 
 fn seed_running(config: &Config, id: &str) {
-    crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = AgentRunUpsert {
             id: id.into(),
             kind: AgentRunKind::Subagent,
@@ -58,7 +58,7 @@ async fn settles_running_run_on_subagent_completed() {
     })
     .await;
 
-    let run = crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    let run = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = ("sub-1").to_string();
         async move { ledger.get_agent_run(&ledger_arg_0).await }
     })
@@ -85,7 +85,7 @@ async fn settles_running_run_on_subagent_failed_with_error() {
     })
     .await;
 
-    let run = crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    let run = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = ("sub-2").to_string();
         async move { ledger.get_agent_run(&ledger_arg_0).await }
     })
@@ -112,7 +112,7 @@ async fn settles_running_run_on_subagent_awaiting_user() {
     })
     .await;
 
-    let run = crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    let run = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = ("sub-3").to_string();
         async move { ledger.get_agent_run(&ledger_arg_0).await }
     })
@@ -142,7 +142,7 @@ async fn ignores_unrelated_events_and_missing_runs() {
     })
     .await;
     assert!(
-        crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+        crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
             let ledger_arg_0 = ("ghost").to_string();
             async move { ledger.get_agent_run(&ledger_arg_0).await }
         })

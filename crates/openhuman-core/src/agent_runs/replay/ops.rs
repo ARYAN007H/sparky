@@ -18,7 +18,7 @@ pub(crate) async fn read_run_events_page(
     limit: u64,
 ) -> anyhow::Result<RunEventsPage> {
     let journal =
-        StoreEventJournal::new(crate::agent::session_store::stores_or_ephemeral(workspace).journal);
+        StoreEventJournal::new(crate::storage::sessions::stores_or_ephemeral(workspace).journal);
     replay::read_run_events_page(&journal, run_id, offset, limit)
         .await
         .map_err(|e| {
@@ -31,7 +31,7 @@ pub(crate) async fn read_run_status(
     workspace: &Path,
     run_id: &str,
 ) -> anyhow::Result<Option<HarnessRunStatus>> {
-    let store = crate::agent::session_store::status_store_for(workspace);
+    let store = crate::storage::sessions::status_store_for(workspace);
     replay::read_run_status(&store, run_id)
         .await
         .map_err(|e| anyhow::anyhow!("[agent] replay read_run_status failed run_id={run_id}: {e}"))
@@ -43,7 +43,7 @@ pub(crate) async fn list_active_runs(
     thread_id: Option<&str>,
     root_run_id: Option<&str>,
 ) -> anyhow::Result<Vec<HarnessRunStatus>> {
-    let store = crate::agent::session_store::status_store_for(workspace);
+    let store = crate::storage::sessions::status_store_for(workspace);
     replay::list_active_runs(&store, thread_id, root_run_id)
         .await
         .map_err(|e| anyhow::anyhow!("[agent] replay list_active_runs failed: {e}"))

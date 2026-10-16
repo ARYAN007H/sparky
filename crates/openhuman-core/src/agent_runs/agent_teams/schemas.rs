@@ -525,7 +525,7 @@ fn parse_members(params: &Map<String, Value>) -> Result<Vec<NewMember>, String> 
 /// OpenHuman chooses the persistence root; the generic service owns only team
 /// coordination over that already-authorized ledger.
 fn team_service(config: &crate::config::Config) -> Result<TeamService<SessionTeamLedger>, String> {
-    let ledger = crate::agent::session_store::require_ledger(&config.workspace_dir)
+    let ledger = crate::storage::sessions::require_ledger(&config.workspace_dir)
         .map_err(|e| format!("run ledger unavailable: {e}"))?;
     let ledger = SessionTeamLedger::new(ledger).map_err(|e| format!("run ledger bridge: {e}"))?;
     Ok(TeamService::new(ledger))

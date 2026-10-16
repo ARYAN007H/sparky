@@ -295,7 +295,7 @@ async fn drive_member(
     parent: ParentExecutionContext,
 ) -> Result<()> {
     let ledger = SessionTeamLedger::new(
-        crate::agent::session_store::require_ledger(&config.workspace_dir)
+        crate::storage::sessions::require_ledger(&config.workspace_dir)
             .map_err(|e| anyhow!("{e}"))?,
     )?;
     let delivered = deliver_pending_messages(&ledger, team_id, member_id)?;
@@ -508,7 +508,7 @@ mod run_ledger {
     fn ledger(
         workspace_dir: &Path,
     ) -> Result<std::sync::Arc<dyn tinyagents_session::run_ledger::RunLedgerStore>> {
-        crate::agent::session_store::require_ledger(workspace_dir).map_err(|e| anyhow!("{e}"))
+        crate::storage::sessions::require_ledger(workspace_dir).map_err(|e| anyhow!("{e}"))
     }
 
     pub(super) async fn get_agent_team_member(

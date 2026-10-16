@@ -318,15 +318,15 @@ async fn drive_turn(
     // `session_kv_store` self-gates on the dual-write flag (config default ON +
     // env kill switch), returning `None` when disabled or unresolvable.
     if let Some(session_kv) =
-        crate::agent::session_import::live::session_kv_store(&run_context.dispatch_ctx()).await
+        crate::storage::import::live::session_kv_store(&run_context.dispatch_ctx()).await
     {
         stores.get_or_insert_with(StoreRegistry::new).register(
-            crate::agent::session_import::live::TINYAGENTS_SESSION_KV_STORE,
+            crate::storage::import::live::TINYAGENTS_SESSION_KV_STORE,
             session_kv,
         );
         tracing::debug!(
             "[session-store] registered session kv store on RunContext.stores under '{}'",
-            crate::agent::session_import::live::TINYAGENTS_SESSION_KV_STORE
+            crate::storage::import::live::TINYAGENTS_SESSION_KV_STORE
         );
     }
     if let Some(stores) = stores {
@@ -543,7 +543,7 @@ async fn drive_turn(
                 .as_ref()
                 .filter(|_| todo_registered)
                 .map(|parent| {
-                    crate::agent::session_store::stores_or_ephemeral(&parent.workspace_dir).kv
+                    crate::storage::sessions::stores_or_ephemeral(&parent.workspace_dir).kv
                 }),
         },
     );
