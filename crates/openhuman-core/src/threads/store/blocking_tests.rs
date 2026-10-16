@@ -412,3 +412,32 @@ async fn explicit_context_picks_the_conversation_scope_without_an_ambient_scope(
     assert_eq!(alice_ids, vec!["alice-thread".to_string()]);
     assert_eq!(bob_ids, vec!["bob-thread".to_string()]);
 }
+
+fn agent_ctx(agent: &str) -> std::sync::Arc<crate::core::runtime::CoreContext> {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+    CoreContext::for_test(DomainSet::full(), None).derive_with(
+        ContextOverlay::new(
+            crate::config::Config::default(),
+            DomainSet::full(),
+            Default::default(),
+        )
+        .session_agent(agent),
+    )
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn run_acts_under_the_handed_context_not_the_active_one() {
+    use crate::core::runtime::CoreContext;
+    let asha = DispatchCtx::new(agent_ctx("u-asha"));
+    let ravi = DispatchCtx::new(agent_ctx("u-ravi"));
+    // The caller's own scope is Ravi's; the call was handed Asha's.
+    let seen = CoreContext::scope(ravi.into_core().unwrap(), async {
+        run(asha, "who", || {
+            Ok::<_, String>(CoreContext::current().and_then(|c| c.session_agent().map(str::to_owned)))
+        })
+        .await
+    })
+    .await
+    .unwrap();
+    assert_eq!(seen.as_deref(), Some("u-asha"));
+}
