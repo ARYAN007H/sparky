@@ -41,6 +41,7 @@ mod contract_tests;
 mod records_computer;
 mod records_docs_wallet;
 mod records_extra;
+mod records_flows;
 mod records_mcp_connectors;
 #[cfg(feature = "tinymemes")]
 mod records_memes;
@@ -57,6 +58,7 @@ use records_docs_wallet::TINYWALLET;
 #[cfg(feature = "modules")]
 use records_extra::TINYBOX;
 use records_extra::TINYCHANNELS;
+use records_flows::TINYFLOWS;
 #[cfg(feature = "hosting")]
 use records_extra::TINYHOSTS;
 use records_mcp_connectors::{TINYCONNECTORS, TINYMCP};
@@ -69,7 +71,7 @@ use records_voice::TINYVOICE;
 
 /// Every module this build can load. The records whose contract crate is an
 /// optional dependency (`documents`, `web3`, `voice`, `hosting`, `tinymemes`) exist only when
-/// that gate is on; a product-feature build carries all eleven.
+/// that gate is on; a product-feature build carries all twelve.
 pub const ALL: &[ModuleRecord] = &[
     TINYCOMPUTER,
     TINYSEARCH,
@@ -85,6 +87,7 @@ pub const ALL: &[ModuleRecord] = &[
     #[cfg(feature = "modules")]
     TINYBOX,
     TINYCHANNELS,
+    TINYFLOWS,
     #[cfg(feature = "hosting")]
     TINYHOSTS,
     #[cfg(feature = "tinymemes")]
@@ -125,6 +128,7 @@ pub const COMPONENT_OF: &[(&str, &str)] = &[
     ("tinyconnectors", "connectors"),
     ("tinybox", "sandbox"),
     ("tinychannels", "channels"),
+    ("tinyflows", "tinyflows"),
     ("tinyhosts", "hosting"),
     ("tinymemes", "memes"),
 ];
