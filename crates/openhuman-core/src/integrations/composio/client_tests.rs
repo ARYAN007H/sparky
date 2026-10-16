@@ -459,23 +459,6 @@ async fn direct_connected_integrations_fetches_schemas_without_backend_composio_
     assert_eq!(backend_tool_requests.load(Ordering::SeqCst), 0);
 }
 
-#[tokio::test]
-async fn pricing_for_config_short_circuits_in_direct_mode() {
-    // Build a client pointed at an unreachable backend — if the
-    // short-circuit fires, we never actually attempt the network call
-    // and the empty default struct comes back immediately.
-    let client =
-        crate::integrations::IntegrationClient::new("http://127.0.0.1:0".into(), "test".into());
-    let mut config = crate::config::Config::default();
-    config.composio.mode = "direct".into();
-
-    let pricing = crate::integrations::pricing_for_config(&client, &config).await;
-    // The default struct has every per-integration entry as `None`.
-    assert!(pricing.integrations.google_places.is_none());
-    assert!(pricing.integrations.parallel.is_none());
-    assert!(pricing.integrations.tinyfish.is_none());
-}
-
 // ── failure messages stay byte-identical to the pre-module client ─────────
 
 #[tokio::test]

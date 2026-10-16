@@ -59,3 +59,20 @@ fn missing_or_blank_credential_builds_no_client() {
     )
     .is_none());
 }
+
+#[tokio::test]
+async fn pricing_for_config_short_circuits_in_direct_mode() {
+    // Build a client pointed at an unreachable backend — if the
+    // short-circuit fires, we never actually attempt the network call
+    // and the empty default struct comes back immediately.
+    let client =
+        IntegrationClient::new("http://127.0.0.1:0".into(), "test".into());
+    let mut config = openhuman_embed::__host::config::Config::default();
+    config.composio.mode = "direct".into();
+
+    let pricing = pricing_for_config(&client, &config).await;
+    // The default struct has every per-integration entry as `None`.
+    assert!(pricing.integrations.google_places.is_none());
+    assert!(pricing.integrations.parallel.is_none());
+    assert!(pricing.integrations.tinyfish.is_none());
+}
