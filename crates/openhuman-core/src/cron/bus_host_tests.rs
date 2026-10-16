@@ -54,10 +54,11 @@ fn shell_job(config: &Config, command: &str) -> CronJob {
     .unwrap()
 }
 
-/// Runs jobs whose command starts with `bus-host-test:` itself and hands every
+/// Runs jobs whose command starts with its own `prefix` itself and hands every
 /// other job to the handler it replaced, so tests running in parallel keep
 /// their real shell/flow behaviour.
 struct Marker {
+    prefix: &'static str,
     inner: Arc<dyn JobKindHandler>,
     calls: Arc<AtomicUsize>,
     permanent: bool,
@@ -66,7 +67,7 @@ struct Marker {
 #[async_trait]
 impl JobKindHandler for Marker {
     async fn run(&self, cx: &JobRunContext, job: &CronJob, run_id: &str) -> JobOutcome {
-        if !job.command.starts_with("bus-host-test:") {
+        if !job.command.starts_with(self.prefix) {
             return self.inner.run(cx, job, run_id).await;
         }
         self.calls.fetch_add(1, Ordering::SeqCst);
@@ -88,12 +89,13 @@ async fn execute_runs_the_registered_handler_and_reports_a_retryable_failure() {
     let _registration = register_kind(
         JobType::Shell,
         Arc::new(Marker {
+            prefix: "bus-host-test:retryable:",
             inner: kind_handler(&JobType::Shell).unwrap(),
             calls: Arc::clone(&calls),
             permanent: false,
         }),
     );
-    let job = shell_job(&config, "bus-host-test:retryable");
+    let job = shell_job(&config, "bus-host-test:retryable:");
     let attempt: Attempt = proxy
         .call(callbacks::EXECUTE, (&job, "run-a"))
         .await
@@ -112,12 +114,13 @@ async fn a_permanent_handler_outcome_stops_the_retry_loop() {
     let _registration = register_kind(
         JobType::Shell,
         Arc::new(Marker {
+            prefix: "bus-host-test:permanent:",
             inner: kind_handler(&JobType::Shell).unwrap(),
             calls: Arc::new(AtomicUsize::new(0)),
             permanent: true,
         }),
     );
-    let job = shell_job(&config, "bus-host-test:permanent");
+    let job = shell_job(&config, "bus-host-test:permanent:");
     let attempt: Attempt = proxy
         .call(callbacks::EXECUTE, (&job, "run-b"))
         .await
@@ -135,12 +138,13 @@ async fn an_agent_only_scheduler_refuses_shell_jobs_before_running_anything() {
     let _registration = register_kind(
         JobType::Shell,
         Arc::new(Marker {
+            prefix: "bus-host-test:refused:",
             inner: kind_handler(&JobType::Shell).unwrap(),
             calls: Arc::clone(&calls),
             permanent: false,
         }),
     );
-    let job = shell_job(&config, "bus-host-test:refused");
+    let job = shell_job(&config, "bus-host-test:refused:");
     let attempt: Attempt = proxy
         .call(callbacks::EXECUTE, (&job, "run-c"))
         .await

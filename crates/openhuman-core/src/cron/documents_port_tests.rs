@@ -36,7 +36,8 @@ async fn the_port_serves_the_contracts_document_interface_and_reports_capabiliti
 #[tokio::test]
 async fn a_second_absent_write_comes_back_as_a_conflict_kind() {
     let (proxy, _) = port().await;
-    let put = json!({"op":"put","collection":"cron_jobs","id":"dup","doc":{"a":1},"precondition":"absent"});
+    let absent = serde_json::to_value(tinystoragedrivers::Precondition::Absent).unwrap();
+    let put = json!({"op":"put","collection":"cron_jobs","id":"dup","doc":{"a":1},"precondition":absent});
     // The collection must exist first; the module declares it, the port relays.
     let ensured = ask(
         &proxy,
@@ -53,13 +54,14 @@ async fn a_second_absent_write_comes_back_as_a_conflict_kind() {
 #[tokio::test]
 async fn a_collection_outside_the_schedule_port_is_refused() {
     let (proxy, _) = port().await;
+    let none = serde_json::to_value(tinystoragedrivers::Precondition::None).unwrap();
     for request in [
         json!({"op":"get","collection":"memory_items","id":"x"}),
         json!({"op":"count","collection":"flows","filter":{}}),
         json!({"op":"ensure","spec":{"name":"secrets"}}),
         json!({"op":"atomic_batch","ops":[
-            {"op":"put","collection":"cron_jobs","id":"ok","doc":{},"precondition":"none"},
-            {"op":"delete","collection":"approvals","id":"x","precondition":"none"}
+            {"op":"put","collection":"cron_jobs","id":"ok","doc":{},"precondition":none},
+            {"op":"delete","collection":"approvals","id":"x","precondition":none}
         ]}),
     ] {
         let reply = ask(&proxy, request.clone()).await;

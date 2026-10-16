@@ -8,7 +8,7 @@ fn at(hour: u32) -> DateTime<Utc> {
 fn cron(expr: &str) -> Schedule {
     Schedule::Cron {
         expr: expr.into(),
-        tz: None,
+        tz: Some("UTC".into()),
         active_hours: None,
     }
 }
