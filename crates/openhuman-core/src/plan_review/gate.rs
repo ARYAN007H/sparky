@@ -25,6 +25,7 @@ use uuid::Uuid;
 
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
+use crate::core::runtime::Tenant;
 
 use super::types::PlanReviewResolution;
 
@@ -56,15 +57,15 @@ pub struct ParkedReview {
 /// across a restart, so an orphaned review has nothing to recover.
 pub struct PlanReviewGate {
     ttl: Duration,
-    waiters: Mutex<HashMap<String, oneshot::Sender<PlanReviewResolution>>>,
+    waiters: Mutex<HashMap<(Tenant, String), oneshot::Sender<PlanReviewResolution>>>,
     /// Newest parked `request_id` per thread, so a typed reply or a UI action
     /// that only knows the thread can resolve the latest review.
-    thread_to_request: Mutex<HashMap<String, String>>,
+    thread_to_request: Mutex<HashMap<(Tenant, String), String>>,
     /// request_id → [`ParkedReview`] for every currently-parked review —
     /// consulted by `parked_review_for_thread` so a socket that (re)joins a
     /// thread room can be handed whatever is parked on it, the same
     /// reconciliation `ApprovalGate::parked_request_for_thread` performs.
-    parked: Mutex<HashMap<String, ParkedReview>>,
+    parked: Mutex<HashMap<(Tenant, String), ParkedReview>>,
 }
 
 impl PlanReviewGate {
@@ -86,6 +87,7 @@ impl PlanReviewGate {
     /// review card back to the exact timeline row.
     pub async fn request_review(
         &self,
+        tenant: Tenant,
         thread_id: Option<String>,
         client_id: Option<String>,
         summary: String,
@@ -94,17 +96,18 @@ impl PlanReviewGate {
     ) -> PlanReviewResolution {
         let request_id = format!("plan-{}", Uuid::new_v4());
         let (tx, rx) = oneshot::channel();
-        self.waiters.lock().insert(request_id.clone(), tx);
+        let request_key = (tenant.clone(), request_id.clone());
+        self.waiters.lock().insert(request_key.clone(), tx);
         if let Some(tid) = thread_id.clone() {
             self.thread_to_request
                 .lock()
-                .insert(tid, request_id.clone());
+                .insert((tenant.clone(), tid), request_id.clone());
         }
         let expires_at = (chrono::Utc::now()
             + chrono::Duration::from_std(self.ttl).unwrap_or_default())
         .to_rfc3339();
         self.parked.lock().insert(
-            request_id.clone(),
+            request_key,
             ParkedReview {
                 request_id: request_id.clone(),
                 thread_id: thread_id.clone(),
@@ -123,6 +126,7 @@ impl PlanReviewGate {
         // re-decided against a dead turn or replayed as still-pending.
         let _guard = ParkGuard {
             gate: self,
+            tenant: tenant.clone(),
             request_id: request_id.clone(),
             thread_id: thread_id.clone(),
         };
@@ -177,15 +181,31 @@ impl PlanReviewGate {
 
     /// The parked review on `thread_id`, if any — lets a socket (re)joining a
     /// thread room be handed whatever review is still parked on it.
-    pub fn parked_review_for_thread(&self, thread_id: &str) -> Option<ParkedReview> {
-        let request_id = self.thread_to_request.lock().get(thread_id)?.clone();
-        self.parked.lock().get(&request_id).cloned()
+    pub fn parked_review_for_thread(
+        &self,
+        tenant: &Tenant,
+        thread_id: &str,
+    ) -> Option<ParkedReview> {
+        let key = (tenant.clone(), thread_id.to_string());
+        let request_id = self.thread_to_request.lock().get(&key)?.clone();
+        self.parked
+            .lock()
+            .get(&(tenant.clone(), request_id))
+            .cloned()
     }
 
     /// Resolve a parked review by `request_id`. Returns `true` when a waiter was
     /// woken; `false` when the id is unknown (already decided / expired).
-    pub fn decide(&self, request_id: &str, resolution: PlanReviewResolution) -> bool {
-        let sender = self.waiters.lock().remove(request_id);
+    pub fn decide(
+        &self,
+        tenant: &Tenant,
+        request_id: &str,
+        resolution: PlanReviewResolution,
+    ) -> bool {
+        let sender = self
+            .waiters
+            .lock()
+            .remove(&(tenant.clone(), request_id.to_string()));
         match sender {
             Some(tx) => tx.send(resolution).is_ok(),
             None => {
@@ -200,10 +220,19 @@ impl PlanReviewGate {
 
     /// Resolve the newest parked review on `thread_id` (typed-reply / thread-
     /// scoped path). Returns `true` when a waiter was woken.
-    pub fn decide_by_thread(&self, thread_id: &str, resolution: PlanReviewResolution) -> bool {
-        let request_id = self.thread_to_request.lock().get(thread_id).cloned();
+    pub fn decide_by_thread(
+        &self,
+        tenant: &Tenant,
+        thread_id: &str,
+        resolution: PlanReviewResolution,
+    ) -> bool {
+        let request_id = self
+            .thread_to_request
+            .lock()
+            .get(&(tenant.clone(), thread_id.to_string()))
+            .cloned();
         match request_id {
-            Some(id) => self.decide(&id, resolution),
+            Some(id) => self.decide(tenant, &id, resolution),
             None => false,
         }
     }
@@ -213,18 +242,26 @@ impl PlanReviewGate {
 /// return and cancellation of the parked future.
 struct ParkGuard<'a> {
     gate: &'a PlanReviewGate,
+    tenant: Tenant,
     request_id: String,
     thread_id: Option<String>,
 }
 
 impl Drop for ParkGuard<'_> {
     fn drop(&mut self) {
-        self.gate.waiters.lock().remove(&self.request_id);
-        self.gate.parked.lock().remove(&self.request_id);
+        self.gate
+            .waiters
+            .lock()
+            .remove(&(self.tenant.clone(), self.request_id.clone()));
+        self.gate
+            .parked
+            .lock()
+            .remove(&(self.tenant.clone(), self.request_id.clone()));
         if let Some(tid) = &self.thread_id {
             let mut map = self.gate.thread_to_request.lock();
-            if map.get(tid) == Some(&self.request_id) {
-                map.remove(tid);
+            let key = (self.tenant.clone(), tid.clone());
+            if map.get(&key) == Some(&self.request_id) {
+                map.remove(&key);
             }
         }
     }
