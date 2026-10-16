@@ -161,15 +161,16 @@ async fn store_work_runs_under_the_handed_context_and_two_contexts_do_not_cross(
     };
     // Called from outside any scope: the blocking store work acts for the
     // context it was handed, not for whatever the caller happened to run in.
+    let (asha, ravi) = (agent_ctx("u-asha"), agent_ctx("u-ravi"));
     let (a, b) = tokio::join!(
         update(
-            &agent_ctx("u-asha"),
+            &asha,
             &config,
             IDENTITIES_FILE,
             move |_: &mut BTreeMap<String, u32>| (seen(), false)
         ),
         update(
-            &agent_ctx("u-ravi"),
+            &ravi,
             &config,
             IDENTITIES_FILE,
             move |_: &mut BTreeMap<String, u32>| (seen(), false)
