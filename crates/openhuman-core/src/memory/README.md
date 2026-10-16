@@ -113,7 +113,7 @@ user message
 session host prelude ----> prefetch::pre_turn
 (agent/session_host/          takes a completed cached TurnPack (or none)
  runtime_session/             queues user log (index 2n), recall and
- memory_ingest.rs)            optional date hint in a scoped worker
+ session_hooks.rs)             optional date hint in a scoped worker
    v
 MemoryPackMiddleware ----> adds the pack to each model request of the
 (agent/tinyagents/            turn as an ephemeral instruction; it is

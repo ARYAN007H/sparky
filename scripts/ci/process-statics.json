@@ -186,7 +186,7 @@
     "type": "OnceLock<PlanReviewGate>",
     "count": 1,
     "category": "B",
-    "reason": "The process gate is infrastructure, and its waiter, parked-review, and thread lookup tables are keyed by the authenticated Tenant plus request/thread id; a decision or replay lookup in one tenant cannot reach another tenant's parked plan.",
+    "reason": "The process gate is infrastructure, and its waiter, parked-review, and thread lookup tables use the profile-only tenant key plus request/thread id; agent requests remain available to their profile-level UI while other profiles cannot reach them.",
     "verification": "plan_review/gate_tests.rs: parked_reviews_are_isolated_by_tenant"
   },
   {

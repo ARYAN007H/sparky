@@ -4,15 +4,15 @@
 //!
 //! Tools, by role:
 //! - **Spawn**: `spawn_subagent`, `spawn_async_subagent`,
-//!   `spawn_parallel_agents`, `spawn_worker_thread` (in `tools::impl::threads`).
+//!   `spawn_parallel_agents`.
 //! - **Control**: `steer_subagent`, `continue_subagent`, `close_subagent`,
 //!   `wait_subagent`, `wait` / `wait_loop`, `list_subagents`.
 //! - **Delegation**: `DelegateGraphTool`, `ArchetypeDelegationTool`,
 //!   and `CollapsedDelegationTool` (`delegate_to`).
 //!
-//! `dispatch.rs`, `awaiting_user.rs`, and `worker_thread.rs` are `pub(crate)`
-//! helpers shared by the tools above (the common spawn path, the awaiting-user
-//! envelope, and worker thread creation), not tools themselves.
+//! `dispatch.rs` and `awaiting_user.rs` are `pub(crate)` helpers shared by the
+//! tools above (the common spawn path and awaiting-user envelope), not tools
+//! themselves. Worker-thread persistence lives in `threads`.
 //!
 //! `agent::registration` assembles the delegation tools for the catalogue.
 //! Execution itself goes through

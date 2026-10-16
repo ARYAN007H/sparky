@@ -42,7 +42,7 @@ use tinyagents_definition::SubagentEntry;
 use crate::agent::orchestration::tools::ArchetypeDelegationTool;
 use crate::agent::orchestration::tools::DelegationTarget;
 #[allow(unused_imports)]
-use crate::agent::orchestration::tools::SpawnWorkerThreadTool;
+use crate::tools::r#impl::threads::SpawnWorkerThreadTool;
 use tinytools::Tool;
 
 /// Synthesise the delegation tool list for an agent based on its

@@ -193,10 +193,7 @@ impl PlanReviewGate {
         let scope = tenant.profile_only();
         let key = (scope.clone(), thread_id.to_string());
         let request_id = self.thread_to_request.lock().get(&key)?.clone();
-        self.parked
-            .lock()
-            .get(&(scope, request_id))
-            .cloned()
+        self.parked.lock().get(&(scope, request_id)).cloned()
     }
 
     /// Resolve a parked review by `request_id`. Returns `true` when a waiter was

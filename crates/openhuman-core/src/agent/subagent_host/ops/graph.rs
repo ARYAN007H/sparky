@@ -50,7 +50,7 @@ pub(super) use dispatch::run_subagent_via_graph;
 
 // Only what `graph_tests.rs`'s `use super::*` still needs directly (the rest
 // of the original flat imports now live with the code that uses them, in
-// `dispatch.rs` / `transcript.rs` / `worker_mirror.rs`).
+// `dispatch.rs` / `transcript.rs` / `threads::worker_mirror`).
 #[cfg(test)]
 use crate::agent::progress::AgentProgress;
 #[cfg(test)]
