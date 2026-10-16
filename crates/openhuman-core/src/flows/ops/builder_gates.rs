@@ -217,7 +217,11 @@ pub(crate) async fn build_builder_proposal(
     // Connector onboarding (Phase 5, item 18): tell the proposal card which
     // toolkits this graph needs and whether they're connected, so it can render
     // "Connect <toolkit>" CTAs instead of a bare gate error later.
-    let required_connections = compute_required_connections(config, graph).await;
+    let required_connections = compute_required_connections(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        config,
+        graph,
+    ).await;
     // B45 (design correction): the LLM-provider-connectivity evaluation is
     // ADVISORY here, never a rejection — `run_builder_gates` above no longer
     // includes it (that used to hard-block `propose_workflow`/`edit_workflow`

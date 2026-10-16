@@ -60,8 +60,10 @@ pub(crate) async fn validate_connection_refs(
     config: &Config,
     graph: &WorkflowGraph,
 ) -> Vec<String> {
+    // Transitional (#7801): the builder gates carry no context yet.
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
     let connections: Option<Vec<FlowConnection>> =
-        match crate::integrations::composio::ops::composio_list_connections(config).await {
+        match crate::integrations::composio::ops::composio_list_connections(&ctx, config).await {
             Ok(outcome) => Some(build_flow_connections(
                 outcome.value.connections,
                 Vec::new(),
