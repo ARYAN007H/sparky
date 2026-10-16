@@ -66,7 +66,10 @@ export function checkVendoredOwner(metadata) {
   for (const pkg of packages) {
     if (!isOwner(pkg.name)) continue;
     const manifest = String(pkg.manifest_path ?? '').replaceAll('\\', '/');
-    if (!pkg.source && manifest.includes(`/${VENDORED_TSD_DIR}`)) continue;
+    // Top-level checkout only: a nested vendor/*/vendor/tinystoragedrivers copy
+    // has another `/vendor/` before the match.
+    const at = manifest.indexOf(`/${VENDORED_TSD_DIR}`);
+    if (!pkg.source && at >= 0 && !manifest.slice(0, at).includes('/vendor/')) continue;
     const dependents = [
       ...new Set(
         packages
