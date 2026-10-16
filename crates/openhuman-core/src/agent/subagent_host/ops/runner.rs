@@ -92,9 +92,6 @@ pub(super) fn tier_gate_decision(
     Ok(())
 }
 
-#[path = "runner_result_cap.rs"]
-mod result_cap;
-use result_cap::apply_max_result_chars;
 
 /// Run a sub-agent based on its definition and a task prompt.
 ///
@@ -376,9 +373,21 @@ pub(crate) async fn run_subagent_direct(
         // continues on to the cap and the summarizer detour exactly as before.
         Box::pin(offload_outcome_artifacts(&mut outcome, definition, &options, &task_id)).await;
 
-        // Truncate result to the definition's cap if set (shared with the
-        // deterministic memory fast path via `apply_max_result_chars`).
-        apply_max_result_chars(&mut outcome.output, definition.max_result_chars, &definition.id);
+        // Use TinyAgents' shared character-safe result cap so subagent output
+        // follows the same truncation contract as other orchestration paths.
+        if let Some(cap) = definition.max_result_chars {
+            let (output, omitted) =
+                tinyagents_orchestration::subagent::truncate_head_tail(&outcome.output, cap);
+            if omitted > 0 {
+                tracing::debug!(
+                    agent_id = %definition.id,
+                    omitted_chars = omitted,
+                    cap,
+                    "[subagent_host] truncating oversized result to max_result_chars cap"
+                );
+                outcome.output = output;
+            }
+        }
 
         tracing::info!(
             agent_id = %definition.id,
