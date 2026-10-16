@@ -44,10 +44,8 @@ pub mod presentation_agent;
 pub mod summarizer;
 #[path = "task_manager_agent/prompt.rs"]
 pub mod task_manager_agent;
-#[path = "trigger_reactor/prompt.rs"]
-pub mod trigger_reactor;
-#[path = "trigger_triage/prompt.rs"]
-pub mod trigger_triage;
+pub use crate::triage::trigger_reactor_prompt as trigger_reactor;
+pub use crate::triage::trigger_triage_prompt as trigger_triage;
 #[path = "video_agent/prompt.rs"]
 pub mod video_agent;
 #[path = "vision_agent/prompt.rs"]

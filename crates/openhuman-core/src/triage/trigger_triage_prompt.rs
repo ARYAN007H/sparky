@@ -8,7 +8,7 @@
 use crate::agent::prompts::{PromptContext, render_tools, render_workspace};
 use anyhow::Result;
 
-const ARCHETYPE: &str = include_str!("prompt.md");
+const ARCHETYPE: &str = include_str!("../agent_registry/agents/trigger_triage/prompt.md");
 
 pub fn build(ctx: &PromptContext<'_>) -> Result<String> {
     let mut out = String::with_capacity(4096);

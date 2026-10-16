@@ -89,6 +89,7 @@ pub mod threads;
 #[cfg(feature = "tinymemes")]
 pub mod tinymemes;
 pub mod tools;
+pub mod triage;
 pub mod util;
 pub mod voice;
 pub mod web3;

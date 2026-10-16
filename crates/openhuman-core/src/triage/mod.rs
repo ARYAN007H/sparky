@@ -38,6 +38,8 @@ pub mod evaluator;
 pub mod events;
 pub mod origin;
 pub mod routing;
+pub mod trigger_reactor_prompt;
+pub mod trigger_triage_prompt;
 
 pub use decision::{ParseError, TriageAction, TriageDecision, parse_triage_decision};
 pub use envelope::{TriggerEnvelope, TriggerSource};

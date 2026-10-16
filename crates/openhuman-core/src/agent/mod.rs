@@ -69,7 +69,6 @@ pub mod subagent_host;
 mod tests;
 pub mod tinyagents;
 pub mod tools;
-pub mod triage;
 /// Explicit per-turn host environment handed to the session an entry point runs.
 pub mod turn_env;
 /// Turn-origin task-local — explicit trust/routing label scoped by every
