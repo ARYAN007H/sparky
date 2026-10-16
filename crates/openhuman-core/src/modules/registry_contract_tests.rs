@@ -174,16 +174,16 @@ fn the_flows_record_serves_the_schedule_object() {
     assert_eq!(component_for("tinyflows"), Some("tinyflows"));
 }
 
-/// The pins are the published v0.8.21 `checksum.toml`, a placeholder until
-/// v0.8.22 (the first release with contract v3) is cut and re-pinned.
+/// The pins are the published v0.8.22 `checksum.toml` (the first release with
+/// schedule contract v3).
 #[test]
 fn the_flows_record_pins_every_host_of_one_release() {
     let record = find("tinyflows").unwrap();
-    assert_eq!(record.version, "0.8.21", "TODO(repin v0.8.22)");
+    assert_eq!(record.version, "0.8.22");
     assert_eq!(record.assets.len(), 11);
     for asset in record.assets {
         assert!(
-            asset.archive.starts_with("tinyflows-module-0.8.21-"),
+            asset.archive.starts_with("tinyflows-module-0.8.22-"),
             "{}",
             asset.archive
         );
