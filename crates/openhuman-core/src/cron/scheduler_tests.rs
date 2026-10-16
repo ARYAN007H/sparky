@@ -236,6 +236,9 @@ async fn security_policy_block_halts_without_spending_the_retry_budget() {
         "fixture must be read-only, or this test does not exercise the blocked path"
     );
 
+    // The first call in a process starts the module runtime and attaches the
+    // module (seconds); warm it so the timing below measures retry sleeps only.
+    cron::list_jobs(&config).unwrap();
     let started = std::time::Instant::now();
     let (success, output) = execute_job_now(
         &crate::core::runtime::DispatchCtx::ambient(),

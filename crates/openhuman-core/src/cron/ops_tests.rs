@@ -202,6 +202,9 @@ fn update_rejects_expression_for_non_cron_schedule() {
 fn add_once_creates_future_at_schedule() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
+    // The first call in a process starts the module runtime and attaches the
+    // module (seconds); take the baseline after it so only the call is timed.
+    list_jobs(&config).unwrap();
     let before = chrono::Utc::now();
     let job = add_once(&config, "5m", "echo hello").unwrap();
     match job.schedule {

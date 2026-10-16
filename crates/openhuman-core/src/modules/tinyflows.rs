@@ -44,7 +44,9 @@ pub(crate) fn disabled_message() -> String {
 mod imp {
     use super::{disabled_message, HOST_BUS_NAME, MODULE_ID};
     use crate::config::Config;
-    use crate::modules::{ops, runtime};
+    #[cfg(not(test))]
+    use crate::modules::ops;
+    use crate::modules::runtime;
     use tinybus::{ObjectPath, Proxy};
     use tinyflows_bus::schedule;
 
@@ -152,11 +154,6 @@ mod imp {
         });
     }
 
-    #[cfg(test)]
-    pub(crate) async fn fixture_attach_for_probe() -> Result<(), String> {
-        fixture::attach().await
-    }
-
     /// The tinyflows module linked into the test binary.
     #[cfg(test)]
     pub(crate) mod fixture {
@@ -185,8 +182,6 @@ mod imp {
 
 #[cfg(feature = "modules")]
 pub(crate) use imp::{proxy, run_proxy, serve, unserve};
-#[cfg(all(test, feature = "modules"))]
-pub(crate) use imp::fixture_attach_for_probe;
 
 #[cfg(not(feature = "modules"))]
 mod imp {
