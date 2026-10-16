@@ -36,7 +36,6 @@ use crate::agent::tinyagents::middleware;
 use crate::agent::tinyagents::middleware::turn_context::TurnContextMiddleware;
 use crate::agent::tinyagents::observability::{ProviderUsageCarry, SubagentScope, ToolFailureMap};
 use crate::agent::tinyagents::routes;
-use crate::agent::tinyagents::stop_hooks;
 use crate::agent::tinyagents::verify_before_finish;
 use crate::inference::provider::model::TurnChatModel;
 
