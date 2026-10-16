@@ -8,7 +8,7 @@ use serde_json::Value;
 use tinyagents_harness::observability::trace_export::otlp::otlp_requests;
 use tinyagents_harness::observability::trace_export::TraceSpan;
 
-use super::langfuse::{environment_for_base, ingestion_url, skip_push};
+use super::langfuse::{environment_for_base, otlp_url, skip_push};
 use crate::config::Config;
 use crate::security::credentials::jwt::bearer_authorization_value;
 use crate::security::credentials::session_support::direct_backend_credential;
@@ -17,9 +17,8 @@ pub(super) async fn push_spans(config: &Config, spans: &[TraceSpan]) -> Result<(
     if spans.is_empty() {
         return Ok(());
     }
-    let legacy_url = ingestion_url(config);
-    let url = legacy_url.replace("/langfuse/ingestion", "/langfuse/otel/v1/traces");
-    let environment = environment_for_base(&url);
+    let url = otlp_url(config);
+    let environment = environment_for_base(config, &url);
     if skip_push(environment) {
         return Ok(());
     }

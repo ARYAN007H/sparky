@@ -13,7 +13,7 @@ use super::{environment_for_base, ingestion_url, skip_push};
 /// discarded anyway, and reading a whole child journal is not free.
 pub(crate) fn journal_push_ready(config: &Config) -> bool {
     let url = ingestion_url(config);
-    !skip_push(environment_for_base(&url))
+    !skip_push(environment_for_base(config, &url))
         && url.starts_with("http")
         && matches!(
             direct_backend_credential(config, "langfuse journal push"),
