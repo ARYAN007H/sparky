@@ -5,8 +5,8 @@ use anyhow::Result;
 use serde_json::json;
 use {
     crate::cron, crate::cron::add_shell_job, crate::cron::update_job,
-    tinyflows_schedule::types::CronJob, tinyflows_schedule::types::CronJobPatch,
-    tinyflows_schedule::types::CronRun, tinyflows_schedule::types::Schedule,
+    tinyflows_bus::schedule::types::CronJob, tinyflows_bus::schedule::types::CronJobPatch,
+    tinyflows_bus::schedule::types::CronRun, tinyflows_bus::schedule::types::Schedule,
 };
 
 /// Claim `job_id` as running. `None` when a run (scheduled or Run Now) already

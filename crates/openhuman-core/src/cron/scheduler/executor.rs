@@ -23,7 +23,7 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Mutex;
 use tinyflows_schedule::runtime::{Attempt, JobExecutor};
-use tinyflows_schedule::types::{CronJob, JobType, SessionTarget};
+use tinyflows_bus::schedule::types::{CronJob, JobType, SessionTarget};
 
 /// Run states kept before the map is cleared outright (a run whose task was
 /// aborted never reaches `failed`).

@@ -1,7 +1,7 @@
 use super::*;
 
-use tinyflows_schedule::types::JobType;
-use tinyflows_schedule::types::Schedule;
+use tinyflows_bus::schedule::types::JobType;
+use tinyflows_bus::schedule::types::Schedule;
 // TAURI-RUST-514 — a BYO provider insufficient-credits 402 ("requires more
 // credits") leaks from a cron-fired agent job through `last_agent_error`.
 // `is_insufficient_credits_failure` must consult the message classifier so the
@@ -480,7 +480,7 @@ fn one_shot(config: &Config, command: &str, delete_after_run: bool) -> CronJob {
         cron::update_job(
             config,
             &job.id,
-            tinyflows_schedule::types::CronJobPatch {
+            tinyflows_bus::schedule::types::CronJobPatch {
                 delete_after_run: Some(true),
                 ..Default::default()
             },

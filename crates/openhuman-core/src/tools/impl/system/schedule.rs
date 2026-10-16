@@ -9,7 +9,7 @@ use chrono::{DateTime, Utc};
 use serde_json::json;
 use std::sync::Arc;
 use tinytools::{PermissionLevel, Tool, ToolResult};
-use {crate::cron, tinyflows_schedule::types::Schedule};
+use {crate::cron, tinyflows_bus::schedule::types::Schedule};
 
 /// Tool that lets the agent manage recurring and one-shot scheduled tasks.
 pub struct ScheduleTool {

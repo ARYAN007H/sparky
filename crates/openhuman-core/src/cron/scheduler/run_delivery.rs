@@ -13,7 +13,7 @@ use crate::core::events::DomainEvent;
 use anyhow::Result;
 use async_trait::async_trait;
 use tinyflows_schedule::runtime::{Attempt, RunDelivery, TriggerSink};
-use tinyflows_schedule::types::{CronJob, DeliveryStatus};
+use tinyflows_bus::schedule::types::{CronJob, DeliveryStatus};
 
 pub(super) struct HostDelivery {
     binding: Binding,

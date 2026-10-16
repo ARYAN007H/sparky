@@ -5,7 +5,7 @@ use serde_json::{Map, Value};
 use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::Outcome;
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
-use tinyflows_schedule::types::CronJobPatch;
+use tinyflows_bus::schedule::types::CronJobPatch;
 
 fn job_id_input(comment: &'static str) -> FieldSchema {
     FieldSchema {
@@ -285,7 +285,7 @@ fn handle_add(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture 
     Box::pin(async move {
         let config = ctx.load_config().await?;
 
-        let schedule: tinyflows_schedule::types::Schedule = read_required(&params, "schedule")?;
+        let schedule: tinyflows_bus::schedule::types::Schedule = read_required(&params, "schedule")?;
         let name = params
             .get("name")
             .and_then(|v| v.as_str())
@@ -303,9 +303,9 @@ fn handle_add(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture 
             .and_then(|v| v.as_str())
             .unwrap_or("isolated");
         let session_target = match session_target_str {
-            "main" => tinyflows_schedule::types::SessionTarget::Main,
-            "isolated" => tinyflows_schedule::types::SessionTarget::Isolated,
-            "current" => tinyflows_schedule::types::SessionTarget::Current,
+            "main" => tinyflows_bus::schedule::types::SessionTarget::Main,
+            "isolated" => tinyflows_bus::schedule::types::SessionTarget::Isolated,
+            "current" => tinyflows_bus::schedule::types::SessionTarget::Current,
             other => return Err(format!("invalid 'session_target': {other}")),
         };
         let model = params
@@ -316,7 +316,7 @@ fn handle_add(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture 
             .get("agent_id")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
-        let delivery: Option<tinyflows_schedule::types::DeliveryConfig> =
+        let delivery: Option<tinyflows_bus::schedule::types::DeliveryConfig> =
             match params.get("delivery") {
                 None | Some(Value::Null) => None,
                 Some(v) => Some(
@@ -328,7 +328,7 @@ fn handle_add(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture 
             .get("delete_after_run")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
-        let origin: Option<tinyflows_schedule::types::JobOrigin> = match params.get("origin") {
+        let origin: Option<tinyflows_bus::schedule::types::JobOrigin> = match params.get("origin") {
             None | Some(Value::Null) => None,
             Some(v) => Some(
                 serde_json::from_value(v.clone()).map_err(|e| format!("invalid 'origin': {e}"))?,
@@ -371,7 +371,7 @@ fn handle_add(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture 
                 let delivery = delivery.or_else(|| {
                     origin
                         .is_none()
-                        .then(tinyflows_schedule::types::DeliveryConfig::default)
+                        .then(tinyflows_bus::schedule::types::DeliveryConfig::default)
                         .or_else(|| {
                             Some(tinyflows_schedule::validation::default_delivery(
                                 origin.as_ref(),
@@ -384,7 +384,7 @@ fn handle_add(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture 
                     &delivery_cfg,
                     origin.as_ref(),
                 )?;
-                let mut spec = tinyflows_schedule::AgentJobSpec::new(schedule, p);
+                let mut spec = tinyflows_bus::schedule::AgentJobSpec::new(schedule, p);
                 spec.name = name;
                 spec.session_target = session_target;
                 spec.model = model;

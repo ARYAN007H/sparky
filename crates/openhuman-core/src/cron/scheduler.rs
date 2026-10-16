@@ -48,7 +48,7 @@ use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tinyflows_schedule::runtime::{execute_with_retry, SchedulerSlot};
-use tinyflows_schedule::types::CronJob;
+use tinyflows_bus::schedule::types::CronJob;
 use tokio::time::{self, Duration};
 
 const MIN_POLL_SECONDS: u64 = 5;

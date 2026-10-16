@@ -12,13 +12,13 @@ use crate::config::Config;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use tinyflows_drivers::schedule::CronDocuments;
-use tinyflows_schedule::DeliveryStatus;
+use tinyflows_bus::schedule::DeliveryStatus;
 use tinyflows_schedule::{
     CronJob, CronJobPatch, CronRun, DeliveryConfig, JobType, Schedule, SessionTarget,
 };
 
 use super::limits;
-use tinyflows_schedule::AgentJobSpec;
+use tinyflows_bus::schedule::AgentJobSpec;
 
 /// The cron database tinyflows used to write, imported on first use.
 pub fn legacy_db_path(config: &Config) -> std::path::PathBuf {

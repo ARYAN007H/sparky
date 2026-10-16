@@ -1,7 +1,7 @@
 use super::*;
 use crate::cron::get_job;
 use tempfile::TempDir;
-use tinyflows_schedule::types::ActiveHours;
+use tinyflows_bus::schedule::types::ActiveHours;
 
 fn test_config(tmp: &TempDir) -> Config {
     let config = Config {
@@ -539,7 +539,7 @@ fn single_flight_system_job(config: &Config, name: &str) -> CronJob {
         config,
         &job.id,
         CronJobPatch {
-            policy: Some(tinyflows_schedule::JobPolicy {
+            policy: Some(tinyflows_bus::schedule::JobPolicy {
                 retries: Some(0),
                 single_flight: true,
             }),

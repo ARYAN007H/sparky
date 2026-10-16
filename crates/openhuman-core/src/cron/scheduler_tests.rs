@@ -6,10 +6,10 @@ use chrono::{Duration as ChronoDuration, Timelike, Utc};
 use std::sync::Arc;
 use tempfile::TempDir;
 use tinyagents_harness::agent_error::AgentError;
-use tinyflows_schedule::types::JobType;
-use tinyflows_schedule::types::SessionTarget;
+use tinyflows_bus::schedule::types::JobType;
+use tinyflows_bus::schedule::types::SessionTarget;
 use {
-    crate::cron, tinyflows_schedule::types::ActiveHours, tinyflows_schedule::types::DeliveryConfig,
+    crate::cron, tinyflows_bus::schedule::types::ActiveHours, tinyflows_bus::schedule::types::DeliveryConfig,
 };
 
 async fn test_config(tmp: &TempDir) -> Config {
@@ -32,7 +32,7 @@ fn test_job(command: &str) -> CronJob {
         policy: Default::default(),
         id: "test-job".into(),
         expression: "* * * * *".into(),
-        schedule: tinyflows_schedule::types::Schedule::Cron {
+        schedule: tinyflows_bus::schedule::types::Schedule::Cron {
             expr: "* * * * *".into(),
             tz: None,
             active_hours: None,

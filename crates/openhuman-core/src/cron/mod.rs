@@ -52,8 +52,8 @@ pub use tinyflows_schedule::schedule::{
     next_run_for_schedule, normalize_expression, runs_closer_than, schedule_cron_expression,
     validate_agent_schedule, validate_schedule, TooFrequent, MIN_AGENT_JOB_INTERVAL,
 };
-pub use tinyflows_schedule::types::delivery_mode;
-pub use tinyflows_schedule::types::{
+pub use tinyflows_bus::schedule::types::delivery_mode;
+pub use tinyflows_bus::schedule::types::{
     ActiveHours, CronJob, CronJobPatch, CronRun, DeliveryConfig, DeliveryStatus, JobOrigin,
     JobType, Schedule, SessionTarget,
 };

@@ -9,10 +9,10 @@
 
 use crate::config::Config;
 use {
-    crate::cron, tinyflows_schedule::types::delivery_mode, tinyflows_schedule::types::CronJob,
-    tinyflows_schedule::types::DeliveryConfig, tinyflows_schedule::types::JobOrigin,
-    tinyflows_schedule::types::Schedule, tinyflows_schedule::types::SessionTarget,
-    tinyflows_schedule::validation, tinyflows_schedule::AgentJobSpec,
+    crate::cron, tinyflows_bus::schedule::types::delivery_mode, tinyflows_bus::schedule::types::CronJob,
+    tinyflows_bus::schedule::types::DeliveryConfig, tinyflows_bus::schedule::types::JobOrigin,
+    tinyflows_bus::schedule::types::Schedule, tinyflows_bus::schedule::types::SessionTarget,
+    tinyflows_schedule::validation, tinyflows_bus::schedule::AgentJobSpec,
 };
 
 /// What an agent job creation request carries; everything defaults.

@@ -8,15 +8,15 @@ use crate::cron::system_jobs::ensure_system_job;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use tempfile::TempDir;
-use tinyflows_schedule::types::Schedule;
-use tinyflows_schedule::JobPolicy;
+use tinyflows_bus::schedule::types::Schedule;
+use tinyflows_bus::schedule::JobPolicy;
 
 /// Stores `policy` on the job.
 fn set_policy(config: &Config, job_id: &str, policy: JobPolicy) -> anyhow::Result<()> {
     cron::update_job(
         config,
         job_id,
-        tinyflows_schedule::types::CronJobPatch {
+        tinyflows_bus::schedule::types::CronJobPatch {
             policy: Some(policy),
             ..Default::default()
         },
@@ -46,7 +46,7 @@ fn due_system_job(config: &Config, name: &str) -> CronJob {
     crate::cron::update_job(
         config,
         &job.id,
-        tinyflows_schedule::types::CronJobPatch {
+        tinyflows_bus::schedule::types::CronJobPatch {
             schedule: Some(Schedule::Every {
                 every_ms: 3_600_000,
             }),
