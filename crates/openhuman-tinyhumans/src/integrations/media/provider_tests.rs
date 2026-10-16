@@ -8,29 +8,31 @@ fn guard(chat: Option<ApprovalChatContext>) -> Guard {
     }
 }
 
-async fn disclosed_routing(
-    rx: &mut tinybus::events::EventReceiver<DomainEvent>,
-    service: &str,
-) -> (Option<String>, Option<String>) {
-    loop {
-        match rx.recv().await {
-            Some(DomainEvent::ExternalTransferPending {
-                descriptor,
-                thread_id,
-                client_id,
-                ..
-            }) if descriptor.service == service => return (thread_id, client_id),
-            Some(_) => continue,
-            None => panic!("the bus closed before the disclosure arrived"),
+/// Waits for the external-transfer disclosure of `service` on `rx` and returns
+/// the `(thread_id, client_id)` it was routed to.
+macro_rules! disclosed_routing {
+    ($rx:expr, $service:expr) => {{
+        let service: &str = $service;
+        loop {
+            match $rx.recv().await {
+                Some(DomainEvent::ExternalTransferPending {
+                    descriptor,
+                    thread_id,
+                    client_id,
+                    ..
+                }) if descriptor.service == service => break (thread_id, client_id),
+                Some(_) => continue,
+                None => panic!("the bus closed before the disclosure arrived"),
+            }
         }
-    }
+    }};
 }
 
 /// A media request discloses its egress to the chat the call was built for, and
 /// two guards built for different chats do not share a destination.
 #[tokio::test]
 async fn a_guard_discloses_to_the_chat_it_was_built_for() {
-    crate::core::bus::init().await.expect("bus init");
+    openhuman_embed::__host::core::bus::init().await.expect("bus init");
     let mut rx = openhuman_embed::__host::core::bus::BUS.get().unwrap().receiver();
 
     let chat_a = ApprovalChatContext {
@@ -51,15 +53,15 @@ async fn a_guard_discloses_to_the_chat_it_was_built_for() {
 
     let service = |route: &str| format!("{OPENROUTER_PROXY_PATH}/{route}");
     assert_eq!(
-        disclosed_routing(&mut rx, &service("videos/probe-a")).await,
+        disclosed_routing!(rx, &service("videos/probe-a")),
         (Some("thread-media-a".into()), Some("client-media-a".into()))
     );
     assert_eq!(
-        disclosed_routing(&mut rx, &service("videos/probe-b")).await,
+        disclosed_routing!(rx, &service("videos/probe-b")),
         (Some("thread-media-b".into()), Some("client-media-b".into()))
     );
     assert_eq!(
-        disclosed_routing(&mut rx, &service("videos/probe-none")).await,
+        disclosed_routing!(rx, &service("videos/probe-none")),
         (None, None)
     );
 }
