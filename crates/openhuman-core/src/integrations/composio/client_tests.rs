@@ -83,9 +83,7 @@ impl Drop for DirectAuthFailureGuard {
 
 /// A host-registered backend route (the core ships none of its own).
 fn register_fake_backend_route() {
-    register_composio_route_builder(crate::config::schema::COMPOSIO_MODE_BACKEND, |_config| {
-        Ok(ComposioRoute::Backend)
-    });
+    crate::integrations::composio::test_backend_route::register();
 }
 
 #[test]
