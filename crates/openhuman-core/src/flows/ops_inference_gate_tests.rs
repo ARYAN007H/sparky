@@ -46,7 +46,8 @@ async fn run_builder_gates_does_not_reject_when_signed_out() {
         ],
         "edges": [ { "from_node": "t", "to_node": "a" } ]
     }));
-    let errors = run_builder_gates(&crate::core::runtime::DispatchCtx::ambient(), &config, &g).await;
+    let errors =
+        run_builder_gates(&crate::core::runtime::DispatchCtx::ambient(), &config, &g).await;
     assert!(
         errors.is_empty(),
         "authoring must not be blocked by a signed-out session: {errors:?}"

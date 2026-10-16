@@ -135,8 +135,12 @@ impl tinyflows::gates::BuilderGateHost for OpenHumanBuilderGateHost<'_> {
         use tinyflows::gates::HostGateStage;
         Ok(match stage {
             HostGateStage::ToolPolicy => validate_upload_paths(graph),
-            HostGateStage::AgentReferences => validate_agent_refs(self.ctx, self.config, graph).await,
-            HostGateStage::Connections => validate_connection_refs(self.ctx, self.config, graph).await,
+            HostGateStage::AgentReferences => {
+                validate_agent_refs(self.ctx, self.config, graph).await
+            }
+            HostGateStage::Connections => {
+                validate_connection_refs(self.ctx, self.config, graph).await
+            }
             HostGateStage::ToolContracts => validate_tool_contracts(self.config, graph).await,
         })
     }
@@ -227,8 +231,7 @@ pub(crate) async fn build_builder_proposal(
     // Connector onboarding (Phase 5, item 18): tell the proposal card which
     // toolkits this graph needs and whether they're connected, so it can render
     // "Connect <toolkit>" CTAs instead of a bare gate error later.
-    let required_connections =
-        compute_required_connections(ctx, config, graph).await;
+    let required_connections = compute_required_connections(ctx, config, graph).await;
     // B45 (design correction): the LLM-provider-connectivity evaluation is
     // ADVISORY here, never a rejection — `run_builder_gates` above no longer
     // includes it (that used to hard-block `propose_workflow`/`edit_workflow`
@@ -399,9 +402,7 @@ pub(crate) async fn validate_agent_refs(
             }
             AgentRoute::RegistryFallback => {
                 if custom_registry.is_none() {
-                    custom_registry = Some(
-                        crate::agent::registry::list_agents(ctx, true).await,
-                    );
+                    custom_registry = Some(crate::agent::registry::list_agents(ctx, true).await);
                 }
                 match custom_registry.as_ref().expect("just populated") {
                     Ok(entries) => match entries.iter().find(|entry| entry.id == agent_ref) {

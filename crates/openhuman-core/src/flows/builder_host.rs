@@ -233,7 +233,7 @@ impl AgentDirectory for FlowsHost {
     async fn list(&self) -> PortResult<Vec<AgentDefinition>> {
         let agents = crate::agent::registry::list_agents(&self.ctx(), false)
             .await
-        .map_err(|e| e.to_string())?;
+            .map_err(|e| e.to_string())?;
         Ok(agents
             .iter()
             .map(|a| AgentDefinition {
