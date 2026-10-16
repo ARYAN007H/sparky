@@ -163,7 +163,7 @@
     "file": "crates/openhuman-core/src/agent_runs/context_breakdown.rs",
     "scope": "",
     "name": "REPORT_CACHE",
-    "type": "Lazy<Mutex<HashMap<ReportCacheKey,(u64,PromptSizeReport)>>> ",
+    "type": "Lazy<Mutex<HashMap<ReportCacheKey,(u64,PromptSizeReport)>>>",
     "count": 1,
     "category": "B",
     "reason": "Each cache key includes the dispatch tenant (profile and agent), requested agent id, workspace, and config path; the serialized-config fingerprint only validates freshness within that scope.",
