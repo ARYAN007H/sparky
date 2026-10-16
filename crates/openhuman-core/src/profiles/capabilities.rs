@@ -148,8 +148,7 @@ impl ProfileCapabilities {
             .as_ref()
             .map(|host| host(turn))
             .unwrap_or_default();
-        // Transitional (#7801): the host-tools factory carries no context yet.
-        let dispatch = DispatchCtx::ambient();
+        let dispatch = turn.dispatch_ctx();
         supplied
             .tools
             .retain(|tool| self.admits(&dispatch, tool.name()));

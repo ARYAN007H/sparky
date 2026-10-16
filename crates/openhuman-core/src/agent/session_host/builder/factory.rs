@@ -767,6 +767,7 @@ impl OpenHumanSessionHost {
         }
         effective_agent_config.max_tool_iterations = effective_cap;
         let merged_host_tools = super::host_tools::merge_for_turn(
+            ctx,
             host,
             agent_id,
             session_id,
