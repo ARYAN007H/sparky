@@ -116,15 +116,15 @@ call a tool. Answer instead, and you will be asked to conclude next.";
 /// One completed tool call, carrying enough of its **actual output** to stand
 /// in for an answer (issue #6014).
 ///
-/// Deliberately not [`ToolCallRecord`](crate::agent::hooks::ToolCallRecord), and the difference is a contract rather
+/// Deliberately not the harness's `ToolOutcomeRecord`, and the difference is a contract rather
 /// than a convenience: that type's `output_summary` is produced by
-/// [`sanitize_tool_output`](crate::agent::hooks::sanitize_tool_output),
+/// the harness's failure classification,
 /// which by design "never contains raw tool output or PII" and renders a
 /// success as `"{tool}: ok (N chars)"`. It feeds the learning pipeline, where
 /// stripping payloads is the point. A checkpoint the user reads has the
 /// opposite requirement — it is a substitute for the answer the turn ran out
 /// of room to give — so it needs the content that type exists to remove.
-/// Widening `ToolCallRecord` would have carried raw payloads into every
+/// Widening the harness outcome record would have carried raw payloads into every
 /// learning record as a side effect.
 pub(crate) struct CheckpointToolResult {
     /// The tool that ran.

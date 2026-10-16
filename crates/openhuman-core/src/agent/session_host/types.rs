@@ -280,7 +280,7 @@ pub struct OpenHumanSessionHost {
     /// distinguish "the agent paused mid-work" from "the agent asked a
     /// question" or "the agent finished" — `run_single` only returns the
     /// checkpoint/final text, with no other signal for which case occurred.
-    pub(super) post_turn_hooks: Vec<Arc<dyn PostTurnHook>>,
+    pub(super) post_turn_hooks: Vec<Arc<dyn LearningSink>>,
     pub(super) event_session_id: String,
     pub(super) event_channel: String,
     /// Recency window handed to every turn's run context so integration
@@ -582,7 +582,7 @@ pub struct SessionHostBuilder {
     pub(super) workflows: Option<Vec<tinyskills::Skill>>,
     /// OpenHumanSessionHost workflows to surface in the prompt. Populated from `load_workflows`
     /// at session start; defaults to empty when not explicitly set.
-    pub(super) post_turn_hooks: Vec<Arc<dyn PostTurnHook>>,
+    pub(super) post_turn_hooks: Vec<Arc<dyn LearningSink>>,
     pub(super) event_session_id: Option<String>,
     pub(super) event_channel: Option<String>,
     pub(super) agent_definition_name: Option<String>,

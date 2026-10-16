@@ -26,7 +26,7 @@ impl<F> PermissionHook<F> {
 }
 
 #[async_trait::async_trait]
-impl<F> ToolHook for PermissionHook<F>
+impl<F> ToolHook<crate::seams::OpenHumanRunContext> for PermissionHook<F>
 where
     F: for<'a> Fn(&'a ToolHookContext) -> PermissionFuture<'a> + Send + Sync,
 {
