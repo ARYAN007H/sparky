@@ -343,4 +343,3 @@ fn all_tools_omits_search_surface_when_search_is_disabled() {
         );
     }
 }
-

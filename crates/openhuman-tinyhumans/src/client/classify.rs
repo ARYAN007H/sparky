@@ -2,8 +2,8 @@
 //! expected states (typed [`HostedApiError`]s), which are transient noise, and
 //! which are reported.
 
-use anyhow::{Context, Result};
 use crate::transport::BackendTransportError;
+use anyhow::{Context, Result};
 use openhuman_embed::__host::core::observability::{
     contains_transient_transport_phrase, is_transient_http_status_code, report_error,
 };

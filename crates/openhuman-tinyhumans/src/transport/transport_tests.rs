@@ -2,9 +2,7 @@
 //! code relies on, pinned against a mock backend.
 
 use super::*;
-use crate::transport::{
-    clear_backend_transport, resolve_backend_transport,
-};
+use crate::transport::{clear_backend_transport, resolve_backend_transport};
 use serde_json::json;
 use wiremock::matchers::{header, header_exists, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};

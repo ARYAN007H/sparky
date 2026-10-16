@@ -236,10 +236,10 @@ pub mod security {
         pub mod session_support {
             pub use openhuman_core::security::credentials::session_support::{
                 build_session_state, classify_session_token, current_session_is_local,
-                get_session_token, is_local_session_token, load_app_session_profile, publish_local_session_expiry,
-                resolve_backend_credential, BackendCredential, SessionTokenCheck,
-                SESSION_EXPIRES_AT_META,
-                LOCAL_SESSION_BACKEND_UNAVAILABLE, LOCAL_SESSION_MANAGED_INFERENCE_UNAVAILABLE,
+                get_session_token, is_local_session_token, load_app_session_profile,
+                publish_local_session_expiry, resolve_backend_credential, BackendCredential,
+                SessionTokenCheck, LOCAL_SESSION_BACKEND_UNAVAILABLE,
+                LOCAL_SESSION_MANAGED_INFERENCE_UNAVAILABLE, SESSION_EXPIRES_AT_META,
             };
         }
         pub mod api_key {
@@ -299,8 +299,8 @@ pub mod tool_sources {
 /// Egress disclosure, for hosted calls that leave the machine.
 pub mod egress {
     pub use openhuman_core::security::egress::{
-        emit_external_transfer, emit_external_transfer_in, enforce_egress, local_only_blocks, DataKind,
-        EgressDescriptor, EgressLedger, EgressReason, IdentificationRisk,
+        emit_external_transfer, emit_external_transfer_in, enforce_egress, local_only_blocks,
+        DataKind, EgressDescriptor, EgressLedger, EgressReason, IdentificationRisk,
     };
 }
 
@@ -347,6 +347,7 @@ pub mod wallet_backend {
 /// Model-provider registries: chat models, embeddings, catalogs.
 pub mod inference_registry {
     pub use openhuman_core::inference::provider::factory::PROVIDER_OPENHUMAN;
+    pub use openhuman_core::inference::provider::openhuman_backend_model::REASONING_OFF_METADATA_KEY;
     pub use openhuman_core::inference::registry::{
         register_catalog, register_catalog_in, register_chat_model, register_chat_model_in,
         register_embedding, register_embedding_in, unregister_catalog, unregister_chat_model,
@@ -354,7 +355,6 @@ pub mod inference_registry {
         ChatModelEntry, ChatModelFactory, ChatModelRequest, EmbeddingFactory, EmbeddingRequest,
         ReadinessProbe,
     };
-    pub use openhuman_core::inference::provider::openhuman_backend_model::REASONING_OFF_METADATA_KEY;
 }
 
 /// Memory engines by id, and the free-background-work predicate.
@@ -381,6 +381,9 @@ pub mod channel_callback {
 /// Voice provider registries: STT, TTS and live sessions by slug.
 #[cfg(feature = "voice")]
 pub mod voice_registry {
+    pub use openhuman_core::config::schema::voice_live::{
+        LIVE_PROVIDER_ELEVENLABS_HOSTED, LIVE_PROVIDER_GEMINI_HOSTED,
+    };
     pub use openhuman_core::voice::factory::registry::{
         register_stt_provider, register_stt_provider_in, register_tts_provider,
         register_tts_provider_in, unregister_stt_provider, unregister_tts_provider,
@@ -392,9 +395,6 @@ pub mod voice_registry {
     pub use openhuman_core::voice::live::registry::{
         register_live_provider, register_live_provider_in, unregister_live_provider, ConfigureFn,
         ConfiguredFn, LiveFuture, LiveProviderEntry, PrepareFn,
-    };
-    pub use openhuman_core::config::schema::voice_live::{
-        LIVE_PROVIDER_ELEVENLABS_HOSTED, LIVE_PROVIDER_GEMINI_HOSTED,
     };
     pub use openhuman_core::voice::live::types::{LiveProviderInfo, LiveProviderKind};
     pub use openhuman_core::voice::live::{

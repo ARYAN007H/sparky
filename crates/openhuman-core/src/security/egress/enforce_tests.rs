@@ -130,10 +130,8 @@ fn enforce_egress_blocks_under_local_only_and_allows_otherwise() {
             "names the service: {msg}"
         );
         // A control-plane integration round-trip still flows.
-        enforce_egress(
-            &EgressDescriptor::integration("/connections").with_control_plane(true),
-        )
-        .expect("control-plane must be allowed under LocalOnly");
+        enforce_egress(&EgressDescriptor::integration("/connections").with_control_plane(true))
+            .expect("control-plane must be allowed under LocalOnly");
     }
 
     // Standard mode permits the same user-data transfer.

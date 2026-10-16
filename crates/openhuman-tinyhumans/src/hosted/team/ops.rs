@@ -17,9 +17,9 @@ use tinyhumans_sdk::api::types::{CodeRequest, CreateTeamInviteRequest};
 
 use crate::backend::url::effective_backend_api_url;
 use crate::client::BackendClient;
+use crate::integrations::client::budget_gate;
 use openhuman_embed::__host::config::Config;
 use openhuman_embed::__host::core::Outcome;
-use crate::integrations::client::budget_gate;
 
 use crate::hosted::client::HostedClient;
 

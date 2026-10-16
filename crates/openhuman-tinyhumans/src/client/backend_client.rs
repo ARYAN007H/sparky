@@ -3,11 +3,11 @@
 
 use std::sync::{Arc, Mutex};
 
-use anyhow::{Context, Result};
+use crate::transport::BackendRequest;
 use crate::transport::{BackendTransport, TransportProfile};
+use anyhow::{Context, Result};
 use openhuman_embed::__host::config::Config;
 use openhuman_embed::__host::security::credentials::session_support::BackendCredential;
-use crate::transport::BackendRequest;
 use reqwest::{Client, Method, Url};
 use serde_json::Value;
 

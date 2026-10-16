@@ -129,7 +129,6 @@ pub enum BaseUrlPurpose {
     Inference,
 }
 
-
 /// Failure of a single backend round-trip, as seen by the core.
 #[derive(Debug, thiserror::Error)]
 pub enum BackendTransportError {

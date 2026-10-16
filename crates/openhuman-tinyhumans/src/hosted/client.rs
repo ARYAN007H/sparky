@@ -120,10 +120,12 @@ impl HostedClient {
 
 /// Reject hosted calls when this crate's transport cannot be built.
 fn require_transport() -> Result<(), String> {
-    crate::client::shared_transport().map(|_| ()).map_err(|err| {
-        log::debug!("{LOG_PREFIX} backend transport unavailable; skipping request: {err:#}");
-        format!("{BACKEND_UNAVAILABLE_PREFIX} no backend transport installed")
-    })
+    crate::client::shared_transport()
+        .map(|_| ())
+        .map_err(|err| {
+            log::debug!("{LOG_PREFIX} backend transport unavailable; skipping request: {err:#}");
+            format!("{BACKEND_UNAVAILABLE_PREFIX} no backend transport installed")
+        })
 }
 
 /// The backend origin with any path, query and fragment stripped — the same

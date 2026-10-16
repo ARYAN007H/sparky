@@ -309,10 +309,8 @@ async fn sdk_backed_channel_typing_surfaces_unauthorized_on_401() {
 // The transport owns what a channel-message 404 means on the backend; these
 // pin the recovery the client attaches to each variant.
 
-use crate::transport::{
-    BackendTransport, BackendTransportError, TransportProfile,
-};
 use crate::transport::{BackendRequest, BaseUrlPurpose};
+use crate::transport::{BackendTransport, BackendTransportError, TransportProfile};
 
 /// A transport that answers every request with the error `make` builds.
 struct FailingTransport(fn() -> BackendTransportError);

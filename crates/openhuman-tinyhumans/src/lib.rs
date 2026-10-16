@@ -95,9 +95,6 @@ pub mod voice;
 pub use backend::{product_identity, set_product_identity, ProductIdentity};
 pub use hosted::extension as hosted_controllers;
 pub use install::{install, is_installed, InstallError, InstallOptions};
-pub use transport::{
-    BackendRequest, BackendTransport, BackendTransportError, BaseUrlPurpose, TransportProfile,
-};
 pub use runtime::{RuntimeBuilder, RuntimeError};
 pub use session::{
     cache::{CachedUser, CurrentUserCache},
@@ -111,3 +108,6 @@ pub use session::{
     manager::{SessionError, SessionEvent, SessionManager, SessionState},
 };
 pub use transport::{map_sdk_error, SdkBackendTransport};
+pub use transport::{
+    BackendRequest, BackendTransport, BackendTransportError, BaseUrlPurpose, TransportProfile,
+};

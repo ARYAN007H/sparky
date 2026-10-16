@@ -12,15 +12,13 @@
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
+use crate::transport::BackendRequest;
+use crate::transport::{BackendTransport, BackendTransportError, TransportProfile};
 use anyhow::Result;
-use crate::transport::{
-    BackendTransport, BackendTransportError, TransportProfile,
-};
 use openhuman_embed::__host::security::credentials::session_support::BackendCredential;
 use openhuman_embed::__host::util::redact_url_for_log;
 use openhuman_embed::__host::util::tls::tls_client_builder;
 use openhuman_embed::__host::util::url::{join_url, normalize_backend_api_base_url};
-use crate::transport::BackendRequest;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use reqwest::Method;
 use serde_json::Value;

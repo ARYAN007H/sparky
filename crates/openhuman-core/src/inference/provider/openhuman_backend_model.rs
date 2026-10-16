@@ -46,22 +46,6 @@ pub(crate) fn is_safe_endpoint_for_managed_bearer(endpoint: &str) -> bool {
     is_loopback_host(&url)
 }
 
-/// API keys belong to TinyHumans. A loopback endpoint is permitted for local
-/// development; an arbitrary TLS host is not a trusted key recipient.
-pub(crate) fn is_managed_endpoint_for_api_key(endpoint: &str) -> bool {
-    let Ok(url) = url::Url::parse(endpoint) else {
-        return false;
-    };
-    if !is_safe_endpoint_for_managed_bearer(endpoint) {
-        return false;
-    }
-    matches!(
-        url.host_str(),
-        Some("api.tinyhumans.ai" | "staging-api.tinyhumans.ai")
-    ) && url.scheme() == "https"
-        || is_loopback_host(&url)
-}
-
 /// Request-metadata key a caller sets (to `true`) to ask for no reasoning on
 /// a call — see [`without_reasoning`].
 pub const REASONING_OFF_METADATA_KEY: &str = "openhuman_reasoning_off";
