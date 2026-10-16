@@ -41,7 +41,7 @@ async fn one_live_capability_observes_full_readonly_full_updates() {
     use crate::security::AutonomyLevel;
 
     let dir = tempfile::tempdir().unwrap();
-    let config = persisted_tier_config(dir.path(), true, AutonomyLevel::Full);
+    let mut config = persisted_tier_config(dir.path(), true, AutonomyLevel::Full);
     save_tier_config(&config).await;
     let ctx = live_tier_context(&config);
     let mut baseline = SecurityPolicy::from_config(
@@ -94,7 +94,7 @@ async fn live_tier_reload_failure_fails_closed() {
     use crate::security::AutonomyLevel;
 
     let dir = tempfile::tempdir().unwrap();
-    let mut config = persisted_tier_config(dir.path(), true, AutonomyLevel::Full);
+    let config = persisted_tier_config(dir.path(), true, AutonomyLevel::Full);
     std::fs::create_dir_all(&config.config_path).unwrap();
     let ctx = live_tier_context(&config);
     let baseline = SecurityPolicy::from_config(
@@ -224,6 +224,7 @@ async fn captured_agent_tier_and_host_ceiling_are_not_replaced_by_parent_file() 
         &baseline,
     )
     .unwrap();
+    assert!(!disabled_full_ceiling.enabled);
     assert_eq!(disabled_full_ceiling.autonomy, AutonomyLevel::Full);
     assert_eq!(
         disabled_full_ceiling.gate_decision(CommandClass::Write),

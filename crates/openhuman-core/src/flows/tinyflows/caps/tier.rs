@@ -104,16 +104,24 @@ pub(crate) fn tier_policy_from_config(
     };
     let mut policy = baseline.clone();
     let ceiling = ctx.autonomy_tier_ceiling();
-    policy.enabled = config.autonomy.enabled || ceiling.is_some();
     if config.autonomy.enabled {
+        policy.enabled = true;
         policy.autonomy = config.autonomy.level;
         if let Some(ceiling) = ceiling {
             policy.autonomy = stricter_tier(policy.autonomy, ceiling);
         }
-    } else if let Some(ceiling) = ceiling {
-        // A disabled config contributes no tier restriction; a host ceiling
-        // remains independently active.
+    } else if let Some(ceiling @ (crate::security::AutonomyLevel::ReadOnly
+    | crate::security::AutonomyLevel::Supervised)) = ceiling
+    {
+        // A disabled config contributes no tier restriction; a restrictive
+        // host ceiling remains independently active.
+        policy.enabled = true;
         policy.autonomy = ceiling;
+    } else {
+        // A Full ceiling adds no restriction, so it cannot enable a tier which
+        // the live config explicitly disabled.
+        policy.enabled = false;
+        policy.autonomy = crate::security::AutonomyLevel::Full;
     }
     Ok(policy)
 }
