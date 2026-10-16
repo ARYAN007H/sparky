@@ -1,20 +1,17 @@
 /**
  * Artifact export service (#2779).
  *
- * All paths first resolve the artifact's meta via the
+ * Every path first resolves the artifact's meta via the
  * `openhuman.ai_get_artifact` core RPC (which also reports a file moved or
- * deleted outside OpenHuman), then hand the artifact id + filename hint to
- * the `download_artifact_to_downloads` Tauri command. The shell resolves the
- * id through the core's artifact store itself — it never trusts a
- * renderer-supplied path (#5505) — copies into the user's Downloads directory
- * with a non-colliding name, and returns the dest path so the UI can offer
- * "Reveal in Finder".
+ * deleted outside OpenHuman), then hands the artifact id + filename hint to a
+ * Tauri command. The shell resolves the id through the core's artifact store
+ * itself — it never trusts a renderer-supplied path (#5505).
  *
- * {@link saveArtifactViaDialog} is kept as the name its callers use, but
- * the native Save-As dialog behind it was removed with the shell's `rfd`
- * dependency — it now delegates to {@link downloadArtifact}, which was
- * already its fallback on any host without an xdg-desktop portal. Callers
- * may still branch on `'CANCELLED'`; nothing produces it any more.
+ * - {@link saveArtifactViaDialog}: the OS save dialog (`save_artifact_as`);
+ *   the user picks the destination. A closed dialog is `'CANCELLED'`.
+ * - {@link downloadArtifact}: a copy into the user's Downloads directory with
+ *   a non-colliding name (`download_artifact_to_downloads`), so the UI can
+ *   offer "Reveal in Finder".
  *
  * No-ops outside Tauri (browser dev preview) — export only makes sense in
  * the desktop shell.
