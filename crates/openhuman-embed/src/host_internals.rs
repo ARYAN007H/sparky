@@ -140,6 +140,10 @@ pub mod config {
         pub use openhuman_core::config::rpc::load_config_with_timeout;
     }
     pub mod schema {
+        // tinyhumans integrations: the Composio routing-mode strings.
+        pub use openhuman_core::config::schema::{
+            COMPOSIO_MODE_BACKEND, COMPOSIO_MODE_DIRECT, COMPOSIO_MODE_DISABLED,
+        };
         pub mod cloud_providers {
             pub use openhuman_core::config::schema::cloud_providers::{
                 endpoint_host, host_is_builtin_cloud_provider,
@@ -163,6 +167,12 @@ pub mod agent {
                 embedding_provider_is_usable, embedding_tool_ranker, embedding_tool_ranker_in,
                 install_tool_ranker, installed_tool_ranker,
             };
+        }
+        // tinyhumans integrations: the turn's approval context for a tool call.
+        pub mod host {
+            pub mod run_context {
+                pub use openhuman_core::agent::tinyagents::host::run_context::approval_for_tool;
+            }
         }
         // rpc: Socket.IO run-mode toggles.
         pub mod run_mode {
@@ -259,7 +269,15 @@ pub mod security {
         }
     }
     pub mod approval {
-        pub use openhuman_core::security::approval::{ApprovalChatContext, ApprovalGate};
+        pub use openhuman_core::security::approval::{
+            ApprovalChatContext, ApprovalGate, ApprovalTurnContext,
+        };
+    }
+    // tinyhumans integrations: the autonomy policy the file-storage tools check,
+    // and the live policy its local-only egress tests install.
+    pub use openhuman_core::security::{AutonomyLevel, SecurityPolicy};
+    pub mod live_policy {
+        pub use openhuman_core::security::live_policy::install;
     }
     pub mod pairing {
         pub use openhuman_core::security::pairing::is_public_bind;
