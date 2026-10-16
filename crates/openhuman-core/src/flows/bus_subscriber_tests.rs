@@ -207,7 +207,10 @@ async fn schedule_tick_is_coalesced_while_a_trigger_run_is_active() {
     sub.dispatch_test_schedule(&ctx, "f1").await;
     release_tx.send(()).unwrap();
     assert_eq!(runs_rx.recv().await, Some("schedule"));
-    assert!(runs_rx.try_recv().is_err(), "a busy schedule tick must be dropped");
+    assert!(
+        runs_rx.try_recv().is_err(),
+        "a busy schedule tick must be dropped"
+    );
 }
 
 #[tokio::test]
@@ -223,11 +226,9 @@ async fn app_event_runs_queue_fifo_per_tenant_while_other_tenants_progress() {
     let started_tx = Arc::new(Mutex::new(Some(started_tx)));
     let (release_first_tx, release_first_rx) = oneshot::channel();
     let release_first_rx = Arc::new(tokio::sync::Mutex::new(Some(release_first_rx)));
-    let runner = move |
-        ctx: DispatchCtx,
-        _config: Arc<Config>,
-        request: crate::flows::bus::trigger::TriggerRunRequest,
-    | {
+    let runner = move |ctx: DispatchCtx,
+                       _config: Arc<Config>,
+                       request: crate::flows::bus::trigger::TriggerRunRequest| {
         let completed_tx = completed_tx.clone();
         let started_tx = Arc::clone(&started_tx);
         let release_first_rx = Arc::clone(&release_first_rx);
@@ -278,17 +279,29 @@ async fn app_event_runs_queue_fifo_per_tenant_while_other_tenants_progress() {
     };
     assert_eq!(
         receive(&mut completed_rx).await,
-        ("tenant-b".to_string(), "shared-flow".to_string(), "b1".to_string()),
+        (
+            "tenant-b".to_string(),
+            "shared-flow".to_string(),
+            "b1".to_string()
+        ),
         "a held run for one tenant must not block the same flow id for another tenant"
     );
     release_first_tx.send(()).unwrap();
     assert_eq!(
         receive(&mut completed_rx).await,
-        ("tenant-a".to_string(), "shared-flow".to_string(), "a1".to_string())
+        (
+            "tenant-a".to_string(),
+            "shared-flow".to_string(),
+            "a1".to_string()
+        )
     );
     assert_eq!(
         receive(&mut completed_rx).await,
-        ("tenant-a".to_string(), "shared-flow".to_string(), "a2".to_string()),
+        (
+            "tenant-a".to_string(),
+            "shared-flow".to_string(),
+            "a2".to_string()
+        ),
         "app_event payloads for one tenant and flow must execute FIFO"
     );
 }

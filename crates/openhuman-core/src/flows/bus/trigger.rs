@@ -112,11 +112,7 @@ pub(crate) struct TriggerRunRequest {
 }
 
 type RunFuture = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
-type RunExecutor = dyn Fn(
-        crate::core::runtime::DispatchCtx,
-        Arc<Config>,
-        TriggerRunRequest,
-    ) -> RunFuture
+type RunExecutor = dyn Fn(crate::core::runtime::DispatchCtx, Arc<Config>, TriggerRunRequest) -> RunFuture
     + Send
     + Sync;
 
@@ -124,40 +120,43 @@ const APP_EVENT_QUEUE_CAPACITY: usize = 32;
 
 impl FlowTriggerSubscriber {
     pub fn new(config: Arc<Config>) -> Self {
-        Self::with_executor(config, APP_EVENT_QUEUE_CAPACITY, |ctx, config, request| async move {
-            let flow_id = request.flow_id.clone();
-            tracing::info!(target: "flows", %flow_id, "[flows] trigger fired — starting run");
-            match crate::flows::ops::flows_run(
-                &ctx,
-                &config,
-                &flow_id,
-                request.input,
-                request.inputs,
-                request.trigger,
-            )
-            .await
-            {
-                Ok(_) => tracing::info!(target: "flows", %flow_id, "[flows] trigger-driven run finished"),
-                Err(e) => tracing::warn!(target: "flows", %flow_id, error = %e, "[flows] trigger-driven run failed"),
-            }
-        })
+        Self::with_executor(
+            config,
+            APP_EVENT_QUEUE_CAPACITY,
+            |ctx, config, request| async move {
+                let flow_id = request.flow_id.clone();
+                tracing::info!(target: "flows", %flow_id, "[flows] trigger fired — starting run");
+                match crate::flows::ops::flows_run(
+                    &ctx,
+                    &config,
+                    &flow_id,
+                    request.input,
+                    request.inputs,
+                    request.trigger,
+                )
+                .await
+                {
+                    Ok(_) => {
+                        tracing::info!(target: "flows", %flow_id, "[flows] trigger-driven run finished")
+                    }
+                    Err(e) => {
+                        tracing::warn!(target: "flows", %flow_id, error = %e, "[flows] trigger-driven run failed")
+                    }
+                }
+            },
+        )
     }
 
     fn with_executor<F, Fut>(config: Arc<Config>, queue_capacity: usize, runner: F) -> Self
     where
-        F: Fn(
-                crate::core::runtime::DispatchCtx,
-                Arc<Config>,
-                TriggerRunRequest,
-            ) -> Fut
+        F: Fn(crate::core::runtime::DispatchCtx, Arc<Config>, TriggerRunRequest) -> Fut
             + Send
             + Sync
             + 'static,
         Fut: Future<Output = ()> + Send + 'static,
     {
-        let runner: Arc<RunExecutor> = Arc::new(move |ctx, config, request| {
-            Box::pin(runner(ctx, config, request))
-        });
+        let runner: Arc<RunExecutor> =
+            Arc::new(move |ctx, config, request| Box::pin(runner(ctx, config, request)));
         Self {
             config,
             queues: Arc::new(Mutex::new(HashMap::new())),
@@ -171,11 +170,7 @@ impl FlowTriggerSubscriber {
     #[cfg(test)]
     pub(crate) fn with_runner<F, Fut>(config: Arc<Config>, queue_capacity: usize, runner: F) -> Self
     where
-        F: Fn(
-                crate::core::runtime::DispatchCtx,
-                Arc<Config>,
-                TriggerRunRequest,
-            ) -> Fut
+        F: Fn(crate::core::runtime::DispatchCtx, Arc<Config>, TriggerRunRequest) -> Fut
             + Send
             + Sync
             + 'static,
@@ -240,7 +235,10 @@ impl FlowTriggerSubscriber {
         key: &DispatchKey,
         ctx: &crate::core::runtime::DispatchCtx,
     ) -> Arc<FlowRunQueue> {
-        let mut queues = self.queues.lock().unwrap_or_else(|error| error.into_inner());
+        let mut queues = self
+            .queues
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
         if let Some(queue) = queues.get(key).filter(|queue| !queue.sender.is_closed()) {
             return Arc::clone(queue);
         }
@@ -338,7 +336,7 @@ impl FlowTriggerSubscriber {
                 continue;
             }
             if queue.outstanding.load(Ordering::Acquire) != 0 {
-                tracing::debug!(target: "flows", %flow_id, "[flows] schedule tick coalesced while a trigger run is queued or active");
+                tracing::debug!(target: "flows", flow_id = %key.flow_id, "[flows] schedule tick coalesced while a trigger run is queued or active");
                 return;
             }
 
@@ -347,7 +345,7 @@ impl FlowTriggerSubscriber {
                 Ok(()) => return,
                 Err(mpsc::error::TrySendError::Full(_)) => {
                     queue.outstanding.fetch_sub(1, Ordering::AcqRel);
-                    tracing::debug!(target: "flows", %flow_id, "[flows] schedule tick coalesced while a trigger run is queued");
+                    tracing::debug!(target: "flows", flow_id = %key.flow_id, "[flows] schedule tick coalesced while a trigger run is queued");
                     return;
                 }
                 Err(mpsc::error::TrySendError::Closed(returned)) => {
@@ -363,7 +361,10 @@ impl FlowTriggerSubscriber {
     }
 
     fn remove_queue_if_current(&self, key: &DispatchKey, queue: &Arc<FlowRunQueue>) {
-        let mut queues = self.queues.lock().unwrap_or_else(|error| error.into_inner());
+        let mut queues = self
+            .queues
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
         if queues
             .get(key)
             .is_some_and(|current| Arc::ptr_eq(current, queue))
@@ -416,7 +417,8 @@ impl FlowTriggerSubscriber {
             return;
         }
         let inputs = pinned_trigger_inputs(&flow);
-        self.enqueue_schedule(&ctx, flow_id.to_string(), inputs).await;
+        self.enqueue_schedule(&ctx, flow_id.to_string(), inputs)
+            .await;
     }
 
     /// `DomainEvent::ComposioTriggerReceived` — scans every enabled flow for
