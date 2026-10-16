@@ -30,9 +30,11 @@ fn inputs() -> (OpenHumanHostBundleInputs, OpenHumanRunContext) {
 }
 
 #[test]
-fn factory_records_every_concrete_adapter_in_one_bundle() {
+fn factory_preserves_the_selected_model_and_host_authority() {
     let (inputs, turn) = inputs();
+    let selected_model = inputs.model_resolver.clone();
     let host = OpenHumanHostBundleFactory::build(inputs, &turn);
+    assert!(Arc::ptr_eq(&selected_model, &host.capabilities.models));
 
     let context: Arc<dyn ContextComposer> = host.context.clone();
     let definitions: Arc<dyn DefinitionRegistry> = host.definitions.clone();
