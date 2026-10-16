@@ -29,6 +29,17 @@ impl std::fmt::Debug for OpenHumanRunExt {
     }
 }
 
+impl OpenHumanRunExt {
+    pub(super) fn from_run_context(
+        context: &super::run_context::OpenHumanRunContext,
+    ) -> Self {
+        Self {
+            task_recency_window: context.task_recency_window,
+            command_environment: context.command_environment.clone(),
+        }
+    }
+}
+
 /// Reads the explicit command environment from a tool's run context.
 pub(crate) fn command_environment_for_tool(
     context: Option<&dyn tinytools::ToolRunContext>,

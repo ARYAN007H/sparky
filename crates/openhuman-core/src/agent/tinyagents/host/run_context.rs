@@ -612,13 +612,8 @@ impl OpenHumanRunContext {
         self
     }
 
-    /// Builds the explicit child state for a recursive invocation.
-    ///
-    /// This inheritance rule is tested in B1 and is ready for the later live
-    /// plumbing. Cancellation, workspace, progress, policy hooks and dispatch
-    /// state are inherited. Route observation and usage accounting are isolated,
-    /// so a completed child cannot mutate facts subsequently persisted for its
-    /// parent.
+    /// Builds a child context that inherits authority, cancellation and shared
+    /// workspace policy while keeping route observation and usage isolated.
     pub fn child(&self) -> Self {
         let mut child = self.clone();
         child.spawn_depth = self.spawn_depth.saturating_add(1);
@@ -675,10 +670,7 @@ impl OpenHumanRunContext {
         }
         let cancellation = self.cancellation.clone();
         let workspace = self.workspace.clone();
-        let run_ext = OpenHumanRunExt {
-            task_recency_window: self.task_recency_window,
-            command_environment: self.command_environment.clone(),
-        };
+        let run_ext = OpenHumanRunExt::from_run_context(&self);
         let host_operations = Arc::new(HostOperationContext {
             origin: self.origin.clone(),
             approval: self.approval.clone(),
