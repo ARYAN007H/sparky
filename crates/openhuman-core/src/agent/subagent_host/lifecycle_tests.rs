@@ -202,7 +202,7 @@ async fn tiny_session_port_recovers_legacy_key_from_owned_pause_and_hides_foreig
         .await
         .unwrap();
     assert_eq!(owned.len(), 1);
-    assert_eq!(owned[0].lifecycle_key, key);
+    assert_eq!(owned[0].lifecycle_key, Some(key));
     assert!(port
         .list_for_parent("foreign-session", Some("thread"))
         .await
