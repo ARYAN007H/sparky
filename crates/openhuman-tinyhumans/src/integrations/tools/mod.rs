@@ -47,3 +47,7 @@ pub fn build_integration_tools(
     }
     tools
 }
+
+#[cfg(test)]
+#[path = "families_tests.rs"]
+mod families_tests;
