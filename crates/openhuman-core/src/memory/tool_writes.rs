@@ -547,7 +547,7 @@ fn schedule_partition(ctx: &crate::core::runtime::DispatchCtx, config: Arc<Confi
         let _guard = guard;
         let _owner_guard = owner_guard;
         let _state = state;
-        drain_locked(&config, &file, owner, generation).await;
+        drain_locked(&config, &file, &owner, generation).await;
     });
 }
 
