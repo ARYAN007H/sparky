@@ -10,7 +10,7 @@ use std::path::{Component, Path, PathBuf};
 
 use async_trait::async_trait;
 use serde_json::{json, Value};
-use tinytools::{PermissionLevel, Tool, ToolExposure, ToolResult};
+use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolExposure, ToolResult, ToolRunContext};
 
 use super::cache::{self, InlineEntry};
 use super::resolve::{MAX_RESOURCE_BYTES, MAX_STRUCTURED_BYTES};
@@ -109,35 +109,38 @@ pub fn confine_path_in(roots: &[PathBuf], path: &str) -> Result<(PathBuf, PathBu
 /// # Errors
 ///
 /// When the open is refused, the file is not regular, or it is too large.
-pub async fn read_confined(root: PathBuf, resolved: PathBuf) -> Result<String, String> {
-    crate::core::runtime::DispatchCtx::ambient()
-        .spawn_blocking(move || {
-            use std::io::Read;
-            let file = crate::agent::attachments::provider::open::secure_open(&resolved, &root)
-                .map_err(|error| {
-                    tracing::debug!(?error, "[mcp_ui] show_ui refused the file open");
-                    "the file is not inside the workspace or a skill bundle".to_string()
-                })?;
-            let metadata = file
-                .metadata()
-                .map_err(|_| "could not read the file".to_string())?;
-            if !metadata.is_file() {
-                return Err("only regular files can be shown".to_string());
-            }
-            if metadata.len() > MAX_RESOURCE_BYTES as u64 {
-                return Err("the file is too large to show".to_string());
-            }
-            let mut html = String::new();
-            file.take(MAX_RESOURCE_BYTES as u64 + 1)
-                .read_to_string(&mut html)
-                .map_err(|_| "could not read the file".to_string())?;
-            if html.len() > MAX_RESOURCE_BYTES {
-                return Err("the file is too large to show".to_string());
-            }
-            Ok(html)
-        })
-        .await
-        .map_err(|_| "could not read the file".to_string())?
+pub async fn read_confined(
+    ctx: &crate::core::runtime::DispatchCtx,
+    root: PathBuf,
+    resolved: PathBuf,
+) -> Result<String, String> {
+    ctx.spawn_blocking(move || {
+        use std::io::Read;
+        let file = crate::agent::attachments::provider::open::secure_open(&resolved, &root)
+            .map_err(|error| {
+                tracing::debug!(?error, "[mcp_ui] show_ui refused the file open");
+                "the file is not inside the workspace or a skill bundle".to_string()
+            })?;
+        let metadata = file
+            .metadata()
+            .map_err(|_| "could not read the file".to_string())?;
+        if !metadata.is_file() {
+            return Err("only regular files can be shown".to_string());
+        }
+        if metadata.len() > MAX_RESOURCE_BYTES as u64 {
+            return Err("the file is too large to show".to_string());
+        }
+        let mut html = String::new();
+        file.take(MAX_RESOURCE_BYTES as u64 + 1)
+            .read_to_string(&mut html)
+            .map_err(|_| "could not read the file".to_string())?;
+        if html.len() > MAX_RESOURCE_BYTES {
+            return Err("the file is too large to show".to_string());
+        }
+        Ok(html)
+    })
+    .await
+    .map_err(|_| "could not read the file".to_string())?
 }
 
 fn clean_title(raw: Option<&str>) -> Option<String> {
@@ -181,6 +184,17 @@ impl Tool for ShowUiTool {
     }
 
     async fn execute(&self, args: Value) -> anyhow::Result<ToolResult> {
+        self.execute_with_context(args, ToolCallOptions::default(), None)
+            .await
+    }
+
+    async fn execute_with_context(
+        &self,
+        args: Value,
+        _options: ToolCallOptions,
+        tool_context: Option<&dyn ToolRunContext>,
+    ) -> anyhow::Result<ToolResult> {
+        let ctx = crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(tool_context);
         let html_arg = args.get("html").and_then(Value::as_str);
         let path_arg = args.get("path").and_then(Value::as_str);
         let html = match (html_arg, path_arg) {
@@ -190,7 +204,7 @@ impl Tool for ShowUiTool {
                     Ok(found) => found,
                     Err(error) => return Ok(ToolResult::error(format!("show_ui: {error}"))),
                 };
-                match read_confined(root, resolved).await {
+                match read_confined(&ctx, root, resolved).await {
                     Ok(html) => html,
                     Err(error) => return Ok(ToolResult::error(format!("show_ui: {error}"))),
                 }
