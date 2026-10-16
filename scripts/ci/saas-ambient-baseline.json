@@ -1,7 +1,7 @@
 [
   {
     "rule": "ambient-config",
-    "path": "crates/openhuman-core/src/agent/debug/mod.rs",
+    "path": "crates/openhuman-core/src/core/agent_cli/debug/mod.rs",
     "line": 159,
     "text": "Config::load_or_init()",
     "occurrence": 1
