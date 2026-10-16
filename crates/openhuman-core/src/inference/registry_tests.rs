@@ -192,3 +192,47 @@ fn selecting_the_managed_provider_with_nothing_registered_is_backend_unavailable
         create_chat_model_from_string("chat", PROVIDER_OPENHUMAN, &Config::default(), 0.5);
     assert!(one_shot.is_err());
 }
+
+/// A configured entry that authenticates with the managed session must hand a
+/// registered catalog the key stored for that entry, so a signed-out user with
+/// their own key still gets a listing.
+#[tokio::test]
+async fn a_registered_catalog_receives_the_entrys_provider_key() {
+    use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
+    use crate::config::schema::{EphemeralRoute, EPHEMERAL_ROUTE_SLUG};
+    let seen = Arc::new(Mutex::new(String::new()));
+    let sink = Arc::clone(&seen);
+    register_catalog(
+        PROVIDER_OPENHUMAN,
+        CatalogEntry {
+            list: Arc::new(move |_, request| {
+                *sink.lock().unwrap() = request.provider_key.clone();
+                Box::pin(async { Ok(Outcome::new(serde_json::json!({ "models": [] }), vec![])) })
+            }),
+            limits: None,
+        },
+    );
+    let config = Config {
+        cloud_providers: vec![CloudProviderCreds {
+            id: "p_ephemeral".into(),
+            slug: EPHEMERAL_ROUTE_SLUG.into(),
+            endpoint: "https://self-hosted.example/v1".into(),
+            auth_style: AuthStyle::OpenhumanJwt,
+            ..Default::default()
+        }],
+        ephemeral_route: Some(EphemeralRoute {
+            endpoint: "https://self-hosted.example/v1".into(),
+            api_key: "entry-key".into(),
+            headers: vec![],
+        }),
+        ..Config::default()
+    };
+    let listing = crate::inference::provider::ops::list_configured_models_from_config(
+        "p_ephemeral",
+        &config,
+    )
+    .await;
+    unregister_catalog(PROVIDER_OPENHUMAN);
+    listing.unwrap();
+    assert_eq!(seen.lock().unwrap().as_str(), "entry-key");
+}
