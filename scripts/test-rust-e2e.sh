@@ -123,11 +123,12 @@ MOCK_LOG="${MOCK_LOG:-/tmp/openhuman-rust-e2e-mock.log}"
 MOCK_PID=""
 CREATED_XDG_DATA_HOME=""
 CREATED_XDG_CACHE_HOME=""
+XDG_ROOT="${OPENHUMAN_XDG_ROOT:-${TMPDIR:-/tmp}}"
 
 # TinyBus rejects module-search paths under a shared runner HOME mount. Keep
 # module state created by this test runner in an owner-only scratch directory.
 if [ -z "${XDG_DATA_HOME:-}" ]; then
-  XDG_DATA_HOME="$(mktemp -d "${TMPDIR:-/tmp}/openhuman-rust-e2e-xdg.XXXXXX")"
+  XDG_DATA_HOME="$(mktemp -d "${XDG_ROOT}/openhuman-rust-e2e-xdg.XXXXXX")"
   chmod 700 "$XDG_DATA_HOME"
   export XDG_DATA_HOME
   CREATED_XDG_DATA_HOME="$XDG_DATA_HOME"
@@ -137,7 +138,7 @@ fi
 # separate private root: the release cache must not also be scanned as a
 # TinyBus module search path.
 if [ -z "${XDG_CACHE_HOME:-}" ]; then
-  XDG_CACHE_HOME="$(mktemp -d "${TMPDIR:-/tmp}/openhuman-rust-e2e-cache.XXXXXX")"
+  XDG_CACHE_HOME="$(mktemp -d "${XDG_ROOT}/openhuman-rust-e2e-cache.XXXXXX")"
   chmod 700 "$XDG_CACHE_HOME"
   CREATED_XDG_CACHE_HOME="$XDG_CACHE_HOME"
   export XDG_CACHE_HOME

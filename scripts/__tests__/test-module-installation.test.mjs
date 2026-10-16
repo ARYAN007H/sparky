@@ -69,7 +69,12 @@ test("Linux container workflows stage TinyBus fixtures under the root-owned cont
   );
   assert.match(
     ciFull,
-    /TMPDIR: \/root\/openhuman-rust-e2e-tmp-\$\{\{ github\.run_id \}\}/,
+    /OPENHUMAN_XDG_ROOT: \/root\/openhuman-rust-e2e-xdg-\$\{\{ github\.run_id \}\}/,
+  );
+  const rustE2eRunnerSource = readFileSync(rustE2eRunner, "utf8");
+  assert.match(
+    rustE2eRunnerSource,
+    /XDG_ROOT="\$\{OPENHUMAN_XDG_ROOT:-\$\{TMPDIR:-\/tmp\}\}"/,
   );
 
   const lanes = readFileSync(

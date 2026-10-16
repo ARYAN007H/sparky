@@ -141,11 +141,11 @@ jobs:
         # server + node harness), not just the cargo segments the inner
         # script wraps itself.
         run: |
-          mkdir -p "$TMPDIR"
-          chmod 700 "$TMPDIR"
+          mkdir -p "$OPENHUMAN_XDG_ROOT"
+          chmod 700 "$OPENHUMAN_XDG_ROOT"
           bash scripts/ci-cancel-aware.sh pnpm test:rust:e2e
         env:
-          TMPDIR: /root/openhuman-rust-e2e-tmp-${{ github.run_id }}-${{ github.run_attempt }}
+          OPENHUMAN_XDG_ROOT: /root/openhuman-rust-e2e-xdg-${{ github.run_id }}-${{ github.run_attempt }}
           RUST_BACKTRACE: "1"
 
   build-playwright-e2e-artifact:
