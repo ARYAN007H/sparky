@@ -9,10 +9,10 @@
 //! accounting. This `ChatModel` bridges all three onto the crate wire client:
 //!
 //! * **Dynamic JWT**: `invoke`/`stream` resolve the current bearer and build a
-//!   fresh crate `OpenAiModel` (Bearer) per call ([`session`](super::session)).
+//!   fresh crate `OpenAiModel` (Bearer) per call ([`managed_session`](super::managed_session)).
 //! * **`thread_id`**: injected into `ModelRequest.provider_options` so the crate
 //!   flattens it into the request body as the top-level `thread_id` field.
-//! * **Billing envelope**: [`usage`](super::usage) re-projects the
+//! * **Billing envelope**: [`managed_usage`](super::managed_usage) re-projects the
 //!   `openhuman.{billing,usage}` envelope into the shape the cost bridge reads.
 
 use serde_json::Value;
@@ -27,7 +27,7 @@ use tinyinference_llm::Error as TiError;
 
 use openhuman_embed::__host::security::credentials::{AuthService, APP_SESSION_PROVIDER};
 
-use super::session::managed_bearer;
+use super::managed_session::managed_bearer;
 use crate::backend::url::effective_api_url;
 use crate::client::endpoint::is_managed_endpoint_for_api_key;
 
