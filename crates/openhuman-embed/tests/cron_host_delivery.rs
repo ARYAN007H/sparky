@@ -68,6 +68,9 @@ fn a_library_agents_scheduled_reply_is_handed_to_the_host() {
                 .workspace(Workspace::Stateless)
                 .session_store(Arc::new(InMemorySessionStores::new()))
                 .backend_url(backend.uri())
+                // Scheduled work is background LLM work; the scheduler gate
+                // correctly parks it until this library runtime has a credential.
+                .api_key("th_test_key")
                 .cron_delivery(recorder.clone())
                 .services(ServiceSet {
                     cron: true,
