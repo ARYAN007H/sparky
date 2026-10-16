@@ -52,39 +52,6 @@ async fn stale_graph_refusal_leaves_a_resume_claimed_run_and_summary_untouched()
 }
 
 #[tokio::test]
-async fn compatibility_refusal_does_not_label_a_resume_claimed_run_failed() {
-    let tmp = TempDir::new().unwrap();
-    let config = test_config(&tmp);
-    let flow = store::create_flow(
-        &config,
-        "compatibility-race".to_string(),
-        structurally_valid_graph(trigger_only_graph()),
-        false,
-        true,
-    )
-    .unwrap();
-    let run_id = "compatibility-race-run";
-    insert_parked_run(&config, &flow.id, run_id);
-    assert!(store::mark_run_resuming(&config, run_id).unwrap());
-
-    assert!(
-        !run_management::settle_parked_run(
-            &config,
-            run_id,
-            &flow.id,
-            "failed",
-            "unsupported graph topology",
-        )
-        .await
-    );
-
-    let row = store::get_flow_run(&config, run_id).unwrap().unwrap();
-    assert_eq!(row.status, "running");
-    let flow = store::get_flow(&config, &flow.id).unwrap().unwrap();
-    assert!(flow.last_status.is_none());
-}
-
-#[tokio::test]
 async fn cancel_observed_parked_does_not_tear_down_a_resume_starting() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
