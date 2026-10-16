@@ -32,7 +32,7 @@ storage-sqlite = ["openhuman-embed/storage-sqlite"]
 storage-mongodb = ["openhuman-embed/storage-mongodb"]
 storage-s3 = ["openhuman-embed/storage-s3"]
 storage-file = ["openhuman-embed/storage-file"]
-media = ["openhuman-embed/media"]
+media = ["openhuman-embed/media", "dep:tinyinference-image", "dep:tinyinference-video"]
 flows = ["openhuman-embed/flows"]
 skills = ["openhuman-embed/skills"]
 mcp = ["openhuman-embed/mcp"]
@@ -71,6 +71,7 @@ tinychannels-bus = { path = "../../vendor/tinychannels/crates/tinychannels-bus" 
 # AES-256-GCM decryption of the backend OAuth token handoff (hosted::oauth).
 aes-gcm = "0.10"
 anyhow = "1"
+bytes = "1"
 async-trait = "0.1"
 base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
@@ -90,6 +91,10 @@ tinyinference-providers = { path = "../../vendor/tinyagents/vendor/tinyinference
 tinyinference-llm = { path = "../../vendor/tinyagents/vendor/tinyinference/crates/tinyinference-llm" }
 tinyinference-embeddings = { path = "../../vendor/tinyagents/vendor/tinyinference/crates/tinyinference-embeddings" }
 tinyinference-core = { path = "../../vendor/tinyagents/vendor/tinyinference/crates/tinyinference-core" }
+# Managed media generation (`integrations::media`): the OpenRouter image and
+# video generators, over the same vendored crates the core's harness uses.
+tinyinference-image = { path = "../../vendor/tinyagents/vendor/tinyinference/crates/tinyinference-image", optional = true }
+tinyinference-video = { path = "../../vendor/tinyagents/vendor/tinyinference/crates/tinyinference-video", optional = true }
 directories = "6"
 urlencoding = "2.1"
 tracing = "0.1"
