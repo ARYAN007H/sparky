@@ -554,46 +554,45 @@ async fn run_queue_worker(
     #[cfg(test)] retiring: Arc<tokio::sync::Notify>,
 ) {
     let mut next = receiver.recv().await;
-    while let Some(queued) = next {
-        loop {
-            let run_ctx = queued.ctx.clone();
-            let flow_id = queued.request.flow_id.clone();
-            let run = run_ctx.spawn((runner)(queued.ctx, queued.config, queued.request));
-            if let Err(error) = run.await {
-                tracing::warn!(target: "flows", %flow_id, error = %error, "[flows] trigger run task exited unexpectedly");
-            }
-            queue.outstanding.fetch_sub(1, Ordering::AcqRel);
+    loop {
+        let Some(queued) = next.take() else {
+            break;
+        };
+        let run_ctx = queued.ctx.clone();
+        let flow_id = queued.request.flow_id.clone();
+        let run = run_ctx.spawn((runner)(queued.ctx, queued.config, queued.request));
+        if let Err(error) = run.await {
+            tracing::warn!(target: "flows", %flow_id, error = %error, "[flows] trigger run task exited unexpectedly");
+        }
+        queue.outstanding.fetch_sub(1, Ordering::AcqRel);
 
-            if let Ok(queued) = receiver.try_recv() {
+        if let Ok(queued) = receiver.try_recv() {
+            next = Some(queued);
+            continue;
+        }
+
+        // A producer takes the same gate before sending. Once this worker
+        // holds it and observes an empty receiver, no successful send can be
+        // stranded behind a closed receiver. A sender that cloned this slot
+        // before retirement gets SendError and retries with the new slot.
+        #[cfg(test)]
+        retiring.notify_one();
+        let admission = Arc::clone(&queue.admission).lock_owned().await;
+        match receiver.try_recv() {
+            Ok(queued) => {
+                drop(admission);
                 next = Some(queued);
-                break;
             }
-
-            // A producer takes the same gate before sending. Once this worker
-            // holds it and observes an empty receiver, no successful send can
-            // be stranded behind a closed receiver. A sender that cloned this
-            // slot before retirement gets SendError and retries with the new
-            // slot.
-            #[cfg(test)]
-            retiring.notify_one();
-            let admission = Arc::clone(&queue.admission).lock_owned().await;
-            match receiver.try_recv() {
-                Ok(queued) => {
-                    drop(admission);
-                    next = Some(queued);
-                    break;
+            Err(mpsc::error::TryRecvError::Empty | mpsc::error::TryRecvError::Disconnected) => {
+                receiver.close();
+                let mut current = queues.lock().unwrap_or_else(|error| error.into_inner());
+                if current
+                    .get(&key)
+                    .is_some_and(|entry| Arc::ptr_eq(entry, &queue))
+                {
+                    current.remove(&key);
                 }
-                Err(mpsc::error::TryRecvError::Empty | mpsc::error::TryRecvError::Disconnected) => {
-                    receiver.close();
-                    let mut current = queues.lock().unwrap_or_else(|error| error.into_inner());
-                    if current
-                        .get(&key)
-                        .is_some_and(|entry| Arc::ptr_eq(entry, &queue))
-                    {
-                        current.remove(&key);
-                    }
-                    return;
-                }
+                return;
             }
         }
     }
