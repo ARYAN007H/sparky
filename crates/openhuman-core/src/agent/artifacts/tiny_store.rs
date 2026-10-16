@@ -272,8 +272,17 @@ fn contains(folder: &Path, inside: &Path) -> bool {
 /// Why a resolved path may not be an artifact's file, if it may not: it is in
 /// a location OpenHuman never lets the agent reach (credential stores, system
 /// roots), however broad the folders around it.
+///
+/// The guard sees canonical paths, and on macOS `/etc` canonicalizes to
+/// `/private/etc`: a `/private/...` path is also checked without that prefix,
+/// as the protected prefixes name the familiar form.
 pub fn refused_path(path: &Path) -> Option<String> {
-    crate::security::SecurityPolicy::is_always_forbidden(path)
+    let forbidden = |p: &Path| crate::security::SecurityPolicy::is_always_forbidden(p);
+    let aliased = path
+        .strip_prefix("/private")
+        .ok()
+        .map(|rest| Path::new("/").join(rest));
+    (forbidden(path) || aliased.as_deref().is_some_and(forbidden))
         .then(|| "the file is in a protected location".to_string())
 }
 
