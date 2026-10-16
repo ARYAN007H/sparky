@@ -1,13 +1,13 @@
-//! Local-vs-remote provider resolver for triage turns.
+//! Provider resolution for the tiered triage fallback chain.
 //!
 //! ## What this does
 //!
-//! [`resolve_provider`] always builds the remote provider. Local AI is never
-//! used for chat triage — the local path has been removed to guarantee that
-//! a triage turn never errors due to Ollama unavailability.
-//!
-//! `ResolvedProvider.used_local` is preserved for telemetry compatibility but
-//! is always `false`.
+//! [`resolve_provider_with_config`] builds the initial cloud arm, forcing the
+//! managed backend when the chat route names a local runtime or CLI. The
+//! evaluator retries retryable cloud failures once, then uses the optional
+//! local arm from [`build_local_provider_with_config`]. Local fallback requires
+//! an enabled local runtime and a configured chat model. Its failures are
+//! handled by the evaluator rather than bubbling up as provider errors.
 
 use std::sync::Arc;
 
@@ -23,22 +23,18 @@ const TRIAGE_ROLE: &str = "chat";
 pub struct ResolvedProvider {
     /// Model source for this arm. Production sources are crate-native.
     pub turn_model_source: crate::agent::tinyagents::TurnModelSource,
-    /// Provider name token — always `"openhuman"` (remote backend).
-    /// Kept for telemetry / observability compat with the previous two-path design.
+    /// Provider name token for the managed backend, BYOK cloud route, or local arm.
     pub provider_name: String,
     /// Model identifier — the concrete string the turn
     /// (`TurnSpec::run`) will hand to the provider.
     pub model: String,
-    /// Always `false` — local AI is never used for triage.
-    /// Preserved so existing telemetry subscribers that read this field do not
-    /// need code changes.
+    /// Whether this is the optional local fallback arm. Cloud arms report `false`.
     pub used_local: bool,
 }
 
 // ── Public API ──────────────────────────────────────────────────────────
 
-/// Inner half of [`resolve_provider`] that takes an already-loaded
-/// [`Config`]. Exposed for tests and for the evaluator's retry path.
+/// Resolve the initial cloud arm from an already-loaded [`Config`].
 pub async fn resolve_provider_with_config(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
@@ -53,7 +49,7 @@ pub async fn resolve_provider_with_config(
 /// Build the local-arm provider for the tiered fallback chain (issue
 /// #1257). Returns `None` when local AI is disabled or no chat model
 /// is configured — callers (`evaluator::run_triage`) skip straight to
-/// `Deferred` in that case.
+/// the evaluator's no-local outcome in that case.
 ///
 /// The returned source is crate-native and targets the configured local
 /// inference base (Ollama by default, overridable via
@@ -135,7 +131,7 @@ fn is_local_cli_route(provider_string: &str) -> bool {
 /// the agent harness uses — NOT from `default_model`, so one place pins the
 /// managed model.
 ///
-/// #1257 invariant — *triage never goes local*: when the resolved
+/// The initial arm must be cloud: when the resolved
 /// `chat_provider` is a local runtime (Ollama/LM Studio/MLX/…) or a
 /// BYOK-incomplete sentinel, we force the managed backend so a trigger never
 /// errors because a local model is down. Only a concrete BYOK **cloud** route is
@@ -152,7 +148,7 @@ fn build_remote_provider(
     let resolved = provider::provider_for_role(TRIAGE_ROLE, config);
     let r = resolved.trim();
 
-    // #1257: triage must never depend on a local model/CLI being up, and a
+    // The initial cloud arm must not depend on a local model/CLI being up, and a
     // half-configured BYOK route must not error a trigger — force the managed
     // backend in all those cases. `is_local_provider_string` only covers the
     // local HTTP runtimes (Ollama/LM Studio/MLX/local-openai), so the local CLI
@@ -167,7 +163,7 @@ fn build_remote_provider(
         tracing::info!(
             resolved = %r,
             "[triage::routing] chat workload not usable for triage (local/incomplete) — \
-             forcing managed backend (#1257: triage never goes local)"
+             forcing managed backend for initial cloud arm"
         );
     }
 

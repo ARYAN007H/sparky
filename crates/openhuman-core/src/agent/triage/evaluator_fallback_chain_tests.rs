@@ -259,7 +259,7 @@ async fn rate_limited_then_ok_marks_cloud_after_retry() {
 }
 
 #[tokio::test]
-async fn double_429_falls_through_to_local_fallback() {
+async fn retryable_cloud_failure_attempts_cloud_then_retry_then_local() {
     AgentDefinitionRegistry::init_global_builtins().expect("init_global_builtins");
     let counter = StdArc::new(AtomicUsize::new(0));
     let counter_for_stub = StdArc::clone(&counter);
@@ -287,6 +287,8 @@ async fn double_429_falls_through_to_local_fallback() {
 
     let run = outcome.into_decision().expect("decision");
     assert_eq!(run.resolution_path, TriageResolutionPath::LocalFallback);
+    assert_eq!(run.provider_name, "stub-local");
+    assert_eq!(run.model, "stub-local-model");
     assert!(run.used_local);
     assert_eq!(counter.load(Ordering::SeqCst), 3);
 }
