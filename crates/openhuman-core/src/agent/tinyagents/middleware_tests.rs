@@ -20,7 +20,7 @@ use tinyinference_llm::message::Message as TaMessage;
 use tinyinference_llm::tool::ToolCall as TaToolCall;
 use tinytools::{ToolPolicy as TaToolPolicy, ToolResult as TaToolResult};
 
-use crate::agent::context::CLEARED_PLACEHOLDER;
+use tinyagents_harness::middleware::library::DEFAULT_CLEARED_PLACEHOLDER;
 use crate::agent::tinyagents::payload_summarizer::DynPayloadSummarizer;
 use tinyagents_harness::context::{RunConfig, RunContext};
 use tinyinference_llm::model::ModelRequest;

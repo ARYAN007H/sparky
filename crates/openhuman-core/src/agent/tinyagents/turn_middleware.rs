@@ -244,7 +244,7 @@ pub(super) fn install_turn_middleware(
                 Arc::new(is_repeat_call_exempt),
             )
             .with_read_only(Arc::new(move |name: &str| read_only_tools.contains(name)))
-            .with_cleared_placeholder(crate::agent::context::CLEARED_PLACEHOLDER),
+            .with_cleared_placeholder(tinyagents_harness::middleware::library::DEFAULT_CLEARED_PLACEHOLDER),
         )
     });
     // Time awareness (#6953); before the repeat guard so its notes land last.

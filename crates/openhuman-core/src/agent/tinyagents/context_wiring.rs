@@ -92,7 +92,7 @@ pub(super) fn install_context_ladder(
                 restore_allowance,
             )
             .with_deliverable_tools(["file_write", "apply_patch"])
-            .with_cleared_placeholder(crate::agent::context::CLEARED_PLACEHOLDER)
+            .with_cleared_placeholder(tinyagents_harness::middleware::library::DEFAULT_CLEARED_PLACEHOLDER)
             .with_budget_notice(BUDGET_NOTICE_THRESHOLDS),
         )
     });
@@ -101,7 +101,7 @@ pub(super) fn install_context_ladder(
         microcompact: (microcompact_keep_recent > 0).then(|| {
             microcompact_for_window(
                 microcompact_keep_recent,
-                crate::agent::context::CLEARED_PLACEHOLDER,
+                tinyagents_harness::middleware::library::DEFAULT_CLEARED_PLACEHOLDER,
                 context_window,
             )
         }),
