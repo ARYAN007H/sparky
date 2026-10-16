@@ -299,21 +299,12 @@ impl ShellTool {
         // `tool_timeout::explicit_call_timeout_*`. Shell has no default deadline
         // (issue #4023) — long scripts must run to completion.
         let requested_timeout = args.get("timeout_secs").and_then(|v| v.as_u64());
-        let command_environment = command_environment_for_tool(context);
-
         let start = Instant::now();
         let (allowed, result) = crate::sandbox::shell_progress::with_shell_progress(
             context,
             crate::sandbox::shell_progress::HEARTBEAT_INTERVAL,
             |meter| {
-                self.run_with_security_in_context(
-                    ctx,
-                    command,
-                    requested_timeout,
-                    context,
-                    command_environment.as_deref(),
-                    meter,
-                )
+                self.run_with_security_in_context(ctx, command, requested_timeout, context, meter)
             },
         )
         .await;
@@ -347,7 +338,7 @@ impl ShellTool {
         command: &str,
         requested_timeout: Option<u64>,
     ) -> (bool, ToolResult) {
-        self.run_with_security_in_context(ctx, command, requested_timeout, None, None, None)
+        self.run_with_security_in_context(ctx, command, requested_timeout, None, None)
             .await
     }
 
@@ -357,9 +348,9 @@ impl ShellTool {
         command: &str,
         requested_timeout: Option<u64>,
         context: Option<&dyn ToolRunContext>,
-        command_environment: Option<&std::collections::BTreeMap<String, String>>,
         meter: Option<crate::sandbox::shell_progress::ShellOutputMeter>,
     ) -> (bool, ToolResult) {
+        let command_environment = command_environment_for_tool(context);
         // Revalidate facts immediately before execution. The authorization
         // hook supplies the same module-owned parser to the harness gate; this
         // second call keeps direct/workflow execution on the same contract and
@@ -435,7 +426,7 @@ impl ShellTool {
                         command,
                         requested_timeout,
                         &action_dir,
-                        command_environment,
+                        context,
                         meter,
                     )
                     .await
@@ -467,14 +458,7 @@ impl ShellTool {
         if sandbox_required {
             let action_dir = self.effective_action_dir_for_context(context);
             return self
-                .run_sandboxed(
-                    ctx,
-                    command,
-                    requested_timeout,
-                    &action_dir,
-                    command_environment,
-                    meter,
-                )
+                .run_sandboxed(ctx, command, requested_timeout, &action_dir, context, meter)
                 .await;
         }
 
@@ -515,7 +499,7 @@ impl ShellTool {
                 request.timeout_ms = timeout_ms;
             }
 
-            let Some(mut env) = container_environment(command_environment) else {
+            let Some(mut env) = container_environment(command_environment.as_deref()) else {
                 return (
                     false,
                     ToolResult::error("Docker environment contains a non-UTF-8 value."),
@@ -568,7 +552,7 @@ impl ShellTool {
         }
         let mut env = std::collections::BTreeMap::new();
 
-        if let Some(overrides) = command_environment {
+        if let Some(overrides) = command_environment.as_deref() {
             env.extend(
                 overrides
                     .iter()
@@ -672,7 +656,7 @@ impl ShellTool {
         command: &str,
         requested_timeout: Option<u64>,
         action_dir: &Path,
-        command_environment: Option<&std::collections::BTreeMap<String, String>>,
+        context: Option<&dyn ToolRunContext>,
         meter: Option<crate::sandbox::shell_progress::ShellOutputMeter>,
     ) -> (bool, ToolResult) {
         let config = crate::config::RuntimeConfig::default();
@@ -690,7 +674,7 @@ impl ShellTool {
             command,
             requested_timeout,
             action_dir,
-            command_environment,
+            context,
             meter,
         )
         .await
@@ -704,7 +688,7 @@ impl ShellTool {
         command: &str,
         requested_timeout: Option<u64>,
         action_dir: &Path,
-        command_environment: Option<&std::collections::BTreeMap<String, String>>,
+        context: Option<&dyn ToolRunContext>,
         meter: Option<crate::sandbox::shell_progress::ShellOutputMeter>,
     ) -> (bool, ToolResult) {
         use crate::sandbox;
@@ -717,7 +701,8 @@ impl ShellTool {
 
         let mut extra_env =
             std::collections::HashMap::<std::ffi::OsString, std::ffi::OsString>::new();
-        if let Some(overrides) = command_environment {
+        let command_environment = command_environment_for_tool(context);
+        if let Some(overrides) = command_environment.as_deref() {
             extra_env.extend(overrides.iter().map(|(name, value)| {
                 (
                     std::ffi::OsString::from(name),
@@ -730,6 +715,7 @@ impl ShellTool {
         // And the same Python UTF-8 defaults the native path sets.
         for (var, val) in python_utf8_env(|name| {
             command_environment
+                .as_ref()
                 .and_then(|overrides| overrides.get(name).map(std::ffi::OsString::from))
                 .or_else(|| {
                     command_environment
