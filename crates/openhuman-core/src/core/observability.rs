@@ -18,6 +18,7 @@ pub(crate) mod progress_tracing;
 
 #[path = "observability_channel_message.rs"]
 mod channel_message;
+#[cfg(feature = "crash-reporting")]
 pub use channel_message::is_channel_message_not_found_event;
 
 use std::fmt::Display;
