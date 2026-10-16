@@ -319,5 +319,5 @@ fn committed_tool_calls(history: &[Message]) -> Vec<ToolCallSummary> {
 }
 
 #[cfg(test)]
-#[path = "memory_ingest_tests.rs"]
+#[path = "session_hooks_tests.rs"]
 mod tests;
