@@ -3,7 +3,7 @@
 //! Coding-harness baseline tool (issue #1205). When a plan-mode agent
 //! is ready to hand off to an execution-mode agent, it calls
 //! `plan_exit { plan }`. The tool returns a structured marker AND flips the
-//! calling thread's `RunMode` (`agent::tinyagents::run_mode::set_mode`) back
+//! calling thread's `RunMode` (`threads::run_mode::set_mode`) back
 //! to `Build`, so the very next tool exposure/execution check on that thread
 //! sees every tool again — the actual gating lives in
 //! `PlanModeMiddleware` (wired per-turn in `turn_middleware.rs`), not here;

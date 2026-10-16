@@ -152,7 +152,7 @@ name:
 
 `dispatch.rs` (the shared spawn path every tool above
 calls), `awaiting_user.rs` (the awaiting-user envelope), and
-`worker_thread.rs` (worker thread creation) are `pub(crate)` helpers, not
+`threads/worker_thread.rs` (worker thread creation) are `pub(crate)` helpers, not
 tools. Live harness registrations use typed `ToolDispatch<(),
 OpenHumanRunContext>` wrappers and fork the parent carrier for every child,
 so cancellation, origin, progress, dispatch state, thread, and workspace stay

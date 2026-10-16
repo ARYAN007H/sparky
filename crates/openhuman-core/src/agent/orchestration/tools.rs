@@ -4,7 +4,7 @@
 //!
 //! Tools, by role:
 //! - **Spawn**: `spawn_subagent`, `spawn_async_subagent`,
-//!   `spawn_parallel_agents`, `spawn_worker_thread`.
+//!   `spawn_parallel_agents`, `spawn_worker_thread` (in `tools::impl::threads`).
 //! - **Control**: `steer_subagent`, `continue_subagent`, `close_subagent`,
 //!   `wait_subagent`, `wait` / `wait_loop`, `list_subagents`.
 //! - **Delegation**: `DelegateGraphTool`, `ArchetypeDelegationTool`,

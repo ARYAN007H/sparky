@@ -405,7 +405,7 @@ sits in the app directory shared by all accounts
   `tinymemory-integrations`, `tinymemory-import`; the CortexDB engine is in
   its nested `tinycortex`). Fix engine or lifecycle behavior there.
 - Turn delivery belongs to the agent harness: the session host prelude
-  (`agent/session_host/runtime_session/memory_ingest.rs`), the pack
+  (`memory/lifecycle/session_hooks.rs`), the pack
   middleware and the compaction summarizer live under `agent/`.
 - Chat transcripts are owned by `threads`; this folder only reads them for
   backfill and forgets their memory on delete.
