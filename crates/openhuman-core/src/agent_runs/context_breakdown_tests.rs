@@ -114,21 +114,14 @@ fn report_cache_key_isolated_by_tenant_even_for_identical_config() {
     );
     assert_ne!(
         report_cache_key(alice.clone(), "orchestrator", &config),
-        report_cache_key(alice, "orchestrator", &other_workspace),
+        report_cache_key(alice.clone(), "orchestrator", &other_workspace),
     );
     let mut other_config_path = config.clone();
     other_config_path.config_path = std::path::PathBuf::from("/tmp/other-config.toml");
     assert_ne!(
-        report_cache_key(tenant_for_test("alice"), "orchestrator", &config),
-        report_cache_key(tenant_for_test("alice"), "orchestrator", &other_config_path),
+        report_cache_key(alice.clone(), "orchestrator", &config),
+        report_cache_key(alice, "orchestrator", &other_config_path),
     );
-}
-
-fn tenant_for_test(profile: &str) -> crate::core::runtime::Tenant {
-    crate::core::runtime::Tenant {
-        profile: Some(profile.into()),
-        agent: None,
-    }
 }
 
 #[tokio::test]
