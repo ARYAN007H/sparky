@@ -200,7 +200,10 @@ impl OpenHumanChannelBackend {
         request: tinychannels_bus::ChannelBackendRequest,
     ) -> anyhow::Result<tinychannels_bus::ChannelBackendResult> {
         let Some(callback) = crate::channels::callback_slot::current() else {
-            tracing::debug!(channel, "[channels][backend] no channel callback registered");
+            tracing::debug!(
+                channel,
+                "[channels][backend] no channel callback registered"
+            );
             anyhow::bail!(
                 "{} no channel transport registered",
                 crate::core::observability::BACKEND_UNAVAILABLE_PREFIX
