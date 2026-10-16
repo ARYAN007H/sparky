@@ -8,16 +8,11 @@
 //!
 //! Delivery strategy:
 //!
-//! 1. **Web channel** — always receives the message via the Socket.IO
-//!    event bus (`publish_web_channel_event`). This is the in-app
-//!    experience.
-//! 2. **Active external channel** — if the user has set an active
+//! - **Active external channel** — if the user has set an active
 //!    channel (e.g. `"telegram"`, `"discord"`) AND that channel is in
 //!    the registered channels map, the message is sent there too.
-//!
-//! If the active channel is `"web"` or unset, only web delivery occurs
-//! (step 1). This avoids double-delivering to a channel that doesn't
-//! exist.
+//! - The independent `web_chat::proactive` subscriber always delivers the web
+//!   destination, including when the external channels feature is disabled.
 
 use crate::channels::{Channel, ChannelSendExt, SendMessage};
 use crate::core::events::DomainEvent;
@@ -148,8 +143,6 @@ impl EventHandler<DomainEvent> for ProactiveMessageSubscriber {
         };
 
         let thread_id = format!("proactive:{}", job_name.as_deref().unwrap_or("system"));
-        let request_id = uuid::Uuid::new_v4().to_string();
-
         tracing::debug!(
             source = %source,
             thread_id = %thread_id,
@@ -181,8 +174,7 @@ impl EventHandler<DomainEvent> for ProactiveMessageSubscriber {
                 // with no resolvable target (e.g. Telegram, which has no stored
                 // default chat) are skipped with a warning rather than handed an
                 // empty recipient that would hit the platform API with a blank
-                // chat/channel id (#3794 review — Codex P2). Web delivery above
-                // already happened, so skipping only drops the external echo.
+                // chat/channel id (#3794 review — Codex P2).
                 let Some(recipient) = ch.proactive_target() else {
                     tracing::warn!(
                         source = %source,
@@ -206,7 +198,7 @@ impl EventHandler<DomainEvent> for ProactiveMessageSubscriber {
                 // before handing off to the channel implementation.
                 // Web delivery above is internal and exempt. When
                 // the gate persists an approval row, we keep its
-                // `request_id` so we can record the delivery
+                // request id so we can record the delivery
                 // outcome after `ch.send` returns (issue #2135).
                 let mut approval_request_id: Option<String> = None;
                 let mut approval_gate_for_audit: Option<
