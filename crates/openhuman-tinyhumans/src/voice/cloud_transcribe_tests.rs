@@ -1,4 +1,10 @@
 use super::*;
+use openhuman_embed::__host::core::observability::{
+    is_backend_unavailable_message, is_session_expired_message,
+};
+use openhuman_embed::__host::security::credentials::{
+    api_key::store_api_key, AuthService, APP_SESSION_PROVIDER, DEFAULT_AUTH_PROFILE_NAME,
+};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -10,7 +16,7 @@ fn backend_401_is_tagged_as_session_expiry() {
         false,
     );
     assert!(tagged.starts_with("SESSION_EXPIRED: "));
-    assert!(crate::core::observability::is_session_expired_message(
+    assert!(is_session_expired_message(
         &tagged
     ));
 }
@@ -28,7 +34,7 @@ fn backend_401_with_api_key_does_not_expire_session() {
         true,
     );
     assert!(tagged.starts_with("API_KEY_REJECTED: "));
-    assert!(!crate::core::observability::is_session_expired_message(
+    assert!(!is_session_expired_message(
         &tagged
     ));
 }
@@ -42,10 +48,10 @@ async fn offline_local_session_refuses_without_a_request() {
         config_path: tmp.path().join("config.toml"),
         ..Config::default()
     };
-    crate::security::credentials::AuthService::from_config(&config)
+    AuthService::from_config(&config)
         .store_provider_token(
-            crate::security::credentials::APP_SESSION_PROVIDER,
-            crate::security::credentials::DEFAULT_AUTH_PROFILE_NAME,
+            APP_SESSION_PROVIDER,
+            DEFAULT_AUTH_PROFILE_NAME,
             "desktop.test.local",
             std::collections::HashMap::new(),
             true,
@@ -55,7 +61,7 @@ async fn offline_local_session_refuses_without_a_request() {
         .await
         .unwrap_err();
     assert!(
-        crate::core::observability::is_backend_unavailable_message(&err),
+        is_backend_unavailable_message(&err),
         "{err}"
     );
 }
@@ -70,7 +76,7 @@ async fn api_key_refuses_remote_plaintext_endpoint_before_request() {
         api_url: Some("http://backend.example.test".to_string()),
         ..Config::default()
     };
-    crate::security::credentials::api_key::store_api_key(&config, "test-api-key").unwrap();
+    store_api_key(&config, "test-api-key").unwrap();
 
     let err = transcribe_cloud(&config, "AAAA", &CloudTranscribeOptions::default())
         .await
@@ -97,7 +103,7 @@ async fn api_key_transcribes_via_safe_backend_with_bearer_and_multipart_audio() 
         api_url: Some(server.uri()),
         ..Config::default()
     };
-    crate::security::credentials::api_key::store_api_key(&config, "test-api-key").unwrap();
+    store_api_key(&config, "test-api-key").unwrap();
 
     let outcome = transcribe_cloud(&config, "AQID", &CloudTranscribeOptions::default())
         .await
