@@ -112,8 +112,7 @@ pub fn cli(args: &[String]) -> anyhow::Result<()> {
         // A one-shot command reads the same backend the server would: the
         // resolved storage URL, opened on the core's storage runtime so the
         // backend outlives this call.
-        let provider =
-            crate::core_host::storage::block_on_anyhow(session_store_for_boot())?;
+        let provider = crate::core_host::storage::block_on_anyhow(session_store_for_boot())?;
         log::debug!("[rpc:host] cli: storage-backed session store installed");
         builder = builder.session_store(provider);
     }

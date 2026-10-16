@@ -55,7 +55,9 @@ fn catalog_request(
         .get(slug)
         .filter(|pem| !pem.is_empty())
     {
-        Some(pem) => crate::util::tls::client_with_ca_bundle_with_timeouts(pem, service_key, 30, 10)?,
+        Some(pem) => {
+            crate::util::tls::client_with_ca_bundle_with_timeouts(pem, service_key, 30, 10)?
+        }
         None => crate::config::build_runtime_proxy_client_with_timeouts(service_key, 30, 10),
     };
     Ok(crate::inference::registry::CatalogRequest {

@@ -32,7 +32,9 @@ const MODELS_PATH: &str = "/openai/v1/models";
 /// The registry entry for the managed catalog.
 pub(super) fn entry() -> CatalogEntry {
     let list: CatalogListing = Arc::new(
-        |config: Config, request: CatalogRequest| -> BoxFuture<Result<Outcome<serde_json::Value>, String>> {
+        |config: Config,
+         request: CatalogRequest|
+         -> BoxFuture<Result<Outcome<serde_json::Value>, String>> {
             Box::pin(async move { list_models(&config, request).await })
         },
     );
@@ -121,9 +123,7 @@ pub(super) async fn list_models(
     let (token, session_token) = match listing_auth(check, &request.provider_key) {
         ListingAuth::Session(token) => (token.clone(), true),
         ListingAuth::ProviderKey(key) => {
-            log::debug!(
-                "[tinyhumans][inference] no live session; using the provider-scoped key"
-            );
+            log::debug!("[tinyhumans][inference] no live session; using the provider-scoped key");
             (key, false)
         }
         ListingAuth::Empty(reason) => {

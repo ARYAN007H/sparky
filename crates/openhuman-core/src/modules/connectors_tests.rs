@@ -93,7 +93,10 @@ struct DirectBaseScrub(Vec<(&'static str, Option<std::ffi::OsString>)>);
 
 impl DirectBaseScrub {
     fn new() -> Self {
-        let vars = ["OPENHUMAN_COMPOSIO_DIRECT_BASE_V2", "OPENHUMAN_COMPOSIO_DIRECT_BASE_V3"];
+        let vars = [
+            "OPENHUMAN_COMPOSIO_DIRECT_BASE_V2",
+            "OPENHUMAN_COMPOSIO_DIRECT_BASE_V3",
+        ];
         Self(
             vars.into_iter()
                 .map(|name| {

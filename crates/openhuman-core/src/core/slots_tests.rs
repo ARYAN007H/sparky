@@ -87,7 +87,11 @@ fn a_context_entry_shadows_a_process_entry_in_first() {
     let ctx = CoreContext::for_test(DomainSet::full(), None);
     slot.register_in(ctx.extensions(), "context", 2);
 
-    assert_eq!(slot.first(), Some(1), "outside the context only the process entry exists");
+    assert_eq!(
+        slot.first(),
+        Some(1),
+        "outside the context only the process entry exists"
+    );
     let inside = CoreContext::sync_scope(Arc::clone(&ctx), || {
         (slot.first(), slot.entries_context_first())
     });
