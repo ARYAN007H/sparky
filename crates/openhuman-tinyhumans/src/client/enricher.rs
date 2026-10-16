@@ -9,6 +9,9 @@
 //! | `inference_url` | [`effective_api_url`]`(&config.api_url)` |
 //! | `socket_url` | the control-plane origin as a ready-to-dial Socket.IO URL |
 //! | `tracing_ingest_url` | `<control>/telemetry/langfuse/ingestion` |
+//! | `tracing_otlp_url` | `<control>/telemetry/langfuse/otel/v1/traces` |
+//! | `deployment_environment` | [`deployment_environment`]`(<control>)` |
+//! | `managed_hosts` | [`MANAGED_HOSTS`] |
 //! | `attribution_headers` | [`attribution_headers`](crate::backend::headers::attribution_headers) |
 //! | `product_identity` | [`product_identity`](crate::backend::product::product_identity) |
 //!
@@ -31,6 +34,66 @@ pub const ENRICHER_ID: &str = "tinyhumans";
 /// The backend authenticates the session JWT, injects the Langfuse project
 /// keys and forwards; clients POST here, never to `/api/public/ingestion`.
 pub const TRACING_INGEST_PATH: &str = "/telemetry/langfuse/ingestion";
+
+/// The Langfuse OTLP/HTTP traces route, relative to the control-plane origin.
+pub const TRACING_OTLP_PATH: &str = "/telemetry/langfuse/otel/v1/traces";
+
+/// The domain the deployed backends live under. A host outside it cannot be
+/// one of ours, so it cannot be staging however it is spelled.
+const DEPLOYMENT_DOMAIN: &str = "tinyhumans.ai";
+
+/// The canonical production API host.
+const PRODUCTION_HOST: &str = "api.tinyhumans.ai";
+
+/// Host patterns this layer treats as its managed backend (exact host or
+/// `.suffix`), including the legacy product hostnames and the bare
+/// `openhuman` name used by compose setups. The core matches provider and
+/// migration endpoints against these through
+/// `ResolvedEndpoints::is_managed_host`.
+pub const MANAGED_HOSTS: [&str; 5] = [
+    "api.openhuman.ai",
+    ".openhuman.ai",
+    "api.tinyhumans.ai",
+    ".tinyhumans.ai",
+    "openhuman",
+];
+
+/// Classify a control-plane origin into the deployment bucket the core's
+/// tracing push gate understands: `production` (the canonical API host),
+/// `staging` (a `staging`-labelled host under the deployment domain) or
+/// `external` (anything else, including unparseable input and non-HTTPS).
+///
+/// Loopback and private hosts are classified `development` by the core before
+/// it consults this value. The host is parsed, never substring-matched:
+/// `https://staging-attacker.invalid` is external, so the fail-closed gate
+/// never pushes a session token to a host this tree does not own.
+pub fn deployment_environment(base: &str) -> &'static str {
+    let Ok(parsed) = url::Url::parse(base) else {
+        return "external";
+    };
+    if parsed.scheme() != "https" {
+        return "external";
+    }
+    let Some(url::Host::Domain(host)) = parsed.host() else {
+        return "external";
+    };
+    let host = host.to_ascii_lowercase();
+    let under_deployment_domain =
+        host == DEPLOYMENT_DOMAIN || host.ends_with(&format!(".{DEPLOYMENT_DOMAIN}"));
+    // Leftmost label only, so `staging-api...` and `staging...` match while
+    // `api-staging-mirror...` does not sneak in on a substring.
+    let leftmost_is_staging = host
+        .split('.')
+        .next()
+        .is_some_and(|label| label == "staging" || label.starts_with("staging-"));
+    if host == PRODUCTION_HOST {
+        "production"
+    } else if under_deployment_domain && leftmost_is_staging {
+        "staging"
+    } else {
+        "external"
+    }
+}
 
 /// The Socket.IO handshake URL for an HTTP(S) control-plane origin
 /// (`https://host` -> `wss://host/socket.io/?EIO=4&transport=websocket`).
@@ -73,6 +136,9 @@ pub fn resolve(config: &Config) -> ResolvedEndpoints {
     ResolvedEndpoints {
         socket_url: Some(socket_url_for(&control)),
         tracing_ingest_url: Some(join_url(&control, TRACING_INGEST_PATH)),
+        tracing_otlp_url: Some(join_url(&control, TRACING_OTLP_PATH)),
+        deployment_environment: Some(deployment_environment(&control).to_string()),
+        managed_hosts: MANAGED_HOSTS.iter().map(|h| (*h).to_string()).collect(),
         inference_url: Some(effective_api_url(&config.api_url)),
         attribution_headers: header_pairs(&headers),
         product_identity: Some(product_identity().as_str().to_owned()),
