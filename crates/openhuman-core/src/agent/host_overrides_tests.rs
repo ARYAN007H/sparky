@@ -3,10 +3,7 @@ use async_trait::async_trait;
 
 struct Hook;
 #[async_trait]
-impl PostTurnHook for Hook {
-    fn name(&self) -> &str {
-        "local"
-    }
+impl tinyagents_harness::host::LearningSink for Hook {
     async fn on_turn_complete(&self, _: &tinyagents_harness::host::TurnSummary) -> anyhow::Result<()> {
         Ok(())
     }
