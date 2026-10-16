@@ -98,6 +98,11 @@ export const config: Options.Testrunner & Record<string, unknown> = {
   capabilities: [
     {
       'tauri:options': { application: linuxAppPath() },
+      // WebKitGTK shipped by Ubuntu 22.04 does not support WebDriver BiDi.
+      // WDIO 9 negotiates it by default; tauri-driver forwards that capability
+      // to WebKitWebDriver, which never completes session creation. Keep this
+      // native driver on the classic WebDriver protocol.
+      'wdio:enforceWebDriverClassic': true,
       // WDIO's per-capability ceiling is required by the Tauri driver.
       // Without it, the runner can schedule one WebKit session per spec
       // despite the global maxInstances: 1, causing simultaneous app
