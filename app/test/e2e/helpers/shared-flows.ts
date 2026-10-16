@@ -948,7 +948,7 @@ export async function performFullLogin(
     // reached the mock but failed to complete.
     const authRequests = getRequestLog()
       .filter(entry => typeof entry.url === 'string' && entry.url.startsWith('/auth/'))
-      .map(entry => `${entry.method} ${entry.url.split('?')[0]}`);
+      .map(entry => `${entry.method} ${entry.url.split('?')[0]} -> ${entry.status ?? 'pending'}`);
     console.error(
       `${logPrefix} auth bootstrap failed; mock auth endpoints=${JSON.stringify(authRequests)}`
     );
