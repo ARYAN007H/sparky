@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use anyhow::Context;
 
-use crate::cron::llm_gate::LlmPermit;
+use crate::platform::llm_gate::LlmPermit;
 
 use super::super::envelope::TriggerEnvelope;
 use super::super::events;
@@ -89,7 +89,7 @@ pub async fn run_triage(
     let local = build_local_provider_with_config(ctx, &config);
 
     let outcome = run_triage_with_arms_inner(cloud, local, envelope, Some(retry_state()), || {
-        crate::cron::llm_gate::wait_for_capacity()
+        crate::platform::llm_gate::wait_for_capacity()
     })
     .await;
     if let Err(err) = &outcome {
