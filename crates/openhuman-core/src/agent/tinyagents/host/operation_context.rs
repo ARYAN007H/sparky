@@ -11,13 +11,22 @@ use std::{sync::Arc, time::Duration};
 /// [`OpenHumanRunContext::into_tinyagents`] with `RunContext::with_host`.
 /// It replaces the former per-value task-locals, which do not cross a module
 /// boundary.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Clone, Default, PartialEq, Eq)]
 pub struct OpenHumanRunExt {
     /// Recency window narrowing integration task-fetch tools (morning
     /// briefing only); `None` leaves them unbounded.
     pub task_recency_window: Option<Duration>,
     /// Explicit child-process environment supplied by the embedding host.
     pub command_environment: Option<Arc<std::collections::BTreeMap<String, String>>>,
+}
+
+impl std::fmt::Debug for OpenHumanRunExt {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OpenHumanRunExt")
+            .field("task_recency_window", &self.task_recency_window)
+            .field("command_environment", &self.command_environment.is_some())
+            .finish()
+    }
 }
 
 /// Reads the explicit command environment from a tool's run context.
