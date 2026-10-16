@@ -42,7 +42,7 @@ const rustE2eRunner = fileURLToPath(
   new URL("../test-rust-e2e.sh", import.meta.url),
 );
 
-test("Linux container workflows stage TinyBus fixtures below sticky /tmp", () => {
+test("Linux container workflows stage TinyBus fixtures under the root-owned container home", () => {
   for (const workflow of [
     "../../.github/workflows/test-reusable.yml",
     "../../.github/workflows/ci-full.yml",
@@ -52,7 +52,7 @@ test("Linux container workflows stage TinyBus fixtures below sticky /tmp", () =>
     const source = readFileSync(new URL(workflow, import.meta.url), "utf8");
     assert.match(
       source,
-      /\/tmp\/openhuman-test-modules-\$\{GITHUB_RUN_ID\}-\$\{GITHUB_RUN_ATTEMPT\}/,
+      /\/root\/\.cache\/openhuman-test-modules-\$\{GITHUB_RUN_ID\}-\$\{GITHUB_RUN_ATTEMPT\}/,
       workflow,
     );
     assert.doesNotMatch(source, /\/opt\/openhuman-test-modules/, workflow);
