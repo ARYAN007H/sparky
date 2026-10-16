@@ -23,7 +23,7 @@
 mod environment;
 mod journal_export;
 
-pub(crate) use environment::{environment_for_base, ingestion_url, otlp_url, skip_push};
+pub(crate) use environment::{environment_for_base, otlp_url, skip_push};
 pub(crate) use journal_export::journal_push_ready;
 
 #[cfg(test)]

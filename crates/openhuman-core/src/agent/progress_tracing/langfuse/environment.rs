@@ -1,23 +1,10 @@
 //! Backend-host resolution and the deployment-environment push gate for the
-//! Langfuse exporter: where the ingestion proxy lives, which environment the
+//! Langfuse exporter: where the OTLP proxy lives, which environment the
 //! resolved host belongs to, and whether that environment may push at all.
 
 use crate::config::Config;
 
 use super::LOG_TARGET;
-
-/// The Langfuse ingestion URL the host resolved
-/// (`config.resolved_endpoints.tracing_ingest_url`), so the host always
-/// matches wherever the app's domain calls go (staging, prod, or a custom
-/// `api_url` override). Empty when no host resolved one; callers treat a
-/// non-`http` URL as "proxy unavailable" and skip the push.
-pub(crate) fn ingestion_url(config: &Config) -> String {
-    config
-        .resolved_endpoints
-        .tracing_ingest_url
-        .clone()
-        .unwrap_or_default()
-}
 
 /// The OTLP/HTTP traces URL the host resolved
 /// (`config.resolved_endpoints.tracing_otlp_url`). Empty when no host resolved
@@ -52,7 +39,7 @@ pub(crate) fn otlp_url(config: &Config) -> String {
 /// domain, anchored to its own deployment domain so the classifier fails
 /// *closed*.
 ///
-/// An unparseable URL is external — the fail-closed default. `ingestion_url`
+/// An unparseable URL is external — the fail-closed default. `otlp_url`
 /// can return a non-URL placeholder when no backend host resolves, and the
 /// caller checks `starts_with("http")` separately; classifying that as
 /// anything pushable would defeat the gate.
