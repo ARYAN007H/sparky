@@ -243,15 +243,10 @@ impl OpenHumanSessionHost {
     /// Hands the host environment of the turns this session runs (shared
     /// model budget, cancellation, deadline, hooks, tool-belt authority).
     ///
-    /// Call it after building the session and before each turn: live host and
-    /// agent hooks are refreshed, and the tool belt authority is read when the
-    /// runtime session is first created.
+    /// Call it after building the session and before its first turn: the
+    /// completed-turn callbacks join the learning sink's set and the tool belt
+    /// authority is read when the runtime session is first created.
     pub fn set_host_env(&mut self, env: crate::agent::turn_env::HostTurnEnv) {
-        // A session can be resumed after an embedder or agent removes a live
-        // hook. Refresh the registry snapshot on every turn instead of keeping
-        // the callbacks captured when this session was first built.
-        let dispatch = crate::core::runtime::DispatchCtx::from_weak(env.core.as_ref());
-        self.post_turn_hooks = crate::agent::hooks::embedder_post_turn_hooks_in(&dispatch);
         for hook in env.hooks.learning_hooks() {
             if !self
                 .post_turn_hooks
