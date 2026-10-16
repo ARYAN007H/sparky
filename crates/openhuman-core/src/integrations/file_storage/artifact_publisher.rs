@@ -143,12 +143,23 @@ pub(crate) fn link_seconds(
     }
 }
 
+/// Whether `err` is the backend refusing the request's values (a 400 or 422),
+/// as opposed to a transport, authentication or server failure. The
+/// integration client reports a status as "Backend returned <code> <reason>".
+fn is_validation_rejection(err: &anyhow::Error) -> bool {
+    let message = err.to_string();
+    ["Backend returned 400 ", "Backend returned 422 "]
+        .iter()
+        .any(|prefix| message.contains(prefix))
+}
+
 impl StorageArtifactPublisher {
     /// A presigned link for `file_id` lasting `seconds`. If the backend
-    /// rejects that lifetime, one retry asks for its default lifetime instead.
+    /// rejects that lifetime (a 400/422), one retry asks for its default
+    /// lifetime instead; any other failure is returned as it is.
     async fn private_link(&self, file_id: &str, seconds: u64) -> anyhow::Result<LinkResponse> {
         let route = file_path(file_id, "/link");
-        match self
+        let first = match self
             .client
             .post::<LinkResponse>(
                 &self.approval,
@@ -157,20 +168,20 @@ impl StorageArtifactPublisher {
             )
             .await
         {
-            Ok(link) => Ok(link),
-            Err(first) => {
-                tracing::warn!(
-                    file_id,
-                    seconds,
-                    err = %first,
-                    "[file_storage] link with a set lifetime refused; retrying with the default"
-                );
-                self.client
-                    .post::<LinkResponse>(&self.approval, &route, &json!({}))
-                    .await
-                    .map_err(|e| anyhow::anyhow!("link generation failed: {e}"))
-            }
-        }
+            Ok(link) => return Ok(link),
+            Err(err) if is_validation_rejection(&err) => err,
+            Err(err) => return Err(anyhow::anyhow!("link generation failed: {err}")),
+        };
+        tracing::warn!(
+            file_id,
+            seconds,
+            err = %first,
+            "[file_storage] link with a set lifetime refused; retrying with the default"
+        );
+        self.client
+            .post::<LinkResponse>(&self.approval, &route, &json!({}))
+            .await
+            .map_err(|e| anyhow::anyhow!("link generation failed: {e}"))
     }
 
     /// Delete an upload nothing points at. Best-effort.

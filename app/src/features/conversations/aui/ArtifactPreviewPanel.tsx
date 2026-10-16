@@ -620,7 +620,9 @@ function EditableTextViewer({
   const [copied, setCopied] = useState(false);
   // Only kinds whose record holds the content itself can take a new version;
   // a `file` record holds a path, and its text here is read off that file.
-  const editable = EDITABLE_KINDS.has(kind);
+  // A body that failed to load is not the artifact's content: editing it
+  // would save the empty text over it.
+  const editable = EDITABLE_KINDS.has(kind) && !error;
   const autosave = useArtifactAutosave(artifact.artifactId, body, version, editable);
 
   // Sync when body changes (switching artifact tabs)
@@ -725,7 +727,9 @@ function EditableTextViewer({
           <iframe
             srcDoc={editedBody}
             className="w-full flex-1 border-0"
-            sandbox="allow-scripts allow-same-origin"
+            // Scripts run, but in an opaque origin: the agent's HTML cannot
+            // reach the app window, its storage or the Tauri bridge.
+            sandbox="allow-scripts"
             title="HTML preview"
           />
         ) : isMarkdown ? (

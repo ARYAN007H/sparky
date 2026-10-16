@@ -2175,9 +2175,11 @@ const Conversations = ({
         a =>
           // Ready artifacts render inside their turn's reply, placed by the
           // core's artifact rows (`MessageArtifactCards`); so does an
-          // in-progress one whose event names its turn. Only an in-progress
-          // artifact with no turn (an older core) waits at the end.
-          !a.ownerRequestId && !a.toolCallId && a.status === 'in_progress'
+          // in-progress one whose event names its turn. Here wait an
+          // in-progress artifact with no turn (an older core) and every failed
+          // one, which needs its Retry button.
+          !a.toolCallId &&
+          (a.status === 'failed' || (!a.ownerRequestId && a.status === 'in_progress'))
       )
     : [];
   const liveArtifactDeck =

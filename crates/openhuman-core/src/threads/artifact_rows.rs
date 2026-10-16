@@ -37,8 +37,8 @@ pub const ARTIFACT_MESSAGE_TYPE: &str = "artifact";
 
 const LOG_PREFIX: &str = "[threads:artifact-rows]";
 
-/// Most artifacts a thread is backfilled for in one pass.
-const BACKFILL_LIMIT: usize = 1_000;
+/// Artifacts read per page when a thread is backfilled.
+const BACKFILL_PAGE: usize = 1_000;
 
 /// The row id for an artifact. One row per artifact: a new version, a retry or
 /// a re-delivered ready event finds the row already there.
@@ -173,13 +173,21 @@ pub async fn backfill_artifact_rows(
     thread_id: &str,
     messages: &[ConversationMessage],
 ) -> Result<Vec<ConversationMessage>, String> {
-    let (artifacts, _) = crate::agent::artifacts::store::list_artifacts(
-        workspace_dir,
-        0,
-        BACKFILL_LIMIT,
-        Some(thread_id),
-    )
-    .await?;
+    let mut artifacts = Vec::new();
+    loop {
+        let (page, total) = crate::agent::artifacts::store::list_artifacts(
+            workspace_dir,
+            artifacts.len(),
+            BACKFILL_PAGE,
+            Some(thread_id),
+        )
+        .await?;
+        let empty = page.is_empty();
+        artifacts.extend(page);
+        if empty || artifacts.len() >= total {
+            break;
+        }
+    }
     let mut written = Vec::new();
     for row in missing_rows(messages, &artifacts) {
         let stored = conversations::blocking::append_message(

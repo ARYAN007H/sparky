@@ -2996,6 +2996,9 @@ const chatRuntimeSlice = createSlice({
       state.pendingPlanReviewByThread = {};
       state.pendingWorkflowProposalsByThread = {};
       state.artifactsByThread = {};
+      // The preview tabs name artifacts that are gone now.
+      state.openArtifactIds = [];
+      state.activeArtifactId = null;
       state.queueStatusByThread = {};
       state.pendingSendThreadIds = {};
     },

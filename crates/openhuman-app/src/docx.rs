@@ -12,14 +12,20 @@ use std::path::Path;
 pub fn extract_text(path: &Path) -> Result<String, String> {
     use std::process::Command;
 
+    // Text runs (`<w:t>`) are joined as they are: formatting can split one
+    // word across several runs. Paragraphs, line breaks and tabs become
+    // whitespace; every other tag is dropped.
     let script = r#"
-import sys, zipfile, re
+import sys, zipfile, re, html
 try:
     with zipfile.ZipFile(sys.argv[1]) as z:
         xml = z.read('word/document.xml').decode('utf-8')
-    text = re.sub(r'<[^>]+>', ' ', xml)
-    text = re.sub(r'\s+', ' ', text).strip()
-    sys.stdout.write(text)
+    xml = re.sub(r'</w:p>', '\n', xml)
+    xml = re.sub(r'<w:(br|cr)\b[^>]*/>', '\n', xml)
+    xml = re.sub(r'<w:tab\b[^>]*/>', '\t', xml)
+    text = html.unescape(re.sub(r'<[^>]+>', '', xml))
+    lines = [re.sub(r'[ \t]+', ' ', line).strip() for line in text.split('\n')]
+    sys.stdout.write('\n'.join(line for line in lines if line))
 except Exception:
     sys.exit(1)
 "#;

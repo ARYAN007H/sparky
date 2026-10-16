@@ -300,3 +300,41 @@ async fn an_upload_that_cannot_be_linked_is_deleted() {
         .unwrap_err();
     assert!(err.to_string().contains("link generation failed"), "{err}");
 }
+
+#[tokio::test]
+async fn a_server_failure_on_the_link_is_not_retried() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/agent-integrations/file-storage/files"))
+        .respond_with(uploaded(None))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/agent-integrations/file-storage/files/file-1/link"))
+        .respond_with(
+            ResponseTemplate::new(503)
+                .set_body_json(json!({ "success": false, "error": "unavailable" })),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("DELETE"))
+        .and(path("/agent-integrations/file-storage/files/file-1"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "success": true, "data": { "deleted": true }
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let record = ArtifactRecord::new("a-1", "T", ArtifactKind::Text, "x", "agent", 1);
+    let err = publisher(server.uri(), AutonomyLevel::Full)
+        .publish(
+            &record,
+            record.latest().unwrap(),
+            &PublishOptions::default(),
+        )
+        .await
+        .unwrap_err();
+    assert!(err.to_string().contains("link generation failed"), "{err}");
+}

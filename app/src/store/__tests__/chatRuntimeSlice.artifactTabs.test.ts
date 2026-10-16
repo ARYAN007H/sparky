@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import reducer, { activateArtifactTab, closeArtifactTab, openArtifact } from '../chatRuntimeSlice';
+import reducer, {
+  activateArtifactTab,
+  clearAllChatRuntime,
+  closeArtifactTab,
+  openArtifact,
+} from '../chatRuntimeSlice';
 
 function seeded() {
   let s = reducer(undefined, openArtifact('a-1'));
@@ -17,6 +22,12 @@ describe('chatRuntimeSlice — artifact tab model (#1535)', () => {
     const s2 = reducer(s, openArtifact('a-1'));
     expect(s2.openArtifactIds).toEqual(['a-1', 'a-2']);
     expect(s2.activeArtifactId).toBe('a-1');
+  });
+
+  it('a full runtime reset closes every preview tab', () => {
+    const s = reducer(seeded(), clearAllChatRuntime());
+    expect(s.openArtifactIds).toEqual([]);
+    expect(s.activeArtifactId).toBeNull();
   });
 
   it('activateArtifactTab switches the active tab', () => {

@@ -1,6 +1,6 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { invoke } from '@tauri-apps/api/core';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -16,9 +16,11 @@ vi.mock('../../../lib/i18n/I18nContext', () => ({
 
 const MD = '# Hello\n\nThis is **bold** text.\n';
 
-function renderPanel(kind: string, body: string) {
+function renderPanel(kind: string, body: string, failWith?: string) {
   // Stub the body fetch BEFORE mounting so the panel's effect resolves it.
-  vi.mocked(invoke).mockResolvedValue({ kind, title: 'Notes', version: 1, body, is_text: true });
+  if (failWith) vi.mocked(invoke).mockRejectedValue(failWith);
+  else
+    vi.mocked(invoke).mockResolvedValue({ kind, title: 'Notes', version: 1, body, is_text: true });
   const store = configureStore({ reducer: { chatRuntime: chatRuntimeReducer } });
   store.dispatch(
     upsertArtifactReadyForThread({
@@ -69,8 +71,17 @@ describe('ArtifactPreviewPanel — preview rendering by kind (#1535)', () => {
 
     const frame = await screen.findByTitle('HTML preview');
     expect(frame.tagName).toBe('IFRAME');
-    expect(frame.getAttribute('sandbox')).toBe('allow-scripts allow-same-origin');
+    expect(frame.getAttribute('sandbox')).toBe('allow-scripts');
     expect(frame.getAttribute('srcdoc')).toContain('<h1>Hi</h1>');
+  });
+
+  it('keeps the editor read-only when the body failed to load', async () => {
+    renderPanel('markdown', '', 'artifact unreadable');
+
+    expect(await screen.findByText('artifact unreadable')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Code/ }));
+    // Typing here would save the empty text over the artifact.
+    expect((screen.getByRole('textbox') as HTMLTextAreaElement).readOnly).toBe(true);
   });
 
   it('still renders plain text kind as raw preformatted source', async () => {

@@ -55,27 +55,9 @@ export function ArtifactCardAdapter({
         ? t('chat.artifact.failed')
         : '';
 
-  const handleClick = () => {
-    if (isReady && onOpenPreview) {
-      onOpenPreview(artifact.artifactId);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      handleClick();
-    }
-  };
-
+  // The card's own button is the one control that opens the preview.
   return (
-    <div
-      role={isReady && onOpenPreview ? 'button' : undefined}
-      tabIndex={isReady && onOpenPreview ? 0 : undefined}
-      onClick={handleClick}
-      onKeyDown={isReady && onOpenPreview ? handleKeyDown : undefined}
-      className={'flex flex-col items-start gap-1.5' + (isReady ? ' cursor-pointer' : '')}
-      data-testid="artifact-card-adapter">
+    <div className="flex flex-col items-start gap-1.5" data-testid="artifact-card-adapter">
       <ArtifactCard
         title={artifact.title}
         meta={meta}

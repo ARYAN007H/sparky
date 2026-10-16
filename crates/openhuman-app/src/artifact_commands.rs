@@ -59,14 +59,36 @@ pub struct ArtifactBodyResult {
     pub is_text: bool,
 }
 
+/// Largest file the preview reads as text. A bigger file shows as a file
+/// (metadata and download) without being loaded into memory.
+const PREVIEW_MAX_BYTES: u64 = 10 * 1024 * 1024;
+
+/// An artifact id is one file name in the versioned store: anything that could
+/// name another file (a separator, `..`, a drive prefix) is refused.
+fn check_artifact_id(artifact_id: &str) -> Result<(), String> {
+    let id = artifact_id.trim();
+    if id.is_empty() || id.starts_with('.') || id.contains(['/', '\\', ':', '\0']) {
+        return Err(format!("invalid artifact id {artifact_id:?}"));
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn read_artifact_body(artifact_id: String) -> Result<ArtifactBodyResult, String> {
     let config = openhuman_rpc::embed::config::load_config_with_timeout().await?;
-    let path = config
-        .workspace_dir
+    read_body_in(&config.workspace_dir, &artifact_id).await
+}
+
+/// [`read_artifact_body`] for a given workspace.
+async fn read_body_in(
+    workspace_dir: &Path,
+    artifact_id: &str,
+) -> Result<ArtifactBodyResult, String> {
+    check_artifact_id(artifact_id)?;
+    let artifact_id = artifact_id.trim();
+    let path = workspace_dir
         .join("artifacts/versioned")
-        .join(&artifact_id)
-        .with_extension("json");
+        .join(format!("{artifact_id}.json"));
     let json = tokio::fs::read_to_string(&path)
         .await
         .map_err(|e| format!("artifact {artifact_id} not found: {e}"))?;
@@ -91,8 +113,15 @@ pub async fn read_artifact_body(artifact_id: String) -> Result<ArtifactBodyResul
     // Truly binary files stay as paths — the panel shows metadata + download.
     if kind == "file" && !body.is_empty() {
         let file_path = PathBuf::from(&body);
+        let small_enough = tokio::fs::metadata(&file_path)
+            .await
+            .is_ok_and(|meta| meta.len() <= PREVIEW_MAX_BYTES);
         // First pass: try the native UTF-8 read (text files like .md, .txt)
-        match tokio::fs::read(&file_path).await {
+        match if small_enough {
+            tokio::fs::read(&file_path).await
+        } else {
+            Err(std::io::Error::other("too large to preview"))
+        } {
             Ok(bytes) => {
                 let probe = &bytes[..bytes.len().min(8192)];
                 if !probe.contains(&0) && std::str::from_utf8(probe).is_ok() {
@@ -105,7 +134,10 @@ pub async fn read_artifact_body(artifact_id: String) -> Result<ArtifactBodyResul
             Err(_) => {}
         }
         // If still no text and it's a .docx, try to extract text via Python
-        if !is_text && file_path.extension().and_then(|e| e.to_str()) == Some("docx") {
+        if !is_text
+            && small_enough
+            && file_path.extension().and_then(|e| e.to_str()) == Some("docx")
+        {
             if let Ok(text) = crate::docx::extract_text(&file_path) {
                 if !text.is_empty() {
                     body = text;
