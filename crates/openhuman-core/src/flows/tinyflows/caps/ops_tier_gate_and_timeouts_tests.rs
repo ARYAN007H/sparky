@@ -41,7 +41,7 @@ async fn one_live_capability_observes_full_readonly_full_updates() {
     use crate::security::AutonomyLevel;
 
     let dir = tempfile::tempdir().unwrap();
-    let mut config = persisted_tier_config(dir.path(), true, AutonomyLevel::Full);
+    let config = persisted_tier_config(dir.path(), true, AutonomyLevel::Full);
     save_tier_config(&config).await;
     let ctx = live_tier_context(&config);
     let mut baseline = SecurityPolicy::from_config(

@@ -61,7 +61,14 @@ impl CodeRunner for OpenHumanCode {
         // Autonomy-tier gate (Phase 2): sandboxed arbitrary-code execution is
         // Write-class. A read-only run `Block`s here and never spawns anything;
         // Supervised/Full fall through to the ApprovalGate below.
-        let tier_decision = enforce_node_tier_gate(&self.security, CommandClass::Write, "code")?;
+        let tier_decision = enforce_current_node_tier_gate(
+            &self.ctx,
+            &self.config,
+            &self.security,
+            CommandClass::Write,
+            "code",
+        )
+        .await?;
 
         // Approval gate (mirrors OpenHumanTools/OpenHumanHttp): `gate_call_for_tier`
         // is what turns a Supervised-tier `Prompt` decision into a real human
