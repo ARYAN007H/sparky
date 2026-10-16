@@ -415,6 +415,7 @@ impl SpawnAsyncSubagentTool {
                     worktree_action_dir: background_worktree_action_dir,
                     workspace_descriptor: background_workspace_descriptor,
                     run_queue: Some(task_queue),
+                    message_run_queue: None,
                 };
 
                 let result = crate::agent::subagent_host::run_async_spawn_via_driver_tool(

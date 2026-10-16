@@ -150,6 +150,7 @@ pub(crate) async fn run_chat_turn_graph(graph: ChatTurnGraph) -> Result<Tinyagen
             context_window: graph.context_window,
             // Mid-flight steering from the session's run queue.
             run_queue: graph.run_queue,
+            message_run_queue: None,
             // `ask_user_clarification` pauses this turn: the turn returns the
             // question as `outcome.text`, the caller ends the turn on it, and the
             // user's next message is the answer. No resume plumbing is needed at

@@ -415,6 +415,7 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
         worktree_action_dir,
         workspace_descriptor: parent_workspace_descriptor,
         run_queue: None,
+        message_run_queue: None,
     };
 
     let run =

@@ -402,6 +402,7 @@ impl AgentOrchestrationSession {
             // cooperative `CancellationToken` and an `AbortHandle` below, which
             // is what `abort_all` uses.
             run_queue: None,
+            message_run_queue: None,
         };
 
         let session = self.clone();

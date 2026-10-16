@@ -283,6 +283,7 @@ fn delegation_subagent_options(
         worktree_action_dir,
         workspace_descriptor,
         run_queue: None,
+        message_run_queue: None,
     }
 }
 

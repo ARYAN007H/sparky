@@ -335,6 +335,7 @@ impl SpawnWorkerThreadTool {
             worktree_action_dir,
             workspace_descriptor,
             run_queue: None,
+            message_run_queue: None,
         };
 
         tracing::debug!(
