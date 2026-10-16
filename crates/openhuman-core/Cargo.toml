@@ -222,9 +222,8 @@ tinyconnectors-bus = { path = "../../vendor/tinyconnectors/crates/tinyconnectors
 
 
 
-# tinymcp: pure tool-UI rules only (`tinymcp::ui`). The MCP runtime itself runs
-# as a module behind `tinymcp-bus`.
-tinymcp = { path = "../../vendor/tinymcp/crates/tinymcp", default-features = false, features = ["ui"] }
+# tinymcp's contract, including the pure tool-UI rules (`tinymcp_bus::ui`). The
+# MCP runtime itself runs as a module behind it.
 tinymcp-bus = { path = "../../vendor/tinymcp/crates/tinymcp-bus", features = ["schemars"] }
 # The transport-free channel vocabulary: inbound envelopes, outbound intents,
 # the config schema, controller metadata and relay frames. UNCONDITIONAL — `DomainEvent` embeds
