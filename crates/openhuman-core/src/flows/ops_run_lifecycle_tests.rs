@@ -116,6 +116,41 @@ async fn cancel_observed_parked_does_not_tear_down_a_resume_starting() {
 }
 
 #[tokio::test]
+async fn dropping_finalizer_for_terminal_run_does_not_rewrite_flow_summary() {
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let flow = store::create_flow(
+        &config,
+        "terminal-finalizer-race".to_string(),
+        structurally_valid_graph(trigger_only_graph()),
+        false,
+        true,
+    )
+    .unwrap();
+    let run_id = "terminal-finalizer-race-run";
+    insert_parked_run(&config, &flow.id, run_id);
+    assert!(store::finish_flow_run(
+        &config,
+        run_id,
+        "completed",
+        &Utc::now().to_rfc3339(),
+        &[],
+        &[],
+        None,
+        None,
+    )
+    .unwrap());
+
+    let config = Arc::new(config);
+    drop(RunRowFinalizer::new(config.clone(), run_id, &flow.id));
+
+    let row = store::get_flow_run(&config, run_id).unwrap().unwrap();
+    assert_eq!(row.status, "completed");
+    let flow = store::get_flow(&config, &flow.id).unwrap().unwrap();
+    assert!(flow.last_status.is_none());
+}
+
+#[tokio::test]
 async fn flows_duplicate_missing_flow_errors() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
