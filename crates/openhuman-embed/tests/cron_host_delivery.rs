@@ -130,11 +130,24 @@ fn a_library_agents_scheduled_reply_is_handed_to_the_host() {
                 .expect("the stretch turn runs");
 
             let jobs = runtime.cron().list().expect("scheduled job is stored");
+            let tool_messages = common::chat_requests(&provider)
+                .await
+                .into_iter()
+                .flat_map(|request| {
+                    let body: serde_json::Value = serde_json::from_slice(&request.body).unwrap();
+                    body["messages"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .filter(|message| message["role"] == "tool")
+                        .map(|message| message["content"].clone())
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>();
             assert_eq!(
                 jobs.len(),
                 1,
-                "{jobs:?}; requests: {:#?}",
-                common::chat_requests(&provider).await
+                "{jobs:?}; tool responses: {tool_messages:?}"
             );
             let job = &jobs[0];
             assert_eq!(job.name, "stretch");
