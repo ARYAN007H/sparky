@@ -125,3 +125,7 @@ pub fn remove_orphaned_connector_files(workspace_dir: &Path) {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "state_tests.rs"]
+mod tests;

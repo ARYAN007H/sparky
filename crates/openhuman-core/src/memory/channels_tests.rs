@@ -12,6 +12,21 @@ fn records_threads_per_channel_case_insensitively() {
     assert!(threads_of(tmp.path(), "web").is_empty());
 }
 
+#[test]
+fn corrupt_channel_thread_file_is_set_aside() {
+    let tmp = tempfile::tempdir().unwrap();
+    let file = path(tmp.path());
+    std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+    std::fs::write(&file, b"{\"telegram\":[").unwrap();
+
+    assert!(threads_of(tmp.path(), "telegram").is_empty());
+    assert!(!file.exists(), "corrupt state must not be silently replaced");
+    assert_eq!(
+        std::fs::read(file.with_extension("json.corrupt")).unwrap(),
+        b"{\"telegram\":["
+    );
+}
+
 #[tokio::test]
 async fn a_channel_forgotten_while_signed_out_queues_each_thread_it_owned() {
     use crate::memory::deletion::{pending, PendingDeletion};
