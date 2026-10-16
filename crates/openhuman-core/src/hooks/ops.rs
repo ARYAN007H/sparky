@@ -55,10 +55,10 @@ pub async fn init(ctx: &DispatchCtx, config: &crate::config::schema::Config) {
         crate::agent::hooks::replace_embedder_tool_hook("configured_hooks", None);
         return;
     }
-    crate::agent::hooks::replace_embedder_tool_hook(
-        "configured_hooks",
-        Some(std::sync::Arc::clone(super::host::engine())),
-    );
+    let hook: std::sync::Arc<
+        dyn tinyagents_hooks::tool::ToolHook<crate::agent::tinyagents::host::OpenHumanRunContext>,
+    > = super::host::engine().clone();
+    crate::agent::hooks::replace_embedder_tool_hook("configured_hooks", Some(hook));
 }
 
 fn workspace_roots(config: &crate::config::schema::Config) -> Vec<PathBuf> {
