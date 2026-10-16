@@ -1,7 +1,7 @@
 //! Operator adapters installed once, before the SaaS profile host boots.
 
 use super::{ProfileError, ProfileRuntimeBuilder, SaasConfig};
-use crate::seams::{ToolHook, ToolHookContext};
+use crate::seams::{OpenHumanRunContext, ToolHook, ToolHookContext};
 use crate::{
     HostTools, HostTurnTools, PermissionFuture, PermissionLevel, ToolScopeSpec, TurnContext,
 };

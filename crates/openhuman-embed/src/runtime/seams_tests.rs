@@ -93,10 +93,18 @@ impl ToolHook<OpenHumanRunContext> for NamedToolHook {
     fn name(&self) -> &str {
         self.0
     }
-    async fn before_tool(&self, _context: &ToolHookContext) -> anyhow::Result<()> {
+    async fn before_tool(
+        &self,
+        _: &OpenHumanRunContext,
+        _context: &ToolHookContext,
+    ) -> anyhow::Result<()> {
         Ok(())
     }
-    async fn after_tool(&self, _context: &ToolHookContext) -> anyhow::Result<()> {
+    async fn after_tool(
+        &self,
+        _: &OpenHumanRunContext,
+        _context: &ToolHookContext,
+    ) -> anyhow::Result<()> {
         Ok(())
     }
 }

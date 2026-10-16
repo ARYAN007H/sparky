@@ -48,7 +48,11 @@ impl ToolHook<OpenHumanRunContext> for Observer {
     fn name(&self) -> &str {
         "same-policy-name"
     }
-    async fn before_tool(&self, ctx: &ToolHookContext) -> anyhow::Result<()> {
+    async fn before_tool(
+        &self,
+        _: &OpenHumanRunContext,
+        ctx: &ToolHookContext,
+    ) -> anyhow::Result<()> {
         self.record("before", ctx.arguments["owner"].as_str().unwrap());
         if self.first.swap(false, Ordering::SeqCst) {
             if let Some(barrier) = &self.overlap {
@@ -57,7 +61,11 @@ impl ToolHook<OpenHumanRunContext> for Observer {
         }
         Ok(())
     }
-    async fn after_tool(&self, ctx: &ToolHookContext) -> anyhow::Result<()> {
+    async fn after_tool(
+        &self,
+        _: &OpenHumanRunContext,
+        ctx: &ToolHookContext,
+    ) -> anyhow::Result<()> {
         assert_eq!(ctx.success, Some(true));
         self.record("after", ctx.arguments["owner"].as_str().unwrap());
         Ok(())
