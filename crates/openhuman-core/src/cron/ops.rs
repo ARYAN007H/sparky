@@ -9,8 +9,10 @@ use {
     tinyflows_bus::schedule::types::CronRun, tinyflows_bus::schedule::types::Schedule,
 };
 
-/// Claim `job_id` as running. `None` when a Run Now of it already holds it; the claim is released when the guard drops, including on panic or
-/// future cancellation, so an aborted task can never lock a job id.
+/// Claim `job_id` as running. `None` when a Run Now of it already holds it. The
+/// claim is released when the guard drops, including on panic or future
+/// cancellation, so an aborted task can never lock a job id. A *scheduled* run
+/// of the same job is refused by the module's own claim when the run starts.
 pub(crate) fn try_acquire_run(job_id: &str) -> Option<crate::cron::scheduler::RunGuard> {
     crate::cron::scheduler::try_acquire_run(job_id)
 }
@@ -133,6 +135,7 @@ pub async fn cron_list(config: &Config) -> Result<Outcome<Vec<CronJob>>, String>
     if !config.cron.enabled {
         return Err("cron is disabled by config (cron.enabled=false)".to_string());
     }
+    crate::core::runtime::components::require_config(config, "tinyflows")?;
     let jobs = cron::list_jobs(config).map_err(|e| e.to_string())?;
     Ok(Outcome::single_log(jobs, "cron jobs listed"))
 }
@@ -148,6 +151,7 @@ pub async fn cron_update(
     if !config.cron.enabled {
         return Err("cron is disabled by config (cron.enabled=false)".to_string());
     }
+    crate::core::runtime::components::require_config(config, "tinyflows")?;
 
     if let Some(command) = &patch.command {
         let security = SecurityPolicy::from_config(
@@ -176,6 +180,7 @@ pub async fn cron_remove(
     if !config.cron.enabled {
         return Err("cron is disabled by config (cron.enabled=false)".to_string());
     }
+    crate::core::runtime::components::require_config(config, "tinyflows")?;
 
     cron::remove_job(config, job_id.trim()).map_err(|e| e.to_string())?;
     Ok(Outcome::new(
@@ -196,6 +201,7 @@ pub async fn cron_run(
     if !config.cron.enabled {
         return Err("cron is disabled by config (cron.enabled=false)".to_string());
     }
+    crate::core::runtime::components::require_config(config, "tinyflows")?;
 
     // Fail closed before queueing anything: an unreadable job refuses the run.
     cron::limits::check_run(
@@ -270,6 +276,14 @@ async fn run_and_record(
     let run_id = uuid::Uuid::new_v4().to_string();
     let started_at = chrono::Utc::now();
     let (success, output) = cron::scheduler::execute_job_now(ctx, config, job, &run_id).await;
+    if !success && output.ends_with("is already running") {
+        // A scheduled run holds the job (the module's claim): nothing ran, so
+        // there is nothing to deliver or record, and the "queued" placeholder
+        // goes with the refused run.
+        tracing::debug!(job_id = %job.id, "[cron_run] refused: a scheduled run holds the job");
+        let _ = cron::delete_queued_runs(config, &job.id);
+        return (false, output);
+    }
     let finished_at = chrono::Utc::now();
     let duration_ms = (finished_at - started_at).num_milliseconds();
     let status = if success { "ok" } else { "error" };
@@ -306,6 +320,7 @@ pub async fn cron_runs(
     if !config.cron.enabled {
         return Err("cron is disabled by config (cron.enabled=false)".to_string());
     }
+    crate::core::runtime::components::require_config(config, "tinyflows")?;
 
     let limit = limit.unwrap_or(20).max(1);
     let runs = cron::list_runs(config, job_id.trim(), limit).map_err(|e| e.to_string())?;
