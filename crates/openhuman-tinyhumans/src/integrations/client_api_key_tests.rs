@@ -24,7 +24,7 @@ fn record(seen: &Seen, headers: &HeaderMap) {
             .and_then(|value| value.to_str().ok())
             .map(str::to_owned)
     };
-    seen.lock()
+    seen.lock().unwrap()
         .push((header("x-api-key"), header("authorization")));
 }
 
@@ -51,7 +51,7 @@ async fn json_requests_send_the_api_key_as_x_api_key_and_no_bearer() {
         .await
         .expect("an API-key client reaches composio");
 
-    let seen = seen.lock();
+    let seen = seen.lock().unwrap();
     assert_eq!(seen.len(), 1);
     assert_eq!(seen[0].0.as_deref(), Some(KEY));
     assert_eq!(seen[0].1, None, "an API key must never ride Authorization");
@@ -80,7 +80,7 @@ async fn binary_download_sends_the_api_key_as_x_api_key() {
         .expect("download with an API key");
     assert_eq!(&bytes[..], b"bytes");
 
-    let seen = seen.lock();
+    let seen = seen.lock().unwrap();
     assert_eq!(seen[0].0.as_deref(), Some(KEY));
     assert_eq!(seen[0].1, None);
 }
@@ -121,7 +121,7 @@ async fn presigned_download_redirect_does_not_forward_api_key() {
         .await
         .unwrap();
     assert_eq!(&bytes[..], b"stored bytes");
-    let seen = seen.lock();
+    let seen = seen.lock().unwrap();
     assert_eq!(seen.len(), 1);
     assert_eq!(seen[0], (None, None));
 }
