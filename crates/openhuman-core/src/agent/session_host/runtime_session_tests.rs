@@ -5,6 +5,15 @@ use std::sync::Arc;
 use tinyagents_runtime::ToolSnapshot;
 use tinytools::ToolSpec;
 
+fn synthesized_tool_names(prelude: &super::SessionPrelude) -> std::collections::HashSet<String> {
+    prelude
+        .tool_surface
+        .lock()
+        .expect("tool surface")
+        .synthesized_tool_names
+        .clone()
+}
+
 #[tokio::test]
 async fn committed_progress_uses_each_turns_receipt_sender() {
     use crate::agent::progress::AgentProgress;
@@ -238,7 +247,7 @@ fn connected_mcp_actions_enter_search_and_leave_on_disconnect() {
 
     let action = "mcp_weather_forecast_abc123".to_string();
     prelude.refresh_delegation_tool_surface().unwrap();
-    assert!(prelude.synthesized_tool_names_for_test().contains(&action));
+    assert!(synthesized_tool_names(&prelude).contains(&action));
     {
         let surface = prelude.tool_surface.lock().expect("tool surface");
         assert!(surface.deferred_tool_names.contains(&action));
@@ -253,7 +262,7 @@ fn connected_mcp_actions_enter_search_and_leave_on_disconnect() {
         .connected
         .clear();
     prelude.refresh_delegation_tool_surface().unwrap();
-    assert!(!prelude.synthesized_tool_names_for_test().contains(&action));
+    assert!(!synthesized_tool_names(&prelude).contains(&action));
     assert!(!prelude
         .tool_surface
         .lock()
@@ -464,9 +473,7 @@ async fn a_resumed_orchestrator_keeps_the_integration_actions_it_was_sent() {
 
     // Fresh process: no integrations known, so no actions are synthesised.
     prelude.refresh_delegation_tool_surface().unwrap();
-    assert!(!prelude
-        .synthesized_tool_names_for_test()
-        .contains("GMAIL_SEND_EMAIL"));
+    assert!(!synthesized_tool_names(&prelude).contains("GMAIL_SEND_EMAIL"));
 
     // Resume hands back what the thread was sent.
     let recorded = ToolSnapshot::new(vec![
@@ -491,7 +498,7 @@ async fn a_resumed_orchestrator_keeps_the_integration_actions_it_was_sent() {
     }
     prelude.refresh_delegation_tool_surface().unwrap();
 
-    let names = prelude.synthesized_tool_names_for_test();
+    let names = synthesized_tool_names(&prelude);
     assert!(names.contains("GMAIL_SEND_EMAIL"), "{names:?}");
     assert!(names.contains("GMAIL_FETCH_EMAILS"), "{names:?}");
     assert!(

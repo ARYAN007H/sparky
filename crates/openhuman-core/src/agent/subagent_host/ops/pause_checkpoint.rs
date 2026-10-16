@@ -39,66 +39,6 @@ pub(crate) fn is_safe_task_id(task_id: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
 }
 
-pub(super) fn write(
-    checkpoint_dir: &std::path::Path,
-    task_id: &str,
-    data: &crate::agent::subagent_host::types::SubagentCheckpointData,
-) -> Option<std::path::PathBuf> {
-    if !is_safe_task_id(task_id) {
-        tracing::error!(
-            task_id = %task_id,
-            dir = %checkpoint_dir.display(),
-            "[subagent_host] refusing to write a checkpoint under an unsafe task id; \
-             this pause will not be resumable from disk"
-        );
-        return None;
-    }
-
-    if let Err(e) = std::fs::create_dir_all(checkpoint_dir) {
-        tracing::error!(
-            task_id = %task_id,
-            dir = %checkpoint_dir.display(),
-            error = %e,
-            "[subagent_host] could not create the checkpoint directory; this pause will not be \
-             resumable from disk"
-        );
-        return None;
-    }
-
-    let json = match serde_json::to_string_pretty(data) {
-        Ok(json) => json,
-        Err(e) => {
-            tracing::error!(
-                task_id = %task_id,
-                error = %e,
-                "[subagent_host] could not serialize the checkpoint; this pause will not be \
-                 resumable from disk"
-            );
-            return None;
-        }
-    };
-
-    let checkpoint_path = checkpoint_dir.join(format!("{task_id}.json"));
-    if let Err(e) = std::fs::write(&checkpoint_path, json) {
-        tracing::error!(
-            task_id = %task_id,
-            path = %checkpoint_path.display(),
-            error = %e,
-            "[subagent_host] could not write the checkpoint; this pause will not be resumable \
-             from disk"
-        );
-        return None;
-    }
-
-    tracing::info!(
-        task_id = %task_id,
-        path = %checkpoint_path.display(),
-        history_len = data.history.len(),
-        "[subagent_host] checkpoint written for awaiting_user"
-    );
-    Some(checkpoint_path)
-}
-
 #[cfg(test)]
 #[path = "runner_checkpoint_tests.rs"]
 mod tests;
