@@ -132,14 +132,18 @@ async fn concurrent_operations_complete_without_stalling_the_single_async_worker
     // genuinely blocking wait — the same shape as `parking_lot::Mutex::lock`.
     let probe_entered = Arc::new(AtomicBool::new(false));
     let (release, held) = std::sync::mpsc::channel::<()>();
-    let probe = tokio::spawn(run(crate::core::runtime::DispatchCtx::ambient(), "blocked_probe", {
-        let probe_entered = Arc::clone(&probe_entered);
-        move || {
-            probe_entered.store(true, Ordering::SeqCst);
-            let _ = held.recv();
-            Ok::<(), String>(())
-        }
-    }));
+    let probe = tokio::spawn(run(
+        crate::core::runtime::DispatchCtx::ambient(),
+        "blocked_probe",
+        {
+            let probe_entered = Arc::clone(&probe_entered);
+            move || {
+                probe_entered.store(true, Ordering::SeqCst);
+                let _ = held.recv();
+                Ok::<(), String>(())
+            }
+        },
+    ));
 
     // A cooperative task that only ever yields: it can make progress solely
     // because no store call is holding the worker hostage.
@@ -433,7 +437,9 @@ async fn run_acts_under_the_handed_context_not_the_active_one() {
     // The caller's own scope is Ravi's; the call was handed Asha's.
     let seen = CoreContext::scope(ravi.into_core().unwrap(), async {
         run(asha, "who", || {
-            Ok::<_, String>(CoreContext::current().and_then(|c| c.session_agent().map(str::to_owned)))
+            Ok::<_, String>(
+                CoreContext::current().and_then(|c| c.session_agent().map(str::to_owned)),
+            )
         })
         .await
     })
