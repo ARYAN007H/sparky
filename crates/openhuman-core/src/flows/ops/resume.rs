@@ -25,8 +25,16 @@ pub async fn flows_resume(
     approvals: Vec<String>,
     rejections: Vec<String>,
 ) -> Result<Outcome<Value>, String> {
-    flows_resume_with_refusal_hook(ctx, config, flow_id, thread_id, approvals, rejections, || {})
-        .await
+    flows_resume_with_refusal_hook(
+        ctx,
+        config,
+        flow_id,
+        thread_id,
+        approvals,
+        rejections,
+        || {},
+    )
+    .await
 }
 
 /// Runs the resume lifecycle with an invocation-scoped hook immediately

@@ -41,7 +41,6 @@ pub(super) async fn flows_cancel_run_with_snapshot<F>(
 where
     F: FnMut(),
 {
-
     if rm::is_terminal_run_status(&run.status) {
         return Err(rm::already_terminal_error(run_id, &run.status));
     }

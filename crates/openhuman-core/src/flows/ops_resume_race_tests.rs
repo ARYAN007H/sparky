@@ -16,6 +16,35 @@ fn insert_parked_run(config: &Config, flow_id: &str, run_id: &str) {
     .unwrap());
 }
 
+async fn park_approval_flow(config: &Config, name: &str) -> (String, String, Vec<String>) {
+    let created = flows_create(config, name.to_string(), approval_gated_graph(), false)
+        .await
+        .unwrap();
+    let parked = flows_run(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        config,
+        &created.value.id,
+        json!({ "x": 1 }),
+        serde_json::Map::new(),
+        FlowRunTrigger::Rpc,
+    )
+    .await
+    .unwrap();
+    let run_id = parked.value["thread_id"].as_str().unwrap().to_string();
+    let pending = serde_json::from_value(parked.value["pending_approvals"].clone()).unwrap();
+    assert!(!pending.is_empty());
+    (created.value.id, run_id, pending)
+}
+
+async fn checkpoint_count(config: &Config, thread_id: &str) -> usize {
+    let checkpointer = crate::flows::tinyflows::open_flow_checkpointer(config).unwrap();
+    let thread_id = thread_id.to_string();
+    crate::storage::block_on_anyhow(
+        async move { Ok(checkpointer.get_thread(&thread_id).await?.len()) },
+    )
+    .unwrap()
+}
+
 #[tokio::test]
 async fn duplicate_resume_preserves_the_registered_run_and_parked_checkpoint() {
     let tmp = TempDir::new().unwrap();
@@ -94,6 +123,211 @@ async fn duplicate_resume_preserves_the_registered_run_and_parked_checkpoint() {
             .status,
         "completed"
     );
+}
+
+#[tokio::test]
+async fn stale_graph_refusal_does_not_settle_a_resume_claimed_after_its_snapshot() {
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let (flow_id, run_id, pending) = park_approval_flow(&config, "stale-resume-race").await;
+    let summary_before = store::get_flow(&config, &flow_id)
+        .unwrap()
+        .unwrap()
+        .last_status;
+    let mut changed_graph = approval_gated_graph();
+    changed_graph["nodes"][2]["name"] = json!("Downstream changed after park");
+    let flow = store::get_flow(&config, &flow_id).unwrap().unwrap();
+    store::update_flow_graph(
+        &config,
+        &flow_id,
+        flow.name,
+        structurally_valid_graph(changed_graph),
+        flow.require_approval,
+        None,
+        false,
+        None,
+    )
+    .unwrap();
+
+    let mut owner = None;
+    let mut claim_resume = || {
+        owner = Some(
+            run_registry::try_register(&run_id)
+                .expect("the competing resume must reserve the parked run"),
+        );
+        assert!(store::mark_run_resuming(&config, &run_id).unwrap());
+    };
+    let error = resume::flows_resume_with_refusal_hook(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &flow_id,
+        &run_id,
+        pending,
+        vec![],
+        &mut claim_resume,
+    )
+    .await
+    .unwrap_err();
+    drop(claim_resume);
+    assert!(error.contains(GRAPH_CHANGED_SINCE_PARK_ERROR), "{error}");
+
+    let (token, guard) = owner.take().unwrap();
+    assert!(!token.is_cancelled());
+    assert!(run_registry::is_in_flight(&run_id));
+    let row = store::get_flow_run(&config, &run_id).unwrap().unwrap();
+    assert_eq!(row.status, "running");
+    let flow = store::get_flow(&config, &flow_id).unwrap().unwrap();
+    assert_eq!(flow.last_status, summary_before);
+    assert!(checkpoint_count(&config, &run_id).await > 0);
+
+    let cancel = flows_cancel_run(&config, &run_id).await.unwrap();
+    assert_eq!(cancel.value["was_in_flight"], true);
+    assert!(token.is_cancelled());
+    assert_eq!(
+        store::get_flow_run(&config, &run_id)
+            .unwrap()
+            .unwrap()
+            .status,
+        "running"
+    );
+    assert!(checkpoint_count(&config, &run_id).await > 0);
+    drop(guard);
+}
+
+#[tokio::test]
+async fn compatibility_refusal_does_not_settle_a_resume_claimed_after_its_snapshot() {
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let (flow_id, run_id, pending) = park_approval_flow(&config, "compatibility-resume-race").await;
+    let flow = store::get_flow(&config, &flow_id).unwrap().unwrap();
+    let incompatible_graph = structurally_valid_graph(nested_conditional_fan_in_graph());
+    store::update_flow_graph(
+        &config,
+        &flow_id,
+        flow.name,
+        incompatible_graph.clone(),
+        flow.require_approval,
+        None,
+        false,
+        None,
+    )
+    .unwrap();
+    let current_flow = store::get_flow(&config, &flow_id).unwrap().unwrap();
+    let hash = compute_graph_hash(&incompatible_graph, current_flow.require_approval).unwrap();
+    let row = store::get_flow_run(&config, &run_id).unwrap().unwrap();
+    assert!(store::finish_flow_run(
+        &config,
+        &run_id,
+        "pending_approval",
+        row.finished_at.as_deref().unwrap_or(&row.started_at),
+        &row.steps,
+        &pending,
+        None,
+        Some(&hash),
+    )
+    .unwrap());
+    let summary_before = current_flow.last_status;
+
+    let mut owner = None;
+    let mut claim_resume = || {
+        owner = Some(
+            run_registry::try_register(&run_id)
+                .expect("the competing resume must reserve the parked run"),
+        );
+        assert!(store::mark_run_resuming(&config, &run_id).unwrap());
+    };
+    let error = resume::flows_resume_with_refusal_hook(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &flow_id,
+        &run_id,
+        pending,
+        vec![],
+        &mut claim_resume,
+    )
+    .await
+    .unwrap_err();
+    drop(claim_resume);
+    assert!(
+        error.contains(UNSUPPORTED_NESTED_CONDITIONAL_FAN_IN),
+        "{error}"
+    );
+
+    let (token, guard) = owner.take().unwrap();
+    assert!(!token.is_cancelled());
+    assert!(run_registry::is_in_flight(&run_id));
+    let row = store::get_flow_run(&config, &run_id).unwrap().unwrap();
+    assert_eq!(row.status, "running");
+    let flow = store::get_flow(&config, &flow_id).unwrap().unwrap();
+    assert_eq!(flow.last_status, summary_before);
+    assert!(checkpoint_count(&config, &run_id).await > 0);
+
+    let cancel = flows_cancel_run(&config, &run_id).await.unwrap();
+    assert_eq!(cancel.value["was_in_flight"], true);
+    assert!(token.is_cancelled());
+    assert_eq!(
+        store::get_flow_run(&config, &run_id)
+            .unwrap()
+            .unwrap()
+            .status,
+        "running"
+    );
+    assert!(checkpoint_count(&config, &run_id).await > 0);
+    drop(guard);
+}
+
+#[tokio::test]
+async fn cancel_after_a_parked_snapshot_does_not_drop_a_resume_starting() {
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let (flow_id, run_id, _) = park_approval_flow(&config, "cancel-resume-start-race").await;
+    let observed = store::get_flow_run(&config, &run_id).unwrap().unwrap();
+    assert_eq!(observed.status, "pending_approval");
+    let summary_before = store::get_flow(&config, &flow_id)
+        .unwrap()
+        .unwrap()
+        .last_status;
+
+    let mut owner = None;
+    let mut claim_resume = || {
+        owner = Some(
+            run_registry::try_register(&run_id)
+                .expect("the starting resume must reserve the parked run"),
+        );
+        assert!(store::mark_run_resuming(&config, &run_id).unwrap());
+    };
+    let error = run_management::flows_cancel_run_with_snapshot(
+        &config,
+        &run_id,
+        observed,
+        &mut claim_resume,
+    )
+    .await
+    .unwrap_err();
+    drop(claim_resume);
+    assert!(error.contains("settled concurrently"), "{error}");
+
+    let (token, guard) = owner.take().unwrap();
+    assert!(!token.is_cancelled());
+    assert!(run_registry::is_in_flight(&run_id));
+    let row = store::get_flow_run(&config, &run_id).unwrap().unwrap();
+    assert_eq!(row.status, "running");
+    let flow = store::get_flow(&config, &flow_id).unwrap().unwrap();
+    assert_eq!(flow.last_status, summary_before);
+    assert!(checkpoint_count(&config, &run_id).await > 0);
+
+    let cancel = flows_cancel_run(&config, &run_id).await.unwrap();
+    assert_eq!(cancel.value["was_in_flight"], true);
+    assert!(token.is_cancelled());
+    assert_eq!(
+        store::get_flow_run(&config, &run_id)
+            .unwrap()
+            .unwrap()
+            .status,
+        "running"
+    );
+    assert!(checkpoint_count(&config, &run_id).await > 0);
+    drop(guard);
 }
 
 #[tokio::test]
