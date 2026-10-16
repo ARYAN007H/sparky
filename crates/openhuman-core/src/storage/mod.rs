@@ -38,6 +38,7 @@ mod lease_local;
 pub mod local;
 pub mod rebind;
 pub mod secrets;
+pub mod sessions;
 
 use std::future::Future;
 use std::sync::{Arc, LazyLock, Mutex, OnceLock, RwLock};
