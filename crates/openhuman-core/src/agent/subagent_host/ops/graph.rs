@@ -38,7 +38,6 @@
 //   spawn's worker thread.
 mod dispatch;
 mod transcript;
-mod worker_mirror;
 
 // Re-exported under the original flat `graph::` path so external callers
 // (`ops/mod.rs`, `ops/runner.rs`, `graph_tests.rs`'s `use super::*`) are
@@ -62,9 +61,6 @@ use std::sync::Arc;
 use tinyagents_session::transcript::TranscriptMessage;
 #[cfg(test)]
 use tinyjuice_bus::types::AgentTokenjuiceCompression;
-#[cfg(test)]
-#[cfg(test)]
-use worker_mirror::{mirror_worker_thread, mirror_worker_thread_from_history};
 
 #[cfg(test)]
 #[path = "graph_tests.rs"]

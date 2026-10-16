@@ -7,6 +7,7 @@
 pub mod artifact_rows;
 pub mod error;
 pub mod ops;
+pub(crate) mod run_mode;
 pub mod rpc_models;
 pub mod schemas;
 pub mod store;
@@ -14,6 +15,8 @@ pub mod store;
 mod transcript_host_tests;
 pub mod turn_state;
 pub mod welcome_migration;
+pub(crate) mod worker_mirror;
+pub(crate) mod worker_thread;
 
 pub use error::{ThreadsError, THREAD_NOT_FOUND_KIND};
 pub use rpc_models::*;

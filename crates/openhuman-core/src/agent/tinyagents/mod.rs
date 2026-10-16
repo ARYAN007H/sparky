@@ -32,7 +32,6 @@ pub(crate) mod live_harness;
 mod memory_summarizer;
 pub(crate) mod middleware;
 pub(crate) mod observability;
-pub mod run_mode;
 // `pub` since issue #6014, and the inconsistency it removes is the point:
 // `AgentBuilder::payload_summarizer` is a **public** setter taking
 // `Arc<DynPayloadSummarizer>`, so the seam was already advertised to embedders

@@ -41,8 +41,6 @@ mod spawn_async_subagent;
 mod spawn_parallel_agents;
 #[path = "tools/spawn_subagent.rs"]
 mod spawn_subagent;
-#[path = "tools/spawn_worker_thread.rs"]
-pub mod spawn_worker_thread;
 #[path = "tools/steer_subagent.rs"]
 mod steer_subagent;
 #[path = "tools/subagent_abort_report.rs"]
@@ -52,8 +50,6 @@ mod subagent_abort_report;
 mod tools_e2e_tests;
 #[path = "tools/wait_subagent.rs"]
 mod wait_subagent;
-#[path = "tools/worker_thread.rs"]
-mod worker_thread;
 
 pub(crate) use dispatch::DelegationDispatch;
 
@@ -88,8 +84,6 @@ pub(crate) use spawn_parallel_agents::SpawnParallelAgentsDispatch;
 pub use spawn_parallel_agents::SpawnParallelAgentsTool;
 pub(crate) use spawn_subagent::SpawnSubagentDispatch;
 pub use spawn_subagent::SpawnSubagentTool;
-pub(crate) use spawn_worker_thread::SpawnWorkerThreadDispatch;
-pub use spawn_worker_thread::SpawnWorkerThreadTool;
 pub(crate) use steer_subagent::SteerSubagentDispatch;
 pub use steer_subagent::SteerSubagentTool;
 pub(crate) use wait_subagent::WaitSubagentDispatch;
