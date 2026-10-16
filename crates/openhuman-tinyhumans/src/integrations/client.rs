@@ -5,7 +5,7 @@ mod construct;
 mod download;
 mod errors;
 mod pricing;
-mod requests;
+pub(crate) mod requests;
 
 pub use construct::IntegrationClient;
 pub use pricing::{build_client, pricing_for_config};

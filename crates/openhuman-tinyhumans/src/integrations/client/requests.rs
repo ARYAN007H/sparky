@@ -13,11 +13,52 @@ pub(super) fn managed_budget_applies_to_path(path: &str) -> bool {
 /// Build the egress descriptor for a managed-backend round-trip. The query
 /// string is stripped so only the endpoint (the "to where") is described, never
 /// any data carried in the query.
-pub(super) fn backend_egress_descriptor(
+///
+/// The descriptor is classified here ([`is_control_plane_path`]); the core only
+/// honours the flag.
+pub(crate) fn backend_egress_descriptor(
     path: &str,
 ) -> openhuman_embed::__host::egress::EgressDescriptor {
     let endpoint = path.split('?').next().unwrap_or(path);
     openhuman_embed::__host::egress::EgressDescriptor::integration(endpoint)
+        .with_control_plane(is_control_plane_path(endpoint))
+}
+
+/// Is `path` a backend **control-plane** round-trip that must keep flowing
+/// under `LocalOnly` (it carries no user content: auth tokens, ids, routing
+/// metadata)? Two shapes are exempt:
+///
+/// 1. **Any path outside the user-data tool namespace** (not under
+///    `/agent-integrations/`). Every user-data integration call (composio
+///    execute, research, file-storage uploads, ...) routes through
+///    `IntegrationClient` under that prefix, while session / team / billing /
+///    auth round-trips go through `BackendClient` and never build an egress
+///    descriptor. A path outside the prefix only reaches here if a caller
+///    re-homes a control-plane call onto this descriptor; exempt it
+///    defensively so a re-home can never brick login.
+/// 2. **A narrow allow-list of read-only sub-routes** that set up or describe
+///    an integration without shipping user content: `pricing`, and under
+///    `composio/` only `connections` (list + per-connection delete),
+///    `authorize` (OAuth handoff), `tools` and `toolkits` (catalog).
+///
+/// Everything else is **blocked** (fail-closed): `composio/execute` (tool
+/// arguments), `composio/triggers[/available]` (user-data writes; the
+/// descriptor carries no HTTP method, so the reads on the same path block with
+/// them), `composio/github/repos`, any unknown composio sub-route, and every
+/// non-composio tool namespace.
+pub(crate) fn is_control_plane_path(path: &str) -> bool {
+    let path = path.trim_start_matches('/');
+    let Some(subroute) = path.strip_prefix("agent-integrations/") else {
+        return true;
+    };
+    if subroute == "pricing" {
+        return true;
+    }
+    if let Some(rest) = subroute.strip_prefix("composio/") {
+        let head = rest.split(['/', '?']).next().unwrap_or(rest);
+        return matches!(head, "connections" | "authorize" | "tools" | "toolkits");
+    }
+    false
 }
 
 /// Egress spine (privacy epic S2, #4436): disclose an OpenHuman managed-backend
@@ -35,7 +76,7 @@ pub(super) fn emit_backend_egress(approval: &ApprovalTurnContext, path: &str) {
 /// `Ok(())` for control-plane paths (session / team / billing / integration
 /// connection-management + catalog) even under `LocalOnly` — blocking those
 /// would break sign-in and the Connections UI for no privacy benefit. See
-/// [`is_control_plane`](openhuman_embed::__host::egress). Call before
+/// [`is_control_plane_path`]. Call before
 /// [`emit_backend_egress`] so a blocked call is neither disclosed nor sent.
 pub(super) fn enforce_backend_egress(path: &str) -> anyhow::Result<()> {
     openhuman_embed::__host::egress::enforce_egress(&backend_egress_descriptor(path))
@@ -171,3 +212,7 @@ impl IntegrationClient {
         Ok(serde_json::from_value(value)?)
     }
 }
+
+#[cfg(test)]
+#[path = "requests_tests.rs"]
+mod tests;

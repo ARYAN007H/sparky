@@ -112,9 +112,9 @@ impl Guard {
     /// Local-only enforcement, then the egress disclosure. A blocked call is
     /// neither disclosed nor sent.
     fn admit(&self, route: &str) -> ti_image::Result<()> {
-        let descriptor = openhuman_embed::__host::egress::EgressDescriptor::integration(format!(
-            "{OPENROUTER_PROXY_PATH}/{route}"
-        ));
+        let descriptor = crate::integrations::client::requests::backend_egress_descriptor(
+            &format!("{OPENROUTER_PROXY_PATH}/{route}"),
+        );
         openhuman_embed::__host::egress::enforce_egress(&descriptor).map_err(|error| {
             tracing::info!(route, %error, "[media_generation] blocked by privacy policy");
             ti_image::Error::Validation(format!("blocked by the privacy policy: {error}"))
