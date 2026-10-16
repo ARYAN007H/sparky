@@ -163,7 +163,12 @@ fn anchored_sources_sit_where_the_catalogue_always_listed_them() {
         unregister_tool_source(id);
     }
 
-    let pos = |name: &str| names.iter().position(|n| n == name).unwrap_or_else(|| panic!("{name} missing"));
+    let pos = |name: &str| {
+        names
+            .iter()
+            .position(|n| n == name)
+            .unwrap_or_else(|| panic!("{name} missing"))
+    };
     // Registration order within an anchor.
     assert_eq!(pos("anchor_fake_search_b"), pos("anchor_fake_search_a") + 1);
     // After-search sources precede the image-info built-in registered after

@@ -9,8 +9,9 @@
 use openhuman_embed::__host::config::Config;
 use openhuman_embed::__host::security::credentials::session_support::resolve_backend_credential;
 use openhuman_embed::__host::voice_registry::{
-    register_live_provider, LiveProviderEntry, LiveProviderKind, LiveProviderPlacement, LiveVoiceError, PreparedProvider,
-    GEMINI_LANGUAGES, GEMINI_VOICES, LIVE_PROVIDER_ELEVENLABS_HOSTED, LIVE_PROVIDER_GEMINI_HOSTED,
+    register_live_provider, LiveProviderEntry, LiveProviderKind, LiveProviderPlacement,
+    LiveVoiceError, PreparedProvider, GEMINI_LANGUAGES, GEMINI_VOICES,
+    LIVE_PROVIDER_ELEVENLABS_HOSTED, LIVE_PROVIDER_GEMINI_HOSTED,
 };
 use reqwest::Method;
 use serde_json::{json, Value};
