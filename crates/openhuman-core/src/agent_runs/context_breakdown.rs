@@ -16,6 +16,7 @@ use std::sync::Mutex;
 
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+use crate::core::runtime::Tenant;
 
 use crate::config::Config;
 use crate::core::Outcome;
@@ -85,18 +86,40 @@ fn config_fingerprint(config: &Config) -> u64 {
     hasher.finish()
 }
 
-static REPORT_CACHE: Lazy<Mutex<HashMap<String, (u64, PromptSizeReport)>>> =
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct ReportCacheKey {
+    tenant: Tenant,
+    agent_id: String,
+    workspace_dir: std::path::PathBuf,
+    config_path: std::path::PathBuf,
+}
+
+fn report_cache_key(tenant: Tenant, agent_id: &str, config: &Config) -> ReportCacheKey {
+    ReportCacheKey {
+        tenant,
+        agent_id: agent_id.to_string(),
+        workspace_dir: config.workspace_dir.clone(),
+        config_path: config.config_path.clone(),
+    }
+}
+
+static REPORT_CACHE: Lazy<Mutex<HashMap<ReportCacheKey, (u64, PromptSizeReport)>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
 /// Builds (or reuses a cached) [`PromptSizeReport`] for `agent_id` under the
 /// given config, invalidating the cache entry when the config fingerprint
 /// changed since the last build.
-async fn cached_report(agent_id: &str, config: &Config) -> Result<PromptSizeReport, String> {
+async fn cached_report(
+    tenant: Tenant,
+    agent_id: &str,
+    config: &Config,
+) -> Result<PromptSizeReport, String> {
+    let key = report_cache_key(tenant, agent_id, config);
     let fingerprint = config_fingerprint(config);
     if let Some((cached_fingerprint, report)) = REPORT_CACHE
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .get(agent_id)
+        .get(&key)
     {
         if *cached_fingerprint == fingerprint {
             log::debug!(
@@ -123,7 +146,7 @@ async fn cached_report(agent_id: &str, config: &Config) -> Result<PromptSizeRepo
     REPORT_CACHE
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .insert(agent_id.to_string(), (fingerprint, report.clone()));
+        .insert(key, (fingerprint, report.clone()));
     Ok(report)
 }
 
@@ -199,7 +222,8 @@ pub async fn context_breakdown(
         .unwrap_or(DEFAULT_AGENT_ID)
         .to_string();
 
-    let report = cached_report(&agent_id, &config).await?;
+    let tenant = ctx.tenant().map_err(|error| error.to_string())?;
+    let report = cached_report(tenant, &agent_id, &config).await?;
 
     let mut sections: Vec<ContextSection> =
         report.sections.iter().map(section_from_prompt).collect();
