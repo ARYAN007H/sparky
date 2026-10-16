@@ -33,7 +33,7 @@ fn row_key_normalises_the_toolkit() {
 async fn save_rejects_an_empty_toolkit() {
     let dir = tempfile::tempdir().unwrap();
     let config = config_in(&dir);
-    assert!(save(&config, "  ", UserScopePref::default()).await.is_err());
+    assert!(save(&crate::core::runtime::DispatchCtx::ambient(), &config, "  ", UserScopePref::default()).await.is_err());
 }
 
 /// A stored preference is never lost: either the module took it (the read
@@ -59,7 +59,7 @@ async fn a_legacy_pref_either_reaches_the_module_or_stays_stored() {
         admin: true,
     };
 
-    let pref = load_or_default(&config, "github").await;
+    let pref = load_or_default(&crate::core::runtime::DispatchCtx::ambient(), &config, "github").await;
     let done = migrated().lock().unwrap().contains(&config.workspace_dir);
     let left: LegacyScopeFile = file_store::load(
         &crate::core::runtime::DispatchCtx::ambient(),
@@ -85,6 +85,6 @@ async fn a_legacy_pref_either_reaches_the_module_or_stays_stored() {
 async fn a_workspace_with_no_legacy_file_is_marked_migrated() {
     let dir = tempfile::tempdir().unwrap();
     let config = config_in(&dir);
-    migrate_legacy(&config).await;
+    migrate_legacy(&crate::core::runtime::DispatchCtx::ambient(), &config).await;
     assert!(migrated().lock().unwrap().contains(&config.workspace_dir));
 }

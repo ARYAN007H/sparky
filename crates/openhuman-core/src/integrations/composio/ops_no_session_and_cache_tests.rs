@@ -123,7 +123,7 @@ async fn composio_list_tools_errors_without_session() {
     let _serialised = module_guard().await;
     let tmp = tempfile::tempdir().unwrap();
     let config = test_config(&tmp);
-    let err = composio_list_tools(&config, None, None).await.unwrap_err();
+    let err = composio_list_tools(&crate::core::runtime::DispatchCtx::ambient(), &config, None, None).await.unwrap_err();
     // Same contract as `composio_list_toolkits_errors_without_session`.
     assert!(
         err.to_lowercase().contains("composio"),
@@ -184,7 +184,7 @@ async fn composio_list_trigger_history_errors_when_store_not_init() {
     // reading history reports that rather than answering with an empty list —
     // "no triggers have fired" and "nothing is recording them" are different
     // things to tell someone debugging a trigger.
-    let err = composio_list_trigger_history(&config, Some(10))
+    let err = composio_list_trigger_history(&crate::core::runtime::DispatchCtx::ambient(), &config, Some(10))
         .await
         .unwrap_err();
     assert!(err.contains("list_trigger_history failed"), "{err}");
