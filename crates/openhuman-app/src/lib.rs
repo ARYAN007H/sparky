@@ -76,7 +76,6 @@ mod core_rpc;
 mod deep_link_ipc;
 #[cfg(target_os = "windows")]
 mod deep_link_ipc_windows;
-mod docx;
 mod remote_ws_relay;
 // Cross-platform module: the registry-reading function is windows-only, but
 // the parsing helpers compile (and test) everywhere so `cargo test` on the
@@ -3306,7 +3305,6 @@ pub fn run() {
             // too (CodeRabbit on #4127). The Save-As dialog that used to sit in
             // front of this went with the shell's `rfd` dependency.
             artifact_commands::download_artifact_to_downloads,
-            artifact_commands::read_artifact_body,
             artifact_commands::save_artifact_as,
             // Native directory chooser for the folder memory-source (#5831).
             // Unlike the Save-As dialog above it, this one has no renderer-side

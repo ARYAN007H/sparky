@@ -1,14 +1,16 @@
 import { configureStore } from '@reduxjs/toolkit';
-import { invoke } from '@tauri-apps/api/core';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { callCoreRpc } from '../../../services/coreRpcClient';
 import chatRuntimeReducer, {
   openArtifact,
   upsertArtifactReadyForThread,
 } from '../../../store/chatRuntimeSlice';
 import { ArtifactPreviewPanel } from './ArtifactPreviewPanel';
+
+vi.mock('../../../services/coreRpcClient', () => ({ callCoreRpc: vi.fn() }));
 
 vi.mock('../../../lib/i18n/I18nContext', () => ({
   useT: () => ({ t: (k: string) => k, locale: 'en' }),
@@ -16,11 +18,18 @@ vi.mock('../../../lib/i18n/I18nContext', () => ({
 
 const MD = '# Hello\n\nThis is **bold** text.\n';
 
-function renderPanel(kind: string, body: string, failWith?: string) {
+function renderPanel(kind: string, body: string, failWith?: string, converted = false) {
   // Stub the body fetch BEFORE mounting so the panel's effect resolves it.
-  if (failWith) vi.mocked(invoke).mockRejectedValue(failWith);
+  if (failWith) vi.mocked(callCoreRpc).mockRejectedValue(failWith);
   else
-    vi.mocked(invoke).mockResolvedValue({ kind, title: 'Notes', version: 1, body, is_text: true });
+    vi.mocked(callCoreRpc).mockResolvedValue({
+      kind,
+      title: 'Notes',
+      version: 1,
+      body,
+      is_text: true,
+      converted,
+    });
   const store = configureStore({ reducer: { chatRuntime: chatRuntimeReducer } });
   store.dispatch(
     upsertArtifactReadyForThread({
@@ -42,7 +51,7 @@ function renderPanel(kind: string, body: string, failWith?: string) {
 
 describe('ArtifactPreviewPanel — preview rendering by kind (#1535)', () => {
   beforeEach(() => {
-    vi.mocked(invoke).mockReset();
+    vi.mocked(callCoreRpc).mockReset();
   });
 
   it('renders markdown as formatted content, not raw source', async () => {
@@ -56,6 +65,25 @@ describe('ArtifactPreviewPanel — preview rendering by kind (#1535)', () => {
 
     // The raw markdown source must NOT be shown verbatim.
     expect(screen.queryByText(/# Hello/)).toBeNull();
+  });
+
+  it('reads the body from the core', async () => {
+    renderPanel('markdown', MD);
+    await screen.findByRole('heading', { level: 1 });
+    expect(callCoreRpc).toHaveBeenCalledWith({
+      method: 'openhuman.ai_read_artifact_body',
+      params: { artifact_id: 'a-1' },
+    });
+  });
+
+  it('renders a converted document as Markdown, read-only', async () => {
+    renderPanel('file', '# Quarterly report\n\nRevenue **up**.\n', undefined, true);
+
+    const h1 = await screen.findByRole('heading', { level: 1 });
+    expect(h1.textContent).toBe('Quarterly report');
+    fireEvent.click(screen.getByRole('button', { name: /Code/ }));
+    // The artifact is the file, not this text: it cannot be edited here.
+    expect((screen.getByRole('textbox') as HTMLTextAreaElement).readOnly).toBe(true);
   });
 
   it('renders GFM constructs (tables) via remark-gfm', async () => {

@@ -15,6 +15,7 @@ pub fn all_controller_schemas() -> Vec<ControllerSchema> {
         schemas("regenerate"),
         schemas("save_artifact_version"),
         schemas("share_artifact"),
+        schemas("read_artifact_body"),
     ]
 }
 
@@ -43,6 +44,10 @@ pub fn all_registered_controllers() -> Vec<RegisteredController> {
         RegisteredController {
             schema: schemas("share_artifact"),
             handler: handle_share_artifact,
+        },
+        RegisteredController {
+            schema: schemas("read_artifact_body"),
+            handler: handle_read_artifact_body,
         },
     ]
 }
@@ -198,6 +203,57 @@ pub fn schemas(function: &str) -> ControllerSchema {
                     ],
                 },
                 comment: "Save result payload.",
+                required: true,
+            }],
+        },
+        "read_artifact_body" => ControllerSchema {
+            namespace: "ai",
+            function: "read_artifact_body",
+            description: "The newest version of an artifact for the preview panel: its text, a document converted to Markdown, or the file's path.",
+            inputs: vec![artifact_id_input("Identifier of the versioned artifact.")],
+            outputs: vec![FieldSchema {
+                name: "result",
+                ty: TypeSchema::Object {
+                    fields: vec![
+                        FieldSchema {
+                            name: "kind",
+                            ty: TypeSchema::String,
+                            comment: "text, markdown, html, image or file.",
+                            required: true,
+                        },
+                        FieldSchema {
+                            name: "title",
+                            ty: TypeSchema::String,
+                            comment: "The artifact's title.",
+                            required: true,
+                        },
+                        FieldSchema {
+                            name: "version",
+                            ty: TypeSchema::U64,
+                            comment: "The newest version number.",
+                            required: true,
+                        },
+                        FieldSchema {
+                            name: "body",
+                            ty: TypeSchema::String,
+                            comment: "The content, or the file's path when is_text is false.",
+                            required: true,
+                        },
+                        FieldSchema {
+                            name: "is_text",
+                            ty: TypeSchema::Bool,
+                            comment: "Whether body is content rather than a path.",
+                            required: true,
+                        },
+                        FieldSchema {
+                            name: "converted",
+                            ty: TypeSchema::Bool,
+                            comment: "Whether body is Markdown converted from a document file.",
+                            required: true,
+                        },
+                    ],
+                },
+                comment: "Preview payload.",
                 required: true,
             }],
         },
@@ -408,6 +464,15 @@ fn handle_save_artifact_version(ctx: DispatchCtx, params: Map<String, Value>) ->
             )
             .await?,
         )
+    })
+}
+
+fn handle_read_artifact_body(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+    Box::pin(async move {
+        let config = ctx.load_config().await?;
+        let artifact_id = read_required::<String>(&params, "artifact_id")?;
+        let body = crate::agent::artifacts::preview::read_body(&config, artifact_id.trim()).await?;
+        to_json(Outcome::new(body, vec![]))
     })
 }
 

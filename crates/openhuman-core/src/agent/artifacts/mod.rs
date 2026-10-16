@@ -1,6 +1,7 @@
 pub mod files;
 pub mod migrate;
 pub mod ops;
+pub mod preview;
 pub mod production;
 pub mod schemas;
 pub mod store;

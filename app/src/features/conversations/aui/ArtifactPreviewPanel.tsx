@@ -32,6 +32,8 @@ interface ArtifactBodyResponse {
   version: number;
   body: string;
   is_text: boolean;
+  /** `body` is Markdown converted from a document file (DOCX, PDF, ...). */
+  converted?: boolean;
 }
 
 // ─── Constants ──────────────────────────────────────────────────
@@ -223,8 +225,11 @@ function ArtifactContentPanel({ artifact }: { artifact: ArtifactSnapshot }) {
 
     const fetchBody = async () => {
       try {
-        const result = await invoke<ArtifactBodyResponse>('read_artifact_body', {
-          artifactId: artifact.artifactId,
+        // Read from the core the app talks to (local or remote): it opens the
+        // file and converts documents where the artifact lives.
+        const result = await callCoreRpc<ArtifactBodyResponse>({
+          method: 'openhuman.ai_read_artifact_body',
+          params: { artifact_id: artifact.artifactId },
         });
         if (!cancelled) setBodyResult(result);
       } catch (err) {
@@ -251,6 +256,7 @@ function ArtifactContentPanel({ artifact }: { artifact: ArtifactSnapshot }) {
   const body = bodyResult?.body || '';
   const version = bodyResult?.version || 1;
   const isText = bodyResult?.is_text ?? false;
+  const converted = bodyResult?.converted ?? false;
 
   // File kind whose body is actual readable text → editable viewer.
   // Truly binary files (body stays a path) → FileViewer (metadata + download).
@@ -263,6 +269,7 @@ function ArtifactContentPanel({ artifact }: { artifact: ArtifactSnapshot }) {
           version={version}
           kind={kind}
           error={error}
+          converted={converted}
         />
       );
     }
@@ -620,12 +627,15 @@ function EditableTextViewer({
   version,
   kind,
   error,
+  converted = false,
 }: {
   artifact: ArtifactSnapshot;
   body: string;
   version: number;
   kind: string;
   error: string | null;
+  /** The body is Markdown converted from a document file: render it as such. */
+  converted?: boolean;
 }) {
   const [tab, setTab] = useState<'preview' | 'code'>('preview');
   const [editedBody, setEditedBody] = useState(body);
@@ -667,7 +677,7 @@ function EditableTextViewer({
   // const sharing = useArtifactShare(artifact.artifactId, autosave.flush);
 
   const isHtml = kind === 'html';
-  const isMarkdown = kind === 'markdown';
+  const isMarkdown = kind === 'markdown' || converted;
 
   return (
     <div className="flex flex-col h-full">

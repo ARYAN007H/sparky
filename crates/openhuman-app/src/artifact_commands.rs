@@ -25,7 +25,6 @@
 //! already vouches for. The filename hint is still sanitized so nothing is
 //! written outside the Downloads directory.
 
-use serde::Serialize;
 use std::path::{Path, PathBuf};
 
 /// Resolve an artifact id to the file the core's artifact store vouches for,
@@ -48,118 +47,6 @@ async fn copy_to_path(source: &Path, dest: &Path) -> Result<u64, String> {
     tokio::fs::copy(source, dest)
         .await
         .map_err(|e| format!("failed to copy artifact to {:?}: {e}", dest))
-}
-
-#[derive(Serialize)]
-pub struct ArtifactBodyResult {
-    pub kind: String,
-    pub title: String,
-    pub version: u32,
-    pub body: String,
-    pub is_text: bool,
-}
-
-/// Largest file the preview reads as text. A bigger file shows as a file
-/// (metadata and download) without being loaded into memory.
-const PREVIEW_MAX_BYTES: u64 = 10 * 1024 * 1024;
-
-/// An artifact id is one file name in the versioned store: anything that could
-/// name another file (a separator, `..`, a drive prefix) is refused.
-fn check_artifact_id(artifact_id: &str) -> Result<(), String> {
-    let id = artifact_id.trim();
-    if id.is_empty() || id.starts_with('.') || id.contains(['/', '\\', ':', '\0']) {
-        return Err(format!("invalid artifact id {artifact_id:?}"));
-    }
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn read_artifact_body(artifact_id: String) -> Result<ArtifactBodyResult, String> {
-    let config = openhuman_rpc::embed::config::load_host_config().await?;
-    // A file version may point into the agent's working folder or the files
-    // folders, the same places the artifact service accepts.
-    let roots = openhuman_rpc::embed::artifacts::FileRoots::from_config(&config)
-        .with_trusted([config.action_dir.clone()]);
-    read_body_in(&config.workspace_dir, &roots, &artifact_id).await
-}
-
-/// [`read_artifact_body`] for a given workspace and its trusted folders.
-async fn read_body_in(
-    workspace_dir: &Path,
-    roots: &openhuman_rpc::embed::artifacts::FileRoots,
-    artifact_id: &str,
-) -> Result<ArtifactBodyResult, String> {
-    check_artifact_id(artifact_id)?;
-    let artifact_id = artifact_id.trim();
-    let path = workspace_dir
-        .join("artifacts/versioned")
-        .join(format!("{artifact_id}.json"));
-    let json = tokio::fs::read_to_string(&path)
-        .await
-        .map_err(|e| format!("artifact {artifact_id} not found: {e}"))?;
-    let record: serde_json::Value = serde_json::from_str(&json)
-        .map_err(|e| format!("artifact {artifact_id} parse error: {e}"))?;
-    let kind = record["kind"].as_str().unwrap_or("text").to_string();
-    let title = record["title"].as_str().unwrap_or("artifact").to_string();
-    let versions = record["versions"]
-        .as_array()
-        .map(|v| v.len() as u32)
-        .unwrap_or(0);
-    let mut body = record["versions"]
-        .as_array()
-        .and_then(|v| v.last())
-        .and_then(|v| v["body"].as_str())
-        .unwrap_or("")
-        .to_string();
-    let mut is_text = kind != "file" && kind != "image";
-
-    // For file-kind artifacts the body is a path to a real file. Try to read
-    // its text content so the panel can render it (md/txt/html/etc).
-    // Truly binary files stay as paths — the panel shows metadata + download.
-    // A file outside the trusted folders (a hand-edited record) is never
-    // opened: it shows as a file, its path only.
-    if kind == "file" && !body.is_empty() && roots.holds(Path::new(&body)) {
-        let file_path = PathBuf::from(&body);
-        let small_enough = tokio::fs::metadata(&file_path)
-            .await
-            .is_ok_and(|meta| meta.len() <= PREVIEW_MAX_BYTES);
-        // First pass: try the native UTF-8 read (text files like .md, .txt)
-        match if small_enough {
-            tokio::fs::read(&file_path).await
-        } else {
-            Err(std::io::Error::other("too large to preview"))
-        } {
-            Ok(bytes) => {
-                let probe = &bytes[..bytes.len().min(8192)];
-                if !probe.contains(&0) && std::str::from_utf8(probe).is_ok() {
-                    if let Ok(text) = String::from_utf8(bytes) {
-                        body = text;
-                        is_text = true;
-                    }
-                }
-            }
-            Err(_) => {}
-        }
-        // If still no text and it's a .docx, try to extract text via Python
-        if !is_text
-            && small_enough
-            && file_path.extension().and_then(|e| e.to_str()) == Some("docx")
-        {
-            if let Ok(text) = crate::docx::extract_text(&file_path) {
-                if !text.is_empty() {
-                    body = text;
-                    is_text = true;
-                }
-            }
-        }
-    }
-    Ok(ArtifactBodyResult {
-        kind,
-        title,
-        version: versions,
-        body,
-        is_text,
-    })
 }
 
 /// Ask the user where to save an artifact (the OS save dialog, prefilled with
