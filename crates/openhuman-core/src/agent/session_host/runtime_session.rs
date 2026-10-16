@@ -427,8 +427,8 @@ impl OpenHumanTurnPrelude {
             if let Some(block) = tinyagents_graph::goals::active_goal_context_block(goal) {
                 context.push_str(&block);
             }
-            if let Some(hook) = crate::agent::goals::runtime::GoalBudgetStopHook::for_goal(
-                &self.workspace_dir,
+            if let Some(hook) = tinyagents_hooks::stop::GoalBudgetStopHook::for_goal(
+                crate::storage::sessions::stores_or_ephemeral(&self.workspace_dir).kv,
                 goal,
             ) {
                 run_context.stop_hooks.push(Arc::new(hook));

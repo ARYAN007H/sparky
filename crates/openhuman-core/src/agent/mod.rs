@@ -51,7 +51,6 @@ pub(crate) mod registration;
 /// session runtime. Generic history, transcript delta, prefix and tool
 /// snapshots are owned by `tinyagents-runtime`.
 pub mod session_host;
-pub mod stop_hooks;
 /// Product-specific adapters around `tinyagents_orchestration::subagent`.
 /// Generic lifecycle ordering and task-key coalescing live in TinyAgents;
 /// definitions, prompts, tools, policy, checkpoints and progress remain here.

@@ -49,7 +49,6 @@ mod policy_denial;
 pub(crate) mod reaper;
 mod routes;
 mod steering_forwarder;
-pub(crate) mod stop_hooks;
 pub(crate) mod tool_registration;
 mod turn_exec;
 mod turn_middleware;
