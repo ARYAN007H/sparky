@@ -34,7 +34,14 @@ impl OpenHumanSessionHost {
             self.host_env.core = crate::core::runtime::DispatchCtx::ambient().downgrade();
         }
         self.ensure_runtime_session()?;
-        let staged = super::attachment_input::stage_turn(self, user_message, origin).await?;
+        let staged = crate::agent::attachments::stage_turn(
+            user_message,
+            self.runtime_config.as_deref(),
+            self.workspace_descriptor.as_ref(),
+            self.thread_id.as_deref(),
+            origin,
+        )
+        .await?;
         let mut context = OpenHumanRunContext::new().with_host_env(&self.host_env);
         context.untrusted_input_turn = self.untrusted_input;
         context.origin = origin.cloned();
