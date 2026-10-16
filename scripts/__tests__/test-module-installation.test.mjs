@@ -481,6 +481,14 @@ for (const runner of ["test-rust-with-mock.sh", "test-rust-e2e.sh"]) {
   });
 }
 
+test("the Rust E2E runner reuses container-staged module paths", () => {
+  const installerSource = readFileSync(installer, "utf8");
+  const runnerSource = readFileSync(rustE2eRunner, "utf8");
+  assert.match(installerSource, /OPENHUMAN_TEST_MODULES_STAGED=1/);
+  assert.match(runnerSource, /OPENHUMAN_TEST_MODULES_STAGED/);
+  assert.match(runnerSource, /pre-staged native modules/);
+});
+
 test("the CI installer builds nothing: every module, tinyconnectors included, is a registry release", () => {
   const source = readFileSync(installer, "utf8");
   assert.doesNotMatch(source, /cargo build|cargo-cancel|--target-dir/);

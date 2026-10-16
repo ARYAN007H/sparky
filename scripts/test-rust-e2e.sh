@@ -223,6 +223,8 @@ source "$SCRIPT_DIR/modules/stage-local-modules.sh"
 e2e_source_ids=()
 if local_module_source_is_source; then
   e2e_source_ids+=(tinyconnectors tinysearch tinybox tinymcp)
+elif [ "${OPENHUMAN_TEST_MODULES_STAGED:-}" = "1" ]; then
+  echo "[rust-e2e] Using pre-staged native modules from OPENHUMAN_MODULE_PATH."
 else
   # Shell command analysis and the storage URL E2E suites load TinyBox through
   # the native module path; the ignored MCP registry cases need TinyMCP. Both
