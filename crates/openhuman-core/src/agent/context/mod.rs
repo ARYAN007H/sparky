@@ -23,15 +23,6 @@ pub mod manager;
 pub mod stats;
 
 pub use manager::{ContextManager, ContextStats};
-/// Default per-tool-result budget. The live TinyAgents tool-output middleware
-/// and action-workspace artifact previews enforce this outside the legacy
-/// context reducer modules.
-pub const DEFAULT_TOOL_RESULT_BUDGET_BYTES: usize = 16 * 1024;
-
-/// Placeholder used by the TinyAgents microcompact middleware when it clears
-/// older tool-result bodies.
-pub const CLEARED_PLACEHOLDER: &str = "[Old tool result content cleared]";
-
 /// Default number of most-recent tool-result envelopes the TinyAgents
 /// microcompact middleware leaves intact.
 pub const DEFAULT_KEEP_RECENT_TOOL_RESULTS: usize = 5;
