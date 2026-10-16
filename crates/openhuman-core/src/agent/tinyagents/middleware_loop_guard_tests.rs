@@ -25,8 +25,7 @@ async fn sampling_tool_output_still_hits_the_byte_budget_backstop() {
     let mw = truncation_probe_mw();
     let payload = large_sample_response_json(400);
     assert!(
-        payload.len()
-            > tinyagents_harness::config::TurnConfig::default().tool_result_budget_bytes,
+        payload.len() > tinyagents_harness::config::TurnConfig::default().tool_result_budget_bytes,
         "test payload must exceed the shared byte budget: {} bytes",
         payload.len()
     );
