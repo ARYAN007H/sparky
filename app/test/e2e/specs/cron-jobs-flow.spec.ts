@@ -242,9 +242,8 @@ describe('Cron jobs settings panel (real UI flow)', () => {
     // The removal RPC + optimistic re-render can take longer on the slower macOS
     // runner, so poll for up to 20s rather than 10s before declaring the row stuck.
     const gone = await browser.waitUntil(
-      async () =>
-        !(await browser.$(`[data-testid="cron-job-row-${morningBriefingId}"]`).isExisting()),
-      { timeout: 20_000, interval: 500, timeoutMsg: 'morning_briefing row never disappeared' }
+      async () => !(await browser.$(`[data-testid="cron-job-row-${removableJobId}"]`).isExisting()),
+      { timeout: 20_000, interval: 500, timeoutMsg: 'user-created cron row never disappeared' }
     );
     expect(gone).toBe(true);
 

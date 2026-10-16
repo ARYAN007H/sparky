@@ -15,8 +15,8 @@ import { callOpenhumanRpc } from '../helpers/core-rpc';
 import {
   clickSelector,
   getSwitchCheckedByLabel,
-  textExists,
   toggleSwitchByLabel,
+  visibleTextExists,
   waitForText,
 } from '../helpers/element-helpers';
 import { resetApp } from '../helpers/reset-app';
@@ -57,7 +57,7 @@ describe('Settings - Channels & Permissions', () => {
     // resetApp must finish dismissing the post-onboarding Joyride before a
     // settings flow starts; otherwise the spotlight overlay intercepts the
     // hash navigation and leaves the app on Chat.
-    expect(await textExists('Skip tour')).toBe(false);
+    expect(await visibleTextExists('Skip tour')).toBe(false);
 
     // The messaging panel now offers "Set as default" only on *connected*
     // channels. In a fresh workspace the only always-connected channel is Web

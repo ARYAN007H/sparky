@@ -20,7 +20,12 @@
  */
 import { waitForApp, waitForAppReady } from './app-helpers';
 import { callOpenhumanRpc } from './core-rpc';
-import { clickText, textExists, waitForWebView, waitForWindowVisible } from './element-helpers';
+import {
+  clickText,
+  visibleTextExists,
+  waitForWebView,
+  waitForWindowVisible,
+} from './element-helpers';
 import { triggerAuthLoopbackBypass } from './loopback-auth-helpers';
 import { supportsExecuteScript } from './platform';
 import { dismissBootCheckGateIfVisible, waitForHomePage, walkOnboarding } from './shared-flows';
@@ -51,7 +56,7 @@ function stepLog(message: string): void {
 /** Dismiss the Joyride tour if it starts after the home route becomes ready. */
 async function dismissLateWalkthrough(): Promise<void> {
   const appeared = await browser
-    .waitUntil(async () => textExists('Skip tour'), {
+    .waitUntil(async () => visibleTextExists('Skip tour'), {
       timeout: 4_000,
       interval: 250,
       timeoutMsg: 'waiting for the walkthrough Skip tour action',
@@ -61,7 +66,7 @@ async function dismissLateWalkthrough(): Promise<void> {
   if (!appeared) return;
 
   await clickText('Skip tour', 2_000);
-  await browser.waitUntil(async () => !(await textExists('Skip tour')), {
+  await browser.waitUntil(async () => !(await visibleTextExists('Skip tour')), {
     timeout: 5_000,
     interval: 250,
     timeoutMsg: 'walkthrough Skip tour action remained visible after dismissal',
