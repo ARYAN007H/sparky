@@ -662,6 +662,8 @@ mod migration_and_side_effect_tests;
 mod resume_checkpoint_tests;
 #[path = "ops_run_lifecycle_tests.rs"]
 mod run_lifecycle_tests;
+#[path = "ops_run_finalizer_tests.rs"]
+mod run_finalizer_tests;
 #[path = "ops_run_rows_and_notifications_tests.rs"]
 mod run_rows_and_notifications_tests;
 #[path = "ops_run_status_and_prompt_binding_tests.rs"]
