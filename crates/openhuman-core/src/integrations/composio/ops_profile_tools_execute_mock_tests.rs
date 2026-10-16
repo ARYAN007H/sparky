@@ -94,9 +94,14 @@ async fn composio_list_tools_via_mock_with_filter() {
     let base = start_mock_backend(app).await;
     let tmp = tempfile::tempdir().unwrap();
     let config = config_with_backend(&tmp, base);
-    let outcome = composio_list_tools(&config, Some(vec!["gmail".into()]), None)
-        .await
-        .unwrap();
+    let outcome = composio_list_tools(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        Some(vec!["gmail".into()]),
+        None,
+    )
+    .await
+    .unwrap();
     assert_eq!(outcome.value.tools.len(), 2);
 }
 
@@ -122,9 +127,14 @@ async fn composio_list_tools_lets_the_module_apply_the_scope_preference_and_cata
     let base = start_mock_backend(app).await;
     let tmp = tempfile::tempdir().unwrap();
     let config = config_with_backend(&tmp, base);
-    let outcome = composio_list_tools(&config, Some(vec!["gmail".into()]), None)
-        .await
-        .unwrap();
+    let outcome = composio_list_tools(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        Some(vec!["gmail".into()]),
+        None,
+    )
+    .await
+    .unwrap();
     let names: Vec<&str> = outcome
         .value
         .tools
@@ -217,10 +227,22 @@ async fn composio_list_tools_honours_a_preference_still_in_the_legacy_file() {
     .await
     .unwrap();
 
-    let outcome = composio_list_tools(&config, Some(vec!["gmail".into()]), None).await;
+    let outcome = composio_list_tools(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        Some(vec!["gmail".into()]),
+        None,
+    )
+    .await;
     // The module's preference store is process-wide: put the default back
     // before asserting so a failure cannot leak `write=false` into other tests.
-    let restored = save_user_scope_pref(&config, "gmail", Default::default()).await;
+    let restored = save_user_scope_pref(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        "gmail",
+        Default::default(),
+    )
+    .await;
     let outcome = outcome.unwrap();
     restored.unwrap();
 

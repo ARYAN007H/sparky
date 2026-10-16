@@ -129,7 +129,7 @@ impl ToolBackend for ComposioToolBackend {
         // doc for why this differs from the general agent tool-call path).
         // Runs before anything else — a rejected slug never reaches the
         // composio client at all.
-        if !super::super::is_curated_flow_tool(&live_config, slug).await {
+        if !super::super::is_curated_flow_tool(ctx.dispatch, &live_config, slug).await {
             tracing::warn!(
                 target: "flows",
                 %slug,

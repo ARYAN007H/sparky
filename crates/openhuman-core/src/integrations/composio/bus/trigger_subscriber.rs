@@ -109,7 +109,7 @@ impl EventHandler<DomainEvent> for ComposioTriggerSubscriber {
                             ..Default::default()
                         },
                     };
-                    if let Err(error) = store.record(&config, event).await {
+                    if let Err(error) = store.record(&ctx, &config, event).await {
                         tracing::warn!(error = %error, "[composio][history] failed to archive trigger");
                     }
                 }

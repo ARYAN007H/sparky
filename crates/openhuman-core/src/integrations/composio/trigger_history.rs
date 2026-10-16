@@ -11,6 +11,7 @@ use super::types::{
     ComposioTriggerEvent, ComposioTriggerHistoryEntry, ComposioTriggerHistoryResult,
 };
 use crate::config::Config;
+use crate::core::runtime::DispatchCtx;
 use tinybus::module::ModuleClient;
 use tinyconnectors_bus::names::methods;
 
@@ -80,6 +81,7 @@ impl TriggerHistory {
 
     async fn acquire(
         &self,
+        ctx: &DispatchCtx,
         config: &Config,
     ) -> Result<tokio::sync::OwnedMutexGuard<Option<Lease>>, String> {
         let lease = Arc::clone(&self.lease);
@@ -87,14 +89,13 @@ impl TriggerHistory {
         let client = self.client(&config);
         // Keep ownership installation running if the caller is cancelled while
         // OpenArchive completes. A later close can still release the handle.
-        crate::core::runtime::DispatchCtx::ambient()
-            .spawn(async move {
-                let mut guard = lease.lock_owned().await;
-                Self::ensure_lease(&config, &mut guard, client).await?;
-                Ok(guard)
-            })
-            .await
-            .map_err(|_| "trigger archive ownership task failed".to_owned())?
+        ctx.spawn(async move {
+            let mut guard = lease.lock_owned().await;
+            Self::ensure_lease(&config, &mut guard, client).await?;
+            Ok(guard)
+        })
+        .await
+        .map_err(|_| "trigger archive ownership task failed".to_owned())?
     }
 
     async fn release(lease: &mut Option<Lease>) -> Result<(), String> {
@@ -116,10 +117,11 @@ impl TriggerHistory {
     /// Archive one delivered event, serialized with reads and scope changes.
     pub async fn record(
         &self,
+        ctx: &DispatchCtx,
         config: &Config,
         event: ComposioTriggerEvent,
     ) -> Result<ComposioTriggerHistoryEntry, String> {
-        let lease = self.acquire(config).await?;
+        let lease = self.acquire(ctx, config).await?;
         let handle = lease.as_ref().expect("lease installed").handle.clone();
         lease
             .as_ref()
@@ -137,10 +139,11 @@ impl TriggerHistory {
     /// Read persisted history without changing the user's connector route.
     pub async fn read(
         &self,
+        ctx: &DispatchCtx,
         config: &Config,
         limit: Option<usize>,
     ) -> Result<ComposioTriggerHistoryResult, String> {
-        let lease = self.acquire(config).await?;
+        let lease = self.acquire(ctx, config).await?;
         let handle = lease.as_ref().expect("lease installed").handle.clone();
         lease
             .as_ref()
