@@ -3,6 +3,18 @@
 
 use std::sync::Arc;
 
+/// Where a derived context gets its autonomy tier for live host gates.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum AutonomyTierSource {
+    /// Reload the context's anchored config file for each gated operation.
+    #[default]
+    LiveConfig,
+    /// Keep the effective tier supplied by an in-memory agent configuration.
+    Captured,
+    /// Keep the host-only read-only restriction even if config changes.
+    ReadOnlyCeiling,
+}
+
 /// Per-agent overrides layered onto a booted context by
 /// [`CoreContext::derive_with`](super::CoreContext::derive_with).
 ///
@@ -42,6 +54,8 @@ pub struct ContextOverlay {
     /// The agent's own security policy: autonomy tier, auto-approve list,
     /// action budget. `None` keeps the parent's.
     pub agent_policy: Option<Arc<crate::security::SecurityPolicy>>,
+    /// Source binding for autonomy-tier gates under this context.
+    pub autonomy_tier_source: AutonomyTierSource,
     /// Turn the interactive approval gate off for this agent.
     pub approvals_disabled: bool,
     /// The agent's own sub-agent catalogue. `None` keeps the parent's.
@@ -64,6 +78,7 @@ impl ContextOverlay {
             session_agent: None,
             profile: None,
             agent_policy: None,
+            autonomy_tier_source: AutonomyTierSource::LiveConfig,
             approvals_disabled: false,
             definitions: None,
         }
@@ -100,6 +115,18 @@ impl ContextOverlay {
     /// Give the derived context its own security policy.
     pub fn agent_policy(mut self, policy: Arc<crate::security::SecurityPolicy>) -> Self {
         self.agent_policy = Some(policy);
+        self
+    }
+
+    /// Keep autonomy tier bound to this context's effective in-memory config.
+    pub fn captured_autonomy_tier(mut self) -> Self {
+        self.autonomy_tier_source = AutonomyTierSource::Captured;
+        self
+    }
+
+    /// Keep this context's effective autonomy tier at ReadOnly.
+    pub fn read_only_autonomy_ceiling(mut self) -> Self {
+        self.autonomy_tier_source = AutonomyTierSource::ReadOnlyCeiling;
         self
     }
 

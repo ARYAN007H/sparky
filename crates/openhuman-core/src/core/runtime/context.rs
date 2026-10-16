@@ -85,6 +85,9 @@ pub struct CoreContext {
     /// the model. Defaults to every group withheld, which is what the
     /// compiled-in pack table meant before the type existed.
     tool_groups: crate::tools::toolpacks::ToolGroups,
+    /// Whether autonomy-tier checks reload config or retain this context's
+    /// effective in-memory tier.
+    autonomy_tier_source: super::AutonomyTierSource,
     /// Which tiny dependencies the config switched off (`[components]`). Only
     /// narrows: `domains` and `tool_groups` are already clamped by it, and this
     /// is kept so dispatch can answer `COMPONENT_DISABLED:<name>` for a method
@@ -286,6 +289,7 @@ impl CoreContext {
             }))),
             domains,
             tool_groups,
+            autonomy_tier_source: super::AutonomyTierSource::LiveConfig,
             components,
             embedder_config,
             user_skill_roots: true,
@@ -418,6 +422,7 @@ impl CoreContext {
             workspace_binding: RwLock::new(shared_binding),
             domains,
             tool_groups: overlay.tool_groups,
+            autonomy_tier_source: overlay.autonomy_tier_source,
             components: self.components,
             embedder_config: Some(overlay.config),
             user_skill_roots: overlay.user_skill_roots,
@@ -435,6 +440,11 @@ impl CoreContext {
     /// this context was derived for one.
     pub fn session_agent(&self) -> Option<&str> {
         self.session_agent.as_deref()
+    }
+
+    /// Source binding for autonomy-tier decisions made by long-lived adapters.
+    pub fn autonomy_tier_source(&self) -> super::AutonomyTierSource {
+        self.autonomy_tier_source
     }
 
     /// The backend transport bound to this context, if the host supplied one.
