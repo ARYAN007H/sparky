@@ -236,6 +236,9 @@ pub mod security {
                 list_provider_credentials, store_provider_credentials,
             };
         }
+        pub mod api_key {
+            pub use openhuman_core::security::credentials::api_key::store_api_key;
+        }
         pub mod session_support {
             pub use openhuman_core::security::credentials::session_support::{
                 build_session_state, current_session_is_local, resolve_backend_credential,

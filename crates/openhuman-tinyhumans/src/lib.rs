@@ -89,7 +89,8 @@ mod register;
 mod runtime;
 pub mod session;
 pub mod transport;
-pub(crate) mod voice;
+#[cfg(feature = "voice")]
+pub mod voice;
 
 pub use backend::{product_identity, set_product_identity, ProductIdentity};
 pub use hosted::extension as hosted_controllers;

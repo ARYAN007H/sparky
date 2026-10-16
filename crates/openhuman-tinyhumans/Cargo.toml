@@ -25,7 +25,7 @@ documents = ["openhuman-embed/documents"]
 hosting = ["openhuman-embed/hosting"]
 tinymemes = ["openhuman-embed/tinymemes"]
 modules = ["openhuman-embed/modules"]
-voice = ["openhuman-embed/voice"]
+voice = ["openhuman-embed/voice", "dep:tinyagents-live"]
 web3 = ["openhuman-embed/web3"]
 # Storage drivers for `[storage] url` (see the core `storage` domain).
 storage-sqlite = ["openhuman-embed/storage-sqlite"]
@@ -79,6 +79,10 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "mul
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
+# Hosted speech (`voice` feature): the live-provider types the hosted Gemini /
+# ElevenLabs sessions build, and the transcription / reply-speech wire helpers.
+tinyagents-live = { path = "../../vendor/tinyagents/crates/tinyagents-live", optional = true }
+tinyinference-voice = { path = "../../vendor/tinyagents/vendor/tinyinference/crates/tinyinference-voice", features = ["schemars"] }
 tinyinference-providers = { path = "../../vendor/tinyagents/vendor/tinyinference/crates/tinyinference-providers" }
 urlencoding = "2.1"
 tracing = "0.1"

@@ -9,13 +9,16 @@
 //! second `install` is harmless.
 
 use crate::install::InstallOptions;
-use crate::{channels, client, inference, integrations, memory, voice};
+#[cfg(feature = "voice")]
+use crate::voice;
+use crate::{channels, client, inference, integrations, memory};
 
 /// Registers every area's hooks with the core.
 pub(crate) fn register_all(options: &InstallOptions) {
     log::debug!("[tinyhumans] register_all: registering core hooks");
     client::register(options);
     integrations::register(options);
+    #[cfg(feature = "voice")]
     voice::register(options);
     inference::register(options);
     channels::register(options);
