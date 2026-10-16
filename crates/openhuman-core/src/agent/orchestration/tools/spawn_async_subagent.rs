@@ -158,8 +158,8 @@ async fn steer_reusable_session(
             tinytools::ToolCategory::System,
             ToolTimeout::Inherit,
         );
-    let result = dispatch
-        .execute(
+    let result = ToolDispatch::execute(
+            &dispatch,
             &(),
             tinyagents_harness::CallId::new(format!("reuse-steer-{session_id}")),
             json!({

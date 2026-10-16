@@ -180,14 +180,13 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
             ToolTimeout::Unbounded,
         );
     let args = serde_json::json!({ "input": input, "mode": "inline" });
-    let tool_result = dispatcher
-        .execute(
+    let tool_result = Box::pin(dispatcher.execute(
             &(),
             tinyagents_harness::CallId::new(format!("spawn-{task_id}")),
             args,
             ToolCallOptions::default(),
             parent,
-        )
+        ))
         .await
         .map_err(|error| SubagentRunError::Provider(anyhow::anyhow!(error.to_string())))?;
     let reply: serde_json::Value = serde_json::from_str(&tool_result.output()).map_err(|error| {
