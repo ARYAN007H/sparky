@@ -1,7 +1,6 @@
 //! `SessionHostBuilder::build` — validates and assembles the final [`OpenHumanSessionHost`].
 
 use super::{dedup_visible_tool_specs, visible_tool_specs_for_policy};
-use crate::agent::context::ContextManager;
 use crate::agent::session_host::types::{OpenHumanSessionHost, SessionHostBuilder};
 use anyhow::Result;
 use std::sync::Arc;
@@ -305,17 +304,7 @@ impl SessionHostBuilder {
             .model_name
             .unwrap_or_else(|| crate::config::DEFAULT_MODEL.into());
 
-        // Assemble the per-session ContextManager. The manager owns
-        // the prompt builder, the reduction pipeline, and the
-        // summarizer — every concern that touches "what's in the
-        // model's context window" routes through this single handle.
         let context_config = self.context_config.unwrap_or_default();
-
-        // Live history reduction moved to the tinyagents graph
-        // (`ContextCompressionMiddleware` + `MessageTrimMiddleware`, issue
-        // #4249), so the session no longer constructs an in-turn summarizer
-        // here.
-        let context = ContextManager::new(&context_config, prompt_builder);
 
         let workspace_dir = self.workspace_dir.unwrap_or_else(|| {
             self.runtime_config
@@ -423,6 +412,8 @@ impl SessionHostBuilder {
             requested_deferred_tools: Arc::from(self.deferred_tools.clone()),
             subagent_tool_ceiling_names,
             tool_policy_session,
+            prompt_builder: Arc::new(prompt_builder),
+            context_config,
             tool_dispatcher: std::sync::Arc::from(
                 self.tool_dispatcher
                     .ok_or_else(|| anyhow::anyhow!("tool_dispatcher is required"))?,
@@ -471,7 +462,6 @@ impl SessionHostBuilder {
             },
             session_parent_prefix: self.session_parent_prefix,
             session: None,
-            context: std::sync::Arc::new(std::sync::Mutex::new(context)),
             on_progress: None,
             run_queue: None,
             connected_integrations: Vec::new(),
