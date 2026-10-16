@@ -134,6 +134,54 @@ impl ManagedTransport {
     }
 }
 
+/// The callback a registered channel callback
+/// ([`crate::channels::callback_slot`]) serves progressive delivery through,
+/// in place of [`ManagedTransport`].
+struct SlotTransport {
+    callback: crate::channels::callback_slot::ChannelCallback,
+    config: crate::config::Config,
+    channel: String,
+    session: tokio_util::sync::CancellationToken,
+}
+
+#[tinybus::interface(name = "ai.tinyhumans.tinychannels.ChannelsHost")]
+impl SlotTransport {
+    async fn dispatch_controller_backend(
+        &self,
+        request: ChannelBackendRequest,
+    ) -> tinybus::Result<ChannelBackendResult> {
+        let ChannelBackendRequest::ProgressiveTransport(request) = request else {
+            return Err(tinybus::Error::failed("callback capability unavailable"));
+        };
+        if request_channel(&request) != self.channel {
+            return Ok(ChannelBackendResult::ProgressiveTransport(
+                ProgressiveTransportResult::Failed,
+            ));
+        }
+        let ctx = crate::channels::callback_slot::ChannelCallbackCtx {
+            config: self.config.clone(),
+            channel: Some(self.channel.clone()),
+            session: self.session.clone(),
+        };
+        let call = (self.callback)(ctx, ChannelBackendRequest::ProgressiveTransport(request));
+        tokio::select! {
+            biased;
+            _ = self.session.cancelled() => Ok(ChannelBackendResult::ProgressiveTransport(
+                ProgressiveTransportResult::Unavailable,
+            )),
+            result = call => match result {
+                Ok(result) => Ok(result),
+                Err(error) => {
+                    tracing::debug!(%error, "[channels][delivery] registered callback failed");
+                    Ok(ChannelBackendResult::ProgressiveTransport(
+                        map_backend_error(error),
+                    ))
+                }
+            },
+        }
+    }
+}
+
 /// The host projects ordered turn facts; the module owns timers and delivery state.
 pub(super) struct ModuleProgressiveReply {
     runtime: ChannelRuntimeLease,
@@ -146,7 +194,26 @@ impl ModuleProgressiveReply {
         channel: String,
         session: tokio_util::sync::CancellationToken,
     ) -> anyhow::Result<Self> {
+        if let Some(callback) = crate::channels::callback_slot::current() {
+            tracing::debug!("[channels][delivery] progressive delivery via the registered callback");
+            anyhow::ensure!(!session.is_cancelled(), "Channel session closed");
+            let transport = SlotTransport {
+                callback,
+                config: config.clone(),
+                channel: channel.clone(),
+                session,
+            };
+            return Self::open_with(config, channel, transport).await;
+        }
         let callback = ManagedTransport::capture(&config, channel.clone(), session)?;
+        Self::open_with(config, channel, callback).await
+    }
+
+    async fn open_with(
+        config: crate::config::Config,
+        channel: String,
+        callback: impl tinybus::service::Interface + 'static,
+    ) -> anyhow::Result<Self> {
         let runtime = ChannelRuntimeLease::open(crate::modules::client(config), callback).await?;
         let result: ProgressiveResult = runtime
             .object()

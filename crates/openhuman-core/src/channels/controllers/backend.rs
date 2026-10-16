@@ -59,6 +59,22 @@ impl OpenHumanChannelBackend {
     ) -> anyhow::Result<tinychannels_bus::ChannelBackendResult> {
         use tinychannels_bus::{ChannelBackendRequest as Request, ChannelBackendResult as Result};
 
+        // A registered callback (`channels::callback_slot`) serves the
+        // progressive transport ahead of the "separate adapter" refusal below.
+        if matches!(request, Request::ProgressiveTransport(_)) {
+            if let Some(callback) = crate::channels::callback_slot::current() {
+                return callback(
+                    crate::channels::callback_slot::ChannelCallbackCtx {
+                        config: self.config.clone(),
+                        channel: None,
+                        session: tokio_util::sync::CancellationToken::new(),
+                    },
+                    request,
+                )
+                .await;
+            }
+        }
+
         match request {
             Request::RemoteControl(_) | Request::ProgressiveTransport(_) => {
                 anyhow::bail!("request is served by a separate callback adapter")
