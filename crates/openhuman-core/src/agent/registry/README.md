@@ -136,9 +136,9 @@ ranking works.
   `DomainGroup::Agent`.
 - [`config/schema/`](../../config/schema/): `Config.agent_registry: AgentRegistryConfig` is the
   persisted store every `ops.rs` function reads and writes.
-- [`agent/harness/builtin_definitions.rs`](../harness/builtin_definitions.rs): `load_builtins()` seeds the
-  process-global `AgentDefinitionRegistry`; [`agent/harness/host_definition.rs`](../harness/host_definition.rs)
-  calls `validate_tier_hierarchy` again after workspace overrides merge.
+- [`agent/harness/host_definition.rs`](../harness/host_definition.rs): seeds the
+  process-global `AgentDefinitionRegistry` from `registry::agents::load_builtins()`;
+  TinyAgents validates the merged hierarchy when workspace overrides load.
 - [`agent/session_host/builder/factory.rs`](../session_host/builder/factory.rs):
   `Agent::from_config_for_agent` falls back to `find_custom_in_config` +
   `definition_from_registry_entry` when an id is not in the harness registry.
