@@ -33,6 +33,18 @@ async fn save_tier_config(config: &Config) {
     config.save().await.unwrap();
 }
 
+fn has_issue48_workflow_origin(ctx: &crate::core::runtime::DispatchCtx) -> bool {
+    matches!(
+        ctx.turn_origin(),
+        Some(crate::agent::turn_origin::AgentTurnOrigin::TrustedAutomation {
+            job_id,
+            source: crate::agent::turn_origin::TrustedAutomationSource::Workflow {
+                require_approval: true,
+            },
+        }) if job_id == "issue48-flow-run"
+    )
+}
+
 #[tokio::test]
 async fn one_live_capability_observes_full_readonly_full_updates() {
     use crate::security::AutonomyLevel;
@@ -53,7 +65,7 @@ async fn one_live_capability_observes_full_readonly_full_updates() {
         },
     };
     let ctx = live_tier_context(&config).with_turn_origin(origin.clone());
-    assert_eq!(ctx.turn_origin(), Some(origin.clone()));
+    assert!(has_issue48_workflow_origin(&ctx));
     let mut baseline =
         SecurityPolicy::from_config(&config.autonomy, &config.workspace_dir, &config.action_dir);
     baseline.trusted_roots.push(crate::security::TrustedRoot {
@@ -73,9 +85,8 @@ async fn one_live_capability_observes_full_readonly_full_updates() {
             .unwrap(),
         GateDecision::Allow
     );
-    assert_eq!(
-        ctx.turn_origin(),
-        Some(origin.clone()),
+    assert!(
+        has_issue48_workflow_origin(&ctx),
         "refreshing the policy must retain the dispatch's workflow origin"
     );
     config.autonomy.level = AutonomyLevel::ReadOnly;
@@ -95,7 +106,7 @@ async fn one_live_capability_observes_full_readonly_full_updates() {
         GateDecision::Allow,
         "a config-derived tier must be allowed to upgrade again"
     );
-    assert_eq!(ctx.turn_origin(), Some(origin));
+    assert!(has_issue48_workflow_origin(&ctx));
 }
 
 #[tokio::test]
