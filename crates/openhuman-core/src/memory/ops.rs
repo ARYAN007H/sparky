@@ -9,7 +9,8 @@
 use chrono::Utc;
 use tinymemory_api::{
     EraseRequest, FetchRequest, ForgetTarget, ItemId, LearningKind, ListRequest, MemoryMeta,
-    MetaFilter, RecallRequest, StoreItem, StoreReceipt, TimeHint, WriteOptions,
+    MetaFilter, RecallMode, RecallRequest, StoreItem, StoreReceipt, ThreadWindow, TimeHint,
+    WriteOptions,
 };
 
 use crate::config::Config;
@@ -170,6 +171,19 @@ fn time_hint(config: &Config, refers_to: Option<RefersTo>) -> MemoryResult<Optio
 
 /// `memory_recall`.
 pub async fn recall(config: &Config, params: RecallParams) -> MemoryResult<RecallView> {
+    recall_with(config, params, RecallMode::Answer, None).await
+}
+
+/// [`recall`] in `mode`, leaving `exclude_thread`'s turns out. The agent's
+/// memory tool asks for [`RecallMode::Evidence`] (its own model answers) and
+/// excludes the thread it runs in, whose user turn is logged before the tool
+/// reads and would otherwise come back as a memory.
+pub async fn recall_with(
+    config: &Config,
+    params: RecallParams,
+    mode: RecallMode,
+    exclude_thread: Option<ThreadWindow>,
+) -> MemoryResult<RecallView> {
     let bound = bound(config)?;
     let request = RecallRequest {
         question: params.question,
@@ -177,12 +191,15 @@ pub async fn recall(config: &Config, params: RecallParams) -> MemoryResult<Recal
         limit: clamp_limit(params.limit),
         instructions: None,
         refers_to: time_hint(config, params.refers_to)?,
+        exclude_thread,
+        mode,
     };
     request.validate()?;
     let answer = bound.engine.recall(request).await?;
     tracing::debug!(
         engine = %bound.id,
         citations = answer.citations.len(),
+        ?mode,
         "[memory:ops] recall answered"
     );
     Ok(RecallView {
@@ -195,6 +212,15 @@ pub async fn recall(config: &Config, params: RecallParams) -> MemoryResult<Recal
 /// `memory_fetch`. An unset mode uses the engine's first declared mode; a
 /// mode the engine does not declare is `UNSUPPORTED`.
 pub async fn fetch(config: &Config, params: FetchParams) -> MemoryResult<FetchView> {
+    fetch_with(config, params, None).await
+}
+
+/// [`fetch`] leaving `exclude_thread`'s turns out (see [`recall_with`]).
+pub async fn fetch_with(
+    config: &Config,
+    params: FetchParams,
+    exclude_thread: Option<ThreadWindow>,
+) -> MemoryResult<FetchView> {
     let bound = bound(config)?;
     let descriptor = bound.engine.descriptor();
     let mode = match params.mode {
@@ -216,6 +242,7 @@ pub async fn fetch(config: &Config, params: FetchParams) -> MemoryResult<FetchVi
         beliefs: 0,
         max_scopes: None,
         refers_to: time_hint(config, params.refers_to)?,
+        exclude_thread,
     };
     request.validate()?;
     let page = bound.engine.fetch(request).await?;

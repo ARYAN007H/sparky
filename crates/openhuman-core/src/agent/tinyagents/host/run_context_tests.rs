@@ -685,3 +685,44 @@ fn a_run_kept_past_its_turn_does_not_pin_the_tenant() {
     // outlive a turn reference it weakly.
     assert!(!core.tenant_in_use());
 }
+
+#[test]
+fn the_turns_still_in_the_prompt_reach_the_runs_tools() {
+    let config = crate::config::Config::default();
+    let mut host = OpenHumanRunContext::new();
+    host.memory_turn = Some(std::sync::Arc::new(
+        crate::memory::lifecycle::hooks::MemoryTurn {
+            identity: crate::memory::scope::MemoryIdentity::agent("a").resolve(&config),
+            config: std::sync::Arc::new(config),
+            thread_id: "thread-long".into(),
+            pack: None,
+            in_prompt_from: std::sync::Arc::new(
+                crate::memory::lifecycle::window::InPromptFrom::new(12, 20),
+            ),
+            core: None,
+        },
+    ));
+    let run = host.into_tinyagents(tinyagents_harness::context::RunConfig::new("memory-window"));
+    let call = tinyagents_harness::tool::ToolExecutionContext::from_run_context(
+        &run,
+        tinyagents_harness::ids::CallId::new("memory-window-call"),
+    );
+    assert_eq!(
+        memory_in_prompt_for_tool(Some(&call)),
+        Some(tinymemory_api::ThreadWindow {
+            thread_id: "thread-long".into(),
+            from_turn: 12,
+        })
+    );
+
+    // A run without the turn's memory (a sub-agent's, a direct dispatch)
+    // knows no window.
+    let bare = OpenHumanRunContext::new()
+        .into_tinyagents(tinyagents_harness::context::RunConfig::new("no-memory"));
+    let call = tinyagents_harness::tool::ToolExecutionContext::from_run_context(
+        &bare,
+        tinyagents_harness::ids::CallId::new("no-memory-call"),
+    );
+    assert_eq!(memory_in_prompt_for_tool(Some(&call)), None);
+    assert_eq!(memory_in_prompt_for_tool(None), None);
+}
