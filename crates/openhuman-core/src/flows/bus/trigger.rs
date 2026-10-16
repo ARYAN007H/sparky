@@ -8,13 +8,15 @@ use crate::core::events::DomainEvent;
 use crate::flows::store;
 use async_trait::async_trait;
 use serde_json::Value;
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use tinybus::EventHandler;
 use tinyflows::model::TriggerKind;
 use tinyflows_catalog::Flow;
+use tokio::sync::{mpsc, Mutex as AsyncMutex};
 
 /// Reads `trigger_kind` from a flow's trigger node config, deserializing into
 /// `tinyflows::model::TriggerKind`. Returns `None` when the flow doesn't have
@@ -77,18 +79,29 @@ pub(super) fn matches_app_event(flow: &Flow, toolkit: &str, trigger_slug: &str) 
 /// enabled flows. See the module doc for the full contract.
 pub struct FlowTriggerSubscriber {
     config: Arc<Config>,
-    /// Process-local dedupe of trigger-driven dispatch, keyed by `flow_id`
-    /// (CodeRabbit finding B — overlapping runs for the same flow). A fast
-    /// cadence or trigger burst can otherwise fire `spawn_run` for the same
-    /// flow multiple times before the first run finishes, racing
-    /// `last_run_at`/`last_status` and doing duplicate work. This is
-    /// intentionally scoped to trigger-driven dispatch (this subscriber) —
-    /// the interactive `flows_run` RPC is NOT deduped, since a user
-    /// explicitly asking to run a flow again (e.g. while a scheduled run is
-    /// still in flight) is fine.
-    in_flight: Arc<Mutex<HashSet<String>>>,
+    queues: Arc<Mutex<HashMap<DispatchKey, Arc<FlowRunQueue>>>>,
     runner: Arc<RunExecutor>,
     queue_capacity: usize,
+    #[cfg(test)]
+    retiring: Arc<tokio::sync::Notify>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+struct DispatchKey {
+    tenant: crate::core::runtime::Tenant,
+    flow_id: String,
+}
+
+struct FlowRunQueue {
+    sender: mpsc::Sender<QueuedRun>,
+    admission: Arc<AsyncMutex<()>>,
+    outstanding: AtomicUsize,
+}
+
+struct QueuedRun {
+    ctx: crate::core::runtime::DispatchCtx,
+    config: Arc<Config>,
+    request: TriggerRunRequest,
 }
 
 pub(crate) struct TriggerRunRequest {
