@@ -11,11 +11,11 @@ use openhuman_core::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use common::{offline_config, runtime, stub_backend};
-use openhuman_core::core::ControllerSchema;
 use openhuman_core::core::all::{ControllerFuture, RegisteredController};
+use openhuman_core::core::ControllerSchema;
 use openhuman_embed::seams::{ControllerExtension, DomainGroup, LearningSink, SecurityPolicy};
-use openhuman_embed::{Runtime, Workspace, schema_for_rpc_method};
-use serde_json::{Map, Value, json};
+use openhuman_embed::{schema_for_rpc_method, Runtime, Workspace};
+use serde_json::{json, Map, Value};
 
 const METHOD: &str = "openhuman.embed_seam_probe_ping";
 const POLICY_MARKER: u32 = 4242;
@@ -48,7 +48,7 @@ impl LearningSink for ProbeHook {
     async fn on_turn_complete(
         &self,
         _ctx: &openhuman_embed::seams::TurnSummary,
-    ) -> anyhow::Result<()> {
+    ) -> tinyagents_harness::error::Result<()> {
         Ok(())
     }
 }
