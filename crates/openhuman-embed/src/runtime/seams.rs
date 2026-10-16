@@ -23,7 +23,7 @@
 use std::sync::Arc;
 
 use openhuman_core::agent::hooks::{
-    embedder_post_turn_hook_named, embedder_post_turn_hooks, embedder_tool_hooks,
+    embedder_post_turn_hook_named, embedder_tool_hooks,
     replace_embedder_post_turn_hook, replace_embedder_tool_hook,
 };
 use crate::seams::{LearningSink, OpenHumanRunContext, ToolHook};
@@ -157,13 +157,12 @@ impl HostSeams {
         let post_turn_hooks = self
             .post_turn_hooks
             .into_iter()
-            .enumerate()
-            .map(|(index, hook)| {
+            .map(|hook| {
                 static NEXT_LEARNING_SINK: std::sync::atomic::AtomicU64 =
                     std::sync::atomic::AtomicU64::new(0);
                 let name = format!(
                     "embedder.learning_sink.{:020}",
-                    NEXT_LEARNING_SINK.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + index as u64
+                    NEXT_LEARNING_SINK.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
                 );
                 let previous = embedder_post_turn_hook_named(&name);
                 replace_embedder_post_turn_hook(&name, Some(Arc::clone(&hook)));
