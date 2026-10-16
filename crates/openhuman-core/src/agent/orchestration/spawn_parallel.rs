@@ -32,13 +32,13 @@ mod staging;
 mod types;
 mod workers;
 
-pub(crate) use collect::{SpawnParallelGraphOutcome, format_spawn_parallel_success};
+pub(crate) use collect::{format_spawn_parallel_success, SpawnParallelGraphOutcome};
 pub(crate) use run::run_spawn_parallel_tasks_with_cancellation_and_workspace;
 pub(crate) use types::ParallelAgentTask;
 
 #[cfg(test)]
 pub(crate) use staging::{
-    ParallelTaskRejectionKind, SpawnParallelTaskPreflight, prepare_spawn_parallel_tasks_from_defs,
+    prepare_spawn_parallel_tasks_from_defs, ParallelTaskRejectionKind, SpawnParallelTaskPreflight,
 };
 #[cfg(test)]
 pub(crate) use types::{ParallelAgentLineage, ParallelAgentResult, ParallelAgentStatus};

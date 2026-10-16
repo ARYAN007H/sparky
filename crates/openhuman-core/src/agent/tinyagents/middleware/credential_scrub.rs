@@ -3,8 +3,8 @@
 //! token, which is minted by the host and must survive the scrubber.
 
 use tinyagents_harness::middleware::{
-    CredentialScrubMiddleware, REDACTION_PLACEHOLDER, ToolScrubber, redaction_notice,
-    scrub_with_notice,
+    redaction_notice, scrub_with_notice, CredentialScrubMiddleware, ToolScrubber,
+    REDACTION_PLACEHOLDER,
 };
 
 /// The browser task's `pending.token` is a host-minted, one-time confirmation

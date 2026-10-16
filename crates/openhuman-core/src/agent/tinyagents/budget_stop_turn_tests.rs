@@ -2,10 +2,10 @@
 //! turn-deadline wind-down, the two graceful pauses of a top-level turn.
 
 use super::*;
-use tinyagents_hooks::stop::BudgetStopHook;
 use crate::agent::tinyagents::TurnModelSource;
 use async_trait::async_trait;
 use std::sync::Arc;
+use tinyagents_hooks::stop::BudgetStopHook;
 use tinyagents_hooks::stop::{StopDecision, StopHook, TurnState};
 use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
 use tinyinference_llm::tool::ToolCall;

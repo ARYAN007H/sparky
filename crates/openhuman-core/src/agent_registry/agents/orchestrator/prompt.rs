@@ -11,8 +11,8 @@
 //! module) so nobody has to branch on `agent_id` in a shared section impl.
 
 use crate::agent::prompts::{ConnectedIntegration, PromptContext};
-use crate::prompts::{render_datetime, render_identity, render_tools, render_workspace};
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
+use crate::prompts::{render_datetime, render_identity, render_tools, render_workspace};
 use crate::tools::orchestrator_tools::sanitise_slug;
 use crate::tools::toolpacks;
 use anyhow::Result;

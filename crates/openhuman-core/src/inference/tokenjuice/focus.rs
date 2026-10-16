@@ -8,7 +8,7 @@
 
 use serde_json::Value;
 
-use tinyjuice_bus::tools::{SUMMARY_FOCUS_ARG, summary_focus_property};
+use tinyjuice_bus::tools::{summary_focus_property, SUMMARY_FOCUS_ARG};
 
 /// Whether a tool's parameter schema declares TinyJuice's `summary_focus`,
 /// as opposed to a parameter of its own that happens to share the name.

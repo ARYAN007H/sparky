@@ -14,7 +14,7 @@
 //!
 use crate::agent::orchestration::tools::dispatch::{incomplete_stop, stopped_subagent_result};
 use crate::agent::subagent_host::{
-    SubagentRunOptions, SubagentRunOutcome, SubagentRunStatus, run_subagent_with_parent,
+    run_subagent_with_parent, SubagentRunOptions, SubagentRunOutcome, SubagentRunStatus,
 };
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::core::runtime::DispatchCtx;

@@ -138,8 +138,8 @@ async fn bound_external_authority_wins_over_legacy_trusted_automation() {
 
 #[tokio::test]
 async fn concurrent_channel_turns_keep_tenant_agent_thread_and_policy_isolated() {
-    use crate::security::turn_origin::{self, AgentTurnOrigin};
     use crate::core::runtime::{ContextOverlay, DomainSet};
+    use crate::security::turn_origin::{self, AgentTurnOrigin};
 
     let barrier = Arc::new(tokio::sync::Barrier::new(2));
     let run = |label: &'static str, barrier: Arc<tokio::sync::Barrier>| async move {

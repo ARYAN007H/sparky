@@ -3,7 +3,6 @@
 //! delivering the draft/final reply.
 
 use crate::agent::bus::AgentTurnResponse;
-use crate::progress::AgentProgress;
 use crate::channels::context::{
     compact_sender_history, is_context_window_overflow_error, ChannelRuntimeContext,
 };
@@ -13,6 +12,7 @@ use crate::channels::routes::{
 use crate::channels::{ChannelSendExt, SendMessage};
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
+use crate::progress::AgentProgress;
 use crate::util::truncate_with_ellipsis;
 use std::sync::Arc;
 use std::time::{Duration, Instant};

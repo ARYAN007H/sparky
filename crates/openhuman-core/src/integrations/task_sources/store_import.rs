@@ -15,11 +15,11 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use chrono::DateTime;
 use rusqlite::Connection;
-use serde_json::{Map, Value, json};
+use serde_json::{json, Map, Value};
 
-use super::store_documents::{INGESTED, SOURCES, ingested_id, to_doc};
+use super::store_documents::{ingested_id, to_doc, INGESTED, SOURCES};
 use crate::config::Config;
-use crate::storage::import::{ImportDoc, table_exists};
+use crate::storage::import::{table_exists, ImportDoc};
 
 /// Reads every legacy row, after bringing an old schema forward (on the
 /// importer's scratch copy of the file).
@@ -101,7 +101,7 @@ fn read_rows(conn: &Connection) -> Result<Vec<ImportDoc>> {
 
 #[path = "store_import_rows.rs"]
 mod store_rows;
-use store_rows::{SELECT_SOURCE_COLUMNS, map_source_row};
+use store_rows::{map_source_row, SELECT_SOURCE_COLUMNS};
 
 /// Tracks which task_sources database files have already had their schema DDL
 /// (the `CREATE TABLE`/`CREATE INDEX` batch plus the `add_column_if_missing`

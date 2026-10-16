@@ -9,12 +9,12 @@
 use std::path::{Component, Path, PathBuf};
 
 use async_trait::async_trait;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolExposure, ToolResult, ToolRunContext};
 
 use super::cache::{self, InlineEntry};
 use super::resolve::{MAX_RESOURCE_BYTES, MAX_STRUCTURED_BYTES};
-use super::types::{MCP_APP_MIME, MCP_UI_KIND, McpUiPresentation, UiCsp, UiFlavor, UiResource};
+use super::types::{McpUiPresentation, UiCsp, UiFlavor, UiResource, MCP_APP_MIME, MCP_UI_KIND};
 use tinymcp_bus::ui::extract_links;
 
 /// The tool's registered name.

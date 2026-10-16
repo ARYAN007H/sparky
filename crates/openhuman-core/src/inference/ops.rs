@@ -1,15 +1,15 @@
 //! JSON-RPC controller surface for inference operations.
 
-use crate::config::Config;
 use crate::config::rpc as config_rpc;
-use crate::core::Outcome;
+use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
+use crate::core::Outcome;
 use crate::inference::host_runtime as local_runtime;
 use crate::inference::provider as providers;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tinyinference_llm::message::Message;
 use tinyinference_llm::model::ModelRequest;
-use tinyinference_llm::sentiment::{SentimentResult, parse_sentiment_response};
+use tinyinference_llm::sentiment::{parse_sentiment_response, SentimentResult};
 use tinyinference_local::status::LocalAiStatus;
 use tracing::{debug, error, warn};
 

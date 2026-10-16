@@ -2,7 +2,7 @@ use super::*;
 use crate::inference::embedding_host::{
     DEFAULT_CLOUD_EMBEDDING_DIMENSIONS, DEFAULT_CLOUD_EMBEDDING_MODEL,
 };
-use crate::security::credentials::{APP_SESSION_PROVIDER, AuthService};
+use crate::security::credentials::{AuthService, APP_SESSION_PROVIDER};
 use std::collections::HashMap;
 use tempfile::TempDir;
 use tinyinference_embeddings::factory::validate_custom_endpoint;
@@ -155,7 +155,7 @@ fn config_aware_factory_ollama_honours_config_base_url() {
 async fn config_aware_factory_ollama_embeds_against_config_base_url() {
     use std::sync::{Arc, Mutex};
 
-    use axum::{Json, Router, extract::State, routing::post};
+    use axum::{extract::State, routing::post, Json, Router};
 
     // Mock Ollama `/api/embed`: records that it was hit and echoes a
     // 3-dimensional vector (matching the requested `dims`).
@@ -248,7 +248,7 @@ fn custom_endpoint_validation_rejects_blank_and_credentialed_remote_http() {
 async fn default_embedder_honors_configured_local_provider() {
     use std::sync::{Arc, Mutex};
 
-    use axum::{Json, Router, extract::State, routing::post};
+    use axum::{extract::State, routing::post, Json, Router};
 
     #[derive(Clone, Default)]
     struct Hit {
@@ -301,7 +301,7 @@ async fn default_embedder_honors_configured_local_provider() {
 async fn factory_managed_provider_authenticates_with_config_scoped_token() {
     use std::sync::{Arc, Mutex};
 
-    use axum::{Json, Router, extract::State, http::HeaderMap, routing::post};
+    use axum::{extract::State, http::HeaderMap, routing::post, Json, Router};
 
     // Mock cloud embeddings backend at {BACKEND_URL}/openai/v1/embeddings.
     #[derive(Clone, Default)]
@@ -384,7 +384,7 @@ async fn factory_managed_provider_authenticates_with_config_scoped_token() {
 async fn default_provider_with_config_authenticates_with_config_scoped_token() {
     use std::sync::{Arc, Mutex};
 
-    use axum::{Json, Router, extract::State, http::HeaderMap, routing::post};
+    use axum::{extract::State, http::HeaderMap, routing::post, Json, Router};
 
     #[derive(Clone, Default)]
     struct Captured {

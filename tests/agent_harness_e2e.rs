@@ -2320,10 +2320,10 @@ async fn multi_hop_delegation_chain_inner() {
 
 mod streaming_support {
     use async_trait::async_trait;
+    use openhuman_core::agent::OpenHumanSessionHost;
     use openhuman_core::agent_registry::host_definition::{
         AgentDefinition, AgentDefinitionRegistry,
     };
-    use openhuman_core::agent::OpenHumanSessionHost;
     use openhuman_core::config::{AgentConfig, ContextConfig};
     use serde_json::json;
     use std::collections::VecDeque;

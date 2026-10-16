@@ -58,8 +58,8 @@ mod persisted_compat_tests;
 pub use autonomous::{definition_iter_cap, subagent_iter_cap_with_autonomous_lift};
 pub(crate) use lifecycle::load_subagent_checkpoint;
 pub use lifecycle::{
-    OpenHumanSubagentHost, continue_subagent, continue_subagent_with_parent, run_subagent,
-    run_subagent_with_parent,
+    continue_subagent, continue_subagent_with_parent, run_subagent, run_subagent_with_parent,
+    OpenHumanSubagentHost,
 };
 pub(crate) use ops::is_safe_task_id;
 pub use types::{

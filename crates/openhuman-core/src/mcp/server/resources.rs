@@ -19,7 +19,7 @@
 //! against `BUILTINS` in `loader.rs`. Adding a new built-in subagent without
 //! a matching catalog entry fails that test and therefore CI.
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tinymcp_bus::{ResourceSpec, ToolCallError};
 
 /// Every bundled prompt is markdown.

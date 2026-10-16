@@ -120,7 +120,6 @@ pub struct ConnectedIntegrationTool {
     pub parameters: Option<serde_json::Value>,
 }
 
-
 // ── Pricing types (fetched from backend) ────────────────────────────
 
 /// Per-integration pricing returned by `GET /agent-integrations/pricing`.

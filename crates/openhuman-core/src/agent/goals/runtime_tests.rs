@@ -119,15 +119,13 @@ async fn complete_and_clear_are_safe_without_a_goal_or_thread() {
     let dir = tmp.path().to_path_buf();
     complete_for_thread(&dir, Some("t-empty")).await;
     clear_for_thread(&dir, Some("t-empty")).await;
-    assert!(
-        tinyagents_graph::goals::store::get(
-            &crate::storage::sessions::stores_or_ephemeral(&dir).kv,
-            "t-empty"
-        )
-        .await
-        .unwrap()
-        .is_none()
-    );
+    assert!(tinyagents_graph::goals::store::get(
+        &crate::storage::sessions::stores_or_ephemeral(&dir).kv,
+        "t-empty"
+    )
+    .await
+    .unwrap()
+    .is_none());
     // No ambient thread scope at all.
     complete_for_thread(&dir, None).await;
     clear_for_thread(&dir, None).await;

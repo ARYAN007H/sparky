@@ -8,8 +8,8 @@
 //! the hosted path. The user-facing class is untouched: the text still reads as
 //! `run timed out: ...`, which `web_errors` classifies as `turn_timeout`.
 
-use tinyagents_harness::TinyAgentsError;
 use tinyagents_harness::runtime::{HostedError, HostedErrorKind, TimeoutBound};
+use tinyagents_harness::TinyAgentsError;
 
 use tinyagents_harness::agent_error::TurnTimeoutBound;
 

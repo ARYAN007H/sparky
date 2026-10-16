@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use tinyagents_hooks::command::context::{
-    HostContext, TurnIdentity, build_input, set_host_context,
+    build_input, set_host_context, HostContext, TurnIdentity,
 };
 use tinyagents_hooks::command::types::{
     CompactPayload, HookEvent, HookPayload, PromptPayload, SessionPayload, SubagentPayload,

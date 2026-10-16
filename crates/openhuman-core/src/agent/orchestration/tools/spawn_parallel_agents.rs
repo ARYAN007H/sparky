@@ -6,8 +6,8 @@ use crate::agent::orchestration::spawn_parallel::ParallelAgentLineage;
 use crate::agent::orchestration::spawn_parallel::ParallelAgentResult;
 use crate::agent::orchestration::spawn_parallel::ParallelAgentTask;
 use crate::agent::orchestration::spawn_parallel::{
-    SpawnParallelGraphOutcome, format_spawn_parallel_success,
-    run_spawn_parallel_tasks_with_cancellation_and_workspace,
+    format_spawn_parallel_success, run_spawn_parallel_tasks_with_cancellation_and_workspace,
+    SpawnParallelGraphOutcome,
 };
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use async_trait::async_trait;

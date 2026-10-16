@@ -13,13 +13,13 @@
 
 use anyhow::Result;
 use chrono::Utc;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tinystoragedrivers::{CollectionSpec, Filter, IndexSpec, Precondition, Query, Sort, Versioned};
 
 use crate::config::Config;
 use crate::security::devices::types::PairedDevice;
+use crate::storage::documents::{compare_and_swap, text, Repo};
 use crate::storage::DocumentStoreExt;
-use crate::storage::documents::{Repo, compare_and_swap, text};
 
 pub(super) const DEVICES: &str = "paired_devices";
 const DOMAIN: &str = "devices::store";

@@ -16,15 +16,15 @@ use tinyagents_harness::middleware::wrap_harness_instruction;
 
 use crate::agent::{
     session_host::turn_checkpoint::{
-        self, CloseVerdict, CloseViolation, build_deterministic_checkpoint,
-        build_deterministic_final_summary, close_repair_instruction, close_verification_prompt,
-        final_answer_instruction, parse_close_verdict, quotes_harness_instruction,
-        render_tool_results, results_from_tool_outcomes,
+        self, build_deterministic_checkpoint, build_deterministic_final_summary,
+        close_repair_instruction, close_verification_prompt, final_answer_instruction,
+        parse_close_verdict, quotes_harness_instruction, render_tool_results,
+        results_from_tool_outcomes, CloseVerdict, CloseViolation,
     },
     tinyagents::{TinyagentsTurnOutcome, TurnModelSource},
 };
 use crate::inference::provider::model::dialect_response_from_provider;
-use crate::inference::provider::{AGENT_TURN_MAX_OUTPUT_TOKENS, BilledUsage, ChatResponse};
+use crate::inference::provider::{BilledUsage, ChatResponse, AGENT_TURN_MAX_OUTPUT_TOKENS};
 
 /// Accounting from model calls performed after the harness loop has ended.
 #[derive(Default)]

@@ -16,14 +16,14 @@ mod shell_support;
 mod update_apply;
 mod update_check;
 
-use crate::security::SecurityPolicy;
 use crate::security::policy::{TrustedAccess, TrustedRoot};
+use crate::security::SecurityPolicy;
 use tinytools::ToolRunContext;
 
 pub use install_tool::InstallToolTool;
-pub use lsp::{LSP_ENABLED_ENV, LspTool, lsp_capability_enabled};
+pub use lsp::{lsp_capability_enabled, LspTool, LSP_ENABLED_ENV};
 pub use proxy_config::ProxyConfigTool;
-pub use retrieve_tool_output::{RetrieveToolOutputTool, retrieve_tool_output_tool};
+pub use retrieve_tool_output::{retrieve_tool_output_tool, RetrieveToolOutputTool};
 pub use schedule::ScheduleTool;
 pub use shell::ShellTool;
 pub use update_apply::UpdateApplyTool;

@@ -93,7 +93,9 @@ fn chat_origin(thread: &str) -> crate::security::turn_origin::AgentTurnOrigin {
 
 fn chat_thread(origin: crate::security::turn_origin::AgentTurnOrigin) -> String {
     match origin {
-        crate::security::turn_origin::AgentTurnOrigin::WebChat { thread_id, .. } => thread_id.into(),
+        crate::security::turn_origin::AgentTurnOrigin::WebChat { thread_id, .. } => {
+            thread_id.into()
+        }
         crate::security::turn_origin::AgentTurnOrigin::DirectChat => "direct".into(),
         other => panic!("unexpected origin {other:?}"),
     }

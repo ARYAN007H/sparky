@@ -170,7 +170,7 @@ pub(crate) fn bridge_prompt_tools(
     if deferred == 0 {
         return Vec::new();
     }
-    use tinyagents_harness::tool::discover::{DeferredCatalog, bridge_schemas};
+    use tinyagents_harness::tool::discover::{bridge_schemas, DeferredCatalog};
     // `discovery_policy` zeroes the manifest budget, so the manifest renders
     // as a bare count: the prompt advertises that a search exists, not what
     // it would find.
@@ -213,7 +213,7 @@ impl ToolRanker for OverlapRanker {
         candidates: &[tinytools::RankCandidate],
         limit: usize,
     ) -> Result<Vec<tinytools::RankHit>, tinytools::RankError> {
-        use tinyagents_harness::tool::{SelectableTool, rank_tools_by_prompt};
+        use tinyagents_harness::tool::{rank_tools_by_prompt, SelectableTool};
         if intent.trim().is_empty() {
             return Err(tinytools::RankError::InvalidInput {
                 reason: "intent is empty".to_owned(),

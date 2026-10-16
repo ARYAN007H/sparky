@@ -23,9 +23,9 @@ use serde_json::json;
 mod store_rows;
 use store_rows::rows_to_notifications;
 
-use super::store_documents::{CORE, LOCAL_WORKSPACE, NOTIFICATIONS, SETTINGS, core_id, to_doc};
+use super::store_documents::{core_id, to_doc, CORE, LOCAL_WORKSPACE, NOTIFICATIONS, SETTINGS};
 use crate::config::Config;
-use crate::storage::import::{ImportDoc, table_exists};
+use crate::storage::import::{table_exists, ImportDoc};
 
 /// SQL schema of the legacy database, applied on every `with_connection` call.
 const SCHEMA: &str = "

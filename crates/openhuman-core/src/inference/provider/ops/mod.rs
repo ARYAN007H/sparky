@@ -24,7 +24,7 @@ pub use models::{
 };
 
 pub use provider_factory::{
-    INFERENCE_BACKEND_ID, ProviderInfo, ProviderRuntimeOptions, list_providers,
+    list_providers, ProviderInfo, ProviderRuntimeOptions, INFERENCE_BACKEND_ID,
 };
 
 // ── test re-exports for ops_tests.rs ──

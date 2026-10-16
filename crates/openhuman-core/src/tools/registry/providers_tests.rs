@@ -1,8 +1,8 @@
 use crate::config::schema::{CapabilityProviderConfig, CapabilityProviderTrustState, Config};
 
 use super::{
-    CapabilityProviderRegistry, capability_provider_by_id, is_capability_provider_trusted_enabled,
-    list_capability_providers, normalize_capability_provider_id,
+    capability_provider_by_id, is_capability_provider_trusted_enabled, list_capability_providers,
+    normalize_capability_provider_id, CapabilityProviderRegistry,
 };
 
 fn config_with(providers: Vec<CapabilityProviderConfig>) -> Config {

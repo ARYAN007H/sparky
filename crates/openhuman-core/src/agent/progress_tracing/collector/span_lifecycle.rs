@@ -3,10 +3,10 @@
 
 use std::collections::BTreeMap;
 
-use tinyagents_harness::observability::trace_export::SpanKind;
 use tinyagents_harness::observability::trace_export::serialize::{
-    MAX_TOOL_CONTENT_CHARS, truncate_capture_text,
+    truncate_capture_text, MAX_TOOL_CONTENT_CHARS,
 };
+use tinyagents_harness::observability::trace_export::SpanKind;
 
 use super::state::SpanCollector;
 

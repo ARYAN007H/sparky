@@ -143,12 +143,10 @@ fn shell_tool_schema_has_command() {
     );
     let schema = tool.parameters_schema();
     assert!(schema["properties"]["command"].is_object());
-    assert!(
-        schema["required"]
-            .as_array()
-            .unwrap()
-            .contains(&json!("command"))
-    );
+    assert!(schema["required"]
+        .as_array()
+        .unwrap()
+        .contains(&json!("command")));
     // The self-asserted `approved` param was removed — approval now happens
     // at the harness ApprovalGate, not via a model-set flag.
     assert!(schema["properties"]["approved"].is_null());

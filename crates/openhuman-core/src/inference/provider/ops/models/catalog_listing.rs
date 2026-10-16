@@ -160,8 +160,8 @@ pub async fn list_configured_models_from_config(
         // A store error still propagates; only a genuinely absent/expired
         // session degrades to an empty list.
         use crate::security::credentials::session_support::{
-            SessionTokenCheck, classify_session_token, load_app_session_profile,
-            publish_local_session_expiry,
+            classify_session_token, load_app_session_profile, publish_local_session_expiry,
+            SessionTokenCheck,
         };
         let profile = load_app_session_profile(config)?;
         match classify_session_token(profile.as_ref(), chrono::Utc::now()) {

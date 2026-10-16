@@ -8,8 +8,8 @@
 
 use tinyagents_harness::runtime::RunPolicy;
 use tinyagents_harness::turn_policy::{
-    TurnPolicyOptions, TurnPolicyOverrides, local_turn_backstop_secs, run_policy,
-    turn_wall_clock_ms,
+    local_turn_backstop_secs, run_policy, turn_wall_clock_ms, TurnPolicyOptions,
+    TurnPolicyOverrides,
 };
 
 use crate::agent::tinyagents::budget::MAX_SPAWN_DEPTH;
@@ -23,8 +23,8 @@ use crate::agent::tinyagents::budget::MAX_SPAWN_DEPTH;
 pub(crate) struct ToolPolicyEnforcement {
     pub policy: std::sync::Arc<
         dyn tinyagents_harness::middleware::ToolCallPolicy<
-                crate::agent::tinyagents::host::OpenHumanRunContext,
-            >,
+            crate::agent::tinyagents::host::OpenHumanRunContext,
+        >,
     >,
     /// The session's channel-permission snapshot — enforces the per-channel
     /// permission ceiling (deny + per-call permission-level gate) the in-house
@@ -49,7 +49,7 @@ pub(crate) struct ToolPolicyEnforcement {
 ///   endpoint host is loopback or on a private network.
 /// - `openai:<model>` and every other cloud provider are never local.
 pub(crate) fn provider_is_self_hosted(provider: &str, endpoint: Option<&str>) -> bool {
-    use tinyinference_local::profile::{LocalProviderKind, kind_from_provider_string};
+    use tinyinference_local::profile::{kind_from_provider_string, LocalProviderKind};
     let p = provider.trim().to_ascii_lowercase();
     let Some(kind) = kind_from_provider_string(&p) else {
         return false;

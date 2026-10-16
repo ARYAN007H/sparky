@@ -5,7 +5,7 @@
 //! `agent::tinyagents::middleware::loop_guards`.
 
 use tinyinference_providers::{
-    BudgetMatch, is_budget_message, is_provider_config_rejection_message,
+    is_budget_message, is_provider_config_rejection_message, BudgetMatch,
 };
 
 /// Clamp the last-error text embedded in a circuit-breaker halt summary so a huge

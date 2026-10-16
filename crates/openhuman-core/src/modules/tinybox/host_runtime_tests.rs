@@ -105,16 +105,12 @@ fn create_runtime_supports_native_and_docker_and_rejects_unknown() {
 /// adapter, which hands it to TinyBox on the native shell request.
 #[test]
 fn hide_window_reaches_the_native_runtime_only() {
-    assert!(
-        create_runtime(&RuntimeConfig::default(), true)
-            .unwrap()
-            .hide_window()
-    );
-    assert!(
-        !create_runtime(&RuntimeConfig::default(), false)
-            .unwrap()
-            .hide_window()
-    );
+    assert!(create_runtime(&RuntimeConfig::default(), true)
+        .unwrap()
+        .hide_window());
+    assert!(!create_runtime(&RuntimeConfig::default(), false)
+        .unwrap()
+        .hide_window());
     assert!(NativeRuntime::with_hide_window(true).hide_window());
     assert!(!NativeRuntime::new().hide_window());
     let docker = create_runtime(

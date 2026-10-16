@@ -10,18 +10,18 @@ mod task_actions;
 #[path = "browser_unattended.rs"]
 mod unattended;
 use crate::modules::browser::BrowserClient;
-use crate::security::SecurityPolicy;
 use crate::security::approval::{ApprovalGate, GateOutcome};
 use crate::security::turn_origin::AgentTurnOrigin;
+use crate::security::SecurityPolicy;
 use async_trait::async_trait;
-use pending::{Pending, approval_target, needs_host_confirmation};
-use serde_json::{Value, json};
+use pending::{approval_target, needs_host_confirmation, Pending};
+use serde_json::{json, Value};
+use session_pool::{
+    browser_session_fingerprint, evict_thread_sessions, requires_rebind, thread_sessions,
+    ThreadSession,
+};
 #[cfg(test)]
 use session_pool::{MAX_THREAD_SESSIONS, SESSION_IDLE_TTL};
-use session_pool::{
-    ThreadSession, browser_session_fingerprint, evict_thread_sessions, requires_rebind,
-    thread_sessions,
-};
 use sha2::{Digest, Sha256};
 #[cfg(test)]
 use std::{collections::HashMap, time::Duration};

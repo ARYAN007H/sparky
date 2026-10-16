@@ -8,12 +8,12 @@ use openhuman_core::core::runtime::CoreBuilder;
 use openhuman_core::core::types::HostKind;
 use tinyagents_session::port::SessionStoreProvider;
 
-use super::builder::{ConfigSource, starts_services_on_build};
+use super::builder::{starts_services_on_build, ConfigSource};
 use super::presets::{default_domains, default_services};
-use super::{ApiKey, RUNTIME_LIVE, Runtime, RuntimeBuilder, RuntimeError};
-use crate::Core;
+use super::{ApiKey, Runtime, RuntimeBuilder, RuntimeError, RUNTIME_LIVE};
 use crate::harness::workspace::ResolvedWorkspace;
 use crate::harness::{Provider, Workspace};
+use crate::Core;
 
 struct SessionStoreCleanup {
     installed: Option<Arc<dyn SessionStoreProvider>>,

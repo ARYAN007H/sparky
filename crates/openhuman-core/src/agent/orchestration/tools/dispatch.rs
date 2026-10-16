@@ -1,7 +1,7 @@
 //! Subagent dispatch logic shared by all agent delegation tools.
 
 use crate::agent::subagent_host::{
-    SubagentRunOptions, SubagentRunStatus, run_subagent_with_parent,
+    run_subagent_with_parent, SubagentRunOptions, SubagentRunStatus,
 };
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::progress::AgentProgress;

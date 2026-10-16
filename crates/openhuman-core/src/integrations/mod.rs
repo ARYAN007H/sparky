@@ -7,8 +7,8 @@
 //! trusted because requests leave the local core process.
 
 pub mod client;
-mod connected_identities;
 pub mod composio;
+mod connected_identities;
 pub mod file_storage;
 pub mod task_sources;
 pub mod tools;

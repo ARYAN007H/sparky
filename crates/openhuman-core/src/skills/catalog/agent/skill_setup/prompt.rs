@@ -1,6 +1,6 @@
 //! System prompt builder for the `skill_setup` built-in agent.
 
-use crate::agent::prompts::{PromptContext};
+use crate::agent::prompts::PromptContext;
 use crate::prompts::{render_safety, render_tools, render_workspace};
 use anyhow::Result;
 

@@ -21,7 +21,7 @@ pub(crate) async fn bootstrap_core_runtime(
     domains: crate::core::runtime::DomainSet,
     ctx: &DispatchCtx,
 ) {
-    use crate::platform::socket::{SocketManager, set_global_socket_manager};
+    use crate::platform::socket::{set_global_socket_manager, SocketManager};
     use std::sync::Arc;
     // `embedded_core` derived from host_kind so the rest of the function (which
     // already keys behavior off the boolean) stays unchanged.

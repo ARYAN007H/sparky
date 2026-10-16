@@ -6,7 +6,7 @@ use std::path::{Component, Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use tinyagents_harness::multimodal::{
-    UnknownMimePolicy, config::FileLimits, markers, resolve::resolve_attachment,
+    config::FileLimits, markers, resolve::resolve_attachment, UnknownMimePolicy,
 };
 
 use crate::config::Config;

@@ -8,7 +8,7 @@
 use tinytools_std::network::NetGate;
 
 use crate::security::egress::{
-    DataKind, EgressDescriptor, emit_external_transfer, local_only_tool_block,
+    emit_external_transfer, local_only_tool_block, DataKind, EgressDescriptor,
 };
 use crate::security::{GateDecision, SecurityPolicy};
 use tinybox_bus::CommandClass;

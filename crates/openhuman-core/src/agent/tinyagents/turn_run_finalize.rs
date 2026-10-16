@@ -18,8 +18,8 @@ use crate::agent::tinyagents::turn_outcome::TinyagentsTurnOutcome;
 use crate::progress::AgentProgress;
 use tinyagents_harness::turn_outcome::{HaltSummarySlot, ToolOutcomeSink};
 use tinyagents_harness::turn_run_finalize::{
-    TurnEnd, TurnEndInputs, classify_turn_end, log_compaction_provenance, select_turn_text,
-    system_segment_bytes,
+    classify_turn_end, log_compaction_provenance, select_turn_text, system_segment_bytes, TurnEnd,
+    TurnEndInputs,
 };
 
 /// Assemble the [`TinyagentsTurnOutcome`] for a run that returned

@@ -2,7 +2,7 @@ use super::*;
 use crate::core::runtime::DispatchCtx;
 use crate::security::credentials::openai_oauth::{OPENAI_OAUTH_PROFILE_NAME, OPENAI_PROVIDER_KEY};
 use crate::security::credentials::profiles::{AuthProfile, AuthProfilesStore, TokenSet};
-use axum::{Json, Router, routing::post};
+use axum::{routing::post, Json, Router};
 use chrono::{Duration, Utc};
 use tempfile::tempdir;
 
@@ -168,12 +168,10 @@ async fn inference_openai_oauth_start_returns_authorize_payload() {
         .await
         .expect("oauth start");
 
-    assert!(
-        outcome.value["authUrl"]
-            .as_str()
-            .unwrap()
-            .contains("auth.openai.com")
-    );
+    assert!(outcome.value["authUrl"]
+        .as_str()
+        .unwrap()
+        .contains("auth.openai.com"));
     assert_eq!(
         outcome.value["redirectUri"].as_str(),
         Some("http://127.0.0.1:1455/auth/callback")

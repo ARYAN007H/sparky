@@ -1,6 +1,6 @@
 use super::super::pending::Pending;
-use super::super::session_pool::{ThreadSession, browser_session_fingerprint, thread_sessions};
-use super::super::{BrowserTool, approve_browser_action, task_actions::approve_task_action};
+use super::super::session_pool::{browser_session_fingerprint, thread_sessions, ThreadSession};
+use super::super::{approve_browser_action, task_actions::approve_task_action, BrowserTool};
 use super::*;
 use crate::core::runtime::{CoreContext, DomainSet};
 use crate::modules::browser::BrowserClient;

@@ -7,9 +7,9 @@
 use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
 
+use crate::agent::tinyagents::host::OpenHumanRunContext;
 use tinyagents_harness::host::LearningSink;
 use tinyagents_hooks::tool::ToolHook;
-use crate::agent::tinyagents::host::OpenHumanRunContext;
 use tinyinference_llm::model::ChatModel;
 
 /// Runtime or agent host adapters, shared by every context derived from it.

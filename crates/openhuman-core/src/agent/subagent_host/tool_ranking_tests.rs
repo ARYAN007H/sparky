@@ -10,7 +10,7 @@
 //! moving up with the algorithm.
 
 use crate::integrations::ConnectedIntegrationTool;
-use tinyagents_harness::tool::{MIN_CONFIDENT_HITS, SelectableTool, rank_tools_by_prompt};
+use tinyagents_harness::tool::{rank_tools_by_prompt, SelectableTool, MIN_CONFIDENT_HITS};
 
 fn rank_actions_by_prompt(
     prompt: &str,

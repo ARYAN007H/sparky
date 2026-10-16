@@ -29,7 +29,7 @@
 
 use std::sync::Arc;
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use serde_json::json;
 
 use crate::agent::harness::ParentExecutionContext;
@@ -46,8 +46,8 @@ use {
 };
 
 use tinyagents_orchestration::teams::{
-    MemberOutcome, SessionTeamLedger, TeamError, build_member_prompt, claimable_task,
-    deliver_pending_messages, run_member_graph, truncate_chars,
+    build_member_prompt, claimable_task, deliver_pending_messages, run_member_graph,
+    truncate_chars, MemberOutcome, SessionTeamLedger, TeamError,
 };
 
 use tinyagents_graph::GraphTracingSink;
@@ -501,7 +501,7 @@ async fn record_failure_event(
 mod run_ledger {
     use std::path::Path;
 
-    use anyhow::{Result, anyhow};
+    use anyhow::{anyhow, Result};
 
     use super::{AgentTeamMember, AgentTeamTask, ClaimOutcome, CompletionOutcome, RunEventAppend};
 

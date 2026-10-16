@@ -1,10 +1,10 @@
 //! Resolve every admitted media source on a disposable provider request.
-use super::super::{SOURCE_MISSING_MARKER, is_missing_local_reference};
+use super::super::{is_missing_local_reference, SOURCE_MISSING_MARKER};
 use super::AttachmentAccessScope;
 use super::*;
 use sha2::{Digest, Sha256};
 use tinyagents_harness::multimodal::{
-    UnknownMimePolicy, config::FileLimits, resolve::resolve_attachment,
+    config::FileLimits, resolve::resolve_attachment, UnknownMimePolicy,
 };
 
 impl AttachmentModel {

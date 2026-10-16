@@ -10,7 +10,7 @@ use crate::core::runtime::DispatchCtx;
 use std::sync::{Arc, LazyLock};
 
 use async_trait::async_trait;
-use tinyagents_hooks::command::{HookConfig, HookEngine, HookEnvironment, PromptEvaluator, config};
+use tinyagents_hooks::command::{config, HookConfig, HookEngine, HookEnvironment, PromptEvaluator};
 
 /// Product name handed to the engine: `ProgramData\OpenHuman`,
 /// `/Library/Application Support/OpenHuman`, `/etc/openhuman`, `.openhuman`,

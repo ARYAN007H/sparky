@@ -21,4 +21,4 @@ pub(crate) use halt::{
     terminal_inference_failure_kind, terminal_inference_halt_summary, user_actionable_escalation,
 };
 pub(crate) use stop_summary::stop_summary_copy;
-pub(crate) use table::{FailureClass, failure_copy};
+pub(crate) use table::{failure_copy, FailureClass};

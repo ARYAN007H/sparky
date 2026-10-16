@@ -8,14 +8,14 @@
 //! expiry key, optional columns left out when NULL. The legacy file is only
 //! ever opened here, by the storage importer, on a scratch copy of it.
 
-use crate::storage::rusqlite::{Connection, params};
+use crate::storage::rusqlite::{params, Connection};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
-use serde_json::{Map, Value, json};
+use serde_json::{json, Map, Value};
 
-use super::store_documents::{APPROVALS, FLOW_TRUST, expiry_key, rfc3339, trust_id};
+use super::store_documents::{expiry_key, rfc3339, trust_id, APPROVALS, FLOW_TRUST};
 use crate::config::Config;
-use crate::storage::import::{ImportDoc, table_exists};
+use crate::storage::import::{table_exists, ImportDoc};
 
 /// SQL schema of the legacy database, applied on every `with_connection` call.
 ///

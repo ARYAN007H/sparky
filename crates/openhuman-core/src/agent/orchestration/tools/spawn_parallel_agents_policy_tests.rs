@@ -210,16 +210,12 @@ async fn collects_immediate_task_validation_failures() {
         .iter()
         .map(|result| result["error"].as_str().unwrap_or_default())
         .collect::<Vec<_>>();
-    assert!(
-        errors
-            .iter()
-            .any(|error| error.contains("agent_id and prompt"))
-    );
-    assert!(
-        errors
-            .iter()
-            .any(|error| error.contains("unknown agent_id"))
-    );
+    assert!(errors
+        .iter()
+        .any(|error| error.contains("agent_id and prompt")));
+    assert!(errors
+        .iter()
+        .any(|error| error.contains("unknown agent_id")));
 }
 
 #[test]
@@ -307,11 +303,9 @@ fn shared_workspace_allows_readonly_or_explicitly_isolated_workers() {
         &parent,
     );
 
-    assert!(
-        preflight
-            .into_iter()
-            .all(|item| matches!(item, SpawnParallelTaskPreflight::Prepared(_)))
-    );
+    assert!(preflight
+        .into_iter()
+        .all(|item| matches!(item, SpawnParallelTaskPreflight::Prepared(_))));
 }
 
 // This exercises the full parallel-subagent path (parent turn → spawn N

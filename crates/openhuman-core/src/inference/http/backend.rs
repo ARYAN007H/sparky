@@ -13,7 +13,7 @@
 
 use async_trait::async_trait;
 use tinyinference_llm::providers::openai::server_http::{
-    BackendFailure, ChatBackend, ListedModel, ResolvedChat, strip_temperature_suffix,
+    strip_temperature_suffix, BackendFailure, ChatBackend, ListedModel, ResolvedChat,
 };
 use tracing::{debug, warn};
 

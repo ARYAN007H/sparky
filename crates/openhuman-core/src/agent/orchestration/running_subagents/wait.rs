@@ -6,7 +6,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use tinyagents_orchestration::subagent::{
-    WaitError, WaitOutcome, record_to_wait_outcome, task_status_label, wait_detached,
+    record_to_wait_outcome, task_status_label, wait_detached, WaitError, WaitOutcome,
 };
 
 use super::registry::{admit_workspace, owner_key, registry};

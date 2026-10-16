@@ -35,17 +35,17 @@ use std::time::Duration;
 
 use tinyagents_tasks::{
     CompletionRecord, CompletionResult, CompletionRouter, CompletionState, CompletionStatus,
-    CompletionStore, DEFAULT_MAX_ATTEMPTS, DriverCompletionStore, InMemoryCompletionStore,
-    NotifyMode, RecordOutcome, TombstoneOutcome,
+    CompletionStore, DriverCompletionStore, InMemoryCompletionStore, NotifyMode, RecordOutcome,
+    TombstoneOutcome, DEFAULT_MAX_ATTEMPTS,
 };
 
 use super::completion_notice::BackgroundCompletionFormatter;
-pub(crate) use super::completion_notice::{AWAITING_INPUT_LABEL, BackgroundAgentOutcome};
-pub(crate) use super::completion_target::CompletionTarget;
+pub(crate) use super::completion_notice::{BackgroundAgentOutcome, AWAITING_INPUT_LABEL};
 #[cfg(test)]
 pub(crate) use super::completion_target::tests::{
-    TestWorkspace, forget_workspace_for_test, install_store_for_test,
+    forget_workspace_for_test, install_store_for_test, TestWorkspace,
 };
+pub(crate) use super::completion_target::CompletionTarget;
 use super::completion_target::{awaiting_input_record_id, awaiting_input_record_prefix};
 pub(crate) use super::completion_target::{claim_recovery, forget_recovery};
 

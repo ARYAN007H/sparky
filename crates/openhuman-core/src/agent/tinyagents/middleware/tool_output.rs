@@ -16,15 +16,15 @@ use tinyinference_llm::tool::ToolCall as TaToolCall;
 use tinytools::{ToolPolicy as TaToolPolicy, ToolResult as TaToolResult};
 
 use crate::agent::harness::tool_result_artifacts::{
-    HostArtifactStore, TINYAGENTS_TOOL_RESULT_ARTIFACT_STORE, artifact_read_target,
-    page_artifact_read,
+    artifact_read_target, page_artifact_read, HostArtifactStore,
+    TINYAGENTS_TOOL_RESULT_ARTIFACT_STORE,
 };
 use crate::agent::tinyagents::payload_summarizer::DynPayloadSummarizer;
 use crate::inference::tokenjuice::generate::GenerateTicket;
 use tinyagents_harness::artifacts::tool_results::{ArtifactRead, ToolResultArtifactOutcome};
 use tinyagents_harness::middleware::library::{
-    CompactedOutput, OutputCapPolicy, OutputLadderInput, OutputProcessor, plan_output_stages,
-    run_output_ladder,
+    plan_output_stages, run_output_ladder, CompactedOutput, OutputCapPolicy, OutputLadderInput,
+    OutputProcessor,
 };
 use tinyjuice_bus::types::AgentTokenjuiceCompression;
 

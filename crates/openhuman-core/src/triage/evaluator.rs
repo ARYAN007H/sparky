@@ -50,7 +50,7 @@ use super::routing::ResolvedProvider;
 #[cfg(test)]
 use crate::agent_registry::host_definition::AgentDefinition;
 #[cfg(test)]
-pub(crate) use arm::{ArmError, classify_error};
+pub(crate) use arm::{classify_error, ArmError};
 #[cfg(test)]
 pub(crate) use chain::run_triage_with_arms_for_test;
 #[cfg(test)]

@@ -1,8 +1,8 @@
 //! OpenHuman-specific policy layered on TinyInference's provider-neutral classifier.
 
 use tinyinference_llm::failure::{
-    ProviderFailureClass, classify_provider_failure,
-    parse_retry_after_ms as parse_inference_retry_after,
+    classify_provider_failure, parse_retry_after_ms as parse_inference_retry_after,
+    ProviderFailureClass,
 };
 
 fn classify(err: &anyhow::Error) -> ProviderFailureClass {

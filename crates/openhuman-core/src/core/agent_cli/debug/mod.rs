@@ -14,7 +14,7 @@
 
 use std::path::PathBuf;
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 
 pub mod dump_writer;
 pub mod prompt_size;

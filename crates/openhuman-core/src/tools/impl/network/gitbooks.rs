@@ -3,7 +3,7 @@
 
 use crate::{config::Config, inference::provider::factory::redact_endpoint};
 use async_trait::async_trait;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::time::Duration;
 use tinybus::module::ModuleClient;
 use tinytools::{PermissionLevel, Tool, ToolResult};

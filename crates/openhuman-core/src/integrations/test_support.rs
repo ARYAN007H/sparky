@@ -1,6 +1,6 @@
-use axum::{Json, Router, routing::post};
+use axum::{routing::post, Json, Router};
 use parking_lot::Mutex;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq)]

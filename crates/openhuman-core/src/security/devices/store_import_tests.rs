@@ -1,6 +1,6 @@
 use super::*;
 use crate::security::devices::store as live;
-use crate::storage::import::{Outcome, run_with};
+use crate::storage::import::{run_with, Outcome};
 use tempfile::TempDir;
 
 fn workspace() -> (TempDir, Config) {

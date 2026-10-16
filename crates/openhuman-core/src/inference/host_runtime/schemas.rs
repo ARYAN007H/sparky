@@ -1,6 +1,6 @@
 use crate::core::runtime::DispatchCtx;
-use serde::Deserialize;
 use serde::de::DeserializeOwned;
+use serde::Deserialize;
 use serde_json::{Map, Value};
 
 #[derive(Debug, Deserialize)]
@@ -8,8 +8,8 @@ struct LocalAiTestConnectionParams {
     url: String,
 }
 
-use crate::core::Outcome;
 use crate::core::all::{ControllerFuture, RegisteredController};
+use crate::core::Outcome;
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
 
 /// Params for `inference.agent_chat` and `inference.agent_chat_simple`.

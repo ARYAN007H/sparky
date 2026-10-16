@@ -97,7 +97,7 @@ async fn one_profiles_stop_and_delete_never_reach_anothers_thread() {
 
 #[test]
 fn a_saas_cancel_reaches_only_the_callers_workspace() {
-    use super::running_subagents::{CallerWorkspace, caller_workspace_in};
+    use super::running_subagents::{caller_workspace_in, CallerWorkspace};
     let ws = TestWorkspace::new();
     let alice = profile("u-alice", ws.path());
     assert!(matches!(

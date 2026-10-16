@@ -2,18 +2,18 @@
 //! update, including the save-time verification of a custom endpoint.
 
 use crate::config::Config;
-use crate::core::Outcome;
 use crate::core::runtime::DispatchCtx;
+use crate::core::Outcome;
 use crate::security::credentials::AuthService;
 
-use super::{LOG_PREFIX, resolve_api_key};
+use super::{resolve_api_key, LOG_PREFIX};
 use tinyinference_embeddings::catalog;
 use tinyinference_embeddings::probe::{
-    EmbedProbe, EmbeddingProbeRejection, classify_embed_probe, final_probe_dims,
-    probe_custom_embeddings,
+    classify_embed_probe, final_probe_dims, probe_custom_embeddings, EmbedProbe,
+    EmbeddingProbeRejection,
 };
 use tinyinference_embeddings::served_models::{
-    ModelNotServed, check_requested_model_served, fetch_served_model_ids,
+    check_requested_model_served, fetch_served_model_ids, ModelNotServed,
 };
 
 fn probe_rejection_outcome(reject: EmbeddingProbeRejection) -> Outcome<serde_json::Value> {

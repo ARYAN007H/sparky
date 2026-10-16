@@ -131,14 +131,12 @@ async fn artifacts_are_tenant_scoped() {
 fn read_targets_use_openhumans_tool_names() {
     let path = "artifacts/tool-results/s/shell/c.txt";
     assert!(artifact_read_target(None, "file_read", &json!({"path": path})).is_some());
-    assert!(
-        artifact_read_target(
-            None,
-            "use_skill",
-            &json!({"skill": "files", "tool": "file_read", "args": {"path": path, "offset": 3}})
-        )
-        .is_some_and(|read| read.offset == 3)
-    );
+    assert!(artifact_read_target(
+        None,
+        "use_skill",
+        &json!({"skill": "files", "tool": "file_read", "args": {"path": path, "offset": 3}})
+    )
+    .is_some_and(|read| read.offset == 3));
     assert!(artifact_read_target(None, "glob", &json!({"path": path})).is_none());
 }
 
@@ -150,22 +148,18 @@ fn read_targets_recognise_the_stores_blob_keys() {
     let store = in_memory_tool_result_store(tmp.path().join("tool-results"), "s");
     let pointer = store.path_for_read_tool("shell", Some("c"));
     assert!(artifact_read_target(Some(&store), "file_read", &json!({"path": pointer})).is_some());
-    assert!(
-        artifact_read_target(
-            Some(&store),
-            "use_skill",
-            &json!({"skill": "files", "tool": "file_read", "args": {"path": pointer, "offset": 3}})
-        )
-        .is_some_and(|read| read.offset == 3)
-    );
-    assert!(
-        artifact_read_target(
-            Some(&store),
-            "file_read",
-            &json!({"path": "tool-results-backup/s/x.txt"})
-        )
-        .is_none()
-    );
+    assert!(artifact_read_target(
+        Some(&store),
+        "use_skill",
+        &json!({"skill": "files", "tool": "file_read", "args": {"path": pointer, "offset": 3}})
+    )
+    .is_some_and(|read| read.offset == 3));
+    assert!(artifact_read_target(
+        Some(&store),
+        "file_read",
+        &json!({"path": "tool-results-backup/s/x.txt"})
+    )
+    .is_none());
 }
 
 /// A continuation names `file_read` and the offset, in the wire format the

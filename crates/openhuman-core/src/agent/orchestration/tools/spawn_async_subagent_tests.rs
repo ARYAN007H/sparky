@@ -299,10 +299,9 @@ fn async_reference_matches_the_orchestrator_fleet_vocabulary() {
         .iter()
         .filter_map(|v| v.as_str())
         .collect();
-    assert!(
-        next.iter()
-            .any(|a| a.contains("delivered to you automatically"))
-    );
+    assert!(next
+        .iter()
+        .any(|a| a.contains("delivered to you automatically")));
 
     let message = format_async_subagent_accepted("task_manager_agent", &serialized, &fleet);
     let prose = message.split("[async_subagent_ref]").next().unwrap();
@@ -614,10 +613,8 @@ fn scoped_instance_advertises_exactly_the_allowlist() {
         schema["properties"]["agent_id"]["enum"],
         serde_json::json!(["agent_memory", "workflow_builder"])
     );
-    assert!(
-        schema["properties"]["agent_id"]["description"]
-            .as_str()
-            .unwrap_or_default()
-            .contains("only these are dispatchable")
-    );
+    assert!(schema["properties"]["agent_id"]["description"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("only these are dispatchable"));
 }

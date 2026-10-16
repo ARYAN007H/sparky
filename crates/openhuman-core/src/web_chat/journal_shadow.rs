@@ -142,11 +142,12 @@ pub(super) async fn shadow_compare_journal_projection(
         return None;
     }
 
-    let projected = crate::core::observability::progress_tracing::journal_projection::spans_from_observations(
-        trace_ctx,
-        max_iterations,
-        &observations,
-    );
+    let projected =
+        crate::core::observability::progress_tracing::journal_projection::spans_from_observations(
+            trace_ctx,
+            max_iterations,
+            &observations,
+        );
     let live_sig = span_projection_signature(live_spans);
     let projected_sig = span_projection_signature(&projected);
     if live_sig == projected_sig {

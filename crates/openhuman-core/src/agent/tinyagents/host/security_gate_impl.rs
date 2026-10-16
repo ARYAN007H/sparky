@@ -6,7 +6,7 @@ use tinyagents_harness::host::security_gate::{
 
 use super::OpenHumanSecurityGate;
 use crate::security::prompt_injection::{
-    PromptEnforcementAction, PromptEnforcementContext, enforce_prompt_input,
+    enforce_prompt_input, PromptEnforcementAction, PromptEnforcementContext,
 };
 
 #[async_trait]

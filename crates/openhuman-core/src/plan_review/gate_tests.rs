@@ -135,19 +135,17 @@ async fn parked_review_for_thread_carries_tool_call_id_and_expiry() {
     parked.await.unwrap();
 
     // Decided reviews are no longer parked.
-    assert!(
-        gate.parked_review_for_thread(&tenant(), "t-replay")
-            .is_none()
-    );
+    assert!(gate
+        .parked_review_for_thread(&tenant(), "t-replay")
+        .is_none());
 }
 
 #[tokio::test]
 async fn parked_review_for_thread_is_none_when_nothing_is_parked() {
     let gate = PlanReviewGate::new(Duration::from_secs(5));
-    assert!(
-        gate.parked_review_for_thread(&tenant(), "no-such-thread")
-            .is_none()
-    );
+    assert!(gate
+        .parked_review_for_thread(&tenant(), "no-such-thread")
+        .is_none());
 }
 
 #[tokio::test]

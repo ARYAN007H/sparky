@@ -285,19 +285,16 @@ async fn paid_vision_readout_is_reused_across_recreated_wrappers_and_invalidated
     let calls = main.requests.lock().unwrap().clone();
     assert_eq!(calls.len(), 3);
     for (_, call) in &calls {
-        assert!(
-            call.messages[0]
-                .text()
-                .contains("Image readout:\nmock vision readout")
-        );
+        assert!(call.messages[0]
+            .text()
+            .contains("Image readout:\nmock vision readout"));
         let Message::User(user) = &call.messages[0] else {
             panic!("expected main user message")
         };
-        assert!(
-            user.content
-                .iter()
-                .all(|block| matches!(block, ContentBlock::Text(_)))
-        );
+        assert!(user
+            .content
+            .iter()
+            .all(|block| matches!(block, ContentBlock::Text(_))));
     }
     assert!(
         matches!(&request.messages[0], Message::User(user) if matches!(&user.content[0], ContentBlock::Image(image) if image.url == "uploads/thread/image/original.jpg"))
@@ -339,15 +336,13 @@ async fn streaming_prepares_only_the_ephemeral_request_and_preserves_order_and_o
     request.temperature = Some(0.37);
     request.max_tokens = Some(128);
     let durable = serde_json::to_value(&request).unwrap();
-    assert!(
-        model
-            .stream(&(), request.clone())
-            .await
-            .unwrap()
-            .collect::<Vec<_>>()
-            .await
-            .is_empty()
-    );
+    assert!(model
+        .stream(&(), request.clone())
+        .await
+        .unwrap()
+        .collect::<Vec<_>>()
+        .await
+        .is_empty());
     assert_eq!(serde_json::to_value(&request).unwrap(), durable);
     let captured = transport.requests.lock().unwrap().clone();
     assert_eq!(captured.len(), 1);
@@ -479,10 +474,8 @@ async fn unsupported_media_urls_and_oversized_inline_sources_fail_before_inferen
         media_type: "application/octet-stream".into(),
     })]);
     let error = model.prepare(oversized).await.unwrap_err();
-    assert!(
-        error
-            .to_string()
-            .contains("inline media exceeds size limit")
-    );
+    assert!(error
+        .to_string()
+        .contains("inline media exceeds size limit"));
     assert!(transport.requests.lock().unwrap().is_empty());
 }

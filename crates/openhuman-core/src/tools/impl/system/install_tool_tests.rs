@@ -1,6 +1,6 @@
 use super::*;
-use crate::security::AutonomyLevel;
 use crate::security::approval::ApprovalChatContext;
+use crate::security::AutonomyLevel;
 
 fn policy(allow_install: bool, autonomy: AutonomyLevel) -> Arc<SecurityPolicy> {
     Arc::new(SecurityPolicy {

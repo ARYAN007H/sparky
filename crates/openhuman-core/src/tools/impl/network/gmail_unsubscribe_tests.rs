@@ -44,11 +44,9 @@ async fn test_gmail_unsubscribe_empty_link() {
         .unwrap();
 
     assert!(result.is_error);
-    assert!(
-        result
-            .text()
-            .contains("without a valid List-Unsubscribe link")
-    );
+    assert!(result
+        .text()
+        .contains("without a valid List-Unsubscribe link"));
 }
 
 #[tokio::test]
@@ -62,9 +60,7 @@ async fn test_gmail_unsubscribe_missing_link() {
         .unwrap();
 
     assert!(result.is_error);
-    assert!(
-        result
-            .text()
-            .contains("without a valid List-Unsubscribe link")
-    );
+    assert!(result
+        .text()
+        .contains("without a valid List-Unsubscribe link"));
 }

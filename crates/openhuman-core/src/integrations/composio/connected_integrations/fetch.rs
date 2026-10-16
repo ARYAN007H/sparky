@@ -4,8 +4,8 @@
 
 use std::sync::atomic::Ordering;
 
-use crate::integrations::ConnectedIntegration;
 use crate::config::Config;
+use crate::integrations::ConnectedIntegration;
 
 use super::cache::{
     cache_generation, checked_cache_key, store_fetched_integrations, INTEGRATIONS_CACHE,
@@ -182,7 +182,9 @@ fn fetch_connected_integrations_uncached(
 pub(crate) fn to_prompt_integrations(
     resp: tinyconnectors_bus::ComposioConnectedIntegrationsResponse,
 ) -> Vec<ConnectedIntegration> {
-    use crate::agent::prompts::{ConnectedIntegrationTool, GatedIntegrationTool, IntegrationConnection};
+    use crate::agent::prompts::{
+        ConnectedIntegrationTool, GatedIntegrationTool, IntegrationConnection,
+    };
     resp.integrations
         .into_iter()
         .map(|i| {

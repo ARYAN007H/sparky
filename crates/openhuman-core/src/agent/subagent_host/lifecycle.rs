@@ -364,15 +364,8 @@ impl OpenHumanSubagentHost {
         })
         .map_err(map_lifecycle_error)?;
         let request = if continuation {
-            SubagentRequest::continue_with_key(
-                task_key.clone(),
-                child,
-                request,
-                input,
-                None,
-                None,
-            )
-            .await
+            SubagentRequest::continue_with_key(task_key.clone(), child, request, input, None, None)
+                .await
         } else {
             // `direct_subagent_child` derives the same key for the host's
             // durable lookup; this constructor independently proves that the
@@ -1126,7 +1119,7 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
 
 #[path = "lifecycle_outcome.rs"]
 mod outcome;
-use outcome::{HostInFlightMap, host_outcome_to_neutral};
+use outcome::{host_outcome_to_neutral, HostInFlightMap};
 
 fn outcome_to_host(
     result: SubagentRunResult,

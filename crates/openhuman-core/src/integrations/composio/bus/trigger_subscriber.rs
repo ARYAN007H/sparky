@@ -4,12 +4,12 @@ use crate::core::runtime::DispatchCtx;
 use async_trait::async_trait;
 use tinybus::EventHandler;
 
+use crate::core::events::DomainEvent;
+use crate::integrations::composio::trigger_history;
+use crate::security::turn_origin::with_origin;
 use crate::triage::{
     apply_decision, remote_trigger_origin, run_triage, TriageOutcome, TriggerEnvelope,
 };
-use crate::security::turn_origin::with_origin;
-use crate::core::events::DomainEvent;
-use crate::integrations::composio::trigger_history;
 
 /// Env var that **disables** the triage pipeline. The pipeline is
 /// enabled by default; set to `1`/`true`/`yes` to opt out (e.g. for

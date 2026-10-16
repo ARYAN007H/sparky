@@ -1,6 +1,6 @@
 //! System prompt builder for the `presentation_agent` built-in agent.
 
-use crate::agent::prompts::{PromptContext};
+use crate::agent::prompts::PromptContext;
 use crate::prompts::{render_tools, render_workspace};
 use anyhow::Result;
 

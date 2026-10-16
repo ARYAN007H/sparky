@@ -75,7 +75,7 @@ use std::sync::Arc;
 use tinyagents_harness::host::{OutcomeClass, ToolOutcomeClassifier};
 use tinytools::ToolResult;
 
-use tinytools::status::{ToolFailureClass, classify};
+use tinytools::status::{classify, ToolFailureClass};
 
 /// OpenHuman's [`ToolOutcomeClassifier`], backed by
 /// [`tinytools::status::classify`].

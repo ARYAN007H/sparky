@@ -52,14 +52,14 @@ pub use schemas::{
 use std::path::Path;
 use std::sync::Arc;
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use serde_json::json;
 use sha2::Digest;
 use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition};
 
 use super::documents::Repo;
 use super::rusqlite;
-use super::{Scope, StorageBackend, block_on};
+use super::{block_on, Scope, StorageBackend};
 use crate::config::Config;
 use rusqlite::Connection;
 use serde_json::Value;

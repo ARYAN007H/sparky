@@ -11,7 +11,7 @@ mod tests;
 use crate::inference::provider::openhuman_backend_model;
 use tinyinference_core::sanitize::sanitize_api_error;
 use tinyinference_llm::failure::http::{
-    ErrorReporter, ProviderHttpFailure, ProviderHttpFailureFacts, classify_and_report_http_failure,
+    classify_and_report_http_failure, ErrorReporter, ProviderHttpFailure, ProviderHttpFailureFacts,
 };
 use tinyinference_llm::failure::{
     local_provider_no_model_loaded_user_message, ollama_cloud_internal_500_user_message,

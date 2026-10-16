@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use tinyagents_harness::error::Result;
-use tinyagents_harness::summarization::{Summarizer, SummaryRecord, SummaryRequest, is_checkpoint};
+use tinyagents_harness::summarization::{is_checkpoint, Summarizer, SummaryRecord, SummaryRequest};
 use tinyinference_llm::message::{ContentBlock, Message};
 use tinymemory_api::{Role, Turn};
 

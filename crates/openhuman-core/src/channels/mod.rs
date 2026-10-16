@@ -26,9 +26,9 @@ pub mod controllers;
 pub mod host;
 #[cfg(feature = "channels")]
 pub mod proactive;
+pub(crate) mod prompt;
 #[cfg(feature = "channels")]
 pub mod providers;
-pub(crate) mod prompt;
 #[cfg(feature = "channels")]
 mod routes;
 #[cfg(feature = "channels")]
@@ -110,14 +110,14 @@ pub use yuanbao::YuanbaoChannel;
 pub use runtime::test_support;
 
 #[cfg(feature = "channels")]
+pub use commands::doctor_channels;
+#[cfg(feature = "channels")]
 // Channel system-prompt assembly lives in
 // `crate::channels::prompt` alongside the rest of
 // the prompt-building code. Re-exported here for callers that used the
 // old `channels::build_system_prompt` path.
 #[cfg(feature = "channels")]
 pub use prompt::build_system_prompt;
-#[cfg(feature = "channels")]
-pub use commands::doctor_channels;
 #[cfg(feature = "channels")]
 pub use runtime::start_channels;
 #[cfg(feature = "channels")]

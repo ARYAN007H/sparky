@@ -55,9 +55,8 @@ pub(crate) mod turn_checkpoint;
 mod types;
 
 pub use codec::OpenHumanTranscriptCodec;
-pub type OpenHumanSessionHooks = tinyagents_runtime::FnSessionHooks<
-    crate::agent::tinyagents::host::OpenHumanRunContext,
->;
+pub type OpenHumanSessionHooks =
+    tinyagents_runtime::FnSessionHooks<crate::agent::tinyagents::host::OpenHumanRunContext>;
 pub use types::{OpenHumanSessionHost, SessionHostBuilder, TurnOverrides};
 
 // Re-export the duplicate-tool-spec guard for sibling harness modules

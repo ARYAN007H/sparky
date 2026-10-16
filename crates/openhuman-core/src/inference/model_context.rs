@@ -5,7 +5,7 @@
 //! otherwise long histories produce upstream `400 Bad Request` errors when usage
 //! metadata is not yet available.
 
-use crate::config::{MODEL_MANAGED_DEFAULT, legacy_tier_role};
+use crate::config::{legacy_tier_role, MODEL_MANAGED_DEFAULT};
 
 /// Conservative default for OpenHuman abstract tier models (tokens).
 const TIER_LARGE_CONTEXT: u64 = 200_000;

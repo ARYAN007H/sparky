@@ -12,8 +12,8 @@ use crate::progress::AgentProgress;
 use super::ops::BudgetCorrelation;
 use super::progress_bridge::spawn_progress_bridge;
 use super::session::{
-    CheckedOutSession, CheckoutPolicy, checkin_session_agent, checkout_session_agent,
-    normalize_model_override,
+    checkin_session_agent, checkout_session_agent, normalize_model_override, CheckedOutSession,
+    CheckoutPolicy,
 };
 use super::types::{ChatRequestMetadata, WebChatTaskResult};
 use super::web_errors::{

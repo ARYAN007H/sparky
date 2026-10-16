@@ -77,12 +77,10 @@ async fn overlap_ranker_ranks_by_token_overlap_and_names_its_kind() {
         hits.first().map(|h| h.key.as_str()),
         Some("SLACK_SEND_MESSAGE")
     );
-    assert!(
-        ranker
-            .rank(" ", &tinytools::RankContext::empty(), &candidates, 3)
-            .await
-            .is_err()
-    );
+    assert!(ranker
+        .rank(" ", &tinytools::RankContext::empty(), &candidates, 3)
+        .await
+        .is_err());
 }
 
 /// A text dialect renders the prompt catalogue and the harness clears

@@ -6,8 +6,8 @@ fn list_configured_models_accepts_slug() {
     // passes a slug instead of the opaque random id. This lets the frontend
     // call the RPC before the provider config has been persisted (where only
     // the slug is stable).
-    use crate::config::Config;
     use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
+    use crate::config::Config;
 
     let mut config = Config::default();
     config.cloud_providers.push(CloudProviderCreds {
@@ -207,7 +207,8 @@ mod provider_config_rejection_suppression {
     use super::super::*;
 
     // The exact #2079 Sentry body shape.
-    const TIER_LEAK_BODY: &str = "The supported API model names are deepseek-v4-pro or deepseek-v4-flash, \
+    const TIER_LEAK_BODY: &str =
+        "The supported API model names are deepseek-v4-pro or deepseek-v4-flash, \
          but you passed reasoning-v1.";
     // #2076 Moonshot Kimi K2 temperature constraint.
     const TEMP_BODY: &str = "invalid temperature: only 1 is allowed for this model";

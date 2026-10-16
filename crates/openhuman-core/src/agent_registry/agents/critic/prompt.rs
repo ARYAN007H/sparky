@@ -4,7 +4,7 @@
 //! (from the sibling `prompt.md`) plus the same section helpers the
 //! runtime uses for every other agent.
 
-use crate::agent::prompts::{PromptContext};
+use crate::agent::prompts::PromptContext;
 use crate::prompts::{render_tools, render_workspace};
 use anyhow::Result;
 

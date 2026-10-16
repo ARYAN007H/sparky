@@ -7,11 +7,9 @@ fn all_controller_schemas_lists_registered_functions() {
     assert_eq!(schemas.len(), 3);
     // The six read-only `session_db` controllers were removed in #6082; only the
     // durable run-ledger read surface remains here.
-    assert!(
-        schemas
-            .iter()
-            .all(|schema| schema.namespace == "run_ledger")
-    );
+    assert!(schemas
+        .iter()
+        .all(|schema| schema.namespace == "run_ledger"));
 }
 
 /// The removed `session_db` surface must stay removed: none of the six read
@@ -65,11 +63,10 @@ fn schema_for_run_ledger_events_requires_run_id() {
     let s = schema_for("run_ledger_events");
     assert_eq!(s.namespace, "run_ledger");
     assert_eq!(s.function, "events");
-    assert!(
-        s.inputs
-            .iter()
-            .any(|input| input.name == "runId" && input.required)
-    );
+    assert!(s
+        .inputs
+        .iter()
+        .any(|input| input.name == "runId" && input.required));
 }
 
 #[test]

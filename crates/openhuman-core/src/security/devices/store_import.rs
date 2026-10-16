@@ -8,11 +8,11 @@
 use crate::storage::rusqlite;
 use anyhow::{Context, Result};
 use rusqlite::Connection;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use super::store_documents::DEVICES;
 use crate::config::Config;
-use crate::storage::import::{ImportDoc, table_exists};
+use crate::storage::import::{table_exists, ImportDoc};
 
 /// The legacy database, `<workspace>/devices/devices.db`.
 pub(crate) fn db_path(config: &Config) -> std::path::PathBuf {

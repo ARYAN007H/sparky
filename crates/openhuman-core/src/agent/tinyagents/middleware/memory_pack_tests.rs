@@ -8,7 +8,7 @@ use std::sync::Arc;
 use tinyagents_harness::context::RunConfig;
 use tinyinference_llm::message::Message;
 
-use crate::memory::lifecycle::hooks::{MemoryTurn, OPEN_TAG, TurnPack};
+use crate::memory::lifecycle::hooks::{MemoryTurn, TurnPack, OPEN_TAG};
 use crate::memory::scope::MemoryIdentity;
 
 fn context(pack: Option<TurnPack>) -> RunContext<OpenHumanRunContext> {
@@ -171,14 +171,12 @@ async fn on_a_hoisting_model_only_the_previous_tail_message_falls_out_of_the_cac
         &second.messages[..turn_two.len() - 1],
         &turn_two[..turn_two.len() - 1]
     );
-    assert!(
-        second
-            .messages
-            .last()
-            .unwrap()
-            .text()
-            .contains("travels by rail")
-    );
+    assert!(second
+        .messages
+        .last()
+        .unwrap()
+        .text()
+        .contains("travels by rail"));
     // Turn one's tail carried turn one's pack, so the shared prefix stops just
     // before it: one user message, never the whole history.
     assert_eq!(

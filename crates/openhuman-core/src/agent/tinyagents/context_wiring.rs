@@ -7,14 +7,14 @@
 use std::sync::Arc;
 
 use tinyagents_harness::middleware::{
+    compression_policy, legacy_max_input_tokens, microcompact_for_window, split_input_allowance,
     ArtifactIndexTocMiddleware, CapturedOutcomes, ContextCompressionMiddleware, ContextLadder,
     FinalCallWrapUpMiddleware, ImageAwareMessageTrimMiddleware, OutcomesUnavailable,
-    compression_policy, legacy_max_input_tokens, microcompact_for_window, split_input_allowance,
 };
 use tinyagents_harness::runtime::AgentHarness;
 use tinyagents_harness::summarization::{
-    DEFAULT_TASK_STATE_CHUNK_TOKENS, FaultTolerantCachingSummarizer, ModelSummarizer,
-    SummarizationPolicy, TaskStateSummarizer,
+    FaultTolerantCachingSummarizer, ModelSummarizer, SummarizationPolicy, TaskStateSummarizer,
+    DEFAULT_TASK_STATE_CHUNK_TOKENS,
 };
 
 use crate::agent::tinyagents::host::OpenHumanRunContext;

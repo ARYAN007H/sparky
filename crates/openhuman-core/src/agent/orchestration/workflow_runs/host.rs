@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use serde_json::json;
 use tinyagents_harness::CancellationToken;

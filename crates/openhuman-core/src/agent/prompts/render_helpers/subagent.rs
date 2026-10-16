@@ -5,8 +5,8 @@
 //! for callers that only hold indices into the parent's tool vec.
 
 use super::builder::GLOBAL_STYLE_SUFFIX;
-use crate::prompts::sections::GROUNDING_BODY;
 use super::types::*;
+use crate::prompts::sections::GROUNDING_BODY;
 use crate::prompts::{inject_workspace_file, write_agents_md_blocks};
 use std::fmt::Write;
 use std::path::Path;

@@ -3,7 +3,7 @@
 //! Returns the final, fully-assembled system prompt — archetype body (from the
 //! sibling `prompt.md`) plus the shared section helpers every agent uses.
 
-use crate::agent::prompts::{PromptContext};
+use crate::agent::prompts::PromptContext;
 use crate::prompts::{render_tools, render_workspace};
 use anyhow::Result;
 

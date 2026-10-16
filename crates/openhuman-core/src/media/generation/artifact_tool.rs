@@ -358,27 +358,23 @@ impl<T: Tool> MediaArtifactTool<T> {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
-        let artifacts = match crate::artifacts::store::list_artifacts(
-            &self.workspace_dir,
-            0,
-            usize::MAX,
-            None,
-        )
-        .await
-        {
-            Ok((artifacts, _)) => artifacts,
-            Err(error) => {
-                tracing::warn!(
-                    target: "media_generation",
-                    %error,
-                    "[media_generation] could not refresh reusable artifact paths"
-                );
-                return Err(
+        let artifacts =
+            match crate::artifacts::store::list_artifacts(&self.workspace_dir, 0, usize::MAX, None)
+                .await
+            {
+                Ok((artifacts, _)) => artifacts,
+                Err(error) => {
+                    tracing::warn!(
+                        target: "media_generation",
+                        %error,
+                        "[media_generation] could not refresh reusable artifact paths"
+                    );
+                    return Err(
                     "could not validate previously generated media references; retry the media call"
                         .to_string(),
                 );
-            }
-        };
+                }
+            };
 
         for meta in artifacts.iter().filter(|meta| {
             matches!(&meta.kind, ArtifactKind::Image | ArtifactKind::Video)

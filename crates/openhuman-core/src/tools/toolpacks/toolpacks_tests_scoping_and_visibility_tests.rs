@@ -2,7 +2,7 @@
 //! execution distinction the whole pack mechanism rests on.
 
 use super::*;
-use tinyagents_harness::tool::packs::{USE_SKILL, route_sentence};
+use tinyagents_harness::tool::packs::{route_sentence, USE_SKILL};
 
 // ── the index must agree with the gate too ──────────────────────────────────
 

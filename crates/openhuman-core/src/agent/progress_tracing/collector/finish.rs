@@ -5,7 +5,7 @@
 use std::collections::BTreeMap;
 
 use tinyagents_harness::observability::trace_export::serialize::{
-    MAX_ERROR_MESSAGE_CHARS, json_str, truncate_chars,
+    json_str, truncate_chars, MAX_ERROR_MESSAGE_CHARS,
 };
 use tinyagents_harness::observability::trace_export::{SpanKind, SpanStatus};
 

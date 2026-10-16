@@ -17,12 +17,10 @@ fn fetch() -> WebFetchTool {
 fn web_fetch_opts_into_an_optional_summary_focus() {
     let schema = fetch().parameters_schema();
     assert_eq!(schema["properties"][SUMMARY_FOCUS_ARG]["type"], "string");
-    assert!(
-        !schema["required"]
-            .as_array()
-            .unwrap()
-            .contains(&json!(SUMMARY_FOCUS_ARG))
-    );
+    assert!(!schema["required"]
+        .as_array()
+        .unwrap()
+        .contains(&json!(SUMMARY_FOCUS_ARG)));
     // The tool's schema declares TinyJuice's own property, not a lookalike.
     assert!(crate::inference::tokenjuice::focus::declares_summary_focus(
         &schema
@@ -95,31 +93,25 @@ async fn tinyjuice_detects_and_converts_html() {
         return;
     }
     let page = "<!DOCTYPE html><html><body><p>hi</p></body></html>";
-    assert!(
-        TinyJuiceHtml {
-            ctx: crate::core::runtime::DispatchCtx::ambient(),
-        }
-        .looks_like_html(page)
-        .await
-        .unwrap()
-    );
-    assert!(
-        !TinyJuiceHtml {
-            ctx: crate::core::runtime::DispatchCtx::ambient(),
-        }
-        .looks_like_html("# Just a README\n\nSome prose.\n")
-        .await
-        .unwrap()
-    );
-    assert!(
-        TinyJuiceHtml {
-            ctx: crate::core::runtime::DispatchCtx::ambient(),
-        }
-        .to_markdown(page)
-        .await
-        .unwrap()
-        .contains("hi")
-    );
+    assert!(TinyJuiceHtml {
+        ctx: crate::core::runtime::DispatchCtx::ambient(),
+    }
+    .looks_like_html(page)
+    .await
+    .unwrap());
+    assert!(!TinyJuiceHtml {
+        ctx: crate::core::runtime::DispatchCtx::ambient(),
+    }
+    .looks_like_html("# Just a README\n\nSome prose.\n")
+    .await
+    .unwrap());
+    assert!(TinyJuiceHtml {
+        ctx: crate::core::runtime::DispatchCtx::ambient(),
+    }
+    .to_markdown(page)
+    .await
+    .unwrap()
+    .contains("hi"));
 }
 
 #[cfg(feature = "web3")]

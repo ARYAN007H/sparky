@@ -7,12 +7,12 @@
 //! * [`build_visible_tool_set`] — union of named tools + extra (delegation) tools.
 
 use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
-use crate::integrations::ConnectedIntegration;
 use crate::config::Config;
 use crate::integrations::composio::{
     cached_active_integrations, fetch_connected_integrations_status,
     FetchConnectedIntegrationsStatus,
 };
+use crate::integrations::ConnectedIntegration;
 use crate::tools::orchestrator_tools;
 use std::collections::HashSet;
 use std::time::Duration;

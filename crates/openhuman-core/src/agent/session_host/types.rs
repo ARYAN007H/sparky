@@ -442,8 +442,8 @@ pub struct OpenHumanSessionHost {
     /// behaviour unless a caller opts into stricter policy.
     pub(super) tool_policy: Arc<
         dyn tinyagents_harness::middleware::ToolCallPolicy<
-                crate::agent::tinyagents::host::OpenHumanRunContext,
-            >,
+            crate::agent::tinyagents::host::OpenHumanRunContext,
+        >,
     >,
     /// Hash of the Composio connection set this OpenHumanSessionHost last reconciled
     /// against. Compared at top-of-turn to a fresh hash computed from
@@ -632,8 +632,8 @@ pub struct SessionHostBuilder {
     pub(super) tool_policy: Option<
         Arc<
             dyn tinyagents_harness::middleware::ToolCallPolicy<
-                    crate::agent::tinyagents::host::OpenHumanRunContext,
-                >,
+                crate::agent::tinyagents::host::OpenHumanRunContext,
+            >,
         >,
     >,
 }

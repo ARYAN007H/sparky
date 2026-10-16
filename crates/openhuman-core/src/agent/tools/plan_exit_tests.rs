@@ -61,15 +61,13 @@ async fn plan_exit_does_not_flip_while_a_review_is_parked() {
 
     // Resolve the parked review so the spawned task and the gate's
     // bookkeeping don't leak past this test.
-    assert!(
-        crate::plan_review::gate::global().decide_by_thread(
-            &crate::core::runtime::DispatchCtx::ambient()
-                .tenant()
-                .unwrap(),
-            thread_id,
-            PlanReviewResolution::Approve,
-        )
-    );
+    assert!(crate::plan_review::gate::global().decide_by_thread(
+        &crate::core::runtime::DispatchCtx::ambient()
+            .tenant()
+            .unwrap(),
+        thread_id,
+        PlanReviewResolution::Approve,
+    ));
     let resolution = parked.await.unwrap();
     assert_eq!(resolution, PlanReviewResolution::Approve);
 

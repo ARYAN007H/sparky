@@ -188,8 +188,8 @@ fn worktree_detail_forwards_isolated_worker_fields() {
 
 // ── #4270 inference heartbeat ────────────────────────────────────────────
 
-use crate::progress::AgentProgress;
 use crate::config::Config;
+use crate::progress::AgentProgress;
 use std::time::Duration;
 use tokio::sync::broadcast::error::TryRecvError;
 

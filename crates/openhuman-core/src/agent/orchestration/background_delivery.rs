@@ -49,10 +49,10 @@ use slot::DeliverySlot;
 use super::background_completions;
 use super::busy_guard::is_busy;
 #[cfg(test)]
-use super::busy_guard::{TurnBusy, busy, clear_busy_for_thread};
+use super::busy_guard::{busy, clear_busy_for_thread, TurnBusy};
 use super::completion_notice::build_undelivered_notice;
 use super::completion_owners;
-use super::delivery_drain::{DrainFence, DrainOutcome, RECOVERY_BUSY_POLL, run_drain};
+use super::delivery_drain::{run_drain, DrainFence, DrainOutcome, RECOVERY_BUSY_POLL};
 use crate::core::runtime::CoreContext;
 
 /// Coalesce completions landing within this window into one delivery turn.

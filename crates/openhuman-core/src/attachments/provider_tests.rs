@@ -51,18 +51,14 @@ async fn local_native_resolution_changes_only_ephemeral_request() {
     )]);
     let durable = request.clone();
     assert!(wrapper.invoke(&(), request).await.is_err());
-    assert!(
-        serde_json::to_string(&durable)
-            .unwrap()
-            .contains("sample.png")
-    );
+    assert!(serde_json::to_string(&durable)
+        .unwrap()
+        .contains("sample.png"));
     let captured = probe.requests.lock().unwrap().clone();
     assert_eq!(captured.len(), 1);
-    assert!(
-        serde_json::to_string(&captured[0])
-            .unwrap()
-            .contains("data:image/png;base64,")
-    );
+    assert!(serde_json::to_string(&captured[0])
+        .unwrap()
+        .contains("data:image/png;base64,"));
     assert_eq!(
         tokio::fs::read(temp.path().join("sample.png"))
             .await
@@ -134,11 +130,9 @@ async fn persisted_image_without_mime_uses_magic_over_extension() {
     assert!(wrapper.invoke(&(), request).await.is_err());
     let captured = probe.requests.lock().unwrap().clone();
     assert_eq!(captured.len(), 1);
-    assert!(
-        serde_json::to_string(&captured[0])
-            .unwrap()
-            .contains("data:image/jpeg;base64,")
-    );
+    assert!(serde_json::to_string(&captured[0])
+        .unwrap()
+        .contains("data:image/jpeg;base64,"));
 }
 
 #[tokio::test]
@@ -232,11 +226,9 @@ async fn unknown_video_retains_path_as_metadata_without_specialist() {
     let text = captured[0].messages[0].text();
     assert!(text.contains("clip.mp4"));
     assert!(text.contains("14 bytes"));
-    assert!(
-        !serde_json::to_string(&captured[0])
-            .unwrap()
-            .contains("base64")
-    );
+    assert!(!serde_json::to_string(&captured[0])
+        .unwrap()
+        .contains("base64"));
 }
 
 #[tokio::test]
@@ -277,22 +269,18 @@ async fn derivative_cache_survives_model_recreation_and_invalidates_changed_cont
         Some("derived readout")
     );
     let changed = first.fallback_key("uploads/thread/id/original.txt", "text/plain", b"modified");
-    assert!(
-        resumed
-            .cached_fallback("uploads/thread/id/original.txt", &changed, &scope)
-            .await
-            .is_none()
-    );
+    assert!(resumed
+        .cached_fallback("uploads/thread/id/original.txt", &changed, &scope)
+        .await
+        .is_none());
     assert_eq!(tokio::fs::read(original).await.unwrap(), b"original");
-    assert!(
-        tokio::fs::read_dir(temp.path().join("uploads/thread/id"))
-            .await
-            .unwrap()
-            .next_entry()
-            .await
-            .unwrap()
-            .is_some()
-    );
+    assert!(tokio::fs::read_dir(temp.path().join("uploads/thread/id"))
+        .await
+        .unwrap()
+        .next_entry()
+        .await
+        .unwrap()
+        .is_some());
 }
 
 #[tokio::test]
@@ -324,7 +312,7 @@ async fn cache_is_not_written_beside_unmanaged_local_files() {
 #[test]
 fn endpoint_discovery_denial_overrides_offline_vision_facts() {
     use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
-    use tinyinference_llm::model::discover::{LimitSource, ModelLimits, model_limits_cache};
+    use tinyinference_llm::model::discover::{model_limits_cache, LimitSource, ModelLimits};
     let temp = tempfile::tempdir().unwrap();
     let mut config = Config::default();
     config.config_path = temp.path().join("config.toml");
@@ -420,11 +408,9 @@ async fn disabled_remote_replay_is_rejected_before_inference() {
             },
         )]);
         let error = wrapper.invoke(&(), request).await.unwrap_err();
-        assert!(
-            error
-                .to_string()
-                .contains("remote attachment fetch is disabled")
-        );
+        assert!(error
+            .to_string()
+            .contains("remote attachment fetch is disabled"));
     }
     assert!(probe.requests.lock().unwrap().is_empty());
 }
@@ -577,16 +563,12 @@ async fn unknown_model_legacy_inline_replay_uses_specialist_once_across_model_re
         assert!(wrapper.invoke(&(), request.clone()).await.is_err());
         let captured = main.requests.lock().unwrap().clone();
         assert_eq!(captured.len(), 1);
-        assert!(
-            captured[0].messages[0]
-                .text()
-                .contains("specialist image readout")
-        );
-        assert!(
-            !serde_json::to_string(&captured[0])
-                .unwrap()
-                .contains("base64")
-        );
+        assert!(captured[0].messages[0]
+            .text()
+            .contains("specialist image readout"));
+        assert!(!serde_json::to_string(&captured[0])
+            .unwrap()
+            .contains("base64"));
     }
     assert_eq!(
         specialist.calls.load(std::sync::atomic::Ordering::SeqCst),
@@ -621,9 +603,7 @@ async fn legacy_audio_base64_unsupported_transport_becomes_workspace_reference()
     let text = captured[0].messages[0].text();
     assert!(text.contains("audio/wav"));
     assert!(text.contains("workspace path: uploads/legacy-media/"));
-    assert!(
-        !serde_json::to_string(&captured[0])
-            .unwrap()
-            .contains("base64")
-    );
+    assert!(!serde_json::to_string(&captured[0])
+        .unwrap()
+        .contains("base64"));
 }

@@ -193,7 +193,7 @@ fn is_provider_not_configured_error_rejects_non_400_status() {
 
 fn seed_app_session(dir: &std::path::Path) {
     use crate::security::credentials::{
-        APP_SESSION_PROVIDER, AuthService, DEFAULT_AUTH_PROFILE_NAME,
+        AuthService, APP_SESSION_PROVIDER, DEFAULT_AUTH_PROFILE_NAME,
     };
     AuthService::new(dir, false)
         .store_provider_token(
@@ -211,8 +211,8 @@ fn seed_app_session(dir: &std::path::Path) {
 /// can be exercised without a live backend.
 fn seed_app_session_with_expiry(dir: &std::path::Path, expires_at: &str) {
     use crate::security::credentials::{
-        APP_SESSION_PROVIDER, AuthService, DEFAULT_AUTH_PROFILE_NAME,
-        session_support::SESSION_EXPIRES_AT_META,
+        session_support::SESSION_EXPIRES_AT_META, AuthService, APP_SESSION_PROVIDER,
+        DEFAULT_AUTH_PROFILE_NAME,
     };
     let mut metadata = std::collections::HashMap::new();
     metadata.insert(SESSION_EXPIRES_AT_META.to_string(), expires_at.to_string());

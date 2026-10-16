@@ -27,8 +27,8 @@ impl MemoryPackSource<OpenHumanRunContext> for TurnMemoryPack {
 }
 
 /// The harness middleware over [`TurnMemoryPack`].
-pub(crate) fn memory_pack_middleware()
--> tinyagents_hooks::lifecycle::MemoryPackMiddleware<OpenHumanRunContext, TurnMemoryPack> {
+pub(crate) fn memory_pack_middleware(
+) -> tinyagents_hooks::lifecycle::MemoryPackMiddleware<OpenHumanRunContext, TurnMemoryPack> {
     tinyagents_hooks::lifecycle::MemoryPackMiddleware::new(TurnMemoryPack)
 }
 

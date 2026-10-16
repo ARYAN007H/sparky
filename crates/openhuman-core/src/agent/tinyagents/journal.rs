@@ -51,8 +51,8 @@ use std::sync::{Arc, Mutex};
 use tinyagents_harness::events::{EventSink, HarnessRunStatus};
 use tinyagents_harness::ids::{ComponentId, HarnessPhase, RunId, ThreadId};
 use tinyagents_harness::observability::{
-    AgentObservation, DriverStatusStore, FanOutSink, HarnessEventJournal, HarnessStatusStore,
-    JournalSink, RedactingSink, StoreEventJournal, process_env_secrets,
+    process_env_secrets, AgentObservation, DriverStatusStore, FanOutSink, HarnessEventJournal,
+    HarnessStatusStore, JournalSink, RedactingSink, StoreEventJournal,
 };
 
 use tinyagents_harness::store::AppendStore;

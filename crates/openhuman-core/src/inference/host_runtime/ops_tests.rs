@@ -280,7 +280,7 @@ async fn effective_origin_defaults_to_direct_chat_outside_any_scope() {
 /// see, not the blanket `Cli` allowance this RPC would otherwise impose.
 #[tokio::test]
 async fn effective_origin_keeps_an_embedder_scoped_label() {
-    use crate::security::turn_origin::{AgentTurnOrigin, TrustedAutomationSource, with_origin};
+    use crate::security::turn_origin::{with_origin, AgentTurnOrigin, TrustedAutomationSource};
     let observed = with_origin(
         AgentTurnOrigin::TrustedAutomation {
             job_id: "run-7".to_string(),
@@ -308,7 +308,7 @@ async fn effective_origin_keeps_an_embedder_scoped_label() {
 /// touched, not a silent fall-through to the orchestrator.
 #[tokio::test]
 async fn agent_chat_for_rejects_an_unknown_agent_id() {
-    use crate::inference::host_runtime::ops::{AgentChatTarget, agent_chat_for};
+    use crate::inference::host_runtime::ops::{agent_chat_for, AgentChatTarget};
     let tmp = tempfile::tempdir().unwrap();
     let mut config = test_config(&tmp);
     std::fs::create_dir_all(&config.workspace_dir).unwrap();

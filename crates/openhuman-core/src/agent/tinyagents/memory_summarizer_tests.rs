@@ -3,7 +3,7 @@ use super::*;
 use chrono::Utc;
 use tinyagents_harness::summarization::ConcatSummarizer;
 
-use crate::memory::lifecycle::hooks::{PostTurnInput, PreTurnInput, post_turn, pre_turn};
+use crate::memory::lifecycle::hooks::{post_turn, pre_turn, PostTurnInput, PreTurnInput};
 use crate::memory::scope::MemoryIdentity;
 use crate::memory::test_fixtures::{bind_reference, config_in};
 
@@ -113,14 +113,13 @@ async fn without_recall_the_summarizer_is_unchanged_and_its_failure_is_its_own()
     let mut quiet = (*turn).clone();
     quiet.identity.recall = false;
     let off = MemoryRecallSummarizer::wrap(Box::new(ConcatSummarizer), Some(Arc::new(quiet)));
-    assert!(
-        !off.summarize(&dropped())
-            .await
-            .unwrap()
-            .summary
-            .text()
-            .contains(RECALLED_HEADING)
-    );
+    assert!(!off
+        .summarize(&dropped())
+        .await
+        .unwrap()
+        .summary
+        .text()
+        .contains(RECALLED_HEADING));
 
     let failing = MemoryRecallSummarizer::wrap(Box::new(Failing), Some(turn));
     assert!(failing.summarize(&dropped()).await.is_err());

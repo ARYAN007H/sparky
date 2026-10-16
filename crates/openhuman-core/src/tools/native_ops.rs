@@ -158,7 +158,8 @@ pub async fn execute_tool(
     let tools = build_runtime_tools(config)?;
     trace!(
         tool_count = tools.len(),
-        tool_name, "[native_ops] execute_tool: runtime tools built"
+        tool_name,
+        "[native_ops] execute_tool: runtime tools built"
     );
     let tool = tools
         .into_iter()

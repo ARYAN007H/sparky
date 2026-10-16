@@ -29,7 +29,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Duration, Utc};
-use serde_json::{Map, Value, json};
+use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 use tinystoragedrivers::{
     CollectionSpec, ErrorKind, Filter, IndexSpec, Precondition, Query, Sort, Versioned,
@@ -40,7 +40,7 @@ use super::types::{
     NotificationStatus,
 };
 use crate::config::Config;
-use crate::storage::documents::{CAS_ATTEMPTS, Repo, compare_and_swap, text};
+use crate::storage::documents::{compare_and_swap, text, Repo, CAS_ATTEMPTS};
 use crate::storage::{DocumentStore, DocumentStoreExt, StorageError};
 
 pub(super) const NOTIFICATIONS: &str = "integration_notifications";

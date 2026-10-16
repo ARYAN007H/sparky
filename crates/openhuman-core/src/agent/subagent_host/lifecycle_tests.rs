@@ -4,8 +4,8 @@ use tinyagents_orchestration::subagent::{
 };
 
 use super::lifecycle::{
-    HostInFlight, OpenHumanPersistence, host_in_flight, load_subagent_checkpoint,
-    merged_resume_history,
+    host_in_flight, load_subagent_checkpoint, merged_resume_history, HostInFlight,
+    OpenHumanPersistence,
 };
 use super::{SubagentMode, SubagentRunOutcome, SubagentRunStatus, SubagentUsage};
 
@@ -330,7 +330,7 @@ async fn host_coalescer_keeps_the_leader_winner_and_cancels_only_the_observer() 
 #[tokio::test]
 async fn each_agent_dedupes_its_own_in_flight_sub_agents() {
     use crate::core::runtime::agent_scope::test_agent_context;
-    use crate::core::runtime::{DomainSet, context::CoreContext};
+    use crate::core::runtime::{context::CoreContext, DomainSet};
     use std::sync::Arc;
 
     let root = CoreContext::for_test(DomainSet::full(), None);

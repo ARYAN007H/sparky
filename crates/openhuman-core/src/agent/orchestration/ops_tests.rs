@@ -6,8 +6,8 @@ use async_trait::async_trait;
 use parking_lot::Mutex;
 use std::future::Future;
 use std::sync::{
-    Arc,
     atomic::{AtomicUsize, Ordering},
+    Arc,
 };
 use tinyagents_tasks::OrchestrationTaskStatus;
 use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
@@ -241,13 +241,11 @@ async fn e2e_orchestrator_answers_coding_agent_question_and_resumes_child() {
         .expect("wait first child");
     let first_child = &first_wait.agents[0];
     assert_eq!(first_child.status, OrchestrationTaskStatus::Completed);
-    assert!(
-        first_child
-            .result_summary
-            .as_deref()
-            .unwrap_or_default()
-            .contains("CODE_AGENT_QUESTION")
-    );
+    assert!(first_child
+        .result_summary
+        .as_deref()
+        .unwrap_or_default()
+        .contains("CODE_AGENT_QUESTION"));
 
     // `message_agent`/`follow_up` are gone (superseded by the durable verbs in
     // `command_center::control`). The orchestrator now records its answer by
@@ -285,13 +283,11 @@ async fn e2e_orchestrator_answers_coding_agent_question_and_resumes_child() {
         Some(first.orchestration_id.as_str())
     );
     assert_eq!(final_child.status, OrchestrationTaskStatus::Completed);
-    assert!(
-        final_child
-            .result_summary
-            .as_deref()
-            .unwrap_or_default()
-            .contains("CODE_AGENT_DONE")
-    );
+    assert!(final_child
+        .result_summary
+        .as_deref()
+        .unwrap_or_default()
+        .contains("CODE_AGENT_DONE"));
 
     let prompts = provider.prompts();
     assert_eq!(prompts.len(), 2);
@@ -365,12 +361,10 @@ async fn e2e_orchestrator_waits_for_multiple_parallel_coding_subagents() {
 
     assert!(waited.completed);
     assert_eq!(waited.agents.len(), 3);
-    assert!(
-        waited
-            .agents
-            .iter()
-            .all(|agent| agent.status == OrchestrationTaskStatus::Completed)
-    );
+    assert!(waited
+        .agents
+        .iter()
+        .all(|agent| agent.status == OrchestrationTaskStatus::Completed));
     let outputs = waited
         .agents
         .iter()

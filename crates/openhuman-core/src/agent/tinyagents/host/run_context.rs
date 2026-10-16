@@ -415,13 +415,13 @@ pub(crate) struct HarnessHostPolicy {
     pub(crate) tool_call_cap: Option<usize>,
 }
 
-pub use super::operation_context::OpenHumanRunExt;
 #[cfg(test)]
 pub(crate) use super::operation_context::tool_context_with_approval;
+pub use super::operation_context::OpenHumanRunExt;
 pub(crate) use super::operation_context::{
-    HostOperationContext, approval_for_tool, dispatch_ctx_for_tool, memory_identity_for_tool,
-    memory_in_prompt_for_tool, parent_agent_id_for_tool, sandbox_mode_for_tool,
-    task_recency_window_for_tool, turn_origin_for_tool,
+    approval_for_tool, dispatch_ctx_for_tool, memory_identity_for_tool, memory_in_prompt_for_tool,
+    parent_agent_id_for_tool, sandbox_mode_for_tool, task_recency_window_for_tool,
+    turn_origin_for_tool, HostOperationContext,
 };
 
 impl Default for OpenHumanRunContext {

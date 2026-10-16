@@ -10,8 +10,8 @@ use crate::prompts::{inject_workspace_file, sync_workspace_file};
 use anyhow::Result;
 use std::fmt::Write;
 use tinytools::ToolSpec;
-use tinytools_agent::dialect::ToolCallFormat;
 use tinytools_agent::dialect::render_pformat_catalogue;
+use tinytools_agent::dialect::ToolCallFormat;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Special sections (archetype, dynamic)

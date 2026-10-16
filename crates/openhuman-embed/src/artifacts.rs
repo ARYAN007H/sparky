@@ -4,9 +4,9 @@
 //! The constructors below the line exist for host tests that need a real
 //! artifact on disk; production hosts only resolve.
 
-pub use openhuman_core::artifacts::{FileRoots, resolve_ready_file};
+pub use openhuman_core::artifacts::{resolve_ready_file, FileRoots};
 
 #[doc(hidden)]
 pub use openhuman_core::artifacts::{
-    ArtifactKind, ArtifactMeta, ArtifactStatus, create_artifact, finalize_artifact,
+    create_artifact, finalize_artifact, ArtifactKind, ArtifactMeta, ArtifactStatus,
 };

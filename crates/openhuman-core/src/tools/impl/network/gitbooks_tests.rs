@@ -58,7 +58,7 @@ impl MockTinyMcp {
 async fn mock_module_client(
     state: MockProviderState,
 ) -> (ModuleClient, tinybus::Connection, MockProviderState) {
-    use tinybus::{Connection, ObjectPath, broker::Broker, transport::memory::MemoryBus};
+    use tinybus::{broker::Broker, transport::memory::MemoryBus, Connection, ObjectPath};
 
     let bus = MemoryBus::new();
     Broker::new().spawn(bus.clone());
@@ -115,17 +115,13 @@ async fn gitbooks_tools_fail_closed_when_the_module_is_not_attested() {
         .expect("page fetch executes");
 
     assert!(search_result.is_error, "{}", search_result.output());
-    assert!(
-        search_result
-            .output()
-            .contains("MODULE_CALL_REPORTED: module transport failed")
-    );
+    assert!(search_result
+        .output()
+        .contains("MODULE_CALL_REPORTED: module transport failed"));
     assert!(page_result.is_error, "{}", page_result.output());
-    assert!(
-        page_result
-            .output()
-            .contains("MODULE_CALL_REPORTED: module transport failed")
-    );
+    assert!(page_result
+        .output()
+        .contains("MODULE_CALL_REPORTED: module transport failed"));
     assert!(
         module_calls
             .calls

@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tinytools::Tool;
 
 use super::super::collapsed_delegation::{
-    CollapsedDelegationTool, DelegateTarget, dispatch_targets_from_schema,
+    dispatch_targets_from_schema, CollapsedDelegationTool, DelegateTarget,
 };
 use super::super::delegate_graph::DelegateGraphDispatch;
 use crate::tools::delegate::DelegateToolDispatch;

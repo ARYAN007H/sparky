@@ -16,10 +16,10 @@ use tinytools_std::network::{
 
 use super::gate::RoutedGate;
 use crate::config::HttpRequestConfig;
-use crate::security::SecurityPolicy;
 use crate::security::approval::ApprovalChatContext;
+use crate::security::SecurityPolicy;
 use crate::tools::per_call::PerCallTool;
-use {tinyjuice_bus::tools::SUMMARY_FOCUS_ARG, tinyjuice_bus::tools::summary_focus_property};
+use {tinyjuice_bus::tools::summary_focus_property, tinyjuice_bus::tools::SUMMARY_FOCUS_ARG};
 
 /// The fallbacks for a `0` limit, from the `[http_request]` schema defaults, so
 /// the tools, the schema and the 5→6 migration share one source.

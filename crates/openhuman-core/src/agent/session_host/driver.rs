@@ -18,7 +18,7 @@ use tinytools_agent::dialect::ToolDialect;
 
 use crate::agent::{
     session_host::turn::graph::{self, ChatTurnGraph},
-    tinyagents::{TurnModelSource, host::OpenHumanHostBase, host::OpenHumanRunContext},
+    tinyagents::{host::OpenHumanHostBase, host::OpenHumanRunContext, TurnModelSource},
 };
 
 /// Immutable host composition consumed by [`OpenHumanSessionDriver`].

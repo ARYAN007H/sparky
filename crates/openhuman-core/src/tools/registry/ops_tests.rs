@@ -72,20 +72,16 @@ async fn diagnostics_reports_inventory_and_policy_surfaces() {
     #[cfg(not(feature = "mcp"))]
     assert_eq!(outcome.value.mcp_stdio_tools, 0);
     assert!(outcome.value.json_rpc_tools > 0);
-    assert!(
-        outcome
-            .value
-            .policy_surfaces
-            .iter()
-            .any(|tool_id| tool_id == "security.policy_info")
-    );
-    assert!(
-        outcome
-            .value
-            .possible_write_surfaces
-            .iter()
-            .any(|tool_id| tool_id == "tools.composio_execute")
-    );
+    assert!(outcome
+        .value
+        .policy_surfaces
+        .iter()
+        .any(|tool_id| tool_id == "security.policy_info"));
+    assert!(outcome
+        .value
+        .possible_write_surfaces
+        .iter()
+        .any(|tool_id| tool_id == "tools.composio_execute"));
 
     assert!(!outcome.value.posture.autonomy_level.is_empty());
     assert!(outcome.value.mcp_write_audit.enabled);
@@ -117,13 +113,11 @@ enabled = true
         outcome.value.capability_providers.trusted_enabled_providers,
         1
     );
-    assert!(
-        outcome
-            .value
-            .capability_providers
-            .registry_errors
-            .is_empty()
-    );
+    assert!(outcome
+        .value
+        .capability_providers
+        .registry_errors
+        .is_empty());
 }
 
 #[tokio::test]
@@ -158,13 +152,11 @@ async fn diagnostics_for_config_reports_capability_provider_summary() {
         outcome.value.capability_providers.trusted_enabled_providers,
         1
     );
-    assert!(
-        outcome
-            .value
-            .capability_providers
-            .registry_errors
-            .is_empty()
-    );
+    assert!(outcome
+        .value
+        .capability_providers
+        .registry_errors
+        .is_empty());
 }
 
 #[tokio::test]

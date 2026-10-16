@@ -43,9 +43,9 @@ pub use bundle::{
 };
 pub use definition_registry::OpenHumanDefinitionRegistry;
 pub use run_context::{
-    DispatchDecision, DispatchInputs, LastTurnUsage, OpenHumanRunContext, OpenHumanRunExt,
-    SubagentUsageEntry, TurnDispatchState, decide_dispatch,
+    decide_dispatch, DispatchDecision, DispatchInputs, LastTurnUsage, OpenHumanRunContext,
+    OpenHumanRunExt, SubagentUsageEntry, TurnDispatchState,
 };
-pub(crate) use run_context::{HarnessHostPolicy, direct_subagent_child};
+pub(crate) use run_context::{direct_subagent_child, HarnessHostPolicy};
 pub use security_gate::OpenHumanSecurityGate;
 pub use tool_outcome_classifier::OpenHumanToolOutcomeClassifier;

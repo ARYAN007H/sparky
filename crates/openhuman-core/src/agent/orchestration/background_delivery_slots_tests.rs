@@ -5,7 +5,7 @@
 
 use super::*;
 use crate::agent::orchestration::background_completions::{
-    TestWorkspace, pending_for, record_completion, router_for_workspace,
+    pending_for, record_completion, router_for_workspace, TestWorkspace,
 };
 use crate::core::runtime::DispatchCtx;
 use crate::core::runtime::{ContextOverlay, DomainSet};

@@ -9,14 +9,14 @@
 
 use std::path::PathBuf;
 
-use super::Harness;
 use super::access::Access;
 use super::error::HarnessError;
 use super::provider::Provider;
 use super::workspace::Workspace;
-use crate::Session;
+use super::Harness;
 use crate::agent::AgentSpec;
 use crate::runtime::RuntimeBuilder;
+use crate::Session;
 use openhuman_core::config::Config;
 use openhuman_core::core::runtime::{DomainSet, ServiceSet};
 use openhuman_core::core::types::HostKind;
@@ -130,11 +130,11 @@ impl HarnessBuilder {
     pub fn tools(
         mut self,
         f: impl for<'a> Fn(
-            openhuman_core::agent::TurnContext<'a>,
-        ) -> openhuman_core::agent::HostTurnTools
-        + Send
-        + Sync
-        + 'static,
+                openhuman_core::agent::TurnContext<'a>,
+            ) -> openhuman_core::agent::HostTurnTools
+            + Send
+            + Sync
+            + 'static,
     ) -> Self {
         self.host_tools = Some(std::sync::Arc::new(f));
         self

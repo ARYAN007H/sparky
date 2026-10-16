@@ -2,7 +2,7 @@ use super::*;
 use crate::integrations::composio::contract::NormalizedTask;
 use crate::integrations::task_sources::store as live;
 use crate::integrations::task_sources::types::{FilterSpec, SourceTarget};
-use crate::storage::import::{Outcome, run_with};
+use crate::storage::import::{run_with, Outcome};
 use crate::storage::rusqlite::params;
 use serde_json::json;
 use tempfile::TempDir;
@@ -124,15 +124,13 @@ fn legacy_sources_and_ledger_are_imported_once_and_the_file_is_left_alone() {
     assert_eq!(got.last_status.as_deref(), Some("periodic: ok"));
     assert!(live::was_ingested(&config, "src-1", "t-1").unwrap());
     assert!(live::was_ingested(&config, "src-2", "t-1").unwrap());
-    assert!(
-        live::is_ingested(
-            &config,
-            "src-1",
-            "t-1",
-            &live::content_hash(&task("t-1", "First"))
-        )
-        .unwrap()
-    );
+    assert!(live::is_ingested(
+        &config,
+        "src-1",
+        "t-1",
+        &live::content_hash(&task("t-1", "First"))
+    )
+    .unwrap());
     let titles: Vec<_> = live::list_ingested(&config, "src-1", 10)
         .unwrap()
         .into_iter()

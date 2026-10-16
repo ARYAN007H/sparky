@@ -431,13 +431,8 @@ fn handle_list_artifacts(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
             .transpose()?;
         let thread_id = read_optional_string(&params, "thread_id")?;
         to_json(
-            crate::artifacts::ops::ai_list_artifacts(
-                &config,
-                offset,
-                limit,
-                thread_id.as_deref(),
-            )
-            .await?,
+            crate::artifacts::ops::ai_list_artifacts(&config, offset, limit, thread_id.as_deref())
+                .await?,
         )
     })
 }
@@ -456,12 +451,8 @@ fn handle_save_artifact_version(ctx: DispatchCtx, params: Map<String, Value>) ->
         let artifact_id = read_required::<String>(&params, "artifact_id")?;
         let body = read_required::<String>(&params, "body")?;
         to_json(
-            crate::artifacts::ops::ai_save_artifact_version(
-                &config,
-                artifact_id.trim(),
-                &body,
-            )
-            .await?,
+            crate::artifacts::ops::ai_save_artifact_version(&config, artifact_id.trim(), &body)
+                .await?,
         )
     })
 }
@@ -493,13 +484,8 @@ fn handle_share_artifact(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
             }
         };
         to_json(
-            crate::artifacts::ops::ai_share_artifact(
-                &config,
-                artifact_id.trim(),
-                version,
-                public,
-            )
-            .await?,
+            crate::artifacts::ops::ai_share_artifact(&config, artifact_id.trim(), version, public)
+                .await?,
         )
     })
 }
@@ -508,9 +494,7 @@ fn handle_delete_artifact(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let artifact_id = read_required::<String>(&params, "artifact_id")?;
-        to_json(
-            crate::artifacts::ops::ai_delete_artifact(&config, artifact_id.trim()).await?,
-        )
+        to_json(crate::artifacts::ops::ai_delete_artifact(&config, artifact_id.trim()).await?)
     })
 }
 

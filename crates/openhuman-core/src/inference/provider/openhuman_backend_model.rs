@@ -28,17 +28,17 @@ use serde_json::Value;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use tinyinference_llm::Error as TiError;
 use tinyinference_llm::message::Message;
 use tinyinference_llm::model::{
     ChatModel, Modalities, ModelProfile, ModelRequest, ModelResponse, ModelStream, ModelStreamItem,
     ProviderError,
 };
-use tinyinference_llm::providers::ProviderRequestOptions;
 use tinyinference_llm::providers::openai::OpenAiModel;
+use tinyinference_llm::providers::ProviderRequestOptions;
+use tinyinference_llm::Error as TiError;
 
 use super::ProviderRuntimeOptions;
-use crate::security::credentials::{APP_SESSION_PROVIDER, AuthService};
+use crate::security::credentials::{AuthService, APP_SESSION_PROVIDER};
 
 pub const PROVIDER_LABEL: &str = "OpenHuman";
 
@@ -510,7 +510,7 @@ fn managed_bearer(
     check: crate::security::credentials::session_support::SessionTokenCheck,
 ) -> anyhow::Result<String> {
     use crate::security::credentials::session_support::{
-        LOCAL_SESSION_MANAGED_INFERENCE_UNAVAILABLE, SessionTokenCheck, is_local_session_token,
+        is_local_session_token, SessionTokenCheck, LOCAL_SESSION_MANAGED_INFERENCE_UNAVAILABLE,
     };
 
     match check {

@@ -23,11 +23,12 @@ fn x402_approval_is_bound_to_the_exact_chat_owner_and_payment_facts() {
             client_id: "client-1".into(),
         }),
     };
-    let origin = |thread: &str, client: &str| crate::security::turn_origin::AgentTurnOrigin::WebChat {
-        thread_id: thread.into(),
-        client_id: client.into(),
-        request_id: Some("request-1".into()),
-    };
+    let origin =
+        |thread: &str, client: &str| crate::security::turn_origin::AgentTurnOrigin::WebChat {
+            thread_id: thread.into(),
+            client_id: client.into(),
+            request_id: Some("request-1".into()),
+        };
     assert!(x402_request_owner_matches(
         &request,
         Some(&origin("thread-1", "client-1"))

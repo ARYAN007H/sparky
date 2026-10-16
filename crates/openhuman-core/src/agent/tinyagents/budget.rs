@@ -4,10 +4,10 @@ use std::sync::Arc;
 
 /// Product recursion ceiling shared by native and MCP delegation.
 pub(crate) const MAX_SPAWN_DEPTH: usize = 3;
-use tinyinference_llm::model::ChatModel;
 pub use tinyinference_llm::model::budget::{
     Budget, BudgetExceeded, BudgetSnapshot, CallBudget, Spend, SpendLimits,
 };
+use tinyinference_llm::model::ChatModel;
 
 /// A shared ledger and conservative reservation bounds for every physical call.
 #[derive(Debug, Clone)]

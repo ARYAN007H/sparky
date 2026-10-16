@@ -20,7 +20,7 @@ mod rpc;
 mod schemas;
 
 pub use cloud::{
-    DEFAULT_CLOUD_EMBEDDING_DIMENSIONS, DEFAULT_CLOUD_EMBEDDING_MODEL, OpenHumanCloudEmbeddingModel,
+    OpenHumanCloudEmbeddingModel, DEFAULT_CLOUD_EMBEDDING_DIMENSIONS, DEFAULT_CLOUD_EMBEDDING_MODEL,
 };
 pub use factory::{
     create_embedding_provider_for_chat, create_embedding_provider_with_config,

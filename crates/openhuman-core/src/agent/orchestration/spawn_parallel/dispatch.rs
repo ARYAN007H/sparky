@@ -18,8 +18,8 @@ use crate::progress::AgentProgress;
 use tinyagents_definition::SandboxMode;
 
 use super::staging::{
-    ParallelTaskRejectionKind, ParallelWorktreeRequest, SpawnParallelTaskPreflight,
-    prepare_spawn_parallel_tasks_from_defs, worktree_request_for_task,
+    prepare_spawn_parallel_tasks_from_defs, worktree_request_for_task, ParallelTaskRejectionKind,
+    ParallelWorktreeRequest, SpawnParallelTaskPreflight,
 };
 use super::types::{
     ParallelAgentLineage, ParallelAgentResult, ParallelAgentStatus, ParallelAgentTask,

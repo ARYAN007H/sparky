@@ -37,12 +37,12 @@ use std::time::Duration;
 use parking_lot::Mutex;
 use tokio::sync::oneshot;
 
-#[cfg(test)]
-use crate::security::turn_origin;
-use crate::security::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
 use crate::config::Config;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
+#[cfg(test)]
+use crate::security::turn_origin;
+use crate::security::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
 use tinytools::status::POLICY_DENIED_MARKER;
 
 use super::store;

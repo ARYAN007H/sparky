@@ -22,7 +22,7 @@ use tinyagents_harness::run_queue::{ForwardEvent, ForwardEventSink, QueuedMessag
 use tinyagents_harness::steering::SteeringHandle;
 use tinyagents_runtime::turn_driver::{RunQueueFeed, SteeringFeed, SteeringRegistrar};
 
-use crate::agent::queued_turn::{QueuedTurn, text_preview};
+use crate::agent::queued_turn::{text_preview, QueuedTurn};
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 

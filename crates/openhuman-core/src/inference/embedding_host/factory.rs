@@ -3,11 +3,11 @@
 use std::sync::Arc;
 
 use crate::config::Config;
-use tinyinference_embeddings::EmbeddingModel;
 use tinyinference_embeddings::factory::{
-    CredentialResolver, EmbeddingFactorySettings, ManagedModelFactory,
-    create_configured_embedding_model, create_default_embedding_model,
+    create_configured_embedding_model, create_default_embedding_model, CredentialResolver,
+    EmbeddingFactorySettings, ManagedModelFactory,
 };
+use tinyinference_embeddings::EmbeddingModel;
 
 use super::cloud::OpenHumanCloudEmbeddingModel;
 use crate::security::approval::ApprovalChatContext;

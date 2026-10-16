@@ -84,7 +84,7 @@ use tinyagents_harness::host::security_gate::{GateDecision, ToolCallRequest};
 
 use crate::agent::tinyagents::policy_denial::PolicyDenial;
 use crate::security::approval::{
-    ApprovalGate, ApprovalTurnContext, GateOutcome, redact_args, summarize_action,
+    redact_args, summarize_action, ApprovalGate, ApprovalTurnContext, GateOutcome,
 };
 use crate::security::policy::{GateDecision as PolicyGateDecision, SecurityPolicy};
 use tinybox_bus::CommandClass;
@@ -93,7 +93,7 @@ use tinytools::{ToolPolicyAction, ToolPolicySession};
 
 #[path = "security_gate_shell_analysis.rs"]
 mod shell_analysis;
-use shell_analysis::{SHELL_TOOL, shell_analysis_for_call};
+use shell_analysis::{shell_analysis_for_call, SHELL_TOOL};
 
 /// The channel tool-policy's verdict for one tool, as three explicit outcomes.
 ///

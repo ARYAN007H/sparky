@@ -17,7 +17,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tinyagents_harness::context::RunConfig;
 use tinyagents_harness::middleware::PromptCacheGuardMiddleware;
 use tinyagents_harness::runtime::AgentHarness;

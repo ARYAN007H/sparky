@@ -33,8 +33,8 @@
 //! [`SubagentEntry::Skills`]: tinyagents_definition::SubagentEntry::Skills
 
 use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
-use crate::integrations::ConnectedIntegration;
 use crate::integrations::composio::ComposioActionTool;
+use crate::integrations::ConnectedIntegration;
 use tinyagents_definition::SubagentEntry;
 
 // SpawnWorkerThreadTool import kept commented while the worker-thread spawn is

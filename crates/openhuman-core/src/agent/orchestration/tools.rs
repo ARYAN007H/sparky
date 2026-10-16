@@ -71,7 +71,7 @@ pub(crate) fn live_parent_run_context(
 pub use archetype_delegation::{ArchetypeDelegationTool, DelegationTarget};
 pub(crate) use close_subagent::CloseSubagentDispatch;
 pub use close_subagent::CloseSubagentTool;
-pub use collapsed_delegation::{CollapsedDelegationTool, DELEGATE_TO_TOOL_NAME, DelegateTarget};
+pub use collapsed_delegation::{CollapsedDelegationTool, DelegateTarget, DELEGATE_TO_TOOL_NAME};
 pub(crate) use continue_subagent::ContinueSubagentDispatch;
 pub use continue_subagent::ContinueSubagentTool;
 pub(crate) use delegate_graph::DelegateGraphDispatch;
@@ -79,7 +79,7 @@ pub use delegate_graph::DelegateGraphTool;
 pub(crate) use list_subagents::ListSubagentsDispatch;
 pub use list_subagents::ListSubagentsTool;
 pub(crate) use spawn_async_subagent::SpawnAsyncSubagentDispatch;
-pub use spawn_async_subagent::{SpawnAsyncSubagentTool, scope_spawn_async_subagent_spec};
+pub use spawn_async_subagent::{scope_spawn_async_subagent_spec, SpawnAsyncSubagentTool};
 pub(crate) use spawn_parallel_agents::SpawnParallelAgentsDispatch;
 pub use spawn_parallel_agents::SpawnParallelAgentsTool;
 pub(crate) use spawn_subagent::SpawnSubagentDispatch;
