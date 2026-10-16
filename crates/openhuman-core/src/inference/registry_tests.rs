@@ -90,7 +90,7 @@ fn a_registered_embedding_factory_builds_the_managed_embedding_model() {
         Ok(Box::new(tinyinference_embeddings::NoopEmbeddingModel))
     });
     let built = crate::inference::embedding_host::create_embedding_provider_with_credentials(
-        "openhuman", "any-model", 8, "", None,
+        "cloud", "any-model", 8, "", None,
     );
     unregister_embedding(PROVIDER_OPENHUMAN);
     assert!(built.is_ok());
