@@ -43,6 +43,7 @@ export function useThreadArtifactsHydration(threadId: string | null | undefined)
             title: artifact.title,
             path: artifact.path,
             sizeBytes: artifact.sizeBytes,
+            loaded: true,
           })
         );
       }

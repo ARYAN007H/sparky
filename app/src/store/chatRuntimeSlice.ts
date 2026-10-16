@@ -2701,9 +2701,15 @@ const chatRuntimeSlice = createSlice({
         sizeBytes: number;
         toolCallId?: string;
         requestId?: string;
+        /**
+         * Loaded from the core (`ai_list_artifacts`), not announced by a turn:
+         * it takes no owner from the thread's live turn. Its placement comes
+         * from the thread's artifact rows.
+         */
+        loaded?: boolean;
       }>
     ) => {
-      const { threadId, artifactId, kind, title, path, sizeBytes, toolCallId, requestId } =
+      const { threadId, artifactId, kind, title, path, sizeBytes, toolCallId, requestId, loaded } =
         action.payload;
       const existing = (state.artifactsByThread[threadId] ?? []).find(
         entry => entry.artifactId === artifactId
@@ -2717,7 +2723,9 @@ const chatRuntimeSlice = createSlice({
         sizeBytes,
         updatedAt: Date.now(),
         toolCallId: toolCallId ?? existing?.toolCallId,
-        ownerRequestId: ownerFor(state, threadId, existing, requestId),
+        ownerRequestId: loaded
+          ? existing?.ownerRequestId
+          : ownerFor(state, threadId, existing, requestId),
       };
       state.artifactsByThread[threadId] = upsertArtifact(
         state.artifactsByThread[threadId],

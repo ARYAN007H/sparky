@@ -28,6 +28,43 @@ function apply(state: State, ...actions: Parameters<typeof chatRuntimeReducer>[1
 }
 
 describe('artifact owner turn', () => {
+  it('gives an artifact loaded when the thread opens no owner from the live turn', () => {
+    const state = apply(
+      chatRuntimeReducer(undefined, { type: 'init' }),
+      liveTurnStarted({ threadId: THREAD, requestId: 'req-latest' }),
+      upsertArtifactReadyForThread({
+        threadId: THREAD,
+        artifactId: 'old-1',
+        kind: 'document',
+        title: 'old-1',
+        path: '/tmp/old-1.md',
+        sizeBytes: 12,
+        loaded: true,
+      })
+    );
+    // Its reply comes from the thread's artifact rows; an owner here would pull
+    // every older card into the latest reply.
+    expect(owner(state, 'old-1')).toBeUndefined();
+  });
+
+  it('keeps the owner a live event gave when the same artifact is loaded later', () => {
+    const state = apply(
+      chatRuntimeReducer(undefined, { type: 'init' }),
+      liveTurnStarted({ threadId: THREAD, requestId: 'req-1' }),
+      ready('a-1'),
+      upsertArtifactReadyForThread({
+        threadId: THREAD,
+        artifactId: 'a-1',
+        kind: 'document',
+        title: 'a-1',
+        path: '/tmp/a-1.md',
+        sizeBytes: 12,
+        loaded: true,
+      })
+    );
+    expect(owner(state, 'a-1')).toBe('req-1');
+  });
+
   it('tags an artifact with the turn that was live when it appeared', () => {
     const state = apply(
       chatRuntimeReducer(undefined, { type: 'init' }),
