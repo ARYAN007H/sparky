@@ -322,20 +322,13 @@ fn plain_agent_learnings_are_trusted_and_everything_else_is_not() {
     )));
 }
 
-fn workflow_origin(flow_id: &str, require_approval: bool) -> AgentTurnOrigin {
-    AgentTurnOrigin::TrustedAutomation {
-        job_id: flow_id.to_string(),
-        source: TrustedAutomationSource::Workflow { require_approval },
-    }
-}
-
 // ── the run's origin comes from its context, not the task's scope ────
 
 #[tokio::test]
 async fn flow_id_comes_from_the_runs_context_not_the_calling_tasks_scope() {
     let (_tmp, mut adapter) = adapter(AutonomyLevel::Full);
-    let own = workflow_origin("flow-own", false);
-    let other = workflow_origin("flow-other", false);
+    let own = workflow_origin("flow-own");
+    let other = workflow_origin("flow-other");
     adapter.ctx = crate::core::runtime::DispatchCtx::unbound().with_turn_origin(own);
 
     // A different flow's origin scoped on the task must not win.
@@ -348,7 +341,7 @@ async fn flow_id_comes_from_the_runs_context_not_the_calling_tasks_scope() {
 #[tokio::test]
 async fn a_context_without_a_workflow_origin_refuses_flow_scope_even_inside_a_workflow_scope() {
     let (_tmp, adapter) = adapter(AutonomyLevel::Full);
-    let other = workflow_origin("flow-other", false);
+    let other = workflow_origin("flow-other");
     let result =
         crate::agent::turn_origin::with_origin(other, async { adapter.trusted_flow_id() }).await;
     assert!(result.is_err());
