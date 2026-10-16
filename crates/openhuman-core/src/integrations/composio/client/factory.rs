@@ -202,3 +202,7 @@ pub fn resolve_composio_route(config: &crate::config::Config) -> anyhow::Result<
         }
     }
 }
+
+#[cfg(test)]
+#[path = "factory_tests.rs"]
+mod tests;
