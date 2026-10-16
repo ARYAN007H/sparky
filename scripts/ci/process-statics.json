@@ -138,5 +138,105 @@
     "category": "A",
     "reason": "Keeps the one process-wide event-bus subscription that writes artifact rows alive and makes registration idempotent; it holds no data, and each event names the workspace and thread its row is written to.",
     "verification": "threads/artifact_rows_tests.rs: recording_an_artifact_twice_writes_one_row"
+  },
+  {
+    "file": "crates/openhuman-core/src/agent/tinyagents/turn_exec.rs",
+    "scope": "",
+    "name": "ROOT_HOSTED_HARNESS",
+    "type": "LazyLock<AgentHarness<(),OpenHumanRunContext>>",
+    "count": 1,
+    "category": "A",
+    "reason": "One unconfigured harness is process infrastructure; per-invocation models, tools, middleware, progress, and host capabilities are supplied through each invocation, so the singleton carries no tenant authority or data.",
+    "verification": "agent/tinyagents/turn_exec_tests.rs: hosted_roots_share_only_an_unconfigured_process_harness"
+  },
+  {
+    "file": "crates/openhuman-core/src/agent_registry/host_definition.rs",
+    "scope": "",
+    "name": "GLOBAL",
+    "type": "OnceLock<Arc<AgentDefinitionRegistry>>",
+    "count": 1,
+    "category": "A",
+    "reason": "The process registry is operator configuration in single-user hosts; SaaS startup installs built-ins only and refuses workspace or home overrides, so it cannot carry one SaaS profile's definitions into another.",
+    "verification": "core/runtime/saas_tests.rs: boot_refuses_a_registry_with_workspace_definitions"
+  },
+  {
+    "file": "crates/openhuman-core/src/agent_runs/context_breakdown.rs",
+    "scope": "",
+    "name": "REPORT_CACHE",
+    "type": "Lazy<Mutex<HashMap<ReportCacheKey,(u64,PromptSizeReport)>>> ",
+    "count": 1,
+    "category": "B",
+    "reason": "Each cache key includes the dispatch tenant (profile and agent), requested agent id, workspace, and config path; the serialized-config fingerprint only validates freshness within that scope.",
+    "verification": "agent_runs/context_breakdown_tests.rs: report_cache_key_isolated_by_tenant_even_for_identical_config"
+  },
+  {
+    "file": "crates/openhuman-core/src/artifacts/store_documents.rs",
+    "scope": "",
+    "name": "TEST_OVERRIDE",
+    "type": "std::cell::RefCell<Option<Docs>>",
+    "count": 1,
+    "category": "A",
+    "reason": "This cfg(test) thread-local override substitutes an explicitly constructed in-memory document store for one test thread; it is test instrumentation and is not installed in production builds.",
+    "verification": "artifacts/store_documents_tests.rs: the_store_dispatches_to_documents_when_a_backend_is_pinned"
+  },
+  {
+    "file": "crates/openhuman-core/src/plan_review/gate.rs",
+    "scope": "",
+    "name": "GATE",
+    "type": "OnceLock<PlanReviewGate>",
+    "count": 1,
+    "category": "B",
+    "reason": "The process gate is infrastructure, and its waiter, parked-review, and thread lookup tables are keyed by the authenticated Tenant plus request/thread id; a decision or replay lookup in one tenant cannot reach another tenant's parked plan.",
+    "verification": "plan_review/gate_tests.rs: parked_reviews_are_isolated_by_tenant"
+  },
+  {
+    "file": "crates/openhuman-core/src/storage/sessions/mod.rs",
+    "scope": "",
+    "name": "PROVIDER",
+    "type": "LazyLock<RwLock<Option<Arc<dyn SessionStoreProvider>>>>",
+    "count": 1,
+    "category": "D",
+    "reason": "The installed provider is a routing handle to the session storage backend; callers select AgentStores with the authenticated tenant's session_key, and durable records remain in the backend.",
+    "verification": "storage/sessions/mod_tests.rs: a_profile_prefixed_key_round_trips_through_edit_and_regenerate"
+  },
+  {
+    "file": "crates/openhuman-core/src/storage/sessions/workspace.rs",
+    "scope": "",
+    "name": "FALLBACKS",
+    "type": "LazyLock<Mutex<HashMap<PathBuf,Fallback>>>",
+    "count": 1,
+    "category": "D",
+    "reason": "Each entry routes one workspace path to its storage backend and DriverSessionStores provider; returned stores still require the caller's tenant session key, while authoritative session data remains in the backend.",
+    "verification": "storage/sessions/mod_tests.rs: each_workspace_keeps_its_sessions_in_its_own_database; storage/sessions/mod_tests.rs: a_profile_prefixed_key_round_trips_through_edit_and_regenerate"
+  },
+  {
+    "file": "crates/openhuman-core/src/storage/sessions/workspace.rs",
+    "scope": "",
+    "name": "MEMORY",
+    "type": "LazyLock<Mutex<HashMap<PathBuf,Arc<dyn SessionStoreProvider>>>>",
+    "count": 1,
+    "category": "D",
+    "reason": "The in-memory provider is a workspace-keyed fallback routing handle; its AgentStores are selected with the caller's tenant session key, and an unusable workspace cannot read another workspace's provider.",
+    "verification": "storage/sessions/workspace_tests.rs: an_unusable_workspace_degrades_to_an_in_memory_store; storage/sessions/mod_tests.rs: a_profile_prefixed_key_round_trips_through_edit_and_regenerate"
+  },
+  {
+    "file": "crates/openhuman-core/src/triage/evaluator/chain.rs",
+    "scope": "",
+    "name": "TRIAGE_RETRY_STATE",
+    "type": "OnceLock<RetryState>",
+    "count": 1,
+    "category": "A",
+    "reason": "This process-wide retry table stores only outage counters, timestamps, and in-flight flags keyed by provider name and model; it holds no trigger payload or tenant record, and deliberately shares provider health backoff.",
+    "verification": "triage/evaluator/chain_tests.rs: only_one_initial_outage_attempt_can_be_in_flight; triage/evaluator_deferral_tests.rs: outage_state_isolated_by_model"
+  },
+  {
+    "file": "crates/openhuman-core/src/triage/events.rs",
+    "scope": "",
+    "name": "TEST_EVENTS",
+    "type": "std::sync::Mutex<Vec<DomainEvent>>",
+    "count": 1,
+    "category": "A",
+    "reason": "This cfg(test)-only recorder captures trigger events emitted by unit-test fixtures so assertions can inspect helper output; it is absent from production builds and is not an application event store.",
+    "verification": "triage/escalation_tests.rs: escalation_events_record_the_trigger_and_target"
   }
 ]
