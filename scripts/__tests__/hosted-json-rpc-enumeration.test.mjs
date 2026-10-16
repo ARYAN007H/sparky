@@ -34,6 +34,8 @@ function runCoreStep(mode) {
     ])
       mkdirSync(join(root, directory), { recursive: true });
     writeFileSync(join(root, "tests/json_rpc_e2e.rs"), "fixture");
+    writeFileSync(join(root, "tests/in_process_all.rs"), "fixture");
+    writeFileSync(join(root, "tests/in_process/domain_modules_e2e.rs"), "fixture");
     writeFileSync(join(root, "scripts/ci/product-features.sh"), "echo voice\n");
     writeFileSync(join(root, "scripts/ci-cancel-aware.sh"), 'exec "$@"\n');
     writeFileSync(join(root, "scripts/run-embed-examples.mjs"), "");
@@ -81,6 +83,24 @@ if [[ "$*" == *"test -p openhuman --lib"* ]]; then
   fi
   echo PRIVATE-XDG-CACHE
 fi
+if [[ "$*" == *"--test in_process_all"* ]]; then
+  if [[ "$*" == *"--skip domain_modules_e2e::cron_update_applies_a_partial_patch_without_clobbering_unset_fields"* &&
+        "$*" == *"--skip domain_modules_e2e::mcp_audit_list_dispatches_internally_and_stays_out_of_the_schema_dump"* &&
+        "$*" == *"--skip domain_modules_e2e::mcp_clients_read_paths_validate_before_reaching_outward"* &&
+        "$*" == *"--skip domain_modules_e2e::mcp_tool_description_scan_flags_injection_and_spares_ordinary_prose"* ]]; then
+    [[ "$*" == *"--test-threads=1"* ]] || exit 17
+    echo IN_PROCESS_DOMAIN_GROUP_EXCLUDES_MODULE_CASES
+  elif [[ "$*" == *"--exact"* &&
+          ( "$*" == *"domain_modules_e2e::cron_update_applies_a_partial_patch_without_clobbering_unset_fields"* ||
+            "$*" == *"domain_modules_e2e::mcp_audit_list_dispatches_internally_and_stays_out_of_the_schema_dump"* ||
+            "$*" == *"domain_modules_e2e::mcp_clients_read_paths_validate_before_reaching_outward"* ||
+            "$*" == *"domain_modules_e2e::mcp_tool_description_scan_flags_injection_and_spares_ordinary_prose"* ) ]]; then
+    [[ "$*" == *"--test-threads=1"* ]] || exit 18
+    echo "ISOLATED-IN-PROCESS-E2E-TEST:$*"
+  else
+    exit 19
+  fi
+fi
 `,
       { mode: 0o755 },
     );
@@ -113,6 +133,12 @@ test("hosted JSON-RPC tests are listed and executed with product features", () =
   assert.equal(
     (result.stdout.match(/ISOLATED-CRON-MODULE-TEST:/g) ?? []).length,
     13,
+    result.stdout,
+  );
+  assert.match(result.stdout, /IN_PROCESS_DOMAIN_GROUP_EXCLUDES_MODULE_CASES/);
+  assert.equal(
+    (result.stdout.match(/ISOLATED-IN-PROCESS-E2E-TEST:/g) ?? []).length,
+    4,
     result.stdout,
   );
   assert.match(result.stdout, /PRIVATE-XDG-CACHE/);
