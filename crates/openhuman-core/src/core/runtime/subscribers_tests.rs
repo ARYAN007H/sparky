@@ -240,12 +240,20 @@ fn proactive_message_reaches_web_on_channelless_core_boot() {
                         None,
                     ),
                 ));
-                profile_host.provision(&id).await.expect("provision profile");
+                profile_host
+                    .provision(&id)
+                    .await
+                    .expect("provision profile");
                 let profile = profile_host.open(&id).await.expect("open profile");
                 crate::profiles::host::install(profile_host);
-                let ctx = crate::core::runtime::DispatchCtx::new(std::sync::Arc::clone(profile.context()));
+                let ctx = crate::core::runtime::DispatchCtx::new(std::sync::Arc::clone(
+                    profile.context(),
+                ));
                 let tenant = ctx.event_tenant();
-                assert_eq!(tenant.as_ref().and_then(|tenant| tenant.profile.as_deref()), Some("proactive-test"));
+                assert_eq!(
+                    tenant.as_ref().and_then(|tenant| tenant.profile.as_deref()),
+                    Some("proactive-test")
+                );
 
                 super::register_domain_subscribers(
                     std::env::temp_dir(),
