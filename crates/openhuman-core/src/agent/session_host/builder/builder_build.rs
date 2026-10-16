@@ -383,7 +383,6 @@ impl SessionHostBuilder {
                 )),
                 config: Arc::clone(&hosted_config),
                 definitions,
-                post_turn_hooks: self.post_turn_hooks.clone(),
                 // Usually this path names a registry id, and carries no
                 // definition of its own. A caller that supplied one with
                 // `agent_definition` is stamped with it here, the way
