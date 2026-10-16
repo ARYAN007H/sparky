@@ -659,6 +659,7 @@ async fn wait_for_terminal_request(
 struct Stack {
     rpc_base: String,
     _home_guard: EnvVarGuard,
+    _action_dir_guard: EnvVarGuard,
     _workspace_guard: EnvVarGuard,
     _backend_guard: EnvVarGuard,
     _vite_guard: EnvVarGuard,
@@ -704,8 +705,11 @@ async fn boot_stack_with_config(extra_config: &str) -> Stack {
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path().to_path_buf();
     let openhuman_home = home.join(".openhuman");
+    let action_dir = home.join("OpenHuman/projects");
+    std::fs::create_dir_all(&action_dir).expect("create action directory");
 
     let home_guard = EnvVarGuard::set_to_path("HOME", &home);
+    let action_dir_guard = EnvVarGuard::set_to_path("OPENHUMAN_ACTION_DIR", &action_dir);
     let workspace_guard = EnvVarGuard::unset("OPENHUMAN_WORKSPACE");
     let backend_guard = EnvVarGuard::unset("BACKEND_URL");
     let vite_guard = EnvVarGuard::unset("VITE_BACKEND_URL");
@@ -742,6 +746,7 @@ async fn boot_stack_with_config(extra_config: &str) -> Stack {
     Stack {
         rpc_base,
         _home_guard: home_guard,
+        _action_dir_guard: action_dir_guard,
         _workspace_guard: workspace_guard,
         _backend_guard: backend_guard,
         _vite_guard: vite_guard,
