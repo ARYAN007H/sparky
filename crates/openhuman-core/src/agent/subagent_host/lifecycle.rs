@@ -103,6 +103,7 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
     input: String,
     options: SubagentRunOptions,
 ) -> Result<(SubagentRunOutcome, String), SubagentRunError> {
+    eprintln!("7950 bridge: helper entered");
     use tinyagents_harness::tool::ToolDispatch;
     use tinyagents_orchestration::subagent::{DriverSubAgentTool, SubAgentJobRegistry};
     use tinytools::{PermissionLevel, ToolCategory, ToolCallOptions, ToolScope, ToolTimeout};
@@ -121,6 +122,7 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
             .unwrap_or_else(|| PathBuf::from(".openhuman/subagent_checkpoints"))
     }));
     let bundle = OpenHumanDriverBundle::new(checkpoint_dir)?;
+    eprintln!("7950 bridge: bundle created");
     let host_request = HostRequest {
         definition: definition.clone(),
         options,
@@ -156,6 +158,7 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
         },
         |_request| None,
     );
+    eprintln!("7950 bridge: dispatcher created");
     let dispatch_ctx = parent.data.dispatch_ctx();
     let jobs = (*crate::core::runtime::slot_for::<SubAgentJobRegistry>(&dispatch_ctx)).clone();
     let parent_session = parent
@@ -180,6 +183,9 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
             ToolTimeout::Unbounded,
         );
     let args = serde_json::json!({ "input": input, "mode": "inline" });
+    eprintln!("7950 bridge: before dispatch, future_size={}", std::mem::size_of_val(&dispatcher.execute(
+        &(), tinyagents_harness::CallId::new("size"), args.clone(), ToolCallOptions::default(), parent
+    )));
     let tool_result = Box::pin(dispatcher.execute(
             &(),
             tinyagents_harness::CallId::new(format!("spawn-{task_id}")),
@@ -189,6 +195,7 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
         ))
         .await
         .map_err(|error| SubagentRunError::Provider(anyhow::anyhow!(error.to_string())))?;
+    eprintln!("7950 bridge: dispatch returned");
     let reply: serde_json::Value = serde_json::from_str(&tool_result.output()).map_err(|error| {
         SubagentRunError::Provider(anyhow::anyhow!(format!(
             "driver-backed async spawn returned an invalid job reference: {error}"
@@ -655,6 +662,7 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
         &self,
         execution: SubagentExecution<crate::agent::tinyagents::host::OpenHumanRunContext>,
     ) -> Result<SubagentOutcome, SubagentError> {
+        eprintln!("7950 bridge: executor entered");
         let task_key = execution.task_key.clone();
         let PreparedHostPlan {
             definition,
