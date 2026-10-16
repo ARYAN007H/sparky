@@ -97,7 +97,6 @@ pub fn apply_engine_set(config: &mut Config, params: &EngineSetParams) -> Memory
             ));
         }
         config.memory.engine = DISABLED_ENGINE.to_string();
-        engine::invalidate();
         tracing::info!("[memory:ops] memory disabled");
         return Ok(());
     }
@@ -138,7 +137,6 @@ pub fn apply_engine_set(config: &mut Config, params: &EngineSetParams) -> Memory
         }
     }
     config.memory.engine = engine_id.to_string();
-    engine::invalidate();
     tracing::info!(engine = %engine_id, "[memory:ops] engine selected");
     Ok(())
 }
@@ -342,6 +340,7 @@ pub async fn learn_with(
     }
     let bound = bound(config)?;
     let receipt = store_on_with(&bound, item, options).await?;
+    super::lifecycle::prefetch::invalidate(config);
     Ok(LearnView { id: receipt.id.0 })
 }
 
@@ -362,7 +361,9 @@ pub async fn store_item_with(
         super::user_scope::clamp_item(&mut item, &root);
     }
     let bound = bound(config)?;
-    store_on_with(&bound, item, options).await
+    let receipt = store_on_with(&bound, item, options).await?;
+    super::lifecycle::prefetch::invalidate(config);
+    Ok(receipt)
 }
 
 /// Stores `item` on `bound`; the bound engine scrubs it ([`super::guard`]).
