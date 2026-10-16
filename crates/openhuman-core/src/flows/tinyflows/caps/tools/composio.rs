@@ -180,7 +180,7 @@ impl ToolBackend for ComposioToolBackend {
                 &summary,
                 redacted,
             )
-                .await
+            .await
         };
         if let crate::security::approval::GateOutcome::Deny { reason } = outcome {
             tracing::warn!(

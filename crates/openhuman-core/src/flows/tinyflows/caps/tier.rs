@@ -105,10 +105,7 @@ pub(crate) async fn gate_call_for_tier(
         return (crate::security::approval::GateOutcome::Allow, None);
     };
 
-    match escalated_origin_for_prompt(
-        tier_decision,
-        ctx.turn_origin(),
-    ) {
+    match escalated_origin_for_prompt(tier_decision, ctx.turn_origin()) {
         Some(escalated) => {
             tracing::debug!(
                 target: "flows",

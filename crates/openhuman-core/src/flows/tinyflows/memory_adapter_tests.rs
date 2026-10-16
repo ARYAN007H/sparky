@@ -224,9 +224,17 @@ fn workflow_origin(flow_id: &str) -> AgentTurnOrigin {
     }
 }
 
+/// The adapter of a run for `flow_id`: its context carries the run's origin.
+fn adapter_for_run(flow_id: &str) -> (TempDir, OpenHumanMemory) {
+    let (tmp, mut adapter) = adapter(AutonomyLevel::Full);
+    adapter.ctx =
+        crate::core::runtime::DispatchCtx::unbound().with_turn_origin(workflow_origin(flow_id));
+    (tmp, adapter)
+}
+
 #[tokio::test]
 async fn remember_search_and_forget_round_trip_in_the_flows_own_scope() {
-    let (_tmp, adapter) = adapter(AutonomyLevel::Full);
+    let (_tmp, adapter) = adapter_for_run("f1");
     turn_origin::with_origin(workflow_origin("f1"), async {
         adapter
             .remember("flow", "sent", json!("newsletter item 42"))
@@ -270,7 +278,7 @@ async fn remember_search_and_forget_round_trip_in_the_flows_own_scope() {
 
 #[tokio::test]
 async fn flow_scope_never_sees_another_flows_items() {
-    let (_tmp, adapter) = adapter(AutonomyLevel::Full);
+    let (_tmp, mut adapter) = adapter_for_run("f-other");
     turn_origin::with_origin(workflow_origin("f-other"), async {
         adapter
             .remember("flow", "k", json!("other flow note"))
@@ -278,6 +286,8 @@ async fn flow_scope_never_sees_another_flows_items() {
             .unwrap();
     })
     .await;
+    adapter.ctx =
+        crate::core::runtime::DispatchCtx::unbound().with_turn_origin(workflow_origin("f-mine"));
     turn_origin::with_origin(workflow_origin("f-mine"), async {
         let found = adapter
             .recall("flow", "other flow note", json!({"operation": "search"}))
