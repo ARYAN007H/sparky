@@ -55,7 +55,11 @@ async fn sweep_all_visits_the_local_scope() {
 
 #[tokio::test(start_paused = true)]
 async fn spawned_sweeper_waits_for_its_first_delay_then_keeps_ticking() {
-    let handle = spawn(&crate::core::runtime::DispatchCtx::ambient(), Duration::from_secs(10), Duration::from_secs(20));
+    let handle = spawn(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        Duration::from_secs(10),
+        Duration::from_secs(20),
+    );
     tokio::time::sleep(Duration::from_secs(65)).await;
     assert!(!handle.is_finished(), "the sweeper keeps running");
     handle.abort();
@@ -79,7 +83,9 @@ async fn sweeping_through_the_fenced_backend_reaches_the_driver() {
 #[tokio::test]
 async fn module_blob_scopes_are_swept_alongside_the_acting_scope() {
     let (now, backend) = backend_with_clock();
-    let module_scopes = crate::modules::expiring_blob_module_scopes(&crate::core::runtime::DispatchCtx::host_default());
+    let module_scopes = crate::modules::expiring_blob_module_scopes(
+        &crate::core::runtime::DispatchCtx::host_default(),
+    );
     assert!(!module_scopes.is_empty(), "TinyJuice owns expiring blobs");
     put_expiring(&backend, &module_scopes[0], "tinyjuice_ccr/t", 10).await;
     now.store(2_000, Ordering::SeqCst);
@@ -89,7 +95,10 @@ async fn module_blob_scopes_are_swept_alongside_the_acting_scope() {
 #[cfg(not(feature = "modules"))]
 #[test]
 fn no_module_blob_scopes_without_the_modules_feature() {
-    assert!(crate::modules::expiring_blob_module_scopes(&crate::core::runtime::DispatchCtx::host_default()).is_empty());
+    assert!(crate::modules::expiring_blob_module_scopes(
+        &crate::core::runtime::DispatchCtx::host_default()
+    )
+    .is_empty());
 }
 
 #[tokio::test]

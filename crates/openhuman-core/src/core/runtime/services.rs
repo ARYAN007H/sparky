@@ -174,8 +174,11 @@ pub fn spawn_login_gated_services(embedded_core: bool) -> tokio::task::JoinHandl
                 if already_logged_in {
                     // User has an active session — start all services now.
                     log::info!("[services] existing session found, starting services");
-                    crate::security::credentials::ops::start_credential_gated_services(&config)
-                        .await;
+                    crate::security::credentials::ops::start_credential_gated_services(
+                        &crate::core::runtime::DispatchCtx::host_default(),
+                        &config,
+                    )
+                    .await;
                 } else {
                     log::info!(
                         "[services] no active session — deferring service startup until login"
@@ -340,7 +343,9 @@ pub fn spawn_channels_service(
     #[cfg(not(feature = "channels"))]
     {
         let _ = dispatch;
-        log::debug!("[channels] channels feature disabled at compile time — not spawning listeners");
+        log::debug!(
+            "[channels] channels feature disabled at compile time — not spawning listeners"
+        );
     }
     None
 }

@@ -184,23 +184,20 @@ pub async fn spawn_workflow_run_background(
             if config.http_request.allowed_domains.is_empty() {
                 config.http_request.allowed_domains = vec!["*".to_string()];
             }
-            let mut agent = match OpenHumanSessionHost::from_config_for_agent(
-                &ctx,
-                &config,
-                "orchestrator",
-            ) {
-                Ok(a) => a,
-                Err(e) => {
-                    let _ = run_log::write_footer(
-                        &log_path,
-                        "FAILED",
-                        0,
-                        &format!("build agent: {e:#}"),
-                    )
-                    .await;
-                    return;
-                }
-            };
+            let mut agent =
+                match OpenHumanSessionHost::from_config_for_agent(&ctx, &config, "orchestrator") {
+                    Ok(a) => a,
+                    Err(e) => {
+                        let _ = run_log::write_footer(
+                            &log_path,
+                            "FAILED",
+                            0,
+                            &format!("build agent: {e:#}"),
+                        )
+                        .await;
+                        return;
+                    }
+                };
             // Issue #4868 — apply the workflow-run iteration budget AFTER
             // construction. The session builder now stamps `orchestrator`'s
             // definition cap (15) onto the agent; a full workflow run
