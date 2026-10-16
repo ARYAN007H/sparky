@@ -31,7 +31,7 @@
 //!
 //! Everything else a turn needs rides explicit values handed to the core
 //! (`AgentChatEnv`): the **progress** sink
-//! ([`progress_sink`](openhuman_core::agent::progress_sink)) and the host
+//! ([`AgentProgress`](openhuman_core::progress::AgentProgress)) and the host
 //! environment (shared budget, delegation depth, cancellation, hooks, tool-belt
 //! authority).
 //!

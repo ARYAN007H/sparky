@@ -153,7 +153,7 @@ pub mod agent {
         }
         // rpc: Socket.IO run-mode toggles.
         pub mod run_mode {
-            pub use openhuman_core::threads::run_mode::{parse_mode_label, set_mode};
+            pub use openhuman_core::threads::{parse_mode_label, set_mode};
         }
     }
     // rpc: shutdown, plan review over Socket.IO, and the session store install.

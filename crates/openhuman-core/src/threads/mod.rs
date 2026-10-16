@@ -20,6 +20,8 @@ pub(crate) mod worker_thread;
 
 pub use error::{THREAD_NOT_FOUND_KIND, ThreadsError};
 pub use rpc_models::*;
+#[doc(hidden)]
+pub use run_mode::{parse_mode_label, set_mode};
 pub use schemas::{
     all_controller_schemas as all_threads_controller_schemas,
     all_registered_controllers as all_threads_registered_controllers,
