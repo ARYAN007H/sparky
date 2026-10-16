@@ -1,6 +1,6 @@
 //! Adapter from TinyAgents' durable subagent-session port to OpenHuman storage.
 
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
 
 use async_trait::async_trait;
 use tinyagents_orchestration::subagent::{
@@ -9,10 +9,8 @@ use tinyagents_orchestration::subagent::{
     SubagentSessionStore as TinySessionStore, SubagentSessionUpsert as TinyUpsert,
 };
 
-use super::{
-    self, DurableSubagentSession, DurableSubagentStatus, SubagentSessionSelector,
-    SubagentSessionStore, SubagentSessionUpsert,
-};
+use super::types::{DurableSubagentSession, DurableSubagentStatus, SubagentSessionSelector};
+use super::{SubagentSessionStore, SubagentSessionUpsert};
 
 /// Routes generic Jobs/Message session operations through OpenHuman's existing
 /// workspace-scoped session store. Legacy rows acquire a lifecycle key only
