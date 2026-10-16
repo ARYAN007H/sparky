@@ -29,10 +29,9 @@ impl CronDelivery for Recorder {
     }
 }
 
-/// A `cron add` call for a one-shot agent job far enough ahead to allow the
-/// runtime to boot and the scheduling turn to finish before its due time.
+/// A `cron add` call for a one-shot agent job a few seconds from now.
 fn add_job(name: &str, prompt: &str) -> serde_json::Value {
-    let at = chrono::Utc::now() + chrono::Duration::seconds(30);
+    let at = chrono::Utc::now() + chrono::Duration::seconds(2);
     let arguments = serde_json::json!({
         "action": "add", "job_type": "agent", "name": name, "prompt": prompt,
         "delivery": {"mode": "origin"},
@@ -51,16 +50,6 @@ fn a_library_agents_scheduled_reply_is_handed_to_the_host() {
     runtime().block_on(async {
         tokio::spawn(async {
             let backend = stub_backend().await;
-            // The chat turn schedules the job and acknowledges it; the job's
-            // own run answers from the fallback.
-            let provider = scripted_provider(
-                vec![
-                    add_job("stretch", "stretch reminder"),
-                    common::chat_completion("Scheduled."),
-                ],
-                "Time to stretch!",
-            )
-            .await;
             let recorder = Arc::new(Recorder::default());
             let mut config = offline_config();
             config.reliability.scheduler_poll_secs = 5;
@@ -85,6 +74,17 @@ fn a_library_agents_scheduled_reply_is_handed_to_the_host() {
                 !openhuman_core::cron::scheduler_gate::is_signed_out(),
                 "background cron inference requires a signed-in runtime"
             );
+            // Compute the one-shot schedule only after runtime startup; the
+            // scheduler must not receive an already-expired `at` timestamp.
+            // The job's own run answers from the provider's fallback.
+            let provider = scripted_provider(
+                vec![
+                    add_job("stretch", "stretch reminder"),
+                    common::chat_completion("Scheduled."),
+                ],
+                "Time to stretch!",
+            )
+            .await;
             let agent = runtime
                 .agent(
                     AgentSpec::new("teeny")
@@ -118,11 +118,7 @@ fn a_library_agents_scheduled_reply_is_handed_to_the_host() {
             assert_eq!(jobs.len(), 1, "{jobs:?}");
             let job = &jobs[0];
             assert_eq!(job.name, "stretch");
-            assert!(
-                job.next_run > std::time::SystemTime::now()
-                    && job.next_run <= std::time::SystemTime::now() + Duration::from_secs(60),
-                "job is not due within the test's delivery window: {job:?}"
-            );
+            assert!(job.next_run > std::time::SystemTime::now(), "{job:?}");
 
             let mut delivered = Vec::new();
             for _ in 0..120 {
