@@ -4,8 +4,8 @@
 //! revision goes through its [`Artifacts`] service. OpenHuman supplies the
 //! service's ports:
 //!
-//! * [`versioned_store`] — the crate's [`FsArtifactStore`] over
-//!   `<workspace>/artifacts/versioned/` (one `<id>.json` per artifact);
+//! * [`versioned_store`] — the records, in the configured storage backend
+//!   ([`super::version_documents::DocumentArtifactStore`]);
 //! * [`LegacyUiBridge`] — the observer that shows each artifact in the
 //!   desktop UI;
 //! * the folders file artifacts may point into: the agent's working folder
@@ -84,12 +84,16 @@ pub(crate) fn legacy_kind_for_extension(ext: &str) -> LegacyArtifactKind {
     }
 }
 
-pub use tiny_artifacts::FsArtifactStore;
+/// The versioned records of a workspace, in the configured storage backend
+/// under the acting scope (records an earlier build kept as files under
+/// [`legacy_versioned_dir`] are imported once).
+pub fn versioned_store(workspace_dir: &Path) -> super::version_documents::DocumentArtifactStore {
+    super::version_documents::DocumentArtifactStore::new(workspace_dir)
+}
 
-/// The versioned records of a workspace: `tiny-artifacts`' file-system store
-/// over `<workspace>/artifacts/versioned/` (one `<id>.json` per artifact).
-pub fn versioned_store(workspace_dir: &Path) -> FsArtifactStore {
-    FsArtifactStore::new(workspace_dir.join("artifacts").join(VERSIONED_SUBDIR))
+/// Where an earlier build kept versioned records, one `<id>.json` each.
+pub fn legacy_versioned_dir(workspace_dir: &Path) -> PathBuf {
+    workspace_dir.join("artifacts").join(VERSIONED_SUBDIR)
 }
 
 /// Shows versioned artifacts in the desktop UI through the legacy pipeline.

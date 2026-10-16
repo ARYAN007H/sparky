@@ -14,7 +14,10 @@ fn temp_dirs() -> (PathBuf, PathBuf) {
     (workspace, files)
 }
 
-async fn seeded(workspace: &PathBuf, _files: &PathBuf) -> FsArtifactStore {
+async fn seeded(
+    workspace: &PathBuf,
+    _files: &PathBuf,
+) -> crate::agent::artifacts::version_documents::DocumentArtifactStore {
     let store = versioned_store(&workspace);
     let record = ArtifactRecord::new(
         "a-1",
