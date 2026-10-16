@@ -79,6 +79,11 @@ fn a_library_agents_scheduled_reply_is_handed_to_the_host() {
                 .build()
                 .await
                 .expect("runtime builds");
+            assert!(runtime.has_api_key(), "the local fixture key is installed");
+            assert!(
+                !openhuman_core::cron::scheduler_gate::is_signed_out(),
+                "background cron inference requires a signed-in runtime"
+            );
             let agent = runtime
                 .agent(
                     AgentSpec::new("teeny")
