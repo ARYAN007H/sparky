@@ -189,9 +189,9 @@ jobs:
           # Container HOME may be a runner-owned bind mount with mode 0755.
           # Keep TinyBus search paths and dirs::cache_dir private and separate:
           # the cache itself must not also be scanned as a module search path.
-          export XDG_DATA_HOME="$(mktemp -d /tmp/openhuman-core-data.XXXXXX)"
+          export XDG_DATA_HOME="$(mktemp -d /root/openhuman-core-data.XXXXXX)"
           chmod 700 "$XDG_DATA_HOME"
-          export XDG_CACHE_HOME="$(mktemp -d /tmp/openhuman-core-cache.XXXXXX)"
+          export XDG_CACHE_HOME="$(mktemp -d /root/openhuman-core-cache.XXXXXX)"
           chmod 700 "$XDG_CACHE_HOME"
 
           integration_test_targets() {

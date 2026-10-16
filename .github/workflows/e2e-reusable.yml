@@ -168,7 +168,7 @@ jobs:
         env:
           E2E_USE_TAURI_DRIVER: "1"
         run: |
-          export XDG_DATA_HOME="$(mktemp -d /tmp/openhuman-e2e-xdg.XXXXXX)"
+          export XDG_DATA_HOME="$(mktemp -d /root/openhuman-e2e-xdg.XXXXXX)"
           chmod 700 "$XDG_DATA_HOME"
           bash scripts/ci-cancel-aware.sh \
             xvfb-run -a --server-args="-screen 0 1280x960x24" \
@@ -455,7 +455,7 @@ jobs:
 
       - name: Run Rust E2E suite (tests/*_e2e.rs vs mock backend)
         run: |
-          export XDG_DATA_HOME="$(mktemp -d /tmp/openhuman-rust-e2e-xdg.XXXXXX)"
+          export XDG_DATA_HOME="$(mktemp -d /root/openhuman-rust-e2e-xdg.XXXXXX)"
           chmod 700 "$XDG_DATA_HOME"
           bash scripts/ci-cancel-aware.sh pnpm test:rust:e2e
 
@@ -871,7 +871,7 @@ jobs:
         env:
           E2E_BAIL_ON_FAILURE: ${{ vars.E2E_BAIL_ON_FAILURE || '' }}
         run: |
-          export XDG_DATA_HOME="$(mktemp -d /tmp/openhuman-e2e-xdg.XXXXXX)"
+          export XDG_DATA_HOME="$(mktemp -d /root/openhuman-e2e-xdg.XXXXXX)"
           chmod 700 "$XDG_DATA_HOME"
           BAIL_FLAG=""
           if [[ "${E2E_BAIL_ON_FAILURE:-}" == "1" ]]; then

@@ -56,7 +56,21 @@ test("Linux container workflows stage TinyBus fixtures under the root-owned cont
       workflow,
     );
     assert.doesNotMatch(source, /\/opt\/openhuman-test-modules/, workflow);
+    assert.doesNotMatch(
+      source,
+      /mktemp -d \/tmp\/openhuman-(?:core|e2e|rust-e2e)/,
+      workflow,
+    );
   }
+
+  const ciFull = readFileSync(
+    new URL("../../.github/workflows/ci-full.yml", import.meta.url),
+    "utf8",
+  );
+  assert.match(
+    ciFull,
+    /TMPDIR: \/root\/openhuman-rust-e2e-tmp-\$\{\{ github\.run_id \}\}/,
+  );
 
   const lanes = readFileSync(
     new URL("../ci/self-hosted/lanes-plan.mjs", import.meta.url),
