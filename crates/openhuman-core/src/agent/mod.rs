@@ -33,7 +33,7 @@ pub(crate) mod message_convert;
 pub mod messages;
 pub mod multimodal;
 pub mod orchestration;
-/// Cross-platform shell selection shared by [`host_runtime::NativeRuntime`]
+/// Cross-platform shell selection shared by [`crate::modules::tinybox::host_runtime::NativeRuntime`]
 /// and [`crate::sandbox::ops`] so all three shell-spawning sites
 /// agree on `cmd.exe` (Windows) vs `bash`/`sh` (Unix). Fixes #4705 where
 /// the sandbox paths hardcoded `sh` and failed at spawn on Windows.
