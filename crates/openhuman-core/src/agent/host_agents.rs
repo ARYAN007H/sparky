@@ -49,7 +49,10 @@ pub struct HostAgent {
     /// The context every read during the agent's turn must see.
     pub context: Arc<CoreContext>,
     /// Agent-owned callbacks inherited by core-scheduled turns.
-    pub hooks: crate::agent::hooks::HookScope,
+    pub hooks: tinyagents_hooks::scope::HookScope<
+        crate::agent::tinyagents::host::OpenHumanRunContext,
+        tinyagents_harness::cost::TurnCost,
+    >,
 }
 
 impl HostAgent {
