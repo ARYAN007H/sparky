@@ -47,7 +47,6 @@ use crate::config::Config;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 use crate::cron::bus_host::{self, Binding, HostRegistration, CLAIM_SCOPE};
-use crate::cron::client;
 use crate::cron::documents_port::DocScope;
 use crate::modules::tinyflows as module;
 use crate::security::SecurityPolicy;
@@ -501,19 +500,3 @@ impl Drop for JobDispatcher {
         });
     }
 }
-
-/// Reachable from tests and the profile sweep that need the pure-claim scope.
-#[allow(dead_code)]
-pub(crate) fn claim_scope() -> &'static str {
-    CLAIM_SCOPE
-}
-
-/// Unused marker so the `client` import stays referenced in builds without
-/// tests: the dispatcher reads the store only through the module.
-#[allow(dead_code)]
-fn _client_link() {
-    let _ = client::blocking::<(), _, std::future::Ready<Result<()>>>;
-}
-
-#[allow(dead_code)]
-type _Unused = HashMap<(), ()>;
