@@ -17,11 +17,11 @@ use std::sync::Mutex;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
-use crate::agent::debug::prompt_size::{PromptSizeReport, SectionSize, ToolSize};
 use crate::agent::debug::DumpPromptOptions;
+use crate::agent::debug::prompt_size::{PromptSizeReport, SectionSize, ToolSize};
 use crate::config::Config;
-use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
+use crate::core::runtime::DispatchCtx;
 
 /// Default agent whose prompt is measured when the caller names none — the
 /// one every main chat turn actually runs under.

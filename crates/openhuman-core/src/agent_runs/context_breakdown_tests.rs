@@ -1,6 +1,6 @@
 use super::*;
-use crate::agent::debug::prompt_size::PromptSizeReport;
 use crate::agent::debug::DumpedPrompt;
+use crate::agent::debug::prompt_size::PromptSizeReport;
 
 fn sample_dump() -> DumpedPrompt {
     DumpedPrompt {
