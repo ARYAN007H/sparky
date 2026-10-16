@@ -1,5 +1,5 @@
 use super::*;
-use tinyagents_definition::{ModelSpec, SandboxMode, SubagentEntry, ToolScope};
+use tinyagents_definition::{AgentTier, ModelSpec, SandboxMode, SubagentEntry, ToolScope};
 
 fn find(id: &str) -> AgentDefinition {
     load_builtins()

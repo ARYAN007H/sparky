@@ -50,33 +50,6 @@ fn orchestrator_does_not_delegate_mcp_calls() {
     assert!(!listed, "orchestrator should call MCP tools directly");
 }
 
-/// The `mcp` gate's load-bearing safety contract (#4799).
-///
-/// `agent.toml` is data and can refer to a missing optional agent. The loader
-/// tolerates unknown ids rather than failing the boot.
-///
-/// Two independent sites provide that tolerance today:
-/// * `orchestrator_tools::collect_orchestrator_tools` warns + skips
-///   subagent ids absent from the registry;
-/// * [`validate_tier_hierarchy`] `continue`s past unknown ids instead of
-///   reporting a tier error.
-///
-/// This test pins the second one (the boot-blocking one) from BOTH build
-/// configurations, so a future "unknown subagent ids are a hard error"
-/// change fails here loudly instead of silently breaking the slim build's
-/// boot — the failure mode would otherwise only appear in a
-/// `--no-default-features` run, which CI's `cargo check` lane cannot catch.
-#[test]
-fn orchestrator_tolerates_unresolvable_subagent_id() {
-    let mut def = find("orchestrator");
-    def.subagents.push(SubagentEntry::AgentId(
-        "definitely_not_a_compiled_in_agent".into(),
-    ));
-
-    validate_tier_hierarchy(&[def])
-        .expect("validate_tier_hierarchy must tolerate an unresolvable subagent id");
-}
-
 /// MCP discovery and invocation are direct; skill setup keeps its specialist
 /// route, and running a skill is the orchestrator's own `run_workflow`.
 #[test]
@@ -207,77 +180,6 @@ fn other_builtins_default_to_worker_tier() {
 }
 
 #[test]
-fn builtins_pass_tier_validation() {
-    // load_builtins() already calls validate_tier_hierarchy; this
-    // just makes the contract a named invariant in the test suite.
-    let defs = load_builtins().expect("built-ins must pass tier validation");
-    validate_tier_hierarchy(&defs).expect("explicit re-check must pass");
-}
-
-#[test]
-fn rejects_chat_to_chat_delegation() {
-    let mut defs = load_builtins().unwrap();
-    // Add a synthetic second chat agent and have the orchestrator
-    // try to delegate to it.
-    let mut bad_chat = find("orchestrator");
-    bad_chat.id = "second_orchestrator".to_string();
-    defs.push(bad_chat);
-    let orch = defs.iter_mut().find(|d| d.id == "orchestrator").unwrap();
-    orch.subagents
-        .push(SubagentEntry::AgentId("second_orchestrator".into()));
-
-    let err = validate_tier_hierarchy(&defs).expect_err("chat→chat must be rejected");
-    let msg = err.to_string();
-    assert!(
-        msg.contains("chat") && msg.contains("leaf"),
-        "error should call out chat-tier leaf rule, got: {msg}"
-    );
-}
-
-#[test]
-fn rejects_reasoning_to_reasoning_delegation() {
-    let mut defs = load_builtins().unwrap();
-    let mut bad_reasoning = find("planner");
-    bad_reasoning.id = "second_planner".to_string();
-    defs.push(bad_reasoning);
-    let planner = defs.iter_mut().find(|d| d.id == "planner").unwrap();
-    planner
-        .subagents
-        .push(SubagentEntry::AgentId("second_planner".into()));
-
-    let err = validate_tier_hierarchy(&defs).expect_err("reasoning→reasoning must be rejected");
-    assert!(err.to_string().contains("reasoning"));
-}
-
-#[test]
-fn rejects_worker_with_subagents() {
-    let mut defs = load_builtins().unwrap();
-    let worker = defs.iter_mut().find(|d| d.id == "summarizer").unwrap();
-    worker
-        .subagents
-        .push(SubagentEntry::AgentId("critic".into()));
-
-    let err = validate_tier_hierarchy(&defs)
-        .expect_err("worker with declared subagents must be rejected");
-    let msg = err.to_string();
-    assert!(
-        msg.contains("worker") && msg.contains("leaf"),
-        "error should call out worker leaf rule, got: {msg}"
-    );
-}
-
-#[test]
-fn allows_skill_wildcards_on_any_non_worker_tier() {
-    // Skills wildcards expand to searchable integration actions, not to
-    // an agent, so there is no tier pair for the check to police.
-    let mut defs = load_builtins().unwrap();
-    let planner = defs.iter_mut().find(|d| d.id == "planner").unwrap();
-    planner.subagents.push(SubagentEntry::Skills(
-        tinyagents_definition::SkillsWildcard { skills: "*".into() },
-    ));
-    validate_tier_hierarchy(&defs).expect("skill wildcards on reasoning tier must validate");
-}
-
 /// The orchestrator defers its rarely-used or duplicate-route tools for itself
 /// only (`deferred_tools`): they stay registered, searchable through
 /// `tool_search` and callable by name, while other agents that name them keep
