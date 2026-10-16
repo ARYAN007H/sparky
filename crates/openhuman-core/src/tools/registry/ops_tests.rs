@@ -5,7 +5,7 @@ use crate::core::{FieldSchema, TypeSchema};
 
 #[test]
 fn registry_entries_include_mcp_and_controller_tools() {
-    let entries = registry_entries();
+    let entries = registry_entries(&DispatchCtx::host_default());
 
     // The MCP-transport half of the inventory is sourced from
     // `mcp::server::tool_specs()`, which the `mcp` feature compiles out (the
@@ -46,7 +46,7 @@ fn registry_entries_include_mcp_and_controller_tools() {
 
 #[test]
 fn registry_entries_are_unique_and_sorted_by_tool_id() {
-    let entries = registry_entries();
+    let entries = registry_entries(&DispatchCtx::host_default());
     let ids = entries
         .iter()
         .map(|entry| entry.tool_id.as_str())
@@ -235,25 +235,25 @@ fn get_tool_trims_and_returns_exact_entry() {
     #[cfg(not(feature = "mcp"))]
     let tool_id = "tools.web_search";
 
-    let outcome = get_tool(&format!("  {tool_id}  ")).expect("registry lookup");
+    let outcome = get_tool(&DispatchCtx::host_default(), &format!("  {tool_id}  ")).expect("registry lookup");
     assert_eq!(outcome.value.tool_id, tool_id);
 }
 
 #[test]
 fn get_tool_rejects_blank_id() {
-    let err = get_tool("  ").expect_err("blank id should fail");
+    let err = get_tool(&DispatchCtx::host_default(), "  ").expect_err("blank id should fail");
     assert!(err.contains("non-empty"));
 }
 
 #[test]
 fn get_tool_reports_unknown_id() {
-    let err = get_tool("missing.tool").expect_err("unknown id should fail");
+    let err = get_tool(&DispatchCtx::host_default(), "missing.tool").expect_err("unknown id should fail");
     assert!(err.contains("missing.tool"));
 }
 
 #[test]
 fn all_registry_entries_have_non_empty_name_and_description() {
-    let entries = registry_entries();
+    let entries = registry_entries(&DispatchCtx::host_default());
     assert!(
         !entries.is_empty(),
         "registry must contain at least one tool"
