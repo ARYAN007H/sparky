@@ -363,7 +363,7 @@ pub mod inference_registry {
     pub use openhuman_core::inference::registry::{
         register_catalog, register_catalog_in, register_chat_model, register_chat_model_in,
         register_embedding, register_embedding_in, unregister_catalog, unregister_chat_model,
-        unregister_embedding, BoxFuture, CatalogEntry, CatalogLimits, CatalogListing,
+        unregister_embedding, BoxFuture, CatalogEntry, CatalogLimits, CatalogListing, CatalogRequest,
         ChatModelEntry, ChatModelFactory, ChatModelRequest, EmbeddingFactory, EmbeddingRequest,
         ReadinessProbe,
     };

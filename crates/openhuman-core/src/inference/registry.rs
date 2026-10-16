@@ -184,10 +184,27 @@ pub(crate) fn embedding(provider_id: &str) -> Option<EmbeddingFactory> {
 // Model catalogs
 // ---------------------------------------------------------------------------
 
+/// What the core resolved for the `cloud_providers` entry a listing serves,
+/// handed to the catalog so it honours the same per-entry settings every
+/// other provider listing does.
+#[derive(Clone)]
+pub struct CatalogRequest {
+    /// The key stored for the entry's slug (empty when none): the credential
+    /// a catalog falls back to when there is no live session.
+    pub provider_key: String,
+    /// The HTTP client for the entry: the entry's CA bundle when it has one,
+    /// else the runtime proxy client, under the `providers.list_models`
+    /// service key.
+    pub client: reqwest::Client,
+}
+
 /// Lists a provider's models: the same envelope `list_configured_models`
 /// returns (`{ "models": [...] }`).
-pub type CatalogListing =
-    Arc<dyn Fn(Config) -> BoxFuture<Result<Outcome<serde_json::Value>, String>> + Send + Sync>;
+pub type CatalogListing = Arc<
+    dyn Fn(Config, CatalogRequest) -> BoxFuture<Result<Outcome<serde_json::Value>, String>>
+        + Send
+        + Sync,
+>;
 
 /// Where to ask for one model's limits: `(model, config)`; `None` when the
 /// provider has no listing for it.
