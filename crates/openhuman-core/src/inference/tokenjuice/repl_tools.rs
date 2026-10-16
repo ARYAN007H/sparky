@@ -30,7 +30,10 @@ const RELATIVE_ARTIFACT_PREFIX: &str = "artifacts/tool-results/";
 /// Contract requests are executed inside the compiled module.
 #[async_trait]
 pub(crate) trait QuerySource: Send + Sync {
-    async fn query(&self, request: QueryRequest) -> Result<QueryResponse, String>;
+    /// `ctx` is the context the calling tool runs under; a source bound to a
+    /// config of its own ignores it.
+    async fn query(&self, ctx: &DispatchCtx, request: QueryRequest)
+        -> Result<QueryResponse, String>;
 }
 
 struct ModuleSource {
@@ -39,10 +42,14 @@ struct ModuleSource {
 
 #[async_trait]
 impl QuerySource for ModuleSource {
-    async fn query(&self, request: QueryRequest) -> Result<QueryResponse, String> {
+    async fn query(
+        &self,
+        ctx: &DispatchCtx,
+        request: QueryRequest,
+    ) -> Result<QueryResponse, String> {
         match &self.config {
             Some(config) => super::query_for_config(config, request).await,
-            None => super::query(&DispatchCtx::ambient(), request).await,
+            None => super::query(ctx, request).await,
         }
     }
 }
@@ -239,7 +246,12 @@ fn miss_message() -> &'static str {
 }
 
 impl ModuleReplTool {
-    async fn run_query(&self, target: QueryTarget, mut args: Value) -> anyhow::Result<ToolResult> {
+    async fn run_query(
+        &self,
+        ctx: &DispatchCtx,
+        target: QueryTarget,
+        mut args: Value,
+    ) -> anyhow::Result<ToolResult> {
         if let Some(object) = args.as_object_mut() {
             object.insert("op".into(), Value::String(self.op.clone()));
         }
@@ -253,7 +265,9 @@ impl ModuleReplTool {
         };
         let response = self
             .source
-            .query(QueryRequest {
+            .query(
+                ctx,
+                QueryRequest {
                 target,
                 op,
                 limits: self.limits,
