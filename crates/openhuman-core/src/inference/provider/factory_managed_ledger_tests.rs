@@ -9,7 +9,6 @@ async fn managed_construction_ledger_collapses_repeat_disclosures() {
     use crate::core::events::DomainEvent;
 
     let _guard = crate::inference::inference_test_guard_async().await;
-    let _managed = crate::inference::registry_test_support::FakeManaged::register();
     crate::core::bus::init().await.expect("bus init");
     let mut rx = crate::core::bus::BUS.get().unwrap().receiver();
 

@@ -1,18 +1,14 @@
-//! Test support: a fake managed chat model registered under the managed
-//! provider id, standing in for the hosted provider the core has no copy of.
-//!
-//! Registration is process-global, so callers hold
-//! [`inference_test_guard`](crate::inference::inference_test_guard) (or its
-//! async twin) for as long as the [`FakeManaged`] guard lives.
+//! Test support: a fake managed chat model standing in for the hosted provider
+//! the core has no copy of. [`chat_model`](super::registry) falls back to it in
+//! unit tests, so the many tests that build a default-config agent keep
+//! working; a test of the bare core opts out with [`without_managed_provider`].
 
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
 
-use super::registry::{
-    register_chat_model, unregister_chat_model, ChatModelEntry, ChatModelRequest,
-};
+use super::registry::{ChatModelEntry, ChatModelRequest};
 use crate::inference::provider::factory::PROVIDER_OPENHUMAN;
 
 /// A chat model whose profile mirrors the managed provider's (`managed`, with
@@ -56,28 +52,6 @@ fn build(request: &ChatModelRequest<'_>) -> anyhow::Result<(Arc<dyn ChatModel<()
         .unwrap_or(crate::config::MODEL_MANAGED_DEFAULT)
         .to_string();
     Ok((Arc::new(model), resolved))
-}
-
-/// Registers the fake for as long as the guard lives.
-pub(crate) struct FakeManaged;
-
-impl FakeManaged {
-    pub(crate) fn register() -> Self {
-        register_chat_model(
-            PROVIDER_OPENHUMAN,
-            ChatModelEntry {
-                build: Arc::new(build),
-                probe: None,
-            },
-        );
-        Self
-    }
-}
-
-impl Drop for FakeManaged {
-    fn drop(&mut self) {
-        unregister_chat_model(PROVIDER_OPENHUMAN);
-    }
 }
 
 thread_local! {
