@@ -66,13 +66,9 @@ impl ToolHook<OpenHumanRunContext> for Observer {
 
 #[async_trait::async_trait]
 impl LearningSink for Observer {
-    fn name(&self) -> &str {
-        "same-policy-name"
-    }
     async fn on_turn_complete(&self, ctx: &TurnSummary) -> anyhow::Result<()> {
-        assert!(ctx.session_id.is_some());
-        assert!(ctx.agent_id.is_some());
-        self.record("turn", ctx.user_message.lines().last().unwrap());
+        assert!(!ctx.agent_id.is_empty());
+        self.record("turn", ctx.input.lines().last().unwrap());
         Ok(())
     }
 }

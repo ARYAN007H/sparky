@@ -45,9 +45,6 @@ struct ProbeHook;
 
 #[async_trait::async_trait]
 impl LearningSink for ProbeHook {
-    fn name(&self) -> &str {
-        "embed-seam-runtime-hook"
-    }
     async fn on_turn_complete(
         &self,
         _ctx: &openhuman_embed::seams::TurnSummary,
