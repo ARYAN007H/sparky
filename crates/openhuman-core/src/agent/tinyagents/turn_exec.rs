@@ -28,7 +28,7 @@ use crate::agent::tinyagents::tool_registration::capability_diagnostics;
 use crate::agent::tinyagents::turn_middleware::{
     TurnMiddlewareInputs, TurnWiring, install_turn_middleware,
 };
-use crate::agent::tinyagents::turn_models::TurnModels;
+use crate::inference::turn_models::TurnModels;
 use crate::agent::tinyagents::turn_outcome::TinyagentsTurnOutcome;
 use crate::agent::tinyagents::turn_plan::{
     OpenHumanTurnPlanner, enforce_registry_diagnostics, turn_models_for_plan, turn_run_policy,
@@ -173,7 +173,7 @@ async fn drive_turn(
     let turn_models = turn_models.with_budget(run_context.model_budget.as_ref());
     let hosted_model_resolver = hosted_root.as_ref().map(|_| {
         Arc::new(
-            crate::agent::tinyagents::turn_models::TurnModelResolver::from_turn_models(
+            crate::inference::turn_models::TurnModelResolver::from_turn_models(
                 &turn_models,
             ),
         ) as Arc<dyn tinyagents_harness::host::ModelResolver<()>>
@@ -198,7 +198,7 @@ async fn drive_turn(
         deterministic_cacheable,
         is_local,
         run_context.tool_dialect,
-        crate::agent::tinyagents::reasoning::turn_reasoning_for(
+        crate::inference::reasoning::turn_reasoning_for(
             &run_context,
             hosted_root.as_ref().map(|(base, _)| base.config.as_ref()),
             max_output_tokens,

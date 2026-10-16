@@ -5,7 +5,7 @@ use super::*;
 /// tokens, and context window — exactly as the legacy legacy model-adapter path did.
 #[test]
 fn project_managed_usage_recovers_charged_and_cached() {
-    use crate::agent::tinyagents::model::usage_info_from_response;
+    use crate::inference::provider::model::usage_info_from_response;
     use tinyinference_llm::message::AssistantMessage;
     use tinyinference_llm::usage::Usage;
 
@@ -54,7 +54,7 @@ fn project_managed_usage_recovers_charged_and_cached() {
 /// charged USD — so non-managed/billing-free responses aren't fabricated.
 #[test]
 fn project_managed_usage_is_noop_without_envelope() {
-    use crate::agent::tinyagents::model::usage_info_from_response;
+    use crate::inference::provider::model::usage_info_from_response;
     use tinyinference_llm::message::AssistantMessage;
     use tinyinference_llm::usage::Usage;
 

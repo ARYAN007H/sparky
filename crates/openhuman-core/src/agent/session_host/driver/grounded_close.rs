@@ -391,7 +391,7 @@ async fn completion(
                 };
                 return (
                     selected,
-                    crate::agent::tinyagents::model::usage_info_from_response(&response),
+                    crate::inference::provider::model::usage_info_from_response(&response),
                 );
             }
             ModelStreamItem::Failed(_) | ModelStreamItem::ProviderFailed(_) => {

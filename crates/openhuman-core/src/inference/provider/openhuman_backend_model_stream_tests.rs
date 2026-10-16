@@ -259,7 +259,7 @@ async fn managed_stream_carries_the_backend_charge_to_the_cost_accounting() {
     ])
     .await;
 
-    let billed = crate::agent::tinyagents::model::usage_info_from_response(&response)
+    let billed = crate::inference::provider::model::usage_info_from_response(&response)
         .expect("usage reported");
     assert!(
         billed.charge_reported,
@@ -282,7 +282,7 @@ async fn managed_stream_keeps_a_zero_charge_as_known() {
         serde_json::json!({ "openhuman": { "billing": { "charged_amount_usd": 0.0 } } }),
     ])
     .await;
-    let billed = crate::agent::tinyagents::model::usage_info_from_response(&response)
+    let billed = crate::inference::provider::model::usage_info_from_response(&response)
         .expect("usage reported");
     assert_eq!(
         crate::agent::cost::call_cost("openrouter/z-ai/glm-5.3-flash", &billed),
@@ -299,7 +299,7 @@ async fn managed_stream_without_a_billing_frame_has_no_charge() {
         serde_json::json!({ "choices": [], "usage": { "prompt_tokens": 10, "completion_tokens": 2, "total_tokens": 12 } }),
     ])
     .await;
-    let billed = crate::agent::tinyagents::model::usage_info_from_response(&response)
+    let billed = crate::inference::provider::model::usage_info_from_response(&response)
         .expect("usage reported");
     assert!(!billed.charge_reported);
     assert_eq!(

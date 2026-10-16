@@ -54,7 +54,7 @@ pub(crate) mod stop_hooks;
 pub(crate) mod tool_registration;
 mod turn_exec;
 mod turn_middleware;
-mod turn_model_resolver;
+pub(crate) mod turn_model_resolver;
 mod turn_outcome;
 mod turn_plan;
 mod turn_policy;

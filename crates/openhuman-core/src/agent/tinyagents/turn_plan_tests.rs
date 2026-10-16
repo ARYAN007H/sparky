@@ -3,7 +3,7 @@
 
 use super::*;
 use crate::agent::tinyagents::TurnModelSource;
-use crate::agent::tinyagents::turn_models::TurnModels;
+use crate::inference::turn_models::TurnModels;
 use async_trait::async_trait;
 use tinyagents_harness::turn_policy::{
     DEFAULT_MODEL_CALL_TIMEOUT_SECS, LOCAL_MODEL_CALL_TIMEOUT_SECS,

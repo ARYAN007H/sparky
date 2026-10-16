@@ -177,7 +177,7 @@ impl ModelMiddleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
 /// Phase 5): after the real model call, it reads the full host [`BilledUsage`] off
 /// the returned [`ModelResponse`] — token breakdowns from the crate `Usage`,
 /// backend-charged USD + context window from the G1 `raw` passthrough
-/// ([`usage_info_from_response`](super::model::usage_info_from_response)) — and
+/// ([`usage_info_from_response`](crate::inference::provider::model::usage_info_from_response)) — and
 /// pushes it onto the shared [`ProviderUsageCarry`](super::observability::ProviderUsageCarry)
 /// the [`OpenhumanEventBridge`](super::OpenhumanEventBridge) drains on
 /// `UsageRecorded`.
@@ -215,7 +215,7 @@ impl ModelMiddleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
     ) -> tinyagents_harness::Result<MiddlewareModelOutcome> {
         let outcome = next.run(ctx, state, request).await?;
         let response = outcome.into_response();
-        if let Some(usage) = super::model::usage_info_from_response(&response) {
+        if let Some(usage) = crate::inference::provider::model::usage_info_from_response(&response) {
             self.carry
                 .lock()
                 .unwrap_or_else(|p| p.into_inner())

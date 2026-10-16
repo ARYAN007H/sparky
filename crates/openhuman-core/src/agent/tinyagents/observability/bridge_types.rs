@@ -25,7 +25,7 @@ pub struct SubagentScope {
 /// writes it when a tool call *starts* (the crate `ToolDelta` has no `tool_name`
 /// field, so the start-event/name half of the tool-arg contract can't ride the
 /// crate stream and stays on the out-of-band forwarder path — see
-/// [`super::model::ThinkingForwarder`]). The bridge reads it to label the
+/// [`crate::inference::provider::model::ThinkingForwarder`]). The bridge reads it to label the
 /// incremental tool-argument fragments it now projects off the crate stream
 /// (`MessageDelta.tool_call`), preserving the UI's `ToolCallArgsDelta`
 /// `tool_name` contract without the forwarder emitting those fragments itself.

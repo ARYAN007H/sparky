@@ -9,9 +9,9 @@ use tinyinference_llm::usage::{ProviderUsageReport, recover_usage};
 
 use crate::inference::provider::{BilledUsage, ChatResponse};
 
-pub(super) type TurnChatModel = Arc<dyn ChatModel<()>>;
-pub(super) type TierRoutes = Vec<(String, TurnChatModel)>;
-pub(super) type BuiltTurnModels = (TurnChatModel, TierRoutes, TurnChatModel);
+pub(crate) type TurnChatModel = Arc<dyn ChatModel<()>>;
+pub(crate) type TierRoutes = Vec<(String, TurnChatModel)>;
+pub(crate) type BuiltTurnModels = (TurnChatModel, TierRoutes, TurnChatModel);
 
 /// Build a [`PFormatRegistry`](tinytools_agent::PFormatRegistry)
 /// from the tool schemas advertised on a [`ModelRequest`] (issue #4465).

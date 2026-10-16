@@ -298,7 +298,7 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
                 guard.output_tokens += usage.output_tokens;
                 guard.cached_input_tokens += usage.cache_read_tokens;
                 let host_usage =
-                    crate::agent::tinyagents::model::usage_info_from_response(response).unwrap_or(
+                    crate::inference::provider::model::usage_info_from_response(response).unwrap_or(
                         crate::inference::provider::BilledUsage::from_counts(
                             usage.input_tokens,
                             usage.output_tokens,
