@@ -4,8 +4,8 @@
 //! identity provider.
 
 use crate::core::runtime::DispatchCtx;
+use std::future::Future;
 use std::time::Duration;
-use std::{future::Future, sync::Arc};
 
 use async_trait::async_trait;
 use tinybus::EventHandler;
