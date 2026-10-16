@@ -25,6 +25,22 @@ pub async fn flows_cancel_run(config: &Config, run_id: &str) -> Result<Outcome<V
     let run = store::get_flow_run(config, run_id)
         .map_err(|e| e.to_string())?
         .ok_or_else(|| format!("flow run '{run_id}' not found"))?;
+    flows_cancel_run_with_snapshot(config, run_id, run, || {}).await
+}
+
+/// Runs cancellation from the persisted-row snapshot. The invocation-scoped
+/// hook lets tests place a resume claim after cancellation observes no registry
+/// entry and before the parked-only compare-and-swap, without sleeps or shared
+/// global state.
+pub(super) async fn flows_cancel_run_with_snapshot<F>(
+    config: &Config,
+    run_id: &str,
+    run: FlowRun,
+    mut before_parked_settle: F,
+) -> Result<Outcome<Value>, String>
+where
+    F: FnMut(),
+{
 
     if rm::is_terminal_run_status(&run.status) {
         return Err(rm::already_terminal_error(run_id, &run.status));
@@ -67,6 +83,7 @@ pub async fn flows_cancel_run(config: &Config, run_id: &str) -> Result<Outcome<V
         // A resume may claim this parked row after the initial read and after
         // `cancel` found no registry entry; the parked-only CAS then loses
         // cleanly instead of tearing down the starting resume.
+        before_parked_settle();
         settle_parked_run(config, run_id, &run.flow_id, "cancelled", "run cancelled").await
     } else {
         // A stale `running` row cannot be newly claimed by ResumeRun, so the

@@ -25,6 +25,26 @@ pub async fn flows_resume(
     approvals: Vec<String>,
     rejections: Vec<String>,
 ) -> Result<Outcome<Value>, String> {
+    flows_resume_with_refusal_hook(ctx, config, flow_id, thread_id, approvals, rejections, || {})
+        .await
+}
+
+/// Runs the resume lifecycle with an invocation-scoped hook immediately
+/// before either parked-run refusal attempts its compare-and-swap. Production
+/// callers use the no-op hook; tests use it to place a competing resume
+/// between the snapshot read and the guarded settlement without timing races.
+pub(super) async fn flows_resume_with_refusal_hook<F>(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+    flow_id: &str,
+    thread_id: &str,
+    approvals: Vec<String>,
+    rejections: Vec<String>,
+    mut before_refusal_settle: F,
+) -> Result<Outcome<Value>, String>
+where
+    F: FnMut(),
+{
     let flow = store::get_flow(config, flow_id)
         .map_err(|e| e.to_string())?
         .ok_or_else(|| format!("flow '{flow_id}' not found"))?;
@@ -123,6 +143,7 @@ pub async fn flows_resume(
                 //
                 // A is refused either way: its own view of the graph is stale,
                 // so it must never proceed regardless of who owns the row.
+                before_refusal_settle();
                 let settled_by_us = super::run_management::settle_parked_run(
                     config,
                     thread_id,
@@ -165,6 +186,7 @@ pub async fn flows_resume(
     // A pending checkpoint may have been created before this compatibility
     // gate shipped, so resume is an independent authoritative boundary.
     if let Err(error) = ensure_config_aware_engine_compatible(config, &flow.graph) {
+        before_refusal_settle();
         let settled_by_us =
             super::run_management::settle_parked_run(config, thread_id, flow_id, "failed", &error)
                 .await;
