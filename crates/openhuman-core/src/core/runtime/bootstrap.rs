@@ -39,7 +39,7 @@ pub(crate) async fn bootstrap_core_runtime(
     // SQLite files (approvals, devices, notifications, task sources) into it
     // once, read-only, before anything below opens those stores. A no-op
     // without a backend; failures are logged and retried at the next boot.
-    for report in crate::storage::import::run(&cfg).await {
+    for report in crate::storage::import::run(ctx, &cfg).await {
         if let Err(error) = report.outcome {
             log::warn!(
                 "[runtime] legacy {} store import failed: {error:#}",
