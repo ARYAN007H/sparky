@@ -107,11 +107,6 @@ fn ranker_kind() -> Option<&'static str> {
     installed_tool_ranker().map(|ranker| ranker.kind())
 }
 
-/// How many hooks of `name` are registered, `None` for zero.
-fn post_turn_marker(name: &str) -> Option<u8> {
-    embedder_post_turn_hook_named(name).map(|_| 1)
-}
-
 fn post_turn_hook_is_registered(hook: &Arc<dyn LearningSink>) -> bool {
     embedder_post_turn_hooks()
         .iter()
@@ -188,10 +183,7 @@ fn persisted_seams_survive_the_guard() {
 #[test]
 fn post_turn_hooks_are_removed_and_a_replaced_one_restored() {
     let original: Arc<dyn LearningSink> = Arc::new(PostTurn("original"));
-    replace_embedder_post_turn_hook(
-        "seams-replaced-hook",
-        Some(original.clone()),
-    );
+    replace_embedder_post_turn_hook("seams-replaced-hook", Some(original.clone()));
     let replaced_hook: Arc<dyn LearningSink> = Arc::new(PostTurn("builder replaced"));
     let new_hook: Arc<dyn LearningSink> = Arc::new(PostTurn("builder new"));
     let seams = HostSeams {
