@@ -142,6 +142,7 @@ impl ComponentSet {
     pub fn narrow_services(&self, host: ServiceSet) -> ServiceSet {
         let mut s = host;
         s.channels &= self.channels;
+        s.cron &= self.tinyflows;
         s.memory_queue &= self.memory;
         s.memory_sync &= self.memory;
         s.skill_catalog_refresh &= self.skills;
